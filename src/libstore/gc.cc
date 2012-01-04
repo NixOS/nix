@@ -371,36 +371,6 @@ static void addAdditionalRoots(StoreAPI & store, PathSet & roots)
 }
 
 
-static void dfsVisit(StoreAPI & store, const PathSet & paths,
-    const Path & path, PathSet & visited, Paths & sorted)
-{
-    if (visited.find(path) != visited.end()) return;
-    visited.insert(path);
-    
-    PathSet references;
-    if (store.isValidPath(path))
-        store.queryReferences(path, references);
-    
-    foreach (PathSet::iterator, i, references)
-        /* Don't traverse into paths that don't exist.  That can
-           happen due to substitutes for non-existent paths. */
-        if (*i != path && paths.find(*i) != paths.end())
-            dfsVisit(store, paths, *i, visited, sorted);
-
-    sorted.push_front(path);
-}
-
-
-Paths topoSortPaths(StoreAPI & store, const PathSet & paths)
-{
-    Paths sorted;
-    PathSet visited;
-    foreach (PathSet::const_iterator, i, paths)
-        dfsVisit(store, paths, *i, visited, sorted);
-    return sorted;
-}
-
-
 struct GCLimitReached { };
 
 

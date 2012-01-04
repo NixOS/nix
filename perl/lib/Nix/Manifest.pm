@@ -307,6 +307,7 @@ EOF
     
     for my $manifestLink (glob "$manifestDir/*.nixmanifest") {
         my $manifest = Cwd::abs_path($manifestLink);
+        next unless -f $manifest;
         my $timestamp = lstat($manifest)->mtime;
         $seen{$manifest} = 1;
 

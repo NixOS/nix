@@ -331,6 +331,16 @@ static void performOp(unsigned int clientVersion,
         break;
     }
 
+    case wopQueryDerivationOutputNames: {
+        Path path = readStorePath(from);
+        startWork();
+        StringSet names;
+        names = store->queryDerivationOutputNames(path);
+        stopWork();
+        writeStrings(names, to);
+        break;
+    }
+
     case wopQueryDeriver: {
         Path path = readStorePath(from);
         startWork();

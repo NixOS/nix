@@ -39,6 +39,7 @@ typedef enum {
     wopClearFailedPaths = 25,
     wopQueryPathInfo = 26,
     wopImportPaths = 27,
+    wopQueryDerivationOutputNames = 28,
 } WorkerOp;
 
 

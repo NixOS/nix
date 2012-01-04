@@ -118,6 +118,8 @@ public:
     PathSet queryValidDerivers(const Path & path);
 
     PathSet queryDerivationOutputs(const Path & path);
+
+    StringSet queryDerivationOutputNames(const Path & path);
     
     PathSet querySubstitutablePaths();
     

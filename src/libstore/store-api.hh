@@ -140,6 +140,9 @@ public:
 
     /* Query the outputs of the derivation denoted by `path'. */
     virtual PathSet queryDerivationOutputs(const Path & path) = 0;
+
+    /* Query the output names of the derivation denoted by `path'. */
+    virtual StringSet queryDerivationOutputNames(const Path & path) = 0;
     
     /* Query whether a path has substitutes. */
     virtual bool hasSubstitutes(const Path & path) = 0;
@@ -344,6 +347,10 @@ ValidPathInfo decodeValidPathInfo(std::istream & str,
    --import’. */
 void exportPaths(StoreAPI & store, const Paths & paths,
     bool sign, Sink & sink);
+
+
+MakeError(SubstError, Error)
+MakeError(BuildError, Error) /* denotes a permanent build failure */
 
 
 }

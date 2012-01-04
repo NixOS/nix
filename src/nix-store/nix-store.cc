@@ -50,26 +50,30 @@ static Path useDeriver(Path path)
 }
 
 
-/* Realisation the given path.  For a derivation that means build it;
-   for other paths it means ensure their validity. */
-static Path realisePath(const Path & path)
+/* Realise the given path.  For a derivation that means build it; for
+   other paths it means ensure their validity. */
+static PathSet realisePath(const Path & path)
 {
     if (isDerivation(path)) {
-        PathSet paths;
-        paths.insert(path);
-        store->buildDerivations(paths);
-        Path outPath = findOutput(derivationFromPath(*store, path), "out");
-        
-        if (gcRoot == "")
-            printGCWarning();
-        else
-            outPath = addPermRoot(*store, outPath,
-                makeRootName(gcRoot, rootNr), indirectRoot);
-        
-        return outPath;
-    } else {
+        store->buildDerivations(singleton<PathSet>(path));
+        Derivation drv = derivationFromPath(*store, path);
+
+        PathSet outputs;
+        foreach (DerivationOutputs::iterator, i, drv.outputs) {
+            Path outPath = i->second.path;
+            if (gcRoot == "")
+                printGCWarning();
+            else
+                outPath = addPermRoot(*store, outPath,
+                    makeRootName(gcRoot, rootNr), indirectRoot);
+            outputs.insert(outPath);
+        }
+        return outputs;
+    }
+
+    else {
         store->ensurePath(path);
-        return path;
+        return singleton<PathSet>(path);
     }
 }
 
@@ -96,8 +100,11 @@ static void opRealise(Strings opFlags, Strings opArgs)
         if (isDerivation(*i)) drvPaths.insert(*i);
     store->buildDerivations(drvPaths);
 
-    foreach (Strings::iterator, i, opArgs)
-        cout << format("%1%\n") % realisePath(*i);
+    foreach (Strings::iterator, i, opArgs) {
+        PathSet paths = realisePath(*i);
+        foreach (PathSet::iterator, j, paths)
+            cout << format("%1%\n") % *j;
+    }
 }
 
 
@@ -157,14 +164,17 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
 }
 
 
-static Path maybeUseOutput(const Path & storePath, bool useOutput, bool forceRealise)
+static PathSet maybeUseOutputs(const Path & storePath, bool useOutput, bool forceRealise)
 {
     if (forceRealise) realisePath(storePath);
     if (useOutput && isDerivation(storePath)) {
         Derivation drv = derivationFromPath(*store, storePath);
-        return findOutput(drv, "out");
+        PathSet outputs;
+        foreach (DerivationOutputs::iterator, i, drv.outputs)
+            outputs.insert(i->second.path);
+        return outputs;
     }
-    else return storePath;
+    else return singleton<PathSet>(storePath);
 }
 
 
@@ -257,7 +267,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 *i = followLinksToStorePath(*i);
                 if (forceRealise) realisePath(*i);
                 Derivation drv = derivationFromPath(*store, *i);
-                cout << format("%1%\n") % findOutput(drv, "out");
+                foreach (DerivationOutputs::iterator, j, drv.outputs)
+                    cout << format("%1%\n") % j->second.path;
             }
             break;
         }
@@ -268,11 +279,13 @@ static void opQuery(Strings opFlags, Strings opArgs)
         case qReferrersClosure: {
             PathSet paths;
             foreach (Strings::iterator, i, opArgs) {
-                Path path = maybeUseOutput(followLinksToStorePath(*i), useOutput, forceRealise);
-                if (query == qRequisites) computeFSClosure(*store, path, paths, false, includeOutputs);
-                else if (query == qReferences) store->queryReferences(path, paths);
-                else if (query == qReferrers) store->queryReferrers(path, paths);
-                else if (query == qReferrersClosure) computeFSClosure(*store, path, paths, true);
+                PathSet ps = maybeUseOutputs(followLinksToStorePath(*i), useOutput, forceRealise);
+                foreach (PathSet::iterator, j, ps) {
+                    if (query == qRequisites) computeFSClosure(*store, *j, paths, false, includeOutputs);
+                    else if (query == qReferences) store->queryReferences(*j, paths);
+                    else if (query == qReferrers) store->queryReferrers(*j, paths);
+                    else if (query == qReferrersClosure) computeFSClosure(*store, *j, paths, true);
+                }
             }
             Paths sorted = topoSortPaths(*store, paths);
             for (Paths::reverse_iterator i = sorted.rbegin(); 
@@ -304,13 +317,15 @@ static void opQuery(Strings opFlags, Strings opArgs)
         case qHash:
         case qSize:
             foreach (Strings::iterator, i, opArgs) {
-                Path path = maybeUseOutput(followLinksToStorePath(*i), useOutput, forceRealise);
-                ValidPathInfo info = store->queryPathInfo(path);
-                if (query == qHash) {
-                    assert(info.hash.type == htSHA256);
-                    cout << format("sha256:%1%\n") % printHash32(info.hash);
-                } else if (query == qSize) 
-                    cout << format("%1%\n") % info.narSize;
+                PathSet paths = maybeUseOutputs(followLinksToStorePath(*i), useOutput, forceRealise);
+                foreach (PathSet::iterator, j, paths) {
+                    ValidPathInfo info = store->queryPathInfo(*j);
+                    if (query == qHash) {
+                        assert(info.hash.type == htSHA256);
+                        cout << format("sha256:%1%\n") % printHash32(info.hash);
+                    } else if (query == qSize) 
+                        cout << format("%1%\n") % info.narSize;
+                }
             }
             break;
 
@@ -323,16 +338,20 @@ static void opQuery(Strings opFlags, Strings opArgs)
             
         case qGraph: {
             PathSet roots;
-            foreach (Strings::iterator, i, opArgs)
-                roots.insert(maybeUseOutput(followLinksToStorePath(*i), useOutput, forceRealise));
+            foreach (Strings::iterator, i, opArgs) {
+                PathSet paths = maybeUseOutputs(followLinksToStorePath(*i), useOutput, forceRealise);
+                roots.insert(paths.begin(), paths.end());
+            }
             printDotGraph(roots);
             break;
         }
 
         case qXml: {
             PathSet roots;
-            foreach (Strings::iterator, i, opArgs)
-                roots.insert(maybeUseOutput(followLinksToStorePath(*i), useOutput, forceRealise));
+            foreach (Strings::iterator, i, opArgs) {
+                PathSet paths = maybeUseOutputs(followLinksToStorePath(*i), useOutput, forceRealise);
+                roots.insert(paths.begin(), paths.end());
+            }
             printXmlGraph(roots);
             break;
         }
@@ -345,10 +364,11 @@ static void opQuery(Strings opFlags, Strings opArgs)
             
         case qRoots: {
             PathSet referrers;
-            foreach (Strings::iterator, i, opArgs)
-                computeFSClosure(*store,
-                    maybeUseOutput(followLinksToStorePath(*i), useOutput, forceRealise),
-                    referrers, true);
+            foreach (Strings::iterator, i, opArgs) {
+                PathSet paths = maybeUseOutputs(followLinksToStorePath(*i), useOutput, forceRealise);
+                foreach (PathSet::iterator, j, paths)
+                    computeFSClosure(*store, *j, referrers, true);
+            }
             Roots roots = store->findRoots();
             foreach (Roots::iterator, i, roots)
                 if (referrers.find(i->second) != referrers.end())

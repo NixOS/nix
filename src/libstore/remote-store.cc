@@ -326,6 +326,16 @@ PathSet RemoteStore::queryDerivationOutputs(const Path & path)
 }
 
 
+PathSet RemoteStore::queryDerivationOutputNames(const Path & path)
+{
+    openConnection();
+    writeInt(wopQueryDerivationOutputNames, to);
+    writeString(path, to);
+    processStderr();
+    return readStrings<PathSet>(from);
+}
+
+
 Path RemoteStore::addToStore(const Path & _srcPath,
     bool recursive, HashType hashAlgo, PathFilter & filter)
 {

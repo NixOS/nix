@@ -356,27 +356,31 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
            inputs to ensure that they are available when the builder
            runs. */
         if (path.at(0) == '=') {
-            path = string(path, 1);
-            PathSet refs; computeFSClosure(*store, path, refs);
+            /* !!! This doesn't work if readOnlyMode is set. */
+            PathSet refs; computeFSClosure(*store, string(path, 1), refs);
             foreach (PathSet::iterator, j, refs) {
                 drv.inputSrcs.insert(*j);
                 if (isDerivation(*j))
-                    drv.inputDrvs[*j] = singleton<StringSet>("out");
+                    drv.inputDrvs[*j] = store->queryDerivationOutputNames(*j);
             }
         }
 
         /* See prim_unsafeDiscardOutputDependency. */
-        bool useDrvAsSrc = false;
-        if (path.at(0) == '~') {
-            path = string(path, 1);
-            useDrvAsSrc = true;
+        else if (path.at(0) == '~')
+            drv.inputSrcs.insert(string(path, 1));
+
+        /* Handle derivation outputs of the form ‘!<name>!<path>’. */
+        else if (path.at(0) == '!') {
+            size_t index = path.find("!", 1);
+            drv.inputDrvs[string(path, index + 1)].insert(string(path, 1, index - 1));
         }
 
-        assert(isStorePath(path));
+        /* Handle derivation contexts returned by
+           ‘builtins.storePath’. */
+        else if (isDerivation(path))
+            drv.inputDrvs[path] = store->queryDerivationOutputNames(path);
 
-        debug(format("derivation uses `%1%'") % path);
-        if (!useDrvAsSrc && isDerivation(path))
-            drv.inputDrvs[path] = singleton<StringSet>("out");
+        /* Otherwise it's a source file. */
         else
             drv.inputSrcs.insert(path);
     }
@@ -447,10 +451,8 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     state.mkAttrs(v, 1 + drv.outputs.size());
     mkString(*state.allocAttr(v, state.sDrvPath), drvPath, singleton<PathSet>("=" + drvPath));
     foreach (DerivationOutputs::iterator, i, drv.outputs) {
-        /* The output path of an output X is ‘<X>Path’,
-           e.g. ‘outPath’. */
-        mkString(*state.allocAttr(v, state.symbols.create(i->first + "Path")),
-            i->second.path, singleton<PathSet>(drvPath));
+        mkString(*state.allocAttr(v, state.symbols.create(i->first)),
+            i->second.path, singleton<PathSet>("!" + i->first + "!" + drvPath));
     }
     v.attrs->sort();
 }
@@ -1042,15 +1044,6 @@ void EvalState::createBaseEnv()
     addPrimOp("__getEnv", 1, prim_getEnv);
     addPrimOp("__trace", 2, prim_trace);
 
-    // Derivations
-    addPrimOp("derivationStrict", 1, prim_derivationStrict);
-
-    /* Add a wrapper around the derivation primop that computes the
-       `drvPath' and `outPath' attributes lazily. */
-    string s = "attrs: let res = derivationStrict attrs; in attrs // { drvPath = res.drvPath; outPath = res.outPath; type = \"derivation\"; }";
-    mkThunk_(v, parseExprFromString(s, "/"));
-    addConstant("derivation", v);
-
     // Paths
     addPrimOp("__toPath", 1, prim_toPath);
     addPrimOp("__storePath", 1, prim_storePath);
@@ -1098,6 +1091,14 @@ void EvalState::createBaseEnv()
     // Versions
     addPrimOp("__parseDrvName", 1, prim_parseDrvName);
     addPrimOp("__compareVersions", 2, prim_compareVersions);
+
+    // Derivations
+    addPrimOp("derivationStrict", 1, prim_derivationStrict);
+
+    /* Add a wrapper around the derivation primop that computes the
+       `drvPath' and `outPath' attributes lazily. */
+    mkThunk_(v, parseExprFromFile(findFile("nix/derivation.nix")));
+    addConstant("derivation", v);
 
     /* Now that we've added all primops, sort the `builtins' attribute
        set, because attribute lookups expect it to be sorted. */

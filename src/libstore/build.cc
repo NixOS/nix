@@ -278,10 +278,6 @@ public:
 };
 
 
-MakeError(SubstError, Error)
-MakeError(BuildError, Error) /* denotes a permanent build failure */
-
-
 //////////////////////////////////////////////////////////////////////
 
 
@@ -1982,7 +1978,8 @@ void DerivationGoal::computeClosure()
     }
 
     /* Register each output path as valid, and register the sets of
-       paths referenced by each of them. */
+       paths referenced by each of them.  If there are cycles in the
+       outputs, this will fail. */
     ValidPathInfos infos;
     foreach (DerivationOutputs::iterator, i, drv.outputs) {
         ValidPathInfo info;
