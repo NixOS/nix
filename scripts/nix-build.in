@@ -1,4 +1,4 @@
-#! @perl@ -w -I@libexecdir@/nix
+#! @perl@ -w @perlFlags@
 
 use strict;
 use Nix::Config;

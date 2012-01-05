@@ -181,6 +181,14 @@ fi
 AC_MSG_RESULT(yes)
 
 
+# Figure out where to install Perl modules.
+AC_MSG_CHECKING([for the Perl installation prefix])
+perlversion=$($perl -e 'use Config; print $Config{version};')
+perlarchname=$($perl -e 'use Config; print $Config{archname};')
+AC_SUBST(perllibdir, [$\(libdir\)/perl5/site_perl/$perlversion/$perlarchname])
+AC_MSG_RESULT($perllibdir)
+
+
 NEED_PROG(cat, cat)
 NEED_PROG(tr, tr)
 AC_ARG_WITH(coreutils-bin, AC_HELP_STRING([--with-coreutils-bin=PATH],
@@ -283,7 +291,7 @@ fi
 
 
 # Check for the required Perl dependencies (DBI and DBD::SQLite).
-perlFlags="-I${libdir}/perl5/site_perl"
+perlFlags="-I$perllibdir"
 
 AC_ARG_WITH(dbi, AC_HELP_STRING([--with-dbi=PATH],
   [prefix of the Perl DBI library]),

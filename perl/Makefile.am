@@ -1,7 +1,3 @@
-perlversion := $(shell perl -e 'use Config; print $$Config{version};')
-perlarchname := $(shell perl -e 'use Config; print $$Config{archname};')
-perllibdir = $(libdir)/perl5/site_perl/$(perlversion)/$(perlarchname)
-
 PERL_MODULES = lib/Nix/Store.pm lib/Nix/Manifest.pm lib/Nix/GeneratePatches.pm lib/Nix/SSH.pm lib/Nix/CopyClosure.pm lib/Nix/Config.pm.in
 
 # Hack required by "make check".
@@ -24,7 +20,7 @@ libNixStore_la_LIBADD = $(top_srcdir)/src/libstore/libstore.la
 
 AM_CXXFLAGS = \
   -I$(top_srcdir)/src -I$(top_srcdir)/src/libutil -I$(top_srcdir)/src/libstore \
-  -I$(shell perl -e 'use Config; print $$Config{archlibexp};')/CORE
+  -I$(shell $(perl) -e 'use Config; print $$Config{archlibexp};')/CORE
 
 lib/Nix/Store.cc: lib/Nix/Store.xs
 	xsubpp $^ -output $@
