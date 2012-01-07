@@ -283,9 +283,7 @@ LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, 
 
 void mkString(Value & v, const char * s)
 {
-    v.type = tString;
-    v.string.s = GC_STRDUP(s);
-    v.string.context = 0;
+    mkStringNoCopy(v, GC_STRDUP(s));
 }
 
 
@@ -303,19 +301,9 @@ void mkString(Value & v, const string & s, const PathSet & context)
 }
 
 
-void mkString(Value & v, const Symbol & s)
-{
-    v.type = tString;
-    v.string.s = ((string) s).c_str();
-    v.string.context = 0;
-}
-
-
 void mkPath(Value & v, const char * s)
 {
-    clearValue(v);
-    v.type = tPath;
-    v.path = GC_STRDUP(s);
+    mkPathNoCopy(v, GC_STRDUP(s));
 }
 
 
@@ -426,6 +414,26 @@ Value * ExprVar::maybeThunk(EvalState & state, Env & env)
 }
 
 
+Value * ExprString::maybeThunk(EvalState & state, Env & env)
+{
+    nrAvoided++;
+    return &v;
+}
+
+Value * ExprInt::maybeThunk(EvalState & state, Env & env)
+{
+    nrAvoided++;
+    return &v;
+}
+
+Value * ExprPath::maybeThunk(EvalState & state, Env & env)
+{
+    nrAvoided++;
+    return &v;
+}
+
+
+
 void EvalState::evalFile(const Path & path, Value & v)
 {
     FileEvalCache::iterator i = fileEvalCache.find(path);
@@ -454,7 +462,7 @@ struct RecursionCounter
             state.maxRecursionDepth = state.recursionDepth;
     }
     ~RecursionCounter()
-    {   
+    {
         state.recursionDepth--;
     }
 };
@@ -512,19 +520,19 @@ void Expr::eval(EvalState & state, Env & env, Value & v)
 
 void ExprInt::eval(EvalState & state, Env & env, Value & v)
 {
-    mkInt(v, n);
+    v = this->v;
 }
 
 
 void ExprString::eval(EvalState & state, Env & env, Value & v)
 {
-    mkString(v, s);
+    v = this->v;
 }
 
 
 void ExprPath::eval(EvalState & state, Env & env, Value & v)
 {
-    mkPath(v, s.c_str());
+    v = this->v;
 }
 
 

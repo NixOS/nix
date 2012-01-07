@@ -1,6 +1,7 @@
 #ifndef __NIXEXPR_H
 #define __NIXEXPR_H
 
+#include "value.hh"
 #include "symbol-table.hh"
 
 #include <map>
@@ -66,15 +67,19 @@ std::ostream & operator << (std::ostream & str, Expr & e);
 struct ExprInt : Expr
 {
     int n;
-    ExprInt(int n) : n(n) { };
+    Value v;
+    ExprInt(int n) : n(n) { mkInt(v, n); };
     COMMON_METHODS
+    Value * maybeThunk(EvalState & state, Env & env);
 };
 
 struct ExprString : Expr
 {
     Symbol s;
-    ExprString(const Symbol & s) : s(s) { };
+    Value v;
+    ExprString(const Symbol & s) : s(s) { mkString(v, s); };
     COMMON_METHODS
+    Value * maybeThunk(EvalState & state, Env & env);
 };
 
 /* Temporary class used during parsing of indented strings. */
@@ -87,8 +92,10 @@ struct ExprIndStr : Expr
 struct ExprPath : Expr
 {
     string s;
-    ExprPath(const string & s) : s(s) { };
+    Value v;
+    ExprPath(const string & s) : s(s) { mkPathNoCopy(v, this->s.c_str()); };
     COMMON_METHODS
+    Value * maybeThunk(EvalState & state, Env & env);
 };
 
 struct VarRef
