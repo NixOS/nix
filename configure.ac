@@ -332,6 +332,11 @@ if test "$(uname)" = "Darwin"; then
 fi
 
 
+# Figure out the extension of dynamic libraries.
+eval dynlib_suffix=$shrext_cmds
+AC_SUBST(dynlib_suffix)
+
+
 AM_CONFIG_HEADER([config.h])
 AC_CONFIG_FILES([Makefile
    externals/Makefile

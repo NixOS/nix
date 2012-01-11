@@ -3,13 +3,13 @@ PERL_MODULES = lib/Nix/Store.pm lib/Nix/Manifest.pm lib/Nix/GeneratePatches.pm l
 # Hack required by "make check".
 all: $(PERL_MODULES:.in=)
 	mkdir -p lib/auto/Nix/Store
-	ln -sfn $(abs_builddir)/.libs/libNixStore.so lib/auto/Nix/Store/Store.so
+	ln -sfn $(abs_builddir)/.libs/libNixStore$(dynlib_suffix) lib/auto/Nix/Store/Store$(dynlib_suffix)
 
 install-exec-local: $(PERL_MODULES:.in=)
 	$(INSTALL) -d $(DESTDIR)$(perllibdir)/Nix
 	$(INSTALL_DATA) $(PERL_MODULES:.in=) $(DESTDIR)$(perllibdir)/Nix
 	$(INSTALL) -d $(DESTDIR)$(perllibdir)/auto/Nix/Store
-	ln -sfn $(pkglibdir)/libNixStore.so $(DESTDIR)$(perllibdir)/auto/Nix/Store/Store.so
+	ln -sfn $(pkglibdir)/libNixStore$(dynlib_suffix) $(DESTDIR)$(perllibdir)/auto/Nix/Store/Store$(dynlib_suffix)
 
 # Awful hackery to get libtool to build Perl XS bindings.
 pkglib_LTLIBRARIES = libNixStore.la
