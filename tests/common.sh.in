@@ -1,5 +1,8 @@
 set -e
 
+export top_srcdir="@abs_top_srcdir@"
+export top_builddir="@abs_top_builddir@"
+
 export TOP=$(pwd)/..
 
 export TEST_ROOT=$(pwd)/test-tmp

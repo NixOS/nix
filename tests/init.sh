@@ -47,7 +47,9 @@ EOF
 cat > $NIX_BIN_DIR/nix/substituters/download-using-manifests.pl <<EOF
 #! $SHELL -e
 export DYLD_LIBRARY_PATH=
-exec $TOP/scripts/download-using-manifests.pl "\$@"
+exec "$top_builddir/libtool" --mode=execute			\
+  -dlopen "$top_builddir/perl/libNixStore.la"			\
+  "$top_builddir/scripts/download-using-manifests.pl" "\$@"
 EOF
 chmod +x $NIX_BIN_DIR/nix/substituters/download-using-manifests.pl
 

@@ -1,5 +1,7 @@
 %: %.in Makefile
 	sed \
+	 -e "s^@abs_top_srcdir\@^$(abs_top_srcdir)^g" \
+	 -e "s^@abs_top_builddir\@^$(abs_top_builddir)^g" \
 	 -e "s^@extra1\@^$(extra1)^g" \
 	 -e "s^@prefix\@^$(prefix)^g" \
 	 -e "s^@bindir\@^$(bindir)^g" \
