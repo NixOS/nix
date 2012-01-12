@@ -17,7 +17,6 @@ pkglib_LTLIBRARIES = libNixStore.la
 libNixStore_la_SOURCES = lib/Nix/Store.cc
 
 libNixStore_la_LIBADD = $(top_builddir)/src/libstore/libstore.la
-libNixStore_la_LDFLAGS = -module
 
 AM_CXXFLAGS = \
   -I$(top_srcdir)/src -I$(top_srcdir)/src/libutil -I$(top_srcdir)/src/libstore \
