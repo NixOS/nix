@@ -382,6 +382,39 @@ static void opQuery(Strings opFlags, Strings opArgs)
 }
 
 
+static string shellEscape(const string & s)
+{
+    string r;
+    foreach (string::const_iterator, i, s)
+        if (*i == '\'') r += "'\\''"; else r += *i;
+    return r;
+}
+
+
+static void opPrintEnv(Strings opFlags, Strings opArgs)
+{
+    if (!opFlags.empty()) throw UsageError("unknown flag");
+    if (opArgs.size() != 1) throw UsageError("`--print-env' requires one derivation store path");
+
+    Path drvPath = opArgs.front();
+    Derivation drv = derivationFromPath(*store, drvPath);
+
+    /* Print each environment variable in the derivation in a format
+       that can be sourced by the shell. */
+    foreach (StringPairs::iterator, i, drv.env)
+        cout << format("export %1%; %1%='%2%'\n") % i->first % shellEscape(i->second);
+
+    /* Also output the arguments.  This doesn't preserve whitespace in
+       arguments. */
+    cout << "export _args; _args='";
+    foreach (Strings::iterator, i, drv.args) {
+        if (i != drv.args.begin()) cout << ' ';
+        cout << shellEscape(*i);
+    }
+    cout << "'\n";
+}
+
+
 static void opReadLog(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
@@ -754,6 +787,8 @@ void run(Strings args)
             op = opDelete;
         else if (arg == "--query" || arg == "-q")
             op = opQuery;
+        else if (arg == "--print-env")
+            op = opPrintEnv;
         else if (arg == "--read-log" || arg == "-l")
             op = opReadLog;
         else if (arg == "--dump-db")

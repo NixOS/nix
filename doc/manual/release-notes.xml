@@ -44,6 +44,10 @@
     <para>TODO: <command>nix-store --verify-path</command> command.</para>
   </listitem>
 
+  <listitem>
+    <para>TODO: <command>nix-store --print-env</command> command.</para>
+  </listitem>
+
 </itemizedlist>
 
 </section>
