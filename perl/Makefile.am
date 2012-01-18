@@ -20,7 +20,8 @@ libNixStore_la_LIBADD = $(top_builddir)/src/libstore/libstore.la
 
 AM_CXXFLAGS = \
   -I$(top_srcdir)/src -I$(top_srcdir)/src/libutil -I$(top_srcdir)/src/libstore \
-  -I$(shell $(perl) -e 'use Config; print $$Config{archlibexp};')/CORE
+  -I$(shell $(perl) -e 'use Config; print $$Config{archlibexp};')/CORE \
+  $(shell $(perl) -e 'use Config; print $$Config{ccflags};')
 
 lib/Nix/Store.cc: lib/Nix/Store.xs
 	xsubpp $^ -output $@
