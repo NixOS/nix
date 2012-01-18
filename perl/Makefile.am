@@ -14,7 +14,9 @@ install-exec-local: $(PERL_MODULES:.in=)
 # Awful hackery to get libtool to build Perl XS bindings.
 pkglib_LTLIBRARIES = libNixStore.la
 
-libNixStore_la_SOURCES = lib/Nix/Store.cc
+nodist_libNixStore_la_SOURCES = lib/Nix/Store.cc
+
+CLEANFILES = lib/Nix/Store.cc
 
 libNixStore_la_LIBADD = $(top_builddir)/src/libstore/libstore.la
 
