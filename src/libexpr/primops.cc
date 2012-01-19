@@ -305,7 +305,10 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
                 drv.env[key] = s;
                 if (key == "builder") drv.builder = s;
                 else if (i->name == state.sSystem) drv.platform = s;
-                else if (i->name == state.sName) drvName = s;
+                else if (i->name == state.sName) {
+                    drvName = s;
+                    printMsg(lvlVomit, format("derivation name is `%1%'") % drvName);
+                }
                 else if (key == "outputHash") outputHash = s;
                 else if (key == "outputHashAlgo") outputHashAlgo = s;
                 else if (key == "outputHashMode") {
