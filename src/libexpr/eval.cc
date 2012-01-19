@@ -1245,11 +1245,23 @@ bool EvalState::eqValues(Value & v1, Value & v2)
             return true;
 
         case tAttrs: {
+            /* If both attribute sets denote a derivation (type =
+               "derivation"), then compare their outPaths. */
+            if (isDerivation(v1) && isDerivation(v2)) {
+                Bindings::iterator i = v1.attrs->find(sOutPath);
+                Bindings::iterator j = v2.attrs->find(sOutPath);
+                if (i != v1.attrs->end() && j != v2.attrs->end())
+                    return eqValues(*i->value, *j->value);
+            }
+
             if (v1.attrs->size() != v2.attrs->size()) return false;
-            Bindings::iterator i = v1.attrs->begin(), j = v2.attrs->begin();
-            for ( ; i != v1.attrs->end(); ++i, ++j)
+
+            /* Otherwise, compare the attributes one by one. */
+            Bindings::iterator i, j;
+            for (i = v1.attrs->begin(), j = v2.attrs->begin(); i != v1.attrs->end(); ++i, ++j)
                 if (i->name != j->name || !eqValues(*i->value, *j->value))
                     return false;
+            
             return true;
         }
 
