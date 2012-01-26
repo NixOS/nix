@@ -23,6 +23,18 @@ namespace nix {
  *************************************************************/
 
 
+/* Decode a context string ‘!<name>!<path>’ into a pair <path,
+   name>. */
+std::pair<string, string> decodeContext(const string & s)
+{
+    if (s.at(0) == '!') {
+        size_t index = s.find("!", 1);
+        return std::pair<string, string>(string(s, index + 1), string(s, 1, index - 1));
+    } else
+        return std::pair<string, string>(s, "");
+}
+
+
 /* Load and evaluate an expression from path specified by the
    argument. */ 
 static void prim_import(EvalState & state, Value * * args, Value & v)
@@ -30,14 +42,17 @@ static void prim_import(EvalState & state, Value * * args, Value & v)
     PathSet context;
     Path path = state.coerceToPath(*args[0], context);
 
-    for (PathSet::iterator i = context.begin(); i != context.end(); ++i) {
-        assert(isStorePath(*i));
-        if (!store->isValidPath(*i))
+    foreach (PathSet::iterator, i, context) {
+        Path ctx = decodeContext(*i).first;
+        assert(isStorePath(ctx));
+        if (!store->isValidPath(ctx))
             throw EvalError(format("cannot import `%1%', since path `%2%' is not valid")
-                % path % *i);
-        if (isDerivation(*i))
+                % path % ctx);
+        if (isDerivation(ctx))
             try {
-                store->buildDerivations(singleton<PathSet>(*i));
+                /* !!! If using a substitute, we only need to fetch
+                   the selected output of this derivation. */
+                store->buildDerivations(singleton<PathSet>(ctx));
             } catch (Error & e) {
                 throw ImportError(e.msg());
             }
@@ -374,8 +389,8 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
 
         /* Handle derivation outputs of the form ‘!<name>!<path>’. */
         else if (path.at(0) == '!') {
-            size_t index = path.find("!", 1);
-            drv.inputDrvs[string(path, index + 1)].insert(string(path, 1, index - 1));
+            std::pair<string, string> ctx = decodeContext(path);
+            drv.inputDrvs[ctx.first].insert(ctx.second);
         }
 
         /* Handle derivation contexts returned by
