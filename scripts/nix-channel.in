@@ -79,20 +79,14 @@ sub update {
     # Create the manifests directory if it doesn't exist.
     mkdir $manifestDir, 0755 unless -e $manifestDir;
 
-    # Do we have write permission to the manifests directory?  If not,
-    # then just skip pulling the manifest and just download the Nix
-    # expressions.  If the user is a non-privileged user in a
-    # multi-user Nix installation, he at least gets installation from
-    # source.
-    if (-W $manifestDir) {
+    # Do we have write permission to the manifests directory?
+    die "$0: you do not have write permission to `$manifestDir'!\n" unless -W $manifestDir;
 
-        # Pull cache manifests.
-        foreach my $url (@channels) {
-            #print "pulling cache manifest from `$url'\n";
-            system("$Nix::Config::binDir/nix-pull", "--skip-wrong-store", "$url/MANIFEST") == 0
-                or die "cannot pull cache manifest from `$url'";
-        }
-
+    # Pull cache manifests.
+    foreach my $url (@channels) {
+        #print "pulling cache manifest from `$url'\n";
+        system("$Nix::Config::binDir/nix-pull", "--skip-wrong-store", "$url/MANIFEST") == 0
+            or die "cannot pull cache manifest from `$url'";
     }
 
     # Create a Nix expression that fetches and unpacks the channel Nix
