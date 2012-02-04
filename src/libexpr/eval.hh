@@ -138,18 +138,17 @@ public:
     /* Evaluate an expression to normal form, storing the result in
        value `v'. */
     void eval(Expr * e, Value & v);
-    void eval(Env & env, Expr * e, Value & v);
 
     /* Evaluation the expression, then verify that it has the expected
        type. */
-    bool evalBool(Env & env, Expr * e);
-    void evalAttrs(Env & env, Expr * e, Value & v);
+    inline bool evalBool(Env & env, Expr * e);
+    inline void evalAttrs(Env & env, Expr * e, Value & v);
 
     /* If `v' is a thunk, enter it and overwrite `v' with the result
        of the evaluation of the thunk.  If `v' is a delayed function
        application, call the function and overwrite `v' with the
        result.  Otherwise, this is a no-op. */
-    void forceValue(Value & v);
+    inline void forceValue(Value & v);
 
     /* Force a value, then recursively force list elements and
        attributes. */
@@ -158,8 +157,8 @@ public:
     /* Force `v', and then verify that it has the expected type. */
     int forceInt(Value & v);
     bool forceBool(Value & v);
-    void forceAttrs(Value & v);
-    void forceList(Value & v);
+    inline void forceAttrs(Value & v);
+    inline void forceList(Value & v);
     void forceFunction(Value & v); // either lambda or primop
     string forceString(Value & v);
     string forceString(Value & v, PathSet & context);
@@ -203,7 +202,7 @@ private:
     void addPrimOp(const string & name,
         unsigned int arity, PrimOpFun primOp);
 
-    Value * lookupVar(Env * env, const VarRef & var);
+    inline Value * lookupVar(Env * env, const VarRef & var);
     
     friend class ExprVar;
     friend class ExprAttrs;

@@ -6,6 +6,7 @@
 #include "archive.hh"
 #include "value-to-xml.hh"
 #include "names.hh"
+#include "eval-inline.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>

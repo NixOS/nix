@@ -4,6 +4,7 @@
 #include "store-api.hh"
 #include "derivations.hh"
 #include "globals.hh"
+#include "eval-inline.hh"
 
 #include <cstring>
 #include <unistd.h>
@@ -25,10 +26,6 @@
 #define NEW new
 
 #endif
-
-
-#define LocalNoInline(f) static f __attribute__((noinline)); f
-#define LocalNoInlineNoReturn(f) static f __attribute__((noinline, noreturn)); f
 
 
 namespace nix {
@@ -227,11 +224,6 @@ void EvalState::addPrimOp(const string & name,
    evaluator.  So here are some helper functions for throwing
    exceptions. */
 
-LocalNoInlineNoReturn(void throwEvalError(const char * s))
-{
-    throw EvalError(s);
-}
-
 LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2))
 {
     throw EvalError(format(s) % s2);
@@ -245,11 +237,6 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, con
 LocalNoInlineNoReturn(void throwTypeError(const char * s))
 {
     throw TypeError(s);
-}
-
-LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s2))
-{
-    throw TypeError(format(s) % s2);
 }
 
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const Pos & pos, const string & s2))
@@ -309,7 +296,7 @@ void mkPath(Value & v, const char * s)
 }
 
 
-Value * EvalState::lookupVar(Env * env, const VarRef & var)
+inline Value * EvalState::lookupVar(Env * env, const VarRef & var)
 {
     for (unsigned int l = var.level; l; --l, env = env->up) ;
     
@@ -435,7 +422,6 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 }
 
 
-
 void EvalState::evalFile(const Path & path, Value & v)
 {
     FileEvalCache::iterator i = fileEvalCache.find(path);
@@ -454,61 +440,25 @@ void EvalState::evalFile(const Path & path, Value & v)
 }
 
 
-struct RecursionCounter
-{
-    EvalState & state;
-    RecursionCounter(EvalState & state) : state(state)
-    {
-        state.recursionDepth++;
-        if (state.recursionDepth > state.maxRecursionDepth)
-            state.maxRecursionDepth = state.recursionDepth;
-    }
-    ~RecursionCounter()
-    {
-        state.recursionDepth--;
-    }
-};
-
-
-void EvalState::eval(Env & env, Expr * e, Value & v)
-{
-    /* When changing this function, make sure that you don't cause a
-       (large) increase in stack consumption! */
-
-    /* !!! Disable this eventually. */
-    RecursionCounter r(*this);
-    char x;
-    if (&x < deepestStack) deepestStack = &x;
-    
-    //debug(format("eval: %1%") % *e);
-
-    checkInterrupt();
-
-    nrEvaluated++;
-
-    e->eval(*this, env, v);
-}
-
-
 void EvalState::eval(Expr * e, Value & v)
 {
-    eval(baseEnv, e, v);
+    e->eval(*this, baseEnv, v);
 }
 
 
-bool EvalState::evalBool(Env & env, Expr * e)
+inline bool EvalState::evalBool(Env & env, Expr * e)
 {
     Value v;
-    eval(env, e, v);
+    e->eval(*this, env, v);
     if (v.type != tBool)
         throwTypeError("value is %1% while a Boolean was expected", showType(v));
     return v.boolean;
 }
 
 
-void EvalState::evalAttrs(Env & env, Expr * e, Value & v)
+inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v)
 {
-    eval(env, e, v);
+    e->eval(*this, env, v);
     if (v.type != tAttrs)
         throwTypeError("value is %1% while an attribute set was expected", showType(v));
 }
@@ -622,7 +572,7 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
         else
             env2.values[displ++] = i->second.e->maybeThunk(state, env2);
 
-    state.eval(env2, body, v);
+    body->eval(state, env2, v);
 }
 
 
@@ -650,7 +600,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     Pos * pos = 0;
     Value * vAttrs = &vTmp;
 
-    state.eval(env, e, vTmp);
+    e->eval(state, env, vTmp);
 
     try {
         
@@ -662,7 +612,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                 if (vAttrs->type != tAttrs ||
                     (j = vAttrs->attrs->find(*i)) == vAttrs->attrs->end())
                 {
-                    state.eval(env, def, v);
+                    def->eval(state, env, v);
                     return;
                 }
             } else {
@@ -692,7 +642,7 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
     Value vTmp;
     Value * vAttrs = &vTmp;
 
-    state.eval(env, e, vTmp);
+    e->eval(state, env, vTmp);
 
     foreach (AttrPath::const_iterator, i, attrPath) {
         state.forceValue(*vAttrs);
@@ -722,7 +672,7 @@ void ExprLambda::eval(EvalState & state, Env & env, Value & v)
 void ExprApp::eval(EvalState & state, Env & env, Value & v)
 {
     Value vFun;
-    state.eval(env, e1, vFun);
+    e1->eval(state, env, vFun);
     state.callFunction(vFun, *(e2->maybeThunk(state, env)), v);
 }
 
@@ -814,7 +764,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
     }
 
     try {
-        eval(env2, fun.lambda.fun->body, v);
+        fun.lambda.fun->body->eval(*this, env2, v);
     } catch (Error & e) {
         addErrorPrefix(e, "while evaluating the function at %1%:\n", fun.lambda.fun->pos);
         throw;
@@ -857,13 +807,13 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
     env2.values[0] = state.allocValue();
     state.evalAttrs(env, attrs, *env2.values[0]);
 
-    state.eval(env2, body, v);
+    body->eval(state, env2, v);
 }
 
 
 void ExprIf::eval(EvalState & state, Env & env, Value & v)
 {
-    state.eval(env, state.evalBool(env, cond) ? then : else_, v);
+    (state.evalBool(env, cond) ? then : else_)->eval(state, env, v);
 }
 
     
@@ -871,7 +821,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 {
     if (!state.evalBool(env, cond))
         throwAssertionError("assertion failed at %1%", pos);
-    state.eval(env, body, v);
+    body->eval(state, env, v);
 }
 
     
@@ -883,16 +833,16 @@ void ExprOpNot::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpEq::eval(EvalState & state, Env & env, Value & v)
 {
-    Value v1; state.eval(env, e1, v1);
-    Value v2; state.eval(env, e2, v2);
+    Value v1; e1->eval(state, env, v1);
+    Value v2; e2->eval(state, env, v2);
     mkBool(v, state.eqValues(v1, v2));
 }
 
 
 void ExprOpNEq::eval(EvalState & state, Env & env, Value & v)
 {
-    Value v1; state.eval(env, e1, v1);
-    Value v2; state.eval(env, e2, v2);
+    Value v1; e1->eval(state, env, v1);
+    Value v2; e2->eval(state, env, v2);
     mkBool(v, !state.eqValues(v1, v2));
 }
 
@@ -954,9 +904,9 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
 {
-    Value v1; state.eval(env, e1, v1);
+    Value v1; e1->eval(state, env, v1);
     state.forceList(v1);
-    Value v2; state.eval(env, e2, v2);
+    Value v2; e2->eval(state, env, v2);
     state.forceList(v2);
     state.mkList(v, v1.list.length + v2.list.length);
     for (unsigned int n = 0; n < v1.list.length; ++n)
@@ -975,7 +925,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     Value vStr;
 
     foreach (vector<Expr *>::iterator, i, *es) {
-        state.eval(env, *i, vStr);
+        (*i)->eval(state, env, vStr);
 
         /* If the first element is a path, then the result will also
            be a path, we don't copy anything (yet - that's done later,
@@ -996,25 +946,6 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
         mkPath(v, s.str().c_str());
     else
         mkString(v, s.str(), context);
-}
-
-
-void EvalState::forceValue(Value & v)
-{
-    if (v.type == tThunk) {
-        ValueType saved = v.type;
-        try {
-            v.type = tBlackhole;
-            eval(*v.thunk.env, v.thunk.expr, v);
-        } catch (Error & e) {
-            v.type = saved;
-            throw;
-        }
-    }
-    else if (v.type == tApp)
-        callFunction(*v.app.left, *v.app.right, v);
-    else if (v.type == tBlackhole)
-        throwEvalError("infinite recursion encountered");
 }
 
 
@@ -1049,22 +980,6 @@ bool EvalState::forceBool(Value & v)
     if (v.type != tBool)
         throwTypeError("value is %1% while a Boolean was expected", showType(v));
     return v.boolean;
-}
-
-
-void EvalState::forceAttrs(Value & v)
-{
-    forceValue(v);
-    if (v.type != tAttrs)
-        throwTypeError("value is %1% while an attribute set was expected", showType(v));
-}
-
-
-void EvalState::forceList(Value & v)
-{
-    forceValue(v);
-    if (v.type != tList)
-        throwTypeError("value is %1% while a list was expected", showType(v));
 }
 
 

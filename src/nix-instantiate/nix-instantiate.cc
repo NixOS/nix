@@ -1,6 +1,7 @@
 #include "globals.hh"
 #include "shared.hh"
 #include "eval.hh"
+#include "eval-inline.hh"
 #include "get-drvs.hh"
 #include "attr-path.hh"
 #include "value-to-xml.hh"

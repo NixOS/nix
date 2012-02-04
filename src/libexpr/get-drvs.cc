@@ -1,5 +1,6 @@
 #include "get-drvs.hh"
 #include "util.hh"
+#include "eval-inline.hh"
 
 
 namespace nix {
