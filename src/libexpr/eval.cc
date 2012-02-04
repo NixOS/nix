@@ -7,6 +7,8 @@
 
 #include <cstring>
 #include <unistd.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 #if HAVE_BOEHMGC
 
@@ -1279,12 +1281,18 @@ bool EvalState::eqValues(Value & v1, Value & v2)
 
 void EvalState::printStats()
 {
-    char x;
     bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
     Verbosity v = showStats ? lvlInfo : lvlDebug;
     printMsg(v, "evaluation statistics:");
+
+    struct rusage buf;
+    getrusage(RUSAGE_SELF, &buf);
+    float cpuTime = buf.ru_utime.tv_sec + ((float) buf.ru_utime.tv_usec / 1000000);
+
+    printMsg(v, format("  time elapsed: %1%") % cpuTime);
     printMsg(v, format("  size of a value: %1%") % sizeof(Value));
     printMsg(v, format("  expressions evaluated: %1%") % nrEvaluated);
+    char x;
     printMsg(v, format("  stack space used: %1% bytes") % (&x - deepestStack));
     printMsg(v, format("  max eval() nesting depth: %1%") % maxRecursionDepth);
     printMsg(v, format("  stack space per eval() level: %1% bytes")
