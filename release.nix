@@ -113,14 +113,15 @@ let
       };
 
       
-    rpm_fedora10i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora10i386) 20;
-    rpm_fedora10x86_64 = makeRPM_x86_64 (diskImageFuns: diskImageFuns.fedora10x86_64) 20;
     rpm_fedora11i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora11i386) 30;
     rpm_fedora11x86_64 = makeRPM_x86_64 (diskImageFuns: diskImageFuns.fedora11x86_64) 30;
     rpm_fedora12i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora12i386) 40;
     rpm_fedora12x86_64 = makeRPM_x86_64 (diskImageFuns: diskImageFuns.fedora12x86_64) 40;
     rpm_fedora13i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora13i386) 50;
     rpm_fedora13x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora13x86_64) 50;
+    rpm_fedora16i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora16i386) 50;
+    rpm_fedora16x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora16x86_64) 50;
+    
     rpm_opensuse103i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.opensuse103i386) 40;
     rpm_opensuse110i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.opensuse110i386) 50;
     rpm_opensuse110x86_64 = makeRPM_x86_64 (diskImageFuns: diskImageFuns.opensuse110x86_64) 50;
@@ -130,14 +131,15 @@ let
     deb_debian50x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.debian50x86_64) 50;
     deb_debian60i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian60i386) 50;
     deb_debian60x86_64 = makeDeb_x86_64 (diskImageFunsFun: diskImageFunsFun.debian60x86_64) 50;
-    deb_ubuntu904i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu904i386) 40;
-    deb_ubuntu904x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu904x86_64) 40;
+    
     deb_ubuntu910i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu910i386) 50;
     deb_ubuntu910x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu910x86_64) 50;
     deb_ubuntu1004i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1004i386) 50;
     deb_ubuntu1004x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1004x86_64) 50;
     deb_ubuntu1010i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1010i386) 50;
     deb_ubuntu1010x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1010x86_64) 50;
+    deb_ubuntu1110i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1110i386) 60;
+    deb_ubuntu1110x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1110x86_64) 60;
 
 
     # System tests.
