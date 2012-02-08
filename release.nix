@@ -1,5 +1,5 @@
 { nixpkgs ? <nixpkgs>, nixos ? <nixos>
-, nix ? { outPath = ./.; rev = 1234; }
+, nix ? { outPath = ./.; revCount = 1234; shortRev = "abcdef"; }
 , officialRelease ? false
 }:
 
@@ -14,6 +14,7 @@ let
       releaseTools.sourceTarball {
         name = "nix-tarball";
         version = builtins.readFile ./version;
+        versionSuffix = if officialRelease then "" else "pre${toString nix.revCount}_${nix.shortRev}";
         src = nix;
         inherit officialRelease;
 
