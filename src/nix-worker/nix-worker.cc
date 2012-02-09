@@ -135,7 +135,7 @@ static void sigPollHandler(int sigNo)
     catch (Error & e) {
         /* Shouldn't happen. */
         string s = "impossible: " + e.msg() + '\n';
-        write(STDERR_FILENO, s.c_str(), s.size());
+        write(STDERR_FILENO, s.data(), s.size());
         throw;
     }
 }

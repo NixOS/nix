@@ -196,7 +196,7 @@ void LocalStore::addTempRoot(const Path & path)
     lockFile(fdTempRoots, ltWrite, true);
 
     string s = path + '\0';
-    writeFull(fdTempRoots, (const unsigned char *) s.c_str(), s.size());
+    writeFull(fdTempRoots, (const unsigned char *) s.data(), s.size());
 
     /* Downgrade to a read lock. */
     debug(format("downgrading to read lock on `%1%'") % fnTempRoots);

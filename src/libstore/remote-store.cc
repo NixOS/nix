@@ -509,7 +509,7 @@ void RemoteStore::processStderr(Sink * sink, Source * source)
         if (msg == STDERR_WRITE) {
             string s = readString(from);
             if (!sink) throw Error("no sink");
-            (*sink)((const unsigned char *) s.c_str(), s.size());
+            (*sink)((const unsigned char *) s.data(), s.size());
         }
         else if (msg == STDERR_READ) {
             if (!source) throw Error("no source");
@@ -521,7 +521,7 @@ void RemoteStore::processStderr(Sink * sink, Source * source)
         }
         else {
             string s = readString(from);
-            writeToStderr((const unsigned char *) s.c_str(), s.size());
+            writeToStderr((const unsigned char *) s.data(), s.size());
         }
     }
     if (msg == STDERR_ERROR) {

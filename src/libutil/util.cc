@@ -236,7 +236,7 @@ void writeFile(const Path & path, const string & s)
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT, 0666);
     if (fd == -1)
         throw SysError(format("opening file `%1%'") % path);
-    writeFull(fd, (unsigned char *) s.c_str(), s.size());
+    writeFull(fd, (unsigned char *) s.data(), s.size());
 }
 
 
@@ -263,7 +263,7 @@ string readLine(int fd)
 void writeLine(int fd, string s)
 {
     s += '\n';
-    writeFull(fd, (const unsigned char *) s.c_str(), s.size());
+    writeFull(fd, (const unsigned char *) s.data(), s.size());
 }
 
 
@@ -485,7 +485,7 @@ void printMsg_(Verbosity level, const format & f)
         prefix = "\033[" + escVerbosity(level) + "s";
     string s = (format("%1%%2%\n") % prefix % f.str()).str();
     try {
-        writeToStderr((const unsigned char *) s.c_str(), s.size());
+        writeToStderr((const unsigned char *) s.data(), s.size());
     } catch (SysError & e) {
         /* Ignore failing writes to stderr if we're in an exception
            handler, otherwise throw an exception.  We need to ignore

@@ -69,7 +69,7 @@ void RefScanSink::operator () (const unsigned char * data, size_t len)
        fragment, so search in the concatenation of the tail of the
        previous fragment and the start of the current fragment. */
     string s = tail + string((const char *) data, len > refLength ? refLength : len);
-    search((const unsigned char *) s.c_str(), s.size(), hashes, seen);
+    search((const unsigned char *) s.data(), s.size(), hashes, seen);
 
     search(data, len, hashes, seen);
 

@@ -136,7 +136,7 @@ string printHash32(const Hash & hash)
     Hash hash2(hash);
     unsigned int len = hashLength32(hash);
 
-    const char * chars = base32Chars.c_str();
+    const char * chars = base32Chars.data();
     
     string s(len, '0');
 
@@ -186,7 +186,7 @@ Hash parseHash32(HashType ht, const string & s)
 {
     Hash hash(ht);
 
-    const char * chars = base32Chars.c_str();
+    const char * chars = base32Chars.data();
 
     for (unsigned int i = 0; i < s.length(); ++i) {
         char c = s[i];
@@ -271,7 +271,7 @@ Hash hashString(HashType ht, const string & s)
     Ctx ctx;
     Hash hash(ht);
     start(ht, ctx);
-    update(ht, ctx, (const unsigned char *) s.c_str(), s.length());
+    update(ht, ctx, (const unsigned char *) s.data(), s.length());
     finish(ht, ctx, hash.hash);
     return hash;
 }

@@ -432,7 +432,7 @@ static void opReadLog(Strings opFlags, Strings opArgs)
 
         /* !!! Make this run in O(1) memory. */
         string log = readFile(logPath);
-        writeFull(STDOUT_FILENO, (const unsigned char *) log.c_str(), log.size());
+        writeFull(STDOUT_FILENO, (const unsigned char *) log.data(), log.size());
     }
 }
 

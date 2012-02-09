@@ -159,7 +159,7 @@ void writeString(const unsigned char * buf, size_t len, Sink & sink)
 
 void writeString(const string & s, Sink & sink)
 {
-    writeString((const unsigned char *) s.c_str(), s.size(), sink);
+    writeString((const unsigned char *) s.data(), s.size(), sink);
 }
 
 

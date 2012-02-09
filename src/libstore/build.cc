@@ -1379,7 +1379,7 @@ HookReply DerivationGoal::tryBuildHook()
             break;
         }
         s += "\n";
-        writeToStderr((unsigned char *) s.c_str(), s.size());
+        writeToStderr((unsigned char *) s.data(), s.size());
     }
 
     debug(format("hook reply is `%1%'") % reply);
@@ -2036,12 +2036,12 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
         (!hook && fd == builderOut.readSide))
     {
         if (verbosity >= buildVerbosity)
-            writeToStderr((unsigned char *) data.c_str(), data.size());
-        writeFull(fdLogFile, (unsigned char *) data.c_str(), data.size());
+            writeToStderr((unsigned char *) data.data(), data.size());
+        writeFull(fdLogFile, (unsigned char *) data.data(), data.size());
     }
 
     if (hook && fd == hook->fromHook.readSide)
-        writeToStderr((unsigned char *) data.c_str(), data.size());
+        writeToStderr((unsigned char *) data.data(), data.size());
 }
 
 
@@ -2409,7 +2409,7 @@ void SubstitutionGoal::handleChildOutput(int fd, const string & data)
 {
     assert(fd == logPipe.readSide);
     if (verbosity >= buildVerbosity)
-        writeToStderr((unsigned char *) data.c_str(), data.size());
+        writeToStderr((unsigned char *) data.data(), data.size());
     /* Don't write substitution output to a log file for now.  We
        probably should, though. */
 }
