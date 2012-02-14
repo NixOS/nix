@@ -167,7 +167,7 @@ void LocalStore::addTempRoot(const Path & path)
             if (pathExists(fnTempRoots))
                 /* It *must* be stale, since there can be no two
                    processes with the same pid. */
-                deletePath(fnTempRoots);
+                unlink(fnTempRoots.c_str());
 
 	    fdTempRoots = openLockFile(fnTempRoots, true);
 
