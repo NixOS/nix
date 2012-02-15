@@ -5,6 +5,7 @@
 #include "pathlocks.hh"
 #include "worker-protocol.hh"
 #include "derivations.hh"
+#include "immutable.hh"
     
 #include <iostream>
 #include <algorithm>
@@ -405,6 +406,10 @@ void canonicalisePathMetaData(const Path & path, bool recurse)
     if (lstat(path.c_str(), &st))
 	throw SysError(format("getting attributes of path `%1%'") % path);
 
+    /* Really make sure that the path is of a supported type.  This
+       has already been checked in dumpPath(). */
+    assert(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode));
+
     /* Change ownership to the current uid.  If it's a symlink, use
        lchown if available, otherwise don't bother.  Wrong ownership
        of a symlink doesn't matter, since the owning user can't change
@@ -451,6 +456,8 @@ void canonicalisePathMetaData(const Path & path, bool recurse)
 	foreach (Strings::iterator, i, names)
 	    canonicalisePathMetaData(path + "/" + *i, true);
     }
+
+    makeImmutable(path);
 }
 
 

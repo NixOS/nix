@@ -1,5 +1,6 @@
 #include "util.hh"
 #include "local-store.hh"
+#include "immutable.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -19,6 +20,7 @@ static void makeWritable(const Path & path)
     struct stat st;
     if (lstat(path.c_str(), &st))
 	throw SysError(format("getting attributes of path `%1%'") % path);
+    if (S_ISDIR(st.st_mode) || S_ISREG(st.st_mode)) makeMutable(path);
     if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
         throw SysError(format("changing writability of `%1%'") % path);
 }
@@ -31,11 +33,21 @@ struct MakeReadOnly
     ~MakeReadOnly()
     {
         try {
+            /* This will make the path read-only (and restore the
+               immutable bit on platforms that support it). */
             if (path != "") canonicalisePathMetaData(path, false);
         } catch (...) {
             ignoreException();
         }
     }
+};
+
+
+struct MakeImmutable
+{
+    Path path;
+    MakeImmutable(const Path & path) : path(path) { }
+    ~MakeImmutable() { makeImmutable(path); }
 };
 
 
@@ -96,14 +108,24 @@ static void hashAndLink(bool dryRun, HashToPath & hashToPath,
 
             /* Make the containing directory writable, but only if
                it's not the store itself (we don't want or need to
-               mess with  its permissions). */
+               mess with its permissions). */
             bool mustToggle = !isStorePath(path);
             if (mustToggle) makeWritable(dirOf(path));
             
             /* When we're done, make the directory read-only again and
                reset its timestamp back to 0. */
             MakeReadOnly makeReadOnly(mustToggle ? dirOf(path) : "");
-        
+
+            /* If ‘prevPath’ is immutable, we can't create hard links
+               to it, so make it mutable first (and make it immutable
+               again when we're done).  We also have to make ‘path’
+               mutable, otherwise rename() will fail to delete it. */
+            makeMutable(prevPath.first);
+            MakeImmutable mk1(prevPath.first);
+            
+            makeMutable(path);
+            MakeImmutable mk2(path);
+
             if (link(prevPath.first.c_str(), tempLink.c_str()) == -1) {
                 if (errno == EMLINK) {
                     /* Too many links to the same file (>= 32000 on

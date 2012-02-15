@@ -12,6 +12,7 @@
 #include <limits.h>
 
 #include "util.hh"
+#include "immutable.hh"
 
 
 extern char * * environ;
@@ -303,6 +304,8 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed,
     printMsg(lvlVomit, format("%1%") % path);
 
     struct stat st = lstat(path);
+
+    if (S_ISDIR(st.st_mode) || S_ISREG(st.st_mode)) makeMutable(path);
 
     if (!S_ISDIR(st.st_mode) && st.st_nlink == 1) {
         bytesFreed += st.st_size;

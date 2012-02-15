@@ -113,8 +113,8 @@ AC_LANG_POP(C++)
 # Check for chroot support (requires chroot() and bind mounts).
 AC_CHECK_FUNCS([chroot])
 AC_CHECK_FUNCS([unshare])
-AC_CHECK_HEADERS([sched.h], [], [], [])
-AC_CHECK_HEADERS([sys/param.h], [], [], [])
+AC_CHECK_HEADERS([sched.h])
+AC_CHECK_HEADERS([sys/param.h])
 AC_CHECK_HEADERS([sys/mount.h], [], [],
 [#ifdef HAVE_SYS_PARAM_H
 # include <sys/param.h>
@@ -124,7 +124,7 @@ AC_CHECK_HEADERS([sys/mount.h], [], [],
 
 # Check for <locale>.
 AC_LANG_PUSH(C++)
-AC_CHECK_HEADERS([locale], [], [], [])
+AC_CHECK_HEADERS([locale])
 AC_LANG_POP(C++)
 
 
@@ -138,9 +138,13 @@ AC_SUBST([bsddiff_compat_include])
 AC_CHECK_HEADERS([sys/personality.h])
 
 
+# Check for <linux/fs.h> (for immutable file support).
+AC_CHECK_HEADERS([linux/fs.h])
+
+
 # Check for tr1/unordered_set.
 AC_LANG_PUSH(C++)
-AC_CHECK_HEADERS([tr1/unordered_set], [], [], [])
+AC_CHECK_HEADERS([tr1/unordered_set])
 AC_LANG_POP(C++)
 
 
