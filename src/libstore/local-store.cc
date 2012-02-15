@@ -394,6 +394,9 @@ void LocalStore::openDB(bool create)
 }
 
 
+const time_t mtimeStore = 1; /* 1 second into the epoch */
+
+
 void canonicalisePathMetaData(const Path & path, bool recurse)
 {
     checkInterrupt();
@@ -433,10 +436,10 @@ void canonicalisePathMetaData(const Path & path, bool recurse)
                 throw SysError(format("changing mode of `%1%' to %2$o") % path % mode);
         }
 
-        if (st.st_mtime != 0) {
+        if (st.st_mtime != mtimeStore) {
             struct utimbuf utimbuf;
             utimbuf.actime = st.st_atime;
-            utimbuf.modtime = 1; /* 1 second into the epoch */
+            utimbuf.modtime = mtimeStore;
             if (utime(path.c_str(), &utimbuf) == -1) 
                 throw SysError(format("changing modification time of `%1%'") % path);
         }
