@@ -7,6 +7,7 @@
 #include "local-store.hh"
 #include "util.hh"
 #include "archive.hh"
+#include "immutable.hh"
 
 #include <map>
 #include <iostream>
@@ -771,6 +772,9 @@ private:
     /* RAII object to delete the chroot directory. */
     boost::shared_ptr<AutoDelete> autoDelChroot;
 
+    /* All inputs that are regular files. */
+    PathSet regularInputPaths;
+
     /* Whether this is a fixed-output derivation. */
     bool fixedOutput;
     
@@ -1291,6 +1295,11 @@ void DerivationGoal::buildDone()
 
         /* Delete the chroot (if we were using one). */
         autoDelChroot.reset(); /* this runs the destructor */
+
+        /* Deleting the chroot will have caused the immutable bits on
+           hard-linked inputs to be cleared.  So set them again. */
+        foreach (PathSet::iterator, i, regularInputPaths)
+            makeImmutable(*i);
         
         /* Compute the FS closure of the outputs and register them as
            being valid. */
@@ -1687,6 +1696,10 @@ void DerivationGoal::startBuilder()
             if (S_ISDIR(st.st_mode))
                 dirsInChroot.insert(*i);
             else {
+                /* Creating a hard link to *i is impossible if its
+                   immutable bit is set.  So clear it first. */
+                makeMutable(*i);
+                
                 Path p = chrootRootDir + *i;
                 if (link(i->c_str(), p.c_str()) == -1) {
                     /* Hard-linking fails if we exceed the maximum
@@ -1700,6 +1713,9 @@ void DerivationGoal::startBuilder()
                     StringSource source(sink.s);
                     restorePath(p, source);
                 }
+                
+                makeImmutable(*i);
+                regularInputPaths.insert(*i);
             }
         }
         
