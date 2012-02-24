@@ -837,6 +837,7 @@ private:
 
 DerivationGoal::DerivationGoal(const Path & drvPath, Worker & worker)
     : Goal(worker)
+    , useChroot(false)
 {
     this->drvPath = drvPath;
     state = &DerivationGoal::init;
