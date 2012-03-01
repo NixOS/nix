@@ -356,13 +356,6 @@ void LocalStore::openDB(bool create)
             throwSQLiteError(db, "initialising database schema");
     }
 
-    /* Backwards compatibility with old (pre-release) databases.  Can
-       remove this eventually. */
-    if (sqlite3_table_column_metadata(db, 0, "ValidPaths", "narSize", 0, 0, 0, 0, 0) != SQLITE_OK) {
-        if (sqlite3_exec(db, "alter table ValidPaths add column narSize integer" , 0, 0, 0) != SQLITE_OK)
-            throwSQLiteError(db, "adding column narSize");
-    }
-
     /* Prepare SQL statements. */
     stmtRegisterValidPath.create(db,
         "insert into ValidPaths (path, hash, registrationTime, deriver, narSize) values (?, ?, ?, ?, ?);");
