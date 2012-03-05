@@ -20,6 +20,8 @@ int openLockFile(const Path & path, bool create)
     if (fd == -1 && (create || errno != ENOENT))
         throw SysError(format("opening lock file `%1%'") % path);
 
+    closeOnExec(fd);
+
     return fd.borrow();
 }
 

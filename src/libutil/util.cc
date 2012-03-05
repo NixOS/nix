@@ -8,6 +8,7 @@
 #include <cstring>
 
 #include <sys/wait.h>
+#include <unistd.h>
 #include <fcntl.h>
 #include <limits.h>
 
@@ -683,6 +684,8 @@ void Pipe::create()
     if (pipe(fds) != 0) throw SysError("creating pipe");
     readSide = fds[0];
     writeSide = fds[1];
+    closeOnExec(readSide);
+    closeOnExec(writeSide);
 }
 
 
@@ -931,6 +934,15 @@ void closeMostFDs(const set<int> & exceptions)
         if (fd != STDIN_FILENO && fd != STDOUT_FILENO && fd != STDERR_FILENO
             && exceptions.find(fd) == exceptions.end())
             close(fd); /* ignore result */
+}
+
+
+void closeOnExec(int fd)
+{
+    int prev;
+    if ((prev = fcntl(fd, F_GETFD, 0)) == -1 ||
+        fcntl(fd, F_SETFD, prev | FD_CLOEXEC) == -1)
+        throw SysError("setting close-on-exec flag");
 }
 
 

@@ -492,6 +492,7 @@ void UserLock::acquire()
         AutoCloseFD fd = open(fnUserLock.c_str(), O_RDWR | O_CREAT, 0600);
         if (fd == -1)
             throw SysError(format("opening user lock `%1%'") % fnUserLock);
+        closeOnExec(fd);
 
         if (lockFile(fd, ltWrite, false)) {
             fdUserLock = fd.borrow();
@@ -1792,9 +1793,6 @@ void DerivationGoal::startBuilder()
             if (chdir(tmpDir.c_str()) == -1)
                 throw SysError(format("changing into `%1%'") % tmpDir);
 
-            /* Close all other file descriptors. */
-            closeMostFDs(set<int>());
-
 #ifdef CAN_DO_LINUX32_BUILDS
             if (drv.platform == "i686-linux" && thisSystem == "x86_64-linux") {
                 if (personality(0x0008 | 0x8000000 /* == PER_LINUX32_3GB */) == -1)
@@ -2026,6 +2024,7 @@ Path DerivationGoal::openLogFile()
         O_CREAT | O_WRONLY | O_TRUNC, 0666);
     if (fdLogFile == -1)
         throw SysError(format("creating log file `%1%'") % logFileName);
+    closeOnExec(fdLogFile);
 
     return logFileName;
 }

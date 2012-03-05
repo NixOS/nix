@@ -40,6 +40,7 @@ int LocalStore::openGCLock(LockType lockType)
     AutoCloseFD fdGCLock = open(fnGCLock.c_str(), O_RDWR | O_CREAT, 0600);
     if (fdGCLock == -1)
         throw SysError(format("opening global GC lock `%1%'") % fnGCLock);
+    closeOnExec(fdGCLock);
 
     if (!lockFile(fdGCLock, lockType, false)) {
         printMsg(lvlError, format("waiting for the big garbage collector lock..."));
