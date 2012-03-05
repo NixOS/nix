@@ -367,6 +367,7 @@ void commonChildInit(Pipe & logPipe)
         throw SysError(format("cannot open `%1%'") % pathNullDevice);
     if (dup2(fdDevNull, STDIN_FILENO) == -1)
         throw SysError("cannot dup null device into stdin");
+    close(fdDevNull);
 }
 
 
