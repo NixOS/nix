@@ -1276,6 +1276,8 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 
     Path dstPath = readStorePath(hashAndReadSource);
 
+    printMsg(lvlInfo, format("importing path `%1%'") % dstPath);
+
     PathSet references = readStorePaths<PathSet>(hashAndReadSource);
 
     Path deriver = readString(hashAndReadSource);
