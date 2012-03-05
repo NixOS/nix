@@ -287,7 +287,7 @@ static void * oomHandler(size_t requested)
 
 
 int exitCode = 0;
-
+char * * argvSaved = 0;
 
 }
 
@@ -297,6 +297,8 @@ static char buf[1024];
 int main(int argc, char * * argv)
 {
     using namespace nix;
+
+    argvSaved = argv;
 
     /* If we're setuid, then we need to take some security precautions
        right away. */

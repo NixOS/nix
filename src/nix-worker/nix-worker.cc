@@ -753,8 +753,21 @@ static void daemonLoop()
 		    throw SysError("accepting connection");
             }
 
-            printMsg(lvlInfo, format("accepted connection %1%") % remote);
+            /* Get the identity of the caller, if possible. */
+            uid_t clientUid = -1;
+            pid_t clientPid = -1;
 
+#if defined(SO_PEERCRED)
+            ucred cred;
+            socklen_t credLen = sizeof(cred);
+            if (getsockopt(remote, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) != -1) {
+                clientPid = cred.pid;
+                clientUid = cred.uid;
+            }
+#endif
+
+            printMsg(lvlInfo, format("accepted connection from pid %1%, uid %2%") % clientPid % clientUid);
+            
             /* Fork a child to handle the connection. */
             pid_t child;
             child = fork();
@@ -774,6 +787,12 @@ static void daemonLoop()
                     /* Restore normal handling of SIGCHLD. */
                     setSigChldAction(false);
 
+                    /* For debugging, stuff the pid into argv[1]. */
+                    if (clientPid != -1 && argvSaved[1]) {
+                        string processName = int2String(clientPid);
+                        strncpy(argvSaved[1], processName.c_str(), strlen(argvSaved[1]));
+                    }
+                    
                     /* Since the daemon can be long-running, the
                        settings may have changed.  So force a reload. */
                     reloadSettings();

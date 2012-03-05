@@ -56,6 +56,8 @@ struct RemoveTempRoots
 /* Exit code of the program. */
 extern int exitCode;
 
+extern char * * argvSaved;
+
 }
 
 
