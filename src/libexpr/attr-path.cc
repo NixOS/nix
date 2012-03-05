@@ -1,4 +1,5 @@
 #include "attr-path.hh"
+#include "eval-inline.hh"
 #include "util.hh"
 
 
