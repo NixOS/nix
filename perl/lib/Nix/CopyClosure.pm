@@ -34,7 +34,7 @@ sub copyTo {
     if (scalar @missing > 0) {
         print STDERR "copying ", scalar @missing, " missing paths to ‘$sshHost’...\n";
         unless ($dryRun) {
-            open SSH, "| $compressor ssh $sshHost @{$sshOpts} '$decompressor nix-store --import'" or die;
+            open SSH, "| $compressor ssh $sshHost @{$sshOpts} '$decompressor nix-store --import' > /dev/null" or die;
             exportPaths(fileno(SSH), $sign, @missing);
             close SSH or die "copying store paths to remote machine `$sshHost' failed: $?";
         }
