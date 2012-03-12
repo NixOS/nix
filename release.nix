@@ -1,4 +1,4 @@
-{ nixpkgs ? <nixpkgs>, nixos ? <nixos>
+{ nixpkgs ? <nixpkgs>
 , nix ? { outPath = ./.; revCount = 1234; shortRev = "abcdef"; }
 , officialRelease ? false
 }:
@@ -145,11 +145,11 @@ let
 
     # System tests.
     tests.remote_builds = (import ./tests/remote-builds.nix rec {
-      inherit nixpkgs nixos; nix = build { inherit system; }; system = "x86_64-linux";
+      nix = build { inherit system; }; system = "x86_64-linux";
     }).test;
 
     tests.nix_copy_closure = (import ./tests/nix-copy-closure.nix rec {
-      inherit nixpkgs nixos; nix = build { inherit system; }; system = "x86_64-linux";
+      nix = build { inherit system; }; system = "x86_64-linux";
     }).test;
 
   };
