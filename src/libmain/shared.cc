@@ -90,12 +90,6 @@ static void setLogType(string lt)
 }
 
 
-RemoveTempRoots::~RemoveTempRoots()
-{
-    removeTempRoots();
-}
-
-
 static bool showTrace = false;
 
 
@@ -217,10 +211,6 @@ static void initAndRun(int argc, char * * argv)
     verbosityDelta += queryIntSetting("verbosity", lvlInfo);
     verbosity = (Verbosity) (verbosityDelta < 0 ? 0 : verbosityDelta);
     
-    /* Automatically clean up the temporary roots file when we
-       exit. */
-    RemoveTempRoots removeTempRoots __attribute__((unused));
-
     run(remaining);
 
     /* Close the Nix database. */

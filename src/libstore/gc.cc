@@ -214,6 +214,18 @@ void removeTempRoots()
 }
 
 
+/* Automatically clean up the temporary roots file when we exit. */
+struct RemoveTempRoots 
+{
+    ~RemoveTempRoots()
+    {
+        removeTempRoots();
+    }
+};
+
+static RemoveTempRoots autoRemoveTempRoots __attribute__((unused));
+
+
 typedef boost::shared_ptr<AutoCloseFD> FDPtr;
 typedef list<FDPtr> FDs;
 

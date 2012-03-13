@@ -48,11 +48,6 @@ extern bool setuidMode;
 
 extern volatile ::sig_atomic_t blockInt;
 
-struct RemoveTempRoots 
-{
-    ~RemoveTempRoots();    
-};
-
 /* Exit code of the program. */
 extern int exitCode;
 

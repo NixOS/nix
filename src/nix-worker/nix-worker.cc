@@ -584,8 +584,6 @@ static void performOp(unsigned int clientVersion,
 
 static void processConnection()
 {
-    RemoveTempRoots removeTempRoots __attribute__((unused));
-
     canSendStderr = false;
     myPid = getpid();    
     writeToStderr = tunnelStderr;
