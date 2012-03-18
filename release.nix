@@ -20,7 +20,7 @@ let
 
         buildInputs =
           [ curl bison24 flex2535 perl libxml2 libxslt w3m bzip2
-            tetex dblatex nukeReferences pkgconfig git
+            tetex dblatex nukeReferences pkgconfig sqlite git
           ];
 
         configureFlags = ''
@@ -33,17 +33,10 @@ let
 
         postUnpack = ''
           # Clean up when building from a working tree.
-          (cd $sourceRoot && (git ls-files -o | xargs rm -v))
+          (cd $sourceRoot && (git ls-files -o | xargs -r rm -v))
         '';
 
-        # Include the Bzip2 tarball in the distribution.
         preConfigure = ''
-          stripHash ${bzip2.src}
-          cp -pv ${bzip2.src} externals/$strippedName
-
-          stripHash ${sqlite.src}
-          cp -pv ${sqlite.src} externals/$strippedName
-
           # TeX needs a writable font cache.
           export VARTEXFONTS=$TMPDIR/texfonts
         '';
@@ -78,11 +71,10 @@ let
         name = "nix";
         src = tarball;
 
-        buildInputs = [ curl perl bzip2 openssl pkgconfig boehmgc ];
+        buildInputs = [ curl perl bzip2 openssl pkgconfig sqlite boehmgc ];
 
         configureFlags = ''
           --disable-init-state
-          --with-bzip2=${bzip2} --with-sqlite=${sqlite}
           --with-dbi=${perlPackages.DBI}/lib/perl5/site_perl
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/lib/perl5/site_perl
           --enable-gc
@@ -98,14 +90,13 @@ let
         src = tarball;
 
         buildInputs =
-          [ curl perl bzip2 openssl
+          [ curl perl bzip2 openssl pkgconfig sqlite
             # These are for "make check" only:
             graphviz libxml2 libxslt
           ];
 
         configureFlags = ''
           --disable-init-state
-          --with-bzip2=${bzip2} --with-sqlite=${sqlite}
           --with-dbi=${perlPackages.DBI}/lib/perl5/site_perl
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/lib/perl5/site_perl
         '';

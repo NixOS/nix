@@ -167,13 +167,10 @@ AC_PATH_PROG(bison, bison, false)
 NEED_PROG(perl, perl)
 NEED_PROG(sed, sed)
 NEED_PROG(tar, tar)
+NEED_PROG(bzip2, bzip2)
 AC_PATH_PROG(dot, dot)
 AC_PATH_PROG(dblatex, dblatex)
 AC_PATH_PROG(gzip, gzip)
-
-AC_PATH_PROG(openssl_prog, openssl, openssl) # if not found, call openssl in $PATH
-AC_SUBST(openssl_prog)
-AC_DEFINE_UNQUOTED(OPENSSL_PATH, ["$openssl_prog"], [Path of the OpenSSL binary])
 
 
 # Test that Perl has the open/fork feature (Perl 5.8.0 and beyond).
@@ -224,63 +221,27 @@ AC_ARG_WITH(store-dir, AC_HELP_STRING([--with-store-dir=PATH],
 AC_SUBST(storedir)
 
 
-AC_ARG_WITH(openssl, AC_HELP_STRING([--with-openssl=PATH],
-  [prefix of the OpenSSL library]),
-  openssl=$withval, openssl=)
-AM_CONDITIONAL(HAVE_OPENSSL, test -n "$openssl")
-if test -n "$openssl"; then
-  LDFLAGS="-L$openssl/lib -lcrypto $LDFLAGS"
-  CFLAGS="-I$openssl/include $CFLAGS"
-  CXXFLAGS="-I$openssl/include $CXXFLAGS"
-  AC_DEFINE(HAVE_OPENSSL, 1, [Whether to use OpenSSL.])
-fi
+# Look for OpenSSL, an optional dependency.
+AC_PATH_PROG(openssl_prog, openssl, openssl) # if not found, call openssl in $PATH
+AC_SUBST(openssl_prog)
+AC_DEFINE_UNQUOTED(OPENSSL_PATH, ["$openssl_prog"], [Path of the OpenSSL binary])
+
+PKG_CHECK_MODULES([OPENSSL], [libcrypto],
+  [AC_DEFINE([HAVE_OPENSSL], [1], [Whether to use OpenSSL.])
+   CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"
+   have_openssl=1], [])
+AM_CONDITIONAL(HAVE_OPENSSL, test "$have_openssl" = 1)
 
 
-AC_ARG_WITH(bzip2, AC_HELP_STRING([--with-bzip2=PATH],
-  [prefix of bzip2]),
-  bzip2=$withval, bzip2=)
-AM_CONDITIONAL(HAVE_BZIP2, test -n "$bzip2")
-ATERM_VERSION=2.5
-AC_SUBST(ATERM_VERSION)
-if test -z "$bzip2"; then
-  # Headers and libraries will be used from the temporary installation
-  # in externals/inst-bzip2.
-  bzip2_lib='-L${top_builddir}/externals/inst-bzip2/lib -lbz2'
-  bzip2_include='-I${top_builddir}/externals/inst-bzip2/include'
-  # The binary will be copied to $libexecdir.
-  bzip2_bin='${libexecdir}/nix'
-  # But for testing, we have to use the temporary copy :-(
-  bzip2_bin_test='${top_builddir}/externals/inst-bzip2/bin'
-else
-  bzip2_lib="-L$bzip2/lib -lbz2"
-  bzip2_include="-I$bzip2/include"
-  bzip2_bin="$bzip2/bin"
-  bzip2_bin_test="$bzip2/bin"
-fi
-AC_SUBST(bzip2_lib)
-AC_SUBST(bzip2_include)
-AC_SUBST(bzip2_bin)
-AC_SUBST(bzip2_bin_test)
+# Look for libbz2, a required dependency.
+AC_CHECK_LIB([bz2], [BZ2_bzWriteOpen], [true],
+  [AC_MSG_ERROR([Nix requires libbz2, which is part of bzip2.  See http://www.bzip.org/.])])
+AC_CHECK_HEADERS([bzlib.h], [true],
+  [AC_MSG_ERROR([Nix requires libbz2, which is part of bzip2.  See http://www.bzip.org/.])])
 
 
-AC_ARG_WITH(sqlite, AC_HELP_STRING([--with-sqlite=PATH],
-  [prefix of SQLite]),
-  sqlite=$withval, sqlite=)
-AM_CONDITIONAL(HAVE_SQLITE, test -n "$sqlite")
-SQLITE_VERSION=3070900
-AC_SUBST(SQLITE_VERSION)
-if test -z "$sqlite"; then
-  sqlite_lib='${top_builddir}/externals/sqlite-autoconf-$(SQLITE_VERSION)/libsqlite3.la'
-  sqlite_include='-I${top_builddir}/externals/sqlite-autoconf-$(SQLITE_VERSION)'
-  sqlite_bin='${top_builddir}/externals/sqlite-autoconf-$(SQLITE_VERSION)'
-else
-  sqlite_lib="-L$sqlite/lib -lsqlite3"
-  sqlite_include="-I$sqlite/include"
-  sqlite_bin="$sqlite/bin"
-fi
-AC_SUBST(sqlite_lib)
-AC_SUBST(sqlite_include)
-AC_SUBST(sqlite_bin)
+# Look for SQLite, a required dependency.
+PKG_CHECK_MODULES([SQLITE3], [sqlite3], [CXXFLAGS="$SQLITE3_CFLAGS $CXXFLAGS"])
 
 
 # Whether to use the Boehm garbage collector.
@@ -329,8 +290,8 @@ AC_CHECK_FUNCS([setresuid setreuid lchown])
 AC_CHECK_FUNCS([strsignal posix_fallocate nanosleep sysconf])
 
 
-# This is needed if ATerm or bzip2 are static libraries,
-# and the Nix libraries are dynamic.
+# This is needed if bzip2 is a static library, and the Nix libraries
+# are dynamic.
 if test "$(uname)" = "Darwin"; then
     LDFLAGS="-all_load $LDFLAGS"
 fi
@@ -343,7 +304,6 @@ AC_SUBST(dynlib_suffix)
 
 AM_CONFIG_HEADER([config.h])
 AC_CONFIG_FILES([Makefile
-   externals/Makefile
    src/Makefile
    src/bin2c/Makefile
    src/boost/Makefile

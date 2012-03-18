@@ -29,15 +29,10 @@ export PATH=$NIX_BIN_DIR:$TOP/scripts:$PATH
 export NIX_BUILD_HOOK=
 export PERL=perl
 export PERL5LIB=$TOP/perl/lib:$PERL5LIB
-export NIX_BZIP2="@bzip2_bin_test@/bzip2"
-if test "${NIX_BZIP2:0:1}" != "/"; then
-    NIX_BZIP2=`pwd`/${NIX_BZIP2}
-fi
 export dot=@dot@
 export xmllint="@xmllint@"
 export xmlflags="@xmlflags@"
 export xsltproc="@xsltproc@"
-export sqlite3="@sqlite_bin@/bin/sqlite3"
 export SHELL="@shell@"
 
 export version=@version@

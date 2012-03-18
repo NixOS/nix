@@ -43,13 +43,6 @@ Makefile.in
 /doc/manual/NEWS.html
 /doc/manual/NEWS.txt
 
-# /externals/
-/externals/bzip2-*
-/externals/build-bzip2
-/externals/inst-bzip2
-/externals/sqlite-*
-/externals/build-sqlite
-
 # /scripts/
 /scripts/nix-profile.sh
 /scripts/nix-pull

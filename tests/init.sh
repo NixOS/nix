@@ -28,7 +28,6 @@ ln -s $TOP/scripts/nix-prefetch-url $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-build $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-pull $NIX_BIN_DIR/
 mkdir -p $NIX_BIN_DIR/nix/substituters
-ln -s $NIX_BZIP2 $NIX_BIN_DIR/nix/
 ln -s $TOP/scripts/copy-from-other-stores.pl $NIX_BIN_DIR/nix/substituters
 
 cat > "$NIX_CONF_DIR"/nix.conf <<EOF

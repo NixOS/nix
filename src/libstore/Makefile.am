@@ -10,12 +10,12 @@ pkginclude_HEADERS = \
   globals.hh references.hh pathlocks.hh \
   worker-protocol.hh
 
-libstore_la_LIBADD = ../libutil/libutil.la ../boost/format/libformat.la ${aterm_lib} ${sqlite_lib}
+libstore_la_LIBADD = ../libutil/libutil.la ../boost/format/libformat.la @SQLITE3_LIBS@
 
 EXTRA_DIST = schema.sql
 
 AM_CXXFLAGS = -Wall \
- ${sqlite_include} -I$(srcdir)/.. -I$(srcdir)/../libutil \
+ -I$(srcdir)/.. -I$(srcdir)/../libutil \
  -DNIX_STORE_DIR=\"$(storedir)\" \
  -DNIX_DATA_DIR=\"$(datadir)\" \
  -DNIX_STATE_DIR=\"$(localstatedir)/nix\" \
