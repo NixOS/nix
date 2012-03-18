@@ -20,7 +20,7 @@ let
 
         buildInputs =
           [ curl bison24 flex2535 perl libxml2 libxslt w3m bzip2
-            tetex dblatex nukeReferences pkgconfig
+            tetex dblatex nukeReferences pkgconfig git
           ];
 
         configureFlags = ''
@@ -29,6 +29,11 @@ let
           --with-xml-flags=--nonet
           --with-dbi=${perlPackages.DBI}/lib/perl5/site_perl
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/lib/perl5/site_perl
+        '';
+
+        postUnpack = ''
+          # Clean up when building from a working tree.
+          (cd $sourceRoot && (git ls-files -o | xargs rm -v))
         '';
 
         # Include the Bzip2 tarball in the distribution.
