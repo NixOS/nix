@@ -107,6 +107,8 @@ let
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/lib/perl5/site_perl
         '';
 
+        dontInstall = false;
+
         installCheckPhase = ''
           make installcheck
         '';
