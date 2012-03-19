@@ -16,6 +16,7 @@ our @EXPORT = qw(
     topoSortPaths computeFSClosure followLinksToStorePath exportPaths
     hashPath hashFile hashString
     addToStore makeFixedOutputPath
+    derivationFromPath
 );
 
 our $VERSION = '0.15';

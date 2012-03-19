@@ -2,11 +2,13 @@
 
 use strict;
 use Nix::Config;
+use Nix::Store;
 use File::Temp qw(tempdir);
 
 
 my $dryRun = 0;
 my $verbose = 0;
+my $runEnv = 0;
 
 my @instArgs = ();
 my @buildArgs = ();
@@ -119,6 +121,10 @@ EOF
         push @instArgs, $arg;
     }
     
+    elsif ($arg eq "--run-env") {
+        $runEnv = 1;
+    }
+    
     elsif (substr($arg, 0, 1) eq "-") {
         push @buildArgs, $arg;
     }
@@ -141,6 +147,29 @@ foreach my $expr (@exprs) {
     if (!close DRVPATHS) {
         die "nix-instantiate killed by signal " . ($? & 127) . "\n" if ($? & 127);
         exit 1;
+    }
+
+    if ($runEnv) {
+        die "$0: ‘--run-env’ requires a single derivation\n" if scalar @drvPaths != 1;
+        my $drvPath = readlink $drvPaths[0] or die "cannot read symlink `$drvPaths[0]'";
+        my $drv = derivationFromPath($drvPath);
+
+        # Build or fetch all dependencies of the derivation.
+        system("$Nix::Config::binDir/nix-store -r @buildArgs @{$drv->{inputDrvs}} @{$drv->{inputSrcs}} > /dev/null") == 0
+            or die "$0: failed to build all dependencies\n";
+
+        # Set the environment.
+        $ENV{'NIX_BUILD_TOP'} = $ENV{'TMPDIR'} || "/tmp";
+        foreach (keys %{$drv->{env}}) {
+            $ENV{$_} = $drv->{env}->{$_};
+        }
+
+        # Run a shell using the derivation's environment.  For
+        # convenience, source $stdenv/setup to setup additional
+        # environment variables.  Also don't lose the current $PATH
+        # directories.
+        exec($ENV{SHELL}, "-c", "p=\$PATH; source \$stdenv/setup; PATH=\$PATH:\$p; exec $ENV{SHELL}");
+        die;
     }
 
     foreach my $drvPath (@drvPaths) {
