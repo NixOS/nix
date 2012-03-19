@@ -229,7 +229,7 @@ AC_DEFINE_UNQUOTED(OPENSSL_PATH, ["$openssl_prog"], [Path of the OpenSSL binary]
 PKG_CHECK_MODULES([OPENSSL], [libcrypto],
   [AC_DEFINE([HAVE_OPENSSL], [1], [Whether to use OpenSSL.])
    CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"
-   have_openssl=1], [])
+   have_openssl=1], [true])
 AM_CONDITIONAL(HAVE_OPENSSL, test "$have_openssl" = 1)
 
 
