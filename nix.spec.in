@@ -21,9 +21,14 @@ Requires: /usr/bin/perl
 Requires: curl
 Requires: perl-DBD-SQLite
 Requires: perl-devel
+Requires: bzip2
+Requires: bzip2-libs
+Requires: sqlite
+BuildRequires: bzip2-devel
+BuildRequires: sqlite-devel
 
 # Hack to make that shitty RPM scanning hack shut up.
-Provides: perl(readmanifest)
+Provides: perl(Nix::SSH)
                                                                
 %description
 
