@@ -193,11 +193,11 @@ let
       name = "nix-deb";
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
-        { extraPackages = [ "libdbd-sqlite3-perl" ]; };
+        { extraPackages = [ "libdbd-sqlite3-perl" "libsqlite3-dev" "libbz2-dev" ]; };
       memSize = 1024;
       meta.schedulingPriority = prio;
       configureFlags = "--sysconfdir=/etc";
-      debRequires = [ "curl" "libdbd-sqlite3-perl" ];
+      debRequires = [ "curl" "libdbd-sqlite3-perl" "libsqlite3-0" "libbz2-1.0" ];
     };
 
 
