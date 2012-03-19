@@ -1,9 +1,6 @@
 set -e
 
-export top_srcdir="@abs_top_srcdir@"
-export top_builddir="@abs_top_builddir@"
-
-export TOP=$(pwd)/..
+datadir="@datadir@"
 
 export TEST_ROOT=$(pwd)/test-tmp
 export NIX_STORE_DIR
@@ -17,18 +14,12 @@ export NIX_LOG_DIR=$TEST_ROOT/var/log/nix
 export NIX_STATE_DIR=$TEST_ROOT/var/nix
 export NIX_DB_DIR=$TEST_ROOT/db
 export NIX_CONF_DIR=$TEST_ROOT/etc
-export NIX_BIN_DIR=$TEST_ROOT/bin
-export NIX_LIBEXEC_DIR=$TEST_ROOT/bin
 export NIX_MANIFESTS_DIR=$TEST_ROOT/var/nix/manifests
-export NIX_ROOT_FINDER=
-export NIX_PATH=nix=$TOP/corepkgs
 export SHARED=$TEST_ROOT/shared
 
-export PATH=$NIX_BIN_DIR:$TOP/scripts:$PATH
+export PATH=@bindir@:$PATH
 
 export NIX_BUILD_HOOK=
-export PERL=perl
-export PERL5LIB=$TOP/perl/lib:$PERL5LIB
 export dot=@dot@
 export xmllint="@xmllint@"
 export xmlflags="@xmlflags@"

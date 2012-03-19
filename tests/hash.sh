@@ -46,7 +46,7 @@ chmod +x $TEST_ROOT/hash-path/hello
 try2 md5 "20f3ffe011d4cfa7d72bfabef7882836"
 
 # Mtime and other bits don't.
-touch -r $TOP $TEST_ROOT/hash-path/hello
+touch -r . $TEST_ROOT/hash-path/hello
 chmod 744 $TEST_ROOT/hash-path/hello
 try2 md5 "20f3ffe011d4cfa7d72bfabef7882836"
 

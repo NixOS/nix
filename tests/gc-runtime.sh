@@ -26,9 +26,7 @@ echo PID=$child
 nix-env -p $profiles/test -e gc-runtime
 nix-env -p $profiles/test --delete-generations old
 
-cp $TOP/scripts/find-runtime-roots.pl $TEST_ROOT/foo.pl
-chmod +x $TEST_ROOT/foo.pl
-NIX_ROOT_FINDER=$TEST_ROOT/foo.pl nix-store --gc
+nix-store --gc
 
 kill -- -$child
 

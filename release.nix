@@ -79,6 +79,12 @@ let
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/lib/perl5/site_perl
           --enable-gc
         '';
+
+        installCheckPhase = ''
+          make installcheck
+        '';
+
+        postPhases = [ "installCheckPhase" ];
       };
 
 
@@ -101,6 +107,12 @@ let
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/lib/perl5/site_perl
         '';
 
+        installCheckPhase = ''
+          make installcheck
+        '';
+
+        postPhases = [ "installCheckPhase" ];
+        
         lcovFilter = [ "*/boost/*" "*-tab.*" ];
 
         # We call `dot', and even though we just use it to

@@ -40,3 +40,9 @@ EXTRA_DIST = $(TESTS) \
   import-derivation.nix \
   $(wildcard lang/*.nix) $(wildcard lang/*.exp) $(wildcard lang/*.exp.xml) $(wildcard lang/*.flags) $(wildcard lang/dir*/*.nix) \
   common.sh.in
+
+# Hacky.
+check-am:
+	@echo "Warning: Nix has no 'make check'. Please install Nix and run 'make installcheck' instead."
+
+installcheck: check-TESTS
