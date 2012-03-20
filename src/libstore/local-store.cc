@@ -377,8 +377,10 @@ void LocalStore::openDB(bool create)
         "select time from FailedPaths where path = ?;");
     stmtQueryFailedPaths.create(db,
         "select path from FailedPaths;");
+    // If the path is a derivation, then clear its outputs.
     stmtClearFailedPath.create(db,
-        "delete from FailedPaths where ?1 = '*' or path = ?1;");
+        "delete from FailedPaths where ?1 = '*' or path = ?1 "
+        "or path in (select d.path from DerivationOutputs d join ValidPaths v on d.drv = v.id where v.path = ?1);");
     stmtAddDerivationOutput.create(db,
         "insert or replace into DerivationOutputs (drv, id, path) values (?, ?, ?);");
     stmtQueryValidDerivers.create(db,
