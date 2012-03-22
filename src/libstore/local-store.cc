@@ -968,6 +968,8 @@ void LocalStore::registerValidPath(const ValidPathInfo & info)
 
 void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 {
+    if (queryBoolSetting("sync-before-registering", true))
+        sync();
     while (1) {
         try {
             SQLiteTxn txn(db);
