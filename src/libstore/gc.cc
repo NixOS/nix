@@ -1,6 +1,7 @@
 #include "globals.hh"
 #include "misc.hh"
 #include "local-store.hh"
+#include "immutable.hh"
 
 #include <boost/shared_ptr.hpp>
 
@@ -396,11 +397,11 @@ struct LocalStore::GCState
     PathSet deleted;
     PathSet live;
     PathSet busy;
+    PathSet invalidated;
     bool gcKeepOutputs;
     bool gcKeepDerivations;
-    GCState(GCResults & results_) : results(results_)
-    {
-    }
+    unsigned long long bytesInvalidated;
+    GCState(GCResults & results_) : results(results_), bytesInvalidated(0) { }
 };
 
 
@@ -416,6 +417,16 @@ bool LocalStore::isActiveTempFile(const GCState & state,
 {
     return hasSuffix(path, suffix)
         && state.tempRoots.find(string(path, 0, path.size() - suffix.size())) != state.tempRoots.end();
+}
+
+
+void LocalStore::deleteGarbage(GCState & state, const Path & path)
+{
+    printMsg(lvlInfo, format("deleting `%1%'") % path);
+    unsigned long long bytesFreed, blocksFreed;
+    deletePathWrapped(path, bytesFreed, blocksFreed);
+    state.results.bytesFreed += bytesFreed;
+    state.results.blocksFreed += blocksFreed;
 }
 
 
@@ -502,15 +513,27 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
 
     /* The path is garbage, so delete it. */
     if (shouldDelete(state.options.action)) {
-        printMsg(lvlInfo, format("deleting `%1%'") % path);
 
-        unsigned long long bytesFreed, blocksFreed;
-        deleteFromStore(path, bytesFreed, blocksFreed);
-        state.results.bytesFreed += bytesFreed;
-        state.results.blocksFreed += blocksFreed;
+        if (isValidPath(path)) {
+            /* If it's a valid path, invalidate it, rename it, and
+               schedule it for deletion.  The renaming is to ensure
+               that later (when we're not holding the global GC lock)
+               we can delete the path without being afraid that the
+               path has become alive again. */
+            printMsg(lvlInfo, format("invalidating `%1%'") % path);
+            // Estimate the amount freed using the narSize field.
+            state.bytesInvalidated += queryPathInfo(path).narSize;
+            invalidatePathChecked(path);
+            Path tmp = (format("%1%-gc-%2%") % path % getpid()).str();
+            makeMutable(path.c_str());
+            if (rename(path.c_str(), tmp.c_str()))
+                throw SysError(format("unable to rename `%1%' to `%2%'") % path % tmp);
+            state.invalidated.insert(tmp);
+        } else
+            deleteGarbage(state, path);
 
-        if (state.options.maxFreed && state.results.bytesFreed > state.options.maxFreed) {
-            printMsg(lvlInfo, format("deleted more than %1% bytes; stopping") % state.options.maxFreed);
+        if (state.options.maxFreed && state.results.bytesFreed + state.bytesInvalidated > state.options.maxFreed) {
+            printMsg(lvlInfo, format("deleted or invalidated more than %1% bytes; stopping") % state.options.maxFreed);
             throw GCLimitReached();
         }
 
@@ -635,6 +658,14 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         } catch (GCLimitReached & e) {
         }
     }
+
+    /* Allow other processes to add to the store from here on. */
+    fdGCLock.close();
+
+    /* Delete the invalidated paths now that the lock has been
+       released. */
+    foreach (PathSet::iterator, i, state.invalidated)
+        deleteGarbage(state, *i);
 }
 
 

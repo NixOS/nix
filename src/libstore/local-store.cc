@@ -1380,11 +1380,8 @@ Paths LocalStore::importPaths(bool requireSignature, Source & source)
 }
 
 
-void LocalStore::deleteFromStore(const Path & path, unsigned long long & bytesFreed,
-    unsigned long long & blocksFreed)
+void LocalStore::invalidatePathChecked(const Path & path)
 {
-    bytesFreed = 0;
-
     assertStorePath(path);
 
     while (1) {
@@ -1404,8 +1401,6 @@ void LocalStore::deleteFromStore(const Path & path, unsigned long long & bytesFr
             break;
         } catch (SQLiteBusy & e) { };
     }
-    
-    deletePathWrapped(path, bytesFreed, blocksFreed);
 }
 
 

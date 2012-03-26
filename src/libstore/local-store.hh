@@ -164,10 +164,6 @@ public:
 
     void collectGarbage(const GCOptions & options, GCResults & results);
 
-    /* Delete a path from the Nix store. */
-    void deleteFromStore(const Path & path, unsigned long long & bytesFreed,
-        unsigned long long & blocksFreed);
-    
     /* Optimise the disk space usage of the Nix store by hard-linking
        files with the same contents. */
     void optimiseStore(bool dryRun, OptimiseStats & stats);
@@ -238,6 +234,9 @@ private:
 
     void invalidatePath(const Path & path);
 
+    /* Delete a path from the Nix store. */
+    void invalidatePathChecked(const Path & path);
+    
     void verifyPath(const Path & path, const PathSet & store,
         PathSet & done, PathSet & validPaths);
 
@@ -249,6 +248,8 @@ private:
 
     struct GCState;
 
+    void deleteGarbage(GCState & state, const Path & path);
+    
     bool tryToDelete(GCState & state, const Path & path);
     
     bool isActiveTempFile(const GCState & state,
