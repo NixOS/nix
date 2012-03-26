@@ -13,7 +13,6 @@ GCOptions::GCOptions()
     action = gcDeleteDead;
     ignoreLiveness = false;
     maxFreed = 0;
-    maxLinks = 0;
 }
 
 

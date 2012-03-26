@@ -212,7 +212,6 @@ linkend="sec-nix-build"><command>nix-build</command></link> does.</para>
     <arg choice='plain'><option>--delete</option></arg>
   </group>
   <arg><option>--max-freed</option> <replaceable>bytes</replaceable></arg>
-  <arg><option>--max-links</option> <replaceable>nrlinks</replaceable></arg>
 </cmdsynopsis>
 
 </refsection>
@@ -277,16 +276,6 @@ options control what gets deleted and in what order:
     <listitem><para>Keep deleting paths until at least
     <replaceable>bytes</replaceable> bytes have been
     deleted, then stop.</para></listitem>
-    
-  </varlistentry>
-
-  <varlistentry><term><option>--max-links</option> <replaceable>nrlinks</replaceable></term>
-  
-    <listitem><para>Keep deleting paths until the hard link count on
-    <filename>/nix/store</filename> is less than
-    <replaceable>nrlinks</replaceable>, then stop.  This is useful for
-    very large Nix stores on filesystems with a 32000 subdirectories
-    limit (like <literal>ext3</literal>).</para></listitem>
     
   </varlistentry>
 

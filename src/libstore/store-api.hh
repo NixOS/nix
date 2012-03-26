@@ -53,10 +53,6 @@ struct GCOptions
        no limit. */
     unsigned long long maxFreed;
 
-    /* Stop after the number of hard links to the Nix store directory
-       has dropped below `maxLinks'. */
-    unsigned int maxLinks;
-
     GCOptions();
 };
 

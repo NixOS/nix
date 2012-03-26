@@ -418,7 +418,7 @@ bool LocalStore::isActiveTempFile(const GCState & state,
         && state.tempRoots.find(string(path, 0, path.size() - suffix.size())) != state.tempRoots.end();
 }
 
-    
+
 bool LocalStore::tryToDelete(GCState & state, const Path & path)
 {
     checkInterrupt();
@@ -514,16 +514,6 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
             throw GCLimitReached();
         }
 
-        if (state.options.maxLinks) {
-            struct stat st;
-            if (stat(nixStore.c_str(), &st) == -1)
-                throw SysError(format("statting `%1%'") % nixStore);
-            if (st.st_nlink < state.options.maxLinks) {
-                printMsg(lvlInfo, format("link count on the store has dropped below %1%; stopping") % state.options.maxLinks);
-                throw GCLimitReached();
-            }
-        }
-        
     } else
         printMsg(lvlTalkative, format("would delete `%1%'") % path);
     

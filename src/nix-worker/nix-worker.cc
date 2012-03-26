@@ -477,7 +477,7 @@ static void performOp(unsigned int clientVersion,
         options.pathsToDelete = readStorePaths<PathSet>(from);
         options.ignoreLiveness = readInt(from);
         options.maxFreed = readLongLong(from);
-        options.maxLinks = readInt(from);
+        readInt(from); // obsolete field
         if (GET_PROTOCOL_MINOR(clientVersion) >= 5) {
             /* removed options */
             readInt(from);

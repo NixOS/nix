@@ -466,7 +466,7 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
     writeStrings(options.pathsToDelete, to);
     writeInt(options.ignoreLiveness, to);
     writeLongLong(options.maxFreed, to);
-    writeInt(options.maxLinks, to);
+    writeInt(0, to);
     if (GET_PROTOCOL_MINOR(daemonVersion) >= 5) {
         /* removed options */
         writeInt(0, to);
