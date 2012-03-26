@@ -532,6 +532,9 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
                 state.bytesInvalidated += queryPathInfo(path).narSize;
                 invalidatePathChecked(path);
                 makeMutable(path.c_str());
+                // Mac OS X cannot rename directories if they are read-only.
+                if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
+                    throw SysError(format("making `%1%' writable") % path);
                 Path tmp = (format("%1%-gc-%2%") % path % getpid()).str();
                 if (rename(path.c_str(), tmp.c_str()))
                     throw SysError(format("unable to rename `%1%' to `%2%'") % path % tmp);
