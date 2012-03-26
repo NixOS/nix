@@ -433,8 +433,13 @@ void LocalStore::deleteGarbage(GCState & state, const Path & path)
 bool LocalStore::tryToDelete(GCState & state, const Path & path)
 {
     checkInterrupt();
-    
-    if (!pathExists(path)) return true;
+
+    struct stat st;
+    if (lstat(path.c_str(), &st)) {
+        if (errno == ENOENT) return true;
+        throw SysError(format("getting status of %1%") % path);
+    }
+
     if (state.deleted.find(path) != state.deleted.end()) return true;
     if (state.live.find(path) != state.live.end()) return false;
 
@@ -514,21 +519,27 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
     /* The path is garbage, so delete it. */
     if (shouldDelete(state.options.action)) {
 
+        /* If it's a valid path that's not a regular file or symlink,
+           invalidate it, rename it, and schedule it for deletion.
+           The renaming is to ensure that later (when we're not
+           holding the global GC lock) we can delete the path without
+           being afraid that the path has become alive again.
+           Otherwise delete it right away. */
         if (isValidPath(path)) {
-            /* If it's a valid path, invalidate it, rename it, and
-               schedule it for deletion.  The renaming is to ensure
-               that later (when we're not holding the global GC lock)
-               we can delete the path without being afraid that the
-               path has become alive again. */
-            printMsg(lvlInfo, format("invalidating `%1%'") % path);
-            // Estimate the amount freed using the narSize field.
-            state.bytesInvalidated += queryPathInfo(path).narSize;
-            invalidatePathChecked(path);
-            Path tmp = (format("%1%-gc-%2%") % path % getpid()).str();
-            makeMutable(path.c_str());
-            if (rename(path.c_str(), tmp.c_str()))
-                throw SysError(format("unable to rename `%1%' to `%2%'") % path % tmp);
-            state.invalidated.insert(tmp);
+            if (S_ISDIR(st.st_mode)) {
+                printMsg(lvlInfo, format("invalidating `%1%'") % path);
+                // Estimate the amount freed using the narSize field.
+                state.bytesInvalidated += queryPathInfo(path).narSize;
+                invalidatePathChecked(path);
+                makeMutable(path.c_str());
+                Path tmp = (format("%1%-gc-%2%") % path % getpid()).str();
+                if (rename(path.c_str(), tmp.c_str()))
+                    throw SysError(format("unable to rename `%1%' to `%2%'") % path % tmp);
+                state.invalidated.insert(tmp);
+            } else {
+                invalidatePathChecked(path);
+                deleteGarbage(state, path);
+            }
         } else
             deleteGarbage(state, path);
 
