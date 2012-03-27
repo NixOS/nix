@@ -44,7 +44,12 @@ Flags:
   --drv-link NAME: create symlink NAME instead of `derivation'
   --no-out-link: do not create the `result' symlink
   --out-link / -o NAME: create symlink NAME instead of `result'
-  --attr ATTR: select a specific attribution from the Nix expression
+  --attr / -A ATTR: select a specific attribute from the Nix expression
+  
+  --run-env: build dependencies of the specified derivation, then start a
+      shell with the environment of the derivation
+  --command: command to run with `--run-env'
+  --exclude: regexp specifying dependencies to be excluded by `--run-env'
 
 Any additional flags are passed to `nix-store'.
 EOF
