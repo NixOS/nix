@@ -14,6 +14,8 @@ my @instArgs = ();
 my @buildArgs = ();
 my @exprs = ();
 
+my $envCommand = "p=\$PATH; source \$stdenv/setup; PATH=\$PATH:\$p; exec $ENV{SHELL}";
+
 
 my $tmpDir = tempdir("nix-build.XXXXXX", CLEANUP => 1, TMPDIR => 1)
     or die "cannot create a temporary directory";
@@ -125,6 +127,12 @@ EOF
         $runEnv = 1;
     }
     
+    elsif ($arg eq "--command") {
+        $n++;
+        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        $envCommand = $ARGV[$n];
+    }
+
     elsif (substr($arg, 0, 1) eq "-") {
         push @buildArgs, $arg;
     }
@@ -168,7 +176,7 @@ foreach my $expr (@exprs) {
         # convenience, source $stdenv/setup to setup additional
         # environment variables.  Also don't lose the current $PATH
         # directories.
-        exec($ENV{SHELL}, "-c", "p=\$PATH; source \$stdenv/setup; PATH=\$PATH:\$p; exec $ENV{SHELL}");
+        exec($ENV{SHELL}, "-c", $envCommand);
         die;
     }
 
