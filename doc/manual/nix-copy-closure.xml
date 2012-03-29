@@ -26,6 +26,7 @@
     <arg><option>--gzip</option></arg>
     <arg><option>--bzip2</option></arg>
     <arg><option>--xz</option></arg>
+    <arg><option>--show-progress</option></arg>
     <arg><option>--include-outputs</option></arg>
     <arg choice='plain'>
       <replaceable>user@</replaceable><replaceable>machine</replaceable>
@@ -107,6 +108,13 @@ those paths.  If this bothers you, use
     <command>xz</command> before sending it.  The corresponding
     decompression program must be installed on the target
     machine.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--show-progress</option></term>
+
+    <listitem><para>Show the progress of each path's transfer as it's made.
+    This requires the <command>pv</command> utility to be in <envar>PATH</envar>.</para></listitem>
 
   </varlistentry>
 
