@@ -109,7 +109,7 @@ else { # Copy FROM the remote machine.
 	$progressViewer = "$progressViewer |" if $progressViewer ne "";
         unless ($dryRun) {
             my $extraOpts = $sign ? "--sign" : "";
-            system("set -f; ssh $sshHost @sshOpts 'nix-store --export $extraOpts @missing $compressor' | $decompressor $progressViewer $Nix::Config::binDir/nix-store --import > /dev/null") == 0
+            system("set -f; ssh $sshHost @sshOpts 'nix-store --export $extraOpts @missing $compressor' | $progressViewer $decompressor $Nix::Config::binDir/nix-store --import > /dev/null") == 0
                 or die "copying store paths from remote machine `$sshHost' failed: $?";
         }
     }
