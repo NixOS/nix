@@ -39,4 +39,14 @@ generatePatches \%srcNarFiles, \%dstNarFiles, \%srcPatches, \%dstPatches,
 
 propagatePatches \%srcPatches, \%dstNarFiles, \%dstPatches;
 
+# Optionally add all new patches to the manifest in $NIX_ALL_PATCHES.
+my $allPatchesFile = $ENV{"NIX_ALL_PATCHES"};
+if (defined $allPatchesFile) {
+    my (%dummy, %allPatches);
+    readManifest("$patchesPath/all-patches", \%dummy, \%allPatches)
+        if -f $allPatchesFile;
+    copyPatches \%dstPatches, \%allPatches;
+    writeManifest($allPatchesFile, {}, \%allPatches, 0);
+}
+
 writeManifest $dstManifest, \%dstNarFiles, \%dstPatches;
