@@ -65,5 +65,7 @@ Options:
 
   --verbose / -v: verbose operation (may be repeated)
   --keep-failed / -K: keep temporary directories of failed builds
+  --keep-going / -k: build as many dependencies as possible, even if
+      some dependencies fail to build
 
   --add-root: add garbage collector roots for the result

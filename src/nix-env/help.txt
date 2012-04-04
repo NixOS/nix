@@ -69,6 +69,8 @@ Options:
   --file / -f FILE: use Nix expression FILE for installation, etc.
   --verbose / -v: verbose operation (may be repeated)
   --keep-failed / -K: keep temporary directories of failed builds
+  --keep-going / -k: build as many dependencies as possible, even if
+      some dependencies fail to build
   --preserve-installed: do not replace currently installed versions in `-i'
   --system-filter SYSTEM: only use derivations for specified platform
   --prebuilt-only / -b: only use derivations whose prebuilt binaries are
