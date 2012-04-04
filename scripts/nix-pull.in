@@ -50,7 +50,7 @@ sub processURL {
     my $manifest;
 
     # First see if a bzipped manifest is available.
-    if (system("$Nix::Config::curl --fail --silent --head '$url'.bz2 > /dev/null") == 0) {
+    if (system("$Nix::Config::curl --fail --silent --location --head '$url'.bz2 > /dev/null") == 0) {
         print "fetching list of Nix archives at `$url.bz2'...\n";
         $manifest = downloadFile "$url.bz2";
     }
