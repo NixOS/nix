@@ -1794,9 +1794,20 @@ void DerivationGoal::startBuilder()
                 throw SysError(format("changing into `%1%'") % tmpDir);
 
 #ifdef CAN_DO_LINUX32_BUILDS
+            /* Change the personality to 32-bit if we're doing an
+               i686-linux build on an x86_64-linux machine. */
             if (drv.platform == "i686-linux" && thisSystem == "x86_64-linux") {
                 if (personality(0x0008 | 0x8000000 /* == PER_LINUX32_3GB */) == -1)
                     throw SysError("cannot set i686-linux personality");
+            }
+
+            /* Impersonate a Linux 2.6 machine to get some determinism
+               in builds that depend on the kernel version. */
+            if ((drv.platform == "i686-linux" || drv.platform == "x86_64-linux") &&
+                queryBoolSetting("build-impersonate-linux-26", true))
+            {
+                int cur = personality(0xffffffff);
+                if (cur != -1) personality(cur | 0x0020000 /* == UNAME26 */);
             }
 #endif
 
