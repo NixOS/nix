@@ -108,7 +108,7 @@ images:
 	cp $(docbookxsl)/images/callouts/*.gif images/callouts
 	chmod -R +w images
 
-KEEP = manual.html manual.is-valid version.txt $(MANS) NEWS.html NEWS.txt
+KEEP = manual.html manual.xmli manual.is-valid version.txt $(MANS) NEWS.html NEWS.txt
 
 EXTRA_DIST = $(MANUAL_SRCS) $(FIGURES) $(KEEP)
 
