@@ -7,7 +7,7 @@
 
 <para>Most Nix commands interpret the following environment variables:</para>
 
-<variablelist>
+<variablelist xml:id="env-common">
 
   
 <varlistentry><term><envar>NIX_IGNORE_SYMLINK_STORE</envar></term>

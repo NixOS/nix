@@ -202,4 +202,13 @@ $ echo 'rec { x = "foo"; y = x; }' | nix-instantiate --eval-only --xml --strict 
 </refsection>
 
 
+<refsection condition="manpage"><title>Environment variables</title>
+
+<variablelist>
+  <xi:include href="env-common.xml#xmlns(db=http://docbook.org/ns/docbook)xpointer(//db:variablelist[@xml:id='env-common']/*)" />
+</variablelist>
+
+</refsection>
+  
+
 </refentry>

@@ -1047,7 +1047,7 @@ backups and when migrating to different database schemas.</para>
 
 <!--######################################################################-->
 
-<refsection><title>Operation <option>--dump-db</option></title>
+<refsection><title>Operation <option>--load-db</option></title>
 
 <refsection>
   <title>Synopsis</title>
@@ -1067,5 +1067,14 @@ loads it into the Nix database.</para>
             
 </refsection>
 
+
+<refsection condition="manpage"><title>Environment variables</title>
+
+<variablelist>
+  <xi:include href="env-common.xml#xmlns(db=http://docbook.org/ns/docbook)xpointer(//db:variablelist[@xml:id='env-common']/*)" />
+</variablelist>
+
+</refsection>
+  
 
 </refentry>
