@@ -5,7 +5,7 @@
 
 <para>Most Nix commands accept the following command-line options:</para>
 
-<variablelist>
+<variablelist xml:id="opt-common">
 
 <varlistentry><term><option>--help</option></term>
   

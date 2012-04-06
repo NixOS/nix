@@ -1,5 +1,5 @@
-XMLLINT = $(xmllint) $(xmlflags)
-XSLTPROC = $(xsltproc) $(xmlflags) \
+XMLLINT = $(xmllint) --nonet $(xmlflags)
+XSLTPROC = $(xsltproc) --nonet $(xmlflags) \
  --param section.autolabel 1 \
  --param section.label.includes.component.label 1 \
  --param html.stylesheet \'style.css\' \
@@ -34,24 +34,36 @@ MANUAL_SRCS = manual.xml introduction.xml installation.xml \
  conf-file.xml release-notes.xml \
  style.css images
 
+# Do XInclude processing.
+manual.xmli: $(MANUAL_SRCS) version.txt
+	$(XMLLINT) --xinclude $< -o $@.tmp
+	mv $@.tmp $@
+
 # Note: RelaxNG validation requires xmllint >= 2.7.4.
-manual.is-valid: $(MANUAL_SRCS) version.txt
-	$(XMLLINT) --noout --nonet --xinclude --noxincludenode --relaxng $(docbookrng)/docbook.rng $<
+manual.is-valid: manual.xmli
+	$(XSLTPROC) --novalid --stringparam profile.condition manual \
+	  $(docbookxsl)/profiling/profile.xsl $< 2> /dev/null | \
+	  $(XMLLINT) --noout --relaxng $(docbookrng)/docbook.rng -
 	touch $@
 
 version.txt:
 	echo -n $(VERSION) > version.txt
 
-man $(MANS): $(MANUAL_SRCS) manual.is-valid
-	$(XSLTPROC) --nonet --xinclude $(docbookxsl)/manpages/docbook.xsl manual.xml
+man $(MANS): manual.is-valid
+	$(XSLTPROC) --stringparam profile.condition manpage \
+	  $(docbookxsl)/profiling/profile.xsl manual.xmli 2> /dev/null | \
+	  $(XSLTPROC) $(docbookxsl)/manpages/docbook.xsl -
 
 manual.html: $(MANUAL_SRCS) manual.is-valid images
-	$(XSLTPROC) --nonet --xinclude --output manual.html \
-	  $(docbookxsl)/html/docbook.xsl manual.xml
+	$(XSLTPROC) --xinclude --stringparam profile.condition manual \
+	  $(docbookxsl)/profiling/profile.xsl manual.xml | \
+	  $(XSLTPROC) --output manual.html $(docbookxsl)/html/docbook.xsl -
 
 manual.pdf: $(MANUAL_SRCS) manual.is-valid images
 	if test "$(dblatex)" != ""; then \
-		$(dblatex) $(dblatex_opts) manual.xml; \
+		$(XSLTPROC) --xinclude --stringparam profile.condition manual \
+		  $(docbookxsl)/profiling/profile.xsl manual.xml | \
+		  $(dblatex) -o manual.pdf $(dblatex_opts) -; \
 	else \
 		echo "Please install dblatex and rerun configure."; \
 		exit 1; \
@@ -64,12 +76,12 @@ NEWS_OPTS = \
  --stringparam header.rule 0
 
 NEWS.html: release-notes.xml
-	$(XSLTPROC) --nonet --xinclude --output $@ $(NEWS_OPTS) \
+	$(XSLTPROC) --xinclude --output $@ $(NEWS_OPTS) \
 	  $(docbookxsl)/html/docbook.xsl release-notes.xml
 
 NEWS.txt: release-notes.xml
-	$(XSLTPROC) --nonet --xinclude quote-literals.xsl release-notes.xml | \
-	  $(XSLTPROC) --nonet --output $@.tmp.html $(NEWS_OPTS) \
+	$(XSLTPROC) --xinclude quote-literals.xsl release-notes.xml | \
+	  $(XSLTPROC) --output $@.tmp.html $(NEWS_OPTS) \
 	  $(docbookxsl)/html/docbook.xsl -
 	LANG=en_US $(w3m) -dump $@.tmp.html > $@
 	rm $@.tmp.html

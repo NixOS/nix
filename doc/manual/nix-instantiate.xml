@@ -64,8 +64,8 @@ store derivation instantiation from Nix expressions automatically).
 It is most commonly used for implementing new deployment
 policies.</para>
 
-<para>See also <xref linkend="sec-common-options" /> for a list of
-common options.</para>
+<para condition="manual">See also <xref linkend="sec-common-options"
+/> for a list of common options.</para>
 
 </refsection>
 
@@ -125,6 +125,10 @@ common options.</para>
 
   </varlistentry>
 
+</variablelist>
+
+<variablelist condition="manpage">
+  <xi:include href="opt-common.xml#xmlns(db=http://docbook.org/ns/docbook)xpointer(//db:variablelist[@xml:id='opt-common']/*)" />
 </variablelist>
 
 </refsection>

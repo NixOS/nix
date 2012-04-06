@@ -75,11 +75,11 @@ or renamed.  So don’t rename the symlink.</para></warning>
 
 <refsection><title>Options</title>
 
-<para>See also <xref linkend="sec-common-options" />.  All options not
-listed here are passed to <command>nix-store --realise</command>,
-except for <option>--arg</option> and <option>--attr</option> /
-<option>-A</option> which are passed to
-<command>nix-instantiate</command>.</para>
+<para>All options not listed here are passed to <command>nix-store
+--realise</command>, except for <option>--arg</option> and
+<option>--attr</option> / <option>-A</option> which are passed to
+<command>nix-instantiate</command>.  <phrase condition="manual">See
+also <xref linkend="sec-common-options" />.</phrase></para>
 
 <variablelist>
 
@@ -120,6 +120,10 @@ except for <option>--arg</option> and <option>--attr</option> /
 
   </varlistentry>
 
+</variablelist>
+
+<variablelist condition="manpage">
+  <xi:include href="opt-common.xml#xmlns(db=http://docbook.org/ns/docbook)xpointer(//db:variablelist[@xml:id='opt-common']/*)" />
 </variablelist>
 
 </refsection>

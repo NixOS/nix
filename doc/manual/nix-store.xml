@@ -48,8 +48,9 @@ be performed.  These are documented below.</para>
 
 <para>This section lists the options that are common to all
 operations.  These options are allowed for every subcommand, though
-they may not always have an effect.  See also <xref
-linkend="sec-common-options" /> for a list of common options.</para>
+they may not always have an effect.  <phrase condition="manual">See
+also <xref linkend="sec-common-options" /> for a list of common
+options.</phrase></para>
 
 <variablelist>
 
@@ -110,6 +111,10 @@ lrwxrwxrwx    1 ... 2005-03-13 21:10 /home/eelco/bla/result -> /nix/store/1r1134
 
   </varlistentry>
     
+</variablelist>
+
+<variablelist condition="manpage">
+  <xi:include href="opt-common.xml#xmlns(db=http://docbook.org/ns/docbook)xpointer(//db:variablelist[@xml:id='opt-common']/*)" />
 </variablelist>
 
 </refsection>

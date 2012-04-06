@@ -18,7 +18,7 @@
 <refsynopsisdiv>
   <cmdsynopsis>
     <command>nix-env</command>
-    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common-syn.xml#xmlns(db=http://docbook.org/ns/docbook)xpointer(/db:nop/*)" />
+    <xi:include href="opt-common-syn.xml#xmlns(db=http://docbook.org/ns/docbook)xpointer(/db:nop/*)" />
     <arg><option>--arg</option> <replaceable>name</replaceable> <replaceable>value</replaceable></arg>
     <arg><option>--argstr</option> <replaceable>name</replaceable> <replaceable>value</replaceable></arg>
     <arg>
@@ -71,8 +71,8 @@ be performed.  These are documented below.</para>
 
 <para>This section lists the options that are common to all
 operations.  These options are allowed for every subcommand, though
-they may not always have an effect.  See also <xref
-linkend="sec-common-options" />.</para>
+they may not always have an effect.  <phrase condition="manual">See
+also <xref linkend="sec-common-options" />.</phrase></para>
 
 <variablelist>
 
@@ -129,6 +129,10 @@ linkend="sec-common-options" />.</para>
 
   </varlistentry>
 
+</variablelist>
+
+<variablelist condition="manpage">
+  <xi:include href="opt-common.xml#xmlns(db=http://docbook.org/ns/docbook)xpointer(//db:variablelist[@xml:id='opt-common']/*)" />
 </variablelist>
 
 </refsection>
