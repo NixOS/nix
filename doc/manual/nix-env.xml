@@ -121,11 +121,9 @@ also <xref linkend="sec-common-options" />.</phrase></para>
   <varlistentry><term><option>--system-filter</option> <replaceable>system</replaceable></term>
 
     <listitem><para>By default, operations such as <option>--query
-    --available</option> only include derivations matching the current
-    platform.  This option allows you to use derivations for the
-    specified platform <replaceable>system</replaceable>.  The special
-    value <literal>*</literal> causes derivations for any platform to
-    be included.</para></listitem>
+    --available</option> show derivations matching any platform.  This
+    option allows you to use derivations for the specified platform
+    <replaceable>system</replaceable>.</para></listitem>
 
   </varlistentry>
 
