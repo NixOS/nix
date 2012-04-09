@@ -47,17 +47,17 @@ for Red Hat, SuSE, and Fedora Core are also available.</para>
 
 <para>Alternatively, the most recent sources of Nix can be obtained
 from its <link
-xlink:href="https://svn.nixos.org/repos/nix/nix/trunk">Subversion
+xlink:href="https://github.com/NixOS/nix">git
 repository</link>.  For example, the following command will check out
 the latest revision into a directory called
 <filename>nix</filename>:</para>
 
 <screen>
-$ svn checkout https://svn.nixos.org/repos/nix/nix/trunk nix</screen>
+$ git clone https://github.com/NixOS/nix</screen>
 
 <para>Likewise, specific releases can be obtained from the <link
-xlink:href="https://svn.nixos.org/repos/nix/nix/tags">tags
-directory</link> of the repository.</para>
+xlink:href="https://github.com/NixOS/nix/tags">tags
+</link> of the repository.</para>
 
 </section>
 
