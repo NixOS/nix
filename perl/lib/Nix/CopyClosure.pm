@@ -6,11 +6,12 @@ use Nix::Store;
 
 
 sub copyTo {
-    my ($sshHost, $sshOpts, $storePaths, $compressor, $decompressor, $includeOutputs, $dryRun, $sign) = @_;
+    my ($sshHost, $sshOpts, $storePaths, $compressor, $decompressor, $includeOutputs, $dryRun, $sign, $progressViewer) = @_;
 
     $compressor = "$compressor |" if $compressor ne "";
     $decompressor = "$decompressor |" if $decompressor ne "";
-    
+    $progressViewer = "$progressViewer |" if $progressViewer ne "";
+
     # Get the closure of this path.
     my @closure = reverse(topoSortPaths(computeFSClosure(0, $includeOutputs,
         map { followLinksToStorePath $_ } @{$storePaths})));
@@ -34,7 +35,7 @@ sub copyTo {
     if (scalar @missing > 0) {
         print STDERR "copying ", scalar @missing, " missing paths to ‘$sshHost’...\n";
         unless ($dryRun) {
-            open SSH, "| $compressor ssh $sshHost @{$sshOpts} '$decompressor nix-store --import' > /dev/null" or die;
+            open SSH, "| $compressor $progressViewer ssh $sshHost @{$sshOpts} '$decompressor nix-store --import' > /dev/null" or die;
             exportPaths(fileno(SSH), $sign, @missing);
             close SSH or die "copying store paths to remote machine `$sshHost' failed: $?";
         }

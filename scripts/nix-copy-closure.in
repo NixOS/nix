@@ -23,6 +23,8 @@ my $sign = 0;
 my $compressor = "";
 my $decompressor = "";
 
+my $progressViewer = "";
+
 my $toMode = 1;
 
 my $includeOutputs = 0;
@@ -60,6 +62,9 @@ while (@ARGV) {
     elsif ($arg eq "--include-outputs") {
         $includeOutputs = 1;
     }
+    elsif ($arg eq "--show-progress") {
+        $progressViewer = "pv";
+    }
     elsif ($arg eq "--dry-run") {
         $dryRun = 1;
     }
@@ -76,7 +81,7 @@ openSSHConnection $sshHost or die "$0: unable to start SSH\n";
 
 
 if ($toMode) { # Copy TO the remote machine.
-    Nix::CopyClosure::copyTo($sshHost, [ @sshOpts ], [ @storePaths ], $compressor, $decompressor, $includeOutputs, $dryRun, $sign);
+    Nix::CopyClosure::copyTo($sshHost, [ @sshOpts ], [ @storePaths ], $compressor, $decompressor, $includeOutputs, $dryRun, $sign, $progressViewer);
 }
 
 else { # Copy FROM the remote machine.
@@ -101,9 +106,10 @@ else { # Copy FROM the remote machine.
         print STDERR "copying ", scalar @missing, " missing paths from ‘$sshHost’...\n";
         $compressor = "| $compressor" if $compressor ne "";
         $decompressor = "$decompressor |" if $decompressor ne "";
+	$progressViewer = "$progressViewer |" if $progressViewer ne "";
         unless ($dryRun) {
             my $extraOpts = $sign ? "--sign" : "";
-            system("set -f; ssh $sshHost @sshOpts 'nix-store --export $extraOpts @missing $compressor' | $decompressor $Nix::Config::binDir/nix-store --import > /dev/null") == 0
+            system("set -f; ssh $sshHost @sshOpts 'nix-store --export $extraOpts @missing $compressor' | $progressViewer $decompressor $Nix::Config::binDir/nix-store --import > /dev/null") == 0
                 or die "copying store paths from remote machine `$sshHost' failed: $?";
         }
     }
