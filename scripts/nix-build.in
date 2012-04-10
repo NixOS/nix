@@ -14,7 +14,8 @@ my @instArgs = ();
 my @buildArgs = ();
 my @exprs = ();
 
-my $envCommand = "p=\$PATH; source \$stdenv/setup; PATH=\$PATH:\$p; exec $ENV{SHELL}";
+my $shell = $ENV{SHELL} || "/bin/sh";
+my $envCommand = "p=\$PATH; source \$stdenv/setup; PATH=\$PATH:\$p; exec $shell";
 my @envExclude = ();
 
 
