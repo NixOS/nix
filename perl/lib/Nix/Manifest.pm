@@ -343,10 +343,10 @@ EOF
         my $version = readManifest_($manifest, \&addNARToDB, \&addPatchToDB);
         
         if ($version < 3) {
-            die "you have an old-style or corrupt manifest `$manifestLink'; please delete it";
+            die "you have an old-style or corrupt manifest `$manifestLink'; please delete it\n";
         }
         if ($version >= 10) {
-            die "manifest `$manifestLink' is too new; please delete it or upgrade Nix";
+            die "manifest `$manifestLink' is too new; please delete it or upgrade Nix\n";
         }
     }
 
