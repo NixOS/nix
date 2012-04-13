@@ -22,6 +22,7 @@
 	 -e "s^@sed\@^$(sed)^g" \
 	 -e "s^@tar\@^$(tar)^g" \
 	 -e "s^@gzip\@^$(gzip)^g" \
+	 -e "s^@pv\@^$(pv)^g" \
 	 -e "s^@tr\@^$(tr)^g" \
 	 -e "s^@dot\@^$(dot)^g" \
 	 -e "s^@xmllint\@^$(xmllint)^g" \
