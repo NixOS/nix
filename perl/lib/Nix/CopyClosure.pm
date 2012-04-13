@@ -36,7 +36,7 @@ sub copyTo {
         unless ($dryRun) {
             my $size = `nix-store -q --size @missing | awk '{n+=\$1} END {printf n}'`;
             $progressViewer = "$progressViewer -s $size |" if $progressViewer ne "";
-            open SSH, "| $progressViewer $compressor ssh $sshHost @{$sshOpts} '$decompressor nix-store --import' > /dev/null" or die;
+            open SSH, "| $compressor ssh $sshHost @{$sshOpts} '$decompressor $progressViewer nix-store --import' > /dev/null" or die;
             exportPaths(fileno(SSH), $sign, @missing);
             close SSH or die "copying store paths to remote machine `$sshHost' failed: $?";
         }
