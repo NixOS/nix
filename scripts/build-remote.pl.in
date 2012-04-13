@@ -248,7 +248,7 @@ if ($@) {
     print STDERR "somebody is hogging $uploadLock, continuing...\n";
     unlink $uploadLock;
 }
-Nix::CopyClosure::copyTo($hostName, [ @sshOpts ], [ $drvPath, @inputs ], "", "", 0, 0, $maybeSign ne "");
+Nix::CopyClosure::copyTo($hostName, [ @sshOpts ], [ $drvPath, @inputs ], "", "", 0, 0, $maybeSign ne "", "");
 close UPLOADLOCK;
 
 
