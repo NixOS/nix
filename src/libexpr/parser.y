@@ -8,6 +8,8 @@
 %parse-param { ParseData * data }
 %lex-param { yyscan_t scanner }
 %lex-param { ParseData * data }
+%expect 1
+%expect-rr 1
 
 %code requires {
     
