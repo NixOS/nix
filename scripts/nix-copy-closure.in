@@ -63,7 +63,7 @@ while (@ARGV) {
         $includeOutputs = 1;
     }
     elsif ($arg eq "--show-progress") {
-        $progressViewer = "@pv@";
+        $progressViewer = "@pv@ -apebt";
     }
     elsif ($arg eq "--dry-run") {
         $dryRun = 1;
@@ -106,10 +106,11 @@ else { # Copy FROM the remote machine.
         print STDERR "copying ", scalar @missing, " missing paths from ‘$sshHost’...\n";
         $compressor = "| $compressor" if $compressor ne "";
         $decompressor = "$decompressor |" if $decompressor ne "";
-	$progressViewer = "$progressViewer |" if $progressViewer ne "";
+	my $size = `ssh $sshHost @sshOpts "nix-store -q --size $extraOpts @missing | awk '{n+=\\\$1} END {printf n}'"`;
+	$progressViewer = "$progressViewer -s $size |" if $progressViewer ne "";
         unless ($dryRun) {
             my $extraOpts = $sign ? "--sign" : "";
-            system("set -f; ssh $sshHost @sshOpts 'nix-store --export $extraOpts @missing $compressor' | $progressViewer $decompressor $Nix::Config::binDir/nix-store --import > /dev/null") == 0
+            system("set -f; ssh $sshHost @sshOpts 'nix-store --export $extraOpts @missing $compressor' | $decompressor $progressViewer $Nix::Config::binDir/nix-store --import > /dev/null") == 0
                 or die "copying store paths from remote machine `$sshHost' failed: $?";
         }
     }
