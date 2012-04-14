@@ -1793,6 +1793,9 @@ void DerivationGoal::startBuilder()
             if (chdir(tmpDir.c_str()) == -1)
                 throw SysError(format("changing into `%1%'") % tmpDir);
 
+            /* Close all other file descriptors. */
+            closeMostFDs(set<int>());
+
 #ifdef CAN_DO_LINUX32_BUILDS
             /* Change the personality to 32-bit if we're doing an
                i686-linux build on an x86_64-linux machine. */
