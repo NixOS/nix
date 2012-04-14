@@ -1,11 +1,11 @@
 with import <nix/config.nix>;
 
-{ name, src }:
+{ name, channelName, src }:
 
 derivation {
   system = builtins.currentSystem;
   builder = shell;
   args = [ "-e" ./unpack-channel.sh ];
-  inherit name src bzip2 tar tr;
+  inherit name channelName src bzip2 tar tr;
   PATH = "${nixBinDir}:${coreutils}";
 }

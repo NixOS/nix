@@ -108,7 +108,13 @@ sub update {
         die "cannot fetch `$fullURL'" if $? != 0;
         chomp $path;
 
-        $exprs .= "'f: f { name = \"$name\"; src = builtins.storePath \"$path\"; }' ";
+        # If the URL contains a version number, append it to the name
+        # attribute (so that "nix-env -q" on the channels profile
+        # shows something useful).
+        my $cname = $name;
+        $cname .= $1 if basename($url) =~ /(-\d.*)$/;
+
+        $exprs .= "'f: f { name = \"$cname\"; channelName = \"$name\"; src = builtins.storePath \"$path\"; }' ";
     }
 
     # Unpack the channel tarballs into the Nix store and install them
