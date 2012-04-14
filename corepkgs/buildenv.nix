@@ -1,10 +1,10 @@
 with import <nix/config.nix>;
 
-{ system, derivations, manifest }:
+{ derivations, manifest }:
 
 derivation { 
   name = "user-environment";
-  system = system;
+  system = builtins.currentSystem;
   builder = perl;
   args = [ "-w" ./buildenv.pl ];
   

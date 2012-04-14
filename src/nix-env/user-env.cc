@@ -118,7 +118,6 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
        builder with the manifest as argument. */
     Value args, topLevel;
     state.mkAttrs(args, 3);
-    mkString(*state.allocAttr(args, state.sSystem), thisSystem);
     mkString(*state.allocAttr(args, state.symbols.create("manifest")),
         manifestFile, singleton<PathSet>(manifestFile));
     args.attrs->push_back(Attr(state.symbols.create("derivations"), &manifest));

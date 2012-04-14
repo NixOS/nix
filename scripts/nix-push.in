@@ -103,7 +103,7 @@ foreach my $storePath (@storePaths) {
     # Construct a Nix expression that creates a Nix archive.
     my $nixexpr = 
         "(import <nix/nar.nix> " .
-        "{ storePath = builtins.storePath \"$storePath\"; system = \"@system@\"; hashAlgo = \"$hashAlgo\"; }) ";
+        "{ storePath = builtins.storePath \"$storePath\"; hashAlgo = \"$hashAlgo\"; }) ";
     
     print NIX $nixexpr;
 }

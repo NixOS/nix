@@ -20,11 +20,12 @@ let
 
 in
 
-{ system, storePath, hashAlgo }:
+{ storePath, hashAlgo }:
 
 derivation {
   name = "nar";
+  system = builtins.currentSystem;
   builder = shell;
   args = [ "-e" builder ];
-  inherit system storePath hashAlgo;
+  inherit storePath hashAlgo;
 }
