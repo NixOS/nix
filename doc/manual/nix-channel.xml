@@ -19,7 +19,7 @@
   <cmdsynopsis>
     <command>nix-channel</command>
     <group choice='req'>
-      <arg choice='plain'><option>--add</option> <replaceable>url</replaceable></arg>
+      <arg choice='plain'><option>--add</option> <replaceable>url</replaceable> <arg choice='opt'><replaceable>name</replaceable></arg></arg>
       <arg choice='plain'><option>--remove</option> <replaceable>url</replaceable></arg>
       <arg choice='plain'><option>--list</option></arg>
       <arg choice='plain'><option>--update</option></arg>
@@ -31,32 +31,39 @@
 
 <para>A Nix channel is mechanism that allows you to automatically stay
 up-to-date with a set of pre-built Nix expressions.  A Nix channel is
-just a URL that points to a place that contains a set of Nix
-expressions, as well as a <command>nix-push</command> manifest.  See
-also <xref linkend="sec-channels" />.</para>
+just a URL that points to a place containing a set of Nix expressions
+and a <command>nix-push</command> manifest.  <phrase
+condition="manual">See also <xref linkend="sec-channels"
+/>.</phrase></para>
 
 <para>This command has the following operations:
 
 <variablelist>
 
-  <varlistentry><term><option>--add</option> <replaceable>url</replaceable></term>
+  <varlistentry><term><option>--add</option> <replaceable>url</replaceable> [<replaceable>name</replaceable>]</term>
 
-    <listitem><para>Adds <replaceable>url</replaceable> to the list of
-    subscribed channels.</para></listitem>
+    <listitem><para>Adds a channel named
+    <replaceable>name</replaceable> with URL
+    <replaceable>url</replaceable> to the list of subscribed channels.
+    If <replaceable>name</replaceable> is omitted, it defaults to the
+    last component of <replaceable>url</replaceable>, with the
+    suffixes <literal>-stable</literal> or
+    <literal>-unstable</literal> removed.</para></listitem>
 
   </varlistentry>
 
-  <varlistentry><term><option>--remove</option> <replaceable>url</replaceable></term>
+  <varlistentry><term><option>--remove</option> <replaceable>name</replaceable></term>
 
-    <listitem><para>Removes <replaceable>url</replaceable> from the
-    list of subscribed channels.</para></listitem>
+    <listitem><para>Removes the channel named
+    <replaceable>name</replaceable> from the list of subscribed
+    channels.</para></listitem>
 
   </varlistentry>
 
   <varlistentry><term><option>--list</option></term>
 
-    <listitem><para>Prints the URLs of all subscribed channels on
-    standard output.</para></listitem>
+    <listitem><para>Prints the names and URLs of all subscribed
+    channels on standard output.</para></listitem>
 
   </varlistentry>
 
@@ -64,7 +71,7 @@ also <xref linkend="sec-channels" />.</para>
 
     <listitem><para>Downloads the Nix expressions of all subscribed
     channels, makes them the default for <command>nix-env</command>
-    operations (by symlinking them in the directory
+    operations (by symlinking them from the directory
     <filename>~/.nix-defexpr</filename>), and performs a
     <command>nix-pull</command> on the manifests of all channels to
     make pre-built binaries available.</para></listitem>
@@ -75,8 +82,8 @@ also <xref linkend="sec-channels" />.</para>
 
 </para>
 
-<para>Note that <option>--add</option> and <option>--remove</option>
-do not automatically perform an update.</para>
+<para>Note that <option>--add</option> does not automatically perform
+an update.</para>
 
 <para>The list of subscribed channels is stored in
 <filename>~/.nix-channels</filename>.</para>
@@ -87,6 +94,17 @@ containing the Nix expressions, and a manifest created by
 <literal><replaceable>url</replaceable>/nixexprs.tar.bz2</literal> and
 <literal><replaceable>url</replaceable>/MANIFEST</literal>,
 respectively.</para>
+
+</refsection>
+
+<refsection><title>Examples</title>
+
+<para>To subscribe to the Nixpkgs channel and install the GNU Hello package:</para>
+
+<screen>
+$ nix-channel --add http://nixos.org/releases/nixpkgs/channels/nixpkgs-unstable
+$ nix-channel --update
+$ nix-env -iA nixpkgs.hello</screen>
 
 </refsection>
 

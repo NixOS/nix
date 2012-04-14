@@ -9,9 +9,9 @@ rm -f $TEST_ROOT/.nix-channels
 export HOME=$TEST_ROOT
 
 # Test add/list/remove.
-nix-channel --add http://foo/bar
+nix-channel --add http://foo/bar xyzzy
 nix-channel --list | grep -q http://foo/bar
-nix-channel --remove http://foo/bar
+nix-channel --remove xyzzy
 
 [ -e $TEST_ROOT/.nix-channels ]
 [ "$(cat $TEST_ROOT/.nix-channels)" = '' ]

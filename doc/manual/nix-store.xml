@@ -58,8 +58,9 @@ options.</phrase></para>
 
     <listitem><para>Causes the result of a realisation
     (<option>--realise</option> and <option>--force-realise</option>)
-    to be registered as a root of the garbage collector (see <xref
-    linkend="ssec-gc-roots" />).  The root is stored in
+    to be registered as a root of the garbage collector<phrase
+    condition="manual"> (see <xref linkend="ssec-gc-roots"
+    />)</phrase>.  The root is stored in
     <replaceable>path</replaceable>, which must be inside a directory
     that is scanned for roots by the garbage collector (i.e.,
     typically in a subdirectory of

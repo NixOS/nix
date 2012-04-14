@@ -1,6 +1,8 @@
 #! @perl@ -w @perlFlags@
 
 use strict;
+use File::Basename;
+use File::Path qw(make_path);
 use Nix::Config;
 
 my $manifestDir = $Nix::Config::manifestDir;
@@ -11,67 +13,67 @@ my $channelCache = "$Nix::Config::stateDir/channel-cache";
 mkdir $channelCache, 0755 unless -e $channelCache;
 $ENV{'NIX_DOWNLOAD_CACHE'} = $channelCache if -W $channelCache;
 
-
 # Figure out the name of the `.nix-channels' file to use.
-my $home = $ENV{"HOME"};
-die '$HOME not set' unless defined $home;
+my $home = $ENV{"HOME"} or die '$HOME not set\n';
 my $channelsList = "$home/.nix-channels";
-
 my $nixDefExpr = "$home/.nix-defexpr";
+
+# Figure out the name of the channels profile.
+my $userName = getpwuid($<) or die "cannot figure out user name";
+my $profile = "$Nix::Config::stateDir/profiles/per-user/$userName/channels";
+make_path(dirname $profile, mode => 0755);
     
+my %channels;
 
-my @channels;
 
-
-# Reads the list of channels from the file $channelsList;
+# Reads the list of channels.
 sub readChannels {
     return if (!-f $channelsList);
     open CHANNELS, "<$channelsList" or die "cannot open `$channelsList': $!";
     while (<CHANNELS>) {
         chomp;
         next if /^\s*\#/;
-        push @channels, $_;
+        my ($url, $name) = split ' ', $_;
+        $url =~ s/\/*$//; # remove trailing slashes
+        $name = basename $url unless defined $name;
+        $channels{$name} = $url;
     }
     close CHANNELS;
 }
 
 
-# Writes the list of channels to the file $channelsList;
+# Writes the list of channels.
 sub writeChannels {
     open CHANNELS, ">$channelsList" or die "cannot open `$channelsList': $!";
-    foreach my $url (@channels) {
-        print CHANNELS "$url\n";
+    foreach my $name (keys %channels) {
+        print CHANNELS "$channels{$name} $name\n";
     }
     close CHANNELS;
 }
 
 
-# Adds a channel to the file $channelsList;
+# Adds a channel.
 sub addChannel {
-    my $url = shift;
+    my ($url, $name) = @_;
     readChannels;
-    foreach my $url2 (@channels) {
-        return if $url eq $url2;
-    }
-    push @channels, $url;
+    $channels{$name} = $url;
     writeChannels;
 }
 
 
-# Remove a channel from the file $channelsList;
+# Remove a channel.
 sub removeChannel {
-    my $url = shift;
-    my @left = ();
+    my ($name) = @_;
     readChannels;
-    foreach my $url2 (@channels) {
-        push @left, $url2 if $url ne $url2;
-    }
-    @channels = @left;
+    delete $channels{$name};
     writeChannels;
+
+    system("$Nix::Config::binDir/nix-env --profile '$profile' -e '$name'") == 0
+        or die "cannot remove channel `$name'";
 }
 
 
-# Fetch Nix expressions and pull cache manifests from the subscribed
+# Fetch Nix expressions and pull manifests from the subscribed
 # channels.
 sub update {
     readChannels;
@@ -82,64 +84,46 @@ sub update {
     # Do we have write permission to the manifests directory?
     die "$0: you do not have write permission to `$manifestDir'!\n" unless -W $manifestDir;
 
-    # Pull cache manifests.
-    foreach my $url (@channels) {
-        #print "pulling cache manifest from `$url'\n";
+    # Download each channel.
+    my $exprs = "";
+    foreach my $name (keys %channels) {
+        my $url = $channels{$name};
+        
+        # Pull the channel manifest.
         system("$Nix::Config::binDir/nix-pull", "--skip-wrong-store", "$url/MANIFEST") == 0
-            or die "cannot pull cache manifest from `$url'";
-    }
+            or die "cannot pull manifest from `$url'\n";
 
-    # Create a Nix expression that fetches and unpacks the channel Nix
-    # expressions.
-
-    my $inputs = "[";
-    foreach my $url (@channels) {
-        $url =~ /\/([^\/]+)\/?$/;
-        my $channelName = $1;
-        $channelName = "unnamed" unless defined $channelName;
-
+        # Download the channel tarball.
         my $fullURL = "$url/nixexprs.tar.bz2";
-        print "downloading Nix expressions from `$fullURL'...\n";
-        $ENV{"PRINT_PATH"} = 1;
-        $ENV{"QUIET"} = 1;
-        my ($hash, $path) = `$Nix::Config::binDir/nix-prefetch-url '$fullURL'`;
+        print STDERR "downloading Nix expressions from `$fullURL'...\n";
+        my ($hash, $path) = `PRINT_PATH=1 QUIET=1 $Nix::Config::binDir/nix-prefetch-url '$fullURL'`;
         die "cannot fetch `$fullURL'" if $? != 0;
         chomp $path;
-        $inputs .= '"' . $channelName . '"' . " " . $path . " ";
+
+        $exprs .= "'f: f { name = \"$name\"; src = builtins.storePath \"$path\"; }' ";
     }
-    $inputs .= "]";
 
-    # Figure out a name for the GC root.
-    my $userName = getpwuid($<);
-    die "who ARE you? go away" unless defined $userName;
-
-    my $rootFile = "$Nix::Config::stateDir/gcroots/per-user/$userName/channels";
-    
-    # Build the Nix expression.
-    print "unpacking channel Nix expressions...\n";
-    my $outPath = `\\
-        $Nix::Config::binDir/nix-build --out-link '$rootFile' --drv-link '$rootFile'.tmp \\
-        '<nix/unpack-channel.nix>' \\
-        --argstr system @system@ --arg inputs '$inputs'`
-        or die "cannot unpack the channels";
-    chomp $outPath;
-
-    unlink "$rootFile.tmp";
+    # Unpack the channel tarballs into the Nix store and install them
+    # into the channels profile.
+    print STDERR "unpacking channels...\n";
+    system("$Nix::Config::binDir/nix-env --profile '$profile' " .
+           "-f '<nix/unpack-channel.nix>' -i -E $exprs --quiet") == 0
+           or die "cannot unpack the channels";
 
     # Make the channels appear in nix-env.
     unlink $nixDefExpr if -l $nixDefExpr; # old-skool ~/.nix-defexpr
     mkdir $nixDefExpr or die "cannot create directory `$nixDefExpr'" if !-e $nixDefExpr;
     my $channelLink = "$nixDefExpr/channels";
     unlink $channelLink; # !!! not atomic
-    symlink($outPath, $channelLink) or die "cannot symlink `$channelLink' to `$outPath'";
+    symlink($profile, $channelLink) or die "cannot symlink `$channelLink' to `$profile'";
 }
 
 
 sub usageError {
     print STDERR <<EOF;
 Usage:
-  nix-channel --add URL
-  nix-channel --remove URL
+  nix-channel --add URL [CHANNEL-NAME]
+  nix-channel --remove CHANNEL-NAME
   nix-channel --list
   nix-channel --update
 EOF
@@ -154,22 +138,29 @@ while (scalar @ARGV) {
     my $arg = shift @ARGV;
 
     if ($arg eq "--add") {
-        usageError if scalar @ARGV != 1;
-        addChannel (shift @ARGV);
+        usageError if scalar @ARGV < 1 || scalar @ARGV > 2;
+        my $url = shift @ARGV;
+        my $name = shift @ARGV;
+        unless (defined $name) {
+            $name = basename $url;
+            $name =~ s/-unstable//;
+            $name =~ s/-stable//;
+        }
+        addChannel($url, $name);
         last;
     }
 
     if ($arg eq "--remove") {
         usageError if scalar @ARGV != 1;
-        removeChannel (shift @ARGV);
+        removeChannel(shift @ARGV);
         last;
     }
 
     if ($arg eq "--list") {
         usageError if scalar @ARGV != 0;
         readChannels;
-        foreach my $url (@channels) {
-            print "$url\n";
+        foreach my $name (keys %channels) {
+            print "$name $channels{$name}\n";
         }
         last;
     }
