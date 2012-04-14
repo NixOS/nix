@@ -35,7 +35,7 @@ readLink() {
 
 clearProfiles() {
     profiles="$NIX_STATE_DIR"/profiles
-    rm -f $profiles/*
+    rm -rf $profiles
 }
 
 clearStore() {
