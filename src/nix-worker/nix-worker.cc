@@ -697,6 +697,8 @@ static void daemonLoop()
     if (fdSocket == -1)
         throw SysError("cannot create Unix domain socket");
 
+    closeOnExec(fdSocket);
+    
     string socketPath = nixStateDir + DEFAULT_SOCKET_PATH;
 
     createDirs(dirOf(socketPath));
@@ -751,6 +753,8 @@ static void daemonLoop()
 		    throw SysError("accepting connection");
             }
 
+            closeOnExec(remote);
+            
             /* Get the identity of the caller, if possible. */
             uid_t clientUid = -1;
             pid_t clientPid = -1;
