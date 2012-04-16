@@ -88,6 +88,7 @@ sub update {
     my $exprs = "";
     foreach my $name (keys %channels) {
         my $url = $channels{$name};
+        my $origUrl = $url;
 
         # Check if $url is a redirect.  If so, follow it now to ensure
         # consistency if the redirection is changed between
@@ -98,6 +99,7 @@ sub update {
         $url = $1 if $headers =~ /^Location:\s*(.*)\s*$/m;
         
         # Pull the channel manifest.
+        $ENV{'NIX_ORIG_URL'} = $origUrl;
         system("$Nix::Config::binDir/nix-pull", "--skip-wrong-store", "$url/MANIFEST") == 0
             or die "cannot pull manifest from `$url'\n";
 

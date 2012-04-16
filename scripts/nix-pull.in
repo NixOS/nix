@@ -72,7 +72,7 @@ sub processURL {
 
     my $urlFile = "$manifestDir/$baseName-$hash.url";
     open URL, ">$urlFile" or die "cannot create `$urlFile'";
-    print URL "$url";
+    print URL ($ENV{'NIX_ORIG_URL'} || $url);
     close URL;
     
     my $finalPath = "$manifestDir/$baseName-$hash.nixmanifest";
