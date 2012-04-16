@@ -56,24 +56,22 @@ int LocalStore::openGCLock(LockType lockType)
 }
 
 
-void createSymlink(const Path & link, const Path & target, bool careful)
+void createSymlink(const Path & link, const Path & target)
 {
     /* Create directories up to `gcRoot'. */
     createDirs(dirOf(link));
 
-    /* !!! shouldn't removing and creating the symlink be atomic? */
-
-    /* Remove the old symlink. */
-    if (pathExists(link)) {
-        if (careful && (!isLink(link) || !isInStore(readLink(link))))
-            throw Error(format("cannot create symlink `%1%'; already exists") % link);
-        unlink(link.c_str());
-    }
-
-    /* And create the new one. */
-    if (symlink(target.c_str(), link.c_str()) == -1)
+    /* Create the new symlink. */
+    Path tempLink = (format("%1%.tmp-%2%-%3%")
+        % link % getpid() % rand()).str();
+    if (symlink(target.c_str(), tempLink.c_str()) == -1)
         throw SysError(format("symlinking `%1%' to `%2%'")
-            % link % target);
+            % tempLink % target);
+
+    /* Atomically replace the old one. */
+    if (rename(tempLink.c_str(), link.c_str()) == -1)
+        throw SysError(format("cannot rename `%1%' to `%2%'")
+            % tempLink % link);
 }
 
 
@@ -88,7 +86,7 @@ void LocalStore::addIndirectRoot(const Path & path)
     string hash = printHash32(hashString(htSHA1, path));
     Path realRoot = canonPath((format("%1%/%2%/auto/%3%")
         % nixStateDir % gcRootsDir % hash).str());
-    createSymlink(realRoot, path, false);
+    createSymlink(realRoot, path);
 }
 
 
@@ -105,7 +103,11 @@ Path addPermRoot(StoreAPI & store, const Path & _storePath,
                 "(are you running nix-build inside the store?)") % gcRoot);
 
     if (indirect) {
-        createSymlink(gcRoot, storePath, true);
+        /* Don't clobber the the link if it already exists and doesn't
+           point to the Nix store. */
+        if (pathExists(gcRoot) && (!isLink(gcRoot) || !isInStore(readLink(gcRoot))))
+            throw Error(format("cannot create symlink `%1%'; already exists") % gcRoot);
+        createSymlink(gcRoot, storePath);
         store.addIndirectRoot(gcRoot);
     }
 
@@ -120,7 +122,7 @@ Path addPermRoot(StoreAPI & store, const Path & _storePath,
                     % gcRoot % rootsDir);
         }
             
-        createSymlink(gcRoot, storePath, false);
+        createSymlink(gcRoot, storePath);
     }
 
     /* Check that the root can be found by the garbage collector.
