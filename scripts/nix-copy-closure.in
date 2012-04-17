@@ -63,7 +63,7 @@ while (@ARGV) {
         $includeOutputs = 1;
     }
     elsif ($arg eq "--show-progress") {
-        $progressViewer = "@pv@ -apebt";
+        $progressViewer = "-apebt";
     }
     elsif ($arg eq "--dry-run") {
         $dryRun = 1;
@@ -81,10 +81,12 @@ openSSHConnection $sshHost or die "$0: unable to start SSH\n";
 
 
 if ($toMode) { # Copy TO the remote machine.
+    $progressViewer = "pv $progressViewer" if $progressViewer ne "";
     Nix::CopyClosure::copyTo($sshHost, [ @sshOpts ], [ @storePaths ], $compressor, $decompressor, $includeOutputs, $dryRun, $sign, $progressViewer);
 }
 
 else { # Copy FROM the remote machine.
+    $progressViewer = "@pv@ $progressViewer" if $progressViewer ne "";
 
     # Query the closure of the given store paths on the remote
     # machine.  Paths are assumed to be store paths; there is no
