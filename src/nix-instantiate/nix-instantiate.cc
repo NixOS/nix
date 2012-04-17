@@ -79,6 +79,7 @@ void run(Strings args)
     EvalState state;
     Strings files;
     bool readStdin = false;
+    bool findFile = false;
     bool evalOnly = false;
     bool parseOnly = false;
     bool xmlOutput = false;
@@ -100,6 +101,8 @@ void run(Strings args)
             readOnlyMode = true;
             parseOnly = evalOnly = true;
         }
+        else if (arg == "--find-file")
+            findFile = true;
         else if (arg == "--attr" || arg == "-A") {
             if (i == args.end())
                 throw UsageError("`--attr' requires an argument");
@@ -129,6 +132,15 @@ void run(Strings args)
     }
 
     if (attrPaths.empty()) attrPaths.push_back("");
+
+    if (findFile) {
+        foreach (Strings::iterator, i, files) {
+            Path p = state.findFile(*i);
+            if (p == "") throw Error(format("unable to find `%1%'") % *i);
+            std::cout << p << std::endl;
+        }
+        return;
+    }
 
     store = openStore();
 

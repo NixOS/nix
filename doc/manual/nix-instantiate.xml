@@ -36,6 +36,7 @@
           <option>--eval-only</option>
           <arg><option>--strict</option></arg>
         </arg>
+        <arg choice='plain'><option>--find-file</option></arg>
       </group>
       <arg><option>--xml</option></arg>
     </arg>
@@ -100,6 +101,19 @@ policies.</para>
     
   </varlistentry>
 
+  <varlistentry><term><option>--find-file</option></term>
+  
+    <listitem><para>Look up the given files in Nix’s search path (as
+    specified by the <envar>NIX_PATH</envar> environment variable).
+    If found, print the corresponding absolute paths on standard
+    output.  For instance, if <envar>NIX_PATH</envar> is
+    <literal>nixpkgs=/home/alice/nixpkgs</literal>, then
+    <literal>nix-instantiate --find-file nixpkgs/default.nix</literal>
+    will print
+    <literal>/home/alice/nixpkgs/default.nix</literal>.</para></listitem>
+    
+  </varlistentry>
+      
   <varlistentry><term><option>--xml</option></term>
 
     <listitem><para>When used with <option>--parse-only</option> and
