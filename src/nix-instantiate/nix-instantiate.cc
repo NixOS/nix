@@ -148,7 +148,8 @@ void run(Strings args)
         Expr * e = parseStdin(state);
         processExpr(state, attrPaths, parseOnly, strict, autoArgs,
             evalOnly, xmlOutput, xmlOutputSourceLocation, e);
-    }
+    } else if (files.empty())
+        files.push_back("./default.nix");
 
     foreach (Strings::iterator, i, files) {
         Expr * e = state.parseExprFromFile(lookupFileArg(state, *i));

@@ -50,8 +50,9 @@
 <para>The command <command>nix-instantiate</command> generates <link
 linkend="gloss-derivation">store derivations</link> from (high-level)
 Nix expressions.  It loads and evaluates the Nix expressions in each
-of <replaceable>files</replaceable>.  Each top-level expression should
-evaluate to a derivation, a list of derivations, or a set of
+of <replaceable>files</replaceable> (which defaults to
+<replaceable>./default.nix</replaceable>).  Each top-level expression
+should evaluate to a derivation, a list of derivations, or a set of
 derivations.  The paths of the resulting store derivations are printed
 on standard output.</para>
 
