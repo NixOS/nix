@@ -88,7 +88,7 @@ sub update {
     my $exprs = "";
     foreach my $name (keys %channels) {
         my $url = $channels{$name};
-        my $origUrl = $url;
+        my $origUrl = "$url/MANIFEST";
 
         # Check if $url is a redirect.  If so, follow it now to ensure
         # consistency if the redirection is changed between
