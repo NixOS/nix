@@ -968,6 +968,12 @@ void LocalStore::registerValidPath(const ValidPathInfo & info)
 
 void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 {
+    /* sqlite will fsync by default, but the new valid paths may not be fsync-ed.
+     * So some may want to fsync them before registering the validity, at the
+     * expense of some speed of the path registering operation. */
+    if (queryBoolSetting("sync-before-registering", false))
+        sync();
+
     while (1) {
         try {
             SQLiteTxn txn(db);
