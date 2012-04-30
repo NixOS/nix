@@ -1,67 +1,17 @@
 <chapter xmlns="http://docbook.org/ns/docbook"
          xmlns:xlink="http://www.w3.org/1999/xlink"
-         xml:id='chap-build-farm'>
+         xml:id='chap-distributed-builds'>
 
-<title>Setting up a Build Farm</title>
+<title>Setting Up Distributed Builds</title>
 
-
-<para>This chapter provides some sketchy information on how to set up
-a Nix-based build farm.  Nix is particularly suited as a basis for a
-build farm, since:
-
-<itemizedlist>
-
-  <listitem><para>Nix supports distributed builds: a local Nix
-  installation can forward Nix builds to other machines over the
-  network.  This allows multiple builds to be performed in parallel
-  (thus improving performance), but more in importantly, it allows Nix
-  to perform multi-platform builds in a semi-transparent way.  For
-  instance, if you perform a build for a
-  <literal>powerpc-darwin</literal> on an
-  <literal>i686-linux</literal> machine, Nix can automatically forward
-  the build to a <literal>powerpc-darwin</literal> machine, if
-  available.</para></listitem>
-
-  <listitem><para>The Nix expression language is ideal for describing
-  build jobs, plus all their dependencies.  For instance, if your
-  package has some dependency, you don't have to manually install it
-  on all the machines in the build farm; they will be built
-  automatically.</para></listitem>
-
-  <listitem><para>Proper release management requires that builds (if
-  deployed) are traceable: it should be possible to figure out from
-  exactly what sources they were built, in what configuration, etc.;
-  and it should be possible to reproduce the build, if necessary.  Nix
-  makes this possible since Nix's hashing scheme uniquely identifies
-  builds, and Nix expressions are self-contained.</para></listitem>
-
-  <listitem><para>Nix will only rebuild things that have actually
-  changed.  For instance, if the sources of a package haven't changed
-  between runs of the build farm, the package won't be rebuilt (unless
-  it was garbage-collected).  Also, dependencies typically don't
-  change very often, so they only need to be built
-  once.</para></listitem>
-
-  <listitem><para>The results of a Nix build farm can be made
-  available through a channel, so successful builds can be deployed to
-  users immediately.</para></listitem>
-
-</itemizedlist>
-
-</para>
-
-
-<section><title>Overview</title>
-
-<para>TODO</para>
-
-<para>The sources of the Nix build farm are at <link
-xlink:href='https://svn.nixos.org/repos/nix/release/trunk'/>.</para>
-
-</section>
-
-
-<section xml:id='sec-distributed-builds'><title>Setting up distributed builds</title>
+<para>Nix supports distributed builds: a local Nix installation can
+forward Nix builds to other machines over the network.  This allows
+multiple builds to be performed in parallel (thus improving
+performance) and allows Nix to perform multi-platform builds in a
+semi-transparent way.  For instance, if you perform a build for a
+<literal>powerpc-darwin</literal> on an <literal>i686-linux</literal>
+machine, Nix can automatically forward the build to a
+<literal>powerpc-darwin</literal> machine, if available.</para>
 
 <para>You can enable distributed builds by setting the environment
 variable <envar>NIX_BUILD_HOOK</envar> to point to a program that Nix
@@ -79,22 +29,22 @@ variable</link>.</para>
 <filename>remote-systems.conf</filename></title>
 <programlisting>
 nix@mcflurry.labs.cs.uu.nl  powerpc-darwin  /home/nix/.ssh/id_quarterpounder_auto  2
-nix@scratchy.labs.cs.uu.nl  i686-linux      /home/nix/.ssh/id_scratchy_auto        1
+nix@scratchy.labs.cs.uu.nl  i686-linux      /home/nix/.ssh/id_scratchy_auto        8 1 kvm
+nix@itchy.labs.cs.uu.nl     i686-linux      /home/nix/.ssh/id_scratchy_auto        8 2
 </programlisting>
 </example>
 
-<para>An example build hook can be found in the Nix build farm
-sources: <link
-xlink:href='https://svn.nixos.org/repos/nix/release/trunk/common/distributed/build-remote.pl'
-/>.  It should be suitable for most purposes, with maybe some minor
-adjustments.  It uses <command>ssh</command> and
-<command>rsync</command> to copy the build inputs and outputs and
-perform the remote build.  You should define a list of available build
-machines and set the environment variable
-<envar>REMOTE_SYSTEMS</envar> to point to it.  An example
-configuration is shown in <xref linkend='ex-remote-systems' />.  Each
-line in the file specifies a machine, with the following bits of
-information:
+<para>Nix ships with a build hook that should be suitable for most
+purposes.  It uses <command>ssh</command> and
+<command>nix-copy-closure</command> to copy the build inputs and
+outputs and perform the remote build.  To use it, you should set
+<envar>NIX_BUILD_HOOK</envar> to
+<filename><replaceable>prefix</replaceable>/libexec/nix/build-remote.pl</filename>.
+You should also define a list of available build machines and point
+the environment variable <envar>NIX_REMOTE_SYSTEMS</envar> to it.  An
+example configuration is shown in <xref linkend='ex-remote-systems'
+/>.  Each line in the file specifies a machine, with the following
+bits of information:
 
 <orderedlist>
   
@@ -104,34 +54,49 @@ information:
   be an alias defined in your
   <filename>~/.ssh/config</filename>.</para></listitem>
 
-  <listitem><para>The Nix platform type identifier, such as
-  <literal>powerpc-darwin</literal>.</para></listitem>
+  <listitem><para>A comma-separated list of Nix platform type
+  identifiers, such as <literal>powerpc-darwin</literal>.  It is
+  possible for a machine to support multiple platform types, e.g.,
+  <literal>i686-linux,x86_64-linux</literal>.</para></listitem>
 
   <listitem><para>The SSH private key to be used to log in to the
   remote machine.  Since builds should be non-interactive, this key
   should not have a passphrase!</para></listitem>
 
-  <listitem><para>The maximum <quote>load</quote> of the remote
-  machine.  This is just the maximum number of jobs that
+  <listitem><para>The maximum number of builds that
   <filename>build-remote.pl</filename> will execute in parallel on the
-  machine.  Typically this should be equal to the number of
-  CPUs.</para></listitem>
+  machine.  Typically this should be equal to the number of CPU cores.
+  For instance, the machine <literal>itchy</literal> in the example
+  will execute up to 8 builds in parallel.</para></listitem>
+
+  <listitem><para>The “speed factor”, indicating the relative speed of
+  the machine.  If there are multiple machines of the right type, Nix
+  will prefer the fastest, taking load into account.</para></listitem>
+
+  <listitem><para>A comma-separated list of
+  <emphasis>features</emphasis>.  If a derivation has the
+  <varname>requiredSystemFeatures</varname> attribute, then
+  <filename>build-remote.pl</filename> will only perform the
+  derivation on a machine that has the specified features.  For instance, the attribute
+  
+<programlisting>
+requiredSystemFeatures = [ "kvm" ];  
+</programlisting>
+
+  will cause the build to be performed on a machine that has the
+  <literal>kvm</literal> feature (i.e., <literal>scratchy</literal> in
+  the example above).</para></listitem>
 
 </orderedlist>
 
 You should also set up the environment variable
-<envar>CURRENT_LOAD</envar> to point at a file that
-<filename>build-remote.pl</filename> uses to remember how many jobs it
-is currently executing remotely.  It doesn't look at the actual load
-on the remote machine, so if you have multiple instances of Nix
-running, they should use the same <envar>CURRENT_LOAD</envar>
-file<footnote><para>Although there are probably some race conditions
-in the script right now.</para></footnote>.  Maybe in the future
-<filename>build-remote.pl</filename> will look at the actual remote
-load.  The load file should exist, so you should just create it as an
-empty file initially.</para>
+<envar>NIX_CURRENT_LOAD</envar> to point at a directory (e.g.,
+<filename>/var/run/nix/current-load</filename>) that
+<filename>build-remote.pl</filename> uses to remember how many builds
+it is currently executing remotely.  It doesn't look at the actual
+load on the remote machine, so if you have multiple instances of Nix
+running, they should use the same <envar>NIX_CURRENT_LOAD</envar>
+file.  Maybe in the future <filename>build-remote.pl</filename> will
+look at the actual remote load.</para>
   
-</section>
-
-
 </chapter>

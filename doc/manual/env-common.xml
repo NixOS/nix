@@ -119,9 +119,10 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
   <para>Specifies the location of the <emphasis>build hook</emphasis>,
   which is a program (typically some script) that Nix will call
   whenever it wants to build a derivation.  This is used to implement
-  distributed builds (see <xref linkend="sec-distributed-builds"
-  />).  The protocol by which the calling Nix process and the build
-  hook communicate is as follows.</para>
+  distributed builds<phrase condition="manual"> (see <xref
+  linkend="chap-distributed-builds" />)</phrase>.  The protocol by
+  which the calling Nix process and the build hook communicate is as
+  follows.</para>
 
   <para>The build hook is called with the following command-line
   arguments:

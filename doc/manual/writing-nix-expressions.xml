@@ -1293,7 +1293,7 @@ set, the attributes of which specify the inputs of the build.</para>
   can only be performed on a machine and operating system matching the
   platform identifier.  (Nix can automatically forward builds for
   other platforms by forwarding them to other machines; see <xref
-  linkend='sec-distributed-builds' />.)</para></listitem>
+  linkend='chap-distributed-builds' />.)</para></listitem>
 
   <listitem><para>There must be an attribute named
   <varname>name</varname> whose value must be a string.  This is used
