@@ -513,8 +513,13 @@ static void performOp(unsigned int clientVersion,
             logType = (LogType) readInt(from);
             printBuildTrace = readInt(from) != 0;
         }
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 6) {
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 6)
             buildCores = readInt(from);
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 10) {
+            int x = readInt(from);
+            Strings ss;
+            ss.push_back(x == 0 ? "false" : "true");
+            overrideSetting("build-use-substitutes", ss);
         }
         startWork();
         stopWork();

@@ -197,6 +197,9 @@ void RemoteStore::setOptions()
     }
     if (GET_PROTOCOL_MINOR(daemonVersion) >= 6)
         writeInt(buildCores, to);
+    if (GET_PROTOCOL_MINOR(daemonVersion) >= 10) 
+        writeInt(queryBoolSetting("build-use-substitutes", true), to);
+    
     processStderr();
 }
 

@@ -1,6 +1,7 @@
 #include "misc.hh"
 #include "store-api.hh"
 #include "local-store.hh"
+#include "globals.hh"
 
 
 namespace nix {
@@ -69,7 +70,8 @@ void queryMissing(StoreAPI & store, const PathSet & targets,
 
             bool mustBuild = false;
             foreach (DerivationOutputs::iterator, i, drv.outputs)
-                if (!store.isValidPath(i->second.path) && !store.hasSubstitutes(i->second.path))
+                if (!store.isValidPath(i->second.path) &&
+                    !(queryBoolSetting("build-use-substitutes", true) && store.hasSubstitutes(i->second.path)))
                     mustBuild = true;
 
             if (mustBuild) {

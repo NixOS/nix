@@ -225,6 +225,15 @@ env-keep-derivations = false
   </varlistentry>
 
   
+  <varlistentry><term><literal>build-use-substitutes</literal></term>
+
+    <listitem><para>If set to <literal>true</literal> (default), Nix
+    will use binary substitutes if available.  This option can be
+    disabled to force building from source.</para></listitem>
+
+  </varlistentry>
+
+    
   <varlistentry xml:id="conf-build-chroot-dirs"><term><literal>build-chroot-dirs</literal></term>
 
     <listitem><para>When builds are performed in a chroot environment,

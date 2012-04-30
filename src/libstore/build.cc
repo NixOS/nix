@@ -962,7 +962,7 @@ void DerivationGoal::haveDerivation()
     foreach (PathSet::iterator, i, invalidOutputs)
         /* Don't bother creating a substitution goal if there are no
            substitutes. */
-        if (worker.store.hasSubstitutes(*i))
+        if (queryBoolSetting("build-use-substitutes", true) && worker.store.hasSubstitutes(*i))
             addWaitee(worker.makeSubstitutionGoal(*i));
     
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
