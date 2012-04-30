@@ -1708,8 +1708,11 @@ void DerivationGoal::startBuilder()
                     /* Hard-linking fails if we exceed the maximum
                        link count on a file (e.g. 32000 of ext3),
                        which is quite possible after a `nix-store
-                       --optimise'.  Make a copy instead. */
-                    if (errno != EMLINK)
+                       --optimise'.  It can also fail if another
+                       process called makeImmutable() on *i after we
+                       did makeMutable().  In those cases, make a copy
+                       instead. */
+                    if (errno != EMLINK && errno != EPERM)
                         throw SysError(format("linking `%1%' to `%2%'") % p % *i);
                     StringSink sink;
                     dumpPath(*i, sink);
