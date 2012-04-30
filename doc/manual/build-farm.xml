@@ -31,6 +31,7 @@ variable</link>.</para>
 nix@mcflurry.labs.cs.uu.nl  powerpc-darwin  /home/nix/.ssh/id_quarterpounder_auto  2
 nix@scratchy.labs.cs.uu.nl  i686-linux      /home/nix/.ssh/id_scratchy_auto        8 1 kvm
 nix@itchy.labs.cs.uu.nl     i686-linux      /home/nix/.ssh/id_scratchy_auto        8 2
+nix@poochie.labs.cs.uu.nl   i686-linux      /home/nix/.ssh/id_scratchy_auto        8 2 kvm perf
 </programlisting>
 </example>
 
@@ -73,11 +74,12 @@ bits of information:
   the machine.  If there are multiple machines of the right type, Nix
   will prefer the fastest, taking load into account.</para></listitem>
 
-  <listitem><para>A comma-separated list of
-  <emphasis>features</emphasis>.  If a derivation has the
+  <listitem><para>A comma-separated list of <emphasis>supported
+  features</emphasis>.  If a derivation has the
   <varname>requiredSystemFeatures</varname> attribute, then
   <filename>build-remote.pl</filename> will only perform the
-  derivation on a machine that has the specified features.  For instance, the attribute
+  derivation on a machine that has the specified features.  For
+  instance, the attribute
   
 <programlisting>
 requiredSystemFeatures = [ "kvm" ];  
@@ -86,6 +88,15 @@ requiredSystemFeatures = [ "kvm" ];
   will cause the build to be performed on a machine that has the
   <literal>kvm</literal> feature (i.e., <literal>scratchy</literal> in
   the example above).</para></listitem>
+
+  <listitem><para>A comma-separated list of <emphasis>mandatory
+  features</emphasis>.  A machine will only be used to build a
+  derivation if all of the machine’s mandatory features appear in the
+  derivation’s <varname>requiredSystemFeatures</varname> attribute.
+  Thus, in the example, the machine <literal>poochie</literal> will
+  only do derivations that have
+  <varname>requiredSystemFeatures</varname> set to <literal>["kvm"
+  "perf"]</literal> or <literal>["perf"]</literal>.</para></listitem>
 
 </orderedlist>
 

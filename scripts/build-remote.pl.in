@@ -70,13 +70,16 @@ if (defined $conf && -e $conf) {
         s/\#.*$//g;
         next if /^\s*$/;
         my @tokens = split /\s/, $_;
+        my @supportedFeatures = split(/,/, $tokens[5] || "");
+        my @mandatoryFeatures = split(/,/, $tokens[6] || "");
         push @machines,
             { hostName => $tokens[0]
             , systemTypes => [ split(/,/, $tokens[1]) ]
             , sshKeys => $tokens[2]
             , maxJobs => int($tokens[3])
             , speedFactor => 1.0 * (defined $tokens[4] ? int($tokens[4]) : 1)
-            , features => [ split(/,/, $tokens[5] || "") ]
+            , supportedFeatures => [ @supportedFeatures, @mandatoryFeatures ]
+            , mandatoryFeatures => [ @mandatoryFeatures ]
             , enabled => 1
             };
     }
@@ -90,8 +93,7 @@ my ($drvPath, $hostName, $slotLock);
 
 REQ: while (1) {
     $_ = <STDIN> || exit 0;
-    my ($amWilling, $neededSystem);
-    ($amWilling, $neededSystem, $drvPath, $requiredFeatures) = split;
+    (my $amWilling, my $neededSystem, $drvPath, my $requiredFeatures) = split;
     my @requiredFeatures = split /,/, $requiredFeatures;
 
     my $canBuildLocally = $amWilling && ($localSystem eq $neededSystem);
@@ -117,7 +119,9 @@ REQ: while (1) {
         LOOP: foreach my $cur (@machines) {
             if ($cur->{enabled}
                 && (grep { $neededSystem eq $_ } @{$cur->{systemTypes}})
-                && all(map { my $f = $_; 0 != grep { $f eq $_ } @{$cur->{features}} } @requiredFeatures))
+                && all(map { my $f = $_; 0 != grep { $f eq $_ } @{$cur->{supportedFeatures}} } (@requiredFeatures, @mandatoryFeatures))
+                && all(map { my $f = $_; 0 != grep { $f eq $_ } @requiredFeatures } @{$cur->{mandatoryFeatures}})
+                )
             {
                 $rightType = 1;
 
