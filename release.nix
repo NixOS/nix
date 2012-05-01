@@ -180,6 +180,7 @@ let
         { extraPackages = [ "perl-DBD-SQLite" "perl-devel" "sqlite" "sqlite-devel" "bzip2-devel" ]; };
       memSize = 1024;
       meta.schedulingPriority = prio;
+      postRPMInstall = "cd /tmp/rpmout/BUILD/nix-* && make installcheck";
     };
 
 
