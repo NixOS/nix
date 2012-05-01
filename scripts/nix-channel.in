@@ -2,7 +2,7 @@
 
 use strict;
 use File::Basename;
-use File::Path qw(make_path);
+use File::Path qw(mkpath);
 use Nix::Config;
 
 my $manifestDir = $Nix::Config::manifestDir;
@@ -21,7 +21,7 @@ my $nixDefExpr = "$home/.nix-defexpr";
 # Figure out the name of the channels profile.
 my $userName = getpwuid($<) or die "cannot figure out user name";
 my $profile = "$Nix::Config::stateDir/profiles/per-user/$userName/channels";
-make_path(dirname $profile, mode => 0755);
+mkpath(dirname $profile, 0, 0755);
     
 my %channels;
 
