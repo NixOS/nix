@@ -242,7 +242,7 @@ AC_CHECK_HEADERS([bzlib.h], [true],
 
 
 # Look for SQLite, a required dependency.
-PKG_CHECK_MODULES([SQLITE3], [sqlite3], [CXXFLAGS="$SQLITE3_CFLAGS $CXXFLAGS"])
+PKG_CHECK_MODULES([SQLITE3], [sqlite3 >= 3.6.19], [CXXFLAGS="$SQLITE3_CFLAGS $CXXFLAGS"])
 
 
 # Whether to use the Boehm garbage collector.
