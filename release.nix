@@ -134,13 +134,9 @@ let
     rpm_opensuse110x86_64 = makeRPM_x86_64 (diskImageFuns: diskImageFuns.opensuse110x86_64) 50;
 
     
-    deb_debian50i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian50i386) 50;
-    deb_debian50x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.debian50x86_64) 50;
     deb_debian60i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian60i386) 50;
     deb_debian60x86_64 = makeDeb_x86_64 (diskImageFunsFun: diskImageFunsFun.debian60x86_64) 50;
     
-    deb_ubuntu910i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu910i386) 50;
-    deb_ubuntu910x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu910x86_64) 50;
     deb_ubuntu1004i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1004i386) 50;
     deb_ubuntu1004x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1004x86_64) 50;
     deb_ubuntu1010i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1010i386) 50;
