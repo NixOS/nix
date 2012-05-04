@@ -124,10 +124,6 @@ let
       };
 
       
-    rpm_fedora11i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora11i386) 30;
-    rpm_fedora11x86_64 = makeRPM_x86_64 (diskImageFuns: diskImageFuns.fedora11x86_64) 30;
-    rpm_fedora12i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora12i386) 40;
-    rpm_fedora12x86_64 = makeRPM_x86_64 (diskImageFuns: diskImageFuns.fedora12x86_64) 40;
     rpm_fedora13i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora13i386) 50;
     rpm_fedora13x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora13x86_64) 50;
     rpm_fedora16i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora16i386) 50;
