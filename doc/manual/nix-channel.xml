@@ -22,7 +22,7 @@
       <arg choice='plain'><option>--add</option> <replaceable>url</replaceable> <arg choice='opt'><replaceable>name</replaceable></arg></arg>
       <arg choice='plain'><option>--remove</option> <replaceable>url</replaceable></arg>
       <arg choice='plain'><option>--list</option></arg>
-      <arg choice='plain'><option>--update</option></arg>
+      <arg choice='plain'><option>--update</option> <arg rep='repeat'><replaceable>names</replaceable></arg></arg>
     </group>
   </cmdsynopsis>
 </refsynopsisdiv>
@@ -67,14 +67,15 @@ condition="manual">See also <xref linkend="sec-channels"
 
   </varlistentry>
 
-  <varlistentry><term><option>--update</option></term>
+  <varlistentry><term><option>--update</option> [<replaceable>names</replaceable>…]</term>
 
     <listitem><para>Downloads the Nix expressions of all subscribed
-    channels, makes them the default for <command>nix-env</command>
-    operations (by symlinking them from the directory
-    <filename>~/.nix-defexpr</filename>), and performs a
-    <command>nix-pull</command> on the manifests of all channels to
-    make pre-built binaries available.</para></listitem>
+    channels (or only those included in
+    <replaceable>names</replaceable> if specified), makes them the
+    default for <command>nix-env</command> operations (by symlinking
+    them from the directory <filename>~/.nix-defexpr</filename>), and
+    performs a <command>nix-pull</command> on the manifests of all
+    channels to make pre-built binaries available.</para></listitem>
 
   </varlistentry>
 

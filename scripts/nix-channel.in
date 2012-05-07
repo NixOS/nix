@@ -76,6 +76,8 @@ sub removeChannel {
 # Fetch Nix expressions and pull manifests from the subscribed
 # channels.
 sub update {
+    my @channelNames = @_;
+        
     readChannels;
 
     # Create the manifests directory if it doesn't exist.
@@ -87,6 +89,8 @@ sub update {
     # Download each channel.
     my $exprs = "";
     foreach my $name (keys %channels) {
+        next if scalar @channelNames > 0 && ! grep { $_ eq $name } @{channelNames};
+        
         my $url = $channels{$name};
         my $origUrl = "$url/MANIFEST";
 
@@ -141,7 +145,7 @@ Usage:
   nix-channel --add URL [CHANNEL-NAME]
   nix-channel --remove CHANNEL-NAME
   nix-channel --list
-  nix-channel --update
+  nix-channel --update [CHANNEL-NAME...]
 EOF
     exit 1;
 }
@@ -182,8 +186,7 @@ while (scalar @ARGV) {
     }
 
     elsif ($arg eq "--update") {
-        usageError if scalar @ARGV != 0;
-        update;
+        update(@ARGV);
         last;
     }
     
