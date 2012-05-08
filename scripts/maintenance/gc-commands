@@ -1,2 +1,0 @@
-./gc-releases.pl /data/releases/patches/all-patches $(find /data/releases -name MANIFEST) | sort > dead
-cat dead | xargs -d '\n' sh -c 'find "$@" -mtime +100 -print' | xargs -d '\n' mv -v --target-directory=/data/releases/trash/
