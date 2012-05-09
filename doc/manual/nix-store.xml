@@ -778,6 +778,44 @@ in Nix itself.</para>
 
 <!--######################################################################-->
 
+<refsection><title>Operation <option>--verify-path</option></title>
+
+<refsection>
+  <title>Synopsis</title>
+  <cmdsynopsis>
+    <command>nix-store</command>
+    <arg choice='plain'><option>--verify-path</option></arg>
+    <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+  </cmdsynopsis>
+</refsection>
+
+<refsection><title>Description</title>
+            
+<para>The operation <option>--verify-paths</option> compares the
+contents of the given store paths to their cryptographic hashes stored
+in Nix’s database.  For every changed path, it prints a warning
+message.  The exit status is 0 if no path has changed, and 1
+otherwise.</para>
+
+</refsection>
+            
+<refsection><title>Example</title>
+
+<para>To verify the integrity of the <command>svn</command> command and all its dependencies:
+
+<screen>
+$ nix-store --verify-path $(nix-store -qR $(which svn))
+</screen>
+
+</para>
+
+</refsection>
+            
+</refsection>
+
+
+<!--######################################################################-->
+
 <refsection xml:id='refsec-nix-store-dump'><title>Operation <option>--dump</option></title>
 
 <refsection>
@@ -1068,6 +1106,122 @@ loads it into the Nix database.</para>
             
 </refsection>
 
+
+<!--######################################################################-->
+
+<refsection><title>Operation <option>--print-env</option></title>
+
+<refsection>
+  <title>Synopsis</title>
+  <cmdsynopsis>
+    <command>nix-store</command>
+    <arg choice='plain'><option>--print-env</option></arg>
+    <arg choice='plain'><replaceable>drvpath</replaceable></arg>
+  </cmdsynopsis>
+</refsection>
+
+<refsection><title>Description</title>
+            
+<para>The operation <option>--print-env</option> prints out the
+environment of a derivation in a format that can be evaluated by a
+shell.  The command line arguments of the builder are placed in the
+variable <envar>_args</envar>.</para>
+
+</refsection>
+            
+<refsection><title>Example</title>
+
+<screen>
+$ nix-store --print-env $(nix-instantiate '&lt;nixpkgs>' -A firefox)
+<replaceable>…</replaceable>
+export src; src='/nix/store/plpj7qrwcz94z2psh6fchsi7s8yihc7k-firefox-12.0.source.tar.bz2'
+export stdenv; stdenv='/nix/store/7c8asx3yfrg5dg1gzhzyq2236zfgibnm-stdenv'
+export system; system='x86_64-linux'
+export _args; _args='-e /nix/store/9krlzvny65gdc8s7kpb6lkx8cd02c25b-default-builder.sh'
+</screen>
+
+</refsection>
+            
+</refsection>
+
+
+<!--######################################################################-->
+
+<refsection><title>Operation <option>--query-failed-paths</option></title>
+
+<refsection>
+  <title>Synopsis</title>
+  <cmdsynopsis>
+    <command>nix-store</command>
+    <arg choice='plain'><option>--query-failed-paths</option></arg>
+  </cmdsynopsis>
+</refsection>
+
+<refsection><title>Description</title>
+            
+<para>If build failure caching is enabled through the
+<literal>build-cache-failures</literal> configuration option, the
+operation <option>--query-failed-paths</option> will print out all
+store paths that have failed to build.</para>
+
+</refsection>
+            
+<refsection><title>Example</title>
+
+<screen>
+$ nix-store --query-failed-paths
+/nix/store/000zi5dcla86l92jn1g997jb06sidm7x-perl-PerlMagick-6.59
+/nix/store/0011iy7sfwbc1qj5a1f6ifjnbcdail8a-haskell-gitit-ghc7.0.4-0.8.1
+/nix/store/001c0yn1hkh86gprvrb46cxnz3pki7q3-gamin-0.1.10
+<replaceable>…</replaceable>
+</screen>
+
+</refsection>
+            
+</refsection>
+
+
+<!--######################################################################-->
+
+<refsection><title>Operation <option>--clear-failed-paths</option></title>
+
+<refsection>
+  <title>Synopsis</title>
+  <cmdsynopsis>
+    <command>nix-store</command>
+    <arg choice='plain'><option>--clear-failed-paths</option></arg>
+    <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+  </cmdsynopsis>
+</refsection>
+
+<refsection><title>Description</title>
+            
+<para>If build failure caching is enabled through the
+<literal>build-cache-failures</literal> configuration option, the
+operation <option>--clear-failed-paths</option> clears the “failed”
+state of the given store paths, allowing them to be built again.  This
+is useful if the failure was actually transient (e.g. because the disk
+was full).</para>
+
+<para>If a path denotes a derivation, its output paths are cleared.
+You can provide the argument <literal>*</literal> to clear all store
+paths.</para>
+
+</refsection>
+            
+<refsection><title>Example</title>
+
+<screen>
+$ nix-store --clear-failed-path /nix/store/000zi5dcla86l92jn1g997jb06sidm7x-perl-PerlMagick-6.59
+$ nix-store --clear-failed-path *
+</screen>
+
+</refsection>
+            
+</refsection>
+
+
+<!--######################################################################-->
 
 <refsection condition="manpage"><title>Environment variables</title>
 

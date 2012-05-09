@@ -132,7 +132,7 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 <refsection><title>Examples</title>
 
 <screen>
-$ nix-build pkgs/top-level/all-packages.nix -A firefox
+$ nix-build '&lt;nixpkgs>' -A firefox
 store derivation is /nix/store/qybprl8sz2lc...-firefox-1.5.0.7.drv
 /nix/store/d18hyl92g30l...-firefox-1.5.0.7
 
