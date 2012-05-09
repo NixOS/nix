@@ -10,6 +10,40 @@
 <variablelist xml:id="env-common">
 
   
+<varlistentry><term><envar>NIX_PATH</envar></term>
+
+  <listitem>
+
+    <para>A colon-separated list of directories used to look up Nix
+    expressions enclosed in angle brackets (i.e.,
+    <literal>&lt;<replaceable>path</replaceable>></literal>).  For
+    instance, the value
+
+    <screen>
+/home/eelco/Dev:/etc/nixos</screen>
+
+    will cause Nix to look for paths relative to
+    <filename>/home/eelco/Dev</filename> and
+    <filename>/etc/nixos</filename>, in that order.  It is also
+    possible to match paths against a prefix.  For example, the value
+    
+    <screen>
+nixpkgs=/home/eelco/Dev/nixpkgs-branch:/etc/nixos</screen>
+
+    will cause Nix to search for
+    <literal>&lt;nixpkgs/<replaceable>path</replaceable>></literal> in
+    <filename>/home/eelco/Dev/nixpkgs-branch/<replaceable>path</replaceable></filename>
+    and
+    <filename>/etc/nixos/nixpkgs/<replaceable>path</replaceable></filename>.
+    </para>
+
+    <para>The search path can be extended using the
+    <option>-I</option> option, which takes precedence over
+    <envar>NIX_PATH</envar>.</para></listitem>
+
+</varlistentry>
+    
+
 <varlistentry><term><envar>NIX_IGNORE_SYMLINK_STORE</envar></term>
 
   <listitem>
@@ -120,9 +154,12 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
   which is a program (typically some script) that Nix will call
   whenever it wants to build a derivation.  This is used to implement
   distributed builds<phrase condition="manual"> (see <xref
-  linkend="chap-distributed-builds" />)</phrase>.  The protocol by
+  linkend="chap-distributed-builds" />)</phrase>.</para>
+
+  <!--
+  The protocol by
   which the calling Nix process and the build hook communicate is as
-  follows.</para>
+  follows.
 
   <para>The build hook is called with the following command-line
   arguments:
@@ -132,7 +169,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
     <listitem><para>A boolean value <literal>0</literal> or
     <literal>1</literal> specifying whether Nix can locally execute
     more builds, as per the <link
-    linkend="opt-max-jobs"><option>--max-jobs</option> option</link>.
+    linkend="opt-max-jobs"><option>- -max-jobs</option> option</link>.
     The purpose of this argument is to allow the hook to not have to
     maintain bookkeeping for the local machine.</para></listitem>
 
@@ -217,7 +254,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 
       <listitem><para>The reference graph of the inputs, in the format
       accepted by the command <command>nix-store
-      --register-validity</command>.  It is necessary to run this
+      - -register-validity</command>.  It is necessary to run this
       command on the remote machine after copying the inputs to inform
       Nix on the remote machine that the inputs are valid
       paths.</para></listitem>
@@ -234,6 +271,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
   <literal>0</literal> indicates that the hook has failed.  An exit
   code equal to 100 means that the remote build failed (as opposed to,
   e.g., a network error).</para>
+  -->
 
   </listitem>
 
@@ -256,12 +294,13 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 
   <listitem><para>This variable contains the paths of remote Nix
   installations from whichs paths can be copied, separated by colons.
-  See <xref linkend="sec-sharing-packages" /> for details.  Each path
-  should be the <filename>/nix</filename> directory of a remote Nix
-  installation (i.e., not the <filename>/nix/store</filename>
-  directory).  The paths are subject to globbing, so you can set it so
-  something like <literal>/var/run/nix/remote-stores/*/nix</literal>
-  and mount multiple remote filesystems in
+  <phrase condition="manual">See <xref linkend="sec-sharing-packages"
+  /> for details.</phrase>  Each path should be the
+  <filename>/nix</filename> directory of a remote Nix installation
+  (i.e., not the <filename>/nix/store</filename> directory).  The
+  paths are subject to globbing, so you can set it so something like
+  <literal>/var/run/nix/remote-stores/*/nix</literal> and mount
+  multiple remote filesystems in
   <literal>/var/run/nix/remote-stores</literal>.</para>
 
   <para>Note that if you’re building through the <link
