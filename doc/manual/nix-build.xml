@@ -28,7 +28,7 @@
       </group>
       <replaceable>attrPath</replaceable>
     </arg>
-    <arg><option>--drv-link </option><replaceable>drvlink</replaceable></arg>
+    <arg><option>--drv-link</option> <replaceable>drvlink</replaceable></arg>
     <arg><option>--add-drv-link</option></arg>
     <arg><option>--no-out-link</option></arg>
     <arg>
@@ -37,6 +37,11 @@
         <arg choice='plain'><option>-o</option></arg>
       </group>
       <replaceable>outlink</replaceable>
+    </arg>
+    <arg>
+      <option>--run-env</option>
+      <arg><option>--command</option> <replaceable>cmd</replaceable></arg>
+      <arg><option>--exclude</option> <replaceable>regexp</replaceable></arg>
     </arg>
     <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
   </cmdsynopsis>
@@ -69,6 +74,13 @@ linkend="rsec-nix-store-realise"><command>nix-store
 a root of the Nix garbage collector.  This root disappears
 automatically when the <filename>result</filename> symlink is deleted
 or renamed.  So don’t rename the symlink.</para></warning>
+
+<para>The subcommand <command>nix-build --run-env</command> will build
+the dependencies of the derivation, but not the derivation itself.  It
+will then start an interactive shell in which all environment
+variables defined by the derivation have been set to their
+corresponding values.  This is useful for reproducing the environment
+of a derivation for development.</para>
 
 </refsection>
 
@@ -126,6 +138,28 @@ also <xref linkend="sec-common-options" />.</phrase></para>
   <xi:include href="opt-common.xml#xmlns(db=http://docbook.org/ns/docbook)xpointer(//db:variablelist[@xml:id='opt-common']/*)" />
 </variablelist>
 
+<para>The following options apply to <command>nix-build --run-env</command>.</para>
+
+<variablelist>
+
+  <varlistentry><term><option>--command</option> <replaceable>cmd</replaceable></term>
+  
+    <listitem><para>In the environment of the derivation, executeq the
+    command <replaceable>cmd</replaceable> instead of the default
+    interactive shell.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--exclude</option> <replaceable>regexp</replaceable></term>
+  
+    <listitem><para>Do not build any dependencies whose store path
+    matches the regular expression <replaceable>regexp</replaceable>.
+    This option may be specified multiple times.</para></listitem>
+
+  </varlistentry>
+
+</variablelist>
+
 </refsection>
 
 
@@ -141,6 +175,21 @@ lrwxrwxrwx  <replaceable>...</replaceable>  result -> /nix/store/d18hyl92g30l...
 
 $ ls ./result/bin/
 firefox  firefox-config</screen>
+
+<para>To build the dependencies of the package Pan, and start an
+interactive shell in which to build it:
+
+<screen>
+$ nix-build '&lt;nixpkgs>' --run-env -A pan
+$ tar xf $src
+$ cd pan-*
+$ ./configure
+$ make
+$ ./pan/gui/pan
+</screen>
+
+</para>
+
 
 </refsection>
 
