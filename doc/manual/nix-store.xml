@@ -731,6 +731,40 @@ $ nix-store -q --roots $(which svn)
 
 <!--######################################################################-->
 
+<refsection><title>Operation <option>--add</option></title>
+
+<refsection><title>Synopsis</title>
+
+<cmdsynopsis>
+  <command>nix-store</command>
+  <arg choice='plain'><option>--add</option></arg>
+  <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+</cmdsynopsis>
+
+</refsection>
+
+<refsection><title>Description</title>
+
+<para>The operation <option>--add</option> adds the specified paths to
+the Nix store.  It prints the resulting paths in the Nix store on
+standard output.</para>
+
+</refsection>
+
+<refsection><title>Example</title>
+
+<screen>
+$ nix-store --add ./foo.c
+/nix/store/m7lrha58ph6rcnv109yzx1nk1cj7k7zf-foo.c</screen>
+
+</refsection>
+
+</refsection>
+
+
+
+<!--######################################################################-->
+
 <refsection xml:id='refsec-nix-store-verify'><title>Operation <option>--verify</option></title>
 
 <refsection>
