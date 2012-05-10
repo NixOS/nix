@@ -28,4 +28,7 @@ derivation {
   builder = shell;
   args = [ "-e" builder ];
   inherit storePath hashAlgo;
+
+  # Don't build in a chroot because Nix's dependencies may not be there.
+  __noChroot = true;
 }
