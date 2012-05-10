@@ -10,6 +10,8 @@ $confDir = $ENV{"NIX_CONF_DIR"} || "@sysconfdir@/nix";
 $bzip2 = $ENV{"NIX_BZIP2"} || "@bzip2@";
 $curl = "@curl@";
 
+$useBindings = "@perlbindings@" eq "yes";
+
 sub readConfig {
     my %config;
     my $config = "@sysconfdir@/nix/nix.conf";

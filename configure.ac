@@ -71,7 +71,7 @@ fi
 AC_PROG_CC
 AC_PROG_CXX
 
-# To build programs to be run in the build machine
+# To build programs to be run in the build machine.
 if test "$CC_FOR_BUILD" = ""; then
     if test "$cross_compiling" = "yes"; then
         AC_CHECK_PROGS(CC_FOR_BUILD, gcc cc)
@@ -85,13 +85,6 @@ AC_SUBST([CC_FOR_BUILD])
 AC_DISABLE_STATIC
 AC_ENABLE_SHARED
 AC_PROG_LIBTOOL
-
-if test "$enable_shared" = yes; then
-   SUB_CONFIGURE_FLAGS="--enable-shared --disable-static"
-else
-   SUB_CONFIGURE_FLAGS="--enable-static --disable-shared"
-fi
-AC_SUBST(SUB_CONFIGURE_FLAGS)
 
 
 # Use 64-bit file system calls so that we can support files > 2 GiB.
@@ -247,7 +240,7 @@ PKG_CHECK_MODULES([SQLITE3], [sqlite3 >= 3.6.19], [CXXFLAGS="$SQLITE3_CFLAGS $CX
 
 # Whether to use the Boehm garbage collector.
 AC_ARG_ENABLE(gc, AC_HELP_STRING([--enable-gc],
-  [enable garbage collection in the Nix expression evaluator (requires Boehm GC)]),
+  [enable garbage collection in the Nix expression evaluator (requires Boehm GC) [default=no]]),
   gc=$enableval, gc=no)
 if test "$gc" = yes; then
   PKG_CHECK_MODULES([BDW_GC], [bdw-gc])
@@ -275,6 +268,20 @@ fi
 AC_MSG_RESULT(yes)
   
 AC_SUBST(perlFlags)
+
+
+# Whether to build the Perl bindings
+AC_MSG_CHECKING([whether to build the Perl bindings])
+AC_ARG_ENABLE(perl-bindings, AC_HELP_STRING([--enable-perl-bindings],
+  [whether to build the Perl bindings (recommended) [default=yes]]),
+  perlbindings=$enableval, perlbindings=yes)
+if test "$enable_shared" = no; then
+   # Perl bindings require shared libraries.
+   perlbindings=no
+fi
+AM_CONDITIONAL(PERL_BINDINGS, test "$perlbindings" = "yes")
+AC_SUBST(perlbindings)
+AC_MSG_RESULT($perlbindings)
 
 
 AC_ARG_ENABLE(init-state, AC_HELP_STRING([--disable-init-state],

@@ -2,9 +2,12 @@ PERL_MODULES = lib/Nix/Store.pm lib/Nix/Manifest.pm lib/Nix/GeneratePatches.pm l
 
 all: $(PERL_MODULES:.in=)
 
-install-exec-local: $(PERL_MODULES:.in=)
+install-exec-local: $(PERL_MODULES:.in=) install-perl-xs
 	$(INSTALL) -d $(DESTDIR)$(perllibdir)/Nix
 	$(INSTALL_DATA) $(PERL_MODULES:.in=) $(DESTDIR)$(perllibdir)/Nix
+
+if PERL_BINDINGS
+install-perl-xs:
 	$(INSTALL) -d $(DESTDIR)$(perllibdir)/auto/Nix/Store
 	ln -sfn $(pkglibdir)/libNixStore$(dynlib_suffix) $(DESTDIR)$(perllibdir)/auto/Nix/Store/Store$(dynlib_suffix)
 
@@ -24,6 +27,10 @@ AM_CXXFLAGS = \
 
 lib/Nix/Store.cc: lib/Nix/Store.xs
 	xsubpp $^ -output $@
+
+else
+install-perl-xs:
+endif
 
 EXTRA_DIST = $(PERL_MODULES) lib/Nix/Store.xs
 
