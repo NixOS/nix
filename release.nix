@@ -27,8 +27,8 @@ let
           --with-docbook-rng=${docbook5}/xml/rng/docbook
           --with-docbook-xsl=${docbook5_xsl}/xml/xsl/docbook
           --with-xml-flags=--nonet
-          --with-dbi=${perlPackages.DBI}/lib/perl5/site_perl
-          --with-dbd-sqlite=${perlPackages.DBDSQLite}/lib/perl5/site_perl
+          --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
+          --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
         '';
 
         postUnpack = ''
@@ -75,8 +75,8 @@ let
 
         configureFlags = ''
           --disable-init-state
-          --with-dbi=${perlPackages.DBI}/lib/perl5/site_perl
-          --with-dbd-sqlite=${perlPackages.DBDSQLite}/lib/perl5/site_perl
+          --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
+          --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
           --enable-gc
         '';
 
@@ -103,8 +103,8 @@ let
 
         configureFlags = ''
           --disable-init-state
-          --with-dbi=${perlPackages.DBI}/lib/perl5/site_perl
-          --with-dbd-sqlite=${perlPackages.DBDSQLite}/lib/perl5/site_perl
+          --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
+          --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
         '';
 
         dontInstall = false;
