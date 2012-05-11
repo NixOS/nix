@@ -5,8 +5,7 @@
 
     <title>Nix User's Guide</title>
 
-    <subtitle>Draft (Version <xi:include href="version.txt"
-    parse="text" />)</subtitle>
+    <edition>Version <xi:include href="version.txt" parse="text" /></edition>
 
     <author>
       <personname>
@@ -24,7 +23,7 @@
       <holder>Eelco Dolstra</holder>
     </copyright>
 
-    <date>January 2012</date>
+    <date>May 2012</date>
     
   </info>
 

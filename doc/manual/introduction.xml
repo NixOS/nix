@@ -17,10 +17,10 @@ store</emphasis>, usually the directory
 subdirectory such as
 
 <programlisting>
-/nix/store/r8vvq9kq18pz08v249h8my6r9vs7s0n3-firefox-2.0.0.1/
+/nix/store/nlc4z5y1hm8w9s8vm6m1f5hy962xjmp5-firefox-12.0
 </programlisting>
 
-where <literal>r8vvq9kq…</literal> is a unique identifier for the
+where <literal>nlc4z5…</literal> is a unique identifier for the
 package that captures all its dependencies (it’s a cryptographic hash
 of the package’s build dependency graph).  This enables many powerful
 features.</para>
@@ -72,15 +72,14 @@ sounds risky, but it works extremely well.</para>
 
 <simplesect><title>Multi-user support</title>
 
-<para>Starting at version 0.11, Nix has multi-user support.  This
-means that non-privileged users can securely install software.  Each
-user can have a different <emphasis>profile</emphasis>, a set of
-packages in the Nix store that appear in the user’s
-<envar>PATH</envar>.  If a user installs a package that another user
-has already installed previously, the package won’t be built or
-downloaded a second time.  At the same time, it is not possible for
-one user to inject a Trojan horse into a package that might be used by
-another user.</para>
+<para>Nix has multi-user support.  This means that non-privileged
+users can securely install software.  Each user can have a different
+<emphasis>profile</emphasis>, a set of packages in the Nix store that
+appear in the user’s <envar>PATH</envar>.  If a user installs a
+package that another user has already installed previously, the
+package won’t be built or downloaded a second time.  At the same time,
+it is not possible for one user to inject a Trojan horse into a
+package that might be used by another user.</para>
 
 <!--
 <para>More details can be found in Section 3 of our <a
@@ -264,8 +263,10 @@ xlink:href="http://www.cs.uu.nl/wiki/Trace/WebHome">TraCE
 project</link> (2003-2008).  The project was funded by the Software
 Engineering Research Program <link
 xlink:href="http://www.jacquard.nl/">Jacquard</link> to improve the
-support for variability in software systems.  Further funding is now
-provided by the NIRICT LaQuSo Build Farm project.</para>
+support for variability in software systems.  Further funding was
+provided by the NIRICT LaQuSo Build Farm project.  Development is
+currently supported by <link
+xlink:href="http://www.logicblox.com/">LogicBlox</link>.</para>
 
 </section>
 
@@ -275,7 +276,7 @@ provided by the NIRICT LaQuSo Build Farm project.</para>
 <para>This manual tells you how to install and use Nix and how to
 write Nix expressions for software not already in the Nix Packages
 collection.  It also discusses some advanced topics, such as setting
-up a Nix-based build farm.</para>
+up distributed multi-platform building.</para>
 
 </section>
 
@@ -315,13 +316,12 @@ Upgrading in a Purely Functional Component Deployment Model
 paper <citetitle
 xlink:href='http://www.st.ewi.tudelft.nl/~dolstra/pubs/servicecm-scm12-final.pdf'>
 Service Configuration Management</citetitle> shows how services (e.g.,
-web servers) can be deployed and managed through Nix.  A short
-overview of NixOS is given in the HotOS XI paper <citetitle
-xlink:href="http://www.st.ewi.tudelft.nl/~dolstra/pubs/hotos-final.pdf">Purely
-Functional System Configuration Management</citetitle>.  The Nix
-homepage has <link
-xlink:href="http://nixos.org/docs/papers.html">an up-to-date list
-of Nix-related papers</link>.</para>
+web servers) can be deployed and managed through Nix.  An overview of
+NixOS is given in the JFP article <citetitle
+xlink:href="http://www.st.ewi.tudelft.nl/~dolstra/pubs/nixos-jfp-final.pdf">NixOS:
+A Purely Functional Linux Distribution</citetitle>.  The Nix homepage
+has <link xlink:href="http://nixos.org/docs/papers.html">an up-to-date
+list of Nix-related papers</link>.</para>
 
 <para>Nix is the subject of Eelco Dolstra’s PhD thesis <citetitle
 xlink:href="http://igitur-archive.library.uu.nl/dissertations/2006-0118-200031/index.htm">The

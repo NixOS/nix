@@ -11,6 +11,13 @@ the things that tell Nix how to build packages.  It starts with a
 simple example (a Nix expression for GNU Hello), and then moves
 on to a more in-depth look at the Nix expression language.</para>
 
+<note><para>This chapter is mostly about the Nix expression language.
+For more extensive information on adding packages to the Nix Packages
+collection (such as functions in the standard environment and coding
+conventions), please consult <link
+xlink:href="http://hydra.nixos.org/job/nixpkgs/trunk/tarball/latest/download-by-type/doc/manual">its
+manual</link>.</para></note>
+
 
 <section><title>A simple Nix expression</title>
 
@@ -315,15 +322,15 @@ error check.</para>
 
 rec { <co xml:id='ex-hello-composition-co-1' />
   
-  hello = (import ../applications/misc/hello/ex-1 <co xml:id='ex-hello-composition-co-2' />) { <co xml:id='ex-hello-composition-co-3' />
+  hello = import ../applications/misc/hello/ex-1 <co xml:id='ex-hello-composition-co-2' /> { <co xml:id='ex-hello-composition-co-3' />
     inherit fetchurl stdenv perl;
   };
 
-  perl = (import ../development/interpreters/perl) { <co xml:id='ex-hello-composition-co-4' />
+  perl = import ../development/interpreters/perl { <co xml:id='ex-hello-composition-co-4' />
     inherit fetchurl stdenv;
   };
 
-  fetchurl = (import ../build-support/fetchurl) { 
+  fetchurl = import ../build-support/fetchurl { 
     inherit stdenv; ...
   };
   
@@ -389,6 +396,23 @@ some fragments of
     the function, what we get is its body, which is the call to
     <varname>stdenv.mkDerivation</varname> in <xref
     linkend='ex-hello-nix' />).</para>
+
+    <note><para>Nixpkgs has a convenience function
+    <function>callPackage</function> that imports and calls a
+    function, filling in any missing arguments by passing the
+    corresponding attribute from the Nixpkgs set, like this:
+
+<programlisting>
+hello = callPackage ../applications/misc/hello/ex-1 { };
+</programlisting>
+
+    If necessary, you can set or override arguments:
+
+<programlisting>
+hello = callPackage ../applications/misc/hello/ex-1 { stdenv = myStdenv; };
+</programlisting>
+
+    </para></note>
 
   </callout>
 
@@ -813,7 +837,23 @@ occur once.</para>
 <programlisting>
 { a = "Foo"; b = "Bar"; }.a</programlisting>
 
-evaluates to <literal>"Foo"</literal>.</para>
+evaluates to <literal>"Foo"</literal>.  It is possible to provide a
+default value in an attribute selection using the
+<literal>or</literal> keyword.  For example,
+
+<programlisting>
+{ a = "Foo"; b = "Bar"; }.c or "Xyzzy"</programlisting>
+
+will evaluate to <literal>"Xyzzy"</literal> because there is no
+<varname>c</varname> attribute in the set.</para>
+
+<para>You can use arbitrary string constants as attribute names by
+enclosing them in quotes:
+
+<programlisting>
+{ "foo bar" = 123; "nix-1.0" = 456; }."foo bar" </programlisting>
+
+This will evaluate to <literal>123</literal>.</para>
 
 </simplesect>
 
@@ -1189,12 +1229,17 @@ weakest binding).</para>
     </thead>
     <tbody>
       <row>
-        <entry><replaceable>e</replaceable> .
-        <replaceable>id</replaceable></entry>
+        <entry><replaceable>e</replaceable> <literal>.</literal>
+        <replaceable>attrpath</replaceable>
+        [ <literal>or</literal> <replaceable>def</replaceable> ]
+        </entry>
         <entry>none</entry>
-        <entry>Select attribute named <replaceable>id</replaceable>
-        from attribute set <replaceable>e</replaceable>.  Abort
-        evaluation if the attribute doesn’t exist.</entry>
+        <entry>Select attribute denoted by the attribute path
+        <replaceable>attrpath</replaceable> from attribute set
+        <replaceable>e</replaceable>.  (An attribute path is a
+        dot-separated list of attribute names.)  If the attribute
+        doesn’t exist, return <replaceable>def</replaceable> if
+        provided, otherwise abort evaluation.</entry>
       </row>
       <row>
         <entry><replaceable>e1</replaceable> <replaceable>e2</replaceable></entry>
@@ -1203,31 +1248,31 @@ weakest binding).</para>
         argument <replaceable>e2</replaceable>.</entry>
       </row>
       <row>
-        <entry><replaceable>e</replaceable> ?
-        <replaceable>id</replaceable></entry>
+        <entry><replaceable>e</replaceable> <literal>?</literal>
+        <replaceable>attrpath</replaceable></entry>
         <entry>none</entry>
         <entry>Test whether attribute set <replaceable>e</replaceable>
-        contains an attribute named <replaceable>id</replaceable>;
+        contains the attribute denoted by <replaceable>attrpath</replaceable>;
         return <literal>true</literal> or
         <literal>false</literal>.</entry>
       </row>
       <row>
-        <entry><replaceable>e1</replaceable> ++ <replaceable>e2</replaceable></entry>
+        <entry><replaceable>e1</replaceable> <literal>++</literal> <replaceable>e2</replaceable></entry>
         <entry>right</entry>
         <entry>List concatenation.</entry>
       </row>
       <row>
-        <entry><replaceable>e1</replaceable> + <replaceable>e2</replaceable></entry>
+        <entry><replaceable>e1</replaceable> <literal>+</literal> <replaceable>e2</replaceable></entry>
         <entry>left</entry>
         <entry>String or path concatenation.</entry>
       </row>
       <row>
-        <entry>! <replaceable>e</replaceable></entry>
+        <entry><literal>!</literal> <replaceable>e</replaceable></entry>
         <entry>left</entry>
         <entry>Boolean negation.</entry>
       </row>
       <row>
-        <entry><replaceable>e1</replaceable> //
+        <entry><replaceable>e1</replaceable> <literal>//</literal>
         <replaceable>e2</replaceable></entry>
         <entry>right</entry>
         <entry>Return an attribute set consisting of the attributes in
@@ -1236,31 +1281,31 @@ weakest binding).</para>
         precedence over the former in case of equally named attributes).</entry>
       </row>
       <row>
-        <entry><replaceable>e1</replaceable> ==
+        <entry><replaceable>e1</replaceable> <literal>==</literal>
         <replaceable>e2</replaceable></entry>
         <entry>none</entry>
         <entry>Equality.</entry>
       </row>
       <row>
-        <entry><replaceable>e1</replaceable> !=
+        <entry><replaceable>e1</replaceable> <literal>!=</literal>
         <replaceable>e2</replaceable></entry>
         <entry>none</entry>
         <entry>Inequality.</entry>
       </row>
       <row>
-        <entry><replaceable>e1</replaceable> &amp;&amp;
+        <entry><replaceable>e1</replaceable> <literal>&amp;&amp;</literal>
         <replaceable>e2</replaceable></entry>
         <entry>left</entry>
         <entry>Logical AND.</entry>
       </row>
       <row>
-        <entry><replaceable>e1</replaceable> ||
+        <entry><replaceable>e1</replaceable> <literal>||</literal>
         <replaceable>e2</replaceable></entry>
         <entry>left</entry>
         <entry>Logical OR.</entry>
       </row>
       <row>
-        <entry><replaceable>e1</replaceable> ->
+        <entry><replaceable>e1</replaceable> <literal>-></literal>
         <replaceable>e2</replaceable></entry>
         <entry>none</entry>
         <entry>Logical implication (equivalent to
@@ -1662,7 +1707,17 @@ impureEnvVars = [ "http_proxy" "https_proxy" <replaceable>...</replaceable> ];
   </varlistentry>
 
   
-  
+  <varlistentry><term><varname>preferLocalBuild</varname></term>
+
+    <listitem><para>If this attribute is set to
+    <literal>true</literal> and <link
+    linkend="chap-distributed-builds">distributed building is
+    enabled</link>, then, if possible, perform this build locally
+    instead of forwarding it to a remote machine.  This is appropriate
+    for trivial builders where the cost of doing a remote build would
+    exceed the cost of building locally.</para></listitem>
+
+  </varlistentry>
 
 </variablelist>
 

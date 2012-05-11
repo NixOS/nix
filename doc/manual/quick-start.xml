@@ -11,9 +11,9 @@ to the following chapters.</para>
 
 <orderedlist>
 
-<listitem><para>Download a source tarball, RPM or Deb from <link
-xlink:href='http://nixos.org/'/>.  Build source distributions using
-the regular sequence:
+<listitem><para>Download a source tarball or RPM or Debian/Ubuntu
+package from <link xlink:href='http://nixos.org/'/>.  Build source
+distributions using the regular sequence:
         
 <screen>
 $ tar xvfj nix-<replaceable>version</replaceable>.tar.bz2
@@ -41,8 +41,7 @@ file).</para></listitem>
 <listitem><para>Subscribe to the Nix Packages channel.
 
 <screen>
-$ nix-channel --add \
-    http://nixos.org/releases/nixpkgs/channels/nixpkgs-unstable</screen>
+$ nix-channel --add http://nixos.org/releases/nixpkgs/channels/nixpkgs-unstable</screen>
 
 </para></listitem>
 
@@ -108,10 +107,10 @@ numbers).</para></listitem>
 
 <listitem><para>You can also install specific packages directly from
 your web browser.  For instance, you can go to <link
-xlink:href="http://hydra.nixos.org/jobset/nixpkgs/trunk/channel/latest" />
-and click on any link for the individual packages for your platform.
-Associate <literal>application/nix-package</literal> with the program
-<filename>/nix/bin/nix-install-package</filename>.  A window should
+xlink:href="http://hydra.nixos.org/jobset/nixpkgs/trunk/channel/latest"
+/> and click on any link for the individual packages for your
+platform.  Associate <literal>application/nix-package</literal> with
+the program <command>nix-install-package</command>.  A window should
 appear asking you whether it’s okay to install the package.  Say
 <literal>Y</literal>.  The package and all its dependencies will be
 installed.</para></listitem>

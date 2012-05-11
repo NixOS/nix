@@ -234,7 +234,6 @@ div.glosslist dt
 
 span.command strong
 {
-    font-family: monospace;
     font-weight: normal;
     color: #400000;
 }
@@ -248,4 +247,9 @@ table
 {
     border-collapse: collapse;
     box-shadow: 0.4em 0.4em 0.5em #e0e0e0;
+}
+
+div.affiliation
+{
+    font-style: italic;
 }

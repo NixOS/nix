@@ -15,11 +15,11 @@
   <listitem><para>Linux (particularly on x86, x86_64, and
   PowerPC).</para></listitem>
 
-  <listitem><para>Mac OS X, both on Intel and
-  PowerPC.</para></listitem>
+  <listitem><para>Mac OS X.</para></listitem>
 
   <listitem><para>FreeBSD (only tested on Intel).</para></listitem>
 
+  <!--
   <listitem><para>Windows through <link
   xlink:href="http://www.cygwin.com/">Cygwin</link>.</para>
 
@@ -28,6 +28,7 @@
   partition.</para></warning>
 
   </listitem>
+  -->
 
 </itemizedlist>
 
@@ -47,7 +48,7 @@ for Red Hat, SuSE, and Fedora Core are also available.</para>
 
 <para>Alternatively, the most recent sources of Nix can be obtained
 from its <link
-xlink:href="https://github.com/NixOS/nix">git
+xlink:href="https://github.com/NixOS/nix">Git
 repository</link>.  For example, the following command will check out
 the latest revision into a directory called
 <filename>nix</filename>:</para>
@@ -56,8 +57,8 @@ the latest revision into a directory called
 $ git clone https://github.com/NixOS/nix</screen>
 
 <para>Likewise, specific releases can be obtained from the <link
-xlink:href="https://github.com/NixOS/nix/tags">tags
-</link> of the repository.</para>
+xlink:href="https://github.com/NixOS/nix/tags">tags</link> of the
+repository.</para>
 
 </section>
 
@@ -85,9 +86,9 @@ installed, including development headers and libraries.  If your
 distribution does not provide these, you can obtain bzip2 from <link
 xlink:href="http://www.bzip.org/"/>.</para>
 
-<para>Nix requires the SQLite embedded database library.  If your
-distribution does not provide it, please install it from <link
-xlink:href="http://www.sqlite.org/" />.</para>
+<para>Nix requires the SQLite embedded database library, version
+3.6.19 or higher.  If your distribution does not provide it, please
+install it from <link xlink:href="http://www.sqlite.org/" />.</para>
 
 <para>Nix requires the Perl DBI and DBD::SQLite libraries, which are
 available from <link xlink:href="http://search.cpan.org/">CPAN</link>
@@ -109,21 +110,20 @@ xlink:href="http://docbook.sourceforge.net/projects/xsl/">DocBook XSL
 stylesheets</link> and optionally the <link
 xlink:href="http://www.docbook.org/schemas/5x"> DocBook 5.0 RELAX NG
 schemas</link>.  Note that these are only required if you modify the
-manual sources or when you are building from the Subversion
+manual sources or when you are building from the Git
 repository.</para>
 
 <para>To build the parser, very <emphasis>recent</emphasis> versions
 of Bison and Flex are required.  (This is because Nix needs GLR
 support in Bison and reentrancy support in Flex.)  For Bison, you need
 version 2.3 or higher (1.875 does <emphasis>not</emphasis> work),
-which can be obtained from
-the <link xlink:href="ftp://alpha.gnu.org/pub/gnu/bison">GNU FTP
-server</link>.  For Flex, you need version 2.5.33, which is available
-on <link xlink:href="http://lex.sourceforge.net/">SourceForge</link>.
-Slightly older versions may also work, but ancient versions like the
-ubiquitous 2.5.4a won't.  Note that these are only required if you
-modify the parser or when you are building from the Subversion
-repository.</para>
+which can be obtained from the <link
+xlink:href="ftp://alpha.gnu.org/pub/gnu/bison">GNU FTP server</link>.
+For Flex, you need version 2.5.33, which is available on <link
+xlink:href="http://lex.sourceforge.net/">SourceForge</link>.  Slightly
+older versions may also work, but ancient versions like the ubiquitous
+2.5.4a won't.  Note that these are only required if you modify the
+parser or when you are building from the Git repository.</para>
 
 </section>
 
@@ -140,8 +140,8 @@ $ make install</screen>
 
 </para>
 
-<para>When building from the Subversion repository, these should be
-preceded by the command:
+<para>When building from the Git repository, these should be preceded
+by the command:
 
 <screen>
 $ ./bootstrap.sh</screen>
