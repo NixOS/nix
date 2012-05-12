@@ -80,11 +80,7 @@ let
           --enable-gc
         '';
 
-        installCheckPhase = ''
-          make installcheck
-        '';
-
-        postPhases = [ "installCheckPhase" ];
+        doInstallCheck = true;
       };
 
 
@@ -109,11 +105,7 @@ let
 
         dontInstall = false;
 
-        installCheckPhase = ''
-          make installcheck
-        '';
-
-        postPhases = [ "installCheckPhase" ];
+        doInstallCheck = true;
         
         lcovFilter = [ "*/boost/*" "*-tab.*" ];
 
@@ -195,10 +187,7 @@ let
       meta.schedulingPriority = prio;
       configureFlags = "--sysconfdir=/etc";
       debRequires = [ "curl" "libdbd-sqlite3-perl" "libsqlite3-0" "libbz2-1.0" ];
-      installCheckPhase = ''
-        make installcheck
-      '';
-      postPhases = [ "installCheckPhase" ];
+      doInstallCheck = true;
     };
 
 
