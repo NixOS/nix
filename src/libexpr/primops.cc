@@ -49,20 +49,29 @@ static void prim_import(EvalState & state, Value * * args, Value & v)
         if (!store->isValidPath(ctx))
             throw EvalError(format("cannot import `%1%', since path `%2%' is not valid")
                 % path % ctx);
-        if (isDerivation(ctx))
-            try {
-                /* For performance, prefetch all substitute info. */
-                PathSet willBuild, willSubstitute, unknown;
-                unsigned long long downloadSize, narSize;
-                queryMissing(*store, singleton<PathSet>(ctx),
-                    willBuild, willSubstitute, unknown, downloadSize, narSize);
+        if (isDerivation(ctx)) {
+            string outputName = decodeContext(*i).second;
+            Derivation drv = derivationFromPath(*store, ctx);
+
+            if (!store->isValidPath(drv.outputs[outputName].path)) {
+                if (settings.readOnlyMode)
+                    throw ImportError(format("cannot import `%1%', since output `%2%' of derivation `%3%' is not valid")
+                        % path % outputName % ctx);
+                try {
+                    /* For performance, prefetch all substitute info. */
+                    PathSet willBuild, willSubstitute, unknown;
+                    unsigned long long downloadSize, narSize;
+                    queryMissing(*store, singleton<PathSet>(ctx),
+                        willBuild, willSubstitute, unknown, downloadSize, narSize);
                   
-                /* !!! If using a substitute, we only need to fetch
-                   the selected output of this derivation. */
-                store->buildPaths(singleton<PathSet>(ctx));
-            } catch (Error & e) {
-                throw ImportError(e.msg());
+                    /* !!! If using a substitute, we only need to fetch
+                       the selected output of this derivation. */
+                    store->buildPaths(singleton<PathSet>(ctx));
+                } catch (Error & e) {
+                    throw ImportError(e.msg());
+                }
             }
+        }
     }
 
     if (isStorePath(path) && store->isValidPath(path) && isDerivation(path)) {
