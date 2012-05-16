@@ -64,6 +64,10 @@ extern unsigned int buildCores;
    database. */
 extern bool readOnlyMode;
 
+/* Whether failures due to read-only mode should cause a crash or allow
+   the tool to try to work around them. */
+extern bool recoverFromReadOnlyErrors;
+
 /* The canonical system name, as returned by config.guess. */ 
 extern string thisSystem;
 

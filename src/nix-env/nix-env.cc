@@ -867,6 +867,7 @@ static void opQuery(Globals & globals,
     enum { sInstalled, sAvailable } source = sInstalled;
 
     readOnlyMode = true; /* makes evaluation a bit faster */
+    recoverFromReadOnlyErrors = true;
 
     for (Strings::iterator i = args.begin(); i != args.end(); ) {
         string arg = *i++;

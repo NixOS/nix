@@ -14,7 +14,7 @@ namespace nix {
 
 struct MetaValue
 {
-    enum { tpNone, tpString, tpStrings, tpInt } type;
+    enum { tpNone, tpString, tpStrings, tpInt, tpNeedsRealise } type;
     string stringValue;
     Strings stringValues;
     int intValue;
@@ -37,11 +37,13 @@ public:
     string name;
     string attrPath; /* path towards the derivation */
     string system;
+    bool threwImportReadOnlyError;
+    bool metaThrewImportReadOnlyError;
 
     /* !!! make this private */
     Bindings * attrs;
 
-    DrvInfo() : metaInfoRead(false), attrs(0) { };
+    DrvInfo() : metaInfoRead(false), attrs(0), threwImportReadOnlyError(false), metaThrewImportReadOnlyError(false) { };
 
     string queryDrvPath(EvalState & state) const;
     string queryOutPath(EvalState & state) const;
