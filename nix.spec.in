@@ -1,11 +1,11 @@
-%define enable_setuid ""
-%define nix_user "nix"
-%define nix_group "nix"
+%global enable_setuid ""
+%global nix_user "nix"
+%global nix_group "nix"
 
 # If set, the Nix user and group will be created by the RPM
 # pre-install script.
-%define nix_user_uid ""
-%define nix_group_gid ""
+%global nix_user_uid ""
+%global nix_group_gid ""
 
 Summary: The Nix software deployment system
 Name: nix
