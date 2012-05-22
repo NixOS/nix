@@ -110,7 +110,7 @@ let
           mkdir -p $out/nix-support
           echo "file binary-dist $fn" >> $out/nix-support/hydra-build-products
           tar cvfj $fn \
-            --owner=root --group=root --absolute-names \
+            --owner=0 --group=0 --absolute-names \
             --transform "s,$TMPDIR/install,/usr/bin/nix-finish-install," \
             --transform "s,$TMPDIR/reginfo,/nix/store/reginfo," \
             $TMPDIR/install $TMPDIR/reginfo $storePaths
