@@ -63,7 +63,7 @@ let
 
 
     build =
-      { system ? "i686-linux" }:
+      { system ? "x86_64-linux" }:
 
       with import nixpkgs { inherit system; };
 
@@ -80,8 +80,41 @@ let
           --enable-gc
         '';
 
+        enableParallelBuilding = true;
+
         doInstallCheck = true;
       };
+
+    binaryTarball =
+      { system ? "x86_64-linux" }:
+
+      with import nixpkgs { inherit system; };
+
+      let
+        toplevel = build { inherit system; };
+        version = toplevel.src.version;
+      in
+
+      runCommand "nix-binary-tarball-${version}"
+        { exportReferencesGraph = [ "closure" toplevel ];
+          buildInputs = [ perl ];
+          meta.description = "Distribution-independent Nix bootstrap binaries for ${system}";
+        }
+        ''
+          storePaths=$(perl ${pathsFromGraph} ./closure)
+          printRegistration=1 perl ${pathsFromGraph} ./closure > $TMPDIR/reginfo
+          substitute ${./scripts/install-nix-from-closure.sh} $TMPDIR/install \
+            --subst-var-by nix ${toplevel} --subst-var-by regInfo /nix/store/reginfo
+          chmod +x $TMPDIR/install
+          fn=$out/nix-${version}-${system}.tar.bz2
+          mkdir -p $out/nix-support
+          echo "file binary-dist $fn" >> $out/nix-support/hydra-build-products
+          tar cvfj $fn \
+            --owner=root --group=root --absolute-names \
+            --transform "s,$TMPDIR/install,/usr/bin/nix-finish-install," \
+            --transform "s,$TMPDIR/reginfo,/nix/store/reginfo," \
+            $TMPDIR/install $TMPDIR/reginfo $storePaths
+        '';
 
 
     coverage =
