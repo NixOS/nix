@@ -40,11 +40,155 @@ platforms as well.</para>
 </section>
 
 
-<section><title>Obtaining Nix</title>
+<section><title>Installing a binary distribution</title>
 
-<para>The easiest way to obtain Nix is to download a <link
-xlink:href="http://nixos.org/">source distribution</link>.  RPMs
-for Red Hat, SuSE, and Fedora Core are also available.</para>
+<para>The easiest way to install Nix is to use a binary package.
+Binary packages of the latest stable release are available for Fedora,
+Debian, Ubuntu, Mac OS X and various other systems from the <link
+xlink:href="http://nixos.org/nix/download.html">Nix homepage</link>.
+You can also get builds of the latest development release from our
+<link
+xlink:href="http://hydra.nixos.org/view/nix/trunk/latest">continuous
+build system</link>.</para>
+
+<para>For Fedora, RPM packages are available.  These can be installed
+or upgraded using <command>rpm -U</command>.  For example,
+
+<screen>
+$ rpm -U nix-1.0-1.i386.rpm</screen>
+
+</para>
+
+<para>For Debian and Ubuntu, you can download a Deb package and
+install it like this:
+
+<screen>
+$ dpkg -i nix_1.0-1_amd64.deb</screen>
+
+</para>
+
+<para>For other platforms, including Mac OS X (Darwin), FreeBSD and
+other Linux distributions, you can download a binary tarball.  It
+contains Nix and all its dependencies.  You should unpack it in the
+root directory, then run <command>nix-finish-install</command>:
+
+<screen>
+$ cd /
+$ tar xfj nix-1.1-x86_64-darwin.tar.bz2
+$ nix-finish-install
+</screen>
+
+After this you can delete
+<filename>/usr/bin/nix-finish-install</filename>.</para>
+
+<para>If you plan to use Nix from a single non-root user account, it’s
+probably convenient to change the ownership of the entire Nix store
+and database to that user account.  In that case, install as follows:
+
+<screen>
+alice$ cd /
+alice$ sudo tar xfj nix-1.1-x86_64-darwin.tar.bz2
+alice$ sudo chown -R alice /nix
+alice$ nix-finish-install
+</screen>
+
+</para>
+
+<para>Nix can be uninstalled using <command>rpm -e nix</command> or
+<command>dpkg -r nix</command> on RPM- and Dpkg-based systems,
+respectively.  After this you should manually remove the Nix store and
+other auxiliary data, if desired:
+
+<screen>
+$ rm -rf /nix</screen>
+
+</para>
+
+</section>
+
+
+<section><title>Installing Nix from source</title>
+
+<para>If no binary package is available, you can download and compile
+a source distribution.</para>
+
+<section><title>Prerequisites</title>
+
+<itemizedlist>
+
+  <listitem><para>A fairly recent version of GCC/G++.  Version 2.95
+  and higher should work.  Clang will also work.</para></listitem>
+
+  <listitem><para>Perl 5.8 or higher.</para></listitem>
+
+  <listitem><para><command>pkg-config</command> to locate
+  dependencies.  If your distribution does not provide it, you can get
+  it from <link
+  xlink:href="http://www.freedesktop.org/wiki/Software/pkg-config"
+  />.</para></listitem>
+
+  <listitem><para>The bzip2 compressor program and the
+  <literal>libbz2</literal> library.  Thus you must have bzip2
+  installed, including development headers and libraries.  If your
+  distribution does not provide these, you can obtain bzip2 from <link
+  xlink:href="http://www.bzip.org/"/>.</para></listitem>
+
+  <listitem><para>The SQLite embedded database library, version 3.6.19
+  or higher.  If your distribution does not provide it, please install
+  it from <link xlink:href="http://www.sqlite.org/" />.</para></listitem>
+
+  <listitem><para>The Perl DBI and DBD::SQLite libraries, which are
+  available from <link
+  xlink:href="http://search.cpan.org/">CPAN</link> if your
+  distribution does not provide them.</para></listitem>
+
+  <listitem><para>The <link
+  xlink:href="http://www.hpl.hp.com/personal/Hans_Boehm/gc/">Boehm
+  garbage collector</link> to reduce the evaluator’s memory
+  consumption (optional).  To enable it, install
+  <literal>pkgconfig</literal> and the Boehm garbage collector, and
+  pass the flag <option>--enable-gc</option> to
+  <command>configure</command>.</para></listitem>
+
+  <listitem><para>The <command>xmllint</command> and
+  <command>xsltproc</command> programs to build this manual and the
+  man-pages.  These are part of the <literal>libxml2</literal> and
+  <literal>libxslt</literal> packages, respectively.  You also need
+  the <link
+  xlink:href="http://docbook.sourceforge.net/projects/xsl/">DocBook
+  XSL stylesheets</link> and optionally the <link
+  xlink:href="http://www.docbook.org/schemas/5x"> DocBook 5.0 RELAX NG
+  schemas</link>.  Note that these are only required if you modify the
+  manual sources or when you are building from the Git
+  repository.</para></listitem>
+
+  <listitem><para>Recent versions of Bison and Flex to build the
+  parser.  (This is because Nix needs GLR support in Bison and
+  reentrancy support in Flex.)  For Bison, you need version 2.3 or
+  higher (1.875 does <emphasis>not</emphasis> work), which can be
+  obtained from the <link
+  xlink:href="ftp://alpha.gnu.org/pub/gnu/bison">GNU FTP
+  server</link>.  For Flex, you need version 2.5.33, which is
+  available on <link
+  xlink:href="http://lex.sourceforge.net/">SourceForge</link>.
+  Slightly older versions may also work, but ancient versions like the
+  ubiquitous 2.5.4a won't.  Note that these are only required if you
+  modify the parser or when you are building from the Git
+  repository.</para></listitem>
+
+</itemizedlist>
+
+</section>
+
+
+<section><title>Obtaining a source distribution</title>
+
+<para>The source tarball of the most recent stable release can be
+downloaded from the <link
+xlink:href="http://nixos.org/nix/download.html">Nix homepage</link>.
+You can also grab the <link
+xlink:href="http://hydra.nixos.org/view/nix/trunk/latest/tarball/download-by-type/file/source-dist">most
+recent development release</link>.</para>
 
 <para>Alternatively, the most recent sources of Nix can be obtained
 from its <link
@@ -59,71 +203,6 @@ $ git clone https://github.com/NixOS/nix</screen>
 <para>Likewise, specific releases can be obtained from the <link
 xlink:href="https://github.com/NixOS/nix/tags">tags</link> of the
 repository.</para>
-
-</section>
-
-
-<section><title>Prerequisites</title>
-
-<para><emphasis>The following prerequisites only apply when you build
-from source</emphasis>.  Binary releases (e.g., RPMs) have no
-prerequisites.</para>
-
-<para>A fairly recent version of GCC/G++ is required.  Version 2.95
-and higher should work.  Clang will also work.</para>
-
-<para>Nix requires Perl, version 5.8 or higher.</para>
-
-<para>Nix requires <command>pkg-config</command> to locate its
-dependencies.  If your distribution does not provide it, you can get
-it from <link
-xlink:href="http://www.freedesktop.org/wiki/Software/pkg-config"
-/>.</para>
-
-<para>Nix requires the bzip2 compressor program and the
-<literal>libbz2</literal> library.  Thus you must have bzip2
-installed, including development headers and libraries.  If your
-distribution does not provide these, you can obtain bzip2 from <link
-xlink:href="http://www.bzip.org/"/>.</para>
-
-<para>Nix requires the SQLite embedded database library, version
-3.6.19 or higher.  If your distribution does not provide it, please
-install it from <link xlink:href="http://www.sqlite.org/" />.</para>
-
-<para>Nix requires the Perl DBI and DBD::SQLite libraries, which are
-available from <link xlink:href="http://search.cpan.org/">CPAN</link>
-if your distribution does not provide them.</para>
-
-<para>Nix can optionally use the <link
-xlink:href="http://www.hpl.hp.com/personal/Hans_Boehm/gc/">Boehm
-garbage collector</link> to reduce the evaluator’s memory consumption.
-To enable it, install <literal>pkgconfig</literal> and the Boehm
-garbage collector, and pass the flag <option>--enable-gc</option> to
-<command>configure</command>.</para>
-
-<para>To build this manual and the man-pages you need the
-<command>xmllint</command> and <command>xsltproc</command> programs,
-which are part of the <literal>libxml2</literal> and
-<literal>libxslt</literal> packages, respectively.  You also need the
-<link
-xlink:href="http://docbook.sourceforge.net/projects/xsl/">DocBook XSL
-stylesheets</link> and optionally the <link
-xlink:href="http://www.docbook.org/schemas/5x"> DocBook 5.0 RELAX NG
-schemas</link>.  Note that these are only required if you modify the
-manual sources or when you are building from the Git
-repository.</para>
-
-<para>To build the parser, very <emphasis>recent</emphasis> versions
-of Bison and Flex are required.  (This is because Nix needs GLR
-support in Bison and reentrancy support in Flex.)  For Bison, you need
-version 2.3 or higher (1.875 does <emphasis>not</emphasis> work),
-which can be obtained from the <link
-xlink:href="ftp://alpha.gnu.org/pub/gnu/bison">GNU FTP server</link>.
-For Flex, you need version 2.5.33, which is available on <link
-xlink:href="http://lex.sourceforge.net/">SourceForge</link>.  Slightly
-older versions may also work, but ancient versions like the ubiquitous
-2.5.4a won't.  Note that these are only required if you modify the
-parser or when you are building from the Git repository.</para>
 
 </section>
 
@@ -179,33 +258,6 @@ options.</para>
 
 </section>
 
-
-<section><title>Installing a binary distribution</title>
-
-<para>RPM and Deb packages of Nix for a number of different versions
-of Fedora, openSUSE, Debian and Ubuntu can be downloaded from <link
-xlink:href="http://nixos.org/" />.  Once downloaded, the RPMs can be
-installed or upgraded using <command>rpm -U</command>.  For example,
-
-<screen>
-$ rpm -U nix-0.13pre18104-1.i386.rpm</screen>
-
-Likewise, for a Deb package:
-
-<screen>
-$ dpkg -i nix_0.13pre18104-1_amd64.deb</screen>
-
-</para>
-
-<para>Nix can be uninstalled using <command>rpm -e nix</command> or
-<command>dpkg -r nix</command>.  After this you should manually remove
-the Nix store and other auxiliary data, if desired:
-
-<screen>
-$ rm -rf /nix/store
-$ rm -rf /nix/var</screen>
-
-</para>
 
 </section>
 
