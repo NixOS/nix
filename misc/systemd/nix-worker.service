@@ -1,0 +1,12 @@
+[Unit]
+Description=Helper daemon for managing secure, multi-user Nix stores
+After=syslog.target
+
+[Service]
+Type=simple
+#PIDFile=/var/run/tuned/tuned.pid
+#BusName=com.redhat.tuned
+ExecStart=/usr/bin/nix-worker --daemon
+
+[Install]
+WantedBy=multi-user.target
