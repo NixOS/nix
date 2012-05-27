@@ -11,7 +11,7 @@ nix-pull nix-push: download-using-manifests.pl
 
 install-exec-local: download-using-manifests.pl copy-from-other-stores.pl find-runtime-roots.pl
 	$(INSTALL) -d $(DESTDIR)$(sysconfdir)/profile.d
-	$(INSTALL_PROGRAM) nix-profile.sh $(DESTDIR)$(sysconfdir)/profile.d/nix.sh
+	$(INSTALL_DATA) nix-profile.sh $(DESTDIR)$(sysconfdir)/profile.d/nix.sh
 	$(INSTALL) -d $(DESTDIR)$(libexecdir)/nix
 	$(INSTALL_PROGRAM) find-runtime-roots.pl $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL_PROGRAM) build-remote.pl $(DESTDIR)$(libexecdir)/nix 
