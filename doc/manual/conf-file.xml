@@ -276,6 +276,18 @@ build-use-chroot = /dev /proc /bin</programlisting>
   </varlistentry>
 
 
+  <varlistentry><term><literal>build-keep-log</literal></term>
+
+    <listitem><para>If set to <literal>true</literal> (the default),
+    Nix will write the build log of a derivation (i.e. the standard
+    output and error of its builder) to the directory
+    <filename>/nix/var/log/nix/drvs</filename>.  The build log can be
+    retrieved using the command <command>nix-store -l
+    <replaceable>path</replaceable></command>.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry><term><literal>system</literal></term>
 
     <listitem><para>This option specifies the canonical Nix system

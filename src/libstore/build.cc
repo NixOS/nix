@@ -2032,6 +2032,8 @@ string drvsLogDir = "drvs";
 
 Path DerivationGoal::openLogFile()
 {
+    if (!queryBoolSetting("build-keep-log", true)) return "";
+    
     /* Create a log file. */
     Path dir = (format("%1%/%2%") % nixLogDir % drvsLogDir).str();
     createDirs(dir);
@@ -2071,7 +2073,8 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
     {
         if (verbosity >= buildVerbosity)
             writeToStderr((unsigned char *) data.data(), data.size());
-        writeFull(fdLogFile, (unsigned char *) data.data(), data.size());
+        if (fdLogFile != -1)
+            writeFull(fdLogFile, (unsigned char *) data.data(), data.size());
     }
 
     if (hook && fd == hook->fromHook.readSide)
