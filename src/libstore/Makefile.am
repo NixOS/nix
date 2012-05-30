@@ -10,7 +10,7 @@ pkginclude_HEADERS = \
   globals.hh references.hh pathlocks.hh \
   worker-protocol.hh
 
-libstore_la_LIBADD = ../libutil/libutil.la ../boost/format/libformat.la @SQLITE3_LIBS@
+libstore_la_LIBADD = ../libutil/libutil.la ../boost/format/libformat.la @SQLITE3_LIBS@ -lbz2
 
 EXTRA_DIST = schema.sql
 
