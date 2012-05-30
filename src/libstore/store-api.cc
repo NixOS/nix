@@ -322,10 +322,10 @@ namespace nix {
 boost::shared_ptr<StoreAPI> store;
 
 
-boost::shared_ptr<StoreAPI> openStore()
+boost::shared_ptr<StoreAPI> openStore(bool reserveSpace)
 {
     if (getEnv("NIX_REMOTE") == "")
-        return boost::shared_ptr<StoreAPI>(new LocalStore());
+        return boost::shared_ptr<StoreAPI>(new LocalStore(reserveSpace));
     else
         return boost::shared_ptr<StoreAPI>(new RemoteStore());
 }

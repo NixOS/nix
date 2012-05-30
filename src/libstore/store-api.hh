@@ -327,7 +327,7 @@ extern boost::shared_ptr<StoreAPI> store;
 
 /* Factory method: open the Nix database, either through the local or
    remote implementation. */
-boost::shared_ptr<StoreAPI> openStore();
+boost::shared_ptr<StoreAPI> openStore(bool reserveSpace = true);
 
 
 /* Display a set of paths in human-readable form (i.e., between quotes

@@ -91,7 +91,7 @@ public:
 
     /* Initialise the local store, upgrading the schema if
        necessary. */
-    LocalStore();
+    LocalStore(bool reserveSpace = true);
 
     ~LocalStore();
     

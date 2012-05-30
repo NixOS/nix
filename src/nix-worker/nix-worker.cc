@@ -625,8 +625,12 @@ static void processConnection()
             throw Error("if you run `nix-worker' as root, then you MUST set `build-users-group'!");
 #endif
 
+        bool reserveSpace = true;
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 11)
+            reserveSpace = readInt(from) != 0;
+
         /* Open the store. */
-        store = boost::shared_ptr<StoreAPI>(new LocalStore());
+        store = boost::shared_ptr<StoreAPI>(new LocalStore(reserveSpace));
 
         stopWork();
         to.flush();

@@ -195,7 +195,7 @@ void checkStoreNotSymlink()
 }
 
 
-LocalStore::LocalStore()
+LocalStore::LocalStore(bool reserveSpace)
 {
     substitutablePathsLoaded = false;
     
@@ -220,6 +220,24 @@ LocalStore::LocalStore()
     }
   
     checkStoreNotSymlink();
+
+    /* We can't open a SQLite database if the disk is full.  Since
+       this prevents the garbage collector from running when it's most
+       needed, we reserve some dummy space that we can free just
+       before doing a garbage collection. */
+    try {
+        Path reservedPath = nixDBPath + "/reserved";
+        if (reserveSpace) {
+            int reservedSize = queryIntSetting("gc-reserved-space", 1024 * 1024);
+            struct stat st;
+            if (stat(reservedPath.c_str(), &st) == -1 ||
+                st.st_size != reservedSize)
+                writeFile(reservedPath, string(reservedSize, 'X'));
+        }
+        else
+            deletePath(reservedPath);
+    } catch (SysError & e) { /* don't care about errors */
+    }
 
     /* Acquire the big fat lock in shared mode to make sure that no
        schema upgrade is in progress. */

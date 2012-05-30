@@ -843,7 +843,7 @@ void run(Strings args)
     if (!op) throw UsageError("no operation specified");
 
     if (op != opDump && op != opRestore) /* !!! hack */
-        store = openStore();
+        store = openStore(op != opGC);
 
     op(opFlags, opArgs);
 }

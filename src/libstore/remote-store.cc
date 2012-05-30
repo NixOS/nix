@@ -43,7 +43,7 @@ RemoteStore::RemoteStore()
 }
 
 
-void RemoteStore::openConnection()
+void RemoteStore::openConnection(bool reserveSpace)
 {
     if (initialised) return;
     initialised = true;
@@ -75,6 +75,8 @@ void RemoteStore::openConnection()
         if (GET_PROTOCOL_MAJOR(daemonVersion) != GET_PROTOCOL_MAJOR(PROTOCOL_VERSION))
             throw Error("Nix daemon protocol version not supported");
         writeInt(PROTOCOL_VERSION, to);
+        if (GET_PROTOCOL_MINOR(daemonVersion) >= 11)
+            writeInt(reserveSpace, to);
         processStderr();
     }
     catch (Error & e) {
@@ -462,7 +464,7 @@ Roots RemoteStore::findRoots()
 
 void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
-    openConnection();
+    openConnection(false);
     
     writeInt(wopCollectGarbage, to);
     writeInt(options.action, to);

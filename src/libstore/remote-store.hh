@@ -86,7 +86,7 @@ private:
     unsigned int daemonVersion;
     bool initialised;
 
-    void openConnection();
+    void openConnection(bool reserveSpace = true);
 
     void processStderr(Sink * sink = 0, Source * source = 0);
 
