@@ -10,6 +10,13 @@
 
 #include <iostream>
 #include <algorithm>
+#include <cstdio>
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+#include <bzlib.h>
 
 
 using namespace nix;
@@ -419,20 +426,38 @@ static void opReadLog(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
-    for (Strings::iterator i = opArgs.begin();
-         i != opArgs.end(); ++i)
-    {
+    foreach (Strings::iterator, i, opArgs) {
         Path path = useDeriver(followLinksToStorePath(*i));
         
         Path logPath = (format("%1%/%2%/%3%") %
             nixLogDir % drvsLogDir % baseNameOf(path)).str();
+        Path logBz2Path = logPath + ".bz2";
 
-        if (!pathExists(logPath))
-            throw Error(format("build log of derivation `%1%' is not available") % path);
+        if (pathExists(logPath)) {
+            /* !!! Make this run in O(1) memory. */
+            string log = readFile(logPath);
+            writeFull(STDOUT_FILENO, (const unsigned char *) log.data(), log.size());
+        }
 
-        /* !!! Make this run in O(1) memory. */
-        string log = readFile(logPath);
-        writeFull(STDOUT_FILENO, (const unsigned char *) log.data(), log.size());
+        else if (pathExists(logBz2Path)) {
+            AutoCloseFD fd = open(logBz2Path.c_str(), O_RDONLY);
+            FILE * f = 0;
+            if (fd == -1 || (f = fdopen(fd.borrow(), "r")) == 0)
+                throw SysError(format("opening file `%1%'") % logBz2Path);
+            int err;
+            BZFILE * bz = BZ2_bzReadOpen(&err, f, 0, 0, 0, 0);
+            if (!bz) throw Error(format("cannot open bzip2 file `%1%'") % logBz2Path);
+            unsigned char buf[128 * 1024];
+            do {
+                int n = BZ2_bzRead(&err, bz, buf, sizeof(buf));
+                if (err != BZ_OK && err != BZ_STREAM_END)
+                    throw Error(format("error reading bzip2 file `%1%'") % logBz2Path);
+                writeFull(STDOUT_FILENO, buf, n);
+            } while (err != BZ_STREAM_END);
+            BZ2_bzReadClose(&err, bz);
+        }
+        
+        else throw Error(format("build log of derivation `%1%' is not available") % path);
     }
 }
 
