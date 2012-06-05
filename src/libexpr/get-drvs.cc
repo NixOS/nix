@@ -16,8 +16,8 @@ string DrvInfo::queryDrvPath(EvalState & state) const
             (string &) drvPath = i != attrs->end() ? state.coerceToPath(*i->value, context) : "";
         } catch (ImportReadOnlyError & e) {
             if (!recoverFromReadOnlyErrors) throw;
+            ((ErrorAttrs &) error).push_back("drvPath");
             (string &) drvPath = "<derivation path unknown>";
-            (bool &) threwImportReadOnlyError = true;
         }
     }
     return drvPath;
@@ -33,8 +33,8 @@ string DrvInfo::queryOutPath(EvalState & state) const
             (string &) outPath = i != attrs->end() ? state.coerceToPath(*i->value, context) : "";
         } catch (ImportReadOnlyError & e) {
             if (!recoverFromReadOnlyErrors) throw;
+            ((ErrorAttrs &) error).push_back("drvPath");
             (string &) outPath = "<output path unknown>";
-            (bool &) threwImportReadOnlyError = true;
         }
     }
     return outPath;
@@ -54,8 +54,7 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
         state.forceAttrs(*a->value);
     } catch (ImportReadOnlyError & e) {
         if (!recoverFromReadOnlyErrors) throw;
-        (bool &) metaThrewImportReadOnlyError = true;
-        (bool &) threwImportReadOnlyError = true;
+        ((ErrorAttrs &) error).push_back("meta");
         return meta;
     }
 
@@ -65,9 +64,7 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
             state.forceAttrs(*a->value);
         } catch (ImportReadOnlyError & e) {
             if (!recoverFromReadOnlyErrors) throw;
-            (bool &) threwImportReadOnlyError = true;
-            value.type = MetaValue::tpNeedsRealise;
-            ((MetaInfo &) meta)[i->name] = value;
+            ((ErrorAttrs &) metaError).push_back("i->name");
             continue;
         }
         if (i->value->type == tString) {
@@ -97,6 +94,8 @@ MetaValue DrvInfo::queryMetaInfo(EvalState & state, const string & name) const
 
 void DrvInfo::setMetaInfo(const MetaInfo & meta)
 {
+    error.remove("meta");
+    metaError.clear();
     metaInfoRead = true;
     this->meta = meta;
 }
@@ -132,8 +131,7 @@ static bool getDerivation(EvalState & state, Value & v,
             drv.name = state.forceStringNoCtx(*i->value);
         } catch (ImportReadOnlyError & e) {
             if (!recoverFromReadOnlyErrors) throw;
-            drv.name = "<name unknown>";
-            drv.threwImportReadOnlyError = true;
+            drv.error.push_back("name");
         }
 
         Bindings::iterator i2 = v.attrs->find(state.sSystem);
@@ -144,8 +142,7 @@ static bool getDerivation(EvalState & state, Value & v,
                 drv.system = state.forceStringNoCtx(*i2->value);
             } catch (ImportReadOnlyError & e) {
                 if (!recoverFromReadOnlyErrors) throw;
-                drv.system = "<system unknown>";
-                drv.threwImportReadOnlyError = true;
+                drv.error.push_back("system");
             }
 
         drv.attrs = v.attrs;

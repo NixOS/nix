@@ -23,6 +23,7 @@ struct MetaValue
 
 typedef std::map<string, MetaValue> MetaInfo;
 
+typedef Strings ErrorAttrs;
 
 struct DrvInfo
 {
@@ -37,13 +38,13 @@ public:
     string name;
     string attrPath; /* path towards the derivation */
     string system;
-    bool threwImportReadOnlyError;
-    bool metaThrewImportReadOnlyError;
+    ErrorAttrs error;
+    ErrorAttrs metaError;
 
     /* !!! make this private */
     Bindings * attrs;
 
-    DrvInfo() : metaInfoRead(false), attrs(0), threwImportReadOnlyError(false), metaThrewImportReadOnlyError(false) { };
+    DrvInfo() : metaInfoRead(false), attrs(0) { };
 
     string queryDrvPath(EvalState & state) const;
     string queryOutPath(EvalState & state) const;
@@ -52,11 +53,13 @@ public:
 
     void setDrvPath(const string & s)
     {
+        error.remove("drvPath");
         drvPath = s;
     }
     
     void setOutPath(const string & s)
     {
+        error.remove("outPath");
         outPath = s;
     }
 
