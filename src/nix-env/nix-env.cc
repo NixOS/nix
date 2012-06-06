@@ -169,7 +169,8 @@ static void loadDerivations(EvalState & state, Path nixExprPath,
        system. */
     for (DrvInfos::iterator i = elems.begin(), j; i != elems.end(); i = j) {
         j = i; j++;
-        if (systemFilter != "*" && i->system != systemFilter)
+        if (systemFilter != "*" && i->error.find("system") == i->error.end() &&
+                i->system != systemFilter)
             elems.erase(i);
     }
 }
