@@ -23,7 +23,7 @@ struct MetaValue
 
 typedef std::map<string, MetaValue> MetaInfo;
 
-typedef Strings ErrorAttrs;
+typedef std::set<string> ErrorAttrs;
 
 struct DrvInfo
 {
@@ -53,13 +53,13 @@ public:
 
     void setDrvPath(const string & s)
     {
-        error.remove("drvPath");
+        error.erase("drvPath");
         drvPath = s;
     }
     
     void setOutPath(const string & s)
     {
-        error.remove("outPath");
+        error.erase("outPath");
         outPath = s;
     }
 

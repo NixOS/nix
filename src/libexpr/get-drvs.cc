@@ -16,7 +16,7 @@ string DrvInfo::queryDrvPath(EvalState & state) const
             (string &) drvPath = i != attrs->end() ? state.coerceToPath(*i->value, context) : "";
         } catch (ImportReadOnlyError & e) {
             if (!recoverFromReadOnlyErrors) throw;
-            ((ErrorAttrs &) error).push_back("drvPath");
+            ((ErrorAttrs &) error).insert("drvPath");
             (string &) drvPath = "<derivation path unknown>";
         }
     }
@@ -33,7 +33,7 @@ string DrvInfo::queryOutPath(EvalState & state) const
             (string &) outPath = i != attrs->end() ? state.coerceToPath(*i->value, context) : "";
         } catch (ImportReadOnlyError & e) {
             if (!recoverFromReadOnlyErrors) throw;
-            ((ErrorAttrs &) error).push_back("drvPath");
+            ((ErrorAttrs &) error).insert("drvPath");
             (string &) outPath = "<output path unknown>";
         }
     }
@@ -54,7 +54,7 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
         state.forceAttrs(*a->value);
     } catch (ImportReadOnlyError & e) {
         if (!recoverFromReadOnlyErrors) throw;
-        ((ErrorAttrs &) error).push_back("meta");
+        ((ErrorAttrs &) error).insert("meta");
         return meta;
     }
 
@@ -64,7 +64,7 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
             state.forceAttrs(*a->value);
         } catch (ImportReadOnlyError & e) {
             if (!recoverFromReadOnlyErrors) throw;
-            ((ErrorAttrs &) metaError).push_back("i->name");
+            ((ErrorAttrs &) metaError).insert("i->name");
             continue;
         }
         if (i->value->type == tString) {
@@ -94,7 +94,7 @@ MetaValue DrvInfo::queryMetaInfo(EvalState & state, const string & name) const
 
 void DrvInfo::setMetaInfo(const MetaInfo & meta)
 {
-    error.remove("meta");
+    error.erase("meta");
     metaError.clear();
     metaInfoRead = true;
     this->meta = meta;
@@ -131,7 +131,7 @@ static bool getDerivation(EvalState & state, Value & v,
             drv.name = state.forceStringNoCtx(*i->value);
         } catch (ImportReadOnlyError & e) {
             if (!recoverFromReadOnlyErrors) throw;
-            drv.error.push_back("name");
+            drv.error.insert("name");
         }
 
         Bindings::iterator i2 = v.attrs->find(state.sSystem);
@@ -142,7 +142,7 @@ static bool getDerivation(EvalState & state, Value & v,
                 drv.system = state.forceStringNoCtx(*i2->value);
             } catch (ImportReadOnlyError & e) {
                 if (!recoverFromReadOnlyErrors) throw;
-                drv.error.push_back("system");
+                drv.error.insert("system");
             }
 
         drv.attrs = v.attrs;
