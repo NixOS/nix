@@ -760,6 +760,12 @@ static bool cmpChars(char a, char b)
 
 static bool cmpElemByName(const DrvInfo & a, const DrvInfo & b)
 {
+    if (a.error.find("name") != a.error.end())
+        return false;
+
+    if (b.error.find("name") != b.error.end())
+        return true;
+
     return lexicographical_compare(
         a.name.begin(), a.name.end(),
         b.name.begin(), b.name.end(), cmpChars);
