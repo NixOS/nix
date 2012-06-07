@@ -1034,11 +1034,14 @@ static void opQuery(Globals & globals,
                 }
             }
 
-            if (xmlOutput) {
-                if (i->system != "") attrs["system"] = i->system;
-            }
-            else if (printSystem) 
-                columns.push_back(i->system);
+            if (i->error.find("system") == i->error.end())
+                if (xmlOutput) {
+                    if (i->system != "") attrs["system"] = i->system;
+                }
+                else if (printSystem) 
+                    columns.push_back(i->system);
+            else if(!xmlOutput && printSystem)
+                    columns.push_back("!system-unknown-in-readonly-mode!");
 
             if (printDrvPath) {
                 string drvPath = i->queryDrvPath(globals.state);
