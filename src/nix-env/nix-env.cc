@@ -821,14 +821,13 @@ static VersionDiff compareVersionAgainstSet(
     const DrvInfo & elem, const DrvInfos & elems, string & version)
 {
     VersionDiff diff = cvUnavail;
+    version = "?";
 
     if (elem.error.find("name") != elem.error.end())
         return diff;
 
     DrvName name(elem.name);
 
-    version = "?";
-    
     for (DrvInfos::const_iterator i = elems.begin(); i != elems.end(); ++i) {
         if (i->error.find("name") != i->error.end())
             continue;
