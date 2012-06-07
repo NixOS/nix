@@ -212,9 +212,12 @@ static int comparePriorities(EvalState & state,
 
 static bool isPrebuilt(EvalState & state, const DrvInfo & elem)
 {
+    string outpath = elem.queryOutPath(state); 
+    if (elem.error.find("outPath") != elem.error.end())
+        return false;
     return
-        store->isValidPath(elem.queryOutPath(state)) ||
-        store->hasSubstitutes(elem.queryOutPath(state));
+        store->isValidPath(outpath) ||
+        store->hasSubstitutes(outpath);
 }
 
 
