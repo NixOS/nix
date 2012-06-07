@@ -820,12 +820,18 @@ typedef enum { cvLess, cvEqual, cvGreater, cvUnavail } VersionDiff;
 static VersionDiff compareVersionAgainstSet(
     const DrvInfo & elem, const DrvInfos & elems, string & version)
 {
-    DrvName name(elem.name);
-    
     VersionDiff diff = cvUnavail;
+
+    if (elem.error.find("name") != elem.error.end())
+        return diff;
+
+    DrvName name(elem.name);
+
     version = "?";
     
     for (DrvInfos::const_iterator i = elems.begin(); i != elems.end(); ++i) {
+        if (i->error.find("name") != i->error.end())
+            continue;
         DrvName name2(i->name);
         if (name.name == name2.name) {
             int d = compareVersions(name.version, name2.version);
