@@ -1040,15 +1040,18 @@ static void opQuery(Globals & globals,
                 }
                 else if (printSystem) 
                     columns.push_back(i->system);
-            else if(!xmlOutput && printSystem)
+            else if (!xmlOutput && printSystem)
                     columns.push_back("!system-unknown-in-readonly-mode!");
 
             if (printDrvPath) {
                 string drvPath = i->queryDrvPath(globals.state);
-                if (xmlOutput) {
-                    if (drvPath != "") attrs["drvPath"] = drvPath;
-                } else
-                    columns.push_back(drvPath == "" ? "-" : drvPath);
+                if (i->error.find("drvPath") == i->error.end())
+                    if (xmlOutput) {
+                        if (drvPath != "") attrs["drvPath"] = drvPath;
+                    } else
+                        columns.push_back(drvPath == "" ? "-" : drvPath);
+                else if (!xmlOutput)
+                    columns.push_back("!drvPath-unknown-in-readonly-mode!");
             }
         
             if (printOutPath) {
