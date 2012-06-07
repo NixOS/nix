@@ -14,7 +14,7 @@ namespace nix {
 
 struct MetaValue
 {
-    enum { tpNone, tpString, tpStrings, tpInt, tpNeedsRealise } type;
+    enum { tpNone, tpString, tpStrings, tpInt } type;
     string stringValue;
     Strings stringValues;
     int intValue;
