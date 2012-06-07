@@ -1056,10 +1056,13 @@ static void opQuery(Globals & globals,
         
             if (printOutPath) {
                 string outPath = i->queryOutPath(globals.state);
-                if (xmlOutput) {
-                    if (outPath != "") attrs["outPath"] = outPath;
-                } else
-                    columns.push_back(outPath);
+                if (i->error.find("outPath") == i->error.end())
+                    if (xmlOutput) {
+                        if (outPath != "") attrs["outPath"] = outPath;
+                    } else
+                        columns.push_back(outPath);
+                else if (!xmlOutput)
+                    columns.push_back("!outPath-unknown-in-readonly-mode!");
             }
 
             if (printDescription) {
