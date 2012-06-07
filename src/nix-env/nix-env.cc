@@ -1067,39 +1067,48 @@ static void opQuery(Globals & globals,
 
             if (printDescription) {
                 MetaInfo meta = i->queryMetaInfo(globals.state);
-                MetaValue value = meta["description"];
-                string descr = value.type == MetaValue::tpString ? value.stringValue : "";
-                if (xmlOutput) {
-                    if (descr != "") attrs["description"] = descr;
-                } else
-                    columns.push_back(descr);
+                if (i->error.find("meta") == i->error.end()) {
+                    MetaValue value = meta["description"];
+                    if (i->metaError.find("description") == i->metaError.end()) {
+                        string descr = value.type == MetaValue::tpString ? value.stringValue : "";
+                        if (xmlOutput) {
+                            if (descr != "") attrs["description"] = descr;
+                        } else
+                            columns.push_back(descr);
+                    } else if (!xmlOutput)
+                        columns.push_back("!description-unknown-in-readonly-mode!");
+                } else if (!xmlOutput)
+                    columns.push_back("!meta-info-unknown-in-readonly-mode!");
             }
 
             if (xmlOutput)
                 if (printMeta) {
-                    XMLOpenElement item(xml, "item", attrs);
                     MetaInfo meta = i->queryMetaInfo(globals.state);
-                    for (MetaInfo::iterator j = meta.begin(); j != meta.end(); ++j) {
-                        XMLAttrs attrs2;
-                        attrs2["name"] = j->first;
-                        if (j->second.type == MetaValue::tpString) {
-                            attrs2["type"] = "string";
-                            attrs2["value"] = j->second.stringValue;
-                            xml.writeEmptyElement("meta", attrs2);
-                        } else if (j->second.type == MetaValue::tpInt) {
-                            attrs2["type"] = "int";
-                            attrs2["value"] = (format("%1%") % j->second.intValue).str();
-                            xml.writeEmptyElement("meta", attrs2);
-                        } else if (j->second.type == MetaValue::tpStrings) {
-                            attrs2["type"] = "strings";
-                            XMLOpenElement m(xml, "meta", attrs2);
-                            foreach (Strings::iterator, k, j->second.stringValues) { 
-                                XMLAttrs attrs3;
-                                attrs3["value"] = *k;
-                                xml.writeEmptyElement("string", attrs3);
-                           }
+                    if (i->error.find("meta") == i->error.end()) {
+                        XMLOpenElement item(xml, "item", attrs);
+                        for (MetaInfo::iterator j = meta.begin(); j != meta.end(); ++j) {
+                            XMLAttrs attrs2;
+                            attrs2["name"] = j->first;
+                            if (j->second.type == MetaValue::tpString) {
+                                attrs2["type"] = "string";
+                                attrs2["value"] = j->second.stringValue;
+                                xml.writeEmptyElement("meta", attrs2);
+                            } else if (j->second.type == MetaValue::tpInt) {
+                                attrs2["type"] = "int";
+                                attrs2["value"] = (format("%1%") % j->second.intValue).str();
+                                xml.writeEmptyElement("meta", attrs2);
+                            } else if (j->second.type == MetaValue::tpStrings) {
+                                attrs2["type"] = "strings";
+                                XMLOpenElement m(xml, "meta", attrs2);
+                                foreach (Strings::iterator, k, j->second.stringValues) { 
+                                    XMLAttrs attrs3;
+                                    attrs3["value"] = *k;
+                                    xml.writeEmptyElement("string", attrs3);
+                                }
+                            }
                         }
-                    }
+                    } else
+                        xml.writeEmptyElement("item", attrs);
                 }
                 else
                     xml.writeEmptyElement("item", attrs);
