@@ -64,7 +64,7 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
             state.forceAttrs(*a->value);
         } catch (ImportReadOnlyError & e) {
             if (!recoverFromReadOnlyErrors) throw;
-            ((ErrorAttrs &) metaError).insert("i->name");
+            ((ErrorAttrs &) metaError).insert(i->name);
             continue;
         }
         if (i->value->type == tString) {
