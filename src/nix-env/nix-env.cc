@@ -960,18 +960,28 @@ static void opQuery(Globals & globals,
             XMLAttrs attrs;
 
             if (printStatus) {
-                bool hasSubs = store->hasSubstitutes(i->queryOutPath(globals.state));
-                bool isInstalled = installed.find(i->queryOutPath(globals.state)) != installed.end();
-                bool isValid = store->isValidPath(i->queryOutPath(globals.state));
-                if (xmlOutput) {
-                    attrs["installed"] = isInstalled ? "1" : "0";
-                    attrs["valid"] = isValid ? "1" : "0";
-                    attrs["substitutable"] = hasSubs ? "1" : "0";
-                } else
-                    columns.push_back(
-                        (string) (isInstalled ? "I" : "-")
-                        + (isValid ? "P" : "-")
-                        + (hasSubs ? "S" : "-"));
+                string outpath = i->queryOutPath(globals.state);
+                if (i->error.find("outPath") == i->error.end()) {
+                    bool hasSubs = store->hasSubstitutes(i->queryOutPath(globals.state));
+                    bool isInstalled = installed.find(i->queryOutPath(globals.state)) != installed.end();
+                    bool isValid = store->isValidPath(i->queryOutPath(globals.state));
+                    if (xmlOutput) {
+                        attrs["installed"] = isInstalled ? "1" : "0";
+                        attrs["valid"] = isValid ? "1" : "0";
+                        attrs["substitutable"] = hasSubs ? "1" : "0";
+                    } else
+                        columns.push_back(
+                            (string) (isInstalled ? "I" : "-")
+                            + (isValid ? "P" : "-")
+                            + (hasSubs ? "S" : "-"));
+                } else {
+                    if (xmlOutput) {
+                        attrs["installed"] = "!";
+                        attrs["valid"] = "!";
+                        attrs["substitutable"] = "!";
+                    } else
+                        columns.push_back("!!!");
+                }
             }
 
             if (xmlOutput)
