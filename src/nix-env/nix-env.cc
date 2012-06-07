@@ -989,10 +989,16 @@ static void opQuery(Globals & globals,
             else if (printAttrPath)
                 columns.push_back(i->attrPath);
 
-            if (xmlOutput)
-                attrs["name"] = i->name;
-            else if (printName)
-                columns.push_back(i->name);
+            if (i->error.find("name") == i->error.end())
+                if (xmlOutput)
+                    attrs["name"] = i->name;
+                else if (printName)
+                    columns.push_back(i->name);
+            else
+                if (xmlOutput)
+                    attrs["name"] = "!name-unknown-in-readonly-mode!";
+                else if (printName)
+                    columns.push_back("!name-unknown-in-readonly-mode!");
 
             if (compareVersions) {
                 /* Compare this element against the versions of the
