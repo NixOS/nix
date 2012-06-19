@@ -695,51 +695,67 @@ static void setSigChldAction(bool autoReap)
 }
 
 
+#define SD_LISTEN_FDS_START 3
+
+
 static void daemonLoop()
 {
     /* Get rid of children automatically; don't let them become
        zombies. */
     setSigChldAction(true);
+
+    AutoCloseFD fdSocket;
+
+    /* Handle socket-based activation by systemd. */
+    if (getEnv("LISTEN_FDS") != "") {
+        if (getEnv("LISTEN_PID") != int2String(getpid()) || getEnv("LISTEN_FDS") != "1")
+            throw Error("unexpected systemd environment variables");
+        fdSocket = SD_LISTEN_FDS_START;
+    }
+
+    /* Otherwise, create and bind to a Unix domain socket. */
+    else {
     
-    /* Create and bind to a Unix domain socket. */
-    AutoCloseFD fdSocket = socket(PF_UNIX, SOCK_STREAM, 0);
-    if (fdSocket == -1)
-        throw SysError("cannot create Unix domain socket");
+        /* Create and bind to a Unix domain socket. */
+        fdSocket = socket(PF_UNIX, SOCK_STREAM, 0);
+        if (fdSocket == -1)
+            throw SysError("cannot create Unix domain socket");
+
+        string socketPath = nixStateDir + DEFAULT_SOCKET_PATH;
+
+        createDirs(dirOf(socketPath));
+
+        /* Urgh, sockaddr_un allows path names of only 108 characters.
+           So chdir to the socket directory so that we can pass a
+           relative path name. */
+        chdir(dirOf(socketPath).c_str());
+        Path socketPathRel = "./" + baseNameOf(socketPath);
+    
+        struct sockaddr_un addr;
+        addr.sun_family = AF_UNIX;
+        if (socketPathRel.size() >= sizeof(addr.sun_path))
+            throw Error(format("socket path `%1%' is too long") % socketPathRel);
+        strcpy(addr.sun_path, socketPathRel.c_str());
+
+        unlink(socketPath.c_str());
+
+        /* Make sure that the socket is created with 0666 permission
+           (everybody can connect --- provided they have access to the
+           directory containing the socket). */
+        mode_t oldMode = umask(0111);
+        int res = bind(fdSocket, (struct sockaddr *) &addr, sizeof(addr));
+        umask(oldMode);
+        if (res == -1)
+            throw SysError(format("cannot bind to socket `%1%'") % socketPath);
+
+        chdir("/"); /* back to the root */
+
+        if (listen(fdSocket, 5) == -1)
+            throw SysError(format("cannot listen on socket `%1%'") % socketPath);
+    }
 
     closeOnExec(fdSocket);
-    
-    string socketPath = nixStateDir + DEFAULT_SOCKET_PATH;
-
-    createDirs(dirOf(socketPath));
-
-    /* Urgh, sockaddr_un allows path names of only 108 characters.  So
-       chdir to the socket directory so that we can pass a relative
-       path name. */
-    chdir(dirOf(socketPath).c_str());
-    Path socketPathRel = "./" + baseNameOf(socketPath);
-    
-    struct sockaddr_un addr;
-    addr.sun_family = AF_UNIX;
-    if (socketPathRel.size() >= sizeof(addr.sun_path))
-        throw Error(format("socket path `%1%' is too long") % socketPathRel);
-    strcpy(addr.sun_path, socketPathRel.c_str());
-
-    unlink(socketPath.c_str());
-
-    /* Make sure that the socket is created with 0666 permission
-       (everybody can connect --- provided they have access to the
-       directory containing the socket). */
-    mode_t oldMode = umask(0111);
-    int res = bind(fdSocket, (struct sockaddr *) &addr, sizeof(addr));
-    umask(oldMode);
-    if (res == -1)
-        throw SysError(format("cannot bind to socket `%1%'") % socketPath);
-
-    chdir("/"); /* back to the root */
-
-    if (listen(fdSocket, 5) == -1)
-        throw SysError(format("cannot listen on socket `%1%'") % socketPath);
-
+        
     /* Loop accepting connections. */
     while (1) {
 
