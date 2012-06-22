@@ -1,6 +1,7 @@
 #include "get-drvs.hh"
 #include "util.hh"
 #include "eval-inline.hh"
+#include "globals.hh"
 
 
 namespace nix {
@@ -11,7 +12,13 @@ string DrvInfo::queryDrvPath(EvalState & state) const
     if (drvPath == "" && attrs) {
         Bindings::iterator i = attrs->find(state.sDrvPath);
         PathSet context;
-        (string &) drvPath = i != attrs->end() ? state.coerceToPath(*i->value, context) : "";
+        try {
+            (string &) drvPath = i != attrs->end() ? state.coerceToPath(*i->value, context) : "";
+        } catch (ImportReadOnlyError & e) {
+            if (!recoverFromReadOnlyErrors) throw;
+            ((ErrorAttrs &) error).insert("drvPath");
+            (string &) drvPath = "<derivation path unknown>";
+        }
     }
     return drvPath;
 }
@@ -22,7 +29,13 @@ string DrvInfo::queryOutPath(EvalState & state) const
     if (outPath == "" && attrs) {
         Bindings::iterator i = attrs->find(state.sOutPath);
         PathSet context;
-        (string &) outPath = i != attrs->end() ? state.coerceToPath(*i->value, context) : "";
+        try {
+            (string &) outPath = i != attrs->end() ? state.coerceToPath(*i->value, context) : "";
+        } catch (ImportReadOnlyError & e) {
+            if (!recoverFromReadOnlyErrors) throw;
+            ((ErrorAttrs &) error).insert("drvPath");
+            (string &) outPath = "<output path unknown>";
+        }
     }
     return outPath;
 }
@@ -37,11 +50,23 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
     Bindings::iterator a = attrs->find(state.sMeta);
     if (a == attrs->end()) return meta; /* fine, empty meta information */
 
-    state.forceAttrs(*a->value);
+    try {
+        state.forceAttrs(*a->value);
+    } catch (ImportReadOnlyError & e) {
+        if (!recoverFromReadOnlyErrors) throw;
+        ((ErrorAttrs &) error).insert("meta");
+        return meta;
+    }
 
     foreach (Bindings::iterator, i, *a->value->attrs) {
         MetaValue value;
-        state.forceValue(*i->value);
+        try {
+            state.forceAttrs(*a->value);
+        } catch (ImportReadOnlyError & e) {
+            if (!recoverFromReadOnlyErrors) throw;
+            ((ErrorAttrs &) metaError).insert(i->name);
+            continue;
+        }
         if (i->value->type == tString) {
             value.type = MetaValue::tpString;
             value.stringValue = i->value->string.s;
@@ -69,6 +94,8 @@ MetaValue DrvInfo::queryMetaInfo(EvalState & state, const string & name) const
 
 void DrvInfo::setMetaInfo(const MetaInfo & meta)
 {
+    error.erase("meta");
+    metaError.clear();
     metaInfoRead = true;
     this->meta = meta;
 }
@@ -96,17 +123,27 @@ static bool getDerivation(EvalState & state, Value & v,
         done.insert(v.attrs);
 
         DrvInfo drv;
-    
+ 
         Bindings::iterator i = v.attrs->find(state.sName);
         /* !!! We really would like to have a decent back trace here. */
         if (i == v.attrs->end()) throw TypeError("derivation name missing");
-        drv.name = state.forceStringNoCtx(*i->value);
+        try {
+            drv.name = state.forceStringNoCtx(*i->value);
+        } catch (ImportReadOnlyError & e) {
+            if (!recoverFromReadOnlyErrors) throw;
+            drv.error.insert("name");
+        }
 
         Bindings::iterator i2 = v.attrs->find(state.sSystem);
         if (i2 == v.attrs->end())
             drv.system = "unknown";
         else
-            drv.system = state.forceStringNoCtx(*i2->value);
+            try {
+                drv.system = state.forceStringNoCtx(*i2->value);
+            } catch (ImportReadOnlyError & e) {
+                if (!recoverFromReadOnlyErrors) throw;
+                drv.error.insert("system");
+            }
 
         drv.attrs = v.attrs;
 
@@ -116,6 +153,9 @@ static bool getDerivation(EvalState & state, Value & v,
         return false;
     
     } catch (AssertionError & e) {
+        return false;
+    } catch (ImportReadOnlyError & e) {
+        if (!recoverFromReadOnlyErrors) throw;
         return false;
     }
 }
@@ -179,6 +219,10 @@ static void getDerivations(EvalState & state, Value & vIn,
                    attribute. */
                 if (v2.type == tAttrs) {
                     Bindings::iterator j = v2.attrs->find(state.symbols.create("recurseForDerivations"));
+                    /* !!! in the weird case where v2.recurseForDerivations
+                       requires evaluating an import of an unrealised derivation
+                       to be evaluated, this will throw in read-only
+                       mode even if read-only recovery was specified */
                     if (j != v2.attrs->end() && state.forceBool(*j->value))
                         getDerivations(state, v2, pathPrefix2, autoArgs, drvs, done);
                 }

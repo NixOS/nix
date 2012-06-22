@@ -45,18 +45,35 @@ static void prim_import(EvalState & state, Value * * args, Value & v)
 
     foreach (PathSet::iterator, i, context) {
         Path ctx = decodeContext(*i).first;
+        string outputName = decodeContext(*i).second;
         assert(isStorePath(ctx));
-        if (!store->isValidPath(ctx))
-            throw EvalError(format("cannot import `%1%', since path `%2%' is not valid")
-                % path % ctx);
-        if (isDerivation(ctx))
-            try {
-                /* !!! If using a substitute, we only need to fetch
-                   the selected output of this derivation. */
-                store->buildDerivations(singleton<PathSet>(ctx));
-            } catch (Error & e) {
-                throw ImportError(e.msg());
+        if (!store->isValidPath(ctx)) {
+            if (outputName.empty())
+                throw EvalError(format("cannot import `%1%', since path `%2%' is not valid")
+                    % path % ctx);
+            else
+                throw ImportReadOnlyError(format("cannot import `%1%', since path `%2%' cannot be written to the store in read-only mode")
+                    % path % ctx);
+        }
+        if (isDerivation(ctx)) {
+            Derivation drv = derivationFromPath(*store, ctx);
+
+            if (outputName.empty() ||
+                    !store->isValidPath(drv.outputs[outputName].path)) {
+                if (readOnlyMode)
+                    foreach (DerivationOutputs::iterator, j, drv.outputs)
+                        if (!store->isValidPath(j->second.path))
+                            throw ImportReadOnlyError(format("cannot import `%1%', since derivation `%2%' cannot be realised in read-only mode")
+                                % path % ctx);
+                try {
+                    /* !!! If using a substitute, we only need to fetch
+                       the selected output of this derivation. */
+                    store->buildDerivations(singleton<PathSet>(ctx));
+                } catch (Error & e) {
+                    throw ImportError(e.msg());
+                }
             }
+        }
     }
 
     state.evalFile(path, v);

@@ -26,6 +26,7 @@ Verbosity buildVerbosity = lvlError;
 unsigned int maxBuildJobs = 1;
 unsigned int buildCores = 1;
 bool readOnlyMode = false;
+bool recoverFromReadOnlyErrors = false;
 string thisSystem = "unset";
 time_t maxSilentTime = 0;
 time_t buildTimeout = 0;

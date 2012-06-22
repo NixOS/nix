@@ -169,7 +169,8 @@ static void loadDerivations(EvalState & state, Path nixExprPath,
        system. */
     for (DrvInfos::iterator i = elems.begin(), j; i != elems.end(); i = j) {
         j = i; j++;
-        if (systemFilter != "*" && i->system != systemFilter)
+        if (systemFilter != "*" && i->error.find("system") == i->error.end() &&
+                i->system != systemFilter)
             elems.erase(i);
     }
 }
@@ -211,9 +212,12 @@ static int comparePriorities(EvalState & state,
 
 static bool isPrebuilt(EvalState & state, const DrvInfo & elem)
 {
+    string outpath = elem.queryOutPath(state); 
+    if (elem.error.find("outPath") != elem.error.end())
+        return false;
     return
-        store->isValidPath(elem.queryOutPath(state)) ||
-        store->hasSubstitutes(elem.queryOutPath(state));
+        store->isValidPath(outpath) ||
+        store->hasSubstitutes(outpath);
 }
 
 
@@ -759,6 +763,12 @@ static bool cmpChars(char a, char b)
 
 static bool cmpElemByName(const DrvInfo & a, const DrvInfo & b)
 {
+    if (a.error.find("name") != a.error.end())
+        return false;
+
+    if (b.error.find("name") != b.error.end())
+        return true;
+
     return lexicographical_compare(
         a.name.begin(), a.name.end(),
         b.name.begin(), b.name.end(), cmpChars);
@@ -810,12 +820,17 @@ typedef enum { cvLess, cvEqual, cvGreater, cvUnavail } VersionDiff;
 static VersionDiff compareVersionAgainstSet(
     const DrvInfo & elem, const DrvInfos & elems, string & version)
 {
-    DrvName name(elem.name);
-    
     VersionDiff diff = cvUnavail;
     version = "?";
-    
+
+    if (elem.error.find("name") != elem.error.end())
+        return diff;
+
+    DrvName name(elem.name);
+
     for (DrvInfos::const_iterator i = elems.begin(); i != elems.end(); ++i) {
+        if (i->error.find("name") != i->error.end())
+            continue;
         DrvName name2(i->name);
         if (name.name == name2.name) {
             int d = compareVersions(name.version, name2.version);
@@ -867,6 +882,7 @@ static void opQuery(Globals & globals,
     enum { sInstalled, sAvailable } source = sInstalled;
 
     readOnlyMode = true; /* makes evaluation a bit faster */
+    recoverFromReadOnlyErrors = true;
 
     for (Strings::iterator i = args.begin(); i != args.end(); ) {
         string arg = *i++;
@@ -949,18 +965,28 @@ static void opQuery(Globals & globals,
             XMLAttrs attrs;
 
             if (printStatus) {
-                bool hasSubs = store->hasSubstitutes(i->queryOutPath(globals.state));
-                bool isInstalled = installed.find(i->queryOutPath(globals.state)) != installed.end();
-                bool isValid = store->isValidPath(i->queryOutPath(globals.state));
-                if (xmlOutput) {
-                    attrs["installed"] = isInstalled ? "1" : "0";
-                    attrs["valid"] = isValid ? "1" : "0";
-                    attrs["substitutable"] = hasSubs ? "1" : "0";
-                } else
-                    columns.push_back(
-                        (string) (isInstalled ? "I" : "-")
-                        + (isValid ? "P" : "-")
-                        + (hasSubs ? "S" : "-"));
+                string outpath = i->queryOutPath(globals.state);
+                if (i->error.find("outPath") == i->error.end()) {
+                    bool hasSubs = store->hasSubstitutes(i->queryOutPath(globals.state));
+                    bool isInstalled = installed.find(i->queryOutPath(globals.state)) != installed.end();
+                    bool isValid = store->isValidPath(i->queryOutPath(globals.state));
+                    if (xmlOutput) {
+                        attrs["installed"] = isInstalled ? "1" : "0";
+                        attrs["valid"] = isValid ? "1" : "0";
+                        attrs["substitutable"] = hasSubs ? "1" : "0";
+                    } else
+                        columns.push_back(
+                            (string) (isInstalled ? "I" : "-")
+                            + (isValid ? "P" : "-")
+                            + (hasSubs ? "S" : "-"));
+                } else {
+                    if (xmlOutput) {
+                        attrs["installed"] = "!";
+                        attrs["valid"] = "!";
+                        attrs["substitutable"] = "!";
+                    } else
+                        columns.push_back("!!!");
+                }
             }
 
             if (xmlOutput)
@@ -968,10 +994,16 @@ static void opQuery(Globals & globals,
             else if (printAttrPath)
                 columns.push_back(i->attrPath);
 
-            if (xmlOutput)
-                attrs["name"] = i->name;
-            else if (printName)
-                columns.push_back(i->name);
+            if (i->error.find("name") == i->error.end())
+                if (xmlOutput)
+                    attrs["name"] = i->name;
+                else if (printName)
+                    columns.push_back(i->name);
+            else
+                if (xmlOutput)
+                    attrs["name"] = "!name-unknown-in-readonly-mode!";
+                else if (printName)
+                    columns.push_back("!name-unknown-in-readonly-mode!");
 
             if (compareVersions) {
                 /* Compare this element against the versions of the
@@ -1002,63 +1034,81 @@ static void opQuery(Globals & globals,
                 }
             }
 
-            if (xmlOutput) {
-                if (i->system != "") attrs["system"] = i->system;
-            }
-            else if (printSystem) 
-                columns.push_back(i->system);
+            if (i->error.find("system") == i->error.end())
+                if (xmlOutput) {
+                    if (i->system != "") attrs["system"] = i->system;
+                }
+                else if (printSystem) 
+                    columns.push_back(i->system);
+            else if (!xmlOutput && printSystem)
+                    columns.push_back("!system-unknown-in-readonly-mode!");
 
             if (printDrvPath) {
                 string drvPath = i->queryDrvPath(globals.state);
-                if (xmlOutput) {
-                    if (drvPath != "") attrs["drvPath"] = drvPath;
-                } else
-                    columns.push_back(drvPath == "" ? "-" : drvPath);
+                if (i->error.find("drvPath") == i->error.end())
+                    if (xmlOutput) {
+                        if (drvPath != "") attrs["drvPath"] = drvPath;
+                    } else
+                        columns.push_back(drvPath == "" ? "-" : drvPath);
+                else if (!xmlOutput)
+                    columns.push_back("!drvPath-unknown-in-readonly-mode!");
             }
         
             if (printOutPath) {
                 string outPath = i->queryOutPath(globals.state);
-                if (xmlOutput) {
-                    if (outPath != "") attrs["outPath"] = outPath;
-                } else
-                    columns.push_back(outPath);
+                if (i->error.find("outPath") == i->error.end())
+                    if (xmlOutput) {
+                        if (outPath != "") attrs["outPath"] = outPath;
+                    } else
+                        columns.push_back(outPath);
+                else if (!xmlOutput)
+                    columns.push_back("!outPath-unknown-in-readonly-mode!");
             }
 
             if (printDescription) {
                 MetaInfo meta = i->queryMetaInfo(globals.state);
-                MetaValue value = meta["description"];
-                string descr = value.type == MetaValue::tpString ? value.stringValue : "";
-                if (xmlOutput) {
-                    if (descr != "") attrs["description"] = descr;
-                } else
-                    columns.push_back(descr);
+                if (i->error.find("meta") == i->error.end()) {
+                    MetaValue value = meta["description"];
+                    if (i->metaError.find("description") == i->metaError.end()) {
+                        string descr = value.type == MetaValue::tpString ? value.stringValue : "";
+                        if (xmlOutput) {
+                            if (descr != "") attrs["description"] = descr;
+                        } else
+                            columns.push_back(descr);
+                    } else if (!xmlOutput)
+                        columns.push_back("!description-unknown-in-readonly-mode!");
+                } else if (!xmlOutput)
+                    columns.push_back("!meta-info-unknown-in-readonly-mode!");
             }
 
             if (xmlOutput)
                 if (printMeta) {
-                    XMLOpenElement item(xml, "item", attrs);
                     MetaInfo meta = i->queryMetaInfo(globals.state);
-                    for (MetaInfo::iterator j = meta.begin(); j != meta.end(); ++j) {
-                        XMLAttrs attrs2;
-                        attrs2["name"] = j->first;
-                        if (j->second.type == MetaValue::tpString) {
-                            attrs2["type"] = "string";
-                            attrs2["value"] = j->second.stringValue;
-                            xml.writeEmptyElement("meta", attrs2);
-                        } else if (j->second.type == MetaValue::tpInt) {
-                            attrs2["type"] = "int";
-                            attrs2["value"] = (format("%1%") % j->second.intValue).str();
-                            xml.writeEmptyElement("meta", attrs2);
-                        } else if (j->second.type == MetaValue::tpStrings) {
-                            attrs2["type"] = "strings";
-                            XMLOpenElement m(xml, "meta", attrs2);
-                            foreach (Strings::iterator, k, j->second.stringValues) { 
-                                XMLAttrs attrs3;
-                                attrs3["value"] = *k;
-                                xml.writeEmptyElement("string", attrs3);
-                           }
+                    if (i->error.find("meta") == i->error.end()) {
+                        XMLOpenElement item(xml, "item", attrs);
+                        for (MetaInfo::iterator j = meta.begin(); j != meta.end(); ++j) {
+                            XMLAttrs attrs2;
+                            attrs2["name"] = j->first;
+                            if (j->second.type == MetaValue::tpString) {
+                                attrs2["type"] = "string";
+                                attrs2["value"] = j->second.stringValue;
+                                xml.writeEmptyElement("meta", attrs2);
+                            } else if (j->second.type == MetaValue::tpInt) {
+                                attrs2["type"] = "int";
+                                attrs2["value"] = (format("%1%") % j->second.intValue).str();
+                                xml.writeEmptyElement("meta", attrs2);
+                            } else if (j->second.type == MetaValue::tpStrings) {
+                                attrs2["type"] = "strings";
+                                XMLOpenElement m(xml, "meta", attrs2);
+                                foreach (Strings::iterator, k, j->second.stringValues) { 
+                                    XMLAttrs attrs3;
+                                    attrs3["value"] = *k;
+                                    xml.writeEmptyElement("string", attrs3);
+                                }
+                            }
                         }
-                    }
+                    } else
+                        xml.writeEmptyElement("item", attrs);
                 }
                 else
                     xml.writeEmptyElement("item", attrs);
