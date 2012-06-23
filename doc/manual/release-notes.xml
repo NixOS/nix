@@ -15,10 +15,24 @@
 <itemizedlist>
 
   <listitem>
+    <para>Builds in chroots are now executed in a private network
+    namespace, meaning that they do not see any network interfaces
+    except a private loopback interface.  This ensures that builds
+    cannot communicate with processes outside of the chroot, or clash
+    with other builds by listening on an identical port number.</para>
+  </listitem>
+
+  <listitem>
+    <para>Build logs are now compressed using
+    <command>bzip2</command>.  The command <command>nix-store
+    -l</command> decompresses them on the fly.</para>
+  </listitem>
+
+  <listitem>
     <para>The creation of build logs in
     <filename>/nix/var/log/nix/drvs</filename> can be disabled by
     setting the new option <literal>build-keep-log</literal> to
-    <literal>false</literal></para>
+    <literal>false</literal>.</para>
   </listitem>    
 
 </itemizedlist>
