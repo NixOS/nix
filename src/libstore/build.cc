@@ -47,6 +47,13 @@
 
 #define CHROOT_ENABLED HAVE_CHROOT && HAVE_UNSHARE && HAVE_SYS_MOUNT_H && defined(MS_BIND) && defined(CLONE_NEWNS)
 
+#if CHROOT_ENABLED
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
+#include <netinet/ip.h>
+#endif
+
 
 #if HAVE_SYS_PERSONALITY_H
 #include <sys/personality.h>
@@ -1769,12 +1776,30 @@ void DerivationGoal::startBuilder()
 
 #if CHROOT_ENABLED
             if (useChroot) {
-                /* Create our own mount namespace.  This means that
-                   all the bind mounts we do will only show up in this
-                   process and its children, and will disappear
-                   automatically when we're done. */
-                if (unshare(CLONE_NEWNS) == -1)
-                    throw SysError(format("cannot set up a private mount namespace"));
+                /* Create our own mount and network namespace.  This
+                   means that all the bind mounts we do will only show
+                   up in this process and its children, and will
+                   disappear automatically when we're done.
+                   Similarly, this process will not have any network
+                   interface except "lo" created below. */
+                if (unshare(CLONE_NEWNS | CLONE_NEWNET) == -1)
+                    throw SysError("cannot set up a private mount namespace");
+
+                /* Initialise the loopback interface.  Note that this
+                   loopback device is unique to this process and its
+                   children.  Thus they won't be able to open
+                   connections to the rest of the system, or vice
+                   versa. */
+                AutoCloseFD fd(socket(PF_INET, SOCK_DGRAM, IPPROTO_IP));
+                if (fd == -1) throw SysError("cannot open IP socket");
+                
+                struct ifreq ifr;
+                strcpy(ifr.ifr_name, "lo");
+                ifr.ifr_flags = IFF_UP | IFF_LOOPBACK | IFF_RUNNING;
+                if (ioctl(fd, SIOCSIFFLAGS, &ifr) == -1)
+                    throw SysError("cannot set loopback interface flags");
+
+                fd.close();
 
                 /* Bind-mount all the directories from the "host"
                    filesystem that we want in the chroot
