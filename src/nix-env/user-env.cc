@@ -64,7 +64,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
         mkString(*state.allocAttr(v, state.sType), "derivation");
         mkString(*state.allocAttr(v, state.sName), i->queryName(state));
-        mkString(*state.allocAttr(v, state.sSystem), i->system);
+        mkString(*state.allocAttr(v, state.sSystem), i->querySystem(state));
         mkString(*state.allocAttr(v, state.sOutPath), i->queryOutPath(state));
         if (drvPath != "")
             mkString(*state.allocAttr(v, state.sDrvPath), i->queryDrvPath(state));
@@ -237,7 +237,7 @@ static void readLegacyManifest(EvalState & state, const Path & path, DrvInfos & 
                 if (name == "name") elem.setName(value);
                 else if (name == "outPath") elem.setOutPath(value);
                 else if (name == "drvPath") elem.setDrvPath(value);
-                else if (name == "system") elem.system = value;
+                else if (name == "system") elem.setSystem(value);
             }
 
             expect(str, ",NoPos)");

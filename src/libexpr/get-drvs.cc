@@ -16,6 +16,19 @@ string DrvInfo::queryName(EvalState & state) const
 }
 
 
+string DrvInfo::querySystem(EvalState & state) const
+{
+    if (system == "" && attrs) {
+        Bindings::iterator i = attrs->find(state.sSystem);
+        if (i == attrs->end())
+            (string &) system = "unknown";
+        else
+            (string &) system = state.forceStringNoCtx(*i->value);
+    }
+    return system;
+}
+
+
 string DrvInfo::queryDrvPath(EvalState & state) const
 {
     if (drvPath == "" && attrs) {
@@ -110,12 +123,6 @@ static bool getDerivation(EvalState & state, Value & v,
         Bindings::iterator i = v.attrs->find(state.sName);
         /* !!! We really would like to have a decent back trace here. */
         if (i == v.attrs->end()) throw TypeError("derivation name missing");
-
-        Bindings::iterator i2 = v.attrs->find(state.sSystem);
-        if (i2 == v.attrs->end())
-            drv.system = "unknown";
-        else
-            drv.system = state.forceStringNoCtx(*i2->value);
 
         drv.attrs = v.attrs;
 

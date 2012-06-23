@@ -173,7 +173,7 @@ static void loadDerivations(EvalState & state, Path nixExprPath,
        system. */
     for (DrvInfos::iterator i = elems.begin(), j; i != elems.end(); i = j) {
         j = i; j++;
-        if (systemFilter != "*" && i->system != systemFilter)
+        if (systemFilter != "*" && i->querySystem(state) != systemFilter)
             elems.erase(i);
     }
 }
@@ -269,9 +269,9 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
                 Newest::iterator k = newest.find(drvName.name);
                 
                 if (k != newest.end()) {
-                    d = j->first.system == k->second.first.system ? 0 :
-                        j->first.system == settings.thisSystem ? 1 :
-                        k->second.first.system == settings.thisSystem ? -1 : 0;
+                    d = j->first.querySystem(state) == k->second.first.querySystem(state) ? 0 :
+                        j->first.querySystem(state) == settings.thisSystem ? 1 :
+                        k->second.first.querySystem(state) == settings.thisSystem ? -1 : 0;
                     if (d == 0)
                         d = comparePriorities(state, j->first, k->second.first);
                     if (d == 0)
@@ -1037,10 +1037,10 @@ static void opQuery(Globals & globals,
             }
 
             if (xmlOutput) {
-                if (i->system != "") attrs["system"] = i->system;
+                if (i->querySystem(globals.state) != "") attrs["system"] = i->querySystem(globals.state);
             }
             else if (printSystem) 
-                columns.push_back(i->system);
+                columns.push_back(i->querySystem(globals.state));
 
             if (printDrvPath) {
                 string drvPath = i->queryDrvPath(globals.state);
