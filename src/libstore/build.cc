@@ -1776,20 +1776,27 @@ void DerivationGoal::startBuilder()
 
 #if CHROOT_ENABLED
             if (useChroot) {
-                /* Create our own mount and network namespace.  This
-                   means that all the bind mounts we do will only show
-                   up in this process and its children, and will
-                   disappear automatically when we're done.
-                   Similarly, this process will not have any network
-                   interface except "lo" created below. */
-                if (unshare(CLONE_NEWNS | CLONE_NEWNET) == -1)
+                /* Set up private namespaces for the build:
+
+                   - The private mount namespace ensures that all the
+                     bind mounts we do will only show up in this
+                     process and its children, and will disappear
+                     automatically when we're done.
+
+                   - The private network namespace ensures that the
+                     builder cannot talk to the outside world (or vice
+                     versa).  It only has a private loopback
+                     interface.
+
+                   - The IPC namespace prevents the builder from
+                     communicating with outside processes using SysV
+                     IPC mechanisms (shared memory, message queues,
+                     semaphores).  It also ensures that all IPC
+                     objects are destroyed when the builder exits. */
+                if (unshare(CLONE_NEWNS | CLONE_NEWNET | CLONE_NEWIPC) == -1)
                     throw SysError("cannot set up a private mount namespace");
 
-                /* Initialise the loopback interface.  Note that this
-                   loopback device is unique to this process and its
-                   children.  Thus they won't be able to open
-                   connections to the rest of the system, or vice
-                   versa. */
+                /* Initialise the loopback interface. */
                 AutoCloseFD fd(socket(PF_INET, SOCK_DGRAM, IPPROTO_IP));
                 if (fd == -1) throw SysError("cannot open IP socket");
                 
