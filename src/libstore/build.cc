@@ -1794,7 +1794,7 @@ void DerivationGoal::startBuilder()
                      semaphores).  It also ensures that all IPC
                      objects are destroyed when the builder exits. */
                 if (unshare(CLONE_NEWNS | CLONE_NEWNET | CLONE_NEWIPC) == -1)
-                    throw SysError("cannot set up a private mount namespace");
+                    throw SysError("cannot set up private namespaces");
 
                 /* Initialise the loopback interface. */
                 AutoCloseFD fd(socket(PF_INET, SOCK_DGRAM, IPPROTO_IP));
