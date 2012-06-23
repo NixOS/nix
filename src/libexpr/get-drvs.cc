@@ -53,19 +53,23 @@ string DrvInfo::queryOutPath(EvalState & state) const
 static MetaValue createMetaValue(EvalState & state, Value & v)
 {
     MetaValue value;
-    state.forceValue(v);
-    if (v.type == tString) {
-        value.type = MetaValue::tpString;
-        value.stringValue = v.string.s;
-    } else if (v.type == tInt) {
-        value.type = MetaValue::tpInt;
-        value.intValue = v.integer;
-    } else if (v.type == tList) {
-        value.type = MetaValue::tpStrings;
-        for (unsigned int j = 0; j < v.list.length; ++j)
-            value.stringValues.push_back(state.forceStringNoCtx(*v.list.elems[j]));
-    } else
+    try {
+        state.forceValue(v);
+        if (v.type == tString) {
+            value.type = MetaValue::tpString;
+            value.stringValue = v.string.s;
+            } else if (v.type == tInt) {
+                value.type = MetaValue::tpInt;
+                value.intValue = v.integer;
+            } else if (v.type == tList) {
+                value.type = MetaValue::tpStrings;
+                for (unsigned int j = 0; j < v.list.length; ++j)
+                    value.stringValues.push_back(state.forceStringNoCtx(*v.list.elems[j]));
+            } else
+                value.type = MetaValue::tpNone;
+    } catch (ImportReadOnlyError & e) {
         value.type = MetaValue::tpNone;
+    }
     return value;
 }
 
