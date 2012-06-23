@@ -25,7 +25,7 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
         Value v;
         state.evalFile(manifestFile, v);
         Bindings bindings;
-        getDerivations(state, v, "", bindings, elems);
+        getDerivations(state, v, "", bindings, elems, false);
     } else if (pathExists(oldManifestFile))
         readLegacyManifest(state, oldManifestFile, elems);
 

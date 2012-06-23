@@ -162,12 +162,12 @@ static Expr * loadSourceExpr(EvalState & state, const Path & path)
 
 static void loadDerivations(EvalState & state, Path nixExprPath,
     string systemFilter, Bindings & autoArgs,
-    const string & pathPrefix, DrvInfos & elems)
+    const string & pathPrefix, DrvInfos & elems, bool skipReadOnlyErrors)
 {
     Value v;
     findAlongAttrPath(state, pathPrefix, autoArgs, loadSourceExpr(state, nixExprPath), v);
     
-    getDerivations(state, v, pathPrefix, autoArgs, elems);
+    getDerivations(state, v, pathPrefix, autoArgs, elems, skipReadOnlyErrors);
 
     /* Filter out all derivations not applicable to the current
        system. */
@@ -342,7 +342,7 @@ static void queryInstSources(EvalState & state,
                Nix expression. */
             DrvInfos allElems;
             loadDerivations(state, instSource.nixExprPath,
-                instSource.systemFilter, instSource.autoArgs, "", allElems);
+                instSource.systemFilter, instSource.autoArgs, "", allElems, false);
 
             elems = filterBySelector(state, allElems, args, newestOnly);
     
@@ -363,7 +363,7 @@ static void queryInstSources(EvalState & state,
                 Expr * e2 = state.parseExprFromString(*i, absPath("."));
                 Expr * call = new ExprApp(e2, e1);
                 Value v; state.eval(call, v);
-                getDerivations(state, v, "", instSource.autoArgs, elems);
+                getDerivations(state, v, "", instSource.autoArgs, elems, false);
             }
             
             break;
@@ -418,7 +418,7 @@ static void queryInstSources(EvalState & state,
                 Value v;
                 findAlongAttrPath(state, *i, instSource.autoArgs,
                     loadSourceExpr(state, instSource.nixExprPath), v);
-                getDerivations(state, v, "", instSource.autoArgs, elems);
+                getDerivations(state, v, "", instSource.autoArgs, elems, false);
             }
             break;
         }
@@ -916,7 +916,7 @@ static void opQuery(Globals & globals,
     if (source == sAvailable || compareVersions)
         loadDerivations(globals.state, globals.instSource.nixExprPath,
             globals.instSource.systemFilter, globals.instSource.autoArgs,
-            attrPath, availElems);
+            attrPath, availElems, true);
 
     DrvInfos elems = filterBySelector(globals.state,
         source == sInstalled ? installedElems : availElems,

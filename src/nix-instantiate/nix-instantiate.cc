@@ -57,7 +57,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 }
             else {
                 DrvInfos drvs;
-                getDerivations(state, v, "", autoArgs, drvs);
+                getDerivations(state, v, "", autoArgs, drvs, false);
                 foreach (DrvInfos::iterator, i, drvs) {
                     Path drvPath = i->queryDrvPath(state);
                     if (gcRoot == "")
