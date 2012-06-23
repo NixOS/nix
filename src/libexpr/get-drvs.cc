@@ -6,6 +6,16 @@
 namespace nix {
 
 
+string DrvInfo::queryName(EvalState & state) const
+{
+    if (name == "" && attrs) {
+        Bindings::iterator i = attrs->find(state.sName);
+        (string &) name = state.forceStringNoCtx(*i->value);
+    }
+    return name;
+}
+
+
 string DrvInfo::queryDrvPath(EvalState & state) const
 {
     if (drvPath == "" && attrs) {
@@ -100,7 +110,6 @@ static bool getDerivation(EvalState & state, Value & v,
         Bindings::iterator i = v.attrs->find(state.sName);
         /* !!! We really would like to have a decent back trace here. */
         if (i == v.attrs->end()) throw TypeError("derivation name missing");
-        drv.name = state.forceStringNoCtx(*i->value);
 
         Bindings::iterator i2 = v.attrs->find(state.sSystem);
         if (i2 == v.attrs->end())

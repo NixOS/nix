@@ -11,7 +11,7 @@
 namespace nix {
 
 
-static void readLegacyManifest(const Path & path, DrvInfos & elems);
+static void readLegacyManifest(EvalState & state, const Path & path, DrvInfos & elems);
 
 
 DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
@@ -27,7 +27,7 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
         Bindings bindings;
         getDerivations(state, v, "", bindings, elems);
     } else if (pathExists(oldManifestFile))
-        readLegacyManifest(oldManifestFile, elems);
+        readLegacyManifest(state, oldManifestFile, elems);
 
     return elems;
 }
@@ -63,7 +63,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         state.mkAttrs(v, 8);
 
         mkString(*state.allocAttr(v, state.sType), "derivation");
-        mkString(*state.allocAttr(v, state.sName), i->name);
+        mkString(*state.allocAttr(v, state.sName), i->queryName(state));
         mkString(*state.allocAttr(v, state.sSystem), i->system);
         mkString(*state.allocAttr(v, state.sOutPath), i->queryOutPath(state));
         if (drvPath != "")
@@ -214,7 +214,7 @@ static MetaInfo parseMeta(std::istream & str)
 }
 
 
-static void readLegacyManifest(const Path & path, DrvInfos & elems)
+static void readLegacyManifest(EvalState & state, const Path & path, DrvInfos & elems)
 {
     string manifest = readFile(path);
     std::istringstream str(manifest);
@@ -234,7 +234,7 @@ static void readLegacyManifest(const Path & path, DrvInfos & elems)
             if (name == "meta") elem.setMetaInfo(parseMeta(str));
             else {
                 string value = parseStr(str);
-                if (name == "name") elem.name = value;
+                if (name == "name") elem.setName(value);
                 else if (name == "outPath") elem.setOutPath(value);
                 else if (name == "drvPath") elem.setDrvPath(value);
                 else if (name == "system") elem.system = value;
@@ -245,7 +245,7 @@ static void readLegacyManifest(const Path & path, DrvInfos & elems)
 
         expect(str, ")");
 
-        if (elem.name != "") {
+        if (elem.queryName(state) != "") {
             elem.attrPath = int2String(n++);
             elems.push_back(elem);
         }
