@@ -162,12 +162,12 @@ static Expr * loadSourceExpr(EvalState & state, const Path & path)
 
 static void loadDerivations(EvalState & state, Path nixExprPath,
     string systemFilter, Bindings & autoArgs,
-    const string & pathPrefix, DrvInfos & elems, bool skipReadOnlyErrors)
+    const string & pathPrefix, DrvInfos & elems)
 {
     Value v;
     findAlongAttrPath(state, pathPrefix, autoArgs, loadSourceExpr(state, nixExprPath), v);
     
-    getDerivations(state, v, pathPrefix, autoArgs, elems, skipReadOnlyErrors);
+    getDerivations(state, v, pathPrefix, autoArgs, elems);
 
     /* Filter out all derivations not applicable to the current
        system. */
@@ -213,7 +213,7 @@ static int comparePriorities(EvalState & state,
 }
 
 
-static bool isPrebuilt(EvalState & state, const DrvInfo & elem, bool ignoreImportReadOnlyError)
+static bool isPrebuilt(EvalState & state, const DrvInfo & elem)
 {
     assert(false);
 #if 0
@@ -222,8 +222,7 @@ static bool isPrebuilt(EvalState & state, const DrvInfo & elem, bool ignoreImpor
             store->isValidPath(elem.queryOutPath(state)) ||
             store->hasSubstitutes(elem.queryOutPath(state));
     } catch (ImportReadOnlyError & e) {
-        if (ignoreImportReadOnlyError) return false;
-        throw;
+        return false;
     }
 #endif
 }
@@ -347,7 +346,7 @@ static void queryInstSources(EvalState & state,
                Nix expression. */
             DrvInfos allElems;
             loadDerivations(state, instSource.nixExprPath,
-                instSource.systemFilter, instSource.autoArgs, "", allElems, false);
+                instSource.systemFilter, instSource.autoArgs, "", allElems);
 
             elems = filterBySelector(state, allElems, args, newestOnly);
     
@@ -368,7 +367,7 @@ static void queryInstSources(EvalState & state,
                 Expr * e2 = state.parseExprFromString(*i, absPath("."));
                 Expr * call = new ExprApp(e2, e1);
                 Value v; state.eval(call, v);
-                getDerivations(state, v, "", instSource.autoArgs, elems, false);
+                getDerivations(state, v, "", instSource.autoArgs, elems);
             }
             
             break;
@@ -423,7 +422,7 @@ static void queryInstSources(EvalState & state,
                 Value v;
                 findAlongAttrPath(state, *i, instSource.autoArgs,
                     loadSourceExpr(state, instSource.nixExprPath), v);
-                getDerivations(state, v, "", instSource.autoArgs, elems, false);
+                getDerivations(state, v, "", instSource.autoArgs, elems);
             }
             break;
         }
@@ -464,7 +463,7 @@ static void installDerivations(Globals & globals,
 
     /* If --prebuilt-only is given, filter out source-only packages. */
     foreach (DrvInfos::iterator, i, newElemsTmp)
-        if (!globals.prebuiltOnly || isPrebuilt(globals.state, *i, false))
+        if (!globals.prebuiltOnly || isPrebuilt(globals.state, *i))
             newElems.push_back(*i);
 
     StringSet newNames;
@@ -585,7 +584,7 @@ static void upgradeDerivations(Globals & globals,
                                 d2 = comparePriorities(globals.state, *bestElem, *j);
                                 if (d2 == 0) d2 = compareVersions(bestName.version, newName.version);
                             }
-                            if (d2 < 0 && (!globals.prebuiltOnly || isPrebuilt(globals.state, *j, false))) {
+                            if (d2 < 0 && (!globals.prebuiltOnly || isPrebuilt(globals.state, *j))) {
                                 bestElem = j;
                                 bestName = newName;
                             }
@@ -921,7 +920,7 @@ static void opQuery(Globals & globals,
     if (source == sAvailable || compareVersions)
         loadDerivations(globals.state, globals.instSource.nixExprPath,
             globals.instSource.systemFilter, globals.instSource.autoArgs,
-            attrPath, availElems, true);
+            attrPath, availElems);
 
     DrvInfos elems = filterBySelector(globals.state,
         source == sInstalled ? installedElems : availElems,
@@ -978,7 +977,7 @@ static void opQuery(Globals & globals,
             
             startNest(nest, lvlDebug, format("outputting query result `%1%'") % i->attrPath);
 
-            if (globals.prebuiltOnly && !isPrebuilt(globals.state, *i, true)) continue;
+            if (globals.prebuiltOnly && !isPrebuilt(globals.state, *i)) continue;
 
             /* For table output. */
             Strings columns;
