@@ -1059,8 +1059,7 @@ static void opQuery(Globals & globals,
             }
 
             if (printDescription) {
-                MetaInfo meta = i->queryMetaInfo(globals.state);
-                MetaValue value = meta["description"];
+                MetaValue value = i->queryMetaInfo(globals.state, "description");
                 string descr = value.type == MetaValue::tpString ? value.stringValue : "";
                 if (xmlOutput) {
                     if (descr != "") attrs["description"] = descr;
