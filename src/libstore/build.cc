@@ -793,6 +793,11 @@ private:
     typedef void (DerivationGoal::*GoalState)();
     GoalState state;
     
+    /* Stuff we need to pass to initChild(). */
+    PathSet dirsInChroot;
+    typedef map<string, string> Environment;
+    Environment env;
+
 public:
     DerivationGoal(const Path & drvPath, Worker & worker);
     ~DerivationGoal();
@@ -820,6 +825,11 @@ private:
 
     /* Start building a derivation. */
     void startBuilder();
+
+    /* Initialise the builder's process. */
+    void initChild();
+
+    friend int childEntry(void *);
 
     /* Must be called after the output paths have become valid (either
        due to a successful build or hook, or because they already
@@ -1468,6 +1478,13 @@ void chmod(const Path & path, mode_t mode)
 }
 
 
+int childEntry(void * arg)
+{
+    ((DerivationGoal *) arg)->initChild();
+    return 1;
+}
+
+
 void DerivationGoal::startBuilder()
 {
     startNest(nest, lvlInfo,
@@ -1480,8 +1497,6 @@ void DerivationGoal::startBuilder()
             % drv.platform % thisSystem % drvPath);
 
     /* Construct the environment passed to the builder. */
-    typedef map<string, string> Environment;
-    Environment env; 
     
     /* Most shells initialise PATH to some default (/bin:/usr/bin:...) when
        PATH is not set.  We don't want this, so we fill it in with some dummy
@@ -1635,7 +1650,6 @@ void DerivationGoal::startBuilder()
        work properly.  Purity checking for fixed-output derivations
        is somewhat pointless anyway. */
     useChroot = queryBoolSetting("build-use-chroot", false);
-    PathSet dirsInChroot;
 
     if (fixedOutput) useChroot = false;
 
@@ -1691,7 +1705,6 @@ void DerivationGoal::startBuilder()
         Paths defaultDirs;
         defaultDirs.push_back("/dev");
         defaultDirs.push_back("/dev/pts");
-        defaultDirs.push_back("/proc");
 
         Paths dirsInChroot_ = querySetting("build-chroot-dirs", defaultDirs);
         dirsInChroot.insert(dirsInChroot_.begin(), dirsInChroot_.end());
@@ -1760,177 +1773,42 @@ void DerivationGoal::startBuilder()
     /* Fork a child to build the package.  Note that while we
        currently use forks to run and wait for the children, it
        shouldn't be hard to use threads for this on systems where
-       fork() is unavailable or inefficient. */
-    pid = fork();
-    switch (pid) {
+       fork() is unavailable or inefficient.
 
-    case -1:
-        throw SysError("unable to fork");
+       If we're building in a chroot, then also set up private
+       namespaces for the build:
 
-    case 0:
+       - The PID namespace causes the build to start as PID 1.
+         Processes outside of the chroot are not visible to those on
+         the inside, but processes inside the chroot are visible from
+         the outside (though with different PIDs).
 
-        /* Warning: in the child we should absolutely not make any
-           SQLite calls! */
+       - The private mount namespace ensures that all the bind mounts
+         we do will only show up in this process and its children, and
+         will disappear automatically when we're done.
+         
+       - The private network namespace ensures that the builder cannot
+         talk to the outside world (or vice versa).  It only has a
+         private loopback interface.
 
-        try { /* child */
-
+       - The IPC namespace prevents the builder from communicating
+         with outside processes using SysV IPC mechanisms (shared
+         memory, message queues, semaphores).  It also ensures that
+         all IPC objects are destroyed when the builder exits.
+    */
 #if CHROOT_ENABLED
-            if (useChroot) {
-                /* Set up private namespaces for the build:
-
-                   - The private mount namespace ensures that all the
-                     bind mounts we do will only show up in this
-                     process and its children, and will disappear
-                     automatically when we're done.
-
-                   - The private network namespace ensures that the
-                     builder cannot talk to the outside world (or vice
-                     versa).  It only has a private loopback
-                     interface.
-
-                   - The IPC namespace prevents the builder from
-                     communicating with outside processes using SysV
-                     IPC mechanisms (shared memory, message queues,
-                     semaphores).  It also ensures that all IPC
-                     objects are destroyed when the builder exits. */
-                if (unshare(CLONE_NEWNS | CLONE_NEWNET | CLONE_NEWIPC | CLONE_NEWUTS) == -1)
-                    throw SysError("cannot set up private namespaces");
-
-                /* Initialise the loopback interface. */
-                AutoCloseFD fd(socket(PF_INET, SOCK_DGRAM, IPPROTO_IP));
-                if (fd == -1) throw SysError("cannot open IP socket");
-                
-                struct ifreq ifr;
-                strcpy(ifr.ifr_name, "lo");
-                ifr.ifr_flags = IFF_UP | IFF_LOOPBACK | IFF_RUNNING;
-                if (ioctl(fd, SIOCSIFFLAGS, &ifr) == -1)
-                    throw SysError("cannot set loopback interface flags");
-
-                fd.close();
-
-                /* Set the hostname etc. to fixed values. */
-                char hostname[] = "localhost";
-                sethostname(hostname, sizeof(hostname));
-                char domainname[] = "(none)"; // kernel default
-                setdomainname(domainname, sizeof(domainname));
-
-                /* Bind-mount all the directories from the "host"
-                   filesystem that we want in the chroot
-                   environment. */
-                foreach (PathSet::iterator, i, dirsInChroot) {
-                    Path source = *i;
-                    Path target = chrootRootDir + source;
-                    debug(format("bind mounting `%1%' to `%2%'") % source % target);
-                
-                    createDirs(target);
-                
-                    if (mount(source.c_str(), target.c_str(), "", MS_BIND, 0) == -1)
-                        throw SysError(format("bind mount from `%1%' to `%2%' failed") % source % target);
-                }
-                    
-                /* Do the chroot().  Below we do a chdir() to the
-                   temporary build directory to make sure the current
-                   directory is in the chroot.  (Actually the order
-                   doesn't matter, since due to the bind mount tmpDir
-                   and tmpRootDit/tmpDir are the same directories.) */
-                if (chroot(chrootRootDir.c_str()) == -1)
-                    throw SysError(format("cannot change root directory to `%1%'") % chrootRootDir);
-            }
+    if (useChroot) {
+        char stack[32 * 1024];
+        pid = clone(childEntry, stack + sizeof(stack) - 8,
+            CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWNET | CLONE_NEWIPC | CLONE_NEWUTS | SIGCHLD, this);
+    } else
 #endif
-            
-            commonChildInit(builderOut);
-    
-            if (chdir(tmpDir.c_str()) == -1)
-                throw SysError(format("changing into `%1%'") % tmpDir);
-
-            /* Close all other file descriptors. */
-            closeMostFDs(set<int>());
-
-#ifdef CAN_DO_LINUX32_BUILDS
-            /* Change the personality to 32-bit if we're doing an
-               i686-linux build on an x86_64-linux machine. */
-            if (drv.platform == "i686-linux" && thisSystem == "x86_64-linux") {
-                if (personality(0x0008 | 0x8000000 /* == PER_LINUX32_3GB */) == -1)
-                    throw SysError("cannot set i686-linux personality");
-            }
-
-            /* Impersonate a Linux 2.6 machine to get some determinism
-               in builds that depend on the kernel version. */
-            if ((drv.platform == "i686-linux" || drv.platform == "x86_64-linux") &&
-                queryBoolSetting("build-impersonate-linux-26", true))
-            {
-                int cur = personality(0xffffffff);
-                if (cur != -1) personality(cur | 0x0020000 /* == UNAME26 */);
-            }
-#endif
-
-            /* Fill in the environment. */
-            Strings envStrs;
-            foreach (Environment::const_iterator, i, env)
-                envStrs.push_back(i->first + "=" + i->second);
-            const char * * envArr = strings2CharPtrs(envStrs);
-
-            Path program = drv.builder.c_str();
-            std::vector<const char *> args; /* careful with c_str()! */
-            string user; /* must be here for its c_str()! */
-            
-            /* If we are running in `build-users' mode, then switch to
-               the user we allocated above.  Make sure that we drop
-               all root privileges.  Note that above we have closed
-               all file descriptors except std*, so that's safe.  Also
-               note that setuid() when run as root sets the real,
-               effective and saved UIDs. */
-            if (buildUser.enabled()) {
-                printMsg(lvlChatty, format("switching to user `%1%'") % buildUser.getUser());
-
-                if (amPrivileged()) {
-                    
-                    if (setgroups(0, 0) == -1)
-                        throw SysError("cannot clear the set of supplementary groups");
-                
-                    if (setgid(buildUser.getGID()) == -1 ||
-                        getgid() != buildUser.getGID() ||
-                        getegid() != buildUser.getGID())
-                        throw SysError("setgid failed");
-
-                    if (setuid(buildUser.getUID()) == -1 ||
-                        getuid() != buildUser.getUID() ||
-                        geteuid() != buildUser.getUID())
-                        throw SysError("setuid failed");
-                    
-                } else {
-                    /* Let the setuid helper take care of it. */
-                    program = nixLibexecDir + "/nix-setuid-helper";
-                    args.push_back(program.c_str());
-                    args.push_back("run-builder");
-                    user = buildUser.getUser().c_str();
-                    args.push_back(user.c_str());
-                    args.push_back(drv.builder.c_str());
-                }
-            }
-            
-            /* Fill in the arguments. */
-            string builderBasename = baseNameOf(drv.builder);
-            args.push_back(builderBasename.c_str());
-            foreach (Strings::iterator, i, drv.args)
-                args.push_back(i->c_str());
-            args.push_back(0);
-
-            restoreSIGPIPE();
-
-            /* Execute the program.  This should not return. */
-            execve(program.c_str(), (char * *) &args[0], (char * *) envArr);
-
-            throw SysError(format("executing `%1%'")
-                % drv.builder);
-            
-        } catch (std::exception & e) {
-            std::cerr << format("build error: %1%") % e.what() << std::endl;
-        }
-        quickExit(1);
+    {
+        pid = fork();
+        if (pid == 0) initChild();
+        else if (pid == -1) throw SysError("unable to fork");
     }
 
-    
     /* parent */
     pid.setSeparatePG(true);
     builderOut.writeSide.close();
@@ -1941,6 +1819,155 @@ void DerivationGoal::startBuilder()
         printMsg(lvlError, format("@ build-started %1% %2% %3% %4%")
             % drvPath % drv.outputs["out"].path % drv.platform % logFile);
     }
+}
+
+
+void DerivationGoal::initChild()
+{
+    /* Warning: in the child we should absolutely not make any SQLite
+       calls! */
+
+    try { /* child */
+
+#if CHROOT_ENABLED
+        if (useChroot) {
+            /* Initialise the loopback interface. */
+            AutoCloseFD fd(socket(PF_INET, SOCK_DGRAM, IPPROTO_IP));
+            if (fd == -1) throw SysError("cannot open IP socket");
+                
+            struct ifreq ifr;
+            strcpy(ifr.ifr_name, "lo");
+            ifr.ifr_flags = IFF_UP | IFF_LOOPBACK | IFF_RUNNING;
+            if (ioctl(fd, SIOCSIFFLAGS, &ifr) == -1)
+                throw SysError("cannot set loopback interface flags");
+
+            fd.close();
+
+            /* Set the hostname etc. to fixed values. */
+            char hostname[] = "localhost";
+            sethostname(hostname, sizeof(hostname));
+            char domainname[] = "(none)"; // kernel default
+            setdomainname(domainname, sizeof(domainname));
+
+            /* Bind-mount all the directories from the "host"
+               filesystem that we want in the chroot
+               environment. */
+            foreach (PathSet::iterator, i, dirsInChroot) {
+                Path source = *i;
+                Path target = chrootRootDir + source;
+                debug(format("bind mounting `%1%' to `%2%'") % source % target);
+                
+                createDirs(target);
+                
+                if (mount(source.c_str(), target.c_str(), "", MS_BIND, 0) == -1)
+                    throw SysError(format("bind mount from `%1%' to `%2%' failed") % source % target);
+            }
+
+            /* Bind a new instance of procfs on /proc to reflect our
+               private PID namespace. */
+            if (mount("none", (chrootRootDir + "/proc").c_str(), "proc", 0, 0) == -1)
+                throw SysError("mounting /proc");
+                    
+            /* Do the chroot().  Below we do a chdir() to the
+               temporary build directory to make sure the current
+               directory is in the chroot.  (Actually the order
+               doesn't matter, since due to the bind mount tmpDir and
+               tmpRootDit/tmpDir are the same directories.) */
+            if (chroot(chrootRootDir.c_str()) == -1)
+                throw SysError(format("cannot change root directory to `%1%'") % chrootRootDir);
+        }
+#endif
+            
+        commonChildInit(builderOut);
+    
+        if (chdir(tmpDir.c_str()) == -1)
+            throw SysError(format("changing into `%1%'") % tmpDir);
+
+        /* Close all other file descriptors. */
+        closeMostFDs(set<int>());
+
+#ifdef CAN_DO_LINUX32_BUILDS
+        /* Change the personality to 32-bit if we're doing an
+           i686-linux build on an x86_64-linux machine. */
+        if (drv.platform == "i686-linux" && thisSystem == "x86_64-linux") {
+            if (personality(0x0008 | 0x8000000 /* == PER_LINUX32_3GB */) == -1)
+                throw SysError("cannot set i686-linux personality");
+        }
+
+        /* Impersonate a Linux 2.6 machine to get some determinism in
+           builds that depend on the kernel version. */
+        if ((drv.platform == "i686-linux" || drv.platform == "x86_64-linux") &&
+            queryBoolSetting("build-impersonate-linux-26", true))
+        {
+            int cur = personality(0xffffffff);
+            if (cur != -1) personality(cur | 0x0020000 /* == UNAME26 */);
+        }
+#endif
+
+        /* Fill in the environment. */
+        Strings envStrs;
+        foreach (Environment::const_iterator, i, env)
+            envStrs.push_back(i->first + "=" + i->second);
+        const char * * envArr = strings2CharPtrs(envStrs);
+
+        Path program = drv.builder.c_str();
+        std::vector<const char *> args; /* careful with c_str()! */
+        string user; /* must be here for its c_str()! */
+            
+        /* If we are running in `build-users' mode, then switch to the
+           user we allocated above.  Make sure that we drop all root
+           privileges.  Note that above we have closed all file
+           descriptors except std*, so that's safe.  Also note that
+           setuid() when run as root sets the real, effective and
+           saved UIDs. */
+        if (buildUser.enabled()) {
+            printMsg(lvlChatty, format("switching to user `%1%'") % buildUser.getUser());
+
+            if (amPrivileged()) {
+                    
+                if (setgroups(0, 0) == -1)
+                    throw SysError("cannot clear the set of supplementary groups");
+                
+                if (setgid(buildUser.getGID()) == -1 ||
+                    getgid() != buildUser.getGID() ||
+                    getegid() != buildUser.getGID())
+                    throw SysError("setgid failed");
+
+                if (setuid(buildUser.getUID()) == -1 ||
+                    getuid() != buildUser.getUID() ||
+                    geteuid() != buildUser.getUID())
+                    throw SysError("setuid failed");
+                    
+            } else {
+                /* Let the setuid helper take care of it. */
+                program = nixLibexecDir + "/nix-setuid-helper";
+                args.push_back(program.c_str());
+                args.push_back("run-builder");
+                user = buildUser.getUser().c_str();
+                args.push_back(user.c_str());
+                args.push_back(drv.builder.c_str());
+            }
+        }
+            
+        /* Fill in the arguments. */
+        string builderBasename = baseNameOf(drv.builder);
+        args.push_back(builderBasename.c_str());
+        foreach (Strings::iterator, i, drv.args)
+            args.push_back(i->c_str());
+        args.push_back(0);
+
+        restoreSIGPIPE();
+
+        /* Execute the program.  This should not return. */
+        execve(program.c_str(), (char * *) &args[0], (char * *) envArr);
+
+        throw SysError(format("executing `%1%'")
+            % drv.builder);
+            
+    } catch (std::exception & e) {
+        std::cerr << format("build error: %1%") % e.what() << std::endl;
+    }
+    quickExit(1);
 }
 
 

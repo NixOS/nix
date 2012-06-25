@@ -779,8 +779,11 @@ void Pid::kill()
     int status;
     while (waitpid(pid, &status, 0) == -1) {
         checkInterrupt();
-        if (errno != EINTR) printMsg(lvlError,
-            (SysError(format("waiting for process %1%") % pid).msg()));
+        if (errno != EINTR) {
+            printMsg(lvlError,
+                (SysError(format("waiting for process %1%") % pid).msg()));
+            break;
+        }
     }
 
     pid = -1;
