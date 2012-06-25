@@ -1793,7 +1793,7 @@ void DerivationGoal::startBuilder()
                      IPC mechanisms (shared memory, message queues,
                      semaphores).  It also ensures that all IPC
                      objects are destroyed when the builder exits. */
-                if (unshare(CLONE_NEWNS | CLONE_NEWNET | CLONE_NEWIPC) == -1)
+                if (unshare(CLONE_NEWNS | CLONE_NEWNET | CLONE_NEWIPC | CLONE_NEWUTS) == -1)
                     throw SysError("cannot set up private namespaces");
 
                 /* Initialise the loopback interface. */
@@ -1807,6 +1807,12 @@ void DerivationGoal::startBuilder()
                     throw SysError("cannot set loopback interface flags");
 
                 fd.close();
+
+                /* Set the hostname etc. to fixed values. */
+                char hostname[] = "localhost";
+                sethostname(hostname, sizeof(hostname));
+                char domainname[] = "(none)"; // kernel default
+                setdomainname(domainname, sizeof(domainname));
 
                 /* Bind-mount all the directories from the "host"
                    filesystem that we want in the chroot
