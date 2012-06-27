@@ -22,7 +22,7 @@ typedef enum {
     wopQueryReferrers = 6,
     wopAddToStore = 7,
     wopAddTextToStore = 8,
-    wopBuildDerivations = 9,
+    wopBuildPaths = 9,
     wopEnsurePath = 10,
     wopAddTempRoot = 11,
     wopAddIndirectRoot = 12,

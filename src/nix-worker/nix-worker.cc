@@ -415,10 +415,10 @@ static void performOp(unsigned int clientVersion,
         break;
     }
 
-    case wopBuildDerivations: {
+    case wopBuildPaths: {
         PathSet drvs = readStorePaths<PathSet>(from);
         startWork();
-        store->buildDerivations(drvs);
+        store->buildPaths(drvs);
         stopWork();
         writeInt(1, to);
         break;

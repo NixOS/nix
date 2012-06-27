@@ -53,7 +53,7 @@ static void prim_import(EvalState & state, Value * * args, Value & v)
             try {
                 /* !!! If using a substitute, we only need to fetch
                    the selected output of this derivation. */
-                store->buildDerivations(singleton<PathSet>(ctx));
+                store->buildPaths(singleton<PathSet>(ctx));
             } catch (Error & e) {
                 throw ImportError(e.msg());
             }

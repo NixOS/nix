@@ -150,7 +150,7 @@ public:
 
     Paths importPaths(bool requireSignature, Source & source);
     
-    void buildDerivations(const PathSet & drvPaths);
+    void buildPaths(const PathSet & paths);
 
     void ensurePath(const Path & path);
 

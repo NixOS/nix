@@ -2275,6 +2275,8 @@ public:
     /* Callback used by the worker to write to the log. */
     void handleChildOutput(int fd, const string & data);
     void handleEOF(int fd);
+
+    Path getStorePath() { return storePath; }
 };
 
 
@@ -2938,7 +2940,7 @@ unsigned int Worker::exitStatus()
 //////////////////////////////////////////////////////////////////////
 
 
-void LocalStore::buildDerivations(const PathSet & drvPaths)
+void LocalStore::buildPaths(const PathSet & drvPaths)
 {
     startNest(nest, lvlDebug,
         format("building %1%") % showPaths(drvPaths));
@@ -2947,7 +2949,10 @@ void LocalStore::buildDerivations(const PathSet & drvPaths)
 
     Goals goals;
     foreach (PathSet::const_iterator, i, drvPaths)
-        goals.insert(worker.makeDerivationGoal(*i));
+        if (isDerivation(*i))
+            goals.insert(worker.makeDerivationGoal(*i));
+        else
+            goals.insert(worker.makeSubstitutionGoal(*i));
 
     worker.run(goals);
 
@@ -2955,8 +2960,8 @@ void LocalStore::buildDerivations(const PathSet & drvPaths)
     foreach (Goals::iterator, i, goals)
         if ((*i)->getExitCode() == Goal::ecFailed) {
             DerivationGoal * i2 = dynamic_cast<DerivationGoal *>(i->get());
-            assert(i2);
-            failed.insert(i2->getDrvPath());
+            if (i2) failed.insert(i2->getDrvPath());
+            else failed.insert(dynamic_cast<SubstitutionGoal *>(i->get())->getStorePath());
         }
             
     if (!failed.empty())

@@ -397,10 +397,10 @@ Paths RemoteStore::importPaths(bool requireSignature, Source & source)
 }
 
 
-void RemoteStore::buildDerivations(const PathSet & drvPaths)
+void RemoteStore::buildPaths(const PathSet & drvPaths)
 {
     openConnection();
-    writeInt(wopBuildDerivations, to);
+    writeInt(wopBuildPaths, to);
     writeStrings(drvPaths, to);
     processStderr();
     readInt(from);

@@ -62,7 +62,7 @@ static Path useDeriver(Path path)
 static PathSet realisePath(const Path & path)
 {
     if (isDerivation(path)) {
-        store->buildDerivations(singleton<PathSet>(path));
+        store->buildPaths(singleton<PathSet>(path));
         Derivation drv = derivationFromPath(*store, path);
 
         PathSet outputs;
@@ -101,13 +101,11 @@ static void opRealise(Strings opFlags, Strings opArgs)
     
     if (dryRun) return;
     
-    /* Build all derivations at the same time to exploit parallelism. */
-    PathSet drvPaths;
-    foreach (Strings::iterator, i, opArgs)
-        if (isDerivation(*i)) drvPaths.insert(*i);
-    store->buildDerivations(drvPaths);
+    /* Build all paths at the same time to exploit parallelism. */
+    PathSet paths(opArgs.begin(), opArgs.end());
+    store->buildPaths(paths);
 
-    foreach (Strings::iterator, i, opArgs) {
+    foreach (Paths::iterator, i, opArgs) {
         PathSet paths = realisePath(*i);
         foreach (PathSet::iterator, j, paths)
             cout << format("%1%\n") % *j;
