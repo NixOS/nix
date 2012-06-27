@@ -1806,8 +1806,9 @@ void DerivationGoal::startBuilder()
     {
         pid = fork();
         if (pid == 0) initChild();
-        else if (pid == -1) throw SysError("unable to fork");
     }
+
+    if (pid == -1) throw SysError("unable to fork");
 
     /* parent */
     pid.setSeparatePG(true);
