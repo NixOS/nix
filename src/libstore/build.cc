@@ -1868,6 +1868,12 @@ void DerivationGoal::initChild()
                private PID namespace. */
             if (mount("none", (chrootRootDir + "/proc").c_str(), "proc", 0, 0) == -1)
                 throw SysError("mounting /proc");
+
+            /* Mount a new tmpfs on /dev/shm to ensure that whatever
+               the builder puts in /dev/shm is cleaned up automatically. */
+            if (pathExists("/dev/shm"))
+                if (mount("none", (chrootRootDir + "/dev/shm").c_str(), "tmpfs", 0, 0) == -1)
+                    throw SysError("mounting /dev/shm");
                     
             /* Do the chroot().  Below we do a chdir() to the
                temporary build directory to make sure the current
