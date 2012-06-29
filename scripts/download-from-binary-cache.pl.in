@@ -1,0 +1,118 @@
+#! @perl@ -w @perlFlags@
+
+use strict;
+use Nix::Config;
+use Nix::Store;
+
+my @binaryCacheUrls = ("file:///tmp/binary-cache");
+
+sub getInfoFrom {
+    my ($storePath, $pathHash, $binaryCacheUrl) = @_;
+    my $infoUrl = "$binaryCacheUrl/$pathHash.narinfo";
+    #print STDERR "checking $infoUrl...\n";
+    my $s = `$Nix::Config::curl --fail --silent --location ${infoUrl}`;
+    if ($? != 0) {
+        print STDERR "GOT CURL REPLY ", $? >> 8, "\n";
+        return undef;
+    }
+    my ($storePath2, $url, $fileHash, $fileSize, $narHash, $narSize, $deriver);
+    my @refs;
+    foreach my $line (split "\n", $s) {
+        $line =~ /^(.*): (.*)$/ or return undef;
+        if ($1 eq "StorePath") { $storePath2 = $2; }
+        elsif ($1 eq "URL") { $url = $2; }
+        elsif ($1 eq "CompressedHash") { $fileHash = $2; }
+        elsif ($1 eq "CompressedSize") { $fileSize = int($2); }
+        elsif ($1 eq "NarHash") { $narHash = $2; }
+        elsif ($1 eq "NarSize") { $narSize = int($2); }
+        elsif ($1 eq "References") { @refs = split / /, $2; }
+        elsif ($1 eq "Deriver") { $deriver = $2; }
+    }
+    if ($storePath ne $storePath2 || !defined $url || !defined $narHash || !defined $narSize) {
+        print STDERR "bad NAR info file ‘$infoUrl’\n";
+        return undef
+    }
+    return
+        { url => $url
+        , fileHash => $fileHash
+        , fileSize => $fileSize
+        , narHash => $narHash
+        , narSize => $narSize
+        , refs => [ map { "$Nix::Config::storeDir/$_" } @refs ]
+        , deriver => "$Nix::Config::storeDir/$deriver"
+        }
+}
+
+sub getInfo {
+    my ($storePath) = @_;
+
+    my $pathHash = hashString("sha256", 1, $storePath);
+
+    cache: foreach my $binaryCacheUrl (@binaryCacheUrls) {
+        my $info = getInfoFrom($storePath, $pathHash, $binaryCacheUrl);
+        return $info if defined $info;
+    }
+
+    return undef;
+}
+
+sub downloadBinary {
+    my ($storePath) = @_;
+    
+    my $pathHash = hashString("sha256", 1, $storePath);
+
+    cache: foreach my $binaryCacheUrl (@binaryCacheUrls) {
+        my $info = getInfoFrom($storePath, $pathHash, $binaryCacheUrl);
+        if (defined $info) {
+            if (system("$Nix::Config::curl --fail --location $binaryCacheUrl/$info->{url} | $Nix::Config::xz -d | $Nix::Config::binDir/nix-store --restore $storePath") == 0) {
+                return 1;
+            }
+        }
+    }
+
+    return 0;
+}
+
+if ($ARGV[0] eq "--query") {
+
+    while (<STDIN>) {
+        my $cmd = $_; chomp $cmd;
+
+        if ($cmd eq "have") {
+            my $storePath = <STDIN>; chomp $storePath;
+            # FIXME: want to give correct info here, but it's too slow.
+            print "0\n";
+            #my $info = getInfo($storePath);
+            #if (defined $info) { print "1\n"; } else { print "0\n"; }
+        }
+
+        elsif ($cmd eq "info") {
+            my $storePath = <STDIN>; chomp $storePath;
+            my $info = getInfo($storePath);
+            if (defined $info) {
+                print "1\n";
+                print $info->{deriver} || "", "\n";
+                print scalar @{$info->{refs}}, "\n";
+                print "$_\n" foreach @{$info->{refs}};
+                print $info->{fileSize} || 0, "\n";
+                print $info->{narSize}, "\n";
+            } else {
+                print "0\n";
+            }
+        }
+
+        else { die "unknown command `$cmd'"; }
+
+        flush STDOUT;
+    }
+
+}
+
+elsif ($ARGV[0] eq "--substitute") {
+    my $storePath = $ARGV[1] or die;
+    exit 1 unless downloadBinary($storePath);
+}
+
+else {
+    die;
+}

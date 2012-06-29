@@ -6,6 +6,7 @@ $stateDir = $ENV{"NIX_STATE_DIR"} || "@localstatedir@/nix";
 $manifestDir = $ENV{"NIX_MANIFESTS_DIR"} || "@localstatedir@/nix/manifests";
 $logDir = $ENV{"NIX_LOG_DIR"} || "@localstatedir@/log/nix";
 $confDir = $ENV{"NIX_CONF_DIR"} || "@sysconfdir@/nix";
+$storeDir = $ENV{"NIX_STORE_DIR"} || "@storedir@";
 
 $bzip2 = "@bzip2@";
 $xz = "@xz@";
