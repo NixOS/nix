@@ -152,7 +152,7 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
     $compressedHash =~ /^[0-9a-z]+$/ or die "invalid hash";
     close HASH;
 
-    my $narName = "$compressedHash.nar.bz2";
+    my $narName = "$compressedHash.nar.xz";
 
     my $narFile = "$narDir/$narName";
     (-f $narFile) or die "NAR file for $storePath not found";
