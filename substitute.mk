@@ -16,6 +16,7 @@
 	 -e "s^@shell\@^$(bash)^g" \
 	 -e "s^@curl\@^$(curl)^g" \
 	 -e "s^@bzip2\@^$(bzip2)^g" \
+	 -e "s^@xz\@^$(xz)^g" \
 	 -e "s^@perl\@^$(perl)^g" \
 	 -e "s^@perlFlags\@^$(perlFlags)^g" \
 	 -e "s^@coreutils\@^$(coreutils)^g" \

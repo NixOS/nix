@@ -8,14 +8,15 @@ let
 
       echo "packing ‘$storePath’..."
       mkdir $out
-      dst=$out/tmp.nar.bz2
+      dst=$out/tmp.nar.xz
 
       set -o pipefail
-      nix-store --dump "$storePath" | ${bzip2} > $dst
+      nix-store --dump "$storePath" | ${xz} -9 > $dst
 
-      nix-hash --flat --type $hashAlgo --base32 $dst > $out/narbz2-hash
+      hash=$(nix-hash --flat --type $hashAlgo --base32 $dst)
+      echo -n $hash > $out/nar-compressed-hash
 
-      mv $out/tmp.nar.bz2 $out/$(cat $out/narbz2-hash).nar.bz2
+      mv $dst $out/$hash.nar.xz
     '';
 
 in

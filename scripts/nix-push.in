@@ -118,7 +118,7 @@ close READ or die "nix-build failed: $?";
 print STDERR "uploading/copying archives...\n";
 
 my $totalNarSize = 0;
-my $totalNarBz2Size = 0;
+my $totalCompressedSize = 0;
 
 for (my $n = 0; $n < scalar @storePaths; $n++) {
     my $storePath = $storePaths[$n];
@@ -146,22 +146,22 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
     $totalNarSize += $narSize;
     
     # Get info about the compressed NAR.
-    open HASH, "$narDir/narbz2-hash" or die "cannot open narbz2-hash";
-    my $narBz2Hash = <HASH>;
-    chomp $narBz2Hash;
-    $narBz2Hash =~ /^[0-9a-z]+$/ or die "invalid hash";
+    open HASH, "$narDir/nar-compressed-hash" or die "cannot open nar-compressed-hash";
+    my $compressedHash = <HASH>;
+    chomp $compressedHash;
+    $compressedHash =~ /^[0-9a-z]+$/ or die "invalid hash";
     close HASH;
 
-    my $narName = "$narBz2Hash.nar.bz2";
+    my $narName = "$compressedHash.nar.bz2";
 
     my $narFile = "$narDir/$narName";
     (-f $narFile) or die "NAR file for $storePath not found";
 
-    my $narBz2Size = stat($narFile)->size;    
-    $totalNarBz2Size += $narBz2Size;
+    my $compressedSize = stat($narFile)->size;    
+    $totalCompressedSize += $compressedSize;
 
     printf STDERR "%s [%.2f MiB, %.1f%%]\n", $storePath,
-        $narBz2Size / (1024 * 1024), $narBz2Size / $narSize * 100;
+        $compressedSize / (1024 * 1024), $compressedSize / $narSize * 100;
 
     # Upload the compressed NAR.
     if ($localCopy) {
@@ -184,13 +184,13 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
     my $info;
     $info .= "StorePath: $storePath\n";
     $info .= "URL: $narName\n";
-    $info .= "CompressedHash: sha256:$narBz2Hash\n";
-    $info .= "CompressedSize: $narBz2Size\n";
+    $info .= "CompressedHash: sha256:$compressedHash\n";
+    $info .= "CompressedSize: $compressedSize\n";
     $info .= "NarHash: $narHash\n";
     $info .= "NarSize: $narSize\n";
     $info .= "References: " . join(" ", map { basename $_ } @{$refs}) . "\n";
     if (defined $deriver) {
-        $info .= "Deriver: " . basename $deriver, "\n";
+        $info .= "Deriver: " . basename $deriver . "\n";
         if (isValidPath($deriver)) {
             my $drv = derivationFromPath($deriver);
             $info .= "System: $drv->{platform}\n";
@@ -214,4 +214,4 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
 }
 
 printf STDERR "total compressed size %.2f MiB, %.1f%%\n",
-    $totalNarBz2Size / (1024 * 1024), $totalNarBz2Size / $totalNarSize * 100;
+    $totalCompressedSize / (1024 * 1024), $totalCompressedSize / $totalNarSize * 100;
