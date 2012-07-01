@@ -4,7 +4,7 @@ use strict;
 use Nix::Config;
 use Nix::Store;
 
-my @binaryCacheUrls = ("file:///tmp/binary-cache");
+my @binaryCacheUrls = ("file:///tmp/binary-cache2");
 
 sub getInfoFrom {
     my ($storePath, $pathHash, $binaryCacheUrl) = @_;
@@ -15,14 +15,15 @@ sub getInfoFrom {
         print STDERR "GOT CURL REPLY ", $? >> 8, "\n";
         return undef;
     }
-    my ($storePath2, $url, $fileHash, $fileSize, $narHash, $narSize, $deriver);
+    my ($storePath2, $url, $compression, $fileHash, $fileSize, $narHash, $narSize, $deriver);
     my @refs;
     foreach my $line (split "\n", $s) {
         $line =~ /^(.*): (.*)$/ or return undef;
         if ($1 eq "StorePath") { $storePath2 = $2; }
         elsif ($1 eq "URL") { $url = $2; }
-        elsif ($1 eq "CompressedHash") { $fileHash = $2; }
-        elsif ($1 eq "CompressedSize") { $fileSize = int($2); }
+        elsif ($1 eq "Compression") { $compression = $2; }
+        elsif ($1 eq "FileHash") { $fileHash = $2; }
+        elsif ($1 eq "FileSize") { $fileSize = int($2); }
         elsif ($1 eq "NarHash") { $narHash = $2; }
         elsif ($1 eq "NarSize") { $narSize = int($2); }
         elsif ($1 eq "References") { @refs = split / /, $2; }
@@ -34,6 +35,7 @@ sub getInfoFrom {
     }
     return
         { url => $url
+        , compression => ($compression || "bzip2")
         , fileHash => $fileHash
         , fileSize => $fileSize
         , narHash => $narHash
@@ -64,7 +66,14 @@ sub downloadBinary {
     cache: foreach my $binaryCacheUrl (@binaryCacheUrls) {
         my $info = getInfoFrom($storePath, $pathHash, $binaryCacheUrl);
         if (defined $info) {
-            if (system("$Nix::Config::curl --fail --location $binaryCacheUrl/$info->{url} | $Nix::Config::xz -d | $Nix::Config::binDir/nix-store --restore $storePath") == 0) {
+            my $decompressor;
+            if ($info->{compression} eq "bzip2") { $decompressor = "$Nix::Config::bzip2 -d"; }
+            elsif ($info->{compression} eq "xz") { $decompressor = "$Nix::Config::xz -d"; }
+            else {
+                print STDERR "unknown compression method ‘$info->{compression}’\n";
+                next;
+            }
+            if (system("$Nix::Config::curl --fail --location $binaryCacheUrl/$info->{url} | $decompressor | $Nix::Config::binDir/nix-store --restore $storePath") == 0) {
                 return 1;
             }
         }

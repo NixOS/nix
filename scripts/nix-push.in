@@ -22,16 +22,21 @@ $curl = "$curl $extraCurlFlags" if defined $extraCurlFlags;
 
 
 # Parse the command line.
+my $compressionType = "xz";
+my $force = 0;
+
 my $localCopy;
 my $localArchivesDir;
 
 my $archivesPutURL;
 my $archivesGetURL;
 
+my @roots;
+
 sub showSyntax {
     print STDERR <<EOF
 Usage: nix-push --copy ARCHIVES_DIR PATHS...
-   or: nix-push ARCHIVES_PUT_URL ARCHIVES_GET_URL PATHS...
+   or: nix-push --upload ARCHIVES_PUT_URL ARCHIVES_GET_URL PATHS...
 
 `nix-push' copies or uploads the closure of PATHS to the given
 destination.
@@ -40,27 +45,42 @@ EOF
     exit 1;
 }
 
-showSyntax if scalar @ARGV < 1;
+for (my $n = 0; $n < scalar @ARGV; $n++) {
+    my $arg = $ARGV[$n];
 
-if ($ARGV[0] eq "--copy") {
-    showSyntax if scalar @ARGV < 2;
-    $localCopy = 1;
-    shift @ARGV;
-    $localArchivesDir = shift @ARGV;
-    mkpath($localArchivesDir, 0, 0755);
-} else {
-    showSyntax if scalar @ARGV < 2;
-    $localCopy = 0;
-    $archivesPutURL = shift @ARGV;
-    $archivesGetURL = shift @ARGV;
+    if ($arg eq "--help") {
+        showSyntax;
+    } elsif ($arg eq "--bzip2") {
+        $compressionType = "bzip2";
+    } elsif ($arg eq "--force") {
+        $force = 1;
+    } elsif ($arg eq "--copy") {
+        $n++;
+        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        $localCopy = 1;
+        $localArchivesDir = $ARGV[$n];
+        mkpath($localArchivesDir, 0, 0755);
+    } elsif ($arg eq "--upload") {
+        die "$0: `$arg' requires two arguments\n" unless $n + 2 < scalar @ARGV;
+        $localCopy = 0;
+        $archivesPutURL = $ARGV[$n + 1];
+        $archivesGetURL = $ARGV[$n + 2];
+        $n++;
+    } elsif (substr($arg, 0, 1) eq "-") {
+        showSyntax;
+    } else {
+        push @roots, $arg;
+    }
 }
+        
+showSyntax if !defined $localCopy;
 
 
 # From the given store paths, determine the set of requisite store
 # paths, i.e, the paths required to realise them.
 my %storePaths;
 
-foreach my $path (@ARGV) {
+foreach my $path (@roots) {
     die unless $path =~ /^\//;
 
     # Get all paths referenced by the normalisation of the given 
@@ -92,7 +112,7 @@ foreach my $storePath (@storePaths) {
     # Construct a Nix expression that creates a Nix archive.
     my $nixexpr = 
         "(import <nix/nar.nix> " .
-        "{ storePath = builtins.storePath \"$storePath\"; hashAlgo = \"$hashAlgo\"; }) ";
+        "{ storePath = builtins.storePath \"$storePath\"; hashAlgo = \"$hashAlgo\"; compressionType = \"$compressionType\"; }) ";
     
     print NIX $nixexpr;
 }
@@ -152,7 +172,7 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
     $compressedHash =~ /^[0-9a-z]+$/ or die "invalid hash";
     close HASH;
 
-    my $narName = "$compressedHash.nar.xz";
+    my $narName = "$compressedHash.nar." . ($compressionType eq "xz" ? "xz" : "bz2");
 
     my $narFile = "$narDir/$narName";
     (-f $narFile) or die "NAR file for $storePath not found";
@@ -184,8 +204,9 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
     my $info;
     $info .= "StorePath: $storePath\n";
     $info .= "URL: $narName\n";
-    $info .= "CompressedHash: sha256:$compressedHash\n";
-    $info .= "CompressedSize: $compressedSize\n";
+    $info .= "Compression: $compressionType\n";
+    $info .= "FileHash: sha256:$compressedHash\n";
+    $info .= "FileSize: $compressedSize\n";
     $info .= "NarHash: $narHash\n";
     $info .= "NarSize: $narSize\n";
     $info .= "References: " . join(" ", map { basename $_ } @{$refs}) . "\n";
@@ -201,7 +222,7 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
     
     if ($localCopy) {
         my $dst = "$localArchivesDir/$infoName.narinfo";
-        if (! -f $dst) {
+        if ($force || ! -f $dst) {
             my $tmp = "$localArchivesDir/.tmp.$$.$infoName";
             open INFO, ">$tmp" or die;
             print INFO "$info" or die;
