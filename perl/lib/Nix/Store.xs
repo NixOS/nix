@@ -86,7 +86,7 @@ SV * queryDeriver(char * path)
         }
 
 
-SV * queryPathInfo(char * path)
+SV * queryPathInfo(char * path, int base32)
     PPCODE:
         try {
             doInit();
@@ -95,7 +95,7 @@ SV * queryPathInfo(char * path)
                 XPUSHs(&PL_sv_undef);
             else
                 XPUSHs(sv_2mortal(newSVpv(info.deriver.c_str(), 0)));
-            string s = "sha256:" + printHash(info.hash);
+            string s = "sha256:" + (base32 ? printHash32(info.hash) : printHash(info.hash));
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
             mXPUSHi(info.registrationTime);
             mXPUSHi(info.narSize);
