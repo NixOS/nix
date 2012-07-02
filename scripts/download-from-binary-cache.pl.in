@@ -4,7 +4,9 @@ use strict;
 use Nix::Config;
 use Nix::Store;
 
-my @binaryCacheUrls = ("file:///tmp/binary-cache2");
+
+my @binaryCacheUrls = split / /, ($ENV{"NIX_BINARY_CACHES"} || "");
+
 
 sub getInfoFrom {
     my ($storePath, $pathHash, $binaryCacheUrl) = @_;
@@ -12,7 +14,7 @@ sub getInfoFrom {
     #print STDERR "checking $infoUrl...\n";
     my $s = `$Nix::Config::curl --fail --silent --location ${infoUrl}`;
     if ($? != 0) {
-        print STDERR "GOT CURL REPLY ", $? >> 8, "\n";
+        #print STDERR "GOT CURL REPLY ", $? >> 8, "\n";
         return undef;
     }
     my ($storePath2, $url, $compression, $fileHash, $fileSize, $narHash, $narSize, $deriver);
@@ -45,6 +47,7 @@ sub getInfoFrom {
         }
 }
 
+
 sub getInfo {
     my ($storePath) = @_;
 
@@ -57,6 +60,7 @@ sub getInfo {
 
     return undef;
 }
+
 
 sub downloadBinary {
     my ($storePath) = @_;
@@ -81,6 +85,7 @@ sub downloadBinary {
 
     return 0;
 }
+
 
 if ($ARGV[0] eq "--query") {
 
