@@ -218,12 +218,12 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
         }
     }
 
-    my $infoName = hashString("sha256", 1, $storePath);
+    my $pathHash = substr(basename($storePath), 0, 32);
     
     if ($localCopy) {
-        my $dst = "$localArchivesDir/$infoName.narinfo";
+        my $dst = "$localArchivesDir/$pathHash.narinfo";
         if ($force || ! -f $dst) {
-            my $tmp = "$localArchivesDir/.tmp.$$.$infoName";
+            my $tmp = "$localArchivesDir/.tmp.$$.$pathHash.narinfo";
             open INFO, ">$tmp" or die;
             print INFO "$info" or die;
             close INFO or die;

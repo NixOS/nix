@@ -1,6 +1,7 @@
 #! @perl@ -w @perlFlags@
 
 use strict;
+use File::Basename;
 use Nix::Config;
 use Nix::Store;
 
@@ -12,9 +13,11 @@ sub getInfoFrom {
     my ($storePath, $pathHash, $binaryCacheUrl) = @_;
     my $infoUrl = "$binaryCacheUrl/$pathHash.narinfo";
     #print STDERR "checking $infoUrl...\n";
-    my $s = `$Nix::Config::curl --fail --silent --location ${infoUrl}`;
+    my $s = `$Nix::Config::curl --fail --silent --location $infoUrl`;
     if ($? != 0) {
-        #print STDERR "GOT CURL REPLY ", $? >> 8, "\n";
+        my $status = $? >> 8;
+        print STDERR "could not download ‘$infoUrl’ (curl returned status ", $? >> 8, ")\n"
+            if $status != 22 && $status != 37;
         return undef;
     }
     my ($storePath2, $url, $compression, $fileHash, $fileSize, $narHash, $narSize, $deriver);
@@ -51,7 +54,7 @@ sub getInfoFrom {
 sub getInfo {
     my ($storePath) = @_;
 
-    my $pathHash = hashString("sha256", 1, $storePath);
+    my $pathHash = substr(basename($storePath), 0, 32);
 
     cache: foreach my $binaryCacheUrl (@binaryCacheUrls) {
         my $info = getInfoFrom($storePath, $pathHash, $binaryCacheUrl);
@@ -65,7 +68,7 @@ sub getInfo {
 sub downloadBinary {
     my ($storePath) = @_;
     
-    my $pathHash = hashString("sha256", 1, $storePath);
+    my $pathHash = substr(basename($storePath), 0, 32);
 
     cache: foreach my $binaryCacheUrl (@binaryCacheUrls) {
         my $info = getInfoFrom($storePath, $pathHash, $binaryCacheUrl);
@@ -124,7 +127,9 @@ if ($ARGV[0] eq "--query") {
 
 elsif ($ARGV[0] eq "--substitute") {
     my $storePath = $ARGV[1] or die;
-    exit 1 unless downloadBinary($storePath);
+    if (!downloadBinary($storePath)) {
+        print STDERR "could not download ‘$storePath’ from any binary cache\n";
+    }
 }
 
 else {
