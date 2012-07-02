@@ -8,10 +8,10 @@ let
 
       if [ $compressionType = "xz" ]; then
         ext=xz
-        compressor=${xz} -9
+        compressor="${xz} -9"
       else
         ext=bz2
-        compressor=${bzip2}
+        compressor="${bzip2}"
       fi
 
       echo "packing ‘$storePath’..."
@@ -19,7 +19,7 @@ let
       dst=$out/tmp.nar.$ext
 
       set -o pipefail
-      nix-store --dump "$storePath" | $compressor -9 > $dst
+      nix-store --dump "$storePath" | $compressor > $dst
 
       hash=$(nix-hash --flat --type $hashAlgo --base32 $dst)
       echo -n $hash > $out/nar-compressed-hash
