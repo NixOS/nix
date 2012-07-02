@@ -34,9 +34,9 @@ sub getInfoFrom {
         elsif ($1 eq "References") { @refs = split / /, $2; }
         elsif ($1 eq "Deriver") { $deriver = $2; }
     }
-    if ($storePath ne $storePath2 || !defined $url || !defined $narHash || !defined $narSize) {
+    if ($storePath ne $storePath2 || !defined $url || !defined $narHash) {
         print STDERR "bad NAR info file ‘$infoUrl’\n";
-        return undef
+        return undef;
     }
     return
         { url => $url
@@ -46,7 +46,7 @@ sub getInfoFrom {
         , narHash => $narHash
         , narSize => $narSize
         , refs => [ map { "$Nix::Config::storeDir/$_" } @refs ]
-        , deriver => "$Nix::Config::storeDir/$deriver"
+        , deriver => defined $deriver ? "$Nix::Config::storeDir/$deriver" : undef
         }
 }
 
@@ -80,9 +80,18 @@ sub downloadBinary {
                 print STDERR "unknown compression method ‘$info->{compression}’\n";
                 next;
             }
-            if (system("$Nix::Config::curl --fail --location $binaryCacheUrl/$info->{url} | $decompressor | $Nix::Config::binDir/nix-store --restore $storePath") == 0) {
-                return 1;
+            if (system("$Nix::Config::curl --fail --location $binaryCacheUrl/$info->{url} | $decompressor | $Nix::Config::binDir/nix-store --restore $storePath") != 0) {
+                die "download of `$info->{url}' failed" . ($! ? ": $!" : "") . "\n" unless $? == 0;
+                next;
             }
+            # The hash in the manifest can be either in base-16 or
+            # base-32.  Handle both.
+            $info->{narHash} =~ /^sha256:(.*)$/ or die "invalid hash";
+            my $hash = $1;
+            my $hash2 = hashPath("sha256", 1, $storePath);
+            die "hash mismatch in downloaded path ‘$storePath’; expected $hash, got $hash2\n"
+                if $hash ne $hash2;
+            return 1;
         }
     }
 
@@ -112,7 +121,7 @@ if ($ARGV[0] eq "--query") {
                 print scalar @{$info->{refs}}, "\n";
                 print "$_\n" foreach @{$info->{refs}};
                 print $info->{fileSize} || 0, "\n";
-                print $info->{narSize}, "\n";
+                print $info->{narSize} || 0, "\n";
             } else {
                 print "0\n";
             }
