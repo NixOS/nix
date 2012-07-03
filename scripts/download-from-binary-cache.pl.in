@@ -4,15 +4,66 @@ use strict;
 use File::Basename;
 use Nix::Config;
 use Nix::Store;
+use DBI;
 
 
 my @binaryCacheUrls = split / /, ($ENV{"NIX_BINARY_CACHES"} || "");
+
+my ($dbh, $insertNAR, $queryNAR);
+my %cacheIds;
+
+
+sub initCache {
+    my $dbPath = "$Nix::Config::stateDir/binary-cache-v1.sqlite";
+
+    # Open/create the database.
+    $dbh = DBI->connect("dbi:SQLite:dbname=$dbPath", "", "")
+        or die "cannot open database `$dbPath'";
+    $dbh->{RaiseError} = 1;
+    $dbh->{PrintError} = 0;
+
+    $dbh->do("pragma synchronous = off"); # we can always reproduce the cache
+    $dbh->do("pragma journal_mode = truncate");
+
+    # Initialise the database schema, if necessary.
+    $dbh->do(<<EOF);
+        create table if not exists BinaryCaches (
+            id        integer primary key autoincrement not null,
+            url       text unique not null
+        );
+EOF
+    
+    $dbh->do(<<EOF);
+        create table if not exists NARs (
+            cache            integer not null,
+            storePath        text not null,
+            url              text not null,
+            compression      text not null,
+            fileHash         text,
+            fileSize         integer,
+            narHash          text,
+            narSize          integer,
+            refs             text,
+            deriver          text,
+            system           text,
+            timestamp        integer not null,
+            primary key (cache, storePath),
+            foreign key (cache) references BinaryCaches(id) on delete cascade
+        );
+EOF
+
+    $insertNAR = $dbh->prepare(
+        "insert or replace into NARs(cache, storePath, url, compression, fileHash, fileSize, narHash, " .
+        "narSize, refs, deriver, system, timestamp) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)") or die;
+
+    $queryNAR = $dbh->prepare("select * from NARs where cache = ? and storePath = ?") or die;
+}
 
 
 sub getInfoFrom {
     my ($storePath, $pathHash, $binaryCacheUrl) = @_;
     my $infoUrl = "$binaryCacheUrl/$pathHash.narinfo";
-    #print STDERR "checking $infoUrl...\n";
+    print STDERR "checking $infoUrl...\n";
     my $s = `$Nix::Config::curl --fail --silent --location $infoUrl`;
     if ($? != 0) {
         my $status = $? >> 8;
@@ -34,6 +85,7 @@ sub getInfoFrom {
         elsif ($1 eq "References") { @refs = split / /, $2; }
         elsif ($1 eq "Deriver") { $deriver = $2; }
     }
+    return undef if $storePath ne $storePath2;
     if ($storePath ne $storePath2 || !defined $url || !defined $narHash) {
         print STDERR "bad NAR info file ‘$infoUrl’\n";
         return undef;
@@ -45,9 +97,63 @@ sub getInfoFrom {
         , fileSize => $fileSize
         , narHash => $narHash
         , narSize => $narSize
-        , refs => [ map { "$Nix::Config::storeDir/$_" } @refs ]
-        , deriver => defined $deriver ? "$Nix::Config::storeDir/$deriver" : undef
-        }
+        , refs => [ @refs ]
+        , deriver => $deriver
+        };
+}
+
+
+sub getCacheId {
+    my ($binaryCacheUrl) = @_;
+    
+    my $cacheId = $cacheIds{$binaryCacheUrl};
+    return $cacheId if defined $cacheId;
+    
+    # FIXME: not atomic.
+    my @res = @{$dbh->selectcol_arrayref("select id from BinaryCaches where url = ?", {}, $binaryCacheUrl)};
+    if (scalar @res == 1) {
+        $cacheId = $res[0];
+    } else {
+        $dbh->do("insert into BinaryCaches(url) values (?)",
+                 {}, $binaryCacheUrl);
+        $cacheId = $dbh->last_insert_id("", "", "", "");
+    }
+
+    $cacheIds{$binaryCacheUrl} = $cacheId;
+    return $cacheId;
+}
+
+
+sub cachedGetInfoFrom {
+    my ($storePath, $pathHash, $binaryCacheUrl) = @_;
+
+    my $cacheId = getCacheId($binaryCacheUrl);
+
+    # Look up $storePath in the SQLite cache.
+    $queryNAR->execute($cacheId, basename($storePath));
+    my $res = $queryNAR->fetchrow_hashref();
+    return 
+        { url => $res->{url}
+        , compression => $res->{compression}
+        , fileHash => $res->{fileHash}
+        , fileSize => $res->{fileSize}
+        , narHash => $res->{narHash}
+        , narSize => $res->{narSize}
+        , refs => [ split " ", $res->{refs} ]
+        , deriver => $res->{deriver}
+        } if defined $res;
+
+    # Not found, so do an HTTP request to get the info.
+    my $info = getInfoFrom($storePath, $pathHash, $binaryCacheUrl);
+
+    # Cache the result.
+    $insertNAR->execute(
+        $cacheId, basename($storePath), $info->{url}, $info->{compression}, $info->{fileHash}, $info->{fileSize},
+        $info->{narHash}, $info->{narSize}, join(" ", @{$info->{refs}}),
+        $info->{deriver}, $info->{system}, time())
+        if defined $info;
+    
+    return $info;
 }
 
 
@@ -57,7 +163,7 @@ sub getInfo {
     my $pathHash = substr(basename($storePath), 0, 32);
 
     cache: foreach my $binaryCacheUrl (@binaryCacheUrls) {
-        my $info = getInfoFrom($storePath, $pathHash, $binaryCacheUrl);
+        my $info = cachedGetInfoFrom($storePath, $pathHash, $binaryCacheUrl);
         return $info if defined $info;
     }
 
@@ -71,7 +177,7 @@ sub downloadBinary {
     my $pathHash = substr(basename($storePath), 0, 32);
 
     cache: foreach my $binaryCacheUrl (@binaryCacheUrls) {
-        my $info = getInfoFrom($storePath, $pathHash, $binaryCacheUrl);
+        my $info = cachedGetInfoFrom($storePath, $pathHash, $binaryCacheUrl);
         if (defined $info) {
             my $decompressor;
             if ($info->{compression} eq "bzip2") { $decompressor = "$Nix::Config::bzip2 -d"; }
@@ -99,6 +205,9 @@ sub downloadBinary {
 }
 
 
+initCache();
+
+
 if ($ARGV[0] eq "--query") {
 
     while (<STDIN>) {
@@ -117,9 +226,9 @@ if ($ARGV[0] eq "--query") {
             my $info = getInfo($storePath);
             if (defined $info) {
                 print "1\n";
-                print $info->{deriver} || "", "\n";
+                print $info->{deriver} ? "$Nix::Config::storeDir/$info->{deriver}" : "", "\n";
                 print scalar @{$info->{refs}}, "\n";
-                print "$_\n" foreach @{$info->{refs}};
+                print "$Nix::Config::storeDir/$_\n" foreach @{$info->{refs}};
                 print $info->{fileSize} || 0, "\n";
                 print $info->{narSize} || 0, "\n";
             } else {
