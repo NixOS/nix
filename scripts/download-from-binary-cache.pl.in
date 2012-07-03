@@ -61,7 +61,8 @@ EOF
 
 
 sub getInfoFrom {
-    my ($storePath, $pathHash, $binaryCacheUrl) = @_;
+    my ($storePath, $pathHash, $binaryCacheUrl, $cacheId) = @_;
+    
     my $infoUrl = "$binaryCacheUrl/$pathHash.narinfo";
     print STDERR "checking $infoUrl...\n";
     my $s = `$Nix::Config::curl --fail --silent --location $infoUrl`;
@@ -71,7 +72,9 @@ sub getInfoFrom {
             if $status != 22 && $status != 37;
         return undef;
     }
-    my ($storePath2, $url, $compression, $fileHash, $fileSize, $narHash, $narSize, $deriver);
+    
+    my ($storePath2, $url, $fileHash, $fileSize, $narHash, $narSize, $deriver, $system);
+    my $compression = "bzip2";
     my @refs;
     foreach my $line (split "\n", $s) {
         $line =~ /^(.*): (.*)$/ or return undef;
@@ -84,21 +87,29 @@ sub getInfoFrom {
         elsif ($1 eq "NarSize") { $narSize = int($2); }
         elsif ($1 eq "References") { @refs = split / /, $2; }
         elsif ($1 eq "Deriver") { $deriver = $2; }
+        elsif ($1 eq "System") { $system = $2; }
     }
     return undef if $storePath ne $storePath2;
     if ($storePath ne $storePath2 || !defined $url || !defined $narHash) {
         print STDERR "bad NAR info file ‘$infoUrl’\n";
         return undef;
     }
+    
+    # Cache the result.
+    $insertNAR->execute(
+        getCacheId($binaryCacheUrl), basename($storePath), $url, $compression, $fileHash, $fileSize,
+        $narHash, $narSize, join(" ", @refs), $deriver, $system, time());
+    
     return
         { url => $url
-        , compression => ($compression || "bzip2")
+        , compression => $compression
         , fileHash => $fileHash
         , fileSize => $fileSize
         , narHash => $narHash
         , narSize => $narSize
         , refs => [ @refs ]
         , deriver => $deriver
+        , system => $system
         };
 }
 
@@ -127,11 +138,10 @@ sub getCacheId {
 sub cachedGetInfoFrom {
     my ($storePath, $pathHash, $binaryCacheUrl) = @_;
 
-    my $cacheId = getCacheId($binaryCacheUrl);
-
-    # Look up $storePath in the SQLite cache.
-    $queryNAR->execute($cacheId, basename($storePath));
+    $queryNAR->execute(getCacheId($binaryCacheUrl), basename($storePath));
     my $res = $queryNAR->fetchrow_hashref();
+    return undef unless defined $res;
+    
     return 
         { url => $res->{url}
         , compression => $res->{compression}
@@ -142,18 +152,6 @@ sub cachedGetInfoFrom {
         , refs => [ split " ", $res->{refs} ]
         , deriver => $res->{deriver}
         } if defined $res;
-
-    # Not found, so do an HTTP request to get the info.
-    my $info = getInfoFrom($storePath, $pathHash, $binaryCacheUrl);
-
-    # Cache the result.
-    $insertNAR->execute(
-        $cacheId, basename($storePath), $info->{url}, $info->{compression}, $info->{fileHash}, $info->{fileSize},
-        $info->{narHash}, $info->{narSize}, join(" ", @{$info->{refs}}),
-        $info->{deriver}, $info->{system}, time())
-        if defined $info;
-    
-    return $info;
 }
 
 
@@ -162,8 +160,15 @@ sub getInfo {
 
     my $pathHash = substr(basename($storePath), 0, 32);
 
-    cache: foreach my $binaryCacheUrl (@binaryCacheUrls) {
+    # First look if we have cached info for one of the URLs.
+    foreach my $binaryCacheUrl (@binaryCacheUrls) {
         my $info = cachedGetInfoFrom($storePath, $pathHash, $binaryCacheUrl);
+        return $info if defined $info;
+    }
+
+    # No, so do an HTTP request until we get a hit.
+    foreach my $binaryCacheUrl (@binaryCacheUrls) {
+        my $info = getInfoFrom($storePath, $pathHash, $binaryCacheUrl);
         return $info if defined $info;
     }
 
@@ -178,6 +183,7 @@ sub downloadBinary {
 
     cache: foreach my $binaryCacheUrl (@binaryCacheUrls) {
         my $info = cachedGetInfoFrom($storePath, $pathHash, $binaryCacheUrl);
+        $info = getInfoFrom($storePath, $pathHash, $binaryCacheUrl) unless defined $info;
         if (defined $info) {
             my $decompressor;
             if ($info->{compression} eq "bzip2") { $decompressor = "$Nix::Config::bzip2 -d"; }
@@ -186,6 +192,7 @@ sub downloadBinary {
                 print STDERR "unknown compression method ‘$info->{compression}’\n";
                 next;
             }
+            print STDERR "\n*** Downloading ‘$info->{url}’ into ‘$storePath’...\n";
             if (system("$Nix::Config::curl --fail --location $binaryCacheUrl/$info->{url} | $decompressor | $Nix::Config::binDir/nix-store --restore $storePath") != 0) {
                 die "download of `$info->{url}' failed" . ($! ? ": $!" : "") . "\n" unless $? == 0;
                 next;
@@ -197,6 +204,7 @@ sub downloadBinary {
             my $hash2 = hashPath("sha256", 1, $storePath);
             die "hash mismatch in downloaded path ‘$storePath’; expected $hash, got $hash2\n"
                 if $hash ne $hash2;
+            print STDERR "\n";
             return 1;
         }
     }
