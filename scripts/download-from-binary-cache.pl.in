@@ -7,7 +7,7 @@ use Nix::Store;
 use DBI;
 
 
-my @binaryCacheUrls = split / /, ($ENV{"NIX_BINARY_CACHES"} || "");
+my @binaryCacheUrls = map { s/\/+$//; $_ } split(/ /, ($ENV{"NIX_BINARY_CACHES"} || ""));
 
 my ($dbh, $insertNAR, $queryNAR);
 my %cacheIds;
