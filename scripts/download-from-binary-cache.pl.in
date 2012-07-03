@@ -9,7 +9,7 @@ use DBI;
 
 my @binaryCacheUrls = map { s/\/+$//; $_ } split(/ /, ($ENV{"NIX_BINARY_CACHES"} || ""));
 
-my ($dbh, $insertNAR, $queryNAR);
+my ($dbh, $insertNAR, $queryNAR, $insertNegativeNAR, $queryNegativeNAR);
 my %cacheIds;
 
 
@@ -52,24 +52,48 @@ EOF
         );
 EOF
 
+    $dbh->do(<<EOF);
+        create table if not exists NegativeNARs (
+            cache            integer not null,
+            storePath        text not null,
+            timestamp        integer not null,
+            primary key (cache, storePath),
+            foreign key (cache) references BinaryCaches(id) on delete cascade
+        );
+EOF
+
     $insertNAR = $dbh->prepare(
         "insert or replace into NARs(cache, storePath, url, compression, fileHash, fileSize, narHash, " .
         "narSize, refs, deriver, system, timestamp) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)") or die;
 
     $queryNAR = $dbh->prepare("select * from NARs where cache = ? and storePath = ?") or die;
+
+    $insertNegativeNAR = $dbh->prepare(
+        "insert or replace into NegativeNARs(cache, storePath, timestamp) values (?, ?, ?)") or die;
+
+    $queryNegativeNAR = $dbh->prepare("select 1 from NegativeNARs where cache = ? and storePath = ?") or die;
 }
 
 
 sub getInfoFrom {
-    my ($storePath, $pathHash, $binaryCacheUrl, $cacheId) = @_;
+    my ($storePath, $pathHash, $binaryCacheUrl) = @_;
+
+    my $cacheId = getCacheId($binaryCacheUrl);
+
+    # Bail out if there is a negative cache entry.
+    $queryNegativeNAR->execute($cacheId, basename($storePath));
+    return undef if @{$queryNegativeNAR->fetchall_arrayref()} != 0;
     
     my $infoUrl = "$binaryCacheUrl/$pathHash.narinfo";
     print STDERR "checking $infoUrl...\n";
     my $s = `$Nix::Config::curl --fail --silent --location $infoUrl`;
     if ($? != 0) {
         my $status = $? >> 8;
-        print STDERR "could not download ‘$infoUrl’ (curl returned status ", $? >> 8, ")\n"
-            if $status != 22 && $status != 37;
+        if ($status != 22 && $status != 37) {
+            print STDERR "could not download ‘$infoUrl’ (curl returned status ", $? >> 8, ")\n";
+        } else {
+            $insertNegativeNAR->execute($cacheId, basename($storePath), time());
+        }
         return undef;
     }
     
@@ -97,7 +121,7 @@ sub getInfoFrom {
     
     # Cache the result.
     $insertNAR->execute(
-        getCacheId($binaryCacheUrl), basename($storePath), $url, $compression, $fileHash, $fileSize,
+        $cacheId, basename($storePath), $url, $compression, $fileHash, $fileSize,
         $narHash, $narSize, join(" ", @refs), $deriver, $system, time());
     
     return
