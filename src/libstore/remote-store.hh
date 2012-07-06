@@ -48,6 +48,9 @@ public:
     bool querySubstitutablePathInfo(const Path & path,
         SubstitutablePathInfo & info);
     
+    void querySubstitutablePathInfos(const PathSet & paths,
+        SubstitutablePathInfos & infos);
+    
     Path addToStore(const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter);

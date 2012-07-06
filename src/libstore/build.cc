@@ -2352,10 +2352,12 @@ void SubstitutionGoal::tryNext()
     sub = subs.front();
     subs.pop_front();
 
-    if (!worker.store.querySubstitutablePathInfo(sub, storePath, info)) {
-        tryNext();
-        return;
-    }
+    SubstitutablePathInfos infos;
+    PathSet dummy(singleton<PathSet>(storePath));
+    worker.store.querySubstitutablePathInfos(sub, dummy, infos);
+    SubstitutablePathInfos::iterator k = infos.find(storePath);
+    if (k == infos.end()) { tryNext(); return; }
+    info = k->second;
 
     /* To maintain the closure invariant, we first have to realise the
        paths referenced by this one. */

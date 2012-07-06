@@ -936,37 +936,57 @@ bool LocalStore::hasSubstitutes(const Path & path)
 }
 
 
-bool LocalStore::querySubstitutablePathInfo(const Path & substituter,
-    const Path & path, SubstitutablePathInfo & info)
+void LocalStore::querySubstitutablePathInfos(const Path & substituter,
+    PathSet & paths, SubstitutablePathInfos & infos)
 {
     RunningSubstituter & run(runningSubstituters[substituter]);
     startSubstituter(substituter, run);
 
-    writeLine(run.to, "info\n" + path);
+    string s = "info ";
+    foreach (PathSet::const_iterator, i, paths)
+        if (infos.find(*i) == infos.end()) { s += *i; s += " "; }
+    writeLine(run.to, s);
 
-    if (!getIntLine<int>(run.from)) return false;
-    
-    info.deriver = readLine(run.from);
-    if (info.deriver != "") assertStorePath(info.deriver);
-    int nrRefs = getIntLine<int>(run.from);
-    while (nrRefs--) {
-        Path p = readLine(run.from);
-        assertStorePath(p);
-        info.references.insert(p);
+    while (true) {
+        Path path = readLine(run.from);
+        if (path == "") break;
+        assert(paths.find(path) != paths.end());
+        paths.erase(path);
+        SubstitutablePathInfo & info(infos[path]);
+        info.deriver = readLine(run.from);
+        if (info.deriver != "") assertStorePath(info.deriver);
+        int nrRefs = getIntLine<int>(run.from);
+        while (nrRefs--) {
+            Path p = readLine(run.from);
+            assertStorePath(p);
+            info.references.insert(p);
+        }
+        info.downloadSize = getIntLine<long long>(run.from);
+        info.narSize = getIntLine<long long>(run.from);
     }
-    info.downloadSize = getIntLine<long long>(run.from);
-    info.narSize = getIntLine<long long>(run.from);
-    
-    return true;
 }
 
 
 bool LocalStore::querySubstitutablePathInfo(const Path & path,
     SubstitutablePathInfo & info)
 {
-    foreach (Paths::iterator, i, substituters)
-        if (querySubstitutablePathInfo(*i, path, info)) return true;
-    return false;
+    SubstitutablePathInfos infos;
+    querySubstitutablePathInfos(singleton<PathSet>(path), infos);
+    SubstitutablePathInfos::iterator i = infos.find(path);
+    if (i == infos.end()) return false;
+    info = i->second;
+    return true;
+}
+
+
+void LocalStore::querySubstitutablePathInfos(const PathSet & paths,
+    SubstitutablePathInfos & infos)
+{
+    PathSet todo = paths;
+    foreach (Paths::iterator, i, substituters) {
+        if (todo.empty()) break;
+        querySubstitutablePathInfos(*i, todo, infos);
+    }
 }
 
 
@@ -1110,7 +1130,7 @@ Path LocalStore::addToStore(const Path & _srcPath,
        method for very large paths, but `copyPath' is mainly used for
        small files. */
     StringSink sink;
-    if (recursive) 
+    if (recursive)
         dumpPath(srcPath, sink, filter);
     else
         sink.s = readFile(srcPath);

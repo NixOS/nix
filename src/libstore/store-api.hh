@@ -86,6 +86,8 @@ struct SubstitutablePathInfo
     unsigned long long narSize; /* 0 = unknown */
 };
 
+typedef std::map<Path, SubstitutablePathInfo> SubstitutablePathInfos;
+
 
 struct ValidPathInfo 
 {
@@ -147,6 +149,9 @@ public:
        substitutable path. */
     virtual bool querySubstitutablePathInfo(const Path & path,
         SubstitutablePathInfo & info) = 0;
+
+    virtual void querySubstitutablePathInfos(const PathSet & paths,
+        SubstitutablePathInfos & infos) = 0;
     
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.

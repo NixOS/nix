@@ -256,6 +256,19 @@ bool RemoteStore::querySubstitutablePathInfo(const Path & path,
 }
 
 
+void RemoteStore::querySubstitutablePathInfos(const PathSet & paths,
+    SubstitutablePathInfos & infos)
+{
+    if (paths.empty()) return;
+    printMsg(lvlError, format("QUERYING %1% (REMOTE)") % showPaths(paths));
+    foreach (PathSet::const_iterator, i, paths) {
+        SubstitutablePathInfo info;
+        if (querySubstitutablePathInfo(*i, info))
+            infos[*i] = info;
+    }
+}
+
+
 ValidPathInfo RemoteStore::queryPathInfo(const Path & path)
 {
     openConnection();

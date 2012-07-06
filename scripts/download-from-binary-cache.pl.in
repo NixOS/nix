@@ -12,33 +12,40 @@ use strict;
 
 my @binaryCacheUrls = map { s/\/+$//; $_ } split(/ /, ($ENV{"NIX_BINARY_CACHES"} || ""));
 
+my $maxParallelRequests = 150;
+
 my ($dbh, $insertNAR, $queryNAR, $insertNegativeNAR, $queryNegativeNAR);
 my %cacheIds;
 
 my $curlm = WWW::Curl::Multi->new;
 my $activeRequests = 0;
 my $curlIdCount = 1;
-my %curlHandles;
+my %requests;
+my %scheduled;
 my $caBundle = $ENV{"CURL_CA_BUNDLE"} || $ENV{"OPENSSL_X509_CERT_FILE"};
 
 
 sub addRequest {
-    my ($url) = @_;
+    my ($storePath, $url) = @_;
     
     my $curl = WWW::Curl::Easy->new;
     my $curlId = $curlIdCount++;
-    $curlHandles{$curlId} = { handle => $curl, content => "" };
+    $requests{$curlId} = { storePath => $storePath, url => $url, handle => $curl, content => "" };
 
     $curl->setopt(CURLOPT_PRIVATE, $curlId);
     $curl->setopt(CURLOPT_URL, $url);
-    $curl->setopt(CURLOPT_WRITEDATA, \$curlHandles{$curlId}->{content});
+    $curl->setopt(CURLOPT_WRITEDATA, \$requests{$curlId}->{content});
     $curl->setopt(CURLOPT_FOLLOWLOCATION, 1);
     $curl->setopt(CURLOPT_CAINFO, $caBundle) if defined $caBundle;
 
-    $curlm->add_handle($curl);
-    $activeRequests++;
+    if ($activeRequests >= $maxParallelRequests) {
+        $scheduled{$curlId} = 1;
+    } else {
+        $curlm->add_handle($curl);
+        $activeRequests++;
+    }
 
-    return $curlHandles{$curlId};
+    return $requests{$curlId};
 }
 
 
@@ -55,12 +62,20 @@ sub processRequests {
         if ($curlm->perform() != $activeRequests) {
             while (my ($id, $result) = $curlm->info_read) {
                 if ($id) {
-                    my $handle = $curlHandles{$id}->{handle};
-                    $curlHandles{$id}->{result} = $result;
-                    $curlHandles{$id}->{httpStatus} = $handle->getinfo(CURLINFO_HTTP_CODE);
-                    #print STDERR "\nRequest completed ($id, $result, $curlHandles{$id}->{httpStatus})\n";
+                    my $handle = $requests{$id}->{handle};
+                    $requests{$id}->{result} = $result;
+                    $requests{$id}->{httpStatus} = $handle->getinfo(CURLINFO_HTTP_CODE);
+                    #print STDERR "\nRequest completed ($id, $result, $requests{$id}->{httpStatus})\n";
                     $activeRequests--;
-                    delete $curlHandles{$id}->{handle};
+                    delete $requests{$id}->{handle};
+
+                    if (scalar(keys %scheduled) > 0) {
+                        my $id2 = (keys %scheduled)[0];
+                        $curlm->add_handle($requests{$id2}->{handle});
+                        $activeRequests++;
+                        delete $scheduled{$id2};
+                    }
+                    
                 }
             }
         }
@@ -130,23 +145,21 @@ EOF
 }
 
 
-sub getInfoFrom {
-    my ($storePath, $pathHash, $binaryCacheUrl) = @_;
+sub negativeHit {
+    my ($storePath, $binaryCacheUrl) = @_;
+    $queryNegativeNAR->execute(getCacheId($binaryCacheUrl), basename($storePath));
+    return @{$queryNegativeNAR->fetchall_arrayref()} != 0;
+}
 
-    my $cacheId = getCacheId($binaryCacheUrl);
 
-    # Bail out if there is a negative cache entry.
-    $queryNegativeNAR->execute($cacheId, basename($storePath));
-    return undef if @{$queryNegativeNAR->fetchall_arrayref()} != 0;
+sub processNARInfo {
+    my ($storePath, $binaryCacheUrl, $request) = @_;
     
-    my $infoUrl = "$binaryCacheUrl/$pathHash.narinfo";
-    print STDERR "checking $infoUrl...\n";
-    my $request = addRequest($infoUrl);
-    processRequests;
+    my $cacheId = getCacheId($binaryCacheUrl);
 
     if ($request->{result} != 0 || $request->{httpStatus} != 200) {
         if ($request->{httpStatus} != 404) {
-            print STDERR "could not download ‘$infoUrl’ (" .
+            print STDERR "could not download ‘$request->{url}’ (" .
                 ($request->{result} != 0 ? "Curl error $request->{result}" : "HTTP status $request->{httpStatus}") . ")\n";
         } else {
             $insertNegativeNAR->execute($cacheId, basename($storePath), time());
@@ -172,7 +185,7 @@ sub getInfoFrom {
     }
     return undef if $storePath ne $storePath2;
     if ($storePath ne $storePath2 || !defined $url || !defined $narHash) {
-        print STDERR "bad NAR info file ‘$infoUrl’\n";
+        print STDERR "bad NAR info file ‘$request->{url}’\n";
         return undef;
     }
     
@@ -236,24 +249,65 @@ sub cachedGetInfoFrom {
 }
 
 
-sub getInfo {
-    my ($storePath) = @_;
+sub printInfo {
+    my ($storePath, $info) = @_;
+    print "$storePath\n";
+    print $info->{deriver} ? "$Nix::Config::storeDir/$info->{deriver}" : "", "\n";
+    print scalar @{$info->{refs}}, "\n";
+    print "$Nix::Config::storeDir/$_\n" foreach @{$info->{refs}};
+    print $info->{fileSize} || 0, "\n";
+    print $info->{narSize} || 0, "\n";
+}
 
-    my $pathHash = substr(basename($storePath), 0, 32);
 
-    # First look if we have cached info for one of the URLs.
-    foreach my $binaryCacheUrl (@binaryCacheUrls) {
-        my $info = cachedGetInfoFrom($storePath, $pathHash, $binaryCacheUrl);
-        return $info if defined $info;
+sub printInfoParallel {
+    my @paths = @_;
+
+    # First print all paths for which we have cached info.
+    my @left;
+    foreach my $storePath (@paths) {
+        my $pathHash = substr(basename($storePath), 0, 32);
+        my $found = 0;
+        foreach my $binaryCacheUrl (@binaryCacheUrls) {
+            my $info = cachedGetInfoFrom($storePath, $pathHash, $binaryCacheUrl);
+            if (defined $info) {
+                printInfo($storePath, $info);
+                $found = 1;
+                last;
+            }
+        }
+        push @left, $storePath if !$found;
     }
 
-    # No, so do an HTTP request until we get a hit.
-    foreach my $binaryCacheUrl (@binaryCacheUrls) {
-        my $info = getInfoFrom($storePath, $pathHash, $binaryCacheUrl);
-        return $info if defined $info;
-    }
+    return if scalar @left == 0;
 
-    return undef;
+    foreach my $binaryCacheUrl (@binaryCacheUrls) {
+
+        my @left2;
+        %requests = ();
+        foreach my $storePath (@left) {
+            my $pathHash = substr(basename($storePath), 0, 32);
+            if (negativeHit($storePath, $binaryCacheUrl)) {
+                push @left2, $storePath;
+                next;
+            }
+            my $infoUrl = "$binaryCacheUrl/$pathHash.narinfo";
+            addRequest($storePath, $infoUrl);
+        }
+
+        processRequests;
+
+        foreach my $request (values %requests) {
+            my $info = processNARInfo($request->{storePath}, $binaryCacheUrl, $request);
+            if (defined $info) {
+                printInfo($request->{storePath}, $info);
+            } else {
+                push @left2, $request->{storePath};
+            }
+        }
+
+        @left = @left2;
+    }
 }
 
 
@@ -264,30 +318,37 @@ sub downloadBinary {
 
     cache: foreach my $binaryCacheUrl (@binaryCacheUrls) {
         my $info = cachedGetInfoFrom($storePath, $pathHash, $binaryCacheUrl);
-        $info = getInfoFrom($storePath, $pathHash, $binaryCacheUrl) unless defined $info;
-        if (defined $info) {
-            my $decompressor;
-            if ($info->{compression} eq "bzip2") { $decompressor = "$Nix::Config::bzip2 -d"; }
-            elsif ($info->{compression} eq "xz") { $decompressor = "$Nix::Config::xz -d"; }
-            else {
-                print STDERR "unknown compression method ‘$info->{compression}’\n";
-                next;
-            }
-            print STDERR "\n*** Downloading ‘$info->{url}’ into ‘$storePath’...\n";
-            if (system("$Nix::Config::curl --fail --location $binaryCacheUrl/$info->{url} | $decompressor | $Nix::Config::binDir/nix-store --restore $storePath") != 0) {
-                die "download of `$info->{url}' failed" . ($! ? ": $!" : "") . "\n" unless $? == 0;
-                next;
-            }
-            # The hash in the manifest can be either in base-16 or
-            # base-32.  Handle both.
-            $info->{narHash} =~ /^sha256:(.*)$/ or die "invalid hash";
-            my $hash = $1;
-            my $hash2 = hashPath("sha256", 1, $storePath);
-            die "hash mismatch in downloaded path ‘$storePath’; expected $hash, got $hash2\n"
-                if $hash ne $hash2;
-            print STDERR "\n";
-            return 1;
+
+        unless (defined $info) {
+            next if negativeHit($storePath, $binaryCacheUrl);
+            my $request = addRequest($storePath, "$binaryCacheUrl/$pathHash.narinfo");
+            processRequests;
+            $info = processNARInfo($storePath, $binaryCacheUrl, $request);
         }
+
+        next unless defined $info;
+        
+        my $decompressor;
+        if ($info->{compression} eq "bzip2") { $decompressor = "$Nix::Config::bzip2 -d"; }
+        elsif ($info->{compression} eq "xz") { $decompressor = "$Nix::Config::xz -d"; }
+        else {
+            print STDERR "unknown compression method ‘$info->{compression}’\n";
+            next;
+        }
+        print STDERR "\n*** Downloading ‘$info->{url}’ into ‘$storePath’...\n";
+        if (system("$Nix::Config::curl --fail --location $binaryCacheUrl/$info->{url} | $decompressor | $Nix::Config::binDir/nix-store --restore $storePath") != 0) {
+            die "download of `$info->{url}' failed" . ($! ? ": $!" : "") . "\n" unless $? == 0;
+            next;
+        }
+        # The hash in the manifest can be either in base-16 or
+        # base-32.  Handle both.
+        $info->{narHash} =~ /^sha256:(.*)$/ or die "invalid hash";
+        my $hash = $1;
+        my $hash2 = hashPath("sha256", 1, $storePath);
+        die "hash mismatch in downloaded path ‘$storePath’; expected $hash, got $hash2\n"
+            if $hash ne $hash2;
+        print STDERR "\n";
+        return 1;
     }
 
     return 0;
@@ -300,29 +361,20 @@ initCache();
 if ($ARGV[0] eq "--query") {
 
     while (<STDIN>) {
-        my $cmd = $_; chomp $cmd;
-
+        chomp;
+        my ($cmd, @args) = split " ", $_;
+        
         if ($cmd eq "have") {
             my $storePath = <STDIN>; chomp $storePath;
             # FIXME: want to give correct info here, but it's too slow.
-            #print "0\n";
-            my $info = getInfo($storePath);
-            if (defined $info) { print "1\n"; } else { print "0\n"; }
+            print "0\n";
+            #my $info = getInfo($storePath);
+            #if (defined $info) { print "1\n"; } else { print "0\n"; }
         }
 
         elsif ($cmd eq "info") {
-            my $storePath = <STDIN>; chomp $storePath;
-            my $info = getInfo($storePath);
-            if (defined $info) {
-                print "1\n";
-                print $info->{deriver} ? "$Nix::Config::storeDir/$info->{deriver}" : "", "\n";
-                print scalar @{$info->{refs}}, "\n";
-                print "$Nix::Config::storeDir/$_\n" foreach @{$info->{refs}};
-                print $info->{fileSize} || 0, "\n";
-                print $info->{narSize} || 0, "\n";
-            } else {
-                print "0\n";
-            }
+            printInfoParallel(@args);
+            print "\n";
         }
 
         else { die "unknown command `$cmd'"; }
