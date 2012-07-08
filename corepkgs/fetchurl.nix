@@ -1,3 +1,5 @@
+with import <nix/config.nix>;
+
 # Argh, this thing is duplicated (more-or-less) in Nixpkgs.  Need to
 # find a way to combine them.
 
@@ -19,5 +21,5 @@ derivation {
   outputHash = if outputHash != "" then outputHash else
       if sha256 != "" then sha256 else if sha1 != "" then sha1 else md5;
   
-  inherit system url;
+  inherit system url curl;
 }
