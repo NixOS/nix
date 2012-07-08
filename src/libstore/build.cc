@@ -94,7 +94,7 @@ typedef map<Path, WeakGoalPtr> WeakGoalMap;
 class Goal : public boost::enable_shared_from_this<Goal>
 {
 public:
-    typedef enum {ecBusy, ecSuccess, ecFailed} ExitCode;
+    typedef enum {ecBusy, ecSuccess, ecFailed, ecNoSubstituters} ExitCode;
     
 protected:
     
@@ -111,6 +111,10 @@ protected:
     /* Number of goals we are/were waiting for that have failed. */
     unsigned int nrFailed;
 
+    /* Number of substitution goals we are/were waiting for that
+       failed because there are no substituters. */
+    unsigned int nrNoSubstituters;
+
     /* Name of this goal for debugging purposes. */
     string name;
 
@@ -119,7 +123,7 @@ protected:
 
     Goal(Worker & worker) : worker(worker)
     {
-        nrFailed = 0;
+        nrFailed = nrNoSubstituters = 0;
         exitCode = ecBusy;
     }
 
@@ -306,7 +310,9 @@ void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
     trace(format("waitee `%1%' done; %2% left") %
         waitee->name % waitees.size());
     
-    if (result == ecFailed) ++nrFailed;
+    if (result == ecFailed || result == ecNoSubstituters) ++nrFailed;
+
+    if (result == ecNoSubstituters) ++nrNoSubstituters;
     
     if (waitees.empty() || (result == ecFailed && !keepGoing)) {
 
@@ -330,7 +336,7 @@ void Goal::amDone(ExitCode result)
 {
     trace("done");
     assert(exitCode == ecBusy);
-    assert(result == ecSuccess || result == ecFailed);
+    assert(result == ecSuccess || result == ecFailed || result == ecNoSubstituters);
     exitCode = result;
     foreach (WeakGoals::iterator, i, waiters) {
         GoalPtr goal = i->lock();
@@ -736,6 +742,8 @@ HookInstance::~HookInstance()
 
 typedef enum {rpAccept, rpDecline, rpPostpone} HookReply;
 
+class SubstitutionGoal;
+
 class DerivationGoal : public Goal
 {
 private:
@@ -985,10 +993,8 @@ void DerivationGoal::haveDerivation()
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
-    foreach (PathSet::iterator, i, invalidOutputs)
-        /* Don't bother creating a substitution goal if there are no
-           substitutes. */
-        if (queryBoolSetting("build-use-substitutes", true) && worker.store.hasSubstitutes(*i))
+    if (queryBoolSetting("build-use-substitutes", true))
+        foreach (PathSet::iterator, i, invalidOutputs)
             addWaitee(worker.makeSubstitutionGoal(*i));
     
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
@@ -1002,10 +1008,10 @@ void DerivationGoal::outputsSubstituted()
 {
     trace("all outputs substituted (maybe)");
 
-    if (nrFailed > 0 && !tryFallback)
+    if (nrFailed > 0 && nrFailed > nrNoSubstituters && !tryFallback)
         throw Error(format("some substitutes for the outputs of derivation `%1%' failed; try `--fallback'") % drvPath);
 
-    nrFailed = 0;
+    nrFailed = nrNoSubstituters = 0;
 
     if (checkPathValidity(false).size() == 0) {
         amDone(ecSuccess);
@@ -2241,6 +2247,9 @@ private:
     /* The current substituter. */
     Path sub;
 
+    /* Whether any substituter can realise this path */
+    bool hasSubstitute;
+
     /* Path info returned by the substituter's query info operation. */
     SubstitutablePathInfo info;
 
@@ -2282,6 +2291,7 @@ public:
 
 SubstitutionGoal::SubstitutionGoal(const Path & storePath, Worker & worker)
     : Goal(worker)
+    , hasSubstitute(false)
 {
     this->storePath = storePath;
     state = &SubstitutionGoal::init;
@@ -2345,7 +2355,10 @@ void SubstitutionGoal::tryNext()
         /* None left.  Terminate this goal and let someone else deal
            with it. */
         debug(format("path `%1%' is required, but there is no substituter that can build it") % storePath);
-        amDone(ecFailed);
+        /* Hack: don't indicate failure if there were no substituters.
+           In that case the calling derivation should just do a
+           build. */
+        amDone(hasSubstitute ? ecFailed : ecNoSubstituters);
         return;
     }
 
@@ -2358,6 +2371,7 @@ void SubstitutionGoal::tryNext()
     SubstitutablePathInfos::iterator k = infos.find(storePath);
     if (k == infos.end()) { tryNext(); return; }
     info = k->second;
+    hasSubstitute = true;
 
     /* To maintain the closure invariant, we first have to realise the
        paths referenced by this one. */
