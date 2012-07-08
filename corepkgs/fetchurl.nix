@@ -1,8 +1,5 @@
 with import <nix/config.nix>;
 
-# Argh, this thing is duplicated (more-or-less) in Nixpkgs.  Need to
-# find a way to combine them.
-
 {system ? builtins.currentSystem, url, outputHash ? "", outputHashAlgo ? "", md5 ? "", sha1 ? "", sha256 ? ""}:
 
 assert (outputHash != "" && outputHashAlgo != "")
