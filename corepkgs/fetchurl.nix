@@ -10,7 +10,8 @@ assert (outputHash != "" && outputHashAlgo != "")
 
 derivation {
   name = baseNameOf (toString url);
-  builder = ./fetchurl.sh;
+  builder = shell;
+  args = [ "-e" ./fetchurl.sh ];
 
   # Compatibility with Nix <= 0.7.
   id = md5;
