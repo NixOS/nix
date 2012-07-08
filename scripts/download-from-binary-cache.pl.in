@@ -230,7 +230,7 @@ sub getCacheId {
 
 
 sub cachedGetInfoFrom {
-    my ($storePath, $pathHash, $binaryCacheUrl) = @_;
+    my ($storePath, $binaryCacheUrl) = @_;
 
     $queryNAR->execute(getCacheId($binaryCacheUrl), basename($storePath));
     my $res = $queryNAR->fetchrow_hashref();
@@ -260,16 +260,22 @@ sub printInfo {
 }
 
 
+sub infoUrl {
+    my ($binaryCacheUrl, $storePath) = @_;
+    my $pathHash = substr(basename($storePath), 0, 32);
+    my $infoUrl = "$binaryCacheUrl/$pathHash.narinfo";
+}
+
+
 sub printInfoParallel {
     my @paths = @_;
 
     # First print all paths for which we have cached info.
     my @left;
     foreach my $storePath (@paths) {
-        my $pathHash = substr(basename($storePath), 0, 32);
         my $found = 0;
         foreach my $binaryCacheUrl (@binaryCacheUrls) {
-            my $info = cachedGetInfoFrom($storePath, $pathHash, $binaryCacheUrl);
+            my $info = cachedGetInfoFrom($storePath, $binaryCacheUrl);
             if (defined $info) {
                 printInfo($storePath, $info);
                 $found = 1;
@@ -286,13 +292,11 @@ sub printInfoParallel {
         my @left2;
         %requests = ();
         foreach my $storePath (@left) {
-            my $pathHash = substr(basename($storePath), 0, 32);
             if (negativeHit($storePath, $binaryCacheUrl)) {
                 push @left2, $storePath;
                 next;
             }
-            my $infoUrl = "$binaryCacheUrl/$pathHash.narinfo";
-            addRequest($storePath, $infoUrl);
+            addRequest($storePath, infoUrl($binaryCacheUrl, $storePath));
         }
 
         processRequests;
@@ -314,14 +318,12 @@ sub printInfoParallel {
 sub downloadBinary {
     my ($storePath) = @_;
     
-    my $pathHash = substr(basename($storePath), 0, 32);
-
-    cache: foreach my $binaryCacheUrl (@binaryCacheUrls) {
-        my $info = cachedGetInfoFrom($storePath, $pathHash, $binaryCacheUrl);
+    foreach my $binaryCacheUrl (@binaryCacheUrls) {
+        my $info = cachedGetInfoFrom($storePath, $binaryCacheUrl);
 
         unless (defined $info) {
             next if negativeHit($storePath, $binaryCacheUrl);
-            my $request = addRequest($storePath, "$binaryCacheUrl/$pathHash.narinfo");
+            my $request = addRequest($storePath, infoUrl($binaryCacheUrl, $storePath));
             processRequests;
             $info = processNARInfo($storePath, $binaryCacheUrl, $request);
         }
@@ -368,8 +370,6 @@ if ($ARGV[0] eq "--query") {
             my $storePath = <STDIN>; chomp $storePath;
             # FIXME: want to give correct info here, but it's too slow.
             print "0\n";
-            #my $info = getInfo($storePath);
-            #if (defined $info) { print "1\n"; } else { print "0\n"; }
         }
 
         elsif ($cmd eq "info") {
