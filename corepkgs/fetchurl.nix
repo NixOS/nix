@@ -23,4 +23,10 @@ derivation {
       if sha256 != "" then sha256 else if sha1 != "" then sha1 else md5;
   
   inherit system url curl;
+
+  # No need to double the amount of network traffic
+  preferLocalBuild = true;
+
+  # Don't build in a chroot because Nix's dependencies may not be there.
+  __noChroot = true;
 }
