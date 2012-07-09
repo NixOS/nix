@@ -1,6 +1,6 @@
 SUBDIRS = src perl scripts corepkgs doc misc tests
 EXTRA_DIST = substitute.mk nix.spec nix.spec.in bootstrap.sh \
-  nix.conf.example NEWS version misc/systemd/nix-worker.service
+  NEWS version misc/systemd/nix-worker.service
 
 pkginclude_HEADERS = config.h
 
@@ -10,10 +10,6 @@ nix.spec: nix.spec.in
 
 install-data-local: init-state
 	$(INSTALL) -d $(DESTDIR)$(sysconfdir)/nix
-	$(INSTALL_DATA) $(srcdir)/nix.conf.example $(DESTDIR)$(sysconfdir)/nix
-	if ! test -e $(DESTDIR)$(sysconfdir)/nix/nix.conf; then \
-		$(INSTALL_DATA) $(srcdir)/nix.conf.example $(DESTDIR)$(sysconfdir)/nix/nix.conf; \
-	fi
 	$(INSTALL) -d $(DESTDIR)$(docdir)
 	$(INSTALL_DATA) README $(DESTDIR)$(docdir)/
 

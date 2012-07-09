@@ -121,10 +121,7 @@ ln -sf %{_libdir}/nix/libNixStore.so.0 Store.so
 popd
 
 # Specify build users group
-sed -i "s|#build-users-group =$|build-users-group = %{nixbld_group}|" \
-  $RPM_BUILD_ROOT%{_sysconfdir}/nix/nix.conf
-# ... and delete the example configuration
-rm $RPM_BUILD_ROOT%{_sysconfdir}/nix/nix.conf.example
+echo "build-users-group = %{nixbld_group}" > $RPM_BUILD_ROOT%{_sysconfdir}/nix/nix.conf
 
 # make per-user directories
 for d in profiles gcroots;
