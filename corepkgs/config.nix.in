@@ -9,5 +9,6 @@ in {
   bzip2 = fromEnv "NIX_BZIP2" "@bzip2@";
   tar = "@tar@";
   tr = "@tr@";
+  curl = "@curl@";
   nixBinDir = fromEnv "NIX_BIN_DIR" "@bindir@";
 }
