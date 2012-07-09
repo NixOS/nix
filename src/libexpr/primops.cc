@@ -51,6 +51,12 @@ static void prim_import(EvalState & state, Value * * args, Value & v)
                 % path % ctx);
         if (isDerivation(ctx))
             try {
+                /* For performance, prefetch all substitute info. */
+                PathSet willBuild, willSubstitute, unknown;
+                unsigned long long downloadSize, narSize;
+                queryMissing(*store, singleton<PathSet>(ctx),
+                    willBuild, willSubstitute, unknown, downloadSize, narSize);
+                  
                 /* !!! If using a substitute, we only need to fetch
                    the selected output of this derivation. */
                 store->buildPaths(singleton<PathSet>(ctx));
