@@ -190,6 +190,7 @@ systemctl start  nix-worker.service
 %{_datadir}/emacs/site-lisp/nix-mode.el
 %{_datadir}/nix
 %{_mandir}/man1/nix-*.1*
+%{_mandir}/man5/nix-*.5*
 %{_mandir}/man8/nix-*.8*
 %config(noreplace) %{_sysconfdir}/profile.d/nix.sh
 /nix
