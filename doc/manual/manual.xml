@@ -40,7 +40,6 @@
     <title>Command Reference</title>
     <xi:include href="opt-common.xml" />
     <xi:include href="env-common.xml" />
-    <xi:include href="conf-file.xml" />
     
     <section>
       <title>Main commands</title>
@@ -63,6 +62,11 @@
       <xi:include href="nix-worker.xml" />
     </section>
 
+    <section>
+      <title>Files</title>
+      <xi:include href="conf-file.xml" />
+    </section>
+    
   </appendix>
 
   <xi:include href="troubleshooting.xml" />

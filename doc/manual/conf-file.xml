@@ -1,27 +1,36 @@
-<section xmlns="http://docbook.org/ns/docbook"
-         xmlns:xlink="http://www.w3.org/1999/xlink"
-         xml:id="sec-conf-file">
+<refentry xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xmlns:xi="http://www.w3.org/2001/XInclude"
+          xml:id="sec-conf-file">
 
-<title>Nix configuration file</title>
+<refmeta>
+  <refentrytitle>nix.conf</refentrytitle>
+  <manvolnum>5</manvolnum>
+  <refmiscinfo class="source">Nix</refmiscinfo>
+  <refmiscinfo class="version"><xi:include href="version.txt" parse="text"/></refmiscinfo>
+</refmeta>
 
+<refnamediv>
+  <refname>nix.conf</refname>
+  <refpurpose>Nix configuration file</refpurpose>
+</refnamediv>
+
+<refsection><title>Description</title>
 
 <para>A number of persistent settings of Nix are stored in the file
 <filename><replaceable>sysconfdir</replaceable>/nix/nix.conf</filename>.
 This file is a list of <literal><replaceable>name</replaceable> =
 <replaceable>value</replaceable></literal> pairs, one per line.
-Comments start with a <literal>#</literal> character.  An example
-configuration file is shown in <xref linkend="ex-nix-conf" />.</para>
-
-<example xml:id='ex-nix-conf'><title>Nix configuration file</title>
+Comments start with a <literal>#</literal> character.  Here is an example
+configuration file:</para>
 
 <programlisting>
 gc-keep-outputs = true       # Nice for developers
 gc-keep-derivations = true   # Idem
 env-keep-derivations = false
 </programlisting>
-</example>
 
-<para>The following variables are currently available: 
+<para>The following settings are currently available: 
 
 <variablelist>
 
@@ -323,5 +332,6 @@ build-use-chroot = /dev /proc /bin</programlisting>
 
 </para>
 
+</refsection>
 
-</section>
+</refentry>
