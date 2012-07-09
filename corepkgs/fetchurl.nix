@@ -10,7 +10,7 @@ let
   builder = builtins.toFile "fetchurl.sh"
     ''
       echo "downloading $url into $out"
-      ${curl} --fail --location --max-redirs 20 "$url" > "$out"
+      ${curl} --fail --location --max-redirs 20 --insecure "$url" > "$out"
     '';
 
 in
