@@ -14,16 +14,16 @@ $curl = "@curl@";
 
 $useBindings = "@perlbindings@" eq "yes";
 
+%config = ();
+
 sub readConfig {
-    my %config;
-    my $config = "@sysconfdir@/nix/nix.conf";
+    my $config = "$confDir/nix.conf";
     return unless -f $config;
     
     open CONFIG, "<$config" or die "cannot open `$config'";
     while (<CONFIG>) {
         /^\s*([\w|-]+)\s*=\s*(.*)$/ or next;
         $config{$1} = $2;
-        print "|$1| -> |$2|\n";
     }
     close CONFIG;
 }
