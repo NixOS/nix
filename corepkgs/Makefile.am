@@ -1,6 +1,6 @@
 all-local: config.nix
 
-files = nar.nix buildenv.nix buildenv.pl unpack-channel.nix unpack-channel.sh derivation.nix fetchurl.nix fetchurl.sh
+files = nar.nix buildenv.nix buildenv.pl unpack-channel.nix unpack-channel.sh derivation.nix fetchurl.nix
 
 install-exec-local:
 	$(INSTALL) -d $(DESTDIR)$(datadir)/nix/corepkgs
