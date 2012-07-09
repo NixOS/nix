@@ -29,6 +29,7 @@ let
           --with-xml-flags=--nonet
           --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
+          --with-www-curl=${perlPackages.WWWCurl}/${perl.libPrefix}
         '';
 
         postUnpack = ''
@@ -77,6 +78,7 @@ let
           --disable-init-state
           --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
+          --with-www-curl=${perlPackages.WWWCurl}/${perl.libPrefix}
           --enable-gc
         '';
 
@@ -134,6 +136,7 @@ let
           --disable-init-state
           --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
+          --with-www-curl=${perlPackages.WWWCurl}/${perl.libPrefix}
         '';
 
         dontInstall = false;
