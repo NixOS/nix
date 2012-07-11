@@ -309,12 +309,21 @@ static void performOp(unsigned int clientVersion,
     case wopHasSubstitutes: {
         Path path = readStorePath(from);
         startWork();
-        bool result = store->hasSubstitutes(path);
+        PathSet res = store->querySubstitutablePaths(singleton<PathSet>(path));
         stopWork();
-        writeInt(result, to);
+        writeInt(res.find(path) != res.end(), to);
         break;
     }
 
+    case wopQuerySubstitutablePaths: {
+        PathSet paths = readStorePaths<PathSet>(from);
+        startWork();
+        PathSet res = store->querySubstitutablePaths(paths);
+        stopWork();
+        writeStrings(res, to);
+        break;
+    }
+        
     case wopQueryPathHash: {
         Path path = readStorePath(from);
         startWork();

@@ -145,8 +145,8 @@ public:
     /* Query the output names of the derivation denoted by `path'. */
     virtual StringSet queryDerivationOutputNames(const Path & path) = 0;
     
-    /* Query whether a path has substitutes. */
-    virtual bool hasSubstitutes(const Path & path) = 0;
+    /* Query which of the given paths have substitutes. */
+    virtual PathSet querySubstitutablePaths(const PathSet & paths) = 0;
 
     /* Query substitute info (i.e. references, derivers and download
        sizes) of a set of paths.  If a path does not have substitute

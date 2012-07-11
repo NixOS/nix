@@ -219,13 +219,13 @@ bool RemoteStore::isValidPath(const Path & path)
 
 PathSet RemoteStore::queryValidPaths(const PathSet & paths)
 {
+    openConnection();
     if (GET_PROTOCOL_MINOR(daemonVersion) < 12) {
         PathSet res;
         foreach (PathSet::const_iterator, i, paths)
             if (isValidPath(*i)) res.insert(*i);
         return res;
     } else {
-        openConnection();
         writeInt(wopQueryValidPaths, to);
         writeStrings(paths, to);
         processStderr();
@@ -243,14 +243,24 @@ PathSet RemoteStore::queryAllValidPaths()
 }
 
 
-bool RemoteStore::hasSubstitutes(const Path & path)
+PathSet RemoteStore::querySubstitutablePaths(const PathSet & paths)
 {
     openConnection();
-    writeInt(wopHasSubstitutes, to);
-    writeString(path, to);
-    processStderr();
-    unsigned int reply = readInt(from);
-    return reply != 0;
+    if (GET_PROTOCOL_MINOR(daemonVersion) < 12) {
+        PathSet res;
+        foreach (PathSet::const_iterator, i, paths) {
+            writeInt(wopHasSubstitutes, to);
+            writeString(*i, to);
+            processStderr();
+            if (readInt(from)) res.insert(*i);
+        }
+        return res;
+    } else {
+        writeInt(wopQuerySubstitutablePaths, to);
+        writeStrings(paths, to);
+        processStderr();
+        return readStorePaths<PathSet>(from);
+    }
 }
 
 

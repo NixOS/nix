@@ -123,9 +123,7 @@ public:
 
     StringSet queryDerivationOutputNames(const Path & path);
     
-    PathSet querySubstitutablePaths();
-    
-    bool hasSubstitutes(const Path & path);
+    PathSet querySubstitutablePaths(const PathSet & paths);
 
     void querySubstitutablePathInfos(const Path & substituter,
         PathSet & paths, SubstitutablePathInfos & infos);

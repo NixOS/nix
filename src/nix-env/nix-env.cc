@@ -211,9 +211,12 @@ static int comparePriorities(EvalState & state,
 
 static bool isPrebuilt(EvalState & state, const DrvInfo & elem)
 {
+    assert(false);
+#if 0
     return
         store->isValidPath(elem.queryOutPath(state)) ||
         store->hasSubstitutes(elem.queryOutPath(state));
+#endif
 }
 
 
@@ -931,8 +934,7 @@ static void opQuery(Globals & globals,
 
 
     /* Query which paths have substitutes. */
-    SubstitutablePathInfos subs;
-    PathSet validPaths;
+    PathSet validPaths, substitutablePaths;
     if (printStatus) {
         PathSet paths;
         foreach (vector<DrvInfo>::iterator, i, elems2)
@@ -943,7 +945,7 @@ static void opQuery(Globals & globals,
                 i->setFailed();
             }
         validPaths = store->queryValidPaths(paths);
-        store->querySubstitutablePathInfos(paths, subs);
+        substitutablePaths = store->querySubstitutablePaths(paths);
     }
 
     
@@ -969,7 +971,7 @@ static void opQuery(Globals & globals,
 
             if (printStatus) {
                 Path outPath = i->queryOutPath(globals.state);
-                bool hasSubs = subs.find(outPath) != subs.end();
+                bool hasSubs = substitutablePaths.find(outPath) != substitutablePaths.end();
                 bool isInstalled = installed.find(outPath) != installed.end();
                 bool isValid = validPaths.find(outPath) != validPaths.end();
                 if (xmlOutput) {

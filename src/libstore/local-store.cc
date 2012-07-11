@@ -932,16 +932,24 @@ template<class T> T getIntLine(int fd)
 }
 
 
-bool LocalStore::hasSubstitutes(const Path & path)
+PathSet LocalStore::querySubstitutablePaths(const PathSet & paths)
 {
+    PathSet res;
     foreach (Paths::iterator, i, substituters) {
+        if (res.size() == paths.size()) break;
         RunningSubstituter & run(runningSubstituters[*i]);
         startSubstituter(*i, run);
-        writeLine(run.to, "have\n" + path);
-        if (getIntLine<int>(run.from)) return true;
+        string s = "have ";
+        foreach (PathSet::const_iterator, i, paths)
+            if (res.find(*i) == res.end()) { s += *i; s += " "; }
+        writeLine(run.to, s);
+        while (true) {
+            Path path = readLine(run.from);
+            if (path == "") break;
+            res.insert(path);
+        }
     }
-
-    return false;
+    return res;
 }
 
 
