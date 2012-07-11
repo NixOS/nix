@@ -10,5 +10,6 @@ in {
   xz = "@xz@";
   tar = "@tar@";
   tr = "@tr@";
+  curl = "@curl@";
   nixBinDir = fromEnv "NIX_BIN_DIR" "@bindir@";
 }
