@@ -233,7 +233,7 @@ sub getCacheId {
 }
 
 
-sub cachedGetInfoFrom {
+sub getCachedInfoFrom {
     my ($storePath, $binaryCacheUrl) = @_;
 
     $queryNAR->execute(getCacheId($binaryCacheUrl), basename($storePath));
@@ -279,7 +279,7 @@ sub printInfoParallel {
     foreach my $storePath (@paths) {
         my $found = 0;
         foreach my $binaryCacheUrl (@binaryCacheUrls) {
-            my $info = cachedGetInfoFrom($storePath, $binaryCacheUrl);
+            my $info = getCachedInfoFrom($storePath, $binaryCacheUrl);
             if (defined $info) {
                 printInfo($storePath, $info);
                 $found = 1;
@@ -323,7 +323,7 @@ sub downloadBinary {
     my ($storePath) = @_;
     
     foreach my $binaryCacheUrl (@binaryCacheUrls) {
-        my $info = cachedGetInfoFrom($storePath, $binaryCacheUrl);
+        my $info = getCachedInfoFrom($storePath, $binaryCacheUrl);
 
         unless (defined $info) {
             next if negativeHit($storePath, $binaryCacheUrl);
