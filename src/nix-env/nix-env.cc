@@ -929,6 +929,21 @@ static void opQuery(Globals & globals,
             installed.insert(i->queryOutPath(globals.state));
     }
 
+
+    /* Query which paths have substitutes. */
+    SubstitutablePathInfos subs;
+    if (printStatus) {
+        PathSet paths;
+        foreach (vector<DrvInfo>::iterator, i, elems2)
+            try {
+                paths.insert(i->queryOutPath(globals.state));
+            } catch (AssertionError & e) {
+                printMsg(lvlTalkative, format("skipping derivation named `%1%' which gives an assertion failure") % i->name);
+                i->setFailed();
+            }
+        store->querySubstitutablePathInfos(paths, subs);
+    }
+
     
     /* Print the desired columns, or XML output. */
     Table table;
@@ -938,6 +953,8 @@ static void opQuery(Globals & globals,
     
     foreach (vector<DrvInfo>::iterator, i, elems2) {
         try {
+            if (i->hasFailed()) continue;
+            
             startNest(nest, lvlDebug, format("outputting query result `%1%'") % i->attrPath);
 
             if (globals.prebuiltOnly && !isPrebuilt(globals.state, *i)) continue;
@@ -949,7 +966,7 @@ static void opQuery(Globals & globals,
             XMLAttrs attrs;
 
             if (printStatus) {
-                bool hasSubs = store->hasSubstitutes(i->queryOutPath(globals.state));
+                bool hasSubs = subs.find(i->queryOutPath(globals.state)) != subs.end();
                 bool isInstalled = installed.find(i->queryOutPath(globals.state)) != installed.end();
                 bool isValid = store->isValidPath(i->queryOutPath(globals.state));
                 if (xmlOutput) {

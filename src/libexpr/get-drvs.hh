@@ -32,6 +32,8 @@ private:
 
     bool metaInfoRead;
     MetaInfo meta;
+
+    bool failed; // set if we get an AssertionError
     
 public:
     string name;
@@ -41,7 +43,7 @@ public:
     /* !!! make this private */
     Bindings * attrs;
 
-    DrvInfo() : metaInfoRead(false), attrs(0) { };
+    DrvInfo() : metaInfoRead(false), failed(false), attrs(0) { };
 
     string queryDrvPath(EvalState & state) const;
     string queryOutPath(EvalState & state) const;
@@ -59,6 +61,9 @@ public:
     }
 
     void setMetaInfo(const MetaInfo & meta);
+
+    void setFailed() { failed = true; };
+    bool hasFailed() { return failed; };
 };
 
 
