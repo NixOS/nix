@@ -41,6 +41,7 @@ sub addRequest {
     $curl->setopt(CURLOPT_WRITEDATA, \$requests{$curlId}->{content});
     $curl->setopt(CURLOPT_FOLLOWLOCATION, 1);
     $curl->setopt(CURLOPT_CAINFO, $caBundle) if defined $caBundle;
+    $curl->setopt(CURLOPT_USERAGENT, "Nix/$Nix::Config::version");
     $curl->setopt(CURLOPT_NOBODY, 1) if $head;
 
     if ($activeRequests >= $maxParallelRequests) {
