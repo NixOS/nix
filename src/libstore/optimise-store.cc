@@ -178,7 +178,7 @@ void LocalStore::optimiseStore(bool dryRun, OptimiseStats & stats)
 {
     HashToPath hashToPath;
 
-    PathSet paths = queryValidPaths();
+    PathSet paths = queryAllValidPaths();
 
     foreach (PathSet::iterator, i, paths) {
         addTempRoot(*i);

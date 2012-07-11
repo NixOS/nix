@@ -27,7 +27,7 @@ public:
     
     bool isValidPath(const Path & path);
 
-    PathSet queryValidPaths();
+    PathSet queryAllValidPaths();
     
     ValidPathInfo queryPathInfo(const Path & path);
 

@@ -465,7 +465,7 @@ static void opDumpDB(Strings opFlags, Strings opArgs)
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (!opArgs.empty())
         throw UsageError("no arguments expected");
-    PathSet validPaths = store->queryValidPaths();
+    PathSet validPaths = store->queryAllValidPaths();
     foreach (PathSet::iterator, i, validPaths)
         cout << store->makeValidityRegistration(singleton<PathSet>(*i), true, true);
 }

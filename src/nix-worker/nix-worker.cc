@@ -563,9 +563,9 @@ static void performOp(unsigned int clientVersion,
         break;
     }
             
-    case wopQueryValidPaths: {
+    case wopQueryAllValidPaths: {
         startWork();
-        PathSet paths = store->queryValidPaths();
+        PathSet paths = store->queryAllValidPaths();
         stopWork();
         writeStrings(paths, to);
         break;

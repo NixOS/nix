@@ -110,20 +110,20 @@ public:
 
     virtual ~StoreAPI() { }
 
-    /* Checks whether a path is valid. */ 
+    /* Check whether a path is valid. */ 
     virtual bool isValidPath(const Path & path) = 0;
 
-    /* Query the set of valid paths. */
-    virtual PathSet queryValidPaths() = 0;
+    /* Query the set of all valid paths. */
+    virtual PathSet queryAllValidPaths() = 0;
 
     /* Query information about a valid path. */
     virtual ValidPathInfo queryPathInfo(const Path & path) = 0;
 
-    /* Queries the hash of a valid path. */ 
+    /* Query the hash of a valid path. */ 
     virtual Hash queryPathHash(const Path & path) = 0;
 
-    /* Queries the set of outgoing FS references for a store path.
-       The result is not cleared. */
+    /* Query the set of outgoing FS references for a store path.  The
+       result is not cleared. */
     virtual void queryReferences(const Path & path,
         PathSet & references) = 0;
 

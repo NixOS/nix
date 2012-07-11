@@ -34,7 +34,7 @@ typedef enum {
     wopCollectGarbage = 20,
     wopQuerySubstitutablePathInfo = 21,
     wopQueryDerivationOutputs = 22,
-    wopQueryValidPaths = 23,
+    wopQueryAllValidPaths = 23,
     wopQueryFailedPaths = 24,
     wopClearFailedPaths = 25,
     wopQueryPathInfo = 26,

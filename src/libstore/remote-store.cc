@@ -217,10 +217,10 @@ bool RemoteStore::isValidPath(const Path & path)
 }
 
 
-PathSet RemoteStore::queryValidPaths()
+PathSet RemoteStore::queryAllValidPaths()
 {
     openConnection();
-    writeInt(wopQueryValidPaths, to);
+    writeInt(wopQueryAllValidPaths, to);
     processStderr();
     return readStorePaths<PathSet>(from);
 }

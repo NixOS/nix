@@ -744,7 +744,7 @@ bool LocalStore::isValidPath(const Path & path)
 }
 
 
-PathSet LocalStore::queryValidPaths()
+PathSet LocalStore::queryAllValidPaths()
 {
     SQLiteStmt stmt;
     stmt.create(db, "select path from ValidPaths");
@@ -1449,7 +1449,7 @@ void LocalStore::verifyStore(bool checkContents)
     /* Check whether all valid paths actually exist. */
     printMsg(lvlInfo, "checking path existence...");
 
-    PathSet validPaths2 = queryValidPaths(), validPaths, done;
+    PathSet validPaths2 = queryAllValidPaths(), validPaths, done;
 
     foreach (PathSet::iterator, i, validPaths2)
         verifyPath(*i, store, done, validPaths);
