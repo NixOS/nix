@@ -194,6 +194,11 @@ while (scalar @ARGV) {
         usageError;
     }
 
+    elsif ($arg eq "--version") {
+        print "nix-channel (Nix) $Nix::Config::version\n";
+        exit 0;
+    }
+    
     else {
         die "unknown argument `$arg'; try `--help'";
     }

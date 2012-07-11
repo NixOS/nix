@@ -58,6 +58,11 @@ EOF
         # '` hack
     }
 
+    elsif ($arg eq "--version") {
+        print "nix-build (Nix) $Nix::Config::version\n";
+        exit 0;
+    }
+    
     elsif ($arg eq "--add-drv-link") {
         $drvLink = "./derivation";
     }
