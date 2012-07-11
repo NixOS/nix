@@ -155,8 +155,8 @@ void setDefaultsFromEnvironment()
 
     string subs = getEnv("NIX_SUBSTITUTERS", "default");
     if (subs == "default") {
-        //substituters.push_back(nixLibexecDir + "/nix/substituters/copy-from-other-stores.pl");
-        //substituters.push_back(nixLibexecDir + "/nix/substituters/download-using-manifests.pl");
+        substituters.push_back(nixLibexecDir + "/nix/substituters/copy-from-other-stores.pl");
+        substituters.push_back(nixLibexecDir + "/nix/substituters/download-using-manifests.pl");
         substituters.push_back(nixLibexecDir + "/nix/substituters/download-from-binary-cache.pl");
     } else
         substituters = tokenizeString(subs, ":");

@@ -173,56 +173,54 @@ sub computeSmallestDownload {
 if ($ARGV[0] eq "--query") {
 
     while (<STDIN>) {
-        my $cmd = $_; chomp $cmd;
+        chomp;
+        my ($cmd, @args) = split " ", $_;
 
         if ($cmd eq "have") {
-            my $storePath = <STDIN>; chomp $storePath;
-            print STDOUT (
-                scalar @{$dbh->selectcol_arrayref("select 1 from NARs where storePath = ?", {}, $storePath)} > 0
-                ? "1\n" : "0\n");
+            foreach my $storePath (@args) {
+                print "$storePath\n" if scalar @{$dbh->selectcol_arrayref("select 1 from NARs where storePath = ?", {}, $storePath)} > 0;
+            }
+            print "\n";
         }
 
         elsif ($cmd eq "info") {
-            my $storePath = <STDIN>; chomp $storePath;
+            foreach my $storePath (@args) {
 
-            my $infos = $dbh->selectall_arrayref(
-                "select * from NARs where storePath = ?",
-                { Slice => {} }, $storePath);
+                my $infos = $dbh->selectall_arrayref(
+                    "select * from NARs where storePath = ?",
+                    { Slice => {} }, $storePath);
             
-            my $info;
-            if (scalar @{$infos} > 0) {
-                $info = @{$infos}[0];
-            }
-            else {
-                print "0\n";
-                next; # not an error
-            }
+                next unless scalar @{$infos} > 0;
+                my $info = @{$infos}[0];
 
-            print "1\n";
-            print "$info->{deriver}\n";
-            my @references = split " ", $info->{refs};
-            print scalar @references, "\n";
-            print "$_\n" foreach @references;
+                print "$storePath\n";
+                print "$info->{deriver}\n";
+                my @references = split " ", $info->{refs};
+                print scalar @references, "\n";
+                print "$_\n" foreach @references;
 
-            my @path = computeSmallestDownload $storePath;
+                my @path = computeSmallestDownload $storePath;
 
-            my $downloadSize = 0;
-            while (scalar @path > 0) {
-                my $edge = pop @path;
-                my $u = $edge->{start};
-                my $v = $edge->{end};
-                if ($edge->{type} eq "patch") {
-                    $downloadSize += $edge->{info}->{size} || 0;
+                my $downloadSize = 0;
+                while (scalar @path > 0) {
+                    my $edge = pop @path;
+                    my $u = $edge->{start};
+                    my $v = $edge->{end};
+                    if ($edge->{type} eq "patch") {
+                        $downloadSize += $edge->{info}->{size} || 0;
+                    }
+                    elsif ($edge->{type} eq "narfile") {
+                        $downloadSize += $edge->{info}->{size} || 0;
+                    }
                 }
-                elsif ($edge->{type} eq "narfile") {
-                    $downloadSize += $edge->{info}->{size} || 0;
-                }
-            }
 
-            print "$downloadSize\n";
+                print "$downloadSize\n";
             
-            my $narSize = $info->{narSize} || 0;
-            print "$narSize\n";
+                my $narSize = $info->{narSize} || 0;
+                print "$narSize\n";
+            }
+
+            print "\n";
         }
         
         else { die "unknown command `$cmd'"; }
