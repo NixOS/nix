@@ -145,11 +145,9 @@ public:
     /* Query whether a path has substitutes. */
     virtual bool hasSubstitutes(const Path & path) = 0;
 
-    /* Query the references, deriver and download size of a
-       substitutable path. */
-    virtual bool querySubstitutablePathInfo(const Path & path,
-        SubstitutablePathInfo & info) = 0;
-
+    /* Query substitute info (i.e. references, derivers and download
+       sizes) of a set of paths.  If a path does not have substitute
+       info, it's omitted from the resulting ‘infos’ map. */
     virtual void querySubstitutablePathInfos(const PathSet & paths,
         SubstitutablePathInfos & infos) = 0;
     

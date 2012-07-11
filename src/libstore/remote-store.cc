@@ -237,34 +237,48 @@ bool RemoteStore::hasSubstitutes(const Path & path)
 }
 
 
-bool RemoteStore::querySubstitutablePathInfo(const Path & path,
-    SubstitutablePathInfo & info)
-{
-    openConnection();
-    if (GET_PROTOCOL_MINOR(daemonVersion) < 3) return false;
-    writeInt(wopQuerySubstitutablePathInfo, to);
-    writeString(path, to);
-    processStderr();
-    unsigned int reply = readInt(from);
-    if (reply == 0) return false;
-    info.deriver = readString(from);
-    if (info.deriver != "") assertStorePath(info.deriver);
-    info.references = readStorePaths<PathSet>(from);
-    info.downloadSize = readLongLong(from);
-    info.narSize = GET_PROTOCOL_MINOR(daemonVersion) >= 7 ? readLongLong(from) : 0;
-    return true;
-}
-
-
 void RemoteStore::querySubstitutablePathInfos(const PathSet & paths,
     SubstitutablePathInfos & infos)
 {
     if (paths.empty()) return;
-    printMsg(lvlError, format("QUERYING %1% (REMOTE)") % showPaths(paths));
-    foreach (PathSet::const_iterator, i, paths) {
-        SubstitutablePathInfo info;
-        if (querySubstitutablePathInfo(*i, info))
+
+    openConnection();
+    
+    if (GET_PROTOCOL_MINOR(daemonVersion) < 3) return;
+    
+    if (GET_PROTOCOL_MINOR(daemonVersion) < 12) {
+        
+        foreach (PathSet::const_iterator, i, paths) {
+            SubstitutablePathInfo info;
+            writeInt(wopQuerySubstitutablePathInfo, to);
+            writeString(*i, to);
+            processStderr();
+            unsigned int reply = readInt(from);
+            if (reply == 0) continue;
+            info.deriver = readString(from);
+            if (info.deriver != "") assertStorePath(info.deriver);
+            info.references = readStorePaths<PathSet>(from);
+            info.downloadSize = readLongLong(from);
+            info.narSize = GET_PROTOCOL_MINOR(daemonVersion) >= 7 ? readLongLong(from) : 0;
             infos[*i] = info;
+        }
+        
+    } else {
+        
+        writeInt(wopQuerySubstitutablePathInfos, to);
+        writeStrings(paths, to);
+        processStderr();
+        unsigned int count = readInt(from);
+        for (unsigned int n = 0; n < count; n++) {
+            Path path = readStorePath(from);
+            SubstitutablePathInfo & info(infos[path]);
+            info.deriver = readString(from);
+            if (info.deriver != "") assertStorePath(info.deriver);
+            info.references = readStorePaths<PathSet>(from);
+            info.downloadSize = readLongLong(from);
+            info.narSize = readLongLong(from);
+        }
+        
     }
 }
 

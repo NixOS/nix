@@ -125,9 +125,6 @@ public:
     
     bool hasSubstitutes(const Path & path);
 
-    bool querySubstitutablePathInfo(const Path & path,
-        SubstitutablePathInfo & info);
-    
     void querySubstitutablePathInfos(const Path & substituter,
         PathSet & paths, SubstitutablePathInfos & infos);
     

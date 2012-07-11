@@ -529,16 +529,36 @@ static void performOp(unsigned int clientVersion,
     case wopQuerySubstitutablePathInfo: {
         Path path = absPath(readString(from));
         startWork();
-        SubstitutablePathInfo info;
-        bool res = store->querySubstitutablePathInfo(path, info);
+        SubstitutablePathInfos infos;
+        store->querySubstitutablePathInfos(singleton<PathSet>(path), infos);
         stopWork();
-        writeInt(res ? 1 : 0, to);
-        if (res) {
-            writeString(info.deriver, to);
-            writeStrings(info.references, to);
-            writeLongLong(info.downloadSize, to);
+        SubstitutablePathInfos::iterator i = infos.find(path);
+        if (i == infos.end())
+            writeInt(0, to);
+        else {
+            writeInt(1, to);
+            writeString(i->second.deriver, to);
+            writeStrings(i->second.references, to);
+            writeLongLong(i->second.downloadSize, to);
             if (GET_PROTOCOL_MINOR(clientVersion) >= 7)
-                writeLongLong(info.narSize, to);
+                writeLongLong(i->second.narSize, to);
+        }
+        break;
+    }
+            
+    case wopQuerySubstitutablePathInfos: {
+        PathSet paths = readStorePaths<PathSet>(from);
+        startWork();
+        SubstitutablePathInfos infos;
+        store->querySubstitutablePathInfos(paths, infos);
+        stopWork();
+        writeInt(infos.size(), to);
+        foreach (SubstitutablePathInfos::iterator, i, infos) {
+            writeString(i->first, to);
+            writeString(i->second.deriver, to);
+            writeStrings(i->second.references, to);
+            writeLongLong(i->second.downloadSize, to);
+            writeLongLong(i->second.narSize, to);
         }
         break;
     }

@@ -967,18 +967,6 @@ void LocalStore::querySubstitutablePathInfos(const Path & substituter,
 }
 
 
-bool LocalStore::querySubstitutablePathInfo(const Path & path,
-    SubstitutablePathInfo & info)
-{
-    SubstitutablePathInfos infos;
-    querySubstitutablePathInfos(singleton<PathSet>(path), infos);
-    SubstitutablePathInfos::iterator i = infos.find(path);
-    if (i == infos.end()) return false;
-    info = i->second;
-    return true;
-}
-
-
 void LocalStore::querySubstitutablePathInfos(const PathSet & paths,
     SubstitutablePathInfos & infos)
 {

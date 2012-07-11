@@ -45,9 +45,6 @@ public:
 
     bool hasSubstitutes(const Path & path);
     
-    bool querySubstitutablePathInfo(const Path & path,
-        SubstitutablePathInfo & info);
-    
     void querySubstitutablePathInfos(const PathSet & paths,
         SubstitutablePathInfos & infos);
     
