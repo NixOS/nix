@@ -35,6 +35,11 @@
     <literal>false</literal>.</para>
   </listitem>    
 
+  <listitem>
+    <para>When using the Nix daemon, the <option>-s</option> flag in
+    <command>nix-env -qa</command> is now much faster.</para>
+  </listitem>
+    
 </itemizedlist>
 
 </section>
