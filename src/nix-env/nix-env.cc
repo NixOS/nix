@@ -932,6 +932,7 @@ static void opQuery(Globals & globals,
 
     /* Query which paths have substitutes. */
     SubstitutablePathInfos subs;
+    PathSet validPaths;
     if (printStatus) {
         PathSet paths;
         foreach (vector<DrvInfo>::iterator, i, elems2)
@@ -941,6 +942,7 @@ static void opQuery(Globals & globals,
                 printMsg(lvlTalkative, format("skipping derivation named `%1%' which gives an assertion failure") % i->name);
                 i->setFailed();
             }
+        validPaths = store->queryValidPaths(paths);
         store->querySubstitutablePathInfos(paths, subs);
     }
 
@@ -966,9 +968,10 @@ static void opQuery(Globals & globals,
             XMLAttrs attrs;
 
             if (printStatus) {
-                bool hasSubs = subs.find(i->queryOutPath(globals.state)) != subs.end();
-                bool isInstalled = installed.find(i->queryOutPath(globals.state)) != installed.end();
-                bool isValid = store->isValidPath(i->queryOutPath(globals.state));
+                Path outPath = i->queryOutPath(globals.state);
+                bool hasSubs = subs.find(outPath) != subs.end();
+                bool isInstalled = installed.find(outPath) != installed.end();
+                bool isValid = validPaths.find(outPath) != validPaths.end();
                 if (xmlOutput) {
                     attrs["installed"] = isInstalled ? "1" : "0";
                     attrs["valid"] = isValid ? "1" : "0";

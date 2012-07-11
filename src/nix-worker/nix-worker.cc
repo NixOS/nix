@@ -297,6 +297,15 @@ static void performOp(unsigned int clientVersion,
         break;
     }
 
+    case wopQueryValidPaths: {
+        PathSet paths = readStorePaths<PathSet>(from);
+        startWork();
+        PathSet res = store->queryValidPaths(paths);
+        stopWork();
+        writeStrings(res, to);
+        break;
+    }
+
     case wopHasSubstitutes: {
         Path path = readStorePath(from);
         startWork();

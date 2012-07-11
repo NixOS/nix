@@ -744,6 +744,15 @@ bool LocalStore::isValidPath(const Path & path)
 }
 
 
+PathSet LocalStore::queryValidPaths(const PathSet & paths)
+{
+    PathSet res;
+    foreach (PathSet::const_iterator, i, paths)
+        if (isValidPath(*i)) res.insert(*i);
+    return res;
+}
+
+
 PathSet LocalStore::queryAllValidPaths()
 {
     SQLiteStmt stmt;

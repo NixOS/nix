@@ -217,6 +217,23 @@ bool RemoteStore::isValidPath(const Path & path)
 }
 
 
+PathSet RemoteStore::queryValidPaths(const PathSet & paths)
+{
+    if (GET_PROTOCOL_MINOR(daemonVersion) < 12) {
+        PathSet res;
+        foreach (PathSet::const_iterator, i, paths)
+            if (isValidPath(*i)) res.insert(*i);
+        return res;
+    } else {
+        openConnection();
+        writeInt(wopQueryValidPaths, to);
+        writeStrings(paths, to);
+        processStderr();
+        return readStorePaths<PathSet>(from);
+    }
+}
+
+
 PathSet RemoteStore::queryAllValidPaths()
 {
     openConnection();

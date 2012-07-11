@@ -113,6 +113,9 @@ public:
     /* Check whether a path is valid. */ 
     virtual bool isValidPath(const Path & path) = 0;
 
+    /* Query which of the given paths is valid. */
+    virtual PathSet queryValidPaths(const PathSet & paths) = 0;
+
     /* Query the set of all valid paths. */
     virtual PathSet queryAllValidPaths() = 0;
 

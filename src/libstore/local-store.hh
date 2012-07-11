@@ -99,6 +99,8 @@ public:
     
     bool isValidPath(const Path & path);
 
+    PathSet queryValidPaths(const PathSet & paths);
+    
     PathSet queryAllValidPaths();
     
     ValidPathInfo queryPathInfo(const Path & path);
