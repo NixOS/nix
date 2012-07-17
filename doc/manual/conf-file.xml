@@ -297,6 +297,16 @@ build-use-chroot = /dev /proc /bin</programlisting>
   </varlistentry>
 
 
+  <varlistentry><term><literal>build-compress-log</literal></term>
+
+    <listitem><para>If set to <literal>true</literal> (the default),
+    build logs written to <filename>/nix/var/log/nix/drvs</filename>
+    will be compressed on the fly using bzip2.  Otherwise, they will
+    not be compressed.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry><term><literal>system</literal></term>
 
     <listitem><para>This option specifies the canonical Nix system
