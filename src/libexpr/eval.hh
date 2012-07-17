@@ -242,13 +242,9 @@ private:
     unsigned long nrValuesInEnvs;
     unsigned long nrValues;
     unsigned long nrListElems;
-    unsigned long nrEvaluated;
     unsigned long nrAttrsets;
     unsigned long nrOpUpdates;
     unsigned long nrOpUpdateValuesCopied;
-    unsigned int recursionDepth;
-    unsigned int maxRecursionDepth;
-    char * deepestStack; /* for measuring stack usage */
     
     friend class RecursionCounter;
     friend class ExprOpUpdate;
