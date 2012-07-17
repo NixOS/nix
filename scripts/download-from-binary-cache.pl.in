@@ -18,6 +18,8 @@ my @binaryCacheUrls = map { s/\/+$//; $_ } split(/ /,
 my $maxParallelRequests = int($Nix::Config::config{"binary-caches-parallel-connections"} // 150);
 $maxParallelRequests = 1 if $maxParallelRequests < 1;
 
+my $debug = ($ENV{"NIX_DEBUG_SUBST"} // "") eq 1;
+
 my ($dbh, $insertNAR, $queryNAR, $insertNARExistence, $queryNARExistence);
 my %cacheIds;
 
@@ -34,7 +36,7 @@ sub addRequest {
     
     my $curl = WWW::Curl::Easy->new;
     my $curlId = $curlIdCount++;
-    $requests{$curlId} = { storePath => $storePath, url => $url, handle => $curl, content => "" };
+    $requests{$curlId} = { storePath => $storePath, url => $url, handle => $curl, content => "", type => $head ? "HEAD" : "GET" };
 
     $curl->setopt(CURLOPT_PRIVATE, $curlId);
     $curl->setopt(CURLOPT_URL, $url);
@@ -68,12 +70,15 @@ sub processRequests {
         if ($curlm->perform() != $activeRequests) {
             while (my ($id, $result) = $curlm->info_read) {
                 if ($id) {
-                    my $handle = $requests{$id}->{handle};
-                    $requests{$id}->{result} = $result;
-                    $requests{$id}->{httpStatus} = $handle->getinfo(CURLINFO_HTTP_CODE);
-                    #print STDERR "\nRequest completed ($id, $result, $requests{$id}->{httpStatus})\n";
+                    my $request = $requests{$id} or die;
+                    my $handle = $request->{handle};
+                    $request->{result} = $result;
+                    $request->{httpStatus} = $handle->getinfo(CURLINFO_HTTP_CODE);
+                    
+                    print STDERR "$request->{type} on $request->{url} [$request->{result}, $request->{httpStatus}]\n" if $debug;
+                    
                     $activeRequests--;
-                    delete $requests{$id}->{handle};
+                    delete $request->{handle};
 
                     if (scalar(keys %scheduled) > 0) {
                         my $id2 = (keys %scheduled)[0];
@@ -81,7 +86,6 @@ sub processRequests {
                         $activeRequests++;
                         delete $scheduled{$id2};
                     }
-                    
                 }
             }
         }
@@ -189,7 +193,10 @@ sub processNARInfo {
     my $compression = "bzip2";
     my @refs;
     foreach my $line (split "\n", $request->{content}) {
-        $line =~ /^(.*): (.*)$/ or return undef;
+        unless ($line =~ /^(.*): (.*)$/) {
+            print STDERR "bad NAR info file ‘$request->{url}’\n";
+            return undef;
+        }
         if ($1 eq "StorePath") { $storePath2 = $2; }
         elsif ($1 eq "URL") { $url = $2; }
         elsif ($1 eq "Compression") { $compression = $2; }
