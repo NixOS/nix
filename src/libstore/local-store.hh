@@ -121,6 +121,8 @@ public:
 
     StringSet queryDerivationOutputNames(const Path & path);
     
+    Path queryPathFromHashPart(const string & hashPart);
+    
     PathSet querySubstitutablePaths();
     
     bool hasSubstitutes(const Path & path);
@@ -217,6 +219,7 @@ private:
     SQLiteStmt stmtAddDerivationOutput;
     SQLiteStmt stmtQueryValidDerivers;
     SQLiteStmt stmtQueryDerivationOutputs;
+    SQLiteStmt stmtQueryPathFromHashPart;
 
     int getSchema();
 

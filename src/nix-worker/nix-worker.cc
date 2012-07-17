@@ -350,6 +350,15 @@ static void performOp(unsigned int clientVersion,
         break;
     }
 
+    case wopQueryPathFromHashPart: {
+        string hashPart = readString(from);
+        startWork();
+        Path path = store->queryPathFromHashPart(hashPart);
+        stopWork();
+        writeString(path, to);
+        break;
+    }
+
     case wopAddToStore: {
         string baseName = readString(from);
         bool fixed = readInt(from) == 1; /* obsolete */

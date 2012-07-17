@@ -405,6 +405,10 @@ void LocalStore::openDB(bool create)
         "select v.id, v.path from DerivationOutputs d join ValidPaths v on d.drv = v.id where d.path = ?;");
     stmtQueryDerivationOutputs.create(db,
         "select id, path from DerivationOutputs where drv = ?;");
+    // Use "path >= ?" with limit 1 rather than "path like '?%'" to
+    // ensure efficient lookup.
+    stmtQueryPathFromHashPart.create(db,
+        "select path from ValidPaths where path >= ? limit 1;");
 }
 
 
@@ -862,6 +866,26 @@ StringSet LocalStore::queryDerivationOutputNames(const Path & path)
         throwSQLiteError(db, format("error getting output names of `%1%'") % path);
 
     return outputNames;
+}
+
+
+Path LocalStore::queryPathFromHashPart(const string & hashPart)
+{
+    if (hashPart.size() != 32) throw Error("invalid hash part");
+    
+    SQLiteTxn txn(db);
+
+    Path prefix = nixStore + "/" + hashPart;
+    
+    SQLiteStmtUse use(stmtQueryPathFromHashPart);
+    stmtQueryPathFromHashPart.bind(prefix);
+
+    int res = sqlite3_step(stmtQueryPathFromHashPart);
+    if (res == SQLITE_DONE) return "";
+    if (res != SQLITE_ROW) throwSQLiteError(db, "finding path in database");
+
+    const char * s = (const char *) sqlite3_column_text(stmtQueryPathFromHashPart, 0);
+    return s && prefix.compare(0, prefix.size(), s, prefix.size()) == 0 ? s : "";
 }
 
 

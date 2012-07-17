@@ -139,6 +139,10 @@ public:
 
     /* Query the output names of the derivation denoted by `path'. */
     virtual StringSet queryDerivationOutputNames(const Path & path) = 0;
+
+    /* Query the full store path given the hash part of a valid store
+       path, or "" if the path doesn't exist. */
+    virtual Path queryPathFromHashPart(const string & hashPart) = 0;
     
     /* Query whether a path has substitutes. */
     virtual bool hasSubstitutes(const Path & path) = 0;

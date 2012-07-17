@@ -108,6 +108,17 @@ SV * queryPathInfo(char * path, int base32)
         }
 
 
+SV * queryPathFromHashPart(char * hashPart)
+    PPCODE:
+        try {
+            doInit();
+            Path path = store->queryPathFromHashPart(hashPart);
+            XPUSHs(sv_2mortal(newSVpv(path.c_str(), 0)));
+        } catch (Error & e) {
+            croak(e.what());
+        }
+
+
 SV * computeFSClosure(int flipDirection, int includeOutputs, ...)
     PPCODE:
         try {

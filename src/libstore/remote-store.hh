@@ -43,6 +43,8 @@ public:
     
     StringSet queryDerivationOutputNames(const Path & path);
 
+    Path queryPathFromHashPart(const string & hashPart);
+    
     bool hasSubstitutes(const Path & path);
     
     bool querySubstitutablePathInfo(const Path & path,
