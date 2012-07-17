@@ -2234,6 +2234,7 @@ bool DerivationGoal::pathFailed(const Path & path)
     if (printBuildTrace)
         printMsg(lvlError, format("@ build-failed %1% %2% cached") % drvPath % path);
     
+    worker.permanentFailure = true;
     amDone(ecFailed);
 
     return true;
