@@ -1796,6 +1796,9 @@ void DerivationGoal::startBuilder()
          with outside processes using SysV IPC mechanisms (shared
          memory, message queues, semaphores).  It also ensures that
          all IPC objects are destroyed when the builder exits.
+
+       - The UTS namespace ensures that builders see a hostname of
+         localhost rather than the actual hostname.
     */
 #if CHROOT_ENABLED
     if (useChroot) {
