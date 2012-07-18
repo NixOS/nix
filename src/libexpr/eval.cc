@@ -143,9 +143,7 @@ EvalState::EvalState()
     , staticBaseEnv(false, 0)
 {
     nrEnvs = nrValuesInEnvs = nrValues = nrListElems = 0;
-    nrEvaluated = recursionDepth = maxRecursionDepth = 0;
     nrAttrsets = nrOpUpdates = nrOpUpdateValuesCopied = 0;
-    deepestStack = (char *) -1;
 
 #if HAVE_BOEHMGC
     static bool gcInitialised = true;
@@ -190,7 +188,6 @@ EvalState::EvalState()
 
 EvalState::~EvalState()
 {
-    assert(recursionDepth == 0);
 }
 
 
@@ -1206,12 +1203,6 @@ void EvalState::printStats()
 
     printMsg(v, format("  time elapsed: %1%") % cpuTime);
     printMsg(v, format("  size of a value: %1%") % sizeof(Value));
-    printMsg(v, format("  expressions evaluated: %1%") % nrEvaluated);
-    char x;
-    printMsg(v, format("  stack space used: %1% bytes") % (&x - deepestStack));
-    printMsg(v, format("  max eval() nesting depth: %1%") % maxRecursionDepth);
-    printMsg(v, format("  stack space per eval() level: %1% bytes")
-        % ((&x - deepestStack) / (float) maxRecursionDepth));
     printMsg(v, format("  environments allocated: %1% (%2% bytes)")
         % nrEnvs % (nrEnvs * sizeof(Env) + nrValuesInEnvs * sizeof(Value *)));
     printMsg(v, format("  list elements: %1% (%2% bytes)")

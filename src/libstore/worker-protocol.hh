@@ -40,9 +40,10 @@ typedef enum {
     wopQueryPathInfo = 26,
     wopImportPaths = 27,
     wopQueryDerivationOutputNames = 28,
-    wopQuerySubstitutablePathInfos = 29,
-    wopQueryValidPaths = 30,
-    wopQuerySubstitutablePaths = 31,
+    wopQueryPathFromHashPart = 29,
+    wopQuerySubstitutablePathInfos = 30,
+    wopQueryValidPaths = 31,
+    wopQuerySubstitutablePaths = 32,
 } WorkerOp;
 
 

@@ -777,6 +777,7 @@ private:
     /* File descriptor for the log file. */
     FILE * fLogFile;
     BZFILE * bzLogFile;
+    AutoCloseFD fdLogFile;
 
     /* Pipe for the builder's standard output/error. */
     Pipe builderOut;
@@ -1801,6 +1802,9 @@ void DerivationGoal::startBuilder()
          with outside processes using SysV IPC mechanisms (shared
          memory, message queues, semaphores).  It also ensures that
          all IPC objects are destroyed when the builder exits.
+
+       - The UTS namespace ensures that builders see a hostname of
+         localhost rather than the actual hostname.
     */
 #if CHROOT_ENABLED
     if (useChroot) {
@@ -2125,20 +2129,29 @@ Path DerivationGoal::openLogFile()
     Path dir = (format("%1%/%2%") % nixLogDir % drvsLogDir).str();
     createDirs(dir);
 
-    Path logFileName = (format("%1%/%2%.bz2") % dir % baseNameOf(drvPath)).str();
-    AutoCloseFD fd = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0666);
-    if (fd == -1)
-        throw SysError(format("creating log file `%1%'") % logFileName);
-    closeOnExec(fd);
+    if (queryBoolSetting("build-compress-log", true)) {
 
-    if (!(fLogFile = fdopen(fd.borrow(), "w")))
-        throw SysError(format("opening file `%1%'") % logFileName);
+        Path logFileName = (format("%1%/%2%.bz2") % dir % baseNameOf(drvPath)).str();
+        AutoCloseFD fd = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0666);
+        if (fd == -1) throw SysError(format("creating log file `%1%'") % logFileName);
+        closeOnExec(fd);
 
-    int err;
-    if (!(bzLogFile = BZ2_bzWriteOpen(&err, fLogFile, 9, 0, 0)))
-        throw Error(format("cannot open compressed log file `%1%'") % logFileName);
+        if (!(fLogFile = fdopen(fd.borrow(), "w")))
+            throw SysError(format("opening file `%1%'") % logFileName);
 
-    return logFileName;
+        int err;
+        if (!(bzLogFile = BZ2_bzWriteOpen(&err, fLogFile, 9, 0, 0)))
+            throw Error(format("cannot open compressed log file `%1%'") % logFileName);
+
+        return logFileName;
+
+    } else {
+        Path logFileName = (format("%1%/%2%") % dir % baseNameOf(drvPath)).str();
+        fdLogFile = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0666);
+        if (fdLogFile == -1) throw SysError(format("creating log file `%1%'") % logFileName);
+        closeOnExec(fdLogFile);
+        return logFileName;
+    }
 }
 
 
@@ -2155,6 +2168,8 @@ void DerivationGoal::closeLogFile()
         fclose(fLogFile);
         fLogFile = 0;
     }
+
+    fdLogFile.close();
 }
 
 
@@ -2186,7 +2201,8 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
             int err;
             BZ2_bzWrite(&err, bzLogFile, (unsigned char *) data.data(), data.size());
             if (err != BZ_OK) throw Error(format("cannot write to compressed log file (BZip2 error = %1%)") % err);
-        }
+        } else if (fdLogFile != -1)
+            writeFull(fdLogFile, (unsigned char *) data.data(), data.size());
     }
 
     if (hook && fd == hook->fromHook.readSide)
@@ -2224,6 +2240,7 @@ bool DerivationGoal::pathFailed(const Path & path)
     if (printBuildTrace)
         printMsg(lvlError, format("@ build-failed %1% %2% cached") % drvPath % path);
     
+    worker.permanentFailure = true;
     amDone(ecFailed);
 
     return true;

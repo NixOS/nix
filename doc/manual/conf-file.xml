@@ -297,6 +297,16 @@ build-use-chroot = /dev /proc /bin</programlisting>
   </varlistentry>
 
 
+  <varlistentry><term><literal>build-compress-log</literal></term>
+
+    <listitem><para>If set to <literal>true</literal> (the default),
+    build logs written to <filename>/nix/var/log/nix/drvs</filename>
+    will be compressed on the fly using bzip2.  Otherwise, they will
+    not be compressed.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry><term><literal>binary-caches</literal></term>
 
     <listitem><para>A list of URLs of binary caches, separated by
@@ -305,7 +315,7 @@ build-use-chroot = /dev /proc /bin</programlisting>
     <literal>http://nixos.org/binary-cache</literal>.</para></listitem>
 
   </varlistentry>
-  
+
 
   <varlistentry><term><literal>binary-caches-parallel-connections</literal></term>
 
@@ -315,7 +325,7 @@ build-use-chroot = /dev /proc /bin</programlisting>
     150.</para></listitem>
 
   </varlistentry>
-  
+
 
   <varlistentry><term><literal>system</literal></term>
 

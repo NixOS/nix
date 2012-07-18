@@ -395,6 +395,18 @@ PathSet RemoteStore::queryDerivationOutputNames(const Path & path)
 }
 
 
+Path RemoteStore::queryPathFromHashPart(const string & hashPart)
+{
+    openConnection();
+    writeInt(wopQueryPathFromHashPart, to);
+    writeString(hashPart, to);
+    processStderr();
+    Path path = readString(from);
+    if (!path.empty()) assertStorePath(path);
+    return path;
+}
+
+
 Path RemoteStore::addToStore(const Path & _srcPath,
     bool recursive, HashType hashAlgo, PathFilter & filter)
 {

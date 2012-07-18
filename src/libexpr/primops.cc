@@ -508,7 +508,11 @@ static void prim_toPath(EvalState & state, Value * * args, Value & v)
 static void prim_storePath(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
-    Path path = canonPath(state.coerceToPath(*args[0], context));
+    Path path = state.coerceToPath(*args[0], context);
+    /* Resolve symlinks in ‘path’, unless ‘path’ itself is a symlink
+       directly in the store.  The latter condition is necessary so
+       e.g. nix-push does the right thing. */
+    if (!isStorePath(path)) path = canonPath(path, true);
     if (!isInStore(path))
         throw EvalError(format("path `%1%' is not in the Nix store") % path);
     Path path2 = toStorePath(path);

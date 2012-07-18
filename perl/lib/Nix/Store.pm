@@ -14,6 +14,7 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw(
     isValidPath queryReferences queryPathInfo queryDeriver queryPathHash
+    queryPathFromHashPart
     topoSortPaths computeFSClosure followLinksToStorePath exportPaths
     hashPath hashFile hashString
     addToStore makeFixedOutputPath
