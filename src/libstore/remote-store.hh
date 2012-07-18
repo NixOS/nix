@@ -1,5 +1,4 @@
-#ifndef __REMOTE_STORE_H
-#define __REMOTE_STORE_H
+#pragma once
 
 #include <string>
 
@@ -101,6 +100,3 @@ private:
 
 
 }
-
-
-#endif /* !__REMOTE_STORE_H */

@@ -1,5 +1,4 @@
-#ifndef __PROFILES_H
-#define __PROFILES_H
+#pragma once
 
 #include "types.hh"
 #include "pathlocks.hh"
@@ -54,6 +53,3 @@ void lockProfile(PathLocks & lock, const Path & profile);
 string optimisticLockProfile(const Path & profile);
 
 }
-
-
-#endif /* !__PROFILES_H */

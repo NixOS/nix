@@ -1,5 +1,4 @@
-#ifndef __VALUE_H
-#define __VALUE_H
+#pragma once
 
 #include "symbol-table.hh"
 
@@ -151,5 +150,3 @@ void mkPath(Value & v, const char * s);
 
 
 }
-
-#endif /* !__VALUE_H */

@@ -1,8 +1,6 @@
-#ifndef __COMMON_OPTS_H
-#define __COMMON_OPTS_H
+#pragma once
 
 #include "eval.hh"
-
 
 namespace nix {
 
@@ -17,6 +15,3 @@ bool parseSearchPathArg(const string & arg, Strings::iterator & i,
 Path lookupFileArg(EvalState & state, string s);
 
 }
-
-
-#endif /* !__COMMON_OPTS_H */

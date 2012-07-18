@@ -1,5 +1,4 @@
-#ifndef __GLOBALS_H
-#define __GLOBALS_H
+#pragma once
 
 #include "types.hh"
 
@@ -118,6 +117,3 @@ void setDefaultsFromEnvironment();
 
 
 }
-
-
-#endif /* !__GLOBALS_H */

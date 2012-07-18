@@ -1,5 +1,4 @@
-#ifndef __EVAL_INLINE_H
-#define __EVAL_INLINE_H
+#pragma once
 
 #include "eval.hh"
 
@@ -7,7 +6,6 @@
 #define LocalNoInlineNoReturn(f) static f __attribute__((noinline, noreturn)); f
 
 namespace nix {
-
 
 LocalNoInlineNoReturn(void throwEvalError(const char * s))
 {
@@ -55,7 +53,4 @@ inline void EvalState::forceList(Value & v)
         throwTypeError("value is %1% while a list was expected", showType(v));
 }
 
-
 }
-
-#endif /* !__EVAL_INLINE_H */

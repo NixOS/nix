@@ -1,6 +1,4 @@
-#ifndef __WORKER_PROTOCOL_H
-#define __WORKER_PROTOCOL_H
-
+#pragma once
 
 namespace nix {
 
@@ -64,6 +62,3 @@ template<class T> T readStorePaths(Source & from);
 
     
 }
-
-
-#endif /* !__WORKER_PROTOCOL_H */

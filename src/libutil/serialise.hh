@@ -1,5 +1,4 @@
-#ifndef __SERIALISE_H
-#define __SERIALISE_H
+#pragma once
 
 #include "types.hh"
 
@@ -130,6 +129,3 @@ MakeError(SerialisationError, Error)
 
 
 }
-
-
-#endif /* !__SERIALISE_H */

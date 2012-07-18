@@ -1,5 +1,4 @@
-#ifndef __EVAL_H
-#define __EVAL_H
+#pragma once
 
 #include "value.hh"
 #include "nixexpr.hh"
@@ -256,6 +255,3 @@ string showType(const Value & v);
 
 
 }
-
-
-#endif /* !__EVAL_H */

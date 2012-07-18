@@ -1,5 +1,4 @@
-#ifndef __IMMUTABLE_H
-#define __IMMUTABLE_H
+#pragma once
 
 #include <types.hh>
 
@@ -15,5 +14,3 @@ void makeImmutable(const Path & path);
 void makeMutable(const Path & path);
 
 }
-
-#endif /* !__IMMUTABLE_H */

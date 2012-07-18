@@ -1,5 +1,4 @@
-#ifndef __LOCAL_STORE_H
-#define __LOCAL_STORE_H
+#pragma once
 
 #include <string>
 
@@ -302,6 +301,3 @@ void deletePathWrapped(const Path & path,
 void deletePathWrapped(const Path & path);
  
 }
-
-
-#endif /* !__LOCAL_STORE_H */

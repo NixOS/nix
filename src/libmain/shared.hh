@@ -1,5 +1,4 @@
-#ifndef __SHARED_H
-#define __SHARED_H
+#pragma once
 
 #include "util.hh"
 
@@ -54,6 +53,3 @@ extern int exitCode;
 extern char * * argvSaved;
 
 }
-
-
-#endif /* !__SHARED_H */

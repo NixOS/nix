@@ -1,5 +1,4 @@
-#ifndef __MISC_H
-#define __MISC_H
+#pragma once
 
 #include "derivations.hh"
 
@@ -35,6 +34,3 @@ void queryMissing(StoreAPI & store, const PathSet & targets,
 
 
 }
-
-
-#endif /* !__MISC_H */

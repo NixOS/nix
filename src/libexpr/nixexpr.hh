@@ -1,5 +1,4 @@
-#ifndef __NIXEXPR_H
-#define __NIXEXPR_H
+#pragma once
 
 #include "value.hh"
 #include "symbol-table.hh"
@@ -290,6 +289,3 @@ struct StaticEnv
 
 
 }
-
-
-#endif /* !__NIXEXPR_H */

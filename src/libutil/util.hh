@@ -1,5 +1,4 @@
-#ifndef __UTIL_H
-#define __UTIL_H
+#pragma once
 
 #include "types.hh"
 
@@ -333,6 +332,3 @@ void ignoreException();
 
 
 }
-
-
-#endif /* !__UTIL_H */

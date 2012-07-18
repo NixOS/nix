@@ -1,5 +1,4 @@
-#ifndef __USER_ENV_H
-#define __USER_ENV_H
+#pragma once
 
 #include "get-drvs.hh"
 
@@ -12,9 +11,3 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     const string & lockToken);
 
 }
-
-#endif /* !__USER_ENV_H */
-
-
-
-
