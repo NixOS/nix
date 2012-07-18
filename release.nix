@@ -153,10 +153,6 @@ let
     rpm_fedora13x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora13x86_64) 50;
     rpm_fedora16i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora16i386) 50;
     rpm_fedora16x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora16x86_64) 50;
-    
-    rpm_opensuse103i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.opensuse103i386) 40;
-    rpm_opensuse110i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.opensuse110i386) 50;
-    rpm_opensuse110x86_64 = makeRPM_x86_64 (diskImageFuns: diskImageFuns.opensuse110x86_64) 50;
 
     
     deb_debian60i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian60i386) 50;
