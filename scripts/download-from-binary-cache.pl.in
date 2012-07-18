@@ -213,6 +213,8 @@ sub processNARInfo {
         print STDERR "bad NAR info file ‘$request->{url}’\n";
         return undef;
     }
+
+    # FIXME: validate $url etc. for security.
     
     # Cache the result.
     $insertNAR->execute(
@@ -417,8 +419,9 @@ sub downloadBinary {
             print STDERR "unknown compression method ‘$info->{compression}’\n";
             next;
         }
-        print STDERR "\n*** Downloading ‘$info->{url}’ into ‘$storePath’...\n";
-        if (system("$Nix::Config::curl --fail --location $binaryCacheUrl/$info->{url} | $decompressor | $Nix::Config::binDir/nix-store --restore $storePath") != 0) {
+        my $url = "$binaryCacheUrl/$info->{url}"; # FIXME: handle non-relative URLs
+        print STDERR "\n*** Downloading ‘$url’ into ‘$storePath’...\n";
+        if (system("$Nix::Config::curl --fail --location '$url' | $decompressor | $Nix::Config::binDir/nix-store --restore $storePath") != 0) {
             die "download of `$info->{url}' failed" . ($! ? ": $!" : "") . "\n" unless $? == 0;
             next;
         }
