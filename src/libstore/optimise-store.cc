@@ -62,8 +62,13 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
         return;
     }
     
-    /* We can hard link regular files and symlinks. */
-    if (!S_ISREG(st.st_mode) && !S_ISLNK(st.st_mode)) return;
+    /* We can hard link regular files and maybe symlinks. */
+    if (!S_ISREG(st.st_mode)
+#if CAN_LINK_SYMLINK
+        x
+        && !S_ISLNK(st.st_mode)
+#endif
+        ) return;
         
     /* Sometimes SNAFUs can cause files in the Nix store to be
        modified, in particular when running programs as root under
