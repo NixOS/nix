@@ -59,7 +59,31 @@ static void prim_import(EvalState & state, Value * * args, Value & v)
             }
     }
 
-    state.evalFile(path, v);
+    if (isStorePath(path) && store->isValidPath(path) && isDerivation(path)) {
+        Derivation drv = parseDerivation(readFile(path));
+        Value w;
+        state.mkAttrs(w, 1 + drv.outputs.size());
+        mkString(*state.allocAttr(w, state.sDrvPath), path, singleton<PathSet>("=" + path));
+        state.mkList(*state.allocAttr(w, state.symbols.create("outputs")), drv.outputs.size());
+        unsigned int outputs_index = 0;
+
+        Value * outputsVal = w.attrs->find(state.symbols.create("outputs"))->value;
+        foreach (DerivationOutputs::iterator, i, drv.outputs) {
+            mkString(*state.allocAttr(w, state.symbols.create(i->first)),
+                i->second.path, singleton<PathSet>("!" + i->first + "!" + path));
+            mkString(*(outputsVal->list.elems[outputs_index++] = state.allocValue()),
+                i->first);
+        }
+        w.attrs->sort();
+        Value fun;
+        state.mkThunk_(fun,
+            state.parseExprFromFile(state.findFile("nix/imported-drv-to-derivation.nix")));
+        state.forceFunction(fun);
+        mkApp(v, fun, w);
+        state.forceAttrs(v);
+    } else {
+        state.evalFile(path, v);
+    }
 }
 
 
