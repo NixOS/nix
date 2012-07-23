@@ -436,6 +436,8 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
 {
     checkInterrupt();
 
+    if (path == linksDir) return true;
+
     struct stat st;
     if (lstat(path.c_str(), &st)) {
         if (errno == ENOENT) return true;
@@ -569,6 +571,37 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
 }
 
 
+/* Unlink all files in /nix/store/.links that have a link count of 1,
+   which indicates that there are no other links and so they can be
+   safely deleted.  FIXME: race condition with optimisePath(): we
+   might see a link count of 1 just before optimisePath() increases
+   the link count. */
+void LocalStore::removeUnusedLinks()
+{
+    AutoCloseDir dir = opendir(linksDir.c_str());
+    if (!dir) throw SysError(format("opening directory `%1%'") % linksDir);
+
+    struct dirent * dirent;
+    while (errno = 0, dirent = readdir(dir)) {
+        checkInterrupt();
+        string name = dirent->d_name;
+        if (name == "." || name == "..") continue;
+        Path path = linksDir + "/" + name;
+
+        struct stat st;
+        if (lstat(path.c_str(), &st) == -1)
+            throw SysError(format("statting `%1%'") % path);
+
+        if (st.st_nlink != 1) continue;
+
+        printMsg(lvlTalkative, format("deleting unused link `%1%'") % path);
+
+        if (unlink(path.c_str()) == -1)
+            throw SysError(format("deleting `%1%'") % path);
+    }
+}
+
+
 void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
     GCState state(results);
@@ -682,6 +715,10 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        released. */
     foreach (PathSet::iterator, i, state.invalidated)
         deleteGarbage(state, *i);
+
+    /* Clean up the links directory. */
+    printMsg(lvlError, format("deleting unused links..."));
+    removeUnusedLinks();
 }
 
 
