@@ -82,7 +82,7 @@ let
 
         enableParallelBuilding = true;
 
-        doInstallCheck = false;
+        doInstallCheck = true;
       };
 
     binaryTarball =
