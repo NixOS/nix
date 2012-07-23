@@ -159,8 +159,8 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
             printMsg(lvlInfo, format("`%1%' has maximum number of links") % linkPath);
 
             /* Unlink the temp link. */
-            if (unlink(linkPath.c_str()) == -1)
-                printMsg(lvlError, format("unable to unlink `%1%'") % linkPath);
+            if (unlink(tempLink.c_str()) == -1)
+                printMsg(lvlError, format("unable to unlink `%1%'") % tempLink);
             return;
         }
         throw SysError(format("cannot rename `%1%' to `%2%'") % tempLink % path);
