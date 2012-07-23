@@ -118,6 +118,10 @@ EOF
     elsif ($arg eq "--show-trace") {
         push @instArgs, $arg;
     }
+
+    elsif ($arg eq "-") {
+        @exprs = ("-");
+    }
     
     elsif ($arg eq "--verbose" or substr($arg, 0, 2) eq "-v") {
         push @buildArgs, $arg;
