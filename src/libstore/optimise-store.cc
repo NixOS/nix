@@ -49,10 +49,7 @@ struct MakeImmutable
 };
 
 
-const string linksDir = ".links";
-
-
-static void hashAndLink(OptimiseStats & stats, const Path & path)
+void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
 {
     struct stat st;
     if (lstat(path.c_str(), &st))
@@ -61,7 +58,7 @@ static void hashAndLink(OptimiseStats & stats, const Path & path)
     if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectory(path);
 	foreach (Strings::iterator, i, names)
-	    hashAndLink(stats, path + "/" + *i);
+	    optimisePath_(stats, path + "/" + *i);
         return;
     }
     
@@ -91,7 +88,7 @@ static void hashAndLink(OptimiseStats & stats, const Path & path)
     printMsg(lvlDebug, format("`%1%' has hash `%2%'") % path % printHash(hash));
 
     /* Check if this is a known hash. */
-    Path linkPath = nixStore + "/" + linksDir + "/" + printHash32(hash);
+    Path linkPath = linksDir + "/" + printHash32(hash);
 
     if (!pathExists(linkPath)) {
         /* Nope, create a hard link in the links directory. */
@@ -177,15 +174,22 @@ static void hashAndLink(OptimiseStats & stats, const Path & path)
 
 void LocalStore::optimiseStore(OptimiseStats & stats)
 {
-    createDirs(nixStore + "/" + linksDir);
-
     PathSet paths = queryValidPaths();
 
     foreach (PathSet::iterator, i, paths) {
         addTempRoot(*i);
         if (!isValidPath(*i)) continue; /* path was GC'ed, probably */
         startNest(nest, lvlChatty, format("hashing files in `%1%'") % *i);
-        hashAndLink(stats, *i);
+        optimisePath_(stats, *i);
+    }
+}
+
+
+void LocalStore::optimisePath(const Path & path)
+{
+    if (queryBoolSetting("auto-optimise-store", true)) {
+        OptimiseStats stats;
+        optimisePath_(stats, path);
     }
 }
 

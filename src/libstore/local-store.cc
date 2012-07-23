@@ -209,6 +209,7 @@ LocalStore::LocalStore(bool reserveSpace)
 
     /* Create missing state directories if they don't already exist. */
     createDirs(nixStore);
+    createDirs(linksDir = nixStore + "/.links");
     Path profilesDir = nixStateDir + "/profiles";
     createDirs(nixStateDir + "/profiles");
     createDirs(nixStateDir + "/temproots");
@@ -1116,6 +1117,8 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
                 hash.second = dump.size();
             } else
                 hash = hashPath(htSHA256, dstPath);
+
+            optimisePath(dstPath); // FIXME: combine with hashPath()
             
             ValidPathInfo info;
             info.path = dstPath;
@@ -1170,6 +1173,8 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
             canonicalisePathMetaData(dstPath);
 
             HashResult hash = hashPath(htSHA256, dstPath);
+
+            optimisePath(dstPath);
             
             ValidPathInfo info;
             info.path = dstPath;
@@ -1405,6 +1410,8 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
             /* !!! if we were clever, we could prevent the hashPath()
                here. */
             HashResult hash = hashPath(htSHA256, dstPath);
+
+            optimisePath(dstPath); // FIXME: combine with hashPath()
             
             ValidPathInfo info;
             info.path = dstPath;

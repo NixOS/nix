@@ -2093,6 +2093,8 @@ void DerivationGoal::computeClosure()
                 if (allowed.find(*i) == allowed.end())
                     throw BuildError(format("output is not allowed to refer to path `%1%'") % *i);
         }
+
+        worker.store.optimisePath(path); // FIXME: combine with scanForReferences()
     }
 
     /* Register each output path as valid, and register the sets of
@@ -2545,6 +2547,8 @@ void SubstitutionGoal::finished()
     canonicalisePathMetaData(storePath);
 
     HashResult hash = hashPath(htSHA256, storePath);
+    
+    worker.store.optimisePath(storePath); // FIXME: combine with hashPath()
     
     ValidPathInfo info2;
     info2.path = storePath;

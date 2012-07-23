@@ -85,6 +85,8 @@ private:
 
     typedef std::map<Path, RunningSubstituter> RunningSubstituters;
     RunningSubstituters runningSubstituters;
+
+    Path linksDir;
     
 public:
 
@@ -169,6 +171,9 @@ public:
        files with the same contents. */
     void optimiseStore(OptimiseStats & stats);
 
+    /* Optimise a single store path. */
+    void optimisePath(const Path & path);
+    
     /* Check the integrity of the Nix store. */
     void verifyStore(bool checkContents);
 
@@ -267,6 +272,8 @@ private:
     Path importPath(bool requireSignature, Source & source);
     
     void checkDerivationOutputs(const Path & drvPath, const Derivation & drv);
+
+    void optimisePath_(OptimiseStats & stats, const Path & path);
 };
 
 
