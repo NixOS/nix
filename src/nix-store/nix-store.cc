@@ -746,18 +746,12 @@ static void showOptimiseStats(OptimiseStats & stats)
    files with the same contents. */
 static void opOptimise(Strings opFlags, Strings opArgs)
 {
-    if (!opArgs.empty())
+    if (!opArgs.empty() || !opFlags.empty())
         throw UsageError("no arguments expected");
-
-    bool dryRun = false;
-
-    foreach (Strings::iterator, i, opFlags)
-        if (*i == "--dry-run") dryRun = true;
-        else throw UsageError(format("unknown flag `%1%'") % *i);
 
     OptimiseStats stats;
     try {
-        ensureLocalStore().optimiseStore(dryRun, stats);
+        ensureLocalStore().optimiseStore(stats);
     } catch (...) {
         showOptimiseStats(stats);
         throw;

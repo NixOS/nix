@@ -167,7 +167,7 @@ public:
 
     /* Optimise the disk space usage of the Nix store by hard-linking
        files with the same contents. */
-    void optimiseStore(bool dryRun, OptimiseStats & stats);
+    void optimiseStore(OptimiseStats & stats);
 
     /* Check the integrity of the Nix store. */
     void verifyStore(bool checkContents);
