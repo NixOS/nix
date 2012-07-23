@@ -12,6 +12,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <utime.h>
 #include <fcntl.h>
@@ -444,7 +445,7 @@ void canonicalisePathMetaData(const Path & path, bool recurse)
             throw SysError(format("changing owner of `%1%' to %2%")
                 % path % geteuid());
     }
-    
+
     if (!S_ISLNK(st.st_mode)) {
 
         /* Mask out all type related bits. */
@@ -458,14 +459,20 @@ void canonicalisePathMetaData(const Path & path, bool recurse)
                 throw SysError(format("changing mode of `%1%' to %2$o") % path % mode);
         }
 
-        if (st.st_mtime != mtimeStore) {
-            struct utimbuf utimbuf;
-            utimbuf.actime = st.st_atime;
-            utimbuf.modtime = mtimeStore;
-            if (utime(path.c_str(), &utimbuf) == -1) 
-                throw SysError(format("changing modification time of `%1%'") % path);
-        }
-
+    }
+    
+    if (st.st_mtime != mtimeStore) {
+        struct timeval times[2];
+        times[0].tv_sec = st.st_atime;
+        times[0].tv_usec = 0;
+        times[1].tv_sec = mtimeStore;
+        times[1].tv_usec = 0;
+#if HAVE_LUTIMES
+        if (lutimes(path.c_str(), times) == -1)
+#else
+        if (!S_ISLNK(st.st_mode) && utimes(path.c_str(), times) == -1)
+#endif                
+            throw SysError(format("changing modification time of `%1%'") % path);
     }
 
     if (recurse && S_ISDIR(st.st_mode)) {

@@ -115,6 +115,11 @@ AC_CHECK_HEADERS([sys/mount.h], [], [],
 ])
 
 
+# Check for lutimes, optionally used for changing the mtime of
+# symlinks.
+AC_CHECK_FUNCS([lutimes])
+
+
 # Check for <locale>.
 AC_LANG_PUSH(C++)
 AC_CHECK_HEADERS([locale])
