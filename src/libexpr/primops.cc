@@ -61,7 +61,7 @@ static void prim_import(EvalState & state, Value * * args, Value & v)
 
     if (isStorePath(path) && store->isValidPath(path) && isDerivation(path)) {
         Derivation drv = parseDerivation(readFile(path));
-        Value w;
+        Value & w = *state.allocValue();
         state.mkAttrs(w, 1 + drv.outputs.size());
         mkString(*state.allocAttr(w, state.sDrvPath), path, singleton<PathSet>("=" + path));
         state.mkList(*state.allocAttr(w, state.symbols.create("outputs")), drv.outputs.size());
