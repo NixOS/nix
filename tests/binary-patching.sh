@@ -7,14 +7,17 @@ mkdir -p $TEST_ROOT/cache2 $TEST_ROOT/patches
 RESULT=$TEST_ROOT/result
 
 # Build version 1 and 2 of the "foo" package.
-nix-push --copy $TEST_ROOT/cache2 $TEST_ROOT/manifest1 \
+nix-push --dest $TEST_ROOT/cache2 --manifest --bzip2 \
     $(nix-build -o $RESULT binary-patching.nix --arg version 1)
+mv $TEST_ROOT/cache2/MANIFEST $TEST_ROOT/manifest1 
 
 out2=$(nix-build -o $RESULT binary-patching.nix --arg version 2)
-nix-push --copy $TEST_ROOT/cache2 $TEST_ROOT/manifest2 $out2
+nix-push --dest $TEST_ROOT/cache2 --manifest --bzip2 $out2
+mv $TEST_ROOT/cache2/MANIFEST $TEST_ROOT/manifest2
     
 out3=$(nix-build -o $RESULT binary-patching.nix --arg version 3)
-nix-push --copy $TEST_ROOT/cache2 $TEST_ROOT/manifest3 $out3
+nix-push --dest $TEST_ROOT/cache2 --manifest --bzip2 $out3
+mv $TEST_ROOT/cache2/MANIFEST $TEST_ROOT/manifest3
 
 rm $RESULT
 

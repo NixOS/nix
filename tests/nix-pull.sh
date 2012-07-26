@@ -2,7 +2,7 @@ source common.sh
 
 pullCache () {
     echo "pulling cache..."
-    nix-pull file://$TEST_ROOT/manifest
+    nix-pull file://$TEST_ROOT/cache/MANIFEST
 }
 
 clearStore

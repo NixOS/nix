@@ -8,31 +8,28 @@ use File::stat;
 use File::Copy;
 use Nix::Config;
 use Nix::Store;
-
-my $hashAlgo = "sha256";
+use Nix::Manifest;
 
 my $tmpDir = tempdir("nix-push.XXXXXX", CLEANUP => 1, TMPDIR => 1)
     or die "cannot create a temporary directory";
 
 my $nixExpr = "$tmpDir/create-nars.nix";
 
-my $curl = "$Nix::Config::curl --fail --silent";
-my $extraCurlFlags = ${ENV{'CURL_FLAGS'}};
-$curl = "$curl $extraCurlFlags" if defined $extraCurlFlags;
-
 
 # Parse the command line.
 my $compressionType = "xz";
 my $force = 0;
 my $destDir;
+my $writeManifest = 0;
+my $archivesURL;
 my @roots;
 
 sub showSyntax {
     print STDERR <<EOF
-Usage: nix-push --dest DIR PATHS...
+Usage: nix-push --dest DIR [--manifest] [--url-prefix URL] PATHS...
 
-`nix-push' packs the closure of PATHS into a set of NAR archives
-stored in DIR.
+`nix-push' packs the closure of PATHS into a set of NAR files stored
+in DIR.  Optionally generate a manifest.
 EOF
     ; # `
     exit 1;
@@ -52,6 +49,12 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
         die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
         $destDir = $ARGV[$n];
         mkpath($destDir, 0, 0755);
+    } elsif ($arg eq "--manifest") {
+        $writeManifest = 1;
+    } elsif ($arg eq "--url-prefix") {
+        $n++;
+        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        $archivesURL = $ARGV[$n];
     } elsif (substr($arg, 0, 1) eq "-") {
         showSyntax;
     } else {
@@ -60,6 +63,8 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
 }
         
 showSyntax if !defined $destDir;
+
+$archivesURL = "file://$destDir" unless defined $archivesURL;
 
 
 # From the given store paths, determine the set of requisite store
@@ -98,7 +103,7 @@ foreach my $storePath (@storePaths) {
     # Construct a Nix expression that creates a Nix archive.
     my $nixexpr = 
         "(import <nix/nar.nix> " .
-        "{ storePath = builtins.storePath \"$storePath\"; hashAlgo = \"$hashAlgo\"; compressionType = \"$compressionType\"; }) ";
+        "{ storePath = builtins.storePath \"$storePath\"; hashAlgo = \"sha256\"; compressionType = \"$compressionType\"; }) ";
     
     print NIX $nixexpr;
 }
@@ -125,6 +130,8 @@ print STDERR "copying archives...\n";
 
 my $totalNarSize = 0;
 my $totalCompressedSize = 0;
+
+my %narFiles;
 
 for (my $n = 0; $n < scalar @storePaths; $n++) {
     my $storePath = $storePaths[$n];
@@ -205,7 +212,24 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
         close INFO or die;
         rename($tmp, $dst) or die "cannot rename $tmp to $dst: $!\n";
     }
+
+    $narFiles{$storePath} = [
+        { url => "$archivesURL/$narName"
+        , hash => "sha256:$compressedHash"
+        , size => $compressedSize
+        , narHash => "$narHash"
+        , narSize => $narSize
+        , references => join(" ", @{$refs})
+        , deriver => $deriver
+        }
+    ] if $writeManifest;
 }
 
 printf STDERR "total compressed size %.2f MiB, %.1f%%\n",
     $totalCompressedSize / (1024 * 1024), $totalCompressedSize / $totalNarSize * 100;
+
+
+# Optionally write a manifest.
+if ($writeManifest) {
+    writeManifest "$destDir/MANIFEST", \%narFiles, \();
+}
