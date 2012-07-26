@@ -1,5 +1,4 @@
-#ifndef __LOCAL_STORE_H
-#define __LOCAL_STORE_H
+#pragma once
 
 #include <string>
 
@@ -86,6 +85,8 @@ private:
 
     typedef std::map<Path, RunningSubstituter> RunningSubstituters;
     RunningSubstituters runningSubstituters;
+
+    Path linksDir;
     
 public:
 
@@ -168,8 +169,11 @@ public:
 
     /* Optimise the disk space usage of the Nix store by hard-linking
        files with the same contents. */
-    void optimiseStore(bool dryRun, OptimiseStats & stats);
+    void optimiseStore(OptimiseStats & stats);
 
+    /* Optimise a single store path. */
+    void optimisePath(const Path & path);
+    
     /* Check the integrity of the Nix store. */
     void verifyStore(bool checkContents);
 
@@ -260,6 +264,8 @@ private:
         
     int openGCLock(LockType lockType);
     
+    void removeUnusedLinks();
+
     void startSubstituter(const Path & substituter,
         RunningSubstituter & runningSubstituter);
 
@@ -268,6 +274,8 @@ private:
     Path importPath(bool requireSignature, Source & source);
     
     void checkDerivationOutputs(const Path & drvPath, const Derivation & drv);
+
+    void optimisePath_(OptimiseStats & stats, const Path & path);
 };
 
 
@@ -302,6 +310,3 @@ void deletePathWrapped(const Path & path,
 void deletePathWrapped(const Path & path);
  
 }
-
-
-#endif /* !__LOCAL_STORE_H */

@@ -1,5 +1,4 @@
-#ifndef __STOREAPI_H
-#define __STOREAPI_H
+#pragma once
 
 #include "hash.hh"
 #include "serialise.hh"
@@ -362,6 +361,3 @@ MakeError(BuildError, Error) /* denotes a permanent build failure */
 
 
 }
-
-
-#endif /* !__STOREAPI_H */

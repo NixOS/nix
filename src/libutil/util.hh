@@ -1,5 +1,4 @@
-#ifndef __UTIL_H
-#define __UTIL_H
+#pragma once
 
 #include "types.hh"
 
@@ -89,7 +88,7 @@ void makePathReadOnly(const Path & path);
 
 /* Create a temporary directory. */
 Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
-    bool includePid = true, bool useGlobalCounter = true);
+    bool includePid = true, bool useGlobalCounter = true, mode_t mode = 0755);
 
 /* Create a directory and all its parents, if necessary.  Returns the
    list of created directories, in order of creation. */
@@ -333,6 +332,3 @@ void ignoreException();
 
 
 }
-
-
-#endif /* !__UTIL_H */

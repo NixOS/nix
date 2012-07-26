@@ -115,6 +115,23 @@ AC_CHECK_HEADERS([sys/mount.h], [], [],
 ])
 
 
+# Check for lutimes, optionally used for changing the mtime of
+# symlinks.
+AC_CHECK_FUNCS([lutimes])
+
+
+# Check whether the store optimiser can optimise symlinks.
+AC_MSG_CHECKING([whether it is possible to create a link to a symlink])
+ln -s bla tmp_link
+if ln tmp_link tmp_link2 2> /dev/null; then
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(CAN_LINK_SYMLINK, 1, [Whether link() works on symlinks.])
+else
+    AC_MSG_RESULT(no)
+fi
+rm -f tmp_link tmp_link2
+
+
 # Check for <locale>.
 AC_LANG_PUSH(C++)
 AC_CHECK_HEADERS([locale])

@@ -1,5 +1,4 @@
-#ifndef __HASH_H
-#define __HASH_H
+#pragma once
 
 #include "types.hh"
 #include "serialise.hh"
@@ -109,6 +108,3 @@ public:
 
 
 }
-
-
-#endif /* !__HASH_H */

@@ -1,5 +1,4 @@
-#ifndef __DERIVATIONS_H
-#define __DERIVATIONS_H
+#pragma once
 
 #include <map>
 
@@ -81,6 +80,3 @@ typedef std::map<Path, Hash> DrvHashes;
 extern DrvHashes drvHashes;
 
 }
-
-
-#endif /* !__DERIVATIONS_H */

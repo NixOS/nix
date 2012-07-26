@@ -1,5 +1,4 @@
-#ifndef __TYPES_H
-#define __TYPES_H
+#pragma once
 
 #include <string>
 #include <list>
@@ -74,6 +73,3 @@ typedef enum {
 
 
 }
-
-
-#endif /* !__TYPES_H */

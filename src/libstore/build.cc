@@ -1533,7 +1533,7 @@ void DerivationGoal::startBuilder()
 
     /* Create a temporary directory where the build will take
        place. */
-    tmpDir = createTempDir("", "nix-build-" + baseNameOf(drvPath), false, false);
+    tmpDir = createTempDir("", "nix-build-" + baseNameOf(drvPath), false, false, 0700);
 
     /* For convenience, set an environment pointing to the top build
        directory. */
@@ -2099,6 +2099,8 @@ void DerivationGoal::computeClosure()
                 if (allowed.find(*i) == allowed.end())
                     throw BuildError(format("output is not allowed to refer to path `%1%'") % *i);
         }
+
+        worker.store.optimisePath(path); // FIXME: combine with scanForReferences()
     }
 
     /* Register each output path as valid, and register the sets of
@@ -2182,6 +2184,7 @@ void DerivationGoal::deleteTmpDir(bool force)
                 % drvPath % tmpDir);
             if (buildUser.enabled() && !amPrivileged())
                 getOwnership(tmpDir);
+            chmod(tmpDir.c_str(), 0755);
         }
         else
             deletePathWrapped(tmpDir);
@@ -2561,6 +2564,8 @@ void SubstitutionGoal::finished()
     canonicalisePathMetaData(storePath);
 
     HashResult hash = hashPath(htSHA256, storePath);
+    
+    worker.store.optimisePath(storePath); // FIXME: combine with hashPath()
     
     ValidPathInfo info2;
     info2.path = storePath;

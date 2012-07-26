@@ -1,5 +1,4 @@
-#ifndef __REFERENCES_H
-#define __REFERENCES_H
+#pragma once
 
 #include "types.hh"
 #include "hash.hh"
@@ -10,5 +9,3 @@ PathSet scanForReferences(const Path & path, const PathSet & refs,
     HashResult & hash);
     
 }
-
-#endif /* !__REFERENCES_H */

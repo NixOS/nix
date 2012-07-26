@@ -79,13 +79,9 @@ Makefile.in
 /src/libexpr/parser-tab.cc
 /src/libexpr/parser-tab.hh
 /src/libexpr/parser-tab.output
-/src/libexpr/nixexpr-ast.hh
-/src/libexpr/nixexpr-ast.cc
 /src/libexpr/nix.tbl
 
 # /src/libstore/
-/src/libstore/derivations-ast.cc
-/src/libstore/derivations-ast.hh
 /src/libstore/schema.sql.hh
 
 # /src/nix-env/

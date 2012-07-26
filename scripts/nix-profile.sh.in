@@ -19,9 +19,9 @@ fi
 
 export PATH="$HOME/.nix-profile/bin:$PATH"
 
-# Subscribe the root user to the NixOS channel by default.
+# Subscribe the root user to the Nixpkgs channel by default.
 if [ "$USER" = root -a ! -e $HOME/.nix-channels ]; then
-    echo "http://nixos.org/releases/nixos/channels/nixos-unstable nixos" > $HOME/.nix-channels
+    echo "http://nixos.org/releases/nixos/channels/nixpkgs-unstable nixpkgs" > $HOME/.nix-channels
 fi
 
 # Create the per-user garbage collector roots directory.
@@ -43,7 +43,7 @@ fi
 
 # Set up secure multi-user builds: non-root users build through the
 # Nix daemon.
-if test "$USER" != root; then
+if [ "$USER" != root -a -e @localstatedir@/nix/daemon-socket/socket ]; then
     export NIX_REMOTE=daemon
 else
     unset NIX_REMOTE

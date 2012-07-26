@@ -12,6 +12,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <utime.h>
 #include <fcntl.h>
@@ -208,6 +209,7 @@ LocalStore::LocalStore(bool reserveSpace)
 
     /* Create missing state directories if they don't already exist. */
     createDirs(nixStore);
+    createDirs(linksDir = nixStore + "/.links");
     Path profilesDir = nixStateDir + "/profiles";
     createDirs(nixStateDir + "/profiles");
     createDirs(nixStateDir + "/temproots");
@@ -444,7 +446,7 @@ void canonicalisePathMetaData(const Path & path, bool recurse)
             throw SysError(format("changing owner of `%1%' to %2%")
                 % path % geteuid());
     }
-    
+
     if (!S_ISLNK(st.st_mode)) {
 
         /* Mask out all type related bits. */
@@ -458,14 +460,20 @@ void canonicalisePathMetaData(const Path & path, bool recurse)
                 throw SysError(format("changing mode of `%1%' to %2$o") % path % mode);
         }
 
-        if (st.st_mtime != mtimeStore) {
-            struct utimbuf utimbuf;
-            utimbuf.actime = st.st_atime;
-            utimbuf.modtime = mtimeStore;
-            if (utime(path.c_str(), &utimbuf) == -1) 
-                throw SysError(format("changing modification time of `%1%'") % path);
-        }
-
+    }
+    
+    if (st.st_mtime != mtimeStore) {
+        struct timeval times[2];
+        times[0].tv_sec = st.st_atime;
+        times[0].tv_usec = 0;
+        times[1].tv_sec = mtimeStore;
+        times[1].tv_usec = 0;
+#if HAVE_LUTIMES
+        if (lutimes(path.c_str(), times) == -1)
+#else
+        if (!S_ISLNK(st.st_mode) && utimes(path.c_str(), times) == -1)
+#endif                
+            throw SysError(format("changing modification time of `%1%'") % path);
     }
 
     if (recurse && S_ISDIR(st.st_mode)) {
@@ -1134,6 +1142,8 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
                 hash.second = dump.size();
             } else
                 hash = hashPath(htSHA256, dstPath);
+
+            optimisePath(dstPath); // FIXME: combine with hashPath()
             
             ValidPathInfo info;
             info.path = dstPath;
@@ -1188,6 +1198,8 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
             canonicalisePathMetaData(dstPath);
 
             HashResult hash = hashPath(htSHA256, dstPath);
+
+            optimisePath(dstPath);
             
             ValidPathInfo info;
             info.path = dstPath;
@@ -1423,6 +1435,8 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
             /* !!! if we were clever, we could prevent the hashPath()
                here. */
             HashResult hash = hashPath(htSHA256, dstPath);
+
+            optimisePath(dstPath); // FIXME: combine with hashPath()
             
             ValidPathInfo info;
             info.path = dstPath;

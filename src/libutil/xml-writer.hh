@@ -1,5 +1,4 @@
-#ifndef __XML_WRITER_H
-#define __XML_WRITER_H
+#pragma once
 
 #include <iostream>
 #include <string>
@@ -70,6 +69,3 @@ public:
 
  
 }
-
-
-#endif /* !__XML_WRITER_H */

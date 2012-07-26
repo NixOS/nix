@@ -357,7 +357,20 @@ build-use-chroot = /dev /proc /bin</programlisting>
     <literal>true</literal>.</para></listitem>
 
   </varlistentry>
-    
+
+  
+  <varlistentry><term><literal>auto-optimise-store</literal></term>
+
+    <listitem><para>If set to <literal>true</literal> (the default),
+    Nix automatically detects files in the store that have identical
+    contents, and replaces them with hard links to a single copy.
+    This saves disk space.  If set to <literal>false</literal>, you
+    can still run <command>nix-store --optimise</command> to get rid
+    of duplicate files.</para></listitem>
+
+  </varlistentry>
+
+
 </variablelist>
 
 </para>

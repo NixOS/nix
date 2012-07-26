@@ -1,5 +1,4 @@
-#ifndef __ARCHIVE_H
-#define __ARCHIVE_H
+#pragma once
 
 #include "types.hh"
 #include "serialise.hh"
@@ -74,6 +73,3 @@ void restorePath(const Path & path, Source & source);
 
  
 }
-
-
-#endif /* !__ARCHIVE_H */

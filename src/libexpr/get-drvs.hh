@@ -1,5 +1,4 @@
-#ifndef __GET_DRVS_H
-#define __GET_DRVS_H
+#pragma once
 
 #include "eval.hh"
 
@@ -83,6 +82,3 @@ void getDerivations(EvalState & state, Value & v, const string & pathPrefix,
 
  
 }
-
-
-#endif /* !__GET_DRVS_H */

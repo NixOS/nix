@@ -1,5 +1,4 @@
-#ifndef __PATHLOCKS_H
-#define __PATHLOCKS_H
+#pragma once
 
 #include "types.hh"
 
@@ -44,6 +43,3 @@ bool pathIsLockedByMe(const Path & path);
 
 
 }
-
-
-#endif /* !__PATHLOCKS_H */
