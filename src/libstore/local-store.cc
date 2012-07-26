@@ -999,7 +999,8 @@ void LocalStore::querySubstitutablePathInfos(const Path & substituter,
     while (true) {
         Path path = readLine(run.from);
         if (path == "") break;
-        assert(paths.find(path) != paths.end());
+        if (paths.find(path) == paths.end())
+            throw Error(format("got unexpected path `%1%' from substituter") % path);
         paths.erase(path);
         SubstitutablePathInfo & info(infos[path]);
         info.deriver = readLine(run.from);
