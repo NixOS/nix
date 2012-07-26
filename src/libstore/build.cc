@@ -1527,7 +1527,7 @@ void DerivationGoal::startBuilder()
 
     /* Create a temporary directory where the build will take
        place. */
-    tmpDir = createTempDir("", "nix-build-" + baseNameOf(drvPath), false, false);
+    tmpDir = createTempDir("", "nix-build-" + baseNameOf(drvPath), false, false, 0700);
 
     /* For convenience, set an environment pointing to the top build
        directory. */
@@ -2178,6 +2178,7 @@ void DerivationGoal::deleteTmpDir(bool force)
                 % drvPath % tmpDir);
             if (buildUser.enabled() && !amPrivileged())
                 getOwnership(tmpDir);
+            chmod(tmpDir.c_str(), 0755);
         }
         else
             deletePathWrapped(tmpDir);

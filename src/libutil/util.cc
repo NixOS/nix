@@ -380,7 +380,7 @@ static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
 
 
 Path createTempDir(const Path & tmpRoot, const Path & prefix,
-    bool includePid, bool useGlobalCounter)
+    bool includePid, bool useGlobalCounter, mode_t mode)
 {
     static int globalCounter = 0;
     int localCounter = 0;
@@ -389,7 +389,7 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
     while (1) {
         checkInterrupt();
 	Path tmpDir = tempName(tmpRoot, prefix, includePid, counter);
-	if (mkdir(tmpDir.c_str(), 0777) == 0) {
+	if (mkdir(tmpDir.c_str(), mode) == 0) {
 	    /* Explicitly set the group of the directory.  This is to
 	       work around around problems caused by BSD's group
 	       ownership semantics (directories inherit the group of
