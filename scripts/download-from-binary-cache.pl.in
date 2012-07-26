@@ -45,6 +45,7 @@ sub addRequest {
     $curl->setopt(CURLOPT_CAINFO, $caBundle) if defined $caBundle;
     $curl->setopt(CURLOPT_USERAGENT, "Nix/$Nix::Config::version");
     $curl->setopt(CURLOPT_NOBODY, 1) if $head;
+    $curl->setopt(CURLOPT_FAILONERROR, 1);
 
     if ($activeRequests >= $maxParallelRequests) {
         $scheduled{$curlId} = 1;
@@ -73,7 +74,7 @@ sub processRequests {
                     my $request = $requests{$id} or die;
                     my $handle = $request->{handle};
                     $request->{result} = $result;
-                    $request->{httpStatus} = $handle->getinfo(CURLINFO_HTTP_CODE);
+                    $request->{httpStatus} = $handle->getinfo(CURLINFO_RESPONSE_CODE);
                     
                     print STDERR "$request->{type} on $request->{url} [$request->{result}, $request->{httpStatus}]\n" if $debug;
                     
@@ -179,12 +180,13 @@ sub processNARInfo {
     
     my $cacheId = getCacheId($binaryCacheUrl);
 
-    if ($request->{result} != 0 || $request->{httpStatus} != 200) {
-        if ($request->{httpStatus} != 404) {
+    if ($request->{result} != 0) {
+        if ($request->{result} != 37 && $request->{httpStatus} != 404) {
             print STDERR "could not download ‘$request->{url}’ (" .
                 ($request->{result} != 0 ? "Curl error $request->{result}" : "HTTP status $request->{httpStatus}") . ")\n";
         } else {
-            $insertNARExistence->execute($cacheId, basename($storePath), 0, time());
+            $insertNARExistence->execute($cacheId, basename($storePath), 0, time())
+                unless $request->{url} =~ /^file:/;
         }
         return undef;
     }
@@ -219,7 +221,8 @@ sub processNARInfo {
     # Cache the result.
     $insertNAR->execute(
         $cacheId, basename($storePath), $url, $compression, $fileHash, $fileSize,
-        $narHash, $narSize, join(" ", @refs), $deriver, $system, time());
+        $narHash, $narSize, join(" ", @refs), $deriver, $system, time())
+        unless $request->{url} =~ /^file:/;
     
     return
         { url => $url
@@ -378,16 +381,18 @@ sub printSubstitutablePaths {
         processRequests;
 
         foreach my $request (values %requests) {
-            if ($request->{result} != 0 || $request->{httpStatus} != 200) {
-                if ($request->{httpStatus} != 404) {
+            if ($request->{result} != 0) {
+                if ($request->{result} != 37 && $request->{httpStatus} != 404) {
                     print STDERR "could not check ‘$request->{url}’ (" .
                         ($request->{result} != 0 ? "Curl error $request->{result}" : "HTTP status $request->{httpStatus}") . ")\n";
                 } else {
-                    $insertNARExistence->execute($cacheId, basename($request->{storePath}), 0, time());
+                    $insertNARExistence->execute($cacheId, basename($request->{storePath}), 0, time())
+                        unless $request->{url} =~ /^file:/;
                 }
                 push @left2, $request->{storePath};
             } else {
-                $insertNARExistence->execute($cacheId, basename($request->{storePath}), 1, time());
+                $insertNARExistence->execute($cacheId, basename($request->{storePath}), 1, time())
+                    unless $request->{url} =~ /^file:/;
                 print "$request->{storePath}\n";
             }
         }
