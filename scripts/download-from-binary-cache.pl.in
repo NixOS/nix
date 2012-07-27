@@ -13,7 +13,9 @@ use strict;
 Nix::Config::readConfig;
 
 my @binaryCacheUrls = map { s/\/+$//; $_ } split(/ /,
-    ($ENV{"NIX_BINARY_CACHES"} // $Nix::Config::config{"binary-caches"} // "http://nixos.org/binary-cache"));
+    ($ENV{"NIX_BINARY_CACHES"}
+     // $Nix::Config::config{"binary-caches"}
+     // ($Nix::Config::storeDir eq "/nix/store" ? "http://nixos.org/binary-cache" : "")));
 
 my $maxParallelRequests = int($Nix::Config::config{"binary-caches-parallel-connections"} // 150);
 $maxParallelRequests = 1 if $maxParallelRequests < 1;
