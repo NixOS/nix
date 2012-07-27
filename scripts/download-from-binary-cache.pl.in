@@ -35,7 +35,7 @@ my $caBundle = $ENV{"CURL_CA_BUNDLE"} // $ENV{"OPENSSL_X509_CERT_FILE"};
 
 sub addRequest {
     my ($storePath, $url, $head) = @_;
-    
+
     my $curl = WWW::Curl::Easy->new;
     my $curlId = $curlIdCount++;
     $requests{$curlId} = { storePath => $storePath, url => $url, handle => $curl, content => "", type => $head ? "HEAD" : "GET" };
@@ -69,7 +69,7 @@ sub processRequests {
         if (scalar @{$rfds} + scalar @{$wfds} + scalar @{$efds} > 0) {
             IO::Select->select(IO::Select->new(@{$rfds}), IO::Select->new(@{$wfds}), IO::Select->new(@{$efds}), 0.1);
         }
-        
+
         if ($curlm->perform() != $activeRequests) {
             while (my ($id, $result) = $curlm->info_read) {
                 if ($id) {
@@ -77,9 +77,9 @@ sub processRequests {
                     my $handle = $request->{handle};
                     $request->{result} = $result;
                     $request->{httpStatus} = $handle->getinfo(CURLINFO_RESPONSE_CODE);
-                    
+
                     print STDERR "$request->{type} on $request->{url} [$request->{result}, $request->{httpStatus}]\n" if $debug;
-                    
+
                     $activeRequests--;
                     delete $request->{handle};
 
@@ -115,7 +115,7 @@ sub initCache {
             url       text unique not null
         );
 EOF
-    
+
     $dbh->do(<<EOF);
         create table if not exists NARs (
             cache            integer not null,
@@ -179,7 +179,7 @@ sub positiveHit {
 
 sub processNARInfo {
     my ($storePath, $binaryCacheUrl, $request) = @_;
-    
+
     my $cacheId = getCacheId($binaryCacheUrl);
 
     if ($request->{result} != 0) {
@@ -192,7 +192,7 @@ sub processNARInfo {
         }
         return undef;
     }
-    
+
     my ($storePath2, $url, $fileHash, $fileSize, $narHash, $narSize, $deriver, $system);
     my $compression = "bzip2";
     my @refs;
@@ -219,13 +219,13 @@ sub processNARInfo {
     }
 
     # FIXME: validate $url etc. for security.
-    
+
     # Cache the result.
     $insertNAR->execute(
         $cacheId, basename($storePath), $url, $compression, $fileHash, $fileSize,
         $narHash, $narSize, join(" ", @refs), $deriver, $system, time())
         unless $request->{url} =~ /^file:/;
-    
+
     return
         { url => $url
         , compression => $compression
@@ -242,10 +242,10 @@ sub processNARInfo {
 
 sub getCacheId {
     my ($binaryCacheUrl) = @_;
-    
+
     my $cacheId = $cacheIds{$binaryCacheUrl};
     return $cacheId if defined $cacheId;
-    
+
     # FIXME: not atomic.
     my @res = @{$dbh->selectcol_arrayref("select id from BinaryCaches where url = ?", {}, $binaryCacheUrl)};
     if (scalar @res == 1) {
@@ -267,8 +267,8 @@ sub getCachedInfoFrom {
     $queryNAR->execute(getCacheId($binaryCacheUrl), basename($storePath));
     my $res = $queryNAR->fetchrow_hashref();
     return undef unless defined $res;
-    
-    return 
+
+    return
         { url => $res->{url}
         , compression => $res->{compression}
         , fileHash => $res->{fileHash}
@@ -379,7 +379,7 @@ sub printSubstitutablePaths {
             }
             addRequest($storePath, infoUrl($binaryCacheUrl, $storePath), 1);
         }
-        
+
         processRequests;
 
         foreach my $request (values %requests) {
@@ -406,7 +406,7 @@ sub printSubstitutablePaths {
 
 sub downloadBinary {
     my ($storePath) = @_;
-    
+
     foreach my $binaryCacheUrl (@binaryCacheUrls) {
         my $info = getCachedInfoFrom($storePath, $binaryCacheUrl);
 
@@ -418,7 +418,7 @@ sub downloadBinary {
         }
 
         next unless defined $info;
-        
+
         my $decompressor;
         if ($info->{compression} eq "bzip2") { $decompressor = "$Nix::Config::bzip2 -d"; }
         elsif ($info->{compression} eq "xz") { $decompressor = "$Nix::Config::xz -d"; }
@@ -455,7 +455,7 @@ if ($ARGV[0] eq "--query") {
     while (<STDIN>) {
         chomp;
         my ($cmd, @args) = split " ", $_;
-        
+
         if ($cmd eq "have") {
             printSubstitutablePaths(@args);
             print "\n";
