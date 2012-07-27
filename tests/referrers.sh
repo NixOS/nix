@@ -10,6 +10,7 @@ touch $reference
 
 echo "making registration..."
 
+set +x
 for ((n = 0; n < $max; n++)); do
     storePath=$NIX_STORE_DIR/$n
     echo -n > $storePath
@@ -19,6 +20,7 @@ for ((n = 0; n < $max; n++)); do
     fi
     echo $storePath; echo; echo 2; echo $reference; echo $ref2
 done > $TEST_ROOT/reg_info
+set -x
 
 echo "registering..."
 
