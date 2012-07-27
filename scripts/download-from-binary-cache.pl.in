@@ -12,18 +12,15 @@ use strict;
 
 Nix::Config::readConfig;
 
-my @binaryCacheUrls = map { s/\/+$//; $_ } split(/ /,
-    ($ENV{"NIX_BINARY_CACHES"}
-     // $Nix::Config::config{"binary-caches"}
-     // ($Nix::Config::storeDir eq "/nix/store" ? "http://nixos.org/binary-cache" : "")));
+my @caches;
+my $gotCaches = 0;
 
 my $maxParallelRequests = int($Nix::Config::config{"binary-caches-parallel-connections"} // 150);
 $maxParallelRequests = 1 if $maxParallelRequests < 1;
 
 my $debug = ($ENV{"NIX_DEBUG_SUBST"} // "") eq 1;
 
-my ($dbh, $insertNAR, $queryNAR, $insertNARExistence, $queryNARExistence);
-my %cacheIds;
+my ($dbh, $queryCache, $insertNAR, $queryNAR, $insertNARExistence, $queryNARExistence);
 
 my $curlm = WWW::Curl::Multi->new;
 my $activeRequests = 0;
@@ -112,7 +109,10 @@ sub initCache {
     $dbh->do(<<EOF);
         create table if not exists BinaryCaches (
             id        integer primary key autoincrement not null,
-            url       text unique not null
+            url       text unique not null,
+            timestamp integer not null,
+            storeDir  text not null,
+            wantMassQuery integer not null
         );
 EOF
 
@@ -146,6 +146,8 @@ EOF
         );
 EOF
 
+    $queryCache = $dbh->prepare("select id, storeDir, wantMassQuery from BinaryCaches where url = ?") or die;
+
     $insertNAR = $dbh->prepare(
         "insert or replace into NARs(cache, storePath, url, compression, fileHash, fileSize, narHash, " .
         "narSize, refs, deriver, system, timestamp) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)") or die;
@@ -159,35 +161,65 @@ EOF
 }
 
 
+sub getAvailableCaches {
+    return if $gotCaches;
+    $gotCaches = 1;
 
-sub negativeHit {
-    my ($storePath, $binaryCacheUrl) = @_;
-    $queryNARExistence->execute(getCacheId($binaryCacheUrl), basename($storePath));
-    my $res = $queryNARExistence->fetchrow_hashref();
-    return defined $res && $res->{exist} == 0;
-}
+    my @urls = map { s/\/+$//; $_ } split(/ /,
+        ($ENV{"NIX_BINARY_CACHES"}
+         // $Nix::Config::config{"binary-caches"}
+         // ($Nix::Config::storeDir eq "/nix/store" ? "http://nixos.org/binary-cache" : "")));
 
+    foreach my $url (@urls) {
 
-sub positiveHit {
-    my ($storePath, $binaryCacheUrl) = @_;
-    return 1 if defined getCachedInfoFrom($storePath, $binaryCacheUrl);
-    $queryNARExistence->execute(getCacheId($binaryCacheUrl), basename($storePath));
-    my $res = $queryNARExistence->fetchrow_hashref();
-    return defined $res && $res->{exist} == 1;
+        # FIXME: not atomic.
+        $queryCache->execute($url);
+        my $res = $queryCache->fetchrow_hashref();
+        if (defined $res) {
+            next if $res->{storeDir} ne $Nix::Config::storeDir;
+            push @caches, { id => $res->{id}, url => $url, wantMassQuery => $res->{wantMassQuery} };
+            next;
+        }
+
+        # Get the cache info file.
+        my $request = addRequest(undef, $url . "/nix-cache-info");
+        processRequests;
+
+        if ($request->{result} != 0) {
+            print STDERR "could not download ‘$request->{url}’ (" .
+                ($request->{result} != 0 ? "Curl error $request->{result}" : "HTTP status $request->{httpStatus}") . ")\n";
+            next;
+        }
+
+        my $storeDir = "/nix/store";
+        my $wantMassQuery = 0;
+        foreach my $line (split "\n", $request->{content}) {
+            unless ($line =~ /^(.*): (.*)$/) {
+                print STDERR "bad cache info file ‘$request->{url}’\n";
+                return undef;
+            }
+            if ($1 eq "StoreDir") { $storeDir = $2; }
+            elsif ($1 eq "WantMassQuery") { $wantMassQuery = int($2); }
+        }
+
+        $dbh->do("insert into BinaryCaches(url, timestamp, storeDir, wantMassQuery) values (?, ?, ?, ?)",
+                 {}, $url, time(), $storeDir, $wantMassQuery);
+        my $id = $dbh->last_insert_id("", "", "", "");
+        next if $storeDir ne $Nix::Config::storeDir;
+        push @caches, { id => $id, url => $url, wantMassQuery => $wantMassQuery };
+    }
 }
 
 
 sub processNARInfo {
-    my ($storePath, $binaryCacheUrl, $request) = @_;
-
-    my $cacheId = getCacheId($binaryCacheUrl);
+    my ($storePath, $cache, $request) = @_;
 
     if ($request->{result} != 0) {
         if ($request->{result} != 37 && $request->{httpStatus} != 404) {
             print STDERR "could not download ‘$request->{url}’ (" .
                 ($request->{result} != 0 ? "Curl error $request->{result}" : "HTTP status $request->{httpStatus}") . ")\n";
         } else {
-            $insertNARExistence->execute($cacheId, basename($storePath), 0, time())
+            $insertNARExistence->execute($cache->{id}, basename($storePath), 0, time())
                 unless $request->{url} =~ /^file:/;
         }
         return undef;
@@ -222,7 +254,7 @@ sub processNARInfo {
 
     # Cache the result.
     $insertNAR->execute(
-        $cacheId, basename($storePath), $url, $compression, $fileHash, $fileSize,
+        $cache->{id}, basename($storePath), $url, $compression, $fileHash, $fileSize,
         $narHash, $narSize, join(" ", @refs), $deriver, $system, time())
         unless $request->{url} =~ /^file:/;
 
@@ -240,31 +272,10 @@ sub processNARInfo {
 }
 
 
-sub getCacheId {
-    my ($binaryCacheUrl) = @_;
-
-    my $cacheId = $cacheIds{$binaryCacheUrl};
-    return $cacheId if defined $cacheId;
-
-    # FIXME: not atomic.
-    my @res = @{$dbh->selectcol_arrayref("select id from BinaryCaches where url = ?", {}, $binaryCacheUrl)};
-    if (scalar @res == 1) {
-        $cacheId = $res[0];
-    } else {
-        $dbh->do("insert into BinaryCaches(url) values (?)",
-                 {}, $binaryCacheUrl);
-        $cacheId = $dbh->last_insert_id("", "", "", "");
-    }
-
-    $cacheIds{$binaryCacheUrl} = $cacheId;
-    return $cacheId;
-}
-
-
 sub getCachedInfoFrom {
-    my ($storePath, $binaryCacheUrl) = @_;
+    my ($storePath, $cache) = @_;
 
-    $queryNAR->execute(getCacheId($binaryCacheUrl), basename($storePath));
+    $queryNAR->execute($cache->{id}, basename($storePath));
     my $res = $queryNAR->fetchrow_hashref();
     return undef unless defined $res;
 
@@ -278,6 +289,23 @@ sub getCachedInfoFrom {
         , refs => [ split " ", $res->{refs} ]
         , deriver => $res->{deriver}
         } if defined $res;
+}
+
+
+sub negativeHit {
+    my ($storePath, $cache) = @_;
+    $queryNARExistence->execute($cache->{id}, basename($storePath));
+    my $res = $queryNARExistence->fetchrow_hashref();
+    return defined $res && $res->{exist} == 0;
+}
+
+
+sub positiveHit {
+    my ($storePath, $cache) = @_;
+    return 1 if defined getCachedInfoFrom($storePath, $cache);
+    $queryNARExistence->execute($cache->{id}, basename($storePath));
+    my $res = $queryNARExistence->fetchrow_hashref();
+    return defined $res && $res->{exist} == 1;
 }
 
 
@@ -306,8 +334,8 @@ sub printInfoParallel {
     my @left;
     foreach my $storePath (@paths) {
         my $found = 0;
-        foreach my $binaryCacheUrl (@binaryCacheUrls) {
-            my $info = getCachedInfoFrom($storePath, $binaryCacheUrl);
+        foreach my $cache (@caches) {
+            my $info = getCachedInfoFrom($storePath, $cache);
             if (defined $info) {
                 printInfo($storePath, $info);
                 $found = 1;
@@ -319,22 +347,22 @@ sub printInfoParallel {
 
     return if scalar @left == 0;
 
-    foreach my $binaryCacheUrl (@binaryCacheUrls) {
+    foreach my $cache (@caches) {
 
         my @left2;
         %requests = ();
         foreach my $storePath (@left) {
-            if (negativeHit($storePath, $binaryCacheUrl)) {
+            if (negativeHit($storePath, $cache)) {
                 push @left2, $storePath;
                 next;
             }
-            addRequest($storePath, infoUrl($binaryCacheUrl, $storePath));
+            addRequest($storePath, infoUrl($cache->{url}, $storePath));
         }
 
         processRequests;
 
         foreach my $request (values %requests) {
-            my $info = processNARInfo($request->{storePath}, $binaryCacheUrl, $request);
+            my $info = processNARInfo($request->{storePath}, $cache, $request);
             if (defined $info) {
                 printInfo($request->{storePath}, $info);
             } else {
@@ -354,8 +382,9 @@ sub printSubstitutablePaths {
     my @left;
     foreach my $storePath (@paths) {
         my $found = 0;
-        foreach my $binaryCacheUrl (@binaryCacheUrls) {
-            if (positiveHit($storePath, $binaryCacheUrl)) {
+        foreach my $cache (@caches) {
+            next unless $cache->{wantMassQuery};
+            if (positiveHit($storePath, $cache)) {
                 print "$storePath\n";
                 $found = 1;
                 last;
@@ -367,17 +396,16 @@ sub printSubstitutablePaths {
     return if scalar @left == 0;
 
     # For remaining paths, do HEAD requests.
-    foreach my $binaryCacheUrl (@binaryCacheUrls) {
-        my $cacheId = getCacheId($binaryCacheUrl);
-
+    foreach my $cache (@caches) {
+        next unless $cache->{wantMassQuery};
         my @left2;
         %requests = ();
         foreach my $storePath (@left) {
-            if (negativeHit($storePath, $binaryCacheUrl)) {
+            if (negativeHit($storePath, $cache)) {
                 push @left2, $storePath;
                 next;
             }
-            addRequest($storePath, infoUrl($binaryCacheUrl, $storePath), 1);
+            addRequest($storePath, infoUrl($cache->{url}, $storePath), 1);
         }
 
         processRequests;
@@ -388,12 +416,12 @@ sub printSubstitutablePaths {
                     print STDERR "could not check ‘$request->{url}’ (" .
                         ($request->{result} != 0 ? "Curl error $request->{result}" : "HTTP status $request->{httpStatus}") . ")\n";
                 } else {
-                    $insertNARExistence->execute($cacheId, basename($request->{storePath}), 0, time())
+                    $insertNARExistence->execute($cache->{id}, basename($request->{storePath}), 0, time())
                         unless $request->{url} =~ /^file:/;
                 }
                 push @left2, $request->{storePath};
             } else {
-                $insertNARExistence->execute($cacheId, basename($request->{storePath}), 1, time())
+                $insertNARExistence->execute($cache->{id}, basename($request->{storePath}), 1, time())
                     unless $request->{url} =~ /^file:/;
                 print "$request->{storePath}\n";
             }
@@ -407,14 +435,14 @@ sub printSubstitutablePaths {
 sub downloadBinary {
     my ($storePath) = @_;
 
-    foreach my $binaryCacheUrl (@binaryCacheUrls) {
-        my $info = getCachedInfoFrom($storePath, $binaryCacheUrl);
+    foreach my $cache (@caches) {
+        my $info = getCachedInfoFrom($storePath, $cache);
 
         unless (defined $info) {
-            next if negativeHit($storePath, $binaryCacheUrl);
-            my $request = addRequest($storePath, infoUrl($binaryCacheUrl, $storePath));
+            next if negativeHit($storePath, $cache);
+            my $request = addRequest($storePath, infoUrl($cache->{url}, $storePath));
             processRequests;
-            $info = processNARInfo($storePath, $binaryCacheUrl, $request);
+            $info = processNARInfo($storePath, $cache, $request);
         }
 
         next unless defined $info;
@@ -426,7 +454,7 @@ sub downloadBinary {
             print STDERR "unknown compression method ‘$info->{compression}’\n";
             next;
         }
-        my $url = "$binaryCacheUrl/$info->{url}"; # FIXME: handle non-relative URLs
+        my $url = "$cache->{url}/$info->{url}"; # FIXME: handle non-relative URLs
         print STDERR "\n*** Downloading ‘$url’ into ‘$storePath’...\n";
         if (system("$Nix::Config::curl --fail --location --insecure '$url' | $decompressor | $Nix::Config::binDir/nix-store --restore $storePath") != 0) {
             die "download of `$info->{url}' failed" . ($! ? ": $!" : "") . "\n" unless $? == 0;
@@ -437,10 +465,10 @@ sub downloadBinary {
         print "$info->{narHash}\n";
 
         print STDERR "\n";
-        return 1;
+        return;
     }
 
-    return 0;
+    print STDERR "could not download ‘$storePath’ from any binary cache\n";
 }
 
 
@@ -450,6 +478,7 @@ initCache();
 if ($ARGV[0] eq "--query") {
 
     while (<STDIN>) {
+        getAvailableCaches;
         chomp;
         my ($cmd, @args) = split " ", $_;
 
@@ -472,9 +501,8 @@ if ($ARGV[0] eq "--query") {
 
 elsif ($ARGV[0] eq "--substitute") {
     my $storePath = $ARGV[1] or die;
-    if (!downloadBinary($storePath)) {
-        print STDERR "could not download ‘$storePath’ from any binary cache\n";
-    }
+    getAvailableCaches;
+    downloadBinary($storePath);
 }
 
 else {
