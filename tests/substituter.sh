@@ -29,6 +29,7 @@ if test $1 = "--query"; then
 elif test $1 = "--substitute"; then
     mkdir $2
     echo "Hallo Wereld" > $2/hello
+    echo # no expected hash
 else
     echo "unknown substituter operation"
     exit 1

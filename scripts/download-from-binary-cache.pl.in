@@ -432,13 +432,10 @@ sub downloadBinary {
             die "download of `$info->{url}' failed" . ($! ? ": $!" : "") . "\n" unless $? == 0;
             next;
         }
-        # The hash in the manifest can be either in base-16 or
-        # base-32.  Handle both.
-        $info->{narHash} =~ /^sha256:(.*)$/ or die "invalid hash";
-        my $hash = $1;
-        my $hash2 = hashPath("sha256", 1, $storePath);
-        die "hash mismatch in downloaded path ‘$storePath’; expected $hash, got $hash2\n"
-            if $hash ne $hash2;
+
+        # Tell Nix about the expected hash so it can verify it.
+        print "$info->{narHash}\n";
+
         print STDERR "\n";
         return 1;
     }

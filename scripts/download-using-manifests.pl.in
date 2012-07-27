@@ -353,19 +353,10 @@ while (scalar @path > 0) {
 }
 
 
-# Make sure that the hash declared in the manifest matches what we
-# downloaded and unpacked.
+# Tell Nix about the expected hash so it can verify it.
 die "cannot check integrity of the downloaded path since its hash is not known\n"
     unless defined $finalNarHash;
-
-my ($hashAlgo, $hash) = parseHash $finalNarHash;
-
-# The hash in the manifest can be either in base-16 or base-32.
-# Handle both.
-my $hash2 = hashPath($hashAlgo, $hashAlgo eq "sha256" && length($hash) != 64, $targetPath);
-
-die "hash mismatch in downloaded path $targetPath; expected $hash, got $hash2\n"
-    if $hash ne $hash2;
+print "$finalNarHash\n";
 
 
 print STDERR "\n";

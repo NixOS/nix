@@ -371,6 +371,7 @@ void commonChildInit(Pipe & logPipe)
     if (dup2(logPipe.writeSide, STDERR_FILENO) == -1)
         throw SysError("cannot pipe standard error into log file");
     logPipe.readSide.close();
+    logPipe.writeSide.close();
 
     /* Dup stderr to stdout. */
     if (dup2(STDERR_FILENO, STDOUT_FILENO) == -1)
@@ -2273,7 +2274,10 @@ private:
     /* Path info returned by the substituter's query info operation. */
     SubstitutablePathInfo info;
 
-    /* Pipe for the substitute's standard output/error. */
+    /* Pipe for the substituter's standard output. */
+    Pipe outPipe;
+
+    /* Pipe for the substituter's standard error. */
     Pipe logPipe;
 
     /* The process ID of the builder. */
@@ -2466,6 +2470,7 @@ void SubstitutionGoal::tryToRun()
 
     printMsg(lvlInfo, format("fetching path `%1%'...") % storePath);
 
+    outPipe.create();
     logPipe.create();
 
     /* Remove the (stale) output path if it exists. */
@@ -2482,9 +2487,12 @@ void SubstitutionGoal::tryToRun()
     case 0:
         try { /* child */
 
-            logPipe.readSide.close();
-
             commonChildInit(logPipe);
+
+            if (dup2(outPipe.writeSide, STDOUT_FILENO) == -1)
+                throw SysError("cannot dup output pipe into stdout");
+            outPipe.readSide.close();
+            outPipe.writeSide.close();
 
             /* Fill in the arguments. */
             Strings args;
@@ -2506,6 +2514,7 @@ void SubstitutionGoal::tryToRun()
     /* parent */
     pid.setSeparatePG(true);
     pid.setKillSignal(SIGTERM);
+    outPipe.writeSide.close();
     logPipe.writeSide.close();
     worker.childStarted(shared_from_this(),
         pid, singleton<set<int> >(logPipe.readSide), true, true);
@@ -2534,9 +2543,12 @@ void SubstitutionGoal::finished()
     /* Close the read side of the logger pipe. */
     logPipe.readSide.close();
 
-    debug(format("substitute for `%1%' finished") % storePath);
+    /* Get the hash info from stdout. */
+    string expectedHashStr = statusOk(status) ? readLine(outPipe.readSide) : "";
+    outPipe.readSide.close();
 
     /* Check the exit status and the build result. */
+    HashResult hash;
     try {
 
         if (!statusOk(status))
@@ -2545,6 +2557,23 @@ void SubstitutionGoal::finished()
 
         if (!pathExists(storePath))
             throw SubstError(format("substitute did not produce path `%1%'") % storePath);
+
+        hash = hashPath(htSHA256, storePath);
+
+        /* Verify the expected hash we got from the substituer. */
+        if (expectedHashStr != "") {
+            size_t n = expectedHashStr.find(':');
+            if (n == string::npos)
+                throw Error(format("bad hash from substituter: %1%") % expectedHashStr);
+            HashType hashType = parseHashType(string(expectedHashStr, 0, n));
+            if (hashType == htUnknown)
+                throw Error(format("unknown hash algorithm in `%1%'") % expectedHashStr);
+            Hash expectedHash = parseHash16or32(hashType, string(expectedHashStr, n + 1));
+            Hash actualHash = hashType == htSHA256 ? hash.first : hashPath(hashType, storePath).first;
+            if (expectedHash != actualHash)
+                throw SubstError(format("hash mismatch in downloaded path `%1%': expected %2%, got %3%")
+                    % storePath % printHash(expectedHash) % printHash(actualHash));
+        }
 
     } catch (SubstError & e) {
 
@@ -2562,8 +2591,6 @@ void SubstitutionGoal::finished()
     }
 
     canonicalisePathMetaData(storePath);
-
-    HashResult hash = hashPath(htSHA256, storePath);
 
     worker.store.optimisePath(storePath); // FIXME: combine with hashPath()
 

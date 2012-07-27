@@ -52,7 +52,7 @@ if ($ARGV[0] eq "--query") {
                 next unless defined $store;
 
                 $ENV{"NIX_DB_DIR"} = "$store/var/nix/db";
-            
+
                 my $deriver = `@bindir@/nix-store --query --deriver $storePath`;
                 die "cannot query deriver of `$storePath'" if $? != 0;
                 chomp $deriver;
@@ -87,9 +87,10 @@ elsif ($ARGV[0] eq "--substitute") {
     my $storePath = $ARGV[1];
     my ($store, $sourcePath) = findStorePath $storePath;
     die unless $store;
-    print "\n*** Copying `$storePath' from `$sourcePath'\n\n";
+    print STDERR "\n*** Copying `$storePath' from `$sourcePath'\n\n";
     system("$binDir/nix-store --dump $sourcePath | $binDir/nix-store --restore $storePath") == 0
         or die "cannot copy `$sourcePath' to `$storePath'";
+    print "\n"; # no hash to verify
 }
 
 
