@@ -2179,8 +2179,8 @@ void DerivationGoal::deleteTmpDir(bool force)
 {
     if (tmpDir != "") {
         if (keepFailed && !force) {
-	    printMsg(lvlError,
-		format("builder for `%1%' failed; keeping build directory `%2%'")
+            printMsg(lvlError,
+                format("builder for `%1%' failed; keeping build directory `%2%'")
                 % drvPath % tmpDir);
             if (buildUser.enabled() && !amPrivileged())
                 getOwnership(tmpDir);
@@ -2838,9 +2838,9 @@ void Worker::waitForInput()
 
     /* If a global timeout has been set, sleep until it's done.  */
     if (buildTimeout != 0) {
-	useTimeout = true;
+        useTimeout = true;
         if (lastWait == 0 || lastWait > before) lastWait = before;
-	timeout.tv_sec = std::max((time_t) 0, lastWait + buildTimeout - before);
+        timeout.tv_sec = std::max((time_t) 0, lastWait + buildTimeout - before);
     }
 
     /* If we're monitoring for silence on stdout/stderr, sleep until
@@ -2854,10 +2854,10 @@ void Worker::waitForInput()
             }
         }
         if (oldest) {
-	    time_t silenceTimeout = std::max((time_t) 0, oldest + maxSilentTime - before);
+            time_t silenceTimeout = std::max((time_t) 0, oldest + maxSilentTime - before);
             timeout.tv_sec = useTimeout
-		? std::min(silenceTimeout, timeout.tv_sec)
-		: silenceTimeout;
+                ? std::min(silenceTimeout, timeout.tv_sec)
+                : silenceTimeout;
             useTimeout = true;
             printMsg(lvlVomit, format("sleeping %1% seconds") % timeout.tv_sec);
         }
@@ -2948,8 +2948,8 @@ void Worker::waitForInput()
             goal->cancel();
         }
 
-	if (buildTimeout != 0 &&
-	    after - before >= (time_t) buildTimeout)
+        if (buildTimeout != 0 &&
+            after - before >= (time_t) buildTimeout)
         {
             printMsg(lvlError,
                 format("%1% timed out after %2% seconds of activity")
