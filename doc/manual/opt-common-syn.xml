@@ -37,6 +37,11 @@
   <option>-I</option>
   <replaceable>path</replaceable>
 </arg>
+<arg>
+  <option>--option</option>
+  <replaceable>name</replaceable>
+  <replaceable>value</replaceable>
+</arg>
 <sbr />
 
 </nop>

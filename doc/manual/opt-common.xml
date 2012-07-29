@@ -337,7 +337,7 @@
   
   <listitem><para>Causes Nix to print out a stack trace in case of Nix
   expression evaluation errors.</para></listitem>
-  
+
 </varlistentry>
 
 
@@ -347,6 +347,16 @@
   the <envar>NIX_PATH</envar> environment variable for details.  Paths
   added through <option>-I</option> take precedence over
   <envar>NIX_PATH</envar>.</para></listitem>
+  
+</varlistentry>
+
+
+<varlistentry><term><option>--option</option> <replaceable>name</replaceable> <replaceable>value</replaceable></term>
+  
+  <listitem><para>Set the Nix configuration option
+  <replaceable>name</replaceable> to <replaceable>value</replaceable>.
+  This overrides settings in the Nix configuration file (see
+  <citerefentry><refentrytitle>nix.conf</refentrytitle><manvolnum>5</manvolnum></citerefentry>).</para></listitem>
   
 </varlistentry>
 
