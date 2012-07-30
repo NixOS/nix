@@ -1,4 +1,4 @@
-PERL_MODULES = lib/Nix/Store.pm lib/Nix/Manifest.pm lib/Nix/GeneratePatches.pm lib/Nix/SSH.pm lib/Nix/CopyClosure.pm lib/Nix/Config.pm.in
+PERL_MODULES = lib/Nix/Store.pm lib/Nix/Manifest.pm lib/Nix/GeneratePatches.pm lib/Nix/SSH.pm lib/Nix/CopyClosure.pm lib/Nix/Config.pm.in lib/Nix/Utils.pm
 
 all: $(PERL_MODULES:.in=)
 

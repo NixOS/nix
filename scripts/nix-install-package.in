@@ -3,6 +3,7 @@
 use strict;
 use File::Temp qw(tempdir);
 use Nix::Config;
+use Nix::Utils;
 
 
 sub usageError {
@@ -72,7 +73,7 @@ my $tmpDir = tempdir("nix-install-package.XXXXXX", CLEANUP => 1, TMPDIR => 1)
 
 sub barf {
     my $msg = shift;
-    print "$msg\n";
+    print "\nInstallation failed: $msg\n";
     <STDIN> if $interactive;
     exit 1;
 }
@@ -92,7 +93,6 @@ open PKGFILE, "<$pkgFile" or barf "cannot open `$pkgFile': $!";
 my $contents = <PKGFILE>;
 close PKGFILE;
 
-my $urlRE = "(?: [a-zA-Z][a-zA-Z0-9\+\-\.]*\:[a-zA-Z0-9\%\/\?\:\@\&\=\+\$\,\-\_\.\!\~\*\']+ )";
 my $nameRE = "(?: [A-Za-z0-9\+\-\.\_\?\=]+ )"; # see checkStoreName()
 my $systemRE = "(?: [A-Za-z0-9\+\-\_]+ )";
 my $pathRE = "(?: \/ [\/A-Za-z0-9\+\-\.\_\?\=]* )";
@@ -101,7 +101,7 @@ my $pathRE = "(?: \/ [\/A-Za-z0-9\+\-\.\_\?\=]* )";
 # store path.  We'll let nix-env do that.
 
 $contents =~
-    / ^ \s* (\S+) \s+ ($urlRE) \s+ ($nameRE) \s+ ($systemRE) \s+ ($pathRE) \s+ ($pathRE) ( \s+ ($urlRE) )?  /x
+    / ^ \s* (\S+) \s+ ($Nix::Utils::urlRE) \s+ ($nameRE) \s+ ($systemRE) \s+ ($pathRE) \s+ ($pathRE) ( \s+ ($Nix::Utils::urlRE) )?  /x
     or barf "invalid package contents";
 my $version = $1;
 my $manifestURL = $2;

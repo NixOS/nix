@@ -4,6 +4,7 @@ use strict;
 use Nix::Config;
 use Nix::Manifest;
 use Nix::Store;
+use Nix::Utils;
 use POSIX qw(strftime);
 use File::Temp qw(tempdir);
 
@@ -306,6 +307,7 @@ while (scalar @path > 0) {
         # Download the patch.
         print STDERR "  downloading patch...\n";
         my $patchPath = "$tmpDir/patch";
+        Nix::Utils::checkURL $patch->{url};
         system("$curl '$patch->{url}' -o $patchPath") == 0
             or die "cannot download patch `$patch->{url}'\n";
 
@@ -336,6 +338,7 @@ while (scalar @path > 0) {
         my $size = $narFile->{size} || -1;
         print LOGFILE "$$ narfile $narFile->{url} $size $v\n";
 
+        Nix::Utils::checkURL $narFile->{url};
         if ($curStep < $maxStep) {
             # The archive will be used a base to a patch.
             system("$curl '$narFile->{url}' | $Nix::Config::bzip2 -d > $tmpNar") == 0

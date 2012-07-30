@@ -5,6 +5,7 @@ use File::Basename;
 use IO::Select;
 use Nix::Config;
 use Nix::Store;
+use Nix::Utils;
 use WWW::Curl::Easy;
 use WWW::Curl::Multi;
 use strict;
@@ -249,8 +250,6 @@ sub processNARInfo {
         return undef;
     }
 
-    # FIXME: validate $url etc. for security.
-
     # Cache the result.
     $insertNAR->execute(
         $cache->{id}, basename($storePath), $url, $compression, $fileHash, $fileSize,
@@ -455,6 +454,7 @@ sub downloadBinary {
         }
         my $url = "$cache->{url}/$info->{url}"; # FIXME: handle non-relative URLs
         print STDERR "\n*** Downloading ‘$url’ into ‘$storePath’...\n";
+        Nix::Utils::checkURL $url;
         if (system("$Nix::Config::curl --fail --location --insecure '$url' | $decompressor | $Nix::Config::binDir/nix-store --restore $storePath") != 0) {
             die "download of `$info->{url}' failed" . ($! ? ": $!" : "") . "\n" unless $? == 0;
             next;
