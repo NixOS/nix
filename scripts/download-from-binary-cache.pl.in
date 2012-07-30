@@ -166,9 +166,8 @@ sub getAvailableCaches {
     $gotCaches = 1;
 
     my @urls = map { s/\/+$//; $_ } split(/ /,
-        ($ENV{"NIX_BINARY_CACHES"}
-         // $Nix::Config::config{"binary-caches"}
-         // ($Nix::Config::storeDir eq "/nix/store" ? "http://nixos.org/binary-cache" : "")));
+        $Nix::Config::config{"binary-caches"}
+        // ($Nix::Config::storeDir eq "/nix/store" ? "http://nixos.org/binary-cache" : ""));
 
     foreach my $url (@urls) {
 

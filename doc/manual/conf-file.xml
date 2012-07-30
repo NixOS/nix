@@ -30,6 +30,9 @@ gc-keep-derivations = true   # Idem
 env-keep-derivations = false
 </programlisting>
 
+<para>You can override settings using the <option>--option</option>
+flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
+
 <para>The following settings are currently available: 
 
 <variablelist>
@@ -310,8 +313,7 @@ build-use-chroot = /dev /proc /bin</programlisting>
   <varlistentry><term><literal>binary-caches</literal></term>
 
     <listitem><para>A list of URLs of binary caches, separated by
-    whitespace.  It can be overriden through the environment variable
-    <envar>NIX_BINARY_CACHES</envar>.  The default is
+    whitespace.  The default is
     <literal>http://nixos.org/binary-cache</literal>.</para></listitem>
 
   </varlistentry>
