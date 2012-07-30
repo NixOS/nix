@@ -931,6 +931,10 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
                written in Perl (i.e. all of them) fail. */
             unsetenv("DYLD_LIBRARY_PATH");
 
+            /* Pass configuration options (including those overriden
+               with --option) to the substituter. */
+            setenv("_NIX_OPTIONS", packSettings().c_str(), 1);
+
             fromPipe.readSide.close();
             toPipe.writeSide.close();
             if (dup2(toPipe.readSide, STDIN_FILENO) == -1)

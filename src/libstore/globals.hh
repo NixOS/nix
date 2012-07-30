@@ -115,5 +115,7 @@ void reloadSettings();
 
 void setDefaultsFromEnvironment();
 
+string packSettings();
+
 
 }

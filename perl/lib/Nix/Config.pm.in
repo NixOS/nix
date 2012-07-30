@@ -19,9 +19,17 @@ $useBindings = "@perlbindings@" eq "yes";
 %config = ();
 
 sub readConfig {
+    if (defined $ENV{'_NIX_OPTIONS'}) {
+        foreach my $s (split '\n', $ENV{'_NIX_OPTIONS'}) {
+            my ($n, $v) = split '=', $s, 2;
+            $config{$n} = $v;
+        }
+        return;
+    }
+
     my $config = "$confDir/nix.conf";
     return unless -f $config;
-    
+
     open CONFIG, "<$config" or die "cannot open `$config'";
     while (<CONFIG>) {
         /^\s*([\w|-]+)\s*=\s*(.*)$/ or next;

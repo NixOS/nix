@@ -36,10 +36,12 @@ bool printBuildTrace = false;
 
 static bool settingsRead = false;
 
-static std::map<string, Strings> settings;
+typedef std::map<string, Strings> Settings;
+
+static Settings settings;
 
 /* Overriden settings. */
-std::map<string, Strings> settingsCmdline;
+Settings settingsCmdline;
 
 
 string & at(Strings & ss, unsigned int n)
@@ -82,7 +84,7 @@ static void readSettings()
     };
 
     settings.insert(settingsCmdline.begin(), settingsCmdline.end());
-    
+
     settingsRead = true;
 }
 
@@ -90,7 +92,7 @@ static void readSettings()
 Strings querySetting(const string & name, const Strings & def)
 {
     if (!settingsRead) readSettings();
-    std::map<string, Strings>::iterator i = settings.find(name);
+    Settings::iterator i = settings.find(name);
     return i == settings.end() ? def : i->second;
 }
 
@@ -169,5 +171,16 @@ void setDefaultsFromEnvironment()
     buildTimeout = queryIntSetting("build-timeout", 0);
 }
 
- 
+
+string packSettings()
+{
+    string s;
+    if (!settingsRead) readSettings();
+    foreach (Settings::iterator, i, settings) {
+        s += i->first; s += '='; s += concatStringsSep(" ", i->second); s += '\n';
+    }
+    return s;
+}
+
+
 }

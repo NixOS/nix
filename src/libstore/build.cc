@@ -2494,6 +2494,10 @@ void SubstitutionGoal::tryToRun()
             outPipe.readSide.close();
             outPipe.writeSide.close();
 
+            /* Pass configuration options (including those overriden
+               with --option) to the substituter. */
+            setenv("_NIX_OPTIONS", packSettings().c_str(), 1);
+
             /* Fill in the arguments. */
             Strings args;
             args.push_back(baseNameOf(sub));
