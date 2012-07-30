@@ -95,7 +95,7 @@ static bool isFarSideClosed(int socket)
         throw Error("EOF expected (protocol error?)");
     else if (rd == -1 && errno != ECONNRESET)
         throw SysError("expected connection reset or EOF");
-    
+
     return true;
 }
 
@@ -185,7 +185,7 @@ static void stopWork(bool success = true, const string & msg = "", unsigned int 
        we're either sending or receiving from the client, so we'll be
        notified of client death anyway. */
     setSigPollAction(false);
-    
+
     canSendStderr = false;
 
     if (success)
@@ -220,7 +220,7 @@ struct TunnelSource : BufferedSource
            so we have to disable the SIGPOLL handler. */
         setSigPollAction(false);
         canSendStderr = false;
-        
+
         writeInt(STDERR_READ, to);
         writeInt(len, to);
         to.flush();
@@ -279,7 +279,7 @@ static void performOp(unsigned int clientVersion,
 {
     switch (op) {
 
-#if 0        
+#if 0
     case wopQuit: {
         /* Close the database. */
         store.reset((StoreAPI *) 0);
@@ -323,7 +323,7 @@ static void performOp(unsigned int clientVersion,
         writeStrings(res, to);
         break;
     }
-        
+
     case wopQueryPathHash: {
         Path path = readStorePath(from);
         startWork();
@@ -391,7 +391,7 @@ static void performOp(unsigned int clientVersion,
 
         SavingSourceAdapter savedNAR(from);
         RetrieveRegularNARSink savedRegular;
-        
+
         if (recursive) {
             /* Get the entire NAR dump from the client and save it to
                a string so that we can pass it to
@@ -400,13 +400,13 @@ static void performOp(unsigned int clientVersion,
             parseDump(sink, savedNAR);
         } else
             parseDump(savedRegular, from);
-            
+
         startWork();
         if (!savedRegular.regular) throw Error("regular file expected");
         Path path = dynamic_cast<LocalStore *>(store.get())
             ->addToStoreFromDump(recursive ? savedNAR.s : savedRegular.s, baseName, recursive, hashAlgo);
         stopWork();
-        
+
         writeString(path, to);
         break;
     }
@@ -512,17 +512,17 @@ static void performOp(unsigned int clientVersion,
         }
 
         GCResults results;
-        
+
         startWork();
         if (options.ignoreLiveness)
             throw Error("you are not allowed to ignore liveness");
         store->collectGarbage(options, results);
         stopWork();
-        
+
         writeStrings(results.paths, to);
         writeLongLong(results.bytesFreed, to);
         writeLongLong(results.blocksFreed, to);
-        
+
         break;
     }
 
@@ -572,7 +572,7 @@ static void performOp(unsigned int clientVersion,
         }
         break;
     }
-            
+
     case wopQuerySubstitutablePathInfos: {
         PathSet paths = readStorePaths<PathSet>(from);
         startWork();
@@ -589,7 +589,7 @@ static void performOp(unsigned int clientVersion,
         }
         break;
     }
-            
+
     case wopQueryAllValidPaths: {
         startWork();
         PathSet paths = store->queryAllValidPaths();
@@ -637,7 +637,7 @@ static void performOp(unsigned int clientVersion,
 static void processConnection()
 {
     canSendStderr = false;
-    myPid = getpid();    
+    myPid = getpid();
     writeToStderr = tunnelStderr;
 
 #ifdef HAVE_HUP_NOTIFICATION
@@ -681,7 +681,7 @@ static void processConnection()
 
         stopWork();
         to.flush();
-        
+
     } catch (Error & e) {
         stopWork(false, e.msg());
         to.flush();
@@ -690,7 +690,7 @@ static void processConnection()
 
     /* Process client requests. */
     unsigned int opCount = 0;
-    
+
     while (true) {
         WorkerOp op;
         try {
@@ -762,7 +762,7 @@ static void daemonLoop()
 
     /* Otherwise, create and bind to a Unix domain socket. */
     else {
-    
+
         /* Create and bind to a Unix domain socket. */
         fdSocket = socket(PF_UNIX, SOCK_STREAM, 0);
         if (fdSocket == -1)
@@ -777,7 +777,7 @@ static void daemonLoop()
            relative path name. */
         chdir(dirOf(socketPath).c_str());
         Path socketPathRel = "./" + baseNameOf(socketPath);
-    
+
         struct sockaddr_un addr;
         addr.sun_family = AF_UNIX;
         if (socketPathRel.size() >= sizeof(addr.sun_path))
@@ -802,7 +802,7 @@ static void daemonLoop()
     }
 
     closeOnExec(fdSocket);
-        
+
     /* Loop accepting connections. */
     while (1) {
 
@@ -810,7 +810,7 @@ static void daemonLoop()
             /* Important: the server process *cannot* open the SQLite
                database, because it doesn't like forks very much. */
             assert(!store);
-            
+
             /* Accept a connection. */
             struct sockaddr_un remoteAddr;
             socklen_t remoteAddrLen = sizeof(remoteAddr);
@@ -819,14 +819,14 @@ static void daemonLoop()
                 (struct sockaddr *) &remoteAddr, &remoteAddrLen);
             checkInterrupt();
             if (remote == -1) {
-		if (errno == EINTR)
-		    continue;
-		else
-		    throw SysError("accepting connection");
+                if (errno == EINTR)
+                    continue;
+                else
+                    throw SysError("accepting connection");
             }
 
             closeOnExec(remote);
-            
+
             /* Get the identity of the caller, if possible. */
             uid_t clientUid = -1;
             pid_t clientPid = -1;
@@ -841,13 +841,13 @@ static void daemonLoop()
 #endif
 
             printMsg(lvlInfo, format("accepted connection from pid %1%, uid %2%") % clientPid % clientUid);
-            
+
             /* Fork a child to handle the connection. */
             pid_t child;
             child = fork();
-    
+
             switch (child) {
-        
+
             case -1:
                 throw SysError("unable to fork");
 
@@ -866,16 +866,16 @@ static void daemonLoop()
                         string processName = int2String(clientPid);
                         strncpy(argvSaved[1], processName.c_str(), strlen(argvSaved[1]));
                     }
-                    
+
                     /* Since the daemon can be long-running, the
                        settings may have changed.  So force a reload. */
                     reloadSettings();
-                    
+
                     /* Handle the connection. */
                     from.fd = remote;
                     to.fd = remote;
                     processConnection();
-                    
+
                 } catch (std::exception & e) {
                     std::cerr << format("child error: %1%\n") % e.what();
                 }
@@ -895,7 +895,7 @@ void run(Strings args)
 {
     bool slave = false;
     bool daemon = false;
-    
+
     for (Strings::iterator i = args.begin(); i != args.end(); ) {
         string arg = *i++;
         if (arg == "--slave") slave = true;

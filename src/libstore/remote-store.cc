@@ -60,7 +60,7 @@ void RemoteStore::openConnection(bool reserveSpace)
     else
          throw Error(format("invalid setting for NIX_REMOTE, `%1%'")
              % remoteMode);
-            
+
     from.fd = fdSocket;
     to.fd = fdSocket;
 
@@ -103,15 +103,15 @@ void RemoteStore::forkSlave()
         worker = nixBinDir + "/nix-worker";
 
     child = fork();
-    
+
     switch (child) {
-        
+
     case -1:
         throw SysError("unable to fork");
 
     case 0:
         try { /* child */
-            
+
             if (dup2(fdChild, STDOUT_FILENO) == -1)
                 throw SysError("dupping write side");
 
@@ -124,7 +124,7 @@ void RemoteStore::forkSlave()
             execlp(worker.c_str(), worker.c_str(), "--slave", NULL);
 
             throw SysError(format("executing `%1%'") % worker);
-            
+
         } catch (std::exception & e) {
             std::cerr << format("child error: %1%\n") % e.what();
         }
@@ -150,16 +150,16 @@ void RemoteStore::connectToDaemon()
        applications... */
     AutoCloseFD fdPrevDir = open(".", O_RDONLY);
     if (fdPrevDir == -1) throw SysError("couldn't open current directory");
-    chdir(dirOf(socketPath).c_str()); 
+    chdir(dirOf(socketPath).c_str());
     Path socketPathRel = "./" + baseNameOf(socketPath);
-    
+
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
     if (socketPathRel.size() >= sizeof(addr.sun_path))
         throw Error(format("socket path `%1%' is too long") % socketPathRel);
     using namespace std;
     strcpy(addr.sun_path, socketPathRel.c_str());
-    
+
     if (connect(fdSocket, (struct sockaddr *) &addr, sizeof(addr)) == -1)
         throw SysError(format("cannot connect to daemon at `%1%'") % socketPath);
 
@@ -199,9 +199,9 @@ void RemoteStore::setOptions()
     }
     if (GET_PROTOCOL_MINOR(daemonVersion) >= 6)
         writeInt(buildCores, to);
-    if (GET_PROTOCOL_MINOR(daemonVersion) >= 10) 
+    if (GET_PROTOCOL_MINOR(daemonVersion) >= 10)
         writeInt(queryBoolSetting("build-use-substitutes", true), to);
-    
+
     processStderr();
 }
 
@@ -270,11 +270,11 @@ void RemoteStore::querySubstitutablePathInfos(const PathSet & paths,
     if (paths.empty()) return;
 
     openConnection();
-    
+
     if (GET_PROTOCOL_MINOR(daemonVersion) < 3) return;
-    
+
     if (GET_PROTOCOL_MINOR(daemonVersion) < 12) {
-        
+
         foreach (PathSet::const_iterator, i, paths) {
             SubstitutablePathInfo info;
             writeInt(wopQuerySubstitutablePathInfo, to);
@@ -289,9 +289,9 @@ void RemoteStore::querySubstitutablePathInfos(const PathSet & paths,
             info.narSize = GET_PROTOCOL_MINOR(daemonVersion) >= 7 ? readLongLong(from) : 0;
             infos[*i] = info;
         }
-        
+
     } else {
-        
+
         writeInt(wopQuerySubstitutablePathInfos, to);
         writeStrings(paths, to);
         processStderr();
@@ -305,7 +305,7 @@ void RemoteStore::querySubstitutablePathInfos(const PathSet & paths,
             info.downloadSize = readLongLong(from);
             info.narSize = readLongLong(from);
         }
-        
+
     }
 }
 
@@ -411,7 +411,7 @@ Path RemoteStore::addToStore(const Path & _srcPath,
     bool recursive, HashType hashAlgo, PathFilter & filter)
 {
     openConnection();
-    
+
     Path srcPath(absPath(_srcPath));
 
     writeInt(wopAddToStore, to);
@@ -434,7 +434,7 @@ Path RemoteStore::addTextToStore(const string & name, const string & s,
     writeString(name, to);
     writeString(s, to);
     writeStrings(references, to);
-    
+
     processStderr();
     return readStorePath(from);
 }
@@ -531,7 +531,7 @@ Roots RemoteStore::findRoots()
 void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
     openConnection(false);
-    
+
     writeInt(wopCollectGarbage, to);
     writeInt(options.action, to);
     writeStrings(options.pathsToDelete, to);
@@ -543,9 +543,9 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
         writeInt(0, to);
         writeInt(0, to);
     }
-    
+
     processStderr();
-    
+
     results.paths = readStrings<PathSet>(from);
     results.bytesFreed = readLongLong(from);
     results.blocksFreed = readLongLong(from);

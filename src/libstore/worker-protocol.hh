@@ -63,5 +63,5 @@ typedef enum {
 Path readStorePath(Source & from);
 template<class T> T readStorePaths(Source & from);
 
-    
+
 }

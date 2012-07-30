@@ -46,7 +46,7 @@ Path makeRootName(const Path & gcRoot, int & counter)
 void printGCWarning()
 {
     static bool haveWarned = false;
-    warnOnce(haveWarned, 
+    warnOnce(haveWarned,
         "you did not specify `--add-root'; "
         "the result might be removed by the garbage collector");
 }
@@ -98,7 +98,7 @@ static bool showTrace = false;
 static void initAndRun(int argc, char * * argv)
 {
     setDefaultsFromEnvironment();
-    
+
     /* Catch SIGINT. */
     struct sigaction act;
     act.sa_handler = sigintHandler;
@@ -137,7 +137,7 @@ static void initAndRun(int argc, char * * argv)
     Strings args, remaining;
     while (argc--) args.push_back(*argv++);
     args.erase(args.begin());
-    
+
     /* Expand compound dash options (i.e., `-qlf' -> `-q -l -f'), and
        ignore options for the ATerm library. */
     for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
@@ -210,7 +210,7 @@ static void initAndRun(int argc, char * * argv)
 
     verbosityDelta += queryIntSetting("verbosity", lvlInfo);
     verbosity = (Verbosity) (verbosityDelta < 0 ? 0 : verbosityDelta);
-    
+
     run(remaining);
 
     /* Close the Nix database. */
@@ -228,7 +228,7 @@ static void setuidInit()
 
     uid_t nixUid = geteuid();
     gid_t nixGid = getegid();
-    
+
     setuidCleanup();
 
     /* Don't trust the current directory. */
@@ -294,7 +294,7 @@ int main(int argc, char * * argv)
        right away. */
     if (argc == 0) abort();
     setuidInit();
-    
+
     /* Turn on buffering for cerr. */
 #if HAVE_PUBSETBUF
     std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
@@ -323,7 +323,7 @@ int main(int argc, char * * argv)
             throw;
         }
     } catch (UsageError & e) {
-        printMsg(lvlError, 
+        printMsg(lvlError,
             format(
                 "error: %1%\n"
                 "Try `%2% --help' for more information.")
