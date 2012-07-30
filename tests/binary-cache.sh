@@ -16,9 +16,9 @@ nix-push --dest $cacheDir $outPath
 clearStore
 rm -f $NIX_STATE_DIR/binary-cache*
 
-NIX_BINARY_CACHES="file://$cacheDir" nix-env -f dependencies.nix -qas \* | grep -- "---"
+nix-env --option binary-caches "file://$cacheDir" -f dependencies.nix -qas \* | grep -- "---"
 
-NIX_BINARY_CACHES="file://$cacheDir" nix-store -r $outPath
+nix-store --option binary-caches "file://$cacheDir" -r $outPath
 
 
 # But with the right configuration, "nix-env -qas" should also work.
@@ -26,9 +26,9 @@ clearStore
 rm -f $NIX_STATE_DIR/binary-cache*
 echo "WantMassQuery: 1" >> $cacheDir/nix-cache-info
 
-NIX_BINARY_CACHES="file://$cacheDir" nix-env -f dependencies.nix -qas \* | grep -- "--S"
+nix-env --option binary-caches "file://$cacheDir" -f dependencies.nix -qas \* | grep -- "--S"
 
-NIX_BINARY_CACHES="file://$cacheDir" nix-store -r $outPath
+nix-store --option binary-caches "file://$cacheDir" -r $outPath
 
 nix-store --check-validity $outPath
 nix-store -qR $outPath | grep input-2
