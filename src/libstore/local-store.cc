@@ -6,7 +6,7 @@
 #include "worker-protocol.hh"
 #include "derivations.hh"
 #include "immutable.hh"
-    
+
 #include <iostream>
 #include <algorithm>
 
@@ -147,11 +147,11 @@ struct SQLiteStmtUse
 };
 
 
-struct SQLiteTxn 
+struct SQLiteTxn
 {
     bool active;
     sqlite3 * db;
-    
+
     SQLiteTxn(sqlite3 * db) : active(false) {
         this->db = db;
         if (sqlite3_exec(db, "begin;", 0, 0, 0) != SQLITE_OK)
@@ -159,14 +159,14 @@ struct SQLiteTxn
         active = true;
     }
 
-    void commit() 
+    void commit()
     {
         if (sqlite3_exec(db, "commit;", 0, 0, 0) != SQLITE_OK)
             throwSQLiteError(db, "committing transaction");
         active = false;
     }
-    
-    ~SQLiteTxn() 
+
+    ~SQLiteTxn()
     {
         try {
             if (active && sqlite3_exec(db, "rollback;", 0, 0, 0) != SQLITE_OK)
@@ -199,9 +199,9 @@ void checkStoreNotSymlink()
 LocalStore::LocalStore(bool reserveSpace)
 {
     substitutablePathsLoaded = false;
-    
+
     schemaPath = nixDBPath + "/schema";
-    
+
     if (readOnlyMode) {
         openDB(false);
         return;
@@ -220,7 +220,7 @@ LocalStore::LocalStore(bool reserveSpace)
         if (symlink(profilesDir.c_str(), (gcRootsDir + "/profiles").c_str()) == -1)
             throw SysError(format("creating symlink to `%1%'") % profilesDir);
     }
-  
+
     checkStoreNotSymlink();
 
     /* We can't open a SQLite database if the disk is full.  Since
@@ -252,7 +252,7 @@ LocalStore::LocalStore(bool reserveSpace)
         openDB(false);
         return;
     }
-    
+
     if (!lockFile(globalLock, ltRead, false)) {
         printMsg(lvlError, "waiting for the big Nix store lock...");
         lockFile(globalLock, ltRead, true);
@@ -264,20 +264,20 @@ LocalStore::LocalStore(bool reserveSpace)
     if (curSchema > nixSchemaVersion)
         throw Error(format("current Nix store schema is version %1%, but I only support %2%")
             % curSchema % nixSchemaVersion);
-    
+
     else if (curSchema == 0) { /* new store */
         curSchema = nixSchemaVersion;
         openDB(true);
         writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
     }
-    
+
     else if (curSchema < nixSchemaVersion) {
         if (curSchema < 5)
             throw Error(
                 "Your Nix store has a database in Berkeley DB format,\n"
                 "which is no longer supported. To convert to the new format,\n"
                 "please upgrade Nix to version 0.12 first.");
-        
+
         if (!lockFile(globalLock, ltWrite, false)) {
             printMsg(lvlError, "waiting for exclusive access to the Nix store...");
             lockFile(globalLock, ltWrite, true);
@@ -293,7 +293,7 @@ LocalStore::LocalStore(bool reserveSpace)
 
         lockFile(globalLock, ltRead, true);
     }
-    
+
     else openDB(false);
 }
 
@@ -339,7 +339,7 @@ void LocalStore::openDB(bool create)
 
     /* !!! check whether sqlite has been built with foreign key
        support */
-    
+
     /* Whether SQLite should fsync().  "Normal" synchronous mode
        should be safe enough.  If the user asks for it, don't sync at
        all.  This can cause database corruption if the system
@@ -368,7 +368,7 @@ void LocalStore::openDB(bool create)
        derivation is done in a single fsync(). */
     if (mode == "wal" && sqlite3_exec(db, "pragma wal_autocheckpoint = 8192;", 0, 0, 0) != SQLITE_OK)
         throwSQLiteError(db, "setting autocheckpoint interval");
-    
+
     /* Initialise the database schema, if necessary. */
     if (create) {
 #include "schema.sql.hh"
@@ -423,7 +423,7 @@ void canonicalisePathMetaData(const Path & path, bool recurse)
 
     struct stat st;
     if (lstat(path.c_str(), &st))
-	throw SysError(format("getting attributes of path `%1%'") % path);
+        throw SysError(format("getting attributes of path `%1%'") % path);
 
     /* Really make sure that the path is of a supported type.  This
        has already been checked in dumpPath(). */
@@ -451,7 +451,7 @@ void canonicalisePathMetaData(const Path & path, bool recurse)
 
         /* Mask out all type related bits. */
         mode_t mode = st.st_mode & ~S_IFMT;
-        
+
         if (mode != 0444 && mode != 0555) {
             mode = (st.st_mode & S_IFMT)
                  | 0444
@@ -461,7 +461,7 @@ void canonicalisePathMetaData(const Path & path, bool recurse)
         }
 
     }
-    
+
     if (st.st_mtime != mtimeStore) {
         struct timeval times[2];
         times[0].tv_sec = st.st_atime;
@@ -472,14 +472,14 @@ void canonicalisePathMetaData(const Path & path, bool recurse)
         if (lutimes(path.c_str(), times) == -1)
 #else
         if (!S_ISLNK(st.st_mode) && utimes(path.c_str(), times) == -1)
-#endif                
+#endif
             throw SysError(format("changing modification time of `%1%'") % path);
     }
 
     if (recurse && S_ISDIR(st.st_mode)) {
         Strings names = readDirectory(path);
-	foreach (Strings::iterator, i, names)
-	    canonicalisePathMetaData(path + "/" + *i, true);
+        foreach (Strings::iterator, i, names)
+            canonicalisePathMetaData(path + "/" + *i, true);
     }
 
     makeImmutable(path);
@@ -494,7 +494,7 @@ void canonicalisePathMetaData(const Path & path)
        be a symlink, since we can't change its ownership. */
     struct stat st;
     if (lstat(path.c_str(), &st))
-	throw SysError(format("getting attributes of path `%1%'") % path);
+        throw SysError(format("getting attributes of path `%1%'") % path);
 
     if (st.st_uid != geteuid()) {
         assert(S_ISLNK(st.st_mode));
@@ -508,7 +508,7 @@ void LocalStore::checkDerivationOutputs(const Path & drvPath, const Derivation &
     string drvName = storePathToName(drvPath);
     assert(isDerivation(drvName));
     drvName = string(drvName, 0, drvName.size() - drvExtension.size());
-        
+
     if (isFixedOutputDrv(drv)) {
         DerivationOutputs::const_iterator out = drv.outputs.find("out");
         if (out == drv.outputs.end())
@@ -532,7 +532,7 @@ void LocalStore::checkDerivationOutputs(const Path & drvPath, const Derivation &
         }
 
         Hash h = hashDerivationModulo(*this, drvCopy);
-        
+
         foreach (DerivationOutputs::const_iterator, i, drv.outputs) {
             Path outPath = makeOutputPath(i->first, h, drvName);
             StringPairs::const_iterator j = drv.env.find(i->first);
@@ -568,14 +568,14 @@ unsigned long long LocalStore::addValidPath(const ValidPathInfo & info, bool che
        derivation. */
     if (isDerivation(info.path)) {
         Derivation drv = parseDerivation(readFile(info.path));
-        
+
         /* Verify that the output paths in the derivation are correct
            (i.e., follow the scheme for computing output paths from
            derivations).  Note that if this throws an error, then the
            DB transaction is rolled back, so the path validity
            registration above is undone. */
         if (checkOutputs) checkDerivationOutputs(info.path, drv);
-        
+
         foreach (DerivationOutputs::iterator, i, drv.outputs) {
             SQLiteStmtUse use(stmtAddDerivationOutput);
             stmtAddDerivationOutput.bind(id);
@@ -681,7 +681,7 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path)
     SQLiteStmtUse use1(stmtQueryPathInfo);
 
     stmtQueryPathInfo.bind(path);
-    
+
     int r = sqlite3_step(stmtQueryPathInfo);
     if (r == SQLITE_DONE) throw Error(format("path `%1%' is not valid") % path);
     if (r != SQLITE_ROW) throwSQLiteError(db, "querying path in database");
@@ -691,7 +691,7 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path)
     const char * s = (const char *) sqlite3_column_text(stmtQueryPathInfo, 1);
     assert(s);
     info.hash = parseHashField(path, s);
-    
+
     info.registrationTime = sqlite3_column_int(stmtQueryPathInfo, 2);
 
     s = (const char *) sqlite3_column_text(stmtQueryPathInfo, 3);
@@ -769,9 +769,9 @@ PathSet LocalStore::queryAllValidPaths()
 {
     SQLiteStmt stmt;
     stmt.create(db, "select path from ValidPaths");
-    
+
     PathSet res;
-    
+
     int r;
     while ((r = sqlite3_step(stmt)) == SQLITE_ROW) {
         const char * s = (const char *) sqlite3_column_text(stmt, 0);
@@ -834,10 +834,10 @@ PathSet LocalStore::queryValidDerivers(const Path & path)
         assert(s);
         derivers.insert(s);
     }
-    
+
     if (r != SQLITE_DONE)
         throwSQLiteError(db, format("error getting valid derivers of `%1%'") % path);
-    
+
     return derivers;
 }
 
@@ -845,10 +845,10 @@ PathSet LocalStore::queryValidDerivers(const Path & path)
 PathSet LocalStore::queryDerivationOutputs(const Path & path)
 {
     SQLiteTxn txn(db);
-    
+
     SQLiteStmtUse use(stmtQueryDerivationOutputs);
     stmtQueryDerivationOutputs.bind(queryValidPathId(path));
-    
+
     PathSet outputs;
     int r;
     while ((r = sqlite3_step(stmtQueryDerivationOutputs)) == SQLITE_ROW) {
@@ -856,7 +856,7 @@ PathSet LocalStore::queryDerivationOutputs(const Path & path)
         assert(s);
         outputs.insert(s);
     }
-    
+
     if (r != SQLITE_DONE)
         throwSQLiteError(db, format("error getting outputs of `%1%'") % path);
 
@@ -867,10 +867,10 @@ PathSet LocalStore::queryDerivationOutputs(const Path & path)
 StringSet LocalStore::queryDerivationOutputNames(const Path & path)
 {
     SQLiteTxn txn(db);
-    
+
     SQLiteStmtUse use(stmtQueryDerivationOutputs);
     stmtQueryDerivationOutputs.bind(queryValidPathId(path));
-    
+
     StringSet outputNames;
     int r;
     while ((r = sqlite3_step(stmtQueryDerivationOutputs)) == SQLITE_ROW) {
@@ -878,7 +878,7 @@ StringSet LocalStore::queryDerivationOutputNames(const Path & path)
         assert(s);
         outputNames.insert(s);
     }
-    
+
     if (r != SQLITE_DONE)
         throwSQLiteError(db, format("error getting output names of `%1%'") % path);
 
@@ -889,11 +889,11 @@ StringSet LocalStore::queryDerivationOutputNames(const Path & path)
 Path LocalStore::queryPathFromHashPart(const string & hashPart)
 {
     if (hashPart.size() != 32) throw Error("invalid hash part");
-    
+
     SQLiteTxn txn(db);
 
     Path prefix = nixStore + "/" + hashPart;
-    
+
     SQLiteStmtUse use(stmtQueryPathFromHashPart);
     stmtQueryPathFromHashPart.bind(prefix);
 
@@ -909,16 +909,16 @@ Path LocalStore::queryPathFromHashPart(const string & hashPart)
 void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter & run)
 {
     if (run.pid != -1) return;
-    
+
     debug(format("starting substituter program `%1%'") % substituter);
 
     Pipe toPipe, fromPipe;
-            
+
     toPipe.create();
     fromPipe.create();
 
     run.pid = fork();
-            
+
     switch (run.pid) {
 
     case -1:
@@ -932,7 +932,7 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
                library named libutil.  As a result, substituters
                written in Perl (i.e. all of them) fail. */
             unsetenv("DYLD_LIBRARY_PATH");
-            
+
             fromPipe.readSide.close();
             toPipe.writeSide.close();
             if (dup2(toPipe.readSide, STDIN_FILENO) == -1)
@@ -949,7 +949,7 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
     }
 
     /* Parent. */
-    
+
     run.to = toPipe.writeSide.borrow();
     run.from = fromPipe.readSide.borrow();
 }
@@ -1054,7 +1054,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         try {
             SQLiteTxn txn(db);
             PathSet paths;
-    
+
             foreach (ValidPathInfos::const_iterator, i, infos) {
                 assert(i->hash.type == htSHA256);
                 /* !!! Maybe the registration info should be updated if the
@@ -1145,7 +1145,7 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
                 hash = hashPath(htSHA256, dstPath);
 
             optimisePath(dstPath); // FIXME: combine with hashPath()
-            
+
             ValidPathInfo info;
             info.path = dstPath;
             info.hash = hash.first;
@@ -1183,7 +1183,7 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
     const PathSet & references)
 {
     Path dstPath = computeStorePathForText(name, s, references);
-    
+
     addTempRoot(dstPath);
 
     if (!isValidPath(dstPath)) {
@@ -1201,7 +1201,7 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
             HashResult hash = hashPath(htSHA256, dstPath);
 
             optimisePath(dstPath);
-            
+
             ValidPathInfo info;
             info.path = dstPath;
             info.hash = hash.first;
@@ -1259,7 +1259,7 @@ void LocalStore::exportPath(const Path & path, bool sign,
         throw Error(format("path `%1%' is not valid") % path);
 
     HashAndWriteSink hashAndWriteSink(sink);
-    
+
     dumpPath(path, hashAndWriteSink);
 
     /* Refuse to export paths that have changed.  This prevents
@@ -1274,7 +1274,7 @@ void LocalStore::exportPath(const Path & path, bool sign,
     writeInt(EXPORT_MAGIC, hashAndWriteSink);
 
     writeString(path, hashAndWriteSink);
-    
+
     PathSet references;
     queryReferences(path, references);
     writeStrings(references, hashAndWriteSink);
@@ -1284,9 +1284,9 @@ void LocalStore::exportPath(const Path & path, bool sign,
 
     if (sign) {
         Hash hash = hashAndWriteSink.currentHash();
- 
+
         writeInt(1, hashAndWriteSink);
-        
+
         Path tmpDir = createTempDir();
         AutoDelete delTmp(tmpDir);
         Path hashFile = tmpDir + "/hash";
@@ -1305,7 +1305,7 @@ void LocalStore::exportPath(const Path & path, bool sign,
         string signature = runProgram(OPENSSL_PATH, true, args);
 
         writeString(signature, hashAndWriteSink);
-        
+
     } else
         writeInt(0, hashAndWriteSink);
 }
@@ -1348,7 +1348,7 @@ Path LocalStore::createTempDirInStore()
 Path LocalStore::importPath(bool requireSignature, Source & source)
 {
     HashAndReadSource hashAndReadSource(source);
-    
+
     /* We don't yet know what store path this archive contains (the
        store path follows the archive data proper), and besides, we
        don't know yet whether the signature is valid. */
@@ -1378,7 +1378,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 
     if (requireSignature && !haveSignature)
         throw Error(format("imported archive of `%1%' lacks a signature") % dstPath);
-    
+
     if (haveSignature) {
         string signature = readString(hashAndReadSource);
 
@@ -1432,13 +1432,13 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
                     % unpacked % dstPath);
 
             canonicalisePathMetaData(dstPath);
-            
+
             /* !!! if we were clever, we could prevent the hashPath()
                here. */
             HashResult hash = hashPath(htSHA256, dstPath);
 
             optimisePath(dstPath); // FIXME: combine with hashPath()
-            
+
             ValidPathInfo info;
             info.path = dstPath;
             info.hash = hash.first;
@@ -1447,10 +1447,10 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
             info.deriver = deriver != "" && isValidPath(deriver) ? deriver : "";
             registerValidPath(info);
         }
-        
+
         outputLock.setDeletion(true);
     }
-    
+
     return dstPath;
 }
 
@@ -1498,7 +1498,7 @@ void LocalStore::verifyStore(bool checkContents)
 
     /* Acquire the global GC lock to prevent a garbage collection. */
     AutoCloseFD fdGCLock = openGCLock(ltWrite);
-    
+
     Paths entries = readDirectory(nixStore);
     PathSet store(entries.begin(), entries.end());
 
@@ -1527,7 +1527,7 @@ void LocalStore::verifyStore(bool checkContents)
                 /* Check the content hash (optionally - slow). */
                 printMsg(lvlTalkative, format("checking contents of `%1%'") % *i);
                 HashResult current = hashPath(info.hash.type, *i);
-                
+
                 if (info.hash != nullHash && info.hash != current.first) {
                     printMsg(lvlError, format("path `%1%' was modified! "
                             "expected hash `%2%', got `%3%'")
@@ -1542,18 +1542,18 @@ void LocalStore::verifyStore(bool checkContents)
                         info.hash = current.first;
                         update = true;
                     }
-                    
+
                     /* Fill in missing narSize fields (from old stores). */
                     if (info.narSize == 0) {
                         printMsg(lvlError, format("updating size field on `%1%' to %2%") % *i % current.second);
                         info.narSize = current.second;
-                        update = true;                        
+                        update = true;
                     }
 
                     if (update) updatePathInfo(info);
 
                 }
-            
+
             } catch (Error & e) {
                 /* It's possible that the path got GC'ed, so ignore
                    errors on invalid paths. */
@@ -1569,7 +1569,7 @@ void LocalStore::verifyPath(const Path & path, const PathSet & store,
     PathSet & done, PathSet & validPaths)
 {
     checkInterrupt();
-    
+
     if (done.find(path) != done.end()) return;
     done.insert(path);
 
@@ -1596,10 +1596,10 @@ void LocalStore::verifyPath(const Path & path, const PathSet & store,
             invalidatePath(path);
         } else
             printMsg(lvlError, format("path `%1%' disappeared, but it still has valid referrers!") % path);
-        
+
         return;
     }
-    
+
     validPaths.insert(path);
 }
 
@@ -1665,14 +1665,14 @@ void LocalStore::upgradeStore6()
     PathSet validPaths = queryValidPathsOld();
 
     SQLiteTxn txn(db);
-    
+
     foreach (PathSet::iterator, i, validPaths) {
         addValidPath(queryPathInfoOld(*i), false);
         std::cerr << ".";
     }
 
     std::cerr << "|";
-    
+
     foreach (PathSet::iterator, i, validPaths) {
         ValidPathInfo info = queryPathInfoOld(*i);
         unsigned long long referrer = queryValidPathId(*i);
