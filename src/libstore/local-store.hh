@@ -80,9 +80,6 @@ struct SQLiteStmt
 class LocalStore : public StoreAPI
 {
 private:
-    bool substitutablePathsLoaded;
-    PathSet substitutablePaths;
-
     typedef std::map<Path, RunningSubstituter> RunningSubstituters;
     RunningSubstituters runningSubstituters;
 

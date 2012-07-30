@@ -198,8 +198,6 @@ void checkStoreNotSymlink()
 
 LocalStore::LocalStore(bool reserveSpace)
 {
-    substitutablePathsLoaded = false;
-
     schemaPath = nixDBPath + "/schema";
 
     if (readOnlyMode) {
