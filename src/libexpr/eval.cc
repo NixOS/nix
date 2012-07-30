@@ -179,7 +179,7 @@ EvalState::EvalState()
     searchPathInsertionPoint = searchPath.end();
     Strings paths = tokenizeString(getEnv("NIX_PATH", ""), ":");
     foreach (Strings::iterator, i, paths) addToSearchPath(*i);
-    addToSearchPath("nix=" + nixDataDir + "/nix/corepkgs");
+    addToSearchPath("nix=" + settings.nixDataDir + "/nix/corepkgs");
     searchPathInsertionPoint = searchPath.begin();
 
     createBaseEnv();
@@ -1058,7 +1058,7 @@ string EvalState::coerceToString(Value & v, PathSet & context,
         if (srcToStore[path] != "")
             dstPath = srcToStore[path];
         else {
-            dstPath = readOnlyMode
+            dstPath = settings.readOnlyMode
                 ? computeStorePathForPath(path).first
                 : store->addToStore(path);
             srcToStore[path] = dstPath;

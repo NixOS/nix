@@ -47,7 +47,7 @@ LocalStore & ensureLocalStore()
 
 
 static Path useDeriver(Path path)
-{       
+{
     if (!isDerivation(path)) {
         path = store->queryDeriver(path);
         if (path == "")
@@ -89,18 +89,18 @@ static PathSet realisePath(const Path & path)
 static void opRealise(Strings opFlags, Strings opArgs)
 {
     bool dryRun = false;
-    
+
     foreach (Strings::iterator, i, opFlags)
         if (*i == "--dry-run") dryRun = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
     foreach (Strings::iterator, i, opArgs)
         *i = followLinksToStorePath(*i);
-            
+
     printMissing(*store, PathSet(opArgs.begin(), opArgs.end()));
-    
+
     if (dryRun) return;
-    
+
     /* Build all paths at the same time to exploit parallelism. */
     PathSet paths(opArgs.begin(), opArgs.end());
     store->buildPaths(paths);
@@ -128,7 +128,7 @@ static void opAdd(Strings opFlags, Strings opArgs)
 static void opAddFixed(Strings opFlags, Strings opArgs)
 {
     bool recursive = false;
-    
+
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
         if (*i == "--recursive") recursive = true;
@@ -136,7 +136,7 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
 
     if (opArgs.empty())
         throw UsageError("first argument must be hash algorithm");
-    
+
     HashType hashAlgo = parseHashType(opArgs.front());
     opArgs.pop_front();
 
@@ -149,7 +149,7 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
 static void opPrintFixedPath(Strings opFlags, Strings opArgs)
 {
     bool recursive = false;
-    
+
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
         if (*i == "--recursive") recursive = true;
@@ -157,7 +157,7 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
 
     if (opArgs.size() != 3)
         throw UsageError(format("`--print-fixed-path' requires three arguments"));
-    
+
     Strings::iterator i = opArgs.begin();
     HashType hashAlgo = parseHashType(*i++);
     string hash = *i++;
@@ -205,12 +205,12 @@ static void printTree(const Path & path,
 
     PathSet references;
     store->queryReferences(path, references);
-    
-#if 0     
+
+#if 0
     for (PathSet::iterator i = drv.inputSrcs.begin();
          i != drv.inputSrcs.end(); ++i)
         cout << format("%1%%2%\n") % (tailPad + treeConn) % *i;
-#endif    
+#endif
 
     /* Topologically sort under the relation A < B iff A \in
        closure(B).  That is, if derivation A is an (possibly indirect)
@@ -266,7 +266,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
     switch (query) {
-        
+
         case qOutputs: {
             foreach (Strings::iterator, i, opArgs) {
                 *i = followLinksToStorePath(*i);
@@ -293,7 +293,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 }
             }
             Paths sorted = topoSortPaths(*store, paths);
-            for (Paths::reverse_iterator i = sorted.rbegin(); 
+            for (Paths::reverse_iterator i = sorted.rbegin();
                  i != sorted.rend(); ++i)
                 cout << format("%s\n") % *i;
             break;
@@ -328,7 +328,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                     if (query == qHash) {
                         assert(info.hash.type == htSHA256);
                         cout << format("sha256:%1%\n") % printHash32(info.hash);
-                    } else if (query == qSize) 
+                    } else if (query == qSize)
                         cout << format("%1%\n") % info.narSize;
                 }
             }
@@ -340,7 +340,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 printTree(followLinksToStorePath(*i), "", "", done);
             break;
         }
-            
+
         case qGraph: {
             PathSet roots;
             foreach (Strings::iterator, i, opArgs) {
@@ -366,7 +366,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 cout << format("%1%\n") % followLinksToStorePath(*i);
             break;
         }
-            
+
         case qRoots: {
             PathSet referrers;
             foreach (Strings::iterator, i, opArgs) {
@@ -380,7 +380,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                     cout << format("%1%\n") % i->first;
             break;
         }
-            
+
         default:
             abort();
     }
@@ -426,9 +426,9 @@ static void opReadLog(Strings opFlags, Strings opArgs)
 
     foreach (Strings::iterator, i, opArgs) {
         Path path = useDeriver(followLinksToStorePath(*i));
-        
+
         Path logPath = (format("%1%/%2%/%3%") %
-            nixLogDir % drvsLogDir % baseNameOf(path)).str();
+            settings.nixLogDir % drvsLogDir % baseNameOf(path)).str();
         Path logBz2Path = logPath + ".bz2";
 
         if (pathExists(logPath)) {
@@ -454,7 +454,7 @@ static void opReadLog(Strings opFlags, Strings opArgs)
             } while (err != BZ_STREAM_END);
             BZ2_bzReadClose(&err, bz);
         }
-        
+
         else throw Error(format("build log of derivation `%1%' is not available") % path);
     }
 }
@@ -474,7 +474,7 @@ static void opDumpDB(Strings opFlags, Strings opArgs)
 static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
 {
     ValidPathInfos infos;
-    
+
     while (1) {
         ValidPathInfo info = decodeValidPathInfo(cin, hashGiven);
         if (info.path == "") break;
@@ -508,7 +508,7 @@ static void opRegisterValidity(Strings opFlags, Strings opArgs)
 {
     bool reregister = false; // !!! maybe this should be the default
     bool hashGiven = false;
-        
+
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
         if (*i == "--reregister") reregister = true;
@@ -524,7 +524,7 @@ static void opRegisterValidity(Strings opFlags, Strings opArgs)
 static void opCheckValidity(Strings opFlags, Strings opArgs)
 {
     bool printInvalid = false;
-    
+
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
         if (*i == "--print-invalid") printInvalid = true;
@@ -551,13 +551,13 @@ static string showBytes(unsigned long long bytes, unsigned long long blocks)
 }
 
 
-struct PrintFreed 
+struct PrintFreed
 {
     bool show;
     const GCResults & results;
     PrintFreed(bool show, const GCResults & results)
         : show(show), results(results) { }
-    ~PrintFreed() 
+    ~PrintFreed()
     {
         if (show)
             cout << format("%1% store paths deleted, %2% freed\n")
@@ -572,9 +572,9 @@ static void opGC(Strings opFlags, Strings opArgs)
     bool printRoots = false;
     GCOptions options;
     options.action = GCOptions::gcDeleteDead;
-    
+
     GCResults results;
-    
+
     /* Do what? */
     foreach (Strings::iterator, i, opFlags)
         if (*i == "--print-roots") printRoots = true;
@@ -613,14 +613,14 @@ static void opDelete(Strings opFlags, Strings opArgs)
 {
     GCOptions options;
     options.action = GCOptions::gcDeleteSpecific;
-    
+
     foreach (Strings::iterator, i, opFlags)
         if (*i == "--ignore-liveness") options.ignoreLiveness = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
     foreach (Strings::iterator, i, opArgs)
         options.pathsToDelete.insert(followLinksToStorePath(*i));
-    
+
     GCResults results;
     PrintFreed freed(true, results);
     store->collectGarbage(options, results);
@@ -671,9 +671,9 @@ static void opImport(Strings opFlags, Strings opArgs)
     foreach (Strings::iterator, i, opFlags)
         if (*i == "--require-signature") requireSignature = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
-    
+
     if (!opArgs.empty()) throw UsageError("no arguments expected");
-    
+
     FdSource source(STDIN_FILENO);
     Paths paths = store->importPaths(requireSignature, source);
 
@@ -700,12 +700,12 @@ static void opVerify(Strings opFlags, Strings opArgs)
         throw UsageError("no arguments expected");
 
     bool checkContents = false;
-    
+
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
         if (*i == "--check-contents") checkContents = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
-    
+
     ensureLocalStore().verifyStore(checkContents);
 }
 
@@ -844,7 +844,7 @@ void run(Strings args)
         }
         else if (arg == "--indirect")
             indirectRoot = true;
-        else if (arg[0] == '-') {            
+        else if (arg[0] == '-') {
             opFlags.push_back(arg);
             if (arg == "--max-freed" || arg == "--max-links" || arg == "--max-atime") { /* !!! hack */
                 if (i != args.end()) opFlags.push_back(*i++);

@@ -34,10 +34,10 @@ static const int defaultGcLevel = 1000;
 int LocalStore::openGCLock(LockType lockType)
 {
     Path fnGCLock = (format("%1%/%2%")
-        % nixStateDir % gcLockName).str();
-         
+        % settings.nixStateDir % gcLockName).str();
+
     debug(format("acquiring global GC lock `%1%'") % fnGCLock);
-    
+
     AutoCloseFD fdGCLock = open(fnGCLock.c_str(), O_RDWR | O_CREAT, 0600);
     if (fdGCLock == -1)
         throw SysError(format("opening global GC lock `%1%'") % fnGCLock);
@@ -51,7 +51,7 @@ int LocalStore::openGCLock(LockType lockType)
     /* !!! Restrict read permission on the GC root.  Otherwise any
        process that can open the file for reading can DoS the
        collector. */
-    
+
     return fdGCLock.borrow();
 }
 
@@ -85,7 +85,7 @@ void LocalStore::addIndirectRoot(const Path & path)
 {
     string hash = printHash32(hashString(htSHA1, path));
     Path realRoot = canonPath((format("%1%/%2%/auto/%3%")
-        % nixStateDir % gcRootsDir % hash).str());
+        % settings.nixStateDir % gcRootsDir % hash).str());
     createSymlink(realRoot, path);
 }
 
@@ -113,15 +113,15 @@ Path addPermRoot(StoreAPI & store, const Path & _storePath,
 
     else {
         if (!allowOutsideRootsDir) {
-            Path rootsDir = canonPath((format("%1%/%2%") % nixStateDir % gcRootsDir).str());
-    
+            Path rootsDir = canonPath((format("%1%/%2%") % settings.nixStateDir % gcRootsDir).str());
+
             if (string(gcRoot, 0, rootsDir.size() + 1) != rootsDir + "/")
                 throw Error(format(
                     "path `%1%' is not a valid garbage collector root; "
                     "it's not in the directory `%2%'")
                     % gcRoot % rootsDir);
         }
-            
+
         createSymlink(gcRoot, storePath);
     }
 
@@ -130,10 +130,10 @@ Path addPermRoot(StoreAPI & store, const Path & _storePath,
        Instead of reading all the roots, it would be more efficient to
        check if the root is in a directory in or linked from the
        gcroots directory. */
-    if (queryBoolSetting("gc-check-reachability", false)) {
+    if (settings.checkRootReachability) {
         Roots roots = store.findRoots();
         if (roots.find(gcRoot) == roots.end())
-            printMsg(lvlError, 
+            printMsg(lvlError,
                 format(
                     "warning: `%1%' is not in a directory where the garbage collector looks for roots; "
                     "therefore, `%2%' might be removed by the garbage collector")
@@ -144,7 +144,7 @@ Path addPermRoot(StoreAPI & store, const Path & _storePath,
        progress.  This prevents the set of permanent roots from
        increasing while a GC is in progress. */
     store.syncWithGC();
-    
+
     return gcRoot;
 }
 
@@ -160,23 +160,23 @@ void LocalStore::addTempRoot(const Path & path)
     if (fdTempRoots == -1) {
 
         while (1) {
-            Path dir = (format("%1%/%2%") % nixStateDir % tempRootsDir).str();
+            Path dir = (format("%1%/%2%") % settings.nixStateDir % tempRootsDir).str();
             createDirs(dir);
-            
+
             fnTempRoots = (format("%1%/%2%")
                 % dir % getpid()).str();
 
             AutoCloseFD fdGCLock = openGCLock(ltRead);
-            
+
             if (pathExists(fnTempRoots))
                 /* It *must* be stale, since there can be no two
                    processes with the same pid. */
                 unlink(fnTempRoots.c_str());
 
-	    fdTempRoots = openLockFile(fnTempRoots, true);
+            fdTempRoots = openLockFile(fnTempRoots, true);
 
             fdGCLock.close();
-      
+
             debug(format("acquiring read lock on `%1%'") % fnTempRoots);
             lockFile(fdTempRoots, ltRead, true);
 
@@ -186,7 +186,7 @@ void LocalStore::addTempRoot(const Path & path)
             if (fstat(fdTempRoots, &st) == -1)
                 throw SysError(format("statting `%1%'") % fnTempRoots);
             if (st.st_size == 0) break;
-            
+
             /* The garbage collector deleted this file before we could
                get a lock.  (It won't delete the file after we get a
                lock.)  Try again. */
@@ -218,7 +218,7 @@ void removeTempRoots()
 
 
 /* Automatically clean up the temporary roots file when we exit. */
-struct RemoveTempRoots 
+struct RemoveTempRoots
 {
     ~RemoveTempRoots()
     {
@@ -238,10 +238,10 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
     /* Read the `temproots' directory for per-process temporary root
        files. */
     Strings tempRootFiles = readDirectory(
-        (format("%1%/%2%") % nixStateDir % tempRootsDir).str());
+        (format("%1%/%2%") % settings.nixStateDir % tempRootsDir).str());
 
     foreach (Strings::iterator, i, tempRootFiles) {
-        Path path = (format("%1%/%2%/%3%") % nixStateDir % tempRootsDir % *i).str();
+        Path path = (format("%1%/%2%/%3%") % settings.nixStateDir % tempRootsDir % *i).str();
 
         debug(format("reading temporary root file `%1%'") % path);
         FDPtr fd(new AutoCloseFD(open(path.c_str(), O_RDWR, 0666)));
@@ -295,7 +295,7 @@ static void findRoots(StoreAPI & store, const Path & path,
     bool recurseSymlinks, bool deleteStale, Roots & roots)
 {
     try {
-        
+
         struct stat st;
         if (lstat(path.c_str(), &st) == -1)
             throw SysError(format("statting `%1%'") % path);
@@ -315,7 +315,7 @@ static void findRoots(StoreAPI & store, const Path & path,
                 debug(format("found root `%1%' in `%2%'")
                     % target % path);
                 Path storePath = toStorePath(target);
-                if (store.isValidPath(storePath)) 
+                if (store.isValidPath(storePath))
                     roots[path] = storePath;
                 else
                     printMsg(lvlInfo, format("skipping invalid root from `%1%' to `%2%'")
@@ -350,7 +350,7 @@ static void findRoots(StoreAPI & store, const Path & path,
 static Roots findRoots(StoreAPI & store, bool deleteStale)
 {
     Roots roots;
-    Path rootsDir = canonPath((format("%1%/%2%") % nixStateDir % gcRootsDir).str());
+    Path rootsDir = canonPath((format("%1%/%2%") % settings.nixStateDir % gcRootsDir).str());
     findRoots(store, rootsDir, true, deleteStale, roots);
     return roots;
 }
@@ -365,16 +365,16 @@ Roots LocalStore::findRoots()
 static void addAdditionalRoots(StoreAPI & store, PathSet & roots)
 {
     Path rootFinder = getEnv("NIX_ROOT_FINDER",
-        nixLibexecDir + "/nix/find-runtime-roots.pl");
+        settings.nixLibexecDir + "/nix/find-runtime-roots.pl");
 
     if (rootFinder.empty()) return;
-    
+
     debug(format("executing `%1%' to find additional roots") % rootFinder);
 
     string result = runProgram(rootFinder);
 
     Strings paths = tokenizeString(result, "\n");
-    
+
     foreach (Strings::iterator, i, paths) {
         if (isInStore(*i)) {
             Path path = toStorePath(*i);
@@ -557,7 +557,7 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
 
     } else
         printMsg(lvlTalkative, format("would delete `%1%'") % path);
-    
+
     state.deleted.insert(path);
     if (state.options.action != GCOptions::gcReturnLive)
         state.results.paths.insert(path);
@@ -605,10 +605,10 @@ void LocalStore::removeUnusedLinks()
 void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
     GCState state(results);
-    state.options = options;    
-    
-    state.gcKeepOutputs = queryBoolSetting("gc-keep-outputs", false);
-    state.gcKeepDerivations = queryBoolSetting("gc-keep-derivations", true);
+    state.options = options;
+
+    state.gcKeepOutputs = settings.gcKeepOutputs;
+    state.gcKeepDerivations = settings.gcKeepDerivations;
 
     /* Using `--ignore-liveness' with `--delete' can have unintended
        consequences if `gc-keep-outputs' or `gc-keep-derivations' are
@@ -618,7 +618,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         state.gcKeepOutputs = false;
         state.gcKeepDerivations = false;
     }
-    
+
     /* Acquire the global GC root.  This prevents
        a) New roots from being added.
        b) Processes from creating new temporary root files. */
@@ -659,18 +659,18 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             if (!tryToDelete(state, *i))
                 throw Error(format("cannot delete path `%1%' since it is still alive") % *i);
         }
-        
+
     } else {
-        
+
         if (shouldDelete(state.options.action))
             printMsg(lvlError, format("deleting garbage..."));
         else
             printMsg(lvlError, format("determining live/dead paths..."));
-    
+
         try {
 
-            AutoCloseDir dir = opendir(nixStore.c_str());
-            if (!dir) throw SysError(format("opening directory `%1%'") % nixStore);
+            AutoCloseDir dir = opendir(settings.nixStore.c_str());
+            if (!dir) throw SysError(format("opening directory `%1%'") % settings.nixStore);
 
             /* Read the store and immediately delete all paths that
                aren't valid.  When using --max-freed etc., deleting
@@ -684,14 +684,14 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 checkInterrupt();
                 string name = dirent->d_name;
                 if (name == "." || name == "..") continue;
-                Path path = nixStore + "/" + name;
+                Path path = settings.nixStore + "/" + name;
                 if (isValidPath(path))
                     entries.push_back(path);
                 else
                     tryToDelete(state, path);
             }
 
-	    dir.close();
+            dir.close();
 
             /* Now delete the unreachable valid paths.  Randomise the
                order in which we delete entries to make the collector

@@ -74,7 +74,7 @@ void printMissing(StoreAPI & store, const PathSet & paths)
 
     if (!unknown.empty()) {
         printMsg(lvlInfo, format("don't know how to build these paths%1%:")
-            % (readOnlyMode ? " (may be caused by read-only store access)" : ""));
+            % (settings.readOnlyMode ? " (may be caused by read-only store access)" : ""));
         foreach (PathSet::iterator, i, unknown)
             printMsg(lvlInfo, format("  %1%") % *i);
     }
@@ -93,11 +93,20 @@ static void setLogType(string lt)
 static bool showTrace = false;
 
 
+string getArg(const string & opt,
+    Strings::iterator & i, const Strings::iterator & end)
+{
+    ++i;
+    if (i == end) throw UsageError(format("`%1%' requires an argument") % opt);
+    return *i;
+}
+
 /* Initialize and reorder arguments, then call the actual argument
    processor. */
 static void initAndRun(int argc, char * * argv)
 {
-    setDefaultsFromEnvironment();
+    settings.processEnvironment();
+    settings.loadConfFile();
 
     /* Catch SIGINT. */
     struct sigaction act;
@@ -156,20 +165,19 @@ static void initAndRun(int argc, char * * argv)
     remaining.clear();
 
     /* Process default options. */
-    int verbosityDelta = 0;
+    int verbosityDelta = lvlInfo;
     for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
         string arg = *i;
         if (arg == "--verbose" || arg == "-v") verbosityDelta++;
         else if (arg == "--quiet") verbosityDelta--;
         else if (arg == "--log-type") {
-            ++i;
-            if (i == args.end()) throw UsageError("`--log-type' requires an argument");
-            setLogType(*i);
+            string s = getArg(arg, i, args.end());
+            setLogType(s);
         }
         else if (arg == "--no-build-output" || arg == "-Q")
-            buildVerbosity = lvlVomit;
+            settings.buildVerbosity = lvlVomit;
         else if (arg == "--print-build-trace")
-            printBuildTrace = true;
+            settings.printBuildTrace = true;
         else if (arg == "--help") {
             printHelp();
             return;
@@ -179,23 +187,23 @@ static void initAndRun(int argc, char * * argv)
             return;
         }
         else if (arg == "--keep-failed" || arg == "-K")
-            keepFailed = true;
+            settings.keepFailed = true;
         else if (arg == "--keep-going" || arg == "-k")
-            keepGoing = true;
+            settings.keepGoing = true;
         else if (arg == "--fallback")
-            tryFallback = true;
+            settings.tryFallback = true;
         else if (arg == "--max-jobs" || arg == "-j")
-            maxBuildJobs = getIntArg<unsigned int>(arg, i, args.end());
+            settings.set("build-max-jobs", getArg(arg, i, args.end()));
         else if (arg == "--cores")
-            buildCores = getIntArg<unsigned int>(arg, i, args.end());
+            settings.set("build-cores", getArg(arg, i, args.end()));
         else if (arg == "--readonly-mode")
-            readOnlyMode = true;
+            settings.readOnlyMode = true;
         else if (arg == "--max-silent-time")
-            maxSilentTime = getIntArg<unsigned int>(arg, i, args.end());
+            settings.set("build-max-silent-time", getArg(arg, i, args.end()));
         else if (arg == "--timeout")
-            buildTimeout = getIntArg<unsigned int>(arg, i, args.end());
+            settings.set("build-timeout", getArg(arg, i, args.end()));
         else if (arg == "--no-build-hook")
-            useBuildHook = false;
+            settings.useBuildHook = false;
         else if (arg == "--show-trace")
             showTrace = true;
         else if (arg == "--option") {
@@ -203,13 +211,14 @@ static void initAndRun(int argc, char * * argv)
             string name = *i;
             ++i; if (i == args.end()) throw UsageError("`--option' requires two arguments");
             string value = *i;
-            overrideSetting(name, tokenizeString(value));
+            settings.set(name, value);
         }
         else remaining.push_back(arg);
     }
 
-    verbosityDelta += queryIntSetting("verbosity", lvlInfo);
     verbosity = (Verbosity) (verbosityDelta < 0 ? 0 : verbosityDelta);
+
+    settings.update();
 
     run(remaining);
 

@@ -181,7 +181,7 @@ struct SQLiteTxn
 void checkStoreNotSymlink()
 {
     if (getEnv("NIX_IGNORE_SYMLINK_STORE") == "1") return;
-    Path path = nixStore;
+    Path path = settings.nixStore;
     struct stat st;
     while (path != "/") {
         if (lstat(path.c_str(), &st))
@@ -198,21 +198,21 @@ void checkStoreNotSymlink()
 
 LocalStore::LocalStore(bool reserveSpace)
 {
-    schemaPath = nixDBPath + "/schema";
+    schemaPath = settings.nixDBPath + "/schema";
 
-    if (readOnlyMode) {
+    if (settings.readOnlyMode) {
         openDB(false);
         return;
     }
 
     /* Create missing state directories if they don't already exist. */
-    createDirs(nixStore);
-    createDirs(linksDir = nixStore + "/.links");
-    Path profilesDir = nixStateDir + "/profiles";
-    createDirs(nixStateDir + "/profiles");
-    createDirs(nixStateDir + "/temproots");
-    createDirs(nixDBPath);
-    Path gcRootsDir = nixStateDir + "/gcroots";
+    createDirs(settings.nixStore);
+    createDirs(linksDir = settings.nixStore + "/.links");
+    Path profilesDir = settings.nixStateDir + "/profiles";
+    createDirs(settings.nixStateDir + "/profiles");
+    createDirs(settings.nixStateDir + "/temproots");
+    createDirs(settings.nixDBPath);
+    Path gcRootsDir = settings.nixStateDir + "/gcroots";
     if (!pathExists(gcRootsDir)) {
         createDirs(gcRootsDir);
         if (symlink(profilesDir.c_str(), (gcRootsDir + "/profiles").c_str()) == -1)
@@ -226,13 +226,12 @@ LocalStore::LocalStore(bool reserveSpace)
        needed, we reserve some dummy space that we can free just
        before doing a garbage collection. */
     try {
-        Path reservedPath = nixDBPath + "/reserved";
+        Path reservedPath = settings.nixDBPath + "/reserved";
         if (reserveSpace) {
-            int reservedSize = queryIntSetting("gc-reserved-space", 1024 * 1024);
             struct stat st;
             if (stat(reservedPath.c_str(), &st) == -1 ||
-                st.st_size != reservedSize)
-                writeFile(reservedPath, string(reservedSize, 'X'));
+                st.st_size != settings.reservedSize)
+                writeFile(reservedPath, string(settings.reservedSize, 'X'));
         }
         else
             deletePath(reservedPath);
@@ -242,11 +241,11 @@ LocalStore::LocalStore(bool reserveSpace)
     /* Acquire the big fat lock in shared mode to make sure that no
        schema upgrade is in progress. */
     try {
-        Path globalLockPath = nixDBPath + "/big-lock";
+        Path globalLockPath = settings.nixDBPath + "/big-lock";
         globalLock = openLockFile(globalLockPath.c_str(), true);
     } catch (SysError & e) {
         if (e.errNo != EACCES) throw;
-        readOnlyMode = true;
+        settings.readOnlyMode = true;
         openDB(false);
         return;
     }
@@ -325,7 +324,7 @@ int LocalStore::getSchema()
 void LocalStore::openDB(bool create)
 {
     /* Open the Nix database. */
-    if (sqlite3_open_v2((nixDBPath + "/db.sqlite").c_str(), &db.db,
+    if (sqlite3_open_v2((settings.nixDBPath + "/db.sqlite").c_str(), &db.db,
             SQLITE_OPEN_READWRITE | (create ? SQLITE_OPEN_CREATE : 0), 0) != SQLITE_OK)
         throw Error("cannot open SQLite database");
 
@@ -342,13 +341,13 @@ void LocalStore::openDB(bool create)
        should be safe enough.  If the user asks for it, don't sync at
        all.  This can cause database corruption if the system
        crashes. */
-    string syncMode = queryBoolSetting("fsync-metadata", true) ? "normal" : "off";
+    string syncMode = settings.fsyncMetadata ? "normal" : "off";
     if (sqlite3_exec(db, ("pragma synchronous = " + syncMode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
         throwSQLiteError(db, "setting synchronous mode");
 
     /* Set the SQLite journal mode.  WAL mode is fastest, so it's the
        default. */
-    string mode = queryBoolSetting("use-sqlite-wal", true) ? "wal" : "truncate";
+    string mode = settings.useSQLiteWAL ? "wal" : "truncate";
     string prevMode;
     {
         SQLiteStmt stmt;
@@ -890,7 +889,7 @@ Path LocalStore::queryPathFromHashPart(const string & hashPart)
 
     SQLiteTxn txn(db);
 
-    Path prefix = nixStore + "/" + hashPart;
+    Path prefix = settings.nixStore + "/" + hashPart;
 
     SQLiteStmtUse use(stmtQueryPathFromHashPart);
     stmtQueryPathFromHashPart.bind(prefix);
@@ -933,7 +932,7 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
 
             /* Pass configuration options (including those overriden
                with --option) to the substituter. */
-            setenv("_NIX_OPTIONS", packSettings().c_str(), 1);
+            setenv("_NIX_OPTIONS", settings.pack().c_str(), 1);
 
             fromPipe.readSide.close();
             toPipe.writeSide.close();
@@ -969,7 +968,7 @@ template<class T> T getIntLine(int fd)
 PathSet LocalStore::querySubstitutablePaths(const PathSet & paths)
 {
     PathSet res;
-    foreach (Paths::iterator, i, substituters) {
+    foreach (Paths::iterator, i, settings.substituters) {
         if (res.size() == paths.size()) break;
         RunningSubstituter & run(runningSubstituters[*i]);
         startSubstituter(*i, run);
@@ -1023,7 +1022,7 @@ void LocalStore::querySubstitutablePathInfos(const PathSet & paths,
     SubstitutablePathInfos & infos)
 {
     PathSet todo = paths;
-    foreach (Paths::iterator, i, substituters) {
+    foreach (Paths::iterator, i, settings.substituters) {
         if (todo.empty()) break;
         querySubstitutablePathInfos(*i, todo, infos);
     }
@@ -1046,11 +1045,10 @@ void LocalStore::registerValidPath(const ValidPathInfo & info)
 
 void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 {
-    /* sqlite will fsync by default, but the new valid paths may not be fsync-ed.
+    /* SQLite will fsync by default, but the new valid paths may not be fsync-ed.
      * So some may want to fsync them before registering the validity, at the
      * expense of some speed of the path registering operation. */
-    if (queryBoolSetting("sync-before-registering", false))
-        sync();
+    if (settings.syncBeforeRegistering) sync();
 
     while (1) {
         try {
@@ -1294,7 +1292,7 @@ void LocalStore::exportPath(const Path & path, bool sign,
         Path hashFile = tmpDir + "/hash";
         writeFile(hashFile, printHash(hash));
 
-        Path secretKey = nixConfDir + "/signing-key.sec";
+        Path secretKey = settings.nixConfDir + "/signing-key.sec";
         checkSecrecy(secretKey);
 
         Strings args;
@@ -1340,7 +1338,7 @@ Path LocalStore::createTempDirInStore()
         /* There is a slight possibility that `tmpDir' gets deleted by
            the GC between createTempDir() and addTempRoot(), so repeat
            until `tmpDir' exists. */
-        tmpDir = createTempDir(nixStore);
+        tmpDir = createTempDir(settings.nixStore);
         addTempRoot(tmpDir);
     } while (!pathExists(tmpDir));
     return tmpDir;
@@ -1392,7 +1390,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
             args.push_back("rsautl");
             args.push_back("-verify");
             args.push_back("-inkey");
-            args.push_back(nixConfDir + "/signing-key.pub");
+            args.push_back(settings.nixConfDir + "/signing-key.pub");
             args.push_back("-pubin");
             args.push_back("-in");
             args.push_back(sigFile);
@@ -1501,7 +1499,7 @@ void LocalStore::verifyStore(bool checkContents)
     /* Acquire the global GC lock to prevent a garbage collection. */
     AutoCloseFD fdGCLock = openGCLock(ltWrite);
 
-    Paths entries = readDirectory(nixStore);
+    Paths entries = readDirectory(settings.nixStore);
     PathSet store(entries.begin(), entries.end());
 
     /* Check whether all valid paths actually exist. */
@@ -1611,9 +1609,9 @@ void LocalStore::verifyPath(const Path & path, const PathSet & store,
 PathSet LocalStore::queryValidPathsOld()
 {
     PathSet paths;
-    Strings entries = readDirectory(nixDBPath + "/info");
+    Strings entries = readDirectory(settings.nixDBPath + "/info");
     foreach (Strings::iterator, i, entries)
-        if (i->at(0) != '.') paths.insert(nixStore + "/" + *i);
+        if (i->at(0) != '.') paths.insert(settings.nixStore + "/" + *i);
     return paths;
 }
 
@@ -1625,7 +1623,7 @@ ValidPathInfo LocalStore::queryPathInfoOld(const Path & path)
 
     /* Read the info file. */
     string baseName = baseNameOf(path);
-    Path infoFile = (format("%1%/info/%2%") % nixDBPath % baseName).str();
+    Path infoFile = (format("%1%/info/%2%") % settings.nixDBPath % baseName).str();
     if (!pathExists(infoFile))
         throw Error(format("path `%1%' is not valid") % path);
     string info = readFile(infoFile);

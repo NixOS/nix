@@ -52,10 +52,8 @@ void queryMissing(StoreAPI & store, const PathSet & targets,
     unsigned long long & downloadSize, unsigned long long & narSize)
 {
     downloadSize = narSize = 0;
-    
-    PathSet todo(targets.begin(), targets.end()), done;
 
-    bool useSubstitutes = queryBoolSetting("build-use-substitutes", true);
+    PathSet todo(targets.begin(), targets.end()), done;
 
     /* Getting substitute info has high latency when using the binary
        cache substituter.  Thus it's essential to do substitute
@@ -77,7 +75,7 @@ void queryMissing(StoreAPI & store, const PathSet & targets,
     */
 
     while (!todo.empty()) {
-              
+
         PathSet query, todoDrv, todoNonDrv;
 
         foreach (PathSet::iterator, i, todo) {
@@ -96,9 +94,9 @@ void queryMissing(StoreAPI & store, const PathSet & targets,
                 foreach (DerivationOutputs::iterator, j, drv.outputs)
                     if (!store.isValidPath(j->second.path)) invalid.insert(j->second.path);
                 if (invalid.empty()) continue;
-                
+
                 todoDrv.insert(*i);
-                if (useSubstitutes) query.insert(invalid.begin(), invalid.end());
+                if (settings.useSubstitutes) query.insert(invalid.begin(), invalid.end());
             }
 
             else {
@@ -109,7 +107,7 @@ void queryMissing(StoreAPI & store, const PathSet & targets,
         }
 
         todo.clear();
-        
+
         SubstitutablePathInfos infos;
         store.querySubstitutablePathInfos(query, infos);
 
@@ -118,7 +116,7 @@ void queryMissing(StoreAPI & store, const PathSet & targets,
             Derivation drv = derivationFromPath(store, *i);
 
             bool mustBuild = false;
-            if (useSubstitutes) {
+            if (settings.useSubstitutes) {
                 foreach (DerivationOutputs::iterator, j, drv.outputs)
                     if (!store.isValidPath(j->second.path) &&
                         infos.find(j->second.path) == infos.end())
@@ -135,7 +133,7 @@ void queryMissing(StoreAPI & store, const PathSet & targets,
                 foreach (DerivationOutputs::iterator, i, drv.outputs)
                     todoNonDrv.insert(i->second.path);
         }
-        
+
         foreach (PathSet::iterator, i, todoNonDrv) {
             done.insert(*i);
             SubstitutablePathInfos::iterator info = infos.find(*i);
@@ -150,22 +148,22 @@ void queryMissing(StoreAPI & store, const PathSet & targets,
     }
 }
 
- 
+
 static void dfsVisit(StoreAPI & store, const PathSet & paths,
     const Path & path, PathSet & visited, Paths & sorted,
     PathSet & parents)
 {
     if (parents.find(path) != parents.end())
         throw BuildError(format("cycle detected in the references of `%1%'") % path);
-    
+
     if (visited.find(path) != visited.end()) return;
     visited.insert(path);
     parents.insert(path);
-    
+
     PathSet references;
     if (store.isValidPath(path))
         store.queryReferences(path, references);
-    
+
     foreach (PathSet::iterator, i, references)
         /* Don't traverse into paths that don't exist.  That can
            happen due to substitutes for non-existent paths. */

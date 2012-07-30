@@ -623,7 +623,7 @@ static void prim_toFile(EvalState & state, Value * * args, Value & v)
         refs.insert(path);
     }
     
-    Path storePath = readOnlyMode
+    Path storePath = settings.readOnlyMode
         ? computeStorePathForText(name, contents, refs)
         : store->addTextToStore(name, contents, refs);
 
@@ -687,7 +687,7 @@ static void prim_filterSource(EvalState & state, Value * * args, Value & v)
 
     FilterFromExpr filter(state, *args[0]);
 
-    Path dstPath = readOnlyMode
+    Path dstPath = settings.readOnlyMode
         ? computeStorePathForPath(path, true, htSHA256, filter).first
         : store->addToStore(path, true, htSHA256, filter);
 
@@ -1079,7 +1079,7 @@ void EvalState::createBaseEnv()
     mkInt(v, time(0));
     addConstant("__currentTime", v);
 
-    mkString(v, thisSystem.c_str());
+    mkString(v, settings.thisSystem.c_str());
     addConstant("__currentSystem", v);
 
     // Miscellaneous

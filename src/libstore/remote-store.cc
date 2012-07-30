@@ -100,7 +100,7 @@ void RemoteStore::forkSlave()
     /* Start the worker. */
     Path worker = getEnv("NIX_WORKER");
     if (worker == "")
-        worker = nixBinDir + "/nix-worker";
+        worker = settings.nixBinDir + "/nix-worker";
 
     child = fork();
 
@@ -142,7 +142,7 @@ void RemoteStore::connectToDaemon()
     if (fdSocket == -1)
         throw SysError("cannot create Unix domain socket");
 
-    string socketPath = nixStateDir + DEFAULT_SOCKET_PATH;
+    string socketPath = settings.nixStateDir + DEFAULT_SOCKET_PATH;
 
     /* Urgh, sockaddr_un allows path names of only 108 characters.  So
        chdir to the socket directory so that we can pass a relative
@@ -184,23 +184,23 @@ RemoteStore::~RemoteStore()
 void RemoteStore::setOptions()
 {
     writeInt(wopSetOptions, to);
-    writeInt(keepFailed, to);
-    writeInt(keepGoing, to);
-    writeInt(tryFallback, to);
+    writeInt(settings.keepFailed, to);
+    writeInt(settings.keepGoing, to);
+    writeInt(settings.tryFallback, to);
     writeInt(verbosity, to);
-    writeInt(maxBuildJobs, to);
-    writeInt(maxSilentTime, to);
+    writeInt(settings.maxBuildJobs, to);
+    writeInt(settings.maxSilentTime, to);
     if (GET_PROTOCOL_MINOR(daemonVersion) >= 2)
-        writeInt(useBuildHook, to);
+        writeInt(settings.useBuildHook, to);
     if (GET_PROTOCOL_MINOR(daemonVersion) >= 4) {
-        writeInt(buildVerbosity, to);
+        writeInt(settings.buildVerbosity, to);
         writeInt(logType, to);
-        writeInt(printBuildTrace, to);
+        writeInt(settings.printBuildTrace, to);
     }
     if (GET_PROTOCOL_MINOR(daemonVersion) >= 6)
-        writeInt(buildCores, to);
+        writeInt(settings.buildCores, to);
     if (GET_PROTOCOL_MINOR(daemonVersion) >= 10)
-        writeInt(queryBoolSetting("build-use-substitutes", true), to);
+        writeInt(settings.useSubstitutes, to);
 
     processStderr();
 }

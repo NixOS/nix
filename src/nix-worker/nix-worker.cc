@@ -527,27 +527,23 @@ static void performOp(unsigned int clientVersion,
     }
 
     case wopSetOptions: {
-        keepFailed = readInt(from) != 0;
-        keepGoing = readInt(from) != 0;
-        tryFallback = readInt(from) != 0;
+        settings.keepFailed = readInt(from) != 0;
+        settings.keepGoing = readInt(from) != 0;
+        settings.tryFallback = readInt(from) != 0;
         verbosity = (Verbosity) readInt(from);
-        maxBuildJobs = readInt(from);
-        maxSilentTime = readInt(from);
+        settings.maxBuildJobs = readInt(from);
+        settings.maxSilentTime = readInt(from);
         if (GET_PROTOCOL_MINOR(clientVersion) >= 2)
-            useBuildHook = readInt(from) != 0;
+            settings.useBuildHook = readInt(from) != 0;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 4) {
-            buildVerbosity = (Verbosity) readInt(from);
+            settings.buildVerbosity = (Verbosity) readInt(from);
             logType = (LogType) readInt(from);
-            printBuildTrace = readInt(from) != 0;
+            settings.printBuildTrace = readInt(from) != 0;
         }
         if (GET_PROTOCOL_MINOR(clientVersion) >= 6)
-            buildCores = readInt(from);
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 10) {
-            int x = readInt(from);
-            Strings ss;
-            ss.push_back(x == 0 ? "false" : "true");
-            overrideSetting("build-use-substitutes", ss);
-        }
+            settings.buildCores = readInt(from);
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 10)
+            settings.useSubstitutes = readInt(from) != 0;
         startWork();
         stopWork();
         break;
@@ -768,7 +764,7 @@ static void daemonLoop()
         if (fdSocket == -1)
             throw SysError("cannot create Unix domain socket");
 
-        string socketPath = nixStateDir + DEFAULT_SOCKET_PATH;
+        string socketPath = settings.nixStateDir + DEFAULT_SOCKET_PATH;
 
         createDirs(dirOf(socketPath));
 
@@ -866,10 +862,6 @@ static void daemonLoop()
                         string processName = int2String(clientPid);
                         strncpy(argvSaved[1], processName.c_str(), strlen(argvSaved[1]));
                     }
-
-                    /* Since the daemon can be long-running, the
-                       settings may have changed.  So force a reload. */
-                    reloadSettings();
 
                     /* Handle the connection. */
                     from.fd = remote;

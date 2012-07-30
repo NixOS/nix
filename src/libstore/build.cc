@@ -229,8 +229,6 @@ private:
 
 public:
 
-    bool cacheFailure;
-
     /* Set if at least one derivation had a BuildError (i.e. permanent
        failure). */
     bool permanentFailure;
@@ -314,7 +312,7 @@ void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
 
     if (result == ecNoSubstituters) ++nrNoSubstituters;
 
-    if (waitees.empty() || (result == ecFailed && !keepGoing)) {
+    if (waitees.empty() || (result == ecFailed && !settings.keepGoing)) {
 
         /* If we failed and keepGoing is not set, we remove all
            remaining waitees. */
@@ -466,14 +464,13 @@ void UserLock::acquire()
 {
     assert(uid == 0);
 
-    string buildUsersGroup = querySetting("build-users-group", "");
-    assert(buildUsersGroup != "");
+    assert(settings.buildUsersGroup != "");
 
     /* Get the members of the build-users-group. */
-    struct group * gr = getgrnam(buildUsersGroup.c_str());
+    struct group * gr = getgrnam(settings.buildUsersGroup.c_str());
     if (!gr)
         throw Error(format("the group `%1%' specified in `build-users-group' does not exist")
-            % buildUsersGroup);
+            % settings.buildUsersGroup);
     gid = gr->gr_gid;
 
     /* Copy the result of getgrnam. */
@@ -485,7 +482,7 @@ void UserLock::acquire()
 
     if (users.empty())
         throw Error(format("the build users group `%1%' has no members")
-            % buildUsersGroup);
+            % settings.buildUsersGroup);
 
     /* Find a user account that isn't currently in use for another
        build. */
@@ -495,11 +492,11 @@ void UserLock::acquire()
         struct passwd * pw = getpwnam(i->c_str());
         if (!pw)
             throw Error(format("the user `%1%' in the group `%2%' does not exist")
-                % *i % buildUsersGroup);
+                % *i % settings.buildUsersGroup);
 
-        createDirs(nixStateDir + "/userpool");
+        createDirs(settings.nixStateDir + "/userpool");
 
-        fnUserLock = (format("%1%/userpool/%2%") % nixStateDir % pw->pw_uid).str();
+        fnUserLock = (format("%1%/userpool/%2%") % settings.nixStateDir % pw->pw_uid).str();
 
         if (lockedPaths.find(fnUserLock) != lockedPaths.end())
             /* We already have a lock on this one. */
@@ -519,7 +516,7 @@ void UserLock::acquire()
             /* Sanity check... */
             if (uid == getuid() || uid == geteuid())
                 throw Error(format("the Nix user should not be a member of `%1%'")
-                    % buildUsersGroup);
+                    % settings.buildUsersGroup);
 
             return;
         }
@@ -527,7 +524,7 @@ void UserLock::acquire()
 
     throw Error(format("all build users are currently in use; "
         "consider creating additional users and adding them to the `%1%' group")
-        % buildUsersGroup);
+        % settings.buildUsersGroup);
 }
 
 
@@ -546,7 +543,7 @@ static void runSetuidHelper(const string & command,
     const string & arg)
 {
     Path program = getEnv("NIX_SETUID_HELPER",
-        nixLibexecDir + "/nix-setuid-helper");
+        settings.nixLibexecDir + "/nix-setuid-helper");
 
     /* Fork. */
     Pid pid;
@@ -601,12 +598,6 @@ bool amPrivileged()
 }
 
 
-bool haveBuildUsers()
-{
-    return querySetting("build-users-group", "") != "";
-}
-
-
 void getOwnership(const Path & path)
 {
     runSetuidHelper("get-ownership", path);
@@ -622,7 +613,7 @@ void deletePathWrapped(const Path & path,
     } catch (SysError & e) {
         /* If this failed due to a permission error, then try it with
            the setuid helper. */
-        if (haveBuildUsers() && !amPrivileged()) {
+        if (settings.buildUsersGroup != "" && !amPrivileged()) {
             getOwnership(path);
             deletePath(path, bytesFreed, blocksFreed);
         } else
@@ -701,9 +692,9 @@ HookInstance::HookInstance()
                 throw SysError("dupping builder's stdout/stderr");
 
             /* XXX: Pass `buildTimeout' to the hook?  */
-            execl(buildHook.c_str(), buildHook.c_str(), thisSystem.c_str(),
-                (format("%1%") % maxSilentTime).str().c_str(),
-                (format("%1%") % printBuildTrace).str().c_str(),
+            execl(buildHook.c_str(), buildHook.c_str(), settings.thisSystem.c_str(),
+                (format("%1%") % settings.maxSilentTime).str().c_str(),
+                (format("%1%") % settings.printBuildTrace).str().c_str(),
                 NULL);
 
             throw SysError(format("executing `%1%'") % buildHook);
@@ -943,7 +934,7 @@ void DerivationGoal::init()
 {
     trace("init");
 
-    if (readOnlyMode)
+    if (settings.readOnlyMode)
         throw Error(format("cannot build derivation `%1%' - no write access to the Nix store") % drvPath);
 
     /* The first thing to do is to make sure that the derivation
@@ -995,7 +986,7 @@ void DerivationGoal::haveDerivation()
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
-    if (queryBoolSetting("build-use-substitutes", true))
+    if (settings.useSubstitutes)
         foreach (PathSet::iterator, i, invalidOutputs)
             addWaitee(worker.makeSubstitutionGoal(*i));
 
@@ -1010,7 +1001,7 @@ void DerivationGoal::outputsSubstituted()
 {
     trace("all outputs substituted (maybe)");
 
-    if (nrFailed > 0 && nrFailed > nrNoSubstituters && !tryFallback)
+    if (nrFailed > 0 && nrFailed > nrNoSubstituters && !settings.tryFallback)
         throw Error(format("some substitutes for the outputs of derivation `%1%' failed; try `--fallback'") % drvPath);
 
     nrFailed = nrNoSubstituters = 0;
@@ -1109,9 +1100,9 @@ PathSet outputPaths(const DerivationOutputs & outputs)
 
 static bool canBuildLocally(const string & platform)
 {
-    return platform == thisSystem
+    return platform == settings.thisSystem
 #ifdef CAN_DO_LINUX32_BUILDS
-        || (platform == "i686-linux" && thisSystem == "x86_64-linux")
+        || (platform == "i686-linux" && settings.thisSystem == "x86_64-linux")
 #endif
         ;
 }
@@ -1213,7 +1204,7 @@ void DerivationGoal::tryToBuild()
        derivation prefers to be done locally, do it even if
        maxBuildJobs is 0. */
     unsigned int curBuilds = worker.getNrLocalBuilds();
-    if (curBuilds >= maxBuildJobs && !(preferLocalBuild && curBuilds == 0)) {
+    if (curBuilds >= settings.maxBuildJobs && !(preferLocalBuild && curBuilds == 0)) {
         worker.waitForBuildSlot(shared_from_this());
         outputLocks.unlock();
         return;
@@ -1228,7 +1219,7 @@ void DerivationGoal::tryToBuild()
         printMsg(lvlError, e.msg());
         outputLocks.unlock();
         buildUser.release();
-        if (printBuildTrace)
+        if (settings.printBuildTrace)
             printMsg(lvlError, format("@ build-failed %1% %2% %3% %4%")
                 % drvPath % drv.outputs["out"].path % 0 % e.msg());
         worker.permanentFailure = true;
@@ -1360,7 +1351,7 @@ void DerivationGoal::buildDone()
         bool hookError = hook &&
             (!WIFEXITED(status) || WEXITSTATUS(status) != 100);
 
-        if (printBuildTrace) {
+        if (settings.printBuildTrace) {
             if (hook && hookError)
                 printMsg(lvlError, format("@ hook-failed %1% %2% %3% %4%")
                     % drvPath % drv.outputs["out"].path % status % e.msg());
@@ -1376,7 +1367,7 @@ void DerivationGoal::buildDone()
            able to access the network).  Hook errors (like
            communication problems with the remote machine) shouldn't
            be cached either. */
-        if (worker.cacheFailure && !hookError && !fixedOutput)
+        if (settings.cacheFailure && !hookError && !fixedOutput)
             foreach (DerivationOutputs::iterator, i, drv.outputs)
                 worker.store.registerFailedPath(i->second.path);
 
@@ -1388,7 +1379,7 @@ void DerivationGoal::buildDone()
     /* Release the build user, if applicable. */
     buildUser.release();
 
-    if (printBuildTrace) {
+    if (settings.printBuildTrace) {
         printMsg(lvlError, format("@ build-succeeded %1% %2%")
             % drvPath % drv.outputs["out"].path);
     }
@@ -1399,7 +1390,7 @@ void DerivationGoal::buildDone()
 
 HookReply DerivationGoal::tryBuildHook()
 {
-    if (!useBuildHook || getEnv("NIX_BUILD_HOOK") == "") return rpDecline;
+    if (!settings.useBuildHook || getEnv("NIX_BUILD_HOOK") == "") return rpDecline;
 
     if (!worker.hook)
         worker.hook = boost::shared_ptr<HookInstance>(new HookInstance);
@@ -1412,7 +1403,7 @@ HookReply DerivationGoal::tryBuildHook()
 
     /* Send the request to the hook. */
     writeLine(worker.hook->toHook.writeSide, (format("%1% %2% %3% %4%")
-        % (worker.getNrLocalBuilds() < maxBuildJobs ? "1" : "0")
+        % (worker.getNrLocalBuilds() < settings.maxBuildJobs ? "1" : "0")
         % drv.platform % drvPath % concatStringsSep(",", features)).str());
 
     /* Read the first line of input, which should be a word indicating
@@ -1471,7 +1462,7 @@ HookReply DerivationGoal::tryBuildHook()
     fds.insert(hook->builderOut.readSide);
     worker.childStarted(shared_from_this(), hook->pid, fds, false, false);
 
-    if (printBuildTrace)
+    if (settings.printBuildTrace)
         printMsg(lvlError, format("@ build-started %1% %2% %3% %4%")
             % drvPath % drv.outputs["out"].path % drv.platform % logFile);
 
@@ -1502,7 +1493,7 @@ void DerivationGoal::startBuilder()
     if (!canBuildLocally(drv.platform))
         throw Error(
             format("a `%1%' is required to build `%3%', but I am a `%2%'")
-            % drv.platform % thisSystem % drvPath);
+            % drv.platform % settings.thisSystem % drvPath);
 
     /* Construct the environment passed to the builder. */
 
@@ -1523,10 +1514,10 @@ void DerivationGoal::startBuilder()
        shouldn't care, but this is useful for purity checking (e.g.,
        the compiler or linker might only want to accept paths to files
        in the store or in the build directory). */
-    env["NIX_STORE"] = nixStore;
+    env["NIX_STORE"] = settings.nixStore;
 
     /* The maximum number of cores to utilize for parallel building. */
-    env["NIX_BUILD_CORES"] = (format("%d") % buildCores).str();
+    env["NIX_BUILD_CORES"] = (format("%d") % settings.buildCores).str();
 
     /* Add all bindings specified in the derivation. */
     foreach (StringPairs::iterator, i, drv.env)
@@ -1618,7 +1609,7 @@ void DerivationGoal::startBuilder()
 
     /* If `build-users-group' is not empty, then we have to build as
        one of the members of that group. */
-    if (haveBuildUsers()) {
+    if (settings.buildUsersGroup != "") {
         buildUser.acquire();
         assert(buildUser.getUID() != 0);
         assert(buildUser.getGID() != 0);
@@ -1640,15 +1631,15 @@ void DerivationGoal::startBuilder()
            the builder can create its output but not mess with the
            outputs of other processes). */
         struct stat st;
-        if (stat(nixStore.c_str(), &st) == -1)
-            throw SysError(format("cannot stat `%1%'") % nixStore);
+        if (stat(settings.nixStore.c_str(), &st) == -1)
+            throw SysError(format("cannot stat `%1%'") % settings.nixStore);
         if (!(st.st_mode & S_ISVTX) ||
             ((st.st_mode & S_IRWXG) != S_IRWXG) ||
             (st.st_gid != buildUser.getGID()))
             throw Error(format(
                 "builder does not have write permission to `%2%'; "
                 "try `chgrp %1% %2%; chmod 1775 %2%'")
-                % buildUser.getGID() % nixStore);
+                % buildUser.getGID() % settings.nixStore);
     }
 
 
@@ -1657,7 +1648,7 @@ void DerivationGoal::startBuilder()
        functions like fetchurl (which needs a proper /etc/resolv.conf)
        work properly.  Purity checking for fixed-output derivations
        is somewhat pointless anyway. */
-    useChroot = queryBoolSetting("build-use-chroot", false);
+    useChroot = settings.useChroot;
 
     if (fixedOutput) useChroot = false;
 
@@ -1707,16 +1698,8 @@ void DerivationGoal::startBuilder()
         writeFile(chrootRootDir + "/etc/hosts", "127.0.0.1 localhost\n");
 
         /* Bind-mount a user-configurable set of directories from the
-           host file system.  The `/dev/pts' directory must be mounted
-           separately so that newly-created pseudo-terminals show
-           up. */
-        Paths defaultDirs;
-        defaultDirs.push_back("/dev");
-        defaultDirs.push_back("/dev/pts");
-
-        Paths dirsInChroot_ = querySetting("build-chroot-dirs", defaultDirs);
-        dirsInChroot.insert(dirsInChroot_.begin(), dirsInChroot_.end());
-
+           host file system. */
+        dirsInChroot = settings.dirsInChroot;
         dirsInChroot.insert(tmpDir);
 
         /* Make the closure of the inputs available in the chroot,
@@ -1726,8 +1709,8 @@ void DerivationGoal::startBuilder()
            can be bind-mounted).  !!! As an extra security
            precaution, make the fake Nix store only writable by the
            build user. */
-        createDirs(chrootRootDir + nixStore);
-        chmod(chrootRootDir + nixStore, 01777);
+        createDirs(chrootRootDir + settings.nixStore);
+        chmod(chrootRootDir + settings.nixStore, 01777);
 
         foreach (PathSet::iterator, i, inputPaths) {
             struct stat st;
@@ -1827,7 +1810,7 @@ void DerivationGoal::startBuilder()
     worker.childStarted(shared_from_this(), pid,
         singleton<set<int> >(builderOut.readSide), true, true);
 
-    if (printBuildTrace) {
+    if (settings.printBuildTrace) {
         printMsg(lvlError, format("@ build-started %1% %2% %3% %4%")
             % drvPath % drv.outputs["out"].path % drv.platform % logFile);
     }
@@ -1907,16 +1890,14 @@ void DerivationGoal::initChild()
 #ifdef CAN_DO_LINUX32_BUILDS
         /* Change the personality to 32-bit if we're doing an
            i686-linux build on an x86_64-linux machine. */
-        if (drv.platform == "i686-linux" && thisSystem == "x86_64-linux") {
+        if (drv.platform == "i686-linux" && settings.thisSystem == "x86_64-linux") {
             if (personality(0x0008 | 0x8000000 /* == PER_LINUX32_3GB */) == -1)
                 throw SysError("cannot set i686-linux personality");
         }
 
         /* Impersonate a Linux 2.6 machine to get some determinism in
            builds that depend on the kernel version. */
-        if ((drv.platform == "i686-linux" || drv.platform == "x86_64-linux") &&
-            queryBoolSetting("build-impersonate-linux-26", true))
-        {
+        if ((drv.platform == "i686-linux" || drv.platform == "x86_64-linux") && settings.impersonateLinux26) {
             int cur = personality(0xffffffff);
             if (cur != -1) personality(cur | 0x0020000 /* == UNAME26 */);
         }
@@ -1958,7 +1939,7 @@ void DerivationGoal::initChild()
 
             } else {
                 /* Let the setuid helper take care of it. */
-                program = nixLibexecDir + "/nix-setuid-helper";
+                program = settings.nixLibexecDir + "/nix-setuid-helper";
                 args.push_back(program.c_str());
                 args.push_back("run-builder");
                 user = buildUser.getUser().c_str();
@@ -2126,13 +2107,13 @@ string drvsLogDir = "drvs";
 
 Path DerivationGoal::openLogFile()
 {
-    if (!queryBoolSetting("build-keep-log", true)) return "";
+    if (!settings.keepLog) return "";
 
     /* Create a log file. */
-    Path dir = (format("%1%/%2%") % nixLogDir % drvsLogDir).str();
+    Path dir = (format("%1%/%2%") % settings.nixLogDir % drvsLogDir).str();
     createDirs(dir);
 
-    if (queryBoolSetting("build-compress-log", true)) {
+    if (settings.compressLog) {
 
         Path logFileName = (format("%1%/%2%.bz2") % dir % baseNameOf(drvPath)).str();
         AutoCloseFD fd = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0666);
@@ -2179,7 +2160,7 @@ void DerivationGoal::closeLogFile()
 void DerivationGoal::deleteTmpDir(bool force)
 {
     if (tmpDir != "") {
-        if (keepFailed && !force) {
+        if (settings.keepFailed && !force) {
             printMsg(lvlError,
                 format("builder for `%1%' failed; keeping build directory `%2%'")
                 % drvPath % tmpDir);
@@ -2199,7 +2180,7 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
     if ((hook && fd == hook->builderOut.readSide) ||
         (!hook && fd == builderOut.readSide))
     {
-        if (verbosity >= buildVerbosity)
+        if (verbosity >= settings.buildVerbosity)
             writeToStderr((unsigned char *) data.data(), data.size());
         if (bzLogFile) {
             int err;
@@ -2235,13 +2216,13 @@ PathSet DerivationGoal::checkPathValidity(bool returnValid)
 
 bool DerivationGoal::pathFailed(const Path & path)
 {
-    if (!worker.cacheFailure) return false;
+    if (!settings.cacheFailure) return false;
 
     if (!worker.store.hasPathFailed(path)) return false;
 
     printMsg(lvlError, format("builder for `%1%' failed previously (cached)") % path);
 
-    if (printBuildTrace)
+    if (settings.printBuildTrace)
         printMsg(lvlError, format("@ build-failed %1% %2% cached") % drvPath % path);
 
     worker.permanentFailure = true;
@@ -2362,10 +2343,10 @@ void SubstitutionGoal::init()
         return;
     }
 
-    if (readOnlyMode)
+    if (settings.readOnlyMode)
         throw Error(format("cannot substitute path `%1%' - no write access to the Nix store") % storePath);
 
-    subs = substituters;
+    subs = settings.substituters;
 
     tryNext();
 }
@@ -2437,7 +2418,7 @@ void SubstitutionGoal::tryToRun()
        is maxBuildJobs == 0 (no local builds allowed), we still allow
        a substituter to run.  This is because substitutions cannot be
        distributed to another machine via the build hook. */
-    if (worker.getNrLocalBuilds() >= (maxBuildJobs == 0 ? 1 : maxBuildJobs)) {
+    if (worker.getNrLocalBuilds() >= (settings.maxBuildJobs == 0 ? 1 : settings.maxBuildJobs)) {
         worker.waitForBuildSlot(shared_from_this());
         return;
     }
@@ -2496,7 +2477,7 @@ void SubstitutionGoal::tryToRun()
 
             /* Pass configuration options (including those overriden
                with --option) to the substituter. */
-            setenv("_NIX_OPTIONS", packSettings().c_str(), 1);
+            setenv("_NIX_OPTIONS", settings.pack().c_str(), 1);
 
             /* Fill in the arguments. */
             Strings args;
@@ -2525,7 +2506,7 @@ void SubstitutionGoal::tryToRun()
 
     state = &SubstitutionGoal::finished;
 
-    if (printBuildTrace) {
+    if (settings.printBuildTrace) {
         printMsg(lvlError, format("@ substituter-started %1% %2%")
             % storePath % sub);
     }
@@ -2583,7 +2564,7 @@ void SubstitutionGoal::finished()
 
         printMsg(lvlInfo, e.msg());
 
-        if (printBuildTrace) {
+        if (settings.printBuildTrace) {
             printMsg(lvlError, format("@ substituter-failed %1% %2% %3%")
                 % storePath % status % e.msg());
         }
@@ -2611,7 +2592,7 @@ void SubstitutionGoal::finished()
     printMsg(lvlChatty,
         format("substitution of path `%1%' succeeded") % storePath);
 
-    if (printBuildTrace) {
+    if (settings.printBuildTrace) {
         printMsg(lvlError, format("@ substituter-succeeded %1%") % storePath);
     }
 
@@ -2622,7 +2603,7 @@ void SubstitutionGoal::finished()
 void SubstitutionGoal::handleChildOutput(int fd, const string & data)
 {
     assert(fd == logPipe.readSide);
-    if (verbosity >= buildVerbosity)
+    if (verbosity >= settings.buildVerbosity)
         writeToStderr((unsigned char *) data.data(), data.size());
     /* Don't write substitution output to a log file for now.  We
        probably should, though. */
@@ -2650,7 +2631,6 @@ Worker::Worker(LocalStore & store)
     working = true;
     nrLocalBuilds = 0;
     lastWokenUp = 0;
-    cacheFailure = queryBoolSetting("build-cache-failure", false);
     permanentFailure = false;
 }
 
@@ -2715,7 +2695,7 @@ void Worker::removeGoal(GoalPtr goal)
         topGoals.erase(goal);
         /* If a top-level goal failed, then kill all other goals
            (unless keepGoing was set). */
-        if (goal->getExitCode() == Goal::ecFailed && !keepGoing)
+        if (goal->getExitCode() == Goal::ecFailed && !settings.keepGoing)
             topGoals.clear();
     }
 
@@ -2787,7 +2767,7 @@ void Worker::childTerminated(pid_t pid, bool wakeSleepers)
 void Worker::waitForBuildSlot(GoalPtr goal)
 {
     debug("wait for build slot");
-    if (getNrLocalBuilds() < maxBuildJobs)
+    if (getNrLocalBuilds() < settings.maxBuildJobs)
         wakeUp(goal); /* we can do it right away */
     else
         wantingToBuild.insert(goal);
@@ -2836,7 +2816,7 @@ void Worker::run(const Goals & _topGoals)
         if (!children.empty() || !waitingForAWhile.empty())
             waitForInput();
         else {
-            if (awake.empty() && maxBuildJobs == 0) throw Error(
+            if (awake.empty() && settings.maxBuildJobs == 0) throw Error(
                 "unable to start any build; either increase `--max-jobs' "
                 "or enable distributed builds");
             assert(!awake.empty());
@@ -2846,9 +2826,9 @@ void Worker::run(const Goals & _topGoals)
     /* If --keep-going is not set, it's possible that the main goal
        exited while some of its subgoals were still active.  But if
        --keep-going *is* set, then they must all be finished now. */
-    assert(!keepGoing || awake.empty());
-    assert(!keepGoing || wantingToBuild.empty());
-    assert(!keepGoing || children.empty());
+    assert(!settings.keepGoing || awake.empty());
+    assert(!settings.keepGoing || wantingToBuild.empty());
+    assert(!settings.keepGoing || children.empty());
 }
 
 
@@ -2868,15 +2848,15 @@ void Worker::waitForInput()
     time_t before = time(0);
 
     /* If a global timeout has been set, sleep until it's done.  */
-    if (buildTimeout != 0) {
+    if (settings.buildTimeout != 0) {
         useTimeout = true;
         if (lastWait == 0 || lastWait > before) lastWait = before;
-        timeout.tv_sec = std::max((time_t) 0, lastWait + buildTimeout - before);
+        timeout.tv_sec = std::max((time_t) 0, lastWait + settings.buildTimeout - before);
     }
 
     /* If we're monitoring for silence on stdout/stderr, sleep until
        the first deadline for any child. */
-    if (maxSilentTime != 0) {
+    if (settings.maxSilentTime != 0) {
         time_t oldest = 0;
         foreach (Children::iterator, i, children) {
             if (i->second.monitorForSilence) {
@@ -2885,7 +2865,7 @@ void Worker::waitForInput()
             }
         }
         if (oldest) {
-            time_t silenceTimeout = std::max((time_t) 0, oldest + maxSilentTime - before);
+            time_t silenceTimeout = std::max((time_t) 0, oldest + settings.maxSilentTime - before);
             timeout.tv_sec = useTimeout
                 ? std::min(silenceTimeout, timeout.tv_sec)
                 : silenceTimeout;
@@ -2896,14 +2876,12 @@ void Worker::waitForInput()
 
     /* If we are polling goals that are waiting for a lock, then wake
        up after a few seconds at most. */
-    int wakeUpInterval = queryIntSetting("build-poll-interval", 5);
-
     if (!waitingForAWhile.empty()) {
         useTimeout = true;
         if (lastWokenUp == 0)
             printMsg(lvlError, "waiting for locks or build slots...");
         if (lastWokenUp == 0 || lastWokenUp > before) lastWokenUp = before;
-        timeout.tv_sec = std::max((time_t) 0, lastWokenUp + wakeUpInterval - before);
+        timeout.tv_sec = std::max((time_t) 0, lastWokenUp + settings.pollInterval - before);
     } else lastWokenUp = 0;
 
     using namespace std;
@@ -2969,27 +2947,27 @@ void Worker::waitForInput()
             }
         }
 
-        if (maxSilentTime != 0 &&
+        if (settings.maxSilentTime != 0 &&
             j->second.monitorForSilence &&
-            after - j->second.lastOutput >= (time_t) maxSilentTime)
+            after - j->second.lastOutput >= (time_t) settings.maxSilentTime)
         {
             printMsg(lvlError,
                 format("%1% timed out after %2% seconds of silence")
-                % goal->getName() % maxSilentTime);
+                % goal->getName() % settings.maxSilentTime);
             goal->cancel();
         }
 
-        if (buildTimeout != 0 &&
-            after - before >= (time_t) buildTimeout)
+        if (settings.buildTimeout != 0 &&
+            after - before >= (time_t) settings.buildTimeout)
         {
             printMsg(lvlError,
                 format("%1% timed out after %2% seconds of activity")
-                % goal->getName() % buildTimeout);
+                % goal->getName() % settings.buildTimeout);
             goal->cancel();
         }
     }
 
-    if (!waitingForAWhile.empty() && lastWokenUp + wakeUpInterval <= after) {
+    if (!waitingForAWhile.empty() && lastWokenUp + settings.pollInterval <= after) {
         lastWokenUp = after;
         foreach (WeakGoals::iterator, i, waitingForAWhile) {
             GoalPtr goal = i->lock();

@@ -55,7 +55,6 @@ struct Globals
     EvalState state;
     bool dryRun;
     bool preserveInstalled;
-    bool keepDerivations;
     string forceName;
     bool prebuiltOnly;
 };
@@ -266,8 +265,8 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
                 
                 if (k != newest.end()) {
                     d = j->first.system == k->second.first.system ? 0 :
-                        j->first.system == thisSystem ? 1 :
-                        k->second.first.system == thisSystem ? -1 : 0;
+                        j->first.system == settings.thisSystem ? 1 :
+                        k->second.first.system == settings.thisSystem ? -1 : 0;
                     if (d == 0)
                         d = comparePriorities(state, j->first, k->second.first);
                     if (d == 0)
@@ -498,7 +497,7 @@ static void installDerivations(Globals & globals,
         if (globals.dryRun) return;
 
         if (createUserEnv(globals.state, allElems,
-                profile, globals.keepDerivations, lockToken)) break;
+                profile, settings.envKeepDerivations, lockToken)) break;
     }
 }
 
@@ -605,7 +604,7 @@ static void upgradeDerivations(Globals & globals,
         if (globals.dryRun) return;
 
         if (createUserEnv(globals.state, newElems,
-                globals.profile, globals.keepDerivations, lockToken)) break;
+                globals.profile, settings.envKeepDerivations, lockToken)) break;
     }
 }
 
@@ -672,7 +671,7 @@ static void opSetFlag(Globals & globals,
 
         /* Write the new user environment. */
         if (createUserEnv(globals.state, installedElems,
-                globals.profile, globals.keepDerivations, lockToken)) break;
+                globals.profile, settings.envKeepDerivations, lockToken)) break;
     }
 }
 
@@ -740,7 +739,7 @@ static void uninstallDerivations(Globals & globals, Strings & selectors,
         if (globals.dryRun) return;
 
         if (createUserEnv(globals.state, newElems,
-                profile, globals.keepDerivations, lockToken)) break;
+                profile, settings.envKeepDerivations, lockToken)) break;
     }
 }
 
@@ -869,7 +868,7 @@ static void opQuery(Globals & globals,
 
     enum { sInstalled, sAvailable } source = sInstalled;
 
-    readOnlyMode = true; /* makes evaluation a bit faster */
+    settings.readOnlyMode = true; /* makes evaluation a bit faster */
 
     for (Strings::iterator i = args.begin(); i != args.end(); ) {
         string arg = *i++;
@@ -1262,9 +1261,6 @@ void run(Strings args)
     globals.preserveInstalled = false;
     globals.prebuiltOnly = false;
 
-    globals.keepDerivations =
-        queryBoolSetting("env-keep-derivations", false);
-    
     for (Strings::iterator i = args.begin(); i != args.end(); ) {
         string arg = *i++;
 
@@ -1331,7 +1327,7 @@ void run(Strings args)
         Path profileLink = getHomeDir() + "/.nix-profile";
         globals.profile = pathExists(profileLink)
             ? absPath(readLink(profileLink), dirOf(profileLink))
-            : canonPath(nixStateDir + "/profiles/default");
+            : canonPath(settings.nixStateDir + "/profiles/default");
     }
     
     store = openStore();
