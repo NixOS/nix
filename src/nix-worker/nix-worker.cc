@@ -544,6 +544,14 @@ static void performOp(unsigned int clientVersion,
             settings.buildCores = readInt(from);
         if (GET_PROTOCOL_MINOR(clientVersion) >= 10)
             settings.useSubstitutes = readInt(from) != 0;
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 12) {
+            unsigned int n = readInt(from);
+            for (unsigned int i = 0; i < n; i++) {
+                string name = readString(from);
+                string value = readString(from);
+                settings.set("untrusted-" + name, value);
+            }
+        }
         startWork();
         stopWork();
         break;

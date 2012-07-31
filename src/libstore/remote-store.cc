@@ -184,6 +184,7 @@ RemoteStore::~RemoteStore()
 void RemoteStore::setOptions()
 {
     writeInt(wopSetOptions, to);
+
     writeInt(settings.keepFailed, to);
     writeInt(settings.keepGoing, to);
     writeInt(settings.tryFallback, to);
@@ -201,6 +202,15 @@ void RemoteStore::setOptions()
         writeInt(settings.buildCores, to);
     if (GET_PROTOCOL_MINOR(daemonVersion) >= 10)
         writeInt(settings.useSubstitutes, to);
+
+    if (GET_PROTOCOL_MINOR(daemonVersion) >= 12) {
+        Settings::SettingsMap overrides = settings.getOverrides();
+        writeInt(overrides.size(), to);
+        foreach (Settings::SettingsMap::iterator, i, overrides) {
+            writeString(i->first, to);
+            writeString(i->second, to);
+        }
+    }
 
     processStderr();
 }

@@ -10,6 +10,8 @@ namespace nix {
 
 struct Settings {
 
+    typedef std::map<string, string> SettingsMap;
+
     Settings();
 
     void processEnvironment();
@@ -21,6 +23,8 @@ struct Settings {
     void update();
 
     string pack();
+
+    SettingsMap getOverrides();
 
     /* The directory where we store sources and derived files. */
     Path nixStore;
@@ -172,9 +176,7 @@ struct Settings {
     bool envKeepDerivations;
 
 private:
-    typedef std::map<string, string> SettingsMap;
-
-    SettingsMap settings;
+    SettingsMap settings, overrides;
 
     void get(string & res, const string & name);
     void get(bool & res, const string & name);
