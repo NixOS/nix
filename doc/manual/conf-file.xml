@@ -329,6 +329,19 @@ build-use-chroot = /dev /proc /bin</programlisting>
   </varlistentry>
 
 
+  <varlistentry><term><literal>trusted-binary-caches</literal></term>
+
+    <listitem><para>A list of URLs of binary caches, separated by
+    whitespace.  These are not used by default, but can be enabled by
+    users of the Nix daemon by specifying <literal>--option
+    binary-caches <replaceable>urls</replaceable></literal> on the
+    command line.  Daemon users are only allowed to pass a subset of
+    the URLs listed in <literal>binary-caches</literal> and
+    <literal>trusted-binary-caches</literal>.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry><term><literal>binary-caches-parallel-connections</literal></term>
 
     <listitem><para>The maximum number of parallel HTTP connections

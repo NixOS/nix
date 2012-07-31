@@ -8,6 +8,7 @@ use Nix::Store;
 use Nix::Utils;
 use WWW::Curl::Easy;
 use WWW::Curl::Multi;
+use List::MoreUtils qw(any);
 use strict;
 
 
@@ -166,9 +167,32 @@ sub getAvailableCaches {
     return if $gotCaches;
     $gotCaches = 1;
 
-    my @urls = map { s/\/+$//; $_ } split(/ /,
-        $Nix::Config::config{"binary-caches"}
-        // ($Nix::Config::storeDir eq "/nix/store" ? "http://nixos.org/binary-cache" : ""));
+    sub strToList {
+        my ($s) = @_;
+        return map { s/\/+$//; $_ } split(/ /, $s);
+    }
+
+    my @urls = strToList
+        ($Nix::Config::config{"binary-caches"}
+         // ($Nix::Config::storeDir eq "/nix/store" ? "http://nixos.org/binary-cache" : ""));
+
+    # Allow Nix daemon users to override the binary caches to a subset
+    # of those listed in the config file.  Note that ‘untrusted-*’
+    # denotes options passed by the client.
+    if (defined $Nix::Config::config{"untrusted-binary-caches"}) {
+        my @untrustedUrls = strToList $Nix::Config::config{"untrusted-binary-caches"};
+        my @trustedUrls = (@urls, strToList($Nix::Config::config{"trusted-binary-caches"} // ""));
+        @urls = ();
+        foreach my $url (@untrustedUrls) {
+            if (any { $url eq $_ } @trustedUrls) {
+                push @urls, $url;
+            } else {
+                # FIXME: should die here, but we currently can't
+                # deliver error messages to clients.
+                warn "warning: binary cache ‘$url’ is not trusted (please add it to ‘trusted-binary-caches’ in $Nix::Config::confDir/nix.conf)\n";
+            }
+        }
+    }
 
     foreach my $url (@urls) {
 
