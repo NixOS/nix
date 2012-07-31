@@ -118,9 +118,10 @@ void Settings::set(const string & name, const string & value)
 
 void Settings::update()
 {
-    get(thisSystem, "system");
+    get(tryFallback, "build-fallback");
     get(maxBuildJobs, "build-max-jobs");
     get(buildCores, "build-cores");
+    get(thisSystem, "system");
     get(maxSilentTime, "build-max-silent-time");
     get(buildTimeout, "build-timeout");
     get(reservedSize, "gc-reserved-space");

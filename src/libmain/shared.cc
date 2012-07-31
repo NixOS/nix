@@ -191,7 +191,7 @@ static void initAndRun(int argc, char * * argv)
         else if (arg == "--keep-going" || arg == "-k")
             settings.keepGoing = true;
         else if (arg == "--fallback")
-            settings.tryFallback = true;
+            settings.set("build-fallback", "true");
         else if (arg == "--max-jobs" || arg == "-j")
             settings.set("build-max-jobs", getArg(arg, i, args.end()));
         else if (arg == "--cores")

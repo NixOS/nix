@@ -246,6 +246,16 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
   </varlistentry>
 
     
+  <varlistentry><term><literal>build-fallback</literal></term>
+
+    <listitem><para>If set to <literal>true</literal>, Nix will fall
+    back to building from source if a binary substitute fails.  This
+    is equivalent to the <option>--fallback</option> flag.  The
+    default is <literal>false</literal>.</para></listitem>
+
+  </varlistentry>
+
+    
   <varlistentry xml:id="conf-build-chroot-dirs"><term><literal>build-chroot-dirs</literal></term>
 
     <listitem><para>When builds are performed in a chroot environment,
