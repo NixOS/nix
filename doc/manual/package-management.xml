@@ -175,21 +175,6 @@ upgrading `coreutils-5.0' to `coreutils-5.2.1'</screen>
 
 </para>
 
-<para>If you grow bored of specifying the Nix expressions using
-<parameter>-f</parameter> all the time, you can set a default
-location:
-
-<screen>
-$ nix-env -I nixpkgs-<replaceable>version</replaceable></screen>
-
-After this you can just say, for instance, <literal>nix-env -u
-'*'</literal>.<footnote><para>Setting a default using
-<parameter>-I</parameter> currently clashes with using Nix channels,
-since <literal>nix-channel --update</literal> calls <literal>nix-env
--I</literal> to set the default to the Nix expressions it downloaded
-from the channel, replacing whatever default you had
-set.</para></footnote></para>
-
 </section>
 
 
