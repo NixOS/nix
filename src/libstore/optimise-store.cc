@@ -51,6 +51,8 @@ struct MakeImmutable
 
 void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
 {
+    checkInterrupt();
+    
     struct stat st;
     if (lstat(path.c_str(), &st))
 	throw SysError(format("getting attributes of path `%1%'") % path);
