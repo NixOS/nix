@@ -8,7 +8,7 @@ use Nix::Store;
 use Nix::Utils;
 use WWW::Curl::Easy;
 use WWW::Curl::Multi;
-use List::MoreUtils qw(any);
+use List::MoreUtils qw(any uniq);
 use strict;
 
 
@@ -190,7 +190,7 @@ sub getAvailableCaches {
         }
     }
 
-    foreach my $url (@urls) {
+    foreach my $url (uniq @urls) {
 
         # FIXME: not atomic.
         $queryCache->execute($url);
