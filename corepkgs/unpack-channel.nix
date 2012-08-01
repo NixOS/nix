@@ -1,14 +1,27 @@
 with import <nix/config.nix>;
 
+let
+
+  builder = builtins.toFile "unpack-channel.sh"
+    ''
+      mkdir $out
+      cd $out
+      ${bzip2} -d < $src | ${tar} xf -
+      mv * $out/$channelName
+    '';
+
+in
+
 { name, channelName, src }:
 
 derivation {
   system = builtins.currentSystem;
   builder = shell;
-  args = [ "-e" ./unpack-channel.sh ];
-  inherit name channelName src bzip2 tar tr;
+  args = [ "-e" builder ];
+  inherit name channelName src;
+
   PATH = "${nixBinDir}:${coreutils}";
-  
+
   # No point in doing this remotely.
   preferLocalBuild = true;
 
