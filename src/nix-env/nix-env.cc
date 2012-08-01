@@ -112,6 +112,11 @@ static void getAllExprs(EvalState & state,
     StringSet namesSorted(names.begin(), names.end());
 
     foreach (StringSet::iterator, i, namesSorted) {
+        /* Ignore the manifest.nix used by profiles.  This is
+           necessary to prevent it from showing up in channels (which
+           are implemented using profiles). */
+        if (*i == "manifest.nix") continue;
+        
         Path path2 = path + "/" + *i;
         
         struct stat st;
