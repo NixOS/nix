@@ -581,6 +581,8 @@ void LocalStore::removeUnusedLinks()
     AutoCloseDir dir = opendir(linksDir.c_str());
     if (!dir) throw SysError(format("opening directory `%1%'") % linksDir);
 
+    unsigned long long actualSize = 0, unsharedSize = 0;
+
     struct dirent * dirent;
     while (errno = 0, dirent = readdir(dir)) {
         checkInterrupt();
@@ -592,13 +594,26 @@ void LocalStore::removeUnusedLinks()
         if (lstat(path.c_str(), &st) == -1)
             throw SysError(format("statting `%1%'") % path);
 
-        if (st.st_nlink != 1) continue;
+        if (st.st_nlink != 1) {
+            unsigned long long size = st.st_blocks * 512ULL;
+            actualSize += size;
+            unsharedSize += (st.st_nlink - 1) * size;
+            continue;
+        }
 
         printMsg(lvlTalkative, format("deleting unused link `%1%'") % path);
 
         if (unlink(path.c_str()) == -1)
             throw SysError(format("deleting `%1%'") % path);
     }
+
+    struct stat st;
+    if (stat(linksDir.c_str(), &st) == -1)
+        throw SysError(format("statting `%1%'") % linksDir);
+    unsigned long long overhead = st.st_blocks * 512ULL;
+
+    printMsg(lvlInfo, format("note: currently hard linking saves %.2f MiB")
+        % ((unsharedSize - actualSize - overhead) / (1024.0 * 1024.0)));
 }
 
 
