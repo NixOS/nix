@@ -1018,7 +1018,7 @@ string concatStringsSep(const string & sep, const Strings & ss)
 string chomp(const string & s)
 {
     size_t i = s.find_last_not_of(" \n\r\t");
-    return i == string::npos ? "" : string(s, 0, i);
+    return i == string::npos ? "" : string(s, 0, i + 1);
 }
 
 
