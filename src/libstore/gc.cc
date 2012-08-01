@@ -550,7 +550,7 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
         } else
             deleteGarbage(state, path);
 
-        if (state.options.maxFreed && state.results.bytesFreed + state.bytesInvalidated > state.options.maxFreed) {
+        if (state.results.bytesFreed + state.bytesInvalidated > state.options.maxFreed) {
             printMsg(lvlInfo, format("deleted or invalidated more than %1% bytes; stopping") % state.options.maxFreed);
             throw GCLimitReached();
         }
@@ -675,7 +675,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 throw Error(format("cannot delete path `%1%' since it is still alive") % *i);
         }
         
-    } else {
+    } else if (options.maxFreed > 0) {
         
         if (shouldDelete(state.options.action))
             printMsg(lvlError, format("deleting garbage..."));
