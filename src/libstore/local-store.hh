@@ -45,7 +45,7 @@ struct OptimiseStats
 struct RunningSubstituter
 {
     Pid pid;
-    AutoCloseFD to, from;
+    AutoCloseFD to, from, error;
 };
 
 

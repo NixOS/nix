@@ -909,10 +909,11 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
 
     debug(format("starting substituter program `%1%'") % substituter);
 
-    Pipe toPipe, fromPipe;
+    Pipe toPipe, fromPipe, errorPipe;
 
     toPipe.create();
     fromPipe.create();
+    errorPipe.create();
 
     run.pid = fork();
 
@@ -940,6 +941,8 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
                 throw SysError("dupping stdin");
             if (dup2(fromPipe.writeSide, STDOUT_FILENO) == -1)
                 throw SysError("dupping stdout");
+            if (dup2(errorPipe.writeSide, STDERR_FILENO) == -1)
+                throw SysError("dupping stderr");
             closeMostFDs(set<int>());
             execl(substituter.c_str(), substituter.c_str(), "--query", NULL);
             throw SysError(format("executing `%1%'") % substituter);
@@ -953,6 +956,7 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
 
     run.to = toPipe.writeSide.borrow();
     run.from = fromPipe.readSide.borrow();
+    run.error = errorPipe.readSide.borrow();
 }
 
 
@@ -973,13 +977,21 @@ PathSet LocalStore::querySubstitutablePaths(const PathSet & paths)
         RunningSubstituter & run(runningSubstituters[*i]);
         startSubstituter(*i, run);
         string s = "have ";
-        foreach (PathSet::const_iterator, i, paths)
-            if (res.find(*i) == res.end()) { s += *i; s += " "; }
+        foreach (PathSet::const_iterator, j, paths)
+            if (res.find(*j) == res.end()) { s += *j; s += " "; }
         writeLine(run.to, s);
         while (true) {
-            Path path = readLine(run.from);
-            if (path == "") break;
-            res.insert(path);
+            /* FIXME: we only read stderr when an error occurs, so
+               substituters should only write (short) messages to
+               stderr when they fail.  I.e. they shouldn't write debug
+               output. */
+            try {
+                Path path = readLine(run.from);
+                if (path == "") break;
+                res.insert(path);
+            } catch (EndOfFile e) {
+                throw Error(format("substituter `%1%' failed: %2%") % *i % chomp(drainFD(run.error)));
+            }
         }
     }
     return res;
@@ -998,22 +1010,26 @@ void LocalStore::querySubstitutablePathInfos(const Path & substituter,
     writeLine(run.to, s);
 
     while (true) {
-        Path path = readLine(run.from);
-        if (path == "") break;
-        if (paths.find(path) == paths.end())
-            throw Error(format("got unexpected path `%1%' from substituter") % path);
-        paths.erase(path);
-        SubstitutablePathInfo & info(infos[path]);
-        info.deriver = readLine(run.from);
-        if (info.deriver != "") assertStorePath(info.deriver);
-        int nrRefs = getIntLine<int>(run.from);
-        while (nrRefs--) {
-            Path p = readLine(run.from);
-            assertStorePath(p);
-            info.references.insert(p);
+        try {
+            Path path = readLine(run.from);
+            if (path == "") break;
+            if (paths.find(path) == paths.end())
+                throw Error(format("got unexpected path `%1%' from substituter") % path);
+            paths.erase(path);
+            SubstitutablePathInfo & info(infos[path]);
+            info.deriver = readLine(run.from);
+            if (info.deriver != "") assertStorePath(info.deriver);
+            int nrRefs = getIntLine<int>(run.from);
+            while (nrRefs--) {
+                Path p = readLine(run.from);
+                assertStorePath(p);
+                info.references.insert(p);
+            }
+            info.downloadSize = getIntLine<long long>(run.from);
+            info.narSize = getIntLine<long long>(run.from);
+        } catch (EndOfFile e) {
+            throw Error(format("substituter `%1%' failed: %2%") % substituter % chomp(drainFD(run.error)));
         }
-        info.downloadSize = getIntLine<long long>(run.from);
-        info.narSize = getIntLine<long long>(run.from);
     }
 }
 

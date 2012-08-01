@@ -184,13 +184,9 @@ sub getAvailableCaches {
         my @trustedUrls = (@urls, strToList($Nix::Config::config{"trusted-binary-caches"} // ""));
         @urls = ();
         foreach my $url (@untrustedUrls) {
-            if (any { $url eq $_ } @trustedUrls) {
-                push @urls, $url;
-            } else {
-                # FIXME: should die here, but we currently can't
-                # deliver error messages to clients.
-                warn "warning: binary cache ‘$url’ is not trusted (please add it to ‘trusted-binary-caches’ in $Nix::Config::confDir/nix.conf)\n";
-            }
+            die "binary cache ‘$url’ is not trusted (please add it to ‘trusted-binary-caches’ in $Nix::Config::confDir/nix.conf)\n"
+                unless any { $url eq $_ } @trustedUrls;
+            push @urls, $url;
         }
     }
 

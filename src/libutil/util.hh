@@ -292,6 +292,10 @@ Strings tokenizeString(const string & s, const string & separators = " \t\n\r");
 string concatStringsSep(const string & sep, const Strings & ss);
 
 
+/* Remove trailing whitespace from a string. */
+string chomp(const string & s);
+
+
 /* Convert the exit status of a child as returned by wait() into an
    error string. */
 string statusToString(int status);
