@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include "util.hh"
 #include "local-store.hh"
 #include "immutable.hh"
@@ -51,6 +53,8 @@ struct MakeImmutable
 
 void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
 {
+    checkInterrupt();
+    
     struct stat st;
     if (lstat(path.c_str(), &st))
         throw SysError(format("getting attributes of path `%1%'") % path);
@@ -65,7 +69,6 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
     /* We can hard link regular files and maybe symlinks. */
     if (!S_ISREG(st.st_mode)
 #if CAN_LINK_SYMLINK
-        x
         && !S_ISLNK(st.st_mode)
 #endif
         ) return;
