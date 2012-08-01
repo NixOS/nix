@@ -176,6 +176,16 @@ sub getAvailableCaches {
         ($Nix::Config::config{"binary-caches"}
          // ($Nix::Config::storeDir eq "/nix/store" ? "http://nixos.org/binary-cache" : ""));
 
+    my $urlsFiles = $Nix::Config::config{"binary-cache-files"}
+        // "/nix/var/nix/profiles/per-user/root/channels/binary-caches/*";
+    foreach my $urlFile (glob $urlsFiles) {
+        next unless -f $urlFile;
+        open FILE, "<$urlFile" or die "cannot open ‘$urlFile’\n";
+        my $url = <FILE>; chomp $url;
+        close FILE;
+        push @urls, strToList($url);
+    }
+
     # Allow Nix daemon users to override the binary caches to a subset
     # of those listed in the config file.  Note that ‘untrusted-*’
     # denotes options passed by the client.

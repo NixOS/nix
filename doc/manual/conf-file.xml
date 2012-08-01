@@ -329,6 +329,18 @@ build-use-chroot = /dev /proc /bin</programlisting>
   </varlistentry>
 
 
+  <varlistentry><term><literal>binary-caches-files</literal></term>
+
+    <listitem><para>A list of names of files that will be read to
+    obtain additional binary cache URLs.  The default is
+    <literal>/nix/var/nix/profiles/per-user/root/channels/binary-caches/*</literal>,
+    which ensures that Nix will use the binary caches corresponding to
+    the channels installed by root.  Do not set this option to read
+    files created by untrusted users!</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry><term><literal>trusted-binary-caches</literal></term>
 
     <listitem><para>A list of URLs of binary caches, separated by
