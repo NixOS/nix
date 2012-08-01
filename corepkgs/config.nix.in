@@ -9,6 +9,7 @@ in {
   bzip2 = "@bzip2@";
   xz = "@xz@";
   tar = "@tar@";
+  tarFlags = "@tarFlags@";
   tr = "@tr@";
   curl = "@curl@";
   nixBinDir = fromEnv "NIX_BIN_DIR" "@bindir@";

@@ -6,7 +6,7 @@ let
     ''
       mkdir $out
       cd $out
-      ${bzip2} -d < $src | ${tar} xf -
+      ${bzip2} -d < $src | ${tar} xf - --warning=no-timestamp 
       mv * $out/$channelName
     '';
 

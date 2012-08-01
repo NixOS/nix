@@ -339,6 +339,18 @@ eval dynlib_suffix=$shrext_cmds
 AC_SUBST(dynlib_suffix)
 
 
+# Do we have GNU tar?
+AC_MSG_CHECKING([if you have GNU tar])
+if $tar --version 2> /dev/null | grep -q GNU; then
+    AC_MSG_RESULT(yes)
+    tarFlags="--warning=no-timestamp"
+else
+    AC_MSG_RESULT(no)
+fi
+AC_SUBST(tarFlags)
+
+
+
 AM_CONFIG_HEADER([config.h])
 AC_CONFIG_FILES([Makefile
    src/Makefile

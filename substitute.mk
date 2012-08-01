@@ -22,6 +22,7 @@
 	 -e "s^@coreutils\@^$(coreutils)^g" \
 	 -e "s^@sed\@^$(sed)^g" \
 	 -e "s^@tar\@^$(tar)^g" \
+	 -e "s^@tarFlags\@^$(tarFlags)^g" \
 	 -e "s^@gzip\@^$(gzip)^g" \
 	 -e "s^@pv\@^$(pv)^g" \
 	 -e "s^@tr\@^$(tr)^g" \
