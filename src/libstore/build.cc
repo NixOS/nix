@@ -606,18 +606,17 @@ void getOwnership(const Path & path)
 }
 
 
-void deletePathWrapped(const Path & path,
-    unsigned long long & bytesFreed, unsigned long long & blocksFreed)
+void deletePathWrapped(const Path & path, unsigned long long & bytesFreed)
 {
     try {
         /* First try to delete it ourselves. */
-        deletePath(path, bytesFreed, blocksFreed);
+        deletePath(path, bytesFreed);
     } catch (SysError & e) {
         /* If this failed due to a permission error, then try it with
            the setuid helper. */
         if (haveBuildUsers() && !amPrivileged()) {
             getOwnership(path);
-            deletePath(path, bytesFreed, blocksFreed);
+            deletePath(path, bytesFreed);
         } else
             throw;
     }
@@ -626,8 +625,8 @@ void deletePathWrapped(const Path & path,
 
 void deletePathWrapped(const Path & path)
 {
-    unsigned long long dummy1, dummy2;
-    deletePathWrapped(path, dummy1, dummy2);
+    unsigned long long dummy1;
+    deletePathWrapped(path, dummy1);
 }
 
 

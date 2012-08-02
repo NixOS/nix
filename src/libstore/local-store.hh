@@ -304,8 +304,7 @@ void getOwnership(const Path & path);
 
 /* Like deletePath(), but changes the ownership of `path' using the
    setuid wrapper if necessary (and possible). */
-void deletePathWrapped(const Path & path,
-    unsigned long long & bytesFreed, unsigned long long & blocksFreed);
+void deletePathWrapped(const Path & path, unsigned long long & bytesFreed);
 
 void deletePathWrapped(const Path & path);
  

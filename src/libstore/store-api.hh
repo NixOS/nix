@@ -65,13 +65,9 @@ struct GCResults
        number of bytes that would be or was freed. */
     unsigned long long bytesFreed;
 
-    /* The number of file system blocks that would be or was freed. */
-    unsigned long long blocksFreed;
-
     GCResults()
     {
         bytesFreed = 0;
-        blocksFreed = 0;
     }
 };
 

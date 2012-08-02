@@ -503,7 +503,7 @@ static void performOp(unsigned int clientVersion,
         
         writeStrings(results.paths, to);
         writeLongLong(results.bytesFreed, to);
-        writeLongLong(results.blocksFreed, to);
+        writeLongLong(0, to); // obsolete
         
         break;
     }

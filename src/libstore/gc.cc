@@ -425,10 +425,9 @@ bool LocalStore::isActiveTempFile(const GCState & state,
 void LocalStore::deleteGarbage(GCState & state, const Path & path)
 {
     printMsg(lvlInfo, format("deleting `%1%'") % path);
-    unsigned long long bytesFreed, blocksFreed;
-    deletePathWrapped(path, bytesFreed, blocksFreed);
+    unsigned long long bytesFreed;
+    deletePathWrapped(path, bytesFreed);
     state.results.bytesFreed += bytesFreed;
-    state.results.blocksFreed += blocksFreed;
 }
 
 

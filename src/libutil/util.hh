@@ -80,8 +80,7 @@ void computePathSize(const Path & path,
    returns the number of bytes and blocks freed. */
 void deletePath(const Path & path);
 
-void deletePath(const Path & path, unsigned long long & bytesFreed,
-    unsigned long long & blocksFreed);
+void deletePath(const Path & path, unsigned long long & bytesFreed);
 
 /* Make a path read-only recursively. */
 void makePathReadOnly(const Path & path);

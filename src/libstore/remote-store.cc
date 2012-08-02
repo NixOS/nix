@@ -494,7 +494,7 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
     
     results.paths = readStrings<PathSet>(from);
     results.bytesFreed = readLongLong(from);
-    results.blocksFreed = readLongLong(from);
+    readLongLong(from); // obsolete
 }
 
 
