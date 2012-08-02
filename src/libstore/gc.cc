@@ -575,7 +575,7 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
    safely deleted.  FIXME: race condition with optimisePath(): we
    might see a link count of 1 just before optimisePath() increases
    the link count. */
-void LocalStore::removeUnusedLinks()
+void LocalStore::removeUnusedLinks(const GCState & state)
 {
     AutoCloseDir dir = opendir(linksDir.c_str());
     if (!dir) throw SysError(format("opening directory `%1%'") % linksDir);
@@ -604,6 +604,8 @@ void LocalStore::removeUnusedLinks()
 
         if (unlink(path.c_str()) == -1)
             throw SysError(format("deleting `%1%'") % path);
+
+        state.results.bytesFreed += st.st_blocks * 512;
     }
 
     struct stat st;
@@ -732,7 +734,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     /* Clean up the links directory. */
     printMsg(lvlError, format("deleting unused links..."));
-    removeUnusedLinks();
+    removeUnusedLinks(state);
 }
 
 

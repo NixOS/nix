@@ -264,7 +264,7 @@ private:
         
     int openGCLock(LockType lockType);
     
-    void removeUnusedLinks();
+    void removeUnusedLinks(const GCState & state);
 
     void startSubstituter(const Path & substituter,
         RunningSubstituter & runningSubstituter);
