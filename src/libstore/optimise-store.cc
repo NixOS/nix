@@ -102,11 +102,11 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
         /* Nope, create a hard link in the links directory. */
         makeMutable(path);
         MakeImmutable mk1(path);
-
-        if (link(path.c_str(), linkPath.c_str()) == -1)
+        if (link(path.c_str(), linkPath.c_str()) == 0) return;
+        if (errno != EEXIST)
             throw SysError(format("cannot link `%1%' to `%2%'") % linkPath % path);
-
-        return;
+        /* Fall through if another process created ‘linkPath’ before
+           we did. */
     }
 
     /* Yes!  We've seen a file with the same contents.  Replace the
