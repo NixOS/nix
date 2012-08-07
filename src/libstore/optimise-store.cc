@@ -156,7 +156,8 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
                 /* Too many links to the same file (>= 32000 on most
                    file systems).  This is likely to happen with empty
                    files.  Just shrug and ignore. */
-                printMsg(lvlInfo, format("`%1%' has maximum number of links") % linkPath);
+                if (st.st_size)
+                    printMsg(lvlInfo, format("`%1%' has maximum number of links") % linkPath);
                 return;
             }
             if (errno == EPERM) continue;
@@ -172,7 +173,8 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
                    rename, rather than on the original link.
                    (Probably it temporarily increases the st_nlink
                    field before decreasing it again.) */
-                printMsg(lvlInfo, format("`%1%' has maximum number of links") % linkPath);
+                if (st.st_size)
+                    printMsg(lvlInfo, format("`%1%' has maximum number of links") % linkPath);
                 return;
             }
             if (errno == EPERM) continue;
