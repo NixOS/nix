@@ -922,11 +922,19 @@ void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
 void EvalState::concatLists(Value & v, unsigned int nrLists, Value * * lists)
 {
     nrListConcats++;
-    
+
+    Value * nonEmpty = 0;
     unsigned int len = 0;
     for (unsigned int n = 0; n < nrLists; ++n) {
         forceList(*lists[n]);
-        len += lists[n]->list.length;
+        unsigned int l = lists[n]->list.length;
+        len += l;
+        if (l) nonEmpty = lists[n];
+    }
+
+    if (nonEmpty && len == nonEmpty->list.length) {
+        v = *nonEmpty;
+        return;
     }
 
     mkList(v, len);
