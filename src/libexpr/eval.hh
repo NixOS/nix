@@ -236,7 +236,7 @@ public:
     void printStats();
 
 private:
-    
+
     unsigned long nrEnvs;
     unsigned long nrValuesInEnvs;
     unsigned long nrValues;
@@ -244,6 +244,9 @@ private:
     unsigned long nrAttrsets;
     unsigned long nrOpUpdates;
     unsigned long nrOpUpdateValuesCopied;
+    unsigned long nrListConcats;
+    unsigned long nrPrimOpCalls;
+    unsigned long nrFunctionCalls;
 
     bool countCalls;
 
@@ -257,6 +260,7 @@ private:
     AttrSelects attrSelects;
 
     friend class ExprOpUpdate;
+    friend class ExprOpConcatLists;
     friend class ExprSelect;
     friend void prim_getAttr(EvalState & state, Value * * args, Value & v);
 };

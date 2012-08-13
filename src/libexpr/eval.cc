@@ -144,6 +144,7 @@ EvalState::EvalState()
 {
     nrEnvs = nrValuesInEnvs = nrValues = nrListElems = 0;
     nrAttrsets = nrOpUpdates = nrOpUpdateValuesCopied = 0;
+    nrListConcats = nrPrimOpCalls = nrFunctionCalls = 0;
     countCalls = getEnv("NIX_COUNT_CALLS", "0") != "0";
 
 #if HAVE_BOEHMGC
@@ -705,6 +706,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
                 vArgs[n--] = arg->primOpApp.right;
 
             /* And call the primop. */
+            nrPrimOpCalls++;
             if (countCalls) primOpCalls[primOp->primOp->name]++;
             try {
                 primOp->primOp->fun(*this, vArgs, v);
@@ -766,6 +768,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
             throwTypeError("function at %1% called with unexpected argument", fun.lambda.fun->pos);
     }
 
+    nrFunctionCalls++;
     if (countCalls) functionCalls[fun.lambda.fun->pos]++;
 
     try {
@@ -909,6 +912,7 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
 {
+    state.nrListConcats++;
     Value v1; e1->eval(state, env, v1);
     state.forceList(v1);
     Value v2; e2->eval(state, env, v2);
@@ -1215,6 +1219,7 @@ void EvalState::printStats()
         % nrEnvs % (nrEnvs * sizeof(Env) + nrValuesInEnvs * sizeof(Value *)));
     printMsg(v, format("  list elements: %1% (%2% bytes)")
         % nrListElems % (nrListElems * sizeof(Value *)));
+    printMsg(v, format("  list concatenations: %1%") % nrListConcats);
     printMsg(v, format("  values allocated: %1% (%2% bytes)")
         % nrValues % (nrValues * sizeof(Value)));
     printMsg(v, format("  attribute sets allocated: %1%") % nrAttrsets);
@@ -1224,6 +1229,8 @@ void EvalState::printStats()
     printMsg(v, format("  number of thunks: %1%") % nrThunks);
     printMsg(v, format("  number of thunks avoided: %1%") % nrAvoided);
     printMsg(v, format("  number of attr lookups: %1%") % nrLookups);
+    printMsg(v, format("  number of primop calls: %1%") % nrPrimOpCalls);
+    printMsg(v, format("  number of function calls: %1%") % nrFunctionCalls);
 
     if (countCalls) {
 
