@@ -912,16 +912,29 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
 {
-    state.nrListConcats++;
     Value v1; e1->eval(state, env, v1);
-    state.forceList(v1);
     Value v2; e2->eval(state, env, v2);
-    state.forceList(v2);
-    state.mkList(v, v1.list.length + v2.list.length);
-    for (unsigned int n = 0; n < v1.list.length; ++n)
-        v.list.elems[n] = v1.list.elems[n];
-    for (unsigned int n = 0; n < v2.list.length; ++n)
-        v.list.elems[n + v1.list.length] = v2.list.elems[n];
+    Value * lists[2] = { &v1, &v2 };
+    state.concatLists(v, 2, lists);
+}
+
+
+void EvalState::concatLists(Value & v, unsigned int nrLists, Value * * lists)
+{
+    nrListConcats++;
+    
+    unsigned int len = 0;
+    for (unsigned int n = 0; n < nrLists; ++n) {
+        forceList(*lists[n]);
+        len += lists[n]->list.length;
+    }
+
+    mkList(v, len);
+    for (unsigned int n = 0, pos = 0; n < nrLists; ++n) {
+        unsigned int l = lists[n]->list.length;
+        memcpy(v.list.elems + pos, lists[n]->list.elems, l * sizeof(Value *));
+        pos += l;
+    }
 }
 
 

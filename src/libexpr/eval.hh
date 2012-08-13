@@ -232,6 +232,8 @@ public:
     void mkAttrs(Value & v, unsigned int expected);
     void mkThunk_(Value & v, Expr * expr);
 
+    void concatLists(Value & v, unsigned int nrLists, Value * * lists);
+
     /* Print statistics. */
     void printStats();
 

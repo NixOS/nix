@@ -931,6 +931,7 @@ static void prim_filter(EvalState & state, Value * * args, Value & v)
 }
 
 
+/* Return true if a list contains a given element. */
 static void prim_elem(EvalState & state, Value * * args, Value & v)
 {
     bool res = false;
@@ -941,6 +942,14 @@ static void prim_elem(EvalState & state, Value * * args, Value & v)
             break;
         }
     mkBool(v, res);
+}
+
+
+/* Concatenate a list of lists. */
+static void prim_concatLists(EvalState & state, Value * * args, Value & v)
+{
+    state.forceList(*args[0]);
+    state.concatLists(v, args[0]->list.length, args[0]->list.elems);
 }
 
 
@@ -1160,6 +1169,7 @@ void EvalState::createBaseEnv()
     addPrimOp("map", 2, prim_map);
     addPrimOp("__filter", 2, prim_filter);
     addPrimOp("__elem", 2, prim_elem);
+    addPrimOp("__concatLists", 1, prim_concatLists);
     addPrimOp("__length", 1, prim_length);
 
     // Integer arithmetic
