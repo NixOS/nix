@@ -724,7 +724,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
     }
     
     if (fun.type != tLambda)
-        throwTypeError("attempt to call something which is neither a function nor a primop (built-in operation) but %1%",
+        throwTypeError("attempt to call something which is not a function but %1%",
             showType(fun));
 
     unsigned int size =

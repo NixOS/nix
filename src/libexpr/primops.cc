@@ -906,6 +906,30 @@ static void prim_map(EvalState & state, Value * * args, Value & v)
 }
 
 
+/* Filter a list using a predicate; that is, return a list containing
+   every element from the list for which the predicate function
+   returns true. */
+static void prim_filter(EvalState & state, Value * * args, Value & v)
+{
+    state.forceFunction(*args[0]);
+    state.forceList(*args[1]);
+
+    // FIXME: putting this on the stack is risky.
+    Value * vs[args[1]->list.length];
+    unsigned int k = 0;
+
+    for (unsigned int n = 0; n < args[1]->list.length; ++n) {
+        Value res;
+        state.callFunction(*args[0], *args[1]->list.elems[n], res);
+        if (state.forceBool(res))
+            vs[k++] = args[1]->list.elems[n];
+    }
+
+    state.mkList(v, k);
+    for (unsigned int n = 0; n < k; ++n) v.list.elems[n] = vs[n];
+}
+
+
 /* Return the length of a list.  This is an O(1) time operation. */
 static void prim_length(EvalState & state, Value * * args, Value & v)
 {
@@ -1120,6 +1144,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__head", 1, prim_head);
     addPrimOp("__tail", 1, prim_tail);
     addPrimOp("map", 2, prim_map);
+    addPrimOp("__filter", 2, prim_filter);
     addPrimOp("__length", 1, prim_length);
     
     // Integer arithmetic
