@@ -868,14 +868,27 @@ static void prim_isList(EvalState & state, Value * * args, Value & v)
 }
 
 
+static void elemAt(EvalState & state, Value & list, int n, Value & v)
+{
+    state.forceList(list);
+    if (n < 0 || n >= list.list.length)
+        throw Error(format("list index %1% is out of bounds") % n);
+    state.forceValue(*list.list.elems[n]);
+    v = *list.list.elems[n];
+}
+
+
+/* Return the n-1'th element of a list. */
+static void prim_elemAt(EvalState & state, Value * * args, Value & v)
+{
+    elemAt(state, *args[0], state.forceInt(*args[1]), v);
+}
+
+
 /* Return the first element of a list. */
 static void prim_head(EvalState & state, Value * * args, Value & v)
 {
-    state.forceList(*args[0]);
-    if (args[0]->list.length == 0)
-        throw Error("`head' called on an empty list");
-    state.forceValue(*args[0]->list.elems[0]);
-    v = *args[0]->list.elems[0];
+    elemAt(state, *args[0], 0, v);
 }
 
 
@@ -1164,6 +1177,7 @@ void EvalState::createBaseEnv()
 
     // Lists
     addPrimOp("__isList", 1, prim_isList);
+    addPrimOp("__elemAt", 2, prim_elemAt);
     addPrimOp("__head", 1, prim_head);
     addPrimOp("__tail", 1, prim_tail);
     addPrimOp("map", 2, prim_map);
