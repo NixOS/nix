@@ -965,7 +965,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
             isPath = vStr.type == tPath;
             first = false;
         }
-            
+
         s << state.coerceToString(vStr, context, false, !isPath);
     }
         
