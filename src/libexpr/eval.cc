@@ -348,7 +348,7 @@ void EvalState::mkList(Value & v, unsigned int length)
 {
     v.type = tList;
     v.list.length = length;
-    v.list.elems = (Value * *) GC_MALLOC(length * sizeof(Value *));
+    v.list.elems = length ? (Value * *) GC_MALLOC(length * sizeof(Value *)) : 0;
     nrListElems += length;
 }
 
