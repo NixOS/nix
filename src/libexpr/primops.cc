@@ -880,7 +880,8 @@ static void prim_head(EvalState & state, Value * * args, Value & v)
 
 
 /* Return a list consisting of everything but the the first element of
-   a list. */
+   a list.  Warning: this function takes O(n) time, so you probably
+   don't want to use it!  */
 static void prim_tail(EvalState & state, Value * * args, Value & v)
 {
     state.forceList(*args[0]);
@@ -927,6 +928,19 @@ static void prim_filter(EvalState & state, Value * * args, Value & v)
 
     state.mkList(v, k);
     for (unsigned int n = 0; n < k; ++n) v.list.elems[n] = vs[n];
+}
+
+
+static void prim_elem(EvalState & state, Value * * args, Value & v)
+{
+    bool res = false;
+    state.forceList(*args[1]);
+    for (unsigned int n = 0; n < args[1]->list.length; ++n)
+        if (state.eqValues(*args[0], *args[1]->list.elems[n])) {
+            res = true;
+            break;
+        }
+    mkBool(v, res);
 }
 
 
@@ -1145,8 +1159,9 @@ void EvalState::createBaseEnv()
     addPrimOp("__tail", 1, prim_tail);
     addPrimOp("map", 2, prim_map);
     addPrimOp("__filter", 2, prim_filter);
+    addPrimOp("__elem", 2, prim_elem);
     addPrimOp("__length", 1, prim_length);
-    
+
     // Integer arithmetic
     addPrimOp("__add", 2, prim_add);
     addPrimOp("__sub", 2, prim_sub);
