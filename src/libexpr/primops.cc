@@ -713,7 +713,7 @@ static void prim_attrNames(EvalState & state, Value * * args, Value & v)
 
 
 /* Dynamic version of the `.' operator. */
-static void prim_getAttr(EvalState & state, Value * * args, Value & v)
+void prim_getAttr(EvalState & state, Value * * args, Value & v)
 {
     string attr = state.forceStringNoCtx(*args[0]);
     state.forceAttrs(*args[1]);
@@ -722,6 +722,7 @@ static void prim_getAttr(EvalState & state, Value * * args, Value & v)
     if (i == args[1]->attrs->end())
         throw EvalError(format("attribute `%1%' missing") % attr);
     // !!! add to stack trace?
+    if (state.countCalls && i->pos) state.attrSelects[*i->pos]++;
     state.forceValue(*i->value);
     v = *i->value;
 }

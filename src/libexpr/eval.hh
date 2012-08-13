@@ -244,9 +244,21 @@ private:
     unsigned long nrAttrsets;
     unsigned long nrOpUpdates;
     unsigned long nrOpUpdateValuesCopied;
-    
-    friend class RecursionCounter;
+
+    bool countCalls;
+
+    typedef std::map<Symbol, unsigned int> PrimOpCalls;
+    PrimOpCalls primOpCalls;
+
+    typedef std::map<Pos, unsigned int> FunctionCalls;
+    FunctionCalls functionCalls;
+
+    typedef std::map<Pos, unsigned int> AttrSelects;
+    AttrSelects attrSelects;
+
     friend class ExprOpUpdate;
+    friend class ExprSelect;
+    friend void prim_getAttr(EvalState & state, Value * * args, Value & v);
 };
 
 

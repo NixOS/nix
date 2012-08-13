@@ -17,6 +17,9 @@ namespace nix {
 #define foreach(it_type, it, collection)                                \
     for (it_type it = (collection).begin(); it != (collection).end(); ++it)
 
+#define foreach_reverse(it_type, it, collection)                                \
+    for (it_type it = (collection).rbegin(); it != (collection).rend(); ++it)
+
 
 /* Return an environment variable. */
 string getEnv(const string & key, const string & def = "");

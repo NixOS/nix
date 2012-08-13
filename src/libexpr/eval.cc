@@ -144,6 +144,7 @@ EvalState::EvalState()
 {
     nrEnvs = nrValuesInEnvs = nrValues = nrListElems = 0;
     nrAttrsets = nrOpUpdates = nrOpUpdateValuesCopied = 0;
+    countCalls = getEnv("NIX_COUNT_CALLS", "0") != "0";
 
 #if HAVE_BOEHMGC
     static bool gcInitialised = true;
@@ -300,8 +301,10 @@ inline Value * EvalState::lookupVar(Env * env, const VarRef & var)
     if (var.fromWith) {
         while (1) {
             Bindings::iterator j = env->values[0]->attrs->find(var.name);
-            if (j != env->values[0]->attrs->end())
+            if (j != env->values[0]->attrs->end()) {
+                if (countCalls && j->pos) attrSelects[*j->pos]++;
                 return j->value;
+            }
             if (env->prevWith == 0)
                 throwEvalError("undefined variable `%1%'", var.name);
             for (unsigned int l = env->prevWith; l; --l, env = env->up) ;
@@ -619,8 +622,10 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             }
             vAttrs = j->value;
             pos = j->pos;
+            if (state.countCalls && pos) state.attrSelects[*pos]++;
         }
     
+
         state.forceValue(*vAttrs);
         
     } catch (Error & e) {
@@ -700,6 +705,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
                 vArgs[n--] = arg->primOpApp.right;
 
             /* And call the primop. */
+            if (countCalls) primOpCalls[primOp->primOp->name]++;
             try {
                 primOp->primOp->fun(*this, vArgs, v);
             } catch (Error & e) {
@@ -759,6 +765,8 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
         if (!fun.lambda.fun->formals->ellipsis && attrsUsed != arg.attrs->size()) 
             throwTypeError("function at %1% called with unexpected argument", fun.lambda.fun->pos);
     }
+
+    if (countCalls) functionCalls[fun.lambda.fun->pos]++;
 
     try {
         fun.lambda.fun->body->eval(*this, env2, v);
@@ -1216,6 +1224,34 @@ void EvalState::printStats()
     printMsg(v, format("  number of thunks: %1%") % nrThunks);
     printMsg(v, format("  number of thunks avoided: %1%") % nrAvoided);
     printMsg(v, format("  number of attr lookups: %1%") % nrLookups);
+
+    if (countCalls) {
+
+        printMsg(v, format("calls to %1% primops:") % primOpCalls.size());
+        typedef std::multimap<unsigned int, Symbol> PrimOpCalls_;
+        std::multimap<unsigned int, Symbol> primOpCalls_;
+        foreach (PrimOpCalls::iterator, i, primOpCalls)
+            primOpCalls_.insert(std::pair<unsigned int, Symbol>(i->second, i->first));
+        foreach_reverse (PrimOpCalls_::reverse_iterator, i, primOpCalls_)
+            printMsg(v, format("%1$10d %2%") % i->first % i->second);
+
+        printMsg(v, format("calls to %1% functions:") % functionCalls.size());
+        typedef std::multimap<unsigned int, Pos> FunctionCalls_;
+        std::multimap<unsigned int, Pos> functionCalls_;
+        foreach (FunctionCalls::iterator, i, functionCalls)
+            functionCalls_.insert(std::pair<unsigned int, Pos>(i->second, i->first));
+        foreach_reverse (FunctionCalls_::reverse_iterator, i, functionCalls_)
+            printMsg(v, format("%1$10d %2%") % i->first % i->second);
+
+        printMsg(v, format("evaluations of %1% attributes:") % attrSelects.size());
+        typedef std::multimap<unsigned int, Pos> AttrSelects_;
+        std::multimap<unsigned int, Pos> attrSelects_;
+        foreach (AttrSelects::iterator, i, attrSelects)
+            attrSelects_.insert(std::pair<unsigned int, Pos>(i->second, i->first));
+        foreach_reverse (AttrSelects_::reverse_iterator, i, attrSelects_)
+            printMsg(v, format("%1$10d %2%") % i->first % i->second);
+
+    }
 }
 
 
