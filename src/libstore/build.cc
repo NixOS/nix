@@ -1471,9 +1471,9 @@ HookReply DerivationGoal::tryBuildHook()
 }
 
 
-void chmod(const Path & path, mode_t mode)
+void chmod_(const Path & path, mode_t mode)
 {
-    if (::chmod(path.c_str(), 01777) == -1)
+    if (chmod(path.c_str(), mode) == -1)
         throw SysError(format("setting permissions on `%1%'") % path);
 }
 
@@ -1675,7 +1675,7 @@ void DerivationGoal::startBuilder()
            instead.) */
         Path chrootTmpDir = chrootRootDir + "/tmp";
         createDirs(chrootTmpDir);
-        chmod(chrootTmpDir, 01777);
+        chmod_(chrootTmpDir, 01777);
 
         /* Create a /etc/passwd with entries for the build user and the
            nobody account.  The latter is kind of a hack to support
@@ -1719,7 +1719,7 @@ void DerivationGoal::startBuilder()
            precaution, make the fake Nix store only writable by the
            build user. */
         createDirs(chrootRootDir + nixStore);
-        chmod(chrootRootDir + nixStore, 01777);
+        chmod_(chrootRootDir + nixStore, 01777);
 
         foreach (PathSet::iterator, i, inputPaths) {
             struct stat st;
