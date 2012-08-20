@@ -1853,6 +1853,24 @@ void DerivationGoal::initChild()
             char domainname[] = "(none)"; // kernel default
             setdomainname(domainname, sizeof(domainname));
 
+            /* Make all filesystems private.  This is necessary
+               because subtrees may have been mounted as "shared"
+               (MS_SHARED).  (Systemd does this, for instance.)  Even
+               though we have a private mount namespace, mounting
+               filesystems on top of a shared subtree still propagates
+               outside of the namespace.  Making a subtree private is
+               local to the namespace, though, so setting MS_PRIVATE
+               does not affect the outside world. */
+            Strings mounts = tokenizeString(readFile("/proc/self/mountinfo", true), "\n");
+            foreach (Strings::iterator, i, mounts) {
+                Strings fields = tokenizeString(*i, " ");
+                assert(fields.size() >= 5);
+                Strings::iterator j = fields.begin();
+                std::advance(j, 4);
+                if (mount(0, j->c_str(), 0, MS_PRIVATE, 0) == -1)
+                    throw SysError(format("unable to make filesystem `%1%' private") % *j);
+            }
+
             /* Bind-mount all the directories from the "host"
                filesystem that we want in the chroot
                environment. */

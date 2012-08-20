@@ -63,7 +63,7 @@ Strings readDirectory(const Path & path);
 
 /* Read the contents of a file into a string. */
 string readFile(int fd);
-string readFile(const Path & path);
+string readFile(const Path & path, bool drain = false);
 
 /* Write a string to a file. */
 void writeFile(const Path & path, const string & s);

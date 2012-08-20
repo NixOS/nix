@@ -224,12 +224,12 @@ string readFile(int fd)
 }
 
 
-string readFile(const Path & path)
+string readFile(const Path & path, bool drain)
 {
     AutoCloseFD fd = open(path.c_str(), O_RDONLY);
     if (fd == -1)
         throw SysError(format("opening file `%1%'") % path);
-    return readFile(fd);
+    return drain ? drainFD(fd) : readFile(fd);
 }
 
 
