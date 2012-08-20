@@ -1859,16 +1859,16 @@ void DerivationGoal::initChild()
             foreach (PathSet::iterator, i, dirsInChroot) {
                 Path source = *i;
                 Path target = chrootRootDir + source;
+                if (source == "/proc") continue; // backwards compatibility
                 debug(format("bind mounting `%1%' to `%2%'") % source % target);
-                
                 createDirs(target);
-                
                 if (mount(source.c_str(), target.c_str(), "", MS_BIND, 0) == -1)
                     throw SysError(format("bind mount from `%1%' to `%2%' failed") % source % target);
             }
 
             /* Bind a new instance of procfs on /proc to reflect our
                private PID namespace. */
+            createDirs(chrootRootDir + "/proc");
             if (mount("none", (chrootRootDir + "/proc").c_str(), "proc", 0, 0) == -1)
                 throw SysError("mounting /proc");
 
