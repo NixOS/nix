@@ -45,7 +45,7 @@
 #include <sched.h>
 #endif
 
-#define CHROOT_ENABLED HAVE_CHROOT && HAVE_UNSHARE && HAVE_SYS_MOUNT_H && defined(MS_BIND) && defined(CLONE_NEWNS)
+#define CHROOT_ENABLED HAVE_CHROOT && HAVE_UNSHARE && HAVE_SYS_MOUNT_H && defined(MS_BIND) && defined(MS_PRIVATE) && defined(CLONE_NEWNS)
 
 #if CHROOT_ENABLED
 #include <sys/socket.h>
