@@ -619,6 +619,10 @@ static void processConnection()
     to.flush();
     unsigned int clientVersion = readInt(from);
 
+    bool reserveSpace = true;
+    if (GET_PROTOCOL_MINOR(clientVersion) >= 11)
+        reserveSpace = readInt(from) != 0;
+
     /* Send startup error messages to the client. */
     startWork();
 
@@ -633,10 +637,6 @@ static void processConnection()
             querySetting("build-users-group", "") == "")
             throw Error("if you run `nix-worker' as root, then you MUST set `build-users-group'!");
 #endif
-
-        bool reserveSpace = true;
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 11)
-            reserveSpace = readInt(from) != 0;
 
         /* Open the store. */
         store = boost::shared_ptr<StoreAPI>(new LocalStore(reserveSpace));
