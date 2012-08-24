@@ -33,16 +33,6 @@ static void sigintHandler(int signo)
 }
 
 
-Path makeRootName(const Path & gcRoot, int & counter)
-{
-    counter++;
-    if (counter == 1)
-        return gcRoot;
-    else
-        return (format("%1%-%2%") % gcRoot % counter).str();
-}
-
-
 void printGCWarning()
 {
     static bool haveWarned = false;

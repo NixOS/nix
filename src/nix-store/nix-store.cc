@@ -64,15 +64,19 @@ static PathSet realisePath(const Path & path)
     if (isDerivation(path)) {
         store->buildPaths(singleton<PathSet>(path));
         Derivation drv = derivationFromPath(*store, path);
+        rootNr++;
 
         PathSet outputs;
         foreach (DerivationOutputs::iterator, i, drv.outputs) {
             Path outPath = i->second.path;
             if (gcRoot == "")
                 printGCWarning();
-            else
-                outPath = addPermRoot(*store, outPath,
-                    makeRootName(gcRoot, rootNr), indirectRoot);
+            else {
+                Path rootName = gcRoot;
+                if (rootNr > 1) rootName += "-" + int2String(rootNr);
+                if (i->first != "out") rootName += "-" + i->first;
+                outPath = addPermRoot(*store, outPath, rootName, indirectRoot);
+            }
             outputs.insert(outPath);
         }
         return outputs;

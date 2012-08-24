@@ -26,7 +26,6 @@ MakeError(UsageError, nix::Error);
 class StoreAPI;
 
 /* Ugh.  No better place to put this. */
-Path makeRootName(const Path & gcRoot, int & counter);
 void printGCWarning();
 
 void printMissing(StoreAPI & store, const PathSet & paths);

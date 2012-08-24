@@ -46,7 +46,7 @@ Flags:
   --no-out-link: do not create the `result' symlink
   --out-link / -o NAME: create symlink NAME instead of `result'
   --attr / -A ATTR: select a specific attribute from the Nix expression
-  
+
   --run-env: build dependencies of the specified derivation, then start a
       shell with the environment of the derivation
   --command: command to run with `--run-env'
@@ -114,7 +114,7 @@ EOF
         push @buildArgs, "--dry-run";
         $dryRun = 1;
     }
-    
+
     elsif ($arg eq "--show-trace") {
         push @instArgs, $arg;
     }
@@ -122,22 +122,22 @@ EOF
     elsif ($arg eq "-") {
         @exprs = ("-");
     }
-    
+
     elsif ($arg eq "--verbose" or substr($arg, 0, 2) eq "-v") {
         push @buildArgs, $arg;
         push @instArgs, $arg;
         $verbose = 1;
     }
-    
+
     elsif ($arg eq "--quiet") {
         push @buildArgs, $arg;
         push @instArgs, $arg;
     }
-    
+
     elsif ($arg eq "--run-env") {
         $runEnv = 1;
     }
-    
+
     elsif ($arg eq "--command") {
         $n++;
         die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
