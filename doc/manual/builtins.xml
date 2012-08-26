@@ -275,8 +275,10 @@ stdenv.mkDerivation {
   <replaceable>path</replaceable></term>
 
     <listitem><para>Load, parse and return the Nix expression in the
-    file <replaceable>path</replaceable>.  Evaluation aborts if the
-    file doesn’t exist or contains an incorrect Nix
+    file <replaceable>path</replaceable>.  If <replaceable>path
+    </replaceable> is a directory, the file <filename>default.nix
+    </filename> in that directory is loaded.  Evaluation aborts if
+    the file doesn’t exist or contains an incorrect Nix
     expression.  <function>import</function> implements Nix’s module
     system: you can put any Nix expression (such as an attribute set
     or a function) in a separate file, and use it from Nix expressions
