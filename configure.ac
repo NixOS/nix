@@ -25,12 +25,12 @@ AC_ARG_WITH(system, AC_HELP_STRING([--with-system=SYSTEM],
 
    case "$host_os" in
      linux-gnu*)
-	# For backward compatibility, strip the `-gnu' part.
-	system="$machine_name-linux";;
+        # For backward compatibility, strip the `-gnu' part.
+        system="$machine_name-linux";;
      *)
         # Strip the version number from names such as `gnu0.3',
         # `darwin10.2.0', etc.
-	system="$machine_name-`echo $host_os | "$SED" -e's/@<:@0-9.@:>@*$//g'`";;
+        system="$machine_name-`echo $host_os | "$SED" -e's/@<:@0-9.@:>@*$//g'`";;
    esac])
 
 sys_name=$(uname -s | tr 'A-Z ' 'a-z_')
@@ -40,7 +40,7 @@ case $sys_name in
         sys_name=cygwin
         ;;
 esac
-   
+
 AC_MSG_RESULT($system)
 AC_SUBST(system)
 AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier (`cpu-os')])
@@ -267,7 +267,7 @@ if test "$gc" = yes; then
 fi
 
 
-# Check for the required Perl dependencies (DBI and DBD::SQLite).
+# Check for the required Perl dependencies (DBI, DBD::SQLite and WWW::Curl).
 perlFlags="-I$perllibdir"
 
 AC_ARG_WITH(dbi, AC_HELP_STRING([--with-dbi=PATH],
@@ -288,14 +288,14 @@ if ! $perl $perlFlags -e 'use DBI; use DBD::SQLite;' 2>&5; then
     AC_MSG_FAILURE([The Perl modules DBI and/or DBD::SQLite are missing.])
 fi
 AC_MSG_RESULT(yes)
-  
+
 AC_MSG_CHECKING([whether WWW::Curl works])
 if ! $perl $perlFlags -e 'use WWW::Curl;' 2>&5; then
     AC_MSG_RESULT(no)
     AC_MSG_FAILURE([The Perl module WWW::Curl is missing.])
 fi
 AC_MSG_RESULT(yes)
-  
+
 AC_SUBST(perlFlags)
 
 
