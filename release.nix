@@ -214,7 +214,7 @@ let
       name = "nix-deb";
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
-        { extraPackages = [ "libdbd-sqlite3-perl" "libsqlite3-dev" "libbz2-dev" ]; };
+        { extraPackages = [ "libdbd-sqlite3-perl" "libsqlite3-dev" "libbz2-dev" "libwww-curl-perl" ]; };
       memSize = 1024;
       meta.schedulingPriority = prio;
       configureFlags = "--sysconfdir=/etc";
