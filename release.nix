@@ -195,7 +195,7 @@ let
       name = "nix-rpm-${diskImage.name}";
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
-        { extraPackages = [ "perl-DBD-SQLite" "perl-devel" "sqlite" "sqlite-devel" "bzip2-devel" "emacs" ]; };
+        { extraPackages = [ "perl-DBD-SQLite" "perl-devel" "sqlite" "sqlite-devel" "bzip2-devel" "emacs" "perl-WWW-Curl" ]; };
       memSize = 1024;
       meta.schedulingPriority = prio;
       postRPMInstall = "cd /tmp/rpmout/BUILD/nix-* && make installcheck";
