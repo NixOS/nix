@@ -8,7 +8,6 @@ use Nix::Store;
 use Nix::Utils;
 use WWW::Curl::Easy;
 use WWW::Curl::Multi;
-use List::MoreUtils qw(any uniq);
 use strict;
 
 
@@ -195,12 +194,12 @@ sub getAvailableCaches {
         @urls = ();
         foreach my $url (@untrustedUrls) {
             die "binary cache ‘$url’ is not trusted (please add it to ‘trusted-binary-caches’ in $Nix::Config::confDir/nix.conf)\n"
-                unless any { $url eq $_ } @trustedUrls;
+                unless grep { $url eq $_ } @trustedUrls > 0;
             push @urls, $url;
         }
     }
 
-    foreach my $url (uniq @urls) {
+    foreach my $url (Nix::Utils::uniq @urls) {
 
         # FIXME: not atomic.
         $queryCache->execute($url);
