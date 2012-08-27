@@ -253,7 +253,7 @@ string readLine(int fd)
             if (errno != EINTR)
                 throw SysError("reading a line");
         } else if (rd == 0)
-            throw Error("unexpected EOF reading a line");
+            throw EndOfFile("unexpected EOF reading a line");
         else {
             if (ch == '\n') return s;
             s += ch;
@@ -1007,6 +1007,13 @@ string concatStringsSep(const string & sep, const Strings & ss)
         s += *i;
     }
     return s;
+}
+
+
+string chomp(const string & s)
+{
+    size_t i = s.find_last_not_of(" \n\r\t");
+    return i == string::npos ? "" : string(s, 0, i + 1);
 }
 
 

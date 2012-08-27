@@ -26,7 +26,9 @@ public:
     
     bool isValidPath(const Path & path);
 
-    PathSet queryValidPaths();
+    PathSet queryValidPaths(const PathSet & paths);
+    
+    PathSet queryAllValidPaths();
     
     ValidPathInfo queryPathInfo(const Path & path);
 
@@ -44,10 +46,10 @@ public:
 
     Path queryPathFromHashPart(const string & hashPart);
     
-    bool hasSubstitutes(const Path & path);
+    PathSet querySubstitutablePaths(const PathSet & paths);
     
-    bool querySubstitutablePathInfo(const Path & path,
-        SubstitutablePathInfo & info);
+    void querySubstitutablePathInfos(const PathSet & paths,
+        SubstitutablePathInfos & infos);
     
     Path addToStore(const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,

@@ -19,7 +19,7 @@ void doInit()
 {
     if (!store) {
         try {
-            setDefaultsFromEnvironment();
+            settings.processEnvironment();
             store = openStore();
         } catch (Error & e) {
             croak(e.what());

@@ -96,11 +96,11 @@ void run(Strings args)
         if (arg == "-")
             readStdin = true;
         else if (arg == "--eval-only") {
-            readOnlyMode = true;
+            settings.readOnlyMode = true;
             evalOnly = true;
         }
         else if (arg == "--parse-only") {
-            readOnlyMode = true;
+            settings.readOnlyMode = true;
             parseOnly = evalOnly = true;
         }
         else if (arg == "--find-file")

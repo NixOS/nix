@@ -36,42 +36,45 @@ sub findStorePath {
 if ($ARGV[0] eq "--query") {
 
     while (<STDIN>) {
-        my $cmd = $_; chomp $cmd;
+        chomp;
+        my ($cmd, @args) = split " ", $_;
 
         if ($cmd eq "have") {
-            my $storePath = <STDIN>; chomp $storePath;
-            print STDOUT (defined findStorePath($storePath) ? "1\n" : "0\n");
+            foreach my $storePath (@args) {
+                print "$storePath\n" if defined findStorePath($storePath);
+            }
+            print "\n";
         }
 
         elsif ($cmd eq "info") {
-            my $storePath = <STDIN>; chomp $storePath;
-            my ($store, $sourcePath) = findStorePath($storePath);
-            if (!defined $store) {
-                print "0\n";
-                next; # not an error
+            foreach my $storePath (@args) {
+                my ($store, $sourcePath) = findStorePath($storePath);
+                next unless defined $store;
+
+                $ENV{"NIX_DB_DIR"} = "$store/var/nix/db";
+
+                my $deriver = `@bindir@/nix-store --query --deriver $storePath`;
+                die "cannot query deriver of `$storePath'" if $? != 0;
+                chomp $deriver;
+                $deriver = "" if $deriver eq "unknown-deriver";
+
+                my @references = split "\n",
+                    `@bindir@/nix-store --query --references $storePath`;
+                die "cannot query references of `$storePath'" if $? != 0;
+
+                my $narSize = `@bindir@/nix-store --query --size $storePath`;
+                die "cannot query size of `$storePath'" if $? != 0;
+                chomp $narSize;
+
+                print "$storePath\n";
+                print "$deriver\n";
+                print scalar @references, "\n";
+                print "$_\n" foreach @references;
+                print "$narSize\n";
+                print "$narSize\n";
             }
-            print "1\n";
 
-            $ENV{"NIX_DB_DIR"} = "$store/var/nix/db";
-            
-            my $deriver = `@bindir@/nix-store --query --deriver $storePath`;
-            die "cannot query deriver of `$storePath'" if $? != 0;
-            chomp $deriver;
-            $deriver = "" if $deriver eq "unknown-deriver";
-
-            my @references = split "\n",
-                `@bindir@/nix-store --query --references $storePath`;
-            die "cannot query references of `$storePath'" if $? != 0;
-
-            my $narSize = `@bindir@/nix-store --query --size $storePath`;
-            die "cannot query size of `$storePath'" if $? != 0;
-            chomp $narSize;
-
-            print "$deriver\n";
-            print scalar @references, "\n";
-            print "$_\n" foreach @references;
-            print "$narSize\n";
-            print "$narSize\n";
+            print "\n";
         }
 
         else { die "unknown command `$cmd'"; }
@@ -84,9 +87,10 @@ elsif ($ARGV[0] eq "--substitute") {
     my $storePath = $ARGV[1];
     my ($store, $sourcePath) = findStorePath $storePath;
     die unless $store;
-    print "\n*** Copying `$storePath' from `$sourcePath'\n\n";
+    print STDERR "\n*** Copying `$storePath' from `$sourcePath'\n\n";
     system("$binDir/nix-store --dump $sourcePath | $binDir/nix-store --restore $storePath") == 0
         or die "cannot copy `$sourcePath' to `$storePath'";
+    print "\n"; # no hash to verify
 }
 
 

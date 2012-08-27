@@ -51,6 +51,12 @@ static void prim_import(EvalState & state, Value * * args, Value & v)
                 % path % ctx);
         if (isDerivation(ctx))
             try {
+                /* For performance, prefetch all substitute info. */
+                PathSet willBuild, willSubstitute, unknown;
+                unsigned long long downloadSize, narSize;
+                queryMissing(*store, singleton<PathSet>(ctx),
+                    willBuild, willSubstitute, unknown, downloadSize, narSize);
+                  
                 /* !!! If using a substitute, we only need to fetch
                    the selected output of this derivation. */
                 store->buildPaths(singleton<PathSet>(ctx));
@@ -617,7 +623,7 @@ static void prim_toFile(EvalState & state, Value * * args, Value & v)
         refs.insert(path);
     }
     
-    Path storePath = readOnlyMode
+    Path storePath = settings.readOnlyMode
         ? computeStorePathForText(name, contents, refs)
         : store->addTextToStore(name, contents, refs);
 
@@ -681,7 +687,7 @@ static void prim_filterSource(EvalState & state, Value * * args, Value & v)
 
     FilterFromExpr filter(state, *args[0]);
 
-    Path dstPath = readOnlyMode
+    Path dstPath = settings.readOnlyMode
         ? computeStorePathForPath(path, true, htSHA256, filter).first
         : store->addToStore(path, true, htSHA256, filter);
 
@@ -1134,7 +1140,7 @@ void EvalState::createBaseEnv()
     mkInt(v, time(0));
     addConstant("__currentTime", v);
 
-    mkString(v, thisSystem.c_str());
+    mkString(v, settings.thisSystem.c_str());
     addConstant("__currentSystem", v);
 
     // Miscellaneous

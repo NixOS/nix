@@ -60,7 +60,7 @@ void RemoteStore::openConnection(bool reserveSpace)
     else
          throw Error(format("invalid setting for NIX_REMOTE, `%1%'")
              % remoteMode);
-            
+
     from.fd = fdSocket;
     to.fd = fdSocket;
 
@@ -100,18 +100,18 @@ void RemoteStore::forkSlave()
     /* Start the worker. */
     Path worker = getEnv("NIX_WORKER");
     if (worker == "")
-        worker = nixBinDir + "/nix-worker";
+        worker = settings.nixBinDir + "/nix-worker";
 
     child = fork();
-    
+
     switch (child) {
-        
+
     case -1:
         throw SysError("unable to fork");
 
     case 0:
         try { /* child */
-            
+
             if (dup2(fdChild, STDOUT_FILENO) == -1)
                 throw SysError("dupping write side");
 
@@ -124,7 +124,7 @@ void RemoteStore::forkSlave()
             execlp(worker.c_str(), worker.c_str(), "--slave", NULL);
 
             throw SysError(format("executing `%1%'") % worker);
-            
+
         } catch (std::exception & e) {
             std::cerr << format("child error: %1%\n") % e.what();
         }
@@ -142,7 +142,7 @@ void RemoteStore::connectToDaemon()
     if (fdSocket == -1)
         throw SysError("cannot create Unix domain socket");
 
-    string socketPath = nixStateDir + DEFAULT_SOCKET_PATH;
+    string socketPath = settings.nixStateDir + DEFAULT_SOCKET_PATH;
 
     /* Urgh, sockaddr_un allows path names of only 108 characters.  So
        chdir to the socket directory so that we can pass a relative
@@ -150,16 +150,16 @@ void RemoteStore::connectToDaemon()
        applications... */
     AutoCloseFD fdPrevDir = open(".", O_RDONLY);
     if (fdPrevDir == -1) throw SysError("couldn't open current directory");
-    chdir(dirOf(socketPath).c_str()); 
+    chdir(dirOf(socketPath).c_str());
     Path socketPathRel = "./" + baseNameOf(socketPath);
-    
+
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
     if (socketPathRel.size() >= sizeof(addr.sun_path))
         throw Error(format("socket path `%1%' is too long") % socketPathRel);
     using namespace std;
     strcpy(addr.sun_path, socketPathRel.c_str());
-    
+
     if (connect(fdSocket, (struct sockaddr *) &addr, sizeof(addr)) == -1)
         throw SysError(format("cannot connect to daemon at `%1%'") % socketPath);
 
@@ -184,24 +184,34 @@ RemoteStore::~RemoteStore()
 void RemoteStore::setOptions()
 {
     writeInt(wopSetOptions, to);
-    writeInt(keepFailed, to);
-    writeInt(keepGoing, to);
-    writeInt(tryFallback, to);
+
+    writeInt(settings.keepFailed, to);
+    writeInt(settings.keepGoing, to);
+    writeInt(settings.tryFallback, to);
     writeInt(verbosity, to);
-    writeInt(maxBuildJobs, to);
-    writeInt(maxSilentTime, to);
+    writeInt(settings.maxBuildJobs, to);
+    writeInt(settings.maxSilentTime, to);
     if (GET_PROTOCOL_MINOR(daemonVersion) >= 2)
-        writeInt(useBuildHook, to);
+        writeInt(settings.useBuildHook, to);
     if (GET_PROTOCOL_MINOR(daemonVersion) >= 4) {
-        writeInt(buildVerbosity, to);
+        writeInt(settings.buildVerbosity, to);
         writeInt(logType, to);
-        writeInt(printBuildTrace, to);
+        writeInt(settings.printBuildTrace, to);
     }
     if (GET_PROTOCOL_MINOR(daemonVersion) >= 6)
-        writeInt(buildCores, to);
-    if (GET_PROTOCOL_MINOR(daemonVersion) >= 10) 
-        writeInt(queryBoolSetting("build-use-substitutes", true), to);
-    
+        writeInt(settings.buildCores, to);
+    if (GET_PROTOCOL_MINOR(daemonVersion) >= 10)
+        writeInt(settings.useSubstitutes, to);
+
+    if (GET_PROTOCOL_MINOR(daemonVersion) >= 12) {
+        Settings::SettingsMap overrides = settings.getOverrides();
+        writeInt(overrides.size(), to);
+        foreach (Settings::SettingsMap::iterator, i, overrides) {
+            writeString(i->first, to);
+            writeString(i->second, to);
+        }
+    }
+
     processStderr();
 }
 
@@ -217,42 +227,96 @@ bool RemoteStore::isValidPath(const Path & path)
 }
 
 
-PathSet RemoteStore::queryValidPaths()
+PathSet RemoteStore::queryValidPaths(const PathSet & paths)
 {
     openConnection();
-    writeInt(wopQueryValidPaths, to);
+    if (GET_PROTOCOL_MINOR(daemonVersion) < 12) {
+        PathSet res;
+        foreach (PathSet::const_iterator, i, paths)
+            if (isValidPath(*i)) res.insert(*i);
+        return res;
+    } else {
+        writeInt(wopQueryValidPaths, to);
+        writeStrings(paths, to);
+        processStderr();
+        return readStorePaths<PathSet>(from);
+    }
+}
+
+
+PathSet RemoteStore::queryAllValidPaths()
+{
+    openConnection();
+    writeInt(wopQueryAllValidPaths, to);
     processStderr();
     return readStorePaths<PathSet>(from);
 }
 
 
-bool RemoteStore::hasSubstitutes(const Path & path)
+PathSet RemoteStore::querySubstitutablePaths(const PathSet & paths)
 {
     openConnection();
-    writeInt(wopHasSubstitutes, to);
-    writeString(path, to);
-    processStderr();
-    unsigned int reply = readInt(from);
-    return reply != 0;
+    if (GET_PROTOCOL_MINOR(daemonVersion) < 12) {
+        PathSet res;
+        foreach (PathSet::const_iterator, i, paths) {
+            writeInt(wopHasSubstitutes, to);
+            writeString(*i, to);
+            processStderr();
+            if (readInt(from)) res.insert(*i);
+        }
+        return res;
+    } else {
+        writeInt(wopQuerySubstitutablePaths, to);
+        writeStrings(paths, to);
+        processStderr();
+        return readStorePaths<PathSet>(from);
+    }
 }
 
 
-bool RemoteStore::querySubstitutablePathInfo(const Path & path,
-    SubstitutablePathInfo & info)
+void RemoteStore::querySubstitutablePathInfos(const PathSet & paths,
+    SubstitutablePathInfos & infos)
 {
+    if (paths.empty()) return;
+
     openConnection();
-    if (GET_PROTOCOL_MINOR(daemonVersion) < 3) return false;
-    writeInt(wopQuerySubstitutablePathInfo, to);
-    writeString(path, to);
-    processStderr();
-    unsigned int reply = readInt(from);
-    if (reply == 0) return false;
-    info.deriver = readString(from);
-    if (info.deriver != "") assertStorePath(info.deriver);
-    info.references = readStorePaths<PathSet>(from);
-    info.downloadSize = readLongLong(from);
-    info.narSize = GET_PROTOCOL_MINOR(daemonVersion) >= 7 ? readLongLong(from) : 0;
-    return true;
+
+    if (GET_PROTOCOL_MINOR(daemonVersion) < 3) return;
+
+    if (GET_PROTOCOL_MINOR(daemonVersion) < 12) {
+
+        foreach (PathSet::const_iterator, i, paths) {
+            SubstitutablePathInfo info;
+            writeInt(wopQuerySubstitutablePathInfo, to);
+            writeString(*i, to);
+            processStderr();
+            unsigned int reply = readInt(from);
+            if (reply == 0) continue;
+            info.deriver = readString(from);
+            if (info.deriver != "") assertStorePath(info.deriver);
+            info.references = readStorePaths<PathSet>(from);
+            info.downloadSize = readLongLong(from);
+            info.narSize = GET_PROTOCOL_MINOR(daemonVersion) >= 7 ? readLongLong(from) : 0;
+            infos[*i] = info;
+        }
+
+    } else {
+
+        writeInt(wopQuerySubstitutablePathInfos, to);
+        writeStrings(paths, to);
+        processStderr();
+        unsigned int count = readInt(from);
+        for (unsigned int n = 0; n < count; n++) {
+            Path path = readStorePath(from);
+            SubstitutablePathInfo & info(infos[path]);
+            info.deriver = readString(from);
+            if (info.deriver != "") assertStorePath(info.deriver);
+            info.references = readStorePaths<PathSet>(from);
+            info.downloadSize = readLongLong(from);
+            info.narSize = readLongLong(from);
+        }
+
+    }
 }
 
 
@@ -357,7 +421,7 @@ Path RemoteStore::addToStore(const Path & _srcPath,
     bool recursive, HashType hashAlgo, PathFilter & filter)
 {
     openConnection();
-    
+
     Path srcPath(absPath(_srcPath));
 
     writeInt(wopAddToStore, to);
@@ -380,7 +444,7 @@ Path RemoteStore::addTextToStore(const string & name, const string & s,
     writeString(name, to);
     writeString(s, to);
     writeStrings(references, to);
-    
+
     processStderr();
     return readStorePath(from);
 }
@@ -477,7 +541,7 @@ Roots RemoteStore::findRoots()
 void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
     openConnection(false);
-    
+
     writeInt(wopCollectGarbage, to);
     writeInt(options.action, to);
     writeStrings(options.pathsToDelete, to);
@@ -489,9 +553,9 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
         writeInt(0, to);
         writeInt(0, to);
     }
-    
+
     processStderr();
-    
+
     results.paths = readStrings<PathSet>(from);
     results.bytesFreed = readLongLong(from);
     readLongLong(from); // obsolete

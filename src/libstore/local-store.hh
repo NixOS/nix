@@ -45,7 +45,7 @@ struct OptimiseStats
 struct RunningSubstituter
 {
     Pid pid;
-    AutoCloseFD to, from;
+    AutoCloseFD to, from, error;
 };
 
 
@@ -75,19 +75,16 @@ struct SQLiteStmt
     void bind64(long long value);
     void bind();
 };
-    
+
 
 class LocalStore : public StoreAPI
 {
 private:
-    bool substitutablePathsLoaded;
-    PathSet substitutablePaths;
-
     typedef std::map<Path, RunningSubstituter> RunningSubstituters;
     RunningSubstituters runningSubstituters;
 
     Path linksDir;
-    
+
 public:
 
     /* Initialise the local store, upgrading the schema if
@@ -95,13 +92,15 @@ public:
     LocalStore(bool reserveSpace = true);
 
     ~LocalStore();
-    
+
     /* Implementations of abstract store API methods. */
-    
+
     bool isValidPath(const Path & path);
 
-    PathSet queryValidPaths();
-    
+    PathSet queryValidPaths(const PathSet & paths);
+
+    PathSet queryAllValidPaths();
+
     ValidPathInfo queryPathInfo(const Path & path);
 
     Hash queryPathHash(const Path & path);
@@ -121,19 +120,17 @@ public:
     PathSet queryDerivationOutputs(const Path & path);
 
     StringSet queryDerivationOutputNames(const Path & path);
-    
-    Path queryPathFromHashPart(const string & hashPart);
-    
-    PathSet querySubstitutablePaths();
-    
-    bool hasSubstitutes(const Path & path);
 
-    bool querySubstitutablePathInfo(const Path & path,
-        SubstitutablePathInfo & info);
-    
-    bool querySubstitutablePathInfo(const Path & substituter,
-        const Path & path, SubstitutablePathInfo & info);
-    
+    Path queryPathFromHashPart(const string & hashPart);
+
+    PathSet querySubstitutablePaths(const PathSet & paths);
+
+    void querySubstitutablePathInfos(const Path & substituter,
+        PathSet & paths, SubstitutablePathInfos & infos);
+
+    void querySubstitutablePathInfos(const PathSet & paths,
+        SubstitutablePathInfos & infos);
+
     Path addToStore(const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter);
@@ -152,7 +149,7 @@ public:
         Sink & sink);
 
     Paths importPaths(bool requireSignature, Source & source);
-    
+
     void buildPaths(const PathSet & paths);
 
     void ensurePath(const Path & path);
@@ -160,7 +157,7 @@ public:
     void addTempRoot(const Path & path);
 
     void addIndirectRoot(const Path & path);
-    
+
     void syncWithGC();
 
     Roots findRoots();
@@ -173,7 +170,7 @@ public:
 
     /* Optimise a single store path. */
     void optimisePath(const Path & path);
-    
+
     /* Check the integrity of the Nix store. */
     void verifyStore(bool checkContents);
 
@@ -232,18 +229,18 @@ private:
     unsigned long long queryValidPathId(const Path & path);
 
     unsigned long long addValidPath(const ValidPathInfo & info, bool checkOutputs = true);
-        
+
     void addReference(unsigned long long referrer, unsigned long long reference);
-    
+
     void appendReferrer(const Path & from, const Path & to, bool lock);
-    
+
     void rewriteReferrers(const Path & path, bool purge, PathSet referrers);
 
     void invalidatePath(const Path & path);
 
     /* Delete a path from the Nix store. */
     void invalidatePathChecked(const Path & path);
-    
+
     void verifyPath(const Path & path, const PathSet & store,
         PathSet & done, PathSet & validPaths);
 
@@ -256,14 +253,14 @@ private:
     struct GCState;
 
     void deleteGarbage(GCState & state, const Path & path);
-    
+
     bool tryToDelete(GCState & state, const Path & path);
-    
+
     bool isActiveTempFile(const GCState & state,
         const Path & path, const string & suffix);
-        
+
     int openGCLock(LockType lockType);
-    
+
     void removeUnusedLinks(const GCState & state);
 
     void startSubstituter(const Path & substituter,
@@ -272,7 +269,7 @@ private:
     Path createTempDirInStore();
 
     Path importPath(bool requireSignature, Source & source);
-    
+
     void checkDerivationOutputs(const Path & drvPath, const Derivation & drv);
 
     void optimisePath_(OptimiseStats & stats, const Path & path);
@@ -293,9 +290,6 @@ void canonicalisePathMetaData(const Path & path, bool recurse);
 
 MakeError(PathInUse, Error);
 
-/* Whether we are in build users mode. */
-bool haveBuildUsers();
-
 /* Whether we are root. */
 bool amPrivileged();
 
@@ -307,5 +301,5 @@ void getOwnership(const Path & path);
 void deletePathWrapped(const Path & path, unsigned long long & bytesFreed);
 
 void deletePathWrapped(const Path & path);
- 
+
 }

@@ -12,7 +12,7 @@ void DerivationOutput::parseHashInfo(bool & recursive, HashType & hashType, Hash
 {
     recursive = false;
     string algo = hashAlgo;
-        
+
     if (string(algo, 0, 2) == "r:") {
         recursive = true;
         algo = string(algo, 2);
@@ -21,7 +21,7 @@ void DerivationOutput::parseHashInfo(bool & recursive, HashType & hashType, Hash
     hashType = parseHashType(algo);
     if (hashType == htUnknown)
         throw Error(format("unknown hash algorithm `%1%'") % algo);
-        
+
     hash = parseHash(hashType, this->hash);
 }
 
@@ -38,7 +38,7 @@ Path writeDerivation(StoreAPI & store,
        held during a garbage collection). */
     string suffix = name + drvExtension;
     string contents = unparseDerivation(drv);
-    return readOnlyMode
+    return settings.readOnlyMode
         ? computeStorePathForText(suffix, contents, references)
         : store.addTextToStore(suffix, contents, references);
 }
@@ -51,7 +51,7 @@ static Path parsePath(std::istream & str)
         throw Error(format("bad path `%1%' in derivation") % s);
     return s;
 }
-    
+
 
 static StringSet parseStrings(std::istream & str, bool arePaths)
 {
@@ -60,7 +60,7 @@ static StringSet parseStrings(std::istream & str, bool arePaths)
         res.insert(arePaths ? parsePath(str) : parseString(str));
     return res;
 }
-    
+
 
 Derivation parseDerivation(const string & s)
 {
@@ -106,7 +106,7 @@ Derivation parseDerivation(const string & s)
         expect(str, ")");
         drv.env[name] = value;
     }
-    
+
     expect(str, ")");
     return drv;
 }
@@ -165,7 +165,7 @@ string unparseDerivation(const Derivation & drv)
 
     s += "],";
     printStrings(s, drv.inputSrcs.begin(), drv.inputSrcs.end());
-    
+
     s += ','; printString(s, drv.platform);
     s += ','; printString(s, drv.builder);
     s += ','; printStrings(s, drv.args.begin(), drv.args.end());
@@ -178,9 +178,9 @@ string unparseDerivation(const Derivation & drv)
         s += ','; printString(s, i->second);
         s += ')';
     }
-    
+
     s += "])";
-    
+
     return s;
 }
 
@@ -190,7 +190,7 @@ bool isDerivation(const string & fileName)
     return hasSuffix(fileName, drvExtension);
 }
 
- 
+
 bool isFixedOutputDrv(const Derivation & drv)
 {
     return drv.outputs.size() == 1 &&
@@ -247,7 +247,7 @@ Hash hashDerivationModulo(StoreAPI & store, Derivation drv)
         inputs2[printHash(h)] = i->second;
     }
     drv.inputDrvs = inputs2;
-    
+
     return hashString(htSHA256, unparseDerivation(drv));
 }
 

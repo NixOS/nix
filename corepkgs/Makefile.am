@@ -1,6 +1,6 @@
 all-local: config.nix
 
-files = nar.nix buildenv.nix buildenv.pl unpack-channel.nix unpack-channel.sh derivation.nix fetchurl.nix \
+files = nar.nix buildenv.nix buildenv.pl unpack-channel.nix derivation.nix fetchurl.nix \
 	imported-drv-to-derivation.nix
 
 install-exec-local:

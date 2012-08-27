@@ -80,6 +80,8 @@ struct SubstitutablePathInfo
     unsigned long long narSize; /* 0 = unknown */
 };
 
+typedef std::map<Path, SubstitutablePathInfo> SubstitutablePathInfos;
+
 
 struct ValidPathInfo 
 {
@@ -102,20 +104,23 @@ public:
 
     virtual ~StoreAPI() { }
 
-    /* Checks whether a path is valid. */ 
+    /* Check whether a path is valid. */ 
     virtual bool isValidPath(const Path & path) = 0;
 
-    /* Query the set of valid paths. */
-    virtual PathSet queryValidPaths() = 0;
+    /* Query which of the given paths is valid. */
+    virtual PathSet queryValidPaths(const PathSet & paths) = 0;
+
+    /* Query the set of all valid paths. */
+    virtual PathSet queryAllValidPaths() = 0;
 
     /* Query information about a valid path. */
     virtual ValidPathInfo queryPathInfo(const Path & path) = 0;
 
-    /* Queries the hash of a valid path. */ 
+    /* Query the hash of a valid path. */ 
     virtual Hash queryPathHash(const Path & path) = 0;
 
-    /* Queries the set of outgoing FS references for a store path.
-       The result is not cleared. */
+    /* Query the set of outgoing FS references for a store path.  The
+       result is not cleared. */
     virtual void queryReferences(const Path & path,
         PathSet & references) = 0;
 
@@ -138,13 +143,14 @@ public:
        path, or "" if the path doesn't exist. */
     virtual Path queryPathFromHashPart(const string & hashPart) = 0;
     
-    /* Query whether a path has substitutes. */
-    virtual bool hasSubstitutes(const Path & path) = 0;
+    /* Query which of the given paths have substitutes. */
+    virtual PathSet querySubstitutablePaths(const PathSet & paths) = 0;
 
-    /* Query the references, deriver and download size of a
-       substitutable path. */
-    virtual bool querySubstitutablePathInfo(const Path & path,
-        SubstitutablePathInfo & info) = 0;
+    /* Query substitute info (i.e. references, derivers and download
+       sizes) of a set of paths.  If a path does not have substitute
+       info, it's omitted from the resulting ‘infos’ map. */
+    virtual void querySubstitutablePathInfos(const PathSet & paths,
+        SubstitutablePathInfos & infos) = 0;
     
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.

@@ -9,7 +9,7 @@ clearStore
 clearProfiles
 
 cat > $TEST_ROOT/foo.nixpkg <<EOF
-NIXPKG1 file://$TEST_ROOT/manifest simple $system $drvPath $outPath
+NIXPKG1 file://$TEST_ROOT/cache/MANIFEST simple $system $drvPath $outPath
 EOF
 
 nix-install-package --non-interactive -p $profiles/test $TEST_ROOT/foo.nixpkg

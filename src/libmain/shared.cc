@@ -36,7 +36,7 @@ static void sigintHandler(int signo)
 void printGCWarning()
 {
     static bool haveWarned = false;
-    warnOnce(haveWarned, 
+    warnOnce(haveWarned,
         "you did not specify `--add-root'; "
         "the result might be removed by the garbage collector");
 }
@@ -64,7 +64,7 @@ void printMissing(StoreAPI & store, const PathSet & paths)
 
     if (!unknown.empty()) {
         printMsg(lvlInfo, format("don't know how to build these paths%1%:")
-            % (readOnlyMode ? " (may be caused by read-only store access)" : ""));
+            % (settings.readOnlyMode ? " (may be caused by read-only store access)" : ""));
         foreach (PathSet::iterator, i, unknown)
             printMsg(lvlInfo, format("  %1%") % *i);
     }
@@ -83,12 +83,21 @@ static void setLogType(string lt)
 static bool showTrace = false;
 
 
+string getArg(const string & opt,
+    Strings::iterator & i, const Strings::iterator & end)
+{
+    ++i;
+    if (i == end) throw UsageError(format("`%1%' requires an argument") % opt);
+    return *i;
+}
+
 /* Initialize and reorder arguments, then call the actual argument
    processor. */
 static void initAndRun(int argc, char * * argv)
 {
-    setDefaultsFromEnvironment();
-    
+    settings.processEnvironment();
+    settings.loadConfFile();
+
     /* Catch SIGINT. */
     struct sigaction act;
     act.sa_handler = sigintHandler;
@@ -127,7 +136,7 @@ static void initAndRun(int argc, char * * argv)
     Strings args, remaining;
     while (argc--) args.push_back(*argv++);
     args.erase(args.begin());
-    
+
     /* Expand compound dash options (i.e., `-qlf' -> `-q -l -f'), and
        ignore options for the ATerm library. */
     for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
@@ -146,20 +155,19 @@ static void initAndRun(int argc, char * * argv)
     remaining.clear();
 
     /* Process default options. */
-    int verbosityDelta = 0;
+    int verbosityDelta = lvlInfo;
     for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
         string arg = *i;
         if (arg == "--verbose" || arg == "-v") verbosityDelta++;
         else if (arg == "--quiet") verbosityDelta--;
         else if (arg == "--log-type") {
-            ++i;
-            if (i == args.end()) throw UsageError("`--log-type' requires an argument");
-            setLogType(*i);
+            string s = getArg(arg, i, args.end());
+            setLogType(s);
         }
         else if (arg == "--no-build-output" || arg == "-Q")
-            buildVerbosity = lvlVomit;
+            settings.buildVerbosity = lvlVomit;
         else if (arg == "--print-build-trace")
-            printBuildTrace = true;
+            settings.printBuildTrace = true;
         else if (arg == "--help") {
             printHelp();
             return;
@@ -169,23 +177,23 @@ static void initAndRun(int argc, char * * argv)
             return;
         }
         else if (arg == "--keep-failed" || arg == "-K")
-            keepFailed = true;
+            settings.keepFailed = true;
         else if (arg == "--keep-going" || arg == "-k")
-            keepGoing = true;
+            settings.keepGoing = true;
         else if (arg == "--fallback")
-            tryFallback = true;
+            settings.set("build-fallback", "true");
         else if (arg == "--max-jobs" || arg == "-j")
-            maxBuildJobs = getIntArg<unsigned int>(arg, i, args.end());
+            settings.set("build-max-jobs", getArg(arg, i, args.end()));
         else if (arg == "--cores")
-            buildCores = getIntArg<unsigned int>(arg, i, args.end());
+            settings.set("build-cores", getArg(arg, i, args.end()));
         else if (arg == "--readonly-mode")
-            readOnlyMode = true;
+            settings.readOnlyMode = true;
         else if (arg == "--max-silent-time")
-            maxSilentTime = getIntArg<unsigned int>(arg, i, args.end());
+            settings.set("build-max-silent-time", getArg(arg, i, args.end()));
         else if (arg == "--timeout")
-            buildTimeout = getIntArg<unsigned int>(arg, i, args.end());
+            settings.set("build-timeout", getArg(arg, i, args.end()));
         else if (arg == "--no-build-hook")
-            useBuildHook = false;
+            settings.useBuildHook = false;
         else if (arg == "--show-trace")
             showTrace = true;
         else if (arg == "--option") {
@@ -193,14 +201,15 @@ static void initAndRun(int argc, char * * argv)
             string name = *i;
             ++i; if (i == args.end()) throw UsageError("`--option' requires two arguments");
             string value = *i;
-            overrideSetting(name, tokenizeString(value));
+            settings.set(name, value);
         }
         else remaining.push_back(arg);
     }
 
-    verbosityDelta += queryIntSetting("verbosity", lvlInfo);
     verbosity = (Verbosity) (verbosityDelta < 0 ? 0 : verbosityDelta);
-    
+
+    settings.update();
+
     run(remaining);
 
     /* Close the Nix database. */
@@ -218,7 +227,7 @@ static void setuidInit()
 
     uid_t nixUid = geteuid();
     gid_t nixGid = getegid();
-    
+
     setuidCleanup();
 
     /* Don't trust the current directory. */
@@ -284,7 +293,7 @@ int main(int argc, char * * argv)
        right away. */
     if (argc == 0) abort();
     setuidInit();
-    
+
     /* Turn on buffering for cerr. */
 #if HAVE_PUBSETBUF
     std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
@@ -313,7 +322,7 @@ int main(int argc, char * * argv)
             throw;
         }
     } catch (UsageError & e) {
-        printMsg(lvlError, 
+        printMsg(lvlError,
             format(
                 "error: %1%\n"
                 "Try `%2% --help' for more information.")

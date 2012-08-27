@@ -29,6 +29,7 @@ let
           --with-xml-flags=--nonet
           --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
+          --with-www-curl=${perlPackages.WWWCurl}/${perl.libPrefix}
         '';
 
         postUnpack = ''
@@ -43,7 +44,7 @@ let
 
         preDist = ''
           make -C doc/manual install prefix=$out
-          
+
           make -C doc/manual manual.pdf prefix=$out
           cp doc/manual/manual.pdf $out/manual.pdf
 
@@ -54,7 +55,7 @@ let
           # to Windows and Macs, so there should be no Linux binaries
           # in the closure).
           nuke-refs $out/manual.pdf
-          
+
           echo "doc manual $out/share/doc/nix/manual" >> $out/nix-support/hydra-build-products
           echo "doc-pdf manual $out/manual.pdf" >> $out/nix-support/hydra-build-products
           echo "doc release-notes $out/share/doc/nix/release-notes" >> $out/nix-support/hydra-build-products
@@ -77,6 +78,7 @@ let
           --disable-init-state
           --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
+          --with-www-curl=${perlPackages.WWWCurl}/${perl.libPrefix}
           --enable-gc
         '';
 
@@ -134,12 +136,13 @@ let
           --disable-init-state
           --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
+          --with-www-curl=${perlPackages.WWWCurl}/${perl.libPrefix}
         '';
 
         dontInstall = false;
 
         doInstallCheck = true;
-        
+
         lcovFilter = [ "*/boost/*" "*-tab.*" ];
 
         # We call `dot', and even though we just use it to
@@ -148,16 +151,16 @@ let
         FONTCONFIG_FILE = texFunctions.fontsConf;
       };
 
-      
+
     rpm_fedora13i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora13i386) 50;
     rpm_fedora13x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora13x86_64) 50;
     rpm_fedora16i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora16i386) 50;
     rpm_fedora16x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora16x86_64) 50;
 
-    
+
     deb_debian60i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian60i386) 50;
     deb_debian60x86_64 = makeDeb_x86_64 (diskImageFunsFun: diskImageFunsFun.debian60x86_64) 50;
-    
+
     deb_ubuntu1004i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1004i386) 50;
     deb_ubuntu1004x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1004x86_64) 50;
     deb_ubuntu1010i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1010i386) 50;
@@ -183,7 +186,7 @@ let
   makeRPM_i686 = makeRPM "i686-linux";
   makeRPM_x86_64 = makeRPM "x86_64-linux";
 
-  makeRPM = 
+  makeRPM =
     system: diskImageFun: prio:
 
     with import nixpkgs { inherit system; };
@@ -192,7 +195,7 @@ let
       name = "nix-rpm-${diskImage.name}";
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
-        { extraPackages = [ "perl-DBD-SQLite" "perl-devel" "sqlite" "sqlite-devel" "bzip2-devel" "emacs" ]; };
+        { extraPackages = [ "perl-DBD-SQLite" "perl-devel" "sqlite" "sqlite-devel" "bzip2-devel" "emacs" "perl-WWW-Curl" ]; };
       memSize = 1024;
       meta.schedulingPriority = prio;
       postRPMInstall = "cd /tmp/rpmout/BUILD/nix-* && make installcheck";
@@ -201,7 +204,7 @@ let
 
   makeDeb_i686 = makeDeb "i686-linux";
   makeDeb_x86_64 = makeDeb "x86_64-linux";
-  
+
   makeDeb =
     system: diskImageFun: prio:
 
@@ -211,7 +214,7 @@ let
       name = "nix-deb";
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
-        { extraPackages = [ "libdbd-sqlite3-perl" "libsqlite3-dev" "libbz2-dev" ]; };
+        { extraPackages = [ "libdbd-sqlite3-perl" "libsqlite3-dev" "libbz2-dev" "libwww-curl-perl" ]; };
       memSize = 1024;
       meta.schedulingPriority = prio;
       configureFlags = "--sysconfdir=/etc";

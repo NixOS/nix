@@ -4,6 +4,7 @@ use strict;
 use Nix::Config;
 use Nix::Manifest;
 use Nix::Store;
+use Nix::Utils;
 use POSIX qw(strftime);
 use File::Temp qw(tempdir);
 
@@ -14,6 +15,9 @@ my $logFile = "$Nix::Config::logDir/downloads";
 # For queries, skip expensive calls to nix-hash etc.  We're just
 # estimating the expected download size.
 my $fast = 1;
+
+# ‘--insecure’ is fine because Nix verifies the hash of the result.
+my $curl = "$Nix::Config::curl --fail --location --insecure";
 
 
 # Open the manifest cache and update it if necessary.
@@ -38,7 +42,7 @@ sub parseHash {
 # given path.
 sub computeSmallestDownload {
     my $targetPath = shift;
-    
+
     # Build a graph of all store paths that might contribute to the
     # construction of $targetPath, and the special node "start".  The
     # edges are either patch operations, or downloads of full NAR
@@ -93,7 +97,7 @@ sub computeSmallestDownload {
             my $patchList = $dbh->selectall_arrayref(
                 "select * from Patches where storePath = ?",
                 { Slice => {} }, $u);
-            
+
             foreach my $patch (@{$patchList}) {
                 if (isValidPath($patch->{basePath})) {
                     my ($baseHashAlgo, $baseHash) = parseHash $patch->{baseHash};
@@ -106,7 +110,7 @@ sub computeSmallestDownload {
                         $hash =~ s/.*://;
                         $hashCache->{$baseHashAlgo}->{$patch->{basePath}} = $hash;
                     }
-                    
+
                     next if $hash ne $baseHash;
                 }
                 push @queue, $patch->{basePath};
@@ -117,7 +121,7 @@ sub computeSmallestDownload {
             my $narFileList = $dbh->selectall_arrayref(
                 "select * from NARs where storePath = ?",
                 { Slice => {} }, $u);
-                
+
             foreach my $narFile (@{$narFileList}) {
                 # !!! how to handle files whose size is not known in advance?
                 # For now, assume some arbitrary size (1 GB).
@@ -173,58 +177,56 @@ sub computeSmallestDownload {
 if ($ARGV[0] eq "--query") {
 
     while (<STDIN>) {
-        my $cmd = $_; chomp $cmd;
+        chomp;
+        my ($cmd, @args) = split " ", $_;
 
         if ($cmd eq "have") {
-            my $storePath = <STDIN>; chomp $storePath;
-            print STDOUT (
-                scalar @{$dbh->selectcol_arrayref("select 1 from NARs where storePath = ?", {}, $storePath)} > 0
-                ? "1\n" : "0\n");
+            foreach my $storePath (@args) {
+                print "$storePath\n" if scalar @{$dbh->selectcol_arrayref("select 1 from NARs where storePath = ?", {}, $storePath)} > 0;
+            }
+            print "\n";
         }
 
         elsif ($cmd eq "info") {
-            my $storePath = <STDIN>; chomp $storePath;
+            foreach my $storePath (@args) {
 
-            my $infos = $dbh->selectall_arrayref(
-                "select * from NARs where storePath = ?",
-                { Slice => {} }, $storePath);
-            
-            my $info;
-            if (scalar @{$infos} > 0) {
-                $info = @{$infos}[0];
-            }
-            else {
-                print "0\n";
-                next; # not an error
-            }
+                my $infos = $dbh->selectall_arrayref(
+                    "select * from NARs where storePath = ?",
+                    { Slice => {} }, $storePath);
 
-            print "1\n";
-            print "$info->{deriver}\n";
-            my @references = split " ", $info->{refs};
-            print scalar @references, "\n";
-            print "$_\n" foreach @references;
+                next unless scalar @{$infos} > 0;
+                my $info = @{$infos}[0];
 
-            my @path = computeSmallestDownload $storePath;
+                print "$storePath\n";
+                print "$info->{deriver}\n";
+                my @references = split " ", $info->{refs};
+                print scalar @references, "\n";
+                print "$_\n" foreach @references;
 
-            my $downloadSize = 0;
-            while (scalar @path > 0) {
-                my $edge = pop @path;
-                my $u = $edge->{start};
-                my $v = $edge->{end};
-                if ($edge->{type} eq "patch") {
-                    $downloadSize += $edge->{info}->{size} || 0;
+                my @path = computeSmallestDownload $storePath;
+
+                my $downloadSize = 0;
+                while (scalar @path > 0) {
+                    my $edge = pop @path;
+                    my $u = $edge->{start};
+                    my $v = $edge->{end};
+                    if ($edge->{type} eq "patch") {
+                        $downloadSize += $edge->{info}->{size} || 0;
+                    }
+                    elsif ($edge->{type} eq "narfile") {
+                        $downloadSize += $edge->{info}->{size} || 0;
+                    }
                 }
-                elsif ($edge->{type} eq "narfile") {
-                    $downloadSize += $edge->{info}->{size} || 0;
-                }
+
+                print "$downloadSize\n";
+
+                my $narSize = $info->{narSize} || 0;
+                print "$narSize\n";
             }
 
-            print "$downloadSize\n";
-            
-            my $narSize = $info->{narSize} || 0;
-            print "$narSize\n";
+            print "\n";
         }
-        
+
         else { die "unknown command `$cmd'"; }
     }
 
@@ -273,16 +275,6 @@ $dbh->disconnect;
 my $curStep = 1;
 my $maxStep = scalar @path;
 
-sub downloadFile { 
-    my $url = shift; 
-    $ENV{"PRINT_PATH"} = 1;
-    $ENV{"QUIET"} = 1;
-    my ($hash, $path) = `$Nix::Config::binDir/nix-prefetch-url '$url'`;
-    die "download of `$url' failed" . ($! ? ": $!" : "") . "\n" unless $? == 0;
-    chomp $path;
-    return $path;
-}
-
 my $finalNarHash;
 
 while (scalar @path > 0) {
@@ -314,13 +306,16 @@ while (scalar @path > 0) {
 
         # Download the patch.
         print STDERR "  downloading patch...\n";
-        my $patchPath = downloadFile "$patch->{url}";
+        my $patchPath = "$tmpDir/patch";
+        Nix::Utils::checkURL $patch->{url};
+        system("$curl '$patch->{url}' -o $patchPath") == 0
+            or die "cannot download patch `$patch->{url}'\n";
 
         # Apply the patch to the NAR archive produced in step 1 (for
         # the already present path) or a later step (for patch sequences).
         print STDERR "  applying patch...\n";
         system("$Nix::Config::libexecDir/bspatch $tmpNar $tmpNar2 $patchPath") == 0
-            or die "cannot apply patch `$patchPath' to $tmpNar";
+            or die "cannot apply patch `$patchPath' to $tmpNar\n";
 
         if ($curStep < $maxStep) {
             # The archive will be used as the base of the next patch.
@@ -330,7 +325,7 @@ while (scalar @path > 0) {
             # into the target path.
             print STDERR "  unpacking patched archive...\n";
             system("$Nix::Config::binDir/nix-store --restore $v < $tmpNar2") == 0
-                or die "cannot unpack $tmpNar2 into `$v'";
+                or die "cannot unpack $tmpNar2 into `$v'\n";
         }
 
         $finalNarHash = $patch->{narHash};
@@ -342,20 +337,16 @@ while (scalar @path > 0) {
 
         my $size = $narFile->{size} || -1;
         print LOGFILE "$$ narfile $narFile->{url} $size $v\n";
-        
-        # Download the archive.
-        print STDERR "  downloading archive...\n";
-        my $narFilePath = downloadFile "$narFile->{url}";
 
+        Nix::Utils::checkURL $narFile->{url};
         if ($curStep < $maxStep) {
             # The archive will be used a base to a patch.
-            system("$Nix::Config::bzip2 -d < '$narFilePath' > $tmpNar") == 0
-                or die "cannot unpack `$narFilePath' into `$v'";
+            system("$curl '$narFile->{url}' | $Nix::Config::bzip2 -d > $tmpNar") == 0
+                or die "cannot download and unpack `$narFile->{url}' into `$v'\n";
         } else {
             # Unpack the archive into the target path.
-            print STDERR "  unpacking archive...\n";
-            system("$Nix::Config::bzip2 -d < '$narFilePath' | $Nix::Config::binDir/nix-store --restore '$v'") == 0
-                or die "cannot unpack `$narFilePath' into `$v'";
+            system("$curl '$narFile->{url}' | $Nix::Config::bzip2 -d | $Nix::Config::binDir/nix-store --restore '$v'") == 0
+                or die "cannot download and unpack `$narFile->{url}' into `$v'\n";
         }
 
         $finalNarHash = $narFile->{narHash};
@@ -365,21 +356,10 @@ while (scalar @path > 0) {
 }
 
 
-# Make sure that the hash declared in the manifest matches what we
-# downloaded and unpacked.
-
-if (defined $finalNarHash) {
-    my ($hashAlgo, $hash) = parseHash $finalNarHash;
-
-    # The hash in the manifest can be either in base-16 or base-32.
-    # Handle both.
-    my $hash2 = hashPath($hashAlgo, $hashAlgo eq "sha256" && length($hash) != 64, $targetPath);
-    
-    die "hash mismatch in downloaded path $targetPath; expected $hash, got $hash2\n"
-        if $hash ne $hash2;
-} else {
-    die "cannot check integrity of the downloaded path since its hash is not known\n";
-}
+# Tell Nix about the expected hash so it can verify it.
+die "cannot check integrity of the downloaded path since its hash is not known\n"
+    unless defined $finalNarHash;
+print "$finalNarHash\n";
 
 
 print STDERR "\n";

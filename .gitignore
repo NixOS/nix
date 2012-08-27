@@ -35,8 +35,11 @@ Makefile.in
 
 # /doc/manual/
 /doc/manual/manual.html
+/doc/manual/manual.xmli
+/doc/manual/manual.pdf
 /doc/manual/manual.is-valid
 /doc/manual/*.1
+/doc/manual/*.5
 /doc/manual/*.8
 /doc/manual/images
 /doc/manual/version.txt
@@ -60,6 +63,7 @@ Makefile.in
 /scripts/GeneratePatches.pm
 /scripts/download-using-manifests.pl
 /scripts/copy-from-other-stores.pl
+/scripts/download-from-binary-cache.pl
 /scripts/find-runtime-roots.pl
 /scripts/build-remote.pl
 /scripts/nix-reduce-build

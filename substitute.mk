@@ -16,11 +16,13 @@
 	 -e "s^@shell\@^$(bash)^g" \
 	 -e "s^@curl\@^$(curl)^g" \
 	 -e "s^@bzip2\@^$(bzip2)^g" \
+	 -e "s^@xz\@^$(xz)^g" \
 	 -e "s^@perl\@^$(perl)^g" \
 	 -e "s^@perlFlags\@^$(perlFlags)^g" \
 	 -e "s^@coreutils\@^$(coreutils)^g" \
 	 -e "s^@sed\@^$(sed)^g" \
 	 -e "s^@tar\@^$(tar)^g" \
+	 -e "s^@tarFlags\@^$(tarFlags)^g" \
 	 -e "s^@gzip\@^$(gzip)^g" \
 	 -e "s^@pv\@^$(pv)^g" \
 	 -e "s^@tr\@^$(tr)^g" \

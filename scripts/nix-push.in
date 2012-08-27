@@ -1,85 +1,85 @@
 #! @perl@ -w @perlFlags@
 
 use strict;
+use File::Basename;
 use File::Temp qw(tempdir);
+use File::Path qw(mkpath);
 use File::stat;
+use File::Copy;
 use Nix::Config;
+use Nix::Store;
 use Nix::Manifest;
-
-my $hashAlgo = "sha256";
 
 my $tmpDir = tempdir("nix-push.XXXXXX", CLEANUP => 1, TMPDIR => 1)
     or die "cannot create a temporary directory";
 
 my $nixExpr = "$tmpDir/create-nars.nix";
-my $manifest = "$tmpDir/MANIFEST";
-
-my $curl = "$Nix::Config::curl --fail --silent";
-my $extraCurlFlags = ${ENV{'CURL_FLAGS'}};
-$curl = "$curl $extraCurlFlags" if defined $extraCurlFlags;
 
 
 # Parse the command line.
-my $localCopy;
-my $localArchivesDir;
-my $localManifestFile;
-
-my $targetArchivesUrl;
-
-my $archivesPutURL;
-my $archivesGetURL;
-my $manifestPutURL;
+my $compressionType = "xz";
+my $force = 0;
+my $destDir;
+my $writeManifest = 0;
+my $archivesURL;
+my @roots;
 
 sub showSyntax {
     print STDERR <<EOF
-Usage: nix-push --copy ARCHIVES_DIR MANIFEST_FILE PATHS...
-   or: nix-push ARCHIVES_PUT_URL ARCHIVES_GET_URL MANIFEST_PUT_URL PATHS...
+Usage: nix-push --dest DIR [--manifest] [--url-prefix URL] PATHS...
 
-`nix-push' copies or uploads the closure of PATHS to the given
-destination.
+`nix-push' packs the closure of PATHS into a set of NAR files stored
+in DIR.  Optionally generate a manifest.
 EOF
     ; # `
     exit 1;
 }
 
-showSyntax if scalar @ARGV < 1;
+for (my $n = 0; $n < scalar @ARGV; $n++) {
+    my $arg = $ARGV[$n];
 
-if ($ARGV[0] eq "--copy") {
-    showSyntax if scalar @ARGV < 3;
-    $localCopy = 1;
-    shift @ARGV;
-    $localArchivesDir = shift @ARGV;
-    $localManifestFile = shift @ARGV;
-    if ($ARGV[0] eq "--target") {
-       shift @ARGV;
-       $targetArchivesUrl = shift @ARGV;
-    }
-    else {
-       $targetArchivesUrl = "file://$localArchivesDir";
+    if ($arg eq "--help") {
+        showSyntax;
+    } elsif ($arg eq "--bzip2") {
+        $compressionType = "bzip2";
+    } elsif ($arg eq "--force") {
+        $force = 1;
+    } elsif ($arg eq "--dest") {
+        $n++;
+        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        $destDir = $ARGV[$n];
+        mkpath($destDir, 0, 0755);
+    } elsif ($arg eq "--manifest") {
+        $writeManifest = 1;
+    } elsif ($arg eq "--url-prefix") {
+        $n++;
+        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        $archivesURL = $ARGV[$n];
+    } elsif (substr($arg, 0, 1) eq "-") {
+        showSyntax;
+    } else {
+        push @roots, $arg;
     }
 }
-else {
-    showSyntax if scalar @ARGV < 3;
-    $localCopy = 0;
-    $archivesPutURL = shift @ARGV;
-    $archivesGetURL = shift @ARGV;
-    $manifestPutURL = shift @ARGV;
-}
+
+showSyntax if !defined $destDir;
+
+$archivesURL = "file://$destDir" unless defined $archivesURL;
 
 
 # From the given store paths, determine the set of requisite store
 # paths, i.e, the paths required to realise them.
 my %storePaths;
 
-foreach my $path (@ARGV) {
+foreach my $path (@roots) {
     die unless $path =~ /^\//;
 
-    # Get all paths referenced by the normalisation of the given 
+    # Get all paths referenced by the normalisation of the given
     # Nix expression.
     my $pid = open(READ,
         "$Nix::Config::binDir/nix-store --query --requisites --force-realise " .
         "--include-outputs '$path'|") or die;
-    
+
     while (<READ>) {
         chomp;
         die "bad: $_" unless /^\//;
@@ -92,8 +92,8 @@ foreach my $path (@ARGV) {
 my @storePaths = keys %storePaths;
 
 
-# For each path, create a Nix expression that turns the path into
-# a Nix archive.
+# Create a list of Nix derivations that turn each path into a Nix
+# archive.
 open NIX, ">$nixExpr";
 print NIX "[";
 
@@ -101,10 +101,10 @@ foreach my $storePath (@storePaths) {
     die unless ($storePath =~ /\/[0-9a-z]{32}[^\"\\\$]*$/);
 
     # Construct a Nix expression that creates a Nix archive.
-    my $nixexpr = 
+    my $nixexpr =
         "(import <nix/nar.nix> " .
-        "{ storePath = builtins.storePath \"$storePath\"; hashAlgo = \"$hashAlgo\"; }) ";
-    
+        "{ storePath = builtins.storePath \"$storePath\"; hashAlgo = \"sha256\"; compressionType = \"$compressionType\"; }) ";
+
     print NIX $nixexpr;
 }
 
@@ -112,172 +112,132 @@ print NIX "]";
 close NIX;
 
 
-# Instantiate store derivations from the Nix expression.
-my @storeExprs;
-print STDERR "instantiating store derivations...\n";
-my $pid = open(READ, "$Nix::Config::binDir/nix-instantiate $nixExpr|")
-    or die "cannot run nix-instantiate";
+# Build the Nix expression.
+print STDERR "building compressed archives...\n";
+my @narPaths;
+my $pid = open(READ, "$Nix::Config::binDir/nix-build $nixExpr -o $tmpDir/result |")
+    or die "cannot run nix-build";
 while (<READ>) {
     chomp;
     die unless /^\//;
-    push @storeExprs, $_;
+    push @narPaths, $_;
 }
-close READ or die "nix-instantiate failed: $?";
+close READ or die "nix-build failed: $?";
 
 
-# Build the derivations.
-print STDERR "creating archives...\n";
-
-my @narPaths;
-
-my @tmp = @storeExprs;
-while (scalar @tmp > 0) {
-    my $n = scalar @tmp;
-    if ($n > 256) { $n = 256 };
-    my @tmp2 = @tmp[0..$n - 1];
-    @tmp = @tmp[$n..scalar @tmp - 1];
-
-    my $pid = open(READ, "$Nix::Config::binDir/nix-store --realise @tmp2|")
-        or die "cannot run nix-store";
-    while (<READ>) {
-        chomp;
-        die unless (/^\//);
-        push @narPaths, "$_";
-    }
-    close READ or die "nix-store failed: $?";
+# Write the cache info file.
+my $cacheInfoFile = "$destDir/nix-cache-info";
+if (! -e $cacheInfoFile) {
+    open FILE, ">$cacheInfoFile" or die "cannot create $cacheInfoFile: $!";
+    print FILE "StoreDir: $Nix::Config::storeDir\n";
+    print FILE "WantMassQuery: 0\n"; # by default, don't hit this cache for "nix-env -qas"
+    close FILE;
 }
 
 
-# Create the manifest.
-print STDERR "creating manifest...\n";
+# Copy the archives and the corresponding NAR info files.
+print STDERR "copying archives...\n";
+
+my $totalNarSize = 0;
+my $totalCompressedSize = 0;
 
 my %narFiles;
-my %patches;
 
-my @narArchives;
 for (my $n = 0; $n < scalar @storePaths; $n++) {
     my $storePath = $storePaths[$n];
     my $narDir = $narPaths[$n];
-    
-    $storePath =~ /\/([^\/]*)$/;
-    my $basename = $1;
-    defined $basename or die;
+    my $baseName = basename $storePath;
 
-    open HASH, "$narDir/narbz2-hash" or die "cannot open narbz2-hash";
-    my $narbz2Hash = <HASH>;
-    chomp $narbz2Hash;
-    $narbz2Hash =~ /^[0-9a-z]+$/ or die "invalid hash";
-    close HASH;
-
-    my $narName = "$narbz2Hash.nar.bz2";
-
-    my $narFile = "$narDir/$narName";
-    (-f $narFile) or die "narfile for $storePath not found";
-    push @narArchives, $narFile;
-
-    my $narbz2Size = stat($narFile)->size;
-
-    my $references = `$Nix::Config::binDir/nix-store --query --references '$storePath'`;
-    die "cannot query references for `$storePath'" if $? != 0;
-    $references = join(" ", split(" ", $references));
-
-    my $deriver = `$Nix::Config::binDir/nix-store --query --deriver '$storePath'`;
-    die "cannot query deriver for `$storePath'" if $? != 0;
-    chomp $deriver;
-    $deriver = "" if $deriver eq "unknown-deriver";
-
-    my $narHash = `$Nix::Config::binDir/nix-store --query --hash '$storePath'`;
-    die "cannot query hash for `$storePath'" if $? != 0;
-    chomp $narHash;
+    # Get info about the store path.
+    my ($deriver, $narHash, $time, $narSize, $refs) = queryPathInfo($storePath, 1);
 
     # In some exceptional cases (such as VM tests that use the Nix
     # store of the host), the database doesn't contain the hash.  So
     # compute it.
     if ($narHash =~ /^sha256:0*$/) {
-        $narHash = `$Nix::Config::binDir/nix-hash --type sha256 --base32 '$storePath'`;
-        die "cannot hash `$storePath'" if $? != 0;
+        my $nar = "$tmpDir/nar";
+        system("$Nix::Config::binDir/nix-store --dump $storePath > $nar") == 0
+            or die "cannot dump $storePath\n";
+        $narHash = `$Nix::Config::binDir/nix-hash --type sha256 --base32 --flat $nar`;
+        die "cannot hash `$nar'" if $? != 0;
         chomp $narHash;
         $narHash = "sha256:$narHash";
+        $narSize = stat("$nar")->size;
+        unlink $nar or die;
     }
 
-    my $narSize = `$Nix::Config::binDir/nix-store --query --size '$storePath'`;
-    die "cannot query size for `$storePath'" if $? != 0;
-    chomp $narSize;
+    $totalNarSize += $narSize;
 
-    my $url;
-    if ($localCopy) {
-        $url = "$targetArchivesUrl/$narName";
-    } else {
-        $url = "$archivesGetURL/$narName";
+    # Get info about the compressed NAR.
+    open HASH, "$narDir/nar-compressed-hash" or die "cannot open nar-compressed-hash";
+    my $compressedHash = <HASH>;
+    chomp $compressedHash;
+    $compressedHash =~ /^[0-9a-z]+$/ or die "invalid hash";
+    close HASH;
+
+    my $narName = "$compressedHash.nar." . ($compressionType eq "xz" ? "xz" : "bz2");
+
+    my $narFile = "$narDir/$narName";
+    (-f $narFile) or die "NAR file for $storePath not found";
+
+    my $compressedSize = stat($narFile)->size;
+    $totalCompressedSize += $compressedSize;
+
+    printf STDERR "%s [%.2f MiB, %.1f%%]\n", $storePath,
+        $compressedSize / (1024 * 1024), $compressedSize / $narSize * 100;
+
+    # Copy the compressed NAR.
+    my $dst = "$destDir/$narName";
+    if (! -f $dst) {
+        my $tmp = "$destDir/.tmp.$$.$narName";
+        copy($narFile, $tmp) or die "cannot copy $narFile to $tmp: $!\n";
+        rename($tmp, $dst) or die "cannot rename $tmp to $dst: $!\n";
     }
+
+    # Write the info file.
+    my $info;
+    $info .= "StorePath: $storePath\n";
+    $info .= "URL: $narName\n";
+    $info .= "Compression: $compressionType\n";
+    $info .= "FileHash: sha256:$compressedHash\n";
+    $info .= "FileSize: $compressedSize\n";
+    $info .= "NarHash: $narHash\n";
+    $info .= "NarSize: $narSize\n";
+    $info .= "References: " . join(" ", map { basename $_ } @{$refs}) . "\n";
+    if (defined $deriver) {
+        $info .= "Deriver: " . basename $deriver . "\n";
+        if (isValidPath($deriver)) {
+            my $drv = derivationFromPath($deriver);
+            $info .= "System: $drv->{platform}\n";
+        }
+    }
+
+    my $pathHash = substr(basename($storePath), 0, 32);
+
+    $dst = "$destDir/$pathHash.narinfo";
+    if ($force || ! -f $dst) {
+        my $tmp = "$destDir/.tmp.$$.$pathHash.narinfo";
+        open INFO, ">$tmp" or die;
+        print INFO "$info" or die;
+        close INFO or die;
+        rename($tmp, $dst) or die "cannot rename $tmp to $dst: $!\n";
+    }
+
     $narFiles{$storePath} = [
-        { url => $url
-        , hash => "$hashAlgo:$narbz2Hash"
-        , size => $narbz2Size
+        { url => "$archivesURL/$narName"
+        , hash => "sha256:$compressedHash"
+        , size => $compressedSize
         , narHash => "$narHash"
         , narSize => $narSize
-        , references => $references
+        , references => join(" ", @{$refs})
         , deriver => $deriver
         }
-    ];
+    ] if $writeManifest;
 }
 
-writeManifest $manifest, \%narFiles, \%patches;
+printf STDERR "total compressed size %.2f MiB, %.1f%%\n",
+    $totalCompressedSize / (1024 * 1024), $totalCompressedSize / $totalNarSize * 100;
 
 
-sub copyFile {
-    my $src = shift;
-    my $dst = shift;
-    my $tmp = "$dst.tmp.$$";
-    system("@coreutils@/cp", $src, $tmp) == 0 or die "cannot copy file";
-    rename($tmp, $dst) or die "cannot rename file: $!";
-}
-
-
-# Upload/copy the archives.
-print STDERR "uploading/copying archives...\n";
-
-sub archiveExists {
-    my $name = shift;
-    print STDERR "  HEAD on $archivesGetURL/$name\n";
-    return system("$curl --head $archivesGetURL/$name > /dev/null") == 0;
-}
-
-foreach my $narArchive (@narArchives) {
-
-    $narArchive =~ /\/([^\/]*)$/;
-    my $basename = $1;
-
-    if ($localCopy) {
-        # Since nix-push creates $dst atomically, if it exists we
-        # don't have to copy again.
-        my $dst = "$localArchivesDir/$basename";
-        if (! -f "$localArchivesDir/$basename") {
-            print STDERR "  $narArchive\n";
-            copyFile $narArchive, $dst;
-        }
-    }
-    else {
-        if (!archiveExists("$basename")) {
-            print STDERR "  $narArchive\n";
-            system("$curl --show-error --upload-file " .
-                   "'$narArchive' '$archivesPutURL/$basename' > /dev/null") == 0 or
-                   die "curl failed on $narArchive: $?";
-        }
-    }
-}
-
-
-# Upload the manifest.
-print STDERR "uploading manifest...\n";
-if ($localCopy) {
-    copyFile $manifest, $localManifestFile;
-    copyFile "$manifest.bz2", "$localManifestFile.bz2";
-} else {
-    system("$curl --show-error --upload-file " .
-           "'$manifest' '$manifestPutURL' > /dev/null") == 0 or
-           die "curl failed on $manifest: $?";
-    system("$curl --show-error --upload-file " .
-           "'$manifest'.bz2 '$manifestPutURL'.bz2 > /dev/null") == 0 or
-           die "curl failed on $manifest: $?";
-}
+# Optionally write a manifest.
+writeManifest "$destDir/MANIFEST", \%narFiles, \() if $writeManifest;

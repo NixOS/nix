@@ -6,8 +6,10 @@ in {
   perl = "@perl@";
   shell = "@shell@";
   coreutils = "@coreutils@";
-  bzip2 = fromEnv "NIX_BZIP2" "@bzip2@";
+  bzip2 = "@bzip2@";
+  xz = "@xz@";
   tar = "@tar@";
+  tarFlags = "@tarFlags@";
   tr = "@tr@";
   curl = "@curl@";
   nixBinDir = fromEnv "NIX_BIN_DIR" "@bindir@";

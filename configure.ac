@@ -25,12 +25,12 @@ AC_ARG_WITH(system, AC_HELP_STRING([--with-system=SYSTEM],
 
    case "$host_os" in
      linux-gnu*)
-	# For backward compatibility, strip the `-gnu' part.
-	system="$machine_name-linux";;
+        # For backward compatibility, strip the `-gnu' part.
+        system="$machine_name-linux";;
      *)
         # Strip the version number from names such as `gnu0.3',
         # `darwin10.2.0', etc.
-	system="$machine_name-`echo $host_os | "$SED" -e's/@<:@0-9.@:>@*$//g'`";;
+        system="$machine_name-`echo $host_os | "$SED" -e's/@<:@0-9.@:>@*$//g'`";;
    esac])
 
 sys_name=$(uname -s | tr 'A-Z ' 'a-z_')
@@ -40,7 +40,7 @@ case $sys_name in
         sys_name=cygwin
         ;;
 esac
-   
+
 AC_MSG_RESULT($system)
 AC_SUBST(system)
 AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier (`cpu-os')])
@@ -178,6 +178,7 @@ NEED_PROG(perl, perl)
 NEED_PROG(sed, sed)
 NEED_PROG(tar, tar)
 NEED_PROG(bzip2, bzip2)
+NEED_PROG(xz, xz)
 AC_PATH_PROG(dot, dot)
 AC_PATH_PROG(dblatex, dblatex)
 AC_PATH_PROG(gzip, gzip)
@@ -266,7 +267,7 @@ if test "$gc" = yes; then
 fi
 
 
-# Check for the required Perl dependencies (DBI and DBD::SQLite).
+# Check for the required Perl dependencies (DBI, DBD::SQLite and WWW::Curl).
 perlFlags="-I$perllibdir"
 
 AC_ARG_WITH(dbi, AC_HELP_STRING([--with-dbi=PATH],
@@ -277,13 +278,24 @@ AC_ARG_WITH(dbd-sqlite, AC_HELP_STRING([--with-dbd-sqlite=PATH],
   [prefix of the Perl DBD::SQLite library]),
   perlFlags="$perlFlags -I$withval")
 
+AC_ARG_WITH(www-curl, AC_HELP_STRING([--with-www-curl=PATH],
+  [prefix of the Perl WWW::Curl library]),
+  perlFlags="$perlFlags -I$withval")
+
 AC_MSG_CHECKING([whether DBD::SQLite works])
 if ! $perl $perlFlags -e 'use DBI; use DBD::SQLite;' 2>&5; then
     AC_MSG_RESULT(no)
     AC_MSG_FAILURE([The Perl modules DBI and/or DBD::SQLite are missing.])
 fi
 AC_MSG_RESULT(yes)
-  
+
+AC_MSG_CHECKING([whether WWW::Curl works])
+if ! $perl $perlFlags -e 'use WWW::Curl;' 2>&5; then
+    AC_MSG_RESULT(no)
+    AC_MSG_FAILURE([The Perl module WWW::Curl is missing.])
+fi
+AC_MSG_RESULT(yes)
+
 AC_SUBST(perlFlags)
 
 
@@ -325,6 +337,18 @@ fi
 # Figure out the extension of dynamic libraries.
 eval dynlib_suffix=$shrext_cmds
 AC_SUBST(dynlib_suffix)
+
+
+# Do we have GNU tar?
+AC_MSG_CHECKING([if you have GNU tar])
+if $tar --version 2> /dev/null | grep -q GNU; then
+    AC_MSG_RESULT(yes)
+    tarFlags="--warning=no-timestamp"
+else
+    AC_MSG_RESULT(no)
+fi
+AC_SUBST(tarFlags)
+
 
 
 AM_CONFIG_HEADER([config.h])
