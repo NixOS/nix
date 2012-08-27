@@ -232,11 +232,13 @@ public:
     void mkAttrs(Value & v, unsigned int expected);
     void mkThunk_(Value & v, Expr * expr);
 
+    void concatLists(Value & v, unsigned int nrLists, Value * * lists);
+
     /* Print statistics. */
     void printStats();
 
 private:
-    
+
     unsigned long nrEnvs;
     unsigned long nrValuesInEnvs;
     unsigned long nrValues;
@@ -244,9 +246,25 @@ private:
     unsigned long nrAttrsets;
     unsigned long nrOpUpdates;
     unsigned long nrOpUpdateValuesCopied;
-    
-    friend class RecursionCounter;
+    unsigned long nrListConcats;
+    unsigned long nrPrimOpCalls;
+    unsigned long nrFunctionCalls;
+
+    bool countCalls;
+
+    typedef std::map<Symbol, unsigned int> PrimOpCalls;
+    PrimOpCalls primOpCalls;
+
+    typedef std::map<Pos, unsigned int> FunctionCalls;
+    FunctionCalls functionCalls;
+
+    typedef std::map<Pos, unsigned int> AttrSelects;
+    AttrSelects attrSelects;
+
     friend class ExprOpUpdate;
+    friend class ExprOpConcatLists;
+    friend class ExprSelect;
+    friend void prim_getAttr(EvalState & state, Value * * args, Value & v);
 };
 
 

@@ -719,7 +719,7 @@ static void prim_attrNames(EvalState & state, Value * * args, Value & v)
 
 
 /* Dynamic version of the `.' operator. */
-static void prim_getAttr(EvalState & state, Value * * args, Value & v)
+void prim_getAttr(EvalState & state, Value * * args, Value & v)
 {
     string attr = state.forceStringNoCtx(*args[0]);
     state.forceAttrs(*args[1]);
@@ -728,6 +728,7 @@ static void prim_getAttr(EvalState & state, Value * * args, Value & v)
     if (i == args[1]->attrs->end())
         throw EvalError(format("attribute `%1%' missing") % attr);
     // !!! add to stack trace?
+    if (state.countCalls && i->pos) state.attrSelects[*i->pos]++;
     state.forceValue(*i->value);
     v = *i->value;
 }
@@ -873,19 +874,33 @@ static void prim_isList(EvalState & state, Value * * args, Value & v)
 }
 
 
+static void elemAt(EvalState & state, Value & list, int n, Value & v)
+{
+    state.forceList(list);
+    if (n < 0 || n >= list.list.length)
+        throw Error(format("list index %1% is out of bounds") % n);
+    state.forceValue(*list.list.elems[n]);
+    v = *list.list.elems[n];
+}
+
+
+/* Return the n-1'th element of a list. */
+static void prim_elemAt(EvalState & state, Value * * args, Value & v)
+{
+    elemAt(state, *args[0], state.forceInt(*args[1]), v);
+}
+
+
 /* Return the first element of a list. */
 static void prim_head(EvalState & state, Value * * args, Value & v)
 {
-    state.forceList(*args[0]);
-    if (args[0]->list.length == 0)
-        throw Error("`head' called on an empty list");
-    state.forceValue(*args[0]->list.elems[0]);
-    v = *args[0]->list.elems[0];
+    elemAt(state, *args[0], 0, v);
 }
 
 
 /* Return a list consisting of everything but the the first element of
-   a list. */
+   a list.  Warning: this function takes O(n) time, so you probably
+   don't want to use it!  */
 static void prim_tail(EvalState & state, Value * * args, Value & v)
 {
     state.forceList(*args[0]);
@@ -908,6 +923,52 @@ static void prim_map(EvalState & state, Value * * args, Value & v)
     for (unsigned int n = 0; n < v.list.length; ++n)
         mkApp(*(v.list.elems[n] = state.allocValue()), 
             *args[0], *args[1]->list.elems[n]);
+}
+
+
+/* Filter a list using a predicate; that is, return a list containing
+   every element from the list for which the predicate function
+   returns true. */
+static void prim_filter(EvalState & state, Value * * args, Value & v)
+{
+    state.forceFunction(*args[0]);
+    state.forceList(*args[1]);
+
+    // FIXME: putting this on the stack is risky.
+    Value * vs[args[1]->list.length];
+    unsigned int k = 0;
+
+    for (unsigned int n = 0; n < args[1]->list.length; ++n) {
+        Value res;
+        state.callFunction(*args[0], *args[1]->list.elems[n], res);
+        if (state.forceBool(res))
+            vs[k++] = args[1]->list.elems[n];
+    }
+
+    state.mkList(v, k);
+    for (unsigned int n = 0; n < k; ++n) v.list.elems[n] = vs[n];
+}
+
+
+/* Return true if a list contains a given element. */
+static void prim_elem(EvalState & state, Value * * args, Value & v)
+{
+    bool res = false;
+    state.forceList(*args[1]);
+    for (unsigned int n = 0; n < args[1]->list.length; ++n)
+        if (state.eqValues(*args[0], *args[1]->list.elems[n])) {
+            res = true;
+            break;
+        }
+    mkBool(v, res);
+}
+
+
+/* Concatenate a list of lists. */
+static void prim_concatLists(EvalState & state, Value * * args, Value & v)
+{
+    state.forceList(*args[0]);
+    state.concatLists(v, args[0]->list.length, args[0]->list.elems);
 }
 
 
@@ -1122,11 +1183,15 @@ void EvalState::createBaseEnv()
 
     // Lists
     addPrimOp("__isList", 1, prim_isList);
+    addPrimOp("__elemAt", 2, prim_elemAt);
     addPrimOp("__head", 1, prim_head);
     addPrimOp("__tail", 1, prim_tail);
     addPrimOp("map", 2, prim_map);
+    addPrimOp("__filter", 2, prim_filter);
+    addPrimOp("__elem", 2, prim_elem);
+    addPrimOp("__concatLists", 1, prim_concatLists);
     addPrimOp("__length", 1, prim_length);
-    
+
     // Integer arithmetic
     addPrimOp("__add", 2, prim_add);
     addPrimOp("__sub", 2, prim_sub);

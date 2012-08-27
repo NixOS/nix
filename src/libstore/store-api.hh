@@ -48,8 +48,7 @@ struct GCOptions
     /* For `gcDeleteSpecific', the paths to delete. */
     PathSet pathsToDelete;
 
-    /* Stop after at least `maxFreed' bytes have been freed.  0 means
-       no limit. */
+    /* Stop after at least `maxFreed' bytes have been freed. */
     unsigned long long maxFreed;
 
     GCOptions();
@@ -66,13 +65,9 @@ struct GCResults
        number of bytes that would be or was freed. */
     unsigned long long bytesFreed;
 
-    /* The number of file system blocks that would be or was freed. */
-    unsigned long long blocksFreed;
-
     GCResults()
     {
         bytesFreed = 0;
-        blocksFreed = 0;
     }
 };
 

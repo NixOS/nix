@@ -17,6 +17,9 @@ namespace nix {
 #define foreach(it_type, it, collection)                                \
     for (it_type it = (collection).begin(); it != (collection).end(); ++it)
 
+#define foreach_reverse(it_type, it, collection)                                \
+    for (it_type it = (collection).rbegin(); it != (collection).rend(); ++it)
+
 
 /* Return an environment variable. */
 string getEnv(const string & key, const string & def = "");
@@ -60,7 +63,7 @@ Strings readDirectory(const Path & path);
 
 /* Read the contents of a file into a string. */
 string readFile(int fd);
-string readFile(const Path & path);
+string readFile(const Path & path, bool drain = false);
 
 /* Write a string to a file. */
 void writeFile(const Path & path, const string & s);
@@ -80,8 +83,7 @@ void computePathSize(const Path & path,
    returns the number of bytes and blocks freed. */
 void deletePath(const Path & path);
 
-void deletePath(const Path & path, unsigned long long & bytesFreed,
-    unsigned long long & blocksFreed);
+void deletePath(const Path & path, unsigned long long & bytesFreed);
 
 /* Make a path read-only recursively. */
 void makePathReadOnly(const Path & path);

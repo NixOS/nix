@@ -2,7 +2,7 @@
 #include "globals.hh"
 #include "util.hh"
 
-#include <limits.h>
+#include <climits>
 
 
 namespace nix {
@@ -12,7 +12,7 @@ GCOptions::GCOptions()
 {
     action = gcDeleteDead;
     ignoreLiveness = false;
-    maxFreed = 0;
+    maxFreed = ULLONG_MAX;
 }
 
 

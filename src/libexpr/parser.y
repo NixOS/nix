@@ -203,7 +203,7 @@ static Expr * stripIndentation(SymbolTable & symbols, vector<Expr *> & es)
         es2->push_back(new ExprString(symbols.create(s2)));
     }
 
-    return new ExprConcatStrings(es2);
+    return es2->size() == 1 ? (*es2)[0] : new ExprConcatStrings(es2);
 }
 
 

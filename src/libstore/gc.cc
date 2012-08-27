@@ -425,10 +425,9 @@ bool LocalStore::isActiveTempFile(const GCState & state,
 void LocalStore::deleteGarbage(GCState & state, const Path & path)
 {
     printMsg(lvlInfo, format("deleting `%1%'") % path);
-    unsigned long long bytesFreed, blocksFreed;
-    deletePathWrapped(path, bytesFreed, blocksFreed);
+    unsigned long long bytesFreed;
+    deletePathWrapped(path, bytesFreed);
     state.results.bytesFreed += bytesFreed;
-    state.results.blocksFreed += blocksFreed;
 }
 
 
@@ -550,7 +549,7 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
         } else
             deleteGarbage(state, path);
 
-        if (state.options.maxFreed && state.results.bytesFreed + state.bytesInvalidated > state.options.maxFreed) {
+        if (state.results.bytesFreed + state.bytesInvalidated > state.options.maxFreed) {
             printMsg(lvlInfo, format("deleted or invalidated more than %1% bytes; stopping") % state.options.maxFreed);
             throw GCLimitReached();
         }
@@ -576,10 +575,12 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
    safely deleted.  FIXME: race condition with optimisePath(): we
    might see a link count of 1 just before optimisePath() increases
    the link count. */
-void LocalStore::removeUnusedLinks()
+void LocalStore::removeUnusedLinks(const GCState & state)
 {
     AutoCloseDir dir = opendir(linksDir.c_str());
     if (!dir) throw SysError(format("opening directory `%1%'") % linksDir);
+
+    long long actualSize = 0, unsharedSize = 0;
 
     struct dirent * dirent;
     while (errno = 0, dirent = readdir(dir)) {
@@ -592,13 +593,28 @@ void LocalStore::removeUnusedLinks()
         if (lstat(path.c_str(), &st) == -1)
             throw SysError(format("statting `%1%'") % path);
 
-        if (st.st_nlink != 1) continue;
+        if (st.st_nlink != 1) {
+            unsigned long long size = st.st_blocks * 512ULL;
+            actualSize += size;
+            unsharedSize += (st.st_nlink - 1) * size;
+            continue;
+        }
 
         printMsg(lvlTalkative, format("deleting unused link `%1%'") % path);
 
         if (unlink(path.c_str()) == -1)
             throw SysError(format("deleting `%1%'") % path);
+
+        state.results.bytesFreed += st.st_blocks * 512;
     }
+
+    struct stat st;
+    if (stat(linksDir.c_str(), &st) == -1)
+        throw SysError(format("statting `%1%'") % linksDir);
+    long long overhead = st.st_blocks * 512ULL;
+
+    printMsg(lvlInfo, format("note: currently hard linking saves %.2f MiB")
+        % ((unsharedSize - actualSize - overhead) / (1024.0 * 1024.0)));
 }
 
 
@@ -660,7 +676,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 throw Error(format("cannot delete path `%1%' since it is still alive") % *i);
         }
 
-    } else {
+    } else if (options.maxFreed > 0) {
 
         if (shouldDelete(state.options.action))
             printMsg(lvlError, format("deleting garbage..."));
@@ -718,7 +734,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     /* Clean up the links directory. */
     printMsg(lvlError, format("deleting unused links..."));
-    removeUnusedLinks();
+    removeUnusedLinks(state);
 }
 
 

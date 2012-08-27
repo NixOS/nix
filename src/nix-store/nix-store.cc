@@ -64,15 +64,19 @@ static PathSet realisePath(const Path & path)
     if (isDerivation(path)) {
         store->buildPaths(singleton<PathSet>(path));
         Derivation drv = derivationFromPath(*store, path);
+        rootNr++;
 
         PathSet outputs;
         foreach (DerivationOutputs::iterator, i, drv.outputs) {
             Path outPath = i->second.path;
             if (gcRoot == "")
                 printGCWarning();
-            else
-                outPath = addPermRoot(*store, outPath,
-                    makeRootName(gcRoot, rootNr), indirectRoot);
+            else {
+                Path rootName = gcRoot;
+                if (rootNr > 1) rootName += "-" + int2String(rootNr);
+                if (i->first != "out") rootName += "-" + i->first;
+                outPath = addPermRoot(*store, outPath, rootName, indirectRoot);
+            }
             outputs.insert(outPath);
         }
         return outputs;
@@ -544,10 +548,9 @@ static void opCheckValidity(Strings opFlags, Strings opArgs)
 }
 
 
-static string showBytes(unsigned long long bytes, unsigned long long blocks)
+static string showBytes(unsigned long long bytes)
 {
-    return (format("%d bytes (%.2f MiB, %d blocks)")
-        % bytes % (bytes / (1024.0 * 1024.0)) % blocks).str();
+    return (format("%.2f MiB") % (bytes / (1024.0 * 1024.0))).str();
 }
 
 
@@ -562,7 +565,7 @@ struct PrintFreed
         if (show)
             cout << format("%1% store paths deleted, %2% freed\n")
                 % results.paths.size()
-                % showBytes(results.bytesFreed, results.blocksFreed);
+                % showBytes(results.bytesFreed);
     }
 };
 
@@ -583,7 +586,7 @@ static void opGC(Strings opFlags, Strings opArgs)
         else if (*i == "--delete") options.action = GCOptions::gcDeleteDead;
         else if (*i == "--max-freed") {
             long long maxFreed = getIntArg<long long>(*i, i, opFlags.end());
-            options.maxFreed = maxFreed >= 1 ? maxFreed : 1;
+            options.maxFreed = maxFreed >= 0 ? maxFreed : 0;
         }
         else throw UsageError(format("bad sub-operation `%1%' in GC") % *i);
 
@@ -735,7 +738,7 @@ static void showOptimiseStats(OptimiseStats & stats)
 {
     printMsg(lvlError,
         format("%1% freed by hard-linking %2% files; there are %3% files with equal contents out of %4% files in total")
-        % showBytes(stats.bytesFreed, stats.blocksFreed)
+        % showBytes(stats.bytesFreed)
         % stats.filesLinked
         % stats.sameContents
         % stats.totalFiles);

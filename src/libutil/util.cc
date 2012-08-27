@@ -224,12 +224,12 @@ string readFile(int fd)
 }
 
 
-string readFile(const Path & path)
+string readFile(const Path & path, bool drain)
 {
     AutoCloseFD fd = open(path.c_str(), O_RDONLY);
     if (fd == -1)
         throw SysError(format("opening file `%1%'") % path);
-    return readFile(fd);
+    return drain ? drainFD(fd) : readFile(fd);
 }
 
 
@@ -297,8 +297,7 @@ void computePathSize(const Path & path,
 }
 
 
-static void _deletePath(const Path & path, unsigned long long & bytesFreed,
-    unsigned long long & blocksFreed)
+static void _deletePath(const Path & path, unsigned long long & bytesFreed)
 {
     checkInterrupt();
 
@@ -308,10 +307,8 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed,
 
     if (S_ISDIR(st.st_mode) || S_ISREG(st.st_mode)) makeMutable(path);
 
-    if (!S_ISDIR(st.st_mode) && st.st_nlink == 1) {
-        bytesFreed += st.st_size;
-        blocksFreed += st.st_blocks;
-    }
+    if (!S_ISDIR(st.st_mode) && st.st_nlink == 1)
+        bytesFreed += st.st_blocks * 512;
 
     if (S_ISDIR(st.st_mode)) {
 	Strings names = readDirectory(path);
@@ -323,7 +320,7 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed,
 	}
 
 	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
-            _deletePath(path + "/" + *i, bytesFreed, blocksFreed);
+            _deletePath(path + "/" + *i, bytesFreed);
     }
 
     if (remove(path.c_str()) == -1)
@@ -333,19 +330,17 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed,
 
 void deletePath(const Path & path)
 {
-    unsigned long long dummy1, dummy2;
-    deletePath(path, dummy1, dummy2);
+    unsigned long long dummy;
+    deletePath(path, dummy);
 }
 
 
-void deletePath(const Path & path, unsigned long long & bytesFreed,
-    unsigned long long & blocksFreed)
+void deletePath(const Path & path, unsigned long long & bytesFreed)
 {
     startNest(nest, lvlDebug,
         format("recursively deleting path `%1%'") % path);
     bytesFreed = 0;
-    blocksFreed = 0;
-    _deletePath(path, bytesFreed, blocksFreed);
+    _deletePath(path, bytesFreed);
 }
 
 
