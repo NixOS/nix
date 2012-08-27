@@ -2898,7 +2898,7 @@ void Worker::waitForInput()
         if (lastWokenUp == 0)
             printMsg(lvlError, "waiting for locks or build slots...");
         if (lastWokenUp == 0 || lastWokenUp > before) lastWokenUp = before;
-        timeout.tv_sec = std::max((time_t) 0, lastWokenUp + settings.pollInterval - before);
+        timeout.tv_sec = std::max((time_t) 0, (time_t) (lastWokenUp + settings.pollInterval - before));
     } else lastWokenUp = 0;
 
     using namespace std;
