@@ -26,9 +26,7 @@ void printHelp()
 static Expr * parseStdin(EvalState & state)
 {
     startNest(nest, lvlTalkative, format("parsing standard input"));
-    string s, s2;
-    while (getline(std::cin, s2)) s += s2 + "\n";
-    return state.parseExprFromString(s, absPath("."));
+    return state.parseExprFromString(drainFD(0), absPath("."));
 }
 
 
