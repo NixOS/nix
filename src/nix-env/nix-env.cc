@@ -213,13 +213,18 @@ static int comparePriorities(EvalState & state,
 }
 
 
-static bool isPrebuilt(EvalState & state, const DrvInfo & elem)
+static bool isPrebuilt(EvalState & state, const DrvInfo & elem, bool ignoreImportReadOnlyError)
 {
     assert(false);
 #if 0
-    return
-        store->isValidPath(elem.queryOutPath(state)) ||
-        store->hasSubstitutes(elem.queryOutPath(state));
+    try {
+        return
+            store->isValidPath(elem.queryOutPath(state)) ||
+            store->hasSubstitutes(elem.queryOutPath(state));
+    } catch (ImportReadOnlyError & e) {
+        if (ignoreImportReadOnlyError) return false;
+        throw;
+    }
 #endif
 }
 
@@ -459,7 +464,7 @@ static void installDerivations(Globals & globals,
 
     /* If --prebuilt-only is given, filter out source-only packages. */
     foreach (DrvInfos::iterator, i, newElemsTmp)
-        if (!globals.prebuiltOnly || isPrebuilt(globals.state, *i))
+        if (!globals.prebuiltOnly || isPrebuilt(globals.state, *i, false))
             newElems.push_back(*i);
 
     StringSet newNames;
@@ -580,7 +585,7 @@ static void upgradeDerivations(Globals & globals,
                                 d2 = comparePriorities(globals.state, *bestElem, *j);
                                 if (d2 == 0) d2 = compareVersions(bestName.version, newName.version);
                             }
-                            if (d2 < 0 && (!globals.prebuiltOnly || isPrebuilt(globals.state, *j))) {
+                            if (d2 < 0 && (!globals.prebuiltOnly || isPrebuilt(globals.state, *j, false))) {
                                 bestElem = j;
                                 bestName = newName;
                             }
@@ -973,7 +978,7 @@ static void opQuery(Globals & globals,
             
             startNest(nest, lvlDebug, format("outputting query result `%1%'") % i->attrPath);
 
-            if (globals.prebuiltOnly && !isPrebuilt(globals.state, *i)) continue;
+            if (globals.prebuiltOnly && !isPrebuilt(globals.state, *i, true)) continue;
 
             /* For table output. */
             Strings columns;
