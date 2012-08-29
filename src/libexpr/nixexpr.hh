@@ -16,6 +16,7 @@ MakeError(ThrownError, AssertionError)
 MakeError(Abort, EvalError)
 MakeError(TypeError, EvalError)
 MakeError(ImportError, EvalError) // error building an imported derivation
+MakeError(ImportReadOnlyError, EvalError) // error when trying to import a derivation in read-only mode
 
 
 /* Position objects. */
