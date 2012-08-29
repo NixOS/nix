@@ -953,13 +953,18 @@ static void opQuery(Globals & globals,
     PathSet validPaths, substitutablePaths;
     if (printStatus) {
         PathSet paths;
-        foreach (vector<DrvInfo>::iterator, i, elems2)
+        foreach (vector<DrvInfo>::iterator, i, elems2) {
+            string name; 
             try {
+                name = i->queryName(globals.state);
                 paths.insert(i->queryOutPath(globals.state));
             } catch (AssertionError & e) {
-                printMsg(lvlTalkative, format("skipping derivation named `%1%' which gives an assertion failure") % i->queryName(globals.state));
+                printMsg(lvlTalkative, format("skipping derivation named `%1%' which gives an assertion failure") % name);
                 i->setFailed();
+            } catch (ImportReadOnlyError & e) {
+                printMsg(lvlTalkative, format("skipping derivation named `%1%' which gives an ImportReadOnly failure") % name);
             }
+        }
         validPaths = store->queryValidPaths(paths);
         substitutablePaths = store->querySubstitutablePaths(paths);
     }
