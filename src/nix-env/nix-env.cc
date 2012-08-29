@@ -987,19 +987,23 @@ static void opQuery(Globals & globals,
             XMLAttrs attrs;
 
             if (printStatus) {
-                Path outPath = i->queryOutPath(globals.state);
-                bool hasSubs = substitutablePaths.find(outPath) != substitutablePaths.end();
-                bool isInstalled = installed.find(outPath) != installed.end();
-                bool isValid = validPaths.find(outPath) != validPaths.end();
-                if (xmlOutput) {
-                    attrs["installed"] = isInstalled ? "1" : "0";
-                    attrs["valid"] = isValid ? "1" : "0";
-                    attrs["substitutable"] = hasSubs ? "1" : "0";
-                } else
-                    columns.push_back(
-                        (string) (isInstalled ? "I" : "-")
-                        + (isValid ? "P" : "-")
-                        + (hasSubs ? "S" : "-"));
+                try {
+                    Path outPath = i->queryOutPath(globals.state);
+                    bool hasSubs = substitutablePaths.find(outPath) != substitutablePaths.end();
+                    bool isInstalled = installed.find(outPath) != installed.end();
+                    bool isValid = validPaths.find(outPath) != validPaths.end();
+                    if (xmlOutput) {
+                        attrs["installed"] = isInstalled ? "1" : "0";
+                        attrs["valid"] = isValid ? "1" : "0";
+                        attrs["substitutable"] = hasSubs ? "1" : "0";
+                    } else
+                        columns.push_back(
+                            (string) (isInstalled ? "I" : "-")
+                            + (isValid ? "P" : "-")
+                            + (hasSubs ? "S" : "-"));
+                } catch (ImportReadOnlyError & e) {
+                    if (!xmlOutput) columns.push_back("?");
+                }
             }
 
             if (xmlOutput)
@@ -1048,55 +1052,69 @@ static void opQuery(Globals & globals,
                 columns.push_back(i->querySystem(globals.state));
 
             if (printDrvPath) {
-                string drvPath = i->queryDrvPath(globals.state);
-                if (xmlOutput) {
-                    if (drvPath != "") attrs["drvPath"] = drvPath;
-                } else
-                    columns.push_back(drvPath == "" ? "-" : drvPath);
+                try {
+                    string drvPath = i->queryDrvPath(globals.state);
+                    if (xmlOutput) {
+                        if (drvPath != "") attrs["drvPath"] = drvPath;
+                    } else
+                        columns.push_back(drvPath == "" ? "-" : drvPath);
+                } catch (ImportReadOnlyError & e) {
+                    if (!xmlOutput) columns.push_back("?");
+                }
             }
         
             if (printOutPath) {
-                string outPath = i->queryOutPath(globals.state);
-                if (xmlOutput) {
-                    if (outPath != "") attrs["outPath"] = outPath;
-                } else
-                    columns.push_back(outPath);
+                try {
+                    string outPath = i->queryOutPath(globals.state);
+                    if (xmlOutput) {
+                        if (outPath != "") attrs["outPath"] = outPath;
+                    } else
+                        columns.push_back(outPath);
+                } catch (ImportReadOnlyError & e) {
+                    if (!xmlOutput) columns.push_back("?");
+                }
             }
 
             if (printDescription) {
-                MetaValue value = i->queryMetaInfo(globals.state, "description");
-                string descr = value.type == MetaValue::tpString ? value.stringValue : "";
-                if (xmlOutput) {
-                    if (descr != "") attrs["description"] = descr;
-                } else
-                    columns.push_back(descr);
+                try {
+                    MetaValue value = i->queryMetaInfo(globals.state, "description");
+                    string descr = value.type == MetaValue::tpString ? value.stringValue : "";
+                    if (xmlOutput) {
+                        if (descr != "") attrs["description"] = descr;
+                    } else
+                        columns.push_back(descr);
+                } catch (ImportReadOnlyError & e) {
+                    if (!xmlOutput) columns.push_back("?");
+                }
             }
 
             if (xmlOutput)
                 if (printMeta) {
                     XMLOpenElement item(xml, "item", attrs);
-                    MetaInfo meta = i->queryMetaInfo(globals.state);
-                    for (MetaInfo::iterator j = meta.begin(); j != meta.end(); ++j) {
-                        XMLAttrs attrs2;
-                        attrs2["name"] = j->first;
-                        if (j->second.type == MetaValue::tpString) {
-                            attrs2["type"] = "string";
-                            attrs2["value"] = j->second.stringValue;
-                            xml.writeEmptyElement("meta", attrs2);
-                        } else if (j->second.type == MetaValue::tpInt) {
-                            attrs2["type"] = "int";
-                            attrs2["value"] = (format("%1%") % j->second.intValue).str();
-                            xml.writeEmptyElement("meta", attrs2);
-                        } else if (j->second.type == MetaValue::tpStrings) {
-                            attrs2["type"] = "strings";
-                            XMLOpenElement m(xml, "meta", attrs2);
-                            foreach (Strings::iterator, k, j->second.stringValues) { 
-                                XMLAttrs attrs3;
-                                attrs3["value"] = *k;
-                                xml.writeEmptyElement("string", attrs3);
-                           }
+		    try {
+                        MetaInfo meta = i->queryMetaInfo(globals.state);
+                        for (MetaInfo::iterator j = meta.begin(); j != meta.end(); ++j) {
+                            XMLAttrs attrs2;
+                            attrs2["name"] = j->first;
+                            if (j->second.type == MetaValue::tpString) {
+                                attrs2["type"] = "string";
+                                attrs2["value"] = j->second.stringValue;
+                                xml.writeEmptyElement("meta", attrs2);
+                            } else if (j->second.type == MetaValue::tpInt) {
+                                attrs2["type"] = "int";
+                                attrs2["value"] = (format("%1%") % j->second.intValue).str();
+                                xml.writeEmptyElement("meta", attrs2);
+                            } else if (j->second.type == MetaValue::tpStrings) {
+                                attrs2["type"] = "strings";
+                                XMLOpenElement m(xml, "meta", attrs2);
+                                foreach (Strings::iterator, k, j->second.stringValues) { 
+                                    XMLAttrs attrs3;
+                                    attrs3["value"] = *k;
+                                    xml.writeEmptyElement("string", attrs3);
+                               }
+                            }
                         }
-                    }
+                    } catch (ImportReadOnlyError & e) { }
                 }
                 else
                     xml.writeEmptyElement("item", attrs);
