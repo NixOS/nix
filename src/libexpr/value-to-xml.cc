@@ -18,7 +18,7 @@ static XMLAttrs singletonAttrs(const string & name, const string & value)
 
 
 static void printValueAsXML(EvalState & state, bool strict, bool location,
-    Value & v, XMLWriter & doc, PathSet & context, PathSet & drvsSeen);
+    Value & v, XMLWriter & doc, ContextEntrySet & context, PathSet & drvsSeen);
 
 
 static void posToXML(XMLAttrs & xmlAttrs, const Pos & pos)
@@ -30,7 +30,7 @@ static void posToXML(XMLAttrs & xmlAttrs, const Pos & pos)
 
 
 static void showAttrs(EvalState & state, bool strict, bool location,
-    Bindings & attrs, XMLWriter & doc, PathSet & context, PathSet & drvsSeen)
+    Bindings & attrs, XMLWriter & doc, ContextEntrySet & context, PathSet & drvsSeen)
 {
     StringSet names;
     
@@ -52,7 +52,7 @@ static void showAttrs(EvalState & state, bool strict, bool location,
 
 
 static void printValueAsXML(EvalState & state, bool strict, bool location,
-    Value & v, XMLWriter & doc, PathSet & context, PathSet & drvsSeen)
+    Value & v, XMLWriter & doc, ContextEntrySet & context, PathSet & drvsSeen)
 {
     checkInterrupt();
 
@@ -151,7 +151,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
 
 
 void printValueAsXML(EvalState & state, bool strict, bool location,
-    Value & v, std::ostream & out, PathSet & context)
+    Value & v, std::ostream & out, ContextEntrySet & context)
 {
     XMLWriter doc(true, out);
     XMLOpenElement root(doc, "expr");

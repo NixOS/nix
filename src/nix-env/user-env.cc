@@ -119,7 +119,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     Value args, topLevel;
     state.mkAttrs(args, 3);
     mkString(*state.allocAttr(args, state.symbols.create("manifest")),
-        manifestFile, singleton<PathSet>(manifestFile));
+        manifestFile, singleton<ContextEntrySet>(state.allocContextEntry(manifestFile)));
     args.attrs->push_back(Attr(state.symbols.create("derivations"), &manifest));
     args.attrs->sort();
     mkApp(topLevel, envBuilder, args);
