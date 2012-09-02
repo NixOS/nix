@@ -47,7 +47,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
             findAlongAttrPath(state, *i, autoArgs, e, v);
             state.forceValue(v);
 
-            PathSet context;
+            ContextEntrySet context;
             if (evalOnly)
                 if (xmlOutput)
                     printValueAsXML(state, strict, location, v, std::cout, context);

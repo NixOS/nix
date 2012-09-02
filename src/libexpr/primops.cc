@@ -24,28 +24,16 @@ namespace nix {
  *************************************************************/
 
 
-/* Decode a context string ‘!<name>!<path>’ into a pair <path,
-   name>. */
-std::pair<string, string> decodeContext(const string & s)
-{
-    if (s.at(0) == '!') {
-        size_t index = s.find("!", 1);
-        return std::pair<string, string>(string(s, index + 1), string(s, 1, index - 1));
-    } else
-        return std::pair<string, string>(s, "");
-}
-
-
 /* Load and evaluate an expression from path specified by the
    argument. */ 
 static void prim_import(EvalState & state, Value * * args, Value & v)
 {
-    PathSet context;
+    ContextEntrySet context;
     Path path = state.coerceToPath(*args[0], context);
 
-    foreach (PathSet::iterator, i, context) {
-        Path ctx = decodeContext(*i).first;
-        string outputName = decodeContext(*i).second;
+    foreach (ContextEntrySet::iterator, i, context) {
+        Path ctx = (*i)->path;
+        string outputName = (*i)->output;
         assert(isStorePath(ctx));
         if (!store->isValidPath(ctx)) {
             if (outputName.empty())
@@ -55,7 +43,7 @@ static void prim_import(EvalState & state, Value * * args, Value & v)
                 throw ImportReadOnlyError(format("cannot import `%1%', since path `%2%' cannot be written to the store in read-only mode")
                     % path % ctx);
         }
-        if (isDerivation(ctx)) {
+        if (isDerivation(ctx) && !(*i)->discardOutputs) {
             Derivation drv = derivationFromPath(*store, ctx);
 
             if (outputName.empty() ||
@@ -86,14 +74,14 @@ static void prim_import(EvalState & state, Value * * args, Value & v)
         Derivation drv = parseDerivation(readFile(path));
         Value & w = *state.allocValue();
         state.mkAttrs(w, 1 + drv.outputs.size());
-        mkString(*state.allocAttr(w, state.sDrvPath), path, singleton<PathSet>("=" + path));
+        mkString(*state.allocAttr(w, state.sDrvPath), path, singleton<ContextEntrySet>(state.allocContextEntry(path)));
         state.mkList(*state.allocAttr(w, state.symbols.create("outputs")), drv.outputs.size());
         unsigned int outputs_index = 0;
 
         Value * outputsVal = w.attrs->find(state.symbols.create("outputs"))->value;
         foreach (DerivationOutputs::iterator, i, drv.outputs) {
             mkString(*state.allocAttr(w, state.symbols.create(i->first)),
-                i->second.path, singleton<PathSet>("!" + i->first + "!" + path));
+                i->second.path, singleton<ContextEntrySet>(state.allocContextEntry(path,i->first)));
             mkString(*(outputsVal->list.elems[outputs_index++] = state.allocValue()),
                 i->first);
         }
@@ -237,7 +225,7 @@ static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
 
 static void prim_abort(EvalState & state, Value * * args, Value & v)
 {
-    PathSet context;
+    ContextEntrySet context;
     throw Abort(format("evaluation aborted with the following error message: `%1%'") %
         state.coerceToString(*args[0], context));
 }
@@ -245,7 +233,7 @@ static void prim_abort(EvalState & state, Value * * args, Value & v)
 
 static void prim_throw(EvalState & state, Value * * args, Value & v)
 {
-    PathSet context;
+    ContextEntrySet context;
     throw ThrownError(format("user-thrown exception: %1%") %
         state.coerceToString(*args[0], context));
 }
@@ -257,7 +245,7 @@ static void prim_addErrorContext(EvalState & state, Value * * args, Value & v)
         state.forceValue(*args[1]);
         v = *args[1];
     } catch (Error & e) {
-        PathSet context;
+        ContextEntrySet context;
         e.addPrefix(format("%1%\n") % state.coerceToString(*args[0], context));
         throw;
     }
@@ -337,7 +325,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     /* Build the derivation expression by processing the attributes. */
     Derivation drv;
     
-    PathSet context;
+    ContextEntrySet context;
 
     string outputHash, outputHashAlgo;
     bool outputHashRecursive = false;
@@ -411,46 +399,24 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     /* Everything in the context of the strings in the derivation
        attributes should be added as dependencies of the resulting
        derivation. */
-    foreach (PathSet::iterator, i, context) {
-        Path path = *i;
-        
-        /* Paths marked with `=' denote that the path of a derivation
-           is explicitly passed to the builder.  Since that allows the
-           builder to gain access to every path in the dependency
-           graph of the derivation (including all outputs), all paths
-           in the graph must be added to this derivation's list of
-           inputs to ensure that they are available when the builder
-           runs. */
-        if (path.at(0) == '=') {
+    foreach (ContextEntrySet::iterator, i, context) {
+        Path path = (*i)->path;
+        string output = (*i)->output;
+        if (!isDerivation(path) || (*i)->discardOutputs)
+            drv.inputSrcs.insert(path);
+        else if (!output.empty())
+            drv.inputDrvs[path].insert(output);
+        else {
             /* !!! This doesn't work if readOnlyMode is set. */
-            PathSet refs; computeFSClosure(*store, string(path, 1), refs);
+            PathSet refs; computeFSClosure(*store, path, refs);
             foreach (PathSet::iterator, j, refs) {
                 drv.inputSrcs.insert(*j);
                 if (isDerivation(*j))
                     drv.inputDrvs[*j] = store->queryDerivationOutputNames(*j);
             }
         }
-
-        /* See prim_unsafeDiscardOutputDependency. */
-        else if (path.at(0) == '~')
-            drv.inputSrcs.insert(string(path, 1));
-
-        /* Handle derivation outputs of the form ‘!<name>!<path>’. */
-        else if (path.at(0) == '!') {
-            std::pair<string, string> ctx = decodeContext(path);
-            drv.inputDrvs[ctx.first].insert(ctx.second);
-        }
-
-        /* Handle derivation contexts returned by
-           ‘builtins.storePath’. */
-        else if (isDerivation(path))
-            drv.inputDrvs[path] = store->queryDerivationOutputNames(path);
-
-        /* Otherwise it's a source file. */
-        else
-            drv.inputSrcs.insert(path);
     }
-            
+
     /* Do we have all required attributes? */
     if (drv.builder == "")
         throw EvalError("required attribute `builder' missing");
@@ -515,11 +481,10 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     drvHashes[drvPath] = hashDerivationModulo(*store, drv);
 
     state.mkAttrs(v, 1 + drv.outputs.size());
-    mkString(*state.allocAttr(v, state.sDrvPath), drvPath, singleton<PathSet>("=" + drvPath));
-    foreach (DerivationOutputs::iterator, i, drv.outputs) {
+    mkString(*state.allocAttr(v, state.sDrvPath), drvPath, singleton<ContextEntrySet>(state.allocContextEntry(drvPath)));
+    foreach (DerivationOutputs::iterator, i, drv.outputs)
         mkString(*state.allocAttr(v, state.symbols.create(i->first)),
-            i->second.path, singleton<PathSet>("!" + i->first + "!" + drvPath));
-    }
+            i->second.path, singleton<ContextEntrySet>(state.allocContextEntry(drvPath, i->first)));
     v.attrs->sort();
 }
 
@@ -532,7 +497,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
 /* Convert the argument to a path.  !!! obsolete? */
 static void prim_toPath(EvalState & state, Value * * args, Value & v)
 {
-    PathSet context;
+    ContextEntrySet context;
     Path path = state.coerceToPath(*args[0], context);
     mkString(v, canonPath(path), context);
 }
@@ -548,7 +513,7 @@ static void prim_toPath(EvalState & state, Value * * args, Value & v)
    corner cases. */
 static void prim_storePath(EvalState & state, Value * * args, Value & v)
 {
-    PathSet context;
+    ContextEntrySet context;
     Path path = state.coerceToPath(*args[0], context);
     /* Resolve symlinks in ‘path’, unless ‘path’ itself is a symlink
        directly in the store.  The latter condition is necessary so
@@ -559,14 +524,14 @@ static void prim_storePath(EvalState & state, Value * * args, Value & v)
     Path path2 = toStorePath(path);
     if (!store->isValidPath(path2))
         throw EvalError(format("store path `%1%' is not valid") % path2);
-    context.insert(path2);
+    context.insert(state.allocContextEntry(path2));
     mkString(v, path, context);
 }
 
 
 static void prim_pathExists(EvalState & state, Value * * args, Value & v)
 {
-    PathSet context;
+    ContextEntrySet context;
     Path path = state.coerceToPath(*args[0], context);
     if (!context.empty())
         throw EvalError(format("string `%1%' cannot refer to other paths") % path);
@@ -578,7 +543,7 @@ static void prim_pathExists(EvalState & state, Value * * args, Value & v)
    following the last slash. */
 static void prim_baseNameOf(EvalState & state, Value * * args, Value & v)
 {
-    PathSet context;
+    ContextEntrySet context;
     mkString(v, baseNameOf(state.coerceToString(*args[0], context)), context);
 }
 
@@ -588,7 +553,7 @@ static void prim_baseNameOf(EvalState & state, Value * * args, Value & v)
    of the argument. */
 static void prim_dirOf(EvalState & state, Value * * args, Value & v)
 {
-    PathSet context;
+    ContextEntrySet context;
     Path dir = dirOf(state.coerceToPath(*args[0], context));
     if (args[0]->type == tPath) mkPath(v, dir.c_str()); else mkString(v, dir, context);
 }
@@ -597,7 +562,7 @@ static void prim_dirOf(EvalState & state, Value * * args, Value & v)
 /* Return the contents of a file as a string. */
 static void prim_readFile(EvalState & state, Value * * args, Value & v)
 {
-    PathSet context;
+    ContextEntrySet context;
     Path path = state.coerceToPath(*args[0], context);
     if (!context.empty())
         throw EvalError(format("string `%1%' cannot refer to other paths") % path);
@@ -616,7 +581,7 @@ static void prim_readFile(EvalState & state, Value * * args, Value & v)
 static void prim_toXML(EvalState & state, Value * * args, Value & v)
 {
     std::ostringstream out;
-    PathSet context;
+    ContextEntrySet context;
     printValueAsXML(state, true, false, *args[0], out, context);
     mkString(v, out.str(), context);
 }
@@ -626,16 +591,15 @@ static void prim_toXML(EvalState & state, Value * * args, Value & v)
    as an input by derivations. */
 static void prim_toFile(EvalState & state, Value * * args, Value & v)
 {
-    PathSet context;
+    ContextEntrySet context;
     string name = state.forceStringNoCtx(*args[0]);
     string contents = state.forceString(*args[1], context);
 
     PathSet refs;
 
-    foreach (PathSet::iterator, i, context) {
-        Path path = *i;
-        if (path.at(0) == '=') path = string(path, 1);
-        if (isDerivation(path))
+    foreach (ContextEntrySet::iterator, i, context) {
+        Path path = (*i)->path;
+        if (isDerivation(path) && !(*i)->discardOutputs)
             throw EvalError(format("in `toFile': the file `%1%' cannot refer to derivation outputs") % name);
         refs.insert(path);
     }
@@ -648,7 +612,7 @@ static void prim_toFile(EvalState & state, Value * * args, Value & v)
        result, since `storePath' itself has references to the paths
        used in args[1]. */
 
-    mkString(v, storePath, singleton<PathSet>(storePath));
+    mkString(v, storePath, singleton<ContextEntrySet>(state.allocContextEntry(storePath)));
 }
 
 
@@ -693,7 +657,7 @@ struct FilterFromExpr : PathFilter
 
 static void prim_filterSource(EvalState & state, Value * * args, Value & v)
 {
-    PathSet context;
+    ContextEntrySet context;
     Path path = state.coerceToPath(*args[1], context);
     if (!context.empty())
         throw EvalError(format("string `%1%' cannot refer to other paths") % path);
@@ -708,7 +672,7 @@ static void prim_filterSource(EvalState & state, Value * * args, Value & v)
         ? computeStorePathForPath(path, true, htSHA256, filter).first
         : store->addToStore(path, true, htSHA256, filter);
 
-    mkString(v, dstPath, singleton<PathSet>(dstPath));
+    mkString(v, dstPath, singleton<ContextEntrySet>(state.allocContextEntry(dstPath)));
 }
 
 
@@ -1044,7 +1008,7 @@ static void prim_lessThan(EvalState & state, Value * * args, Value & v)
    `"/nix/store/whatever..."'. */
 static void prim_toString(EvalState & state, Value * * args, Value & v)
 {
-    PathSet context;
+    ContextEntrySet context;
     string s = state.coerceToString(*args[0], context, true, false);
     mkString(v, s, context);
 }
@@ -1058,7 +1022,7 @@ static void prim_substring(EvalState & state, Value * * args, Value & v)
 {
     int start = state.forceInt(*args[0]);
     int len = state.forceInt(*args[1]);
-    PathSet context;
+    ContextEntrySet context;
     string s = state.coerceToString(*args[2], context);
 
     if (start < 0) throw EvalError("negative start position in `substring'");
@@ -1069,7 +1033,7 @@ static void prim_substring(EvalState & state, Value * * args, Value & v)
 
 static void prim_stringLength(EvalState & state, Value * * args, Value & v)
 {
-    PathSet context;
+    ContextEntrySet context;
     string s = state.coerceToString(*args[0], context);
     mkInt(v, s.size());
 }
@@ -1077,9 +1041,9 @@ static void prim_stringLength(EvalState & state, Value * * args, Value & v)
 
 static void prim_unsafeDiscardStringContext(EvalState & state, Value * * args, Value & v)
 {
-    PathSet context;
+    ContextEntrySet context;
     string s = state.coerceToString(*args[0], context);
-    mkString(v, s, PathSet());
+    mkString(v, s);
 }
 
 
@@ -1091,16 +1055,21 @@ static void prim_unsafeDiscardStringContext(EvalState & state, Value * * args, V
    drv.inputDrvs. */
 static void prim_unsafeDiscardOutputDependency(EvalState & state, Value * * args, Value & v)
 {
-    PathSet context;
+    ContextEntrySet context;
     string s = state.coerceToString(*args[0], context);
 
-    PathSet context2;
-    foreach (PathSet::iterator, i, context) {
-        Path p = *i;
-        if (p.at(0) == '=') p = "~" + string(p, 1);
-        context2.insert(p);
+    ContextEntrySet context2;
+    foreach (ContextEntrySet::iterator, i, context) {
+        Path path = (*i)->path;
+        string output = (*i)->output;
+        if (isDerivation(path) && output.empty()) {
+            ContextEntry * c = state.allocContextEntry(path,output);
+            c->discardOutputs = true;
+            context2.insert(c);
+        } else
+            context2.insert(*i);
     }
-    
+
     mkString(v, s, context2);
 }
 

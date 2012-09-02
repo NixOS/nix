@@ -142,7 +142,7 @@ EvalState::EvalState()
     , baseEnvDispl(0)
     , staticBaseEnv(false, 0)
 {
-    nrEnvs = nrValuesInEnvs = nrValues = nrListElems = 0;
+    nrEnvs = nrValuesInEnvs = nrValues = nrListElems = nrContextEntries = nrContextEntryBytes = 0;
     nrAttrsets = nrOpUpdates = nrOpUpdateValuesCopied = 0;
     nrListConcats = nrPrimOpCalls = nrFunctionCalls = 0;
     countCalls = getEnv("NIX_COUNT_CALLS", "0") != "0";
@@ -275,15 +275,15 @@ void mkString(Value & v, const char * s)
 }
 
 
-void mkString(Value & v, const string & s, const PathSet & context)
+void mkString(Value & v, const string & s, const ContextEntrySet & context)
 {
     mkString(v, s.c_str());
     if (!context.empty()) {
         unsigned int n = 0;
-        v.string.context = (const char * *)
-            GC_MALLOC((context.size() + 1) * sizeof(char *));
-        foreach (PathSet::const_iterator, i, context)  
-            v.string.context[n++] = GC_STRDUP(i->c_str());
+        v.string.context = (const ContextEntry * *)
+            GC_MALLOC((context.size() + 1) * sizeof(ContextEntry *));
+        foreach (ContextEntrySet::const_iterator, i, context)  
+            v.string.context[n++] = *i;
         v.string.context[n] = 0;
     }
 }
@@ -319,6 +319,20 @@ Value * EvalState::allocValue()
 {
     nrValues++;
     return (Value *) GC_MALLOC(sizeof(Value));
+}
+
+
+ContextEntry * EvalState::allocContextEntry(const Path & path, const string & output) {
+    nrContextEntries++;
+    nrContextEntryBytes += sizeof(ContextEntry) + (path.size() + 1) + (output.size() + 1);
+    ContextEntry * c = (ContextEntry *) GC_MALLOC(sizeof(ContextEntry) + (path.size() + 1) + (output.size() + 1));
+    c->path = ((const char *) c) + sizeof(ContextEntry);
+    c->output = c->path + (path.size() + 1);
+    // !!! Commented out because of zero-out behaviour of GC_MALLOC, can we rely on false == 0?
+    // c->discardOutputs = false;
+    memcpy((void *) c->path, path.c_str(), path.size() + 1);
+    memcpy((void *) c->output, output.c_str(), output.size() + 1);
+    return c;
 }
 
 
@@ -948,7 +962,7 @@ void EvalState::concatLists(Value & v, unsigned int nrLists, Value * * lists)
 
 void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 {
-    PathSet context;
+    ContextEntrySet context;
     std::ostringstream s;
         
     bool first = true, isPath = false;
@@ -1030,15 +1044,15 @@ string EvalState::forceString(Value & v)
 }
 
 
-void copyContext(const Value & v, PathSet & context)
+void copyContext(const Value & v, ContextEntrySet & context)
 {
     if (v.string.context)
-        for (const char * * p = v.string.context; *p; ++p) 
+        for (const ContextEntry * * p = v.string.context; *p; ++p)
             context.insert(*p);
 }
 
 
-string EvalState::forceString(Value & v, PathSet & context)
+string EvalState::forceString(Value & v, ContextEntrySet & context)
 {
     string s = forceString(v);
     copyContext(v, context);
@@ -1051,7 +1065,7 @@ string EvalState::forceStringNoCtx(Value & v)
     string s = forceString(v);
     if (v.string.context)
         throwEvalError("the string `%1%' is not allowed to refer to a store path (such as `%2%')",
-            v.string.s, v.string.context[0]);
+            v.string.s, v.string.context[0]->path);
     return s;
 }
 
@@ -1067,7 +1081,7 @@ bool EvalState::isDerivation(Value & v)
 }
 
 
-string EvalState::coerceToString(Value & v, PathSet & context,
+string EvalState::coerceToString(Value & v, ContextEntrySet & context,
     bool coerceMore, bool copyToStore)
 {
     forceValue(v);
@@ -1099,7 +1113,7 @@ string EvalState::coerceToString(Value & v, PathSet & context,
                 % path % dstPath);
         }
 
-        context.insert(dstPath);
+        context.insert(allocContextEntry(dstPath));
         return dstPath;
     }
 
@@ -1137,7 +1151,7 @@ string EvalState::coerceToString(Value & v, PathSet & context,
 }
 
 
-Path EvalState::coerceToPath(Value & v, PathSet & context)
+Path EvalState::coerceToPath(Value & v, ContextEntrySet & context)
 {
     string path = coerceToString(v, context, false, false);
     if (path == "" || path[0] != '/')
@@ -1170,11 +1184,13 @@ bool EvalState::eqValues(Value & v1, Value & v2)
         case tString: {
             /* Compare both the string and its context. */
             if (strcmp(v1.string.s, v2.string.s) != 0) return false;
-            const char * * p = v1.string.context, * * q = v2.string.context;
+            const ContextEntry * * p = v1.string.context, * * q = v2.string.context;
             if (!p && !q) return true;
             if (!p || !q) return false;
-            for ( ; *p && *q; ++p, ++q)
-                if (strcmp(*p, *q) != 0) return false;
+            for ( ; *p && *q; ++p, ++q) {
+                if (strcmp((*p)->path, (*q)->path) != 0) return false;
+                if (strcmp((*p)->output, (*q)->output) != 0) return false;
+	    }
             if (*p || *q) return false;
             return true;
         }
@@ -1243,6 +1259,8 @@ void EvalState::printStats()
     printMsg(v, format("  list concatenations: %1%") % nrListConcats);
     printMsg(v, format("  values allocated: %1% (%2% bytes)")
         % nrValues % (nrValues * sizeof(Value)));
+    printMsg(v, format("  string context entries allocated: %1% (%2% bytes)")
+        % nrContextEntries % nrContextEntryBytes);
     printMsg(v, format("  attribute sets allocated: %1%") % nrAttrsets);
     printMsg(v, format("  right-biased unions: %1%") % nrOpUpdates);
     printMsg(v, format("  values copied in right-biased unions: %1%") % nrOpUpdateValuesCopied);
