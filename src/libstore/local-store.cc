@@ -1045,6 +1045,91 @@ void LocalStore::querySubstitutablePathInfos(const PathSet & paths,
 }
 
 
+PathSet LocalStore::querySubstitutableFiles(const PathSet & paths)
+{
+    PathSet res;
+    foreach (Paths::iterator, i, settings.substituters) {
+        if (res.size() == paths.size()) break;
+        RunningSubstituter & run(runningSubstituters[*i]);
+        startSubstituter(*i, run);
+        string s = "haveFile ";
+        foreach (PathSet::const_iterator, j, paths)
+            if (res.find(*j) == res.end()) { s += *j; s += " "; }
+        writeLine(run.to, s);
+        while (true) {
+            /* FIXME: we only read stderr when an error occurs, so
+               substituters should only write (short) messages to
+               stderr when they fail.  I.e. they shouldn't write debug
+               output. */
+            try {
+                Path path = readLine(run.from);
+                if (path == "") break;
+                res.insert(path);
+            } catch (EndOfFile e) {
+                throw Error(format("substituter `%1%' failed: %2%") % *i % chomp(drainFD(run.error)));
+            }
+        }
+    }
+    return res;
+}
+
+
+void LocalStore::querySubstitutableFileInfos(const Path & substituter,
+    PathSet & paths, SubstitutableFileInfos & infos)
+{
+    RunningSubstituter & run(runningSubstituters[substituter]);
+    startSubstituter(substituter, run);
+
+    string s = "fileInfo ";
+    foreach (PathSet::const_iterator, i, paths)
+        if (infos.find(*i) == infos.end()) { s += *i; s += " "; }
+    writeLine(run.to, s);
+
+    while (true) {
+        try {
+            Path path = readLine(run.from);
+            if (path == "") break;
+            if (paths.find(path) == paths.end())
+                throw Error(format("got unexpected path `%1%' from substituter") % path);
+            paths.erase(path);
+            SubstitutableFileInfo & info(infos[path]);
+            string type = readLine(run.from);
+            if (type == "regular") {
+                info.type = tpRegular;
+                if (readLine(run.from) == "executable")
+                    info.regular.executable = true;
+                else
+                    info.regular.executable = false;
+                info.regular.length = getIntLine<long long>(run.from);
+                info.regular.hash = parseHash32(htSHA256, readLine(run.from));
+            } else if (type == "symlink") {
+                info.type = tpSymlink;
+                info.target = readLine(run.from);
+            } else if (type == "directory") {
+                info.type = tpDirectory;
+                int nrEntries = getIntLine<int>(run.from);
+                while (nrEntries--)
+                    info.files.insert(readLine(run.from));
+            } else
+                info.type = tpUnknown;
+        } catch (EndOfFile e) {
+            throw Error(format("substituter `%1%' failed: %2%") % substituter % chomp(drainFD(run.error)));
+        }
+    }
+}
+
+
+void LocalStore::querySubstitutableFileInfos(const PathSet & paths,
+    SubstitutableFileInfos & infos)
+{
+    PathSet todo = paths;
+    foreach (Paths::iterator, i, settings.substituters) {
+        if (todo.empty()) break;
+        querySubstitutableFileInfos(*i, todo, infos);
+    }
+}
+
+
 Hash LocalStore::queryPathHash(const Path & path)
 {
     return queryPathInfo(path).hash;

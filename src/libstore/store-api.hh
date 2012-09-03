@@ -83,6 +83,33 @@ struct SubstitutablePathInfo
 typedef std::map<Path, SubstitutablePathInfo> SubstitutablePathInfos;
 
 
+enum FileType {
+    tpUnknown,
+    tpRegular,
+    tpDirectory,
+    tpSymlink
+};
+
+
+struct SubstitutableFileInfo
+{
+    FileType type;
+
+    // !!! Want a union here, but requires c++11
+    struct {
+        bool executable;
+        unsigned long long length;
+        Hash hash;
+    } regular;
+
+    Path target;
+
+    StringSet files;
+};
+
+typedef std::map<Path, SubstitutableFileInfo> SubstitutableFileInfos;
+
+
 struct ValidPathInfo 
 {
     Path path;
@@ -151,7 +178,16 @@ public:
        info, it's omitted from the resulting ‘infos’ map. */
     virtual void querySubstitutablePathInfos(const PathSet & paths,
         SubstitutablePathInfos & infos) = 0;
-    
+
+    /* Query which of the given paths have file substitutes. */
+    virtual PathSet querySubstitutableFiles(const PathSet & paths) = 0;
+
+    /* Query file substitute info (i.e. file type, length, hash,
+       etc.) of a set of paths.  If a path does not have file substitute
+       info, it's omitted from the resulting ‘infos’ map. */
+    virtual void querySubstitutableFileInfos(const PathSet & paths,
+        SubstitutableFileInfos & infos) = 0;
+
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
        The function object `filter' can be used to exclude files (see
@@ -242,6 +278,11 @@ public:
        `nix-store --register-validity'. */
     string makeValidityRegistration(const PathSet & paths,
         bool showDerivers, bool showHash);
+
+    /* Check if a store file can be read, either because it's already there
+     * or because there is a file substitute for it. tryDefaultNix checks
+     * path/default.nix if it's a directory */
+    bool canReadFile(const Path & path, bool tryDefaultNix = false);
 };
 
 

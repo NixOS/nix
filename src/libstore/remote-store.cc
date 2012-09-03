@@ -320,6 +320,55 @@ void RemoteStore::querySubstitutablePathInfos(const PathSet & paths,
 }
 
 
+PathSet RemoteStore::querySubstitutableFiles(const PathSet & paths)
+{
+    openConnection();
+
+    if (GET_PROTOCOL_MINOR(daemonVersion) < 13) return PathSet();
+
+    writeInt(wopQuerySubstitutableFiles, to);
+    writeStrings(paths, to);
+    processStderr();
+    return readStorePaths<PathSet>(from);
+}
+
+
+void RemoteStore::querySubstitutableFileInfos(const PathSet & paths,
+    SubstitutableFileInfos & infos)
+{
+    if (paths.empty()) return;
+
+    openConnection();
+
+    if (GET_PROTOCOL_MINOR(daemonVersion) < 13) return;
+
+    writeInt(wopQuerySubstitutableFileInfos, to);
+    writeStrings(paths, to);
+    processStderr();
+    unsigned int count = readInt(from);
+    for (unsigned int n = 0; n < count; n++) {
+        Path path = readStorePath(from);
+        SubstitutableFileInfo & info(infos[path]);
+        string type = readString(from);
+        if (type == "regular") {
+            info.type = tpRegular;
+            info.regular.executable = readInt(from) != 0;
+            info.regular.length = readLongLong(from);
+            info.regular.hash = parseHash32(htSHA256, readString(from));
+        } else if (type == "symlink") {
+            info.type = tpSymlink;
+            info.target = readString(from);
+        } else if (type == "directory") {
+            info.type = tpDirectory;
+            int nrEntries = readInt(from);
+            while (nrEntries--)
+                info.files.insert(readString(from));
+        } else
+            info.type = tpUnknown;
+    }
+}
+
+
 ValidPathInfo RemoteStore::queryPathInfo(const Path & path)
 {
     openConnection();

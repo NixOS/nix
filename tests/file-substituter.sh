@@ -1,16 +1,16 @@
 #! /bin/sh -e
 echo substituter args: $* >&2
 
-barOutPath=`nix-instantiate --eval-only -v 0 -A bar.outPath ./file-substitutes.nix | tr -d \"`
-barDrvPath=`nix-instantiate --eval-only -v 0 -A bar.drvPath ./file-substitutes.nix | tr -d \"`
-bazOutPath=`nix-instantiate --eval-only -v 0 -A bar.baz.outPath ./file-substitutes.nix | tr -d \"`
-bazDrvPath=`nix-instantiate --eval-only -v 0 -A bar.baz.drvPath ./file-substitutes.nix | tr -d \"`
-substitutedExprPath=`nix-instantiate --eval-only -v 0 -A substitutedExpr ./file-substitutes.nix | tr -d \"`
-substitutedExprString=`echo -e \`nix-instantiate --eval-only -v 0 -A substitutedExprString ./file-substitutes.nix | tr -d \"\``
-filePath=`nix-instantiate --eval-only -v 0 -A file ./file-substitutes.nix | tr -d \"`
-fileString=`nix-instantiate --eval-only -v 0 -A fileString ./file-substitutes.nix | tr -d \"`
-aDotNixPath=`nix-instantiate --eval-only -v 0 -A aDotNix ./file-substitutes.nix | tr -d \"`
-aDotNixString=`nix-instantiate --eval-only -v 0 -A aDotNixString ./file-substitutes.nix | tr -d \"`
+barOutPath=`nix-instantiate --eval-only -A bar.outPath ./file-substitutes.nix | tr -d \"`
+barDrvPath=`nix-instantiate --eval-only -A bar.drvPath ./file-substitutes.nix | tr -d \"`
+bazOutPath=`nix-instantiate --eval-only -A bar.baz.outPath ./file-substitutes.nix | tr -d \"`
+bazDrvPath=`nix-instantiate --eval-only -A bar.baz.drvPath ./file-substitutes.nix | tr -d \"`
+substitutedExprPath=`nix-instantiate --eval-only -A substitutedExpr ./file-substitutes.nix | tr -d \"`
+substitutedExprString=`echo -e \`nix-instantiate --eval-only -A substitutedExprString ./file-substitutes.nix | tr -d \"\``
+filePath=`nix-instantiate --eval-only -A file ./file-substitutes.nix | tr -d \"`
+fileString=`nix-instantiate --eval-only -A fileString ./file-substitutes.nix | tr -d \"`
+aDotNixPath=`nix-instantiate --eval-only -A aDotNix ./file-substitutes.nix | tr -d \"`
+aDotNixString=`nix-instantiate --eval-only -A aDotNixString ./file-substitutes.nix | tr -d \"`
 
 if test $1 = "--query"; then
     while read cmd args; do
@@ -24,14 +24,14 @@ if test $1 = "--query"; then
             echo
         elif test "$cmd" = "info"; then
             for path in $args; do
-                if test "$path" = "$barOutPath"
+                if test "$path" = "$barOutPath"; then
                     echo "$path"
                     echo "$barDrvPath"
                     echo 1
                     echo "$bazOutPath"
                     echo $((1 * 1024 * 1024))
                     echo $((2 * 1024 * 1024))
-                elif test "$path" = "$bazOutPath"
+                elif test "$path" = "$bazOutPath"; then
                     echo "$path"
                     echo "$bazDrvPath"
                     echo 0
@@ -113,6 +113,7 @@ elif test $1 = "--read"; then
         echo "$aDotNixString"
     else
         exit 1
+    fi
 elif test $1 = "--substitute"; then
     exit 1
 else

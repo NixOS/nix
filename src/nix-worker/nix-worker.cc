@@ -632,6 +632,48 @@ static void performOp(unsigned int clientVersion,
         break;
     }
 
+    case wopQuerySubstitutableFiles: {
+        PathSet paths = readStorePaths<PathSet>(from);
+        startWork();
+        PathSet res = store->querySubstitutableFiles(paths);
+        stopWork();
+        writeStrings(res, to);
+        break;
+    }
+
+    case wopQuerySubstitutableFileInfos: {
+        PathSet paths = readStorePaths<PathSet>(from);
+        startWork();
+        SubstitutableFileInfos infos;
+        store->querySubstitutableFileInfos(paths, infos);
+        stopWork();
+        writeInt(infos.size(), to);
+        foreach (SubstitutableFileInfos::iterator, i, infos) {
+            writeString(i->first, to);
+            switch (i->second.type)
+            {
+                case tpRegular:
+                    writeString("regular", to);
+                    writeInt(i->second.regular.executable, to);
+                    writeLongLong(i->second.regular.length, to);
+                    writeString(printHash32(i->second.regular.hash), to);
+                    break;
+                case tpSymlink:
+                    writeString("symlink", to);
+                    writeString(i->second.target, to);
+                    break;
+                case tpDirectory:
+                    writeString("directory", to);
+                    writeStrings(i->second.files, to);
+                    break;
+                case tpUnknown:
+                    writeString("unknown", to);
+                    break;
+            }
+        }
+        break;
+    }
+
     default:
         throw Error(format("invalid operation %1%") % op);
     }
