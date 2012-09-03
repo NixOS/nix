@@ -1,16 +1,16 @@
 #! /bin/sh -e
 echo substituter args: $* >&2
 
-barOutPath=`nix-instantiate --eval-only -v 0 -A bar.outPath ./expression-substitutes.nix | tr -d \"`
-barDrvPath=`nix-instantiate --eval-only -v 0 -A bar.drvPath ./expression-substitutes.nix | tr -d \"`
-bazOutPath=`nix-instantiate --eval-only -v 0 -A bar.baz.outPath ./expression-substitutes.nix | tr -d \"`
-bazDrvPath=`nix-instantiate --eval-only -v 0 -A bar.baz.drvPath ./expression-substitutes.nix | tr -d \"`
-substitutedExprPath=`nix-instantiate --eval-only -v 0 -A substitutedExpr ./expression-substitutes.nix | tr -d \"`
-substitutedExprString=`echo -e \`nix-instantiate --eval-only -v 0 -A substitutedExprString ./expression-substitutes.nix | tr -d \"\``
-filePath=`nix-instantiate --eval-only -v 0 -A file ./expression-substitutes.nix | tr -d \"`
-fileString=`nix-instantiate --eval-only -v 0 -A fileString ./expression-substitutes.nix | tr -d \"`
-aDotNixPath=`nix-instantiate --eval-only -v 0 -A aDotNix ./expression-substitutes.nix | tr -d \"`
-aDotNixString=`nix-instantiate --eval-only -v 0 -A aDotNixString ./expression-substitutes.nix | tr -d \"`
+barOutPath=`nix-instantiate --eval-only -v 0 -A bar.outPath ./file-substitutes.nix | tr -d \"`
+barDrvPath=`nix-instantiate --eval-only -v 0 -A bar.drvPath ./file-substitutes.nix | tr -d \"`
+bazOutPath=`nix-instantiate --eval-only -v 0 -A bar.baz.outPath ./file-substitutes.nix | tr -d \"`
+bazDrvPath=`nix-instantiate --eval-only -v 0 -A bar.baz.drvPath ./file-substitutes.nix | tr -d \"`
+substitutedExprPath=`nix-instantiate --eval-only -v 0 -A substitutedExpr ./file-substitutes.nix | tr -d \"`
+substitutedExprString=`echo -e \`nix-instantiate --eval-only -v 0 -A substitutedExprString ./file-substitutes.nix | tr -d \"\``
+filePath=`nix-instantiate --eval-only -v 0 -A file ./file-substitutes.nix | tr -d \"`
+fileString=`nix-instantiate --eval-only -v 0 -A fileString ./file-substitutes.nix | tr -d \"`
+aDotNixPath=`nix-instantiate --eval-only -v 0 -A aDotNix ./file-substitutes.nix | tr -d \"`
+aDotNixString=`nix-instantiate --eval-only -v 0 -A aDotNixString ./file-substitutes.nix | tr -d \"`
 
 if test $1 = "--query"; then
     while read cmd args; do
@@ -60,6 +60,7 @@ if test $1 = "--query"; then
                 if test "$path" = "$barOutPath/default.nix"; then
                     echo "$path"
                     echo "regular" # File type
+                    echo "" # Not executable ("executable" otherwise)
                     echo `expr length "$substitutedExprString"` # File length
                     echo `basename "$substitutedExprPath" | sed 's|-.*||'` # File hash, base-32
                 elif test "$path" = "$barOutPath"; then

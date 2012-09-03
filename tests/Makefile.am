@@ -10,8 +10,8 @@ extra1 = $(shell pwd)/test-tmp/shared
 #  remote-store.sh export.sh export-graph.sh negative-caching.sh \
 #  binary-patching.sh timeout.sh secure-drv-outputs.sh nix-channel.sh \
 #  multiple-outputs.sh import-derivation.sh fetchurl.sh optimise-store.sh \
-#  binary-cache.sh expression-substitutes.sh
-TESTS = init.sh expression-substitutes.sh
+#  binary-cache.sh file-substitutes.sh
+TESTS = init.sh file-substitutes.sh
 
 XFAIL_TESTS =
 
@@ -41,8 +41,8 @@ EXTRA_DIST = $(TESTS) \
   multiple-outputs.nix \
   import-derivation.nix \
   fetchurl.nix \
-  expression-substitutes.nix \
-  expression-substituter.sh \
+  file-substitutes.nix \
+  file-substituter.sh \
   $(wildcard lang/*.nix) $(wildcard lang/*.exp) $(wildcard lang/*.exp.xml) $(wildcard lang/*.flags) $(wildcard lang/dir*/*.nix) \
   common.sh.in
 
