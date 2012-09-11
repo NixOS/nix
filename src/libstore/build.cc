@@ -756,6 +756,9 @@ private:
     /* Referenceable paths (i.e., input and output paths). */
     PathSet allPaths;
 
+    /* Outputs that are already valid. */
+    PathSet validPaths;
+
     /* User selected for running the builder. */
     UserLock buildUser;
 
@@ -1141,7 +1144,7 @@ void DerivationGoal::tryToBuild()
        omitted, but that would be less efficient.)  Note that since we
        now hold the locks on the output paths, no other process can
        build this derivation, so no further checks are necessary. */
-    PathSet validPaths = checkPathValidity(true);
+    validPaths = checkPathValidity(true);
     if (validPaths.size() == drv.outputs.size()) {
         debug(format("skipping build of derivation `%1%', someone beat us to it")
             % drvPath);
@@ -1150,22 +1153,16 @@ void DerivationGoal::tryToBuild()
         return;
     }
 
-    if (validPaths.size() > 0)
-        /* !!! fix this; try to delete valid paths */
-        throw Error(
-            format("derivation `%1%' is blocked by its output paths")
-            % drvPath);
+    printMsg(lvlError, format("BLOCKERS: %1%") % showPaths(validPaths));
 
     /* If any of the outputs already exist but are not valid, delete
        them. */
     foreach (DerivationOutputs::iterator, i, drv.outputs) {
         Path path = i->second.path;
-        if (worker.store.isValidPath(path))
-            throw Error(format("obstructed build: path `%1%' exists") % path);
-        if (pathExists(path)) {
-            debug(format("removing unregistered path `%1%'") % path);
-            deletePathWrapped(path);
-        }
+        if (worker.store.isValidPath(path)) continue;
+        if (!pathExists(path)) continue;
+        debug(format("removing unregistered path `%1%'") % path);
+        deletePathWrapped(path);
     }
 
     /* Check again whether any output previously failed to build,
@@ -1283,6 +1280,10 @@ void DerivationGoal::buildDone()
             Path path = i->second.path;
 
             if (useChroot && pathExists(chrootRootDir + path)) {
+                /* Move output paths from the chroot to the Nix store.
+                   If the output was already valid, just skip
+                   (discard) it. */
+                if (validPaths.find(path) != validPaths.end()) continue;
                 if (rename((chrootRootDir + path).c_str(), path.c_str()) == -1)
                     throw SysError(format("moving build output `%1%' from the chroot to the Nix store") % path);
             }
@@ -1747,6 +1748,9 @@ void DerivationGoal::startBuilder()
 #else
         throw Error("chroot builds are not supported on this platform");
 #endif
+    } else { // !useChroot
+        if (validPaths.size() > 0)
+            throw Error(format("derivation `%1%' is blocked by its output paths %2%") % drvPath % showPaths(validPaths));
     }
 
 

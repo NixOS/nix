@@ -6,6 +6,7 @@ use IO::Handle;
 use Nix::Config;
 use Nix::SSH qw/sshOpts openSSHConnection/;
 use Nix::CopyClosure;
+use Nix::Store;
 no warnings('once');
 
 
@@ -18,7 +19,7 @@ no warnings('once');
 #   less than the maximum load for that machine, we try to get an
 #   exclusive lock on $currentLoad/$machine-$slot (without blocking).
 #   If we get such a lock, we send "accept" to the caller.  Otherwise,
-#   we send "postpone" and exit. 
+#   we send "postpone" and exit.
 # - We release the exclusive lock on $currentLoad/main-lock.
 # - We perform the build on $neededSystem.
 # - We release the exclusive lock on $currentLoad/$machine-$slot.
@@ -102,14 +103,14 @@ REQ: while (1) {
         sendReply "decline";
         next;
     }
-    
+
     # Acquire the exclusive lock on $currentLoad/main-lock.
     mkdir $currentLoad, 0777 or die unless -d $currentLoad;
     my $mainLock = "$currentLoad/main-lock";
     sysopen MAINLOCK, "$mainLock", O_RDWR|O_CREAT, 0600 or die;
     flock(MAINLOCK, LOCK_EX) or die;
-    
-    
+
+
     while (1) {
         # Find all machine that can execute this build, i.e., that
         # support builds for the given platform and features, and are
@@ -141,7 +142,7 @@ REQ: while (1) {
                     close $slotLock;
                     $slot++;
                 }
-                
+
                 push @available, { machine => $cur, load => $load, free => $free }
                 if $load < $cur->{maxJobs};
             }
@@ -160,7 +161,7 @@ REQ: while (1) {
             if ($rightType && !$canBuildLocally) {
                 sendReply "postpone";
             } else {
-                sendReply "decline";                
+                sendReply "decline";
             }
             close MAINLOCK;
             next REQ;
@@ -182,9 +183,9 @@ REQ: while (1) {
 
 
         # Select the best available machine and lock a free slot.
-        my $selected = $available[0]; 
+        my $selected = $available[0];
         my $machine = $selected->{machine};
-        
+
         $slotLock = openSlotLock($machine, $selected->{free});
         flock($slotLock, LOCK_EX | LOCK_NB) or die;
         utime undef, undef, $slotLock;
@@ -196,7 +197,7 @@ REQ: while (1) {
         @sshOpts = ("-i", $machine->{sshKeys}, "-x");
         $hostName = $machine->{hostName};
         last REQ if openSSHConnection $hostName;
-    
+
         warn "unable to open SSH connection to $hostName, trying other available machines...\n";
         $machine->{enabled} = 0;
     }
@@ -286,10 +287,10 @@ if (system("exec ssh $hostName @sshOpts '(read; kill -INT -\$\$) <&0 & nix-store
 foreach my $output (@outputs) {
     my $maybeSignRemote = "";
     $maybeSignRemote = "--sign" if $UID != 0;
-    
+    next if isValidPath($output);
     system("exec ssh $hostName @sshOpts 'nix-store --export $maybeSignRemote $output'" .
            "| NIX_HELD_LOCKS=$output @bindir@/nix-store --import > /dev/null") == 0
-	or die "cannot copy $output from $hostName: $?";
+        or die "cannot copy $output from $hostName: $?";
 }
 
 
