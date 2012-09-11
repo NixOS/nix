@@ -1,9 +1,9 @@
 #pragma once
 
-#include <map>
-
 #include "types.hh"
 #include "hash.hh"
+
+#include <map>
 
 
 namespace nix {
