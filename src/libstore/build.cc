@@ -1332,7 +1332,8 @@ void DerivationGoal::buildDone()
                 StringSink sink;
                 dumpPath(path, sink);
                 deletePath(path);
-                StringSource source(rewriteHashes(sink.s, rewritesFromTmp));
+                sink.s = rewriteHashes(sink.s, rewritesFromTmp);
+                StringSource source(sink.s);
                 restorePath(path, source);
             }
 
