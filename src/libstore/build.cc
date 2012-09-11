@@ -1153,8 +1153,6 @@ void DerivationGoal::tryToBuild()
         return;
     }
 
-    printMsg(lvlError, format("BLOCKERS: %1%") % showPaths(validPaths));
-
     /* If any of the outputs already exist but are not valid, delete
        them. */
     foreach (DerivationOutputs::iterator, i, drv.outputs) {
@@ -1750,7 +1748,7 @@ void DerivationGoal::startBuilder()
 #endif
     } else { // !useChroot
         if (validPaths.size() > 0)
-            throw Error(format("derivation `%1%' is blocked by its output paths %2%") % drvPath % showPaths(validPaths));
+            throw Error(format("derivation `%1%' is blocked by its output path(s) %2%") % drvPath % showPaths(validPaths));
     }
 
 
