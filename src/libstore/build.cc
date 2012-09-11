@@ -731,6 +731,26 @@ HookInstance::~HookInstance()
 //////////////////////////////////////////////////////////////////////
 
 
+typedef map<string, string> HashRewrites;
+
+
+string rewriteHashes(string s, const HashRewrites & rewrites)
+{
+    foreach (HashRewrites::const_iterator, i, rewrites) {
+        assert(i->first.size() == i->second.size());
+        size_t j = 0;
+        while ((j = s.find(i->first, j)) != string::npos) {
+            debug(format("rewriting @ %1%") % j);
+            s.replace(j, i->second.size(), i->second);
+        }
+    }
+    return s;
+}
+
+
+//////////////////////////////////////////////////////////////////////
+
+
 typedef enum {rpAccept, rpDecline, rpPostpone} HookReply;
 
 class SubstitutionGoal;
@@ -800,6 +820,10 @@ private:
     PathSet dirsInChroot;
     typedef map<string, string> Environment;
     Environment env;
+
+    /* Hash rewriting. */
+    HashRewrites rewritesToTmp, rewritesFromTmp;
+    PathSet redirectedOutputs;
 
 public:
     DerivationGoal(const Path & drvPath, Worker & worker);
@@ -1277,14 +1301,13 @@ void DerivationGoal::buildDone()
         foreach (DerivationOutputs::iterator, i, drv.outputs) {
             Path path = i->second.path;
 
-            if (useChroot && pathExists(chrootRootDir + path)) {
-                /* Move output paths from the chroot to the Nix store.
-                   If the output was already valid, just skip
-                   (discard) it. */
-                if (validPaths.find(path) != validPaths.end()) continue;
+            /* If the output was already valid, just skip (discard) it. */
+            if (validPaths.find(path) != validPaths.end()) continue;
+
+            if (useChroot && pathExists(chrootRootDir + path))
+                /* Move output paths from the chroot to the Nix store. */
                 if (rename((chrootRootDir + path).c_str(), path.c_str()) == -1)
                     throw SysError(format("moving build output `%1%' from the chroot to the Nix store") % path);
-            }
 
             if (!pathExists(path)) continue;
 
@@ -1301,6 +1324,17 @@ void DerivationGoal::buildDone()
                 (buildUser.enabled() && st.st_uid != buildUser.getUID()))
                 throw BuildError(format("suspicious ownership or permission on `%1%'; rejecting this build output") % path);
 #endif
+
+            /* Apply hash rewriting if necessary. */
+            if (!rewritesFromTmp.empty()) {
+                printMsg(lvlError, format("warning: rewriting hashes in `%1%'; cross fingers") % path);
+                /* FIXME: this is in-memory. */
+                StringSink sink;
+                dumpPath(path, sink);
+                deletePath(path);
+                StringSource source(rewriteHashes(sink.s, rewritesFromTmp));
+                restorePath(path, source);
+            }
 
             /* Gain ownership of the build result using the setuid
                wrapper if we're not root.  If we *are* root, then
@@ -1326,6 +1360,10 @@ void DerivationGoal::buildDone()
            hard-linked inputs to be cleared.  So set them again. */
         foreach (PathSet::iterator, i, regularInputPaths)
             makeImmutable(*i);
+
+        /* Delete redirected outputs (when doing hash rewriting). */
+        foreach (PathSet::iterator, i, redirectedOutputs)
+            deletePath(*i);
 
         /* Compute the FS closure of the outputs and register them as
            being valid. */
@@ -1746,9 +1784,27 @@ void DerivationGoal::startBuilder()
 #else
         throw Error("chroot builds are not supported on this platform");
 #endif
-    } else { // !useChroot
-        if (validPaths.size() > 0)
-            throw Error(format("derivation `%1%' is blocked by its output path(s) %2%") % drvPath % showPaths(validPaths));
+    }
+
+    /* We're not doing a chroot build, but we have some valid output
+       paths.  Since we can't just overwrite or delete them, we have
+       to do hash rewriting: i.e. in the environment/arguments passed
+       to the build, we replace the hashes of the valid outputs with
+       unique dummy strings; after the build, we discard the
+       redirected outputs corresponding to the valid outputs, and
+       rewrite the contents of the new outputs to replace the dummy
+       strings with the actual hashes. */
+    else if (validPaths.size() > 0) {
+        //throw Error(format("derivation `%1%' is blocked by its output path(s) %2%") % drvPath % showPaths(validPaths));
+        foreach (PathSet::iterator, i, validPaths) {
+            string h1 = string(*i, settings.nixStore.size() + 1, 32);
+            string h2 = string(printHash32(hashString(htSHA256, "rewrite:" + drvPath + ":" + *i)), 0, 32);
+            Path p = settings.nixStore + "/" + h2 + string(*i, settings.nixStore.size() + 33);
+            assert(i->size() == p.size());
+            rewritesToTmp[h1] = h2;
+            rewritesFromTmp[h2] = h1;
+            redirectedOutputs.insert(p);
+        }
     }
 
 
@@ -1925,7 +1981,7 @@ void DerivationGoal::initChild()
         /* Fill in the environment. */
         Strings envStrs;
         foreach (Environment::const_iterator, i, env)
-            envStrs.push_back(i->first + "=" + i->second);
+            envStrs.push_back(rewriteHashes(i->first + "=" + i->second, rewritesToTmp));
         const char * * envArr = strings2CharPtrs(envStrs);
 
         Path program = drv.builder.c_str();
@@ -1971,7 +2027,7 @@ void DerivationGoal::initChild()
         string builderBasename = baseNameOf(drv.builder);
         args.push_back(builderBasename.c_str());
         foreach (Strings::iterator, i, drv.args)
-            args.push_back(i->c_str());
+            args.push_back(rewriteHashes(*i, rewritesToTmp).c_str());
         args.push_back(0);
 
         restoreSIGPIPE();
