@@ -7,6 +7,6 @@ if nix-instantiate --readonly-mode ./import-derivation.nix; then
     exit 1
 fi
 
-outPath=$(nix-build ./import-derivation.nix)
+outPath=$(nix-build ./import-derivation.nix --no-out-link)
 
 [ "$(cat $outPath)" = FOO579 ]

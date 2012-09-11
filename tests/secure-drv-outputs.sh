@@ -28,7 +28,7 @@ if badDrv2=$(nix-store --add $TEST_ROOT/bad.drv); then
 fi
 
 # Now build the good derivation.
-goodOut2=$(nix-build ./secure-drv-outputs.nix -A good)
+goodOut2=$(nix-build ./secure-drv-outputs.nix -A good --no-out-link)
 test "$goodOut" = "$goodOut2"
 
 if ! test -e "$goodOut"/good; then

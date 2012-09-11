@@ -2,7 +2,7 @@ source common.sh
 
 clearStore
 
-outPath=$(nix-build dependencies.nix)
+outPath=$(nix-build dependencies.nix --no-out-link)
 
 nix-store --export $outPath > $TEST_ROOT/exp
 

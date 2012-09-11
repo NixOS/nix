@@ -2,7 +2,7 @@ source common.sh
 
 clearStore
 
-(cd $TEST_ROOT && nix-build ../dependencies.nix)
+nix-build dependencies.nix -o $TEST_ROOT/result
 test "$(cat $TEST_ROOT/result/foobar)" = FOOBAR
 
 # The result should be retained by a GC.

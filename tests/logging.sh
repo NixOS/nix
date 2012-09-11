@@ -4,7 +4,7 @@ clearStore
 
 # Produce an escaped log file.
 set -x
-nix-build --log-type escapes -vv dependencies.nix 2> $TEST_ROOT/log.esc
+nix-build --log-type escapes -vv dependencies.nix --no-out-link 2> $TEST_ROOT/log.esc
 
 # Convert it to an XML representation.
 nix-log2xml < $TEST_ROOT/log.esc > $TEST_ROOT/log.xml

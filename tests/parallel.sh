@@ -8,7 +8,7 @@ clearStore
 
 rm -f $SHARED.cur $SHARED.max
 
-outPath=$(nix-build -j10000 parallel.nix)
+outPath=$(nix-build -j10000 parallel.nix --no-out-link)
 
 echo "output path is $outPath"
 

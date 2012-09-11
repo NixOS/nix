@@ -4,14 +4,14 @@ clearStore
 clearProfiles
 
 checkRef() {
-    nix-store -q --references ./result | grep -q "$1" || fail "missing reference $1"
+    nix-store -q --references $TEST_ROOT/result | grep -q "$1" || fail "missing reference $1"
 }
 
 # Test the export of the runtime dependency graph.
 
-outPath=$(nix-build ./export-graph.nix -A runtimeGraph)
+outPath=$(nix-build ./export-graph.nix -A runtimeGraph -o $TEST_ROOT/result)
 
-test $(nix-store -q --references ./result | wc -l) = 2 || fail "bad nr of references"
+test $(nix-store -q --references $TEST_ROOT/result | wc -l) = 2 || fail "bad nr of references"
 
 checkRef input-2
 for i in $(cat $outPath); do checkRef $i; done
@@ -20,7 +20,7 @@ for i in $(cat $outPath); do checkRef $i; done
 
 nix-store --gc # should force rebuild of input-1
 
-outPath=$(nix-build ./export-graph.nix -A buildGraph)
+outPath=$(nix-build ./export-graph.nix -A buildGraph -o $TEST_ROOT/result)
 
 checkRef input-1
 checkRef input-1.drv

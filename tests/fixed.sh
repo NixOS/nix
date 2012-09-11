@@ -6,13 +6,13 @@ export IMPURE_VAR1=foo
 export IMPURE_VAR2=bar
 
 echo 'testing good...'
-nix-build fixed.nix -A good
+nix-build fixed.nix -A good --no-out-link
 
 echo 'testing good2...'
-nix-build fixed.nix -A good2
+nix-build fixed.nix -A good2 --no-out-link
 
 echo 'testing bad...'
-nix-build fixed.nix -A bad && fail "should fail"
+nix-build fixed.nix -A bad --no-out-link && fail "should fail"
 
 echo 'testing reallyBad...'
 nix-instantiate fixed.nix -A reallyBad && fail "should fail"
@@ -25,12 +25,12 @@ test $(nix-instantiate fixed.nix -A good.1 | wc -l) = 1
 # Only one should run at the same time.
 echo 'testing parallelSame...'
 clearStore
-nix-build fixed.nix -A parallelSame -j2
+nix-build fixed.nix -A parallelSame --no-out-link -j2
 
 # Fixed-output derivations with a recursive SHA-256 hash should
 # produce the same path as "nix-store --add".
 echo 'testing sameAsAdd...'
-out=$(nix-build fixed.nix -A sameAsAdd)
+out=$(nix-build fixed.nix -A sameAsAdd --no-out-link)
 
 # This is what fixed.builder2 produces...
 rm -rf $TEST_ROOT/fixed

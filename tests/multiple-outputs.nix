@@ -9,8 +9,9 @@ rec {
       ''
         mkdir $first $second
         test -z $all
-        echo "second" > $first/file
-        echo "first" > $second/file
+        echo "first" > $first/file
+        echo "second" > $second/file
+        ln -s $first $second/link
       '';
     helloString = "Hello, world!";
   };
@@ -26,8 +27,8 @@ rec {
         mkdir $out
         test "$firstOutput $secondOutput" = "$allOutputs"
         test "$defaultOutput" = "$firstOutput"
-        test "$(cat $firstOutput/file)" = "second"
-        test "$(cat $secondOutput/file)" = "first"
+        test "$(cat $firstOutput/file)" = "first"
+        test "$(cat $secondOutput/file)" = "second"
         echo "success" > $out/file
       '';
   };
