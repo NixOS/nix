@@ -6,7 +6,7 @@ let
     ''
       mkdir $out
       cd $out
-      ${bzip2} -d < $src | ${tar} xf - --warning=no-timestamp
+      ${bzip2} -d < $src | ${tar} xf - ${tarFlags}
       mv * $out/$channelName
       if [ -n "$binaryCacheURL" ]; then
         mkdir $out/binary-caches
