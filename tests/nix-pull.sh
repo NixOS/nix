@@ -28,6 +28,6 @@ cat $outPath/input-2/bar
 
 # Check that the derivers are set properly.
 test $(nix-store -q --deriver "$outPath") = "$drvPath"
-nix-store -q --deriver $(readLink $outPath/input-2) | grep -q -- "-input-2.drv" 
+nix-store -q --deriver $(readLink $outPath/input-2) | grep -q -- "-input-2.drv"
 
 clearManifests

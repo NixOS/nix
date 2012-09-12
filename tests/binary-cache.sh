@@ -1,6 +1,7 @@
 source common.sh
 
 clearStore
+clearManifests
 
 # Create the binary cache.
 cacheDir=$TEST_ROOT/binary-cache
