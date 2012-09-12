@@ -55,4 +55,6 @@ if nix-build multiple-outputs.nix -A cyclic --no-out-link; then
 fi
 
 echo "collecting garbage..."
-nix-store --gc
+rm $TEST_ROOT/result*
+nix-store --gc --option gc-keep-derivations true --option gc-keep-outputs true
+nix-store --gc --print-roots

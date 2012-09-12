@@ -448,67 +448,43 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
 
     startNest(nest, lvlDebug, format("considering whether to delete `%1%'") % path);
 
-    if (state.roots.find(path) != state.roots.end()) {
-        printMsg(lvlDebug, format("cannot delete `%1%' because it's a root") % path);
-        goto isLive;
-    }
+    /* If gc-keep-outputs and gc-keep-derivations are both set, we can
+       have cycles in the liveness graph, so we need to treat such
+       strongly connected components as a single unit (‘paths’).  That
+       is, we can delete the elements of ‘paths’ only if all referrers
+       of ‘paths’ are garbage. */
+    PathSet paths, referrers;
 
     if (isValidPath(path)) {
 
-        /* Recursively try to delete the referrers of this path.  If
-           any referrer can't be deleted, then this path can't be
-           deleted either. */
-        PathSet referrers;
-        queryReferrers(path, referrers);
-        foreach (PathSet::iterator, i, referrers)
-            if (*i != path && !tryToDelete(state, *i)) {
-                printMsg(lvlDebug, format("cannot delete `%1%' because it has live referrers") % path);
-                goto isLive;
+        /* Add derivers and outputs of ‘path’ to ‘paths’. */
+        PathSet todo;
+        todo.insert(path);
+        while (!todo.empty()) {
+            Path p = *todo.begin();
+            assertStorePath(p);
+            todo.erase(p);
+            if (paths.find(p) != paths.end()) continue;
+            paths.insert(p);
+            /* If gc-keep-derivations is set and this is a derivation,
+               then don't delete the derivation if any of the outputs
+               are live. */
+            if (state.gcKeepDerivations && isDerivation(p)) {
+                PathSet outputs = queryDerivationOutputs(p);
+                foreach (PathSet::iterator, i, outputs)
+                    if (isValidPath(*i)) todo.insert(*i);
             }
-
-        /* If gc-keep-derivations is set and this is a derivation,
-           then don't delete the derivation if any of the outputs are
-           live. */
-        if (state.gcKeepDerivations && isDerivation(path)) {
-            PathSet outputs = queryDerivationOutputs(path);
-            foreach (PathSet::iterator, i, outputs)
-                if (!tryToDelete(state, *i)) {
-                    printMsg(lvlDebug, format("cannot delete derivation `%1%' because its output `%2%' is alive") % path % *i);
-                    goto isLive;
-                }
-        }
-
-        /* If gc-keep-derivations and gc-keep-outputs are both set,
-           it's possible that the path has already been deleted (due
-           to the recursion below), so bail out. */
-        if (!pathExists(path)) return true;
-
-        /* If gc-keep-outputs is set, then don't delete this path if
-           there are derivers of this path that are not garbage. */
-        if (state.gcKeepOutputs) {
-            PathSet derivers = queryValidDerivers(path);
-            foreach (PathSet::iterator, deriver, derivers) {
-                /* Break an infinite recursion if gc-keep-derivations
-                   and gc-keep-outputs are both set by tentatively
-                   assuming that this path is garbage.  This is a safe
-                   assumption because at this point, the only thing
-                   that can prevent it from being garbage is the
-                   deriver.  Since tryToDelete() works "upwards"
-                   through the dependency graph, it won't encouter
-                   this path except in the call to tryToDelete() in
-                   the gc-keep-derivation branch. */
-                state.deleted.insert(path);
-                if (!tryToDelete(state, *deriver)) {
-                    state.deleted.erase(path);
-                    printMsg(lvlDebug, format("cannot delete `%1%' because its deriver `%2%' is alive") % path % *deriver);
-                    goto isLive;
-                }
+            /* If gc-keep-outputs is set, then don't delete this path
+               if there are derivers of this path that are not
+               garbage. */
+            if (state.gcKeepOutputs) {
+                PathSet derivers = queryValidDerivers(p);
+                foreach (PathSet::iterator, i, derivers) todo.insert(*i);
             }
         }
     }
 
     else {
-
         /* A lock file belonging to a path that we're building right
            now isn't garbage. */
         if (isActiveTempFile(state, path, ".lock")) return false;
@@ -517,55 +493,80 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
            currently being built. */
         if (isActiveTempFile(state, path, ".chroot")) return false;
 
+        paths.insert(path);
     }
 
-    /* The path is garbage, so delete it. */
-    if (shouldDelete(state.options.action)) {
-
-        /* If it's a valid path that's not a regular file or symlink,
-           invalidate it, rename it, and schedule it for deletion.
-           The renaming is to ensure that later (when we're not
-           holding the global GC lock) we can delete the path without
-           being afraid that the path has become alive again.
-           Otherwise delete it right away. */
-        if (isValidPath(path)) {
-            if (S_ISDIR(st.st_mode)) {
-                printMsg(lvlInfo, format("invalidating `%1%'") % path);
-                // Estimate the amount freed using the narSize field.
-                state.bytesInvalidated += queryPathInfo(path).narSize;
-                invalidatePathChecked(path);
-                makeMutable(path.c_str());
-                // Mac OS X cannot rename directories if they are read-only.
-                if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
-                    throw SysError(format("making `%1%' writable") % path);
-                Path tmp = (format("%1%-gc-%2%") % path % getpid()).str();
-                if (rename(path.c_str(), tmp.c_str()))
-                    throw SysError(format("unable to rename `%1%' to `%2%'") % path % tmp);
-                state.invalidated.insert(tmp);
-            } else {
-                invalidatePathChecked(path);
-                deleteGarbage(state, path);
-            }
-        } else
-            deleteGarbage(state, path);
-
-        if (state.results.bytesFreed + state.bytesInvalidated > state.options.maxFreed) {
-            printMsg(lvlInfo, format("deleted or invalidated more than %1% bytes; stopping") % state.options.maxFreed);
-            throw GCLimitReached();
+    /* Check if any path in ‘paths’ is a root. */
+    foreach (PathSet::iterator, i, paths)
+        if (state.roots.find(*i) != state.roots.end()) {
+            printMsg(lvlDebug, format("cannot delete `%1%' because it's a root") % *i);
+            goto isLive;
         }
 
-    } else
-        printMsg(lvlTalkative, format("would delete `%1%'") % path);
+    /* Recursively try to delete the referrers of this strongly
+       connected component.  If any referrer can't be deleted, then
+       these paths can't be deleted either. */
+    foreach (PathSet::iterator, i, paths)
+        if (isValidPath(*i)) queryReferrers(*i, referrers);
 
-    state.deleted.insert(path);
-    if (state.options.action != GCOptions::gcReturnLive)
-        state.results.paths.insert(path);
+    foreach (PathSet::iterator, i, referrers)
+        if (paths.find(*i) == paths.end() && !tryToDelete(state, *i)) {
+            printMsg(lvlDebug, format("cannot delete `%1%' because it has live referrers") % *i);
+            goto isLive;
+        }
+
+    /* The paths are garbage, so delete them. */
+    foreach (PathSet::iterator, i, paths) {
+        if (shouldDelete(state.options.action)) {
+
+            /* If it's a valid path that's not a regular file or
+               symlink, invalidate it, rename it, and schedule it for
+               deletion.  The renaming is to ensure that later (when
+               we're not holding the global GC lock) we can delete the
+               path without being afraid that the path has become
+               alive again.  Otherwise delete it right away. */
+            if (isValidPath(*i)) {
+                if (S_ISDIR(st.st_mode)) {
+                    printMsg(lvlInfo, format("invalidating `%1%'") % *i);
+                    // Estimate the amount freed using the narSize field.
+                    state.bytesInvalidated += queryPathInfo(*i).narSize;
+                    invalidatePathChecked(*i);
+                    makeMutable(i->c_str());
+                    // Mac OS X cannot rename directories if they are read-only.
+                    if (chmod(i->c_str(), st.st_mode | S_IWUSR) == -1)
+                        throw SysError(format("making `%1%' writable") % *i);
+                    Path tmp = (format("%1%-gc-%2%") % *i % getpid()).str();
+                    if (rename(i->c_str(), tmp.c_str()))
+                        throw SysError(format("unable to rename `%1%' to `%2%'") % *i % tmp);
+                    state.invalidated.insert(tmp);
+                } else {
+                    invalidatePathChecked(*i);
+                    deleteGarbage(state, *i);
+                }
+            } else
+                deleteGarbage(state, *i);
+
+            if (state.results.bytesFreed + state.bytesInvalidated > state.options.maxFreed) {
+                printMsg(lvlInfo, format("deleted or invalidated more than %1% bytes; stopping") % state.options.maxFreed);
+                throw GCLimitReached();
+            }
+
+        } else
+            printMsg(lvlTalkative, format("would delete `%1%'") % *i);
+
+        state.deleted.insert(*i);
+        if (state.options.action != GCOptions::gcReturnLive)
+            state.results.paths.insert(*i);
+    }
+
     return true;
 
  isLive:
-    state.live.insert(path);
-    if (state.options.action == GCOptions::gcReturnLive)
-        state.results.paths.insert(path);
+    foreach (PathSet::iterator, i, paths) {
+        state.live.insert(*i);
+        if (state.options.action == GCOptions::gcReturnLive)
+            state.results.paths.insert(*i);
+    }
     return false;
 }
 
@@ -733,8 +734,10 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         deleteGarbage(state, *i);
 
     /* Clean up the links directory. */
-    printMsg(lvlError, format("deleting unused links..."));
-    removeUnusedLinks(state);
+    if (options.action == GCOptions::gcDeleteDead || options.action == GCOptions::gcDeleteSpecific) {
+        printMsg(lvlError, format("deleting unused links..."));
+        removeUnusedLinks(state);
+    }
 }
 
 
