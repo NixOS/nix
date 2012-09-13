@@ -105,7 +105,8 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 
     <listitem><para>For the <option>--install</option>,
     <option>--upgrade</option>, <option>--uninstall</option>,
-    <option>--switch-generation</option> and
+    <option>--switch-generation</option>,
+    <option>--delete-generations</option> and
     <option>--rollback</option> operations, this flag will cause
     <command>nix-env</command> to print what
     <emphasis>would</emphasis> be done if this flag had not been

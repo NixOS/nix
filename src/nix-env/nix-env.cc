@@ -1205,10 +1205,15 @@ static void opListGenerations(Globals & globals,
 }
 
 
-static void deleteGeneration2(const Path & profile, unsigned int gen)
+static void deleteGeneration2(Globals & globals, unsigned int gen)
 {
-    printMsg(lvlInfo, format("removing generation %1%") % gen);
-    deleteGeneration(profile, gen);
+    if (globals.dryRun)
+        printMsg(lvlInfo, format("would remove generation %1%") % gen);
+    else {
+        printMsg(lvlInfo, format("removing generation %1%") % gen);
+        deleteGeneration(globals.profile, gen);
+    }
+    
 }
 
 
@@ -1229,7 +1234,7 @@ static void opDeleteGenerations(Globals & globals,
         if (*i == "old") {
             for (Generations::iterator j = gens.begin(); j != gens.end(); ++j)
                 if (j->number != curGen)
-                    deleteGeneration2(globals.profile, j->number);
+                    deleteGeneration2(globals, j->number);
         }
 
         else {
@@ -1239,7 +1244,7 @@ static void opDeleteGenerations(Globals & globals,
             bool found = false;
             for (Generations::iterator j = gens.begin(); j != gens.end(); ++j) {
                 if (j->number == n) {
-                    deleteGeneration2(globals.profile, j->number);
+                    deleteGeneration2(globals, j->number);
                     found = true;
                     break;
                 }
