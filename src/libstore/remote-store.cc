@@ -141,6 +141,7 @@ void RemoteStore::connectToDaemon()
     fdSocket = socket(PF_UNIX, SOCK_STREAM, 0);
     if (fdSocket == -1)
         throw SysError("cannot create Unix domain socket");
+    closeOnExec(fdSocket);
 
     string socketPath = settings.nixStateDir + DEFAULT_SOCKET_PATH;
 
