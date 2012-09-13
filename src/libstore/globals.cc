@@ -43,7 +43,7 @@ Settings::Settings()
     checkRootReachability = false;
     gcKeepOutputs = false;
     gcKeepDerivations = true;
-    autoOptimiseStore = true;
+    autoOptimiseStore = false;
     envKeepDerivations = false;
 }
 
