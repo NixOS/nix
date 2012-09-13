@@ -19,10 +19,14 @@ my $gotCaches = 0;
 my $maxParallelRequests = int($Nix::Config::config{"binary-caches-parallel-connections"} // 150);
 $maxParallelRequests = 1 if $maxParallelRequests < 1;
 
+my $ttlNegative = 24 * 3600; # when to purge negative lookups from the database
+my $ttlNegativeUse = 3600; # how long negative lookups are valid for non-"have" lookups
+my $didExpiration = 0;
+
 my $debug = ($ENV{"NIX_DEBUG_SUBST"} // "") eq 1;
 open(STDERR, ">>/dev/tty") if $debug;
 
-my ($dbh, $queryCache, $insertNAR, $queryNAR, $insertNARExistence, $queryNARExistence);
+my ($dbh, $queryCache, $insertNAR, $queryNAR, $insertNARExistence, $queryNARExistence, $expireNARExistence);
 
 my $curlm = WWW::Curl::Multi->new;
 my $activeRequests = 0;
@@ -149,6 +153,8 @@ EOF
         );
 EOF
 
+    $dbh->do("create index if not exists NARExistenceByExistTimestamp on NARExistence (exist, timestamp)");
+
     $queryCache = $dbh->prepare("select id, storeDir, wantMassQuery from BinaryCaches where url = ?") or die;
 
     $insertNAR = $dbh->prepare(
@@ -160,7 +166,9 @@ EOF
     $insertNARExistence = $dbh->prepare(
         "insert or replace into NARExistence(cache, storePath, exist, timestamp) values (?, ?, ?, ?)") or die;
 
-    $queryNARExistence = $dbh->prepare("select exist from NARExistence where cache = ? and storePath = ?") or die;
+    $queryNARExistence = $dbh->prepare("select exist, timestamp from NARExistence where cache = ? and storePath = ?") or die;
+
+    $expireNARExistence = $dbh->prepare("delete from NARExistence where exist = ? and timestamp < ?") or die;
 }
 
 
@@ -238,6 +246,8 @@ sub getAvailableCaches {
         next if $storeDir ne $Nix::Config::storeDir;
         push @caches, { id => $id, url => $url, wantMassQuery => $wantMassQuery };
     }
+
+    expireNegative();
 }
 
 
@@ -324,7 +334,7 @@ sub negativeHit {
     my ($storePath, $cache) = @_;
     $queryNARExistence->execute($cache->{id}, basename($storePath));
     my $res = $queryNARExistence->fetchrow_hashref();
-    return defined $res && $res->{exist} == 0;
+    return defined $res && $res->{exist} == 0 && time() - $res->{timestamp} < $ttlNegativeUse;
 }
 
 
@@ -334,6 +344,21 @@ sub positiveHit {
     $queryNARExistence->execute($cache->{id}, basename($storePath));
     my $res = $queryNARExistence->fetchrow_hashref();
     return defined $res && $res->{exist} == 1;
+}
+
+
+sub expireNegative {
+    return if $didExpiration;
+    $didExpiration = 1;
+    my $time = time();
+    # Round up to the next multiple of the TTL to ensure that we do
+    # expiration only once per time interval.  E.g. if $ttlNegative ==
+    # 3600, we expire entries at most once per hour.  This is
+    # presumably faster than expiring a few entries per request (and
+    # thus doing a transaction).
+    my $limit = (int($time / $ttlNegative) - 1) * $ttlNegative;
+    $expireNARExistence->execute($limit, 0);
+    print STDERR "expired ", $expireNARExistence->rows, " negative entries\n" if $debug;
 }
 
 
@@ -512,11 +537,13 @@ if ($ARGV[0] eq "--query") {
         my ($cmd, @args) = split " ", $_;
 
         if ($cmd eq "have") {
+            print STDERR "checking binary caches for existence of @args\n" if $debug;
             printSubstitutablePaths(@args);
             print "\n";
         }
 
         elsif ($cmd eq "info") {
+            print STDERR "checking binary caches for info on @args\n" if $debug;
             printInfoParallel(@args);
             print "\n";
         }
