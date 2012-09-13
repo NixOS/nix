@@ -1,50 +1,17 @@
-export NIX_USER_PROFILE_DIR=@localstatedir@/nix/profiles/per-user/$USER
-export NIX_PROFILES="@localstatedir@/nix/profiles/default $HOME/.nix-profile"
+if test -n "$HOME"; then
+    NIX_LINK="$HOME/.nix-profile"
 
-# Set up the per-user profile.
-mkdir -m 0755 -p $NIX_USER_PROFILE_DIR
-if test "$(stat --printf '%u' $NIX_USER_PROFILE_DIR)" != "$(id -u)"; then
-    echo "WARNING: bad ownership on $NIX_USER_PROFILE_DIR" >&2
-fi
-
-if ! test -L $HOME/.nix-profile; then
-    echo "creating $HOME/.nix-profile" >&2
-    if test "$USER" != root; then
-        @coreutils@/ln -s $NIX_USER_PROFILE_DIR/profile $HOME/.nix-profile
-    else
-        # Root installs in the system-wide profile by default.
-        @coreutils@/ln -s /nix/var/nix/profiles/default $HOME/.nix-profile
+    # Set the default profile.
+    if ! [ -L "$NIX_LINK" ]; then
+        echo "creating $NIX_LINK" >&2
+        _NIX_DEF_LINK=@localstatedir@/nix/profiles/default
+        @coreutils@/ln -s "$_NIX_DEF_LINK" "$NIX_LINK"
     fi
-fi
 
-export PATH="$HOME/.nix-profile/bin:$PATH"
-
-# Subscribe the root user to the Nixpkgs channel by default.
-if [ "$USER" = root -a ! -e $HOME/.nix-channels ]; then
-    echo "http://nixos.org/releases/nixos/channels/nixpkgs-unstable nixpkgs" > $HOME/.nix-channels
-fi
-
-# Create the per-user garbage collector roots directory.
-NIX_USER_GCROOTS_DIR=@localstatedir@/nix/gcroots/per-user/$USER
-mkdir -m 0755 -p $NIX_USER_GCROOTS_DIR
-if test "$(stat --printf '%u' $NIX_USER_GCROOTS_DIR)" != "$(id -u)"; then
-    echo "WARNING: bad ownership on $NIX_USER_GCROOTS_DIR" >&2
-fi
-
-# Set up a default Nix expression from which to install stuff.
-if [ ! -e $HOME/.nix-defexpr -o -L $HOME/.nix-defexpr ]; then
-    echo "creating $HOME/.nix-defexpr" >&2
-    rm -f $HOME/.nix-defexpr
-    mkdir $HOME/.nix-defexpr
-    if [ "$USER" != root ]; then
-        @coreutils@/ln -s @localstatedir@/nix/profiles/per-user/root/channels $HOME/.nix-defexpr/channels_root
+    # Subscribe the root user to the Nixpkgs channel by default.
+    if [ ! -e $HOME/.nix-channels ]; then
+        echo "http://nixos.org/releases/nixos/channels/nixpkgs-unstable nixpkgs" > $HOME/.nix-channels
     fi
-fi
 
-# Set up secure multi-user builds: non-root users build through the
-# Nix daemon.
-if [ "$USER" != root -a -e @localstatedir@/nix/daemon-socket/socket ]; then
-    export NIX_REMOTE=daemon
-else
-    unset NIX_REMOTE
+    export PATH=$NIX_LINK/bin:$PATH
 fi
