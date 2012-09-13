@@ -4,6 +4,7 @@ use strict;
 use File::Basename;
 use File::Path qw(mkpath);
 use Nix::Config;
+use Nix::Manifest;
 
 my $manifestDir = $Nix::Config::manifestDir;
 
@@ -65,6 +66,8 @@ sub addChannel {
 sub removeChannel {
     my ($name) = @_;
     readChannels;
+    my $url = $channels{$name};
+    deleteOldManifests($url . "/MANIFEST", undef) if defined $url;
     delete $channels{$name};
     writeChannels;
 
@@ -101,6 +104,7 @@ sub update {
         my $extraAttrs = "";
         if ($? == 0 && $binaryCacheURL ne "") {
             $extraAttrs .= "binaryCacheURL = \"$binaryCacheURL\"; ";
+            deleteOldManifests($origUrl, undef);
         } else {
             # No binary cache, so pull the channel manifest.
             mkdir $manifestDir, 0755 unless -e $manifestDir;

@@ -20,6 +20,7 @@ my $maxParallelRequests = int($Nix::Config::config{"binary-caches-parallel-conne
 $maxParallelRequests = 1 if $maxParallelRequests < 1;
 
 my $debug = ($ENV{"NIX_DEBUG_SUBST"} // "") eq 1;
+open(STDERR, ">>/dev/tty") if $debug;
 
 my ($dbh, $queryCache, $insertNAR, $queryNAR, $insertNARExistence, $queryNARExistence);
 

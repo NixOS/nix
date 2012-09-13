@@ -76,26 +76,15 @@ sub processURL {
     open URL, ">$urlFile" or die "cannot create `$urlFile'";
     print URL $origUrl;
     close URL;
-    
+
     my $finalPath = "$manifestDir/$baseName-$hash.nixmanifest";
 
     unlink $finalPath if -e $finalPath;
-        
+
     symlink("$manifest", "$finalPath")
         or die "cannot link `$finalPath to `$manifest'";
 
-    # Delete all old manifests downloaded from this URL.
-    for my $urlFile2 (glob "$manifestDir/*.url") {
-        next if $urlFile eq $urlFile2;
-        open URL, "<$urlFile2" or die;
-        my $url2 = <URL>;
-        chomp $url2;
-        close URL;
-        next unless $origUrl eq $url2;
-        my $base = $urlFile2; $base =~ s/.url$//;
-        unlink "${base}.url";
-        unlink "${base}.nixmanifest";
-    }
+    deleteOldManifests($origUrl, $urlFile);
 }
 
 while (@ARGV) {

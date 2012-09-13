@@ -9,12 +9,12 @@ use Fcntl ':flock';
 use Nix::Config;
 
 our @ISA = qw(Exporter);
-our @EXPORT = qw(readManifest writeManifest updateManifestDB addPatch);
+our @EXPORT = qw(readManifest writeManifest updateManifestDB addPatch deleteOldManifests);
 
 
 sub addNAR {
     my ($narFiles, $storePath, $info) = @_;
-    
+
     $$narFiles{$storePath} = []
         unless defined $$narFiles{$storePath};
 
@@ -24,7 +24,7 @@ sub addNAR {
     foreach my $narFile (@{$narFileList}) {
         $found = 1 if $narFile->{url} eq $info->{url};
     }
-    
+
     push @{$narFileList}, $info if !$found;
 }
 
@@ -43,7 +43,7 @@ sub addPatch {
             $patch2->{url} eq $patch->{url} &&
             $patch2->{basePath} eq $patch->{basePath};
     }
-    
+
     push @{$patchList}, $patch if !$found;
 
     return !$found;
@@ -93,10 +93,10 @@ sub readManifest_ {
                 undef $system;
                 $references = "";
                 $deriver = "";
-	    }
+            }
 
         } else {
-            
+
             if (/^\}$/) {
                 $inside = 0;
 
@@ -120,7 +120,7 @@ sub readManifest_ {
                 }
 
             }
-            
+
             elsif (/^\s*StorePath:\s*(\/\S+)\s*$/) { $storePath = $1; }
             elsif (/^\s*CopyFrom:\s*(\/\S+)\s*$/) { $copyFrom = $1; }
             elsif (/^\s*Hash:\s*(\S+)\s*$/) { $hash = $1; }
@@ -184,7 +184,7 @@ sub writeManifest {
             print MANIFEST "}\n";
         }
     }
-    
+
     foreach my $storePath (sort (keys %{$patches})) {
         my $patchList = $$patches{$storePath};
         foreach my $patch (@{$patchList}) {
@@ -201,8 +201,8 @@ sub writeManifest {
             print MANIFEST "}\n";
         }
     }
-    
-    
+
+
     close MANIFEST;
 
     rename("$manifest.tmp", $manifest)
@@ -211,11 +211,11 @@ sub writeManifest {
 
     # Create a bzipped manifest.
     unless (defined $noCompress) {
-	system("$Nix::Config::bzip2 < $manifest > $manifest.bz2.tmp") == 0
-	    or die "cannot compress manifest";
+        system("$Nix::Config::bzip2 < $manifest > $manifest.bz2.tmp") == 0
+            or die "cannot compress manifest";
 
-	rename("$manifest.bz2.tmp", "$manifest.bz2")
-	    or die "cannot rename $manifest.bz2.tmp: $!";
+        rename("$manifest.bz2.tmp", "$manifest.bz2")
+            or die "cannot rename $manifest.bz2.tmp: $!";
     }
 }
 
@@ -224,7 +224,7 @@ sub updateManifestDB {
     my $manifestDir = $Nix::Config::manifestDir;
 
     mkpath($manifestDir);
-    
+
     my $dbPath = "$manifestDir/cache.sqlite";
 
     # Open/create the database.
@@ -245,7 +245,7 @@ sub updateManifestDB {
             timestamp integer not null
         );
 EOF
-    
+
     $dbh->do(<<EOF);
         create table if not exists NARs (
             id               integer primary key autoincrement not null,
@@ -304,7 +304,7 @@ EOF
     # Read each manifest in $manifestDir and add it to the database,
     # unless we've already done so on a previous run.
     my %seen;
-    
+
     for my $manifestLink (glob "$manifestDir/*.nixmanifest") {
         my $manifest = Cwd::abs_path($manifestLink);
         next unless -f $manifest;
@@ -316,9 +316,9 @@ EOF
             {}, $manifest, $timestamp)} == 1;
 
         print STDERR "caching $manifest...\n";
-        
+
         $dbh->do("delete from Manifests where path = ?", {}, $manifest);
-                 
+
         $dbh->do("insert into Manifests(path, timestamp) values (?, ?)",
                  {}, $manifest, $timestamp);
 
@@ -331,7 +331,7 @@ EOF
                 $narFile->{narHash}, $narFile->{narSize}, $narFile->{references},
                 $narFile->{deriver}, $narFile->{system});
         };
-        
+
         sub addPatchToDB {
             my ($storePath, $patch) = @_;
             $insertPatch->execute(
@@ -341,7 +341,7 @@ EOF
         };
 
         my $version = readManifest_($manifest, \&addNARToDB, \&addPatchToDB);
-        
+
         if ($version < 3) {
             die "you have an old-style or corrupt manifest `$manifestLink'; please delete it\n";
         }
@@ -361,6 +361,24 @@ EOF
     close MAINLOCK;
 
     return $dbh;
+}
+
+
+
+# Delete all old manifests downloaded from a given URL.
+sub deleteOldManifests {
+    my ($url, $curUrlFile) = @_;
+    for my $urlFile (glob "$Nix::Config::manifestDir/*.url") {
+        next if defined $curUrlFile && $urlFile eq $curUrlFile;
+        open URL, "<$urlFile" or die;
+        my $url2 = <URL>;
+        chomp $url2;
+        close URL;
+        next unless $url eq $url2;
+        my $base = $urlFile; $base =~ s/.url$//;
+        unlink "${base}.url";
+        unlink "${base}.nixmanifest";
+    }
 }
 
 
