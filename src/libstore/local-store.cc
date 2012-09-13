@@ -1703,4 +1703,11 @@ void LocalStore::upgradeStore6()
 }
 
 
+void LocalStore::vacuumDB()
+{
+    if (sqlite3_exec(db, "vacuum;", 0, 0, 0) != SQLITE_OK)
+        throwSQLiteError(db, "vacuuming SQLite database");
+}
+
+
 }

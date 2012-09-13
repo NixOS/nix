@@ -195,6 +195,8 @@ public:
 
     void clearFailedPaths(const PathSet & paths);
 
+    void vacuumDB();
+
 private:
 
     Path schemaPath;

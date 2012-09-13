@@ -740,6 +740,9 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         printMsg(lvlError, format("deleting unused links..."));
         removeUnusedLinks(state);
     }
+
+    /* While we're at it, vacuum the database. */
+    if (options.action == GCOptions::gcDeleteDead) vacuumDB();
 }
 
 
