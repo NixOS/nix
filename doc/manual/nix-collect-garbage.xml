@@ -26,6 +26,7 @@
       <arg choice='plain'><option>--print-dead</option></arg>
       <arg choice='plain'><option>--delete</option></arg>
     </group>
+    <arg><option>--dry-run</option></arg>
   </cmdsynopsis>
 </refsynopsisdiv>
 

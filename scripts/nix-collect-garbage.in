@@ -9,10 +9,13 @@ my $profilesDir = "@localstatedir@/nix/profiles";
 # Process the command line arguments.
 my @args = ();
 my $removeOld = 0;
+my $dryRun = 0;
 
 for my $arg (@ARGV) {
     if ($arg eq "--delete-old" || $arg eq "-d") {
         $removeOld = 1;
+    } elsif ($arg eq "--dry-run") {
+        $dryRun = 1;
     } else {
         push @args, $arg;
     }
@@ -35,13 +38,13 @@ sub removeOldGenerations {
         $name = $dir . "/" . $name;
         if (-l $name && (readlink($name) =~ /link/)) {
             print STDERR "removing old generations of profile $name\n";
-            system("$Nix::Config::binDir/nix-env", "-p", $name, "--delete-generations", "old");
+            system("$Nix::Config::binDir/nix-env", "-p", $name, "--delete-generations", "old", $dryRun ? "--dry-run" : ());
         }
         elsif (! -l $name && -d $name) {
             removeOldGenerations $name;
         }
     }
-    
+
     closedir $dh or die;
 }
 
@@ -49,4 +52,4 @@ removeOldGenerations $profilesDir if $removeOld;
 
 
 # Run the actual garbage collector.
-exec "$Nix::Config::binDir/nix-store", "--gc", @args;
+exec "$Nix::Config::binDir/nix-store", "--gc", @args unless $dryRun;
