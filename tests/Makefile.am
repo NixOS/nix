@@ -10,7 +10,7 @@ TESTS = init.sh hash.sh lang.sh add.sh simple.sh dependencies.sh \
   remote-store.sh export.sh export-graph.sh negative-caching.sh \
   binary-patching.sh timeout.sh secure-drv-outputs.sh nix-channel.sh \
   multiple-outputs.sh import-derivation.sh fetchurl.sh optimise-store.sh \
-  binary-cache.sh
+  binary-cache.sh nix-profile.sh
 
 XFAIL_TESTS =
 
