@@ -454,6 +454,7 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
        is, we can delete the elements of ‘paths’ only if all referrers
        of ‘paths’ are garbage. */
     PathSet paths, referrers;
+    Paths pathsSorted;
 
     if (isValidPath(path)) {
 
@@ -516,7 +517,8 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
         }
 
     /* The paths are garbage, so delete them. */
-    foreach (PathSet::iterator, i, paths) {
+    pathsSorted = topoSortPaths(*this, paths);
+    foreach (Paths::iterator, i, pathsSorted) {
         if (shouldDelete(state.options.action)) {
 
             /* If it's a valid path that's not a regular file or
