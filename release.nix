@@ -192,7 +192,7 @@ let
     with import nixpkgs { inherit system; };
 
     releaseTools.rpmBuild rec {
-      name = "nix-rpm-${diskImage.name}";
+      name = "nix-rpm";
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages = [ "perl-DBD-SQLite" "perl-devel" "sqlite" "sqlite-devel" "bzip2-devel" "emacs" "perl-WWW-Curl" ]; };
