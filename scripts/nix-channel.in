@@ -6,6 +6,8 @@ use File::Path qw(mkpath);
 use Nix::Config;
 use Nix::Manifest;
 
+Nix::Config::readConfig;
+
 my $manifestDir = $Nix::Config::manifestDir;
 
 
@@ -102,10 +104,15 @@ sub update {
         # Check if the channel advertises a binary cache.
         my $binaryCacheURL = `$Nix::Config::curl --silent '$url'/binary-cache-url`;
         my $extraAttrs = "";
+        my $getManifest = ($Nix::Config::config{"force-manifest"} // "false") eq "true";
         if ($? == 0 && $binaryCacheURL ne "") {
             $extraAttrs .= "binaryCacheURL = \"$binaryCacheURL\"; ";
             deleteOldManifests($origUrl, undef);
         } else {
+            $getManifest = 1;
+        }
+
+        if ($getManifest) {
             # No binary cache, so pull the channel manifest.
             mkdir $manifestDir, 0755 unless -e $manifestDir;
             die "$0: you do not have write permission to `$manifestDir'!\n" unless -W $manifestDir;

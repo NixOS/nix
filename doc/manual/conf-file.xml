@@ -364,6 +364,18 @@ build-use-chroot = /dev /proc /bin</programlisting>
   </varlistentry>
 
 
+  <varlistentry><term><literal>force-manifest</literal></term>
+
+    <listitem><para>If this option is set to <literal>false</literal>
+    (default) and a Nix channel provides both a manifest and a binary
+    cache, only the binary cache will be used.  If set to
+    <literal>true</literal>, the manifest will be fetched as well.
+    This is useful if you want to use binary patches (which are
+    currently not supported by binary caches).</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry><term><literal>system</literal></term>
 
     <listitem><para>This option specifies the canonical Nix system
