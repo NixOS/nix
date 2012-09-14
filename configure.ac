@@ -340,8 +340,8 @@ AC_SUBST(dynlib_suffix)
 
 
 # Do we have GNU tar?
-AC_MSG_CHECKING([if you have GNU tar])
-if $tar --version 2> /dev/null | grep -q GNU; then
+AC_MSG_CHECKING([if you have a recent GNU tar])
+if $tar --version 2> /dev/null | grep -q GNU && tar cvf /dev/null --warning=no-timestamp ./configure > /dev/null; then
     AC_MSG_RESULT(yes)
     tarFlags="--warning=no-timestamp"
 else
