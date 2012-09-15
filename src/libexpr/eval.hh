@@ -123,12 +123,20 @@ public:
        refers to a directory, then "/default.nix" is appended. */
     Expr * parseExprFromFile(Path path);
 
+    /* Parse a Nix expression from the substitute for the specified file.
+       If `path' refers to a directory, then "/default.nix" is appended. */
+    Expr * parseExprFromSubstitutableFile(Path path);
+
     /* Parse a Nix expression from the specified string. */
     Expr * parseExprFromString(const string & s, const Path & basePath);
     
     /* Evaluate an expression read from the given file to normal
        form. */
     void evalFile(const Path & path, Value & v);
+
+    /* Evaluate an expression read from the substutite for the
+       given file to normal form. */
+    void evalSubstitutableFile(const Path & path, Value & v);
 
     /* Look up a file in the search path. */
     Path findFile(const string & path);

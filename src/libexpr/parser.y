@@ -464,6 +464,7 @@ formal
 #include <unistd.h>
 
 #include <eval.hh>
+#include <store-api.hh>
 
 
 namespace nix {
@@ -517,6 +518,51 @@ Expr * EvalState::parseExprFromFile(Path path)
     Expr * e = parseTrees[path];
     if (!e) {
         e = parse(readFile(path).c_str(), path, dirOf(path));
+        parseTrees[path] = e;
+    }
+
+    return e;
+}
+
+
+Expr * EvalState::parseExprFromSubstitutableFile(Path path)
+{
+    assert(path[0] == '/');
+
+    SubstitutableFileInfos infos;
+    store->querySubstitutableFileInfos(singleton<PathSet>(path), infos);
+    if (!infos.count(path))
+        throw SysError(format("getting info of `%1%'") % path);
+    SubstitutableFileInfo info = infos[path];
+
+    /* If `path' is a symlink, follow it.  This is so that relative
+       path references work. */
+    if (info.type == tpSymlink) {
+        path = absPath(info.target, dirOf(path));
+        if (!isInStore(path) || store->isValidPath(toStorePath(path)))
+            return parseExprFromFile(path);
+        else
+            return parseExprFromSubstitutableFile(path);
+    }
+
+    /* If `path' refers to a directory, append `/default.nix'. */
+    if (info.type == tpDirectory)
+        return parseExprFromSubstitutableFile(path + "/default.nix");
+
+    /* Read and parse the input file, unless it's already in the parse
+       tree cache. */
+    Expr * e = parseTrees[path];
+    if (!e) {
+        FdPair fds;
+        store->readSubstitutableFile(path, info, fds);
+        unsigned char * buf = new unsigned char[info.regular.length];
+        AutoDeleteArray<unsigned char> d(buf);
+        try {
+            readFull(fds.first, buf, info.regular.length);
+            e = parse(string((char *) buf, info.regular.length).c_str(), path, dirOf(path));
+        } catch (EndOfFile err) {
+            throw Error(format("substituter `%1%' failed: %2%") % info.substituter % chomp(drainFD(fds.second)));
+        }
         parseTrees[path] = e;
     }
 

@@ -455,6 +455,24 @@ void EvalState::evalFile(const Path & path, Value & v)
 }
 
 
+void EvalState::evalSubstitutableFile(const Path & path, Value & v)
+{
+    FileEvalCache::iterator i = fileEvalCache.find(path);
+    if (i == fileEvalCache.end()) {
+        startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path);
+        Expr * e = parseExprFromSubstitutableFile(path);
+        try {
+            eval(e, v);
+        } catch (Error & e) {
+            addErrorPrefix(e, "while evaluating the file `%1%':\n", path);
+            throw;
+        }
+        fileEvalCache[path] = v;
+    } else
+        v = i->second;
+}
+
+
 void EvalState::eval(Expr * e, Value & v)
 {
     e->eval(*this, baseEnv, v);

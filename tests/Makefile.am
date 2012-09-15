@@ -17,7 +17,7 @@ XFAIL_TESTS =
 
 include ../substitute.mk
 
-$(TESTS): common.sh config.nix
+$(TESTS): common.sh config.nix file-substituter.sh
 
 EXTRA_DIST = $(TESTS) \
   config.nix.in \
@@ -42,7 +42,7 @@ EXTRA_DIST = $(TESTS) \
   import-derivation.nix \
   fetchurl.nix \
   file-substitutes.nix \
-  file-substituter.sh \
+  file-substituter.sh.in \
   $(wildcard lang/*.nix) $(wildcard lang/*.exp) $(wildcard lang/*.exp.xml) $(wildcard lang/*.flags) $(wildcard lang/dir*/*.nix) \
   common.sh.in
 

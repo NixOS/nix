@@ -44,6 +44,7 @@ typedef enum {
     wopQuerySubstitutablePaths = 32,
     wopQuerySubstitutableFiles = 33,
     wopQuerySubstitutableFileInfos = 34,
+    wopReadSubstitutableFile = 35,
 } WorkerOp;
 
 

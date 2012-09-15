@@ -270,7 +270,7 @@ bool StoreAPI::canReadFile(const Path & path, bool tryDefaultNix) {
         if (S_ISREG(st.st_mode))
             return true;
         if (S_ISLNK(st.st_mode))
-            return canReadFile(readLink(path), tryDefaultNix);
+            return canReadFile(absPath(readLink(path), dirOf(path)), tryDefaultNix);
         if (tryDefaultNix && S_ISDIR(st.st_mode))
             return canReadFile(path + "/default.nix", tryDefaultNix);
     } else {
@@ -284,7 +284,7 @@ bool StoreAPI::canReadFile(const Path & path, bool tryDefaultNix) {
         if (info.type == tpRegular)
             return true;
         if (info.type == tpSymlink)
-            return canReadFile(info.target, tryDefaultNix);
+            return canReadFile(absPath(info.target, dirOf(path)), tryDefaultNix);
         if (tryDefaultNix && info.type == tpDirectory)
             return canReadFile(path + "/default.nix", tryDefaultNix);
     }

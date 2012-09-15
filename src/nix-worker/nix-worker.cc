@@ -274,8 +274,43 @@ struct SavingSourceAdapter : Source
 };
 
 
+static void writeFD(const AutoCloseFD & fd, FdSink & to)
+{
+    struct msghdr msg = {0};
+    struct cmsghdr * cmsg;
+    struct iovec iov;
+    int realfd = fd;
+    unsigned char control[CMSG_SPACE(sizeof realfd)];
+
+    char buf = '!';
+    iov.iov_base = &buf;
+    iov.iov_len = sizeof buf;
+
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+    msg.msg_control = control;
+    msg.msg_controllen = sizeof control;
+
+    cmsg = CMSG_FIRSTHDR(&msg);
+    cmsg->cmsg_len = CMSG_LEN(sizeof realfd);
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_RIGHTS;
+    memcpy(CMSG_DATA(cmsg), &realfd, sizeof realfd);
+
+    to.flush();
+    ssize_t ret = sendmsg(to.fd, &msg, 0);
+    if (ret == -1) {
+        if (errno == EINTR) {
+            writeFD(fd,to);
+            return;
+        }
+        throw SysError("writing fd to socket");
+    }
+}
+
+
 static void performOp(unsigned int clientVersion,
-    Source & from, Sink & to, unsigned int op)
+    FdSource & from, FdSink & to, unsigned int op)
 {
     switch (op) {
 
@@ -633,7 +668,7 @@ static void performOp(unsigned int clientVersion,
     }
 
     case wopQuerySubstitutableFiles: {
-        PathSet paths = readStorePaths<PathSet>(from);
+        PathSet paths = readStrings<PathSet>(from);
         startWork();
         PathSet res = store->querySubstitutableFiles(paths);
         stopWork();
@@ -642,7 +677,7 @@ static void performOp(unsigned int clientVersion,
     }
 
     case wopQuerySubstitutableFileInfos: {
-        PathSet paths = readStorePaths<PathSet>(from);
+        PathSet paths = readStrings<PathSet>(from);
         startWork();
         SubstitutableFileInfos infos;
         store->querySubstitutableFileInfos(paths, infos);
@@ -650,6 +685,7 @@ static void performOp(unsigned int clientVersion,
         writeInt(infos.size(), to);
         foreach (SubstitutableFileInfos::iterator, i, infos) {
             writeString(i->first, to);
+            writeString(i->second.substituter, to);
             switch (i->second.type)
             {
                 case tpRegular:
@@ -671,6 +707,39 @@ static void performOp(unsigned int clientVersion,
                     break;
             }
         }
+        break;
+    }
+
+    case wopReadSubstitutableFile: {
+        Path path = readString(from);
+        SubstitutableFileInfo info;
+        info.substituter = readString(from);
+        string type = readString(from);
+        if (type == "regular") {
+            info.type = tpRegular;
+            info.regular.executable = readInt(from) != 0;
+            info.regular.length = readLongLong(from);
+            info.regular.hash = parseHash32(htSHA256, readString(from));
+        } else if (type == "symlink") {
+            info.type = tpSymlink;
+            info.target = readString(from);
+        } else if (type == "directory") {
+            info.type = tpDirectory;
+            int nrEntries = readInt(from);
+            while (nrEntries--)
+                info.files.insert(readString(from));
+        } else
+            info.type = tpUnknown;
+        FdPair fds;
+        startWork();
+        store->readSubstitutableFile(path, info, fds);
+        stopWork();
+        to.flush();
+        /* See comment in readSubstitutableFile in remote-store.cc */
+        if (readInt(from))
+            throw Error("FD-ready int not written!");
+        writeFD(fds.first.borrow(),to);
+        writeFD(fds.second.borrow(),to);
         break;
     }
 

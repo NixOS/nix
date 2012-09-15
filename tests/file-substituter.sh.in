@@ -1,16 +1,17 @@
 #! /bin/sh -e
 echo substituter args: $* >&2
 
-barOutPath=`nix-instantiate --eval-only -A bar.outPath ./file-substitutes.nix | tr -d \"`
-barDrvPath=`nix-instantiate --eval-only -A bar.drvPath ./file-substitutes.nix | tr -d \"`
-bazOutPath=`nix-instantiate --eval-only -A bar.baz.outPath ./file-substitutes.nix | tr -d \"`
-bazDrvPath=`nix-instantiate --eval-only -A bar.baz.drvPath ./file-substitutes.nix | tr -d \"`
-substitutedExprPath=`nix-instantiate --eval-only -A substitutedExpr ./file-substitutes.nix | tr -d \"`
-substitutedExprString=`echo -e \`nix-instantiate --eval-only -A substitutedExprString ./file-substitutes.nix | tr -d \"\``
-filePath=`nix-instantiate --eval-only -A file ./file-substitutes.nix | tr -d \"`
-fileString=`nix-instantiate --eval-only -A fileString ./file-substitutes.nix | tr -d \"`
-aDotNixPath=`nix-instantiate --eval-only -A aDotNix ./file-substitutes.nix | tr -d \"`
-aDotNixString=`nix-instantiate --eval-only -A aDotNixString ./file-substitutes.nix | tr -d \"`
+nixfile="@abs_top_srcdir@/tests/file-substitutes.nix"
+barOutPath=`nix-instantiate --eval-only -A bar.outPath $nixfile | tr -d \"`
+barDrvPath=`nix-instantiate --eval-only -A bar.drvPath $nixfile | tr -d \"`
+bazOutPath=`nix-instantiate --eval-only -A bar.baz.outPath $nixfile | tr -d \"`
+bazDrvPath=`nix-instantiate --eval-only -A bar.baz.drvPath $nixfile | tr -d \"`
+substitutedExprPath=`nix-instantiate --eval-only -A substitutedExpr $nixfile | tr -d \"`
+substitutedExprString=`echo -e \`nix-instantiate --eval-only -A substitutedExprString $nixfile | tr -d \"\``
+filePath=`nix-instantiate --eval-only -A file $nixfile | tr -d \"`
+fileString=`nix-instantiate --eval-only -A fileString $nixfile | tr -d \"`
+aDotNixPath=`nix-instantiate --eval-only -A aDotNix $nixfile | tr -d \"`
+aDotNixString=`nix-instantiate --eval-only -A aDotNixString $nixfile | tr -d \"`
 
 if test $1 = "--query"; then
     while read cmd args; do

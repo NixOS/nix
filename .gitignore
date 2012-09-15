@@ -124,6 +124,7 @@ Makefile.in
 /tests/common.sh
 /tests/dummy
 /tests/result*
+/tests/file-substituter.sh
 
 # /tests/lang/
 /tests/lang/*.out

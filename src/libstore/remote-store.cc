@@ -14,7 +14,7 @@
 #include <iostream>
 #include <unistd.h>
 #include <cstring>
-
+#include <errno.h>
 
 namespace nix {
 
@@ -24,6 +24,39 @@ Path readStorePath(Source & from)
     Path path = readString(from);
     assertStorePath(path);
     return path;
+}
+
+
+static int readFD(FdSource & from)
+{
+    struct msghdr msg = {0};
+    struct cmsghdr *cmsg;
+    struct iovec iov;
+    int res;
+    unsigned char control[CMSG_SPACE(sizeof res)];
+
+    char buf;
+    iov.iov_base = &buf;
+    iov.iov_len = sizeof buf;
+
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+    msg.msg_control = control;
+    msg.msg_controllen = sizeof control;
+
+    errno = 0;
+    ssize_t ret = recvmsg(from.fd, &msg, 0);
+    if (ret < sizeof buf ||
+        msg.msg_flags & MSG_EOR ||
+        msg.msg_flags & MSG_OOB ||
+        msg.msg_flags & MSG_TRUNC ||
+        msg.msg_flags & MSG_CTRUNC) {
+        if (errno == EINTR) return readFD(from);
+        throw SysError("reading fd from socket");
+    }
+    cmsg = CMSG_FIRSTHDR(&msg);
+    memcpy(&res, CMSG_DATA(cmsg), sizeof res);
+    return res;
 }
 
 
@@ -329,7 +362,7 @@ PathSet RemoteStore::querySubstitutableFiles(const PathSet & paths)
     writeInt(wopQuerySubstitutableFiles, to);
     writeStrings(paths, to);
     processStderr();
-    return readStorePaths<PathSet>(from);
+    return readStrings<PathSet>(from);
 }
 
 
@@ -347,8 +380,9 @@ void RemoteStore::querySubstitutableFileInfos(const PathSet & paths,
     processStderr();
     unsigned int count = readInt(from);
     for (unsigned int n = 0; n < count; n++) {
-        Path path = readStorePath(from);
+        Path path = readString(from);
         SubstitutableFileInfo & info(infos[path]);
+        info.substituter = readString(from);
         string type = readString(from);
         if (type == "regular") {
             info.type = tpRegular;
@@ -366,6 +400,45 @@ void RemoteStore::querySubstitutableFileInfos(const PathSet & paths,
         } else
             info.type = tpUnknown;
     }
+}
+
+
+void RemoteStore::readSubstitutableFile(const Path & path, const SubstitutableFileInfo & info, FdPair & fds) {
+    openConnection();
+
+    assert(GET_PROTOCOL_MINOR(daemonVersion) >= 13);
+
+    writeInt(wopReadSubstitutableFile, to);
+    writeString(path, to);
+    writeString(info.substituter, to);
+    switch (info.type)
+    {
+        case tpRegular:
+            writeString("regular", to);
+            writeInt(info.regular.executable, to);
+            writeLongLong(info.regular.length, to);
+            writeString(printHash32(info.regular.hash), to);
+            break;
+        case tpSymlink:
+            writeString("symlink", to);
+            writeString(info.target, to);
+            break;
+        case tpDirectory:
+            writeString("directory", to);
+            writeStrings(info.files, to);
+            break;
+        case tpUnknown:
+            writeString("unknown", to);
+            break;
+    }
+    processStderr();
+    /* Needed to ensure delay of writing fd until after stderr is processed
+       readUnbuffered reads the full bufSize, which could read the dummy byte
+       that accompanies the written fd, discarding it. */
+    writeInt(0,to);
+    to.flush();
+    fds.first = readFD(from);
+    fds.second = readFD(from);
 }
 
 

@@ -90,7 +90,10 @@ static void prim_import(EvalState & state, Value * * args, Value & v)
         mkApp(v, fun, w);
         state.forceAttrs(v);
     } else {
-        state.evalFile(path, v);
+        if (settings.readOnlyMode && isInStore(path) && !store->isValidPath(toStorePath(path)))
+            state.evalSubstitutableFile(path, v);
+        else
+            state.evalFile(path, v);
     }
 }
 

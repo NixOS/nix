@@ -2,6 +2,7 @@
 
 #include "hash.hh"
 #include "serialise.hh"
+#include "util.hh"
 
 #include <string>
 #include <map>
@@ -93,6 +94,7 @@ enum FileType {
 
 struct SubstitutableFileInfo
 {
+    Path substituter;
     FileType type;
 
     // !!! Want a union here, but requires c++11
@@ -108,6 +110,8 @@ struct SubstitutableFileInfo
 };
 
 typedef std::map<Path, SubstitutableFileInfo> SubstitutableFileInfos;
+
+typedef std::pair<AutoCloseFD, AutoCloseFD> FdPair;
 
 
 struct ValidPathInfo 
@@ -187,6 +191,10 @@ public:
        info, it's omitted from the resulting ‘infos’ map. */
     virtual void querySubstitutableFileInfos(const PathSet & paths,
         SubstitutableFileInfos & infos) = 0;
+
+    /* Read a file substitute of a path.
+       Returns the stdout and stderr fds of the substituter in fds */
+    virtual void readSubstitutableFile(const Path & path, const SubstitutableFileInfo & info, FdPair & fds) = 0;
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.

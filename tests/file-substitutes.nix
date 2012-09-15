@@ -21,16 +21,16 @@ let
       evalFile1 = import ./a.nix;
       evalFile2 = import ${bazOutPath}/a.nix;
 
-      coerceToString1 = mkDerivation {
-        name = "coerceToString";
+      coerceToString1 = (derivation {
+        name = '''coerceToString''';
         builder = ${failBuilder};
         file = ./file;
-      }.drvPath;
-      coerceToString2 = mkDerivation {
-        name = "coerceToString";
+      }).drvPath;
+      coerceToString2 = (derivation {
+        name = '''coerceToString''';
         builder = ${failBuilder};
         file = ${bazOutPath}/file;
-      }.drvPath;
+      }).drvPath;
 
       isValidPath1 = builtins.storePath ./file;
       isValidPath2 = builtins.storePath ${bazOutPath}/file;
