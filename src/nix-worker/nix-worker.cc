@@ -685,13 +685,14 @@ static void performOp(unsigned int clientVersion,
         writeInt(infos.size(), to);
         foreach (SubstitutableFileInfos::iterator, i, infos) {
             writeString(i->first, to);
+            writeString(printHash(i->second.recursiveHash), to);
             switch (i->second.type)
             {
                 case tpRegular:
                     writeString("regular", to);
                     writeInt(i->second.regular.executable, to);
                     writeLongLong(i->second.regular.length, to);
-                    writeString(printHash32(i->second.regular.hash), to);
+                    writeString(printHash(i->second.regular.flatHash), to);
                     break;
                 case tpSymlink:
                     writeString("symlink", to);

@@ -56,12 +56,14 @@ if test $1 = "--query"; then
             for path in $args; do
                 if test "$path" = "$barOutPath/default.nix"; then
                     echo "$path"
+                    echo 1234567890123456789012345678901234567890123456789012345678901230 # File hash, recursive
                     echo "regular" # File type
                     echo "" # Not executable ("executable" otherwise)
                     echo `expr length "$substitutedExprString"` # File length
-                    echo `basename "$substitutedExprPath" | sed 's|-.*||'` # File hash, base-32
+                    echo 0123456789012345678901234567890123456789012345678901234567890123 # File hash, flat
                 elif test "$path" = "$barOutPath"; then
                     echo "$path"
+                    echo 2345678901234567890123456789012345678901234567890123456789012301 # File hash, recursive
                     echo "directory" # File type
                     echo "3" # File count
                     echo "file" # Entry
@@ -69,30 +71,35 @@ if test $1 = "--query"; then
                     echo "default.nix" # Entry
                 elif test "$path" = "$bazOutPath"; then
                     echo "$path"
+                    echo 3456789012345678901234567890123456789012345678901234567890123012 # File hash, recursive
                     echo "directory"
                     echo "2"
                     echo "file"
                     echo "a.nix"
                 elif test "$path" = "$barOutPath/file"; then
                     echo "$path"
+                    echo 4567890123456789012345678901234567890123456789012345678901230123 # File hash, recursive
                     echo "symlink" # File type
                     echo "$bazOutPath/file" # Target
                 elif test "$path" = "$barOutPath/a.nix"; then
                     echo "$path"
+                    echo 9012345678901234567890123456789012345678901234567890123012345678 # File hash, recursive
                     echo "symlink" # File type
                     echo "$bazOutPath/a.nix" # Target
                 elif test "$path" = "$bazOutPath/file"; then
                     echo "$path"
+                    echo 5678901234567890123456789012345678901234567890123456789012301234 # File hash, recursive
                     echo "regular" # File type
                     echo "" # Not executable ("executable" otherwise)
                     echo `expr length "$fileString"`
-                    echo `basename "$filePath" | sed 's|-.*||'`
+                    echo 6789012345678901234567890123456789012345678901234567890123012345 # File hash, flat
                 elif test "$path" = "$bazOutPath/a.nix"; then
                     echo "$path"
+                    echo 7890123456789012345678901234567890123456789012345678901230123456 # File hash, recursive
                     echo "regular"
                     echo ""
                     echo `expr length "$aDotNixString"`
-                    echo `basename "$aDotNixPath" | sed 's|-.*||'`
+                    echo 8901234567890123456789012345678901234567890123456789012301234567 # File hash, flat
                 fi
             done
             echo

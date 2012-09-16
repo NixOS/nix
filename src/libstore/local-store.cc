@@ -1093,6 +1093,7 @@ void LocalStore::querySubstitutableFileInfos(const Path & substituter,
                 throw Error(format("got unexpected path `%1%' from substituter") % path);
             paths.erase(path);
             SubstitutableFileInfo & info(infos[path]);
+            info.recursiveHash = parseHash16or32(htSHA256, readLine(run.from));
             string type = readLine(run.from);
             if (type == "regular") {
                 info.type = tpRegular;
@@ -1101,7 +1102,7 @@ void LocalStore::querySubstitutableFileInfos(const Path & substituter,
                 else
                     info.regular.executable = false;
                 info.regular.length = getIntLine<long long>(run.from);
-                info.regular.hash = parseHash32(htSHA256, readLine(run.from));
+                info.regular.flatHash = parseHash16or32(htSHA256, readLine(run.from));
             } else if (type == "symlink") {
                 info.type = tpSymlink;
                 info.target = readLine(run.from);

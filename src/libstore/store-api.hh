@@ -94,13 +94,14 @@ enum FileType {
 
 struct SubstitutableFileInfo
 {
+    Hash recursiveHash;
     FileType type;
 
     // !!! Want a union here, but requires c++11
     struct {
         bool executable;
         unsigned long long length;
-        Hash hash;
+        Hash flatHash;
     } regular;
 
     Path target;

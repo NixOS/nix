@@ -382,12 +382,13 @@ void RemoteStore::querySubstitutableFileInfos(const PathSet & paths,
     for (unsigned int n = 0; n < count; n++) {
         Path path = readString(from);
         SubstitutableFileInfo & info(infos[path]);
+        info.recursiveHash = parseHash(htSHA256, readString(from));
         string type = readString(from);
         if (type == "regular") {
             info.type = tpRegular;
             info.regular.executable = readInt(from) != 0;
             info.regular.length = readLongLong(from);
-            info.regular.hash = parseHash32(htSHA256, readString(from));
+            info.regular.flatHash = parseHash(htSHA256, readString(from));
         } else if (type == "symlink") {
             info.type = tpSymlink;
             info.target = readString(from);
