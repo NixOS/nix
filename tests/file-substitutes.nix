@@ -39,18 +39,6 @@ let
         system = '''nix''';
         file = ${bazOutPath}/file;
       }).drvPath;
-
-      isValidPath1 = builtins.storePath ./file;
-      isValidPath2 = builtins.storePath ${bazOutPath}/file;
-
-      pathExists1 = builtins.pathExists ./file;
-      pathExists2 = builtins.pathExists ${bazOutPath}/file;
-
-      readFile1 = builtins.readFile ./file;
-      readFile2 = builtins.readFile ${bazOutPath}/file;
-
-      filterSource1 = builtins.filterSource (p: t: baseNameOf p != '''a.nix''') ./.;
-      filterSource2 = builtins.filterSource (p: t: baseNameOf p != '''a.nix''') ${bazOutPath};
     }
   '';
 
