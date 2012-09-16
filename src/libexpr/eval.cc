@@ -1123,9 +1123,12 @@ string EvalState::coerceToString(Value & v, ContextEntrySet & context,
         if (srcToStore[path] != "")
             dstPath = srcToStore[path];
         else {
-            dstPath = settings.readOnlyMode
-                ? computeStorePathForPath(path).first
-                : store->addToStore(path);
+            if (settings.readOnlyMode && isInStore(path) && !store->isValidPath(toStorePath(path)))
+                dstPath = computeStorePathForSubstitutablePath(path).first;
+            else
+                dstPath = settings.readOnlyMode
+                    ? computeStorePathForPath(path).first
+                    : store->addToStore(path);
             srcToStore[path] = dstPath;
             printMsg(lvlChatty, format("copied source `%1%' -> `%2%'")
                 % path % dstPath);

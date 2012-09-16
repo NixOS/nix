@@ -214,6 +214,38 @@ std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
 }
 
 
+std::pair<Path, Hash> computeStorePathForSubstitutablePath(const Path & srcPath, bool recursive)
+{
+    SubstitutableFileInfos infos;
+    store->querySubstitutableFileInfos(singleton<PathSet>(srcPath), infos);
+    if (!infos.count(srcPath))
+        throw Error(format(
+            "cannot compute store path for `%1%' because its parent store path is invalid and it has no file substitute")
+                % srcPath);
+    SubstitutableFileInfo info = infos[srcPath];
+    Hash h;
+    if (recursive)
+        h = info.recursiveHash;
+    else {
+        if (info.type == tpRegular)
+            h = info.regular.flatHash;
+        else if (info.type == tpSymlink) {
+            Path path = absPath(info.target, dirOf(srcPath));
+            if (!isInStore(path) || store->isValidPath(toStorePath(path)))
+                return computeStorePathForPath(path, recursive);
+            else
+                return computeStorePathForSubstitutablePath(path, recursive);
+        } else
+            throw Error(format(
+                "cannot compute flat hash of `%1' because it is a directory")
+                    % srcPath);
+    }
+    string name = baseNameOf(srcPath);
+    Path dstPath = makeFixedOutputPath(recursive, htSHA256, h, name);
+    return std::pair<Path, Hash>(dstPath, h);
+}
+
+
 Path computeStorePathForText(const string & name, const string & s,
     const PathSet & references)
 {

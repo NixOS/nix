@@ -336,6 +336,11 @@ std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
     bool recursive = true, HashType hashAlgo = htSHA256,
     PathFilter & filter = defaultPathFilter);
 
+/* computeStorePathForPath when the path is part of an unrealized store path
+   but a file substituter may have relevant information about it */
+std::pair<Path, Hash> computeStorePathForSubstitutablePath(const Path & srcPath,
+    bool recursive = true);
+
 /* Preparatory part of addTextToStore().
 
    !!! Computation of the path should take the references given to

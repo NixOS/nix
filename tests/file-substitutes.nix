@@ -30,11 +30,13 @@ let
       coerceToString1 = (derivation {
         name = '''coerceToString''';
         builder = '''''${failBuilder}''';
+        system = '''nix''';
         file = ./file;
       }).drvPath;
       coerceToString2 = (derivation {
         name = '''coerceToString''';
         builder = '''''${failBuilder}''';
+        system = '''nix''';
         file = ${bazOutPath}/file;
       }).drvPath;
 

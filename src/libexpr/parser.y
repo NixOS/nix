@@ -533,7 +533,7 @@ Expr * EvalState::parseExprFromSubstitutableFile(Path path)
     store->querySubstitutableFileInfos(singleton<PathSet>(path), infos);
     if (!infos.count(path))
         throw ImportReadOnlyError(format(
-            "cannot import `%1%' because its parent store path is invalid and it has no file substitute")
+            "cannot parse `%1%' because its parent store path is invalid and it has no file substitute")
                 % path);
     SubstitutableFileInfo info = infos[path];
 
@@ -557,7 +557,7 @@ Expr * EvalState::parseExprFromSubstitutableFile(Path path)
     if (!e) {
         if (!store->querySubstitutableFiles(singleton<PathSet>(path)).count(path))
             throw ImportReadOnlyError(format(
-                "cannot import `%1%' because its parent store path is invalid and it has no file substitute")
+                "cannot parse `%1%' because its parent store path is invalid and it has no file substitute")
                     % path);
         FdPair fds;
         store->readSubstitutableFile(path, fds);
