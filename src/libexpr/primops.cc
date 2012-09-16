@@ -31,12 +31,7 @@ static void prim_import(EvalState & state, Value * * args, Value & v)
     ContextEntrySet context;
     Path path = state.coerceToPath(*args[0], context);
 
-    if (settings.readOnlyMode && isInStore(path)) {
-        if (!store->canReadFile(path, true))
-            throw ImportReadOnlyError(format(
-                "cannot import `%1%' because it is not contained in its parent store path or its parent store path is invalid and `%1%' has no file substitute")
-                    % path);
-    } else {
+    if (!settings.readOnlyMode) {
         foreach (ContextEntrySet::iterator, i, context) {
             Path ctx = (*i)->path;
             string outputName = (*i)->output;

@@ -94,7 +94,6 @@ enum FileType {
 
 struct SubstitutableFileInfo
 {
-    Path substituter;
     FileType type;
 
     // !!! Want a union here, but requires c++11
@@ -194,7 +193,7 @@ public:
 
     /* Read a file substitute of a path.
        Returns the stdout and stderr fds of the substituter in fds */
-    virtual void readSubstitutableFile(const Path & path, const SubstitutableFileInfo & info, FdPair & fds) = 0;
+    virtual void readSubstitutableFile(const Path & path, FdPair & fds) = 0;
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
@@ -286,11 +285,6 @@ public:
        `nix-store --register-validity'. */
     string makeValidityRegistration(const PathSet & paths,
         bool showDerivers, bool showHash);
-
-    /* Check if a store file can be read, either because it's already there
-     * or because there is a file substitute for it. tryDefaultNix checks
-     * path/default.nix if it's a directory */
-    bool canReadFile(const Path & path, bool tryDefaultNix = false);
 };
 
 

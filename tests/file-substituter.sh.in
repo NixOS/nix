@@ -43,16 +43,12 @@ if test $1 = "--query"; then
             echo
         elif test "$cmd" = "haveFile"; then
             for path in $args; do
-                base=`basename "$path"`
-                dir=`dirname "$path"`
                 if test "$path" = "$barOutPath/default.nix"; then
                     echo "$path"
-                elif test "$path" = "$barOutPath" || test "$path" = "$bazOutPath"; then
+                elif test "$path" = "$bazOutPath/file"; then
                     echo "$path"
-                elif test "$dir" = "$barOutPath" || test "$dir" = "$bazOutPath"; then
-                    if test "$base" = "file" || test "$base" = "a.nix"; then
-                        echo "$path"
-                    fi
+                elif test "$path" = "$bazOutPath/a.nix"; then
+                    echo "$path"
                 fi
             done
             echo
@@ -107,10 +103,13 @@ if test $1 = "--query"; then
     done
 elif test $1 = "--read"; then
     if test "$2" = "$barOutPath/default.nix"; then
+        echo # Need to echo a char to indicate we have the file
         echo "$substitutedExprString"
     elif test "$2" = "$bazOutPath/file"; then
+        echo
         echo "$fileString"
     elif test "$2" = "$bazOutPath/a.nix"; then
+        echo
         echo "$aDotNixString"
     else
         exit 1

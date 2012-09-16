@@ -1093,7 +1093,6 @@ void LocalStore::querySubstitutableFileInfos(const Path & substituter,
                 throw Error(format("got unexpected path `%1%' from substituter") % path);
             paths.erase(path);
             SubstitutableFileInfo & info(infos[path]);
-            info.substituter = substituter;
             string type = readLine(run.from);
             if (type == "regular") {
                 info.type = tpRegular;
@@ -1131,50 +1130,59 @@ void LocalStore::querySubstitutableFileInfos(const PathSet & paths,
 }
 
 
-void LocalStore::readSubstitutableFile(const Path & path, const SubstitutableFileInfo & info, FdPair & fds)
+void LocalStore::readSubstitutableFile(const Path & path, FdPair & fds)
 {
-    debug(format("starting substituter program `%1%'") % info.substituter);
-    assert(info.type == tpRegular);
+    bool foundSub;
+    foreach (Paths::iterator, i, settings.substituters) {
+        debug(format("starting substituter program `%1%'") % *i);
 
-    Pipe fromPipe, errorPipe;
+        Pipe fromPipe, errorPipe;
 
-    fromPipe.create();
-    errorPipe.create();
+        fromPipe.create();
+        errorPipe.create();
 
-    int pid = fork();
+        int pid = fork();
 
-    switch (pid) {
+        switch (pid) {
 
-    case -1:
-        throw SysError("unable to fork");
+        case -1:
+            throw SysError("unable to fork");
 
-    case 0: /* child */
-        try {
-            /* Pass configuration options (including those overriden
-               with --option) to the substituter. */
-            setenv("_NIX_OPTIONS", settings.pack().c_str(), 1);
+        case 0: /* child */
+            try {
+                /* Pass configuration options (including those overriden
+                   with --option) to the substituter. */
+                setenv("_NIX_OPTIONS", settings.pack().c_str(), 1);
 
-            fromPipe.readSide.close();
-            errorPipe.readSide.close();
-            if (dup2(fromPipe.writeSide, STDOUT_FILENO) == -1)
-                throw SysError("dupping stdout");
-            if (dup2(errorPipe.writeSide, STDERR_FILENO) == -1)
-                throw SysError("dupping stderr");
-            closeMostFDs(set<int>());
-            execl(info.substituter.c_str(), info.substituter.c_str(), "--read", path.c_str(), NULL);
-            throw SysError(format("executing `%1%'") % info.substituter);
-        } catch (std::exception & e) {
-            std::cerr << "error: " << e.what() << std::endl;
+                fromPipe.readSide.close();
+                errorPipe.readSide.close();
+                if (dup2(fromPipe.writeSide, STDOUT_FILENO) == -1)
+                    throw SysError("dupping stdout");
+                if (dup2(errorPipe.writeSide, STDERR_FILENO) == -1)
+                    throw SysError("dupping stderr");
+                closeMostFDs(set<int>());
+                execl(i->c_str(), i->c_str(), "--read", path.c_str(), NULL);
+                throw SysError(format("executing `%1%'") % *i);
+            } catch (std::exception & e) {
+                std::cerr << "error: " << e.what() << std::endl;
+            }
+            quickExit(1);
         }
-        quickExit(1);
+
+        /* Parent. */
+
+        fromPipe.writeSide.close();
+        errorPipe.writeSide.close();
+        char buf;
+        if (!read(fromPipe.readSide,&buf,sizeof buf))
+            continue;
+        fds.first = fromPipe.readSide.borrow();
+        fds.second = errorPipe.readSide.borrow();
+        foundSub = true;
+        break;
     }
-
-    /* Parent. */
-
-    fromPipe.writeSide.close();
-    errorPipe.writeSide.close();
-    fds.first = fromPipe.readSide.borrow();
-    fds.second = errorPipe.readSide.borrow();
+    if (!foundSub)
+        throw Error(format("Could not read `%1%' from any substituter") % path);
 }
 
 

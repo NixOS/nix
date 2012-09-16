@@ -17,18 +17,24 @@ let
   bazOutPath = builtins.unsafeDiscardStringContext bar.baz.outPath;
 
   substitutedExprString = ''
+    let
+      failBuilder = builtins.toFile '''builder.sh''' '''
+        exit 1
+      ''';
+    in
+
     {
       evalFile1 = import ./a.nix;
       evalFile2 = import ${bazOutPath}/a.nix;
 
       coerceToString1 = (derivation {
         name = '''coerceToString''';
-        builder = ${failBuilder};
+        builder = '''''${failBuilder}''';
         file = ./file;
       }).drvPath;
       coerceToString2 = (derivation {
         name = '''coerceToString''';
-        builder = ${failBuilder};
+        builder = '''''${failBuilder}''';
         file = ${bazOutPath}/file;
       }).drvPath;
 

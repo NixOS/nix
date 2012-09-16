@@ -261,37 +261,6 @@ string StoreAPI::makeValidityRegistration(const PathSet & paths,
 }
 
 
-bool StoreAPI::canReadFile(const Path & path, bool tryDefaultNix) {
-    Path base = toStorePath(path);
-    if (isValidPath(base)) {
-        struct stat st;
-        if (lstat(path.c_str(), &st))
-            return false;
-        if (S_ISREG(st.st_mode))
-            return true;
-        if (S_ISLNK(st.st_mode))
-            return canReadFile(absPath(readLink(path), dirOf(path)), tryDefaultNix);
-        if (tryDefaultNix && S_ISDIR(st.st_mode))
-            return canReadFile(path + "/default.nix", tryDefaultNix);
-    } else {
-        if (querySubstitutableFiles(singleton<PathSet>(path)).empty())
-            return false;
-        SubstitutableFileInfos infos;
-        querySubstitutableFileInfos(singleton<PathSet>(path), infos);
-        if (!infos.count(path))
-            return false;
-        SubstitutableFileInfo info = infos[path];
-        if (info.type == tpRegular)
-            return true;
-        if (info.type == tpSymlink)
-            return canReadFile(absPath(info.target, dirOf(path)), tryDefaultNix);
-        if (tryDefaultNix && info.type == tpDirectory)
-            return canReadFile(path + "/default.nix", tryDefaultNix);
-    }
-    return false;
-}
-
-
 ValidPathInfo decodeValidPathInfo(std::istream & str, bool hashGiven)
 {
     ValidPathInfo info;

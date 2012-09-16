@@ -46,7 +46,7 @@ static int readFD(FdSource & from)
 
     errno = 0;
     ssize_t ret = recvmsg(from.fd, &msg, 0);
-    if (ret < sizeof buf ||
+    if (ret <= 0 ||
         msg.msg_flags & MSG_EOR ||
         msg.msg_flags & MSG_OOB ||
         msg.msg_flags & MSG_TRUNC ||
@@ -382,7 +382,6 @@ void RemoteStore::querySubstitutableFileInfos(const PathSet & paths,
     for (unsigned int n = 0; n < count; n++) {
         Path path = readString(from);
         SubstitutableFileInfo & info(infos[path]);
-        info.substituter = readString(from);
         string type = readString(from);
         if (type == "regular") {
             info.type = tpRegular;
@@ -403,34 +402,13 @@ void RemoteStore::querySubstitutableFileInfos(const PathSet & paths,
 }
 
 
-void RemoteStore::readSubstitutableFile(const Path & path, const SubstitutableFileInfo & info, FdPair & fds) {
+void RemoteStore::readSubstitutableFile(const Path & path, FdPair & fds) {
     openConnection();
 
     assert(GET_PROTOCOL_MINOR(daemonVersion) >= 13);
 
     writeInt(wopReadSubstitutableFile, to);
     writeString(path, to);
-    writeString(info.substituter, to);
-    switch (info.type)
-    {
-        case tpRegular:
-            writeString("regular", to);
-            writeInt(info.regular.executable, to);
-            writeLongLong(info.regular.length, to);
-            writeString(printHash32(info.regular.hash), to);
-            break;
-        case tpSymlink:
-            writeString("symlink", to);
-            writeString(info.target, to);
-            break;
-        case tpDirectory:
-            writeString("directory", to);
-            writeStrings(info.files, to);
-            break;
-        case tpUnknown:
-            writeString("unknown", to);
-            break;
-    }
     processStderr();
     /* Needed to ensure delay of writing fd until after stderr is processed
        readUnbuffered reads the full bufSize, which could read the dummy byte

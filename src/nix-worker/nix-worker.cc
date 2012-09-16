@@ -685,7 +685,6 @@ static void performOp(unsigned int clientVersion,
         writeInt(infos.size(), to);
         foreach (SubstitutableFileInfos::iterator, i, infos) {
             writeString(i->first, to);
-            writeString(i->second.substituter, to);
             switch (i->second.type)
             {
                 case tpRegular:
@@ -712,27 +711,9 @@ static void performOp(unsigned int clientVersion,
 
     case wopReadSubstitutableFile: {
         Path path = readString(from);
-        SubstitutableFileInfo info;
-        info.substituter = readString(from);
-        string type = readString(from);
-        if (type == "regular") {
-            info.type = tpRegular;
-            info.regular.executable = readInt(from) != 0;
-            info.regular.length = readLongLong(from);
-            info.regular.hash = parseHash32(htSHA256, readString(from));
-        } else if (type == "symlink") {
-            info.type = tpSymlink;
-            info.target = readString(from);
-        } else if (type == "directory") {
-            info.type = tpDirectory;
-            int nrEntries = readInt(from);
-            while (nrEntries--)
-                info.files.insert(readString(from));
-        } else
-            info.type = tpUnknown;
         FdPair fds;
         startWork();
-        store->readSubstitutableFile(path, info, fds);
+        store->readSubstitutableFile(path, fds);
         stopWork();
         to.flush();
         /* See comment in readSubstitutableFile in remote-store.cc */

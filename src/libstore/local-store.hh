@@ -139,7 +139,7 @@ public:
     void querySubstitutableFileInfos(const PathSet & paths,
         SubstitutableFileInfos & infos);
 
-    void readSubstitutableFile(const Path & path, const SubstitutableFileInfo & info, FdPair & fds);
+    void readSubstitutableFile(const Path & path, FdPair & fds);
 
     Path addToStore(const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,

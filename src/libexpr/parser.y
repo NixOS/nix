@@ -532,7 +532,9 @@ Expr * EvalState::parseExprFromSubstitutableFile(Path path)
     SubstitutableFileInfos infos;
     store->querySubstitutableFileInfos(singleton<PathSet>(path), infos);
     if (!infos.count(path))
-        throw SysError(format("getting info of `%1%'") % path);
+        throw ImportReadOnlyError(format(
+            "cannot import `%1%' because its parent store path is invalid and it has no file substitute")
+                % path);
     SubstitutableFileInfo info = infos[path];
 
     /* If `path' is a symlink, follow it.  This is so that relative
@@ -553,15 +555,19 @@ Expr * EvalState::parseExprFromSubstitutableFile(Path path)
        tree cache. */
     Expr * e = parseTrees[path];
     if (!e) {
+        if (!store->querySubstitutableFiles(singleton<PathSet>(path)).count(path))
+            throw ImportReadOnlyError(format(
+                "cannot import `%1%' because its parent store path is invalid and it has no file substitute")
+                    % path);
         FdPair fds;
-        store->readSubstitutableFile(path, info, fds);
+        store->readSubstitutableFile(path, fds);
         unsigned char * buf = new unsigned char[info.regular.length];
         AutoDeleteArray<unsigned char> d(buf);
         try {
             readFull(fds.first, buf, info.regular.length);
             e = parse(string((char *) buf, info.regular.length).c_str(), path, dirOf(path));
         } catch (EndOfFile err) {
-            throw Error(format("substituter `%1%' failed: %2%") % info.substituter % chomp(drainFD(fds.second)));
+            throw Error(format("substituter failed: %1%") % chomp(drainFD(fds.second)));
         }
         parseTrees[path] = e;
     }
