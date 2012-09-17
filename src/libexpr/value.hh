@@ -1,6 +1,7 @@
 #pragma once
 
 #include "symbol-table.hh"
+#include "context.hh"
 
 namespace nix {
 
@@ -61,7 +62,7 @@ struct Value
            For canonicity, the store paths should be in sorted order. */
         struct {
             const char * s;
-            const char * * context; // must be in sorted order
+            const ContextEntry * * context;
         } string;
         
         const char * path;

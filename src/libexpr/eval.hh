@@ -71,10 +71,9 @@ struct Attr
     }
 };
 
+void mkString(Value & v, const string & s, const ContextEntrySet & context = ContextEntrySet());
 
-void mkString(Value & v, const string & s, const PathSet & context = PathSet());
-
-void copyContext(const Value & v, PathSet & context);
+void copyContext(const Value & v, ContextEntrySet & context);
 
 
 /* Cache for calls to addToStore(); maps source paths to the store
@@ -160,7 +159,7 @@ public:
     inline void forceList(Value & v);
     void forceFunction(Value & v); // either lambda or primop
     string forceString(Value & v);
-    string forceString(Value & v, PathSet & context);
+    string forceString(Value & v, ContextEntrySet & context);
     string forceStringNoCtx(Value & v);
 
     /* Return true iff the value `v' denotes a derivation (i.e. a
@@ -171,13 +170,13 @@ public:
        string.  If `coerceMore' is set, also converts nulls, integers,
        booleans and lists to a string.  If `copyToStore' is set,
        referenced paths are copied to the Nix store as a side effect.q */
-    string coerceToString(Value & v, PathSet & context,
+    string coerceToString(Value & v, ContextEntrySet & context,
         bool coerceMore = false, bool copyToStore = true);
 
     /* Path coercion.  Converts strings, paths and derivations to a
        path.  The result is guaranteed to be a canonicalised, absolute
        path.  Nothing is copied to the store. */
-    Path coerceToPath(Value & v, PathSet & context);
+    Path coerceToPath(Value & v, ContextEntrySet & context);
 
 private:
 
@@ -224,6 +223,9 @@ public:
     
     /* Allocation primitives. */
     Value * allocValue();
+
+    ContextEntry * allocContextEntry(const Path & path, const string & output = string());
+
     Env & allocEnv(unsigned int size);
 
     Value * allocAttr(Value & vAttrs, const Symbol & name);
@@ -242,6 +244,8 @@ private:
     unsigned long nrEnvs;
     unsigned long nrValuesInEnvs;
     unsigned long nrValues;
+    unsigned long nrContextEntries;
+    unsigned long nrContextEntryBytes;
     unsigned long nrListElems;
     unsigned long nrAttrsets;
     unsigned long nrOpUpdates;
