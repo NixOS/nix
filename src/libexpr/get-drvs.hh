@@ -26,6 +26,8 @@ typedef std::map<string, MetaValue> MetaInfo;
 struct DrvInfo
 {
 private:
+    string name;
+    string system;
     string drvPath;
     string outPath;
 
@@ -35,19 +37,29 @@ private:
     bool failed; // set if we get an AssertionError
     
 public:
-    string name;
     string attrPath; /* path towards the derivation */
-    string system;
 
     /* !!! make this private */
     Bindings * attrs;
 
     DrvInfo() : metaInfoRead(false), failed(false), attrs(0) { };
 
+    string queryName(EvalState & state) const;
+    string querySystem(EvalState & state) const;
     string queryDrvPath(EvalState & state) const;
     string queryOutPath(EvalState & state) const;
     MetaInfo queryMetaInfo(EvalState & state) const;
     MetaValue queryMetaInfo(EvalState & state, const string & name) const;
+
+    void setName(const string & s)
+    {
+        name = s;
+    }
+
+    void setSystem(const string & s)
+    {
+        system = s;
+    }
 
     void setDrvPath(const string & s)
     {

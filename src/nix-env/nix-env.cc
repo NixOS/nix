@@ -173,7 +173,7 @@ static void loadDerivations(EvalState & state, Path nixExprPath,
        system. */
     for (DrvInfos::iterator i = elems.begin(), j; i != elems.end(); i = j) {
         j = i; j++;
-        if (systemFilter != "*" && i->system != systemFilter)
+        if (systemFilter != "*" && i->querySystem(state) != systemFilter)
             elems.erase(i);
     }
 }
@@ -217,9 +217,13 @@ static bool isPrebuilt(EvalState & state, const DrvInfo & elem)
 {
     assert(false);
 #if 0
-    return
-        store->isValidPath(elem.queryOutPath(state)) ||
-        store->hasSubstitutes(elem.queryOutPath(state));
+    try {
+        return
+            store->isValidPath(elem.queryOutPath(state)) ||
+            store->hasSubstitutes(elem.queryOutPath(state));
+    } catch (ImportReadOnlyError & e) {
+        return false;
+    }
 #endif
 }
 
@@ -241,7 +245,7 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
         for (DrvInfos::const_iterator j = allElems.begin();
              j != allElems.end(); ++j, ++n)
         {
-            DrvName drvName(j->name);
+            DrvName drvName(j->queryName(state));
             if (i->matches(drvName)) {
                 i->hits++;
                 matches.push_back(std::pair<DrvInfo, unsigned int>(*j, n));
@@ -263,35 +267,35 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
             StringSet multiple;
 
             for (Matches::iterator j = matches.begin(); j != matches.end(); ++j) {
-                DrvName drvName(j->first.name);
+                DrvName drvName(j->first.queryName(state));
                 int d = 1;
 
                 Newest::iterator k = newest.find(drvName.name);
                 
                 if (k != newest.end()) {
-                    d = j->first.system == k->second.first.system ? 0 :
-                        j->first.system == settings.thisSystem ? 1 :
-                        k->second.first.system == settings.thisSystem ? -1 : 0;
+                    d = j->first.querySystem(state) == k->second.first.querySystem(state) ? 0 :
+                        j->first.querySystem(state) == settings.thisSystem ? 1 :
+                        k->second.first.querySystem(state) == settings.thisSystem ? -1 : 0;
                     if (d == 0)
                         d = comparePriorities(state, j->first, k->second.first);
                     if (d == 0)
-                        d = compareVersions(drvName.version, DrvName(k->second.first.name).version);
+                        d = compareVersions(drvName.version, DrvName(k->second.first.queryName(state)).version);
                 }
 
                 if (d > 0) {
                     newest[drvName.name] = *j;
-                    multiple.erase(j->first.name);
+                    multiple.erase(j->first.queryName(state));
                 } else if (d == 0) {
-                    multiple.insert(j->first.name);
+                    multiple.insert(j->first.queryName(state));
                 }
             }
 
             matches.clear();
             for (Newest::iterator j = newest.begin(); j != newest.end(); ++j) {
-                if (multiple.find(j->second.first.name) != multiple.end())
+                if (multiple.find(j->second.first.queryName(state)) != multiple.end())
                     printMsg(lvlInfo,
                         format("warning: there are multiple derivations named `%1%'; using the first one")
-                        % j->second.first.name);
+                        % j->second.first.queryName(state));
                 matches.push_back(j->second);
             }
         }
@@ -395,7 +399,7 @@ static void queryInstSources(EvalState & state,
                 }
                 else elem.setOutPath(path);
 
-                elem.name = name;
+                elem.setName(name);
 
                 elems.push_back(elem);
             }
@@ -469,8 +473,8 @@ static void installDerivations(Globals & globals,
            path is not the one we want (e.g., `java-front' versus
            `java-front-0.9pre15899'). */
         if (globals.forceName != "")
-            i->name = globals.forceName;
-        newNames.insert(DrvName(i->name).name);
+            i->setName(globals.forceName);
+        newNames.insert(DrvName(i->queryName(globals.state)).name);
     }
 
     /* Add in the already installed derivations, unless they have the
@@ -483,19 +487,19 @@ static void installDerivations(Globals & globals,
         
         DrvInfos allElems(newElems);
         foreach (DrvInfos::iterator, i, installedElems) {
-            DrvName drvName(i->name);
+            DrvName drvName(i->queryName(globals.state));
             MetaInfo meta = i->queryMetaInfo(globals.state);
             if (!globals.preserveInstalled &&
                 newNames.find(drvName.name) != newNames.end() &&
                 !keep(meta))
                 printMsg(lvlInfo,
-                    format("replacing old `%1%'") % i->name);
+                    format("replacing old `%1%'") % i->queryName(globals.state));
             else
                 allElems.push_back(*i);
         }
 
         foreach (DrvInfos::iterator, i, newElems)
-            printMsg(lvlInfo, format("installing `%1%'") % i->name);
+            printMsg(lvlInfo, format("installing `%1%'") % i->queryName(globals.state));
     
         printMissing(globals.state, newElems);
     
@@ -547,7 +551,7 @@ static void upgradeDerivations(Globals & globals,
         /* Go through all installed derivations. */
         DrvInfos newElems;
         foreach (DrvInfos::iterator, i, installedElems) {
-            DrvName drvName(i->name);
+            DrvName drvName(i->queryName(globals.state));
 
             try {
 
@@ -566,7 +570,7 @@ static void upgradeDerivations(Globals & globals,
                 DrvInfos::iterator bestElem = availElems.end();
                 DrvName bestName;
                 foreach (DrvInfos::iterator, j, availElems) {
-                    DrvName newName(j->name);
+                    DrvName newName(j->queryName(globals.state));
                     if (newName.name == drvName.name) {
                         int d = comparePriorities(globals.state, *i, *j);
                         if (d == 0) d = compareVersions(drvName.version, newName.version);
@@ -594,12 +598,12 @@ static void upgradeDerivations(Globals & globals,
                 {
                     printMsg(lvlInfo,
                         format("upgrading `%1%' to `%2%'")
-                        % i->name % bestElem->name);
+                        % i->queryName(globals.state) % bestElem->queryName(globals.state));
                     newElems.push_back(*bestElem);
                 } else newElems.push_back(*i);
 
             } catch (Error & e) {
-                e.addPrefix(format("while trying to find an upgrade for `%1%':\n") % i->name);
+                e.addPrefix(format("while trying to find an upgrade for `%1%':\n") % i->queryName(globals.state));
                 throw;
             }
         }
@@ -664,11 +668,11 @@ static void opSetFlag(Globals & globals,
 
         /* Update all matching derivations. */
         foreach (DrvInfos::iterator, i, installedElems) {
-            DrvName drvName(i->name);
+            DrvName drvName(i->queryName(globals.state));
             foreach (DrvNames::iterator, j, selectors)
                 if (j->matches(drvName)) {
                     printMsg(lvlInfo,
-                        format("setting flag on `%1%'") % i->name);
+                        format("setting flag on `%1%'") % i->queryName(globals.state));
                     setMetaFlag(globals.state, *i, flagName, flagValue);
                     break;
                 }
@@ -726,7 +730,7 @@ static void uninstallDerivations(Globals & globals, Strings & selectors,
         DrvInfos newElems;
 
         foreach (DrvInfos::iterator, i, installedElems) {
-            DrvName drvName(i->name);
+            DrvName drvName(i->queryName(globals.state));
             bool found = false;
             foreach (Strings::iterator, j, selectors)
                 /* !!! the repeated calls to followLinksToStorePath()
@@ -734,7 +738,7 @@ static void uninstallDerivations(Globals & globals, Strings & selectors,
                 if ((isPath(*j) && i->queryOutPath(globals.state) == followLinksToStorePath(*j))
                     || DrvName(*j).matches(drvName))
                 {
-                    printMsg(lvlInfo, format("uninstalling `%1%'") % i->name);
+                    printMsg(lvlInfo, format("uninstalling `%1%'") % i->queryName(globals.state));
                     found = true;
                     break;
                 }
@@ -764,12 +768,19 @@ static bool cmpChars(char a, char b)
 }
 
 
-static bool cmpElemByName(const DrvInfo & a, const DrvInfo & b)
+class cmpElemByName
 {
-    return lexicographical_compare(
-        a.name.begin(), a.name.end(),
-        b.name.begin(), b.name.end(), cmpChars);
-}
+    public:
+        cmpElemByName(EvalState & state) : _state(state) { }
+        bool operator()(const DrvInfo & a, const DrvInfo & b)
+        {
+            return lexicographical_compare(
+                a.queryName(_state).begin(), a.queryName(_state).end(),
+                b.queryName(_state).begin(), b.queryName(_state).end(), cmpChars);
+        }
+    private:
+        EvalState & _state;
+};
 
 
 typedef list<Strings> Table;
@@ -814,16 +825,16 @@ void printTable(Table & table)
 
 typedef enum { cvLess, cvEqual, cvGreater, cvUnavail } VersionDiff;
 
-static VersionDiff compareVersionAgainstSet(
+static VersionDiff compareVersionAgainstSet(EvalState & state,
     const DrvInfo & elem, const DrvInfos & elems, string & version)
 {
-    DrvName name(elem.name);
+    DrvName name(elem.queryName(state));
     
     VersionDiff diff = cvUnavail;
     version = "?";
     
     for (DrvInfos::const_iterator i = elems.begin(); i != elems.end(); ++i) {
-        DrvName name2(i->name);
+        DrvName name2(i->queryName(state));
         if (name.name == name2.name) {
             int d = compareVersions(name.version, name2.version);
             if (d < 0) {
@@ -921,9 +932,10 @@ static void opQuery(Globals & globals,
     /* Sort them by name. */
     /* !!! */
     vector<DrvInfo> elems2;
+    cmpElemByName nameComparer(globals.state);
     for (DrvInfos::iterator i = elems.begin(); i != elems.end(); ++i)
         elems2.push_back(*i);
-    sort(elems2.begin(), elems2.end(), cmpElemByName);
+    sort(elems2.begin(), elems2.end(), nameComparer);
 
     
     /* We only need to know the installed paths when we are querying
@@ -941,13 +953,18 @@ static void opQuery(Globals & globals,
     PathSet validPaths, substitutablePaths;
     if (printStatus) {
         PathSet paths;
-        foreach (vector<DrvInfo>::iterator, i, elems2)
+        foreach (vector<DrvInfo>::iterator, i, elems2) {
+            string name; 
             try {
+                name = i->queryName(globals.state);
                 paths.insert(i->queryOutPath(globals.state));
             } catch (AssertionError & e) {
-                printMsg(lvlTalkative, format("skipping derivation named `%1%' which gives an assertion failure") % i->name);
+                printMsg(lvlTalkative, format("skipping derivation named `%1%' which gives an assertion failure") % name);
                 i->setFailed();
+            } catch (ImportReadOnlyError & e) {
+                printMsg(lvlTalkative, format("skipping derivation named `%1%' which gives an ImportReadOnly failure") % name);
             }
+        }
         validPaths = store->queryValidPaths(paths);
         substitutablePaths = store->querySubstitutablePaths(paths);
     }
@@ -974,19 +991,23 @@ static void opQuery(Globals & globals,
             XMLAttrs attrs;
 
             if (printStatus) {
-                Path outPath = i->queryOutPath(globals.state);
-                bool hasSubs = substitutablePaths.find(outPath) != substitutablePaths.end();
-                bool isInstalled = installed.find(outPath) != installed.end();
-                bool isValid = validPaths.find(outPath) != validPaths.end();
-                if (xmlOutput) {
-                    attrs["installed"] = isInstalled ? "1" : "0";
-                    attrs["valid"] = isValid ? "1" : "0";
-                    attrs["substitutable"] = hasSubs ? "1" : "0";
-                } else
-                    columns.push_back(
-                        (string) (isInstalled ? "I" : "-")
-                        + (isValid ? "P" : "-")
-                        + (hasSubs ? "S" : "-"));
+                try {
+                    Path outPath = i->queryOutPath(globals.state);
+                    bool hasSubs = substitutablePaths.find(outPath) != substitutablePaths.end();
+                    bool isInstalled = installed.find(outPath) != installed.end();
+                    bool isValid = validPaths.find(outPath) != validPaths.end();
+                    if (xmlOutput) {
+                        attrs["installed"] = isInstalled ? "1" : "0";
+                        attrs["valid"] = isValid ? "1" : "0";
+                        attrs["substitutable"] = hasSubs ? "1" : "0";
+                    } else
+                        columns.push_back(
+                            (string) (isInstalled ? "I" : "-")
+                            + (isValid ? "P" : "-")
+                            + (hasSubs ? "S" : "-"));
+                } catch (ImportReadOnlyError & e) {
+                    if (!xmlOutput) columns.push_back("?");
+                }
             }
 
             if (xmlOutput)
@@ -995,9 +1016,9 @@ static void opQuery(Globals & globals,
                 columns.push_back(i->attrPath);
 
             if (xmlOutput)
-                attrs["name"] = i->name;
+                attrs["name"] = i->queryName(globals.state);
             else if (printName)
-                columns.push_back(i->name);
+                columns.push_back(i->queryName(globals.state));
 
             if (compareVersions) {
                 /* Compare this element against the versions of the
@@ -1005,7 +1026,7 @@ static void opQuery(Globals & globals,
                    elements, or the set of installed elements.  !!!
                    This is O(N * M), should be O(N * lg M). */
                 string version;
-                VersionDiff diff = compareVersionAgainstSet(*i, otherElems, version);
+                VersionDiff diff = compareVersionAgainstSet(globals.state, *i, otherElems, version);
 
                 char ch;
                 switch (diff) {
@@ -1029,62 +1050,75 @@ static void opQuery(Globals & globals,
             }
 
             if (xmlOutput) {
-                if (i->system != "") attrs["system"] = i->system;
+                if (i->querySystem(globals.state) != "") attrs["system"] = i->querySystem(globals.state);
             }
             else if (printSystem) 
-                columns.push_back(i->system);
+                columns.push_back(i->querySystem(globals.state));
 
             if (printDrvPath) {
-                string drvPath = i->queryDrvPath(globals.state);
-                if (xmlOutput) {
-                    if (drvPath != "") attrs["drvPath"] = drvPath;
-                } else
-                    columns.push_back(drvPath == "" ? "-" : drvPath);
+                try {
+                    string drvPath = i->queryDrvPath(globals.state);
+                    if (xmlOutput) {
+                        if (drvPath != "") attrs["drvPath"] = drvPath;
+                    } else
+                        columns.push_back(drvPath == "" ? "-" : drvPath);
+                } catch (ImportReadOnlyError & e) {
+                    if (!xmlOutput) columns.push_back("?");
+                }
             }
         
             if (printOutPath) {
-                string outPath = i->queryOutPath(globals.state);
-                if (xmlOutput) {
-                    if (outPath != "") attrs["outPath"] = outPath;
-                } else
-                    columns.push_back(outPath);
+                try {
+                    string outPath = i->queryOutPath(globals.state);
+                    if (xmlOutput) {
+                        if (outPath != "") attrs["outPath"] = outPath;
+                    } else
+                        columns.push_back(outPath);
+                } catch (ImportReadOnlyError & e) {
+                    if (!xmlOutput) columns.push_back("?");
+                }
             }
 
             if (printDescription) {
-                MetaInfo meta = i->queryMetaInfo(globals.state);
-                MetaValue value = meta["description"];
-                string descr = value.type == MetaValue::tpString ? value.stringValue : "";
-                if (xmlOutput) {
-                    if (descr != "") attrs["description"] = descr;
-                } else
-                    columns.push_back(descr);
+                try {
+                    MetaValue value = i->queryMetaInfo(globals.state, "description");
+                    string descr = value.type == MetaValue::tpString ? value.stringValue : "";
+                    if (xmlOutput) {
+                        if (descr != "") attrs["description"] = descr;
+                    } else
+                        columns.push_back(descr);
+                } catch (ImportReadOnlyError & e) {
+                    if (!xmlOutput) columns.push_back("?");
+                }
             }
 
             if (xmlOutput)
                 if (printMeta) {
                     XMLOpenElement item(xml, "item", attrs);
-                    MetaInfo meta = i->queryMetaInfo(globals.state);
-                    for (MetaInfo::iterator j = meta.begin(); j != meta.end(); ++j) {
-                        XMLAttrs attrs2;
-                        attrs2["name"] = j->first;
-                        if (j->second.type == MetaValue::tpString) {
-                            attrs2["type"] = "string";
-                            attrs2["value"] = j->second.stringValue;
-                            xml.writeEmptyElement("meta", attrs2);
-                        } else if (j->second.type == MetaValue::tpInt) {
-                            attrs2["type"] = "int";
-                            attrs2["value"] = (format("%1%") % j->second.intValue).str();
-                            xml.writeEmptyElement("meta", attrs2);
-                        } else if (j->second.type == MetaValue::tpStrings) {
-                            attrs2["type"] = "strings";
-                            XMLOpenElement m(xml, "meta", attrs2);
-                            foreach (Strings::iterator, k, j->second.stringValues) { 
-                                XMLAttrs attrs3;
-                                attrs3["value"] = *k;
-                                xml.writeEmptyElement("string", attrs3);
-                           }
+		    try {
+                        MetaInfo meta = i->queryMetaInfo(globals.state);
+                        for (MetaInfo::iterator j = meta.begin(); j != meta.end(); ++j) {
+                            XMLAttrs attrs2;
+                            attrs2["name"] = j->first;
+                            if (j->second.type == MetaValue::tpString) {
+                                attrs2["type"] = "string";
+                                attrs2["value"] = j->second.stringValue;
+                                xml.writeEmptyElement("meta", attrs2);
+                            } else if (j->second.type == MetaValue::tpInt) {
+                                attrs2["type"] = "int";
+                                attrs2["value"] = (format("%1%") % j->second.intValue).str();
+                                xml.writeEmptyElement("meta", attrs2);
+                            } else if (j->second.type == MetaValue::tpStrings) {
+                                attrs2["type"] = "strings";
+                                XMLOpenElement m(xml, "meta", attrs2);
+                                foreach (Strings::iterator, k, j->second.stringValues) { 
+                                    XMLAttrs attrs3;
+                                    attrs3["value"] = *k;
+                                    xml.writeEmptyElement("string", attrs3);
+                               }
+                            }
                         }
-                    }
+                    } catch (ImportReadOnlyError & e) { }
                 }
                 else
                     xml.writeEmptyElement("item", attrs);
@@ -1094,7 +1128,7 @@ static void opQuery(Globals & globals,
             cout.flush();
 
         } catch (AssertionError & e) {
-            printMsg(lvlTalkative, format("skipping derivation named `%1%' which gives an assertion failure") % i->name);
+            printMsg(lvlTalkative, format("skipping derivation named `%1%' which gives an assertion failure") % i->queryName(globals.state));
         }
     }
 

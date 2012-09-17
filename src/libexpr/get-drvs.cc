@@ -6,6 +6,29 @@
 namespace nix {
 
 
+string DrvInfo::queryName(EvalState & state) const
+{
+    if (name == "" && attrs) {
+        Bindings::iterator i = attrs->find(state.sName);
+        (string &) name = state.forceStringNoCtx(*i->value);
+    }
+    return name;
+}
+
+
+string DrvInfo::querySystem(EvalState & state) const
+{
+    if (system == "" && attrs) {
+        Bindings::iterator i = attrs->find(state.sSystem);
+        if (i == attrs->end())
+            (string &) system = "unknown";
+        else
+            (string &) system = state.forceStringNoCtx(*i->value);
+    }
+    return system;
+}
+
+
 string DrvInfo::queryDrvPath(EvalState & state) const
 {
     if (drvPath == "" && attrs) {
@@ -27,12 +50,35 @@ string DrvInfo::queryOutPath(EvalState & state) const
     return outPath;
 }
 
+static MetaValue createMetaValue(EvalState & state, Value & v)
+{
+    MetaValue value;
+    try {
+        state.forceValue(v);
+        if (v.type == tString) {
+            value.type = MetaValue::tpString;
+            value.stringValue = v.string.s;
+            } else if (v.type == tInt) {
+                value.type = MetaValue::tpInt;
+                value.intValue = v.integer;
+            } else if (v.type == tList) {
+                value.type = MetaValue::tpStrings;
+                for (unsigned int j = 0; j < v.list.length; ++j)
+                    value.stringValues.push_back(state.forceStringNoCtx(*v.list.elems[j]));
+            } else
+                value.type = MetaValue::tpNone;
+    } catch (ImportReadOnlyError & e) {
+        value.type = MetaValue::tpNone;
+    }
+    return value;
+}
 
 MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
 {
     if (metaInfoRead) return meta;
     
     (bool &) metaInfoRead = true;
+    ((MetaInfo &) meta).clear();
     
     Bindings::iterator a = attrs->find(state.sMeta);
     if (a == attrs->end()) return meta; /* fine, empty meta information */
@@ -40,20 +86,8 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
     state.forceAttrs(*a->value);
 
     foreach (Bindings::iterator, i, *a->value->attrs) {
-        MetaValue value;
-        state.forceValue(*i->value);
-        if (i->value->type == tString) {
-            value.type = MetaValue::tpString;
-            value.stringValue = i->value->string.s;
-        } else if (i->value->type == tInt) {
-            value.type = MetaValue::tpInt;
-            value.intValue = i->value->integer;
-        } else if (i->value->type == tList) {
-            value.type = MetaValue::tpStrings;
-            for (unsigned int j = 0; j < i->value->list.length; ++j)
-                value.stringValues.push_back(state.forceStringNoCtx(*i->value->list.elems[j]));
-        } else continue;
-        ((MetaInfo &) meta)[i->name] = value;
+        MetaValue value = createMetaValue(state, *i->value);
+        if (value.type != MetaValue::tpNone) ((MetaInfo &) meta)[i->name] = value;
     }
 
     return meta;
@@ -62,8 +96,19 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
 
 MetaValue DrvInfo::queryMetaInfo(EvalState & state, const string & name) const
 {
-    /* !!! evaluates all meta attributes => inefficient */
-    return queryMetaInfo(state)[name];
+    if (metaInfoRead) return ((MetaInfo &)meta)[name];
+    if (meta.count(name)) return ((MetaInfo &)meta)[name];
+
+    Bindings::iterator m = attrs->find(state.sMeta);
+    if (m == attrs->end()) return ((MetaInfo &)meta)[name];
+
+    state.forceAttrs(*m->value);
+    Bindings::iterator i = m->value->attrs->find(state.symbols.create(name));
+    if (i == m->value->attrs->end()) return ((MetaInfo &)meta)[name];
+    MetaValue value = createMetaValue(state, *i->value);
+    if (value.type != MetaValue::tpNone) ((MetaInfo &) meta)[name] = value;
+
+    return ((MetaInfo &)meta)[name];
 }
 
 
@@ -100,13 +145,6 @@ static bool getDerivation(EvalState & state, Value & v,
         Bindings::iterator i = v.attrs->find(state.sName);
         /* !!! We really would like to have a decent back trace here. */
         if (i == v.attrs->end()) throw TypeError("derivation name missing");
-        drv.name = state.forceStringNoCtx(*i->value);
-
-        Bindings::iterator i2 = v.attrs->find(state.sSystem);
-        if (i2 == v.attrs->end())
-            drv.system = "unknown";
-        else
-            drv.system = state.forceStringNoCtx(*i2->value);
 
         drv.attrs = v.attrs;
 
@@ -116,6 +154,8 @@ static bool getDerivation(EvalState & state, Value & v,
         return false;
     
     } catch (AssertionError & e) {
+        return false;
+    } catch (ImportReadOnlyError & e) {
         return false;
     }
 }
