@@ -1352,8 +1352,6 @@ void DerivationGoal::buildDone()
                 % drvPath % statusToString(status));
         }
 
-        deleteTmpDir(true);
-
         /* Delete the chroot (if we were using one). */
         autoDelChroot.reset(); /* this runs the destructor */
 
@@ -1369,6 +1367,8 @@ void DerivationGoal::buildDone()
         /* Compute the FS closure of the outputs and register them as
            being valid. */
         computeClosure();
+
+        deleteTmpDir(true);
 
         /* It is now safe to delete the lock files, since all future
            lockers will see that the output paths are valid; they will
@@ -2239,7 +2239,7 @@ void DerivationGoal::deleteTmpDir(bool force)
     if (tmpDir != "") {
         if (settings.keepFailed && !force) {
             printMsg(lvlError,
-                format("builder for `%1%' failed; keeping build directory `%2%'")
+                format("note: keeping build directory `%2%'")
                 % drvPath % tmpDir);
             if (buildUser.enabled() && !amPrivileged())
                 getOwnership(tmpDir);
