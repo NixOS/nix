@@ -984,9 +984,9 @@ void _interrupted()
 //////////////////////////////////////////////////////////////////////
 
 
-Strings tokenizeString(const string & s, const string & separators)
+template<class C> C tokenizeString(const string & s, const string & separators)
 {
-    Strings result;
+    C result;
     string::size_type pos = s.find_first_not_of(separators, 0);
     while (pos != string::npos) {
         string::size_type end = s.find_first_of(separators, pos + 1);
@@ -997,6 +997,9 @@ Strings tokenizeString(const string & s, const string & separators)
     }
     return result;
 }
+
+template Strings tokenizeString(const string & s, const string & separators);
+template vector<string> tokenizeString(const string & s, const string & separators);
 
 
 string concatStringsSep(const string & sep, const Strings & ss)

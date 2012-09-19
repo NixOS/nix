@@ -193,16 +193,15 @@ static void run(int argc, char * * argv)
     if (st.st_mode & (S_IWGRP | S_IWOTH))
         throw Error(format("`%1%' should not be group or world-writable") % configFile);
 
-    Strings tokens = tokenizeString(readFile(fdConfig));
+    vector<string> tokens = tokenizeString<vector<string> >(readFile(fdConfig));
 
     fdConfig.close();
 
     if (tokens.size() != 2)
         throw Error(format("parse error in `%1%'") % configFile);
 
-    Strings::iterator i = tokens.begin();
-    string nixUser = *i++;
-    string buildUsersGroup = *i++;
+    string nixUser = tokens[0];
+    string buildUsersGroup = tokens[1];
 
 
     /* Check that the caller (real uid) is the one allowed to call

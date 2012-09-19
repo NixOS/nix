@@ -373,7 +373,7 @@ static void addAdditionalRoots(StoreAPI & store, PathSet & roots)
 
     string result = runProgram(rootFinder);
 
-    Strings paths = tokenizeString(result, "\n");
+    Strings paths = tokenizeString<Strings>(result, "\n");
 
     foreach (Strings::iterator, i, paths) {
         if (isInStore(*i)) {

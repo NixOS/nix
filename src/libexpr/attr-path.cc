@@ -10,7 +10,7 @@ namespace nix {
 void findAlongAttrPath(EvalState & state, const string & attrPath,
     Bindings & autoArgs, Expr * e, Value & v)
 {
-    Strings tokens = tokenizeString(attrPath, ".");
+    Strings tokens = tokenizeString<Strings>(attrPath, ".");
 
     Error attrError =
         Error(format("attribute selection path `%1%' does not match expression") % attrPath);

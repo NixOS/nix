@@ -363,7 +363,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
                     else throw EvalError(format("invalid value `%1%' for `outputHashMode' attribute") % s);
                 }
                 else if (key == "outputs") {
-                    Strings tmp = tokenizeString(s);
+                    Strings tmp = tokenizeString<Strings>(s);
                     outputs.clear();
                     foreach (Strings::iterator, j, tmp) {
                         if (outputs.find(*j) != outputs.end())

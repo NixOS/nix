@@ -65,15 +65,7 @@ void Settings::processEnvironment()
         substituters.push_back(nixLibexecDir + "/nix/substituters/download-using-manifests.pl");
         substituters.push_back(nixLibexecDir + "/nix/substituters/download-from-binary-cache.pl");
     } else
-        substituters = tokenizeString(subs, ":");
-}
-
-
-string & at(Strings & ss, unsigned int n)
-{
-    Strings::iterator i = ss.begin();
-    advance(i, n);
-    return *i;
+        substituters = tokenizeString<Strings>(subs, ":");
 }
 
 
@@ -95,15 +87,15 @@ void Settings::loadConfFile()
         if (hash != string::npos)
             line = string(line, 0, hash);
 
-        Strings tokens = tokenizeString(line);
+        vector<string> tokens = tokenizeString<vector<string> >(line);
         if (tokens.empty()) continue;
 
-        if (tokens.size() < 2 || at(tokens, 1) != "=")
+        if (tokens.size() < 2 || tokens[1] != "=")
             throw Error(format("illegal configuration line `%1%' in `%2%'") % line % settingsFile);
 
-        string name = at(tokens, 0);
+        string name = tokens[0];
 
-        Strings::iterator i = tokens.begin();
+        vector<string>::iterator i = tokens.begin();
         advance(i, 2);
         settings[name] = concatStringsSep(" ", Strings(i, tokens.end())); // FIXME: slow
     };
@@ -170,7 +162,7 @@ void Settings::get(PathSet & res, const string & name)
     SettingsMap::iterator i = settings.find(name);
     if (i == settings.end()) return;
     res.clear();
-    Strings ss = tokenizeString(i->second);
+    Strings ss = tokenizeString<Strings>(i->second);
     res.insert(ss.begin(), ss.end());
 }
 

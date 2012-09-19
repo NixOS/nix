@@ -1435,7 +1435,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
         /* Lock the output path.  But don't lock if we're being called
            from a build hook (whose parent process already acquired a
            lock on this path). */
-        Strings locksHeld = tokenizeString(getEnv("NIX_HELD_LOCKS"));
+        Strings locksHeld = tokenizeString<Strings>(getEnv("NIX_HELD_LOCKS"));
         if (find(locksHeld.begin(), locksHeld.end(), dstPath) == locksHeld.end())
             outputLock.lockPaths(singleton<PathSet, Path>(dstPath));
 
@@ -1645,7 +1645,7 @@ ValidPathInfo LocalStore::queryPathInfoOld(const Path & path)
     string info = readFile(infoFile);
 
     /* Parse it. */
-    Strings lines = tokenizeString(info, "\n");
+    Strings lines = tokenizeString<Strings>(info, "\n");
 
     foreach (Strings::iterator, i, lines) {
         string::size_type p = i->find(':');
@@ -1654,7 +1654,7 @@ ValidPathInfo LocalStore::queryPathInfoOld(const Path & path)
         string name(*i, 0, p);
         string value(*i, p + 2);
         if (name == "References") {
-            Strings refs = tokenizeString(value, " ");
+            Strings refs = tokenizeString<Strings>(value, " ");
             res.references = PathSet(refs.begin(), refs.end());
         } else if (name == "Deriver") {
             res.deriver = value;
