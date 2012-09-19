@@ -1355,11 +1355,6 @@ void DerivationGoal::buildDone()
         /* Delete the chroot (if we were using one). */
         autoDelChroot.reset(); /* this runs the destructor */
 
-        /* Deleting the chroot will have caused the immutable bits on
-           hard-linked inputs to be cleared.  So set them again. */
-        foreach (PathSet::iterator, i, regularInputPaths)
-            makeImmutable(*i);
-
         /* Delete redirected outputs (when doing hash rewriting). */
         foreach (PathSet::iterator, i, redirectedOutputs)
             deletePath(*i);
@@ -1766,11 +1761,8 @@ void DerivationGoal::startBuilder()
                     /* Hard-linking fails if we exceed the maximum
                        link count on a file (e.g. 32000 of ext3),
                        which is quite possible after a `nix-store
-                       --optimise'.  It can also fail if another
-                       process called makeImmutable() on *i after we
-                       did makeMutable().  In those cases, make a copy
-                       instead. */
-                    if (errno != EMLINK && errno != EPERM)
+                       --optimise'. */
+                    if (errno != EMLINK)
                         throw SysError(format("linking `%1%' to `%2%'") % p % *i);
                     StringSink sink;
                     dumpPath(*i, sink);
@@ -1778,7 +1770,6 @@ void DerivationGoal::startBuilder()
                     restorePath(p, source);
                 }
 
-                makeImmutable(*i);
                 regularInputPaths.insert(*i);
             }
         }

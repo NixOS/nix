@@ -16,7 +16,7 @@
 namespace nix {
 
 
-void changeMutable(const Path & path, bool mut)
+void makeMutable(const Path & path)
 {
 #if defined(FS_IOC_SETFLAGS) && defined(FS_IOC_GETFLAGS) && defined(FS_IMMUTABLE_FL)
 
@@ -38,29 +38,11 @@ void changeMutable(const Path & path, bool mut)
     /* Silently ignore errors getting/setting the immutable flag so
        that we work correctly on filesystems that don't support it. */
     if (ioctl(fd, FS_IOC_GETFLAGS, &flags)) return;
-
     old = flags;
-    
-    if (mut) flags &= ~FS_IMMUTABLE_FL;
-    else flags |= FS_IMMUTABLE_FL;
-
+    flags &= ~FS_IMMUTABLE_FL;
     if (old == flags) return;
-
     if (ioctl(fd, FS_IOC_SETFLAGS, &flags)) return;
-    
 #endif
-}
-
-
-void makeImmutable(const Path & path)
-{
-    changeMutable(path, false);
-}
-
-
-void makeMutable(const Path & path)
-{
-    changeMutable(path, true);
 }
 
 

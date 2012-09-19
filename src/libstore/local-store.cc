@@ -517,8 +517,6 @@ void canonicalisePathMetaData(const Path & path, bool recurse)
         foreach (Strings::iterator, i, names)
             canonicalisePathMetaData(path + "/" + *i, true);
     }
-
-    makeImmutable(path);
 }
 
 
