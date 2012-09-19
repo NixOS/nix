@@ -339,13 +339,19 @@ while (scalar @path > 0) {
         print LOGFILE "$$ narfile $narFile->{url} $size $v\n";
 
         Nix::Utils::checkURL $narFile->{url};
+
+        my $decompressor =
+            $narFile->{compressionType} eq "bzip2" ? "$Nix::Config::bzip2 -d" :
+            $narFile->{compressionType} eq "xz" ? "$Nix::Config::xz -d" :
+            die "unknown compression type `$narFile->{compressionType}'";
+
         if ($curStep < $maxStep) {
             # The archive will be used a base to a patch.
-            system("$curl '$narFile->{url}' | $Nix::Config::bzip2 -d > $tmpNar") == 0
+            system("$curl '$narFile->{url}' | $decompressor > $tmpNar") == 0
                 or die "cannot download and unpack `$narFile->{url}' into `$v'\n";
         } else {
             # Unpack the archive into the target path.
-            system("$curl '$narFile->{url}' | $Nix::Config::bzip2 -d | $Nix::Config::binDir/nix-store --restore '$v'") == 0
+            system("$curl '$narFile->{url}' | $decompressor | $Nix::Config::binDir/nix-store --restore '$v'") == 0
                 or die "cannot download and unpack `$narFile->{url}' into `$v'\n";
         }
 

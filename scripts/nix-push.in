@@ -227,6 +227,7 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
         { url => "$archivesURL/$narName"
         , hash => "sha256:$compressedHash"
         , size => $compressedSize
+        , compressionType => $compressionType
         , narHash => "$narHash"
         , narSize => $narSize
         , references => join(" ", @{$refs})

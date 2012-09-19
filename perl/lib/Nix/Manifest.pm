@@ -68,7 +68,7 @@ sub readManifest_ {
     my $manifestVersion = 2;
 
     my ($storePath, $url, $hash, $size, $basePath, $baseHash, $patchType);
-    my ($narHash, $narSize, $references, $deriver, $copyFrom, $system);
+    my ($narHash, $narSize, $references, $deriver, $copyFrom, $system, $compressionType);
 
     while (<MANIFEST>) {
         chomp;
@@ -93,6 +93,7 @@ sub readManifest_ {
                 undef $system;
                 $references = "";
                 $deriver = "";
+                $compressionType = "bzip2";
             }
 
         } else {
@@ -107,6 +108,7 @@ sub readManifest_ {
                         , references => $references
                         , deriver => $deriver
                         , system => $system
+                        , compressionType => $compressionType
                         });
                 }
 
@@ -125,6 +127,7 @@ sub readManifest_ {
             elsif (/^\s*CopyFrom:\s*(\/\S+)\s*$/) { $copyFrom = $1; }
             elsif (/^\s*Hash:\s*(\S+)\s*$/) { $hash = $1; }
             elsif (/^\s*URL:\s*(\S+)\s*$/) { $url = $1; }
+            elsif (/^\s*Compression:\s*(\S+)\s*$/) { $compressionType = $1; }
             elsif (/^\s*Size:\s*(\d+)\s*$/) { $size = $1; }
             elsif (/^\s*BasePath:\s*(\/\S+)\s*$/) { $basePath = $1; }
             elsif (/^\s*BaseHash:\s*(\S+)\s*$/) { $baseHash = $1; }
@@ -172,6 +175,7 @@ sub writeManifest {
             print MANIFEST "{\n";
             print MANIFEST "  StorePath: $storePath\n";
             print MANIFEST "  NarURL: $narFile->{url}\n";
+            print MANIFEST "  Compression: $narFile->{compressionType}\n";
             print MANIFEST "  Hash: $narFile->{hash}\n" if defined $narFile->{hash};
             print MANIFEST "  Size: $narFile->{size}\n" if defined $narFile->{size};
             print MANIFEST "  NarHash: $narFile->{narHash}\n";
@@ -225,7 +229,8 @@ sub updateManifestDB {
 
     mkpath($manifestDir);
 
-    my $dbPath = "$manifestDir/cache.sqlite";
+    unlink "$manifestDir/cache.sqlite"; # remove obsolete cache
+    my $dbPath = "$manifestDir/cache-v2.sqlite";
 
     # Open/create the database.
     our $dbh = DBI->connect("dbi:SQLite:dbname=$dbPath", "", "")
@@ -252,6 +257,7 @@ EOF
             manifest         integer not null,
             storePath        text not null,
             url              text not null,
+            compressionType  text not null,
             hash             text,
             size             integer,
             narHash          text,
@@ -292,8 +298,8 @@ EOF
     flock(MAINLOCK, LOCK_EX) or die;
 
     our $insertNAR = $dbh->prepare(
-        "insert into NARs(manifest, storePath, url, hash, size, narHash, " .
-        "narSize, refs, deriver, system) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)") or die;
+        "insert into NARs(manifest, storePath, url, compressionType, hash, size, narHash, " .
+        "narSize, refs, deriver, system) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)") or die;
 
     our $insertPatch = $dbh->prepare(
         "insert into Patches(manifest, storePath, basePath, baseHash, url, hash, " .
@@ -327,8 +333,8 @@ EOF
         sub addNARToDB {
             my ($storePath, $narFile) = @_;
             $insertNAR->execute(
-                $id, $storePath, $narFile->{url}, $narFile->{hash}, $narFile->{size},
-                $narFile->{narHash}, $narFile->{narSize}, $narFile->{references},
+                $id, $storePath, $narFile->{url}, $narFile->{compressionType}, $narFile->{hash},
+                $narFile->{size}, $narFile->{narHash}, $narFile->{narSize}, $narFile->{references},
                 $narFile->{deriver}, $narFile->{system});
         };
 
