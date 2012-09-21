@@ -325,7 +325,7 @@ while (scalar @path > 0) {
             # into the target path.
             print STDERR "  unpacking patched archive...\n";
             system("$Nix::Config::binDir/nix-store --restore $v < $tmpNar2") == 0
-                or die "cannot unpack $tmpNar2 into `$v'\n";
+                or die "cannot unpack $tmpNar2 to `$v'\n";
         }
 
         $finalNarHash = $patch->{narHash};
@@ -333,7 +333,7 @@ while (scalar @path > 0) {
 
     elsif ($edge->{type} eq "narfile") {
         my $narFile = $edge->{info};
-        print STDERR "downloading `$narFile->{url}' into `$v'\n";
+        print STDERR "downloading `$narFile->{url}' to `$v'\n";
 
         my $size = $narFile->{size} || -1;
         print LOGFILE "$$ narfile $narFile->{url} $size $v\n";
@@ -348,11 +348,11 @@ while (scalar @path > 0) {
         if ($curStep < $maxStep) {
             # The archive will be used a base to a patch.
             system("$curl '$narFile->{url}' | $decompressor > $tmpNar") == 0
-                or die "cannot download and unpack `$narFile->{url}' into `$v'\n";
+                or die "cannot download and unpack `$narFile->{url}' to `$v'\n";
         } else {
-            # Unpack the archive into the target path.
+            # Unpack the archive to the target path.
             system("$curl '$narFile->{url}' | $decompressor | $Nix::Config::binDir/nix-store --restore '$v'") == 0
-                or die "cannot download and unpack `$narFile->{url}' into `$v'\n";
+                or die "cannot download and unpack `$narFile->{url}' to `$v'\n";
         }
 
         $finalNarHash = $narFile->{narHash};

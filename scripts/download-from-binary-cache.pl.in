@@ -508,7 +508,7 @@ sub downloadBinary {
             next;
         }
         my $url = "$cache->{url}/$info->{url}"; # FIXME: handle non-relative URLs
-        print STDERR "\n*** Downloading ‘$url’ into ‘$storePath’...\n";
+        print STDERR "\n*** Downloading ‘$url’ to ‘$storePath’...\n";
         Nix::Utils::checkURL $url;
         if (system("$Nix::Config::curl --fail --location --insecure '$url' | $decompressor | $Nix::Config::binDir/nix-store --restore $storePath") != 0) {
             die "download of `$info->{url}' failed" . ($! ? ": $!" : "") . "\n" unless $? == 0;
