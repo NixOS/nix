@@ -17,8 +17,8 @@
   <listitem>
     <para>Nix no longer sets the immutable bit on files in the Nix
     store.  Instead, the recommended way to guard the Nix store
-    against accidental modification is to make it a read-only bind
-    mount, like this:
+    against accidental modification on Linux is to make it a read-only
+    bind mount, like this:
 
 <screen>
 $ mount --bind /nix/store /nix/store
