@@ -116,6 +116,8 @@ a source distribution.</para>
 
 <itemizedlist>
 
+  <listitem><para>GNU Make.</para></listitem>
+
   <listitem><para>A fairly recent version of GCC/G++.  Version 2.95
   and higher should work.  Clang will also work.</para></listitem>
 
@@ -217,7 +219,8 @@ $ ./configure <replaceable>options...</replaceable>
 $ make
 $ make install</screen>
 
-</para>
+Nix requires GNU Make so you may need to invoke
+<command>gmake</command> instead.</para>
 
 <para>When building from the Git repository, these should be preceded
 by the command:
