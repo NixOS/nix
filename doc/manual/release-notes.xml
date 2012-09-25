@@ -8,6 +8,35 @@
 
 <!--==================================================================-->
 
+<section xml:id="ssec-relnotes-1.2"><title>Release 1.2 (TBA)</title>
+
+<para>This release has the following improvements:</para>
+
+<itemizedlist>
+
+  <listitem>
+    <para>Nix no longer sets the immutable bit on files in the Nix
+    store.  Instead, the recommended way to guard the Nix store
+    against accidental modification is to make it a read-only bind
+    mount, like this:
+
+<screen>
+$ mount --bind /nix/store /nix/store
+$ mount -o remount,ro,bind /nix/store
+</screen>
+
+    Nix will automatically make <filename>/nix/store</filename>
+    writable as needed (using a private mount namespace) to allow
+    modifications.</para>
+  </listitem>
+
+</itemizedlist>
+
+</section>
+
+
+<!--==================================================================-->
+
 <section xml:id="ssec-relnotes-1.1"><title>Release 1.1 (July 18, 2012)</title>
 
 <para>This release has the following improvements:</para>
