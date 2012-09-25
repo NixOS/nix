@@ -179,7 +179,7 @@ EvalState::EvalState()
 
     /* Initialise the Nix expression search path. */
     searchPathInsertionPoint = searchPath.end();
-    Strings paths = tokenizeString(getEnv("NIX_PATH", ""), ":");
+    Strings paths = tokenizeString<Strings>(getEnv("NIX_PATH", ""), ":");
     foreach (Strings::iterator, i, paths) addToSearchPath(*i);
     addToSearchPath("nix=" + settings.nixDataDir + "/nix/corepkgs");
     searchPathInsertionPoint = searchPath.begin();

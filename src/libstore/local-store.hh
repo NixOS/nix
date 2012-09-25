@@ -228,6 +228,8 @@ private:
 
     void openDB(bool create);
 
+    void makeStoreWritable();
+
     unsigned long long queryValidPathId(const Path & path);
 
     unsigned long long addValidPath(const ValidPathInfo & info, bool checkOutputs = true);

@@ -33,21 +33,12 @@ struct MakeReadOnly
     ~MakeReadOnly()
     {
         try {
-            /* This will make the path read-only (and restore the
-               immutable bit on platforms that support it). */
+            /* This will make the path read-only. */
             if (path != "") canonicalisePathMetaData(path, false);
         } catch (...) {
             ignoreException();
         }
     }
-};
-
-
-struct MakeImmutable
-{
-    Path path;
-    MakeImmutable(const Path & path) : path(path) { }
-    ~MakeImmutable() { makeImmutable(path); }
 };
 
 
@@ -101,7 +92,6 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
     if (!pathExists(linkPath)) {
         /* Nope, create a hard link in the links directory. */
         makeMutable(path);
-        MakeImmutable mk1(path);
         if (link(path.c_str(), linkPath.c_str()) == 0) return;
         if (errno != EEXIST)
             throw SysError(format("cannot link `%1%' to `%2%'") % linkPath % path);
@@ -134,57 +124,41 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
     MakeReadOnly makeReadOnly(mustToggle ? dirOf(path) : "");
 
     /* If ‘linkPath’ is immutable, we can't create hard links to it,
-       so make it mutable first (and make it immutable again when
-       we're done).  We also have to make ‘path’ mutable, otherwise
-       rename() will fail to delete it. */
+       so make it mutable first.  We also have to make ‘path’ mutable,
+       otherwise rename() will fail to delete it. */
     makeMutable(path);
-    MakeImmutable mk2(path);
+    makeMutable(linkPath);
 
-    /* Another process might be doing the same thing (creating a new
-       link to ‘linkPath’) and make ‘linkPath’ immutable before we're
-       done.  In that case, just retry. */
-    unsigned int retries = 1024;
-    while (--retries > 0) {
-        makeMutable(linkPath);
-        MakeImmutable mk1(linkPath);
+    Path tempLink = (format("%1%/.tmp-link-%2%-%3%")
+        % settings.nixStore % getpid() % rand()).str();
 
-        Path tempLink = (format("%1%/.tmp-link-%2%-%3%")
-            % settings.nixStore % getpid() % rand()).str();
-
-        if (link(linkPath.c_str(), tempLink.c_str()) == -1) {
-            if (errno == EMLINK) {
-                /* Too many links to the same file (>= 32000 on most
-                   file systems).  This is likely to happen with empty
-                   files.  Just shrug and ignore. */
-                if (st.st_size)
-                    printMsg(lvlInfo, format("`%1%' has maximum number of links") % linkPath);
-                return;
-            }
-            if (errno == EPERM) continue;
-            throw SysError(format("cannot link `%1%' to `%2%'") % tempLink % linkPath);
+    if (link(linkPath.c_str(), tempLink.c_str()) == -1) {
+        if (errno == EMLINK) {
+            /* Too many links to the same file (>= 32000 on most file
+               systems).  This is likely to happen with empty files.
+               Just shrug and ignore. */
+            if (st.st_size)
+                printMsg(lvlInfo, format("`%1%' has maximum number of links") % linkPath);
+            return;
         }
-
-        /* Atomically replace the old file with the new hard link. */
-        if (rename(tempLink.c_str(), path.c_str()) == -1) {
-            if (unlink(tempLink.c_str()) == -1)
-                printMsg(lvlError, format("unable to unlink `%1%'") % tempLink);
-            if (errno == EMLINK) {
-                /* Some filesystems generate too many links on the
-                   rename, rather than on the original link.
-                   (Probably it temporarily increases the st_nlink
-                   field before decreasing it again.) */
-                if (st.st_size)
-                    printMsg(lvlInfo, format("`%1%' has maximum number of links") % linkPath);
-                return;
-            }
-            if (errno == EPERM) continue;
-            throw SysError(format("cannot rename `%1%' to `%2%'") % tempLink % path);
-        }
-
-        break;
+        throw SysError(format("cannot link `%1%' to `%2%'") % tempLink % linkPath);
     }
 
-    if (retries == 0) throw Error(format("cannot link `%1%' to `%2%'") % path % linkPath);
+    /* Atomically replace the old file with the new hard link. */
+    if (rename(tempLink.c_str(), path.c_str()) == -1) {
+        if (unlink(tempLink.c_str()) == -1)
+            printMsg(lvlError, format("unable to unlink `%1%'") % tempLink);
+        if (errno == EMLINK) {
+            /* Some filesystems generate too many links on the rename,
+               rather than on the original link.  (Probably it
+               temporarily increases the st_nlink field before
+               decreasing it again.) */
+            if (st.st_size)
+                printMsg(lvlInfo, format("`%1%' has maximum number of links") % linkPath);
+            return;
+        }
+        throw SysError(format("cannot rename `%1%' to `%2%'") % tempLink % path);
+    }
 
     stats.filesLinked++;
     stats.bytesFreed += st.st_size;

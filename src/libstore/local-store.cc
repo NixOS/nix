@@ -20,6 +20,11 @@
 #include <stdio.h>
 #include <time.h>
 
+#if HAVE_UNSHARE
+#include <sched.h>
+#include <sys/mount.h>
+#endif
+
 #include <sqlite3.h>
 
 
@@ -292,6 +297,8 @@ LocalStore::LocalStore(bool reserveSpace)
     }
 
     else openDB(false);
+
+    makeStoreWritable();
 }
 
 
@@ -411,6 +418,38 @@ void LocalStore::openDB(bool create)
 }
 
 
+/* To improve purity, users may want to make the Nix store a read-only
+   bind mount.  So make the Nix store writable for this process. */
+void LocalStore::makeStoreWritable()
+{
+#if HAVE_UNSHARE
+    if (getuid() != 0) return;
+
+    if (!pathExists("/proc/self/mountinfo")) return;
+
+    /* Check if /nix/store is a read-only bind mount. */
+    bool found = false;
+    Strings mounts = tokenizeString<Strings>(readFile("/proc/self/mountinfo", true), "\n");
+    foreach (Strings::iterator, i, mounts) {
+        vector<string> fields = tokenizeString<vector<string> >(*i, " ");
+        if (fields.at(3) == "/" || fields.at(4) != settings.nixStore) continue;
+        Strings options = tokenizeString<Strings>(fields.at(5), ",");
+        if (std::find(options.begin(), options.end(), "ro") == options.end()) continue;
+        found = true;
+        break;
+    }
+
+    if (!found) return;
+
+    if (unshare(CLONE_NEWNS) == -1)
+        throw SysError("setting up a private mount namespace");
+
+    if (mount(0, settings.nixStore.c_str(), 0, MS_REMOUNT | MS_BIND, 0) == -1)
+        throw SysError(format("remounting %1% writable") % settings.nixStore);
+#endif
+}
+
+
 const time_t mtimeStore = 1; /* 1 second into the epoch */
 
 
@@ -478,8 +517,6 @@ void canonicalisePathMetaData(const Path & path, bool recurse)
         foreach (Strings::iterator, i, names)
             canonicalisePathMetaData(path + "/" + *i, true);
     }
-
-    makeImmutable(path);
 }
 
 
@@ -1435,7 +1472,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
         /* Lock the output path.  But don't lock if we're being called
            from a build hook (whose parent process already acquired a
            lock on this path). */
-        Strings locksHeld = tokenizeString(getEnv("NIX_HELD_LOCKS"));
+        Strings locksHeld = tokenizeString<Strings>(getEnv("NIX_HELD_LOCKS"));
         if (find(locksHeld.begin(), locksHeld.end(), dstPath) == locksHeld.end())
             outputLock.lockPaths(singleton<PathSet, Path>(dstPath));
 
@@ -1645,7 +1682,7 @@ ValidPathInfo LocalStore::queryPathInfoOld(const Path & path)
     string info = readFile(infoFile);
 
     /* Parse it. */
-    Strings lines = tokenizeString(info, "\n");
+    Strings lines = tokenizeString<Strings>(info, "\n");
 
     foreach (Strings::iterator, i, lines) {
         string::size_type p = i->find(':');
@@ -1654,7 +1691,7 @@ ValidPathInfo LocalStore::queryPathInfoOld(const Path & path)
         string name(*i, 0, p);
         string value(*i, p + 2);
         if (name == "References") {
-            Strings refs = tokenizeString(value, " ");
+            Strings refs = tokenizeString<Strings>(value, " ");
             res.references = PathSet(refs.begin(), refs.end());
         } else if (name == "Deriver") {
             res.deriver = value;

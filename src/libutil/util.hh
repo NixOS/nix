@@ -286,7 +286,7 @@ MakeError(Interrupted, BaseError)
 
 
 /* String tokenizer. */
-Strings tokenizeString(const string & s, const string & separators = " \t\n\r");
+template<class C> C tokenizeString(const string & s, const string & separators = " \t\n\r");
 
 
 /* Concatenate the given strings with a separator between the

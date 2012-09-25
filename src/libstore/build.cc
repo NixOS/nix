@@ -1355,11 +1355,6 @@ void DerivationGoal::buildDone()
         /* Delete the chroot (if we were using one). */
         autoDelChroot.reset(); /* this runs the destructor */
 
-        /* Deleting the chroot will have caused the immutable bits on
-           hard-linked inputs to be cleared.  So set them again. */
-        foreach (PathSet::iterator, i, regularInputPaths)
-            makeImmutable(*i);
-
         /* Delete redirected outputs (when doing hash rewriting). */
         foreach (PathSet::iterator, i, redirectedOutputs)
             deletePath(*i);
@@ -1435,7 +1430,7 @@ HookReply DerivationGoal::tryBuildHook()
     /* Tell the hook about system features (beyond the system type)
        required from the build machine.  (The hook could parse the
        drv file itself, but this is easier.) */
-    Strings features = tokenizeString(drv.env["requiredSystemFeatures"]);
+    Strings features = tokenizeString<Strings>(drv.env["requiredSystemFeatures"]);
     foreach (Strings::iterator, i, features) checkStoreName(*i); /* !!! abuse */
 
     /* Send the request to the hook. */
@@ -1594,7 +1589,7 @@ void DerivationGoal::startBuilder()
        fixed-output derivations is by definition pure (since we
        already know the cryptographic hash of the output). */
     if (fixedOutput) {
-        Strings varNames = tokenizeString(drv.env["impureEnvVars"]);
+        Strings varNames = tokenizeString<Strings>(drv.env["impureEnvVars"]);
         foreach (Strings::iterator, i, varNames) env[*i] = getEnv(*i);
     }
 
@@ -1606,7 +1601,7 @@ void DerivationGoal::startBuilder()
        by `nix-store --register-validity'.  However, the deriver
        fields are left empty. */
     string s = drv.env["exportReferencesGraph"];
-    Strings ss = tokenizeString(s);
+    Strings ss = tokenizeString<Strings>(s);
     if (ss.size() % 2 != 0)
         throw BuildError(format("odd number of tokens in `exportReferencesGraph': `%1%'") % s);
     for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
@@ -1766,11 +1761,8 @@ void DerivationGoal::startBuilder()
                     /* Hard-linking fails if we exceed the maximum
                        link count on a file (e.g. 32000 of ext3),
                        which is quite possible after a `nix-store
-                       --optimise'.  It can also fail if another
-                       process called makeImmutable() on *i after we
-                       did makeMutable().  In those cases, make a copy
-                       instead. */
-                    if (errno != EMLINK && errno != EPERM)
+                       --optimise'. */
+                    if (errno != EMLINK)
                         throw SysError(format("linking `%1%' to `%2%'") % p % *i);
                     StringSink sink;
                     dumpPath(*i, sink);
@@ -1778,7 +1770,6 @@ void DerivationGoal::startBuilder()
                     restorePath(p, source);
                 }
 
-                makeImmutable(*i);
                 regularInputPaths.insert(*i);
             }
         }
@@ -1911,14 +1902,11 @@ void DerivationGoal::initChild()
                outside of the namespace.  Making a subtree private is
                local to the namespace, though, so setting MS_PRIVATE
                does not affect the outside world. */
-            Strings mounts = tokenizeString(readFile("/proc/self/mountinfo", true), "\n");
+            Strings mounts = tokenizeString<Strings>(readFile("/proc/self/mountinfo", true), "\n");
             foreach (Strings::iterator, i, mounts) {
-                Strings fields = tokenizeString(*i, " ");
-                assert(fields.size() >= 5);
-                Strings::iterator j = fields.begin();
-                std::advance(j, 4);
-                if (mount(0, j->c_str(), 0, MS_PRIVATE, 0) == -1)
-                    throw SysError(format("unable to make filesystem `%1%' private") % *j);
+                vector<string> fields = tokenizeString<vector<string> >(*i, " ");
+                if (mount(0, fields.at(4).c_str(), 0, MS_PRIVATE, 0) == -1)
+                    throw SysError(format("unable to make filesystem `%1%' private") % fields.at(4));
             }
 
             /* Bind-mount all the directories from the "host"
@@ -2053,7 +2041,7 @@ void DerivationGoal::initChild()
 PathSet parseReferenceSpecifiers(const Derivation & drv, string attr)
 {
     PathSet result;
-    Paths paths = tokenizeString(attr);
+    Paths paths = tokenizeString<Paths>(attr);
     foreach (Strings::iterator, i, paths) {
         if (isStorePath(*i))
             result.insert(*i);
