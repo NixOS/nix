@@ -212,6 +212,7 @@ LocalStore::LocalStore(bool reserveSpace)
 
     /* Create missing state directories if they don't already exist. */
     createDirs(settings.nixStore);
+    makeStoreWritable();
     createDirs(linksDir = settings.nixStore + "/.links");
     Path profilesDir = settings.nixStateDir + "/profiles";
     createDirs(settings.nixStateDir + "/profiles");
@@ -297,8 +298,6 @@ LocalStore::LocalStore(bool reserveSpace)
     }
 
     else openDB(false);
-
-    makeStoreWritable();
 }
 
 
