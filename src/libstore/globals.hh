@@ -3,6 +3,7 @@
 #include "types.hh"
 
 #include <map>
+#include <sys/types.h>
 
 
 namespace nix {
