@@ -15,6 +15,11 @@
 <itemizedlist>
 
   <listitem>
+    <para>Dashes are now valid as part of identifiers and attribute
+    names.</para>
+  </listitem>
+
+  <listitem>
     <para>Nix no longer sets the immutable bit on files in the Nix
     store.  Instead, the recommended way to guard the Nix store
     against accidental modification on Linux is to make it a read-only
