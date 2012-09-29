@@ -332,6 +332,12 @@ string parseString(std::istream & str);
 bool endOfList(std::istream & str);
 
 
+/* Escape a string that contains octal-encoded escape codes such as
+   used in /etc/fstab and /proc/mounts (e.g. "foo\040bar" decodes to
+   "foo bar"). */
+string decodeOctalEscaped(const string & s);
+
+
 /* Exception handling in destructors: print an error message, then
    ignore the exception. */
 void ignoreException();

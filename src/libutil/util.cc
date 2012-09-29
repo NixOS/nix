@@ -1101,6 +1101,21 @@ bool endOfList(std::istream & str)
 }
 
 
+string decodeOctalEscaped(const string & s)
+{
+    string r;
+    for (string::const_iterator i = s.begin(); i != s.end(); ) {
+        if (*i != '\\') { r += *i++; continue; }
+        unsigned char c = 0;
+        ++i;
+        while (i != s.end() && *i >= '0' && *i < '8')
+            c = c * 8 + (*i++ - '0');
+        r += c;
+    }
+    return r;
+}
+
+
 void ignoreException()
 {
     try {

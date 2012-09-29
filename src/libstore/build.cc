@@ -1914,8 +1914,9 @@ void DerivationGoal::initChild()
             Strings mounts = tokenizeString<Strings>(readFile("/proc/self/mountinfo", true), "\n");
             foreach (Strings::iterator, i, mounts) {
                 vector<string> fields = tokenizeString<vector<string> >(*i, " ");
-                if (mount(0, fields.at(4).c_str(), 0, MS_PRIVATE, 0) == -1)
-                    throw SysError(format("unable to make filesystem `%1%' private") % fields.at(4));
+                string fs = decodeOctalEscaped(fields.at(4));
+                if (mount(0, fs.c_str(), 0, MS_PRIVATE, 0) == -1)
+                    throw SysError(format("unable to make filesystem `%1%' private") % fs);
             }
 
             /* Bind-mount all the directories from the "host"
