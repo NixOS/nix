@@ -825,6 +825,11 @@ private:
     HashRewrites rewritesToTmp, rewritesFromTmp;
     PathSet redirectedOutputs;
 
+    /* Magic exit code denoting that setting up the child environment
+       failed.  (It's possible that the child actually returns the
+       exit code, but ah well.) */
+    const static int childSetupFailed = 189;
+
 public:
     DerivationGoal(const Path & drvPath, Worker & worker);
     ~DerivationGoal();
@@ -1348,6 +1353,8 @@ void DerivationGoal::buildDone()
         /* Check the exit status. */
         if (!statusOk(status)) {
             deleteTmpDir(false);
+            if (WIFEXITED(status) && WEXITSTATUS(status) == childSetupFailed)
+                throw Error(format("failed to set up the build environment for `%1%'") % drvPath);
             throw BuildError(format("builder for `%1%' %2%")
                 % drvPath % statusToString(status));
         }
@@ -1872,6 +1879,8 @@ void DerivationGoal::initChild()
     /* Warning: in the child we should absolutely not make any SQLite
        calls! */
 
+    bool inSetup = true;
+
     try { /* child */
 
 #if CHROOT_ENABLED
@@ -2023,15 +2032,17 @@ void DerivationGoal::initChild()
         restoreSIGPIPE();
 
         /* Execute the program.  This should not return. */
+        inSetup = false;
         execve(program.c_str(), (char * *) &args[0], (char * *) envArr);
 
-        throw SysError(format("executing `%1%'")
-            % drv.builder);
+        throw SysError(format("executing `%1%'") % drv.builder);
 
     } catch (std::exception & e) {
         std::cerr << format("build error: %1%") % e.what() << std::endl;
+        quickExit(inSetup ? childSetupFailed : 1);
     }
-    quickExit(1);
+
+    abort(); /* never reached */
 }
 
 
