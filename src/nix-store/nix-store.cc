@@ -734,6 +734,21 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
 }
 
 
+/* Repair the contents of the given path by redownloading it using a
+   substituter (if available). */
+static void opRepairPath(Strings opFlags, Strings opArgs)
+{
+    if (!opFlags.empty())
+        throw UsageError("no flags expected");
+
+    foreach (Strings::iterator, i, opArgs) {
+        Path path = followLinksToStorePath(*i);
+        printMsg(lvlTalkative, format("repairing path `%1%'...") % path);
+        ensureLocalStore().repairPath(path);
+    }
+}
+
+
 static void showOptimiseStats(OptimiseStats & stats)
 {
     printMsg(lvlError,
@@ -834,6 +849,8 @@ void run(Strings args)
             op = opVerify;
         else if (arg == "--verify-path")
             op = opVerifyPath;
+        else if (arg == "--repair-path")
+            op = opRepairPath;
         else if (arg == "--optimise")
             op = opOptimise;
         else if (arg == "--query-failed-paths")

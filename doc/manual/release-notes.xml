@@ -20,6 +20,12 @@
   </listitem>
 
   <listitem>
+    <para>The new operation <command>nix-store --repair-path</command>
+    allows corrupted or deleted store paths to be repaired by
+    redownloading them.</para>
+  </listitem>
+
+  <listitem>
     <para>Nix no longer sets the immutable bit on files in the Nix
     store.  Instead, the recommended way to guard the Nix store
     against accidental modification on Linux is to make it a read-only

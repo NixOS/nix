@@ -242,7 +242,7 @@ public:
 
     /* Make a goal (with caching). */
     GoalPtr makeDerivationGoal(const Path & drvPath);
-    GoalPtr makeSubstitutionGoal(const Path & storePath);
+    GoalPtr makeSubstitutionGoal(const Path & storePath, bool repair = false);
 
     /* Remove a dead goal. */
     void removeGoal(GoalPtr goal);
@@ -2344,11 +2344,18 @@ private:
     /* Lock on the store path. */
     boost::shared_ptr<PathLocks> outputLock;
 
+    /* Whether to try to repair a valid path. */
+    bool repair;
+
+    /* Location where we're downloading the substitute.  Differs from
+       storePath when doing a repair. */
+    Path destPath;
+
     typedef void (SubstitutionGoal::*GoalState)();
     GoalState state;
 
 public:
-    SubstitutionGoal(const Path & storePath, Worker & worker);
+    SubstitutionGoal(const Path & storePath, Worker & worker, bool repair = false);
     ~SubstitutionGoal();
 
     void cancel();
@@ -2371,9 +2378,10 @@ public:
 };
 
 
-SubstitutionGoal::SubstitutionGoal(const Path & storePath, Worker & worker)
+SubstitutionGoal::SubstitutionGoal(const Path & storePath, Worker & worker, bool repair)
     : Goal(worker)
     , hasSubstitute(false)
+    , repair(repair)
 {
     this->storePath = storePath;
     state = &SubstitutionGoal::init;
@@ -2415,7 +2423,7 @@ void SubstitutionGoal::init()
     worker.store.addTempRoot(storePath);
 
     /* If the path already exists we're done. */
-    if (worker.store.isValidPath(storePath)) {
+    if (!repair && worker.store.isValidPath(storePath)) {
         amDone(ecSuccess);
         return;
     }
@@ -2519,7 +2527,7 @@ void SubstitutionGoal::tryToRun()
     }
 
     /* Check again whether the path is invalid. */
-    if (worker.store.isValidPath(storePath)) {
+    if (!repair && worker.store.isValidPath(storePath)) {
         debug(format("store path `%1%' has become valid") % storePath);
         outputLock->setDeletion(true);
         amDone(ecSuccess);
@@ -2531,9 +2539,11 @@ void SubstitutionGoal::tryToRun()
     outPipe.create();
     logPipe.create();
 
+    destPath = repair ? storePath + ".tmp" : storePath;
+
     /* Remove the (stale) output path if it exists. */
-    if (pathExists(storePath))
-        deletePathWrapped(storePath);
+    if (pathExists(destPath))
+        deletePathWrapped(destPath);
 
     /* Fork the substitute program. */
     pid = fork();
@@ -2561,6 +2571,7 @@ void SubstitutionGoal::tryToRun()
             args.push_back(baseNameOf(sub));
             args.push_back("--substitute");
             args.push_back(storePath);
+            args.push_back(destPath);
             const char * * argArr = strings2CharPtrs(args);
 
             execv(sub.c_str(), (char * *) argArr);
@@ -2617,10 +2628,10 @@ void SubstitutionGoal::finished()
             throw SubstError(format("fetching path `%1%' %2%")
                 % storePath % statusToString(status));
 
-        if (!pathExists(storePath))
-            throw SubstError(format("substitute did not produce path `%1%'") % storePath);
+        if (!pathExists(destPath))
+            throw SubstError(format("substitute did not produce path `%1%'") % destPath);
 
-        hash = hashPath(htSHA256, storePath);
+        hash = hashPath(htSHA256, destPath);
 
         /* Verify the expected hash we got from the substituer. */
         if (expectedHashStr != "") {
@@ -2631,7 +2642,7 @@ void SubstitutionGoal::finished()
             if (hashType == htUnknown)
                 throw Error(format("unknown hash algorithm in `%1%'") % expectedHashStr);
             Hash expectedHash = parseHash16or32(hashType, string(expectedHashStr, n + 1));
-            Hash actualHash = hashType == htSHA256 ? hash.first : hashPath(hashType, storePath).first;
+            Hash actualHash = hashType == htSHA256 ? hash.first : hashPath(hashType, destPath).first;
             if (expectedHash != actualHash)
                 throw SubstError(format("hash mismatch in downloaded path `%1%': expected %2%, got %3%")
                     % storePath % printHash(expectedHash) % printHash(actualHash));
@@ -2652,9 +2663,26 @@ void SubstitutionGoal::finished()
         return;
     }
 
-    canonicalisePathMetaData(storePath);
+    canonicalisePathMetaData(destPath);
 
-    worker.store.optimisePath(storePath); // FIXME: combine with hashPath()
+    worker.store.optimisePath(destPath); // FIXME: combine with hashPath()
+
+    if (repair) {
+        /* We can't atomically replace storePath (the original) with
+           destPath (the replacement), so we have to move it out of
+           the way first.  We'd better not be interrupted here,
+           because if we're repairing (say) Glibc, we end up with a
+           broken system. */
+        Path oldPath = (format("%1%.old-%2%-%3%") % storePath % getpid() % rand()).str();
+        if (pathExists(storePath)) {
+            makeMutable(storePath);
+            rename(storePath.c_str(), oldPath.c_str());
+        }
+        if (rename(destPath.c_str(), storePath.c_str()) == -1)
+            throw SysError(format("moving `%1%' to `%2%'") % destPath % storePath);
+        if (pathExists(oldPath))
+            deletePathWrapped(oldPath);
+    }
 
     ValidPathInfo info2;
     info2.path = storePath;
@@ -2724,29 +2752,27 @@ Worker::~Worker()
 }
 
 
-template<class T>
-static GoalPtr addGoal(const Path & path,
-    Worker & worker, WeakGoalMap & goalMap)
+GoalPtr Worker::makeDerivationGoal(const Path & path)
 {
-    GoalPtr goal = goalMap[path].lock();
+    GoalPtr goal = derivationGoals[path].lock();
     if (!goal) {
-        goal = GoalPtr(new T(path, worker));
-        goalMap[path] = goal;
-        worker.wakeUp(goal);
+        goal = GoalPtr(new DerivationGoal(path, *this));
+        derivationGoals[path] = goal;
+        wakeUp(goal);
     }
     return goal;
 }
 
 
-GoalPtr Worker::makeDerivationGoal(const Path & nePath)
+GoalPtr Worker::makeSubstitutionGoal(const Path & path, bool repair)
 {
-    return addGoal<DerivationGoal>(nePath, *this, derivationGoals);
-}
-
-
-GoalPtr Worker::makeSubstitutionGoal(const Path & storePath)
-{
-    return addGoal<SubstitutionGoal>(storePath, *this, substitutionGoals);
+    GoalPtr goal = substitutionGoals[path].lock();
+    if (!goal) {
+        goal = GoalPtr(new SubstitutionGoal(path, *this, repair));
+        substitutionGoals[path] = goal;
+        wakeUp(goal);
+    }
+    return goal;
 }
 
 
@@ -3106,6 +3132,19 @@ void LocalStore::ensurePath(const Path & path)
 
     if (goal->getExitCode() != Goal::ecSuccess)
         throw Error(format("path `%1%' does not exist and cannot be created") % path, worker.exitStatus());
+}
+
+
+void LocalStore::repairPath(const Path & path)
+{
+    Worker worker(*this);
+    GoalPtr goal = worker.makeSubstitutionGoal(path, true);
+    Goals goals = singleton<Goals>(goal);
+
+    worker.run(goals);
+
+    if (goal->getExitCode() != Goal::ecSuccess)
+        throw Error(format("cannot repair path `%1%'") % path, worker.exitStatus());
 }
 
 

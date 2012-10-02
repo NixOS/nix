@@ -197,6 +197,10 @@ public:
 
     void vacuumDB();
 
+    /* Repair the contents of the given path by redownloading it using
+       a substituter (if available). */
+    void repairPath(const Path & path);
+
 private:
 
     Path schemaPath;

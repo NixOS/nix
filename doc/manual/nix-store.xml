@@ -850,6 +850,52 @@ $ nix-store --verify-path $(nix-store -qR $(which svn))
 
 <!--######################################################################-->
 
+<refsection><title>Operation <option>--repair-path</option></title>
+
+<refsection>
+  <title>Synopsis</title>
+  <cmdsynopsis>
+    <command>nix-store</command>
+    <arg choice='plain'><option>--repair-path</option></arg>
+    <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+  </cmdsynopsis>
+</refsection>
+
+<refsection><title>Description</title>
+            
+<para>The operation <option>--repair-path</option> attempts to
+“repair” the specified paths by redownloading them using the available
+substituters.  If no substitutes are available, then repair is not
+possible.</para>
+
+<warning><para>During repair, there is a very small time window during
+which the old path (if it exists) is moved out of the way and replaced
+with the new path.  If repair is interrupted in between, then the
+system may be left in a broken state (e.g., if the path contains a
+critical system component like the GNU C Library).</para></warning>
+
+</refsection>
+            
+<refsection><title>Example</title>
+
+<screen>
+$ nix-store --verify-path /nix/store/cj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13
+path `/nix/store/cj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13' was modified!
+  expected hash `2db57715ae90b7e31ff1f2ecb8c12ec1cc43da920efcbe3b22763f36a1861588',
+  got `481c5aa5483ebc97c20457bb8bca24deea56550d3985cda0027f67fe54b808e4'
+
+$ nix-store --repair-path /nix/store/cj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13
+fetching path `/nix/store/cj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13'...
+…
+</screen>
+
+</refsection>
+            
+</refsection>
+
+
+<!--######################################################################-->
+
 <refsection xml:id='refsec-nix-store-dump'><title>Operation <option>--dump</option></title>
 
 <refsection>

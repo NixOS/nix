@@ -238,8 +238,9 @@ elsif ($ARGV[0] ne "--substitute") {
 }
 
 
-die unless scalar @ARGV == 2;
+die unless scalar @ARGV == 3;
 my $targetPath = $ARGV[1];
+my $destPath = $ARGV[2];
 $fast = 0;
 
 
@@ -324,7 +325,7 @@ while (scalar @path > 0) {
             # This was the last patch.  Unpack the final NAR archive
             # into the target path.
             print STDERR "  unpacking patched archive...\n";
-            system("$Nix::Config::binDir/nix-store --restore $v < $tmpNar2") == 0
+            system("$Nix::Config::binDir/nix-store --restore $destPath < $tmpNar2") == 0
                 or die "cannot unpack $tmpNar2 to `$v'\n";
         }
 
@@ -351,7 +352,7 @@ while (scalar @path > 0) {
                 or die "cannot download and unpack `$narFile->{url}' to `$v'\n";
         } else {
             # Unpack the archive to the target path.
-            system("$curl '$narFile->{url}' | $decompressor | $Nix::Config::binDir/nix-store --restore '$v'") == 0
+            system("$curl '$narFile->{url}' | $decompressor | $Nix::Config::binDir/nix-store --restore '$destPath'") == 0
                 or die "cannot download and unpack `$narFile->{url}' to `$v'\n";
         }
 

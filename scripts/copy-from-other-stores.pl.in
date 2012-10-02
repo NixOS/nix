@@ -83,12 +83,13 @@ if ($ARGV[0] eq "--query") {
 
 
 elsif ($ARGV[0] eq "--substitute") {
-    die unless scalar @ARGV == 2;
+    die unless scalar @ARGV == 3;
     my $storePath = $ARGV[1];
+    my $destPath = $ARGV[2];
     my ($store, $sourcePath) = findStorePath $storePath;
     die unless $store;
     print STDERR "\n*** Copying `$storePath' from `$sourcePath'\n\n";
-    system("$binDir/nix-store --dump $sourcePath | $binDir/nix-store --restore $storePath") == 0
+    system("$binDir/nix-store --dump $sourcePath | $binDir/nix-store --restore $destPath") == 0
         or die "cannot copy `$sourcePath' to `$storePath'";
     print "\n"; # no hash to verify
 }

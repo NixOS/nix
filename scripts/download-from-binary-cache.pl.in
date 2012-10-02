@@ -486,7 +486,7 @@ sub printSubstitutablePaths {
 
 
 sub downloadBinary {
-    my ($storePath) = @_;
+    my ($storePath, $destPath) = @_;
 
     foreach my $cache (@caches) {
         my $info = getCachedInfoFrom($storePath, $cache);
@@ -510,7 +510,7 @@ sub downloadBinary {
         my $url = "$cache->{url}/$info->{url}"; # FIXME: handle non-relative URLs
         print STDERR "\n*** Downloading ‘$url’ to ‘$storePath’...\n";
         Nix::Utils::checkURL $url;
-        if (system("$Nix::Config::curl --fail --location --insecure '$url' | $decompressor | $Nix::Config::binDir/nix-store --restore $storePath") != 0) {
+        if (system("$Nix::Config::curl --fail --location --insecure '$url' | $decompressor | $Nix::Config::binDir/nix-store --restore $destPath") != 0) {
             die "download of `$info->{url}' failed" . ($! ? ": $!" : "") . "\n" unless $? == 0;
             next;
         }
@@ -557,8 +557,9 @@ if ($ARGV[0] eq "--query") {
 
 elsif ($ARGV[0] eq "--substitute") {
     my $storePath = $ARGV[1] or die;
+    my $destPath = $ARGV[2] or die;
     getAvailableCaches;
-    downloadBinary($storePath);
+    downloadBinary($storePath, $destPath);
 }
 
 else {
