@@ -474,8 +474,9 @@ Paths RemoteStore::importPaths(bool requireSignature, Source & source)
 }
 
 
-void RemoteStore::buildPaths(const PathSet & drvPaths)
+void RemoteStore::buildPaths(const PathSet & drvPaths, bool repair)
 {
+    if (repair) throw Error("`--repair' is not supported when building through the Nix daemon");
     openConnection();
     writeInt(wopBuildPaths, to);
     writeStrings(drvPaths, to);

@@ -150,7 +150,7 @@ public:
 
     Paths importPaths(bool requireSignature, Source & source);
 
-    void buildPaths(const PathSet & paths);
+    void buildPaths(const PathSet & paths, bool repair = false);
 
     void ensurePath(const Path & path);
 
@@ -201,6 +201,10 @@ public:
     /* Repair the contents of the given path by redownloading it using
        a substituter (if available). */
     void repairPath(const Path & path);
+
+    /* Check whether the given valid path exists and has the right
+       contents. */
+    bool pathContentsGood(const Path & path);
 
 private:
 

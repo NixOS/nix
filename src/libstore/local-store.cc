@@ -1671,6 +1671,16 @@ void LocalStore::verifyPath(const Path & path, const PathSet & store,
 }
 
 
+bool LocalStore::pathContentsGood(const Path & path)
+{
+    ValidPathInfo info = queryPathInfo(path);
+    if (!pathExists(path)) return false;
+    HashResult current = hashPath(info.hash.type, path);
+    Hash nullHash(htSHA256);
+    return info.hash == nullHash || info.hash == current.first;
+}
+
+
 /* Functions for upgrading from the pre-SQLite database. */
 
 PathSet LocalStore::queryValidPathsOld()

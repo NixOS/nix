@@ -93,9 +93,11 @@ static PathSet realisePath(const Path & path, bool build = true)
 static void opRealise(Strings opFlags, Strings opArgs)
 {
     bool dryRun = false;
+    bool repair = false;
 
     foreach (Strings::iterator, i, opFlags)
         if (*i == "--dry-run") dryRun = true;
+        else if (*i == "--repair") repair = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
     foreach (Strings::iterator, i, opArgs)
@@ -107,7 +109,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
 
     /* Build all paths at the same time to exploit parallelism. */
     PathSet paths(opArgs.begin(), opArgs.end());
-    store->buildPaths(paths);
+    store->buildPaths(paths, repair);
 
     foreach (Paths::iterator, i, opArgs) {
         PathSet paths = realisePath(*i, false);

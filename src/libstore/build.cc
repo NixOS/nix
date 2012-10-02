@@ -241,7 +241,7 @@ public:
     ~Worker();
 
     /* Make a goal (with caching). */
-    GoalPtr makeDerivationGoal(const Path & drvPath);
+    GoalPtr makeDerivationGoal(const Path & drvPath, bool repair = false);
     GoalPtr makeSubstitutionGoal(const Path & storePath, bool repair = false);
 
     /* Remove a dead goal. */
@@ -825,13 +825,18 @@ private:
     HashRewrites rewritesToTmp, rewritesFromTmp;
     PathSet redirectedOutputs;
 
+    /* Whether we're repairing.  If set, a derivation will be rebuilt
+       if its outputs are valid but corrupt or missing. */
+    bool repair;
+    map<Path, Path> redirectedBadOutputs;
+
     /* Magic exit code denoting that setting up the child environment
        failed.  (It's possible that the child actually returns the
        exit code, but ah well.) */
     const static int childSetupFailed = 189;
 
 public:
-    DerivationGoal(const Path & drvPath, Worker & worker);
+    DerivationGoal(const Path & drvPath, Worker & worker, bool repair = false);
     ~DerivationGoal();
 
     void cancel();
@@ -882,21 +887,24 @@ private:
     void handleEOF(int fd);
 
     /* Return the set of (in)valid paths. */
-    PathSet checkPathValidity(bool returnValid);
+    PathSet checkPathValidity(bool returnValid, bool checkHash);
 
     /* Abort the goal if `path' failed to build. */
     bool pathFailed(const Path & path);
 
     /* Forcibly kill the child process, if any. */
     void killChild();
+
+    Path addHashRewrite(const Path & path);
 };
 
 
-DerivationGoal::DerivationGoal(const Path & drvPath, Worker & worker)
+DerivationGoal::DerivationGoal(const Path & drvPath, Worker & worker, bool repair)
     : Goal(worker)
     , fLogFile(0)
     , bzLogFile(0)
     , useChroot(false)
+    , repair(repair)
 {
     this->drvPath = drvPath;
     state = &DerivationGoal::init;
@@ -1001,10 +1009,10 @@ void DerivationGoal::haveDerivation()
         worker.store.addTempRoot(i->second.path);
 
     /* Check what outputs paths are not already valid. */
-    PathSet invalidOutputs = checkPathValidity(false);
+    PathSet invalidOutputs = checkPathValidity(false, repair);
 
     /* If they are all valid, then we're done. */
-    if (invalidOutputs.size() == 0) {
+    if (invalidOutputs.size() == 0 && !repair) {
         amDone(ecSuccess);
         return;
     }
@@ -1019,7 +1027,7 @@ void DerivationGoal::haveDerivation()
        them. */
     if (settings.useSubstitutes)
         foreach (PathSet::iterator, i, invalidOutputs)
-            addWaitee(worker.makeSubstitutionGoal(*i));
+            addWaitee(worker.makeSubstitutionGoal(*i, repair));
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
         outputsSubstituted();
@@ -1037,7 +1045,7 @@ void DerivationGoal::outputsSubstituted()
 
     nrFailed = nrNoSubstituters = 0;
 
-    if (checkPathValidity(false).size() == 0) {
+    if (checkPathValidity(false, repair).size() == 0) {
         amDone(ecSuccess);
         return;
     }
@@ -1173,7 +1181,7 @@ void DerivationGoal::tryToBuild()
        omitted, but that would be less efficient.)  Note that since we
        now hold the locks on the output paths, no other process can
        build this derivation, so no further checks are necessary. */
-    validPaths = checkPathValidity(true);
+    validPaths = checkPathValidity(true, repair);
     if (validPaths.size() == drv.outputs.size()) {
         debug(format("skipping build of derivation `%1%', someone beat us to it")
             % drvPath);
@@ -1256,6 +1264,24 @@ void DerivationGoal::tryToBuild()
 }
 
 
+void replaceValidPath(const Path & storePath, const Path tmpPath)
+{
+    /* We can't atomically replace storePath (the original) with
+       tmpPath (the replacement), so we have to move it out of the
+       way first.  We'd better not be interrupted here, because if
+       we're repairing (say) Glibc, we end up with a broken system. */
+    Path oldPath = (format("%1%.old-%2%-%3%") % storePath % getpid() % rand()).str();
+    if (pathExists(storePath)) {
+        makeMutable(storePath);
+        rename(storePath.c_str(), oldPath.c_str());
+    }
+    if (rename(tmpPath.c_str(), storePath.c_str()) == -1)
+        throw SysError(format("moving `%1%' to `%2%'") % tmpPath % storePath);
+    if (pathExists(oldPath))
+        deletePathWrapped(oldPath);
+}
+
+
 void DerivationGoal::buildDone()
 {
     trace("build done");
@@ -1309,10 +1335,18 @@ void DerivationGoal::buildDone()
             /* If the output was already valid, just skip (discard) it. */
             if (validPaths.find(path) != validPaths.end()) continue;
 
-            if (useChroot && pathExists(chrootRootDir + path))
+            if (useChroot && pathExists(chrootRootDir + path)) {
                 /* Move output paths from the chroot to the Nix store. */
-                if (rename((chrootRootDir + path).c_str(), path.c_str()) == -1)
-                    throw SysError(format("moving build output `%1%' from the chroot to the Nix store") % path);
+                if (repair)
+                    replaceValidPath(path, chrootRootDir + path);
+                else
+                    if (rename((chrootRootDir + path).c_str(), path.c_str()) == -1)
+                        throw SysError(format("moving build output `%1%' from the chroot to the Nix store") % path);
+            }
+
+            Path redirected;
+            if (repair && (redirected = redirectedBadOutputs[path]) != "" && pathExists(redirected))
+                replaceValidPath(path, redirected);
 
             if (!pathExists(path)) continue;
 
@@ -1786,25 +1820,28 @@ void DerivationGoal::startBuilder()
 #endif
     }
 
-    /* We're not doing a chroot build, but we have some valid output
-       paths.  Since we can't just overwrite or delete them, we have
-       to do hash rewriting: i.e. in the environment/arguments passed
-       to the build, we replace the hashes of the valid outputs with
-       unique dummy strings; after the build, we discard the
-       redirected outputs corresponding to the valid outputs, and
-       rewrite the contents of the new outputs to replace the dummy
-       strings with the actual hashes. */
-    else if (validPaths.size() > 0) {
-        //throw Error(format("derivation `%1%' is blocked by its output path(s) %2%") % drvPath % showPaths(validPaths));
-        foreach (PathSet::iterator, i, validPaths) {
-            string h1 = string(*i, settings.nixStore.size() + 1, 32);
-            string h2 = string(printHash32(hashString(htSHA256, "rewrite:" + drvPath + ":" + *i)), 0, 32);
-            Path p = settings.nixStore + "/" + h2 + string(*i, settings.nixStore.size() + 33);
-            assert(i->size() == p.size());
-            rewritesToTmp[h1] = h2;
-            rewritesFromTmp[h2] = h1;
-            redirectedOutputs.insert(p);
-        }
+    else {
+
+        /* We're not doing a chroot build, but we have some valid
+           output paths.  Since we can't just overwrite or delete
+           them, we have to do hash rewriting: i.e. in the
+           environment/arguments passed to the build, we replace the
+           hashes of the valid outputs with unique dummy strings;
+           after the build, we discard the redirected outputs
+           corresponding to the valid outputs, and rewrite the
+           contents of the new outputs to replace the dummy strings
+           with the actual hashes. */
+        if (validPaths.size() > 0)
+            //throw Error(format("derivation `%1%' is blocked by its output path(s) %2%") % drvPath % showPaths(validPaths));
+            foreach (PathSet::iterator, i, validPaths)
+                redirectedOutputs.insert(addHashRewrite(*i));
+
+        /* If we're repairing, then we don't want to delete the
+           corrupt outputs in advance.  So rewrite them as well. */
+        if (repair)
+            foreach (PathSet::iterator, i, missing)
+                if (worker.store.isValidPath(*i) && pathExists(*i))
+                    redirectedBadOutputs[*i] = addHashRewrite(*i);
     }
 
 
@@ -2278,15 +2315,15 @@ void DerivationGoal::handleEOF(int fd)
 }
 
 
-PathSet DerivationGoal::checkPathValidity(bool returnValid)
+PathSet DerivationGoal::checkPathValidity(bool returnValid, bool checkHash)
 {
     PathSet result;
-    foreach (DerivationOutputs::iterator, i, drv.outputs)
-        if (worker.store.isValidPath(i->second.path)) {
-            if (returnValid) result.insert(i->second.path);
-        } else {
-            if (!returnValid) result.insert(i->second.path);
-        }
+    foreach (DerivationOutputs::iterator, i, drv.outputs) {
+        bool good =
+            worker.store.isValidPath(i->second.path) &&
+            (!checkHash || worker.store.pathContentsGood(i->second.path));
+        if (good == returnValid) result.insert(i->second.path);
+    }
     return result;
 }
 
@@ -2306,6 +2343,19 @@ bool DerivationGoal::pathFailed(const Path & path)
     amDone(ecFailed);
 
     return true;
+}
+
+
+Path DerivationGoal::addHashRewrite(const Path & path)
+{
+    string h1 = string(path, settings.nixStore.size() + 1, 32);
+    string h2 = string(printHash32(hashString(htSHA256, "rewrite:" + drvPath + ":" + path)), 0, 32);
+    Path p = settings.nixStore + "/" + h2 + string(path, settings.nixStore.size() + 33);
+    if (pathExists(p)) deletePathWrapped(p);
+    assert(path.size() == p.size());
+    rewritesToTmp[h1] = h2;
+    rewritesFromTmp[h2] = h1;
+    return p;
 }
 
 
@@ -2667,22 +2717,7 @@ void SubstitutionGoal::finished()
 
     worker.store.optimisePath(destPath); // FIXME: combine with hashPath()
 
-    if (repair) {
-        /* We can't atomically replace storePath (the original) with
-           destPath (the replacement), so we have to move it out of
-           the way first.  We'd better not be interrupted here,
-           because if we're repairing (say) Glibc, we end up with a
-           broken system. */
-        Path oldPath = (format("%1%.old-%2%-%3%") % storePath % getpid() % rand()).str();
-        if (pathExists(storePath)) {
-            makeMutable(storePath);
-            rename(storePath.c_str(), oldPath.c_str());
-        }
-        if (rename(destPath.c_str(), storePath.c_str()) == -1)
-            throw SysError(format("moving `%1%' to `%2%'") % destPath % storePath);
-        if (pathExists(oldPath))
-            deletePathWrapped(oldPath);
-    }
+    if (repair) replaceValidPath(storePath, destPath);
 
     ValidPathInfo info2;
     info2.path = storePath;
@@ -2752,11 +2787,11 @@ Worker::~Worker()
 }
 
 
-GoalPtr Worker::makeDerivationGoal(const Path & path)
+GoalPtr Worker::makeDerivationGoal(const Path & path, bool repair)
 {
     GoalPtr goal = derivationGoals[path].lock();
     if (!goal) {
-        goal = GoalPtr(new DerivationGoal(path, *this));
+        goal = GoalPtr(new DerivationGoal(path, *this, repair));
         derivationGoals[path] = goal;
         wakeUp(goal);
     }
@@ -3090,7 +3125,7 @@ unsigned int Worker::exitStatus()
 //////////////////////////////////////////////////////////////////////
 
 
-void LocalStore::buildPaths(const PathSet & drvPaths)
+void LocalStore::buildPaths(const PathSet & drvPaths, bool repair)
 {
     startNest(nest, lvlDebug,
         format("building %1%") % showPaths(drvPaths));
@@ -3100,9 +3135,9 @@ void LocalStore::buildPaths(const PathSet & drvPaths)
     Goals goals;
     foreach (PathSet::const_iterator, i, drvPaths)
         if (isDerivation(*i))
-            goals.insert(worker.makeDerivationGoal(*i));
+            goals.insert(worker.makeDerivationGoal(*i, repair));
         else
-            goals.insert(worker.makeSubstitutionGoal(*i));
+            goals.insert(worker.makeSubstitutionGoal(*i, repair));
 
     worker.run(goals);
 
