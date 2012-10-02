@@ -59,10 +59,10 @@ static Path useDeriver(Path path)
 
 /* Realise the given path.  For a derivation that means build it; for
    other paths it means ensure their validity. */
-static PathSet realisePath(const Path & path)
+static PathSet realisePath(const Path & path, bool build = true)
 {
     if (isDerivation(path)) {
-        store->buildPaths(singleton<PathSet>(path));
+        if (build) store->buildPaths(singleton<PathSet>(path));
         Derivation drv = derivationFromPath(*store, path);
         rootNr++;
 
@@ -83,7 +83,7 @@ static PathSet realisePath(const Path & path)
     }
 
     else {
-        store->ensurePath(path);
+        if (build) store->ensurePath(path);
         return singleton<PathSet>(path);
     }
 }
@@ -110,7 +110,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
     store->buildPaths(paths);
 
     foreach (Paths::iterator, i, opArgs) {
-        PathSet paths = realisePath(*i);
+        PathSet paths = realisePath(*i, false);
         foreach (PathSet::iterator, j, paths)
             cout << format("%1%\n") % *j;
     }
