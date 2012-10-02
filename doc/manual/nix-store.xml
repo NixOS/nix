@@ -773,6 +773,7 @@ $ nix-store --add ./foo.c
     <command>nix-store</command>
     <arg choice='plain'><option>--verify</option></arg>
     <arg><option>--check-contents</option></arg>
+    <arg><option>--repair</option></arg>
   </cmdsynopsis>
 </refsection>
 
@@ -785,7 +786,7 @@ automatically repaired.  Inconsistencies are generally the result of
 the Nix store or database being modified by non-Nix tools, or of bugs
 in Nix itself.</para>
 
-<para>There is one option:
+<para>This operation has the following options:
 
 <variablelist>
 
@@ -797,6 +798,16 @@ in Nix itself.</para>
     time.  Paths that have been modified are printed out.  For large
     stores, <option>--check-contents</option> is obviously quite
     slow.</para></listitem>
+    
+  </varlistentry>
+  
+  <varlistentry><term><option>--repair</option></term>
+  
+    <listitem><para>If any valid path is missing from the store, or
+    (if <option>--check-contents</option> is given) the contents of a
+    valid path has been modified, then try to repair the path by
+    redownloading it.  See <command>nix-store --repair-path</command>
+    for details.</para></listitem>
     
   </varlistentry>
   

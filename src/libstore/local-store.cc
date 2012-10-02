@@ -1544,9 +1544,11 @@ void LocalStore::invalidatePathChecked(const Path & path)
 }
 
 
-void LocalStore::verifyStore(bool checkContents)
+bool LocalStore::verifyStore(bool checkContents, bool repair)
 {
     printMsg(lvlError, format("reading the Nix store..."));
+
+    bool errors = false;
 
     /* Acquire the global GC lock to prevent a garbage collection. */
     AutoCloseFD fdGCLock = openGCLock(ltWrite);
@@ -1560,7 +1562,7 @@ void LocalStore::verifyStore(bool checkContents)
     PathSet validPaths2 = queryAllValidPaths(), validPaths, done;
 
     foreach (PathSet::iterator, i, validPaths2)
-        verifyPath(*i, store, done, validPaths);
+        verifyPath(*i, store, done, validPaths, repair, errors);
 
     /* Release the GC lock so that checking content hashes (which can
        take ages) doesn't block the GC or builds. */
@@ -1584,6 +1586,7 @@ void LocalStore::verifyStore(bool checkContents)
                     printMsg(lvlError, format("path `%1%' was modified! "
                             "expected hash `%2%', got `%3%'")
                         % *i % printHash(info.hash) % printHash(current.first));
+                    if (repair) repairPath(*i); else errors = true;
                 } else {
 
                     bool update = false;
@@ -1611,14 +1614,17 @@ void LocalStore::verifyStore(bool checkContents)
                    errors on invalid paths. */
                 if (isValidPath(*i)) throw;
                 printMsg(lvlError, format("warning: %1%") % e.msg());
+                errors = true;
             }
         }
     }
+
+    return errors;
 }
 
 
 void LocalStore::verifyPath(const Path & path, const PathSet & store,
-    PathSet & done, PathSet & validPaths)
+    PathSet & done, PathSet & validPaths, bool repair, bool & errors)
 {
     checkInterrupt();
 
@@ -1638,7 +1644,7 @@ void LocalStore::verifyPath(const Path & path, const PathSet & store,
         PathSet referrers; queryReferrers(path, referrers);
         foreach (PathSet::iterator, i, referrers)
             if (*i != path) {
-                verifyPath(*i, store, done, validPaths);
+                verifyPath(*i, store, done, validPaths, repair, errors);
                 if (validPaths.find(*i) != validPaths.end())
                     canInvalidate = false;
             }
@@ -1646,8 +1652,17 @@ void LocalStore::verifyPath(const Path & path, const PathSet & store,
         if (canInvalidate) {
             printMsg(lvlError, format("path `%1%' disappeared, removing from database...") % path);
             invalidatePath(path);
-        } else
+        } else {
             printMsg(lvlError, format("path `%1%' disappeared, but it still has valid referrers!") % path);
+            if (repair)
+                try {
+                    repairPath(path);
+                } catch (Error & e) {
+                    printMsg(lvlError, format("warning: %1%") % e.msg());
+                    errors = true;
+                }
+            else errors = true;
+        }
 
         return;
     }

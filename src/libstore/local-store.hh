@@ -171,8 +171,9 @@ public:
     /* Optimise a single store path. */
     void optimisePath(const Path & path);
 
-    /* Check the integrity of the Nix store. */
-    void verifyStore(bool checkContents);
+    /* Check the integrity of the Nix store.  Returns true if errors
+       remain. */
+    bool verifyStore(bool checkContents, bool repair);
 
     /* Register the validity of a path, i.e., that `path' exists, that
        the paths referenced by it exists, and in the case of an output
@@ -250,7 +251,7 @@ private:
     void invalidatePathChecked(const Path & path);
 
     void verifyPath(const Path & path, const PathSet & store,
-        PathSet & done, PathSet & validPaths);
+        PathSet & done, PathSet & validPaths, bool repair, bool & errors);
 
     void updatePathInfo(const ValidPathInfo & info);
 

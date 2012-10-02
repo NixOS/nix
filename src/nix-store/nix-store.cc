@@ -703,13 +703,18 @@ static void opVerify(Strings opFlags, Strings opArgs)
         throw UsageError("no arguments expected");
 
     bool checkContents = false;
+    bool repair = false;
 
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
         if (*i == "--check-contents") checkContents = true;
+        else if (*i == "--repair") repair = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
-    ensureLocalStore().verifyStore(checkContents);
+    if (ensureLocalStore().verifyStore(checkContents, repair)) {
+        printMsg(lvlError, "warning: not all errors were fixed");
+        exitCode = 1;
+    }
 }
 
 
@@ -743,7 +748,6 @@ static void opRepairPath(Strings opFlags, Strings opArgs)
 
     foreach (Strings::iterator, i, opArgs) {
         Path path = followLinksToStorePath(*i);
-        printMsg(lvlTalkative, format("repairing path `%1%'...") % path);
         ensureLocalStore().repairPath(path);
     }
 }
