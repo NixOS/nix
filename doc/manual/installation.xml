@@ -412,11 +412,11 @@ $ chown -R root /nix/store /nix/var/nix</screen>
 
 </para>
 
-<para>The <link linkend="sec-nix-worker">Nix daemon</link> should be
+<para>The <link linkend="sec-nix-daemon">Nix daemon</link> should be
 started as follows (as <literal>root</literal>):
 
 <screen>
-$ nix-worker --daemon</screen>
+$ nix-daemon</screen>
 
 You’ll want to put that line somewhere in your system’s boot
 scripts.</para>
@@ -450,11 +450,11 @@ named anything.  It should own the Nix store and database:
 <screen>
 $ chown -R nix /nix/store /nix/var/nix</screen>
 
-and of course <command>nix-worker --daemon</command> should be started
-under that user, e.g.,
+and of course <command>nix-daemon</command> should be started under
+that user, e.g.,
 
 <screen>
-$ su - nix -c "exec /nix/bin/nix-worker --daemon"</screen>
+$ su - nix -c "exec /nix/bin/nix-daemon"</screen>
 
 </para>
 

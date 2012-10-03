@@ -139,7 +139,7 @@ chmod -x $RPM_BUILD_ROOT%{_sysconfdir}/profile.d/nix.sh
 %if ! 0%{?rhel} 
 # install systemd service descriptor
 mkdir -p $RPM_BUILD_ROOT%{_prefix}/lib/systemd/system
-cp -p misc/systemd/nix-worker.service \
+cp -p misc/systemd/nix-daemon.service \
   $RPM_BUILD_ROOT%{_prefix}/lib/systemd/system/
 %endif
 
@@ -173,8 +173,8 @@ chgrp %{nixbld_group} /nix/store
 chmod 1775 /nix/store
 %if ! 0%{?rhel}
 # Enable and start Nix worker
-systemctl enable nix-worker.service
-systemctl start  nix-worker.service
+systemctl enable nix-daemon.service
+systemctl start  nix-daemon.service
 %endif
 
 %files
@@ -186,7 +186,7 @@ systemctl start  nix-worker.service
 %exclude %dir %{perl_vendorarch}/auto/
 %{_prefix}/libexec/*
 %if ! 0%{?rhel}
-%{_prefix}/lib/systemd/system/nix-worker.service
+%{_prefix}/lib/systemd/system/nix-daemon.service
 %endif
 %{_datadir}/emacs/site-lisp/nix-mode.el
 %{_datadir}/nix

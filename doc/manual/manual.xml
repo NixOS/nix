@@ -59,7 +59,7 @@
       <xi:include href="nix-prefetch-url.xml" />
       <xi:include href="nix-pull.xml" />
       <xi:include href="nix-push.xml" />
-      <xi:include href="nix-worker.xml" />
+      <xi:include href="nix-daemon.xml" />
     </section>
 
     <section>

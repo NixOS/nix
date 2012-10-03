@@ -4,7 +4,7 @@ After=syslog.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/nix-worker --daemon
+ExecStart=/usr/bin/nix-daemon
 
 [Install]
 WantedBy=multi-user.target

@@ -10,7 +10,7 @@
 
 <section xml:id="ssec-relnotes-1.2"><title>Release 1.2 (TBA)</title>
 
-<para>This release has the following improvements:</para>
+<para>This release has the following improvements and changes:</para>
 
 <itemizedlist>
 
@@ -45,6 +45,12 @@ $ mount -o remount,ro,bind /nix/store
     Nix will automatically make <filename>/nix/store</filename>
     writable as needed (using a private mount namespace) to allow
     modifications.</para>
+  </listitem>
+
+  <listitem>
+    <para>The command <command>nix-worker</command> has been renamed
+    to <command>nix-daemon</command>.  Support for running the Nix
+    worker in “slave” mode has been removed.</para>
   </listitem>
 
 </itemizedlist>

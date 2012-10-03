@@ -25,7 +25,7 @@ using namespace nix;
    disconnects and immediately kill any ongoing builds.  On platforms
    that lack it, we only notice the disconnection the next time we try
    to write to the client.  So if you have a builder that never
-   generates output on stdout/stderr, the worker will never notice
+   generates output on stdout/stderr, the daemon will never notice
    that the client has disconnected until the builder terminates. */
 #ifdef O_ASYNC
 #define HAVE_HUP_NOTIFICATION
@@ -677,7 +677,7 @@ static void processConnection()
         /* Prevent users from doing something very dangerous. */
         if (geteuid() == 0 &&
             querySetting("build-users-group", "") == "")
-            throw Error("if you run `nix-worker' as root, then you MUST set `build-users-group'!");
+            throw Error("if you run `nix-daemon' as root, then you MUST set `build-users-group'!");
 #endif
 
         /* Open the store. */
@@ -724,7 +724,7 @@ static void processConnection()
         assert(!canSendStderr);
     };
 
-    printMsg(lvlError, format("%1% worker operations") % opCount);
+    printMsg(lvlError, format("%1% operations") % opCount);
 }
 
 
@@ -858,7 +858,7 @@ static void daemonLoop()
             case 0:
                 try { /* child */
 
-                    /* Background the worker. */
+                    /* Background the daemon. */
                     if (setsid() == -1)
                         throw SysError(format("creating a new session"));
 
@@ -907,8 +907,8 @@ void run(Strings args)
 
 void printHelp()
 {
-    showManPage("nix-worker");
+    showManPage("nix-daemon");
 }
 
 
-string programId = "nix-worker";
+string programId = "nix-daemon";

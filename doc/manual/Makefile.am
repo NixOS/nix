@@ -23,7 +23,7 @@ man1_MANS = nix-env.1 nix-build.1 nix-store.1 nix-instantiate.1 \
 
 man5_MANS = nix.conf.5
 
-man8_MANS = nix-worker.8
+man8_MANS = nix-daemon.8
 
 FIGURES = figures/user-environments.png
 

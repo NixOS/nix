@@ -106,8 +106,8 @@ Makefile.in
 # /src/nix-store/
 /src/nix-store/nix-store
 
-# /src/nix-worker/
-/src/nix-worker/nix-worker
+# /src/nix-daemon/
+/src/nix-daemon/nix-daemon
 
 # /tests/
 /tests/test-tmp
