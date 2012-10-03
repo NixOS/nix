@@ -21,8 +21,14 @@
 
   <listitem>
     <para>The new operation <command>nix-store --repair-path</command>
-    allows corrupted or deleted store paths to be repaired by
-    redownloading them.</para>
+    allows corrupted or missing store paths to be repaired by
+    redownloading them.  <command>nix-store --verify --check-contents
+    --repair</command> will scan and repair all paths in the Nix
+    store.  Similarly, <command>nix-env</command>,
+    <command>nix-build</command>, <command>nix-instantiate</command>
+    and <command>nix-store --realise</command> have a
+    <option>--repair</option> flag to detect and fix bad paths by
+    rebuilding or redownloading them.</para>
   </listitem>
 
   <listitem>

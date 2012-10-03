@@ -174,10 +174,19 @@ the specified store paths.  Realisation is a somewhat overloaded term:
 output.  (For non-derivations argument, the argument itself is
 printed.)</para>
 
-<para>If the <option>--dry-run</option> option is used, then
-<command>nix-store</command> will print on standard error a
-description of what packages would be built or downloaded, and then
-quit.</para>
+<para>The following flags are available:</para>
+
+<variablelist>
+
+  <varlistentry><term><option>--dry-run</option></term>
+
+    <listitem><para>Print on standard error a description of what
+    packages would be built or downloaded, without actually performing
+    the operation</para></listitem>
+
+  </varlistentry>
+
+</variablelist>
 
 </refsection>
             
