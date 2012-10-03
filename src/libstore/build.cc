@@ -1875,6 +1875,13 @@ void DerivationGoal::startBuilder()
             }
         }
 
+        /* If we're repairing, it's possible that we're rebuilding a
+           path that is in settings.dirsInChroot (typically the
+           dependencies of /bin/sh).  Throw them out. */
+        if (repair)
+            foreach (DerivationOutputs::iterator, i, drv.outputs)
+                dirsInChroot.erase(i->second.path);
+
 #else
         throw Error("chroot builds are not supported on this platform");
 #endif
