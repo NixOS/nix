@@ -69,9 +69,6 @@ Makefile.in
 /scripts/nix-reduce-build
 /scripts/nix-http-export.cgi
 
-# /src/bin2c/
-/src/bin2c/bin2c
-
 # /src/bsdiff-4.3/
 /src/bsdiff-4.3/bsdiff
 /src/bsdiff-4.3/bspatch

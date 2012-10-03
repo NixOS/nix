@@ -374,7 +374,9 @@ void LocalStore::openDB(bool create)
 
     /* Initialise the database schema, if necessary. */
     if (create) {
+        const char * schema =
 #include "schema.sql.hh"
+            ;
         if (sqlite3_exec(db, (const char *) schema, 0, 0, 0) != SQLITE_OK)
             throwSQLiteError(db, "initialising database schema");
     }
