@@ -1,6 +1,5 @@
 #include "hash.hh"
 #include "shared.hh"
-#include "help.txt.hh"
 
 #include <iostream>
 
@@ -10,7 +9,7 @@ using namespace nix;
 
 void printHelp()
 {
-    std::cout << string((char *) helpText);
+    showManPage("nix-hash");
 }
 
 

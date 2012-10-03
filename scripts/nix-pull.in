@@ -89,7 +89,9 @@ sub processURL {
 
 while (@ARGV) {
     my $url = shift @ARGV;
-    if ($url eq "--skip-wrong-store") {
+    if ($url eq "--help") {
+        exec "man nix-pull" or die;
+    } elsif ($url eq "--skip-wrong-store") {
         # No-op, no longer supported.
     } else {
         processURL $url;

@@ -923,11 +923,9 @@ void run(Strings args)
 }
 
 
-#include "help.txt.hh"
-
 void printHelp()
 {
-    std::cout << string((char *) helpText);
+    showManPage("nix-worker");
 }
 
 

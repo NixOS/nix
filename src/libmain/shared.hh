@@ -41,6 +41,9 @@ template<class N> N getIntArg(const string & opt,
     return n;
 }
 
+/* Show the manual page for the specified program. */
+void showManPage(const string & name);
+
 /* Whether we're running setuid. */
 extern bool setuidMode;
 

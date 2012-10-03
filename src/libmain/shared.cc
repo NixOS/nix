@@ -91,6 +91,7 @@ string getArg(const string & opt,
     return *i;
 }
 
+
 /* Initialize and reorder arguments, then call the actual argument
    processor. */
 static void initAndRun(int argc, char * * argv)
@@ -272,6 +273,14 @@ static void * oomHandler(size_t requested)
 {
     /* Convert this to a proper C++ exception. */
     throw std::bad_alloc();
+}
+
+
+void showManPage(const string & name)
+{
+    string cmd = "man " + name;
+    if (system(cmd.c_str()) != 0)
+        throw Error(format("command `%1%' failed") % cmd);
 }
 
 

@@ -37,8 +37,11 @@ my @storePaths = ();
 
 while (@ARGV) {
     my $arg = shift @ARGV;
-    
-    if ($arg eq "--sign") {
+
+    if ($arg eq "--help") {
+        exec "man nix-copy-closure" or die;
+    }
+    elsif ($arg eq "--sign") {
         $sign = 1;
     }
     elsif ($arg eq "--gzip") {
@@ -92,7 +95,7 @@ else { # Copy FROM the remote machine.
     my $extraOpts = $includeOutputs ? "--include-outputs" : "";
     my $pid = open(READ,
         "set -f; ssh @sshOpts $sshHost nix-store --query --requisites $extraOpts @storePaths|") or die;
-    
+
     while (<READ>) {
         chomp;
         die "bad: $_" unless /^\//;
@@ -106,7 +109,7 @@ else { # Copy FROM the remote machine.
         print STDERR "copying ", scalar @missing, " missing paths from ‘$sshHost’...\n";
         $compressor = "| $compressor" if $compressor ne "";
         $decompressor = "$decompressor |" if $decompressor ne "";
-	$progressViewer = "$progressViewer |" if $progressViewer ne "";
+        $progressViewer = "$progressViewer |" if $progressViewer ne "";
         unless ($dryRun) {
             my $extraOpts = $sign ? "--sign" : "";
             system("set -f; ssh $sshHost @sshOpts 'nix-store --export $extraOpts @missing $compressor' | $progressViewer $decompressor $Nix::Config::binDir/nix-store --import > /dev/null") == 0

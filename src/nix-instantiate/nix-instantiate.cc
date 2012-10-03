@@ -8,7 +8,6 @@
 #include "util.hh"
 #include "store-api.hh"
 #include "common-opts.hh"
-#include "help.txt.hh"
 
 #include <map>
 #include <iostream>
@@ -19,7 +18,7 @@ using namespace nix;
 
 void printHelp()
 {
-    std::cout << string((char *) helpText);
+    showManPage("nix-instantiate");
 }
 
 

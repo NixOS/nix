@@ -16,6 +16,8 @@ for my $arg (@ARGV) {
         $removeOld = 1;
     } elsif ($arg eq "--dry-run") {
         $dryRun = 1;
+    } elsif ($arg eq "--help") {
+        exec "man nix-collect-garbage" or die;
     } else {
         push @args, $arg;
     }

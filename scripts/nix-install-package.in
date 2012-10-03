@@ -6,25 +6,8 @@ use Nix::Config;
 use Nix::Utils;
 
 
-sub usageError {
-    print STDERR <<EOF;
-Usage: nix-install-package (FILE | --url URL)
-
-Install a Nix Package (.nixpkg) either directly from FILE or by
-downloading it from URL.
-
-Flags:
-  --profile / -p LINK: install into the specified profile
-  --non-interactive: don't run inside a new terminal
-EOF
-    ; # '
-    exit 1;
-}
-
-
 # Parse the command line arguments.
 my @args = @ARGV;
-usageError if scalar @args == 0;
 
 my $source;
 my $fromURL = 0;
@@ -34,14 +17,14 @@ my $interactive = 1;
 while (scalar @args) {
     my $arg = shift @args;
     if ($arg eq "--help") {
-        usageError;
+        exec "man nix-install-package" or die;
     }
     elsif ($arg eq "--url") {
         $fromURL = 1;
     }
     elsif ($arg eq "--profile" || $arg eq "-p") {
         my $profile = shift @args;
-        usageError if !defined $profile;
+        die "$0: `--profile' requires an argument\n" if !defined $profile;
         push @extraNixEnvArgs, "-p", $profile;
     }
     elsif ($arg eq "--non-interactive") {
@@ -52,7 +35,7 @@ while (scalar @args) {
     }
 }
 
-usageError unless defined $source;
+die "$0: please specify a .nixpkg file or URL\n" unless defined $source;
 
 
 # Re-execute in a terminal, if necessary, so that if we're executed

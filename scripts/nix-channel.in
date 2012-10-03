@@ -74,7 +74,7 @@ sub removeChannel {
     writeChannels;
 
     system("$Nix::Config::binDir/nix-env --profile '$profile' -e '$name'") == 0
-        or die "cannot remove channel `$name'";
+        or die "cannot remove channel `$name'\n";
 }
 
 
@@ -125,7 +125,7 @@ sub update {
         my $fullURL = "$url/nixexprs.tar.bz2";
         print STDERR "downloading Nix expressions from `$fullURL'...\n";
         my ($hash, $path) = `PRINT_PATH=1 QUIET=1 $Nix::Config::binDir/nix-prefetch-url '$fullURL'`;
-        die "cannot fetch `$fullURL'" if $? != 0;
+        die "cannot fetch `$fullURL'\n" if $? != 0;
         chomp $path;
 
         # If the URL contains a version number, append it to the name
@@ -153,26 +153,14 @@ sub update {
 }
 
 
-sub usageError {
-    print STDERR <<EOF;
-Usage:
-  nix-channel --add URL [CHANNEL-NAME]
-  nix-channel --remove CHANNEL-NAME
-  nix-channel --list
-  nix-channel --update [CHANNEL-NAME...]
-EOF
-    exit 1;
-}
-
-
-usageError if scalar @ARGV == 0;
+die "$0: argument expected\n" if scalar @ARGV == 0;
 
 
 while (scalar @ARGV) {
     my $arg = shift @ARGV;
 
     if ($arg eq "--add") {
-        usageError if scalar @ARGV < 1 || scalar @ARGV > 2;
+        die "$0: `--add' requires one or two arguments\n" if scalar @ARGV < 1 || scalar @ARGV > 2;
         my $url = shift @ARGV;
         my $name = shift @ARGV;
         unless (defined $name) {
@@ -185,13 +173,13 @@ while (scalar @ARGV) {
     }
 
     if ($arg eq "--remove") {
-        usageError if scalar @ARGV != 1;
+        die "$0: `--remove' requires one argument\n" if scalar @ARGV != 1;
         removeChannel(shift @ARGV);
         last;
     }
 
     if ($arg eq "--list") {
-        usageError if scalar @ARGV != 0;
+        die "$0: `--list' requires one argument\n" if scalar @ARGV != 0;
         readChannels;
         foreach my $name (keys %channels) {
             print "$name $channels{$name}\n";
@@ -205,7 +193,7 @@ while (scalar @ARGV) {
     }
 
     elsif ($arg eq "--help") {
-        usageError;
+        exec "man nix-channel" or die;
     }
 
     elsif ($arg eq "--version") {
@@ -214,6 +202,6 @@ while (scalar @ARGV) {
     }
 
     else {
-        die "unknown argument `$arg'; try `--help'";
+        die "unknown argument `$arg'; try `--help'\n";
     }
 }

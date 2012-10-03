@@ -89,15 +89,12 @@ Makefile.in
 
 # /src/nix-env/
 /src/nix-env/nix-env
-/src/nix-env/help.txt.hh
 
 # /src/nix-hash/
 /src/nix-hash/nix-hash
-/src/nix-hash/help.txt.hh
 
 # /src/nix-instantiate/
 /src/nix-instantiate/nix-instantiate
-/src/nix-instantiate/help.txt.hh
 
 # /src/nix-log2xml/
 /src/nix-log2xml/nix-log2xml
@@ -108,15 +105,12 @@ Makefile.in
 
 # /src/nix-setuid-helper/
 /src/nix-setuid-helper/nix-setuid-helper
-/src/nix-setuid-helper/help.txt.hh
 
 # /src/nix-store/
-/src/nix-store/help.txt.hh
 /src/nix-store/nix-store
 
 # /src/nix-worker/
 /src/nix-worker/nix-worker
-/src/nix-worker/help.txt.hh
 
 # /tests/
 /tests/test-tmp

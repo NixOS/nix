@@ -4,7 +4,6 @@
 #include "misc.hh"
 #include "shared.hh"
 #include "eval.hh"
-#include "help.txt.hh"
 #include "get-drvs.hh"
 #include "attr-path.hh"
 #include "common-opts.hh"
@@ -66,7 +65,7 @@ typedef void (* Operation) (Globals & globals,
 
 void printHelp()
 {
-    cout << string((char *) helpText);
+    showManPage("nix-env");
 }
 
 

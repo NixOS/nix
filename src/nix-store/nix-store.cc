@@ -6,7 +6,6 @@
 #include "xmlgraph.hh"
 #include "local-store.hh"
 #include "util.hh"
-#include "help.txt.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -29,7 +28,7 @@ typedef void (* Operation) (Strings opFlags, Strings opArgs);
 
 void printHelp()
 {
-    cout << string((char *) helpText);
+    showManPage("nix-store");
 }
 
 
