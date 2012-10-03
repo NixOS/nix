@@ -853,6 +853,7 @@ private:
     void init();
     void haveDerivation();
     void outputsSubstituted();
+    void closureRepaired();
     void inputsRealised();
     void tryToBuild();
     void buildDone();
@@ -896,6 +897,8 @@ private:
     void killChild();
 
     Path addHashRewrite(const Path & path);
+
+    void repairClosure();
 };
 
 
@@ -1046,7 +1049,7 @@ void DerivationGoal::outputsSubstituted()
     nrFailed = nrNoSubstituters = 0;
 
     if (checkPathValidity(false, repair).size() == 0) {
-        amDone(ecSuccess);
+        if (repair) repairClosure(); else amDone(ecSuccess);
         return;
     }
 
@@ -1055,7 +1058,7 @@ void DerivationGoal::outputsSubstituted()
 
     /* The inputs must be built before we can build this goal. */
     foreach (DerivationInputs::iterator, i, drv.inputDrvs)
-        addWaitee(worker.makeDerivationGoal(i->first));
+        addWaitee(worker.makeDerivationGoal(i->first, repair));
 
     foreach (PathSet::iterator, i, drv.inputSrcs)
         addWaitee(worker.makeSubstitutionGoal(*i));
@@ -1064,6 +1067,63 @@ void DerivationGoal::outputsSubstituted()
         inputsRealised();
     else
         state = &DerivationGoal::inputsRealised;
+}
+
+
+void DerivationGoal::repairClosure()
+{
+    /* If we're repairing, we now know that our own outputs are valid.
+       Now check whether the other paths in the outputs closure are
+       good.  If not, then start derivation goals for the derivations
+       that produced those outputs. */
+
+    /* Get the output closure. */
+    PathSet outputClosure;
+    foreach (DerivationOutputs::iterator, i, drv.outputs)
+        computeFSClosure(worker.store, i->second.path, outputClosure);
+
+    /* Filter out our own outputs (which we have already checked). */
+    foreach (DerivationOutputs::iterator, i, drv.outputs)
+        outputClosure.erase(i->second.path);
+
+    /* Get all dependencies of this derivation so that we know which
+       derivation is responsible for which path in the output
+       closure. */
+    PathSet inputClosure;
+    computeFSClosure(worker.store, drvPath, inputClosure);
+    std::map<Path, Path> outputsToDrv;
+    foreach (PathSet::iterator, i, inputClosure)
+        if (isDerivation(*i)) {
+            Derivation drv = derivationFromPath(worker.store, *i);
+            foreach (DerivationOutputs::iterator, j, drv.outputs)
+                outputsToDrv[j->second.path] = *i;
+        }
+
+    /* Check each path (slow!). */
+    PathSet broken;
+    foreach (PathSet::iterator, i, outputClosure) {
+        if (worker.store.pathContentsGood(*i)) continue;
+        printMsg(lvlError, format("found corrupted or missing path `%1%' in the output closure of `%2%'") % *i % drvPath);
+        Path drvPath2 = outputsToDrv[*i];
+        if (drvPath2 == "") throw Error(format("don't know how to repair corrupted or missing path `%1%'") % *i);
+        addWaitee(worker.makeDerivationGoal(drvPath2, true));
+    }
+
+    if (waitees.empty()) {
+        amDone(ecSuccess);
+        return;
+    }
+
+    state = &DerivationGoal::closureRepaired;
+}
+
+
+void DerivationGoal::closureRepaired()
+{
+    trace("closure repaired");
+    if (nrFailed > 0)
+        throw Error(format("some paths in the output closure of derivation `%1%' could not be repaired") % drvPath);
+    amDone(ecSuccess);
 }
 
 
@@ -2197,6 +2257,8 @@ void DerivationGoal::computeClosure()
         }
 
         worker.store.optimisePath(path); // FIXME: combine with scanForReferences()
+
+        worker.store.markContentsGood(path);
     }
 
     /* Register each output path as valid, and register the sets of
@@ -2728,6 +2790,8 @@ void SubstitutionGoal::finished()
     worker.store.registerValidPath(info2);
 
     outputLock->setDeletion(true);
+
+    worker.store.markContentsGood(storePath);
 
     printMsg(lvlChatty,
         format("substitution of path `%1%' succeeded") % storePath);

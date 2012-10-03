@@ -206,6 +206,8 @@ public:
        contents. */
     bool pathContentsGood(const Path & path);
 
+    void markContentsGood(const Path & path);
+
 private:
 
     Path schemaPath;
@@ -232,6 +234,9 @@ private:
     SQLiteStmt stmtQueryValidDerivers;
     SQLiteStmt stmtQueryDerivationOutputs;
     SQLiteStmt stmtQueryPathFromHashPart;
+
+    /* Cache for pathContentsGood(). */
+    std::map<Path, bool> pathContentsGoodCache;
 
     int getSchema();
 

@@ -1673,11 +1673,27 @@ void LocalStore::verifyPath(const Path & path, const PathSet & store,
 
 bool LocalStore::pathContentsGood(const Path & path)
 {
+    std::map<Path, bool>::iterator i = pathContentsGoodCache.find(path);
+    if (i != pathContentsGoodCache.end()) return i->second;
+    printMsg(lvlInfo, format("checking path `%1%'...") % path);
     ValidPathInfo info = queryPathInfo(path);
-    if (!pathExists(path)) return false;
-    HashResult current = hashPath(info.hash.type, path);
-    Hash nullHash(htSHA256);
-    return info.hash == nullHash || info.hash == current.first;
+    bool res;
+    if (!pathExists(path))
+        res = false;
+    else {
+        HashResult current = hashPath(info.hash.type, path);
+        Hash nullHash(htSHA256);
+        res = info.hash == nullHash || info.hash == current.first;
+    }
+    pathContentsGoodCache[path] = res;
+    if (!res) printMsg(lvlError, format("path `%1%' is corrupted or missing!") % path);
+    return res;
+}
+
+
+void LocalStore::markContentsGood(const Path & path)
+{
+    pathContentsGoodCache[path] = true;
 }
 
 
