@@ -57,7 +57,7 @@ class StoreAPI;
 
 /* Write a derivation to the Nix store, and return its path. */
 Path writeDerivation(StoreAPI & store,
-    const Derivation & drv, const string & name);
+    const Derivation & drv, const string & name, bool repair = false);
 
 /* Parse a derivation. */
 Derivation parseDerivation(const string & s);

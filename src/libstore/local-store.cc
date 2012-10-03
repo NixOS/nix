@@ -1158,7 +1158,7 @@ void LocalStore::invalidatePath(const Path & path)
 
 
 Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
-    bool recursive, HashType hashAlgo)
+    bool recursive, HashType hashAlgo, bool repair)
 {
     Hash h = hashString(hashAlgo, dump);
 
@@ -1166,14 +1166,14 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
 
     addTempRoot(dstPath);
 
-    if (!isValidPath(dstPath)) {
+    if (repair || !isValidPath(dstPath)) {
 
         /* The first check above is an optimisation to prevent
            unnecessary lock acquisition. */
 
         PathLocks outputLock(singleton<PathSet, Path>(dstPath));
 
-        if (!isValidPath(dstPath)) {
+        if (repair || !isValidPath(dstPath)) {
 
             if (pathExists(dstPath)) deletePathWrapped(dstPath);
 
@@ -1213,7 +1213,7 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
 
 
 Path LocalStore::addToStore(const Path & _srcPath,
-    bool recursive, HashType hashAlgo, PathFilter & filter)
+    bool recursive, HashType hashAlgo, PathFilter & filter, bool repair)
 {
     Path srcPath(absPath(_srcPath));
     debug(format("adding `%1%' to the store") % srcPath);
@@ -1227,22 +1227,22 @@ Path LocalStore::addToStore(const Path & _srcPath,
     else
         sink.s = readFile(srcPath);
 
-    return addToStoreFromDump(sink.s, baseNameOf(srcPath), recursive, hashAlgo);
+    return addToStoreFromDump(sink.s, baseNameOf(srcPath), recursive, hashAlgo, repair);
 }
 
 
 Path LocalStore::addTextToStore(const string & name, const string & s,
-    const PathSet & references)
+    const PathSet & references, bool repair)
 {
     Path dstPath = computeStorePathForText(name, s, references);
 
     addTempRoot(dstPath);
 
-    if (!isValidPath(dstPath)) {
+    if (repair || !isValidPath(dstPath)) {
 
         PathLocks outputLock(singleton<PathSet, Path>(dstPath));
 
-        if (!isValidPath(dstPath)) {
+        if (repair || !isValidPath(dstPath)) {
 
             if (pathExists(dstPath)) deletePathWrapped(dstPath);
 

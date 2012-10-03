@@ -95,6 +95,10 @@ public:
     const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName,
         sSystem, sOverrides;
 
+    /* If set, force copying files to the Nix store even if they
+       already exist there. */
+    bool repair;
+
 private:
     SrcToStore srcToStore; 
 

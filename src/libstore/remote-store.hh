@@ -53,10 +53,10 @@ public:
     
     Path addToStore(const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter);
+        PathFilter & filter = defaultPathFilter, bool repair = false);
 
     Path addTextToStore(const string & name, const string & s,
-        const PathSet & references);
+        const PathSet & references, bool repair = false);
 
     void exportPath(const Path & path, bool sign,
         Sink & sink);

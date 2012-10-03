@@ -419,8 +419,10 @@ Path RemoteStore::queryPathFromHashPart(const string & hashPart)
 
 
 Path RemoteStore::addToStore(const Path & _srcPath,
-    bool recursive, HashType hashAlgo, PathFilter & filter)
+    bool recursive, HashType hashAlgo, PathFilter & filter, bool repair)
 {
+    if (repair) throw Error("repairing is not supported when building through the Nix daemon");
+
     openConnection();
 
     Path srcPath(absPath(_srcPath));
@@ -438,8 +440,10 @@ Path RemoteStore::addToStore(const Path & _srcPath,
 
 
 Path RemoteStore::addTextToStore(const string & name, const string & s,
-    const PathSet & references)
+    const PathSet & references, bool repair)
 {
+    if (repair) throw Error("repairing is not supported when building through the Nix daemon");
+
     openConnection();
     writeInt(wopAddTextToStore, to);
     writeString(name, to);
@@ -476,7 +480,7 @@ Paths RemoteStore::importPaths(bool requireSignature, Source & source)
 
 void RemoteStore::buildPaths(const PathSet & drvPaths, bool repair)
 {
-    if (repair) throw Error("`--repair' is not supported when building through the Nix daemon");
+    if (repair) throw Error("repairing is not supported when building through the Nix daemon");
     openConnection();
     writeInt(wopBuildPaths, to);
     writeStrings(drvPaths, to);

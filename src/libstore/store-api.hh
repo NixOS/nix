@@ -158,12 +158,12 @@ public:
        libutil/archive.hh). */
     virtual Path addToStore(const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter) = 0;
+        PathFilter & filter = defaultPathFilter, bool repair = false) = 0;
 
     /* Like addToStore, but the contents written to the output path is
        a regular file containing the given string. */
     virtual Path addTextToStore(const string & name, const string & s,
-        const PathSet & references) = 0;
+        const PathSet & references, bool repair = false) = 0;
 
     /* Export a store path, that is, create a NAR dump of the store
        path and append its references and its deriver.  Optionally, a

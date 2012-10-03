@@ -125,6 +125,8 @@ void run(Strings args)
             xmlOutputSourceLocation = false;
         else if (arg == "--strict")
             strict = true;
+        else if (arg == "--repair")
+            state.repair = true;
         else if (arg[0] == '-')
             throw UsageError(format("unknown flag `%1%'") % arg);
         else

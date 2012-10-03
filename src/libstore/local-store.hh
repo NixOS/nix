@@ -133,17 +133,17 @@ public:
 
     Path addToStore(const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter);
+        PathFilter & filter = defaultPathFilter, bool repair = false);
 
     /* Like addToStore(), but the contents of the path are contained
        in `dump', which is either a NAR serialisation (if recursive ==
        true) or simply the contents of a regular file (if recursive ==
        false). */
     Path addToStoreFromDump(const string & dump, const string & name,
-        bool recursive = true, HashType hashAlgo = htSHA256);
+        bool recursive = true, HashType hashAlgo = htSHA256, bool repair = false);
 
     Path addTextToStore(const string & name, const string & s,
-        const PathSet & references);
+        const PathSet & references, bool repair = false);
 
     void exportPath(const Path & path, bool sign,
         Sink & sink);

@@ -487,7 +487,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     }
 
     /* Write the resulting term into the Nix store directory. */
-    Path drvPath = writeDerivation(*store, drv, drvName);
+    Path drvPath = writeDerivation(*store, drv, drvName, state.repair);
 
     printMsg(lvlChatty, format("instantiated `%1%' -> `%2%'")
         % drvName % drvPath);
@@ -625,7 +625,7 @@ static void prim_toFile(EvalState & state, Value * * args, Value & v)
     
     Path storePath = settings.readOnlyMode
         ? computeStorePathForText(name, contents, refs)
-        : store->addTextToStore(name, contents, refs);
+        : store->addTextToStore(name, contents, refs, state.repair);
 
     /* Note: we don't need to add `context' to the context of the
        result, since `storePath' itself has references to the paths
@@ -689,7 +689,7 @@ static void prim_filterSource(EvalState & state, Value * * args, Value & v)
 
     Path dstPath = settings.readOnlyMode
         ? computeStorePathForPath(path, true, htSHA256, filter).first
-        : store->addToStore(path, true, htSHA256, filter);
+        : store->addToStore(path, true, htSHA256, filter, state.repair);
 
     mkString(v, dstPath, singleton<PathSet>(dstPath));
 }

@@ -141,6 +141,7 @@ EvalState::EvalState()
     , baseEnv(allocEnv(128))
     , baseEnvDispl(0)
     , staticBaseEnv(false, 0)
+    , repair(false)
 {
     nrEnvs = nrValuesInEnvs = nrValues = nrListElems = 0;
     nrAttrsets = nrOpUpdates = nrOpUpdateValuesCopied = 0;
@@ -1093,7 +1094,7 @@ string EvalState::coerceToString(Value & v, PathSet & context,
         else {
             dstPath = settings.readOnlyMode
                 ? computeStorePathForPath(path).first
-                : store->addToStore(path);
+                : store->addToStore(path, true, htSHA256, defaultPathFilter, repair);
             srcToStore[path] = dstPath;
             printMsg(lvlChatty, format("copied source `%1%' -> `%2%'")
                 % path % dstPath);
