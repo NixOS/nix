@@ -44,9 +44,6 @@ template<class N> N getIntArg(const string & opt,
 /* Show the manual page for the specified program. */
 void showManPage(const string & name);
 
-/* Whether we're running setuid. */
-extern bool setuidMode;
-
 extern volatile ::sig_atomic_t blockInt;
 
 /* Exit code of the program. */

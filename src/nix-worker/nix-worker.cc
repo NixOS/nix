@@ -893,33 +893,15 @@ static void daemonLoop()
 
 void run(Strings args)
 {
-    bool slave = false;
     bool daemon = false;
 
     for (Strings::iterator i = args.begin(); i != args.end(); ) {
         string arg = *i++;
-        if (arg == "--slave") slave = true;
-        if (arg == "--daemon") daemon = true;
+        if (arg == "--daemon") /* ignored for backwards compatibility */;
     }
 
-    if (slave) {
-        /* This prevents us from receiving signals from the terminal
-           when we're running in setuid mode. */
-        if (setsid() == -1)
-            throw SysError(format("creating a new session"));
-
-        processConnection();
-    }
-
-    else if (daemon) {
-        if (setuidMode)
-            throw Error("daemon cannot be started in setuid mode");
-        chdir("/");
-        daemonLoop();
-    }
-
-    else
-        throw Error("must be run in either --slave or --daemon mode");
+    chdir("/");
+    daemonLoop();
 }
 
 

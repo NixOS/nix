@@ -50,16 +50,12 @@ void RemoteStore::openConnection(bool reserveSpace)
 
     string remoteMode = getEnv("NIX_REMOTE");
 
-    if (remoteMode == "slave")
-        /* Fork off a setuid worker to do the privileged work. */
-        forkSlave();
-    else if (remoteMode == "daemon")
+    if (remoteMode == "daemon")
         /* Connect to a daemon that does the privileged work for
            us. */
-       connectToDaemon();
+        connectToDaemon();
     else
-         throw Error(format("invalid setting for NIX_REMOTE, `%1%'")
-             % remoteMode);
+        throw Error(format("invalid setting for NIX_REMOTE, `%1%'") % remoteMode);
 
     from.fd = fdSocket;
     to.fd = fdSocket;
@@ -85,54 +81,6 @@ void RemoteStore::openConnection(bool reserveSpace)
     }
 
     setOptions();
-}
-
-
-void RemoteStore::forkSlave()
-{
-    int sockets[2];
-    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == -1)
-        throw SysError("cannot create sockets");
-
-    fdSocket = sockets[0];
-    AutoCloseFD fdChild = sockets[1];
-
-    /* Start the worker. */
-    Path worker = getEnv("NIX_WORKER");
-    if (worker == "")
-        worker = settings.nixBinDir + "/nix-worker";
-
-    child = fork();
-
-    switch (child) {
-
-    case -1:
-        throw SysError("unable to fork");
-
-    case 0:
-        try { /* child */
-
-            if (dup2(fdChild, STDOUT_FILENO) == -1)
-                throw SysError("dupping write side");
-
-            if (dup2(fdChild, STDIN_FILENO) == -1)
-                throw SysError("dupping read side");
-
-            close(fdSocket);
-            close(fdChild);
-
-            execlp(worker.c_str(), worker.c_str(), "--slave", NULL);
-
-            throw SysError(format("executing `%1%'") % worker);
-
-        } catch (std::exception & e) {
-            std::cerr << format("child error: %1%\n") % e.what();
-        }
-        quickExit(1);
-    }
-
-    fdChild.close();
-
 }
 
 

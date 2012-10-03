@@ -201,10 +201,8 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
     under the uid of the Nix process (that is, the uid of the caller
     if <envar>NIX_REMOTE</envar> is empty, the uid under which the Nix
     daemon runs if <envar>NIX_REMOTE</envar> is
-    <literal>daemon</literal>, or the uid that owns the setuid
-    <command>nix-worker</command> program if <envar>NIX_REMOTE</envar>
-    is <literal>slave</literal>).  Obviously, this should not be used
-    in multi-user settings with untrusted users.</para>
+    <literal>daemon</literal>).  Obviously, this should not be used in
+    multi-user settings with untrusted users.</para>
 
     </listitem>
 

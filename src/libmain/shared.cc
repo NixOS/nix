@@ -125,8 +125,7 @@ static void initAndRun(int argc, char * * argv)
 
     /* There is no privacy in the Nix system ;-)  At least not for
        now.  In particular, store objects should be readable by
-       everybody.  This prevents nasty surprises when using a shared
-       store (with the setuid() hack). */
+       everybody. */
     umask(0022);
 
     /* Process the NIX_LOG_TYPE environment variable. */
@@ -218,56 +217,6 @@ static void initAndRun(int argc, char * * argv)
 }
 
 
-bool setuidMode = false;
-
-
-static void setuidInit()
-{
-    /* Don't do anything if this is not a setuid binary. */
-    if (getuid() == geteuid() && getgid() == getegid()) return;
-
-    uid_t nixUid = geteuid();
-    gid_t nixGid = getegid();
-
-    setuidCleanup();
-
-    /* Don't trust the current directory. */
-    if (chdir("/") == -1) abort();
-
-    /* Set the real (and preferably also the save) uid/gid to the
-       effective uid/gid.  This matters mostly when we're not using
-       build-users (bad!), since some builders (like Perl) complain
-       when real != effective.
-
-       On systems where setresuid is unavailable, we can't drop the
-       saved uid/gid.  This means that we could go back to the
-       original real uid (i.e., the uid of the caller).  That's not
-       really a problem, except maybe when we execute a builder and
-       we're not using build-users.  In that case, the builder may be
-       able to switch to the uid of the caller and possibly do bad
-       stuff.  But note that when not using build-users, the builder
-       could also modify the Nix executables (say, replace them by a
-       Trojan horse), so the problem is already there. */
-
-#if HAVE_SETRESUID
-    if (setresuid(nixUid, nixUid, nixUid)) abort();
-    if (setresgid(nixGid, nixGid, nixGid)) abort();
-#elif HAVE_SETREUID
-    /* Note: doesn't set saved uid/gid! */
-    fprintf(stderr, "warning: cannot set saved uid\n");
-    if (setreuid(nixUid, nixUid)) abort();
-    if (setregid(nixGid, nixGid)) abort();
-#else
-    /* Note: doesn't set real and saved uid/gid! */
-    fprintf(stderr, "warning: cannot set real and saved uids\n");
-    if (setuid(nixUid)) abort();
-    if (setgid(nixGid)) abort();
-#endif
-
-    setuidMode = true;
-}
-
-
 /* Called when the Boehm GC runs out of memory. */
 static void * oomHandler(size_t requested)
 {
@@ -297,11 +246,6 @@ int main(int argc, char * * argv)
     using namespace nix;
 
     argvSaved = argv;
-
-    /* If we're setuid, then we need to take some security precautions
-       right away. */
-    if (argc == 0) abort();
-    setuidInit();
 
     /* Turn on buffering for cerr. */
 #if HAVE_PUBSETBUF
