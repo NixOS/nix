@@ -134,7 +134,7 @@ EOF
         $verbose = 1;
     }
 
-    elsif ($arg eq "--quiet") {
+    elsif ($arg eq "--quiet" || $arg eq "--repair") {
         push @buildArgs, $arg;
         push @instArgs, $arg;
     }
