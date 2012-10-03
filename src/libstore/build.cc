@@ -1105,8 +1105,10 @@ void DerivationGoal::repairClosure()
         if (worker.store.pathContentsGood(*i)) continue;
         printMsg(lvlError, format("found corrupted or missing path `%1%' in the output closure of `%2%'") % *i % drvPath);
         Path drvPath2 = outputsToDrv[*i];
-        if (drvPath2 == "") throw Error(format("don't know how to repair corrupted or missing path `%1%'") % *i);
-        addWaitee(worker.makeDerivationGoal(drvPath2, true));
+        if (drvPath2 == "")
+            addWaitee(worker.makeSubstitutionGoal(*i, true));
+        else
+            addWaitee(worker.makeDerivationGoal(drvPath2, true));
     }
 
     if (waitees.empty()) {

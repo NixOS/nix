@@ -702,7 +702,7 @@ static void opSet(Globals & globals,
         PathSet paths = singleton<PathSet>(drv.queryDrvPath(globals.state));
         printMissing(*store, paths);
         if (globals.dryRun) return;
-        store->buildPaths(paths);
+        store->buildPaths(paths, globals.state.repair);
     }
     else {
         printMissing(*store, singleton<PathSet>(drv.queryOutPath(globals.state)));
@@ -1317,6 +1317,8 @@ void run(Strings args)
             globals.instSource.systemFilter = needArg(i, args, arg);
         else if (arg == "--prebuilt-only" || arg == "-b")
             globals.prebuiltOnly = true;
+        else if (arg == "--repair")
+            globals.state.repair = true;
         else {
             remaining.push_back(arg);
             if (arg[0] == '-') {
