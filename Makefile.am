@@ -1,6 +1,6 @@
 SUBDIRS = src perl scripts corepkgs doc misc tests
 EXTRA_DIST = substitute.mk nix.spec nix.spec.in bootstrap.sh \
-  NEWS version misc/systemd/nix-worker.service
+  NEWS version misc/systemd/nix-daemon.service
 
 pkginclude_HEADERS = config.h
 
