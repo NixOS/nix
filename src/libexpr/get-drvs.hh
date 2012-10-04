@@ -75,10 +75,12 @@ typedef list<DrvInfo> DrvInfos;
 
 /* If value `v' denotes a derivation, store information about the
    derivation in `drv' and return true.  Otherwise, return false. */
-bool getDerivation(EvalState & state, Value & v, DrvInfo & drv);
+bool getDerivation(EvalState & state, Value & v, DrvInfo & drv,
+    bool ignoreAssertionFailures);
 
 void getDerivations(EvalState & state, Value & v, const string & pathPrefix,
-    Bindings & autoArgs, DrvInfos & drvs);
+    Bindings & autoArgs, DrvInfos & drvs,
+    bool ignoreAssertionFailures);
 
  
 }

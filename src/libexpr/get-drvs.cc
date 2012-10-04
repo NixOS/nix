@@ -84,7 +84,8 @@ typedef set<Bindings *> Done;
    makes sense for the caller to recursively search for derivations in
    `v'. */
 static bool getDerivation(EvalState & state, Value & v,
-    const string & attrPath, DrvInfos & drvs, Done & done)
+    const string & attrPath, DrvInfos & drvs, Done & done,
+    bool ignoreAssertionFailures)
 {
     try {
         state.forceValue(v);
@@ -116,16 +117,18 @@ static bool getDerivation(EvalState & state, Value & v,
         return false;
     
     } catch (AssertionError & e) {
-        return false;
+        if (ignoreAssertionFailures) return false;
+        throw;
     }
 }
 
 
-bool getDerivation(EvalState & state, Value & v, DrvInfo & drv)
+bool getDerivation(EvalState & state, Value & v, DrvInfo & drv,
+    bool ignoreAssertionFailures)
 {
     Done done;
     DrvInfos drvs;
-    getDerivation(state, v, "", drvs, done);
+    getDerivation(state, v, "", drvs, done, ignoreAssertionFailures);
     if (drvs.size() != 1) return false;
     drv = drvs.front();
     return true;
@@ -140,7 +143,8 @@ static string addToPath(const string & s1, const string & s2)
 
 static void getDerivations(EvalState & state, Value & vIn,
     const string & pathPrefix, Bindings & autoArgs,
-    DrvInfos & drvs, Done & done)
+    DrvInfos & drvs, Done & done,
+    bool ignoreAssertionFailures)
 {
     Value v;
     state.autoCallFunction(autoArgs, vIn, v);
@@ -148,7 +152,7 @@ static void getDerivations(EvalState & state, Value & vIn,
     /* Process the expression. */
     DrvInfo drv;
 
-    if (!getDerivation(state, v, pathPrefix, drvs, done)) ;
+    if (!getDerivation(state, v, pathPrefix, drvs, done, ignoreAssertionFailures)) ;
 
     else if (v.type == tAttrs) {
 
@@ -171,8 +175,8 @@ static void getDerivations(EvalState & state, Value & vIn,
             string pathPrefix2 = addToPath(pathPrefix, i->first);
             Value & v2(*v.attrs->find(i->second)->value);
             if (combineChannels)
-                getDerivations(state, v2, pathPrefix2, autoArgs, drvs, done);
-            else if (getDerivation(state, v2, pathPrefix2, drvs, done)) {
+                getDerivations(state, v2, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
+            else if (getDerivation(state, v2, pathPrefix2, drvs, done, ignoreAssertionFailures)) {
                 /* If the value of this attribute is itself an
                    attribute set, should we recurse into it?  => Only
                    if it has a `recurseForDerivations = true'
@@ -180,7 +184,7 @@ static void getDerivations(EvalState & state, Value & vIn,
                 if (v2.type == tAttrs) {
                     Bindings::iterator j = v2.attrs->find(state.symbols.create("recurseForDerivations"));
                     if (j != v2.attrs->end() && state.forceBool(*j->value))
-                        getDerivations(state, v2, pathPrefix2, autoArgs, drvs, done);
+                        getDerivations(state, v2, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
                 }
             }
         }
@@ -191,8 +195,8 @@ static void getDerivations(EvalState & state, Value & vIn,
             startNest(nest, lvlDebug,
                 format("evaluating list element"));
             string pathPrefix2 = addToPath(pathPrefix, (format("%1%") % n).str());
-            if (getDerivation(state, *v.list.elems[n], pathPrefix2, drvs, done))
-                getDerivations(state, *v.list.elems[n], pathPrefix2, autoArgs, drvs, done);
+            if (getDerivation(state, *v.list.elems[n], pathPrefix2, drvs, done, ignoreAssertionFailures))
+                getDerivations(state, *v.list.elems[n], pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
         }
     }
 
@@ -201,10 +205,10 @@ static void getDerivations(EvalState & state, Value & vIn,
 
 
 void getDerivations(EvalState & state, Value & v, const string & pathPrefix,
-    Bindings & autoArgs, DrvInfos & drvs)
+    Bindings & autoArgs, DrvInfos & drvs, bool ignoreAssertionFailures)
 {
     Done done;
-    getDerivations(state, v, pathPrefix, autoArgs, drvs, done);
+    getDerivations(state, v, pathPrefix, autoArgs, drvs, done, ignoreAssertionFailures);
 }
 
  

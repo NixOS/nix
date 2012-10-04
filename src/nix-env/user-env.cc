@@ -25,7 +25,7 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
         Value v;
         state.evalFile(manifestFile, v);
         Bindings bindings;
-        getDerivations(state, v, "", bindings, elems);
+        getDerivations(state, v, "", bindings, elems, false);
     } else if (pathExists(oldManifestFile))
         readLegacyManifest(oldManifestFile, elems);
 
@@ -127,7 +127,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     /* Evaluate it. */
     debug("evaluating user environment builder");
     DrvInfo topLevelDrv;
-    if (!getDerivation(state, topLevel, topLevelDrv))
+    if (!getDerivation(state, topLevel, topLevelDrv, false))
         abort();
     
     /* Realise the resulting store expression. */

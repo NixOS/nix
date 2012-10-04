@@ -166,7 +166,7 @@ static void loadDerivations(EvalState & state, Path nixExprPath,
     Value v;
     findAlongAttrPath(state, pathPrefix, autoArgs, loadSourceExpr(state, nixExprPath), v);
     
-    getDerivations(state, v, pathPrefix, autoArgs, elems);
+    getDerivations(state, v, pathPrefix, autoArgs, elems, true);
 
     /* Filter out all derivations not applicable to the current
        system. */
@@ -362,7 +362,7 @@ static void queryInstSources(EvalState & state,
                 Expr * e2 = state.parseExprFromString(*i, absPath("."));
                 Expr * call = new ExprApp(e2, e1);
                 Value v; state.eval(call, v);
-                getDerivations(state, v, "", instSource.autoArgs, elems);
+                getDerivations(state, v, "", instSource.autoArgs, elems, true);
             }
             
             break;
@@ -417,7 +417,7 @@ static void queryInstSources(EvalState & state,
                 Value v;
                 findAlongAttrPath(state, *i, instSource.autoArgs,
                     loadSourceExpr(state, instSource.nixExprPath), v);
-                getDerivations(state, v, "", instSource.autoArgs, elems);
+                getDerivations(state, v, "", instSource.autoArgs, elems, true);
             }
             break;
         }
