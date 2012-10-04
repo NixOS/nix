@@ -1614,8 +1614,10 @@ bool LocalStore::verifyStore(bool checkContents, bool repair)
             } catch (Error & e) {
                 /* It's possible that the path got GC'ed, so ignore
                    errors on invalid paths. */
-                if (isValidPath(*i)) throw;
-                printMsg(lvlError, format("warning: %1%") % e.msg());
+                if (isValidPath(*i))
+                    printMsg(lvlError, format("error: %1%") % e.msg());
+                else
+                    printMsg(lvlError, format("warning: %1%") % e.msg());
                 errors = true;
             }
         }
