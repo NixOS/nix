@@ -899,13 +899,13 @@ critical system component like the GNU C Library).</para></warning>
 <refsection><title>Example</title>
 
 <screen>
-$ nix-store --verify-path /nix/store/cj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13
-path `/nix/store/cj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13' was modified!
+$ nix-store --verify-path /nix/store/dj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13
+path `/nix/store/dj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13' was modified!
   expected hash `2db57715ae90b7e31ff1f2ecb8c12ec1cc43da920efcbe3b22763f36a1861588',
   got `481c5aa5483ebc97c20457bb8bca24deea56550d3985cda0027f67fe54b808e4'
 
-$ nix-store --repair-path /nix/store/cj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13
-fetching path `/nix/store/cj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13'...
+$ nix-store --repair-path /nix/store/dj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13
+fetching path `/nix/store/d7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13'...
 …
 </screen>
 
