@@ -9,7 +9,7 @@ namespace nix {
 XMLWriter::XMLWriter(bool indent, std::ostream & output)
     : output(output), indent(indent)
 {
-    output << "<?xml version='1.0' encoding='utf-8'?>\n";
+    output << "<?xml version='1.0' encoding='utf-8'?>" << std::endl;
     closed = false;
 }
 
@@ -43,7 +43,7 @@ void XMLWriter::openElement(const string & name,
     output << "<" << name;
     writeAttrs(attrs);
     output << ">";
-    if (indent) output << "\n";
+    if (indent) output << std::endl;
     pendingElems.push_back(name);
 }
 
@@ -53,7 +53,7 @@ void XMLWriter::closeElement()
     assert(!pendingElems.empty());
     indent_(pendingElems.size() - 1);
     output << "</" << pendingElems.back() << ">";
-    if (indent) output << "\n";
+    if (indent) output << std::endl;
     pendingElems.pop_back();
     if (pendingElems.empty()) closed = true;
 }
@@ -67,7 +67,7 @@ void XMLWriter::writeEmptyElement(const string & name,
     output << "<" << name;
     writeAttrs(attrs);
     output << " />";
-    if (indent) output << "\n";
+    if (indent) output << std::endl;
 }
 
 
