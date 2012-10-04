@@ -29,4 +29,4 @@ AM_CXXFLAGS = -Wall \
 local-store.lo: schema.sql.hh
 
 %.sql.hh: %.sql
-	sed -e 's/"/\\"/g' -e 's/.*/"\0\\n"/' < $< > $@ || (rm $@ && exit 1)
+	sed -e 's/"/\\"/g' -e 's/\(.*\)/"\1\\n"/' < $< > $@ || (rm $@ && exit 1)
