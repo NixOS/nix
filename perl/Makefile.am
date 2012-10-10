@@ -26,6 +26,7 @@ AM_CXXFLAGS = \
   -D_FILE_OFFSET_BITS=64
 
 lib/Nix/Store.cc: lib/Nix/Store.xs
+	$(INSTALL) -d lib/Nix
 	xsubpp $^ -output $@
 
 else
