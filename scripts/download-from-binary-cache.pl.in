@@ -199,7 +199,7 @@ sub getAvailableCaches {
     # denotes options passed by the client.
     if (defined $Nix::Config::config{"untrusted-binary-caches"}) {
         my @untrustedUrls = strToList $Nix::Config::config{"untrusted-binary-caches"};
-        my @trustedUrls = (@urls, strToList($Nix::Config::config{"trusted-binary-caches"} // ""));
+        my @trustedUrls = Nix::Utils::uniq(@urls, strToList($Nix::Config::config{"trusted-binary-caches"} // ""));
         @urls = ();
         foreach my $url (@untrustedUrls) {
             die "binary cache ‘$url’ is not trusted (please add it to ‘trusted-binary-caches’ [@trustedUrls] in $Nix::Config::confDir/nix.conf)\n"
