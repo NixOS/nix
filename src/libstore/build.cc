@@ -1661,7 +1661,7 @@ void DerivationGoal::startBuilder()
 
     /* Create a temporary directory where the build will take
        place. */
-    tmpDir = createTempDir("", "nix-build-" + baseNameOf(drvPath), false, false, 0700);
+    tmpDir = createTempDir("", "nix-build-" + storePathToName(drvPath), false, false, 0700);
 
     /* For convenience, set an environment pointing to the top build
        directory. */
