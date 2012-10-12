@@ -1312,8 +1312,8 @@ paths.</para>
 <refsection><title>Example</title>
 
 <screen>
-$ nix-store --clear-failed-path /nix/store/000zi5dcla86l92jn1g997jb06sidm7x-perl-PerlMagick-6.59
-$ nix-store --clear-failed-path *
+$ nix-store --clear-failed-paths /nix/store/000zi5dcla86l92jn1g997jb06sidm7x-perl-PerlMagick-6.59
+$ nix-store --clear-failed-paths *
 </screen>
 
 </refsection>
