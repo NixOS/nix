@@ -6,6 +6,7 @@ use IO::Select;
 use Nix::Config;
 use Nix::Store;
 use Nix::Utils;
+use Nix::Manifest;
 use WWW::Curl::Easy;
 use WWW::Curl::Multi;
 use strict;
@@ -199,7 +200,7 @@ sub getAvailableCaches {
     # denotes options passed by the client.
     if (defined $Nix::Config::config{"untrusted-binary-caches"}) {
         my @untrustedUrls = strToList $Nix::Config::config{"untrusted-binary-caches"};
-        my @trustedUrls = Nix::Utils::uniq(@urls, strToList($Nix::Config::config{"trusted-binary-caches"} // ""));
+        my @trustedUrls = uniq(@urls, strToList($Nix::Config::config{"trusted-binary-caches"} // ""));
         @urls = ();
         foreach my $url (@untrustedUrls) {
             die "binary cache ‘$url’ is not trusted (please add it to ‘trusted-binary-caches’ [@trustedUrls] in $Nix::Config::confDir/nix.conf)\n"
@@ -208,7 +209,7 @@ sub getAvailableCaches {
         }
     }
 
-    foreach my $url (Nix::Utils::uniq @urls) {
+    foreach my $url (uniq @urls) {
 
         # FIXME: not atomic.
         $queryCache->execute($url);
@@ -265,48 +266,17 @@ sub processNARInfo {
         return undef;
     }
 
-    my ($storePath2, $url, $fileHash, $fileSize, $narHash, $narSize, $deriver, $system);
-    my $compression = "bzip2";
-    my @refs;
-    foreach my $line (split "\n", $request->{content}) {
-        unless ($line =~ /^(.*): (.*)$/) {
-            print STDERR "bad NAR info file ‘$request->{url}’\n";
-            return undef;
-        }
-        if ($1 eq "StorePath") { $storePath2 = $2; }
-        elsif ($1 eq "URL") { $url = $2; }
-        elsif ($1 eq "Compression") { $compression = $2; }
-        elsif ($1 eq "FileHash") { $fileHash = $2; }
-        elsif ($1 eq "FileSize") { $fileSize = int($2); }
-        elsif ($1 eq "NarHash") { $narHash = $2; }
-        elsif ($1 eq "NarSize") { $narSize = int($2); }
-        elsif ($1 eq "References") { @refs = split / /, $2; }
-        elsif ($1 eq "Deriver") { $deriver = $2; }
-        elsif ($1 eq "System") { $system = $2; }
-    }
-    return undef if $storePath ne $storePath2;
-    if ($storePath ne $storePath2 || !defined $url || !defined $narHash) {
-        print STDERR "bad NAR info file ‘$request->{url}’\n";
-        return undef;
-    }
+    my $narInfo = parseNARInfo($storePath, $request->{content});
+    return undef unless defined $narInfo;
 
     # Cache the result.
     $insertNAR->execute(
-        $cache->{id}, basename($storePath), $url, $compression, $fileHash, $fileSize,
-        $narHash, $narSize, join(" ", @refs), $deriver, $system, time())
+        $cache->{id}, basename($storePath), $narInfo->{url}, $narInfo->{compression},
+        $narInfo->{fileHash}, $narInfo->{fileSize}, $narInfo->{narHash}, $narInfo->{narSize},
+        join(" ", @$narInfo->{refs}), $narInfo->{deriver}, $narInfo->{system}, time())
         unless $request->{url} =~ /^file:/;
 
-    return
-        { url => $url
-        , compression => $compression
-        , fileHash => $fileHash
-        , fileSize => $fileSize
-        , narHash => $narHash
-        , narSize => $narSize
-        , refs => [ @refs ]
-        , deriver => $deriver
-        , system => $system
-        };
+    return $narInfo;
 }
 
 
@@ -509,7 +479,7 @@ sub downloadBinary {
         }
         my $url = "$cache->{url}/$info->{url}"; # FIXME: handle non-relative URLs
         print STDERR "\n*** Downloading ‘$url’ to ‘$storePath’...\n";
-        Nix::Utils::checkURL $url;
+        checkURL $url;
         if (system("$Nix::Config::curl --fail --location --insecure '$url' | $decompressor | $Nix::Config::binDir/nix-store --restore $destPath") != 0) {
             die "download of `$info->{url}' failed" . ($! ? ": $!" : "") . "\n" unless $? == 0;
             next;

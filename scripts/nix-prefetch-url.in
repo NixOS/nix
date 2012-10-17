@@ -6,6 +6,7 @@ use File::Temp qw(tempdir);
 use File::stat;
 use Nix::Store;
 use Nix::Config;
+use Nix::Utils;
 
 my $url = shift;
 my $expHash = shift;
@@ -18,22 +19,6 @@ Usage: nix-prefetch-url URL [EXPECTED-HASH]
 EOF
     ;
     exit 1;
-}
-
-sub writeFile {
-    my ($fn, $s) = @_;
-    open TMP, ">$fn" or die;
-    print TMP "$s" or die;
-    close TMP or die;
-}
-
-sub readFile {
-    local $/ = undef;
-    my ($fn) = @_;
-    open TMP, "<$fn" or die;
-    my $s = <TMP>;
-    close TMP or die;
-    return $s;
 }
 
 my $tmpDir = tempdir("nix-prefetch-url.XXXXXX", CLEANUP => 1, TMPDIR => 1)

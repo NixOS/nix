@@ -9,7 +9,7 @@ use Fcntl ':flock';
 use Nix::Config;
 
 our @ISA = qw(Exporter);
-our @EXPORT = qw(readManifest writeManifest updateManifestDB addPatch deleteOldManifests);
+our @EXPORT = qw(readManifest writeManifest updateManifestDB addPatch deleteOldManifests parseNARInfo);
 
 
 sub addNAR {
@@ -385,6 +385,44 @@ sub deleteOldManifests {
         unlink "${base}.url";
         unlink "${base}.nixmanifest";
     }
+}
+
+
+# Parse a NAR info file.
+sub parseNARInfo {
+    my ($storePath, $content) = @_;
+
+    my ($storePath2, $url, $fileHash, $fileSize, $narHash, $narSize, $deriver, $system);
+    my $compression = "bzip2";
+    my @refs;
+
+    foreach my $line (split "\n", $content) {
+        return undef unless $line =~ /^(.*): (.*)$/;
+        if ($1 eq "StorePath") { $storePath2 = $2; }
+        elsif ($1 eq "URL") { $url = $2; }
+        elsif ($1 eq "Compression") { $compression = $2; }
+        elsif ($1 eq "FileHash") { $fileHash = $2; }
+        elsif ($1 eq "FileSize") { $fileSize = int($2); }
+        elsif ($1 eq "NarHash") { $narHash = $2; }
+        elsif ($1 eq "NarSize") { $narSize = int($2); }
+        elsif ($1 eq "References") { @refs = split / /, $2; }
+        elsif ($1 eq "Deriver") { $deriver = $2; }
+        elsif ($1 eq "System") { $system = $2; }
+    }
+
+    return undef if $storePath ne $storePath2 || !defined $url || !defined $narHash;
+
+    return
+        { url => $url
+        , compression => $compression
+        , fileHash => $fileHash
+        , fileSize => $fileSize
+        , narHash => $narHash
+        , narSize => $narSize
+        , refs => [ @refs ]
+        , deriver => $deriver
+        , system => $system
+        };
 }
 
 

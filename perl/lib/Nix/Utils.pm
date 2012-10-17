@@ -1,5 +1,8 @@
 package Nix::Utils;
 
+our @ISA = qw(Exporter);
+our @EXPORT = qw(checkURL uniq writeFile readFile);
+
 $urlRE = "(?: [a-zA-Z][a-zA-Z0-9\+\-\.]*\:[a-zA-Z0-9\%\/\?\:\@\&\=\+\$\,\-\_\.\!\~\*]+ )";
 
 sub checkURL {
@@ -16,4 +19,20 @@ sub uniq {
         push @res, $name;
     }
     return @res;
+}
+
+sub writeFile {
+    my ($fn, $s) = @_;
+    open TMP, ">$fn" or die;
+    print TMP "$s" or die;
+    close TMP or die;
+}
+
+sub readFile {
+    local $/ = undef;
+    my ($fn) = @_;
+    open TMP, "<$fn" or die;
+    my $s = <TMP>;
+    close TMP or die;
+    return $s;
 }

@@ -9,6 +9,7 @@ use File::Copy;
 use Nix::Config;
 use Nix::Store;
 use Nix::Manifest;
+use Nix::Utils;
 
 my $tmpDir = tempdir("nix-push.XXXXXX", CLEANUP => 1, TMPDIR => 1)
     or die "cannot create a temporary directory";
@@ -81,12 +82,43 @@ foreach my $path (@roots) {
 my @storePaths = keys %storePaths;
 
 
+# Don't create archives for files that are already in the binary cache.
+my @storePaths2;
+my %narFiles;
+foreach my $storePath (@storePaths) {
+    my $pathHash = substr(basename($storePath), 0, 32);
+    my $narInfoFile = "$destDir/$pathHash.narinfo";
+    if (-e $narInfoFile) {
+        my $narInfo = parseNARInfo($storePath, readFile($narInfoFile));
+        my $narFile = "$destDir/$narInfo->{url}";
+        if (-e $narFile) {
+            print STDERR "skipping existing $storePath\n";
+            # Add the NAR info to $narFiles if we're writing a
+            # manifest.
+            $narFiles{$storePath} = [
+                { url => ("$archivesURL/" . basename $narInfo->{url})
+                  , hash => $narInfo->{fileHash}
+                  , size => $narInfo->{fileSize}
+                  , compressionType => $narInfo->{compression}
+                  , narHash => $narInfo->{narHash}
+                  , narSize => $narInfo->{narSize}
+                  , references => join(" ", map { "$Nix::Config::storeDir/$_" } @{$narInfo->{refs}})
+                  , deriver => $narInfo->{deriver} ? "$Nix::Config::storeDir/$narInfo->{deriver}" : undef
+                  }
+            ] if $writeManifest;
+            next;
+        }
+    }
+    push @storePaths2, $storePath;
+}
+
+
 # Create a list of Nix derivations that turn each path into a Nix
 # archive.
 open NIX, ">$nixExpr";
 print NIX "[";
 
-foreach my $storePath (@storePaths) {
+foreach my $storePath (@storePaths2) {
     die unless ($storePath =~ /\/[0-9a-z]{32}[^\"\\\$]*$/);
 
     # Construct a Nix expression that creates a Nix archive.
@@ -130,10 +162,8 @@ print STDERR "copying archives...\n";
 my $totalNarSize = 0;
 my $totalCompressedSize = 0;
 
-my %narFiles;
-
-for (my $n = 0; $n < scalar @storePaths; $n++) {
-    my $storePath = $storePaths[$n];
+for (my $n = 0; $n < scalar @storePaths2; $n++) {
+    my $storePath = $storePaths2[$n];
     my $narDir = $narPaths[$n];
     my $baseName = basename $storePath;
 
@@ -226,7 +256,7 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
 }
 
 printf STDERR "total compressed size %.2f MiB, %.1f%%\n",
-    $totalCompressedSize / (1024 * 1024), $totalCompressedSize / $totalNarSize * 100;
+    $totalCompressedSize / (1024 * 1024), $totalCompressedSize / ($totalNarSize || 1) * 100;
 
 
 # Optionally write a manifest.
