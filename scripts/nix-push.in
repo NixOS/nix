@@ -23,6 +23,7 @@ my $force = 0;
 my $destDir;
 my $writeManifest = 0;
 my $archivesURL;
+my $link = 0;
 my @roots;
 
 for (my $n = 0; $n < scalar @ARGV; $n++) {
@@ -45,6 +46,8 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
         $n++;
         die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
         $archivesURL = $ARGV[$n];
+    } elsif ($arg eq "--link") {
+        $link = 1;
     } elsif (substr($arg, 0, 1) eq "-") {
         die "$0: unknown flag `$arg'\n";
     } else {
@@ -209,7 +212,11 @@ for (my $n = 0; $n < scalar @storePaths2; $n++) {
     my $dst = "$destDir/$narName";
     if (! -f $dst) {
         my $tmp = "$destDir/.tmp.$$.$narName";
-        copy($narFile, $tmp) or die "cannot copy $narFile to $tmp: $!\n";
+        if ($link) {
+            link($narFile, $tmp) or die "cannot link $tmp to $narFile: $!\n";
+        } else {
+            copy($narFile, $tmp) or die "cannot copy $narFile to $tmp: $!\n";
+        }
         rename($tmp, $dst) or die "cannot rename $tmp to $dst: $!\n";
     }
 
