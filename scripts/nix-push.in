@@ -22,6 +22,7 @@ my $compressionType = "xz";
 my $force = 0;
 my $destDir;
 my $writeManifest = 0;
+my $manifestPath;
 my $archivesURL;
 my $link = 0;
 my @roots;
@@ -42,6 +43,12 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
         mkpath($destDir, 0, 0755);
     } elsif ($arg eq "--manifest") {
         $writeManifest = 1;
+    } elsif ($arg eq "--manifest-path") {
+        $n++;
+        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        $manifestPath = $ARGV[$n];
+        $writeManifest = 1;
+        mkpath(dirname($manifestPath), 0, 0755);
     } elsif ($arg eq "--url-prefix") {
         $n++;
         die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
@@ -267,4 +274,4 @@ printf STDERR "total compressed size %.2f MiB, %.1f%%\n",
 
 
 # Optionally write a manifest.
-writeManifest "$destDir/MANIFEST", \%narFiles, \() if $writeManifest;
+writeManifest($manifestPath // "$destDir/MANIFEST", \%narFiles, \()) if $writeManifest;
