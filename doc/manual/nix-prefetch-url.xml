@@ -18,6 +18,7 @@
 <refsynopsisdiv>
   <cmdsynopsis>
     <command>nix-prefetch-url</command>
+    <arg><option>--type</option> <replaceable>hashAlgo</replaceable></arg>
     <arg choice='plain'><replaceable>url</replaceable></arg>
     <arg><replaceable>hash</replaceable></arg>
   </cmdsynopsis>
@@ -45,11 +46,6 @@ download it again when you build your Nix expression.  Since
 as <command>nix-prefetch-url</command>, the redundant download can be
 avoided.</para>
 
-<para>The environment variable <envar>NIX_HASH_ALGO</envar> specifies
-which hash algorithm to use.  It can be either <literal>md5</literal>,
-<literal>sha1</literal>, or <literal>sha256</literal>.  The default is
-<literal>sha256</literal>.</para>
-
 <para>If <replaceable>hash</replaceable> is specified, then a download
 is not performed if the Nix store already contains a file with the
 same hash and base name.  Otherwise, the file is downloaded, and an
@@ -59,6 +55,24 @@ specified hash.</para>
 <para>This command prints the hash on standard output.  Additionally,
 if the environment variable <envar>PRINT_PATH</envar> is set, the path
 of the downloaded file in the Nix store is also printed.</para>
+
+</refsection>
+
+
+<refsection><title>Options</title>
+
+<variablelist>
+  
+  <varlistentry><term><option>--type</option> <replaceable>hashAlgo</replaceable></term>
+
+    <listitem><para>Use the specified cryptographic hash algorithm,
+    which can be one of <literal>md5</literal>,
+    <literal>sha1</literal>, and
+    <literal>sha256</literal>.</para></listitem>
+
+  </varlistentry>
+
+</variablelist>
 
 </refsection>
 

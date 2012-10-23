@@ -91,8 +91,9 @@ cryptographic hash as <literal>nix-store --dump
 
   <varlistentry><term><option>--type</option> <replaceable>hashAlgo</replaceable></term>
 
-    <listitem><para>Specify a cryptographic hash, which can be one of
-    <literal>md5</literal>, <literal>sha1</literal>, and
+    <listitem><para>Use the specified cryptographic hash algorithm,
+    which can be one of <literal>md5</literal>,
+    <literal>sha1</literal>, and
     <literal>sha256</literal>.</para></listitem>
 
   </varlistentry>

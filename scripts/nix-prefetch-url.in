@@ -8,10 +8,27 @@ use Nix::Store;
 use Nix::Config;
 use Nix::Utils;
 
-my $url = shift;
-my $expHash = shift;
-my $hashType = $ENV{'NIX_HASH_ALGO'} || "sha256";
+my $hashType = $ENV{'NIX_HASH_ALGO'} || "sha256"; # obsolete
 my $cacheDir = $ENV{'NIX_DOWNLOAD_CACHE'};
+
+my @args;
+my $arg;
+while ($arg = shift) {
+    if ($arg eq "--help") {
+        exec "man nix-prefetch-url" or die;
+    } elsif ($arg eq "--type") {
+        $hashType = shift;
+        die "$0: `$arg' requires an argument\n" unless defined $hashType;
+    } elsif (substr($arg, 0, 1) eq "-") {
+        die "$0: unknown flag `$arg'\n";
+    } else {
+        push @args, $arg;
+    }
+}
+
+my $url = $args[0];
+my $expHash = $args[1];
+
 
 if (!defined $url || $url eq "") {
     print STDERR <<EOF
