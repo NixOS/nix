@@ -2228,7 +2228,7 @@ void DerivationGoal::computeClosure()
             if (h != h2)
                 throw BuildError(
                     format("output path `%1%' should have %2% hash `%3%', instead has `%4%'")
-                    % path % i->second.hashAlgo % printHash(h) % printHash(h2));
+                    % path % i->second.hashAlgo % printHash16or32(h) % printHash16or32(h2));
         }
 
         /* Get rid of all weird permissions. */

@@ -153,6 +153,12 @@ string printHash32(const Hash & hash)
 }
 
 
+string printHash16or32(const Hash & hash)
+{
+    return hash.type == htMD5 ? printHash(hash) : printHash32(hash);
+}
+
+
 static bool mul(unsigned char * bytes, unsigned char y, int maxSize)
 {
     unsigned char carry = 0;
