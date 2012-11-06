@@ -160,6 +160,18 @@
 </glossentry>
 
 
+<glossentry xml:id="gloss-nar"><glossterm>NAR</glossterm>
+
+  <glossdef><para>A <emphasis>N</emphasis>ix
+  <emphasis>AR</emphasis>chive.  This is a serialisation of a path in
+  the Nix store.  It can contain regular files, directories and
+  symbolic links.  NARs are generated and unpacked using
+  <command>nix-store --dump</command> and <command>nix-store
+  --restore</command>.</para></glossdef>
+
+</glossentry>
+
+
 
 </glosslist>
 
