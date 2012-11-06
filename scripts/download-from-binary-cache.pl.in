@@ -492,7 +492,7 @@ sub downloadBinary {
         print STDERR "\n*** Downloading ‘$url’ to ‘$storePath’...\n";
         checkURL $url;
         if (system("$Nix::Config::curl --fail --location --insecure '$url' | $decompressor | $Nix::Config::binDir/nix-store --restore $destPath") != 0) {
-            die "download of `$info->{url}' failed" . ($! ? ": $!" : "") . "\n" unless $? == 0;
+            warn "download of `$url' failed" . ($! ? ": $!" : "") . "\n";
             next;
         }
 
