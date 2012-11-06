@@ -507,6 +507,8 @@ void canonicalisePathMetaData(const Path & path, bool recurse)
         times[1].tv_usec = 0;
 #if HAVE_LUTIMES
         if (lutimes(path.c_str(), times) == -1)
+            if (errno != ENOSYS ||
+                (!S_ISLNK(st.st_mode) && utimes(path.c_str(), times) == -1))
 #else
         if (!S_ISLNK(st.st_mode) && utimes(path.c_str(), times) == -1)
 #endif
