@@ -177,6 +177,10 @@ sub getAvailableCaches {
     return if $gotCaches;
     $gotCaches = 1;
 
+    return if
+        ($Nix::Config::config{"use-binary-caches"} // "true") eq "false" ||
+        ($Nix::Config::config{"untrusted-use-binary-caches"} // "true") eq "false";
+
     sub strToList {
         my ($s) = @_;
         return map { s/\/+$//; $_ } split(/ /, $s);

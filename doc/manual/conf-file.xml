@@ -318,6 +318,16 @@ build-use-chroot = /dev /proc /bin</programlisting>
   </varlistentry>
 
 
+  <varlistentry><term><literal>use-binary-caches</literal></term>
+
+    <listitem><para>If set to <literal>true</literal> (the default),
+    Nix will check the binary caches specified by
+    <option>binary-caches</option> and related options to obtain
+    binary substitutes.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry><term><literal>binary-caches</literal></term>
 
     <listitem><para>A list of URLs of binary caches, separated by
