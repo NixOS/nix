@@ -210,6 +210,7 @@ properties.  Here’s an example:
 <screen>
 StoreDir: /nix/store
 WantMassQuery: 1
+Priority: 10
 </screen>
 
 The properties that are currently supported are:
@@ -243,6 +244,16 @@ The properties that are currently supported are:
     you actually install the package.  If
     <literal>WantMassQuery</literal> is set to <literal>1</literal>,
     mass queries will use this cache.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><literal>Priority</literal></term>
+
+    <listitem><para>Each binary cache has a priority (defaulting to
+    50).  Binary caches are checked for binaries in order of ascending
+    priority; thus a higher number denotes a lower priority.  The
+    binary cache <uri>http://nixos.org/binary-cache</uri> has priority
+    40.</para></listitem>
 
   </varlistentry>
 

@@ -102,7 +102,9 @@ sub processRequests {
 
 
 sub initCache {
-    my $dbPath = "$Nix::Config::stateDir/binary-cache-v1.sqlite";
+    my $dbPath = "$Nix::Config::stateDir/binary-cache-v2.sqlite";
+
+    unlink "$Nix::Config::stateDir/binary-cache-v1.sqlite";
 
     # Open/create the database.
     $dbh = DBI->connect("dbi:SQLite:dbname=$dbPath", "", "")
@@ -120,7 +122,8 @@ sub initCache {
             url       text unique not null,
             timestamp integer not null,
             storeDir  text not null,
-            wantMassQuery integer not null
+            wantMassQuery integer not null,
+            priority  integer not null
         );
 EOF
 
@@ -156,7 +159,7 @@ EOF
 
     $dbh->do("create index if not exists NARExistenceByExistTimestamp on NARExistence (exist, timestamp)");
 
-    $queryCache = $dbh->prepare("select id, storeDir, wantMassQuery from BinaryCaches where url = ?") or die;
+    $queryCache = $dbh->prepare("select id, storeDir, wantMassQuery, priority from BinaryCaches where url = ?") or die;
 
     $insertNAR = $dbh->prepare(
         "insert or replace into NARs(cache, storePath, url, compression, fileHash, fileSize, narHash, " .
@@ -220,7 +223,7 @@ sub getAvailableCaches {
         my $res = $queryCache->fetchrow_hashref();
         if (defined $res) {
             next if $res->{storeDir} ne $Nix::Config::storeDir;
-            push @caches, { id => $res->{id}, url => $url, wantMassQuery => $res->{wantMassQuery} };
+            push @caches, { id => $res->{id}, url => $url, wantMassQuery => $res->{wantMassQuery}, priority => $res->{priority} };
             next;
         }
 
@@ -236,6 +239,7 @@ sub getAvailableCaches {
 
         my $storeDir = "/nix/store";
         my $wantMassQuery = 0;
+        my $priority = 50;
         foreach my $line (split "\n", $request->{content}) {
             unless ($line =~ /^(.*): (.*)$/) {
                 print STDERR "bad cache info file ‘$request->{url}’\n";
@@ -243,14 +247,17 @@ sub getAvailableCaches {
             }
             if ($1 eq "StoreDir") { $storeDir = $2; }
             elsif ($1 eq "WantMassQuery") { $wantMassQuery = int($2); }
+            elsif ($1 eq "Priority") { $priority = int($2); }
         }
 
-        $dbh->do("insert into BinaryCaches(url, timestamp, storeDir, wantMassQuery) values (?, ?, ?, ?)",
-                 {}, $url, time(), $storeDir, $wantMassQuery);
+        $dbh->do("insert into BinaryCaches(url, timestamp, storeDir, wantMassQuery, priority) values (?, ?, ?, ?, ?)",
+                 {}, $url, time(), $storeDir, $wantMassQuery, $priority);
         my $id = $dbh->last_insert_id("", "", "", "");
         next if $storeDir ne $Nix::Config::storeDir;
-        push @caches, { id => $id, url => $url, wantMassQuery => $wantMassQuery };
+        push @caches, { id => $id, url => $url, wantMassQuery => $wantMassQuery, priority => $priority };
     }
+
+    @caches = sort { $a->{priority} <=> $b->{priority} } @caches;
 
     expireNegative();
 }
