@@ -72,8 +72,6 @@ $archivesURL = "file://$destDir" unless defined $archivesURL;
 my %storePaths;
 
 foreach my $path (@roots) {
-    die unless $path =~ /^\//;
-
     # Get all paths referenced by the normalisation of the given
     # Nix expression.
     my $pid = open(READ,
