@@ -870,7 +870,13 @@ void killUser(uid_t uid)
 string runProgram(Path program, bool searchPath, const Strings & args)
 {
     checkInterrupt();
-    
+
+    std::vector<const char *> cargs; /* careful with c_str()! */
+    cargs.push_back(program.c_str());
+    for (Strings::const_iterator i = args.begin(); i != args.end(); ++i)
+        cargs.push_back(i->c_str());
+    cargs.push_back(0);
+
     /* Create a pipe. */
     Pipe pipe;
     pipe.create();
@@ -885,23 +891,15 @@ string runProgram(Path program, bool searchPath, const Strings & args)
 
     case 0: /* child */
         try {
-            pipe.readSide.close();
-
             if (dup2(pipe.writeSide, STDOUT_FILENO) == -1)
                 throw SysError("dupping stdout");
-
-            std::vector<const char *> cargs; /* careful with c_str()! */
-            cargs.push_back(program.c_str());
-            for (Strings::const_iterator i = args.begin(); i != args.end(); ++i)
-                cargs.push_back(i->c_str());
-            cargs.push_back(0);
 
             if (searchPath)
                 execvp(program.c_str(), (char * *) &cargs[0]);
             else
                 execv(program.c_str(), (char * *) &cargs[0]);
             throw SysError(format("executing `%1%'") % program);
-            
+
         } catch (std::exception & e) {
             std::cerr << "error: " << e.what() << std::endl;
         }

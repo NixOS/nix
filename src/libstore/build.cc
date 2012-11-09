@@ -368,8 +368,6 @@ void commonChildInit(Pipe & logPipe)
     /* Dup the write side of the logger pipe into stderr. */
     if (dup2(logPipe.writeSide, STDERR_FILENO) == -1)
         throw SysError("cannot pipe standard error into log file");
-    logPipe.readSide.close();
-    logPipe.writeSide.close();
 
     /* Dup stderr to stdout. */
     if (dup2(STDERR_FILENO, STDOUT_FILENO) == -1)
@@ -681,12 +679,10 @@ HookInstance::HookInstance()
             if (chdir("/") == -1) throw SysError("changing into `/");
 
             /* Dup the communication pipes. */
-            toHook.writeSide.close();
             if (dup2(toHook.readSide, STDIN_FILENO) == -1)
                 throw SysError("dupping to-hook read side");
 
             /* Use fd 4 for the builder's stdout/stderr. */
-            builderOut.readSide.close();
             if (dup2(builderOut.writeSide, 4) == -1)
                 throw SysError("dupping builder's stdout/stderr");
 
@@ -2680,8 +2676,6 @@ void SubstitutionGoal::tryToRun()
 
             if (dup2(outPipe.writeSide, STDOUT_FILENO) == -1)
                 throw SysError("cannot dup output pipe into stdout");
-            outPipe.readSide.close();
-            outPipe.writeSide.close();
 
             /* Pass configuration options (including those overriden
                with --option) to the substituter. */

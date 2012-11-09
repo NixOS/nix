@@ -968,8 +968,6 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
                with --option) to the substituter. */
             setenv("_NIX_OPTIONS", settings.pack().c_str(), 1);
 
-            fromPipe.readSide.close();
-            toPipe.writeSide.close();
             if (dup2(toPipe.readSide, STDIN_FILENO) == -1)
                 throw SysError("dupping stdin");
             if (dup2(fromPipe.writeSide, STDOUT_FILENO) == -1)
