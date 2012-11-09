@@ -847,9 +847,9 @@ void killUser(uid_t uid)
         } catch (std::exception & e) {
             std::cerr << format("killing processes belonging to uid `%1%': %2%")
                 % uid % e.what() << std::endl;
-            quickExit(1);
+            _exit(1);
         }
-        quickExit(0);
+        _exit(0);
     }
     
     /* parent */
@@ -905,7 +905,7 @@ string runProgram(Path program, bool searchPath, const Strings & args)
         } catch (std::exception & e) {
             std::cerr << "error: " << e.what() << std::endl;
         }
-        quickExit(1);
+        _exit(1);
     }
 
     /* Parent. */
@@ -941,12 +941,6 @@ void closeOnExec(int fd)
     if ((prev = fcntl(fd, F_GETFD, 0)) == -1 ||
         fcntl(fd, F_SETFD, prev | FD_CLOEXEC) == -1)
         throw SysError("setting close-on-exec flag");
-}
-
-
-void quickExit(int status)
-{
-    _exit(status);
 }
 
 

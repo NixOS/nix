@@ -981,7 +981,7 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
         } catch (std::exception & e) {
             std::cerr << "error: " << e.what() << std::endl;
         }
-        quickExit(1);
+        _exit(1);
     }
 
     /* Parent. */

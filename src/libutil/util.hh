@@ -262,10 +262,6 @@ void closeMostFDs(const set<int> & exceptions);
 /* Set the close-on-exec flag for the given file descriptor. */
 void closeOnExec(int fd);
 
-/* Wrapper around _exit() on Unix and ExitProcess() on Windows.  (On
-   Cygwin, _exit() doesn't seem to do the right thing.) */
-void quickExit(int status);
-
 /* Common initialisation for setuid programs: clear the environment,
    sanitize file handles 0, 1 and 2. */
 void setuidCleanup();

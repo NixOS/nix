@@ -569,7 +569,7 @@ static void runSetuidHelper(const string & command,
         catch (std::exception & e) {
             std::cerr << "error: " << e.what() << std::endl;
         }
-        quickExit(1);
+        _exit(1);
     }
 
     /* Parent. */
@@ -701,7 +701,7 @@ HookInstance::HookInstance()
         } catch (std::exception & e) {
             std::cerr << format("build hook error: %1%") % e.what() << std::endl;
         }
-        quickExit(1);
+        _exit(1);
     }
 
     /* parent */
@@ -2146,7 +2146,7 @@ void DerivationGoal::initChild()
 
     } catch (std::exception & e) {
         std::cerr << format("build error: %1%") % e.what() << std::endl;
-        quickExit(inSetup ? childSetupFailed : 1);
+        _exit(inSetup ? childSetupFailed : 1);
     }
 
     abort(); /* never reached */
@@ -2702,7 +2702,7 @@ void SubstitutionGoal::tryToRun()
         } catch (std::exception & e) {
             std::cerr << format("substitute error: %1%") % e.what() << std::endl;
         }
-        quickExit(1);
+        _exit(1);
     }
 
     /* parent */
