@@ -93,8 +93,6 @@ private:
 
     void processStderr(Sink * sink = 0, Source * source = 0);
 
-    void forkSlave();
-    
     void connectToDaemon();
 
     void setOptions();
