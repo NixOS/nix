@@ -273,11 +273,11 @@ is the hash part of <replaceable>p</replaceable>.  Thus, if we have a
 cache <uri>http://nixos.org/binary-cache</uri> and we want to obtain
 the store path
 <screen>
-/nix/store/cj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13
+/nix/store/a8922c0h87iilxzzvwn2hmv8x210aqb9-glibc-2.7
 </screen>
 then Nix will attempt to fetch
 <screen>
-http://nixos.org/binary-cache/cj7a81wsm1ijwwpkks3725661h3263p5.narinfo
+http://nixos.org/binary-cache/a8922c0h87iilxzzvwn2hmv8x210aqb9.narinfo
 </screen>
 (Commands such as <command>nix-env -qas</command> will issue an HTTP
 HEAD request, since it only needs to know if the
@@ -286,16 +286,15 @@ HEAD request, since it only needs to know if the
 like this:
 
 <screen>
-StorePath: /nix/store/cj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13
-URL: nar/0k6335lpbcmdgncqwkcry4dxr2m6qs77zia51684ynjgc7n5xx21.nar.bz2
+StorePath: /nix/store/a8922c0h87iilxzzvwn2hmv8x210aqb9-glibc-2.7
+URL: nar/0zzjpdz46mdn74v09m053yczlz4am038g8r74iy8w43gx8801h70.nar.bz2
 Compression: bzip2
-FileHash: sha256:0k6335lpbcmdgncqwkcry4dxr2m6qs77zia51684ynjgc7n5xx21
-FileSize: 10119014
-NarHash: sha256:120mhshkcgvn48xvxz0fjbd47k615v0viv7jy4gy7dwhmqapgd9d
-NarSize: 33702192
-References: cj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13 jfcs9xnfbmiwqs224sb0qqsybbfl3sab-linux-headers-2.6.35.14
-Deriver: xs32zzf2d58f6l5iz5fgwxrds2q5pnvn-glibc-2.13.drv
-System: x86_64-linux
+FileHash: sha256:0zzjpdz46mdn74v09m053yczlz4am038g8r74iy8w43gx8801h70
+FileSize: 24473768
+NarHash: sha256:0s491y1h9hxj5ghiizlxk7ax6jwbha00zwn7lpyd5xg5bhf60vzg
+NarSize: 109521136
+References: 2ma2k0ys8knh4an48n28vigcmc2z8773-linux-headers-2.6.23.16 ...
+Deriver: 7akyyc87ka32xwmqza9dvyg5pwx3j212-glibc-2.7.drv
 </screen>
 
 The fields are as follows:
@@ -305,7 +304,7 @@ The fields are as follows:
   <varlistentry><term><literal>StorePath</literal></term>
 
     <listitem><para>The full store path, including the name part
-    (e.g., <literal>glibc-2.13</literal>).  It must match the
+    (e.g., <literal>glibc-2.7</literal>).  It must match the
     requested store path.</para></listitem>
 
   </varlistentry>
@@ -380,11 +379,11 @@ The fields are as follows:
 
 <para>Thus, in our example, after recursively ensuring that the
 references exist (e.g.,
-<filename>/nix/store/jfcs9xnfbmiwqs224sb0qqsybbfl3sab-linux-headers-2.6.35.14</filename>),
+<filename>/nix/store/2ma2k0ys8knh4an48n28vigcmc2z8773-linux-headers-2.6.23.16</filename>),
 Nix will fetch <screen>
-http://nixos.org/binary-cache/nar/0k6335lpbcmdgncqwkcry4dxr2m6qs77zia51684ynjgc7n5xx21.nar.bz2
+http://nixos.org/binary-cache/nar/0zzjpdz46mdn74v09m053yczlz4am038g8r74iy8w43gx8801h70.nar.bz2
 </screen> and decompress and unpack it to
-<filename>/nix/store/cj7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13</filename>.</para>
+<filename>/nix/store/a8922c0h87iilxzzvwn2hmv8x210aqb9-glibc-2.7</filename>.</para>
 
 </refsection>
 
