@@ -443,7 +443,7 @@ URL.</para>
 <command>nix-channel --add</command>, e.g.,
 
 <screen>
-$ nix-channel --add http://nixos.org/releases/nixpkgs/channels/nixpkgs-unstable</screen>
+$ nix-channel --add http://nixos.org/channels/nixpkgs-unstable</screen>
 
 subscribes you to a channel that always contains that latest version
 of the Nix Packages collection.  (Instead of

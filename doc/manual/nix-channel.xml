@@ -103,7 +103,7 @@ respectively.</para>
 <para>To subscribe to the Nixpkgs channel and install the GNU Hello package:</para>
 
 <screen>
-$ nix-channel --add http://nixos.org/releases/nixpkgs/channels/nixpkgs-unstable
+$ nix-channel --add http://nixos.org/channels/nixpkgs-unstable
 $ nix-channel --update
 $ nix-env -iA nixpkgs.hello</screen>
 

@@ -10,7 +10,7 @@ if test -n "$HOME"; then
 
     # Subscribe the root user to the Nixpkgs channel by default.
     if [ ! -e $HOME/.nix-channels ]; then
-        echo "http://nixos.org/releases/nixos/channels/nixpkgs-unstable nixpkgs" > $HOME/.nix-channels
+        echo "http://nixos.org/channels/nixpkgs-unstable nixpkgs" > $HOME/.nix-channels
     fi
 
     export PATH=$NIX_LINK/bin:$PATH
