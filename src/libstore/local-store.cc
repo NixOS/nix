@@ -983,7 +983,6 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
                 throw SysError("dupping stdout");
             if (dup2(errorPipe.writeSide, STDERR_FILENO) == -1)
                 throw SysError("dupping stderr");
-            closeMostFDs(set<int>());
             execl(substituter.c_str(), substituter.c_str(), "--query", NULL);
             throw SysError(format("executing `%1%'") % substituter);
         } catch (std::exception & e) {
