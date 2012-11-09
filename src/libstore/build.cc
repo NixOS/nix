@@ -665,7 +665,7 @@ HookInstance::HookInstance()
     builderOut.create();
 
     /* Fork the hook. */
-    pid = fork();
+    pid = maybeVfork();
     switch (pid) {
 
     case -1:
@@ -2662,8 +2662,19 @@ void SubstitutionGoal::tryToRun()
     if (pathExists(destPath))
         deletePathWrapped(destPath);
 
+    worker.store.setSubstituterEnv();
+
+    /* Fill in the arguments. */
+    Strings args;
+    args.push_back(baseNameOf(sub));
+    args.push_back("--substitute");
+    args.push_back(storePath);
+    args.push_back(destPath);
+    const char * * argArr = strings2CharPtrs(args);
+
     /* Fork the substitute program. */
-    pid = fork();
+    pid = maybeVfork();
+
     switch (pid) {
 
     case -1:
@@ -2676,18 +2687,6 @@ void SubstitutionGoal::tryToRun()
 
             if (dup2(outPipe.writeSide, STDOUT_FILENO) == -1)
                 throw SysError("cannot dup output pipe into stdout");
-
-            /* Pass configuration options (including those overriden
-               with --option) to the substituter. */
-            setenv("_NIX_OPTIONS", settings.pack().c_str(), 1);
-
-            /* Fill in the arguments. */
-            Strings args;
-            args.push_back(baseNameOf(sub));
-            args.push_back("--substitute");
-            args.push_back(storePath);
-            args.push_back(destPath);
-            const char * * argArr = strings2CharPtrs(args);
 
             execv(sub.c_str(), (char * *) argArr);
 

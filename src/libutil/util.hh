@@ -266,6 +266,9 @@ void closeOnExec(int fd);
    sanitize file handles 0, 1 and 2. */
 void setuidCleanup();
 
+/* Call vfork() if available, otherwise fork(). */
+extern pid_t (*maybeVfork)();
+
 
 /* User interruption. */
 

@@ -760,8 +760,8 @@ Pid::operator pid_t()
 
 void Pid::kill()
 {
-    if (pid == -1) return;
-    
+    if (pid == -1 || pid == 0) return;
+
     printMsg(lvlError, format("killing process %1%") % pid);
 
     /* Send the requested signal to the child.  If it has its own
@@ -883,7 +883,8 @@ string runProgram(Path program, bool searchPath, const Strings & args)
 
     /* Fork. */
     Pid pid;
-    pid = fork();
+    pid = maybeVfork();
+
     switch (pid) {
 
     case -1:
@@ -953,6 +954,13 @@ void setuidCleanup()
         if (fstat(fd, &st) == -1) abort();
     }
 }
+
+
+#if HAVE_VFORK
+pid_t (*maybeVfork)() = vfork;
+#else
+pid_t (*maybeVfork)() = fork;
+#endif
 
 
 //////////////////////////////////////////////////////////////////////

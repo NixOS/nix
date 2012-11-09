@@ -202,6 +202,7 @@ void checkStoreNotSymlink()
 
 
 LocalStore::LocalStore(bool reserveSpace)
+    : didSetSubstituterEnv(false)
 {
     schemaPath = settings.nixDBPath + "/schema";
 
@@ -943,6 +944,18 @@ Path LocalStore::queryPathFromHashPart(const string & hashPart)
 }
 
 
+void LocalStore::setSubstituterEnv()
+{
+    if (didSetSubstituterEnv) return;
+
+    /* Pass configuration options (including those overriden with
+       --option) to substituters. */
+    setenv("_NIX_OPTIONS", settings.pack().c_str(), 1);
+
+    didSetSubstituterEnv = true;
+}
+
+
 void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter & run)
 {
     if (run.pid != -1) return;
@@ -955,7 +968,9 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
     fromPipe.create();
     errorPipe.create();
 
-    run.pid = fork();
+    setSubstituterEnv();
+
+    run.pid = maybeVfork();
 
     switch (run.pid) {
 
@@ -964,10 +979,6 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
 
     case 0: /* child */
         try {
-            /* Pass configuration options (including those overriden
-               with --option) to the substituter. */
-            setenv("_NIX_OPTIONS", settings.pack().c_str(), 1);
-
             if (dup2(toPipe.readSide, STDIN_FILENO) == -1)
                 throw SysError("dupping stdin");
             if (dup2(fromPipe.writeSide, STDOUT_FILENO) == -1)

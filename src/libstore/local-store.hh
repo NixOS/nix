@@ -208,6 +208,8 @@ public:
 
     void markContentsGood(const Path & path);
 
+    void setSubstituterEnv();
+
 private:
 
     Path schemaPath;
@@ -237,6 +239,8 @@ private:
 
     /* Cache for pathContentsGood(). */
     std::map<Path, bool> pathContentsGoodCache;
+
+    bool didSetSubstituterEnv;
 
     int getSchema();
 
