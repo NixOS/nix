@@ -517,9 +517,7 @@ static void prim_toPath(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
     Path path = state.coerceToPath(*args[0], context);
-    if (!context.empty())
-        throw EvalError(format("string `%1%' cannot refer to other paths") % path);
-    mkPath(v, canonPath(path).c_str());
+    mkString(v, canonPath(path), context);
 }
 
 
