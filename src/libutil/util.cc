@@ -652,7 +652,7 @@ void AutoCloseFD::close()
     if (fd != -1) {
         if (::close(fd) == -1)
             /* This should never happen. */
-            throw SysError("closing file descriptor");
+            throw SysError(format("closing file descriptor %1%") % fd);
         fd = -1;
     }
 }
