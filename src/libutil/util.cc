@@ -854,8 +854,16 @@ void killUser(uid_t uid)
     
     /* parent */
     int status = pid.wait(true);
+
+    /*
+     * According to kill(2), kill on pid -1 should send the signal to every
+     * process except to the process sending the signal. Unfortunately, this is
+     * not the case, so let's ignore the status if we're on Darwin.
+     */
+#ifndef __APPLE__
     if (status != 0)
         throw Error(format("cannot kill processes for uid `%1%': %2%") % uid % statusToString(status));
+#endif
 
     /* !!! We should really do some check to make sure that there are
        no processes left running under `uid', but there is no portable
