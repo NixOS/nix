@@ -483,16 +483,7 @@ void printMsg_(Verbosity level, const format & f)
     else if (logType == ltEscapes && level != lvlInfo)
         prefix = "\033[" + escVerbosity(level) + "s";
     string s = (format("%1%%2%\n") % prefix % f.str()).str();
-    try {
-        writeToStderr((const unsigned char *) s.data(), s.size());
-    } catch (SysError & e) {
-        /* Ignore failing writes to stderr if we're in an exception
-           handler, otherwise throw an exception.  We need to ignore
-           write errors in exception handlers to ensure that cleanup
-           code runs to completion if the other side of stderr has
-           been closed unexpectedly. */
-        if (!std::uncaught_exception()) throw;
-    }
+    writeToStderr(s);
 }
 
 
@@ -505,13 +496,28 @@ void warnOnce(bool & haveWarned, const format & f)
 }
 
 
+void writeToStderr(const string & s)
+{
+    try {
+        _writeToStderr((const unsigned char *) s.data(), s.size());
+    } catch (SysError & e) {
+        /* Ignore failing writes to stderr if we're in an exception
+           handler, otherwise throw an exception.  We need to ignore
+           write errors in exception handlers to ensure that cleanup
+           code runs to completion if the other side of stderr has
+           been closed unexpectedly. */
+        if (!std::uncaught_exception()) throw;
+    }
+}
+
+
 static void defaultWriteToStderr(const unsigned char * buf, size_t count)
 {
     writeFull(STDERR_FILENO, buf, count);
 }
 
 
-void (*writeToStderr) (const unsigned char * buf, size_t count) = defaultWriteToStderr;
+void (*_writeToStderr) (const unsigned char * buf, size_t count) = defaultWriteToStderr;
 
 
 void readFull(int fd, unsigned char * buf, size_t count)
@@ -845,8 +851,7 @@ void killUser(uid_t uid)
 	    }
 
         } catch (std::exception & e) {
-            std::cerr << format("killing processes belonging to uid `%1%': %2%")
-                % uid % e.what() << std::endl;
+            writeToStderr((format("killing processes belonging to uid `%1%': %2%\n") % uid % e.what()).str());
             _exit(1);
         }
         _exit(0);
@@ -902,7 +907,7 @@ string runProgram(Path program, bool searchPath, const Strings & args)
             throw SysError(format("executing `%1%'") % program);
 
         } catch (std::exception & e) {
-            std::cerr << "error: " << e.what() << std::endl;
+            writeToStderr("error: " + string(e.what()) + "\n");
         }
         _exit(1);
     }
@@ -1125,5 +1130,5 @@ void ignoreException()
     }
 }
 
- 
+
 }

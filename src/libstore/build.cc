@@ -10,7 +10,6 @@
 #include "immutable.hh"
 
 #include <map>
-#include <iostream>
 #include <sstream>
 #include <algorithm>
 #include <boost/shared_ptr.hpp>
@@ -565,7 +564,7 @@ static void runSetuidHelper(const string & command,
             throw SysError(format("executing `%1%'") % program);
         }
         catch (std::exception & e) {
-            std::cerr << "error: " << e.what() << std::endl;
+            writeToStderr("error: " + string(e.what()) + "\n");
         }
         _exit(1);
     }
@@ -695,7 +694,7 @@ HookInstance::HookInstance()
             throw SysError(format("executing `%1%'") % buildHook);
 
         } catch (std::exception & e) {
-            std::cerr << format("build hook error: %1%") % e.what() << std::endl;
+            writeToStderr("build hook error: " + string(e.what()) + "\n");
         }
         _exit(1);
     }
@@ -1547,7 +1546,7 @@ HookReply DerivationGoal::tryBuildHook()
             break;
         }
         s += "\n";
-        writeToStderr((unsigned char *) s.data(), s.size());
+        writeToStderr(s);
     }
 
     debug(format("hook reply is `%1%'") % reply);
@@ -2141,7 +2140,7 @@ void DerivationGoal::initChild()
         throw SysError(format("executing `%1%'") % drv.builder);
 
     } catch (std::exception & e) {
-        std::cerr << format("build error: %1%") % e.what() << std::endl;
+        writeToStderr("build error: " + string(e.what()) + "\n");
         _exit(inSetup ? childSetupFailed : 1);
     }
 
@@ -2362,7 +2361,7 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
         (!hook && fd == builderOut.readSide))
     {
         if (verbosity >= settings.buildVerbosity)
-            writeToStderr((unsigned char *) data.data(), data.size());
+            writeToStderr(data);
         if (bzLogFile) {
             int err;
             BZ2_bzWrite(&err, bzLogFile, (unsigned char *) data.data(), data.size());
@@ -2372,7 +2371,7 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
     }
 
     if (hook && fd == hook->fromHook.readSide)
-        writeToStderr((unsigned char *) data.data(), data.size());
+        writeToStderr(data);
 }
 
 
@@ -2693,7 +2692,7 @@ void SubstitutionGoal::tryToRun()
             throw SysError(format("executing `%1%'") % sub);
 
         } catch (std::exception & e) {
-            std::cerr << format("substitute error: %1%") % e.what() << std::endl;
+            writeToStderr("substitute error: " + string(e.what()) + "\n");
         }
         _exit(1);
     }
@@ -2809,8 +2808,7 @@ void SubstitutionGoal::finished()
 void SubstitutionGoal::handleChildOutput(int fd, const string & data)
 {
     assert(fd == logPipe.readSide);
-    if (verbosity >= settings.buildVerbosity)
-        writeToStderr((unsigned char *) data.data(), data.size());
+    if (verbosity >= settings.buildVerbosity) writeToStderr(data);
     /* Don't write substitution output to a log file for now.  We
        probably should, though. */
 }

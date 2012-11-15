@@ -556,7 +556,7 @@ void RemoteStore::processStderr(Sink * sink, Source * source)
         }
         else {
             string s = readString(from);
-            writeToStderr((const unsigned char *) s.data(), s.size());
+            writeToStderr(s);
         }
     }
     if (msg == STDERR_ERROR) {

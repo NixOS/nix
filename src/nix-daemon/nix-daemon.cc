@@ -6,7 +6,6 @@
 #include "archive.hh"
 #include "globals.hh"
 
-#include <iostream>
 #include <cstring>
 #include <unistd.h>
 #include <signal.h>
@@ -642,7 +641,7 @@ static void processConnection()
 {
     canSendStderr = false;
     myPid = getpid();
-    writeToStderr = tunnelStderr;
+    _writeToStderr = tunnelStderr;
 
 #ifdef HAVE_HUP_NOTIFICATION
     /* Allow us to receive SIGPOLL for events on the client socket. */
@@ -877,7 +876,7 @@ static void daemonLoop()
                     processConnection();
 
                 } catch (std::exception & e) {
-                    std::cerr << format("child error: %1%\n") % e.what();
+                    writeToStderr("child error: " + string(e.what()) + "\n");
                 }
                 exit(0);
             }
