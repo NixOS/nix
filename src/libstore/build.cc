@@ -355,7 +355,7 @@ void Goal::trace(const format & f)
 
 
 /* Common initialisation performed in child processes. */
-void commonChildInit(Pipe & logPipe)
+static void commonChildInit(Pipe & logPipe)
 {
     /* Put the child in a separate session (and thus a separate
        process group) so that it has no controlling terminal (meaning

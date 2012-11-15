@@ -116,7 +116,7 @@ AC_CHECK_HEADERS([sys/mount.h], [], [],
 
 
 # Check for vfork.
-AC_FUNC_FORK()
+#AC_FUNC_FORK()
 
 
 # Check for lutimes, optionally used for changing the mtime of
