@@ -182,7 +182,14 @@ printed.)</para>
 
     <listitem><para>Print on standard error a description of what
     packages would be built or downloaded, without actually performing
-    the operation</para></listitem>
+    the operation.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--ignore-unknown</option></term>
+
+    <listitem><para>If a non-derivation path does not have a
+    substitute, then silently ignore it.</para></listitem>
 
   </varlistentry>
 

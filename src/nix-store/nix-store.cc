@@ -94,28 +94,44 @@ static void opRealise(Strings opFlags, Strings opArgs)
 {
     bool dryRun = false;
     bool repair = false;
+    bool ignoreUnknown = false;
 
     foreach (Strings::iterator, i, opFlags)
         if (*i == "--dry-run") dryRun = true;
         else if (*i == "--repair") repair = true;
+        else if (*i == "--ignore-unknown") ignoreUnknown = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
+    Paths paths;
     foreach (Strings::iterator, i, opArgs)
-        *i = followLinksToStorePath(*i);
+        paths.push_back(followLinksToStorePath(*i));
 
-    printMissing(*store, PathSet(opArgs.begin(), opArgs.end()));
+    unsigned long long downloadSize, narSize;
+    PathSet willBuild, willSubstitute, unknown;
+    queryMissing(*store, PathSet(paths.begin(), paths.end()),
+        willBuild, willSubstitute, unknown, downloadSize, narSize);
+
+    if (ignoreUnknown) {
+        Paths paths2;
+        foreach (Paths::iterator, i, paths)
+            if (unknown.find(*i) == unknown.end()) paths2.push_back(*i);
+        paths = paths2;
+        unknown = PathSet();
+    }
+
+    printMissing(willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     if (dryRun) return;
 
     /* Build all paths at the same time to exploit parallelism. */
-    PathSet paths(opArgs.begin(), opArgs.end());
-    store->buildPaths(paths, repair);
+    store->buildPaths(PathSet(paths.begin(), paths.end()), repair);
 
-    foreach (Paths::iterator, i, opArgs) {
-        PathSet paths = realisePath(*i, false);
-        foreach (PathSet::iterator, j, paths)
-            cout << format("%1%\n") % *j;
-    }
+    if (!ignoreUnknown)
+        foreach (Paths::iterator, i, paths) {
+            PathSet paths = realisePath(*i, false);
+            foreach (PathSet::iterator, j, paths)
+                cout << format("%1%\n") % *j;
+        }
 }
 
 

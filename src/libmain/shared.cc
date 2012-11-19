@@ -47,7 +47,14 @@ void printMissing(StoreAPI & store, const PathSet & paths)
     unsigned long long downloadSize, narSize;
     PathSet willBuild, willSubstitute, unknown;
     queryMissing(store, paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
+    printMissing(willBuild, willSubstitute, unknown, downloadSize, narSize);
+}
 
+
+void printMissing(const PathSet & willBuild,
+    const PathSet & willSubstitute, const PathSet & unknown,
+    unsigned long long downloadSize, unsigned long long narSize)
+{
     if (!willBuild.empty()) {
         printMsg(lvlInfo, format("these derivations will be built:"));
         foreach (PathSet::iterator, i, willBuild)
