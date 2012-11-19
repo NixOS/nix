@@ -83,6 +83,7 @@ static PathSet realisePath(const Path & path, bool build = true)
 
     else {
         if (build) store->ensurePath(path);
+        else if (!store->isValidPath(path)) throw Error(format("path `%1%' does not exist and cannot be created") % path);
         return singleton<PathSet>(path);
     }
 }
