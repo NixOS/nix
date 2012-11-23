@@ -6,7 +6,8 @@ use Nix::Store;
 
 
 sub copyTo {
-    my ($sshHost, $sshOpts, $storePaths, $compressor, $decompressor, $includeOutputs, $dryRun, $sign, $progressViewer) = @_;
+    my ($sshHost, $sshOpts, $storePaths, $compressor, $decompressor,
+        $includeOutputs, $dryRun, $sign, $progressViewer, $useSubstitutes) = @_;
 
     $compressor = "$compressor |" if $compressor ne "";
     $decompressor = "$decompressor |" if $decompressor ne "";
@@ -15,6 +16,12 @@ sub copyTo {
     # Get the closure of this path.
     my @closure = reverse(topoSortPaths(computeFSClosure(0, $includeOutputs,
         map { followLinksToStorePath $_ } @{$storePaths})));
+
+    # Optionally use substitutes on the remote host.
+    if (!$dryRun && $useSubstitutes) {
+        system "ssh $sshHost @{$sshOpts} nix-store -r --ignore-unknown @closure";
+        # Ignore exit status because this is just an optimisation.
+    }
 
     # Ask the remote host which paths are invalid.  Because of limits
     # to the command line length, do this in chunks.  Eventually,

@@ -28,6 +28,8 @@
     <arg><option>--xz</option></arg>
     <arg><option>--show-progress</option></arg>
     <arg><option>--include-outputs</option></arg>
+    <arg><option>--use-substitutes</option></arg>
+    <arg><option>-s</option></arg>
     <arg choice='plain'>
       <replaceable>user@</replaceable><replaceable>machine</replaceable>
     </arg>
@@ -65,7 +67,7 @@ those paths.  If this bothers you, use
 <refsection><title>Options</title>
 
 <variablelist>
-  
+
   <varlistentry><term><option>--to</option></term>
 
     <listitem><para>Copy the closure of
@@ -119,10 +121,22 @@ those paths.  If this bothers you, use
   </varlistentry>
 
   <varlistentry><term><option>--include-outputs</option></term>
-  
-  <listitem><para>Also copy the outputs of store derivations included
-  in the closure.</para></listitem>
-  
+
+    <listitem><para>Also copy the outputs of store derivations
+    included in the closure.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--use-substitutes</option> / <option>-s</option></term>
+
+    <listitem><para>Attempt to download missing paths on the target
+    machine using Nix’s substitute mechanism.  Any paths that cannot
+    be substituted on the target are still copied normally from the
+    source.  This is useful, for instance, if the connection between
+    the source and target machine is slow, but the connection between
+    the target machine and <literal>nixos.org</literal> (the default
+    binary cache server) is fast.</para></listitem>
+
   </varlistentry>
 
 </variablelist>
@@ -140,7 +154,7 @@ those paths.  If this bothers you, use
     <command>ssh</command> on the command line.</para></listitem>
 
   </varlistentry>
-  
+
 </variablelist>
 
 </refsection>

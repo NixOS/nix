@@ -82,6 +82,13 @@ $ mount -o remount,ro,bind /nix/store
   </listitem>
 
   <listitem>
+    <para>The command <command>nix-copy-closure</command> has a new
+    flag <option>--use-substitutes</option> (<option>-s</option>) to
+    download missing paths on the target machine using the substitute
+    mechanism.</para>
+  </listitem>
+
+  <listitem>
     <para>The command <command>nix-worker</command> has been renamed
     to <command>nix-daemon</command>.  Support for running the Nix
     worker in “slave” mode has been removed.</para>
