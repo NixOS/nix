@@ -62,16 +62,9 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                     Path drvPath = i->queryDrvPath(state);
 
                     /* What output do we want? */
-                    Path outPath = i->queryOutPath(state);
-                    Derivation drv = derivationFromPath(*store, drvPath);
-                    string outputName;
-                    foreach (DerivationOutputs::iterator, i, drv.outputs)
-                        if (i->second.path == outPath) {
-                            outputName = i->first;
-                            break;
-                        }
+                    string outputName = i->queryOutputName(state);
                     if (outputName == "")
-                        throw Error(format("derivation `%1%' does not have an output `%2%'") % drvPath % outPath);
+                        throw Error(format("derivation `%1%' lacks an `outputName' attribute ") % drvPath);
 
                     if (gcRoot == "")
                         printGCWarning();

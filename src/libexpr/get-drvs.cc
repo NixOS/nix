@@ -28,6 +28,17 @@ string DrvInfo::queryOutPath(EvalState & state) const
 }
 
 
+string DrvInfo::queryOutputName(EvalState & state) const
+{
+    if (outputName == "" && attrs) {
+        Bindings::iterator i = attrs->find(state.sOutputName);
+        PathSet context;
+        (string &) outputName = i != attrs->end() ? state.coerceToString(*i->value, context) : "";
+    }
+    return outputName;
+}
+
+
 MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
 {
     if (metaInfoRead) return meta;

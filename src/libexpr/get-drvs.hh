@@ -28,6 +28,7 @@ struct DrvInfo
 private:
     string drvPath;
     string outPath;
+    string outputName;
 
     bool metaInfoRead;
     MetaInfo meta;
@@ -46,6 +47,7 @@ public:
 
     string queryDrvPath(EvalState & state) const;
     string queryOutPath(EvalState & state) const;
+    string queryOutputName(EvalState & state) const;
     MetaInfo queryMetaInfo(EvalState & state) const;
     MetaValue queryMetaInfo(EvalState & state, const string & name) const;
 

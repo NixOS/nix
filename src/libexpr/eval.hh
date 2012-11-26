@@ -93,7 +93,7 @@ public:
     SymbolTable symbols;
 
     const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName,
-        sSystem, sOverrides;
+        sSystem, sOverrides, sOutputName;
 
     /* If set, force copying files to the Nix store even if they
        already exist there. */
