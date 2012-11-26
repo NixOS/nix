@@ -19,7 +19,7 @@ my $envCommand = "p=\$PATH; source \$stdenv/setup; PATH=\$PATH:\$p; exec $shell"
 my @envExclude = ();
 
 
-my $tmpDir = tempdir("nix-build.XXXXXX", CLEANUP => 0, TMPDIR => 1)
+my $tmpDir = tempdir("nix-build.XXXXXX", CLEANUP => 1, TMPDIR => 1)
     or die "cannot create a temporary directory";
 
 my $outLink = "./result";
