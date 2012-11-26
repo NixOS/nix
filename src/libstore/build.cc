@@ -3197,11 +3197,13 @@ void LocalStore::buildPaths(const PathSet & drvPaths, bool repair)
     Worker worker(*this);
 
     Goals goals;
-    foreach (PathSet::const_iterator, i, drvPaths)
-        if (isDerivation(*i))
-            goals.insert(worker.makeDerivationGoal(*i, repair));
+    foreach (PathSet::const_iterator, i, drvPaths) {
+        DrvPathWithOutputs i2 = parseDrvPathWithOutputs(*i);
+        if (isDerivation(i2.first))
+            goals.insert(worker.makeDerivationGoal(i2.first, repair));
         else
             goals.insert(worker.makeSubstitutionGoal(*i, repair));
+    }
 
     worker.run(goals);
 

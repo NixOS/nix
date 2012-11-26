@@ -293,6 +293,7 @@ template<class C> C tokenizeString(const string & s, const string & separators =
 /* Concatenate the given strings with a separator between the
    elements. */
 string concatStringsSep(const string & sep, const Strings & ss);
+string concatStringsSep(const string & sep, const StringSet & ss);
 
 
 /* Remove trailing whitespace from a string. */

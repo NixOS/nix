@@ -6,7 +6,7 @@ drvAttrs @ { outputs ? [ "out" ], ... }:
 let
 
   strict = derivationStrict drvAttrs;
-  
+
   commonAttrs = drvAttrs // (builtins.listToAttrs outputsList) //
     { all = map (x: x.value) outputsList;
       inherit drvAttrs;
@@ -21,7 +21,7 @@ let
         inherit outputName;
       };
     };
-    
+
   outputsList = map outputToAttrListElement outputs;
-    
+
 in (builtins.head outputsList).value

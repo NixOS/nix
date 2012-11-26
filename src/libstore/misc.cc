@@ -82,20 +82,23 @@ void queryMissing(StoreAPI & store, const PathSet & targets,
             if (done.find(*i) != done.end()) continue;
             done.insert(*i);
 
-            if (isDerivation(*i)) {
-                if (!store.isValidPath(*i)) {
+            DrvPathWithOutputs i2 = parseDrvPathWithOutputs(*i);
+
+            if (isDerivation(i2.first)) {
+                if (!store.isValidPath(i2.first)) {
                     // FIXME: we could try to substitute p.
                     unknown.insert(*i);
                     continue;
                 }
-                Derivation drv = derivationFromPath(store, *i);
+                Derivation drv = derivationFromPath(store, i2.first);
 
                 PathSet invalid;
+                // FIXME: only fetch the desired outputs
                 foreach (DerivationOutputs::iterator, j, drv.outputs)
                     if (!store.isValidPath(j->second.path)) invalid.insert(j->second.path);
                 if (invalid.empty()) continue;
 
-                todoDrv.insert(*i);
+                todoDrv.insert(i2.first);
                 if (settings.useSubstitutes) query.insert(invalid.begin(), invalid.end());
             }
 

@@ -60,13 +60,21 @@ static Path useDeriver(Path path)
    other paths it means ensure their validity. */
 static PathSet realisePath(const Path & path, bool build = true)
 {
-    if (isDerivation(path)) {
+    DrvPathWithOutputs p = parseDrvPathWithOutputs(path);
+
+    if (isDerivation(p.first)) {
         if (build) store->buildPaths(singleton<PathSet>(path));
-        Derivation drv = derivationFromPath(*store, path);
+        Derivation drv = derivationFromPath(*store, p.first);
         rootNr++;
 
+        if (p.second.empty())
+            foreach (DerivationOutputs::iterator, i, drv.outputs) p.second.insert(i->first);
+
         PathSet outputs;
-        foreach (DerivationOutputs::iterator, i, drv.outputs) {
+        foreach (StringSet::iterator, j, p.second) {
+            DerivationOutputs::iterator i = drv.outputs.find(*j);
+            if (i == drv.outputs.end())
+                throw Error(format("derivation `%1%' does not have an output named `%2%'") % p.first % *j);
             Path outPath = i->second.path;
             if (gcRoot == "")
                 printGCWarning();
@@ -103,8 +111,10 @@ static void opRealise(Strings opFlags, Strings opArgs)
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
     Paths paths;
-    foreach (Strings::iterator, i, opArgs)
-        paths.push_back(followLinksToStorePath(*i));
+    foreach (Strings::iterator, i, opArgs) {
+        DrvPathWithOutputs p = parseDrvPathWithOutputs(*i);
+        paths.push_back(makeDrvPathWithOutputs(followLinksToStorePath(p.first), p.second));
+    }
 
     unsigned long long downloadSize, narSize;
     PathSet willBuild, willSubstitute, unknown;

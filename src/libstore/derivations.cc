@@ -252,4 +252,21 @@ Hash hashDerivationModulo(StoreAPI & store, Derivation drv)
 }
 
 
+DrvPathWithOutputs parseDrvPathWithOutputs(const string & s)
+{
+    size_t n = s.find("!");
+    return n == s.npos
+        ? DrvPathWithOutputs(s, std::set<string>())
+        : DrvPathWithOutputs(string(s, 0, n), tokenizeString<std::set<string> >(string(s, n + 1), ","));
+}
+
+
+Path makeDrvPathWithOutputs(const Path & drvPath, std::set<string> outputs)
+{
+    return outputs.empty()
+        ? drvPath
+        : drvPath + "!" + concatStringsSep(",", outputs);
+}
+
+
 }

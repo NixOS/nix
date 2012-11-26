@@ -19,7 +19,7 @@ my $envCommand = "p=\$PATH; source \$stdenv/setup; PATH=\$PATH:\$p; exec $shell"
 my @envExclude = ();
 
 
-my $tmpDir = tempdir("nix-build.XXXXXX", CLEANUP => 1, TMPDIR => 1)
+my $tmpDir = tempdir("nix-build.XXXXXX", CLEANUP => 0, TMPDIR => 1)
     or die "cannot create a temporary directory";
 
 my $outLink = "./result";
@@ -181,15 +181,33 @@ foreach my $expr (@exprs) {
         die;
     }
 
+    # Ugly hackery to make "nix-build -A foo.all" produce symlinks
+    # ./result, ./result-dev, and so on, rather than ./result,
+    # ./result-2-dev, and so on.  This combines multiple derivation
+    # paths into one "/nix/store/drv-path!out1,out2,..." argument.
+    my $prevDrvPath = "";
+    my @drvPaths2;
     foreach my $drvPath (@drvPaths) {
-        my $target = readlink $drvPath or die "cannot read symlink `$drvPath'";
+        my $p = $drvPath; my $output = "out";
+        if ($drvPath =~ /(.*)!(.*)/) {
+            $p = $1; $output = $2;
+        } else {
+            $p = $drvPath;
+        }
+        my $target = readlink $p or die "cannot read symlink `$p'";
         print STDERR "derivation is $target\n" if $verbose;
+        if ($target eq $prevDrvPath) {
+            push @drvPaths2, (pop @drvPaths2) . "," . $output;
+        } else {
+            push @drvPaths2, $target . "!" . $output;
+            $prevDrvPath = $target;
+        }
     }
 
     # Build.
     my @outPaths;
     $pid = open(OUTPATHS, "-|") || exec "$Nix::Config::binDir/nix-store", "--add-root", $outLink, "--indirect", "-r",
-        @buildArgs, @drvPaths;
+        @buildArgs, @drvPaths2;
     while (<OUTPATHS>) {chomp; push @outPaths, $_;}
     if (!close OUTPATHS) {
         die "nix-store killed by signal " . ($? & 127) . "\n" if ($? & 127);

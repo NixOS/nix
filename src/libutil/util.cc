@@ -997,13 +997,14 @@ template<class C> C tokenizeString(const string & s, const string & separators)
         string::size_type end = s.find_first_of(separators, pos + 1);
         if (end == string::npos) end = s.size();
         string token(s, pos, end - pos);
-        result.push_back(token);
+        result.insert(result.end(), token);
         pos = s.find_first_not_of(separators, end);
     }
     return result;
 }
 
 template Strings tokenizeString(const string & s, const string & separators);
+template StringSet tokenizeString(const string & s, const string & separators);
 template vector<string> tokenizeString(const string & s, const string & separators);
 
 
@@ -1011,6 +1012,17 @@ string concatStringsSep(const string & sep, const Strings & ss)
 {
     string s;
     foreach (Strings::const_iterator, i, ss) {
+        if (s.size() != 0) s += sep;
+        s += *i;
+    }
+    return s;
+}
+
+
+string concatStringsSep(const string & sep, const StringSet & ss)
+{
+    string s;
+    foreach (StringSet::const_iterator, i, ss) {
         if (s.size() != 0) s += sep;
         s += *i;
     }
