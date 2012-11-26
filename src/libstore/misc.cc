@@ -126,11 +126,12 @@ void queryMissing(StoreAPI & store, const PathSet & targets,
             if (settings.useSubstitutes) {
                 foreach (DerivationOutputs::iterator, j, drv.outputs) {
                     if (!wantOutput(j->first, i2.second)) continue;
-                    if (!store.isValidPath(j->second.path) &&
-                        infos.find(j->second.path) == infos.end())
-                        mustBuild = true;
-                    else
-                        outputs.insert(j->second.path);
+                    if (!store.isValidPath(j->second.path)) {
+                        if (infos.find(j->second.path) == infos.end())
+                            mustBuild = true;
+                        else
+                            outputs.insert(j->second.path);
+                    }
                 }
             } else
                 mustBuild = true;
