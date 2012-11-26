@@ -29,6 +29,9 @@ echo "output path is $outPath"
 
 # Test nix-build on a derivation with multiple outputs.
 nix-build multiple-outputs.nix -A a -o $TEST_ROOT/result
+[ -e $TEST_ROOT/result-first ]
+! [ -e $TEST_ROOT/result-second ]
+nix-build multiple-outputs.nix -A a.all -o $TEST_ROOT/result
 [ "$(cat $TEST_ROOT/result-first/file)" = "first" ]
 [ "$(cat $TEST_ROOT/result-second/file)" = "second" ]
 [ "$(cat $TEST_ROOT/result-second/link/file)" = "first" ]
@@ -37,7 +40,7 @@ hash1=$(nix-store -q --hash $TEST_ROOT/result-second)
 # Delete one of the outputs and rebuild it.  This will cause a hash
 # rewrite.
 nix-store --delete $TEST_ROOT/result-second --ignore-liveness
-nix-build multiple-outputs.nix -A a -o $TEST_ROOT/result
+nix-build multiple-outputs.nix -A a.all -o $TEST_ROOT/result
 [ "$(cat $TEST_ROOT/result-second/file)" = "second" ]
 [ "$(cat $TEST_ROOT/result-second/link/file)" = "first" ]
 hash2=$(nix-store -q --hash $TEST_ROOT/result-second)
