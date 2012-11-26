@@ -240,7 +240,7 @@ public:
     ~Worker();
 
     /* Make a goal (with caching). */
-    GoalPtr makeDerivationGoal(const Path & drvPath, bool repair = false);
+    GoalPtr makeDerivationGoal(const Path & drvPath, const StringSet & wantedOutputs, bool repair = false);
     GoalPtr makeSubstitutionGoal(const Path & storePath, bool repair = false);
 
     /* Remove a dead goal. */
@@ -756,6 +756,13 @@ private:
     /* The path of the derivation. */
     Path drvPath;
 
+    /* The specific outputs that we need to build.  Empty means all of
+       them. */
+    StringSet wantedOutputs;
+
+    /* Whether additional wanted outputs have been added. */
+    bool needRestart;
+
     /* The derivation stored at drvPath. */
     Derivation drv;
 
@@ -831,7 +838,7 @@ private:
     const static int childSetupFailed = 189;
 
 public:
-    DerivationGoal(const Path & drvPath, Worker & worker, bool repair = false);
+    DerivationGoal(const Path & drvPath, const StringSet & wantedOutputs, Worker & worker, bool repair = false);
     ~DerivationGoal();
 
     void cancel();
@@ -842,6 +849,9 @@ public:
     {
         return drvPath;
     }
+
+    /* Add wanted outputs to an already existing derivation goal. */
+    void addWantedOutputs(const StringSet & outputs);
 
 private:
     /* The states. */
@@ -897,8 +907,10 @@ private:
 };
 
 
-DerivationGoal::DerivationGoal(const Path & drvPath, Worker & worker, bool repair)
+DerivationGoal::DerivationGoal(const Path & drvPath, const StringSet & wantedOutputs, Worker & worker, bool repair)
     : Goal(worker)
+    , wantedOutputs(wantedOutputs)
+    , needRestart(false)
     , fLogFile(0)
     , bzLogFile(0)
     , useChroot(false)
@@ -964,6 +976,23 @@ void DerivationGoal::cancel()
 void DerivationGoal::work()
 {
     (this->*state)();
+}
+
+
+void DerivationGoal::addWantedOutputs(const StringSet & outputs)
+{
+    /* If we already want all outputs, there is nothing to do. */
+    if (wantedOutputs.empty()) return;
+
+    if (outputs.empty()) {
+        wantedOutputs.clear();
+        needRestart = true;
+    } else
+        foreach (StringSet::const_iterator, i, outputs)
+            if (wantedOutputs.find(*i) == wantedOutputs.end()) {
+                wantedOutputs.insert(*i);
+                needRestart = true;
+            }
 }
 
 
@@ -1043,6 +1072,12 @@ void DerivationGoal::outputsSubstituted()
 
     nrFailed = nrNoSubstituters = 0;
 
+    if (needRestart) {
+        needRestart = false;
+        haveDerivation();
+        return;
+    }
+
     if (checkPathValidity(false, repair).size() == 0) {
         if (repair) repairClosure(); else amDone(ecSuccess);
         return;
@@ -1051,9 +1086,13 @@ void DerivationGoal::outputsSubstituted()
     /* Otherwise, at least one of the output paths could not be
        produced using a substitute.  So we have to build instead. */
 
+    /* Make sure checkPathValidity() from now on checks all
+       outputs. */
+    wantedOutputs = PathSet();
+
     /* The inputs must be built before we can build this goal. */
     foreach (DerivationInputs::iterator, i, drv.inputDrvs)
-        addWaitee(worker.makeDerivationGoal(i->first, repair));
+        addWaitee(worker.makeDerivationGoal(i->first, i->second, repair));
 
     foreach (PathSet::iterator, i, drv.inputSrcs)
         addWaitee(worker.makeSubstitutionGoal(*i));
@@ -1103,7 +1142,7 @@ void DerivationGoal::repairClosure()
         if (drvPath2 == "")
             addWaitee(worker.makeSubstitutionGoal(*i, true));
         else
-            addWaitee(worker.makeDerivationGoal(drvPath2, true));
+            addWaitee(worker.makeDerivationGoal(drvPath2, PathSet(), true));
     }
 
     if (waitees.empty()) {
@@ -2385,6 +2424,7 @@ PathSet DerivationGoal::checkPathValidity(bool returnValid, bool checkHash)
 {
     PathSet result;
     foreach (DerivationOutputs::iterator, i, drv.outputs) {
+        if (!wantOutput(i->first, wantedOutputs)) continue;
         bool good =
             worker.store.isValidPath(i->second.path) &&
             (!checkHash || worker.store.pathContentsGood(i->second.path));
@@ -2851,14 +2891,15 @@ Worker::~Worker()
 }
 
 
-GoalPtr Worker::makeDerivationGoal(const Path & path, bool repair)
+GoalPtr Worker::makeDerivationGoal(const Path & path, const StringSet & wantedOutputs, bool repair)
 {
     GoalPtr goal = derivationGoals[path].lock();
     if (!goal) {
-        goal = GoalPtr(new DerivationGoal(path, *this, repair));
+        goal = GoalPtr(new DerivationGoal(path, wantedOutputs, *this, repair));
         derivationGoals[path] = goal;
         wakeUp(goal);
-    }
+    } else
+        (dynamic_cast<DerivationGoal *>(goal.get()))->addWantedOutputs(wantedOutputs);
     return goal;
 }
 
@@ -3200,7 +3241,7 @@ void LocalStore::buildPaths(const PathSet & drvPaths, bool repair)
     foreach (PathSet::const_iterator, i, drvPaths) {
         DrvPathWithOutputs i2 = parseDrvPathWithOutputs(*i);
         if (isDerivation(i2.first))
-            goals.insert(worker.makeDerivationGoal(i2.first, repair));
+            goals.insert(worker.makeDerivationGoal(i2.first, i2.second, repair));
         else
             goals.insert(worker.makeSubstitutionGoal(*i, repair));
     }

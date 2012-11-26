@@ -85,7 +85,9 @@ extern DrvHashes drvHashes;
 typedef std::pair<string, std::set<string> > DrvPathWithOutputs;
 DrvPathWithOutputs parseDrvPathWithOutputs(const string & s);
 
-Path makeDrvPathWithOutputs(const Path & drvPath, std::set<string> outputs);
+Path makeDrvPathWithOutputs(const Path & drvPath, const std::set<string> & outputs);
+
+bool wantOutput(const string & output, const std::set<string> & wanted);
 
 
 }

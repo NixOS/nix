@@ -93,12 +93,13 @@ void queryMissing(StoreAPI & store, const PathSet & targets,
                 Derivation drv = derivationFromPath(store, i2.first);
 
                 PathSet invalid;
-                // FIXME: only fetch the desired outputs
                 foreach (DerivationOutputs::iterator, j, drv.outputs)
-                    if (!store.isValidPath(j->second.path)) invalid.insert(j->second.path);
+                    if (wantOutput(j->first, i2.second)
+                        && !store.isValidPath(j->second.path))
+                        invalid.insert(j->second.path);
                 if (invalid.empty()) continue;
 
-                todoDrv.insert(i2.first);
+                todoDrv.insert(*i);
                 if (settings.useSubstitutes) query.insert(invalid.begin(), invalid.end());
             }
 
@@ -115,26 +116,32 @@ void queryMissing(StoreAPI & store, const PathSet & targets,
         store.querySubstitutablePathInfos(query, infos);
 
         foreach (PathSet::iterator, i, todoDrv) {
-            // FIXME: cache this
-            Derivation drv = derivationFromPath(store, *i);
+            DrvPathWithOutputs i2 = parseDrvPathWithOutputs(*i);
 
+            // FIXME: cache this
+            Derivation drv = derivationFromPath(store, i2.first);
+
+            PathSet outputs;
             bool mustBuild = false;
             if (settings.useSubstitutes) {
-                foreach (DerivationOutputs::iterator, j, drv.outputs)
+                foreach (DerivationOutputs::iterator, j, drv.outputs) {
+                    if (!wantOutput(j->first, i2.second)) continue;
                     if (!store.isValidPath(j->second.path) &&
                         infos.find(j->second.path) == infos.end())
                         mustBuild = true;
+                    else
+                        outputs.insert(j->second.path);
+                }
             } else
                 mustBuild = true;
 
             if (mustBuild) {
-                willBuild.insert(*i);
+                willBuild.insert(i2.first);
                 todo.insert(drv.inputSrcs.begin(), drv.inputSrcs.end());
-                foreach (DerivationInputs::iterator, i, drv.inputDrvs)
-                    todo.insert(i->first);
+                foreach (DerivationInputs::iterator, j, drv.inputDrvs)
+                    todo.insert(makeDrvPathWithOutputs(j->first, j->second));
             } else
-                foreach (DerivationOutputs::iterator, i, drv.outputs)
-                    todoNonDrv.insert(i->second.path);
+                todoNonDrv.insert(outputs.begin(), outputs.end());
         }
 
         foreach (PathSet::iterator, i, todoNonDrv) {

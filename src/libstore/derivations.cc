@@ -261,11 +261,17 @@ DrvPathWithOutputs parseDrvPathWithOutputs(const string & s)
 }
 
 
-Path makeDrvPathWithOutputs(const Path & drvPath, std::set<string> outputs)
+Path makeDrvPathWithOutputs(const Path & drvPath, const std::set<string> & outputs)
 {
     return outputs.empty()
         ? drvPath
         : drvPath + "!" + concatStringsSep(",", outputs);
+}
+
+
+bool wantOutput(const string & output, const std::set<string> & wanted)
+{
+    return wanted.empty() || wanted.find(output) != wanted.end();
 }
 
 
