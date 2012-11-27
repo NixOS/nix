@@ -190,4 +190,7 @@ private:
 extern Settings settings;
 
 
+extern const string nixVersion;
+
+
 }

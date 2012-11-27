@@ -180,7 +180,7 @@ static void initAndRun(int argc, char * * argv)
             return;
         }
         else if (arg == "--version") {
-            std::cout << format("%1% (Nix) %2%") % programId % NIX_VERSION << std::endl;
+            std::cout << format("%1% (Nix) %2%") % programId % nixVersion << std::endl;
             return;
         }
         else if (arg == "--keep-failed" || arg == "-K")

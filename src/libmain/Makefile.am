@@ -7,6 +7,5 @@ libmain_la_LIBADD = ../libstore/libstore.la @BDW_GC_LIBS@
 pkginclude_HEADERS = shared.hh
 
 AM_CXXFLAGS = \
- -DNIX_VERSION=\"$(VERSION)\" \
  -I$(srcdir)/.. -I$(srcdir)/../libutil \
  -I$(srcdir)/../libstore

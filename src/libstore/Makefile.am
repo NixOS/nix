@@ -23,6 +23,7 @@ AM_CXXFLAGS = -Wall \
  -DNIX_CONF_DIR=\"$(sysconfdir)/nix\" \
  -DNIX_LIBEXEC_DIR=\"$(libexecdir)\" \
  -DNIX_BIN_DIR=\"$(bindir)\" \
+ -DNIX_VERSION=\"$(VERSION)\" \
  -I$(srcdir)/.. -I$(srcdir)/../libutil \
  -I$(srcdir)/../libstore
 

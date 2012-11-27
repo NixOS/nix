@@ -1143,6 +1143,16 @@ void EvalState::createBaseEnv()
     mkString(v, settings.thisSystem.c_str());
     addConstant("__currentSystem", v);
 
+    mkString(v, nixVersion.c_str());
+    addConstant("__nixVersion", v);
+
+    /* Language version.  This should be increased every time a new
+       language feature gets added.  It's not necessary to increase it
+       when primops get added, because you can just use `builtins ?
+       primOp' to check. */
+    mkInt(v, 1);
+    addConstant("__langVersion", v);
+
     // Miscellaneous
     addPrimOp("import", 1, prim_import);
     addPrimOp("isNull", 1, prim_isNull);

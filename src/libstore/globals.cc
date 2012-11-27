@@ -197,4 +197,7 @@ Settings::SettingsMap Settings::getOverrides()
 }
 
 
+const string nixVersion = NIX_VERSION;
+
+
 }
