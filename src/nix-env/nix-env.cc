@@ -1030,7 +1030,7 @@ static void opQuery(Globals & globals,
             if (xmlOutput) {
                 if (i->system != "") attrs["system"] = i->system;
             }
-            else if (printSystem) 
+            else if (printSystem)
                 columns.push_back(i->system);
 
             if (printDrvPath) {
@@ -1040,13 +1040,16 @@ static void opQuery(Globals & globals,
                 } else
                     columns.push_back(drvPath == "" ? "-" : drvPath);
             }
-        
-            if (printOutPath) {
-                string outPath = i->queryOutPath(globals.state);
-                if (xmlOutput) {
-                    if (outPath != "") attrs["outPath"] = outPath;
-                } else
-                    columns.push_back(outPath);
+
+            if (printOutPath && !xmlOutput) {
+                DrvInfo::Outputs outputs = i->queryOutputs(globals.state);
+                string s;
+                foreach (DrvInfo::Outputs::iterator, j, outputs) {
+                    if (!s.empty()) s += ';';
+                    if (j->first != "out") { s += j->first; s += "="; }
+                    s += j->second;
+                }
+                columns.push_back(s);
             }
 
             if (printDescription) {
@@ -1059,35 +1062,45 @@ static void opQuery(Globals & globals,
                     columns.push_back(descr);
             }
 
-            if (xmlOutput)
-                if (printMeta) {
+            if (xmlOutput) {
+                if (printOutPath || printMeta) {
                     XMLOpenElement item(xml, "item", attrs);
-                    MetaInfo meta = i->queryMetaInfo(globals.state);
-                    for (MetaInfo::iterator j = meta.begin(); j != meta.end(); ++j) {
-                        XMLAttrs attrs2;
-                        attrs2["name"] = j->first;
-                        if (j->second.type == MetaValue::tpString) {
-                            attrs2["type"] = "string";
-                            attrs2["value"] = j->second.stringValue;
-                            xml.writeEmptyElement("meta", attrs2);
-                        } else if (j->second.type == MetaValue::tpInt) {
-                            attrs2["type"] = "int";
-                            attrs2["value"] = (format("%1%") % j->second.intValue).str();
-                            xml.writeEmptyElement("meta", attrs2);
-                        } else if (j->second.type == MetaValue::tpStrings) {
-                            attrs2["type"] = "strings";
-                            XMLOpenElement m(xml, "meta", attrs2);
-                            foreach (Strings::iterator, k, j->second.stringValues) { 
-                                XMLAttrs attrs3;
-                                attrs3["value"] = *k;
-                                xml.writeEmptyElement("string", attrs3);
-                           }
+                    if (printOutPath) {
+                        DrvInfo::Outputs outputs = i->queryOutputs(globals.state);
+                        foreach (DrvInfo::Outputs::iterator, j, outputs) {
+                            XMLAttrs attrs2;
+                            attrs2["name"] = j->first;
+                            attrs2["path"] = j->second;
+                            xml.writeEmptyElement("output", attrs2);
                         }
                     }
-                }
-                else
+                    if (printMeta) {
+                        MetaInfo meta = i->queryMetaInfo(globals.state);
+                        for (MetaInfo::iterator j = meta.begin(); j != meta.end(); ++j) {
+                            XMLAttrs attrs2;
+                            attrs2["name"] = j->first;
+                            if (j->second.type == MetaValue::tpString) {
+                                attrs2["type"] = "string";
+                                attrs2["value"] = j->second.stringValue;
+                                xml.writeEmptyElement("meta", attrs2);
+                            } else if (j->second.type == MetaValue::tpInt) {
+                                attrs2["type"] = "int";
+                                attrs2["value"] = (format("%1%") % j->second.intValue).str();
+                                xml.writeEmptyElement("meta", attrs2);
+                            } else if (j->second.type == MetaValue::tpStrings) {
+                                attrs2["type"] = "strings";
+                                XMLOpenElement m(xml, "meta", attrs2);
+                                foreach (Strings::iterator, k, j->second.stringValues) { 
+                                    XMLAttrs attrs3;
+                                    attrs3["value"] = *k;
+                                    xml.writeEmptyElement("string", attrs3);
+                               }
+                            }
+                        }
+                    }
+                } else
                     xml.writeEmptyElement("item", attrs);
-            else
+            } else
                 table.push_back(columns);
 
             cout.flush();

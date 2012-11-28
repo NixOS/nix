@@ -25,16 +25,20 @@ typedef std::map<string, MetaValue> MetaInfo;
 
 struct DrvInfo
 {
+public:
+    typedef std::map<string, Path> Outputs;
+
 private:
     string drvPath;
     string outPath;
     string outputName;
+    Outputs outputs;
 
     bool metaInfoRead;
     MetaInfo meta;
 
     bool failed; // set if we get an AssertionError
-    
+
 public:
     string name;
     string attrPath; /* path towards the derivation */
@@ -48,6 +52,7 @@ public:
     string queryDrvPath(EvalState & state) const;
     string queryOutPath(EvalState & state) const;
     string queryOutputName(EvalState & state) const;
+    Outputs queryOutputs(EvalState & state);
     MetaInfo queryMetaInfo(EvalState & state) const;
     MetaValue queryMetaInfo(EvalState & state, const string & name) const;
 
@@ -55,7 +60,7 @@ public:
     {
         drvPath = s;
     }
-    
+
     void setOutPath(const string & s)
     {
         outPath = s;
@@ -84,5 +89,5 @@ void getDerivations(EvalState & state, Value & v, const string & pathPrefix,
     Bindings & autoArgs, DrvInfos & drvs,
     bool ignoreAssertionFailures);
 
- 
+
 }

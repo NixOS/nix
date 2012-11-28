@@ -28,12 +28,42 @@ string DrvInfo::queryOutPath(EvalState & state) const
 }
 
 
+DrvInfo::Outputs DrvInfo::queryOutputs(EvalState & state)
+{
+    if (outputs.empty()) {
+        /* Get the ‘outputs’ list. */
+        Bindings::iterator i = attrs->find(state.sOutputs);
+
+        if (i == attrs->end())
+            outputs["out"] = queryOutPath(state);
+        else {
+            state.forceList(*i->value);
+
+            /* For each output... */
+            for (unsigned int j = 0; j < i->value->list.length; ++j) {
+                /* Evaluate the corresponding attribute set. */
+                string name = state.forceStringNoCtx(*i->value->list.elems[j]);
+                Bindings::iterator out = attrs->find(state.symbols.create(name));
+                if (out == attrs->end()) continue; // FIXME: throw error?
+                state.forceAttrs(*out->value);
+
+                /* And evaluate its ‘outPath’ attribute. */
+                Bindings::iterator outPath = out->value->attrs->find(state.sOutPath);
+                if (outPath == out->value->attrs->end()) continue; // FIXME: throw error?
+                PathSet context;
+                outputs[name] = state.coerceToPath(*outPath->value, context);
+            }
+        }
+    }
+    return outputs;
+}
+
+
 string DrvInfo::queryOutputName(EvalState & state) const
 {
     if (outputName == "" && attrs) {
         Bindings::iterator i = attrs->find(state.sOutputName);
-        PathSet context;
-        (string &) outputName = i != attrs->end() ? state.coerceToString(*i->value, context) : "";
+        (string &) outputName = i != attrs->end() ? state.forceStringNoCtx(*i->value) : "";
     }
     return outputName;
 }
@@ -42,9 +72,9 @@ string DrvInfo::queryOutputName(EvalState & state) const
 MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
 {
     if (metaInfoRead) return meta;
-    
+
     (bool &) metaInfoRead = true;
-    
+
     Bindings::iterator a = attrs->find(state.sMeta);
     if (a == attrs->end()) return meta; /* fine, empty meta information */
 
@@ -108,7 +138,7 @@ static bool getDerivation(EvalState & state, Value & v,
         done.insert(v.attrs);
 
         DrvInfo drv;
-    
+
         Bindings::iterator i = v.attrs->find(state.sName);
         /* !!! We really would like to have a decent back trace here. */
         if (i == v.attrs->end()) throw TypeError("derivation name missing");
@@ -126,7 +156,7 @@ static bool getDerivation(EvalState & state, Value & v,
 
         drvs.push_back(drv);
         return false;
-    
+
     } catch (AssertionError & e) {
         if (ignoreAssertionFailures) return false;
         throw;
@@ -159,7 +189,7 @@ static void getDerivations(EvalState & state, Value & vIn,
 {
     Value v;
     state.autoCallFunction(autoArgs, vIn, v);
-    
+
     /* Process the expression. */
     DrvInfo drv;
 
@@ -222,5 +252,5 @@ void getDerivations(EvalState & state, Value & v, const string & pathPrefix,
     getDerivations(state, v, pathPrefix, autoArgs, drvs, done, ignoreAssertionFailures);
 }
 
- 
+
 }
