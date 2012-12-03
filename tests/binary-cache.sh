@@ -29,6 +29,9 @@ echo "WantMassQuery: 1" >> $cacheDir/nix-cache-info
 
 nix-env --option binary-caches "file://$cacheDir" -f dependencies.nix -qas \* | grep -- "--S"
 
+x=$(nix-env -f dependencies.nix -qas \* --prebuilt-only)
+[ -z "$x" ]
+
 nix-store --option binary-caches "file://$cacheDir" -r $outPath
 
 nix-store --check-validity $outPath
