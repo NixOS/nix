@@ -41,7 +41,7 @@ Generations findGenerations(Path profile, int & curGen)
 
     Path profileDir = dirOf(profile);
     string profileName = baseNameOf(profile);
-    
+
     Strings names = readDirectory(profileDir);
     for (Strings::iterator i = names.begin(); i != names.end(); ++i) {
         int n;
@@ -116,7 +116,7 @@ void switchLink(Path link, Path target)
 {
     /* Hacky. */
     if (dirOf(target) == dirOf(link)) target = baseNameOf(target);
-    
+
     Path tmp = canonPath(dirOf(link) + "/.new_" + baseNameOf(link));
     if (symlink(target.c_str(), tmp.c_str()) != 0)
         throw SysError(format("creating symlink `%1%'") % tmp);
@@ -146,4 +146,3 @@ string optimisticLockProfile(const Path & profile)
 
 
 }
-

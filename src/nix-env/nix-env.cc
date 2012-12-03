@@ -115,13 +115,13 @@ static void getAllExprs(EvalState & state,
            necessary to prevent it from showing up in channels (which
            are implemented using profiles). */
         if (*i == "manifest.nix") continue;
-        
+
         Path path2 = path + "/" + *i;
-        
+
         struct stat st;
         if (stat(path2.c_str(), &st) == -1)
             continue; // ignore dangling symlinks in ~/.nix-defexpr
-        
+
         if (isNixExpr(path2)) {
             /* Strip off the `.nix' filename suffix (if applicable),
                otherwise the attribute cannot be selected with the
@@ -165,7 +165,7 @@ static void loadDerivations(EvalState & state, Path nixExprPath,
 {
     Value v;
     findAlongAttrPath(state, pathPrefix, autoArgs, loadSourceExpr(state, nixExprPath), v);
-    
+
     getDerivations(state, v, pathPrefix, autoArgs, elems, true);
 
     /* Filter out all derivations not applicable to the current
@@ -266,7 +266,7 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
                 int d = 1;
 
                 Newest::iterator k = newest.find(drvName.name);
-                
+
                 if (k != newest.end()) {
                     d = j->first.system == k->second.first.system ? 0 :
                         j->first.system == settings.thisSystem ? 1 :
@@ -303,7 +303,7 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
                 elems.push_back(j->first);
             }
     }
-            
+
     /* Check that all selectors have been used. */
     for (DrvNames::iterator i = selectors.begin();
          i != selectors.end(); ++i)
@@ -328,7 +328,7 @@ static void queryInstSources(EvalState & state,
     InstallSourceType type = instSource.type;
     if (type == srcUnknown && args.size() > 0 && isPath(args.front()))
         type = srcStorePaths;
-    
+
     switch (type) {
 
         /* Get the available user environment elements from the
@@ -344,7 +344,7 @@ static void queryInstSources(EvalState & state,
                 instSource.systemFilter, instSource.autoArgs, "", allElems);
 
             elems = filterBySelector(state, allElems, args, newestOnly);
-    
+
             break;
         }
 
@@ -355,7 +355,7 @@ static void queryInstSources(EvalState & state,
            argument `x: x.bar' is equivalent to `(x: x.bar)
            (import ./foo.nix)' = `(import ./foo.nix).bar'. */
         case srcNixExprs: {
-                
+
             Expr * e1 = loadSourceExpr(state, instSource.nixExprPath);
 
             foreach (Strings::const_iterator, i, args) {
@@ -364,10 +364,10 @@ static void queryInstSources(EvalState & state,
                 Value v; state.eval(call, v);
                 getDerivations(state, v, "", instSource.autoArgs, elems, true);
             }
-            
+
             break;
         }
-            
+
         /* The available user environment elements are specified as a
            list of store paths (which may or may not be
            derivations). */
@@ -398,10 +398,10 @@ static void queryInstSources(EvalState & state,
 
                 elems.push_back(elem);
             }
-            
+
             break;
         }
-            
+
         /* Get the available user environment elements from another
            user environment.  These are then filtered as in the
            `srcNixExprDrvs' case. */
@@ -477,9 +477,9 @@ static void installDerivations(Globals & globals,
 
     while (true) {
         string lockToken = optimisticLockProfile(profile);
-        
+
         DrvInfos installedElems = queryInstalled(globals.state, profile);
-        
+
         DrvInfos allElems(newElems);
         foreach (DrvInfos::iterator, i, installedElems) {
             DrvName drvName(i->name);
@@ -495,9 +495,9 @@ static void installDerivations(Globals & globals,
 
         foreach (DrvInfos::iterator, i, newElems)
             printMsg(lvlInfo, format("installing `%1%'") % i->name);
-    
+
         printMissing(globals.state, newElems);
-    
+
         if (globals.dryRun) return;
 
         if (createUserEnv(globals.state, allElems,
@@ -536,7 +536,7 @@ static void upgradeDerivations(Globals & globals,
 
     while (true) {
         string lockToken = optimisticLockProfile(globals.profile);
-        
+
         DrvInfos installedElems = queryInstalled(globals.state, globals.profile);
 
         /* Fetch all derivations from the input file. */
@@ -586,7 +586,7 @@ static void upgradeDerivations(Globals & globals,
                         }
                     }
                 }
-                
+
                 if (bestElem != availElems.end() &&
                     i->queryOutPath(globals.state) !=
                     bestElem->queryOutPath(globals.state))
@@ -602,9 +602,9 @@ static void upgradeDerivations(Globals & globals,
                 throw;
             }
         }
-    
+
         printMissing(globals.state, newElems);
-    
+
         if (globals.dryRun) return;
 
         if (createUserEnv(globals.state, newElems,
@@ -694,7 +694,7 @@ static void opSet(Globals & globals,
 
     if (elems.size() != 1)
         throw Error("--set requires exactly one derivation");
-    
+
     DrvInfo & drv(elems.front());
 
     if (drv.queryDrvPath(globals.state) != "") {
@@ -777,10 +777,10 @@ typedef list<Strings> Table;
 void printTable(Table & table)
 {
     unsigned int nrColumns = table.size() > 0 ? table.front().size() : 0;
-    
+
     vector<unsigned int> widths;
     widths.resize(nrColumns);
-    
+
     foreach (Table::iterator, i, table) {
         assert(i->size() == nrColumns);
         Strings::iterator j;
@@ -789,7 +789,7 @@ void printTable(Table & table)
             if (j->size() > widths[column]) widths[column] = j->size();
     }
 
-    foreach (Table::iterator, i, table) { 
+    foreach (Table::iterator, i, table) {
         Strings::iterator j;
         unsigned int column;
         for (j = i->begin(), column = 0; j != i->end(); ++j, ++column) {
@@ -817,10 +817,10 @@ static VersionDiff compareVersionAgainstSet(
     const DrvInfo & elem, const DrvInfos & elems, string & version)
 {
     DrvName name(elem.name);
-    
+
     VersionDiff diff = cvUnavail;
     version = "?";
-    
+
     for (DrvInfos::const_iterator i = elems.begin(); i != elems.end(); ++i) {
         DrvName name2(i->name);
         if (name.name == name2.name) {
@@ -858,7 +858,7 @@ static void opQuery(Globals & globals,
     typedef vector< map<string, string> > ResultSet;
     Strings remaining;
     string attrPath;
-        
+
     bool printStatus = false;
     bool printName = true;
     bool printAttrPath = false;
@@ -898,7 +898,7 @@ static void opQuery(Globals & globals,
     if (remaining.size() == 0)
         printMsg(lvlInfo, "warning: you probably meant to specify the argument '*' to show all packages");
 
-    
+
     /* Obtain derivation information from the specified source. */
     DrvInfos availElems, installedElems;
 
@@ -916,7 +916,7 @@ static void opQuery(Globals & globals,
 
     DrvInfos & otherElems(source == sInstalled ? availElems : installedElems);
 
-    
+
     /* Sort them by name. */
     /* !!! */
     vector<DrvInfo> elems2;
@@ -924,11 +924,11 @@ static void opQuery(Globals & globals,
         elems2.push_back(*i);
     sort(elems2.begin(), elems2.end(), cmpElemByName);
 
-    
+
     /* We only need to know the installed paths when we are querying
        the status of the derivation. */
     PathSet installed; /* installed paths */
-    
+
     if (printStatus) {
         for (DrvInfos::iterator i = installedElems.begin();
              i != installedElems.end(); ++i)
@@ -951,17 +951,17 @@ static void opQuery(Globals & globals,
         substitutablePaths = store->querySubstitutablePaths(paths);
     }
 
-    
+
     /* Print the desired columns, or XML output. */
     Table table;
     std::ostringstream dummy;
     XMLWriter xml(true, *(xmlOutput ? &cout : &dummy));
     XMLOpenElement xmlRoot(xml, "items");
-    
+
     foreach (vector<DrvInfo>::iterator, i, elems2) {
         try {
             if (i->hasFailed()) continue;
-            
+
             startNest(nest, lvlDebug, format("outputting query result `%1%'") % i->attrPath);
 
             if (globals.prebuiltOnly && !isPrebuilt(globals.state, *i)) continue;
@@ -1090,7 +1090,7 @@ static void opQuery(Globals & globals,
                             } else if (j->second.type == MetaValue::tpStrings) {
                                 attrs2["type"] = "strings";
                                 XMLOpenElement m(xml, "meta", attrs2);
-                                foreach (Strings::iterator, k, j->second.stringValues) { 
+                                foreach (Strings::iterator, k, j->second.stringValues) {
                                     XMLAttrs attrs3;
                                     attrs3["value"] = *k;
                                     xml.writeEmptyElement("string", attrs3);
@@ -1136,7 +1136,7 @@ static void switchGeneration(Globals & globals, int dstGen)
 {
     PathLocks lock;
     lockProfile(lock, globals.profile);
-    
+
     int curGen;
     Generations gens = findGenerations(globals.profile, curGen);
 
@@ -1156,9 +1156,9 @@ static void switchGeneration(Globals & globals, int dstGen)
 
     printMsg(lvlInfo, format("switching from generation %1% to %2%")
         % curGen % dst.number);
-    
+
     if (globals.dryRun) return;
-    
+
     switchLink(globals.profile, dst.path);
 }
 
@@ -1201,7 +1201,7 @@ static void opListGenerations(Globals & globals,
 
     PathLocks lock;
     lockProfile(lock, globals.profile);
-    
+
     int curGen;
     Generations gens = findGenerations(globals.profile, curGen);
 
@@ -1225,7 +1225,7 @@ static void deleteGeneration2(Globals & globals, unsigned int gen)
         printMsg(lvlInfo, format("removing generation %1%") % gen);
         deleteGeneration(globals.profile, gen);
     }
-    
+
 }
 
 
@@ -1237,7 +1237,7 @@ static void opDeleteGenerations(Globals & globals,
 
     PathLocks lock;
     lockProfile(lock, globals.profile);
-    
+
     int curGen;
     Generations gens = findGenerations(globals.profile, curGen);
 
@@ -1272,13 +1272,13 @@ void run(Strings args)
 {
     Strings opFlags, opArgs, remaining;
     Operation op = 0;
-    
+
     Globals globals;
-    
+
     globals.instSource.type = srcUnknown;
     globals.instSource.nixExprPath = getDefNixExprPath();
     globals.instSource.systemFilter = "*";
-    
+
     globals.dryRun = false;
     globals.preserveInstalled = false;
     globals.prebuiltOnly = false;
@@ -1353,7 +1353,7 @@ void run(Strings args)
             ? absPath(readLink(profileLink), dirOf(profileLink))
             : canonPath(settings.nixStateDir + "/profiles/default");
     }
-    
+
     store = openStore();
 
     op(globals, remaining, opFlags, opArgs);
