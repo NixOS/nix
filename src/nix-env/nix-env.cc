@@ -212,14 +212,14 @@ static int comparePriorities(EvalState & state,
 }
 
 
+// FIXME: this function is rather slow since it checks a single path
+// at a time.
 static bool isPrebuilt(EvalState & state, const DrvInfo & elem)
 {
-    assert(false);
-#if 0
-    return
-        store->isValidPath(elem.queryOutPath(state)) ||
-        store->hasSubstitutes(elem.queryOutPath(state));
-#endif
+    Path path = elem.queryOutPath(state);
+    if (store->isValidPath(path)) return true;
+    PathSet ps = store->querySubstitutablePaths(singleton<PathSet>(path));
+    return ps.find(path) != ps.end();
 }
 
 
@@ -938,7 +938,7 @@ static void opQuery(Globals & globals,
 
     /* Query which paths have substitutes. */
     PathSet validPaths, substitutablePaths;
-    if (printStatus) {
+    if (printStatus || globals.prebuiltOnly) {
         PathSet paths;
         foreach (vector<DrvInfo>::iterator, i, elems2)
             try {
@@ -964,7 +964,10 @@ static void opQuery(Globals & globals,
 
             startNest(nest, lvlDebug, format("outputting query result `%1%'") % i->attrPath);
 
-            if (globals.prebuiltOnly && !isPrebuilt(globals.state, *i)) continue;
+            if (globals.prebuiltOnly &&
+                validPaths.find(i->queryOutPath(globals.state)) == validPaths.end() &&
+                substitutablePaths.find(i->queryOutPath(globals.state)) == substitutablePaths.end())
+                continue;
 
             /* For table output. */
             Strings columns;
