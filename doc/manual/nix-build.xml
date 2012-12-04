@@ -96,7 +96,7 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 <variablelist>
 
   <varlistentry><term><option>--drv-link</option> <replaceable>drvlink</replaceable></term>
-  
+
     <listitem><para>Add a symlink named
     <replaceable>drvlink</replaceable> to the store derivation
     produced by <command>nix-instantiate</command>.  The derivation is
@@ -108,14 +108,14 @@ also <xref linkend="sec-common-options" />.</phrase></para>
   </varlistentry>
 
   <varlistentry><term><option>--add-drv-link</option></term>
-  
+
     <listitem><para>Shorthand for <option>--drv-link</option>
     <filename>./derivation</filename>.</para></listitem>
-    
+
   </varlistentry>
 
   <varlistentry><term><option>--no-out-link</option></term>
-  
+
     <listitem><para>Do not create a symlink to the output path.  Note
     that as a result the output does not become a root of the garbage
     collector, and so might be deleted by <command>nix-store
@@ -125,7 +125,7 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 
   <varlistentry xml:id='opt-out-link'><term><option>--out-link</option> /
   <option>-o</option> <replaceable>outlink</replaceable></term>
-  
+
     <listitem><para>Change the name of the symlink to the output path
     created from <filename>result</filename> to
     <replaceable>outlink</replaceable>.</para></listitem>
@@ -143,7 +143,7 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 <variablelist>
 
   <varlistentry><term><option>--command</option> <replaceable>cmd</replaceable></term>
-  
+
     <listitem><para>In the environment of the derivation, executeq the
     command <replaceable>cmd</replaceable> instead of the default
     interactive shell.</para></listitem>
@@ -151,7 +151,7 @@ also <xref linkend="sec-common-options" />.</phrase></para>
   </varlistentry>
 
   <varlistentry><term><option>--exclude</option> <replaceable>regexp</replaceable></term>
-  
+
     <listitem><para>Do not build any dependencies whose store path
     matches the regular expression <replaceable>regexp</replaceable>.
     This option may be specified multiple times.</para></listitem>
@@ -190,6 +190,25 @@ $ ./pan/gui/pan
 
 </para>
 
+<para>If a derivation has multiple outputs,
+<command>nix-build</command> will build the default (first) output.
+You can also build all outputs:
+<screen>
+$ nix-build '&lt;nixpkgs>' -A openssl.all
+</screen>
+This will create a symlink for each output named
+<filename>result-<replaceable>outputname</replaceable></filename>.
+The suffix is omitted if the output name is <literal>out</literal>.
+So if <literal>openssl</literal> has outputs <literal>out</literal>,
+<literal>bin</literal> and <literal>man</literal>,
+<command>nix-build</command> will create symlinks
+<literal>result</literal>, <literal>result-bin</literal> and
+<literal>result-man</literal>.  It’s also possible to build a specific
+output:
+<screen>
+$ nix-build '&lt;nixpkgs>' -A openssl.man
+</screen>
+This will create a symlink <literal>result-man</literal>.</para>
 
 </refsection>
 
@@ -201,6 +220,6 @@ $ ./pan/gui/pan
 </variablelist>
 
 </refsection>
-  
+
 
 </refentry>

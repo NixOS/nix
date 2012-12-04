@@ -106,7 +106,7 @@ the single Nix expression in that directory
     here, the entire remainder of the file is the body of the
     function; when given the required arguments, the body should
     describe how to build an instance of the Hello package.</para>
-    
+
   </callout>
 
   <callout arearefs='ex-hello-nix-co-2'>
@@ -190,7 +190,7 @@ perl = perl;</programlisting>
     with the same name happen to be in scope.</para>
 
   </callout>
-  
+
 </calloutlist>
 
 </para>
@@ -301,7 +301,7 @@ steps:</para>
     (<literal>make install</literal>).</para>
 
   </callout>
-  
+
 </calloutlist>
 
 <para>If you are wondering about the absence of error checking on the
@@ -321,7 +321,7 @@ error check.</para>
 ...
 
 rec { <co xml:id='ex-hello-composition-co-1' />
-  
+
   hello = import ../applications/misc/hello/ex-1 <co xml:id='ex-hello-composition-co-2' /> { <co xml:id='ex-hello-composition-co-3' />
     inherit fetchurl stdenv perl;
   };
@@ -330,10 +330,10 @@ rec { <co xml:id='ex-hello-composition-co-1' />
     inherit fetchurl stdenv;
   };
 
-  fetchurl = import ../build-support/fetchurl { 
+  fetchurl = import ../build-support/fetchurl {
     inherit stdenv; ...
   };
-  
+
   stdenv = ...;
 
 }
@@ -476,8 +476,8 @@ that the path denoted by <envar>out</envar> is now
 will see that the path is already valid and finish immediately.  If a
 build fails, either because it returns a non-zero exit code, because
 Nix or the builder are killed, or because the machine crashes, then
-the output path will not be registered as valid.  If you try to build
-the derivation again, Nix will remove the output path if it exists
+the output paths will not be registered as valid.  If you try to build
+the derivation again, Nix will remove the output paths if they exist
 (e.g., because the builder died half-way through <literal>make
 install</literal>) and try again.  Note that there is no
 <quote>negative caching</quote>: Nix doesn't remember that a build
@@ -543,7 +543,7 @@ genericBuild <co xml:id='ex-hello-builder2-co-3' /></programlisting>
 <calloutlist>
 
   <callout arearefs='ex-hello-builder2-co-1'>
-    
+
     <para>The <envar>buildInputs</envar> variable tells
     <filename>setup</filename> to use the indicated packages as
     <quote>inputs</quote>.  This means that if a package provides a
@@ -568,7 +568,7 @@ genericBuild <co xml:id='ex-hello-builder2-co-3' /></programlisting>
     the file <literal>$stdenv/setup</literal>.</para>
 
   </callout>
-  
+
   <callout arearefs='ex-hello-builder2-co-3'>
 
     <para>The final step calls the shell function
@@ -580,7 +580,7 @@ genericBuild <co xml:id='ex-hello-builder2-co-3' /></programlisting>
     see <xref linkend='sec-standard-environment' />.</para>
 
   </callout>
-  
+
 </calloutlist>
 
 <para>Discerning readers will note that the
@@ -704,7 +704,7 @@ configureFlags = "
     the third line is indented three spaces.  Thus, two spaces are
     stripped from each line, so the resulting string is
 
-<programlisting>    
+<programlisting>
 "This is the first line.\nThis is the second line.\n  This is the third line.\n"</programlisting>
 
     </para>
@@ -726,7 +726,7 @@ configureFlags = "
     linefeed, carriage-return and tab characters can be writted as
     <literal>''\n</literal>, <literal>''\r</literal>,
     <literal>''\t</literal>.</para>
-    
+
     <para>Indented strings are primarily useful in that they allow
     multi-line string literals to follow the indentation of the
     enclosing Nix expression, and that less escaping is typically
@@ -745,7 +745,7 @@ stdenv.mkDerivation {
       ${if enableBar then "cp bar $out/bin" else ""}
     '';
   <replaceable>...</replaceable>
-}    
+}
 </programlisting>
 
     </para>
@@ -781,7 +781,7 @@ stdenv.mkDerivation {
   <listitem><para><emphasis>Booleans</emphasis> with values
   <literal>true</literal> and
   <literal>false</literal>.</para></listitem>
-  
+
 </itemizedlist>
 
 </para>
@@ -931,7 +931,7 @@ propagate attributes).  This can be shortened using the
 <literal>inherit</literal> keyword.  For instance,
 
 <programlisting>
-let x = 123; in 
+let x = 123; in
 { inherit x;
   y = 456;
 }</programlisting>
@@ -982,7 +982,7 @@ argument.  There are three kinds of patterns:</para>
 
 <itemizedlist>
 
-  
+
   <listitem><para>If a pattern is a single identifier, then the
   function matches any argument.  Example:
 
@@ -1002,7 +1002,7 @@ map (concat "foo") [ "bar" "bla" "abc" ]</programlisting>
   evaluates to <literal>[ "foobar" "foobla"
   "fooabc" ]</literal>.</para></listitem>
 
-  
+
   <listitem><para>An <emphasis>attribute set pattern</emphasis> of the
   form <literal>{ name1, name2, …, nameN }</literal>
   matches an attribute set containing the listed attributes, and binds
@@ -1016,7 +1016,7 @@ map (concat "foo") [ "bar" "bla" "abc" ]</programlisting>
   <varname>x</varname>, <varname>y</varname> and
   <varname>z</varname>.  No other attributes are allowed.  If you want
   to allow additional arguments, you can use an ellipsis
-  (<literal>...</literal>): 
+  (<literal>...</literal>):
 
 <programlisting>
 { x, y, z, ... }: z + y + x</programlisting>
@@ -1164,7 +1164,7 @@ used in the Nix expression for Subversion.</para>
 </calloutlist>
 
 </simplesect>
-  
+
 
 
 <simplesect><title>With-expressions</title>
@@ -1343,7 +1343,7 @@ set, the attributes of which specify the inputs of the build.</para>
   <listitem><para>There must be an attribute named
   <varname>name</varname> whose value must be a string.  This is used
   as a symbolic name for the package by <command>nix-env</command>,
-  and it is appended to the hash in the output path of the
+  and it is appended to the output paths of the
   derivation.</para></listitem>
 
   <listitem><para>There must be an attribute named
@@ -1358,7 +1358,7 @@ set, the attributes of which specify the inputs of the build.</para>
 
     <itemizedlist>
 
-      <listitem><para>Strings, URIs, and integers are just passed
+      <listitem><para>Strings and integers are just passed
       verbatim.</para></listitem>
 
       <listitem><para>A <emphasis>path</emphasis> (e.g.,
@@ -1369,8 +1369,8 @@ set, the attributes of which specify the inputs of the build.</para>
       should reside in the Nix store.</para></listitem>
 
       <listitem><para>A <emphasis>derivation</emphasis> causes that
-      derivation to be built prior to the present derivation; the
-      output path is put in the environment
+      derivation to be built prior to the present derivation; its
+      default output path is put in the environment
       variable.</para></listitem>
 
       <listitem><para>Lists of the previous types are also allowed.
@@ -1389,14 +1389,48 @@ set, the attributes of which specify the inputs of the build.</para>
   specifies command-line arguments to be passed to the builder.  It
   should be a list.</para></listitem>
 
+  <listitem><para>The optional attribute <varname>outputs</varname>
+  specifies a list of symbolic outputs of the derivation.  By default,
+  a derivation produces a single output path, denoted as
+  <literal>out</literal>.  However, derivations can produce multiple
+  output paths.  This is useful because it allows outputs to be
+  downloaded or garbage-collected separately.  For instance, imagine a
+  library package that provides a dynamic library, header files, and
+  documentation.  A program that links against the library doesn’t
+  need the header files and documentation at runtime, and it doesn’t
+  need the documentation at build time.  Thus, the library package
+  could specify:
+<programlisting>
+outputs = [ "lib" "headers" "doc" ];
+</programlisting>
+  This will cause Nix to pass environment variables
+  <literal>lib</literal>, <literal>headers</literal> and
+  <literal>doc</literal> to the builder containing the intended store
+  paths of each output.  The builder would typically do something like
+<programlisting>
+./configure --libdir=$lib/lib --includedir=$headers/include --docdir=$doc/share/doc
+</programlisting>
+  for an Autoconf-style package.  You can refer to each output of a
+  derivation by selecting it as an attribute, e.g.
+<programlisting>
+buildInputs = [ pkg.lib pkg.headers ];
+</programlisting>
+  The first element of <varname>output</varname> determines the
+  <emphasis>default output</emphasis>.  Thus, you could also write
+<programlisting>
+buildInputs = [ pkg pkg.headers ];
+</programlisting>
+  since <literal>pkg</literal> is equivalent to
+  <literal>pkg.lib</literal>.</para></listitem>
+
 </itemizedlist>
 
-<para>(Note that <function>mkDerivation</function> in the standard
+<para>The function <function>mkDerivation</function> in the standard
 environment is a wrapper around <function>derivation</function> that
 adds a default value for <varname>system</varname> and always uses
 Bash as the builder, to which the supplied builder is passed as a
 command-line argument.  See <xref linkend='sec-standard-environment'
-/>.)</para>
+/>.</para>
 
 <para>The builder is executed as follows:
 
@@ -1440,17 +1474,19 @@ command-line argument.  See <xref linkend='sec-standard-environment'
     top-level Nix store directory (typically,
     <filename>/nix/store</filename>).</para></listitem>
 
-    <listitem><para><envar>out</envar> is set to point to the output
-    path of the derivation, which is a subdirectory of the Nix store.
-    The output path is a concatenation of the cryptographic hash of
-    all build inputs, and the <varname>name</varname>
-    attribute.</para></listitem>
-    
+    <listitem><para>For each output declared in
+    <varname>outputs</varname>, the corresponding environment variable
+    is set to point to the intended path in the Nix store for that
+    output.  Each output path is a concatenation of the cryptographic
+    hash of all build inputs, the <varname>name</varname> attribute
+    and the output name.  (The output name is omitted if it’s
+    <literal>out</literal>.)</para></listitem>
+
   </itemizedlist>
 
   </para></listitem>
 
-  <listitem><para>If the output path already exists, it is removed.
+  <listitem><para>If an output path already exists, it is removed.
   Also, locks are acquired to prevent multiple Nix instances from
   performing the same build at the same time.</para></listitem>
 
@@ -1464,14 +1500,11 @@ command-line argument.  See <xref linkend='sec-standard-environment'
   <listitem><para>The temporary directory is removed (unless the
   <option>-K</option> option was specified).</para></listitem>
 
-  <listitem><para>If the build was successful, Nix scans the output
-  for references to the paths of the inputs.  These so-called
-  <emphasis>retained dependencies</emphasis> could be used when the
-  output of the derivation is used (e.g., when it's executed or used
-  as input to another derivation), so if we deploy the derivation, we
-  should copy the retained dependencies as well.  The scan is
-  performed by looking for the hash parts of file names of the
-  inputs.</para></listitem>
+  <listitem><para>If the build was successful, Nix scans each output
+  path for references to input paths by looking for the hash parts of
+  the input paths.  Since these are potential runtime dependencies,
+  Nix registers them as dependencies of the output
+  paths.</para></listitem>
 
   <listitem><para>After the build, Nix sets the last-modified
   timestamp on all files in the build result to 1 (00:00:01 1/1/1970
@@ -1497,7 +1530,7 @@ attributes.</para>
 <variablelist>
 
   <varlistentry><term><varname>allowedReferences</varname></term>
-  
+
     <listitem><para>The optional attribute
     <varname>allowedReferences</varname> specifies a list of legal
     references (dependencies) of the output of the builder.  For
@@ -1515,7 +1548,7 @@ allowedReferences = [];
 
   </varlistentry>
 
-  
+
   <varlistentry><term><varname>exportReferencesGraph</varname></term>
 
     <listitem><para>This attribute allows builders access to the
@@ -1626,7 +1659,7 @@ stdenv.mkDerivation {
   outputHashMode = "flat";
   outputHashAlgo = "md5";
   outputHash = md5;
-  
+
   inherit url;
 }
 </programlisting>
@@ -1655,7 +1688,7 @@ stdenv.mkDerivation {
         <para>This is the default.</para></listitem>
 
       </varlistentry>
-    
+
       <varlistentry><term><literal>"recursive"</literal></term>
 
         <listitem><para>The hash is computed over the NAR archive dump
@@ -1676,10 +1709,10 @@ stdenv.mkDerivation {
     linkend="sec-nix-hash"><command>nix-hash</command> command</link>
     for information about converting to and from base-32
     notation.)</para></listitem>
-    
+
   </varlistentry>
 
-  
+
   <varlistentry><term><varname>impureEnvVars</varname></term>
 
     <listitem><para>This attribute allows you to specify a list of
@@ -1706,7 +1739,7 @@ impureEnvVars = [ "http_proxy" "https_proxy" <replaceable>...</replaceable> ];
 
   </varlistentry>
 
-  
+
   <varlistentry><term><varname>preferLocalBuild</varname></term>
 
     <listitem><para>If this attribute is set to
