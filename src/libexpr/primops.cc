@@ -950,15 +950,22 @@ static void prim_filter(EvalState & state, Value * * args, Value & v)
     Value * vs[args[1]->list.length];
     unsigned int k = 0;
 
+    bool same = true;
     for (unsigned int n = 0; n < args[1]->list.length; ++n) {
         Value res;
         state.callFunction(*args[0], *args[1]->list.elems[n], res);
         if (state.forceBool(res))
             vs[k++] = args[1]->list.elems[n];
+        else
+            same = false;
     }
 
-    state.mkList(v, k);
-    for (unsigned int n = 0; n < k; ++n) v.list.elems[n] = vs[n];
+    if (same)
+        v = *args[1];
+    else {
+        state.mkList(v, k);
+        for (unsigned int n = 0; n < k; ++n) v.list.elems[n] = vs[n];
+    }
 }
 
 
