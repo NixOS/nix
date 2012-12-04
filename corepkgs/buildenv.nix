@@ -2,18 +2,22 @@ with import <nix/config.nix>;
 
 { derivations, manifest }:
 
-derivation { 
+derivation {
   name = "user-environment";
   system = builtins.currentSystem;
   builder = perl;
   args = [ "-w" ./buildenv.pl ];
-  
+
   manifest = manifest;
 
   # !!! grmbl, need structured data for passing this in a clean way.
-  paths = derivations;
-  active = map (x: if x ? meta && x.meta ? active then x.meta.active else "true") derivations;
-  priority = map (x: if x ? meta && x.meta ? priority then x.meta.priority else "5") derivations;
+  derivations =
+    map (d:
+      [ (if d.meta.active or true then "1" else "0")
+        (d.meta.priority or 5)
+        (builtins.length d.outputs)
+      ] ++ map (output: builtins.getAttr output d) d.outputs)
+      derivations;
 
   # Building user environments remotely just causes huge amounts of
   # network traffic, so don't do that.

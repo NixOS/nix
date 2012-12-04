@@ -43,12 +43,12 @@ sub createLinks {
             $srcFile =~ /\/log$/)
         {
             # Do nothing.
-	}
+        }
 
         elsif (-d $srcFile) {
 
             lstat $dstFile;
-            
+
             if (-d _) {
                 createLinks($srcFile, $dstFile, $priority);
             }
@@ -59,7 +59,7 @@ sub createLinks {
                     die "collission between directory `$srcFile' and non-directory `$target'";
                 }
                 unlink $dstFile or die "error unlinking `$dstFile': $!";
-                mkdir $dstFile, 0755 || 
+                mkdir $dstFile, 0755 ||
                     die "error creating directory `$dstFile': $!";
                 createLinks($target, $dstFile, $priorities{$dstFile});
                 createLinks($srcFile, $dstFile, $priority);
@@ -86,7 +86,7 @@ sub createLinks {
                 next if $prevPriority < $priority;
                 unlink $dstFile or die;
             }
-            
+
             symlink($srcFile, $dstFile) ||
                 die "error creating link `$dstFile': $!";
             $priorities{$dstFile} = $priority;
@@ -125,19 +125,18 @@ sub addPkg {
 
 # Convert the stuff we get from the environment back into a coherent
 # data type.
-my @paths = split ' ', $ENV{"paths"};
-my @active = split ' ', $ENV{"active"};
-my @priority = split ' ', $ENV{"priority"};
-
-die if scalar @paths != scalar @active;
-die if scalar @paths != scalar @priority;
-
 my %pkgs;
-
-for (my $n = 0; $n < scalar @paths; $n++) {
-    $pkgs{$paths[$n]} =
-        { active => $active[$n]
-        , priority => $priority[$n] };
+my @derivations = split ' ', $ENV{"derivations"};
+while (scalar @derivations) {
+    my $active = shift @derivations;
+    my $priority = shift @derivations;
+    my $outputs = shift @derivations;
+    for (my $n = 0; $n < $outputs; $n++) {
+        my $path = shift @derivations;
+        $pkgs{$path} =
+            { active => int($active)
+            , priority => int($priority) };
+    }
 }
 
 
@@ -145,7 +144,7 @@ for (my $n = 0; $n < scalar @paths; $n++) {
 # user.
 foreach my $pkg (sort (keys %pkgs)) {
     #print $pkg, " ", $pkgs{$pkg}->{priority}, "\n";
-    addPkg($pkg, $pkgs{$pkg}->{priority}) if $pkgs{$pkg}->{active} ne "false";
+    addPkg($pkg, $pkgs{$pkg}->{priority}) if $pkgs{$pkg}->{active};
 }
 
 
