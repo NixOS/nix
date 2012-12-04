@@ -8,7 +8,7 @@ set -x
 test "$(nix-env -p $profiles/test -q '*' | wc -l)" -eq 0
 
 # Query available: should contain several.
-test "$(nix-env -p $profiles/test -f ./user-envs.nix -qa '*' | wc -l)" -eq 5
+test "$(nix-env -p $profiles/test -f ./user-envs.nix -qa '*' | wc -l)" -eq 6
 
 # Query descriptions.
 nix-env -p $profiles/test -f ./user-envs.nix -qa '*' --description | grep silly
@@ -98,7 +98,7 @@ nix-env -p $profiles/test --delete-generations old
 # foo-1.0.
 nix-collect-garbage
 test -e "$outPath10"
-if test -e "$outPath20"; then false; fi
+! [ -e "$outPath20" ]
 
 # Uninstall everything
 nix-env -p $profiles/test -f ./user-envs.nix -e '*'
@@ -112,7 +112,7 @@ nix-env -p $profiles/test -q '*' | grep -q foo-2.0
 # On the other hand, this should install both (and should fail due to
 # a collision).
 nix-env -p $profiles/test -f ./user-envs.nix -e '*'
-if nix-env -p $profiles/test -f ./user-envs.nix -i foo-1.0 foo-2.0; then false; fi
+! nix-env -p $profiles/test -f ./user-envs.nix -i foo-1.0 foo-2.0
 
 # Installing "*" should install one foo and one bar.
 nix-env -p $profiles/test -f ./user-envs.nix -e '*'
@@ -120,3 +120,12 @@ nix-env -p $profiles/test -f ./user-envs.nix -i '*'
 test "$(nix-env -p $profiles/test -q '*' | wc -l)" -eq 2
 nix-env -p $profiles/test -q '*' | grep -q foo-2.0
 nix-env -p $profiles/test -q '*' | grep -q bar-0.1.1
+
+# Test priorities: foo-0.1 has a lower priority than foo-1.0, so it
+# should be possible to install both without a collision.  Also test
+# ‘--set-flag priority’ to manually override the declared priorities.
+nix-env -p $profiles/test -f ./user-envs.nix -e '*'
+nix-env -p $profiles/test -f ./user-envs.nix -i foo-0.1 foo-1.0
+[ "$($profiles/test/bin/foo)" = "foo-1.0" ]
+nix-env -p $profiles/test -f ./user-envs.nix --set-flag priority 1 foo-0.1
+[ "$($profiles/test/bin/foo)" = "foo-0.1" ]
