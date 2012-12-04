@@ -22,6 +22,14 @@ test "$(nix-env -p $profiles/test -q '*' | wc -l)" -eq 1
 nix-env -p $profiles/test -q '*' | grep -q foo-1.0
 test "$($profiles/test/bin/foo)" = "foo-1.0"
 
+# Disable foo.
+nix-env -p $profiles/test --set-flag active false foo
+! [ -e "$profiles/test/bin/foo" ]
+
+# Enable foo.
+nix-env -p $profiles/test --set-flag active true foo
+[ -e "$profiles/test/bin/foo" ]
+
 # Store the path of foo-1.0.
 outPath10=$(nix-env -p $profiles/test -q --out-path --no-name '*' | grep foo-1.0)
 echo "foo-1.0 = $outPath10"
@@ -67,7 +75,7 @@ if nix-env -p $profiles/test -q '*' | grep -q bar; then false; fi
 
 # Count generations.
 nix-env -p $profiles/test --list-generations
-test "$(nix-env -p $profiles/test --list-generations | wc -l)" -eq 5
+test "$(nix-env -p $profiles/test --list-generations | wc -l)" -eq 7
 
 # Install foo-1.0, now using its store path.
 echo $outPath10

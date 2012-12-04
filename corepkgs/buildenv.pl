@@ -134,7 +134,7 @@ while (scalar @derivations) {
     for (my $n = 0; $n < $outputs; $n++) {
         my $path = shift @derivations;
         $pkgs{$path} =
-            { active => int($active)
+            { active => $active ne "false"
             , priority => int($priority) };
     }
 }

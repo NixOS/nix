@@ -13,7 +13,7 @@ derivation {
   # !!! grmbl, need structured data for passing this in a clean way.
   derivations =
     map (d:
-      [ (if d.meta.active or true then "1" else "0")
+      [ (d.meta.active or "true")
         (d.meta.priority or 5)
         (builtins.length d.outputs)
       ] ++ map (output: builtins.getAttr output d) d.outputs)
