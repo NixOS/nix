@@ -49,6 +49,28 @@ $ nix-env -i thunderbird --option binary-caches http://nixos.org/binary-cache
   </listitem>
 
   <listitem>
+    <para>Multiple output support should now be usable.  A derivation
+    can declare that it wants to produce multiple store paths by
+    saying something like
+<programlisting>
+outputs = [ "lib" "headers" "doc" ];
+</programlisting>
+    This will cause Nix to pass the intended store path of each output
+    to the builder through the environment variables
+    <literal>lib</literal>, <literal>headers</literal> and
+    <literal>doc</literal>.  Other packages can refer to a specific
+    output by referring to
+    <literal><replaceable>pkg</replaceable>.<replaceable>output</replaceable></literal>,
+    e.g.
+<programlisting>
+buildInputs = [ pkg.lib pkg.headers ];
+</programlisting>
+    If you install a package with multiple outputs using
+    <command>nix-env</command>, each output path will be symlinked
+    into the user environment.</para>
+  </listitem>
+
+  <listitem>
     <para>Dashes are now valid as part of identifiers and attribute
     names.</para>
   </listitem>
@@ -82,6 +104,34 @@ $ mount -o remount,ro,bind /nix/store
   </listitem>
 
   <listitem>
+    <para>Store optimisation (replacing identical files in the store
+    with hard links) can now be done automatically every time a path
+    is added to the store.  This is enabled by setting the
+    configuration option <literal>auto-optimise-store</literal> to
+    <literal>true</literal> (disabled by default).</para>
+  </listitem>
+
+  <listitem>
+    <para>Nix now supports <command>xz</command> compression for NARs
+    in addition to <command>bzip2</command>.  It compresses about 30%
+    better on typical archives and decompresses about twice as
+    fast.</para>
+  </listitem>
+
+  <listitem>
+    <para>Basic Nix expression evaluation profiling: setting the
+    environment variable <envar>NIX_COUNT_CALLS</envar> to
+    <literal>1</literal> will cause Nix to print how many times each
+    primop or function was executed.</para>
+  </listitem>
+
+  <listitem>
+    <para>New primops: <varname>concatLists</varname>,
+    <varname>elem</varname>, <varname>elemAt</varname> and
+    <varname>filter</varname>.</para>
+  </listitem>
+
+  <listitem>
     <para>The command <command>nix-copy-closure</command> has a new
     flag <option>--use-substitutes</option> (<option>-s</option>) to
     download missing paths on the target machine using the substitute
@@ -94,7 +144,19 @@ $ mount -o remount,ro,bind /nix/store
     worker in “slave” mode has been removed.</para>
   </listitem>
 
+  <listitem>
+    <para>The <option>--help</option> flag of every Nix command now
+    invokes <command>man</command>.</para>
+  </listitem>
+
+  <listitem>
+    <para>Chroot builds are now supported on systemd machines.</para>
+  </listitem>
+
 </itemizedlist>
+
+<para>This release has contributions from Eelco Dolstra, Florian
+Friesdorf, Mats Erik Andersson and Shea Levy.</para>
 
 </section>
 
