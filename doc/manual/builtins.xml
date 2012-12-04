@@ -19,7 +19,7 @@ is also available as <function>builtins.derivation</function>.</para>
 
 <variablelist>
 
-  
+
   <varlistentry><term><function>abort</function> <replaceable>s</replaceable></term>
 
     <listitem><para>Abort Nix expression evaluation, print error
@@ -27,7 +27,7 @@ is also available as <function>builtins.derivation</function>.</para>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.add</function>
   <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
 
@@ -37,7 +37,7 @@ is also available as <function>builtins.derivation</function>.</para>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.attrNames</function>
   <replaceable>attrs</replaceable></term>
 
@@ -55,7 +55,7 @@ attrValues = attrs: map (name: builtins.getAttr name attrs) (builtins.attrNames 
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>baseNameOf</function> <replaceable>s</replaceable></term>
 
     <listitem><para>Return the <emphasis>base name</emphasis> of the
@@ -65,7 +65,7 @@ attrValues = attrs: map (name: builtins.getAttr name attrs) (builtins.attrNames 
 
   </varlistentry>
 
-  
+
   <varlistentry><term><varname>builtins</varname></term>
 
     <listitem><para>The attribute set <varname>builtins</varname>
@@ -82,7 +82,7 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.compareVersions</function>
   <replaceable>s1</replaceable> <replaceable>s2</replaceable></term>
 
@@ -99,7 +99,16 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
   </varlistentry>
 
-  
+
+  <varlistentry><term><function>builtins.concatLists</function>
+  <replaceable>lists</replaceable></term>
+
+    <listitem><para>Concatenate a list of lists into a single
+    list.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry
   xml:id='builtin-currentSystem'><term><varname>builtins.currentSystem</varname></term>
 
@@ -124,7 +133,7 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
   </varlistentry>
   -->
 
-  
+
   <!--
   <varlistentry><term><function>dependencyClosure</function></term>
 
@@ -133,7 +142,7 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
   </varlistentry>
   -->
 
-  
+
   <varlistentry><term><function>derivation</function>
   <replaceable>attrs</replaceable></term>
 
@@ -152,7 +161,7 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.div</function>
   <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
 
@@ -162,7 +171,40 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
   </varlistentry>
 
-  
+
+  <varlistentry><term><function>builtins.elem</function>
+  <replaceable>x</replaceable> <replaceable>xs</replaceable></term>
+
+    <listitem><para>Return <literal>true</literal> if a value equal to
+    <replaceable>x</replaceable> occurs in the list
+    <replaceable>xs</replaceable>, and <literal>false</literal>
+    otherwise.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry><term><function>builtins.elemAt</function>
+  <replaceable>xs</replaceable> <replaceable>n</replaceable></term>
+
+    <listitem><para>Return element <replaceable>n</replaceable> from
+    the list <replaceable>xs</replaceable>.  Elements are counted
+    starting from 0.  A fatal error occurs in the index is out of
+    bounds.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry><term><function>builtins.filter</function>
+  <replaceable>f</replaceable> <replaceable>xs</replaceable></term>
+
+    <listitem><para>Return a list consisting of the elements of
+    <replaceable>xs</replaceable> for which the function
+    <replaceable>f</replaceable> returns
+    <literal>true</literal>.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry><term><function>builtins.filterSource</function>
   <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
 
@@ -214,7 +256,7 @@ stdenv.mkDerivation {
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.getAttr</function>
   <replaceable>s</replaceable> <replaceable>attrs</replaceable></term>
 
@@ -227,7 +269,7 @@ stdenv.mkDerivation {
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.getEnv</function>
   <replaceable>s</replaceable></term>
 
@@ -245,7 +287,7 @@ stdenv.mkDerivation {
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.hasAttr</function>
   <replaceable>s</replaceable> <replaceable>attrs</replaceable></term>
 
@@ -259,7 +301,7 @@ stdenv.mkDerivation {
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.head</function>
   <replaceable>list</replaceable></term>
 
@@ -270,7 +312,7 @@ stdenv.mkDerivation {
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>import</function>
   <replaceable>path</replaceable></term>
 
@@ -290,7 +332,7 @@ stdenv.mkDerivation {
     built-in).  Therefore, it cannot refer to variables that are in
     scope at the call site.  For instance, if you have a calling
     expression
-    
+
 <programlisting>
 rec {
   x = 123;
@@ -325,7 +367,7 @@ x: x + 456</programlisting>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.intersectAttrs</function>
   <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
 
@@ -334,8 +376,8 @@ x: x + 456</programlisting>
     exist in the set <replaceable>e1</replaceable>.</para></listitem>
 
   </varlistentry>
-        
-    
+
+
   <varlistentry><term><function>builtins.isAttrs</function>
   <replaceable>e</replaceable></term>
 
@@ -345,7 +387,7 @@ x: x + 456</programlisting>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.isList</function>
   <replaceable>e</replaceable></term>
 
@@ -355,7 +397,7 @@ x: x + 456</programlisting>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.isFunction</function>
   <replaceable>e</replaceable></term>
 
@@ -365,7 +407,7 @@ x: x + 456</programlisting>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.isString</function>
   <replaceable>e</replaceable></term>
 
@@ -375,7 +417,7 @@ x: x + 456</programlisting>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.isInt</function>
   <replaceable>e</replaceable></term>
 
@@ -385,7 +427,7 @@ x: x + 456</programlisting>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.isBool</function>
   <replaceable>e</replaceable></term>
 
@@ -395,7 +437,7 @@ x: x + 456</programlisting>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>isNull</function>
   <replaceable>e</replaceable></term>
 
@@ -405,12 +447,12 @@ x: x + 456</programlisting>
 
     <warning><para>This function is <emphasis>deprecated</emphasis>;
     just write <literal>e == null</literal> instead.</para></warning>
-    
+
     </listitem>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.length</function>
   <replaceable>e</replaceable></term>
 
@@ -419,7 +461,7 @@ x: x + 456</programlisting>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.lessThan</function>
   <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
 
@@ -432,7 +474,7 @@ x: x + 456</programlisting>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.listToAttrs</function>
   <replaceable>e</replaceable></term>
 
@@ -459,7 +501,7 @@ builtins.listToAttrs
     </para></listitem>
 
   </varlistentry>
-  
+
   <varlistentry><term><function>map</function>
   <replaceable>f</replaceable> <replaceable>list</replaceable></term>
 
@@ -472,10 +514,10 @@ map (x: "foo" + x) [ "bar" "bla" "abc" ]</programlisting>
 
     evaluates to <literal>[ "foobar" "foobla" "fooabc"
     ]</literal>.</para></listitem>
-    
+
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.mul</function>
   <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
 
@@ -485,7 +527,7 @@ map (x: "foo" + x) [ "bar" "bla" "abc" ]</programlisting>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.parseDrvName</function>
   <replaceable>s</replaceable></term>
 
@@ -500,7 +542,7 @@ map (x: "foo" + x) [ "bar" "bla" "abc" ]</programlisting>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.pathExists</function>
   <replaceable>path</replaceable></term>
 
@@ -533,7 +575,7 @@ in config.someSetting</programlisting>
   </varlistentry>
   -->
 
-  
+
   <varlistentry><term><function>builtins.readFile</function>
   <replaceable>path</replaceable></term>
 
@@ -541,8 +583,8 @@ in config.someSetting</programlisting>
     <replaceable>path</replaceable> as a string.</para></listitem>
 
   </varlistentry>
-  
-  
+
+
   <varlistentry><term><function>removeAttrs</function>
   <replaceable>attrs</replaceable> <replaceable>list</replaceable></term>
 
@@ -558,7 +600,7 @@ removeAttrs { x = 1; y = 2; z = 3; } [ "a" "x" "z" ]</screen>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.stringLength</function>
   <replaceable>e</replaceable></term>
 
@@ -568,7 +610,7 @@ removeAttrs { x = 1; y = 2; z = 3; } [ "a" "x" "z" ]</screen>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.sub</function>
   <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
 
@@ -578,7 +620,7 @@ removeAttrs { x = 1; y = 2; z = 3; } [ "a" "x" "z" ]</screen>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.substring</function>
   <replaceable>start</replaceable> <replaceable>len</replaceable>
   <replaceable>s</replaceable></term>
@@ -596,7 +638,7 @@ removeAttrs { x = 1; y = 2; z = 3; } [ "a" "x" "z" ]</screen>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.tail</function>
   <replaceable>list</replaceable></term>
 
@@ -606,7 +648,7 @@ removeAttrs { x = 1; y = 2; z = 3; } [ "a" "x" "z" ]</screen>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>throw</function>
   <replaceable>s</replaceable></term>
 
@@ -620,7 +662,7 @@ removeAttrs { x = 1; y = 2; z = 3; } [ "a" "x" "z" ]</screen>
 
   </varlistentry>
 
-  
+
   <varlistentry
   xml:id='builtin-toFile'><term><function>builtins.toFile</function>
   <replaceable>name</replaceable> <replaceable>s</replaceable></term>
@@ -638,7 +680,7 @@ removeAttrs { x = 1; y = 2; z = 3; } [ "a" "x" "z" ]</screen>
 
 stdenv.mkDerivation {
   name = "hello-2.1.1";
-  
+
   builder = builtins.toFile "builder.sh" "
     source $stdenv/setup
 
@@ -657,7 +699,7 @@ stdenv.mkDerivation {
   };
   inherit perl;
 }</programlisting>
-  
+
     </para>
 
     <para>It is even possible for one file to refer to another, e.g.,
@@ -695,7 +737,7 @@ in foo</programlisting>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.toPath</function> <replaceable>s</replaceable></term>
 
     <listitem><para>Convert the string value
@@ -708,7 +750,7 @@ in foo</programlisting>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>toString</function> <replaceable>e</replaceable></term>
 
     <listitem><para>Convert the expression
@@ -720,7 +762,7 @@ in foo</programlisting>
 
   </varlistentry>
 
-  
+
   <varlistentry xml:id='builtin-toXML'><term><function>builtins.toXML</function> <replaceable>e</replaceable></term>
 
     <listitem><para>Return a string containing an XML representation
@@ -765,7 +807,7 @@ in foo</programlisting>
 
     <example xml:id='ex-toxml'><title>Passing information to a builder
     using <function>toXML</function></title>
-    
+
 <programlisting><![CDATA[
 { stdenv, fetchurl, libxslt, jira, uberwiki }:
 
@@ -773,7 +815,7 @@ stdenv.mkDerivation (rec {
   name = "web-server";
 
   buildInputs = [ libxslt ];
-  
+
   builder = builtins.toFile "builder.sh" "
     source $stdenv/setup
     mkdir $out
@@ -806,7 +848,7 @@ stdenv.mkDerivation (rec {
 
     <example xml:id='ex-toxml-result'><title>XML representation produced by
     <function>toXML</function></title>
-    
+
 <programlisting><![CDATA[<?xml version='1.0' encoding='utf-8'?>
 <expr>
   <list>
@@ -835,7 +877,7 @@ stdenv.mkDerivation (rec {
 
   </varlistentry>
 
-  
+
   <varlistentry><term><function>builtins.trace</function>
   <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
 
@@ -846,7 +888,7 @@ stdenv.mkDerivation (rec {
 
   </varlistentry>
 
-  
+
 </variablelist>
 
 
