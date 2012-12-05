@@ -122,7 +122,9 @@ sub update {
         }
 
         # Download the channel tarball.
-        my $fullURL = "$url/nixexprs.tar.bz2";
+        my $fullURL = "$url/nixexprs.tar.xz";
+        system("$Nix::Config::curl --fail --silent --head '$fullURL' > /dev/null") == 0 or
+            $fullURL = "$url/nixexprs.tar.bz2";
         print STDERR "downloading Nix expressions from `$fullURL'...\n";
         my ($hash, $path) = `PRINT_PATH=1 QUIET=1 $Nix::Config::binDir/nix-prefetch-url '$fullURL'`;
         die "cannot fetch `$fullURL'\n" if $? != 0;
