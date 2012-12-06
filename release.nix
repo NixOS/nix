@@ -42,7 +42,14 @@ let
           export VARTEXFONTS=$TMPDIR/texfonts
         '';
 
-        distPhase = "make dist-gzip; make dist-xz; mkdir -p $out/tarballs; cp *.tar.* $out/tarballs";
+        distPhase =
+          ''
+            runHook preDist
+            make dist-gzip
+            make dist-xz
+            mkdir -p $out/tarballs
+            cp *.tar.* $out/tarballs
+          '';
 
         preDist = ''
           make -C doc/manual install prefix=$out
