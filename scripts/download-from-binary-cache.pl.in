@@ -112,6 +112,8 @@ sub initCache {
     $dbh->{RaiseError} = 1;
     $dbh->{PrintError} = 0;
 
+    $dbh->sqlite_busy_timeout(60 * 60 * 1000);
+
     $dbh->do("pragma synchronous = off"); # we can always reproduce the cache
     $dbh->do("pragma journal_mode = truncate");
 
