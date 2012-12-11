@@ -10,6 +10,7 @@
 #include <cctype>
 #include <exception>
 
+#include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -134,6 +135,11 @@ static void initAndRun(int argc, char * * argv)
        now.  In particular, store objects should be readable by
        everybody. */
     umask(0022);
+
+    /* Initialise the PRNG. */
+    struct timeval tv;
+    gettimeofday(&tv, 0);
+    srandom(tv.tv_usec);
 
     /* Process the NIX_LOG_TYPE environment variable. */
     string lt = getEnv("NIX_LOG_TYPE");

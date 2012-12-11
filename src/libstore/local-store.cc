@@ -48,7 +48,7 @@ static void throwSQLiteError(sqlite3 * db, const format & f)
 #if HAVE_NANOSLEEP
         struct timespec t;
         t.tv_sec = 0;
-        t.tv_nsec = 100 * 1000 * 1000; /* 0.1s */
+        t.tv_nsec = (random() % 100) * 1000 * 1000; /* <= 0.1s */
         nanosleep(&t, 0);
 #else
         sleep(1);
