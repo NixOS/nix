@@ -93,11 +93,10 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 
     <listitem><para>Specifies the profile to be used by those
     operations that operate on a profile (designated below as the
-    <emphasis>active profile</emphasis>).  A profile is sequence of
+    <emphasis>active profile</emphasis>).  A profile is a sequence of
     user environments called <emphasis>generations</emphasis>, one of
-    which is the <emphasis>current generation</emphasis>.  The default
-    profile is the target of the symbolic link
-    <filename>~/.nix-profile</filename> (see below).</para></listitem>
+    which is the <emphasis>current
+    generation</emphasis>.</para></listitem>
 
   </varlistentry>
 
@@ -1256,6 +1255,16 @@ error: no generation older than the current (91) exists</screen>
 <refsection condition="manpage"><title>Environment variables</title>
 
 <variablelist>
+  
+  <varlistentry><term><envar>NIX_PROFILE</envar></term>
+
+    <listitem><para>Location of the Nix profile.  Defaults to the
+    target of the symlink <filename>~/.nix-profile</filename>, if it
+    exists, or <filename>/nix/var/nix/profiles/default</filename>
+    otherwise.</para></listitem>
+
+  </varlistentry>
+
   <xi:include href="env-common.xml#xmlns(db=http://docbook.org/ns/docbook)xpointer(//db:variablelist[@xml:id='env-common']/*)" />
 </variablelist>
 

@@ -1350,6 +1350,9 @@ void run(Strings args)
 
     if (!op) throw UsageError("no operation specified");
 
+    if (globals.profile == "")
+        globals.profile = getEnv("NIX_PROFILE", "");
+
     if (globals.profile == "") {
         Path profileLink = getHomeDir() + "/.nix-profile";
         globals.profile = pathExists(profileLink)
