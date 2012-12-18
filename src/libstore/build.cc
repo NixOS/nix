@@ -3141,6 +3141,8 @@ void Worker::waitForInput()
         }
     }
 
+    assert(fdMax != 0);
+
     if (select(fdMax, &fds, 0, 0, useTimeout ? &timeout : 0) == -1) {
         if (errno == EINTR) return;
         throw SysError("waiting for input");
