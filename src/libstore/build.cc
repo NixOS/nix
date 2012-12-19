@@ -710,13 +710,7 @@ HookInstance::HookInstance()
 HookInstance::~HookInstance()
 {
     try {
-        /* Cleanly shut down the hook by closing its stdin if it's not
-           already building.  Otherwise pid's destructor will kill
-           it. */
-        if (pid != -1 && toHook.writeSide != -1) {
-            toHook.writeSide.close();
-            pid.wait(true);
-        }
+        pid.kill();
     } catch (...) {
         ignoreException();
     }
