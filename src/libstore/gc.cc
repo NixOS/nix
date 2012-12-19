@@ -473,7 +473,7 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
             if (state.gcKeepDerivations && isDerivation(p)) {
                 PathSet outputs = queryDerivationOutputs(p);
                 foreach (PathSet::iterator, i, outputs)
-                    if (isValidPath(*i)) todo.insert(*i);
+                    if (isValidPath(*i) && queryDeriver(*i) == p) todo.insert(*i);
             }
             /* If gc-keep-outputs is set, then don't delete this path
                if there are derivers of this path that are not
