@@ -276,7 +276,11 @@ private:
 
     void deleteGarbage(GCState & state, const Path & path);
 
-    bool tryToDelete(GCState & state, const Path & path);
+    void tryToDelete(GCState & state, const Path & path);
+
+    bool canReachRoot(GCState & state, PathSet & visited, const Path & path);
+
+    void deletePathRecursive(GCState & state, const Path & path);
 
     bool isActiveTempFile(const GCState & state,
         const Path & path, const string & suffix);
