@@ -15,27 +15,47 @@ Derivation derivationFromPath(StoreAPI & store, const Path & drvPath)
 }
 
 
-void computeFSClosure(StoreAPI & store, const Path & storePath,
-    PathSet & paths, bool flipDirection, bool includeOutputs)
+void computeFSClosure(StoreAPI & store, const Path & path,
+    PathSet & paths, bool flipDirection, bool includeOutputs, bool includeDerivers)
 {
-    if (paths.find(storePath) != paths.end()) return;
-    paths.insert(storePath);
+    if (paths.find(path) != paths.end()) return;
+    paths.insert(path);
 
-    PathSet references;
-    if (flipDirection)
-        store.queryReferrers(storePath, references);
-    else
-        store.queryReferences(storePath, references);
+    PathSet edges;
 
-    if (includeOutputs && isDerivation(storePath)) {
-        PathSet outputs = store.queryDerivationOutputs(storePath);
-        foreach (PathSet::iterator, i, outputs)
-            if (store.isValidPath(*i))
-                computeFSClosure(store, *i, paths, flipDirection, true);
+    if (flipDirection) {
+        store.queryReferrers(path, edges);
+
+        if (includeOutputs) {
+            PathSet derivers = store.queryValidDerivers(path);
+            foreach (PathSet::iterator, i, derivers)
+                edges.insert(*i);
+        }
+
+        if (includeDerivers && isDerivation(path)) {
+            PathSet outputs = store.queryDerivationOutputs(path);
+            foreach (PathSet::iterator, i, outputs)
+                if (store.isValidPath(*i) && store.queryDeriver(*i) == path)
+                    edges.insert(*i);
+        }
+
+    } else {
+        store.queryReferences(path, edges);
+
+        if (includeOutputs && isDerivation(path)) {
+            PathSet outputs = store.queryDerivationOutputs(path);
+            foreach (PathSet::iterator, i, outputs)
+                if (store.isValidPath(*i)) edges.insert(*i);
+        }
+
+        if (includeDerivers) {
+            Path deriver = store.queryDeriver(path);
+            if (store.isValidPath(deriver)) edges.insert(deriver);
+        }
     }
 
-    foreach (PathSet::iterator, i, references)
-        computeFSClosure(store, *i, paths, flipDirection, includeOutputs);
+    foreach (PathSet::iterator, i, edges)
+        computeFSClosure(store, *i, paths, flipDirection, includeOutputs, includeDerivers);
 }
 
 

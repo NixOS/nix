@@ -334,6 +334,16 @@ Path RemoteStore::queryDeriver(const Path & path)
 }
 
 
+PathSet RemoteStore::queryValidDerivers(const Path & path)
+{
+    openConnection();
+    writeInt(wopQueryValidDerivers, to);
+    writeString(path, to);
+    processStderr();
+    return readStorePaths<PathSet>(from);
+}
+
+
 PathSet RemoteStore::queryDerivationOutputs(const Path & path)
 {
     openConnection();

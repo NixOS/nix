@@ -40,6 +40,8 @@ public:
 
     Path queryDeriver(const Path & path);
     
+    PathSet queryValidDerivers(const Path & path);
+
     PathSet queryDerivationOutputs(const Path & path);
     
     StringSet queryDerivationOutputNames(const Path & path);

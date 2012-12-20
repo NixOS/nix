@@ -111,10 +111,6 @@ public:
 
     Path queryDeriver(const Path & path);
 
-    /* Return all currently valid derivations that have `path' as an
-       output.  (Note that the result of `queryDeriver()' is the
-       derivation that was actually used to produce `path', which may
-       not exist anymore.) */
     PathSet queryValidDerivers(const Path & path);
 
     PathSet queryDerivationOutputs(const Path & path);

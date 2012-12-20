@@ -404,7 +404,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
             foreach (Strings::iterator, i, opArgs) {
                 PathSet paths = maybeUseOutputs(followLinksToStorePath(*i), useOutput, forceRealise);
                 foreach (PathSet::iterator, j, paths)
-                    computeFSClosure(*store, *j, referrers, true);
+                    computeFSClosure(*store, *j, referrers, true,
+                        settings.gcKeepOutputs, settings.gcKeepDerivations);
             }
             Roots roots = store->findRoots();
             foreach (Roots::iterator, i, roots)

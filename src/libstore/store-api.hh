@@ -133,6 +133,12 @@ public:
        no deriver has been set. */
     virtual Path queryDeriver(const Path & path) = 0;
 
+    /* Return all currently valid derivations that have `path' as an
+       output.  (Note that the result of `queryDeriver()' is the
+       derivation that was actually used to produce `path', which may
+       not exist anymore.) */
+    virtual PathSet queryValidDerivers(const Path & path) = 0;
+
     /* Query the outputs of the derivation denoted by `path'. */
     virtual PathSet queryDerivationOutputs(const Path & path) = 0;
 

@@ -334,6 +334,7 @@ static void performOp(unsigned int clientVersion,
 
     case wopQueryReferences:
     case wopQueryReferrers:
+    case wopQueryValidDerivers:
     case wopQueryDerivationOutputs: {
         Path path = readStorePath(from);
         startWork();
@@ -342,6 +343,8 @@ static void performOp(unsigned int clientVersion,
             store->queryReferences(path, paths);
         else if (op == wopQueryReferrers)
             store->queryReferrers(path, paths);
+        else if (op == wopQueryValidDerivers)
+            paths = store->queryValidDerivers(path);
         else paths = store->queryDerivationOutputs(path);
         stopWork();
         writeStrings(paths, to);
