@@ -318,7 +318,7 @@ nix channels in single-user mode (where the user isn't
 <systemitem class="username">root</systemitem>), you should add
 the following to <filename>nix.conf</filename>:
 <programlisting>
-binary-cache-files = <replaceable>localstatedir</replaceable>/nix/profiles/<replaceable>username</replaceable>/binary-caches/*
+binary-cache-files = <replaceable>localstatedir</replaceable>/nix/profiles/<replaceable>username</replaceable>/channels/binary-caches/*
 </programlisting></para></note>
 
 </section>
