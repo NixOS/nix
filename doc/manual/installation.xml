@@ -313,6 +313,14 @@ However, on single-user machines, it is often convenient to
 so that you don’t have to <command>su</command> to <systemitem
 class="username">root</systemitem> all the time.</para>
 
+<note><para>If you wish to take advantage of binary caches provided
+nix channels in single-user mode (where the user isn't
+<systemitem class="username">root</systemitem>), you should add
+the following to <filename>nix.conf</filename>:
+<programlisting>
+binary-cache-files = <replaceable>localstatedir</replaceable>/nix/profiles/<replaceable>username</replaceable>/channels/binary-caches/*
+</programlisting></para></note>
+
 </section>
 
 
