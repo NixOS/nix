@@ -36,6 +36,8 @@ my %requests;
 my %scheduled;
 my $caBundle = $ENV{"CURL_CA_BUNDLE"} // $ENV{"OPENSSL_X509_CERT_FILE"};
 
+my $userName = getpwuid($<) or die "cannot figure out user name";
+
 
 sub addRequest {
     my ($storePath, $url, $head) = @_;
@@ -195,7 +197,7 @@ sub getAvailableCaches {
     # // ($Nix::Config::storeDir eq "/nix/store" ? "http://nixos.org/binary-cache" : ""));
 
     my $urlsFiles = $Nix::Config::config{"binary-cache-files"}
-        // "/nix/var/nix/profiles/per-user/root/channels/binary-caches/*";
+        // "$Nix::Config::stateDir/profiles/per-user/$userName/channels/binary-caches/*";
     foreach my $urlFile (glob $urlsFiles) {
         next unless -f $urlFile;
         open FILE, "<$urlFile" or die "cannot open ‘$urlFile’\n";
