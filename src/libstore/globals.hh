@@ -139,7 +139,7 @@ struct Settings {
 
     /* The directories from the host filesystem to be included in the
        chroot. */
-    PathSet dirsInChroot;
+    StringSet dirsInChroot;
 
     /* Whether to impersonate a Linux 2.6 machine on newer kernels. */
     bool impersonateLinux26;
@@ -181,7 +181,7 @@ private:
 
     void get(string & res, const string & name);
     void get(bool & res, const string & name);
-    void get(PathSet & res, const string & name);
+    void get(StringSet & res, const string & name);
     template<class N> void get(N & res, const string & name);
 };
 

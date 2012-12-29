@@ -33,18 +33,18 @@ env-keep-derivations = false
 <para>You can override settings using the <option>--option</option>
 flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
 
-<para>The following settings are currently available: 
+<para>The following settings are currently available:
 
 <variablelist>
 
-  
+
   <varlistentry xml:id="conf-gc-keep-outputs"><term><literal>gc-keep-outputs</literal></term>
 
     <listitem><para>If <literal>true</literal>, the garbage collector
     will keep the outputs of non-garbage derivations.  If
     <literal>false</literal> (default), outputs will be deleted unless
     they are GC roots themselves (or reachable from other roots).</para>
- 
+
     <para>In general, outputs must be registered as roots separately.
     However, even if the output of a derivation is registered as a
     root, the collector will still delete store paths that are used
@@ -53,7 +53,7 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
     this option to <literal>true</literal>.</para></listitem>
 
   </varlistentry>
-  
+
 
   <varlistentry xml:id="conf-gc-keep-derivations"><term><literal>gc-keep-derivations</literal></term>
 
@@ -71,7 +71,7 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><literal>env-keep-derivations</literal></term>
 
     <listitem><para>If <literal>false</literal> (default), derivations
@@ -95,7 +95,7 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
 
   </varlistentry>
 
-  
+
   <varlistentry xml:id="conf-build-max-jobs"><term><literal>build-max-jobs</literal></term>
 
     <listitem><para>This option defines the maximum number of jobs
@@ -234,7 +234,27 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
 
   </varlistentry>
 
-  
+
+  <varlistentry xml:id="conf-build-chroot-dirs"><term><literal>build-chroot-dirs</literal></term>
+
+    <listitem><para>When builds are performed in a chroot environment,
+    Nix will mount some directories from the normal file system
+    hierarchy inside the chroot.  These are the Nix store, the
+    temporary build directory (usually
+    <filename>/tmp/nix-build-<replaceable>drvname</replaceable>-<replaceable>number</replaceable></filename>),
+    the <literal>/proc</literal> filesystem, and the directories
+    listed here.  The default is <literal>/dev /dev/pts</literal>,
+    since these contain files needed by many builds (such as
+    <filename>/dev/null</filename>).  You can use the syntax
+    <literal><replaceable>target</replaceable>=<replaceable>source</replaceable></literal>
+    to mount a path in a different location in the chroot; for
+    instance, <literal>/bin=/nix-bin</literal> will mount the
+    directory <literal>/nix-bin</literal> as <literal>/bin</literal>
+    inside the chroot.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry><term><literal>build-use-substitutes</literal></term>
 
     <listitem><para>If set to <literal>true</literal> (default), Nix
@@ -243,7 +263,7 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
 
   </varlistentry>
 
-    
+
   <varlistentry><term><literal>build-fallback</literal></term>
 
     <listitem><para>If set to <literal>true</literal>, Nix will fall
@@ -253,34 +273,7 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
 
   </varlistentry>
 
-    
-  <varlistentry xml:id="conf-build-chroot-dirs"><term><literal>build-chroot-dirs</literal></term>
 
-    <listitem><para>When builds are performed in a chroot environment,
-    Nix will mount (using <command>mount --bind</command> on Linux)
-    some directories from the normal file system hierarchy inside the
-    chroot.  These are the Nix store, the temporary build directory
-    (usually
-    <filename>/tmp/nix-<replaceable>pid</replaceable>-<replaceable>number</replaceable></filename>)
-    and the directories listed here.  The default is <literal>dev
-    /proc</literal>.  Files in <filename>/dev</filename> (such as
-    <filename>/dev/null</filename>) are needed by many builds, and
-    some files in <filename>/proc</filename> may also be needed
-    occasionally.</para>
-
-    <para>The value used on NixOS is
-    
-<programlisting>
-build-use-chroot = /dev /proc /bin</programlisting>
-
-    to make the <filename>/bin/sh</filename> symlink available (which
-    is still needed by many builders).</para>
-
-    </listitem>
-
-  </varlistentry>
-
-  
   <varlistentry><term><literal>build-cache-failures</literal></term>
 
     <listitem><para>If set to <literal>true</literal>, Nix will
@@ -417,7 +410,7 @@ build-use-chroot = /dev /proc /bin</programlisting>
 
   </varlistentry>
 
-  
+
   <varlistentry><term><literal>auto-optimise-store</literal></term>
 
     <listitem><para>If set to <literal>true</literal> (the default),

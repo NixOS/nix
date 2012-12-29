@@ -158,7 +158,7 @@ void Settings::get(bool & res, const string & name)
 }
 
 
-void Settings::get(PathSet & res, const string & name)
+void Settings::get(StringSet & res, const string & name)
 {
     SettingsMap::iterator i = settings.find(name);
     if (i == settings.end()) return;

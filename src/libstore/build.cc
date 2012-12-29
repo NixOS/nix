@@ -813,7 +813,8 @@ private:
     GoalState state;
 
     /* Stuff we need to pass to initChild(). */
-    PathSet dirsInChroot;
+    typedef map<Path, Path> DirsInChroot; // maps target path to source path
+    DirsInChroot dirsInChroot;
     typedef map<string, string> Environment;
     Environment env;
 
@@ -1863,8 +1864,14 @@ void DerivationGoal::startBuilder()
 
         /* Bind-mount a user-configurable set of directories from the
            host file system. */
-        dirsInChroot = settings.dirsInChroot;
-        dirsInChroot.insert(tmpDir);
+        foreach (StringSet::iterator, i, settings.dirsInChroot) {
+            size_t p = i->find('=');
+            if (p == string::npos)
+                dirsInChroot[*i] = *i;
+            else
+                dirsInChroot[string(*i, 0, p)] = string(*i, p + 1);
+        }
+        dirsInChroot[tmpDir] = tmpDir;
 
         /* Make the closure of the inputs available in the chroot,
            rather than the whole Nix store.  This prevents any access
@@ -1881,7 +1888,7 @@ void DerivationGoal::startBuilder()
             if (lstat(i->c_str(), &st))
                 throw SysError(format("getting attributes of path `%1%'") % *i);
             if (S_ISDIR(st.st_mode))
-                dirsInChroot.insert(*i);
+                dirsInChroot[*i] = *i;
             else {
                 /* Creating a hard link to *i is impossible if its
                    immutable bit is set.  So clear it first. */
@@ -2056,9 +2063,9 @@ void DerivationGoal::initChild()
             /* Bind-mount all the directories from the "host"
                filesystem that we want in the chroot
                environment. */
-            foreach (PathSet::iterator, i, dirsInChroot) {
-                Path source = *i;
-                Path target = chrootRootDir + source;
+            foreach (DirsInChroot::iterator, i, dirsInChroot) {
+                Path source = i->second;
+                Path target = chrootRootDir + i->first;
                 if (source == "/proc") continue; // backwards compatibility
                 debug(format("bind mounting `%1%' to `%2%'") % source % target);
                 createDirs(target);
