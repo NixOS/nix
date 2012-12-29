@@ -441,7 +441,16 @@ void RemoteStore::buildPaths(const PathSet & drvPaths, bool repair)
     if (repair) throw Error("repairing is not supported when building through the Nix daemon");
     openConnection();
     writeInt(wopBuildPaths, to);
-    writeStrings(drvPaths, to);
+    if (GET_PROTOCOL_MINOR(daemonVersion) >= 13)
+        writeStrings(drvPaths, to);
+    else {
+        /* For backwards compatibility with old daemons, strip output
+           identifiers. */
+        PathSet drvPaths2;
+        foreach (PathSet::const_iterator, i, drvPaths)
+            drvPaths2.insert(string(*i, 0, i->find('!')));
+        writeStrings(drvPaths2, to);
+    }
     processStderr();
     readInt(from);
 }
