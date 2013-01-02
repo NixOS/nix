@@ -538,7 +538,7 @@ dependencies) to a file, and then unpack that file into another Nix
 store.  For example,
 
 <screen>
-$ nix-store --export $(type -p firefox) > firefox.closure</screen>
+$ nix-store --export $(nix-store -qR $(type -p firefox)) > firefox.closure</screen>
 
 writes the closure of Firefox to a file.  You can then copy this file
 to another machine and install the closure:
@@ -552,7 +552,7 @@ another command, e.g. to copy and install a closure directly to/on
 another machine:
 
 <screen>
-$ nix-store --export $(type -p firefox) | bzip2 | \
+$ nix-store --export $(nix-store -qR $(type -p firefox)) | bzip2 | \
     ssh alice@itchy.example.org "bunzip2 | nix-store --import"</screen>
 
 But note that <command>nix-copy-closure</command> is generally more
@@ -583,7 +583,7 @@ $ nix-env -i firefox</screen>
 and Nix has to build a path that it sees is already present in
 <filename>/mnt/nix</filename>, then it will just copy from there
 instead of building it from source.</para>
- 
+
 
 </section>
 
