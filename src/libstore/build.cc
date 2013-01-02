@@ -2639,7 +2639,7 @@ void SubstitutionGoal::referencesValid()
 
     if (nrFailed > 0) {
         debug(format("some references of path `%1%' could not be realised") % storePath);
-        amDone(ecFailed);
+        amDone(nrNoSubstituters > 0 ? ecNoSubstituters : ecFailed);
         return;
     }
 
