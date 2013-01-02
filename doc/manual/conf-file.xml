@@ -324,8 +324,8 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
   <varlistentry><term><literal>binary-caches</literal></term>
 
     <listitem><para>A list of URLs of binary caches, separated by
-    whitespace.  The default is empty.<!-- The default is
-    <literal>http://nixos.org/binary-cache</literal>. --></para></listitem>
+    whitespace.  The default is
+    <literal>http://nixos.org/binary-cache</literal>.</para></listitem>
 
   </varlistentry>
 
