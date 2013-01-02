@@ -7,9 +7,11 @@ noinst_SCRIPTS = nix-profile.sh \
   find-runtime-roots.pl build-remote.pl nix-reduce-build \
   copy-from-other-stores.pl nix-http-export.cgi
 
+profiledir = $(sysconfdir)/profile.d
+
 install-exec-local: download-using-manifests.pl copy-from-other-stores.pl download-from-binary-cache.pl find-runtime-roots.pl
-	$(INSTALL) -d $(DESTDIR)$(sysconfdir)/profile.d
-	$(INSTALL_DATA) nix-profile.sh $(DESTDIR)$(sysconfdir)/profile.d/nix.sh
+	$(INSTALL) -d $(DESTDIR)$(profiledir)
+	$(INSTALL_DATA) nix-profile.sh $(DESTDIR)$(profiledir)/nix.sh
 	$(INSTALL) -d $(DESTDIR)$(libexecdir)/nix
 	$(INSTALL_PROGRAM) find-runtime-roots.pl $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL_PROGRAM) build-remote.pl $(DESTDIR)$(libexecdir)/nix 

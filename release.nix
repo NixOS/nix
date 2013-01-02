@@ -94,6 +94,8 @@ let
 
         enableParallelBuilding = true;
 
+        makeFlags = "profiledir=$(out)/etc/profile.d";
+
         installFlags = "sysconfdir=$(out)/etc";
 
         doInstallCheck = true;

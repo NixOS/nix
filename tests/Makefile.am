@@ -14,6 +14,8 @@ TESTS = init.sh hash.sh lang.sh add.sh simple.sh dependencies.sh \
 
 XFAIL_TESTS =
 
+profiledir = $(sysconfdir)/profile.d
+
 include ../substitute.mk
 
 $(TESTS): common.sh config.nix

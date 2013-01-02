@@ -354,7 +354,6 @@ fi
 AC_SUBST(tarFlags)
 
 
-
 AM_CONFIG_HEADER([config.h])
 AC_CONFIG_FILES([Makefile
    src/Makefile
