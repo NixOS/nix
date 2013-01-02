@@ -8,6 +8,16 @@
 
 <!--==================================================================-->
 
+<section xml:id="ssec-relnotes-1.3"><title>Release 1.3 (January 2, 2013)</title>
+
+<para>This is primarily a bug fix release.  It has contributions from
+Eelco Dolstra and Stuart Pernsteiner.</para>
+
+</section>
+
+
+<!--==================================================================-->
+
 <section xml:id="ssec-relnotes-1.2"><title>Release 1.2 (December 6, 2012)</title>
 
 <para>This release has the following improvements and changes:</para>
