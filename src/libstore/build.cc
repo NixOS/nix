@@ -93,7 +93,7 @@ typedef map<Path, WeakGoalPtr> WeakGoalMap;
 class Goal : public boost::enable_shared_from_this<Goal>
 {
 public:
-    typedef enum {ecBusy, ecSuccess, ecFailed, ecNoSubstituters} ExitCode;
+    typedef enum {ecBusy, ecSuccess, ecFailed, ecNoSubstituters, ecIncompleteClosure} ExitCode;
 
 protected:
 
@@ -114,6 +114,10 @@ protected:
        failed because there are no substituters. */
     unsigned int nrNoSubstituters;
 
+    /* Number of substitution goals we are/were waiting for that
+       failed because othey had unsubstitutable references. */
+    unsigned int nrIncompleteClosure;
+
     /* Name of this goal for debugging purposes. */
     string name;
 
@@ -122,7 +126,7 @@ protected:
 
     Goal(Worker & worker) : worker(worker)
     {
-        nrFailed = nrNoSubstituters = 0;
+        nrFailed = nrNoSubstituters = nrIncompleteClosure = 0;
         exitCode = ecBusy;
     }
 
@@ -307,9 +311,11 @@ void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
     trace(format("waitee `%1%' done; %2% left") %
         waitee->name % waitees.size());
 
-    if (result == ecFailed || result == ecNoSubstituters) ++nrFailed;
+    if (result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure) ++nrFailed;
 
     if (result == ecNoSubstituters) ++nrNoSubstituters;
+
+    if (result == ecIncompleteClosure) ++nrIncompleteClosure;
 
     if (waitees.empty() || (result == ecFailed && !settings.keepGoing)) {
 
@@ -333,7 +339,7 @@ void Goal::amDone(ExitCode result)
 {
     trace("done");
     assert(exitCode == ecBusy);
-    assert(result == ecSuccess || result == ecFailed || result == ecNoSubstituters);
+    assert(result == ecSuccess || result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure);
     exitCode = result;
     foreach (WeakGoals::iterator, i, waiters) {
         GoalPtr goal = i->lock();
@@ -757,6 +763,10 @@ private:
     /* Whether additional wanted outputs have been added. */
     bool needRestart;
 
+    /* Whether to retry substituting the outputs after building the
+       inputs. */
+    bool retrySubstitution;
+
     /* The derivation stored at drvPath. */
     Derivation drv;
 
@@ -906,6 +916,7 @@ DerivationGoal::DerivationGoal(const Path & drvPath, const StringSet & wantedOut
     : Goal(worker)
     , wantedOutputs(wantedOutputs)
     , needRestart(false)
+    , retrySubstitution(false)
     , fLogFile(0)
     , bzLogFile(0)
     , useChroot(false)
@@ -1062,10 +1073,15 @@ void DerivationGoal::outputsSubstituted()
 {
     trace("all outputs substituted (maybe)");
 
-    if (nrFailed > 0 && nrFailed > nrNoSubstituters && !settings.tryFallback)
+    if (nrFailed > 0 && nrFailed > nrNoSubstituters + nrIncompleteClosure && !settings.tryFallback)
         throw Error(format("some substitutes for the outputs of derivation `%1%' failed; try `--fallback'") % drvPath);
 
-    nrFailed = nrNoSubstituters = 0;
+    /*  If the substitutes form an incomplete closure, then we should
+        build the dependencies of this derivation, but after that, we
+        can still use the substitutes for this derivation itself. */
+    if (nrIncompleteClosure > 0 && !retrySubstitution) retrySubstitution = true;
+
+    nrFailed = nrNoSubstituters = nrIncompleteClosure = 0;
 
     if (needRestart) {
         needRestart = false;
@@ -1168,6 +1184,11 @@ void DerivationGoal::inputsRealised()
                 "%2% dependencies couldn't be built")
             % drvPath % nrFailed);
         amDone(ecFailed);
+        return;
+    }
+
+    if (retrySubstitution) {
+        haveDerivation();
         return;
     }
 
@@ -2639,7 +2660,7 @@ void SubstitutionGoal::referencesValid()
 
     if (nrFailed > 0) {
         debug(format("some references of path `%1%' could not be realised") % storePath);
-        amDone(nrNoSubstituters > 0 ? ecNoSubstituters : ecFailed);
+        amDone(nrNoSubstituters > 0 || nrIncompleteClosure > 0 ? ecIncompleteClosure : ecFailed);
         return;
     }
 
