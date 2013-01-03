@@ -297,7 +297,7 @@ LocalStore::LocalStore(bool reserveSpace)
         curSchema = getSchema();
 
         if (curSchema < 6) upgradeStore6();
-        else if (curSchema < 7) upgradeStore7();
+        else if (curSchema < 7) { upgradeStore7(); openDB(true); }
 
         writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
 
