@@ -1,7 +1,6 @@
 #include "globals.hh"
 #include "misc.hh"
 #include "local-store.hh"
-#include "immutable.hh"
 
 #include <boost/shared_ptr.hpp>
 
@@ -456,7 +455,6 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
         // if the path was not valid, need to determine the actual
         // size.
         state.bytesInvalidated += size;
-        makeMutable(path.c_str());
         // Mac OS X cannot rename directories if they are read-only.
         if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
             throw SysError(format("making `%1%' writable") % path);

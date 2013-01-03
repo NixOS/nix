@@ -7,7 +7,6 @@
 #include "local-store.hh"
 #include "util.hh"
 #include "archive.hh"
-#include "immutable.hh"
 
 #include <map>
 #include <sstream>
@@ -1383,10 +1382,8 @@ void replaceValidPath(const Path & storePath, const Path tmpPath)
        way first.  We'd better not be interrupted here, because if
        we're repairing (say) Glibc, we end up with a broken system. */
     Path oldPath = (format("%1%.old-%2%-%3%") % storePath % getpid() % rand()).str();
-    if (pathExists(storePath)) {
-        makeMutable(storePath);
+    if (pathExists(storePath))
         rename(storePath.c_str(), oldPath.c_str());
-    }
     if (rename(tmpPath.c_str(), storePath.c_str()) == -1)
         throw SysError(format("moving `%1%' to `%2%'") % tmpPath % storePath);
     if (pathExists(oldPath))
@@ -1911,10 +1908,6 @@ void DerivationGoal::startBuilder()
             if (S_ISDIR(st.st_mode))
                 dirsInChroot[*i] = *i;
             else {
-                /* Creating a hard link to *i is impossible if its
-                   immutable bit is set.  So clear it first. */
-                makeMutable(*i);
-
                 Path p = chrootRootDir + *i;
                 if (link(i->c_str(), p.c_str()) == -1) {
                     /* Hard-linking fails if we exceed the maximum

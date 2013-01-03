@@ -2,7 +2,6 @@
 
 #include "util.hh"
 #include "local-store.hh"
-#include "immutable.hh"
 #include "globals.hh"
 
 #include <sys/types.h>
@@ -20,7 +19,6 @@ static void makeWritable(const Path & path)
     struct stat st;
     if (lstat(path.c_str(), &st))
         throw SysError(format("getting attributes of path `%1%'") % path);
-    if (S_ISDIR(st.st_mode) || S_ISREG(st.st_mode)) makeMutable(path);
     if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
         throw SysError(format("changing writability of `%1%'") % path);
 }
@@ -91,7 +89,6 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
 
     if (!pathExists(linkPath)) {
         /* Nope, create a hard link in the links directory. */
-        makeMutable(path);
         if (link(path.c_str(), linkPath.c_str()) == 0) return;
         if (errno != EEXIST)
             throw SysError(format("cannot link `%1%' to `%2%'") % linkPath % path);
@@ -122,12 +119,6 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
     /* When we're done, make the directory read-only again and reset
        its timestamp back to 0. */
     MakeReadOnly makeReadOnly(mustToggle ? dirOf(path) : "");
-
-    /* If ‘linkPath’ is immutable, we can't create hard links to it,
-       so make it mutable first.  We also have to make ‘path’ mutable,
-       otherwise rename() will fail to delete it. */
-    makeMutable(path);
-    makeMutable(linkPath);
 
     Path tempLink = (format("%1%/.tmp-link-%2%-%3%")
         % settings.nixStore % getpid() % rand()).str();
