@@ -99,7 +99,7 @@ Path canonPath(const Path & path, bool resolveSymlinks)
             i++;
 
         /* If `..', delete the last component. */
-        else if (*i == '.' && i + 1 < end && i[1] == '.' && 
+        else if (*i == '.' && i + 1 < end && i[1] == '.' &&
             (i + 2 == end || i[2] == '/'))
         {
             if (!s.empty()) s.erase(s.rfind('/'));
@@ -214,7 +214,7 @@ string readFile(int fd)
     struct stat st;
     if (fstat(fd, &st) == -1)
         throw SysError("statting file");
-    
+
     unsigned char * buf = new unsigned char[st.st_size];
     AutoDeleteArray<unsigned char> d(buf);
     readFull(fd, buf, st.st_size);
@@ -279,9 +279,9 @@ static void _computePathSize(const Path & path,
     blocks += st.st_blocks;
 
     if (S_ISDIR(st.st_mode)) {
-	Strings names = readDirectory(path);
+        Strings names = readDirectory(path);
 
-	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
+        for (Strings::iterator i = names.begin(); i != names.end(); ++i)
             _computePathSize(path + "/" + *i, bytes, blocks);
     }
 }
@@ -308,15 +308,15 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
         bytesFreed += st.st_blocks * 512;
 
     if (S_ISDIR(st.st_mode)) {
-	Strings names = readDirectory(path);
+        Strings names = readDirectory(path);
 
-	/* Make the directory writable. */
-	if (!(st.st_mode & S_IWUSR)) {
-	    if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
-		throw SysError(format("making `%1%' writable") % path);
-	}
+        /* Make the directory writable. */
+        if (!(st.st_mode & S_IWUSR)) {
+            if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
+                throw SysError(format("making `%1%' writable") % path);
+        }
 
-	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
+        for (Strings::iterator i = names.begin(); i != names.end(); ++i)
             _deletePath(path + "/" + *i, bytesFreed);
     }
 
@@ -348,14 +348,14 @@ void makePathReadOnly(const Path & path)
     struct stat st = lstat(path);
 
     if (!S_ISLNK(st.st_mode) && (st.st_mode & S_IWUSR)) {
-	if (chmod(path.c_str(), st.st_mode & ~S_IWUSR) == -1)
-	    throw SysError(format("making `%1%' read-only") % path);
+        if (chmod(path.c_str(), st.st_mode & ~S_IWUSR) == -1)
+            throw SysError(format("making `%1%' read-only") % path);
     }
 
     if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectory(path);
-	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
-	    makePathReadOnly(path + "/" + *i);
+        for (Strings::iterator i = names.begin(); i != names.end(); ++i)
+            makePathReadOnly(path + "/" + *i);
     }
 }
 
@@ -377,25 +377,25 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
     static int globalCounter = 0;
     int localCounter = 0;
     int & counter(useGlobalCounter ? globalCounter : localCounter);
-    
+
     while (1) {
         checkInterrupt();
-	Path tmpDir = tempName(tmpRoot, prefix, includePid, counter);
-	if (mkdir(tmpDir.c_str(), mode) == 0) {
-	    /* Explicitly set the group of the directory.  This is to
-	       work around around problems caused by BSD's group
-	       ownership semantics (directories inherit the group of
-	       the parent).  For instance, the group of /tmp on
-	       FreeBSD is "wheel", so all directories created in /tmp
-	       will be owned by "wheel"; but if the user is not in
-	       "wheel", then "tar" will fail to unpack archives that
-	       have the setgid bit set on directories. */
-	    if (chown(tmpDir.c_str(), (uid_t) -1, getegid()) != 0)
-		throw SysError(format("setting group of directory `%1%'") % tmpDir);
-	    return tmpDir;
-	}
-	if (errno != EEXIST)
-	    throw SysError(format("creating directory `%1%'") % tmpDir);
+        Path tmpDir = tempName(tmpRoot, prefix, includePid, counter);
+        if (mkdir(tmpDir.c_str(), mode) == 0) {
+            /* Explicitly set the group of the directory.  This is to
+               work around around problems caused by BSD's group
+               ownership semantics (directories inherit the group of
+               the parent).  For instance, the group of /tmp on
+               FreeBSD is "wheel", so all directories created in /tmp
+               will be owned by "wheel"; but if the user is not in
+               "wheel", then "tar" will fail to unpack archives that
+               have the setgid bit set on directories. */
+            if (chown(tmpDir.c_str(), (uid_t) -1, getegid()) != 0)
+                throw SysError(format("setting group of directory `%1%'") % tmpDir);
+            return tmpDir;
+        }
+        if (errno != EEXIST)
+            throw SysError(format("creating directory `%1%'") % tmpDir);
     }
 }
 
@@ -415,7 +415,7 @@ Paths createDirs(const Path & path)
     }
 
     if (!S_ISDIR(st.st_mode)) throw Error(format("`%1%' is not a directory") % path);
-    
+
     return created;
 }
 
@@ -724,8 +724,8 @@ AutoCloseDir::operator DIR *()
 void AutoCloseDir::close()
 {
     if (dir) {
-	closedir(dir);
-	dir = 0;
+        closedir(dir);
+        dir = 0;
     }
 }
 
@@ -840,12 +840,12 @@ void killUser(uid_t uid)
             if (setuid(uid) == -1)
                 throw SysError("setting uid");
 
-	    while (true) {
-		if (kill(-1, SIGKILL) == 0) break;
-		if (errno == ESRCH) break; /* no more processes */
-		if (errno != EINTR)
-		    throw SysError(format("cannot kill processes for uid `%1%'") % uid);
-	    }
+            while (true) {
+                if (kill(-1, SIGKILL) == 0) break;
+                if (errno == ESRCH) break; /* no more processes */
+                if (errno != EINTR)
+                    throw SysError(format("cannot kill processes for uid `%1%'") % uid);
+            }
 
         } catch (std::exception & e) {
             writeToStderr((format("killing processes belonging to uid `%1%': %2%\n") % uid % e.what()).str());
@@ -853,7 +853,7 @@ void killUser(uid_t uid)
         }
         _exit(0);
     }
-    
+
     /* parent */
     int status = pid.wait(true);
     if (status != 0)
@@ -1040,14 +1040,14 @@ string statusToString(int status)
         if (WIFEXITED(status))
             return (format("failed with exit code %1%") % WEXITSTATUS(status)).str();
         else if (WIFSIGNALED(status)) {
-	    int sig = WTERMSIG(status);
+            int sig = WTERMSIG(status);
 #if HAVE_STRSIGNAL
             const char * description = strsignal(sig);
             return (format("failed due to signal %1% (%2%)") % sig % description).str();
 #else
             return (format("failed due to signal %1%") % sig).str();
 #endif
-	}
+        }
         else
             return "died abnormally";
     } else return "succeeded";

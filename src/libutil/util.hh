@@ -174,7 +174,7 @@ struct AutoDeleteArray
 {
     T * p;
     AutoDeleteArray(T * p) : p(p) { }
-    ~AutoDeleteArray() 
+    ~AutoDeleteArray()
     {
         delete [] p;
     }
@@ -185,7 +185,7 @@ class AutoDelete
 {
     Path path;
     bool del;
-    bool recursive;    
+    bool recursive;
 public:
     AutoDelete(const Path & p, bool recursive = true);
     ~AutoDelete();
