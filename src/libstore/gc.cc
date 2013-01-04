@@ -445,6 +445,8 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
 
     printMsg(lvlInfo, format("deleting `%1%'") % path);
 
+    state.results.paths.insert(path);
+
     /* If the path is not a regular file or symlink, move it to the
        trash directory.  The move is to ensure that later (when we're
        not holding the global GC lock) we can delete the path without

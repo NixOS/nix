@@ -8,7 +8,7 @@
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-1.3"><title>Release 1.3 (January 3, 2013)</title>
+<section xml:id="ssec-relnotes-1.3"><title>Release 1.3 (January 4, 2013)</title>
 
 <para>This is primarily a bug fix release.  When this version is first
 run on Linux, it removes any immutable bits from the Nix store and
