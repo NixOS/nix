@@ -2343,13 +2343,15 @@ Path DerivationGoal::openLogFile()
 {
     if (!settings.keepLog) return "";
 
+    string baseName = baseNameOf(drvPath);
+
     /* Create a log file. */
-    Path dir = (format("%1%/%2%") % settings.nixLogDir % drvsLogDir).str();
+    Path dir = (format("%1%/%2%/%3%/") % settings.nixLogDir % drvsLogDir % string(baseName, 0, 2)).str();
     createDirs(dir);
 
     if (settings.compressLog) {
 
-        Path logFileName = (format("%1%/%2%.bz2") % dir % baseNameOf(drvPath)).str();
+        Path logFileName = (format("%1%/%2%.bz2") % dir % string(baseName, 2)).str();
         AutoCloseFD fd = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0666);
         if (fd == -1) throw SysError(format("creating log file `%1%'") % logFileName);
         closeOnExec(fd);
@@ -2364,7 +2366,7 @@ Path DerivationGoal::openLogFile()
         return logFileName;
 
     } else {
-        Path logFileName = (format("%1%/%2%") % dir % baseNameOf(drvPath)).str();
+        Path logFileName = (format("%1%/%2%") % dir % string(baseName, 2)).str();
         fdLogFile = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0666);
         if (fdLogFile == -1) throw SysError(format("creating log file `%1%'") % logFileName);
         closeOnExec(fdLogFile);

@@ -460,35 +460,40 @@ static void opReadLog(Strings opFlags, Strings opArgs)
     foreach (Strings::iterator, i, opArgs) {
         Path path = useDeriver(followLinksToStorePath(*i));
 
-        Path logPath = (format("%1%/%2%/%3%") %
-            settings.nixLogDir % drvsLogDir % baseNameOf(path)).str();
-        Path logBz2Path = logPath + ".bz2";
+        for (int j = 0; j < 2; j++) {
+            if (j == 2) throw Error(format("build log of derivation `%1%' is not available") % path);
 
-        if (pathExists(logPath)) {
-            /* !!! Make this run in O(1) memory. */
-            string log = readFile(logPath);
-            writeFull(STDOUT_FILENO, (const unsigned char *) log.data(), log.size());
+            string baseName = baseNameOf(path);
+            Path logPath =
+                j == 0
+                ? (format("%1%/%2%/%3%/%4%") % settings.nixLogDir % drvsLogDir % string(baseName, 0, 2) % string(baseName, 2)).str()
+                : (format("%1%/%2%/%3%") % settings.nixLogDir % drvsLogDir % baseName).str();
+            Path logBz2Path = logPath + ".bz2";
+
+            if (pathExists(logPath)) {
+                /* !!! Make this run in O(1) memory. */
+                string log = readFile(logPath);
+                writeFull(STDOUT_FILENO, (const unsigned char *) log.data(), log.size());
+            }
+
+            else if (pathExists(logBz2Path)) {
+                AutoCloseFD fd = open(logBz2Path.c_str(), O_RDONLY);
+                FILE * f = 0;
+                if (fd == -1 || (f = fdopen(fd.borrow(), "r")) == 0)
+                    throw SysError(format("opening file `%1%'") % logBz2Path);
+                int err;
+                BZFILE * bz = BZ2_bzReadOpen(&err, f, 0, 0, 0, 0);
+                if (!bz) throw Error(format("cannot open bzip2 file `%1%'") % logBz2Path);
+                unsigned char buf[128 * 1024];
+                do {
+                    int n = BZ2_bzRead(&err, bz, buf, sizeof(buf));
+                    if (err != BZ_OK && err != BZ_STREAM_END)
+                        throw Error(format("error reading bzip2 file `%1%'") % logBz2Path);
+                    writeFull(STDOUT_FILENO, buf, n);
+                } while (err != BZ_STREAM_END);
+                BZ2_bzReadClose(&err, bz);
+            }
         }
-
-        else if (pathExists(logBz2Path)) {
-            AutoCloseFD fd = open(logBz2Path.c_str(), O_RDONLY);
-            FILE * f = 0;
-            if (fd == -1 || (f = fdopen(fd.borrow(), "r")) == 0)
-                throw SysError(format("opening file `%1%'") % logBz2Path);
-            int err;
-            BZFILE * bz = BZ2_bzReadOpen(&err, f, 0, 0, 0, 0);
-            if (!bz) throw Error(format("cannot open bzip2 file `%1%'") % logBz2Path);
-            unsigned char buf[128 * 1024];
-            do {
-                int n = BZ2_bzRead(&err, bz, buf, sizeof(buf));
-                if (err != BZ_OK && err != BZ_STREAM_END)
-                    throw Error(format("error reading bzip2 file `%1%'") % logBz2Path);
-                writeFull(STDOUT_FILENO, buf, n);
-            } while (err != BZ_STREAM_END);
-            BZ2_bzReadClose(&err, bz);
-        }
-
-        else throw Error(format("build log of derivation `%1%' is not available") % path);
     }
 }
 
