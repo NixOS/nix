@@ -460,7 +460,7 @@ static void opReadLog(Strings opFlags, Strings opArgs)
     foreach (Strings::iterator, i, opArgs) {
         Path path = useDeriver(followLinksToStorePath(*i));
 
-        for (int j = 0; j < 2; j++) {
+        for (int j = 0; j <= 2; j++) {
             if (j == 2) throw Error(format("build log of derivation `%1%' is not available") % path);
 
             string baseName = baseNameOf(path);
@@ -474,6 +474,7 @@ static void opReadLog(Strings opFlags, Strings opArgs)
                 /* !!! Make this run in O(1) memory. */
                 string log = readFile(logPath);
                 writeFull(STDOUT_FILENO, (const unsigned char *) log.data(), log.size());
+                break;
             }
 
             else if (pathExists(logBz2Path)) {
@@ -492,6 +493,7 @@ static void opReadLog(Strings opFlags, Strings opArgs)
                     writeFull(STDOUT_FILENO, buf, n);
                 } while (err != BZ_STREAM_END);
                 BZ2_bzReadClose(&err, bz);
+                break;
             }
         }
     }
