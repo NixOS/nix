@@ -51,6 +51,10 @@ let
       libXv = callPackage libXvFun { };
     };
 
+  funWithDefault = rec {
+    fn = { a ? "default", b ? "${a}-string" }: throw "Don't evaluate me";
+    bFun = (builtins.functionArgs fn).b;
+  };
 in
 
 let
@@ -64,7 +68,7 @@ let
       xorg = pkgsPrev.xorg // { libX11 = libX11_2Fun { inherit (pkgs) stdenv fetchurl; }; };
     };
   };
-  
+
 in
 
   [ pkgs.stdenv.name
@@ -77,4 +81,6 @@ in
     pkgs2.mplayer.name
     pkgs.nix.name
     pkgs2.nix.name
+    (funWithDefault.bFun { })
+    (funWithDefault.bFun { a = "not-default"; })
   ]

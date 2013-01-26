@@ -11,5 +11,7 @@
     <string value="mplayer-stdenv2.libXv-libX11_2" />
     <string value="nix-stdenv-aterm-stdenv" />
     <string value="nix-stdenv2-aterm2-stdenv2" />
+    <string value="default-string" />
+    <string value="not-default-string" />
   </list>
 </expr>
