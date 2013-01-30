@@ -293,7 +293,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (*i == "--resolve") query = qResolve;
         else if (*i == "--roots") query = qRoots;
         else if (*i == "--use-output" || *i == "-u") useOutput = true;
-        else if (*i == "--force-realise" || *i == "-f") forceRealise = true;
+        else if (*i == "--force-realise" || *i == "--force-realize" || *i == "-f") forceRealise = true;
         else if (*i == "--include-outputs") includeOutputs = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
@@ -849,7 +849,7 @@ void run(Strings args)
 
         Operation oldOp = op;
 
-        if (arg == "--realise" || arg == "-r")
+        if (arg == "--realise" || arg == "--realize" || arg == "-r")
             op = opRealise;
         else if (arg == "--add" || arg == "-A")
             op = opAdd;
@@ -891,7 +891,7 @@ void run(Strings args)
             op = opVerifyPath;
         else if (arg == "--repair-path")
             op = opRepairPath;
-        else if (arg == "--optimise")
+        else if (arg == "--optimise" || arg == "--optimize")
             op = opOptimise;
         else if (arg == "--query-failed-paths")
             op = opQueryFailedPaths;
