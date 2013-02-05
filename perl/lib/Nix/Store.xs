@@ -15,7 +15,7 @@
 using namespace nix;
 
 
-void doInit() 
+void doInit()
 {
     if (!store) {
         try {
@@ -237,32 +237,35 @@ SV * derivationFromPath(char * drvPath)
             doInit();
             Derivation drv = derivationFromPath(*store, drvPath);
             hash = newHV();
-            
-            /* TODO: handle drv.outputs */
-            
+
+            HV * outputs = newHV();
+            for (DerivationOutputs::iterator i = drv.outputs.begin(); i != drv.outputs.end(); ++i)
+                hv_store(outputs, i->first.c_str(), i->first.size(), newSVpv(i->second.path.c_str(), 0), 0);
+            hv_stores(hash, "outputs", newRV((SV *) outputs));
+
             AV * inputDrvs = newAV();
             for (DerivationInputs::iterator i = drv.inputDrvs.begin(); i != drv.inputDrvs.end(); ++i)
                 av_push(inputDrvs, newSVpv(i->first.c_str(), 0)); // !!! ignores i->second
             hv_stores(hash, "inputDrvs", newRV((SV *) inputDrvs));
-            
+
             AV * inputSrcs = newAV();
             for (PathSet::iterator i = drv.inputSrcs.begin(); i != drv.inputSrcs.end(); ++i)
                 av_push(inputSrcs, newSVpv(i->c_str(), 0));
             hv_stores(hash, "inputSrcs", newRV((SV *) inputSrcs));
-            
+
             hv_stores(hash, "platform", newSVpv(drv.platform.c_str(), 0));
             hv_stores(hash, "builder", newSVpv(drv.builder.c_str(), 0));
-            
+
             AV * args = newAV();
             for (Strings::iterator i = drv.args.begin(); i != drv.args.end(); ++i)
                 av_push(args, newSVpv(i->c_str(), 0));
             hv_stores(hash, "args", newRV((SV *) args));
-            
+
             HV * env = newHV();
             for (StringPairs::iterator i = drv.env.begin(); i != drv.env.end(); ++i)
                 hv_store(env, i->first.c_str(), i->first.size(), newSVpv(i->second.c_str(), 0), 0);
             hv_stores(hash, "env", newRV((SV *) env));
-            
+
             RETVAL = newRV_noinc((SV *)hash);
         } catch (Error & e) {
             croak(e.what());
