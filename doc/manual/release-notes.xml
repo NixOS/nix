@@ -8,6 +8,20 @@
 
 <!--==================================================================-->
 
+<section xml:id="ssec-relnotes-1.4"><title>Release 1.4 (TBA)</title>
+
+<itemizedlist>
+
+  <listitem><para>New built-in function:
+  <function>builtins.hashString</function>.</para></listitem>
+
+</itemizedlist>
+
+</section>
+
+
+<!--==================================================================-->
+
 <section xml:id="ssec-relnotes-1.3"><title>Release 1.3 (January 4, 2013)</title>
 
 <para>This is primarily a bug fix release.  When this version is first
