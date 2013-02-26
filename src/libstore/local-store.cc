@@ -465,7 +465,7 @@ void LocalStore::makeStoreWritable()
 const time_t mtimeStore = 1; /* 1 second into the epoch */
 
 
-void canonicalisePathMetaData(const Path & path, bool recurse)
+void canonicalisePathMetaData(const Path & path, bool recurse, uid_t fromUid)
 {
     checkInterrupt();
 
@@ -476,6 +476,9 @@ void canonicalisePathMetaData(const Path & path, bool recurse)
     /* Really make sure that the path is of a supported type.  This
        has already been checked in dumpPath(). */
     assert(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode));
+
+    if (fromUid != (uid_t) -1 && st.st_uid != fromUid)
+        throw BuildError(format("invalid ownership on file `%1%'") % path);
 
     /* Change ownership to the current uid.  If it's a symlink, use
        lchown if available, otherwise don't bother.  Wrong ownership
@@ -529,14 +532,14 @@ void canonicalisePathMetaData(const Path & path, bool recurse)
     if (recurse && S_ISDIR(st.st_mode)) {
         Strings names = readDirectory(path);
         foreach (Strings::iterator, i, names)
-            canonicalisePathMetaData(path + "/" + *i, true);
+            canonicalisePathMetaData(path + "/" + *i, true, fromUid);
     }
 }
 
 
-void canonicalisePathMetaData(const Path & path)
+void canonicalisePathMetaData(const Path & path, uid_t fromUid)
 {
-    canonicalisePathMetaData(path, true);
+    canonicalisePathMetaData(path, true, fromUid);
 
     /* On platforms that don't have lchown(), the top-level path can't
        be a symlink, since we can't change its ownership. */
@@ -1198,7 +1201,7 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
             } else
                 writeFile(dstPath, dump);
 
-            canonicalisePathMetaData(dstPath);
+            canonicalisePathMetaData(dstPath, -1);
 
             /* Register the SHA-256 hash of the NAR serialisation of
                the path in the database.  We may just have computed it
@@ -1263,7 +1266,7 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
 
             writeFile(dstPath, s);
 
-            canonicalisePathMetaData(dstPath);
+            canonicalisePathMetaData(dstPath, -1);
 
             HashResult hash = hashPath(htSHA256, dstPath);
 
@@ -1498,7 +1501,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
                 throw SysError(format("cannot move `%1%' to `%2%'")
                     % unpacked % dstPath);
 
-            canonicalisePathMetaData(dstPath);
+            canonicalisePathMetaData(dstPath, -1);
 
             /* !!! if we were clever, we could prevent the hashPath()
                here. */

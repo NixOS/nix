@@ -307,9 +307,9 @@ private:
      without execute permission; setuid bits etc. are cleared)
    - the owner and group are set to the Nix user and group, if we're
      in a setuid Nix installation. */
-void canonicalisePathMetaData(const Path & path);
+void canonicalisePathMetaData(const Path & path, uid_t fromUid);
 
-void canonicalisePathMetaData(const Path & path, bool recurse);
+void canonicalisePathMetaData(const Path & path, bool recurse, uid_t fromUid);
 
 MakeError(PathInUse, Error);
 

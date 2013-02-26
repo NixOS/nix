@@ -2287,7 +2287,7 @@ void DerivationGoal::computeClosure()
         }
 
         /* Get rid of all weird permissions. */
-        canonicalisePathMetaData(path);
+        canonicalisePathMetaData(path, buildUser.enabled() ? buildUser.getUID() : -1);
 
         /* For this output path, find the references to other paths
            contained in it.  Compute the SHA-256 NAR hash at the same
@@ -2839,7 +2839,7 @@ void SubstitutionGoal::finished()
         return;
     }
 
-    canonicalisePathMetaData(destPath);
+    canonicalisePathMetaData(destPath, -1);
 
     worker.store.optimisePath(destPath); // FIXME: combine with hashPath()
 

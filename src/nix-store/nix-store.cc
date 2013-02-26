@@ -238,12 +238,6 @@ static void printTree(const Path & path,
     PathSet references;
     store->queryReferences(path, references);
 
-#if 0
-    for (PathSet::iterator i = drv.inputSrcs.begin();
-         i != drv.inputSrcs.end(); ++i)
-        cout << format("%1%%2%\n") % (tailPad + treeConn) % *i;
-#endif
-
     /* Topologically sort under the relation A < B iff A \in
        closure(B).  That is, if derivation A is an (possibly indirect)
        input of B, then A is printed first.  This has the effect of
@@ -251,7 +245,7 @@ static void printTree(const Path & path,
     Paths sorted = topoSortPaths(*store, references);
     reverse(sorted.begin(), sorted.end());
 
-    for (Paths::iterator i = sorted.begin(); i != sorted.end(); ++i) {
+    foreach (Paths::iterator, i, sorted) {
         Paths::iterator j = i; ++j;
         printTree(*i, tailPad + treeConn,
             j == sorted.end() ? tailPad + treeNull : tailPad + treeLine,
@@ -521,7 +515,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
         if (!store->isValidPath(info.path) || reregister) {
             /* !!! races */
             if (canonicalise)
-                canonicalisePathMetaData(info.path);
+                canonicalisePathMetaData(info.path, -1);
             if (!hashGiven) {
                 HashResult hash = hashPath(htSHA256, info.path);
                 info.hash = hash.first;
