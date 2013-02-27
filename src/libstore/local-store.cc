@@ -509,7 +509,11 @@ void canonicaliseTimestampAndPermissions(const Path & path)
 }
 
 
-static void canonicalisePathMetaData_(const Path & path, uid_t fromUid)
+typedef std::pair<dev_t, ino_t> Inode;
+typedef set<Inode> InodesSeen;
+
+
+static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSeen & inodesSeen)
 {
     checkInterrupt();
 
@@ -521,10 +525,24 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid)
        has already been checked in dumpPath(). */
     assert(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode));
 
-    canonicaliseTimestampAndPermissions(path, st);
+    /* Fail if the file is not owned by the build user.  This prevents
+       us from messing up the ownership/permissions of files
+       hard-linked into the output (e.g. "ln /etc/shadow $out/foo").
+       However, ignore files that we chown'ed ourselves previously to
+       ensure that we don't fail on hard links within the same build
+       (i.e. "touch $out/foo; ln $out/foo $out/bar"). */
+    if (fromUid != (uid_t) -1 && st.st_uid != fromUid) {
+        assert(!S_ISDIR(st.st_mode));
+        if (inodesSeen.find(Inode(st.st_dev, st.st_ino)) == inodesSeen.end())
+            throw BuildError(format("invalid ownership on file `%1%'") % path);
+        mode_t mode = st.st_mode & ~S_IFMT;
+        assert(st.st_uid == geteuid() && (mode == 0444 || mode == 0555) && st.st_mtime == mtimeStore);
+        return;
+    }
 
-    if (fromUid != (uid_t) -1 && st.st_uid != fromUid)
-        throw BuildError(format("invalid ownership on file `%1%'") % path);
+    inodesSeen.insert(Inode(st.st_dev, st.st_ino));
+
+    canonicaliseTimestampAndPermissions(path, st);
 
     /* Change ownership to the current uid.  If it's a symlink, use
        lchown if available, otherwise don't bother.  Wrong ownership
@@ -547,14 +565,16 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid)
     if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectory(path);
         foreach (Strings::iterator, i, names)
-            canonicalisePathMetaData_(path + "/" + *i, fromUid);
+            canonicalisePathMetaData_(path + "/" + *i, fromUid, inodesSeen);
     }
 }
 
 
 void canonicalisePathMetaData(const Path & path, uid_t fromUid)
 {
-    canonicalisePathMetaData_(path, fromUid);
+    InodesSeen inodesSeen;
+
+    canonicalisePathMetaData_(path, fromUid, inodesSeen);
 
     /* On platforms that don't have lchown(), the top-level path can't
        be a symlink, since we can't change its ownership. */
