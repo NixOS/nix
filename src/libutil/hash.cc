@@ -220,7 +220,7 @@ Hash parseHash16or32(HashType ht, const string & s)
         /* base-32 representation */
         hash = parseHash32(ht, s);
     else
-        throw Error(format("hash `%1%' has wrong length for hash type `%2%'")
+        throw Error(format("hash `%1%' has wrong length for hash type `%2%' (maybe you want to use nix-prefetch-url?)")
             % s % printHashType(ht));
     return hash;
 }
