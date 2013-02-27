@@ -89,7 +89,7 @@ Hash parseHash(HashType ht, const string & s)
 {
     Hash hash(ht);
     if (s.length() != hash.hashSize * 2)
-        throw Error(format("invalid hash `%1%'") % s);
+        throw Error(format("invalid hash `%1%' (maybe you want to use nix-prefetch-url?)") % s);
     for (unsigned int i = 0; i < hash.hashSize; i++) {
         string s2(s, i * 2, 2);
         if (!isxdigit(s2[0]) || !isxdigit(s2[1])) 
