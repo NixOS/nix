@@ -309,7 +309,7 @@ private:
      in a setuid Nix installation. */
 void canonicalisePathMetaData(const Path & path, uid_t fromUid);
 
-void canonicalisePathMetaData(const Path & path, bool recurse, uid_t fromUid);
+void canonicaliseTimestampAndPermissions(const Path & path);
 
 MakeError(PathInUse, Error);
 

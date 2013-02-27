@@ -465,39 +465,8 @@ void LocalStore::makeStoreWritable()
 const time_t mtimeStore = 1; /* 1 second into the epoch */
 
 
-void canonicalisePathMetaData(const Path & path, bool recurse, uid_t fromUid)
+static void canonicaliseTimestampAndPermissions(const Path & path, const struct stat & st)
 {
-    checkInterrupt();
-
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-        throw SysError(format("getting attributes of path `%1%'") % path);
-
-    /* Really make sure that the path is of a supported type.  This
-       has already been checked in dumpPath(). */
-    assert(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode));
-
-    if (fromUid != (uid_t) -1 && st.st_uid != fromUid)
-        throw BuildError(format("invalid ownership on file `%1%'") % path);
-
-    /* Change ownership to the current uid.  If it's a symlink, use
-       lchown if available, otherwise don't bother.  Wrong ownership
-       of a symlink doesn't matter, since the owning user can't change
-       the symlink and can't delete it because the directory is not
-       writable.  The only exception is top-level paths in the Nix
-       store (since that directory is group-writable for the Nix build
-       users group); we check for this case below. */
-    if (st.st_uid != geteuid()) {
-#if HAVE_LCHOWN
-        if (lchown(path.c_str(), geteuid(), (gid_t) -1) == -1)
-#else
-        if (!S_ISLNK(st.st_mode) &&
-            chown(path.c_str(), geteuid(), (gid_t) -1) == -1)
-#endif
-            throw SysError(format("changing owner of `%1%' to %2%")
-                % path % geteuid());
-    }
-
     if (!S_ISLNK(st.st_mode)) {
 
         /* Mask out all type related bits. */
@@ -528,18 +497,64 @@ void canonicalisePathMetaData(const Path & path, bool recurse, uid_t fromUid)
 #endif
             throw SysError(format("changing modification time of `%1%'") % path);
     }
+}
 
-    if (recurse && S_ISDIR(st.st_mode)) {
+
+void canonicaliseTimestampAndPermissions(const Path & path)
+{
+    struct stat st;
+    if (lstat(path.c_str(), &st))
+        throw SysError(format("getting attributes of path `%1%'") % path);
+    canonicaliseTimestampAndPermissions(path, st);
+}
+
+
+static void canonicalisePathMetaData_(const Path & path, uid_t fromUid)
+{
+    checkInterrupt();
+
+    struct stat st;
+    if (lstat(path.c_str(), &st))
+        throw SysError(format("getting attributes of path `%1%'") % path);
+
+    /* Really make sure that the path is of a supported type.  This
+       has already been checked in dumpPath(). */
+    assert(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode));
+
+    canonicaliseTimestampAndPermissions(path, st);
+
+    if (fromUid != (uid_t) -1 && st.st_uid != fromUid)
+        throw BuildError(format("invalid ownership on file `%1%'") % path);
+
+    /* Change ownership to the current uid.  If it's a symlink, use
+       lchown if available, otherwise don't bother.  Wrong ownership
+       of a symlink doesn't matter, since the owning user can't change
+       the symlink and can't delete it because the directory is not
+       writable.  The only exception is top-level paths in the Nix
+       store (since that directory is group-writable for the Nix build
+       users group); we check for this case below. */
+    if (st.st_uid != geteuid()) {
+#if HAVE_LCHOWN
+        if (lchown(path.c_str(), geteuid(), (gid_t) -1) == -1)
+#else
+        if (!S_ISLNK(st.st_mode) &&
+            chown(path.c_str(), geteuid(), (gid_t) -1) == -1)
+#endif
+            throw SysError(format("changing owner of `%1%' to %2%")
+                % path % geteuid());
+    }
+
+    if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectory(path);
         foreach (Strings::iterator, i, names)
-            canonicalisePathMetaData(path + "/" + *i, true, fromUid);
+            canonicalisePathMetaData_(path + "/" + *i, fromUid);
     }
 }
 
 
 void canonicalisePathMetaData(const Path & path, uid_t fromUid)
 {
-    canonicalisePathMetaData(path, true, fromUid);
+    canonicalisePathMetaData_(path, fromUid);
 
     /* On platforms that don't have lchown(), the top-level path can't
        be a symlink, since we can't change its ownership. */
