@@ -536,7 +536,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
         if (inodesSeen.find(Inode(st.st_dev, st.st_ino)) == inodesSeen.end())
             throw BuildError(format("invalid ownership on file `%1%'") % path);
         mode_t mode = st.st_mode & ~S_IFMT;
-        assert(st.st_uid == geteuid() && (mode == 0444 || mode == 0555) && st.st_mtime == mtimeStore);
+        assert(st.st_uid == geteuid() && (S_ISLNK(st.st_mode) ? 1 : mode == 0444 || mode == 0555) && st.st_mtime == mtimeStore);
         return;
     }
 
