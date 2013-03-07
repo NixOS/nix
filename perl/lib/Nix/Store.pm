@@ -42,50 +42,50 @@ if ($Nix::Config::useBindings) {
     use File::Temp;
     use Fcntl qw/F_SETFD/;
 
-    sub hashFile {
+    *hashFile = sub {
         my ($algo, $base32, $path) = @_;
         my $res = backtick("$Nix::Config::binDir/nix-hash", "--flat", $path, "--type", $algo, $base32 ? "--base32" : ());
         chomp $res;
         return $res;
-    }
-    
-    sub hashPath {
+    };
+
+    *hashPath = sub {
         my ($algo, $base32, $path) = @_;
         my $res = backtick("$Nix::Config::binDir/nix-hash", $path, "--type", $algo, $base32 ? "--base32" : ());
         chomp $res;
         return $res;
-    }
-    
-    sub hashString {
+    };
+
+    *hashString = sub {
         my ($algo, $base32, $s) = @_;
         my $fh = File::Temp->new();
         print $fh $s;
         my $res = backtick("$Nix::Config::binDir/nix-hash", $fh->filename, "--type", $algo, $base32 ? "--base32" : ());
         chomp $res;
         return $res;
-    }
-    
-    sub addToStore {
+    };
+
+    *addToStore = sub {
         my ($srcPath, $recursive, $algo) = @_;
         die "not implemented" if $recursive || $algo ne "sha256";
         my $res = backtick("$Nix::Config::binDir/nix-store", "--add", $srcPath);
         chomp $res;
         return $res;
-    }
-    
-    sub isValidPath {
+    };
+
+    *isValidPath = sub {
         my ($path) = @_;
         my $res = backtick("$Nix::Config::binDir/nix-store", "--check-validity", "--print-invalid", $path);
         chomp $res;
         return $res ne $path;
-    }
-    
-    sub queryPathHash {
+    };
+
+    *queryPathHash = sub {
         my ($path) = @_;
         my $res = backtick("$Nix::Config::binDir/nix-store", "--query", "--hash", $path);
         chomp $res;
         return $res;
-    }
+    };
 }
 
 1;
