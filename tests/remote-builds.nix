@@ -72,11 +72,11 @@ in
       $client->succeed("chmod 600 /root/.ssh/id_dsa");
 
       # Install the SSH key on the slaves.
-      $client->waitForUnit("network.target");
+      $client->waitForJob("network-interfaces");
       foreach my $slave ($slave1, $slave2) {
           $slave->succeed("mkdir -m 700 /root/.ssh");
           $slave->copyFileFromHost("key.pub", "/root/.ssh/authorized_keys");
-          $slave->waitForUnit("sshd");
+          $slave->waitForJob("sshd");
           $client->succeed("ssh -o StrictHostKeyChecking=no " . $slave->name() . " 'echo hello world'");
       }
 

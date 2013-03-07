@@ -13,14 +13,14 @@ makeTest ({ pkgs, ... }: let pkgA = pkgs.aterm; pkgB = pkgs.wget; in {
           virtualisation.pathsInNixDB = [ pkgA ];
           environment.nix = nix;
         };
-
+        
       server =
         { config, pkgs, ... }:
         { services.openssh.enable = true;
           virtualisation.writableStore = true;
           virtualisation.pathsInNixDB = [ pkgB ];
           environment.nix = nix;
-        };
+        };        
     };
 
   testScript = { nodes }:
@@ -36,8 +36,8 @@ makeTest ({ pkgs, ... }: let pkgA = pkgs.aterm; pkgB = pkgs.wget; in {
       # Install the SSH key on the server.
       $server->succeed("mkdir -m 700 /root/.ssh");
       $server->copyFileFromHost("key.pub", "/root/.ssh/authorized_keys");
-      $server->waitForUnit("sshd");
-      $client->waitForUnit("network.target");
+      $server->waitForJob("sshd");
+      $client->waitForJob("network-interfaces");
       $client->succeed("ssh -o StrictHostKeyChecking=no " . $server->name() . " 'echo hello world'");
 
       # Copy the closure of package A from the client to the server.

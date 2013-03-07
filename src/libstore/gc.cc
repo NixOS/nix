@@ -659,10 +659,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        increase, since we hold locks on everything.  So everything
        that is not reachable from `roots'. */
 
-    if (state.shouldDelete) {
-        if (pathExists(state.trashDir)) deleteGarbage(state, state.trashDir);
-        createDirs(state.trashDir);
-    }
+    if (state.shouldDelete) createDirs(state.trashDir);
 
     /* Now either delete all garbage paths, or just the specified
        paths (for gcDeleteSpecific). */

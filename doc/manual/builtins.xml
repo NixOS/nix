@@ -302,18 +302,6 @@ stdenv.mkDerivation {
   </varlistentry>
 
 
-  <varlistentry><term><function>builtins.hashString</function>
-  <replaceable>type</replaceable> <replaceable>s</replaceable></term>
-
-    <listitem><para>Return a base-16 representation of the
-    cryptographic hash of string <replaceable>s</replaceable>.  The
-    hash algorithm specified by <replaceable>type</replaceable> must
-    be one of <literal>"md5"</literal>, <literal>"sha1"</literal> or
-    <literal>"sha256"</literal>.</para></listitem>
-
-  </varlistentry>
-
-
   <varlistentry><term><function>builtins.head</function>
   <replaceable>list</replaceable></term>
 

@@ -966,7 +966,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
            since paths are copied when they are used in a derivation),
            and none of the strings are allowed to have contexts. */
         if (first) {
-            isPath = !forceString && vStr.type == tPath;
+            isPath = vStr.type == tPath;
             first = false;
         }
 

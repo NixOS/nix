@@ -50,9 +50,6 @@ struct Settings {
     /* The directory where the main programs are stored. */
     Path nixBinDir;
 
-    /* File name of the socket the daemon listens to.  */
-    Path nixDaemonSocketFile;
-
     /* Whether to keep temporary directories of failed builds. */
     bool keepFailed;
 

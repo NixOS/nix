@@ -91,7 +91,7 @@ void RemoteStore::connectToDaemon()
         throw SysError("cannot create Unix domain socket");
     closeOnExec(fdSocket);
 
-    string socketPath = settings.nixDaemonSocketFile;
+    string socketPath = settings.nixStateDir + DEFAULT_SOCKET_PATH;
 
     /* Urgh, sockaddr_un allows path names of only 108 characters.  So
        chdir to the socket directory so that we can pass a relative

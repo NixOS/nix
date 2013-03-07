@@ -238,6 +238,12 @@ static void printTree(const Path & path,
     PathSet references;
     store->queryReferences(path, references);
 
+#if 0
+    for (PathSet::iterator i = drv.inputSrcs.begin();
+         i != drv.inputSrcs.end(); ++i)
+        cout << format("%1%%2%\n") % (tailPad + treeConn) % *i;
+#endif
+
     /* Topologically sort under the relation A < B iff A \in
        closure(B).  That is, if derivation A is an (possibly indirect)
        input of B, then A is printed first.  This has the effect of
@@ -245,7 +251,7 @@ static void printTree(const Path & path,
     Paths sorted = topoSortPaths(*store, references);
     reverse(sorted.begin(), sorted.end());
 
-    foreach (Paths::iterator, i, sorted) {
+    for (Paths::iterator i = sorted.begin(); i != sorted.end(); ++i) {
         Paths::iterator j = i; ++j;
         printTree(*i, tailPad + treeConn,
             j == sorted.end() ? tailPad + treeNull : tailPad + treeLine,
@@ -287,7 +293,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (*i == "--resolve") query = qResolve;
         else if (*i == "--roots") query = qRoots;
         else if (*i == "--use-output" || *i == "-u") useOutput = true;
-        else if (*i == "--force-realise" || *i == "--force-realize" || *i == "-f") forceRealise = true;
+        else if (*i == "--force-realise" || *i == "-f") forceRealise = true;
         else if (*i == "--include-outputs") includeOutputs = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
@@ -454,42 +460,35 @@ static void opReadLog(Strings opFlags, Strings opArgs)
     foreach (Strings::iterator, i, opArgs) {
         Path path = useDeriver(followLinksToStorePath(*i));
 
-        for (int j = 0; j <= 2; j++) {
-            if (j == 2) throw Error(format("build log of derivation `%1%' is not available") % path);
+        Path logPath = (format("%1%/%2%/%3%") %
+            settings.nixLogDir % drvsLogDir % baseNameOf(path)).str();
+        Path logBz2Path = logPath + ".bz2";
 
-            string baseName = baseNameOf(path);
-            Path logPath =
-                j == 0
-                ? (format("%1%/%2%/%3%/%4%") % settings.nixLogDir % drvsLogDir % string(baseName, 0, 2) % string(baseName, 2)).str()
-                : (format("%1%/%2%/%3%") % settings.nixLogDir % drvsLogDir % baseName).str();
-            Path logBz2Path = logPath + ".bz2";
-
-            if (pathExists(logPath)) {
-                /* !!! Make this run in O(1) memory. */
-                string log = readFile(logPath);
-                writeFull(STDOUT_FILENO, (const unsigned char *) log.data(), log.size());
-                break;
-            }
-
-            else if (pathExists(logBz2Path)) {
-                AutoCloseFD fd = open(logBz2Path.c_str(), O_RDONLY);
-                FILE * f = 0;
-                if (fd == -1 || (f = fdopen(fd.borrow(), "r")) == 0)
-                    throw SysError(format("opening file `%1%'") % logBz2Path);
-                int err;
-                BZFILE * bz = BZ2_bzReadOpen(&err, f, 0, 0, 0, 0);
-                if (!bz) throw Error(format("cannot open bzip2 file `%1%'") % logBz2Path);
-                unsigned char buf[128 * 1024];
-                do {
-                    int n = BZ2_bzRead(&err, bz, buf, sizeof(buf));
-                    if (err != BZ_OK && err != BZ_STREAM_END)
-                        throw Error(format("error reading bzip2 file `%1%'") % logBz2Path);
-                    writeFull(STDOUT_FILENO, buf, n);
-                } while (err != BZ_STREAM_END);
-                BZ2_bzReadClose(&err, bz);
-                break;
-            }
+        if (pathExists(logPath)) {
+            /* !!! Make this run in O(1) memory. */
+            string log = readFile(logPath);
+            writeFull(STDOUT_FILENO, (const unsigned char *) log.data(), log.size());
         }
+
+        else if (pathExists(logBz2Path)) {
+            AutoCloseFD fd = open(logBz2Path.c_str(), O_RDONLY);
+            FILE * f = 0;
+            if (fd == -1 || (f = fdopen(fd.borrow(), "r")) == 0)
+                throw SysError(format("opening file `%1%'") % logBz2Path);
+            int err;
+            BZFILE * bz = BZ2_bzReadOpen(&err, f, 0, 0, 0, 0);
+            if (!bz) throw Error(format("cannot open bzip2 file `%1%'") % logBz2Path);
+            unsigned char buf[128 * 1024];
+            do {
+                int n = BZ2_bzRead(&err, bz, buf, sizeof(buf));
+                if (err != BZ_OK && err != BZ_STREAM_END)
+                    throw Error(format("error reading bzip2 file `%1%'") % logBz2Path);
+                writeFull(STDOUT_FILENO, buf, n);
+            } while (err != BZ_STREAM_END);
+            BZ2_bzReadClose(&err, bz);
+        }
+
+        else throw Error(format("build log of derivation `%1%' is not available") % path);
     }
 }
 
@@ -515,7 +514,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
         if (!store->isValidPath(info.path) || reregister) {
             /* !!! races */
             if (canonicalise)
-                canonicalisePathMetaData(info.path, -1);
+                canonicalisePathMetaData(info.path);
             if (!hashGiven) {
                 HashResult hash = hashPath(htSHA256, info.path);
                 info.hash = hash.first;
@@ -843,7 +842,7 @@ void run(Strings args)
 
         Operation oldOp = op;
 
-        if (arg == "--realise" || arg == "--realize" || arg == "-r")
+        if (arg == "--realise" || arg == "-r")
             op = opRealise;
         else if (arg == "--add" || arg == "-A")
             op = opAdd;
@@ -885,7 +884,7 @@ void run(Strings args)
             op = opVerifyPath;
         else if (arg == "--repair-path")
             op = opRepairPath;
-        else if (arg == "--optimise" || arg == "--optimize")
+        else if (arg == "--optimise")
             op = opOptimise;
         else if (arg == "--query-failed-paths")
             op = opQueryFailedPaths;

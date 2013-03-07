@@ -168,10 +168,11 @@ static void initAndRun(int argc, char * * argv)
     remaining.clear();
 
     /* Process default options. */
+    int verbosityDelta = lvlInfo;
     for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
         string arg = *i;
-        if (arg == "--verbose" || arg == "-v") verbosity = (Verbosity) (verbosity + 1);
-        else if (arg == "--quiet") verbosity = verbosity > lvlError ? (Verbosity) (verbosity - 1) : lvlError;
+        if (arg == "--verbose" || arg == "-v") verbosityDelta++;
+        else if (arg == "--quiet") verbosityDelta--;
         else if (arg == "--log-type") {
             string s = getArg(arg, i, args.end());
             setLogType(s);
@@ -217,6 +218,8 @@ static void initAndRun(int argc, char * * argv)
         }
         else remaining.push_back(arg);
     }
+
+    verbosity = (Verbosity) (verbosityDelta < 0 ? 0 : verbosityDelta);
 
     settings.update();
 

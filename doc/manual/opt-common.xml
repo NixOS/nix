@@ -343,11 +343,10 @@
 
 <varlistentry><term><option>-I</option> <replaceable>path</replaceable></term>
   
-  <listitem><para>Add a path to the Nix expression search path.  This
-  option may be given multiple times.  See the <envar>NIX_PATH</envar>
-  environment variable for information on the semantics of the Nix
-  search path.  Paths added through <option>-I</option> take
-  precedence over <envar>NIX_PATH</envar>.</para></listitem>
+  <listitem><para>Add a path to the Nix expression search path.  See
+  the <envar>NIX_PATH</envar> environment variable for details.  Paths
+  added through <option>-I</option> take precedence over
+  <envar>NIX_PATH</envar>.</para></listitem>
   
 </varlistentry>
 
