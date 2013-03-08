@@ -437,12 +437,12 @@ void LocalStore::makeStoreWritable()
 {
 #if HAVE_UNSHARE && HAVE_STATVFS && HAVE_SYS_MOUNT_H && defined(MS_BIND) && defined(MS_REMOUNT)
     if (getuid() != 0) return;
-    /* Check if /nix/store is a read-only bind mount. */
+    /* Check if /nix/store is on a read-only mount. */
     struct statvfs stat;
     if (statvfs(settings.nixStore.c_str(), &stat) !=0)
         throw SysError("Getting info of nix store mountpoint");
 
-    if (stat.f_flag & (ST_RDONLY | MS_BIND)) {
+    if (stat.f_flag & ST_RDONLY) {
         if (unshare(CLONE_NEWNS) == -1)
             throw SysError("setting up a private mount namespace");
 
