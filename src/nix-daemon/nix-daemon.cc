@@ -774,7 +774,7 @@ static void daemonLoop()
         if (fdSocket == -1)
             throw SysError("cannot create Unix domain socket");
 
-        string socketPath = settings.nixStateDir + DEFAULT_SOCKET_PATH;
+        string socketPath = settings.nixDaemonSocketFile;
 
         createDirs(dirOf(socketPath));
 

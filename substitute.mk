@@ -37,6 +37,3 @@
 	 -e "s^@testPath\@^$(coreutils):$$(dirname $$(type -p expr))^g" \
 	 < $< > $@ || rm $@
 	if test -x $<; then chmod +x $@; fi
-
-$(CONFIG_HEADER):
-	true

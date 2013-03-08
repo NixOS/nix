@@ -47,7 +47,11 @@ static void throwSQLiteError(sqlite3 * db, const format & f)
 {
     int err = sqlite3_errcode(db);
     if (err == SQLITE_BUSY) {
-        printMsg(lvlError, "warning: SQLite database is busy");
+        static bool warned = false;
+        if (!warned) {
+            printMsg(lvlError, "warning: SQLite database is busy");
+            warned = true;
+        }
         /* Sleep for a while since retrying the transaction right away
            is likely to fail again. */
 #if HAVE_NANOSLEEP
@@ -461,36 +465,8 @@ void LocalStore::makeStoreWritable()
 const time_t mtimeStore = 1; /* 1 second into the epoch */
 
 
-void canonicalisePathMetaData(const Path & path, bool recurse)
+static void canonicaliseTimestampAndPermissions(const Path & path, const struct stat & st)
 {
-    checkInterrupt();
-
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-        throw SysError(format("getting attributes of path `%1%'") % path);
-
-    /* Really make sure that the path is of a supported type.  This
-       has already been checked in dumpPath(). */
-    assert(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode));
-
-    /* Change ownership to the current uid.  If it's a symlink, use
-       lchown if available, otherwise don't bother.  Wrong ownership
-       of a symlink doesn't matter, since the owning user can't change
-       the symlink and can't delete it because the directory is not
-       writable.  The only exception is top-level paths in the Nix
-       store (since that directory is group-writable for the Nix build
-       users group); we check for this case below. */
-    if (st.st_uid != geteuid()) {
-#if HAVE_LCHOWN
-        if (lchown(path.c_str(), geteuid(), (gid_t) -1) == -1)
-#else
-        if (!S_ISLNK(st.st_mode) &&
-            chown(path.c_str(), geteuid(), (gid_t) -1) == -1)
-#endif
-            throw SysError(format("changing owner of `%1%' to %2%")
-                % path % geteuid());
-    }
-
     if (!S_ISLNK(st.st_mode)) {
 
         /* Mask out all type related bits. */
@@ -521,18 +497,84 @@ void canonicalisePathMetaData(const Path & path, bool recurse)
 #endif
             throw SysError(format("changing modification time of `%1%'") % path);
     }
+}
 
-    if (recurse && S_ISDIR(st.st_mode)) {
+
+void canonicaliseTimestampAndPermissions(const Path & path)
+{
+    struct stat st;
+    if (lstat(path.c_str(), &st))
+        throw SysError(format("getting attributes of path `%1%'") % path);
+    canonicaliseTimestampAndPermissions(path, st);
+}
+
+
+typedef std::pair<dev_t, ino_t> Inode;
+typedef set<Inode> InodesSeen;
+
+
+static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSeen & inodesSeen)
+{
+    checkInterrupt();
+
+    struct stat st;
+    if (lstat(path.c_str(), &st))
+        throw SysError(format("getting attributes of path `%1%'") % path);
+
+    /* Really make sure that the path is of a supported type.  This
+       has already been checked in dumpPath(). */
+    assert(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode));
+
+    /* Fail if the file is not owned by the build user.  This prevents
+       us from messing up the ownership/permissions of files
+       hard-linked into the output (e.g. "ln /etc/shadow $out/foo").
+       However, ignore files that we chown'ed ourselves previously to
+       ensure that we don't fail on hard links within the same build
+       (i.e. "touch $out/foo; ln $out/foo $out/bar"). */
+    if (fromUid != (uid_t) -1 && st.st_uid != fromUid) {
+        assert(!S_ISDIR(st.st_mode));
+        if (inodesSeen.find(Inode(st.st_dev, st.st_ino)) == inodesSeen.end())
+            throw BuildError(format("invalid ownership on file `%1%'") % path);
+        mode_t mode = st.st_mode & ~S_IFMT;
+        assert(S_ISLNK(st.st_mode) || (st.st_uid == geteuid() && (mode == 0444 || mode == 0555) && st.st_mtime == mtimeStore));
+        return;
+    }
+
+    inodesSeen.insert(Inode(st.st_dev, st.st_ino));
+
+    canonicaliseTimestampAndPermissions(path, st);
+
+    /* Change ownership to the current uid.  If it's a symlink, use
+       lchown if available, otherwise don't bother.  Wrong ownership
+       of a symlink doesn't matter, since the owning user can't change
+       the symlink and can't delete it because the directory is not
+       writable.  The only exception is top-level paths in the Nix
+       store (since that directory is group-writable for the Nix build
+       users group); we check for this case below. */
+    if (st.st_uid != geteuid()) {
+#if HAVE_LCHOWN
+        if (lchown(path.c_str(), geteuid(), (gid_t) -1) == -1)
+#else
+        if (!S_ISLNK(st.st_mode) &&
+            chown(path.c_str(), geteuid(), (gid_t) -1) == -1)
+#endif
+            throw SysError(format("changing owner of `%1%' to %2%")
+                % path % geteuid());
+    }
+
+    if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectory(path);
         foreach (Strings::iterator, i, names)
-            canonicalisePathMetaData(path + "/" + *i, true);
+            canonicalisePathMetaData_(path + "/" + *i, fromUid, inodesSeen);
     }
 }
 
 
-void canonicalisePathMetaData(const Path & path)
+void canonicalisePathMetaData(const Path & path, uid_t fromUid)
 {
-    canonicalisePathMetaData(path, true);
+    InodesSeen inodesSeen;
+
+    canonicalisePathMetaData_(path, fromUid, inodesSeen);
 
     /* On platforms that don't have lchown(), the top-level path can't
        be a symlink, since we can't change its ownership. */
@@ -1194,7 +1236,7 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
             } else
                 writeFile(dstPath, dump);
 
-            canonicalisePathMetaData(dstPath);
+            canonicalisePathMetaData(dstPath, -1);
 
             /* Register the SHA-256 hash of the NAR serialisation of
                the path in the database.  We may just have computed it
@@ -1259,7 +1301,7 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
 
             writeFile(dstPath, s);
 
-            canonicalisePathMetaData(dstPath);
+            canonicalisePathMetaData(dstPath, -1);
 
             HashResult hash = hashPath(htSHA256, dstPath);
 
@@ -1494,7 +1536,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
                 throw SysError(format("cannot move `%1%' to `%2%'")
                     % unpacked % dstPath);
 
-            canonicalisePathMetaData(dstPath);
+            canonicalisePathMetaData(dstPath, -1);
 
             /* !!! if we were clever, we could prevent the hashPath()
                here. */

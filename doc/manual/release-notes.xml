@@ -8,6 +8,63 @@
 
 <!--==================================================================-->
 
+<section xml:id="ssec-relnotes-1.5.1"><title>Release 1.5.1 (February 28, 2013)</title>
+
+<para>The bug fix to the bug fix had a bug itself, of course.  But
+this time it will work for sure!</para>
+
+</section>
+
+
+<!--==================================================================-->
+
+<section xml:id="ssec-relnotes-1.5"><title>Release 1.5 (February 27, 2013)</title>
+
+<para>This is a brown paper bag release to fix a regression introduced
+by the hard link security fix in 1.4.</para>
+
+</section>
+
+
+<!--==================================================================-->
+
+<section xml:id="ssec-relnotes-1.4"><title>Release 1.4 (February 26, 2013)</title>
+
+<para>This release fixes a security bug in multi-user operation.  It
+was possible for derivations to cause the mode of files outside of the
+Nix store to be changed to 444 (read-only but world-readable) by
+creating hard links to those files (<link
+xlink:href="https://github.com/NixOS/nix/commit/5526a282b5b44e9296e61e07d7d2626a79141ac4">details</link>).</para>
+
+<para>There are also the following improvements:</para>
+
+<itemizedlist>
+
+  <listitem><para>New built-in function:
+  <function>builtins.hashString</function>.</para></listitem>
+
+  <listitem><para>Build logs are now stored in
+  <filename>/nix/var/log/nix/drvs/<replaceable>XX</replaceable>/</filename>,
+  where <replaceable>XX</replaceable> is the first two characters of
+  the derivation.  This is useful on machines that keep a lot of build
+  logs (such as Hydra servers).</para></listitem>
+
+  <listitem><para>The function <function>corepkgs/fetchurl</function>
+  can now make the downloaded file executable.  This will allow
+  getting rid of all bootstrap binaries in the Nixpkgs source
+  tree.</para></listitem>
+
+  <listitem><para>Language change: The expression <literal>"${./path}
+  ..."</literal> now evaluates to a string instead of a
+  path.</para></listitem>
+
+</itemizedlist>
+
+</section>
+
+
+<!--==================================================================-->
+
 <section xml:id="ssec-relnotes-1.3"><title>Release 1.3 (January 4, 2013)</title>
 
 <para>This is primarily a bug fix release.  When this version is first

@@ -43,6 +43,12 @@
 #include <sched.h>
 #endif
 
+/* In GNU libc 2.11, <sys/mount.h> does not define `MS_PRIVATE', but
+   <linux/fs.h> does.  */
+#if !defined MS_PRIVATE && defined HAVE_LINUX_FS_H
+#include <linux/fs.h>
+#endif
+
 #define CHROOT_ENABLED HAVE_CHROOT && HAVE_UNSHARE && HAVE_SYS_MOUNT_H && defined(MS_BIND) && defined(MS_PRIVATE) && defined(CLONE_NEWNS)
 
 #if CHROOT_ENABLED
@@ -2281,7 +2287,7 @@ void DerivationGoal::computeClosure()
         }
 
         /* Get rid of all weird permissions. */
-        canonicalisePathMetaData(path);
+        canonicalisePathMetaData(path, buildUser.enabled() ? buildUser.getUID() : -1);
 
         /* For this output path, find the references to other paths
            contained in it.  Compute the SHA-256 NAR hash at the same
@@ -2343,13 +2349,15 @@ Path DerivationGoal::openLogFile()
 {
     if (!settings.keepLog) return "";
 
+    string baseName = baseNameOf(drvPath);
+
     /* Create a log file. */
-    Path dir = (format("%1%/%2%") % settings.nixLogDir % drvsLogDir).str();
+    Path dir = (format("%1%/%2%/%3%/") % settings.nixLogDir % drvsLogDir % string(baseName, 0, 2)).str();
     createDirs(dir);
 
     if (settings.compressLog) {
 
-        Path logFileName = (format("%1%/%2%.bz2") % dir % baseNameOf(drvPath)).str();
+        Path logFileName = (format("%1%/%2%.bz2") % dir % string(baseName, 2)).str();
         AutoCloseFD fd = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0666);
         if (fd == -1) throw SysError(format("creating log file `%1%'") % logFileName);
         closeOnExec(fd);
@@ -2364,7 +2372,7 @@ Path DerivationGoal::openLogFile()
         return logFileName;
 
     } else {
-        Path logFileName = (format("%1%/%2%") % dir % baseNameOf(drvPath)).str();
+        Path logFileName = (format("%1%/%2%") % dir % string(baseName, 2)).str();
         fdLogFile = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0666);
         if (fdLogFile == -1) throw SysError(format("creating log file `%1%'") % logFileName);
         closeOnExec(fdLogFile);
@@ -2831,7 +2839,7 @@ void SubstitutionGoal::finished()
         return;
     }
 
-    canonicalisePathMetaData(destPath);
+    canonicalisePathMetaData(destPath, -1);
 
     worker.store.optimisePath(destPath); // FIXME: combine with hashPath()
 

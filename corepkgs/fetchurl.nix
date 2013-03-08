@@ -1,6 +1,6 @@
 with import <nix/config.nix>;
 
-{system ? builtins.currentSystem, url, outputHash ? "", outputHashAlgo ? "", md5 ? "", sha1 ? "", sha256 ? ""}:
+{system ? builtins.currentSystem, url, outputHash ? "", outputHashAlgo ? "", md5 ? "", sha1 ? "", sha256 ? "", executable ? false}:
 
 assert (outputHash != "" && outputHashAlgo != "")
     || md5 != "" || sha1 != "" || sha256 != "";
@@ -8,10 +8,10 @@ assert (outputHash != "" && outputHashAlgo != "")
 let
 
   builder = builtins.toFile "fetchurl.sh"
-    ''
+    (''
       echo "downloading $url into $out"
       ${curl} --fail --location --max-redirs 20 --insecure "$url" > "$out"
-    '';
+    '' + (if executable then "${coreutils}/chmod +x $out" else ""));
 
 in
     
@@ -25,6 +25,7 @@ derivation {
       if sha256 != "" then "sha256" else if sha1 != "" then "sha1" else "md5";
   outputHash = if outputHash != "" then outputHash else
       if sha256 != "" then sha256 else if sha1 != "" then sha1 else md5;
+  outputHashMode = if executable then "recursive" else "flat";
   
   inherit system url;
 

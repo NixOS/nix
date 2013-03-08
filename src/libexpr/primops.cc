@@ -1107,6 +1107,21 @@ static void prim_unsafeDiscardOutputDependency(EvalState & state, Value * * args
 }
 
 
+/* Return the cryptographic hash of a string in base-16. */
+static void prim_hashString(EvalState & state, Value * * args, Value & v)
+{
+    string type = state.forceStringNoCtx(*args[0]);
+    HashType ht = parseHashType(type);
+    if (ht == htUnknown)
+      throw Error(format("unknown hash type `%1%'") % type);
+
+    PathSet context; // discarded
+    string s = state.forceString(*args[1], context);
+
+    mkString(v, printHash(hashString(ht, s)), context);
+};
+
+
 /*************************************************************
  * Versions
  *************************************************************/
@@ -1234,6 +1249,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__stringLength", 1, prim_stringLength);
     addPrimOp("__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
     addPrimOp("__unsafeDiscardOutputDependency", 1, prim_unsafeDiscardOutputDependency);
+    addPrimOp("__hashString", 2, prim_hashString);
 
     // Versions
     addPrimOp("__parseDrvName", 1, prim_parseDrvName);
