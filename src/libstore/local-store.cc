@@ -19,8 +19,9 @@
 #include <stdio.h>
 #include <time.h>
 
-#if HAVE_UNSHARE
+#if HAVE_UNSHARE && HAVE_STATVFS && HAVE_SYS_MOUNT_H
 #include <sched.h>
+#include <sys/statvfs.h>
 #include <sys/mount.h>
 #endif
 
@@ -434,30 +435,20 @@ void LocalStore::openDB(bool create)
    bind mount.  So make the Nix store writable for this process. */
 void LocalStore::makeStoreWritable()
 {
-#if HAVE_UNSHARE
+#if HAVE_UNSHARE && HAVE_STATVFS && HAVE_SYS_MOUNT_H && defined(MS_BIND) && defined(MS_REMOUNT)
     if (getuid() != 0) return;
-
-    if (!pathExists("/proc/self/mountinfo")) return;
-
     /* Check if /nix/store is a read-only bind mount. */
-    bool found = false;
-    Strings mounts = tokenizeString<Strings>(readFile("/proc/self/mountinfo", true), "\n");
-    foreach (Strings::iterator, i, mounts) {
-        vector<string> fields = tokenizeString<vector<string> >(*i, " ");
-        if (fields.at(3) == "/" || fields.at(4) != settings.nixStore) continue;
-        Strings options = tokenizeString<Strings>(fields.at(5), ",");
-        if (std::find(options.begin(), options.end(), "ro") == options.end()) continue;
-        found = true;
-        break;
+    struct statvfs stat;
+    if (statvfs(settings.nixStore.c_str(), &stat) !=0)
+        throw SysError("Getting info of nix store mountpoint");
+
+    if (stat.f_flag & (ST_RDONLY | MS_BIND)) {
+        if (unshare(CLONE_NEWNS) == -1)
+            throw SysError("setting up a private mount namespace");
+
+        if (mount(0, settings.nixStore.c_str(), 0, MS_REMOUNT | MS_BIND, 0) == -1)
+            throw SysError(format("remounting %1% writable") % settings.nixStore);
     }
-
-    if (!found) return;
-
-    if (unshare(CLONE_NEWNS) == -1)
-        throw SysError("setting up a private mount namespace");
-
-    if (mount(0, settings.nixStore.c_str(), 0, MS_REMOUNT | MS_BIND, 0) == -1)
-        throw SysError(format("remounting %1% writable") % settings.nixStore);
 #endif
 }
 
