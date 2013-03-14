@@ -21,13 +21,16 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s2))
 void EvalState::forceValue(Value & v)
 {
     if (v.type == tThunk) {
-        ValueType saved = v.type;
+        Env * env = v.thunk.env;
+        Expr * expr = v.thunk.expr;
         try {
             v.type = tBlackhole;
             //checkInterrupt();
-            v.thunk.expr->eval(*this, *v.thunk.env, v);
+            expr->eval(*this, *env, v);
         } catch (Error & e) {
-            v.type = saved;
+            v.type = tThunk;
+            v.thunk.env = env;
+            v.thunk.expr = expr;
             throw;
         }
     }
