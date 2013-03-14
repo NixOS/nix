@@ -4,10 +4,10 @@
 %error-verbose
 %defines
 /* %no-lines */
-%parse-param { yyscan_t scanner }
-%parse-param { ParseData * data }
-%lex-param { yyscan_t scanner }
-%lex-param { ParseData * data }
+%parse-param { void * scanner }
+%parse-param { nix::ParseData * data }
+%lex-param { void * scanner }
+%lex-param { nix::ParseData * data }
 %expect 1
 %expect-rr 1
 
@@ -52,7 +52,6 @@ namespace nix {
 
 #include "parser-tab.hh"
 #include "lexer-tab.hh"
-#define YYSTYPE YYSTYPE // workaround a bug in Bison 2.4
 
 #include <stdio.h>
 #include <stdlib.h>

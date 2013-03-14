@@ -9,7 +9,6 @@
 
 %{
 #include "nixexpr.hh"
-#define BISON_HEADER_HACK
 #include "parser-tab.hh"
 
 using namespace nix;
