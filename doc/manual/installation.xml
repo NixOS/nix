@@ -166,11 +166,10 @@ a source distribution.</para>
 
   <listitem><para>Recent versions of Bison and Flex to build the
   parser.  (This is because Nix needs GLR support in Bison and
-  reentrancy support in Flex.)  For Bison, you need version 2.3 or
-  higher (1.875 does <emphasis>not</emphasis> work), which can be
-  obtained from the <link
+  reentrancy support in Flex.)  For Bison, you need version 2.6, which
+  can be obtained from the <link
   xlink:href="ftp://alpha.gnu.org/pub/gnu/bison">GNU FTP
-  server</link>.  For Flex, you need version 2.5.33, which is
+  server</link>.  For Flex, you need version 2.5.35, which is
   available on <link
   xlink:href="http://lex.sourceforge.net/">SourceForge</link>.
   Slightly older versions may also work, but ancient versions like the
