@@ -1,15 +1,19 @@
-{ nixpkgs ? <nixpkgs>
-, nix ? { outPath = ./.; revCount = 1234; shortRev = "abcdef"; }
+{ nix ? { outPath = ./.; revCount = 1234; shortRev = "abcdef"; }
 , officialRelease ? false
 }:
 
 let
 
+  pkgs = import <nixpkgs> {};
+
+  systems = [ "x86_64-linux" "i686-linux" "x86_64-darwin" "x86_64-freebsd" "i686-freebsd" "i686-cygwin" "i686-solaris" ];
+
+
   jobs = rec {
 
 
     tarball =
-      with import nixpkgs {};
+      with pkgs;
 
       releaseTools.sourceTarball {
         name = "nix-tarball";
@@ -72,10 +76,9 @@ let
       };
 
 
-    build =
-      { system ? "x86_64-linux" }:
+    build = pkgs.lib.genAttrs systems (system:
 
-      with import nixpkgs { inherit system; };
+      with import <nixpkgs> { inherit system; };
 
       releaseTools.nixBuild {
         name = "nix";
@@ -99,15 +102,16 @@ let
         installFlags = "sysconfdir=$(out)/etc";
 
         doInstallCheck = true;
-      };
+      });
 
-    binaryTarball =
+
+    binaryTarball = pkgs.lib.genAttrs systems (system:
       { system ? "x86_64-linux" }:
 
-      with import nixpkgs { inherit system; };
+      with import <nixpkgs> { inherit system; };
 
       let
-        toplevel = build { inherit system; };
+        toplevel = builtins.getAttr system jobs.build;
         version = toplevel.src.version;
       in
 
@@ -130,11 +134,11 @@ let
             --transform "s,$TMPDIR/install,/usr/bin/nix-finish-install," \
             --transform "s,$TMPDIR/reginfo,/nix/store/reginfo," \
             $TMPDIR/install $TMPDIR/reginfo $storePaths
-        '';
+        '');
 
 
     coverage =
-      with import nixpkgs { system = "x86_64-linux"; };
+      with import <nixpkgs> { system = "x86_64-linux"; };
 
       releaseTools.coverageAnalysis {
         name = "nix-build";
@@ -205,7 +209,7 @@ let
   makeRPM =
     system: diskImageFun: prio:
 
-    with import nixpkgs { inherit system; };
+    with import <nixpkgs> { inherit system; };
 
     releaseTools.rpmBuild rec {
       name = "nix-rpm";
@@ -224,7 +228,7 @@ let
   makeDeb =
     system: diskImageFun: prio:
 
-    with import nixpkgs { inherit system; };
+    with import <nixpkgs> { inherit system; };
 
     releaseTools.debBuild {
       name = "nix-deb";
