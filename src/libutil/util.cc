@@ -856,7 +856,7 @@ void killUser(uid_t uid)
 
     /* parent */
     int status = pid.wait(true);
-    if (status != 0)
+    if (status != 0 && !(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL))
         throw Error(format("cannot kill processes for uid `%1%': %2%") % uid % statusToString(status));
 
     /* !!! We should really do some check to make sure that there are
