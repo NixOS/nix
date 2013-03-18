@@ -106,7 +106,6 @@ let
 
 
     binaryTarball = pkgs.lib.genAttrs systems (system:
-      { system ? "x86_64-linux" }:
 
       with import <nixpkgs> { inherit system; };
 
