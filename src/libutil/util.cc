@@ -893,7 +893,7 @@ void killUser(uid_t uid)
 
             free(line);
             pclose(handle);
-            if (hasProcesses)
+            if (!hasProcesses)
                 return;
         }
         throw Error(format("cannot kill processes for uid `%1%': %2%") % uid % statusToString(status));
