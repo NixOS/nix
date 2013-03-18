@@ -869,8 +869,35 @@ void killUser(uid_t uid)
 
     /* parent */
     int status = pid.wait(true);
-    if (status != 0)
+    if (status != 0) {
+        if (WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL) {
+            /* Either the builder killed the killing process, or we're on a
+               non-Apple system that implements kill(2) according to POSIX.
+               To check for the latter case, we can check if any processes
+               are still running. Unfortunately, it seems the only way to
+               do this without non-POSIX assumptions is to use the `ps'
+               command, but it's OK if this error path is inefficient, since
+               the alternative is unavoidable failure
+             */
+            string command(PS);
+            command += " -u " + int2String(uid);
+            char *line = NULL;
+            size_t len = 0;
+            FILE *handle = popen(command.c_str(), "r");
+            if (handle == NULL)
+                throw SysError("Calling `ps'");
+
+            bool hasProcesses = !(getline(&line, &len, handle) != -1 &&
+                    getline(&line, &len, handle) == -1 &&
+                    feof(handle));
+
+            free(line);
+            pclose(handle);
+            if (hasProcesses)
+                return;
+        }
         throw Error(format("cannot kill processes for uid `%1%': %2%") % uid % statusToString(status));
+    }
 
     /* !!! We should really do some check to make sure that there are
        no processes left running under `uid', but there is no portable

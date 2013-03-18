@@ -187,6 +187,7 @@ AC_PATH_PROG(dot, dot)
 AC_PATH_PROG(dblatex, dblatex)
 AC_PATH_PROG(gzip, gzip)
 AC_PATH_PROG(pv, pv, pv)
+AC_PATH_PROG(ps, ps)
 
 
 # Test that Perl has the open/fork feature (Perl 5.8.0 and beyond).

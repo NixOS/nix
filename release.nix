@@ -84,7 +84,7 @@ let
         name = "nix";
         src = tarball;
 
-        buildInputs = [ curl perl bzip2 openssl pkgconfig sqlite boehmgc ];
+        buildInputs = [ curl perl bzip2 openssl pkgconfig sqlite boehmgc ] ++ lib.optional stdenv.isLinux procps;
 
         configureFlags = ''
           --disable-init-state

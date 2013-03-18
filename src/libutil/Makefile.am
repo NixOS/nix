@@ -15,4 +15,4 @@ else
 libutil_la_LIBADD += @OPENSSL_LIBS@
 endif
 
-AM_CXXFLAGS = -Wall -I$(srcdir)/..
+AM_CXXFLAGS = -Wall -I$(srcdir)/.. -DPS=\"@ps@\"
