@@ -1697,7 +1697,8 @@ void DerivationGoal::startBuilder()
        if HOME is not set, but they will just assume that the settings file
        they are looking for does not exist if HOME is set but points to some
        non-existing path. */
-    env["HOME"] = "/homeless-shelter";
+    Path homeDir = "/homeless-shelter";
+    env["HOME"] = homeDir;
 
     /* Tell the builder where the Nix store is.  Usually they
        shouldn't care, but this is useful for purity checking (e.g.,
@@ -1945,6 +1946,9 @@ void DerivationGoal::startBuilder()
     }
 
     else {
+
+        if (pathExists(homeDir))
+            throw Error(format("directory `%1%' exists; please remove it") % homeDir);
 
         /* We're not doing a chroot build, but we have some valid
            output paths.  Since we can't just overwrite or delete
