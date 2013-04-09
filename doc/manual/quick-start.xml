@@ -14,9 +14,10 @@ to the following chapters.</para>
 <listitem><para>Download a source tarball or RPM or Debian/Ubuntu
 package from <link xlink:href='http://nixos.org/'/>.  Build source
 distributions using the regular sequence:
-        
+
 <screen>
 $ tar xvfj nix-<replaceable>version</replaceable>.tar.bz2
+$ cd nix-<replaceable>version</replaceable>
 $ ./configure
 $ make
 $ make install <lineannotation>(as root)</lineannotation></screen>
@@ -69,7 +70,7 @@ libxslt-1.1.0
 </para></listitem>
 
 <listitem><para>Install some packages from the channel:
-        
+
 <screen>
 $ nix-env -i hello firefox <replaceable>...</replaceable> </screen>
 
@@ -87,7 +88,7 @@ $ firefox
 <lineannotation>(read Slashdot or something)</lineannotation></screen>
 
 </para></listitem>
-    
+
 <listitem><para>Uninstall a package:
 
 <screen>
