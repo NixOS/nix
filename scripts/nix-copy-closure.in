@@ -62,7 +62,7 @@ while (@ARGV) {
         $includeOutputs = 1;
     }
     elsif ($arg eq "--show-progress") {
-        $progressViewer = "pv";
+        $progressViewer = "@pv@";
     }
     elsif ($arg eq "--dry-run") {
         $dryRun = 1;
