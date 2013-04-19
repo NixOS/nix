@@ -81,6 +81,12 @@ struct Settings {
        the database. */
     bool readOnlyMode;
 
+
+    /* if set to true nix will print the value it tried to coerce to a
+     particular type as xml. This printing may trigger infitie recursions
+     in soem cases - thus use for debugging only */
+    bool xmldebugCorecionFailure;
+
     /* The canonical system name, as returned by config.guess. */
     string thisSystem;
 

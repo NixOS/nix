@@ -30,6 +30,7 @@ Settings::Settings()
     maxBuildJobs = 1;
     buildCores = 1;
     readOnlyMode = false;
+    xmldebugCorecionFailure = false;
     thisSystem = SYSTEM;
     maxSilentTime = 0;
     buildTimeout = 0;

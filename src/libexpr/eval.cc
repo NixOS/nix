@@ -4,6 +4,7 @@
 #include "store-api.hh"
 #include "derivations.hh"
 #include "globals.hh"
+#include "value-to-xml.hh"
 #include "eval-inline.hh"
 
 #include <cstring>
@@ -207,6 +208,18 @@ void EvalState::addConstant(const string & name, Value & v)
     baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v2));
 }
 
+
+string EvalState::showTypeOrXml(Value &v){
+    if (settings.xmldebugCorecionFailure){
+        // make running this code intsead optional
+        std::ostringstream out;
+        PathSet context;
+        printValueAsXML(*this, true, false, v, out, context);
+        return out.str(); // don't know whether this is safe !
+    } else {
+        return showType(v);
+    }
+}
 
 void EvalState::addPrimOp(const string & name,
     unsigned int arity, PrimOpFun primOp)
@@ -456,7 +469,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e)
     Value v;
     e->eval(*this, env, v);
     if (v.type != tBool)
-        throwTypeError("value is %1% while a Boolean was expected", showType(v));
+        throwTypeError("value is %1% while a Boolean was expected", showTypeOrXml(v));
     return v.boolean;
 }
 
@@ -465,7 +478,7 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v)
 {
     e->eval(*this, env, v);
     if (v.type != tAttrs)
-        throwTypeError("value is %1% while an attribute set was expected", showType(v));
+        throwTypeError("value is %1% while an attribute set was expected", showTypeOrXml(v));
 }
 
 
@@ -729,7 +742,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
     
     if (fun.type != tLambda)
         throwTypeError("attempt to call something which is not a function but %1%",
-            showType(fun));
+            showTypeOrXml(fun));
 
     unsigned int size =
         (fun.lambda.fun->arg.empty() ? 0 : 1) +
@@ -1003,7 +1016,7 @@ int EvalState::forceInt(Value & v)
 {
     forceValue(v);
     if (v.type != tInt)
-        throwTypeError("value is %1% while an integer was expected", showType(v));
+        throwTypeError("value is %1% while an integer was expected", showTypeOrXml(v));
     return v.integer;
 }
 
@@ -1012,7 +1025,7 @@ bool EvalState::forceBool(Value & v)
 {
     forceValue(v);
     if (v.type != tBool)
-        throwTypeError("value is %1% while a Boolean was expected", showType(v));
+        throwTypeError("value is %1% while a Boolean was expected", showTypeOrXml(v));
     return v.boolean;
 }
 
@@ -1021,7 +1034,7 @@ void EvalState::forceFunction(Value & v)
 {
     forceValue(v);
     if (v.type != tLambda && v.type != tPrimOp && v.type != tPrimOpApp)
-        throwTypeError("value is %1% while a function was expected", showType(v));
+        throwTypeError("value is %1% while a function was expected", showTypeOrXml(v));
 }
 
 
@@ -1029,7 +1042,7 @@ string EvalState::forceString(Value & v)
 {
     forceValue(v);
     if (v.type != tString)
-        throwTypeError("value is %1% while a string was expected", showType(v));
+        throwTypeError("value is %1% while a string was expected", showTypeOrXml(v));
     return string(v.string.s);
 }
 
@@ -1110,7 +1123,7 @@ string EvalState::coerceToString(Value & v, PathSet & context,
     if (v.type == tAttrs) {
         Bindings::iterator i = v.attrs->find(sOutPath);
         if (i == v.attrs->end())
-            throwTypeError("cannot coerce an attribute set (except a derivation) to a string");
+            throwTypeError("cannot coerce an attribute set: %1% (except a derivation) to a string", showTypeOrXml(v));
         return coerceToString(*i->value, context, coerceMore, copyToStore);
     }
 
@@ -1137,7 +1150,7 @@ string EvalState::coerceToString(Value & v, PathSet & context,
         }
     }
     
-    throwTypeError("cannot coerce %1% to a string", showType(v));
+    throwTypeError("cannot coerce %1% to a string", showTypeOrXml(v));
 }
 
 
@@ -1223,7 +1236,7 @@ bool EvalState::eqValues(Value & v1, Value & v2)
             return false;
 
         default:
-            throwEvalError("cannot compare %1% with %2%", showType(v1), showType(v2));
+            throwEvalError("cannot compare %1% with %2%", showTypeOrXml(v1), showTypeOrXml(v2));
     }
 }
 
