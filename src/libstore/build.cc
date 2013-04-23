@@ -186,9 +186,10 @@ struct Child
 {
     WeakGoalPtr goal;
     set<int> fds;
-    bool monitorForSilence;
+    bool respectTimeouts;
     bool inBuildSlot;
     time_t lastOutput; /* time we last got output on stdout/stderr */
+    time_t timeStarted;
 };
 
 typedef map<pid_t, Child> Children;
@@ -232,9 +233,6 @@ private:
     /* Last time the goals in `waitingForAWhile' where woken up. */
     time_t lastWokenUp;
 
-    /* Last time `waitForInput' was last called.  */
-    time_t lastWait;
-
 public:
 
     /* Set if at least one derivation had a BuildError (i.e. permanent
@@ -266,7 +264,7 @@ public:
     /* Registers a running child process.  `inBuildSlot' means that
        the process counts towards the jobs limit. */
     void childStarted(GoalPtr goal, pid_t pid,
-        const set<int> & fds, bool inBuildSlot, bool monitorForSilence);
+        const set<int> & fds, bool inBuildSlot, bool respectTimeouts);
 
     /* Unregisters a running child process.  `wakeSleepers' should be
        false if there is no sense in waking up goals that are sleeping
@@ -2994,14 +2992,14 @@ unsigned Worker::getNrLocalBuilds()
 
 void Worker::childStarted(GoalPtr goal,
     pid_t pid, const set<int> & fds, bool inBuildSlot,
-    bool monitorForSilence)
+    bool respectTimeouts)
 {
     Child child;
     child.goal = goal;
     child.fds = fds;
-    child.lastOutput = time(0);
+    child.timeStarted = child.lastOutput = time(0);
     child.inBuildSlot = inBuildSlot;
-    child.monitorForSilence = monitorForSilence;
+    child.respectTimeouts = respectTimeouts;
     children[pid] = child;
     if (inBuildSlot) nrLocalBuilds++;
 }
@@ -3117,31 +3115,22 @@ void Worker::waitForInput()
     timeout.tv_usec = 0;
     time_t before = time(0);
 
-    /* If a global timeout has been set, sleep until it's done.  */
-    if (settings.buildTimeout != 0) {
-        useTimeout = true;
-        if (lastWait == 0 || lastWait > before) lastWait = before;
-        timeout.tv_sec = std::max((time_t) 0, lastWait + settings.buildTimeout - before);
+    /* If we're monitoring for silence on stdout/stderr, or if there
+       is a build timeout, then wait for input until the first
+       deadline for any child. */
+    assert(sizeof(time_t) >= sizeof(long));
+    time_t nearest = LONG_MAX; // nearest deadline
+    foreach (Children::iterator, i, children) {
+        if (!i->second.respectTimeouts) continue;
+        if (settings.maxSilentTime != 0)
+            nearest = std::min(nearest, i->second.lastOutput + settings.maxSilentTime);
+        if (settings.buildTimeout != 0)
+            nearest = std::min(nearest, i->second.timeStarted + settings.buildTimeout);
     }
-
-    /* If we're monitoring for silence on stdout/stderr, sleep until
-       the first deadline for any child. */
-    if (settings.maxSilentTime != 0) {
-        time_t oldest = 0;
-        foreach (Children::iterator, i, children) {
-            if (i->second.monitorForSilence) {
-                oldest = oldest == 0 || i->second.lastOutput < oldest
-                    ? i->second.lastOutput : oldest;
-            }
-        }
-        if (oldest) {
-            time_t silenceTimeout = std::max((time_t) 0, oldest + settings.maxSilentTime - before);
-            timeout.tv_sec = useTimeout
-                ? std::min(silenceTimeout, timeout.tv_sec)
-                : silenceTimeout;
-            useTimeout = true;
-            printMsg(lvlVomit, format("sleeping %1% seconds") % timeout.tv_sec);
-        }
+    if (nearest != LONG_MAX) {
+        timeout.tv_sec = std::max((time_t) 1, nearest - before);
+        useTimeout = true;
+        printMsg(lvlVomit, format("sleeping %1% seconds") % timeout.tv_sec);
     }
 
     /* If we are polling goals that are waiting for a lock, then wake
@@ -3151,7 +3140,7 @@ void Worker::waitForInput()
         if (lastWokenUp == 0)
             printMsg(lvlError, "waiting for locks or build slots...");
         if (lastWokenUp == 0 || lastWokenUp > before) lastWokenUp = before;
-        timeout.tv_sec = std::max((time_t) 0, (time_t) (lastWokenUp + settings.pollInterval - before));
+        timeout.tv_sec = std::max((time_t) 1, (time_t) (lastWokenUp + settings.pollInterval - before));
     } else lastWokenUp = 0;
 
     using namespace std;
@@ -3174,9 +3163,6 @@ void Worker::waitForInput()
     }
 
     time_t after = time(0);
-
-    /* Keep track of when we were last called.  */
-    lastWait = after;
 
     /* Process all available file descriptors. */
 
@@ -3218,7 +3204,7 @@ void Worker::waitForInput()
         }
 
         if (settings.maxSilentTime != 0 &&
-            j->second.monitorForSilence &&
+            j->second.respectTimeouts &&
             after - j->second.lastOutput >= (time_t) settings.maxSilentTime)
         {
             printMsg(lvlError,
@@ -3228,7 +3214,8 @@ void Worker::waitForInput()
         }
 
         if (settings.buildTimeout != 0 &&
-            after - before >= (time_t) settings.buildTimeout)
+            j->second.respectTimeouts &&
+            after - j->second.timeStarted >= (time_t) settings.buildTimeout)
         {
             printMsg(lvlError,
                 format("%1% timed out after %2% seconds")
