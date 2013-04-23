@@ -516,6 +516,7 @@ sub downloadBinary {
     }
 
     print STDERR "could not download ‘$storePath’ from any binary cache\n";
+    exit 1;
 }
 
 
