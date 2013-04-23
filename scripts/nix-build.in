@@ -87,7 +87,7 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
         $n += 2;
     }
 
-    elsif ($arg eq "--max-jobs" or $arg eq "-j" or $arg eq "--max-silent-time" or $arg eq "--log-type" or $arg eq "--cores") {
+    elsif ($arg eq "--max-jobs" or $arg eq "-j" or $arg eq "--max-silent-time" or $arg eq "--log-type" or $arg eq "--cores" or $arg eq "--timeout") {
         $n++;
         die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
         push @buildArgs, ($arg, $ARGV[$n]);
