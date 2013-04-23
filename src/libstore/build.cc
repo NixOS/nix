@@ -3231,7 +3231,7 @@ void Worker::waitForInput()
             after - before >= (time_t) settings.buildTimeout)
         {
             printMsg(lvlError,
-                format("%1% timed out after %2% seconds of activity")
+                format("%1% timed out after %2% seconds")
                 % goal->getName() % settings.buildTimeout);
             goal->cancel();
         }

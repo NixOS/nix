@@ -551,7 +551,10 @@ static void performOp(unsigned int clientVersion,
             for (unsigned int i = 0; i < n; i++) {
                 string name = readString(from);
                 string value = readString(from);
-                settings.set("untrusted-" + name, value);
+                if (name == "build-timeout")
+                    string2Int(value, settings.buildTimeout);
+                else
+                    settings.set("untrusted-" + name, value);
             }
         }
         startWork();
@@ -895,8 +898,6 @@ static void daemonLoop()
 
 void run(Strings args)
 {
-    bool daemon = false;
-
     for (Strings::iterator i = args.begin(); i != args.end(); ) {
         string arg = *i++;
         if (arg == "--daemon") /* ignored for backwards compatibility */;
