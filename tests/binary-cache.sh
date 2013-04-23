@@ -5,7 +5,7 @@ clearManifests
 
 # Create the binary cache.
 cacheDir=$TEST_ROOT/binary-cache
-rm -rf $cacheDir
+rm -rf "$cacheDir"
 
 outPath=$(nix-build dependencies.nix --no-out-link)
 
@@ -16,6 +16,8 @@ nix-push --dest $cacheDir $outPath
 # support installation.
 clearStore
 rm -f $NIX_STATE_DIR/binary-cache*
+
+export _NIX_CACHE_FILE_URLS=1
 
 nix-env --option binary-caches "file://$cacheDir" -f dependencies.nix -qas \* | grep -- "---"
 
