@@ -40,6 +40,20 @@ nix-store --check-validity $outPath
 nix-store -qR $outPath | grep input-2
 
 
+# Test whether fallback works if we have cached info but the
+# corresponding NAR has disappeared.
+clearStore
+
+nix-build --option binary-caches "file://$cacheDir" dependencies.nix --dry-run # get info
+
+mkdir $cacheDir/tmp
+mv $cacheDir/*.nar.xz $cacheDir/tmp/
+
+NIX_DEBUG_SUBST=1 nix-build --option binary-caches "file://$cacheDir" dependencies.nix -o $TEST_ROOT/result --fallback
+
+mv $cacheDir/tmp/* $cacheDir/
+
+
 # Test whether building works if the binary cache contains an
 # incomplete closure.
 clearStore
