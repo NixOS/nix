@@ -35,6 +35,13 @@ sub readProc {
             }
             close MAP;
         }
+
+        # Get all store paths that appear in the environment of this process.
+        eval {
+            my $env = Nix::Utils::readFile "$process/environ";
+            my @matches = $env =~ /\/nix\/store\/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*/g;
+            print "$_\n" foreach @matches;
+        }
     }
 
     closedir DIR;
