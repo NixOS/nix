@@ -2,6 +2,7 @@
 
 use strict;
 use Nix::Utils;
+use Nix::Config;
 
 
 sub readProc {
@@ -39,7 +40,7 @@ sub readProc {
         # Get all store paths that appear in the environment of this process.
         eval {
             my $env = Nix::Utils::readFile "$process/environ";
-            my @matches = $env =~ /\/nix\/store\/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*/g;
+            my @matches = $env =~ /\Q$Nix::Config::storeDir\E\/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*/g;
             print "$_\n" foreach @matches;
         }
     }
