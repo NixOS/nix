@@ -1,22 +1,21 @@
-#! @perl@ -w
+#! @perl@ -w @perlFlags@
 
 use strict;
-
-my $procDir = "/proc";
+use Nix::Utils;
 
 
 sub readProc {
-    return unless -d $procDir;
+    return unless -d "/proc";
 
-    opendir DIR, $procDir or return;
-    
+    opendir DIR, "/proc" or return;
+
     foreach my $name (readdir DIR) {
         next unless $name =~ /^\d+$/;
 
-        my $process = "$procDir/$name";
+        my $process = "/proc/$name";
 
         #print STDERR "=== $process\n";
-        
+
         my $target;
         print "$target\n" if $target = readlink "$process/exe";
         print "$target\n" if $target = readlink "$process/cwd";
@@ -58,18 +57,15 @@ readProc;
 lsof;
 
 
-sub readFile {
-    my $path = shift;
-    if (-e $path) {
-        if (open FILE, "$path") {
-            while (<FILE>) {
-                print;
-            }
-            close FILE;
-        }
+sub printFile {
+    my ($fn) = @_;
+    if (-e $fn) {
+        print Nix::Utils::readFile($fn), "\n";
     }
 }
 
+
 # This is rather NixOS-specific, so it probably shouldn't be here.
-readFile "/proc/sys/kernel/modprobe";
-readFile "/proc/sys/kernel/fbsplash";
+printFile "/proc/sys/kernel/modprobe";
+printFile "/proc/sys/kernel/fbsplash";
+printFile "/proc/sys/kernel/poweroff_cmd";
