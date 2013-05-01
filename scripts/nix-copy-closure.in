@@ -4,6 +4,7 @@ use Nix::SSH;
 use Nix::Config;
 use Nix::Store;
 use Nix::CopyClosure;
+use List::Util qw(sum);
 
 
 if (scalar @ARGV < 1) {
@@ -104,6 +105,11 @@ else { # Copy FROM the remote machine.
 
     close READ or die "nix-store on remote machine `$sshHost' failed: $?";
 
+    my $missingSize = 0;
+    if ($progressViewer ne "") {
+        $missingSize = sum (split ' ', `set -f; ssh @sshOpts $sshHost nix-store -q --size @missing`) or die;
+    }
+
     # Export the store paths on the remote machine and import them locally.
     if (scalar @missing > 0) {
         print STDERR "copying ", scalar @missing, " missing paths from ‘$sshHost’...\n";
@@ -113,9 +119,9 @@ else { # Copy FROM the remote machine.
             }
             $compressor = "| $compressor" if $compressor ne "";
             $decompressor = "$decompressor |" if $decompressor ne "";
-            $progressViewer = "$progressViewer |" if $progressViewer ne "";
+            $progressViewer = "$progressViewer -s $missingSize |" if $progressViewer ne "";
             my $extraOpts = $sign ? "--sign" : "";
-            system("set -f; ssh $sshHost @sshOpts 'nix-store --export $extraOpts @missing $compressor' | $progressViewer $decompressor $Nix::Config::binDir/nix-store --import > /dev/null") == 0
+            system("set -f; ssh $sshHost @sshOpts 'nix-store --export $extraOpts @missing $compressor' | $decompressor $progressViewer $Nix::Config::binDir/nix-store --import > /dev/null") == 0
                 or die "copying store paths from remote machine `$sshHost' failed: $?";
         }
     }
