@@ -8,6 +8,15 @@
 
 <!--==================================================================-->
 
+<section xml:id="ssec-relnotes-1.5.2"><title>Release 1.5.2 (May 1, 2013)</title>
+
+<para>This is a bug fix release.</para>
+
+</section>
+
+
+<!--==================================================================-->
+
 <section xml:id="ssec-relnotes-1.5.1"><title>Release 1.5.1 (February 28, 2013)</title>
 
 <para>The bug fix to the bug fix had a bug itself, of course.  But
