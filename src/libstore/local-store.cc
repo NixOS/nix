@@ -1007,6 +1007,10 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
     fromPipe.create();
     errorPipe.create();
 
+    /* Hack: prevent substituters that write too much to stderr from
+       deadlocking our read() from stdout. */
+    fcntl(errorPipe.writeSide, F_SETFL, O_NONBLOCK);
+
     setSubstituterEnv();
 
     run.pid = maybeVfork();
