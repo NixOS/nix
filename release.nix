@@ -188,6 +188,8 @@ let
     deb_ubuntu1204x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1204x86_64) 60;
     deb_ubuntu1210i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1210i386) 70;
     deb_ubuntu1210x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1210x86_64) 70;
+    deb_ubuntu1304i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1304i386) 80;
+    deb_ubuntu1304x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1304x86_64) 80;
 
 
     # System tests.
