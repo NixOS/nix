@@ -78,6 +78,8 @@ while (@ARGV) {
     }
 }
 
+die "$0: you did not specify a host name\n" unless defined $sshHost;
+
 
 openSSHConnection $sshHost or die "$0: unable to start SSH\n";
 
