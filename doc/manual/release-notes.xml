@@ -8,9 +8,10 @@
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-1.5.2"><title>Release 1.5.2 (May 1, 2013)</title>
+<section xml:id="ssec-relnotes-1.5.2"><title>Release 1.5.2 (May 3, 2013)</title>
 
-<para>This is a bug fix release.</para>
+<para>This is primarily a bug fix release.  It has contributions from
+Eelco Dolstra, Lluís Batlle i Rossell and Shea Levy.</para>
 
 </section>
 
