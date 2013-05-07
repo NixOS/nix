@@ -208,18 +208,27 @@ sub getAvailableCaches {
         push @urls, strToList($url);
     }
 
+    push @urls, strToList($Nix::Config::config{"extra-binary-caches"} // "");
+
     # Allow Nix daemon users to override the binary caches to a subset
     # of those listed in the config file.  Note that ‘untrusted-*’
     # denotes options passed by the client.
+    my @trustedUrls = uniq(@urls, strToList($Nix::Config::config{"trusted-binary-caches"} // ""));
+
     if (defined $Nix::Config::config{"untrusted-binary-caches"}) {
         my @untrustedUrls = strToList $Nix::Config::config{"untrusted-binary-caches"};
-        my @trustedUrls = uniq(@urls, strToList($Nix::Config::config{"trusted-binary-caches"} // ""));
         @urls = ();
         foreach my $url (@untrustedUrls) {
             die "binary cache ‘$url’ is not trusted (please add it to ‘trusted-binary-caches’ [@trustedUrls] in $Nix::Config::confDir/nix.conf)\n"
                 unless scalar(grep { $url eq $_ } @trustedUrls) > 0;
             push @urls, $url;
         }
+    }
+
+    my @untrustedUrls = strToList $Nix::Config::config{"untrusted-extra-binary-caches"};
+    foreach my $url (@untrustedUrls) {
+        next unless scalar(grep { $url eq $_ } @trustedUrls) > 0;
+        push @urls, $url;
     }
 
     foreach my $url (uniq @urls) {
