@@ -1366,8 +1366,8 @@ void DerivationGoal::tryToBuild()
         outputLocks.unlock();
         buildUser.release();
         if (settings.printBuildTrace)
-            printMsg(lvlError, format("@ build-failed %1% %2% %3% %4%")
-                % drvPath % drv.outputs["out"].path % 0 % e.msg());
+            printMsg(lvlError, format("@ build-failed %1% - %2% %3%")
+                % drvPath % 0 % e.msg());
         worker.permanentFailure = true;
         amDone(ecFailed);
         return;
@@ -1539,11 +1539,11 @@ void DerivationGoal::buildDone()
 
         if (settings.printBuildTrace) {
             if (hook && hookError)
-                printMsg(lvlError, format("@ hook-failed %1% %2% %3% %4%")
-                    % drvPath % drv.outputs["out"].path % status % e.msg());
+                printMsg(lvlError, format("@ hook-failed %1% - %2% %3%")
+                    % drvPath % status % e.msg());
             else
-                printMsg(lvlError, format("@ build-failed %1% %2% %3% %4%")
-                    % drvPath % drv.outputs["out"].path % 1 % e.msg());
+                printMsg(lvlError, format("@ build-failed %1% - %2% %3%")
+                    % drvPath % 1 % e.msg());
         }
 
         /* Register the outputs of this build as "failed" so we won't
@@ -1566,8 +1566,7 @@ void DerivationGoal::buildDone()
     buildUser.release();
 
     if (settings.printBuildTrace) {
-        printMsg(lvlError, format("@ build-succeeded %1% %2%")
-            % drvPath % drv.outputs["out"].path);
+        printMsg(lvlError, format("@ build-succeeded %1% -") % drvPath);
     }
 
     amDone(ecSuccess);
@@ -1649,8 +1648,8 @@ HookReply DerivationGoal::tryBuildHook()
     worker.childStarted(shared_from_this(), hook->pid, fds, false, true);
 
     if (settings.printBuildTrace)
-        printMsg(lvlError, format("@ build-started %1% %2% %3% %4%")
-            % drvPath % drv.outputs["out"].path % drv.platform % logFile);
+        printMsg(lvlError, format("@ build-started %1% - %2% %3%")
+            % drvPath % drv.platform % logFile);
 
     return rpAccept;
 }
@@ -2031,8 +2030,8 @@ void DerivationGoal::startBuilder()
         singleton<set<int> >(builderOut.readSide), true, true);
 
     if (settings.printBuildTrace) {
-        printMsg(lvlError, format("@ build-started %1% %2% %3% %4%")
-            % drvPath % drv.outputs["out"].path % drv.platform % logFile);
+        printMsg(lvlError, format("@ build-started %1% - %2% %3%")
+            % drvPath % drv.platform % logFile);
     }
 }
 
@@ -2468,7 +2467,7 @@ bool DerivationGoal::pathFailed(const Path & path)
     printMsg(lvlError, format("builder for `%1%' failed previously (cached)") % path);
 
     if (settings.printBuildTrace)
-        printMsg(lvlError, format("@ build-failed %1% %2% cached") % drvPath % path);
+        printMsg(lvlError, format("@ build-failed %1% - cached") % drvPath);
 
     worker.permanentFailure = true;
     amDone(ecFailed);
@@ -2774,10 +2773,8 @@ void SubstitutionGoal::tryToRun()
 
     state = &SubstitutionGoal::finished;
 
-    if (settings.printBuildTrace) {
-        printMsg(lvlError, format("@ substituter-started %1% %2%")
-            % storePath % sub);
-    }
+    if (settings.printBuildTrace)
+        printMsg(lvlError, format("@ substituter-started %1% %2%") % storePath % sub);
 }
 
 
@@ -2864,9 +2861,8 @@ void SubstitutionGoal::finished()
     printMsg(lvlChatty,
         format("substitution of path `%1%' succeeded") % storePath);
 
-    if (settings.printBuildTrace) {
+    if (settings.printBuildTrace)
         printMsg(lvlError, format("@ substituter-succeeded %1%") % storePath);
-    }
 
     amDone(ecSuccess);
 }
