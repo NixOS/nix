@@ -172,7 +172,7 @@ public:
     /* Cancel the goal.  It should wake up its waiters, get rid of any
        running child processes that are being monitored by the worker
        (important!), etc. */
-    virtual void cancel() = 0;
+    virtual void cancel(bool timeout) = 0;
 
 protected:
     void amDone(ExitCode result);
@@ -847,7 +847,7 @@ public:
     DerivationGoal(const Path & drvPath, const StringSet & wantedOutputs, Worker & worker, bool repair = false);
     ~DerivationGoal();
 
-    void cancel();
+    void cancel(bool timeout);
 
     void work();
 
@@ -973,8 +973,10 @@ void DerivationGoal::killChild()
 }
 
 
-void DerivationGoal::cancel()
+void DerivationGoal::cancel(bool timeout)
 {
+    if (timeout)
+        printMsg(lvlError, format("@ build-failed %1% - timeout") % drvPath);
     killChild();
     amDone(ecFailed);
 }
@@ -2537,7 +2539,7 @@ public:
     SubstitutionGoal(const Path & storePath, Worker & worker, bool repair = false);
     ~SubstitutionGoal();
 
-    void cancel();
+    void cancel(bool timeout);
 
     void work();
 
@@ -2578,8 +2580,10 @@ SubstitutionGoal::~SubstitutionGoal()
 }
 
 
-void SubstitutionGoal::cancel()
+void SubstitutionGoal::cancel(bool timeout)
 {
+    if (timeout)
+        printMsg(lvlError, format("@ substituter-failed %1% timeout") % storePath);
     if (pid != -1) {
         pid_t savedPid = pid;
         pid.kill();
@@ -3208,7 +3212,7 @@ void Worker::waitForInput()
             printMsg(lvlError,
                 format("%1% timed out after %2% seconds of silence")
                 % goal->getName() % settings.maxSilentTime);
-            goal->cancel();
+            goal->cancel(true);
         }
 
         if (settings.buildTimeout != 0 &&
@@ -3218,7 +3222,7 @@ void Worker::waitForInput()
             printMsg(lvlError,
                 format("%1% timed out after %2% seconds")
                 % goal->getName() % settings.buildTimeout);
-            goal->cancel();
+            goal->cancel(true);
         }
     }
 
