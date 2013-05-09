@@ -46,7 +46,7 @@ sub all { $_ || return 0 for @_; 1 }
 # Initialisation.
 my $loadIncreased = 0;
 
-my ($localSystem, $maxSilentTime, $printBuildTrace, $buildTimeout) = @ARGV;
+my ($localSystem, $printBuildTrace) = @ARGV;
 
 my $currentLoad = $ENV{"NIX_CURRENT_LOAD"};
 my $conf = $ENV{"NIX_REMOTE_SYSTEMS"};
@@ -258,8 +258,7 @@ close UPLOADLOCK;
 
 # Perform the build.
 my $buildFlags =
-    "--max-silent-time $maxSilentTime --option build-timeout $buildTimeout"
-    . " --fallback --add-root $rootsDir/\$PPID.out --quiet"
+    " --fallback --add-root $rootsDir/\$PPID.out --quiet"
     . " --option build-keep-log false";
 
 # We let the remote side kill its process group when the connection is
