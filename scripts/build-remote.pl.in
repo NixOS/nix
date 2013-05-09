@@ -195,7 +195,9 @@ REQ: while (1) {
         # Connect to the selected machine.
         @sshOpts = ("-i", $machine->{sshKeys}, "-x");
         $hostName = $machine->{hostName};
-        last REQ if openSSHConnection $hostName;
+        last REQ if
+            openSSHConnection($hostName) &&
+            system("ssh $hostName @sshOpts nix-builds-inhibited >/dev/null 2>&1") != 0;
 
         warn "unable to open SSH connection to $hostName, trying other available machines...\n";
         $machine->{enabled} = 0;
