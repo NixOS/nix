@@ -269,7 +269,7 @@ my $buildFlags =
 # in which case every child receives SIGHUP; however, `-tt' doesn't
 # work on some platforms when connection sharing is used.)
 pipe STDIN, DUMMY; # make sure we have a readable STDIN
-if (system("exec ssh $hostName @sshOpts '(read; kill -INT -\$\$) <&0 & nix-store -r $drvPath $buildFlags > /dev/null' 2>&4") != 0) {
+if (system("exec ssh $hostName @sshOpts '(read; kill -INT -\$\$) <&0 & exec nix-store -r $drvPath $buildFlags > /dev/null' 2>&4") != 0) {
     # Note that if we get exit code 100 from `nix-store -r', it
     # denotes a permanent build failure (as opposed to an SSH problem
     # or a temporary Nix problem).  We propagate this to the caller to
