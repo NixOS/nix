@@ -44,6 +44,7 @@ sub closeSSHConnection {
     if ($sshStarted) {
         system("ssh $sshHost @sshOpts -O exit 2> /dev/null") == 0
             or warn "unable to stop SSH master: $?";
+        $sshStarted = 0;
     }
 }
 
