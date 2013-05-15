@@ -225,7 +225,7 @@ sub getAvailableCaches {
         }
     }
 
-    my @untrustedUrls = strToList $Nix::Config::config{"untrusted-extra-binary-caches"};
+    my @untrustedUrls = strToList $Nix::Config::config{"untrusted-extra-binary-caches"} // "";
     foreach my $url (@untrustedUrls) {
         next unless scalar(grep { $url eq $_ } @trustedUrls) > 0;
         push @urls, $url;
