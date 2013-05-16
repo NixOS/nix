@@ -247,6 +247,11 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const Pos & pos, const
     throw TypeError(format(s) % pos % s2);
 }
 
+LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1, const string & s2))
+{
+    throw TypeError(format(s) % s1 % s2);
+}
+
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const Pos & pos))
 {
     throw TypeError(format(s) % pos);
@@ -755,8 +760,8 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
         foreach (Formals::Formals_::iterator, i, fun.lambda.fun->formals->formals) {
             Bindings::iterator j = arg.attrs->find(i->name);
             if (j == arg.attrs->end()) {
-                if (!i->def) throwTypeError("function at %1% called without required argument `%2%'",
-                    fun.lambda.fun->pos, i->name);
+                if (!i->def) throwTypeError("%1% called without required argument `%2%'",
+                    fun.lambda.fun->showNamePos(), i->name);
                 env2.values[displ++] = i->def->maybeThunk(*this, env2);
             } else {
                 attrsUsed++;
@@ -771,7 +776,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
                user. */
             foreach (Bindings::iterator, i, *arg.attrs)
                 if (fun.lambda.fun->formals->argNames.find(i->name) == fun.lambda.fun->formals->argNames.end())
-                    throwTypeError("function at %1% called with unexpected argument `%2%'", fun.lambda.fun->pos, i->name);
+                    throwTypeError("%1% called with unexpected argument `%2%'", fun.lambda.fun->showNamePos(), i->name);
             abort(); // can't happen
         }
     }
@@ -782,7 +787,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
     try {
         fun.lambda.fun->body->eval(*this, env2, v);
     } catch (Error & e) {
-        addErrorPrefix(e, "while evaluating the function at %1%:\n", fun.lambda.fun->pos);
+        addErrorPrefix(e, "while evaluating %1%:\n", fun.lambda.fun->showNamePos());
         throw;
     }
 }

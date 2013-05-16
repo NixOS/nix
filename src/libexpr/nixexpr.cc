@@ -324,4 +324,24 @@ void ExprConcatStrings::bindVars(const StaticEnv & env)
 }
 
 
+/* Storing function names. */
+
+void Expr::setName(Symbol & name)
+{
+}
+
+
+void ExprLambda::setName(Symbol & name)
+{
+    this->name = name;
+    body->setName(name);
+}
+
+
+string ExprLambda::showNamePos()
+{
+    return (format("%1% at %2%") % (name.set() ? "`" + (string) name + "'" : "an anonymous function") % pos).str();
+}
+
+
 }

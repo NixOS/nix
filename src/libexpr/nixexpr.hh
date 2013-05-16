@@ -63,6 +63,7 @@ struct Expr
     virtual void bindVars(const StaticEnv & env);
     virtual void eval(EvalState & state, Env & env, Value & v);
     virtual Value * maybeThunk(EvalState & state, Env & env);
+    virtual void setName(Symbol & name);
 };
 
 std::ostream & operator << (std::ostream & str, Expr & e);
@@ -197,6 +198,7 @@ struct Formals
 struct ExprLambda : Expr
 {
     Pos pos;
+    Symbol name;
     Symbol arg;
     bool matchAttrs;
     Formals * formals;
@@ -208,6 +210,8 @@ struct ExprLambda : Expr
             throw ParseError(format("duplicate formal function argument `%1%' at %2%")
                 % arg % pos);
     };
+    void setName(Symbol & name);
+    string showNamePos();
     COMMON_METHODS
 };
 

@@ -28,17 +28,17 @@ private:
 
 public:
     Symbol() : s(0) { };
-    
+
     bool operator == (const Symbol & s2) const
     {
         return s == s2.s;
     }
-    
+
     bool operator != (const Symbol & s2) const
     {
         return s != s2.s;
     }
-    
+
     bool operator < (const Symbol & s2) const
     {
         return s < s2.s;
@@ -47,6 +47,11 @@ public:
     operator const string & () const
     {
         return *s;
+    }
+
+    bool set() const
+    {
+        return s;
     }
 
     bool empty() const
@@ -66,7 +71,7 @@ inline std::ostream & operator << (std::ostream & str, const Symbol & sym)
 class SymbolTable
 {
 private:
-#if HAVE_TR1_UNORDERED_SET 
+#if HAVE_TR1_UNORDERED_SET
     typedef std::tr1::unordered_set<string> Symbols;
 #else
     typedef std::set<string> Symbols;

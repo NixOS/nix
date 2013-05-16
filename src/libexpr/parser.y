@@ -104,6 +104,7 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
             }
         }
     }
+    e->setName(attrPath.back());
 }
 
 
