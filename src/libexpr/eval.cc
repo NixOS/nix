@@ -765,11 +765,15 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
         }
 
         /* Check that each actual argument is listed as a formal
-           argument (unless the attribute match specifies a `...').
-           TODO: show the names of the expected/unexpected
-           arguments. */
-        if (!fun.lambda.fun->formals->ellipsis && attrsUsed != arg.attrs->size()) 
-            throwTypeError("function at %1% called with unexpected argument", fun.lambda.fun->pos);
+           argument (unless the attribute match specifies a `...'). */
+        if (!fun.lambda.fun->formals->ellipsis && attrsUsed != arg.attrs->size()) {
+            /* Nope, so show the first unexpected argument to the
+               user. */
+            foreach (Bindings::iterator, i, *arg.attrs)
+                if (fun.lambda.fun->formals->argNames.find(i->name) == fun.lambda.fun->formals->argNames.end())
+                    throwTypeError("function at %1% called with unexpected argument `%2%'", fun.lambda.fun->pos, i->name);
+            abort(); // can't happen
+        }
     }
 
     nrFunctionCalls++;
