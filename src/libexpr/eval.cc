@@ -141,10 +141,10 @@ EvalState::EvalState()
     , sOutputs(symbols.create("outputs"))
     , sOutputName(symbols.create("outputName"))
     , sIgnoreNulls(symbols.create("__ignoreNulls"))
+    , repair(false)
     , baseEnv(allocEnv(128))
     , baseEnvDispl(0)
     , staticBaseEnv(false, 0)
-    , repair(false)
 {
     nrEnvs = nrValuesInEnvs = nrValues = nrListElems = 0;
     nrAttrsets = nrOpUpdates = nrOpUpdateValuesCopied = 0;
