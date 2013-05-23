@@ -694,7 +694,9 @@ static void opExport(Strings opFlags, Strings opArgs)
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
     FdSink sink(STDOUT_FILENO);
-    exportPaths(*store, opArgs, sign, sink);
+    Paths sorted = topoSortPaths(*store, PathSet(opArgs.begin(), opArgs.end()));
+    reverse(sorted.begin(), sorted.end());
+    exportPaths(*store, sorted, sign, sink);
 }
 
 
