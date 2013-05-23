@@ -197,10 +197,11 @@ REQ: while (1) {
         $hostName = $machine->{hostName};
         if (openSSHConnection($hostName)) {
             last REQ if system("ssh $hostName @sshOpts nix-builds-inhibited < /dev/null > /dev/null 2>&1") != 0;
+            warn "machine `$hostName' is refusing builds, trying other available machines...\n";
             closeSSHConnection;
+        } else {
+            warn "unable to open SSH connection to `$hostName', trying other available machines...\n";
         }
-
-        warn "unable to open SSH connection to $hostName, trying other available machines...\n";
         $machine->{enabled} = 0;
     }
 }
