@@ -280,7 +280,7 @@ xlink:href="http://nixos.org/releases/full-index-nix.html" />.</para>
 -->
 
 
-<section><title>Security</title>
+<section><title>Choosing mode of operation</title>
 
 <para>Nix has two basic security models.  First, it can be used in
 “single-user mode”, which is similar to what most other package
