@@ -291,9 +291,7 @@ if (system("exec ssh $hostName @sshOpts '(read; kill -INT -\$\$) <&0 & exec nix-
 # Copy the output from the build machine.
 my @outputs2 = grep { !isValidPath($_) } @outputs;
 if (scalar @outputs2 > 0) {
-    my $maybeSignRemote = "";
-    $maybeSignRemote = "--sign" if $UID != 0;
-    system("exec ssh $hostName @sshOpts 'nix-store --export $maybeSignRemote @outputs2'" .
+    system("exec ssh $hostName @sshOpts 'nix-store --export @outputs2'" .
            "| NIX_HELD_LOCKS='@outputs2' @bindir@/nix-store --import > /dev/null") == 0
         or die("cannot copy paths " . join(", ", @outputs) . " from `$hostName': $?");
 }
