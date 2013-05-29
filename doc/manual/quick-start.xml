@@ -36,7 +36,7 @@ changed using
 
 <listitem><para>You should add
 <filename><replaceable>prefix</replaceable>/etc/profile.d/nix.sh</filename>
-to your <filename>~/.bashrc</filename> (or some other login
+to your <filename>~/.profile</filename> (or some other login
 file).</para></listitem>
 
 <listitem><para>Subscribe to the Nix Packages channel.
