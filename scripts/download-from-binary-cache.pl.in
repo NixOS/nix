@@ -288,7 +288,7 @@ sub processNARInfo {
     my ($storePath, $cache, $request) = @_;
 
     if ($request->{result} != 0) {
-        if ($request->{result} != 37 && $request->{httpStatus} != 404) {
+        if ($request->{result} != 37 && $request->{httpStatus} != 404 && $request->{httpStatus} != 403) {
             print STDERR "could not download ‘$request->{url}’ (" .
                 ($request->{result} != 0 ? "Curl error $request->{result}" : "HTTP status $request->{httpStatus}") . ")\n";
         } else {
@@ -467,7 +467,7 @@ sub printSubstitutablePaths {
 
         foreach my $request (values %requests) {
             if ($request->{result} != 0) {
-                if ($request->{result} != 37 && $request->{httpStatus} != 404) {
+                if ($request->{result} != 37 && $request->{httpStatus} != 404 && $request->{httpStatus} != 403) {
                     print STDERR "could not check ‘$request->{url}’ (" .
                         ($request->{result} != 0 ? "Curl error $request->{result}" : "HTTP status $request->{httpStatus}") . ")\n";
                 } else {
