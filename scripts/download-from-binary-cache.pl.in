@@ -265,11 +265,12 @@ sub getAvailableCaches {
             elsif ($1 eq "Priority") { $priority = int($2); }
         }
 
-        $dbh->do("insert into BinaryCaches(url, timestamp, storeDir, wantMassQuery, priority) values (?, ?, ?, ?, ?)",
+        $dbh->do("insert or replace into BinaryCaches(url, timestamp, storeDir, wantMassQuery, priority) values (?, ?, ?, ?, ?)",
                  {}, $url, time(), $storeDir, $wantMassQuery, $priority);
-        my $id = $dbh->last_insert_id("", "", "", "");
+        $queryCache->execute($url);
+        $res = $queryCache->fetchrow_hashref() or die;
         next if $storeDir ne $Nix::Config::storeDir;
-        push @caches, { id => $id, url => $url, wantMassQuery => $wantMassQuery, priority => $priority };
+        push @caches, { id => $res->{id}, url => $url, wantMassQuery => $wantMassQuery, priority => $priority };
     }
 
     @caches = sort { $a->{priority} <=> $b->{priority} } @caches;
