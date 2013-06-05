@@ -107,10 +107,10 @@ Pernsteiner.</para>
     configuration setting <option>binary-caches</option> contains a
     list of URLs of binary caches.  For instance, doing
 <screen>
-$ nix-env -i thunderbird --option binary-caches http://nixos.org/binary-cache
+$ nix-env -i thunderbird --option binary-caches http://cache.nixos.org
 </screen>
     will install Thunderbird and its dependencies, using the available
-    pre-built binaries in <uri>http://nixos.org/binary-cache</uri>.
+    pre-built binaries in <uri>http://cache.nixos.org</uri>.
     The main advantage over the old “manifest”-based method of getting
     pre-built binaries is that you don’t have to worry about your
     manifest being in sync with the Nix expressions you’re installing
@@ -123,7 +123,7 @@ $ nix-env -i thunderbird --option binary-caches http://nixos.org/binary-cache
     used automatically if you subscribe to that channel.  If you use
     the Nixpkgs or NixOS channels
     (<uri>http://nixos.org/channels</uri>) you automatically get the
-    cache <uri>http://nixos.org/binary-cache</uri>.</para>
+    cache <uri>http://cache.nixos.org</uri>.</para>
 
     <para>Binary caches are created using <command>nix-push</command>.
     For details on the operation and format of binary caches, see the

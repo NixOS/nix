@@ -252,7 +252,7 @@ The properties that are currently supported are:
     <listitem><para>Each binary cache has a priority (defaulting to
     50).  Binary caches are checked for binaries in order of ascending
     priority; thus a higher number denotes a lower priority.  The
-    binary cache <uri>http://nixos.org/binary-cache</uri> has priority
+    binary cache <uri>http://cache.nixos.org</uri> has priority
     40.</para></listitem>
 
   </varlistentry>
@@ -270,14 +270,14 @@ URL <replaceable>url</replaceable> has a binary for
 <replaceable>p</replaceable>, Nix fetches
 <replaceable>url/h</replaceable>, where <replaceable>h</replaceable>
 is the hash part of <replaceable>p</replaceable>.  Thus, if we have a
-cache <uri>http://nixos.org/binary-cache</uri> and we want to obtain
+cache <uri>http://cache.nixos.org</uri> and we want to obtain
 the store path
 <screen>
 /nix/store/a8922c0h87iilxzzvwn2hmv8x210aqb9-glibc-2.7
 </screen>
 then Nix will attempt to fetch
 <screen>
-http://nixos.org/binary-cache/a8922c0h87iilxzzvwn2hmv8x210aqb9.narinfo
+http://cache.nixos.org/a8922c0h87iilxzzvwn2hmv8x210aqb9.narinfo
 </screen>
 (Commands such as <command>nix-env -qas</command> will issue an HTTP
 HEAD request, since it only needs to know if the
@@ -381,7 +381,7 @@ The fields are as follows:
 references exist (e.g.,
 <filename>/nix/store/2ma2k0ys8knh4an48n28vigcmc2z8773-linux-headers-2.6.23.16</filename>),
 Nix will fetch <screen>
-http://nixos.org/binary-cache/nar/0zzjpdz46mdn74v09m053yczlz4am038g8r74iy8w43gx8801h70.nar.bz2
+http://cache.nixos.org/nar/0zzjpdz46mdn74v09m053yczlz4am038g8r74iy8w43gx8801h70.nar.bz2
 </screen> and decompress and unpack it to
 <filename>/nix/store/a8922c0h87iilxzzvwn2hmv8x210aqb9-glibc-2.7</filename>.</para>
 
