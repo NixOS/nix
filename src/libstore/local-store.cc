@@ -1039,14 +1039,26 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
     /* Parent. */
 
     run.to = toPipe.writeSide.borrow();
-    run.from = fromPipe.readSide.borrow();
+    run.from = run.fromBuf.fd = fromPipe.readSide.borrow();
     run.error = errorPipe.readSide.borrow();
 }
 
 
-template<class T> T getIntLine(int fd)
+string LocalStore::getLineFromSubstituter(RunningSubstituter & run)
 {
-    string s = readLine(fd);
+    string s;
+    while (1) {
+        unsigned char c;
+        run.fromBuf(&c, 1);
+        if (c == '\n') return s;
+        s += c;
+    }
+}
+
+
+template<class T> T LocalStore::getIntLineFromSubstituter(RunningSubstituter & run)
+{
+    string s = getLineFromSubstituter(run);
     T res;
     if (!string2Int(s, res)) throw Error("integer expected from stream");
     return res;
@@ -1070,7 +1082,7 @@ PathSet LocalStore::querySubstitutablePaths(const PathSet & paths)
                stderr when they fail.  I.e. they shouldn't write debug
                output. */
             try {
-                Path path = readLine(run.from);
+                Path path = getLineFromSubstituter(run);
                 if (path == "") break;
                 res.insert(path);
             } catch (EndOfFile e) {
@@ -1095,22 +1107,22 @@ void LocalStore::querySubstitutablePathInfos(const Path & substituter,
 
     while (true) {
         try {
-            Path path = readLine(run.from);
+            Path path = getLineFromSubstituter(run);
             if (path == "") break;
             if (paths.find(path) == paths.end())
                 throw Error(format("got unexpected path `%1%' from substituter") % path);
             paths.erase(path);
             SubstitutablePathInfo & info(infos[path]);
-            info.deriver = readLine(run.from);
+            info.deriver = getLineFromSubstituter(run);
             if (info.deriver != "") assertStorePath(info.deriver);
-            int nrRefs = getIntLine<int>(run.from);
+            int nrRefs = getIntLineFromSubstituter<int>(run);
             while (nrRefs--) {
-                Path p = readLine(run.from);
+                Path p = getLineFromSubstituter(run);
                 assertStorePath(p);
                 info.references.insert(p);
             }
-            info.downloadSize = getIntLine<long long>(run.from);
-            info.narSize = getIntLine<long long>(run.from);
+            info.downloadSize = getIntLineFromSubstituter<long long>(run);
+            info.narSize = getIntLineFromSubstituter<long long>(run);
         } catch (EndOfFile e) {
             throw Error(format("substituter `%1%' failed: %2%") % substituter % chomp(drainFD(run.error)));
         }

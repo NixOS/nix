@@ -46,6 +46,7 @@ struct RunningSubstituter
 {
     Pid pid;
     AutoCloseFD to, from, error;
+    FdSource fromBuf;
 };
 
 
@@ -288,6 +289,10 @@ private:
 
     void startSubstituter(const Path & substituter,
         RunningSubstituter & runningSubstituter);
+
+    string getLineFromSubstituter(RunningSubstituter & run);
+
+    template<class T> T getIntLineFromSubstituter(RunningSubstituter & run);
 
     Path createTempDirInStore();
 
