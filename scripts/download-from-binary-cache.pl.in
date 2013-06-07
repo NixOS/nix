@@ -24,8 +24,9 @@ my $ttlNegative = 24 * 3600; # when to purge negative lookups from the database
 my $ttlNegativeUse = 3600; # how long negative lookups are valid for non-"have" lookups
 my $didExpiration = 0;
 
+my $showAfter = 5; # show that we're waiting for a request after this many seconds
+
 my $debug = ($ENV{"NIX_DEBUG_SUBST"} // "") eq 1;
-open(STDERR, ">>/dev/tty") if $debug;
 
 my $cacheFileURLs = ($ENV{"_NIX_CACHE_FILE_URLS"} // "") eq 1; # for testing
 
@@ -46,7 +47,8 @@ sub addRequest {
 
     my $curl = WWW::Curl::Easy->new;
     my $curlId = $curlIdCount++;
-    $requests{$curlId} = { storePath => $storePath, url => $url, handle => $curl, content => "", type => $head ? "HEAD" : "GET" };
+    $requests{$curlId} = { storePath => $storePath, url => $url, handle => $curl, content => "", type => $head ? "HEAD" : "GET"
+                         , shown => 0, started => time() };
 
     $curl->setopt(CURLOPT_PRIVATE, $curlId);
     $curl->setopt(CURLOPT_URL, $url);
@@ -76,7 +78,7 @@ sub processRequests {
 
         # Sleep until we can read or write some data.
         if (scalar @{$rfds} + scalar @{$wfds} + scalar @{$efds} > 0) {
-            IO::Select->select(IO::Select->new(@{$rfds}), IO::Select->new(@{$wfds}), IO::Select->new(@{$efds}), 0.1);
+            IO::Select->select(IO::Select->new(@{$rfds}), IO::Select->new(@{$wfds}), IO::Select->new(@{$efds}), 1.0);
         }
 
         if ($curlm->perform() != $activeRequests) {
@@ -99,6 +101,16 @@ sub processRequests {
                         delete $scheduled{$id2};
                     }
                 }
+            }
+        }
+
+        my $time = time();
+        while (my ($key, $request) = each %requests) {
+            next unless defined $request->{handle};
+            next if $request->{shown};
+            if ($time > $request->{started} + $showAfter) {
+                print STDERR "still waiting for ‘$request->{url}’ after $showAfter seconds...\n";
+                $request->{shown} = 1;
             }
         }
     }
