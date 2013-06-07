@@ -26,7 +26,7 @@ my $didExpiration = 0;
 
 my $showAfter = 5; # show that we're waiting for a request after this many seconds
 
-my $debug = ($ENV{"NIX_DEBUG_SUBST"} // "") eq 1;
+my $debug = ($Nix::Config::config{"debug-subst"} // "") eq 1 || ($Nix::Config::config{"untrusted-debug-subst"} // "") eq 1;
 
 my $cacheFileURLs = ($ENV{"_NIX_CACHE_FILE_URLS"} // "") eq 1; # for testing
 
