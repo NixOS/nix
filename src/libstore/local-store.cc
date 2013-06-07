@@ -1122,13 +1122,9 @@ PathSet LocalStore::querySubstitutablePaths(const PathSet & paths)
                substituters should only write (short) messages to
                stderr when they fail.  I.e. they shouldn't write debug
                output. */
-            try {
-                Path path = getLineFromSubstituter(run);
-                if (path == "") break;
-                res.insert(path);
-            } catch (EndOfFile e) {
-                throw Error(format("substituter `%1%' failed: %2%") % *i % chomp(drainFD(run.error)));
-            }
+            Path path = getLineFromSubstituter(run);
+            if (path == "") break;
+            res.insert(path);
         }
     }
     return res;
@@ -1147,26 +1143,22 @@ void LocalStore::querySubstitutablePathInfos(const Path & substituter,
     writeLine(run.to, s);
 
     while (true) {
-        try {
-            Path path = getLineFromSubstituter(run);
-            if (path == "") break;
-            if (paths.find(path) == paths.end())
-                throw Error(format("got unexpected path `%1%' from substituter") % path);
-            paths.erase(path);
-            SubstitutablePathInfo & info(infos[path]);
-            info.deriver = getLineFromSubstituter(run);
-            if (info.deriver != "") assertStorePath(info.deriver);
-            int nrRefs = getIntLineFromSubstituter<int>(run);
-            while (nrRefs--) {
-                Path p = getLineFromSubstituter(run);
-                assertStorePath(p);
-                info.references.insert(p);
-            }
-            info.downloadSize = getIntLineFromSubstituter<long long>(run);
-            info.narSize = getIntLineFromSubstituter<long long>(run);
-        } catch (EndOfFile e) {
-            throw Error(format("substituter `%1%' failed: %2%") % substituter % chomp(drainFD(run.error)));
+        Path path = getLineFromSubstituter(run);
+        if (path == "") break;
+        if (paths.find(path) == paths.end())
+            throw Error(format("got unexpected path `%1%' from substituter") % path);
+        paths.erase(path);
+        SubstitutablePathInfo & info(infos[path]);
+        info.deriver = getLineFromSubstituter(run);
+        if (info.deriver != "") assertStorePath(info.deriver);
+        int nrRefs = getIntLineFromSubstituter<int>(run);
+        while (nrRefs--) {
+            Path p = getLineFromSubstituter(run);
+            assertStorePath(p);
+            info.references.insert(p);
         }
+        info.downloadSize = getIntLineFromSubstituter<long long>(run);
+        info.narSize = getIntLineFromSubstituter<long long>(run);
     }
 }
 
