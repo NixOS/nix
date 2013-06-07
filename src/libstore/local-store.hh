@@ -44,6 +44,7 @@ struct OptimiseStats
 
 struct RunningSubstituter
 {
+    Path program;
     Pid pid;
     AutoCloseFD to, from, error;
     FdSource fromBuf;

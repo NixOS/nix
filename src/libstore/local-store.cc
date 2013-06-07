@@ -1007,10 +1007,6 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
     fromPipe.create();
     errorPipe.create();
 
-    /* Hack: prevent substituters that write too much to stderr from
-       deadlocking our read() from stdout. */
-    fcntl(errorPipe.writeSide, F_SETFL, O_NONBLOCK);
-
     setSubstituterEnv();
 
     run.pid = maybeVfork();
@@ -1038,20 +1034,65 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
 
     /* Parent. */
 
+    run.program = baseNameOf(substituter);
     run.to = toPipe.writeSide.borrow();
     run.from = run.fromBuf.fd = fromPipe.readSide.borrow();
     run.error = errorPipe.readSide.borrow();
 }
 
 
+/* Read a line from the substituter's stdout, while also processing
+   its stderr. */
 string LocalStore::getLineFromSubstituter(RunningSubstituter & run)
 {
-    string s;
+    string res, err;
+
+    /* We might have stdout data left over from the last time. */
+    if (run.fromBuf.hasData()) goto haveData;
+
     while (1) {
-        unsigned char c;
-        run.fromBuf(&c, 1);
-        if (c == '\n') return s;
-        s += c;
+        fd_set fds;
+        FD_ZERO(&fds);
+        FD_SET(run.from, &fds);
+        FD_SET(run.error, &fds);
+
+        /* Wait for data to appear on the substituter's stdout or
+           stderr. */
+        if (select(run.from > run.error ? run.from + 1 : run.error + 1, &fds, 0, 0, 0) == -1) {
+            if (errno == EINTR) continue;
+            throw SysError("waiting for input from the substituter");
+        }
+
+        /* Completely drain stderr before dealing with stdout. */
+        if (FD_ISSET(run.error, &fds)) {
+            char buf[4096];
+            ssize_t n = read(run.error, (unsigned char *) buf, sizeof(buf));
+            if (n == -1) {
+                if (errno == EINTR) continue;
+                throw SysError("reading from substituter's stderr");
+            }
+            if (n == 0) throw Error(format("substituter `%1%' died unexpectedly") % run.program);
+            err.append(buf, n);
+            string::size_type p;
+            while ((p = err.find('\n')) != string::npos) {
+                printMsg(lvlError, run.program + ": " + string(err, 0, p));
+                err = string(err, p + 1);
+            }
+        }
+
+        /* Read from stdout until we get a newline or the buffer is empty. */
+        else if (run.fromBuf.hasData() || FD_ISSET(run.from, &fds)) {
+        haveData:
+            do {
+                unsigned char c;
+                run.fromBuf(&c, 1);
+                if (c == '\n') {
+                    if (!err.empty()) printMsg(lvlError, run.program + ": " + err);
+                    return res;
+                }
+                res += c;
+            } while (run.fromBuf.hasData());
+        }
     }
 }
 

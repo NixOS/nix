@@ -90,6 +90,12 @@ size_t BufferedSource::read(unsigned char * data, size_t len)
 }
 
 
+bool BufferedSource::hasData()
+{
+    return bufPosOut < bufPosIn;
+}
+
+
 size_t FdSource::readUnbuffered(unsigned char * data, size_t len)
 {
     ssize_t n;
