@@ -561,11 +561,16 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
     }
 
     else {
-        foreach (AttrDefs::iterator, i, attrs)
+        foreach (AttrDefs::iterator, i, attrs) {
+            if (i->first.dynamic) {
+                printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
+                abort();
+            }
             if (i->second.inherited)
-                v.attrs->push_back(Attr(i->first, state.lookupVar(&env, i->second.var), &i->second.pos));
+                v.attrs->push_back(Attr(i->first.nameSym, state.lookupVar(&env, i->second.var), &i->second.pos));
             else
-                v.attrs->push_back(Attr(i->first, i->second.e->maybeThunk(state, env), &i->second.pos));
+                v.attrs->push_back(Attr(i->first.nameSym, i->second.e->maybeThunk(state, env), &i->second.pos));
+        }
     }
 }
 
