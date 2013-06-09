@@ -148,7 +148,7 @@ string showAttrPath(const AttrPath & attrPath)
         AttrName & name = **i;
         if (!s.empty()) s += '.';
         if (name.dynamic) {
-            s += name.nameSym;
+            s += name.name;
         } else {
             printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
             abort();
@@ -234,7 +234,7 @@ void ExprAttrs::bindVars(const StaticEnv & env)
         unsigned int displ = 0;
         foreach (AttrDefs::iterator, i, attrs)
             if (!i->first.dynamic)
-                newEnv.vars[i->first.nameSym] = i->second.displ = displ++;
+                newEnv.vars[i->first.name] = i->second.displ = displ++;
         
         foreach (AttrDefs::iterator, i, attrs)
             if (i->second.inherited) i->second.var.bind(env);
@@ -280,7 +280,7 @@ void ExprLet::bindVars(const StaticEnv & env)
     foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs) {
         // !!! Should be a parse error
         assert(!i->first.dynamic);
-        newEnv.vars[i->first.nameSym] = i->second.displ = displ++;
+        newEnv.vars[i->first.name] = i->second.displ = displ++;
     }
     
     foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs)
@@ -381,7 +381,7 @@ bool AttrName::operator < (const AttrName n) const
             printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
             abort();
         } else {
-            return nameSym < n.nameSym;
+            return name < n.name;
         }
     }
 }

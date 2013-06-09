@@ -330,7 +330,7 @@ void AttrName::eval(EvalState & state, Env & env)
         Value v;
         expr->eval(state, env, v);
         state.forceStringNoCtx(v);
-        nameSym = state.symbols.create(v.string.s);
+        name = state.symbols.create(v.string.s);
         dynamic = false;
     }
 }
@@ -536,7 +536,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
                 /* !!! handle overrides? */
                 Value * vAttr = state.lookupVar(&env, i->second.var);
                 env2.values[displ++] = vAttr;
-                v.attrs->push_back(Attr(i->first.nameSym, vAttr, &i->second.pos));
+                v.attrs->push_back(Attr(i->first.name, vAttr, &i->second.pos));
             } else {
                 Value * vAttr;
                 if (hasOverrides) {
@@ -545,7 +545,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
                 } else
                     vAttr = i->second.e->maybeThunk(state, env2);
                 env2.values[displ++] = vAttr;
-                v.attrs->push_back(Attr(i->first.nameSym, vAttr, &i->second.pos));
+                v.attrs->push_back(Attr(i->first.name, vAttr, &i->second.pos));
             }
         }
         
@@ -579,9 +579,9 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
                 abort();
             }
             if (i->second.inherited)
-                v.attrs->push_back(Attr(i->first.nameSym, state.lookupVar(&env, i->second.var), &i->second.pos));
+                v.attrs->push_back(Attr(i->first.name, state.lookupVar(&env, i->second.var), &i->second.pos));
             else
-                v.attrs->push_back(Attr(i->first.nameSym, i->second.e->maybeThunk(state, env), &i->second.pos));
+                v.attrs->push_back(Attr(i->first.name, i->second.e->maybeThunk(state, env), &i->second.pos));
         }
     }
 }
@@ -647,14 +647,14 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             if (def) {
                 state.forceValue(*vAttrs);
                 if (vAttrs->type != tAttrs ||
-                    (j = vAttrs->attrs->find(name.nameSym)) == vAttrs->attrs->end())
+                    (j = vAttrs->attrs->find(name.name)) == vAttrs->attrs->end())
                 {
                     def->eval(state, env, v);
                     return;
                 }
             } else {
                 state.forceAttrs(*vAttrs);
-                if ((j = vAttrs->attrs->find(name.nameSym)) == vAttrs->attrs->end())
+                if ((j = vAttrs->attrs->find(name.name)) == vAttrs->attrs->end())
                     throwEvalError("attribute `%1%' missing", showAttrPath(attrPath));
             }
             vAttrs = j->value;
@@ -689,7 +689,7 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
         state.forceValue(*vAttrs);
         Bindings::iterator j;
         if (vAttrs->type != tAttrs ||
-            (j = vAttrs->attrs->find(name.nameSym)) == vAttrs->attrs->end())
+            (j = vAttrs->attrs->find(name.name)) == vAttrs->attrs->end())
         {
             mkBool(v, false);
             return;

@@ -108,7 +108,7 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
     AttrName & name = *attrPath.back();
     /* !!! Should we try to set names for functions when the attrnames are dynamic? */
     if (!name.dynamic) {
-        e->setName(name.nameSym);
+        e->setName(name.name);
     }
 }
 
@@ -409,10 +409,10 @@ binds
           if (name.dynamic) {
               throw ParseError("Dynamic attributes not allowed in `inherit' statements");
           }
-          if ($$->attrs.find(name.nameSym) != $$->attrs.end())
-              dupAttr(name.nameSym, makeCurPos(@3, data), $$->attrs[name.nameSym].pos);
+          if ($$->attrs.find(name.name) != $$->attrs.end())
+              dupAttr(name.name, makeCurPos(@3, data), $$->attrs[name.name].pos);
           Pos pos = makeCurPos(@3, data);
-          $$->attrs[name.nameSym] = ExprAttrs::AttrDef(name.nameSym, pos);
+          $$->attrs[name.name] = ExprAttrs::AttrDef(name.name, pos);
       }
     }
   | binds INHERIT '(' expr ')' attrs ';'
@@ -423,9 +423,9 @@ binds
           if (name.dynamic) {
               throw ParseError("Dynamic attributes not allowed in `inherit' statements");
           }
-          if ($$->attrs.find(name.nameSym) != $$->attrs.end())
-              dupAttr(name.nameSym, makeCurPos(@6, data), $$->attrs[name.nameSym].pos);
-          $$->attrs[name.nameSym] = ExprAttrs::AttrDef(new ExprSelect($4, &name), makeCurPos(@6, data));
+          if ($$->attrs.find(name.name) != $$->attrs.end())
+              dupAttr(name.name, makeCurPos(@6, data), $$->attrs[name.name].pos);
+          $$->attrs[name.name] = ExprAttrs::AttrDef(new ExprSelect($4, &name), makeCurPos(@6, data));
       }
     }
   | { $$ = new ExprAttrs; }

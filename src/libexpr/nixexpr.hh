@@ -50,10 +50,10 @@ struct StaticEnv;
 
 struct AttrName {
     bool dynamic;
-    Symbol nameSym;
+    Symbol name;
     Expr * expr;
     AttrName(Expr * e) : dynamic(true), expr(e) {};
-    AttrName(const Symbol & s) : dynamic(false), nameSym(s) {};
+    AttrName(const Symbol & s) : dynamic(false), name(s) {};
     void eval(EvalState & state, Env & env);
     bool operator < (const AttrName other) const;
 };
