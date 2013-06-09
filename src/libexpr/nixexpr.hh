@@ -50,8 +50,9 @@ struct StaticEnv;
 
 struct AttrName {
     bool dynamic;
+    Symbol nameSym;
     AttrName(Expr * e) : dynamic(true) {};
-    AttrName(const char * s) : dynamic(false) {};
+    AttrName(const char * s) : dynamic(false), nameSym(s) {};
 };
 
 /* An attribute path is a sequence of attribute names. */
