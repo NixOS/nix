@@ -662,10 +662,15 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
     e->eval(state, env, vTmp);
 
     foreach (AttrPath::const_iterator, i, attrPath) {
+        AttrName & name = **i;
+        if (name.dynamic) {
+            printMsg(lvlError, "Not implemented!");
+            abort();
+        }
         state.forceValue(*vAttrs);
         Bindings::iterator j;
         if (vAttrs->type != tAttrs ||
-            (j = vAttrs->attrs->find(*i)) == vAttrs->attrs->end())
+            (j = vAttrs->attrs->find(name.nameSym)) == vAttrs->attrs->end())
         {
             mkBool(v, false);
             return;
