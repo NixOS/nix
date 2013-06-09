@@ -574,10 +574,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 
     else {
         foreach (AttrDefs::iterator, i, attrs) {
-            if (i->first.dynamic) {
-                printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
-                abort();
-            }
+            ((AttrName) i->first).eval(state, env);
             if (i->second.inherited)
                 v.attrs->push_back(Attr(i->first.name, state.lookupVar(&env, i->second.var), &i->second.pos));
             else
