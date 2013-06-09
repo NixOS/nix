@@ -412,7 +412,7 @@ binds
       foreach (vector<Symbol>::iterator, i, *$6) {
           if ($$->attrs.find(*i) != $$->attrs.end())
               dupAttr(*i, makeCurPos(@6, data), $$->attrs[*i].pos);
-          $$->attrs[*i] = ExprAttrs::AttrDef(new ExprSelect($4, *i), makeCurPos(@6, data));
+          $$->attrs[*i] = ExprAttrs::AttrDef(new ExprSelect($4, new AttrName(*i)), makeCurPos(@6, data));
       }
     }
   | { $$ = new ExprAttrs; }
