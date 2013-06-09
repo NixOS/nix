@@ -407,8 +407,7 @@ binds
       foreach (AttrPath::iterator, i, *$3) {
           AttrName & name = **i;
           if (name.dynamic) {
-              printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
-              abort();
+              throw ParseError("Dynamic attributes not allowed in `inherit' statements");
           }
           if ($$->attrs.find(name.nameSym) != $$->attrs.end())
               dupAttr(name.nameSym, makeCurPos(@3, data), $$->attrs[name.nameSym].pos);
@@ -422,8 +421,7 @@ binds
       foreach (AttrPath::iterator, i, *$6) {
           AttrName & name = **i;
           if (name.dynamic) {
-              printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
-              abort();
+              throw ParseError("Dynamic attributes not allowed in `inherit' statements");
           }
           if ($$->attrs.find(name.nameSym) != $$->attrs.end())
               dupAttr(name.nameSym, makeCurPos(@6, data), $$->attrs[name.nameSym].pos);
