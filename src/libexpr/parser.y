@@ -402,10 +402,15 @@ binds
   | binds INHERIT attrs ';'
     { $$ = $1;
       foreach (AttrPath::iterator, i, *$3) {
-          if ($$->attrs.find(*i) != $$->attrs.end())
-              dupAttr(*i, makeCurPos(@3, data), $$->attrs[*i].pos);
+          AttrName & name = **i;
+          if (name.dynamic) {
+              printMsg(lvlError, "Not implemented!");
+              abort();
+          }
+          if ($$->attrs.find(name.nameSym) != $$->attrs.end())
+              dupAttr(name.nameSym, makeCurPos(@3, data), $$->attrs[name.nameSym].pos);
           Pos pos = makeCurPos(@3, data);
-          $$->attrs[*i] = ExprAttrs::AttrDef(*i, pos);
+          $$->attrs[name.nameSym] = ExprAttrs::AttrDef(name.nameSym, pos);
       }
     }
   | binds INHERIT '(' expr ')' attrs ';'
