@@ -53,6 +53,7 @@ struct AttrName {
     Symbol nameSym;
     AttrName(Expr * e) : dynamic(true) {};
     AttrName(const Symbol & s) : dynamic(false), nameSym(s) {};
+    void eval(EvalState & state, Env & env);
     bool operator < (const AttrName other) const;
 };
 
