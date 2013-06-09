@@ -432,7 +432,7 @@ attr
   | OR_KW { $$ = "or"; }
   | '"' STR '"'
     { $$ = strdup(((string) ((ExprString *) $2)->s).c_str()); delete $2; }
-  | DOLLAR_CURLY expr '}' { throw ParseError("Not yet implemented"); }
+  | DOLLAR_CURLY expr '}' { $$ = new AttrName($2); }
   ;
 
 expr_list
