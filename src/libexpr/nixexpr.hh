@@ -49,6 +49,7 @@ struct EvalState;
 struct StaticEnv;
 
 struct AttrName {
+    AttrName(Expr * e) {};
 };
 
 /* An attribute path is a sequence of attribute names. */
