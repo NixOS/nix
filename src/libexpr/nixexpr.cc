@@ -150,7 +150,7 @@ string showAttrPath(const AttrPath & attrPath)
         if (name.dynamic) {
             s += name.nameSym;
         } else {
-            printMsg(lvlError, "Not implemented!");
+            printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
             abort();
         }
     }

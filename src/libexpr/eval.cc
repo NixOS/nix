@@ -618,7 +618,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             nrLookups++;
             AttrName & name = **i;
             if (name.dynamic) {
-                printMsg(lvlError, "Not implemented!");
+                printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
                 abort();
             }
             Bindings::iterator j;
@@ -664,7 +664,7 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
     foreach (AttrPath::const_iterator, i, attrPath) {
         AttrName & name = **i;
         if (name.dynamic) {
-            printMsg(lvlError, "Not implemented!");
+            printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
             abort();
         }
         state.forceValue(*vAttrs);

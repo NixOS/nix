@@ -87,7 +87,7 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
     foreach (AttrPath::const_iterator, i, attrPath) {
         AttrName & name = **i;
         if (name.dynamic) {
-            printMsg(lvlError, "Not implemented!");
+            printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
             abort();
         }
         n++;
@@ -111,7 +111,7 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
     }
     AttrName & name = *attrPath.back();
     if (name.dynamic) {
-        printMsg(lvlError, "Not implemented!");
+        printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
         abort();
     }
     e->setName(name.nameSym);
@@ -412,7 +412,7 @@ binds
       foreach (AttrPath::iterator, i, *$3) {
           AttrName & name = **i;
           if (name.dynamic) {
-              printMsg(lvlError, "Not implemented!");
+              printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
               abort();
           }
           if ($$->attrs.find(name.nameSym) != $$->attrs.end())
@@ -427,7 +427,7 @@ binds
       foreach (AttrPath::iterator, i, *$6) {
           AttrName & name = **i;
           if (name.dynamic) {
-              printMsg(lvlError, "Not implemented!");
+              printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
               abort();
           }
           if ($$->attrs.find(name.nameSym) != $$->attrs.end())
