@@ -233,7 +233,8 @@ void ExprAttrs::bindVars(const StaticEnv & env)
     
         unsigned int displ = 0;
         foreach (AttrDefs::iterator, i, attrs)
-            newEnv.vars[i->first] = i->second.displ = displ++;
+            if (!i->first.dynamic)
+                newEnv.vars[i->first.nameSym] = i->second.displ = displ++;
         
         foreach (AttrDefs::iterator, i, attrs)
             if (i->second.inherited) i->second.var.bind(env);
