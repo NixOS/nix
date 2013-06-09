@@ -354,4 +354,17 @@ string ExprLambda::showNamePos()
 }
 
 
+/* AttrNames */
+std::ostream & operator << (std::ostream & str, const AttrName & name)
+{
+    if (name.dynamic) {
+        printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
+        abort();
+    } else {
+        printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
+        abort();
+    }
+}
+
+
 }
