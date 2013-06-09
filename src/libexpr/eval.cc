@@ -515,12 +515,16 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
            environment, while the inherited attributes are evaluated
            in the original environment. */
         unsigned int displ = 0;
-        foreach (AttrDefs::iterator, i, attrs)
+        foreach (AttrDefs::iterator, i, attrs) {
+            if (i->first.dynamic) {
+                printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
+                abort();
+            }
             if (i->second.inherited) {
                 /* !!! handle overrides? */
                 Value * vAttr = state.lookupVar(&env, i->second.var);
                 env2.values[displ++] = vAttr;
-                v.attrs->push_back(Attr(i->first, vAttr, &i->second.pos));
+                v.attrs->push_back(Attr(i->first.nameSym, vAttr, &i->second.pos));
             } else {
                 Value * vAttr;
                 if (hasOverrides) {
@@ -529,8 +533,9 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
                 } else
                     vAttr = i->second.e->maybeThunk(state, env2);
                 env2.values[displ++] = vAttr;
-                v.attrs->push_back(Attr(i->first, vAttr, &i->second.pos));
+                v.attrs->push_back(Attr(i->first.nameSym, vAttr, &i->second.pos));
             }
+        }
         
         /* If the rec contains an attribute called `__overrides', then
            evaluate it, and add the attributes in that set to the rec.
