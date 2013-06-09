@@ -54,7 +54,7 @@ struct AttrName {
 };
 
 /* An attribute path is a sequence of attribute names. */
-typedef vector<Symbol> AttrPath;
+typedef vector<AttrName *> AttrPath;
 
 string showAttrPath(const AttrPath & attrPath);
 

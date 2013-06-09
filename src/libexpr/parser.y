@@ -243,7 +243,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   char * id; // !!! -> Symbol
   char * path;
   char * uri;
-  std::vector<nix::AttrName *> * attrNames;
+  nix::AttrPath * attrNames;
   std::vector<nix::Expr *> * string_parts;
 }
 
@@ -420,12 +420,12 @@ binds
 
 attrs
   : attrs attr { $$ = $1; $1->push_back($2); /* !!! dangerous */ }
-  | { $$ = new vector<AttrName *>; }
+  | { $$ = new AttrPath; }
   ;
 
 attrpath
   : attrpath '.' attr { $$ = $1; $1->push_back($3); }
-  | attr { $$ = new vector<AttrName *>; $$->push_back($1); }
+  | attr { $$ = new AttrPath; $$->push_back($1); }
   ;
 
 attr
