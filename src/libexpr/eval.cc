@@ -680,9 +680,7 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
 
     foreach (AttrPath::const_iterator, i, attrPath) {
         AttrName & name = **i;
-        if (name.dynamic) {
-            name.eval(state, env);
-        }
+        name.eval(state, env);
         state.forceValue(*vAttrs);
         Bindings::iterator j;
         if (vAttrs->type != tAttrs ||
