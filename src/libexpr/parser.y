@@ -238,6 +238,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   nix::ExprAttrs * attrs;
   nix::Formals * formals;
   nix::Formal * formal;
+  nix::AttrName * attrName;
   int n;
   char * id; // !!! -> Symbol
   char * path;
@@ -254,7 +255,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %type <formal> formal
 %type <attrNames> attrs attrpath
 %type <string_parts> string_parts ind_string_parts
-%type <id> attr
+%type <attrName> attr
 %token <id> ID ATTRPATH
 %token <e> STR IND_STR
 %token <n> INT
