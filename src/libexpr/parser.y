@@ -243,7 +243,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   char * id; // !!! -> Symbol
   char * path;
   char * uri;
-  std::vector<nix::Symbol> * attrNames;
+  std::vector<nix::AttrName *> * attrNames;
   std::vector<nix::Expr *> * string_parts;
 }
 
