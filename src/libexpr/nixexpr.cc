@@ -337,6 +337,15 @@ void ExprConcatStrings::bindVars(const StaticEnv & env)
         (*i)->bindVars(env);
 }
 
+void bindAttrPathVars(AttrPath & attrPath, const StaticEnv & env)
+{
+    foreach (AttrPath::iterator, i, attrPath) {
+        AttrName & name = **i;
+        if (name.dynamic)
+            name.expr->bindVars(env);
+    }
+}
+
 
 /* Storing function names. */
 
