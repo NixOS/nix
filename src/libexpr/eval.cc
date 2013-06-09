@@ -324,6 +324,13 @@ inline Value * EvalState::lookupVar(Env * env, const VarRef & var)
 }
 
 
+void AttrName::eval(EvalState & state, Env & env)
+{
+    printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
+    abort();
+}
+
+
 Value * EvalState::allocValue()
 {
     nrValues++;
