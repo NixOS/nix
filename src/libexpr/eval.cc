@@ -326,8 +326,13 @@ inline Value * EvalState::lookupVar(Env * env, const VarRef & var)
 
 void AttrName::eval(EvalState & state, Env & env)
 {
-    printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
-    abort();
+    if (dynamic) {
+        Value v;
+        expr->eval(state, env, v);
+        state.forceStringNoCtx(v);
+        nameSym = state.symbols.create(v.string.s);
+        dynamic = false;
+    }
 }
 
 
