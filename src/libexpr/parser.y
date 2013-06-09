@@ -106,11 +106,10 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
         }
     }
     AttrName & name = *attrPath.back();
-    if (name.dynamic) {
-        printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
-        abort();
+    /* !!! Should we try to set names for functions when the attrnames are dynamic? */
+    if (!name.dynamic) {
+        e->setName(name.nameSym);
     }
-    e->setName(name.nameSym);
 }
 
 
