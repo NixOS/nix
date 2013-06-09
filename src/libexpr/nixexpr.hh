@@ -53,6 +53,7 @@ struct AttrName {
     Symbol nameSym;
     AttrName(Expr * e) : dynamic(true) {};
     AttrName(const Symbol & s) : dynamic(false), nameSym(s) {};
+    bool operator < (AttrName other);
 };
 
 /* An attribute path is a sequence of attribute names. */
@@ -173,7 +174,7 @@ struct ExprAttrs : Expr
         AttrDef(const Symbol & name, const Pos & pos) : inherited(true), var(name), pos(pos) { };
         AttrDef() { };
     };
-    typedef std::map<Symbol, AttrDef> AttrDefs;
+    typedef std::map<AttrName, AttrDef> AttrDefs;
     AttrDefs attrs;
     ExprAttrs() : recursive(false) { };
     COMMON_METHODS
