@@ -246,9 +246,12 @@ void ExprAttrs::bindVars(const StaticEnv & env)
     }
 
     else
-        foreach (AttrDefs::iterator, i, attrs)
+        foreach (AttrDefs::iterator, i, attrs) {
+            if (i->first.dynamic)
+                i->first.expr->bindVars(env);
             if (i->second.inherited) i->second.var.bind(env);
             else i->second.e->bindVars(env);
+        }
 }
 
 void ExprList::bindVars(const StaticEnv & env)
