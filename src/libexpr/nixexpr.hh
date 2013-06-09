@@ -48,6 +48,8 @@ struct Value;
 struct EvalState;
 struct StaticEnv;
 
+struct AttrName {
+};
 
 /* An attribute path is a sequence of attribute names. */
 typedef vector<Symbol> AttrPath;
