@@ -420,12 +420,12 @@ binds
 
 attrs
   : attrs attr { $$ = $1; $1->push_back($2); /* !!! dangerous */ }
-  | { $$ = new vector<Symbol>; }
+  | { $$ = new vector<AttrName *>; }
   ;
 
 attrpath
   : attrpath '.' attr { $$ = $1; $1->push_back($3); }
-  | attr { $$ = new vector<Symbol>; $$->push_back($1); }
+  | attr { $$ = new vector<AttrName *>; $$->push_back($1); }
   ;
 
 attr
