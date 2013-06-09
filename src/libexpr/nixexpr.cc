@@ -145,8 +145,13 @@ string showAttrPath(const AttrPath & attrPath)
 {
     string s;
     foreach (AttrPath::const_iterator, i, attrPath) {
+        AttrName & name = **i;
         if (!s.empty()) s += '.';
-        s += *i;
+        if (name.dynamic) {
+            s += name.nameSym;
+        } else {
+            abort("Not implemented!");
+        }
     }
     return s;
 }
