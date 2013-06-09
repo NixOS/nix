@@ -377,7 +377,7 @@ expr_simple
   /* Let expressions `let {..., body = ...}' are just desugared
      into `(rec {..., body = ...}).body'. */
   | LET '{' binds '}'
-    { $3->recursive = true; $$ = new ExprSelect($3, data->symbols.create("body")); }
+    { $3->recursive = true; $$ = new ExprSelect($3, new AttrName(data->symbols.create("body"))); }
   | REC '{' binds '}'
     { $3->recursive = true; $$ = $3; }
   | '{' binds '}'
