@@ -616,18 +616,23 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
         
         foreach (AttrPath::const_iterator, i, attrPath) {
             nrLookups++;
+            AttrName & name = **i;
+            if (name.dynamic) {
+                printMsg(lvlError, "Not implemented!");
+                abort();
+            }
             Bindings::iterator j;
             if (def) {
                 state.forceValue(*vAttrs);
                 if (vAttrs->type != tAttrs ||
-                    (j = vAttrs->attrs->find(*i)) == vAttrs->attrs->end())
+                    (j = vAttrs->attrs->find(name.nameSym)) == vAttrs->attrs->end())
                 {
                     def->eval(state, env, v);
                     return;
                 }
             } else {
                 state.forceAttrs(*vAttrs);
-                if ((j = vAttrs->attrs->find(*i)) == vAttrs->attrs->end())
+                if ((j = vAttrs->attrs->find(name.nameSym)) == vAttrs->attrs->end())
                     throwEvalError("attribute `%1%' missing", showAttrPath(attrPath));
             }
             vAttrs = j->value;
