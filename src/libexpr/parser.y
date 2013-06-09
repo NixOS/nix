@@ -72,14 +72,6 @@ static void dupAttr(const AttrPath & attrPath, const Pos & pos, const Pos & prev
 }
  
 
-static void dupAttr(Symbol attr, const Pos & pos, const Pos & prevPos)
-{
-    AttrPath attrPath; attrPath.push_back(attr);
-    throw ParseError(format("attribute `%1%' at %2% already defined at %3%")
-        % showAttrPath(attrPath) % pos % prevPos);
-}
- 
-
 static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
     Expr * e, const Pos & pos)
 {
