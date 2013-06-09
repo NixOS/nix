@@ -674,8 +674,7 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
     foreach (AttrPath::const_iterator, i, attrPath) {
         AttrName & name = **i;
         if (name.dynamic) {
-            printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
-            abort();
+            name.eval(state, env);
         }
         state.forceValue(*vAttrs);
         Bindings::iterator j;
