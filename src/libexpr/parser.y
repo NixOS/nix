@@ -424,10 +424,15 @@ binds
   | binds INHERIT '(' expr ')' attrs ';'
     { $$ = $1;
       /* !!! Should ensure sharing of the expression in $4. */
-      foreach (vector<Symbol>::iterator, i, *$6) {
-          if ($$->attrs.find(*i) != $$->attrs.end())
-              dupAttr(*i, makeCurPos(@6, data), $$->attrs[*i].pos);
-          $$->attrs[*i] = ExprAttrs::AttrDef(new ExprSelect($4, new AttrName(*i)), makeCurPos(@6, data));
+      foreach (AttrPath::iterator, i, *$6) {
+          AttrName & name = **i;
+          if (name.dynamic) {
+              printMsg(lvlError, "Not implemented!");
+              abort();
+          }
+          if ($$->attrs.find(name.nameSym) != $$->attrs.end())
+              dupAttr(name.nameSym, makeCurPos(@6, data), $$->attrs[name.nameSym].pos);
+          $$->attrs[name.nameSym] = ExprAttrs::AttrDef(new ExprSelect($4, &name), makeCurPos(@6, data));
       }
     }
   | { $$ = new ExprAttrs; }
