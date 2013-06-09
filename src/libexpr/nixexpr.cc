@@ -277,8 +277,11 @@ void ExprLet::bindVars(const StaticEnv & env)
     StaticEnv newEnv(false, &env);
     
     unsigned int displ = 0;
-    foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs)
-        newEnv.vars[i->first] = i->second.displ = displ++;
+    foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs) {
+        // !!! Should be a parse error
+        assert(!i->first.dynamic);
+        newEnv.vars[i->first.nameSym] = i->second.displ = displ++;
+    }
     
     foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs)
         if (i->second.inherited) i->second.var.bind(env);
