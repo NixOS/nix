@@ -429,10 +429,10 @@ attrpath
   ;
 
 attr
-  : ID { $$ = new AttrName($1); }
-  | OR_KW { $$ = new AttrName("or"); }
+  : ID { $$ = new AttrName(data->symbols.create($1)); }
+  | OR_KW { $$ = new AttrName(data->symbols.create("or")); }
   | '"' STR '"'
-    { $$ = new AttrName(strdup(((string) ((ExprString *) $2)->s).c_str())); delete $2; }
+    { $$ = new AttrName(data->symbols.create(strdup(((string) ((ExprString *) $2)->s).c_str()))); delete $2; }
   | DOLLAR_CURLY expr '}' { $$ = new AttrName($2); }
   ;
 
