@@ -146,7 +146,7 @@ struct ExprSelect : Expr
     Expr * e, * def;
     AttrPath attrPath;
     ExprSelect(Expr * e, const AttrPath & attrPath, Expr * def) : e(e), def(def), attrPath(attrPath) { };
-    ExprSelect(Expr * e, const Symbol & name) : e(e), def(0) { attrPath.push_back(name); };
+    ExprSelect(Expr * e, AttrName * name) : e(e), def(0) { attrPath.push_back(name); };
     COMMON_METHODS
 };
 
