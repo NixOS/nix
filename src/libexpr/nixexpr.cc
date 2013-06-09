@@ -366,5 +366,26 @@ std::ostream & operator << (std::ostream & str, const AttrName & name)
     }
 }
 
+bool AttrName::operator < (const AttrName n) const
+{
+    if (dynamic) {
+        if (n.dynamic) {
+            printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
+            abort();
+        } else {
+            printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
+            abort();
+        }
+    } else {
+        if (n.dynamic) {
+            printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
+            abort();
+        } else {
+            printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
+            abort();
+        }
+    }
+}
+
 
 }
