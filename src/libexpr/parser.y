@@ -429,10 +429,10 @@ attrpath
   ;
 
 attr
-  : ID { $$ = $1; }
-  | OR_KW { $$ = "or"; }
+  : ID { $$ = new AttrName($1); }
+  | OR_KW { $$ = new AttrName("or"); }
   | '"' STR '"'
-    { $$ = strdup(((string) ((ExprString *) $2)->s).c_str()); delete $2; }
+    { $$ = new AttrName(strdup(((string) ((ExprString *) $2)->s).c_str())); delete $2; }
   | DOLLAR_CURLY expr '}' { $$ = new AttrName($2); }
   ;
 
