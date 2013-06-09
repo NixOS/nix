@@ -56,6 +56,8 @@ struct AttrName {
     bool operator < (AttrName other);
 };
 
+std::ostream & operator << (std::ostream & str, const AttrName & name);
+
 /* An attribute path is a sequence of attribute names. */
 typedef vector<AttrName *> AttrPath;
 
