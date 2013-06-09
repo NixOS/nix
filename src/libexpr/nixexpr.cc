@@ -381,8 +381,7 @@ bool AttrName::operator < (const AttrName n) const
             printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
             abort();
         } else {
-            printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
-            abort();
+            return nameSym < n.nameSym;
         }
     }
 }
