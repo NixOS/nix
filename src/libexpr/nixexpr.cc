@@ -143,18 +143,21 @@ std::ostream & operator << (std::ostream & str, const Pos & pos)
 
 string showAttrPath(const AttrPath & attrPath)
 {
-    string s;
+    std::ostringstream s;
+    bool first = true;
     foreach (AttrPath::const_iterator, i, attrPath) {
         AttrName & name = **i;
-        if (!s.empty()) s += '.';
+        if (!first) s << '.';
+        first = false;
         if (name.dynamic) {
-            s += name.name;
+            s << "${";
+            s << *name.expr;
+            s << "}";
         } else {
-            printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
-            abort();
+            s << name.name;
         }
     }
-    return s;
+    return s.str();
 }
 
 
