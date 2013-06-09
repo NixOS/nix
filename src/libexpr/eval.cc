@@ -639,10 +639,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
         foreach (AttrPath::const_iterator, i, attrPath) {
             nrLookups++;
             AttrName & name = **i;
-            if (name.dynamic) {
-                printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
-                abort();
-            }
+            name.eval(state, env);
             Bindings::iterator j;
             if (def) {
                 state.forceValue(*vAttrs);
