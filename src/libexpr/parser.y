@@ -86,12 +86,8 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
     unsigned int n = 0;
     foreach (AttrPath::const_iterator, i, attrPath) {
         AttrName & name = **i;
-        if (name.dynamic) {
-            printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
-            abort();
-        }
         n++;
-        ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(name.nameSym);
+        ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(name);
         if (j != attrs->attrs.end()) {
             if (!j->second.inherited) {
                 ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(j->second.e);
@@ -101,10 +97,10 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
                 dupAttr(attrPath, pos, j->second.pos);
         } else {
             if (n == attrPath.size())
-                attrs->attrs[name.nameSym] = ExprAttrs::AttrDef(e, pos);
+                attrs->attrs[name] = ExprAttrs::AttrDef(e, pos);
             else {
                 ExprAttrs * nested = new ExprAttrs;
-                attrs->attrs[name.nameSym] = ExprAttrs::AttrDef(nested, pos);
+                attrs->attrs[name] = ExprAttrs::AttrDef(nested, pos);
                 attrs = nested;
             }
         }
