@@ -220,6 +220,7 @@ void ExprVar::bindVars(const StaticEnv & env)
 
 void ExprSelect::bindVars(const StaticEnv & env)
 {
+    bindAttrPathVars(attrPath, env);
     e->bindVars(env);
     if (def) def->bindVars(env);
 }
