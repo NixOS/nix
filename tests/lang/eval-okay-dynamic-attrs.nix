@@ -9,7 +9,7 @@ in {
 
   selectOrAttrs = { }.${aString} or true;
 
-  binds = { ${aString}.${bString} = true }.a.b;
+  binds = { ${aString}.${bString} = true; }.a.b;
 
   "inherit" = let a = true; b = false; in { inherit ${aString} b; }.a;
 
