@@ -53,7 +53,7 @@ struct AttrName {
     Symbol nameSym;
     AttrName(Expr * e) : dynamic(true) {};
     AttrName(const Symbol & s) : dynamic(false), nameSym(s) {};
-    bool operator < (AttrName other);
+    bool operator < (const AttrName other) const;
 };
 
 std::ostream & operator << (std::ostream & str, const AttrName & name);
