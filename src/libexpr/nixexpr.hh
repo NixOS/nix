@@ -50,6 +50,7 @@ struct StaticEnv;
 
 struct AttrName {
     AttrName(Expr * e) {};
+    AttrName(const char * s) {};
 };
 
 /* An attribute path is a sequence of attribute names. */
