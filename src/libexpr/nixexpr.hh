@@ -49,8 +49,9 @@ struct EvalState;
 struct StaticEnv;
 
 struct AttrName {
-    AttrName(Expr * e) {};
-    AttrName(const char * s) {};
+    bool dynamic;
+    AttrName(Expr * e) : dynamic(true) {};
+    AttrName(const char * s) : dynamic(false) {};
 };
 
 /* An attribute path is a sequence of attribute names. */
