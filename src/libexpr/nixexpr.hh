@@ -64,7 +64,6 @@ std::ostream & operator << (std::ostream & str, const AttrName & name);
 typedef vector<AttrName *> AttrPath;
 
 string showAttrPath(const AttrPath & attrPath);
-void bindAttrPathVars(AttrPath & path, const StaticEnv & env);
 
 
 /* Abstract syntax of Nix expressions. */

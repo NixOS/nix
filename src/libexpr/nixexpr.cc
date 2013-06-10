@@ -220,7 +220,11 @@ void ExprVar::bindVars(const StaticEnv & env)
 
 void ExprSelect::bindVars(const StaticEnv & env)
 {
-    bindAttrPathVars(attrPath, env);
+    foreach (AttrPath::iterator, i, attrPath) {
+        AttrName & name = **i;
+        if (name.dynamic)
+            name.expr->bindVars(env);
+    }
     e->bindVars(env);
     if (def) def->bindVars(env);
 }
@@ -338,15 +342,6 @@ void ExprConcatStrings::bindVars(const StaticEnv & env)
 {
     foreach (vector<Expr *>::iterator, i, *es)
         (*i)->bindVars(env);
-}
-
-void bindAttrPathVars(AttrPath & attrPath, const StaticEnv & env)
-{
-    foreach (AttrPath::iterator, i, attrPath) {
-        AttrName & name = **i;
-        if (name.dynamic)
-            name.expr->bindVars(env);
-    }
 }
 
 
