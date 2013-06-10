@@ -11,7 +11,7 @@ in {
 
   binds = { ${aString}.${bString} = true; }.a.b;
 
-  recBinds = rec { ${aString} = true; }.a;
+  recBinds = rec { ${bString} = true; }.b;
 
   multiAttrs = { ${aString} = true; ${bString} = false; }.a;
 }
