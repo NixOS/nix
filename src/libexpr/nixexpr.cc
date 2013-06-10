@@ -384,13 +384,11 @@ bool AttrName::operator < (const AttrName & n) const
             printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
             abort();
         } else {
-            printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
-            abort();
+            return true;
         }
     } else {
         if (n.dynamic) {
-            printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
-            abort();
+            return false;
         } else {
             return name < n.name;
         }
