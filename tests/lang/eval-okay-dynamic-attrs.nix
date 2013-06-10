@@ -10,4 +10,6 @@ in {
   selectOrAttrs = { }.${aString} or true;
 
   binds = { ${aString}.${bString} = true; }.a.b;
+
+  recBinds = rec { cString = "c"; ${cString} = true; }.c;
 }
