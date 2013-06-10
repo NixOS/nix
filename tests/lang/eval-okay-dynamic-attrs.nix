@@ -11,5 +11,5 @@ in {
 
   binds = { ${aString}.${bString} = true; }.a.b;
 
-  recBinds = rec { cString = "c"; ${cString} = true; }.c;
+  recBinds = rec { ${aString} = true; }.a;
 }
