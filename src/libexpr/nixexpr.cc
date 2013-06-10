@@ -377,7 +377,7 @@ std::ostream & operator << (std::ostream & str, const AttrName & name)
     }
 }
 
-bool AttrName::operator < (const AttrName n) const
+bool AttrName::operator < (const AttrName & n) const
 {
     if (dynamic) {
         if (n.dynamic) {

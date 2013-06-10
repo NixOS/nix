@@ -55,7 +55,7 @@ struct AttrName {
     AttrName(Expr * e) : dynamic(true), expr(e) {};
     AttrName(const Symbol & s) : dynamic(false), name(s) {};
     void eval(EvalState & state, Env & env);
-    bool operator < (const AttrName other) const;
+    bool operator < (const AttrName & other) const;
 };
 
 std::ostream & operator << (std::ostream & str, const AttrName & name);
