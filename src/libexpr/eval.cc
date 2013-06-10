@@ -583,7 +583,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         foreach (AttrDefs::iterator, i, attrs) {
             AttrName name = i->first;
             name.eval(state, env);
-            if (i->first.dynamic && staticAttrs.find(name) != staticAttrs.end()) {
+            if (i->first.dynamic) {
                 AttrDefs::iterator j = staticAttrs.find(name);
                 if (j != staticAttrs.end()) {
                     std::ostringstream s; s << *i->first.expr;
