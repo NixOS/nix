@@ -381,8 +381,13 @@ bool AttrName::operator < (const AttrName & n) const
 {
     if (dynamic) {
         if (n.dynamic) {
-            printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
-            abort();
+            std::ostringstream s;
+            expr->show(s);
+            string thisString = s.str();
+            s.str("");
+            n.expr->show(s);
+            string nString = s.str();
+            return thisString < nString;
         } else {
             return true;
         }

@@ -1,1 +1,1 @@
-{ binds = true; hasAttrs = true; recBinds = true; selectAttrs = true; selectOrAttrs = true; }
+{ binds = true; hasAttrs = true; multiAttrs = true; recBinds = true; selectAttrs = true; selectOrAttrs = true; }
