@@ -528,15 +528,13 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
            in the original environment. */
         unsigned int displ = 0;
         foreach (AttrDefs::iterator, i, attrs) {
-            if (i->first.dynamic) {
-                printMsg(lvlError, format("Not implemented! File: %s line: %i") % __FILE__ % __LINE__);
-                abort();
-            }
+            AttrName name = i->first;
+            name.eval(state, env);
             if (i->second.inherited) {
                 /* !!! handle overrides? */
                 Value * vAttr = state.lookupVar(&env, i->second.var);
                 env2.values[displ++] = vAttr;
-                v.attrs->push_back(Attr(i->first.name, vAttr, &i->second.pos));
+                v.attrs->push_back(Attr(name.name, vAttr, &i->second.pos));
             } else {
                 Value * vAttr;
                 if (hasOverrides) {
@@ -545,7 +543,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
                 } else
                     vAttr = i->second.e->maybeThunk(state, env2);
                 env2.values[displ++] = vAttr;
-                v.attrs->push_back(Attr(i->first.name, vAttr, &i->second.pos));
+                v.attrs->push_back(Attr(name.name, vAttr, &i->second.pos));
             }
         }
         
