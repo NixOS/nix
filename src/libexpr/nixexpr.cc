@@ -292,7 +292,7 @@ void ExprLet::bindVars(const StaticEnv & env)
     
     unsigned int displ = 0;
     foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs) {
-        // !!! Should be a parse error
+        // Dynamic attrs in lets is a parse error
         assert(!i->first.dynamic);
         newEnv.vars[i->first.name] = i->second.displ = displ++;
     }

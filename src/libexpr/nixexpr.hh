@@ -2,6 +2,7 @@
 
 #include "value.hh"
 #include "symbol-table.hh"
+#include "util.hh"
 
 #include <map>
 
@@ -230,7 +231,11 @@ struct ExprLet : Expr
 {
     ExprAttrs * attrs;
     Expr * body;
-    ExprLet(ExprAttrs * attrs, Expr * body) : attrs(attrs), body(body) { };
+    ExprLet(ExprAttrs * attrs, Expr * body) : attrs(attrs), body(body) {
+        foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs)
+            if (i->first.dynamic)
+                throw ParseError("Dynamic attribute names not allowed in let statements");
+    };
     COMMON_METHODS
 };
 

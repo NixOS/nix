@@ -407,7 +407,7 @@ binds
       foreach (AttrPath::iterator, i, *$3) {
           AttrName & name = **i;
           if (name.dynamic) {
-              throw ParseError("Dynamic attributes not allowed in `inherit' statements");
+              throw ParseError("Dynamic attribute names not allowed in `inherit' statements");
           }
           if ($$->attrs.find(name.name) != $$->attrs.end())
               dupAttr(name.name, makeCurPos(@3, data), $$->attrs[name.name].pos);
@@ -421,7 +421,7 @@ binds
       foreach (AttrPath::iterator, i, *$6) {
           AttrName & name = **i;
           if (name.dynamic) {
-              throw ParseError("Dynamic attributes not allowed in `inherit' statements");
+              throw ParseError("Dynamic attribute names not allowed in `inherit' statements");
           }
           if ($$->attrs.find(name.name) != $$->attrs.end())
               dupAttr(name.name, makeCurPos(@6, data), $$->attrs[name.name].pos);
