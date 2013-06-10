@@ -574,11 +574,12 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 
     else {
         foreach (AttrDefs::iterator, i, attrs) {
-            ((AttrName) i->first).eval(state, env);
+            AttrName name = i->first;
+            name.eval(state, env);
             if (i->second.inherited)
-                v.attrs->push_back(Attr(i->first.name, state.lookupVar(&env, i->second.var), &i->second.pos));
+                v.attrs->push_back(Attr(name.name, state.lookupVar(&env, i->second.var), &i->second.pos));
             else
-                v.attrs->push_back(Attr(i->first.name, i->second.e->maybeThunk(state, env), &i->second.pos));
+                v.attrs->push_back(Attr(name.name, i->second.e->maybeThunk(state, env), &i->second.pos));
         }
     }
 }
