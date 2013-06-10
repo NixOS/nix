@@ -514,6 +514,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 {
     state.mkAttrs(v, attrs.size());
 
+    AttrDefs staticAttrs;
     if (recursive) {
         /* Create a new environment that contains the attributes in
            this `rec'. */
@@ -530,6 +531,15 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         foreach (AttrDefs::iterator, i, attrs) {
             AttrName name = i->first;
             name.eval(state, env);
+            if (i->first.dynamic) {
+                AttrDefs::iterator j = staticAttrs.find(name);
+                if (j != staticAttrs.end()) {
+                    std::ostringstream s; s << *i->first.expr;
+                    throw EvalError(format("attribute `${%1%}' at %2% already defined at %3%")
+                                    % s.str() % i->second.pos % j->second.pos);
+                }
+            }
+            staticAttrs[name] = i->second;
             if (i->second.inherited) {
                 /* !!! handle overrides? */
                 Value * vAttr = state.lookupVar(&env, i->second.var);
@@ -569,11 +579,19 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             v.attrs->sort();
         }
     }
-
     else {
         foreach (AttrDefs::iterator, i, attrs) {
             AttrName name = i->first;
             name.eval(state, env);
+            if (i->first.dynamic && staticAttrs.find(name) != staticAttrs.end()) {
+                AttrDefs::iterator j = staticAttrs.find(name);
+                if (j != staticAttrs.end()) {
+                    std::ostringstream s; s << *i->first.expr;
+                    throw EvalError(format("attribute `${%1%}' at %2% already defined at %3%")
+                                    % s.str() % i->second.pos % j->second.pos);
+                }
+            }
+            staticAttrs[name] = i->second;
             if (i->second.inherited)
                 v.attrs->push_back(Attr(name.name, state.lookupVar(&env, i->second.var), &i->second.pos));
             else
