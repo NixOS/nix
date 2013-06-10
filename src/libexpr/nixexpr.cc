@@ -392,11 +392,11 @@ bool AttrName::operator < (const AttrName & n) const
             string nString = s.str();
             return thisString < nString;
         } else {
-            return true;
+            return false;
         }
     } else {
         if (n.dynamic) {
-            return false;
+            return true;
         } else {
             return name < n.name;
         }
