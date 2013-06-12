@@ -273,7 +273,7 @@ struct SavingSourceAdapter : Source
 };
 
 
-static void performOp(unsigned int clientVersion,
+static void performOp(bool trusted, unsigned int clientVersion,
     Source & from, Sink & to, unsigned int op)
 {
     switch (op) {
@@ -554,7 +554,7 @@ static void performOp(unsigned int clientVersion,
                 if (name == "build-timeout")
                     string2Int(value, settings.buildTimeout);
                 else
-                    settings.set("untrusted-" + name, value);
+                    settings.set(trusted ? name : "untrusted-" + name, value);
             }
         }
         startWork();
@@ -643,7 +643,7 @@ static void performOp(unsigned int clientVersion,
 }
 
 
-static void processConnection()
+static void processConnection(bool trusted)
 {
     canSendStderr = false;
     myPid = getpid();
@@ -711,7 +711,7 @@ static void processConnection()
         opCount++;
 
         try {
-            performOp(clientVersion, from, to, op);
+            performOp(trusted, clientVersion, from, to, op);
         } catch (Error & e) {
             /* If we're not in a state were we can send replies, then
                something went wrong processing the input of the
@@ -839,6 +839,7 @@ static void daemonLoop()
             /* Get the identity of the caller, if possible. */
             uid_t clientUid = -1;
             pid_t clientPid = -1;
+            bool trusted = false;
 
 #if defined(SO_PEERCRED)
             ucred cred;
@@ -846,6 +847,7 @@ static void daemonLoop()
             if (getsockopt(remote, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) != -1) {
                 clientPid = cred.pid;
                 clientUid = cred.uid;
+                if (clientUid == 0) trusted = true;
             }
 #endif
 
@@ -879,7 +881,7 @@ static void daemonLoop()
                     /* Handle the connection. */
                     from.fd = remote;
                     to.fd = remote;
-                    processConnection();
+                    processConnection(trusted);
 
                 } catch (std::exception & e) {
                     writeToStderr("child error: " + string(e.what()) + "\n");
