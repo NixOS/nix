@@ -786,6 +786,9 @@ private:
     /* Outputs that are already valid. */
     PathSet validPaths;
 
+    /* Outputs that are corrupt or not valid. */
+    PathSet missingPaths;
+
     /* User selected for running the builder. */
     UserLock buildUser;
 
@@ -1305,6 +1308,9 @@ void DerivationGoal::tryToBuild()
         return;
     }
 
+    missingPaths = outputPaths(drv.outputs);
+    foreach (PathSet::iterator, i, validPaths) missingPaths.erase(*i);
+
     /* If any of the outputs already exist but are not valid, delete
        them. */
     foreach (DerivationOutputs::iterator, i, drv.outputs) {
@@ -1442,8 +1448,8 @@ void DerivationGoal::buildDone()
         /* Some cleanup per path.  We do this here and not in
            computeClosure() for convenience when the build has
            failed. */
-        foreach (DerivationOutputs::iterator, i, drv.outputs) {
-            Path path = i->second.path;
+        foreach (PathSet::iterator, i, missingPaths) {
+            Path path = *i;
 
             /* If the output was already valid, just skip (discard) it. */
             if (validPaths.find(path) != validPaths.end()) continue;
@@ -1671,9 +1677,7 @@ int childEntry(void * arg)
 
 void DerivationGoal::startBuilder()
 {
-    PathSet missing = outputPaths(drv.outputs);
-    foreach (PathSet::iterator, i, validPaths) missing.erase(*i);
-    startNest(nest, lvlInfo, format(repair ? "repairing path(s) %1%" : "building path(s) %1%") % showPaths(missing));
+    startNest(nest, lvlInfo, format(repair ? "repairing path(s) %1%" : "building path(s) %1%") % showPaths(missingPaths));
 
     /* Right platform? */
     if (!canBuildLocally(drv.platform))
@@ -1964,7 +1968,7 @@ void DerivationGoal::startBuilder()
         /* If we're repairing, then we don't want to delete the
            corrupt outputs in advance.  So rewrite them as well. */
         if (repair)
-            foreach (PathSet::iterator, i, missing)
+            foreach (PathSet::iterator, i, missingPaths)
                 if (worker.store.isValidPath(*i) && pathExists(*i))
                     redirectedBadOutputs[*i] = addHashRewrite(*i);
     }
@@ -2249,6 +2253,8 @@ void DerivationGoal::computeClosure()
        output paths read-only. */
     foreach (DerivationOutputs::iterator, i, drv.outputs) {
         Path path = i->second.path;
+        if (missingPaths.find(path) == missingPaths.end()) continue;
+
         if (!pathExists(path)) {
             throw BuildError(
                 format("builder for `%1%' failed to produce output path `%2%'")
@@ -2330,12 +2336,12 @@ void DerivationGoal::computeClosure()
        paths referenced by each of them.  If there are cycles in the
        outputs, this will fail. */
     ValidPathInfos infos;
-    foreach (DerivationOutputs::iterator, i, drv.outputs) {
+    foreach (PathSet::iterator, i, missingPaths) {
         ValidPathInfo info;
-        info.path = i->second.path;
-        info.hash = contentHashes[i->second.path].first;
-        info.narSize = contentHashes[i->second.path].second;
-        info.references = allReferences[i->second.path];
+        info.path = *i;
+        info.hash = contentHashes[*i].first;
+        info.narSize = contentHashes[*i].second;
+        info.references = allReferences[*i];
         info.deriver = drvPath;
         infos.push_back(info);
     }
