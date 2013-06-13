@@ -305,6 +305,10 @@ private:
 };
 
 
+typedef std::pair<dev_t, ino_t> Inode;
+typedef set<Inode> InodesSeen;
+
+
 /* "Fix", or canonicalise, the meta-data of the files in a store path
    after it has been built.  In particular:
    - the last modification date on each file is set to 1 (i.e.,
@@ -313,6 +317,7 @@ private:
      without execute permission; setuid bits etc. are cleared)
    - the owner and group are set to the Nix user and group, if we're
      in a setuid Nix installation. */
+void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen);
 void canonicalisePathMetaData(const Path & path, uid_t fromUid);
 
 void canonicaliseTimestampAndPermissions(const Path & path);

@@ -844,6 +844,11 @@ private:
     bool repair;
     map<Path, Path> redirectedBadOutputs;
 
+    /* Set of inodes seen during calls to canonicalisePathMetaData()
+       for this build's outputs.  This needs to be shared between
+       outputs to allow hard links between outputs. */
+    InodesSeen inodesSeen;
+
     /* Magic exit code denoting that setting up the child environment
        failed.  (It's possible that the child actually returns the
        exit code, but ah well.) */
@@ -1493,7 +1498,7 @@ void DerivationGoal::buildDone()
                 /* Canonicalise first.  This ensures that the path
                    we're rewriting doesn't contain a hard link to
                    /etc/shadow or something like that. */
-                canonicalisePathMetaData(path, buildUser.enabled() ? buildUser.getUID() : -1);
+                canonicalisePathMetaData(path, buildUser.enabled() ? buildUser.getUID() : -1, inodesSeen);
 
                 /* FIXME: this is in-memory. */
                 StringSink sink;
@@ -2307,7 +2312,7 @@ void DerivationGoal::computeClosure()
         /* Get rid of all weird permissions.  This also checks that
            all files are owned by the build user, if applicable. */
         canonicalisePathMetaData(path,
-            buildUser.enabled() && rewrittenPaths.find(path) == rewrittenPaths.end() ? buildUser.getUID() : -1);
+            buildUser.enabled() && rewrittenPaths.find(path) == rewrittenPaths.end() ? buildUser.getUID() : -1, inodesSeen);
 
         /* For this output path, find the references to other paths
            contained in it.  Compute the SHA-256 NAR hash at the same

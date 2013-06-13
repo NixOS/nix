@@ -500,10 +500,6 @@ void canonicaliseTimestampAndPermissions(const Path & path)
 }
 
 
-typedef std::pair<dev_t, ino_t> Inode;
-typedef set<Inode> InodesSeen;
-
-
 static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSeen & inodesSeen)
 {
     checkInterrupt();
@@ -561,10 +557,8 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
 }
 
 
-void canonicalisePathMetaData(const Path & path, uid_t fromUid)
+void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen)
 {
-    InodesSeen inodesSeen;
-
     canonicalisePathMetaData_(path, fromUid, inodesSeen);
 
     /* On platforms that don't have lchown(), the top-level path can't
@@ -577,6 +571,13 @@ void canonicalisePathMetaData(const Path & path, uid_t fromUid)
         assert(S_ISLNK(st.st_mode));
         throw Error(format("wrong ownership of top-level store path `%1%'") % path);
     }
+}
+
+
+void canonicalisePathMetaData(const Path & path, uid_t fromUid)
+{
+    InodesSeen inodesSeen;
+    canonicalisePathMetaData(path, fromUid, inodesSeen);
 }
 
 
