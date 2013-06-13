@@ -1489,6 +1489,12 @@ void DerivationGoal::buildDone()
             /* Apply hash rewriting if necessary. */
             if (!rewritesFromTmp.empty()) {
                 printMsg(lvlError, format("warning: rewriting hashes in `%1%'; cross fingers") % path);
+
+                /* Canonicalise first.  This ensures that the path
+                   we're rewriting doesn't contain a hard link to
+                   /etc/shadow or something like that. */
+                canonicalisePathMetaData(path, buildUser.enabled() ? buildUser.getUID() : -1);
+
                 /* FIXME: this is in-memory. */
                 StringSink sink;
                 dumpPath(path, sink);
