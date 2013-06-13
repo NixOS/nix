@@ -789,6 +789,9 @@ private:
     /* Outputs that are corrupt or not valid. */
     PathSet missingPaths;
 
+    /* Paths that have been subject to hash rewriting. */
+    PathSet rewrittenPaths;
+
     /* User selected for running the builder. */
     UserLock buildUser;
 
@@ -1493,6 +1496,8 @@ void DerivationGoal::buildDone()
                 sink.s = rewriteHashes(sink.s, rewritesFromTmp);
                 StringSource source(sink.s);
                 restorePath(path, source);
+
+                rewrittenPaths.insert(path);
             }
 
             /* Gain ownership of the build result using the setuid
@@ -2293,8 +2298,10 @@ void DerivationGoal::computeClosure()
                     % path % i->second.hashAlgo % printHash16or32(h) % printHash16or32(h2));
         }
 
-        /* Get rid of all weird permissions. */
-        canonicalisePathMetaData(path, buildUser.enabled() ? buildUser.getUID() : -1);
+        /* Get rid of all weird permissions.  This also checks that
+           all files are owned by the build user, if applicable. */
+        canonicalisePathMetaData(path,
+            buildUser.enabled() && rewrittenPaths.find(path) == rewrittenPaths.end() ? buildUser.getUID() : -1);
 
         /* For this output path, find the references to other paths
            contained in it.  Compute the SHA-256 NAR hash at the same
