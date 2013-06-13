@@ -1202,9 +1202,10 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 
             foreach (ValidPathInfos::const_iterator, i, infos) {
                 assert(i->hash.type == htSHA256);
-                /* !!! Maybe the registration info should be updated if the
-                   path is already valid. */
-                if (!isValidPath(i->path)) addValidPath(*i);
+                if (isValidPath(i->path))
+                    updatePathInfo(*i);
+                else
+                    addValidPath(*i);
                 paths.insert(i->path);
             }
 

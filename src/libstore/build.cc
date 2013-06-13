@@ -1673,7 +1673,7 @@ void DerivationGoal::startBuilder()
 {
     PathSet missing = outputPaths(drv.outputs);
     foreach (PathSet::iterator, i, validPaths) missing.erase(*i);
-    startNest(nest, lvlInfo, format("building path(s) %1%") % showPaths(missing));
+    startNest(nest, lvlInfo, format(repair ? "repairing path(s) %1%" : "building path(s) %1%") % showPaths(missing));
 
     /* Right platform? */
     if (!canBuildLocally(drv.platform))
