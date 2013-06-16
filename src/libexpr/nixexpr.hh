@@ -162,9 +162,13 @@ struct ExprAttrs : Expr
         Expr * e; // if not inherited
         VarRef var; // if inherited
         Pos pos;
-        unsigned int displ; // displacement
-        AttrDef(Expr * e, const Pos & pos) : inherited(false), e(e), pos(pos) { };
-        AttrDef(const Symbol & name, const Pos & pos) : inherited(true), var(name), pos(pos) { };
+        // Union because once displ is set, fromAttrPath is no longer needed
+        union {
+            unsigned int displ; // displacement
+            bool fromAttrPath; // Whether this AttrDef is generated from an a.b.c -> a = { b = { c } } desugaring
+        };
+        AttrDef(Expr * e, const Pos & pos, bool fromAttrPath = false) : inherited(false), e(e), pos(pos), fromAttrPath(fromAttrPath) { };
+        AttrDef(const Symbol & name, const Pos & pos) : inherited(true), var(name), pos(pos), fromAttrPath(false) { };
         AttrDef() { };
     };
     typedef std::map<Symbol, AttrDef> AttrDefs;

@@ -89,9 +89,8 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
         ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(*i);
         if (j != attrs->attrs.end()) {
             if (!j->second.inherited) {
-                ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(j->second.e);
-                if (!attrs2 || n == attrPath.size()) dupAttr(attrPath, pos, j->second.pos);
-                attrs = attrs2;
+                if (!j->second.fromAttrPath || n == attrPath.size()) dupAttr(attrPath, pos, j->second.pos);
+                attrs = static_cast<ExprAttrs *>(j->second.e);
             } else
                 dupAttr(attrPath, pos, j->second.pos);
         } else {
@@ -99,7 +98,7 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
                 attrs->attrs[*i] = ExprAttrs::AttrDef(e, pos);
             else {
                 ExprAttrs * nested = new ExprAttrs;
-                attrs->attrs[*i] = ExprAttrs::AttrDef(nested, pos);
+                attrs->attrs[*i] = ExprAttrs::AttrDef(nested, pos, true);
                 attrs = nested;
             }
         }
