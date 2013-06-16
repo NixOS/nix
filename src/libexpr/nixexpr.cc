@@ -131,13 +131,12 @@ void ExprConcatStrings::show(std::ostream & str)
 }
 
 
-std::ostream & operator << (std::ostream & str, const Pos & pos)
+Pos::operator string() const
 {
-    if (!pos.line)
-        str << "undefined position";
+    if (!line)
+        return "undefined position";
     else
-        str << (format("`%1%:%2%:%3%'") % pos.file % pos.line % pos.column).str();
-    return str;
+        return (format("`%1%:%2%:%3%'") % file % line % column).str();
 }
 
 

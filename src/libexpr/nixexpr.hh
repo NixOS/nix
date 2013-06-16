@@ -36,11 +36,13 @@ struct Pos
         if (line > p2.line) return false;
         return column < p2.column;
     }
+
+    operator string() const;
 };
 
 extern Pos noPos;
 
-std::ostream & operator << (std::ostream & str, const Pos & pos);
+inline std::ostream & operator << (std::ostream & str, const Pos & pos) { str << string(pos); };
 
 
 struct Env;

@@ -1,7 +1,7 @@
 all-local: config.nix
 
 files = nar.nix buildenv.nix buildenv.pl unpack-channel.nix derivation.nix fetchurl.nix \
-	imported-drv-to-derivation.nix
+	imported-drv-to-derivation.nix dynamic-attrs.nix
 
 install-exec-local:
 	$(INSTALL) -d $(DESTDIR)$(datadir)/nix/corepkgs
