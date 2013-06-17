@@ -3,15 +3,20 @@ bin_SCRIPTS = nix-collect-garbage \
   nix-install-package nix-channel nix-build \
   nix-copy-closure nix-generate-patches
 
-noinst_SCRIPTS = nix-profile.sh \
+noinst_SCRIPTS = nix-profile.sh nix-profile-multiuser.sh nix-daemon.sh \
   find-runtime-roots.pl build-remote.pl nix-reduce-build \
   copy-from-other-stores.pl nix-http-export.cgi
 
 profiledir = $(sysconfdir)/profile.d
 
+initdir = $(sysconfdir)/init.d
+
 install-exec-local: download-using-manifests.pl copy-from-other-stores.pl download-from-binary-cache.pl find-runtime-roots.pl
 	$(INSTALL) -d $(DESTDIR)$(profiledir)
 	$(INSTALL_DATA) nix-profile.sh $(DESTDIR)$(profiledir)/nix.sh
+	$(INSTALL_DATA) nix-profile-multiuser.sh $(DESTDIR)$(profiledir)/nix-multiuser.sh
+	$(INSTALL) -d $(DESTDIR)$(initdir)
+	$(INSTALL_DATA) nix-daemon.sh $(DESTDIR)$(initdir)/nix-daemon
 	$(INSTALL) -d $(DESTDIR)$(libexecdir)/nix
 	$(INSTALL_PROGRAM) find-runtime-roots.pl $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL_PROGRAM) build-remote.pl $(DESTDIR)$(libexecdir)/nix 
@@ -22,7 +27,7 @@ install-exec-local: download-using-manifests.pl copy-from-other-stores.pl downlo
 include ../substitute.mk
 
 EXTRA_DIST = nix-collect-garbage.in \
-  nix-pull.in nix-push.in nix-profile.sh.in \
+  nix-pull.in nix-push.in nix-profile.sh.in nix-profile-multiuser.sh.in nix-daemon.sh \
   nix-prefetch-url.in nix-install-package.in \
   nix-channel.in \
   nix-build.in \

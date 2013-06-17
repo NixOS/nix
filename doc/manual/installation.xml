@@ -386,7 +386,7 @@ $ chmod 1775 /nix/store
 
 </para>
 
-<para>Finally, you should tell Nix to use the build users by
+<para>You should tell Nix to use the build users by
 specifying the build users group in the <link
 linkend="conf-build-users-group"><literal>build-users-group</literal>
 option</link> in the <link linkend="sec-conf-file">Nix configuration
@@ -395,6 +395,18 @@ file</link> (usually <literal>/etc/nix/nix.conf</literal>):
 <programlisting>
 build-users-group = nixbld
 </programlisting>
+
+</para>
+
+<para>
+Finally, each individual user may also need to set up a custom user profile
+and garbarge collector root. The following commands creates per-user
+directories with the appropriate permissions:
+
+<screen>
+$ mkdir -p -m1777 /nix/var/nix/profiles/per-user
+$ mkdir -p -m1777 /nix/var/nix/gcroots/per-user
+</screen>
 
 </para>
 

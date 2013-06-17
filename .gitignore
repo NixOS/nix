@@ -48,6 +48,7 @@ Makefile.in
 
 # /scripts/
 /scripts/nix-profile.sh
+/scripts/nix-profile-multiuser.sh
 /scripts/nix-pull
 /scripts/nix-push
 /scripts/nix-switch
