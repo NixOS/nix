@@ -134,7 +134,7 @@ static Expr *buildDynamicAttrs(SymbolTable & symbols, EvalState & state, std::pa
     AttrPath path;
     foreach (std::list<ExprAttrs *>::iterator, i, binds->first)
         addAttrsAndPosition(symbols, staticSet, positions, *i, path);
-    Expr *import = new ExprVar(symbols.create("import"));
+    Expr *import = new ExprBuiltin(symbols.create("import"));
     Expr *dynamicFnsPath = new ExprPath(state.findFile("nix/dynamic-attrs.nix"));
     Expr *dynamicFns = new ExprApp(import, dynamicFnsPath);
     Expr *bindAttrs = new ExprSelect(dynamicFns, symbols.create("bindAttrs"));
@@ -372,7 +372,7 @@ expr_op
   | expr_op UPDATE expr_op { $$ = new ExprOpUpdate($1, $3); }
   | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, *$3); }
   | expr_op '?' attrpath_dynamic
-    { Expr *import = new ExprVar(data->symbols.create("import"));
+    { Expr *import = new ExprBuiltin(data->symbols.create("import"));
       Expr *dynamicFnsPath = new ExprPath(data->state.findFile("nix/dynamic-attrs.nix"));
       Expr *dynamicFns = new ExprApp(import, dynamicFnsPath);
       Expr *hasAttrs = new ExprSelect(dynamicFns, data->symbols.create("hasAttrs"));
@@ -398,7 +398,7 @@ expr_select
   : expr_simple '.' attrpath
     { $$ = new ExprSelect($1, *$3, 0); }
   | expr_simple '.' attrpath_dynamic
-    { Expr *import = new ExprVar(data->symbols.create("import"));
+    { Expr *import = new ExprBuiltin(data->symbols.create("import"));
       Expr *dynamicFnsPath = new ExprPath(data->state.findFile("nix/dynamic-attrs.nix"));
       Expr *dynamicFns = new ExprApp(import, dynamicFnsPath);
       Expr *getAttrs = new ExprSelect(dynamicFns, data->symbols.create("getAttrs"));
@@ -407,7 +407,7 @@ expr_select
   | expr_simple '.' attrpath OR_KW expr_select
     { $$ = new ExprSelect($1, *$3, $5); }
   | expr_simple '.' attrpath_dynamic OR_KW expr_select
-    { Expr *import = new ExprVar(data->symbols.create("import"));
+    { Expr *import = new ExprBuiltin(data->symbols.create("import"));
       Expr *dynamicFnsPath = new ExprPath(data->state.findFile("nix/dynamic-attrs.nix"));
       Expr *dynamicFns = new ExprApp(import, dynamicFnsPath);
       Expr *getAttrsOr = new ExprSelect(dynamicFns, data->symbols.create("getAttrsOr"));
@@ -442,7 +442,7 @@ expr_simple
          ‘abort’. */
       $$ = path2 == ""
           ? (Expr * ) new ExprApp(
-              new ExprVar(data->symbols.create("throw")),
+              new ExprBuiltin(data->symbols.create("throw")),
               new ExprString(data->symbols.create(
                       (format("file `%1%' was not found in the Nix search path (add it using $NIX_PATH or -I)") % path).str())))
           : (Expr * ) new ExprPath(path2);

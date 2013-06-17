@@ -852,6 +852,17 @@ void ExprOpNot::eval(EvalState & state, Env & env, Value & v)
 }
 
 
+void ExprBuiltin::eval(EvalState & state, Env & env, Value & v)
+{
+    // Not a hot path at all, but would be nice to access state.baseEnv directly
+    Env *baseEnv = &env;
+    while (baseEnv->up) baseEnv = baseEnv->up;
+    Bindings::iterator binding = baseEnv->values[0]->attrs->find(name);
+    assert(binding != baseEnv->values[0]->attrs->end());
+    v = *binding->value;
+}
+
+
 void ExprOpEq::eval(EvalState & state, Env & env, Value & v)
 {
     Value v1; e1->eval(state, env, v1);

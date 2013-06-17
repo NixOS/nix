@@ -121,6 +121,11 @@ void ExprOpNot::show(std::ostream & str)
     str << "! " << *e;
 }
 
+void ExprBuiltin::show(std::ostream & str)
+{
+    str << "builtins." << name;
+}
+
 void ExprConcatStrings::show(std::ostream & str)
 {
     bool first = true;
@@ -314,6 +319,10 @@ void ExprAssert::bindVars(const StaticEnv & env)
 void ExprOpNot::bindVars(const StaticEnv & env)
 {
     e->bindVars(env);
+}
+
+void ExprBuiltin::bindVars(const StaticEnv & env)
+{
 }
 
 void ExprConcatStrings::bindVars(const StaticEnv & env)
