@@ -8,6 +8,54 @@
 
 <!--==================================================================-->
 
+<section xml:id="ssec-relnotes-1.5.3"><title>Release 1.5.3 (June 17, 2013)</title>
+
+<para>This is primarily a bug fix release.  The following changes are
+noteworthy:</para>
+
+<itemizedlist>
+
+  <listitem>
+    <para>Yet another security bug involving hard links to files
+    outside the store was fixed.  This bug only affected multi-user
+    installations that do not have hard link restrictions
+    enabled.  (NixOS is thus not vulnerable.)</para>
+  </listitem>
+
+  <listitem>
+    <para>The default binary cache URL has changed from
+    <uri>http://nixos.org/binary-cache</uri> to
+    <uri>http://cache.nixos.org</uri>.  The latter is hosted on Amazon
+    CloudFront (courtesy of <link
+    xlink:href="http://www.logicblox.com/">LogicBlox</link>) and
+    should provide better performance for users in both Europe and
+    North America.</para>
+  </listitem>
+
+  <listitem>
+    <para>The binary cache substituter now prints a warning message if
+    fetching information from the cache takes more than five seconds.
+    Thus network or server problems no longer make Nix appear to just
+    hang.</para>
+  </listitem>
+
+  <listitem>
+    <para>Stack traces now show function names, e.g.
+<screen>
+while evaluating `concatMapStrings' at `<replaceable>...</replaceable>/nixpkgs/pkgs/lib/strings.nix:18:25':
+</screen>
+      Also, if a function is called with an unexpected argument, Nix
+      now shows the name of the argument.
+    </para>
+  </listitem>
+
+</itemizedlist>
+
+</section>
+
+
+<!--==================================================================-->
+
 <section xml:id="ssec-relnotes-1.5.2"><title>Release 1.5.2 (May 13, 2013)</title>
 
 <para>This is primarily a bug fix release.  It has contributions from
