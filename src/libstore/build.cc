@@ -1072,7 +1072,7 @@ void DerivationGoal::haveDerivation()
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
-    if (settings.useSubstitutes)
+    if (settings.useSubstitutes && !willBuildLocally(drv))
         foreach (PathSet::iterator, i, invalidOutputs)
             addWaitee(worker.makeSubstitutionGoal(*i, repair));
 
@@ -1273,6 +1273,12 @@ static bool canBuildLocally(const string & platform)
 }
 
 
+bool willBuildLocally(Derivation & drv)
+{
+    return drv.env["preferLocalBuild"] == "1" && canBuildLocally(drv.platform);
+}
+
+
 void DerivationGoal::tryToBuild()
 {
     trace("trying to build");
@@ -1337,11 +1343,10 @@ void DerivationGoal::tryToBuild()
 
     /* Don't do a remote build if the derivation has the attribute
        `preferLocalBuild' set. */
-    bool preferLocalBuild =
-        drv.env["preferLocalBuild"] == "1" && canBuildLocally(drv.platform);
+    bool buildLocally = willBuildLocally(drv);
 
     /* Is the build hook willing to accept this job? */
-    if (!preferLocalBuild) {
+    if (!buildLocally) {
         switch (tryBuildHook()) {
             case rpAccept:
                 /* Yes, it has started doing so.  Wait until we get
@@ -1364,7 +1369,7 @@ void DerivationGoal::tryToBuild()
        derivation prefers to be done locally, do it even if
        maxBuildJobs is 0. */
     unsigned int curBuilds = worker.getNrLocalBuilds();
-    if (curBuilds >= settings.maxBuildJobs && !(preferLocalBuild && curBuilds == 0)) {
+    if (curBuilds >= settings.maxBuildJobs && !(buildLocally && curBuilds == 0)) {
         worker.waitForBuildSlot(shared_from_this());
         outputLocks.unlock();
         return;
