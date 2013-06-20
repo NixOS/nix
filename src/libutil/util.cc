@@ -790,6 +790,7 @@ void Pid::kill()
 
 int Pid::wait(bool block)
 {
+    assert(pid != -1);
     while (1) {
         int status;
         int res = waitpid(pid, &status, block ? 0 : WNOHANG);

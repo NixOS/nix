@@ -317,8 +317,10 @@ LocalStore::~LocalStore()
 {
     try {
         foreach (RunningSubstituters::iterator, i, runningSubstituters) {
+            if (i->second.disabled) continue;
             i->second.to.close();
             i->second.from.close();
+            i->second.error.close();
             i->second.pid.wait(true);
         }
     } catch (...) {
@@ -998,7 +1000,7 @@ void LocalStore::setSubstituterEnv()
 
 void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter & run)
 {
-    if (run.pid != -1) return;
+    if (run.disabled || run.pid != -1) return;
 
     debug(format("starting substituter program `%1%'") % substituter);
 
@@ -1039,6 +1041,23 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
     run.to = toPipe.writeSide.borrow();
     run.from = run.fromBuf.fd = fromPipe.readSide.borrow();
     run.error = errorPipe.readSide.borrow();
+
+    toPipe.readSide.close();
+    fromPipe.writeSide.close();
+    errorPipe.writeSide.close();
+
+    /* The substituter may exit right away if it's disabled in any way
+       (e.g. copy-from-other-stores.pl will exit if no other stores
+       are configured). */
+    try {
+        getLineFromSubstituter(run);
+    } catch (EndOfFile & e) {
+        run.to.close();
+        run.from.close();
+        run.error.close();
+        run.disabled = true;
+        if (run.pid.wait(true) != 0) throw;
+    }
 }
 
 
@@ -1052,6 +1071,8 @@ string LocalStore::getLineFromSubstituter(RunningSubstituter & run)
     if (run.fromBuf.hasData()) goto haveData;
 
     while (1) {
+        checkInterrupt();
+
         fd_set fds;
         FD_ZERO(&fds);
         FD_SET(run.from, &fds);
@@ -1072,7 +1093,7 @@ string LocalStore::getLineFromSubstituter(RunningSubstituter & run)
                 if (errno == EINTR) continue;
                 throw SysError("reading from substituter's stderr");
             }
-            if (n == 0) throw Error(format("substituter `%1%' died unexpectedly") % run.program);
+            if (n == 0) throw EndOfFile(format("substituter `%1%' died unexpectedly") % run.program);
             err.append(buf, n);
             string::size_type p;
             while ((p = err.find('\n')) != string::npos) {
@@ -1114,6 +1135,7 @@ PathSet LocalStore::querySubstitutablePaths(const PathSet & paths)
         if (res.size() == paths.size()) break;
         RunningSubstituter & run(runningSubstituters[*i]);
         startSubstituter(*i, run);
+        if (run.disabled) continue;
         string s = "have ";
         foreach (PathSet::const_iterator, j, paths)
             if (res.find(*j) == res.end()) { s += *j; s += " "; }
@@ -1137,6 +1159,7 @@ void LocalStore::querySubstitutablePathInfos(const Path & substituter,
 {
     RunningSubstituter & run(runningSubstituters[substituter]);
     startSubstituter(substituter, run);
+    if (run.disabled) return;
 
     string s = "info ";
     foreach (PathSet::const_iterator, i, paths)

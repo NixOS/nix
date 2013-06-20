@@ -1,4 +1,5 @@
 #! /bin/sh -e
+echo
 echo substituter2 args: $* >&2
 
 if test $1 = "--query"; then

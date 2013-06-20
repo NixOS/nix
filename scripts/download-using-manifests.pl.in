@@ -22,6 +22,8 @@ my $curl = "$Nix::Config::curl --fail --location --insecure";
 
 # Open the manifest cache and update it if necessary.
 my $dbh = updateManifestDB();
+exit 0 unless defined $dbh; # exit if there are no manifests
+print "\n";
 
 
 # $hashCache->{$algo}->{$path} yields the $algo-hash of $path.

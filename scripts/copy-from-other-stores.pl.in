@@ -16,6 +16,9 @@ foreach my $dir (@remoteStoresAll) {
     push @remoteStores, glob($dir);
 }
 
+exit if scalar @remoteStores == 0;
+print "\n";
+
 
 $ENV{"NIX_REMOTE"} = "";
 

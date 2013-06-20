@@ -227,6 +227,9 @@ sub writeManifest {
 sub updateManifestDB {
     my $manifestDir = $Nix::Config::manifestDir;
 
+    my @manifests = glob "$manifestDir/*.nixmanifest";
+    return undef if scalar @manifests == 0;
+
     mkpath($manifestDir);
 
     unlink "$manifestDir/cache.sqlite"; # remove obsolete cache
@@ -311,7 +314,7 @@ EOF
     # unless we've already done so on a previous run.
     my %seen;
 
-    for my $manifestLink (glob "$manifestDir/*.nixmanifest") {
+    for my $manifestLink (@manifests) {
         my $manifest = Cwd::abs_path($manifestLink);
         next unless -f $manifest;
         my $timestamp = lstat($manifest)->mtime;

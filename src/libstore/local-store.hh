@@ -48,6 +48,8 @@ struct RunningSubstituter
     Pid pid;
     AutoCloseFD to, from, error;
     FdSource fromBuf;
+    bool disabled;
+    RunningSubstituter() : disabled(false) { };
 };
 
 
