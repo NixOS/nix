@@ -380,10 +380,10 @@ void LocalStore::openDB(bool create)
         sqlite3_exec(db, ("pragma main.journal_mode = " + mode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
         throwSQLiteError(db, "setting journal mode");
 
-    /* Increase the auto-checkpoint interval to 8192 pages.  This
+    /* Increase the auto-checkpoint interval to 40000 pages.  This
        seems enough to ensure that instantiating the NixOS system
        derivation is done in a single fsync(). */
-    if (mode == "wal" && sqlite3_exec(db, "pragma wal_autocheckpoint = 8192;", 0, 0, 0) != SQLITE_OK)
+    if (mode == "wal" && sqlite3_exec(db, "pragma wal_autocheckpoint = 40000;", 0, 0, 0) != SQLITE_OK)
         throwSQLiteError(db, "setting autocheckpoint interval");
 
     /* Initialise the database schema, if necessary. */
