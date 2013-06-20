@@ -70,8 +70,10 @@ void Settings::processEnvironment()
 
     string subs = getEnv("NIX_SUBSTITUTERS", "default");
     if (subs == "default") {
+#if 0
         if (getEnv("NIX_OTHER_STORES") != "")
             substituters.push_back(nixLibexecDir + "/nix/substituters/copy-from-other-stores.pl");
+#endif
         substituters.push_back(nixLibexecDir + "/nix/substituters/download-using-manifests.pl");
         substituters.push_back(nixLibexecDir + "/nix/substituters/download-from-binary-cache.pl");
     } else
