@@ -32,7 +32,7 @@ void queryMissing(StoreAPI & store, const PathSet & targets,
     PathSet & willBuild, PathSet & willSubstitute, PathSet & unknown,
     unsigned long long & downloadSize, unsigned long long & narSize);
 
-bool willBuildLocally(Derivation & drv);
+bool willBuildLocally(const Derivation & drv);
 
 
 }

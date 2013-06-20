@@ -1263,6 +1263,13 @@ PathSet outputPaths(const DerivationOutputs & outputs)
 }
 
 
+static string get(const StringPairs & map, const string & key)
+{
+    StringPairs::const_iterator i = map.find(key);
+    return i == map.end() ? (string) "" : i->second;
+}
+
+
 static bool canBuildLocally(const string & platform)
 {
     return platform == settings.thisSystem
@@ -1273,9 +1280,9 @@ static bool canBuildLocally(const string & platform)
 }
 
 
-bool willBuildLocally(Derivation & drv)
+bool willBuildLocally(const Derivation & drv)
 {
-    return drv.env["preferLocalBuild"] == "1" && canBuildLocally(drv.platform);
+    return get(drv.env, "preferLocalBuild") == "1" && canBuildLocally(drv.platform);
 }
 
 
@@ -1610,7 +1617,7 @@ HookReply DerivationGoal::tryBuildHook()
     /* Tell the hook about system features (beyond the system type)
        required from the build machine.  (The hook could parse the
        drv file itself, but this is easier.) */
-    Strings features = tokenizeString<Strings>(drv.env["requiredSystemFeatures"]);
+    Strings features = tokenizeString<Strings>(get(drv.env, "requiredSystemFeatures"));
     foreach (Strings::iterator, i, features) checkStoreName(*i); /* !!! abuse */
 
     /* Send the request to the hook. */
@@ -1768,7 +1775,7 @@ void DerivationGoal::startBuilder()
        fixed-output derivations is by definition pure (since we
        already know the cryptographic hash of the output). */
     if (fixedOutput) {
-        Strings varNames = tokenizeString<Strings>(drv.env["impureEnvVars"]);
+        Strings varNames = tokenizeString<Strings>(get(drv.env, "impureEnvVars"));
         foreach (Strings::iterator, i, varNames) env[*i] = getEnv(*i);
     }
 
@@ -1779,7 +1786,7 @@ void DerivationGoal::startBuilder()
        temporary build directory.  The text files have the format used
        by `nix-store --register-validity'.  However, the deriver
        fields are left empty. */
-    string s = drv.env["exportReferencesGraph"];
+    string s = get(drv.env, "exportReferencesGraph");
     Strings ss = tokenizeString<Strings>(s);
     if (ss.size() % 2 != 0)
         throw BuildError(format("odd number of tokens in `exportReferencesGraph': `%1%'") % s);
@@ -1865,7 +1872,7 @@ void DerivationGoal::startBuilder()
     if (fixedOutput) useChroot = false;
 
     /* Hack to allow derivations to disable chroot builds. */
-    if (drv.env["__noChroot"] == "1") useChroot = false;
+    if (get(drv.env, "__noChroot") == "1") useChroot = false;
 
     if (useChroot) {
 #if CHROOT_ENABLED
@@ -2344,7 +2351,7 @@ void DerivationGoal::computeClosure()
            refer to), check that all references are in that list.  !!!
            allowedReferences should really be per-output. */
         if (drv.env.find("allowedReferences") != drv.env.end()) {
-            PathSet allowed = parseReferenceSpecifiers(drv, drv.env["allowedReferences"]);
+            PathSet allowed = parseReferenceSpecifiers(drv, get(drv.env, "allowedReferences"));
             foreach (PathSet::iterator, i, references)
                 if (allowed.find(*i) == allowed.end())
                     throw BuildError(format("output is not allowed to refer to path `%1%'") % *i);
