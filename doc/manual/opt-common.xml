@@ -181,7 +181,7 @@
   from, say, a network repository.  If the repository is down, the
   realisation of the derivation will fail.  When this option is
   specified, Nix will build the derivation instead.  Thus,
-  installation from binaries falls back on nstallation from source.
+  installation from binaries falls back on installation from source.
   This option is not the default since it is generally not desirable
   for a transient failure in obtaining the substitutes to lead to a
   full build from source (with the related consumption of
