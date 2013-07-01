@@ -513,8 +513,9 @@ sub downloadBinary {
         next unless defined $info;
 
         my $decompressor;
-        if ($info->{compression} eq "bzip2") { $decompressor = "$Nix::Config::bzip2 -d"; }
-        elsif ($info->{compression} eq "xz") { $decompressor = "$Nix::Config::xz -d"; }
+        if ($info->{compression} eq "bzip2") { $decompressor = "| $Nix::Config::bzip2 -d"; }
+        elsif ($info->{compression} eq "xz") { $decompressor = "| $Nix::Config::xz -d"; }
+        elsif ($info->{compression} eq "none") { $decompressor = ""; }
         else {
             print STDERR "unknown compression method ‘$info->{compression}’\n";
             next;
@@ -522,7 +523,7 @@ sub downloadBinary {
         my $url = "$cache->{url}/$info->{url}"; # FIXME: handle non-relative URLs
         print STDERR "\n*** Downloading ‘$url’ to ‘$storePath’...\n";
         checkURL $url;
-        if (system("$Nix::Config::curl --fail --location --insecure '$url' | $decompressor | $Nix::Config::binDir/nix-store --restore $destPath") != 0) {
+        if (system("$Nix::Config::curl --fail --location --insecure '$url' $decompressor | $Nix::Config::binDir/nix-store --restore $destPath") != 0) {
             warn "download of `$url' failed" . ($! ? ": $!" : "") . "\n";
             next;
         }

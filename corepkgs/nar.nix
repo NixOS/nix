@@ -6,25 +6,28 @@ let
     ''
       export PATH=${nixBinDir}:${coreutils}
 
-      if [ $compressionType = "xz" ]; then
-        ext=xz
-        compressor="${xz} -9"
+      if [ $compressionType = xz ]; then
+        ext=.xz
+        compressor="| ${xz} -9"
+      elif [ $compressionType = bzip2 ]; then
+        ext=.bz2
+        compressor="| ${bzip2}"
       else
-        ext=bz2
-        compressor="${bzip2}"
+        ext=
+        compressor=
       fi
 
       echo "packing ‘$storePath’..."
       mkdir $out
-      dst=$out/tmp.nar.$ext
+      dst=$out/tmp.nar$ext
 
       set -o pipefail
-      nix-store --dump "$storePath" | $compressor > $dst
+      eval "nix-store --dump \"$storePath\" $compressor > $dst"
 
       hash=$(nix-hash --flat --type $hashAlgo --base32 $dst)
       echo -n $hash > $out/nar-compressed-hash
 
-      mv $dst $out/$hash.nar.$ext
+      mv $dst $out/$hash.nar$ext
     '';
 
 in

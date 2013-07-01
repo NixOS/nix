@@ -20,6 +20,7 @@
     <command>nix-push</command>
     <arg choice='plain'><option>--dest</option> <replaceable>dest-dir</replaceable></arg>
     <arg><option>--bzip2</option></arg>
+    <arg><option>--none</option></arg>
     <arg><option>--force</option></arg>
     <arg><option>--link</option></arg>
     <arg><option>--manifest</option></arg>
@@ -103,6 +104,12 @@ automatically.</para>
     30% better on typical archives, decompresses about twice as fast,
     but compresses a lot slower and is not supported by Nix prior to
     version 1.2.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--none</option></term>
+
+    <listitem><para>Do not compress NARs.</para></listitem>
 
   </varlistentry>
 

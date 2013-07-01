@@ -47,7 +47,7 @@ clearStore
 nix-build --option binary-caches "file://$cacheDir" dependencies.nix --dry-run # get info
 
 mkdir $cacheDir/tmp
-mv $cacheDir/*.nar.xz $cacheDir/tmp/
+mv $cacheDir/*.nar* $cacheDir/tmp/
 
 NIX_DEBUG_SUBST=1 nix-build --option binary-caches "file://$cacheDir" dependencies.nix -o $TEST_ROOT/result --fallback
 
