@@ -30,7 +30,7 @@ sub findStorePath {
         next unless -e $sourcePath || -l $sourcePath;
         $ENV{"NIX_DB_DIR"} = "$store/var/nix/db";
         return ($store, $sourcePath) if
-            system("@bindir@/nix-store --check-validity $storePath") == 0;
+            system("$binDir/nix-store --check-validity $storePath") == 0;
     }
     return undef;
 }
@@ -56,16 +56,16 @@ if ($ARGV[0] eq "--query") {
 
                 $ENV{"NIX_DB_DIR"} = "$store/var/nix/db";
 
-                my $deriver = `@bindir@/nix-store --query --deriver $storePath`;
+                my $deriver = `$binDir/nix-store --query --deriver $storePath`;
                 die "cannot query deriver of `$storePath'" if $? != 0;
                 chomp $deriver;
                 $deriver = "" if $deriver eq "unknown-deriver";
 
                 my @references = split "\n",
-                    `@bindir@/nix-store --query --references $storePath`;
+                    `$binDir/nix-store --query --references $storePath`;
                 die "cannot query references of `$storePath'" if $? != 0;
 
-                my $narSize = `@bindir@/nix-store --query --size $storePath`;
+                my $narSize = `$binDir/nix-store --query --size $storePath`;
                 die "cannot query size of `$storePath'" if $? != 0;
                 chomp $narSize;
 
