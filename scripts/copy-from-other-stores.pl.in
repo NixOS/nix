@@ -73,7 +73,7 @@ if ($ARGV[0] eq "--query") {
                 print "$deriver\n";
                 print scalar @references, "\n";
                 print "$_\n" foreach @references;
-                print "$narSize\n";
+                print "0\n";
                 print "$narSize\n";
             }
 
