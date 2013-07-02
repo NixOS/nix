@@ -324,6 +324,18 @@ inline Value * EvalState::lookupVar(Env * env, const VarRef & var)
 }
 
 
+void AttrName::eval(EvalState & state, Env & env)
+{
+    if (dynamic) {
+        Value v;
+        expr->eval(state, env, v);
+        state.forceStringNoCtx(v);
+        name = state.symbols.create(v.string.s);
+        dynamic = false;
+    }
+}
+
+
 Value * EvalState::allocValue()
 {
     nrValues++;
@@ -502,6 +514,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 {
     state.mkAttrs(v, attrs.size());
 
+    AttrDefs staticAttrs;
     if (recursive) {
         /* Create a new environment that contains the attributes in
            this `rec'. */
@@ -515,12 +528,23 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
            environment, while the inherited attributes are evaluated
            in the original environment. */
         unsigned int displ = 0;
-        foreach (AttrDefs::iterator, i, attrs)
+        foreach (AttrDefs::iterator, i, attrs) {
+            AttrName name = i->first;
+            name.eval(state, env);
+            if (i->first.dynamic) {
+                AttrDefs::iterator j = staticAttrs.find(name);
+                if (j != staticAttrs.end()) {
+                    std::ostringstream s; s << *i->first.expr;
+                    throw EvalError(format("attribute `${%1%}' at %2% already defined at %3%")
+                                    % s.str() % i->second.pos % j->second.pos);
+                }
+            }
+            staticAttrs[name] = i->second;
             if (i->second.inherited) {
                 /* !!! handle overrides? */
                 Value * vAttr = state.lookupVar(&env, i->second.var);
                 env2.values[displ++] = vAttr;
-                v.attrs->push_back(Attr(i->first, vAttr, &i->second.pos));
+                v.attrs->push_back(Attr(name.name, vAttr, &i->second.pos));
             } else {
                 Value * vAttr;
                 if (hasOverrides) {
@@ -529,8 +553,9 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
                 } else
                     vAttr = i->second.e->maybeThunk(state, env2);
                 env2.values[displ++] = vAttr;
-                v.attrs->push_back(Attr(i->first, vAttr, &i->second.pos));
+                v.attrs->push_back(Attr(name.name, vAttr, &i->second.pos));
             }
+        }
         
         /* If the rec contains an attribute called `__overrides', then
            evaluate it, and add the attributes in that set to the rec.
@@ -554,13 +579,24 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             v.attrs->sort();
         }
     }
-
     else {
-        foreach (AttrDefs::iterator, i, attrs)
+        foreach (AttrDefs::iterator, i, attrs) {
+            AttrName name = i->first;
+            name.eval(state, env);
+            if (i->first.dynamic) {
+                AttrDefs::iterator j = staticAttrs.find(name);
+                if (j != staticAttrs.end()) {
+                    std::ostringstream s; s << *i->first.expr;
+                    throw EvalError(format("attribute `${%1%}' at %2% already defined at %3%")
+                                    % s.str() % i->second.pos % j->second.pos);
+                }
+            }
+            staticAttrs[name] = i->second;
             if (i->second.inherited)
-                v.attrs->push_back(Attr(i->first, state.lookupVar(&env, i->second.var), &i->second.pos));
+                v.attrs->push_back(Attr(name.name, state.lookupVar(&env, i->second.var), &i->second.pos));
             else
-                v.attrs->push_back(Attr(i->first, i->second.e->maybeThunk(state, env), &i->second.pos));
+                v.attrs->push_back(Attr(name.name, i->second.e->maybeThunk(state, env), &i->second.pos));
+        }
     }
 }
 
@@ -616,18 +652,20 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
         
         foreach (AttrPath::const_iterator, i, attrPath) {
             nrLookups++;
+            AttrName & name = **i;
+            name.eval(state, env);
             Bindings::iterator j;
             if (def) {
                 state.forceValue(*vAttrs);
                 if (vAttrs->type != tAttrs ||
-                    (j = vAttrs->attrs->find(*i)) == vAttrs->attrs->end())
+                    (j = vAttrs->attrs->find(name.name)) == vAttrs->attrs->end())
                 {
                     def->eval(state, env, v);
                     return;
                 }
             } else {
                 state.forceAttrs(*vAttrs);
-                if ((j = vAttrs->attrs->find(*i)) == vAttrs->attrs->end())
+                if ((j = vAttrs->attrs->find(name.name)) == vAttrs->attrs->end())
                     throwEvalError("attribute `%1%' missing", showAttrPath(attrPath));
             }
             vAttrs = j->value;
@@ -657,10 +695,12 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
     e->eval(state, env, vTmp);
 
     foreach (AttrPath::const_iterator, i, attrPath) {
+        AttrName & name = **i;
+        name.eval(state, env);
         state.forceValue(*vAttrs);
         Bindings::iterator j;
         if (vAttrs->type != tAttrs ||
-            (j = vAttrs->attrs->find(*i)) == vAttrs->attrs->end())
+            (j = vAttrs->attrs->find(name.name)) == vAttrs->attrs->end())
         {
             mkBool(v, false);
             return;

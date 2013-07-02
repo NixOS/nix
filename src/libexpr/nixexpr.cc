@@ -143,12 +143,21 @@ std::ostream & operator << (std::ostream & str, const Pos & pos)
 
 string showAttrPath(const AttrPath & attrPath)
 {
-    string s;
+    std::ostringstream s;
+    bool first = true;
     foreach (AttrPath::const_iterator, i, attrPath) {
-        if (!s.empty()) s += '.';
-        s += *i;
+        AttrName & name = **i;
+        if (!first) s << '.';
+        first = false;
+        if (name.dynamic) {
+            s << "${";
+            s << *name.expr;
+            s << "}";
+        } else {
+            s << name.name;
+        }
     }
-    return s;
+    return s.str();
 }
 
 
@@ -211,6 +220,11 @@ void ExprVar::bindVars(const StaticEnv & env)
 
 void ExprSelect::bindVars(const StaticEnv & env)
 {
+    foreach (AttrPath::iterator, i, attrPath) {
+        AttrName & name = **i;
+        if (name.dynamic)
+            name.expr->bindVars(env);
+    }
     e->bindVars(env);
     if (def) def->bindVars(env);
 }
@@ -227,17 +241,24 @@ void ExprAttrs::bindVars(const StaticEnv & env)
     
         unsigned int displ = 0;
         foreach (AttrDefs::iterator, i, attrs)
-            newEnv.vars[i->first] = i->second.displ = displ++;
+            if (!i->first.dynamic)
+                newEnv.vars[i->first.name] = i->second.displ = displ++;
         
-        foreach (AttrDefs::iterator, i, attrs)
+        foreach (AttrDefs::iterator, i, attrs) {
+            if (i->first.dynamic)
+                i->first.expr->bindVars(env);
             if (i->second.inherited) i->second.var.bind(env);
             else i->second.e->bindVars(newEnv);
+        }
     }
 
     else
-        foreach (AttrDefs::iterator, i, attrs)
+        foreach (AttrDefs::iterator, i, attrs) {
+            if (i->first.dynamic)
+                i->first.expr->bindVars(env);
             if (i->second.inherited) i->second.var.bind(env);
             else i->second.e->bindVars(env);
+        }
 }
 
 void ExprList::bindVars(const StaticEnv & env)
@@ -270,8 +291,11 @@ void ExprLet::bindVars(const StaticEnv & env)
     StaticEnv newEnv(false, &env);
     
     unsigned int displ = 0;
-    foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs)
-        newEnv.vars[i->first] = i->second.displ = displ++;
+    foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs) {
+        // Dynamic attrs in lets is a parse error
+        assert(!i->first.dynamic);
+        newEnv.vars[i->first.name] = i->second.displ = displ++;
+    }
     
     foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs)
         if (i->second.inherited) i->second.var.bind(env);
@@ -341,6 +365,39 @@ void ExprLambda::setName(Symbol & name)
 string ExprLambda::showNamePos()
 {
     return (format("%1% at %2%") % (name.set() ? "`" + (string) name + "'" : "an anonymous function") % pos).str();
+}
+
+
+/* AttrNames */
+std::ostream & operator << (std::ostream & str, const AttrName & name)
+{
+    if (name.dynamic)
+        str << "${" << *name.expr << "}";
+    else
+        str << name.name;
+}
+
+bool AttrName::operator < (const AttrName & n) const
+{
+    if (dynamic) {
+        if (n.dynamic) {
+            std::ostringstream s;
+            expr->show(s);
+            string thisString = s.str();
+            s.str("");
+            n.expr->show(s);
+            string nString = s.str();
+            return thisString < nString;
+        } else {
+            return false;
+        }
+    } else {
+        if (n.dynamic) {
+            return true;
+        } else {
+            return name < n.name;
+        }
+    }
 }
 
 

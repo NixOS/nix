@@ -74,7 +74,7 @@ static void dupAttr(const AttrPath & attrPath, const Pos & pos, const Pos & prev
 
 static void dupAttr(Symbol attr, const Pos & pos, const Pos & prevPos)
 {
-    AttrPath attrPath; attrPath.push_back(attr);
+    AttrPath attrPath; attrPath.push_back(new AttrName(attr));
     throw ParseError(format("attribute `%1%' at %2% already defined at %3%")
         % showAttrPath(attrPath) % pos % prevPos);
 }
@@ -85,8 +85,9 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
 {
     unsigned int n = 0;
     foreach (AttrPath::const_iterator, i, attrPath) {
+        AttrName & name = **i;
         n++;
-        ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(*i);
+        ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(name);
         if (j != attrs->attrs.end()) {
             if (!j->second.inherited) {
                 ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(j->second.e);
@@ -96,15 +97,19 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
                 dupAttr(attrPath, pos, j->second.pos);
         } else {
             if (n == attrPath.size())
-                attrs->attrs[*i] = ExprAttrs::AttrDef(e, pos);
+                attrs->attrs[name] = ExprAttrs::AttrDef(e, pos);
             else {
                 ExprAttrs * nested = new ExprAttrs;
-                attrs->attrs[*i] = ExprAttrs::AttrDef(nested, pos);
+                attrs->attrs[name] = ExprAttrs::AttrDef(nested, pos);
                 attrs = nested;
             }
         }
     }
-    e->setName(attrPath.back());
+    AttrName & name = *attrPath.back();
+    /* !!! Should we try to set names for functions when the attrnames are dynamic? */
+    if (!name.dynamic) {
+        e->setName(name.name);
+    }
 }
 
 
@@ -238,11 +243,12 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   nix::ExprAttrs * attrs;
   nix::Formals * formals;
   nix::Formal * formal;
+  nix::AttrName * attrName;
   int n;
   char * id; // !!! -> Symbol
   char * path;
   char * uri;
-  std::vector<nix::Symbol> * attrNames;
+  nix::AttrPath * attrNames;
   std::vector<nix::Expr *> * string_parts;
 }
 
@@ -254,7 +260,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %type <formal> formal
 %type <attrNames> attrs attrpath
 %type <string_parts> string_parts ind_string_parts
-%type <id> attr
+%type <attrName> attr
 %token <id> ID ATTRPATH
 %token <e> STR IND_STR
 %token <n> INT
@@ -374,7 +380,7 @@ expr_simple
   /* Let expressions `let {..., body = ...}' are just desugared
      into `(rec {..., body = ...}).body'. */
   | LET '{' binds '}'
-    { $3->recursive = true; $$ = new ExprSelect($3, data->symbols.create("body")); }
+    { $3->recursive = true; $$ = new ExprSelect($3, new AttrName(data->symbols.create("body"))); }
   | REC '{' binds '}'
     { $3->recursive = true; $$ = $3; }
   | '{' binds '}'
@@ -399,39 +405,48 @@ binds
   | binds INHERIT attrs ';'
     { $$ = $1;
       foreach (AttrPath::iterator, i, *$3) {
-          if ($$->attrs.find(*i) != $$->attrs.end())
-              dupAttr(*i, makeCurPos(@3, data), $$->attrs[*i].pos);
+          AttrName & name = **i;
+          if (name.dynamic) {
+              throw ParseError("Dynamic attribute names not allowed in `inherit' statements");
+          }
+          if ($$->attrs.find(name.name) != $$->attrs.end())
+              dupAttr(name.name, makeCurPos(@3, data), $$->attrs[name.name].pos);
           Pos pos = makeCurPos(@3, data);
-          $$->attrs[*i] = ExprAttrs::AttrDef(*i, pos);
+          $$->attrs[name.name] = ExprAttrs::AttrDef(name.name, pos);
       }
     }
   | binds INHERIT '(' expr ')' attrs ';'
     { $$ = $1;
       /* !!! Should ensure sharing of the expression in $4. */
-      foreach (vector<Symbol>::iterator, i, *$6) {
-          if ($$->attrs.find(*i) != $$->attrs.end())
-              dupAttr(*i, makeCurPos(@6, data), $$->attrs[*i].pos);
-          $$->attrs[*i] = ExprAttrs::AttrDef(new ExprSelect($4, *i), makeCurPos(@6, data));
+      foreach (AttrPath::iterator, i, *$6) {
+          AttrName & name = **i;
+          if (name.dynamic) {
+              throw ParseError("Dynamic attribute names not allowed in `inherit' statements");
+          }
+          if ($$->attrs.find(name.name) != $$->attrs.end())
+              dupAttr(name.name, makeCurPos(@6, data), $$->attrs[name.name].pos);
+          $$->attrs[name.name] = ExprAttrs::AttrDef(new ExprSelect($4, &name), makeCurPos(@6, data));
       }
     }
   | { $$ = new ExprAttrs; }
   ;
 
 attrs
-  : attrs attr { $$ = $1; $1->push_back(data->symbols.create($2)); /* !!! dangerous */ }
-  | { $$ = new vector<Symbol>; }
+  : attrs attr { $$ = $1; $1->push_back($2); /* !!! dangerous */ }
+  | { $$ = new AttrPath; }
   ;
 
 attrpath
-  : attrpath '.' attr { $$ = $1; $1->push_back(data->symbols.create($3)); }
-  | attr { $$ = new vector<Symbol>; $$->push_back(data->symbols.create($1)); }
+  : attrpath '.' attr { $$ = $1; $1->push_back($3); }
+  | attr { $$ = new AttrPath; $$->push_back($1); }
   ;
 
 attr
-  : ID { $$ = $1; }
-  | OR_KW { $$ = "or"; }
+  : ID { $$ = new AttrName(data->symbols.create($1)); }
+  | OR_KW { $$ = new AttrName(data->symbols.create("or")); }
   | '"' STR '"'
-    { $$ = strdup(((string) ((ExprString *) $2)->s).c_str()); delete $2; }
+    { $$ = new AttrName(data->symbols.create(strdup(((string) ((ExprString *) $2)->s).c_str()))); delete $2; }
+  | DOLLAR_CURLY expr '}' { $$ = new AttrName($2); }
   ;
 
 expr_list

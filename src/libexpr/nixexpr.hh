@@ -2,6 +2,7 @@
 
 #include "value.hh"
 #include "symbol-table.hh"
+#include "util.hh"
 
 #include <map>
 
@@ -48,9 +49,20 @@ struct Value;
 struct EvalState;
 struct StaticEnv;
 
+struct AttrName {
+    bool dynamic;
+    Symbol name;
+    Expr * expr;
+    AttrName(Expr * e) : dynamic(true), expr(e) {};
+    AttrName(const Symbol & s) : dynamic(false), name(s) {};
+    void eval(EvalState & state, Env & env);
+    bool operator < (const AttrName & other) const;
+};
+
+std::ostream & operator << (std::ostream & str, const AttrName & name);
 
 /* An attribute path is a sequence of attribute names. */
-typedef vector<Symbol> AttrPath;
+typedef vector<AttrName *> AttrPath;
 
 string showAttrPath(const AttrPath & attrPath);
 
@@ -142,7 +154,7 @@ struct ExprSelect : Expr
     Expr * e, * def;
     AttrPath attrPath;
     ExprSelect(Expr * e, const AttrPath & attrPath, Expr * def) : e(e), def(def), attrPath(attrPath) { };
-    ExprSelect(Expr * e, const Symbol & name) : e(e), def(0) { attrPath.push_back(name); };
+    ExprSelect(Expr * e, AttrName * name) : e(e), def(0) { attrPath.push_back(name); };
     COMMON_METHODS
 };
 
@@ -167,7 +179,7 @@ struct ExprAttrs : Expr
         AttrDef(const Symbol & name, const Pos & pos) : inherited(true), var(name), pos(pos) { };
         AttrDef() { };
     };
-    typedef std::map<Symbol, AttrDef> AttrDefs;
+    typedef std::map<AttrName, AttrDef> AttrDefs;
     AttrDefs attrs;
     ExprAttrs() : recursive(false) { };
     COMMON_METHODS
@@ -219,7 +231,11 @@ struct ExprLet : Expr
 {
     ExprAttrs * attrs;
     Expr * body;
-    ExprLet(ExprAttrs * attrs, Expr * body) : attrs(attrs), body(body) { };
+    ExprLet(ExprAttrs * attrs, Expr * body) : attrs(attrs), body(body) {
+        foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs)
+            if (i->first.dynamic)
+                throw ParseError("Dynamic attribute names not allowed in let statements");
+    };
     COMMON_METHODS
 };
 
