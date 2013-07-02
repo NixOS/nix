@@ -45,24 +45,41 @@ static void prim_import(EvalState & state, Value * * args, Value & v)
 
     foreach (PathSet::iterator, i, context) {
         Path ctx = decodeContext(*i).first;
+        string outputName = decodeContext(*i).second;
         assert(isStorePath(ctx));
-        if (!store->isValidPath(ctx))
-            throw EvalError(format("cannot import `%1%', since path `%2%' is not valid")
-                % path % ctx);
-        if (isDerivation(ctx))
-            try {
-                /* For performance, prefetch all substitute info. */
-                PathSet willBuild, willSubstitute, unknown;
-                unsigned long long downloadSize, narSize;
-                queryMissing(*store, singleton<PathSet>(ctx),
-                    willBuild, willSubstitute, unknown, downloadSize, narSize);
+        if (!store->isValidPath(ctx)) {
+            if (outputName.empty())
+                throw EvalError(format("cannot import `%1%', since path `%2%' is not valid")
+                    % path % ctx);
+            else
+                throw ImportReadOnlyError(format("cannot import `%1%', since path `%2%' cannot be written to the store in read-only mode")
+                    % path % ctx);
+        }
+        if (isDerivation(ctx)) {
+            Derivation drv = derivationFromPath(*store, ctx);
+
+            if (outputName.empty() ||
+                    !store->isValidPath(drv.outputs[outputName].path)) {
+                if (settings.readOnlyMode)
+                    foreach (DerivationOutputs::iterator, j, drv.outputs)
+                        if (!store->isValidPath(j->second.path))
+                            throw ImportReadOnlyError(format("cannot import `%1%', since derivation `%2%' cannot be realised in read-only mode")
+                                % path % ctx);
+                try {
+                    /* For performance, prefetch all substitute info. */
+                    PathSet willBuild, willSubstitute, unknown;
+                    unsigned long long downloadSize, narSize;
+                    queryMissing(*store, singleton<PathSet>(ctx),
+                        willBuild, willSubstitute, unknown, downloadSize, narSize);
                   
-                /* !!! If using a substitute, we only need to fetch
-                   the selected output of this derivation. */
-                store->buildPaths(singleton<PathSet>(ctx));
-            } catch (Error & e) {
-                throw ImportError(e.msg());
+                    /* !!! If using a substitute, we only need to fetch
+                       the selected output of this derivation. */
+                    store->buildPaths(singleton<PathSet>(ctx));
+                } catch (Error & e) {
+                    throw ImportError(e.msg());
+                }
             }
+        }
     }
 
     if (isStorePath(path) && store->isValidPath(path) && isDerivation(path)) {
