@@ -74,6 +74,15 @@ struct Attr
 
 void mkString(Value & v, const string & s, const PathSet & context = PathSet());
 
+void mkLambda(Value & v,
+        Env * env,
+        Pos & pos,
+        const Symbol & arg,
+        bool matchAttrs,
+        Formals * formals,
+        Expr * body
+        );
+
 void copyContext(const Value & v, PathSet & context);
 
 

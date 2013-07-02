@@ -304,6 +304,21 @@ void mkPath(Value & v, const char * s)
 }
 
 
+void mkLambda(Value & v,
+        Env * env,
+        Pos & pos,
+        const Symbol & arg,
+        bool matchAttrs,
+        Formals * formals,
+        Expr * body
+        )
+{
+    v.type = tLambda;
+    v.lambda.env = env;
+    v.lambda.fun = NEW ExprLambda(pos, arg, matchAttrs, formals, body);
+}
+
+
 inline Value * EvalState::lookupVar(Env * env, const VarRef & var)
 {
     for (unsigned int l = var.level; l; --l, env = env->up) ;

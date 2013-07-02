@@ -842,11 +842,13 @@ static void prim_intersectAttrs(EvalState & state, Value * * args, Value & v)
 
 
 /* Return a set containing the names of the formal arguments expected
-   by the function `f'.  The value of each attribute is a Boolean
-   denoting whether has a default value.  For instance,
+   by the function `f'.  The value of each attribute is either null if
+   the argument has no default value, or a function with the same
+   formal arguments and defaults as `f' but whose body is the default
+   value of that argument.  For instance,
 
-      functionArgs ({ x, y ? 123}: ...)
-   => { x = false; y = true; }
+      functionArgs ({ x, y ? 123, z ? y}: ...)
+   => { x = null; y = {x, y ? 123, z ? y}: 123; z = {x, y ? 123, z ? y}: y; }
 
    "Formal argument" here refers to the attributes pattern-matched by
    the function.  Plain lambdas are not included, e.g.
@@ -866,9 +868,22 @@ static void prim_functionArgs(EvalState & state, Value * * args, Value & v)
     }
 
     state.mkAttrs(v, args[0]->lambda.fun->formals->formals.size());
-    foreach (Formals::Formals_::iterator, i, args[0]->lambda.fun->formals->formals)
-        // !!! should optimise booleans (allocate only once)
-        mkBool(*state.allocAttr(v, i->name), i->def);
+    ExprLambda *fun = args[0]->lambda.fun;
+    foreach (Formals::Formals_::iterator, i, fun->formals->formals) {
+        Value & w = *state.allocAttr(v, i->name);
+        if (i->def)
+            mkLambda(
+                    w,
+                    args[0]->lambda.env,
+                    fun->pos,
+                    fun->arg,
+                    fun->matchAttrs,
+                    fun->formals,
+                    i->def
+                    );
+        else
+            w.type = tNull;
+    }
     v.attrs->sort();
 }
 
