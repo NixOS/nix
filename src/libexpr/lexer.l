@@ -113,8 +113,6 @@ or          { return OR_KW; }
               return INT;
             }
 
-\$\{        { return DOLLAR_CURLY; }
-
 \"          { BEGIN(STRING); return '"'; }
 <STRING>([^\$\"\\]|\$[^\{\"]|\\.)+ {
               /* !!! Not quite right: we want a follow restriction on

@@ -288,6 +288,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %union {
   // !!! We're probably leaking stuff here.  
   nix::Expr * e;
+  nix::ExprString * s;
   nix::ExprList * list;
   nix::ExprAttrs * attrs;
   std::pair<std::list<nix::ExprAttrs *>,nix::ExprList *> * attrs_dynamic;
@@ -310,7 +311,9 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %type <formal> formal
 %type <attrNames> attrs attrpath
 %type <list> attrpath_dynamic attrpath_dynamic_recursive
-%type <string_parts> string_parts ind_string_parts
+%type <e> string_parts attr_dynamic
+%type <string_parts> interpolated_string_parts ind_string_parts
+%type <s> plain_string_parts
 %type <id> attr
 %token <id> ID ATTRPATH
 %token <e> STR IND_STR
@@ -423,12 +426,7 @@ expr_select
 expr_simple
   : ID { $$ = new ExprVar(data->symbols.create($1)); }
   | INT { $$ = new ExprInt($1); }
-  | '"' string_parts '"' {
-      /* For efficiency, and to simplify parse trees a bit. */
-      if ($2->empty()) $$ = new ExprString(data->symbols.create(""));
-      else if ($2->size() == 1) $$ = $2->front();
-      else $$ = new ExprConcatStrings(true, $2);
-  }
+  | '"' string_parts '"' { $$ = $2; }
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
       $$ = stripIndentation(data->symbols, *$2);
   }
@@ -467,9 +465,24 @@ expr_simple
   ;
 
 string_parts
-  : string_parts STR { $$ = $1; $1->push_back($2); }
-  | string_parts DOLLAR_CURLY expr '}' { backToString(scanner); $$ = $1; $1->push_back($3); }
-  | { $$ = new vector<Expr *>; }
+  : plain_string_parts
+  | interpolated_string_parts { $$ = new ExprConcatStrings(true, $1); }
+  ;
+
+interpolated_string_parts
+  : interpolated_string_parts STR { $$ = $1; $1->push_back($2); }
+  | interpolated_string_parts DOLLAR_CURLY expr '}' { backToString(scanner); $$ = $1; $1->push_back($3); }
+  | plain_string_parts DOLLAR_CURLY expr '}'
+    { backToString(scanner);
+      $$ = new vector<Expr *>;
+      $1->s.empty() ? delete $1 : $$->push_back($1);
+      $$->push_back($3);
+    }
+  ;
+
+plain_string_parts
+  : STR { $$ = static_cast<ExprString *>($1); }
+  | { $$ = new ExprString(data->symbols.create("")); }
   ;
 
 ind_string_parts
@@ -529,20 +542,20 @@ attrpath_dynamic
   ;
 
 attrpath_dynamic_recursive
-  : attrpath_dynamic_recursive '.' DOLLAR_CURLY expr '}' { $$ = $1; $$->elems.push_back($4); }
-  | attrpath_dynamic_recursive '.' attrpath '.' DOLLAR_CURLY expr '}'
+  : attrpath_dynamic_recursive '.' attr_dynamic { $$ = $1; $$->elems.push_back($3); }
+  | attrpath_dynamic_recursive '.' attrpath '.' attr_dynamic
     { $$ = $1;
       foreach (vector<Symbol>::const_iterator, i, *$3)
           $$->elems.push_back(new ExprString(*i));
-      $$->elems.push_back($6);
+      $$->elems.push_back($5);
     }
-  | DOLLAR_CURLY expr '}' { $$ = new ExprList; $$->elems.push_back($2); }
-  | attrpath '.' DOLLAR_CURLY expr '}'
+  | attr_dynamic { $$ = new ExprList; $$->elems.push_back($1); }
+  | attrpath '.' attr_dynamic
     { $$ = new ExprList;
       foreach (vector<Symbol>::const_iterator, i, *$1)
           $$->elems.push_back(new ExprString(*i));
       delete $1;
-      $$->elems.push_back($4);
+      $$->elems.push_back($3);
     }
   ;
 
@@ -559,8 +572,12 @@ attrpath
 attr
   : ID { $$ = $1; }
   | OR_KW { $$ = "or"; }
-  | '"' STR '"'
-    { $$ = strdup(((string) ((ExprString *) $2)->s).c_str()); delete $2; }
+  | '"' plain_string_parts '"'
+    { $$ = strdup(((string) $2->s).c_str()); delete $2; }
+  ;
+
+attr_dynamic
+  : '"' interpolated_string_parts '"' { $$ = new ExprConcatStrings(true, $2); }
   ;
 
 expr_list

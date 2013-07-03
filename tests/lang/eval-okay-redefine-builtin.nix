@@ -1,3 +1,3 @@
 let
   import = abort "Error!";
-in { ${"a"} = true; }.a
+in { "${"a"}" = true; }.a
