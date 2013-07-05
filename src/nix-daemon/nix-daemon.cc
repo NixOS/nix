@@ -25,8 +25,13 @@ using namespace nix;
    that lack it, we only notice the disconnection the next time we try
    to write to the client.  So if you have a builder that never
    generates output on stdout/stderr, the daemon will never notice
-   that the client has disconnected until the builder terminates. */
-#ifdef O_ASYNC
+   that the client has disconnected until the builder terminates.
+
+   GNU/Hurd does have O_ASYNC, but its Unix-domain socket translator
+   (pflocal) does not implement F_SETOWN.  See
+   <http://lists.gnu.org/archive/html/bug-guix/2013-07/msg00021.html> for
+   details.*/
+#if defined O_ASYNC && !defined __GNU__
 #define HAVE_HUP_NOTIFICATION
 #ifndef SIGPOLL
 #define SIGPOLL SIGIO
