@@ -213,7 +213,6 @@ my @inputs = split /\s/, readline(STDIN);
 my @outputs = split /\s/, readline(STDIN);
 
 
-print STDERR "building `$drvPath' on `$hostName'\n";
 print STDERR "@ build-remote $drvPath $hostName\n" if $printBuildTrace;
 
 
@@ -272,6 +271,7 @@ my $buildFlags =
 # is interrupted unless the `-tt' flag is used to force a pseudo-tty,
 # in which case every child receives SIGHUP; however, `-tt' doesn't
 # work on some platforms when connection sharing is used.)
+print STDERR "building `$drvPath' on `$hostName'\n";
 pipe STDIN, DUMMY; # make sure we have a readable STDIN
 if (system("exec ssh $hostName @sshOpts '(read; kill -INT -\$\$) <&0 & exec nix-store -r $drvPath $buildFlags > /dev/null' 2>&4") != 0) {
     # Note that if we get exit code 100 from `nix-store -r', it
