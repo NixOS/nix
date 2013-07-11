@@ -3,6 +3,7 @@
 use strict;
 use Nix::Config;
 use Nix::Store;
+use Nix::Utils;
 use File::Temp qw(tempdir);
 
 
@@ -15,7 +16,7 @@ my @buildArgs = ();
 my @exprs = ();
 
 my $shell = $ENV{SHELL} || "/bin/sh";
-my $envCommand = "p=\$PATH; source \$stdenv/setup; PATH=\$PATH:\$p; exec $shell";
+my $envCommand = ""; # interactive shell
 my @envExclude = ();
 
 
@@ -124,7 +125,7 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
     elsif ($arg eq "--command") {
         $n++;
         die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
-        $envCommand = $ARGV[$n];
+        $envCommand = "$ARGV[$n]\nexit $!";
     }
 
     elsif ($arg eq "--exclude") {
@@ -169,15 +170,23 @@ foreach my $expr (@exprs) {
 
         # Set the environment.
         $ENV{'NIX_BUILD_TOP'} = $ENV{'TMPDIR'} || "/tmp";
-        foreach (keys %{$drv->{env}}) {
-            $ENV{$_} = $drv->{env}->{$_};
-        }
+        $ENV{$_} = $drv->{env}->{$_} foreach keys %{$drv->{env}};
 
         # Run a shell using the derivation's environment.  For
         # convenience, source $stdenv/setup to setup additional
-        # environment variables.  Also don't lose the current $PATH
-        # directories.
-        exec($ENV{SHELL}, "-c", $envCommand);
+        # environment variables and shell functions.  Also don't lose
+        # the current $PATH directories.
+        my $rcfile = "$tmpDir/rc";
+        writeFile(
+            $rcfile,
+            '[ -e ~/.bashrc ] && source ~/.bashrc; ' .
+            'p=$PATH; ' .
+            '[ -e $stdenv/setup ] && source $stdenv/setup; ' .
+            'PATH=$PATH:$p; ' .
+            'set +e; ' .
+            'PS1="\n\[\033[1;32m\][nix-build:\w]$\[\033[0m\] "; ' .
+            $envCommand);
+        exec($ENV{SHELL}, "--rcfile", $rcfile);
         die;
     }
 

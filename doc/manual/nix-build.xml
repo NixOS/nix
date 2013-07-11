@@ -79,8 +79,9 @@ or renamed.  So don’t rename the symlink.</para></warning>
 the dependencies of the derivation, but not the derivation itself.  It
 will then start an interactive shell in which all environment
 variables defined by the derivation have been set to their
-corresponding values.  This is useful for reproducing the environment
-of a derivation for development.</para>
+corresponding values, and the script <literal>$stdenv/setup</literal>
+has been sourced.  This is useful for reproducing the environment of a
+derivation for development.</para>
 
 </refsection>
 
@@ -144,9 +145,9 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 
   <varlistentry><term><option>--command</option> <replaceable>cmd</replaceable></term>
 
-    <listitem><para>In the environment of the derivation, executeq the
-    command <replaceable>cmd</replaceable> instead of the default
-    interactive shell.</para></listitem>
+    <listitem><para>In the environment of the derivation, run the
+    shell command <replaceable>cmd</replaceable> instead of starting
+    an interactive shell.</para></listitem>
 
   </varlistentry>
 
@@ -181,10 +182,10 @@ interactive shell in which to build it:
 
 <screen>
 $ nix-build '&lt;nixpkgs>' --run-env -A pan
-$ tar xf $src
+$ unpackPhase
 $ cd pan-*
-$ ./configure
-$ make
+$ configurePhase
+$ buildPhase
 $ ./pan/gui/pan
 </screen>
 
