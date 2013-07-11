@@ -186,7 +186,7 @@ foreach my $expr (@exprs) {
             'set +e; ' .
             'PS1="\n\[\033[1;32m\][nix-build:\w]$\[\033[0m\] "; ' .
             $envCommand);
-        exec($ENV{SHELL}, "--rcfile", $rcfile);
+        exec($ENV{NIX_BUILD_SHELL} // "bash", "--rcfile", $rcfile);
         die;
     }
 
