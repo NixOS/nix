@@ -27,11 +27,9 @@ init-state:
 	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix/profiles
 	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix/gcroots
 	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix/temproots
-	ln -sfn $(localstatedir)/nix/profiles $(DESTDIR)$(localstatedir)/nix/gcroots/profiles
 	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix/userpool
 	-$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(storedir)
 	$(INSTALL) $(INIT_FLAGS) $(GROUP_WRITABLE) -d $(DESTDIR)$(localstatedir)/nix/manifests
-	ln -sfn $(localstatedir)/nix/manifests $(DESTDIR)$(localstatedir)/nix/gcroots/manifests
 
 else
 

@@ -18,10 +18,7 @@ GCOptions::GCOptions()
 
 bool isInStore(const Path & path)
 {
-    return path[0] == '/'
-        && string(path, 0, settings.nixStore.size()) == settings.nixStore
-        && path.size() >= settings.nixStore.size() + 2
-        && path[settings.nixStore.size()] == '/';
+    return isInDir(path, settings.nixStore);
 }
 
 
