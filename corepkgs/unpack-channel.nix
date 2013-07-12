@@ -10,7 +10,7 @@ let
       gzpat="\.gz\$"
       if [[ "$src" =~ $xzpat ]]; then
         ${xz} -d < $src | ${tar} xf - ${tarFlags}
-      else if [[ "$src" =~ $gzpat ]]; then
+      elif [[ "$src" =~ $gzpat ]]; then
         ${gzip} -d < $src | ${tar} xf - ${tarFlags}
       else
         ${bzip2} -d < $src | ${tar} xf - ${tarFlags}
