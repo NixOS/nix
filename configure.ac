@@ -183,10 +183,10 @@ NEED_PROG(perl, perl)
 NEED_PROG(sed, sed)
 NEED_PROG(tar, tar)
 NEED_PROG(bzip2, bzip2)
+NEED_PROG(gzip, gzip)
 NEED_PROG(xz, xz)
 AC_PATH_PROG(dot, dot)
 AC_PATH_PROG(dblatex, dblatex)
-AC_PATH_PROG(gzip, gzip)
 AC_PATH_PROG(pv, pv, pv)
 
 

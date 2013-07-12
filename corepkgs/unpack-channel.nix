@@ -6,9 +6,12 @@ let
     ''
       mkdir $out
       cd $out
-      pat="\.xz\$"
-      if [[ "$src" =~ $pat ]]; then
+      xzpat="\.xz\$"
+      gzpat="\.gz\$"
+      if [[ "$src" =~ $xzpat ]]; then
         ${xz} -d < $src | ${tar} xf - ${tarFlags}
+      else if [[ "$src" =~ $gzpat ]]; then
+        ${gzip} -d < $src | ${tar} xf - ${tarFlags}
       else
         ${bzip2} -d < $src | ${tar} xf - ${tarFlags}
       fi
