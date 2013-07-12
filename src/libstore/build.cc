@@ -2117,11 +2117,19 @@ void DerivationGoal::initChild()
                filesystem that we want in the chroot
                environment. */
             foreach (DirsInChroot::iterator, i, dirsInChroot) {
+                struct stat st;
                 Path source = i->second;
                 Path target = chrootRootDir + i->first;
                 if (source == "/proc") continue; // backwards compatibility
                 debug(format("bind mounting `%1%' to `%2%'") % source % target);
-                createDirs(target);
+                if (stat(source.c_str(), &st) == -1)
+                    throw SysError(format("getting attributes of path `%1%'") % source);
+                if (S_ISDIR(st.st_mode))
+                    createDirs(target);
+                else {
+                    createDirs(dirOf(target));
+                    writeFile(target, "");
+                }
                 if (mount(source.c_str(), target.c_str(), "", MS_BIND, 0) == -1)
                     throw SysError(format("bind mount from `%1%' to `%2%' failed") % source % target);
             }
