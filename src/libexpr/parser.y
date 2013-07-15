@@ -402,7 +402,7 @@ binds
           if ($$->attrs.find(*i) != $$->attrs.end())
               dupAttr(*i, makeCurPos(@3, data), $$->attrs[*i].pos);
           Pos pos = makeCurPos(@3, data);
-          $$->attrs[*i] = ExprAttrs::AttrDef(*i, pos);
+          $$->attrs[*i] = ExprAttrs::AttrDef(new ExprVar(*i), pos, true);
       }
     }
   | binds INHERIT '(' expr ')' attrs ';'

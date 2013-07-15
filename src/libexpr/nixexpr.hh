@@ -159,12 +159,10 @@ struct ExprAttrs : Expr
     bool recursive;
     struct AttrDef {
         bool inherited;
-        Expr * e; // if not inherited
-        VarRef var; // if inherited
+        Expr * e;
         Pos pos;
         unsigned int displ; // displacement
-        AttrDef(Expr * e, const Pos & pos) : inherited(false), e(e), pos(pos) { };
-        AttrDef(const Symbol & name, const Pos & pos) : inherited(true), var(name), pos(pos) { };
+        AttrDef(Expr * e, const Pos & pos, bool inherited=false) : inherited(inherited), e(e), pos(pos) { };
         AttrDef() { };
     };
     typedef std::map<Symbol, AttrDef> AttrDefs;
