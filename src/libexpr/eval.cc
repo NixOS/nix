@@ -521,23 +521,17 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
            environment, while the inherited attributes are evaluated
            in the original environment. */
         unsigned int displ = 0;
-        foreach (AttrDefs::iterator, i, attrs)
-            if (i->second.inherited) {
-                /* !!! handle overrides? */
-                Value * vAttr = state.lookupVar(&env, i->second.var);
-                env2.values[displ++] = vAttr;
-                v.attrs->push_back(Attr(i->first, vAttr, &i->second.pos));
-            } else {
-                Value * vAttr;
-                if (hasOverrides) {
-                    vAttr = state.allocValue();
-                    mkThunk(*vAttr, env2, i->second.e);
-                } else
-                    vAttr = i->second.e->maybeThunk(state, env2);
-                env2.values[displ++] = vAttr;
-                v.attrs->push_back(Attr(i->first, vAttr, &i->second.pos));
-            }
-        
+        foreach (AttrDefs::iterator, i, attrs) {
+            Value * vAttr;
+            if (hasOverrides && !i->second.inherited) {
+                vAttr = state.allocValue();
+                mkThunk(*vAttr, env2, i->second.e);
+            } else
+                vAttr = i->second.e->maybeThunk(state, i->second.inherited ? env : env2);
+            env2.values[displ++] = vAttr;
+            v.attrs->push_back(Attr(i->first, vAttr, &i->second.pos));
+        }
+
         /* If the rec contains an attribute called `__overrides', then
            evaluate it, and add the attributes in that set to the rec.
            This allows overriding of recursive attributes, which is
@@ -563,10 +557,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 
     else {
         foreach (AttrDefs::iterator, i, attrs)
-            if (i->second.inherited)
-                v.attrs->push_back(Attr(i->first, state.lookupVar(&env, i->second.var), &i->second.pos));
-            else
-                v.attrs->push_back(Attr(i->first, i->second.e->maybeThunk(state, env), &i->second.pos));
+            v.attrs->push_back(Attr(i->first, i->second.e->maybeThunk(state, env), &i->second.pos));
     }
 }
 
@@ -583,10 +574,7 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
        environment. */
     unsigned int displ = 0;
     foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs)
-        if (i->second.inherited)
-            env2.values[displ++] = state.lookupVar(&env, i->second.var);
-        else
-            env2.values[displ++] = i->second.e->maybeThunk(state, env2);
+        env2.values[displ++] = i->second.e->maybeThunk(state, i->second.inherited ? env : env2);
 
     body->eval(state, env2, v);
 }
@@ -602,7 +590,7 @@ void ExprList::eval(EvalState & state, Env & env, Value & v)
 
 void ExprVar::eval(EvalState & state, Env & env, Value & v)
 {
-    Value * v2 = state.lookupVar(&env, info);
+    Value * v2 = state.lookupVar(&env, info, false);
     state.forceValue(*v2);
     v = *v2;
 }

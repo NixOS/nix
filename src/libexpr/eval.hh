@@ -206,7 +206,7 @@ private:
     void addPrimOp(const string & name,
         unsigned int arity, PrimOpFun primOp);
 
-    inline Value * lookupVar(Env * env, const VarRef & var, bool noEval = false);
+    inline Value * lookupVar(Env * env, const VarRef & var, bool noEval);
     
     friend class ExprVar;
     friend class ExprAttrs;

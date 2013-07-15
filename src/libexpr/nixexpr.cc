@@ -230,14 +230,12 @@ void ExprAttrs::bindVars(const StaticEnv & env)
             newEnv.vars[i->first] = i->second.displ = displ++;
         
         foreach (AttrDefs::iterator, i, attrs)
-            if (i->second.inherited) i->second.var.bind(env);
-            else i->second.e->bindVars(newEnv);
+            i->second.e->bindVars(i->second.inherited ? env : newEnv);
     }
 
     else
         foreach (AttrDefs::iterator, i, attrs)
-            if (i->second.inherited) i->second.var.bind(env);
-            else i->second.e->bindVars(env);
+            i->second.e->bindVars(env);
 }
 
 void ExprList::bindVars(const StaticEnv & env)
@@ -274,8 +272,7 @@ void ExprLet::bindVars(const StaticEnv & env)
         newEnv.vars[i->first] = i->second.displ = displ++;
     
     foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs)
-        if (i->second.inherited) i->second.var.bind(env);
-        else i->second.e->bindVars(newEnv);
+        i->second.e->bindVars(i->second.inherited ? env : newEnv);
     
     body->bindVars(newEnv);
 }
