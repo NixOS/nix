@@ -53,6 +53,7 @@ struct Env
 {
     Env * up;
     unsigned int prevWith; // nr of levels up to next `with' environment
+    Expr * withAttrs;
     Value * values[0];
 };
 

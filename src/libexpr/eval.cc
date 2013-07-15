@@ -310,6 +310,10 @@ inline Value * EvalState::lookupVar(Env * env, const VarRef & var)
     
     if (var.fromWith) {
         while (1) {
+            if (env->values[0] == NULL) {
+                env->values[0] = allocValue();
+                evalAttrs(*env->up, env->withAttrs, *env->values[0]);
+            }
             Bindings::iterator j = env->values[0]->attrs->find(var.name);
             if (j != env->values[0]->attrs->end()) {
                 if (countCalls && j->pos) attrSelects[*j->pos]++;
@@ -337,7 +341,7 @@ Env & EvalState::allocEnv(unsigned int size)
     nrValuesInEnvs += size;
     Env * env = (Env *) GC_MALLOC(sizeof(Env) + size * sizeof(Value *));
 
-    /* Clear the values because maybeThunk() expects this. */
+    /* Clear the values because maybeThunk() and lookupVar fromWith expects this. */
     for (unsigned i = 0; i < size; ++i)
         env->values[i] = 0;
     
@@ -405,10 +409,12 @@ unsigned long nrAvoided = 0;
 
 Value * ExprVar::maybeThunk(EvalState & state, Env & env)
 {
-    Value * v = state.lookupVar(&env, info);
-    /* The value might not be initialised in the environment yet.
-       In that case, ignore it. */
-    if (v) { nrAvoided++; return v; }
+    if (!info.fromWith) {
+        Value * v = state.lookupVar(&env, info);
+        /* The value might not be initialised in the environment yet.
+           In that case, ignore it. */
+        if (v) { nrAvoided++; return v; }
+    }
     return Expr::maybeThunk(state, env);
 }
 
@@ -825,8 +831,7 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
     env2.up = &env;
     env2.prevWith = prevWith;
 
-    env2.values[0] = state.allocValue();
-    state.evalAttrs(env, attrs, *env2.values[0]);
+    env2.withAttrs = attrs;
 
     body->eval(state, env2, v);
 }
