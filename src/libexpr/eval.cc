@@ -304,13 +304,15 @@ void mkPath(Value & v, const char * s)
 }
 
 
-inline Value * EvalState::lookupVar(Env * env, const VarRef & var)
+inline Value * EvalState::lookupVar(Env * env, const VarRef & var, bool noEval)
 {
     for (unsigned int l = var.level; l; --l, env = env->up) ;
     
     if (var.fromWith) {
         while (1) {
             if (env->values[0] == NULL) {
+                if (noEval)
+                    return NULL;
                 env->values[0] = allocValue();
                 evalAttrs(*env->up, env->withAttrs, *env->values[0]);
             }
@@ -409,12 +411,10 @@ unsigned long nrAvoided = 0;
 
 Value * ExprVar::maybeThunk(EvalState & state, Env & env)
 {
-    if (!info.fromWith) {
-        Value * v = state.lookupVar(&env, info);
-        /* The value might not be initialised in the environment yet.
-           In that case, ignore it. */
-        if (v) { nrAvoided++; return v; }
-    }
+    Value * v = state.lookupVar(&env, info, true);
+    /* The value might not be initialised in the environment yet.
+       In that case, ignore it. */
+    if (v) { nrAvoided++; return v; }
     return Expr::maybeThunk(state, env);
 }
 
