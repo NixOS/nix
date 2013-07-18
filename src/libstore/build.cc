@@ -695,7 +695,9 @@ HookInstance::HookInstance()
                 throw SysError("dupping builder's stdout/stderr");
 
             execl(buildHook.c_str(), buildHook.c_str(), settings.thisSystem.c_str(),
+                (format("%1%") % settings.maxSilentTime).str().c_str(),
                 (format("%1%") % settings.printBuildTrace).str().c_str(),
+                (format("%1%") % settings.buildTimeout).str().c_str(),
                 NULL);
 
             throw SysError(format("executing `%1%'") % buildHook);
@@ -1679,7 +1681,7 @@ HookReply DerivationGoal::tryBuildHook()
     set<int> fds;
     fds.insert(hook->fromHook.readSide);
     fds.insert(hook->builderOut.readSide);
-    worker.childStarted(shared_from_this(), hook->pid, fds, false, true);
+    worker.childStarted(shared_from_this(), hook->pid, fds, false, false);
 
     if (settings.printBuildTrace)
         printMsg(lvlError, format("@ build-started %1% - %2% %3%")
