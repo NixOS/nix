@@ -184,7 +184,8 @@ foreach my $expr (@exprs) {
             # NixOS hack: prevent /etc/bashrc from sourcing /etc/profile.
             $ENV{'__ETC_PROFILE_SOURCED'} = 1;
         }
-        $ENV{'NIX_BUILD_TOP'} = $ENV{'TMPDIR'} || "/tmp";
+        $ENV{'NIX_BUILD_TOP'} = $ENV{'TMPDIR'} = $ENV{'TEMPDIR'} = $ENV{'TMP'} = $ENV{'TEMP'} = $ENV{'TMPDIR'} // "/tmp";
+        $ENV{'NIX_STORE'} = $Nix::Config::storeDir;
         $ENV{$_} = $drv->{env}->{$_} foreach keys %{$drv->{env}};
 
         # Run a shell using the derivation's environment.  For
@@ -200,6 +201,7 @@ foreach my $expr (@exprs) {
             ($pure ? '' : 'PATH=$PATH:$p; ') .
             'set +e; ' .
             'PS1="\n\[\033[1;32m\][nix-shell:\w]$\[\033[0m\] "; ' .
+            'unset NIX_ENFORCE_PURITY; ' .
             $envCommand);
         exec($ENV{NIX_BUILD_SHELL} // "bash", "--rcfile", $rcfile);
         die;
