@@ -188,6 +188,8 @@ foreach my $expr (@exprs) {
         $ENV{'NIX_STORE'} = $Nix::Config::storeDir;
         $ENV{$_} = $drv->{env}->{$_} foreach keys %{$drv->{env}};
 
+        $ENV{'IN_NIX_SHELL'} = 1;
+
         # Run a shell using the derivation's environment.  For
         # convenience, source $stdenv/setup to setup additional
         # environment variables and shell functions.  Also don't lose
