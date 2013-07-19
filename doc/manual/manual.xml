@@ -73,6 +73,7 @@
   <xi:include href="troubleshooting.xml" />
   <!-- <xi:include href="bugs.xml" /> -->
   <xi:include href="glossary.xml" />
+  <xi:include href="hacking.xml" />
 
   <appendix>
     <title>Nix Release Notes</title>
