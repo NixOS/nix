@@ -42,6 +42,7 @@
       <option>--run-env</option>
       <arg><option>--command</option> <replaceable>cmd</replaceable></arg>
       <arg><option>--exclude</option> <replaceable>regexp</replaceable></arg>
+      <arg><option>--pure</option></arg>
     </arg>
     <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
   </cmdsynopsis>
@@ -147,7 +148,10 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 
     <listitem><para>In the environment of the derivation, run the
     shell command <replaceable>cmd</replaceable> instead of starting
-    an interactive shell.</para></listitem>
+    an interactive shell.  However, if you end the shell command with
+    <literal>return</literal>, you still get an interactive shell.
+    This can be useful for doing any additional
+    initialisation.</para></listitem>
 
   </varlistentry>
 
@@ -156,6 +160,21 @@ also <xref linkend="sec-common-options" />.</phrase></para>
     <listitem><para>Do not build any dependencies whose store path
     matches the regular expression <replaceable>regexp</replaceable>.
     This option may be specified multiple times.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--pure</option></term>
+
+    <listitem><para>If this flag is specified, the environment is
+    almost entirely cleared before the interactive shell is started,
+    so you get an environment that more closely corresponds to the
+    “real” Nix build.  A few variables, in particular
+    <envar>HOME</envar>, <envar>USER</envar> and
+    <envar>DISPLAY</envar>, are retained.  Note that
+    <filename>~/.bashrc</filename> and (depending on your Bash
+    installation) <filename>/etc/bashrc</filename> are still sourced,
+    so any variables set there will affect the interactive
+    shell.</para></listitem>
 
   </varlistentry>
 
@@ -187,6 +206,14 @@ $ cd pan-*
 $ configurePhase
 $ buildPhase
 $ ./pan/gui/pan
+</screen>
+
+To clear the environment first, and do some additional automatic
+initialisation of the interactive shell:
+
+<screen>
+$ nix-build '&lt;nixpkgs>' --run-env -A pan --pure \
+    --command 'export NIX_DEBUG=1; export NIX_CORES=8; return'
 </screen>
 
 </para>

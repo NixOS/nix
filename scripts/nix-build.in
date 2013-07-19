@@ -10,6 +10,7 @@ use File::Temp qw(tempdir);
 my $dryRun = 0;
 my $verbose = 0;
 my $runEnv = 0;
+my $pure = 0;
 
 my @instArgs = ();
 my @buildArgs = ();
@@ -134,6 +135,10 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
         push @envExclude, $ARGV[$n];
     }
 
+    elsif ($arg eq "--pure") {
+        $pure = 1;
+    }
+
     elsif (substr($arg, 0, 1) eq "-") {
         push @buildArgs, $arg;
     }
@@ -169,6 +174,14 @@ foreach my $expr (@exprs) {
             or die "$0: failed to build all dependencies\n";
 
         # Set the environment.
+        if ($pure) {
+            foreach my $name (keys %ENV) {
+                next if $name eq "HOME" || $name eq "USER" || $name eq "LOGNAME" || $name eq "DISPLAY" || $name eq "PATH";
+                delete $ENV{$name};
+            }
+            # NixOS hack: prevent /etc/bashrc from sourcing /etc/profile.
+            $ENV{'__ETC_PROFILE_SOURCED'} = 1;
+        }
         $ENV{'NIX_BUILD_TOP'} = $ENV{'TMPDIR'} || "/tmp";
         $ENV{$_} = $drv->{env}->{$_} foreach keys %{$drv->{env}};
 
@@ -180,9 +193,9 @@ foreach my $expr (@exprs) {
         writeFile(
             $rcfile,
             '[ -e ~/.bashrc ] && source ~/.bashrc; ' .
-            'p=$PATH; ' .
+            ($pure ? '' : 'p=$PATH; ' ).
             '[ -e $stdenv/setup ] && source $stdenv/setup; ' .
-            'PATH=$PATH:$p; ' .
+            ($pure ? '' : 'PATH=$PATH:$p; ') .
             'set +e; ' .
             'PS1="\n\[\033[1;32m\][nix-build:\w]$\[\033[0m\] "; ' .
             $envCommand);
