@@ -18,6 +18,7 @@ install-exec-local: download-using-manifests.pl copy-from-other-stores.pl downlo
 	$(INSTALL) -d $(DESTDIR)$(libexecdir)/nix/substituters
 	$(INSTALL_PROGRAM) download-using-manifests.pl copy-from-other-stores.pl download-from-binary-cache.pl $(DESTDIR)$(libexecdir)/nix/substituters
 	$(INSTALL) -d $(DESTDIR)$(sysconfdir)/nix
+	ln -sf nix-build $(DESTDIR)$(bindir)/nix-shell
 
 include ../substitute.mk
 

@@ -16,7 +16,7 @@ dblatex_opts = \
 # Note: we use GIF for now, since the PNGs shipped with Docbook aren't
 # transparent.
 
-man1_MANS = nix-env.1 nix-build.1 nix-store.1 nix-instantiate.1 \
+man1_MANS = nix-env.1 nix-build.1 nix-shell.1 nix-store.1 nix-instantiate.1 \
  nix-collect-garbage.1 nix-push.1 nix-pull.1 \
  nix-prefetch-url.1 nix-channel.1 \
  nix-install-package.1 nix-hash.1 nix-copy-closure.1

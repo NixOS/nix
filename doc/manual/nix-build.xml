@@ -38,12 +38,6 @@
       </group>
       <replaceable>outlink</replaceable>
     </arg>
-    <arg>
-      <option>--run-env</option>
-      <arg><option>--command</option> <replaceable>cmd</replaceable></arg>
-      <arg><option>--exclude</option> <replaceable>regexp</replaceable></arg>
-      <arg><option>--pure</option></arg>
-    </arg>
     <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
   </cmdsynopsis>
 </refsynopsisdiv>
@@ -75,14 +69,6 @@ linkend="rsec-nix-store-realise"><command>nix-store
 a root of the Nix garbage collector.  This root disappears
 automatically when the <filename>result</filename> symlink is deleted
 or renamed.  So don’t rename the symlink.</para></warning>
-
-<para>The subcommand <command>nix-build --run-env</command> will build
-the dependencies of the derivation, but not the derivation itself.  It
-will then start an interactive shell in which all environment
-variables defined by the derivation have been set to their
-corresponding values, and the script <literal>$stdenv/setup</literal>
-has been sourced.  This is useful for reproducing the environment of a
-derivation for development.</para>
 
 </refsection>
 
@@ -136,48 +122,10 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 
 </variablelist>
 
+<para>The following common options are supported:</para>
+
 <variablelist condition="manpage">
   <xi:include href="opt-common.xml#xmlns(db=http://docbook.org/ns/docbook)xpointer(//db:variablelist[@xml:id='opt-common']/*)" />
-</variablelist>
-
-<para>The following options apply to <command>nix-build --run-env</command>.</para>
-
-<variablelist>
-
-  <varlistentry><term><option>--command</option> <replaceable>cmd</replaceable></term>
-
-    <listitem><para>In the environment of the derivation, run the
-    shell command <replaceable>cmd</replaceable> instead of starting
-    an interactive shell.  However, if you end the shell command with
-    <literal>return</literal>, you still get an interactive shell.
-    This can be useful for doing any additional
-    initialisation.</para></listitem>
-
-  </varlistentry>
-
-  <varlistentry><term><option>--exclude</option> <replaceable>regexp</replaceable></term>
-
-    <listitem><para>Do not build any dependencies whose store path
-    matches the regular expression <replaceable>regexp</replaceable>.
-    This option may be specified multiple times.</para></listitem>
-
-  </varlistentry>
-
-  <varlistentry><term><option>--pure</option></term>
-
-    <listitem><para>If this flag is specified, the environment is
-    almost entirely cleared before the interactive shell is started,
-    so you get an environment that more closely corresponds to the
-    “real” Nix build.  A few variables, in particular
-    <envar>HOME</envar>, <envar>USER</envar> and
-    <envar>DISPLAY</envar>, are retained.  Note that
-    <filename>~/.bashrc</filename> and (depending on your Bash
-    installation) <filename>/etc/bashrc</filename> are still sourced,
-    so any variables set there will affect the interactive
-    shell.</para></listitem>
-
-  </varlistentry>
-
 </variablelist>
 
 </refsection>
@@ -195,28 +143,6 @@ lrwxrwxrwx  <replaceable>...</replaceable>  result -> /nix/store/d18hyl92g30l...
 
 $ ls ./result/bin/
 firefox  firefox-config</screen>
-
-<para>To build the dependencies of the package Pan, and start an
-interactive shell in which to build it:
-
-<screen>
-$ nix-build '&lt;nixpkgs>' --run-env -A pan
-$ unpackPhase
-$ cd pan-*
-$ configurePhase
-$ buildPhase
-$ ./pan/gui/pan
-</screen>
-
-To clear the environment first, and do some additional automatic
-initialisation of the interactive shell:
-
-<screen>
-$ nix-build '&lt;nixpkgs>' --run-env -A pan --pure \
-    --command 'export NIX_DEBUG=1; export NIX_CORES=8; return'
-</screen>
-
-</para>
 
 <para>If a derivation has multiple outputs,
 <command>nix-build</command> will build the default (first) output.

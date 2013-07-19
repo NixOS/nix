@@ -19,15 +19,15 @@
     </author>
 
     <copyright>
-      <year>2004-2012</year>
+      <year>2004-2013</year>
       <holder>Eelco Dolstra</holder>
     </copyright>
 
-    <date>May 2012</date>
-    
+    <date>July 2013</date>
+
   </info>
 
-  
+
   <xi:include href="introduction.xml" />
   <xi:include href="quick-start.xml" />
   <xi:include href="installation.xml" />
@@ -40,17 +40,18 @@
     <title>Command Reference</title>
     <xi:include href="opt-common.xml" />
     <xi:include href="env-common.xml" />
-    
+
     <section>
       <title>Main commands</title>
       <xi:include href="nix-env.xml" />
       <xi:include href="nix-instantiate.xml" />
       <xi:include href="nix-store.xml" />
     </section>
-    
+
     <section>
       <title>Utilities</title>
       <xi:include href="nix-build.xml" />
+      <xi:include href="nix-shell.xml" />
       <xi:include href="nix-channel.xml" />
       <xi:include href="nix-collect-garbage.xml" />
       <xi:include href="nix-copy-closure.xml" />
@@ -66,7 +67,7 @@
       <title>Files</title>
       <xi:include href="conf-file.xml" />
     </section>
-    
+
   </appendix>
 
   <xi:include href="troubleshooting.xml" />
@@ -78,5 +79,5 @@
     <xi:include href="release-notes.xml"
                 xpointer="xmlns(x=http://docbook.org/ns/docbook)xpointer(x:article/x:section)" />
   </appendix>
-    
+
 </book>

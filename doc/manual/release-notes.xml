@@ -8,6 +8,43 @@
 
 <!--==================================================================-->
 
+<section xml:id="ssec-relnotes-1.6.0"><title>Release 1.6.0 (TBA)</title>
+
+<itemizedlist>
+
+  <listitem>
+    <para>The command <command>nix-build --run-env</command> has been
+    renamed to <command>nix-shell</command>.</para>
+  </listitem>
+
+  <listitem>
+    <para><command>nix-shell</command> now sources
+    <filename>$stdenv/setup</filename> <emphasis>inside</emphasis> the
+    interactive shell, rather than in a parent shell.  This ensures
+    that shell functions defined by <literal>stdenv</literal> can be
+    used in the interactive shell.</para>
+  </listitem>
+
+  <listitem>
+    <para><command>nix-shell</command> has a new flag
+    <option>--pure</option> to clear the environment, so you get an
+    environment that more closely corresponds to the “real” Nix build.
+    </para>
+  </listitem>
+
+  <listitem>
+    <para><command>nix-shell</command> now sets the shell prompt
+    (<envar>PS1</envar>) to ensure that Nix shells are distinguishable
+    from your regular shells.</para>
+  </listitem>
+
+</itemizedlist>
+
+</section>
+
+
+<!--==================================================================-->
+
 <section xml:id="ssec-relnotes-1.5.3"><title>Release 1.5.3 (June 17, 2013)</title>
 
 <para>This is primarily a bug fix release.  The following changes are
