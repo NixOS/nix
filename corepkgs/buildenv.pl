@@ -36,9 +36,6 @@ sub createLinks {
         if ($srcFile =~ /\/propagated-build-inputs$/ ||
             $srcFile =~ /\/nix-support$/ ||
             $srcFile =~ /\/perllocal.pod$/ ||
-            $srcFile =~ /\/easy-install.pth$/ ||
-            $srcFile =~ /\/site.py$/ ||
-            $srcFile =~ /\/site.pyc$/ ||
             $srcFile =~ /\/info\/dir$/ ||
             $srcFile =~ /\/log$/)
         {
