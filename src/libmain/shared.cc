@@ -13,6 +13,7 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <signal.h>
 
 #if HAVE_BOEHMGC
 #include <gc/gc.h>
@@ -100,6 +101,9 @@ string getArg(const string & opt,
 }
 
 
+void detectStackOverflow();
+
+
 /* Initialize and reorder arguments, then call the actual argument
    processor. */
 static void initAndRun(int argc, char * * argv)
@@ -130,6 +134,9 @@ static void initAndRun(int argc, char * * argv)
     act.sa_flags = 0;
     if (sigaction(SIGCHLD, &act, 0))
         throw SysError("resetting SIGCHLD");
+
+    /* Register a SIGSEGV handler to detect stack overflows. */
+    detectStackOverflow();
 
     /* There is no privacy in the Nix system ;-)  At least not for
        now.  In particular, store objects should be readable by
