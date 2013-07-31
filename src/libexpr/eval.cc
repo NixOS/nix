@@ -310,9 +310,8 @@ inline Value * EvalState::lookupVar(Env * env, const VarRef & var, bool noEval)
     
     if (var.fromWith) {
         while (1) {
-            if (env->values[0] == NULL) {
-                if (noEval)
-                    return NULL;
+            if (!env->values[0]) {
+                if (noEval) return 0;
                 env->values[0] = allocValue();
                 evalAttrs(*env->up, env->withAttrs, *env->values[0]);
             }
@@ -830,7 +829,6 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
     Env & env2(state.allocEnv(1));
     env2.up = &env;
     env2.prevWith = prevWith;
-
     env2.withAttrs = attrs;
 
     body->eval(state, env2, v);
