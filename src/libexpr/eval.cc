@@ -307,25 +307,26 @@ void mkPath(Value & v, const char * s)
 inline Value * EvalState::lookupVar(Env * env, const VarRef & var, bool noEval)
 {
     for (unsigned int l = var.level; l; --l, env = env->up) ;
-    
-    if (var.fromWith) {
-        while (1) {
-            if (!env->values[0]) {
-                if (noEval) return 0;
-                env->values[0] = allocValue();
-                evalAttrs(*env->up, env->withAttrs, *env->values[0]);
-            }
-            Bindings::iterator j = env->values[0]->attrs->find(var.name);
-            if (j != env->values[0]->attrs->end()) {
-                if (countCalls && j->pos) attrSelects[*j->pos]++;
-                return j->value;
-            }
-            if (env->prevWith == 0)
-                throwEvalError("undefined variable `%1%'", var.name);
-            for (unsigned int l = env->prevWith; l; --l, env = env->up) ;
+
+    if (!var.fromWith) return env->values[var.displ];
+
+    while (1) {
+        if (!env->haveWithAttrs) {
+            if (noEval) return 0;
+            Expr * attrs = (Expr *) env->values[0];
+            env->values[0] = allocValue();
+            evalAttrs(*env->up, attrs, *env->values[0]);
+            env->haveWithAttrs = true;
         }
-    } else
-        return env->values[var.displ];
+        Bindings::iterator j = env->values[0]->attrs->find(var.name);
+        if (j != env->values[0]->attrs->end()) {
+            if (countCalls && j->pos) attrSelects[*j->pos]++;
+            return j->value;
+        }
+        if (!env->prevWith)
+            throwEvalError("undefined variable `%1%'", var.name);
+        for (unsigned int l = env->prevWith; l; --l, env = env->up) ;
+    }
 }
 
 
@@ -829,7 +830,8 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
     Env & env2(state.allocEnv(1));
     env2.up = &env;
     env2.prevWith = prevWith;
-    env2.withAttrs = attrs;
+    env2.haveWithAttrs = false;
+    env2.values[0] = (Value *) attrs;
 
     body->eval(state, env2, v);
 }
