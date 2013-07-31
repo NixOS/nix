@@ -1,0 +1,36 @@
+#! @shell@
+
+# Runs nix-build and executes the result
+# All arguments before "--" are given to nix-build,
+# and all arguments after "--" are given to the
+# executed command. stdin is redirected to the executed
+# command.
+
+out=$(mktemp)
+rm "$out"
+
+# parse args into args1 and args2, separated by --
+# args1 goes to nix-build, args2 goes to the built command
+args1=("$@")
+args2=()
+for i in "${!args1[@]}"; do 
+  if [ "${args1[$i]}" == "--" ]; then
+    args2=("${args1[@]:$((i+1))}")
+    args1=("${args1[@]:0:$((i))}")
+    break
+  fi
+done
+
+if nix-build -o "$out" "${args1[@]}" >/dev/null; then
+  target=$(readlink -m "$out")
+  unlink "$out"
+  if test -f "$target" && test -x "$target"; then
+    exec "$target" "${args2[@]}" <&0
+  else
+    echo "nix-run: No executable target produced by nix-build"
+    exit 1
+  fi
+else
+  echo "nix-run: nix-build failed"
+  exit 1
+fi

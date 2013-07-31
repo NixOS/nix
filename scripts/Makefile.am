@@ -1,7 +1,8 @@
 bin_SCRIPTS = nix-collect-garbage \
   nix-pull nix-push nix-prefetch-url \
   nix-install-package nix-channel nix-build \
-  nix-copy-closure nix-generate-patches
+  nix-copy-closure nix-generate-patches \
+  nix-run
 
 noinst_SCRIPTS = nix-profile.sh \
   find-runtime-roots.pl build-remote.pl nix-reduce-build \
@@ -35,7 +36,8 @@ EXTRA_DIST = nix-collect-garbage.in \
   build-remote.pl.in \
   nix-reduce-build.in \
   nix-http-export.cgi.in \
-  nix-generate-patches.in
+  nix-generate-patches.in \
+  nix-run.in
 
 clean:
 	rm -f $(bin_SCRIPTS) $(noinst_SCRIPTS)
