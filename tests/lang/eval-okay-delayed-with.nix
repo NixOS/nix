@@ -1,4 +1,5 @@
 let
+
   pkgs_ = with pkgs; {
     a = derivation {
       name = "a";
@@ -13,14 +14,16 @@ let
       system = builtins.currentSystem;
       builder = "/bin/sh";
       args = [ "-c" "touch $out" ];
+      inherit a;
     };
 
     c = b;
   };
 
-  packageOverrides = p: {
-    b = derivation (p.b.drvAttrs // { name = "b-overridden"; });
+  packageOverrides = pkgs: with pkgs; {
+    b = derivation (b.drvAttrs // { name = "${b.name}-overridden"; });
   };
 
   pkgs = pkgs_ // (packageOverrides pkgs_);
-in pkgs.a.b.name
+
+in "${pkgs.a.b.name} ${pkgs.c.name} ${pkgs.b.a.name}"
