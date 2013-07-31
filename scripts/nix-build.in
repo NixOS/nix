@@ -198,7 +198,8 @@ foreach my $expr (@exprs) {
         writeFile(
             $rcfile,
             '[ -e ~/.bashrc ] && source ~/.bashrc; ' .
-            ($pure ? '' : 'p=$PATH; ' ).
+            ($pure ? '' : 'p=$PATH; ' ) .
+            'dontAddDisableDepTrack=1; ' .
             '[ -e $stdenv/setup ] && source $stdenv/setup; ' .
             ($pure ? '' : 'PATH=$PATH:$p; ') .
             'set +e; ' .
