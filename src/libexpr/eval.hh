@@ -53,6 +53,7 @@ struct Env
 {
     Env * up;
     unsigned int prevWith; // nr of levels up to next `with' environment
+    Expr * withAttrs;
     Value * values[0];
 };
 
@@ -205,7 +206,7 @@ private:
     void addPrimOp(const string & name,
         unsigned int arity, PrimOpFun primOp);
 
-    inline Value * lookupVar(Env * env, const VarRef & var);
+    inline Value * lookupVar(Env * env, const VarRef & var, bool noEval = false);
     
     friend class ExprVar;
     friend class ExprAttrs;
