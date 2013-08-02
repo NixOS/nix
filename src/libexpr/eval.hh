@@ -260,7 +260,7 @@ private:
     typedef std::map<Symbol, unsigned int> PrimOpCalls;
     PrimOpCalls primOpCalls;
 
-    typedef std::map<Pos, unsigned int> FunctionCalls;
+    typedef std::map<ExprLambda *, unsigned int> FunctionCalls;
     FunctionCalls functionCalls;
 
     typedef std::map<Pos, unsigned int> AttrSelects;

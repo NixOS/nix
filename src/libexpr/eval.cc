@@ -788,7 +788,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
     }
 
     nrFunctionCalls++;
-    if (countCalls) functionCalls[fun.lambda.fun->pos]++;
+    if (countCalls) functionCalls[fun.lambda.fun]++;
 
     try {
         fun.lambda.fun->body->eval(*this, env2, v);
@@ -1283,23 +1283,23 @@ void EvalState::printStats()
 
         printMsg(v, format("calls to %1% primops:") % primOpCalls.size());
         typedef std::multimap<unsigned int, Symbol> PrimOpCalls_;
-        std::multimap<unsigned int, Symbol> primOpCalls_;
+        PrimOpCalls_ primOpCalls_;
         foreach (PrimOpCalls::iterator, i, primOpCalls)
             primOpCalls_.insert(std::pair<unsigned int, Symbol>(i->second, i->first));
         foreach_reverse (PrimOpCalls_::reverse_iterator, i, primOpCalls_)
             printMsg(v, format("%1$10d %2%") % i->first % i->second);
 
         printMsg(v, format("calls to %1% functions:") % functionCalls.size());
-        typedef std::multimap<unsigned int, Pos> FunctionCalls_;
-        std::multimap<unsigned int, Pos> functionCalls_;
+        typedef std::multimap<unsigned int, ExprLambda *> FunctionCalls_;
+        FunctionCalls_ functionCalls_;
         foreach (FunctionCalls::iterator, i, functionCalls)
-            functionCalls_.insert(std::pair<unsigned int, Pos>(i->second, i->first));
+            functionCalls_.insert(std::pair<unsigned int, ExprLambda *>(i->second, i->first));
         foreach_reverse (FunctionCalls_::reverse_iterator, i, functionCalls_)
-            printMsg(v, format("%1$10d %2%") % i->first % i->second);
+            printMsg(v, format("%1$10d %2%") % i->first % i->second->showNamePos());
 
         printMsg(v, format("evaluations of %1% attributes:") % attrSelects.size());
         typedef std::multimap<unsigned int, Pos> AttrSelects_;
-        std::multimap<unsigned int, Pos> attrSelects_;
+        AttrSelects_ attrSelects_;
         foreach (AttrSelects::iterator, i, attrSelects)
             attrSelects_.insert(std::pair<unsigned int, Pos>(i->second, i->first));
         foreach_reverse (AttrSelects_::reverse_iterator, i, attrSelects_)
