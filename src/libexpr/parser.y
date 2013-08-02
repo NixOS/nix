@@ -271,7 +271,8 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %nonassoc EQ NEQ
 %right UPDATE
 %left NOT
-%left '+'
+%left '+' '-'
+%left '*' '/'
 %right CONCAT
 %nonassoc '?'
 %nonassoc '~'
@@ -322,6 +323,9 @@ expr_op
       l->push_back($3);
       $$ = new ExprConcatStrings(false, l);
     }
+  | expr_op '-' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(data->symbols.create("__sub")), $1), $3); }
+  | expr_op '*' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(data->symbols.create("__mul")), $1), $3); }
+  | expr_op '/' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(data->symbols.create("__div")), $1), $3); }
   | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists($1, $3); }
   | expr_app
   ;
