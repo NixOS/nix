@@ -16,6 +16,11 @@ let {
   range = range_ [];
   */
 
-  body = sum (range 1 50) + 123 + 456;
+  x = 12;
 
+  body = sum
+    [ (sum (range 1 50))
+      (123 + 456)
+      (0 + -10 + -(-11) + -x)
+    ];
 }

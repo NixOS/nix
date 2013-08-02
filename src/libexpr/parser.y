@@ -270,11 +270,12 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %left AND
 %nonassoc EQ NEQ
 %right UPDATE
-%left NEG
+%left NOT
 %left '+'
 %right CONCAT
 %nonassoc '?'
 %nonassoc '~'
+%nonassoc NEGATE
 
 %%
 
@@ -306,7 +307,8 @@ expr_if
   ;
 
 expr_op
-  : '!' expr_op %prec NEG { $$ = new ExprOpNot($2); }
+  : '!' expr_op %prec NOT { $$ = new ExprOpNot($2); }
+  | '-' expr_op %prec NEGATE { $$ = new ExprApp(new ExprApp(new ExprVar(data->symbols.create("__sub")), new ExprInt(0)), $2); }
   | expr_op EQ expr_op { $$ = new ExprOpEq($1, $3); }
   | expr_op NEQ expr_op { $$ = new ExprOpNEq($1, $3); }
   | expr_op AND expr_op { $$ = new ExprOpAnd($1, $3); }
