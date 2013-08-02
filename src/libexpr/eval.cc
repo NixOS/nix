@@ -968,31 +968,39 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 {
     PathSet context;
     std::ostringstream s;
-        
-    bool first = true, isPath = false;
-    Value vStr;
+    int n = 0;
+
+    bool first = true;
+    ValueType firstType;
 
     foreach (vector<Expr *>::iterator, i, *es) {
-        (*i)->eval(state, env, vStr);
+        Value vTmp;
+        (*i)->eval(state, env, vTmp);
 
         /* If the first element is a path, then the result will also
            be a path, we don't copy anything (yet - that's done later,
            since paths are copied when they are used in a derivation),
            and none of the strings are allowed to have contexts. */
         if (first) {
-            isPath = !forceString && vStr.type == tPath;
+            firstType = vTmp.type;
             first = false;
         }
 
-        s << state.coerceToString(vStr, context, false, !isPath);
+        if (firstType == tInt && !forceString) {
+            if (vTmp.type != tInt)
+                throwEvalError("cannot add %1% to an integer", showType(vTmp));
+            n += vTmp.integer;
+        } else
+            s << state.coerceToString(vTmp, context, false, firstType != tPath);
     }
-        
-    if (isPath && !context.empty())
-        throwEvalError("a string that refers to a store path cannot be appended to a path, in `%1%'", s.str());
 
-    if (isPath)
+    if (firstType == tInt)
+        mkInt(v, n);
+    else if (firstType == tPath) {
+        if (!context.empty())
+            throwEvalError("a string that refers to a store path cannot be appended to a path, in `%1%'", s.str());
         mkPath(v, s.str().c_str());
-    else
+    } else
         mkString(v, s.str(), context);
 }
 
