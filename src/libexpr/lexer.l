@@ -101,6 +101,8 @@ or          { return OR_KW; }
 
 \=\=        { return EQ; }
 \!\=        { return NEQ; }
+\<\=        { return LEQ; }
+\>\=        { return GEQ; }
 \&\&        { return AND; }
 \|\|        { return OR; }
 \-\>        { return IMPL; }

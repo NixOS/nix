@@ -269,6 +269,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %left OR
 %left AND
 %nonassoc EQ NEQ
+%left '<' '>' LEQ GEQ
 %right UPDATE
 %left NOT
 %left '+' '-'
@@ -312,6 +313,10 @@ expr_op
   | '-' expr_op %prec NEGATE { $$ = new ExprApp(new ExprApp(new ExprVar(data->symbols.create("__sub")), new ExprInt(0)), $2); }
   | expr_op EQ expr_op { $$ = new ExprOpEq($1, $3); }
   | expr_op NEQ expr_op { $$ = new ExprOpNEq($1, $3); }
+  | expr_op '<' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $1), $3); }
+  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprApp(new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $3), $1)); }
+  | expr_op '>' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $3), $1); }
+  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprApp(new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $1), $3)); }
   | expr_op AND expr_op { $$ = new ExprOpAnd($1, $3); }
   | expr_op OR expr_op { $$ = new ExprOpOr($1, $3); }
   | expr_op IMPL expr_op { $$ = new ExprOpImpl($1, $3); }

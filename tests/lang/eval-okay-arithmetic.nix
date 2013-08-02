@@ -18,6 +18,8 @@ let {
 
   x = 12;
 
+  err = abort "urgh";
+
   body = sum
     [ (sum (range 1 50))
       (123 + 456)
@@ -28,5 +30,26 @@ let {
       (3 * 4 * 5)
       (56088 / 123 / 2)
       (3 + 4 * const 5 0 - 6 / id 2)
+
+      (if 3 < 7 then 1 else err)
+      (if 7 < 3 then err else 1)
+      (if 3 < 3 then err else 1)
+
+      (if 3 <= 7 then 1 else err)
+      (if 7 <= 3 then err else 1)
+      (if 3 <= 3 then 1 else err)
+
+      (if 3 > 7 then err else 1)
+      (if 7 > 3 then 1 else err)
+      (if 3 > 3 then err else 1)
+
+      (if 3 >= 7 then err else 1)
+      (if 7 >= 3 then 1 else err)
+      (if 3 >= 3 then 1 else err)
+
+      (if 2 > 1 == 1 < 2 then 1 else err)
+      (if 1 + 2 * 3 >= 7 then 1 else err)
+      (if 1 + 2 * 3 < 7 then err else 1)
     ];
+
 }
