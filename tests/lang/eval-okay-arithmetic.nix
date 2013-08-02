@@ -50,6 +50,11 @@ let {
       (if 2 > 1 == 1 < 2 then 1 else err)
       (if 1 + 2 * 3 >= 7 then 1 else err)
       (if 1 + 2 * 3 < 7 then err else 1)
+
+      # Not integer, but so what.
+      (if "aa" < "ab" then 1 else err)
+      (if "aa" < "aa" then err else 1)
+      (if "foo" < "foobar" then 1 else err)
     ];
 
 }

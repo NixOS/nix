@@ -183,8 +183,8 @@ static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
     list<Value> res;
     set<Value, CompareValues> doneKeys; // !!! use Value *?
     while (!workSet.empty()) {
-	Value * e = *(workSet.begin());
-	workSet.pop_front();
+        Value * e = *(workSet.begin());
+        workSet.pop_front();
 
         state.forceAttrs(*e);
 
@@ -1032,7 +1032,10 @@ static void prim_div(EvalState & state, Value * * args, Value & v)
 
 static void prim_lessThan(EvalState & state, Value * * args, Value & v)
 {
-    mkBool(v, state.forceInt(*args[0]) < state.forceInt(*args[1]));
+    state.forceValue(*args[0]);
+    state.forceValue(*args[1]);
+    CompareValues comp;
+    mkBool(v, comp(*args[0], *args[1]));
 }
 
 
