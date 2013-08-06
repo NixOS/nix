@@ -39,9 +39,9 @@ struct Value
         int integer;
         bool boolean;
         
-        /* Strings in the evaluator carry a so-called `context' (the
-           ATermList) which is a list of strings representing store
-           paths.  This is to allow users to write things like
+        /* Strings in the evaluator carry a so-called `context' which
+           is a list of strings representing store paths.  This is to
+           allow users to write things like
 
              "--with-freetype2-library=" + freetype + "/lib"
 
