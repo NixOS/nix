@@ -53,7 +53,7 @@ void detectStackOverflow()
        requires an alternative stack, otherwise the signal cannot be
        delivered when we're out of stack space. */
     stack_t stack;
-    stack.ss_size = 4096 * 4;
+    stack.ss_size = 4096 * 4 + MINSIGSTKSZ;
     stack.ss_sp = new char[stack.ss_size];
     if (!stack.ss_sp) throw Error("cannot allocate alternative stack");
     stack.ss_flags = 0;
