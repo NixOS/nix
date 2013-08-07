@@ -9,8 +9,10 @@
 namespace nix {
 
 
+#if HAVE_SCHED_SETAFFINITY
 static bool didSaveAffinity = false;
 static cpu_set_t savedAffinity;
+#endif
 
 
 void setAffinityTo(int cpu)
