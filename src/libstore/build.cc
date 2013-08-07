@@ -7,6 +7,7 @@
 #include "local-store.hh"
 #include "util.hh"
 #include "archive.hh"
+#include "affinity.hh"
 
 #include <map>
 #include <sstream>
@@ -366,6 +367,8 @@ void Goal::trace(const format & f)
 /* Common initialisation performed in child processes. */
 static void commonChildInit(Pipe & logPipe)
 {
+    restoreAffinity();
+
     /* Put the child in a separate session (and thus a separate
        process group) so that it has no controlling terminal (meaning
        that e.g. ssh cannot open /dev/tty) and it doesn't receive
@@ -568,6 +571,7 @@ static void runSetuidHelper(const string & command,
             args.push_back(0);
 
             restoreSIGPIPE();
+            restoreAffinity();
 
             execve(program.c_str(), (char * *) &args[0], 0);
             throw SysError(format("executing `%1%'") % program);

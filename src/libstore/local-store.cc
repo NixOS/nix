@@ -5,6 +5,7 @@
 #include "pathlocks.hh"
 #include "worker-protocol.hh"
 #include "derivations.hh"
+#include "affinity.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -1021,6 +1022,7 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
 
     case 0: /* child */
         try {
+            restoreAffinity();
             if (dup2(toPipe.readSide, STDIN_FILENO) == -1)
                 throw SysError("dupping stdin");
             if (dup2(fromPipe.writeSide, STDOUT_FILENO) == -1)

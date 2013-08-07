@@ -127,6 +127,10 @@ AC_CHECK_HEADERS([sys/mount.h], [], [],
 AC_CHECK_FUNCS([lutimes])
 
 
+# Check for sched_setaffinity.
+AC_CHECK_FUNCS([sched_setaffinity])
+
+
 # Check whether the store optimiser can optimise symlinks.
 AC_MSG_CHECKING([whether it is possible to create a link to a symlink])
 ln -s bla tmp_link

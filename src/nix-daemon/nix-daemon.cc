@@ -4,6 +4,7 @@
 #include "serialise.hh"
 #include "worker-protocol.hh"
 #include "archive.hh"
+#include "affinity.hh"
 #include "globals.hh"
 
 #include <cstring>
@@ -670,6 +671,9 @@ static void processConnection(bool trusted)
     writeInt(PROTOCOL_VERSION, to);
     to.flush();
     unsigned int clientVersion = readInt(from);
+
+    if (GET_PROTOCOL_MINOR(clientVersion) >= 14 && readInt(from))
+        setAffinityTo(readInt(from));
 
     bool reserveSpace = true;
     if (GET_PROTOCOL_MINOR(clientVersion) >= 11)
