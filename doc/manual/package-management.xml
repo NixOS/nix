@@ -129,7 +129,7 @@ downloading binaries from <systemitem
 class='fqdomainname'>nixos.org</systemitem>, instead of building
 them from source.  This might still take a while since all
 dependencies must be downloaded, but on a reasonably fast connection
-such as an DSL line it’s on the order of a few minutes.</para>
+such as a DSL line it’s on the order of a few minutes.</para>
 
 <para>Naturally, packages can also be uninstalled:
 

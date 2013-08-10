@@ -158,7 +158,7 @@ EvalState::EvalState()
            physical RAM, up to a maximum of 384 MiB) so that in most
            cases we don't need to garbage collect at all.  (Collection
            has a fairly significant overhead.)  The heap size can be
-           overriden through libgc's GC_INITIAL_HEAP_SIZE environment
+           overridden through libgc's GC_INITIAL_HEAP_SIZE environment
            variable.  We should probably also provide a nix.conf
            setting for this.  Note that GC_expand_hp() causes a lot of
            virtual, but not physical (resident) memory to be

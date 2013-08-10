@@ -53,7 +53,7 @@ sub createLinks {
             elsif (-l _) {
                 my $target = readlink $dstFile or die;
                 if (!-d $target) {
-                    die "collission between directory `$srcFile' and non-directory `$target'";
+                    die "collision between directory `$srcFile' and non-directory `$target'";
                 }
                 unlink $dstFile or die "error unlinking `$dstFile': $!";
                 mkdir $dstFile, 0755 ||
@@ -75,7 +75,7 @@ sub createLinks {
             if (-l $dstFile) {
                 my $target = readlink $dstFile;
                 my $prevPriority = $priorities{$dstFile};
-                die ( "collission between `$srcFile' and `$target'; "
+                die ( "collision between `$srcFile' and `$target'; "
                     . "use `nix-env --set-flag "
                     . "priority NUMBER PKGNAME' to change the priority of "
                     . "one of the conflicting packages\n" )

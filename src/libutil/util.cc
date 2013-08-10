@@ -629,8 +629,8 @@ AutoCloseFD::AutoCloseFD(int fd)
 
 AutoCloseFD::AutoCloseFD(const AutoCloseFD & fd)
 {
-    /* Copying a AutoCloseFD isn't allowed (who should get to close
-       it?).  But as a edge case, allow copying of closed
+    /* Copying an AutoCloseFD isn't allowed (who should get to close
+       it?).  But as an edge case, allow copying of closed
        AutoCloseFDs.  This is necessary due to tiresome reasons
        involving copy constructor use on default object values in STL
        containers (like when you do `map[value]' where value isn't in
