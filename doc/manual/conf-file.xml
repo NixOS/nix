@@ -101,8 +101,8 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
     <listitem><para>This option defines the maximum number of jobs
     that Nix will try to build in parallel.  The default is
     <literal>1</literal>.  You should generally set it to the number
-    of CPUs in your system (e.g., <literal>2</literal> on a Athlon 64
-    X2).  It can be overriden using the <option
+    of CPUs in your system (e.g., <literal>2</literal> on an Athlon 64
+    X2).  It can be overridden using the <option
     linkend='opt-max-jobs'>--max-jobs</option> (<option>-j</option>)
     command line switch.</para></listitem>
 
@@ -119,7 +119,7 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
     <varname>enableParallelBuilding</varname> is set to
     <literal>true</literal>, the builder passes the
     <option>-j<replaceable>N</replaceable></option> flag to GNU Make.
-    It can be overriden using the <option
+    It can be overridden using the <option
     linkend='opt-cores'>--cores</option> command line switch and
     defaults to <literal>1</literal>.  The value <literal>0</literal>
     means that the builder should use all available CPU cores in the
@@ -134,10 +134,10 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
 
       <para>This option defines the maximum number of seconds that a
       builder can go without producing any data on standard output or
-      standard error.  This is useful (for instance in a automated
+      standard error.  This is useful (for instance in an automated
       build system) to catch builds that are stuck in an infinite
       loop, or to catch remote builds that are hanging due to network
-      problems.  It can be overriden using the <option
+      problems.  It can be overridden using the <option
       linkend="opt-max-silent-time">--max-silent-time</option> command
       line switch.</para>
 
@@ -153,10 +153,10 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
     <listitem>
 
       <para>This option defines the maximum number of seconds that a
-      builder can run.  This is useful (for instance in a automated
+      builder can run.  This is useful (for instance in an automated
       build system) to catch builds that are stuck in an infinite loop
       but keep writing to their standard output or standard error.  It
-      can be overriden using the <option
+      can be overridden using the <option
       linkend="opt-timeout">--timeout</option> command line
       switch.</para>
 

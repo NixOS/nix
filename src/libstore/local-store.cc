@@ -991,7 +991,7 @@ void LocalStore::setSubstituterEnv()
 {
     if (didSetSubstituterEnv) return;
 
-    /* Pass configuration options (including those overriden with
+    /* Pass configuration options (including those overridden with
        --option) to substituters. */
     setenv("_NIX_OPTIONS", settings.pack().c_str(), 1);
 

@@ -293,7 +293,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 <varlistentry xml:id="envar-other-stores"><term><envar>NIX_OTHER_STORES</envar></term>
 
   <listitem><para>This variable contains the paths of remote Nix
-  installations from whichs paths can be copied, separated by colons.
+  installations from which packages can be copied, separated by colons.
   <phrase condition="manual">See <xref linkend="sec-sharing-packages"
   /> for details.</phrase>  Each path should be the
   <filename>/nix</filename> directory of a remote Nix installation

@@ -17,7 +17,7 @@ bug tracker</link> for a list of currently known issues.</para>
 $ nix-env -i docbook-xml
 ...
 adding /nix/store/s5hyxgm62gk2...-docbook-xml-4.2
-collission between `/nix/store/s5hyxgm62gk2...-docbook-xml-4.2/xml/dtd/docbook/calstblx.dtd'
+collision between `/nix/store/s5hyxgm62gk2...-docbook-xml-4.2/xml/dtd/docbook/calstblx.dtd'
   and `/nix/store/06h377hr4b33...-docbook-xml-4.3/xml/dtd/docbook/calstblx.dtd'
   at /nix/store/...-builder.pl line 62.</screen>
 
@@ -68,7 +68,7 @@ in <filename>/nix/store</filename>, as can be seen using <command>ls
 $ ls -l /nix/store
 drwxrwxrwt 32000 nix nix 4620288 Sep 8 15:08 store</screen>
 
-The <literal>ext2</literal> file system is limited to a inode link
+The <literal>ext2</literal> file system is limited to an inode link
 count of 32,000 (each subdirectory increasing the count by one).
 Furthermore, the <literal>st_nlink</literal> field of the
 <function>stat</function> system call is a 16-bit value.</para>

@@ -617,7 +617,7 @@ Laziness means that arguments to functions are evaluated only when
 they are needed.  Functional means that functions are
 <quote>normal</quote> values that can be passed around and manipulated
 in interesting ways.  The language is not a full-featured, general
-purpose language.  It's main job is to describe packages,
+purpose language.  Its main job is to describe packages,
 compositions of packages, and the variability within
 packages.</para>
 
@@ -723,7 +723,7 @@ configureFlags = "
     <literal>''</literal>, i.e., <literal>''${</literal>.
     <literal>''</literal> can be escaped by prefixing it with
     <literal>'</literal>, i.e., <literal>'''</literal>.  Finally,
-    linefeed, carriage-return and tab characters can be writted as
+    linefeed, carriage-return and tab characters can be written as
     <literal>''\n</literal>, <literal>''\r</literal>,
     <literal>''\t</literal>.</para>
 
@@ -775,7 +775,7 @@ stdenv.mkDerivation {
   absolute at parse time relative to the directory of the Nix
   expression that contained it.  For instance, if a Nix expression in
   <filename>/foo/bar/bla.nix</filename> refers to
-  <filename>../xyzzy/fnord.nix</filename>, the absolutised path is
+  <filename>../xyzzy/fnord.nix</filename>, the absolute path is
   <filename>/foo/xyzzy/fnord.nix</filename>.</para></listitem>
 
   <listitem><para><emphasis>Booleans</emphasis> with values
