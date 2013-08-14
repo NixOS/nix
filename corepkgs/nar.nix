@@ -43,4 +43,7 @@ derivation {
 
   # Don't build in a chroot because Nix's dependencies may not be there.
   __noChroot = true;
+
+  # Remote machines may not have ${nixBinDir} or ${coreutils} in the same prefixes
+  preferLocalBuild = true;
 }
