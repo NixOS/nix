@@ -175,7 +175,7 @@ public:
     /* String coercion.  Converts strings, paths and derivations to a
        string.  If `coerceMore' is set, also converts nulls, integers,
        booleans and lists to a string.  If `copyToStore' is set,
-       referenced paths are copied to the Nix store as a side effect.q */
+       referenced paths are copied to the Nix store as a side effect. */
     string coerceToString(Value & v, PathSet & context,
         bool coerceMore = false, bool copyToStore = true);
 
