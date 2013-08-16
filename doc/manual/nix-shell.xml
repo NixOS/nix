@@ -37,7 +37,7 @@
 
 <refsection><title>Description</title>
 
-<para>The command <command>nix-shell --run-env</command> will build
+<para>The command <command>nix-shell</command> will build
 the dependencies of the specified derivation, but not the derivation
 itself.  It will then start an interactive shell in which all
 environment variables defined by the derivation have been set to their
