@@ -68,8 +68,8 @@ if test "$sys_name" = sunos; then
 fi
 
 
-CFLAGS=${CFLAGS:--g -O3}
-CXXFLAGS=${CXXFLAGS:--g -O3}
+CFLAGS=${CFLAGS:--g -O3 -Wall}
+CXXFLAGS=${CXXFLAGS:--g -O3 -Wall}
 AC_PROG_CC
 AC_PROG_CXX
 
