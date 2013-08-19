@@ -1083,14 +1083,6 @@ bool statusOk(int status)
 }
 
 
-string int2String(int n)
-{
-    std::ostringstream str;
-    str << n;
-    return str.str();
-}
-
-
 bool hasSuffix(const string & s, const string & suffix)
 {
     return s.size() >= suffix.size() && string(s, s.size() - suffix.size()) == suffix;

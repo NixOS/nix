@@ -31,14 +31,17 @@ struct PrimOp;
 struct Symbol;
 
 
+typedef long NixInt;
+
+
 struct Value
 {
     ValueType type;
-    union 
+    union
     {
-        int integer;
+        NixInt integer;
         bool boolean;
-        
+
         /* Strings in the evaluator carry a so-called `context' which
            is a list of strings representing store paths.  This is to
            allow users to write things like
@@ -63,7 +66,7 @@ struct Value
             const char * s;
             const char * * context; // must be in sorted order
         } string;
-        
+
         const char * path;
         Bindings * attrs;
         struct {
@@ -97,7 +100,7 @@ static inline void clearValue(Value & v)
 }
 
 
-static inline void mkInt(Value & v, int n)
+static inline void mkInt(Value & v, NixInt n)
 {
     clearValue(v);
     v.type = tInt;

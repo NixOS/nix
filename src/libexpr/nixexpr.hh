@@ -75,9 +75,9 @@ std::ostream & operator << (std::ostream & str, Expr & e);
 
 struct ExprInt : Expr
 {
-    int n;
+    NixInt n;
     Value v;
-    ExprInt(int n) : n(n) { mkInt(v, n); };
+    ExprInt(NixInt n) : n(n) { mkInt(v, n); };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };

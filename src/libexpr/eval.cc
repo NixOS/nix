@@ -968,7 +968,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 {
     PathSet context;
     std::ostringstream s;
-    int n = 0;
+    NixInt n = 0;
 
     bool first = true;
     ValueType firstType;
@@ -1021,7 +1021,7 @@ void EvalState::strictForceValue(Value & v)
 }
 
 
-int EvalState::forceInt(Value & v)
+NixInt EvalState::forceInt(Value & v)
 {
     forceValue(v);
     if (v.type != tInt)

@@ -1024,7 +1024,7 @@ static void prim_mul(EvalState & state, Value * * args, Value & v)
 
 static void prim_div(EvalState & state, Value * * args, Value & v)
 {
-    int i2 = state.forceInt(*args[1]);
+    NixInt i2 = state.forceInt(*args[1]);
     if (i2 == 0) throw EvalError("division by zero");
     mkInt(v, state.forceInt(*args[0]) / i2);
 }

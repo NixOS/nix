@@ -238,7 +238,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   nix::ExprAttrs * attrs;
   nix::Formals * formals;
   nix::Formal * formal;
-  int n;
+  nix::NixInt n;
   char * id; // !!! -> Symbol
   char * path;
   char * uri;

@@ -159,7 +159,7 @@ public:
     void strictForceValue(Value & v);
 
     /* Force `v', and then verify that it has the expected type. */
-    int forceInt(Value & v);
+    NixInt forceInt(Value & v);
     bool forceBool(Value & v);
     inline void forceAttrs(Value & v);
     inline void forceList(Value & v);
