@@ -1,4 +1,9 @@
 #! /bin/sh
+if [ -e tests/test-tmp ]; then
+    chmod -R u+w tests/test-tmp
+    rm -rf tests/test-tmp
+fi
+
 s=$(type -p nix-shell)
 exec $s release.nix -A tarball --command "
     export NIX_REMOTE=daemon
