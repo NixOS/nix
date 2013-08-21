@@ -36,11 +36,13 @@ struct Pos
         if (line > p2.line) return false;
         return column < p2.column;
     }
+
+    operator string() const;
 };
 
 extern Pos noPos;
 
-std::ostream & operator << (std::ostream & str, const Pos & pos);
+inline std::ostream & operator << (std::ostream & str, const Pos & pos) { str << string(pos); };
 
 
 struct Env;
@@ -162,9 +164,13 @@ struct ExprAttrs : Expr
         Expr * e; // if not inherited
         VarRef var; // if inherited
         Pos pos;
-        unsigned int displ; // displacement
-        AttrDef(Expr * e, const Pos & pos) : inherited(false), e(e), pos(pos) { };
-        AttrDef(const Symbol & name, const Pos & pos) : inherited(true), var(name), pos(pos) { };
+        // Union because once displ is set, fromAttrPath is no longer needed
+        union {
+            unsigned int displ; // displacement
+            bool fromAttrPath; // Whether this AttrDef is generated from an a.b.c -> a = { b = { c } } desugaring
+        };
+        AttrDef(Expr * e, const Pos & pos, bool fromAttrPath = false) : inherited(false), e(e), pos(pos), fromAttrPath(fromAttrPath) { };
+        AttrDef(const Symbol & name, const Pos & pos) : inherited(true), var(name), pos(pos), fromAttrPath(false) { };
         AttrDef() { };
     };
     typedef std::map<Symbol, AttrDef> AttrDefs;
@@ -251,6 +257,13 @@ struct ExprOpNot : Expr
 {
     Expr * e;
     ExprOpNot(Expr * e) : e(e) { };
+    COMMON_METHODS
+};
+
+struct ExprBuiltin : Expr
+{
+    Symbol name;
+    ExprBuiltin(Symbol name) : name(name) { };
     COMMON_METHODS
 };
 

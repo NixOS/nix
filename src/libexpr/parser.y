@@ -89,9 +89,8 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
         ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(*i);
         if (j != attrs->attrs.end()) {
             if (!j->second.inherited) {
-                ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(j->second.e);
-                if (!attrs2 || n == attrPath.size()) dupAttr(attrPath, pos, j->second.pos);
-                attrs = attrs2;
+                if (!j->second.fromAttrPath || n == attrPath.size()) dupAttr(attrPath, pos, j->second.pos);
+                attrs = static_cast<ExprAttrs *>(j->second.e);
             } else
                 dupAttr(attrPath, pos, j->second.pos);
         } else {
@@ -99,12 +98,67 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
                 attrs->attrs[*i] = ExprAttrs::AttrDef(e, pos);
             else {
                 ExprAttrs * nested = new ExprAttrs;
-                attrs->attrs[*i] = ExprAttrs::AttrDef(nested, pos);
+                attrs->attrs[*i] = ExprAttrs::AttrDef(nested, pos, true);
                 attrs = nested;
             }
         }
     }
     e->setName(attrPath.back());
+}
+
+
+static void addAttrsAndPosition(SymbolTable & symbols, ExprAttrs *attrs, ExprAttrs *positions, ExprAttrs *set, AttrPath & path)
+{
+    foreach (ExprAttrs::AttrDefs::iterator, i, set->attrs) {
+        path.push_back(i->first);
+        if (i->second.inherited) {
+            ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(i->first);
+            if (j != attrs->attrs.end()) dupAttr(path, i->second.pos, j->second.pos);
+            attrs->attrs[i->first] = i->second;
+            positions->attrs[i->first] = ExprAttrs::AttrDef(new ExprString(symbols.create(i->second.pos)), noPos);
+        } else if (i->second.fromAttrPath) {
+            addAttrsAndPosition(symbols, attrs, positions, static_cast<ExprAttrs *>(i->second.e), path);
+        } else {
+            addAttr(attrs, path, i->second.e, i->second.pos);
+            // Unnecessary duplication checks here, but whatever
+            addAttr(positions, path, new ExprString(symbols.create(i->second.pos)), noPos);
+        }
+        path.pop_back();
+    }
+    delete set;
+}
+
+static Expr *buildDynamicAttrs(SymbolTable & symbols, EvalState & state, std::pair<std::list<ExprAttrs *>,ExprList *> *binds, bool recursive)
+{
+    ExprAttrs *staticSet = new ExprAttrs, *positions = new ExprAttrs;
+    AttrPath path;
+    foreach (std::list<ExprAttrs *>::iterator, i, binds->first)
+        addAttrsAndPosition(symbols, staticSet, positions, *i, path);
+    Expr *import = new ExprBuiltin(symbols.create("import"));
+    Expr *dynamicFnsPath = new ExprPath(state.findFile("nix/dynamic-attrs.nix"));
+    Expr *dynamicFns = new ExprApp(import, dynamicFnsPath);
+    Expr *bindAttrs = new ExprSelect(dynamicFns, symbols.create("bindAttrs"));
+    Expr *dynamicBindings;
+    if (recursive) {
+        staticSet->recursive = true;
+        /* !!!! Dangerous! We reuse staticSet, so it will get its vars bound twice.
+           In the current implementation, no new scope is created between the two uses,
+           so it works out, but this is fragile. */
+        dynamicBindings = new ExprLet(staticSet, binds->second);
+    } else
+        dynamicBindings = binds->second;
+    delete binds;
+    return new ExprApp(new ExprApp(new ExprApp(bindAttrs, staticSet), positions), dynamicBindings);
+}
+
+
+static ExprAttrs *buildDynamicBindings(SymbolTable & symbols, ExprList *names, Expr * value, const Pos & pos)
+{
+    ExprAttrs *set = new ExprAttrs;
+    set->attrs[symbols.create("names")] = ExprAttrs::AttrDef(names, noPos);
+    set->attrs[symbols.create("value")] = ExprAttrs::AttrDef(value, noPos);
+    set->attrs[symbols.create("position")] = ExprAttrs::AttrDef(new ExprString(symbols.create(pos)), noPos);
+    return set;
 }
 
 
@@ -234,8 +288,10 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %union {
   // !!! We're probably leaking stuff here.  
   nix::Expr * e;
+  nix::ExprString * s;
   nix::ExprList * list;
   nix::ExprAttrs * attrs;
+  std::pair<std::list<nix::ExprAttrs *>,nix::ExprList *> * attrs_dynamic;
   nix::Formals * formals;
   nix::Formal * formal;
   nix::NixInt n;
@@ -250,10 +306,14 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %type <e> expr_app expr_select expr_simple
 %type <list> expr_list
 %type <attrs> binds
+%type <attrs_dynamic> binds_dynamic binds_dynamic_recursive
 %type <formals> formals
 %type <formal> formal
 %type <attrNames> attrs attrpath
-%type <string_parts> string_parts ind_string_parts
+%type <list> attrpath_dynamic attrpath_dynamic_recursive
+%type <e> string_parts attr_dynamic
+%type <string_parts> interpolated_string_parts ind_string_parts
+%type <s> plain_string_parts
 %type <id> attr
 %token <id> ID ATTRPATH
 %token <e> STR IND_STR
@@ -322,6 +382,13 @@ expr_op
   | expr_op IMPL expr_op { $$ = new ExprOpImpl($1, $3); }
   | expr_op UPDATE expr_op { $$ = new ExprOpUpdate($1, $3); }
   | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, *$3); }
+  | expr_op '?' attrpath_dynamic
+    { Expr *import = new ExprBuiltin(data->symbols.create("import"));
+      Expr *dynamicFnsPath = new ExprPath(data->state.findFile("nix/dynamic-attrs.nix"));
+      Expr *dynamicFns = new ExprApp(import, dynamicFnsPath);
+      Expr *hasAttrs = new ExprSelect(dynamicFns, data->symbols.create("hasAttrs"));
+      $$ = new ExprApp(new ExprApp(hasAttrs, $1), $3);
+    }
   | expr_op '+' expr_op
     { vector<Expr *> * l = new vector<Expr *>;
       l->push_back($1);
@@ -344,8 +411,22 @@ expr_app
 expr_select
   : expr_simple '.' attrpath
     { $$ = new ExprSelect($1, *$3, 0); }
+  | expr_simple '.' attrpath_dynamic
+    { Expr *import = new ExprBuiltin(data->symbols.create("import"));
+      Expr *dynamicFnsPath = new ExprPath(data->state.findFile("nix/dynamic-attrs.nix"));
+      Expr *dynamicFns = new ExprApp(import, dynamicFnsPath);
+      Expr *getAttrs = new ExprSelect(dynamicFns, data->symbols.create("getAttrs"));
+      $$ = new ExprApp(new ExprApp(getAttrs, $1), $3);
+    }
   | expr_simple '.' attrpath OR_KW expr_select
     { $$ = new ExprSelect($1, *$3, $5); }
+  | expr_simple '.' attrpath_dynamic OR_KW expr_select
+    { Expr *import = new ExprBuiltin(data->symbols.create("import"));
+      Expr *dynamicFnsPath = new ExprPath(data->state.findFile("nix/dynamic-attrs.nix"));
+      Expr *dynamicFns = new ExprApp(import, dynamicFnsPath);
+      Expr *getAttrsOr = new ExprSelect(dynamicFns, data->symbols.create("getAttrsOr"));
+      $$ = new ExprApp(new ExprApp(new ExprApp(getAttrsOr, $5), $1), $3);
+    }
   | /* Backwards compatibility: because Nixpkgs has a rarely used
        function named ‘or’, allow stuff like ‘map or [...]’. */
     expr_simple OR_KW
@@ -356,12 +437,7 @@ expr_select
 expr_simple
   : ID { $$ = new ExprVar(data->symbols.create($1)); }
   | INT { $$ = new ExprInt($1); }
-  | '"' string_parts '"' {
-      /* For efficiency, and to simplify parse trees a bit. */
-      if ($2->empty()) $$ = new ExprString(data->symbols.create(""));
-      else if ($2->size() == 1) $$ = $2->front();
-      else $$ = new ExprConcatStrings(true, $2);
-  }
+  | '"' string_parts '"' { $$ = $2; }
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
       $$ = stripIndentation(data->symbols, *$2);
   }
@@ -375,7 +451,7 @@ expr_simple
          ‘abort’. */
       $$ = path2 == ""
           ? (Expr * ) new ExprApp(
-              new ExprVar(data->symbols.create("throw")),
+              new ExprBuiltin(data->symbols.create("throw")),
               new ExprString(data->symbols.create(
                       (format("file `%1%' was not found in the Nix search path (add it using $NIX_PATH or -I)") % path).str())))
           : (Expr * ) new ExprPath(path2);
@@ -386,23 +462,62 @@ expr_simple
      into `(rec {..., body = ...}).body'. */
   | LET '{' binds '}'
     { $3->recursive = true; $$ = new ExprSelect($3, data->symbols.create("body")); }
+  | LET '{' binds_dynamic '}'
+    { Expr *attrs = buildDynamicAttrs(data->symbols, data->state, $3, true); $$ = new ExprSelect(attrs, data->symbols.create("body")); }
   | REC '{' binds '}'
     { $3->recursive = true; $$ = $3; }
+  | REC '{' binds_dynamic '}'
+    { $$ = buildDynamicAttrs(data->symbols, data->state, $3, true); }
   | '{' binds '}'
     { $$ = $2; }
+  | '{' binds_dynamic '}'
+    { $$ = buildDynamicAttrs(data->symbols, data->state, $2, false); }
   | '[' expr_list ']' { $$ = $2; }
   ;
 
 string_parts
-  : string_parts STR { $$ = $1; $1->push_back($2); }
-  | string_parts DOLLAR_CURLY expr '}' { backToString(scanner); $$ = $1; $1->push_back($3); }
-  | { $$ = new vector<Expr *>; }
+  : plain_string_parts
+  | interpolated_string_parts { $$ = new ExprConcatStrings(true, $1); }
+  ;
+
+interpolated_string_parts
+  : interpolated_string_parts STR { $$ = $1; $1->push_back($2); }
+  | interpolated_string_parts DOLLAR_CURLY expr '}' { backToString(scanner); $$ = $1; $1->push_back($3); }
+  | plain_string_parts DOLLAR_CURLY expr '}'
+    { backToString(scanner);
+      $$ = new vector<Expr *>;
+      $1->s.empty() ? delete $1 : $$->push_back($1);
+      $$->push_back($3);
+    }
+  ;
+
+plain_string_parts
+  : STR { $$ = static_cast<ExprString *>($1); }
+  | { $$ = new ExprString(data->symbols.create("")); }
   ;
 
 ind_string_parts
   : ind_string_parts IND_STR { $$ = $1; $1->push_back($2); }
   | ind_string_parts DOLLAR_CURLY expr '}' { backToIndString(scanner); $$ = $1; $1->push_back($3); }
   | { $$ = new vector<Expr *>; }
+  ;
+
+binds_dynamic
+  : binds_dynamic_recursive binds { $$ = $1; $2->attrs.empty() ? delete $2 : $$->first.push_back($2); }
+  ;
+
+binds_dynamic_recursive
+  : binds_dynamic_recursive binds attrpath_dynamic '=' expr ';'
+    { $$ = $1;
+      $2->attrs.empty() ? delete $2 : $$->first.push_back($2);
+      $$->second->elems.push_back(buildDynamicBindings(data->symbols, $3, $5, makeCurPos(@3, data)));
+    }
+  | binds attrpath_dynamic '=' expr ';'
+    { $$ = new std::pair<std::list<ExprAttrs *>,ExprList *>;
+      $1->attrs.empty() ? delete $1 : $$->first.push_back($1);
+      $$->second = new ExprList;
+      $$->second->elems.push_back(buildDynamicBindings(data->symbols, $2, $4, makeCurPos(@2, data)));
+    }
   ;
 
 binds
@@ -428,6 +543,33 @@ binds
   | { $$ = new ExprAttrs; }
   ;
 
+attrpath_dynamic
+  : attrpath_dynamic_recursive '.' attrpath
+    { $$ = $1;
+      foreach (vector<Symbol>::const_iterator, i, *$3)
+          $$->elems.push_back(new ExprString(*i));
+    }
+  | attrpath_dynamic_recursive
+  ;
+
+attrpath_dynamic_recursive
+  : attrpath_dynamic_recursive '.' attr_dynamic { $$ = $1; $$->elems.push_back($3); }
+  | attrpath_dynamic_recursive '.' attrpath '.' attr_dynamic
+    { $$ = $1;
+      foreach (vector<Symbol>::const_iterator, i, *$3)
+          $$->elems.push_back(new ExprString(*i));
+      $$->elems.push_back($5);
+    }
+  | attr_dynamic { $$ = new ExprList; $$->elems.push_back($1); }
+  | attrpath '.' attr_dynamic
+    { $$ = new ExprList;
+      foreach (vector<Symbol>::const_iterator, i, *$1)
+          $$->elems.push_back(new ExprString(*i));
+      delete $1;
+      $$->elems.push_back($3);
+    }
+  ;
+
 attrs
   : attrs attr { $$ = $1; $1->push_back(data->symbols.create($2)); /* !!! dangerous */ }
   | { $$ = new vector<Symbol>; }
@@ -441,8 +583,12 @@ attrpath
 attr
   : ID { $$ = $1; }
   | OR_KW { $$ = "or"; }
-  | '"' STR '"'
-    { $$ = strdup(((string) ((ExprString *) $2)->s).c_str()); delete $2; }
+  | '"' plain_string_parts '"'
+    { $$ = strdup(((string) $2->s).c_str()); delete $2; }
+  ;
+
+attr_dynamic
+  : '"' interpolated_string_parts '"' { $$ = new ExprConcatStrings(true, $2); }
   ;
 
 expr_list
