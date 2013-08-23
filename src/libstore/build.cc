@@ -21,6 +21,7 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/utsname.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -2173,7 +2174,11 @@ void DerivationGoal::initChild()
 #ifdef CAN_DO_LINUX32_BUILDS
         /* Change the personality to 32-bit if we're doing an
            i686-linux build on an x86_64-linux machine. */
-        if (drv.platform == "i686-linux" && settings.thisSystem == "x86_64-linux") {
+        struct utsname utsbuf;
+        uname(&utsbuf);
+        if (drv.platform == "i686-linux" &&
+            (settings.thisSystem == "x86_64-linux" ||
+             (!strcmp(utsbuf.sysname, "Linux") && !strcmp(utsbuf.machine, "x86_64")))) {
             if (personality(0x0008 | 0x8000000 /* == PER_LINUX32_3GB */) == -1)
                 throw SysError("cannot set i686-linux personality");
         }
