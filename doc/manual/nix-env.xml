@@ -272,7 +272,7 @@ number of possible ways:
   linkend="ss-functions">functions</link> that are called with the
   active Nix expression as their single argument.  The derivations
   returned by those function calls are installed.  This allows
-  derivations to be specified in a unambiguous way, which is necessary
+  derivations to be specified in an unambiguous way, which is necessary
   if there are multiple derivations with the same
   name.</para></listitem>
 
@@ -692,7 +692,7 @@ firefox-2.0.0.9 <lineannotation>(the current one)</lineannotation>
 $ nix-env --preserve-installed -i firefox-2.0.0.11
 installing `firefox-2.0.0.11'
 building path(s) `/nix/store/myy0y59q3ig70dgq37jqwg1j0rsapzsl-user-environment'
-Collission between `/nix/store/<replaceable>...</replaceable>-firefox-2.0.0.11/bin/firefox'
+collision between `/nix/store/<replaceable>...</replaceable>-firefox-2.0.0.11/bin/firefox'
   and `/nix/store/<replaceable>...</replaceable>-firefox-2.0.0.9/bin/firefox'.
 <lineannotation>(i.e., can’t have two active at the same time)</lineannotation>
 
@@ -1244,7 +1244,7 @@ wrapper around <option>--list-generations</option> and
 $ nix-env --rollback
 switching from generation 92 to 91
 
-$ nix-env --rolback
+$ nix-env --rollback
 error: no generation older than the current (91) exists</screen>
 
 </refsection>

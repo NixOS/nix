@@ -1358,7 +1358,7 @@ irreversible.</para></warning>
   </para></listitem>
   
 
-  <listitem><para>You can now unambigously specify which derivation to
+  <listitem><para>You can now unambiguously specify which derivation to
   build or install in <command>nix-env</command>,
   <command>nix-instantiate</command> and <command>nix-build</command>
   using the <option>--attr</option> / <option>-A</option> flags, which
@@ -1498,7 +1498,7 @@ irreversible.</para></warning>
     <itemizedlist>
 
       <listitem><para>Make sure that the garbage collector can run
-      succesfully when the disk is full
+      successfully when the disk is full
       (<literal>NIX-18</literal>).</para></listitem>
 
       <listitem><para><command>nix-env</command> now locks the profile
@@ -1853,7 +1853,7 @@ $ nix-env -f .../i686-linux.nix -i -E 'x: x.firefoxWrapper'</screen>
   </itemizedlist></para></listitem>
 
   <listitem><para>A hash of the contents of a store path is now stored
-  in the database after a succesful build.  This allows you to check
+  in the database after a successful build.  This allows you to check
   whether store paths have been tampered with: <command>nix-store
   --verify --check-contents</command>.</para></listitem>
 
@@ -2017,7 +2017,7 @@ $ nix-env -f .../i686-linux.nix -i -E 'x: x.firefoxWrapper'</screen>
     <itemizedlist>
 
       <listitem><para>Derivations for other platforms are filtered out
-      (which can be overriden using
+      (which can be overridden using
       <option>--system-filter</option>).</para></listitem>
 
       <listitem><para><option>--install</option> by default now

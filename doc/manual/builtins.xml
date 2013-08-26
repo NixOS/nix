@@ -434,7 +434,7 @@ x: x + 456</programlisting>
   <replaceable>e</replaceable></term>
 
     <listitem><para>Return <literal>true</literal> if
-    <replaceable>e</replaceable> evaluates to a int, and
+    <replaceable>e</replaceable> evaluates to an int, and
     <literal>false</literal> otherwise.</para></listitem>
 
   </varlistentry>

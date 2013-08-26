@@ -804,7 +804,7 @@ void printTable(Table & table)
 }
 
 
-/* This function compares the version of a element against the
+/* This function compares the version of an element against the
    versions in the given set of elements.  `cvLess' means that only
    lower versions are in the set, `cvEqual' means that at most an
    equal version is in the set, and `cvGreater' means that there is at

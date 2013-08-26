@@ -164,7 +164,7 @@ the specified store paths.  Realisation is a somewhat overloaded term:
   exist in the file system).  If the path is already valid, we are
   done immediately.  Otherwise, the path and any missing paths in its
   closure may be produced through substitutes.  If there are no
-  (succesful) subsitutes, realisation fails.</para></listitem>
+  (successful) subsitutes, realisation fails.</para></listitem>
 
 </itemizedlist>
 

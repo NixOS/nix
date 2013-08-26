@@ -5,7 +5,7 @@ let
 in
 
 { xyzzy2 ? xyzzy # mutually recursive args
-, xyzzy ? "blaat" # will be overriden by --argstr
+, xyzzy ? "blaat" # will be overridden by --argstr
 , fb ? foobar
 , lib # will be set by --arg
 }:
