@@ -179,6 +179,12 @@ struct Settings {
        (to prevent them from being GCed). */
     bool envKeepDerivations;
 
+    /* Whether to use cgroup of process invoking the action also for nix-daemon
+       process running it (to prevent escaping from cgroup).
+       Daemon process must be able to write to tasks file of all cgroups that
+       can be used this way */
+    bool daemonUseCgroups;
+
 private:
     SettingsMap settings, overrides;
 

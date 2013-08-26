@@ -53,6 +53,7 @@ Settings::Settings()
     gcKeepDerivations = true;
     autoOptimiseStore = false;
     envKeepDerivations = false;
+    daemonUseCgroups = false;
 }
 
 
@@ -147,6 +148,7 @@ void Settings::update()
     get(gcKeepDerivations, "gc-keep-derivations");
     get(autoOptimiseStore, "auto-optimise-store");
     get(envKeepDerivations, "env-keep-derivations");
+    get(daemonUseCgroups, "daemon-use-cgroups");
 }
 
 

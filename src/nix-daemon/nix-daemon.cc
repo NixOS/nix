@@ -762,6 +762,12 @@ static void setSigChldAction(bool autoReap)
 
 #define SD_LISTEN_FDS_START 3
 
+static void setupCgroups(long pid) {
+    if (settings.daemonUseCgroups) {
+        Cgroups cgs = getCgroups(pid);
+        joinCgroups(cgs);
+    }
+}
 
 static void daemonLoop()
 {
@@ -886,6 +892,8 @@ static void daemonLoop()
                         string processName = int2String(clientPid);
                         strncpy(argvSaved[1], processName.c_str(), strlen(argvSaved[1]));
                     }
+
+                    setupCgroups(clientPid);
 
                     /* Handle the connection. */
                     from.fd = remote;
