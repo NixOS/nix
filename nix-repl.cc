@@ -8,6 +8,7 @@
 #include "eval.hh"
 #include "eval-inline.hh"
 #include "store-api.hh"
+#include "common-opts.hh"
 
 using namespace std;
 using namespace nix;
@@ -28,7 +29,8 @@ struct NixRepl
     NixRepl();
     void mainLoop();
     void processLine(string line);
-    void addVar(const Symbol & name, Value * v);
+    void addAttrsToScope(Value & attrs);
+    void addVarToScope(const Symbol & name, Value * v);
     Expr * parseString(string s);
     void evalString(string s, Value & v);
 };
@@ -48,6 +50,15 @@ bool getLine(string & line)
     free(s);
     if (line != "") add_history(line.c_str());
     return true;
+}
+
+
+string removeWhitespace(string s)
+{
+    s = chomp(s);
+    size_t n = s.find_first_not_of(" \n\r\t");
+    if (n != string::npos) s = string(s, n);
+    return s;
 }
 
 
@@ -72,12 +83,8 @@ void NixRepl::mainLoop()
         string line;
         if (!getLine(line)) break;
 
-        /* Remove preceeding whitespace. */
-        size_t n = line.find_first_not_of(" \n\r\t");
-        if (n != string::npos) line = string(line, n);
-
         try {
-            processLine(line);
+            processLine(removeWhitespace(line));
         } catch (Error & e) {
             printMsg(lvlError, e.msg());
         }
@@ -94,9 +101,17 @@ void NixRepl::processLine(string line)
     if (string(line, 0, 2) == ":a") {
         Value v;
         evalString(string(line, 2), v);
-        state.forceAttrs(v);
-        foreach (Bindings::iterator, i, *v.attrs)
-            addVar(i->name, i->value);
+        addAttrsToScope(v);
+    }
+
+    else if (string(line, 0, 2) == ":l") {
+        state.resetFileCache();
+        Path path = lookupFileArg(state, removeWhitespace(string(line, 2)));
+        Value v, v2;
+        state.evalFile(path, v);
+        Bindings bindings;
+        state.autoCallFunction(bindings, v, v2);
+        addAttrsToScope(v2);
     }
 
     else if (string(line, 0, 2) == ":t") {
@@ -118,7 +133,15 @@ void NixRepl::processLine(string line)
 }
 
 
-void NixRepl::addVar(const Symbol & name, Value * v)
+void NixRepl::addAttrsToScope(Value & attrs)
+{
+    state.forceAttrs(attrs);
+    foreach (Bindings::iterator, i, *attrs.attrs)
+        addVarToScope(i->name, i->value);
+}
+
+
+void NixRepl::addVarToScope(const Symbol & name, Value * v)
 {
     staticEnv.vars[name] = displ;
     env->values[displ++] = v;
