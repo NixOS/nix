@@ -27,7 +27,7 @@ void findAlongAttrPath(EvalState & state, const string & attrPath,
         /* Is *i an index (integer) or a normal attribute name? */
         enum { apAttr, apIndex } apType = apAttr;
         string attr = *i;
-        int attrIndex = -1;
+        unsigned int attrIndex;
         if (string2Int(attr, attrIndex)) apType = apIndex;
 
         /* Evaluate the expression. */
