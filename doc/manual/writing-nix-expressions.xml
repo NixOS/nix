@@ -720,12 +720,12 @@ configureFlags = "
     <para>Since <literal>${</literal> and <literal>''</literal> have
     special meaning in indented strings, you need a way to quote them.
     <literal>${</literal> can be escaped by prefixing it with
-    <literal>''</literal>, i.e., <literal>''${</literal>.
-    <literal>''</literal> can be escaped by prefixing it with
-    <literal>'</literal>, i.e., <literal>'''</literal>.  Finally,
-    linefeed, carriage-return and tab characters can be written as
-    <literal>''\n</literal>, <literal>''\r</literal>,
-    <literal>''\t</literal>.</para>
+    <literal>''</literal> (that is, two single quotes), i.e.,
+    <literal>''${</literal>.  <literal>''</literal> can be escaped by
+    prefixing it with <literal>'</literal>, i.e.,
+    <literal>'''</literal>.  Finally, linefeed, carriage-return and
+    tab characters can be written as <literal>''\n</literal>,
+    <literal>''\r</literal>, <literal>''\t</literal>.</para>
 
     <para>Indented strings are primarily useful in that they allow
     multi-line string literals to follow the indentation of the
