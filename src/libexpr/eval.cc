@@ -143,8 +143,8 @@ EvalState::EvalState()
     , sIgnoreNulls(symbols.create("__ignoreNulls"))
     , repair(false)
     , baseEnv(allocEnv(128))
-    , baseEnvDispl(0)
     , staticBaseEnv(false, 0)
+    , baseEnvDispl(0)
 {
     nrEnvs = nrValuesInEnvs = nrValues = nrListElems = 0;
     nrAttrsets = nrOpUpdates = nrOpUpdateValuesCopied = 0;
@@ -453,6 +453,13 @@ void EvalState::evalFile(const Path & path, Value & v)
         fileEvalCache[path] = v;
     } else
         v = i->second;
+}
+
+
+void EvalState::resetFileCache()
+{
+    fileEvalCache.clear();
+    parseTrees.clear();
 }
 
 

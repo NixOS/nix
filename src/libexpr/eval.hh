@@ -130,11 +130,14 @@ public:
     Expr * parseExprFromFile(Path path);
 
     /* Parse a Nix expression from the specified string. */
+    Expr * parseExprFromString(const string & s, const Path & basePath, StaticEnv & staticEnv);
     Expr * parseExprFromString(const string & s, const Path & basePath);
 
     /* Evaluate an expression read from the given file to normal
        form. */
     void evalFile(const Path & path, Value & v);
+
+    void resetFileCache();
 
     /* Look up a file in the search path. */
     Path findFile(const string & path);
@@ -184,20 +187,18 @@ public:
        path.  Nothing is copied to the store. */
     Path coerceToPath(Value & v, PathSet & context);
 
-private:
+public:
 
     /* The base environment, containing the builtin functions and
        values. */
     Env & baseEnv;
 
-    unsigned int baseEnvDispl;
-
-public:
-
     /* The same, but used during parsing to resolve variables. */
     StaticEnv staticBaseEnv; // !!! should be private
 
 private:
+
+    unsigned int baseEnvDispl;
 
     void createBaseEnv();
 
@@ -212,8 +213,8 @@ private:
     friend class ExprAttrs;
     friend class ExprLet;
 
-    Expr * parse(const char * text,
-        const Path & path, const Path & basePath);
+    Expr * parse(const char * text, const Path & path,
+        const Path & basePath, StaticEnv & staticEnv);
 
 public:
 

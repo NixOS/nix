@@ -481,7 +481,7 @@ namespace nix {
 
 
 Expr * EvalState::parse(const char * text,
-    const Path & path, const Path & basePath)
+    const Path & path, const Path & basePath, StaticEnv & staticEnv)
 {
     yyscan_t scanner;
     ParseData data(*this);
@@ -496,7 +496,7 @@ Expr * EvalState::parse(const char * text,
     if (res) throw ParseError(data.error);
 
     try {
-        data.result->bindVars(staticBaseEnv);
+        data.result->bindVars(staticEnv);
     } catch (Error & e) {
         throw ParseError(format("%1%, in `%2%'") % e.msg() % path);
     }
@@ -527,7 +527,7 @@ Expr * EvalState::parseExprFromFile(Path path)
        tree cache. */
     Expr * e = parseTrees[path];
     if (!e) {
-        e = parse(readFile(path).c_str(), path, dirOf(path));
+        e = parse(readFile(path).c_str(), path, dirOf(path), staticBaseEnv);
         parseTrees[path] = e;
     }
 
@@ -535,9 +535,15 @@ Expr * EvalState::parseExprFromFile(Path path)
 }
 
 
+Expr * EvalState::parseExprFromString(const string & s, const Path & basePath, StaticEnv & staticEnv)
+{
+    return parse(s.c_str(), "(string)", basePath, staticEnv);
+}
+
+
 Expr * EvalState::parseExprFromString(const string & s, const Path & basePath)
 {
-    return parse(s.c_str(), "(string)", basePath);
+    return parseExprFromString(s, basePath, staticBaseEnv);
 }
 
 
