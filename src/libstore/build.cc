@@ -996,7 +996,7 @@ void DerivationGoal::killChild()
 
 void DerivationGoal::cancel(bool timeout)
 {
-    if (timeout)
+    if (settings.printBuildTrace && timeout)
         printMsg(lvlError, format("@ build-failed %1% - timeout") % drvPath);
     killChild();
     amDone(ecFailed);
@@ -1609,9 +1609,8 @@ void DerivationGoal::buildDone()
     /* Release the build user, if applicable. */
     buildUser.release();
 
-    if (settings.printBuildTrace) {
+    if (settings.printBuildTrace)
         printMsg(lvlError, format("@ build-succeeded %1% -") % drvPath);
-    }
 
     amDone(ecSuccess);
 }
@@ -2649,7 +2648,7 @@ SubstitutionGoal::~SubstitutionGoal()
 
 void SubstitutionGoal::cancel(bool timeout)
 {
-    if (timeout)
+    if (settings.printBuildTrace && timeout)
         printMsg(lvlError, format("@ substituter-failed %1% timeout") % storePath);
     if (pid != -1) {
         pid_t savedPid = pid;
