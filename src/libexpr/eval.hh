@@ -88,7 +88,7 @@ struct EvalState;
 std::ostream & operator << (std::ostream & str, const Value & v);
 
 
-class EvalState 
+class EvalState
 {
 public:
     SymbolTable symbols;
@@ -101,7 +101,7 @@ public:
     bool repair;
 
 private:
-    SrcToStore srcToStore; 
+    SrcToStore srcToStore;
 
     /* A cache from path names to parse trees. */
     std::map<Path, Expr *> parseTrees;
@@ -119,7 +119,7 @@ private:
     SearchPath::iterator searchPathInsertionPoint;
 
 public:
-    
+
     EvalState();
     ~EvalState();
 
@@ -131,7 +131,7 @@ public:
 
     /* Parse a Nix expression from the specified string. */
     Expr * parseExprFromString(const string & s, const Path & basePath);
-    
+
     /* Evaluate an expression read from the given file to normal
        form. */
     void evalFile(const Path & path, Value & v);
@@ -193,21 +193,21 @@ private:
     unsigned int baseEnvDispl;
 
 public:
-    
+
     /* The same, but used during parsing to resolve variables. */
     StaticEnv staticBaseEnv; // !!! should be private
 
 private:
-    
+
     void createBaseEnv();
-    
+
     void addConstant(const string & name, Value & v);
 
     void addPrimOp(const string & name,
         unsigned int arity, PrimOpFun primOp);
 
     inline Value * lookupVar(Env * env, const VarRef & var, bool noEval);
-    
+
     friend class ExprVar;
     friend class ExprAttrs;
     friend class ExprLet;
@@ -216,7 +216,7 @@ private:
         const Path & path, const Path & basePath);
 
 public:
-    
+
     /* Do a deep equality test between two values.  That is, list
        elements and attributes are compared recursively. */
     bool eqValues(Value & v1, Value & v2);
@@ -226,7 +226,7 @@ public:
     /* Automatically call a function for which each argument has a
        default value or has a binding in the `args' map. */
     void autoCallFunction(Bindings & args, Value & fun, Value & res);
-    
+
     /* Allocation primitives. */
     Value * allocValue();
     Env & allocEnv(unsigned int size);

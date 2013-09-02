@@ -114,7 +114,7 @@ struct VarRef
     /* Whether the variable comes from an environment (e.g. a rec, let
        or function argument) or from a "with". */
     bool fromWith;
-    
+
     /* In the former case, the value is obtained by going `level'
        levels up from the current environment and getting the
        `displ'th value in that environment.  In the latter case, the

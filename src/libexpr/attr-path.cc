@@ -18,7 +18,7 @@ void findAlongAttrPath(EvalState & state, const string & attrPath,
     string curPath;
 
     state.mkThunk_(v, e);
-    
+
     foreach (Strings::iterator, i, tokens) {
 
         if (!curPath.empty()) curPath += ".";
@@ -65,9 +65,9 @@ void findAlongAttrPath(EvalState & state, const string & attrPath,
 
             v = *v.list.elems[attrIndex];
         }
-        
+
     }
 }
 
- 
+
 }

@@ -15,14 +15,14 @@ using namespace nix;
 
 namespace nix {
 
-    
+
 static void initLoc(YYLTYPE * loc)
 {
     loc->first_line = loc->last_line = 1;
     loc->first_column = loc->last_column = 1;
 }
 
-    
+
 static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
 {
     loc->first_line = loc->last_line;
@@ -34,7 +34,7 @@ static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
            if (*s == '\n') /* cr/lf */
                s++;
            /* fall through */
-       case '\n': 
+       case '\n':
            ++loc->last_line;
            loc->last_column = 1;
            break;
@@ -68,7 +68,7 @@ static Expr * unescapeStr(SymbolTable & symbols, const char * s)
     return new ExprString(symbols.create(t));
 }
 
- 
+
 }
 
 #define YY_USER_INIT initLoc(yylloc)
@@ -171,7 +171,7 @@ or          { return OR_KW; }
 
 
 namespace nix {
-    
+
 /* Horrible, disgusting hack: allow the parser to set the scanner
    start condition back to STRING.  Necessary in interpolations like
    "foo${expr}bar"; after the close brace we have to go back to the

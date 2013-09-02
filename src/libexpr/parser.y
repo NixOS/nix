@@ -12,18 +12,18 @@
 %expect-rr 1
 
 %code requires {
-    
+
 #ifndef BISON_HEADER
 #define BISON_HEADER
-    
+
 #include "util.hh"
-    
+
 #include "nixexpr.hh"
 #include "eval.hh"
 
 namespace nix {
 
-    struct ParseData 
+    struct ParseData
     {
         EvalState & state;
         SymbolTable & symbols;
@@ -38,7 +38,7 @@ namespace nix {
             , sLetBody(symbols.create("<let-body>"))
             { };
     };
-    
+
 }
 
 #define YY_DECL int yylex \
@@ -63,14 +63,14 @@ using namespace nix;
 
 
 namespace nix {
-    
+
 
 static void dupAttr(const AttrPath & attrPath, const Pos & pos, const Pos & prevPos)
 {
     throw ParseError(format("attribute `%1%' at %2% already defined at %3%")
         % showAttrPath(attrPath) % pos % prevPos);
 }
- 
+
 
 static void dupAttr(Symbol attr, const Pos & pos, const Pos & prevPos)
 {
@@ -78,7 +78,7 @@ static void dupAttr(Symbol attr, const Pos & pos, const Pos & prevPos)
     throw ParseError(format("attribute `%1%' at %2% already defined at %3%")
         % showAttrPath(attrPath) % pos % prevPos);
 }
- 
+
 
 static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
     Expr * e, const Pos & pos)
@@ -121,7 +121,7 @@ static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
 static Expr * stripIndentation(SymbolTable & symbols, vector<Expr *> & es)
 {
     if (es.empty()) return new ExprString(symbols.create(""));
-    
+
     /* Figure out the minimum indentation.  Note that by design
        whitespace-only final lines are not taken into account.  (So
        the " " in "\n ''" is ignored, but the " " in "\n foo''" is.) */
@@ -170,7 +170,7 @@ static Expr * stripIndentation(SymbolTable & symbols, vector<Expr *> & es)
             es2->push_back(*i);
             continue;
         }
-        
+
         string s2;
         for (unsigned int j = 0; j < e->s.size(); ++j) {
             if (atStartOfLine) {
@@ -232,7 +232,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %}
 
 %union {
-  // !!! We're probably leaking stuff here.  
+  // !!! We're probably leaking stuff here.
   nix::Expr * e;
   nix::ExprList * list;
   nix::ExprAttrs * attrs;
@@ -465,7 +465,7 @@ formal
   : ID { $$ = new Formal(data->symbols.create($1), 0); }
   | ID '?' expr { $$ = new Formal(data->symbols.create($1), $3); }
   ;
-  
+
 %%
 
 
@@ -478,7 +478,7 @@ formal
 
 
 namespace nix {
-      
+
 
 Expr * EvalState::parse(const char * text,
     const Path & path, const Path & basePath)
@@ -492,7 +492,7 @@ Expr * EvalState::parse(const char * text,
     yy_scan_string(text, scanner);
     int res = yyparse(scanner, &data);
     yylex_destroy(scanner);
-    
+
     if (res) throw ParseError(data.error);
 
     try {
@@ -500,7 +500,7 @@ Expr * EvalState::parse(const char * text,
     } catch (Error & e) {
         throw ParseError(format("%1%, in `%2%'") % e.msg() % path);
     }
-    
+
     return data.result;
 }
 
@@ -552,7 +552,7 @@ void EvalState::addToSearchPath(const string & s)
         prefix = string(s, 0, pos);
         path = string(s, pos + 1);
     }
-    
+
     path = absPath(path);
     if (pathExists(path)) {
         debug(format("adding path `%1%' to the search path") % path);
@@ -565,7 +565,7 @@ Path EvalState::findFile(const string & path)
 {
     foreach (SearchPath::iterator, i, searchPath) {
         Path res;
-        if (i->first.empty()) 
+        if (i->first.empty())
             res = i->second + "/" + path;
         else {
             if (path.compare(0, i->first.size(), i->first) != 0 ||

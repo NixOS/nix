@@ -224,11 +224,11 @@ void ExprAttrs::bindVars(const StaticEnv & env)
 {
     if (recursive) {
         StaticEnv newEnv(false, &env);
-    
+
         unsigned int displ = 0;
         foreach (AttrDefs::iterator, i, attrs)
             newEnv.vars[i->first] = i->second.displ = displ++;
-        
+
         foreach (AttrDefs::iterator, i, attrs)
             i->second.e->bindVars(i->second.inherited ? env : newEnv);
     }
@@ -247,9 +247,9 @@ void ExprList::bindVars(const StaticEnv & env)
 void ExprLambda::bindVars(const StaticEnv & env)
 {
     StaticEnv newEnv(false, &env);
-    
+
     unsigned int displ = 0;
-    
+
     if (!arg.empty()) newEnv.vars[arg] = displ++;
 
     if (matchAttrs) {
@@ -266,14 +266,14 @@ void ExprLambda::bindVars(const StaticEnv & env)
 void ExprLet::bindVars(const StaticEnv & env)
 {
     StaticEnv newEnv(false, &env);
-    
+
     unsigned int displ = 0;
     foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs)
         newEnv.vars[i->first] = i->second.displ = displ++;
-    
+
     foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs)
         i->second.e->bindVars(i->second.inherited ? env : newEnv);
-    
+
     body->bindVars(newEnv);
 }
 
@@ -290,8 +290,8 @@ void ExprWith::bindVars(const StaticEnv & env)
             prevWith = level;
             break;
         }
-    
-    attrs->bindVars(env);    
+
+    attrs->bindVars(env);
     StaticEnv newEnv(true, &env);
     body->bindVars(newEnv);
 }

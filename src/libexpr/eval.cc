@@ -44,7 +44,7 @@ void Bindings::sort()
 {
     std::sort(begin(), end());
 }
-    
+
 
 std::ostream & operator << (std::ostream & str, const Value & v)
 {
@@ -291,7 +291,7 @@ void mkString(Value & v, const string & s, const PathSet & context)
         unsigned int n = 0;
         v.string.context = (const char * *)
             GC_MALLOC((context.size() + 1) * sizeof(char *));
-        foreach (PathSet::const_iterator, i, context)  
+        foreach (PathSet::const_iterator, i, context)
             v.string.context[n++] = GC_STRDUP(i->c_str());
         v.string.context[n] = 0;
     }
@@ -346,7 +346,7 @@ Env & EvalState::allocEnv(unsigned int size)
     /* Clear the values because maybeThunk() and lookupVar fromWith expects this. */
     for (unsigned i = 0; i < size; ++i)
         env->values[i] = 0;
-    
+
     return *env;
 }
 
@@ -358,7 +358,7 @@ Value * EvalState::allocAttr(Value & vAttrs, const Symbol & name)
     return v;
 }
 
-    
+
 void EvalState::mkList(Value & v, unsigned int length)
 {
     v.type = tList;
@@ -607,7 +607,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     e->eval(state, env, vTmp);
 
     try {
-        
+
         foreach (AttrPath::const_iterator, i, attrPath) {
             nrLookups++;
             Bindings::iterator j;
@@ -628,17 +628,17 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             pos = j->pos;
             if (state.countCalls && pos) state.attrSelects[*pos]++;
         }
-    
+
 
         state.forceValue(*vAttrs);
-        
+
     } catch (Error & e) {
         if (pos)
             addErrorPrefix(e, "while evaluating the attribute `%1%' at %2%:\n",
                 showAttrPath(attrPath), *pos);
         throw;
     }
-    
+
     v = *vAttrs;
 }
 
@@ -662,7 +662,7 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
             vAttrs = j->value;
         }
     }
-    
+
     mkBool(v, true);
 }
 
@@ -697,10 +697,10 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
         assert(primOp->type == tPrimOp);
         unsigned int arity = primOp->primOp->arity;
         unsigned int argsLeft = arity - argsDone;
-        
+
         if (argsLeft == 1) {
             /* We have all the arguments, so call the primop. */
-                
+
             /* Put all the arguments in an array. */
             Value * vArgs[arity];
             unsigned int n = arity - 1;
@@ -725,7 +725,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
         }
         return;
     }
-    
+
     if (fun.type != tLambda)
         throwTypeError("attempt to call something which is not a function but %1%",
             showType(fun));
@@ -743,7 +743,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
 
     else {
         forceAttrs(arg);
-        
+
         if (!fun.lambda.fun->arg.empty())
             env2.values[displ++] = &arg;
 
@@ -830,7 +830,7 @@ void ExprIf::eval(EvalState & state, Env & env, Value & v)
     (state.evalBool(env, cond) ? then : else_)->eval(state, env, v);
 }
 
-    
+
 void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 {
     if (!state.evalBool(env, cond))
@@ -838,7 +838,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
     body->eval(state, env, v);
 }
 
-    
+
 void ExprOpNot::eval(EvalState & state, Env & env, Value & v)
 {
     mkBool(v, !state.evalBool(env, e));
@@ -911,7 +911,7 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
 
     while (i != v1.attrs->end()) v.attrs->push_back(*i++);
     while (j != v2.attrs->end()) v.attrs->push_back(*j++);
-    
+
     state.nrOpUpdateValuesCopied += v.attrs->size();
 }
 
@@ -996,12 +996,12 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 void EvalState::strictForceValue(Value & v)
 {
     forceValue(v);
-    
+
     if (v.type == tAttrs) {
         foreach (Bindings::iterator, i, *v.attrs)
             strictForceValue(*i->value);
     }
-    
+
     else if (v.type == tList) {
         for (unsigned int n = 0; n < v.list.length; ++n)
             strictForceValue(*v.list.elems[n]);
@@ -1047,7 +1047,7 @@ string EvalState::forceString(Value & v)
 void copyContext(const Value & v, PathSet & context)
 {
     if (v.string.context)
-        for (const char * * p = v.string.context; *p; ++p) 
+        for (const char * * p = v.string.context; *p; ++p)
             context.insert(*p);
 }
 
@@ -1097,7 +1097,7 @@ string EvalState::coerceToString(Value & v, PathSet & context,
         Path path(canonPath(v.path));
 
         if (!copyToStore) return path;
-        
+
         if (nix::isDerivation(path))
             throwEvalError("file names are not allowed to end in `%1%'", drvExtension);
 
@@ -1146,7 +1146,7 @@ string EvalState::coerceToString(Value & v, PathSet & context,
             return result;
         }
     }
-    
+
     throwTypeError("cannot coerce %1% to a string", showType(v));
 }
 
@@ -1222,7 +1222,7 @@ bool EvalState::eqValues(Value & v1, Value & v2)
             for (i = v1.attrs->begin(), j = v2.attrs->begin(); i != v1.attrs->end(); ++i, ++j)
                 if (i->name != j->name || !eqValues(*i->value, *j->value))
                     return false;
-            
+
             return true;
         }
 
