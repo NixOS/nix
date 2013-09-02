@@ -148,6 +148,7 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
 
   </varlistentry>
 
+
   <varlistentry xml:id="conf-build-timeout"><term><literal>build-timeout</literal></term>
 
     <listitem>
@@ -162,6 +163,20 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
 
       <para>The value <literal>0</literal> means that there is no
       timeout.  This is also the default.</para>
+
+    </listitem>
+
+  </varlistentry>
+
+
+  <varlistentry xml:id="conf-build-max-log-size"><term><literal>build-max-log-size</literal></term>
+
+    <listitem>
+
+      <para>This option defines the maximum number of bytes that a
+      builder can write to its stdout/stderr.  If the builder exceeds
+      this limit, it’s killed.  A value of <literal>0</literal> (the
+      default) means that there is no limit.</para>
 
     </listitem>
 

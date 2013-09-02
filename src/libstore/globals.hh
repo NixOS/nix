@@ -153,6 +153,10 @@ struct Settings {
     /* Whether to compress logs. */
     bool compressLog;
 
+    /* Maximum number of bytes a builder can write to stdout/stderr
+       before being killed (0 means no limit). */
+    unsigned long maxLogSize;
+
     /* Whether to cache build failures. */
     bool cacheFailure;
 

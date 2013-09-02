@@ -813,6 +813,9 @@ private:
     BZFILE * bzLogFile;
     AutoCloseFD fdLogFile;
 
+    /* Number of bytes received from the builder's stdout/stderr. */
+    unsigned long logSize;
+
     /* Pipe for the builder's standard output/error. */
     Pipe builderOut;
 
@@ -2403,6 +2406,8 @@ string drvsLogDir = "drvs";
 
 Path DerivationGoal::openLogFile()
 {
+    logSize = 0;
+
     if (!settings.keepLog) return "";
 
     string baseName = baseNameOf(drvPath);
@@ -2478,6 +2483,14 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
     if ((hook && fd == hook->builderOut.readSide) ||
         (!hook && fd == builderOut.readSide))
     {
+        logSize += data.size();
+        if (settings.maxLogSize && logSize > settings.maxLogSize) {
+            printMsg(lvlError,
+                format("%1% killed after writing more than %2% bytes of log output")
+                % getName() % settings.maxLogSize);
+            cancel(true); // not really a timeout, but close enough
+            return;
+        }
         if (verbosity >= settings.buildVerbosity)
             writeToStderr(data);
         if (bzLogFile) {

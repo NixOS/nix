@@ -46,6 +46,7 @@ Settings::Settings()
     impersonateLinux26 = false;
     keepLog = true;
     compressLog = true;
+    maxLogSize = 0;
     cacheFailure = false;
     pollInterval = 5;
     checkRootReachability = false;
@@ -140,6 +141,7 @@ void Settings::update()
     get(impersonateLinux26, "build-impersonate-linux-26");
     get(keepLog, "build-keep-log");
     get(compressLog, "build-compress-log");
+    get(maxLogSize, "build-max-log-size");
     get(cacheFailure, "build-cache-failure");
     get(pollInterval, "build-poll-interval");
     get(checkRootReachability, "gc-check-reachability");
