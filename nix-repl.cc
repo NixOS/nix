@@ -30,6 +30,7 @@ struct NixRepl
     void processLine(string line);
     void addVar(const Symbol & name, Value * v);
     Expr * parseString(string s);
+    void evalString(string s, Value & v);
 };
 
 
@@ -91,12 +92,17 @@ void NixRepl::mainLoop()
 void NixRepl::processLine(string line)
 {
     if (string(line, 0, 2) == ":a") {
-        Expr * e = parseString(string(line, 2));
         Value v;
-        e->eval(state, *env, v);
+        evalString(string(line, 2), v);
         state.forceAttrs(v);
         foreach (Bindings::iterator, i, *v.attrs)
             addVar(i->name, i->value);
+    }
+
+    else if (string(line, 0, 2) == ":t") {
+        Value v;
+        evalString(string(line, 2), v);
+        std::cout << showType(v) << std::endl;
     }
 
     else if (string(line, 0, 1) == ":") {
@@ -104,9 +110,8 @@ void NixRepl::processLine(string line)
     }
 
     else {
-        Expr * e = parseString(line);
         Value v;
-        e->eval(state, *env, v);
+        evalString(line, v);
         state.strictForceValue(v);
         std::cout << v << std::endl;
     }
@@ -124,6 +129,14 @@ Expr * NixRepl::parseString(string s)
 {
     Expr * e = state.parseExprFromString(s, curDir, staticEnv);
     return e;
+}
+
+
+void NixRepl::evalString(string s, Value & v)
+{
+    Expr * e = parseString(s);
+    e->eval(state, *env, v);
+    state.forceValue(v);
 }
 
 
