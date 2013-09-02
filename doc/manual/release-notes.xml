@@ -10,6 +10,9 @@
 
 <section xml:id="ssec-relnotes-1.6.0"><title>Release 1.6.0 (TBA)</title>
 
+<para>In addition to the usual bug fixes, this release has several new
+features:</para>
+
 <itemizedlist>
 
   <listitem>
@@ -36,6 +39,55 @@
     <para><command>nix-shell</command> now sets the shell prompt
     (<envar>PS1</envar>) to ensure that Nix shells are distinguishable
     from your regular shells.</para>
+  </listitem>
+
+  <listitem>
+    <para>The ‘<literal>with</literal>’ language construct is now more
+    lazy.  It only evaluates its argument if a variable might actually
+    refer to an attribute in the argument.  For instance, this now
+    works:
+
+<programlisting>
+let
+  pkgs = with pkgs; { foo = "old"; bar = foo; } // overrides;
+  overrides = { foo = "new"; };
+in pkgs.bar
+</programlisting>
+
+    This evaluates to <literal>"new"</literal>, while previously it
+    gave an “infinite recursion” error.</para>
+  </listitem>
+
+  <listitem>
+    <para>Nix now has proper integer arithmetic operators. For
+    instance, you can write <literal>x + y</literal> instead of
+    <literal>builtins.add x y</literal>, or <literal>x &lt;
+    y</literal> instead of <literal>builtins.lessThan x y</literal>.
+    The comparison operators also work on strings.</para>
+  </listitem>
+
+  <listitem>
+    <para>On 64-bit systems, Nix integers are now 64 bits rather than
+    32 bits.</para>
+  </listitem>
+
+  <listitem>
+    <para>When using the Nix daemon, the <command>nix-daemon</command>
+    worker process now runs on the same CPU as the client, on systems
+    that support setting CPU affinity.  This gives a significant speedup
+    on some systems.</para>
+  </listitem>
+
+  <listitem>
+    <para>If a stack overflow occurs in the Nix evaluator, you now get
+    a proper error message (rather than “Segmentation fault”) on some
+    systems.</para>
+  </listitem>
+
+  <listitem>
+    <para>In addition to directories, you can now bind-mount regular
+    files in chroots through the (now misnamed) option
+    <option>build-chroot-dirs</option>.</para>
   </listitem>
 
 </itemizedlist>
