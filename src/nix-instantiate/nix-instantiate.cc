@@ -44,9 +44,11 @@ void processExpr(EvalState & state, const Strings & attrPaths,
         return;
     }
 
+    Value vRoot;
+    state.eval(e, vRoot);
+
     foreach (Strings::const_iterator, i, attrPaths) {
-        Value v;
-        findAlongAttrPath(state, *i, autoArgs, e, v);
+        Value & v(*findAlongAttrPath(state, *i, autoArgs, vRoot));
         state.forceValue(v);
 
         PathSet context;
