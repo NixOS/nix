@@ -203,6 +203,12 @@ private:
     void addPrimOp(const string & name,
         unsigned int arity, PrimOpFun primOp);
 
+public:
+
+    void getBuiltin(const string & name, Value & v);
+
+private:
+
     inline Value * lookupVar(Env * env, const VarRef & var, bool noEval);
 
     friend class ExprVar;

@@ -222,6 +222,12 @@ void EvalState::addPrimOp(const string & name,
 }
 
 
+void EvalState::getBuiltin(const string & name, Value & v)
+{
+    v = *baseEnv.values[0]->attrs->find(symbols.create(name))->value;
+}
+
+
 /* Every "format" object (even temporary) takes up a few hundred bytes
    of stack space, which is a real killer in the recursive
    evaluator.  So here are some helper functions for throwing

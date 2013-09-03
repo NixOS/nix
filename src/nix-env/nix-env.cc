@@ -131,9 +131,12 @@ static void getAllExprs(EvalState & state,
                 continue;
             }
             attrs.insert(attrName);
-            // FIXME: make loading lazy.
-            Value & v2(*state.allocAttr(v, state.symbols.create(attrName)));
-            state.evalFile(path2, v2);
+            /* Load the expression on demand. */
+            Value & vFun(*state.allocValue());
+            Value & vArg(*state.allocValue());
+            state.getBuiltin("import", vFun);
+            mkString(vArg, path2);
+            mkApp(*state.allocAttr(v, state.symbols.create(attrName)), vFun, vArg);
         }
         else if (S_ISDIR(st.st_mode))
             /* `path2' is a directory (with no default.nix in it);
