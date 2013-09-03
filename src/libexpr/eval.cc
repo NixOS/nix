@@ -440,26 +440,30 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 
 void EvalState::evalFile(const Path & path, Value & v)
 {
-    FileEvalCache::iterator i = fileEvalCache.find(path);
-    if (i == fileEvalCache.end()) {
-        startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path);
-        Expr * e = parseExprFromFile(path);
-        try {
-            eval(e, v);
-        } catch (Error & e) {
-            addErrorPrefix(e, "while evaluating the file `%1%':\n", path);
-            throw;
-        }
-        fileEvalCache[path] = v;
-    } else
+    Path path2 = resolveExprPath(path);
+
+    FileEvalCache::iterator i = fileEvalCache.find(path2);
+    if (i != fileEvalCache.end()) {
         v = i->second;
+        return;
+    }
+
+    startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path2);
+    Expr * e = parseExprFromFile(path2);
+    try {
+        eval(e, v);
+    } catch (Error & e) {
+        addErrorPrefix(e, "while evaluating the file `%1%':\n", path2);
+        throw;
+    }
+    fileEvalCache[path2] = v;
+    //if (path != path2) fileEvalCache[path2] = v;
 }
 
 
 void EvalState::resetFileCache()
 {
     fileEvalCache.clear();
-    parseTrees.clear();
 }
 
 

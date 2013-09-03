@@ -160,7 +160,7 @@ void run(Strings args)
         files.push_back("./default.nix");
 
     foreach (Strings::iterator, i, files) {
-        Expr * e = state.parseExprFromFile(lookupFileArg(state, *i));
+        Expr * e = state.parseExprFromFile(resolveExprPath(lookupFileArg(state, *i)));
         processExpr(state, attrPaths, parseOnly, strict, autoArgs,
             evalOnly, xmlOutput, xmlOutputSourceLocation, e);
     }

@@ -131,7 +131,7 @@ static void getAllExprs(EvalState & state,
             if (hasSuffix(attrName, ".nix"))
                 attrName = string(attrName, 0, attrName.size() - 4);
             attrs.attrs[state.symbols.create(attrName)] =
-                ExprAttrs::AttrDef(state.parseExprFromFile(absPath(path2)), noPos);
+                ExprAttrs::AttrDef(state.parseExprFromFile(resolveExprPath(absPath(path2))), noPos);
         }
         else
             /* `path2' is a directory (with no default.nix in it);
@@ -143,7 +143,7 @@ static void getAllExprs(EvalState & state,
 
 static Expr * loadSourceExpr(EvalState & state, const Path & path)
 {
-    if (isNixExpr(path)) return state.parseExprFromFile(absPath(path));
+    if (isNixExpr(path)) return state.parseExprFromFile(resolveExprPath(absPath(path)));
 
     /* The path is a directory.  Put the Nix expressions in the
        directory in an attribute set, with the file name of each

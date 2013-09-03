@@ -103,9 +103,6 @@ public:
 private:
     SrcToStore srcToStore;
 
-    /* A cache from path names to parse trees. */
-    std::map<Path, Expr *> parseTrees;
-
     /* A cache from path names to values. */
 #if HAVE_BOEHMGC
     typedef std::map<Path, Value, std::less<Path>, gc_allocator<std::pair<const Path, Value> > > FileEvalCache;
@@ -125,9 +122,8 @@ public:
 
     void addToSearchPath(const string & s);
 
-    /* Parse a Nix expression from the specified file.  If `path'
-       refers to a directory, then "/default.nix" is appended. */
-    Expr * parseExprFromFile(Path path);
+    /* Parse a Nix expression from the specified file. */
+    Expr * parseExprFromFile(const Path & path);
 
     /* Parse a Nix expression from the specified string. */
     Expr * parseExprFromString(const string & s, const Path & basePath, StaticEnv & staticEnv);
@@ -276,6 +272,10 @@ private:
 
 /* Return a string representing the type of the value `v'. */
 string showType(const Value & v);
+
+
+/* If `path' refers to a directory, then append "/default.nix". */
+Path resolveExprPath(Path path);
 
 
 }

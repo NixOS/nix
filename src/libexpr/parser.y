@@ -505,7 +505,7 @@ Expr * EvalState::parse(const char * text,
 }
 
 
-Expr * EvalState::parseExprFromFile(Path path)
+Path resolveExprPath(Path path)
 {
     assert(path[0] == '/');
 
@@ -523,15 +523,13 @@ Expr * EvalState::parseExprFromFile(Path path)
     if (S_ISDIR(st.st_mode))
         path = canonPath(path + "/default.nix");
 
-    /* Read and parse the input file, unless it's already in the parse
-       tree cache. */
-    Expr * e = parseTrees[path];
-    if (!e) {
-        e = parse(readFile(path).c_str(), path, dirOf(path), staticBaseEnv);
-        parseTrees[path] = e;
-    }
+    return path;
+}
 
-    return e;
+
+Expr * EvalState::parseExprFromFile(const Path & path)
+{
+    return parse(readFile(path).c_str(), path, dirOf(path), staticBaseEnv);
 }
 
 

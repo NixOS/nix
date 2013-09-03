@@ -82,8 +82,7 @@ static void prim_import(EvalState & state, Value * * args, Value & v)
         }
         w.attrs->sort();
         Value fun;
-        state.mkThunk_(fun,
-            state.parseExprFromFile(state.findFile("nix/imported-drv-to-derivation.nix")));
+        state.evalFile(state.findFile("nix/imported-drv-to-derivation.nix"), fun);
         state.forceFunction(fun);
         mkApp(v, fun, w);
         state.forceAttrs(v);
@@ -1263,7 +1262,7 @@ void EvalState::createBaseEnv()
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
-    mkThunk_(v, parseExprFromFile(findFile("nix/derivation.nix")));
+    evalFile(findFile("nix/derivation.nix"), v);
     addConstant("derivation", v);
 
     /* Now that we've added all primops, sort the `builtins' attribute
