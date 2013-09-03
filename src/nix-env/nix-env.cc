@@ -101,7 +101,7 @@ static bool isNixExpr(const Path & path, struct stat & st)
 
 
 static void getAllExprs(EvalState & state,
-    const Path & path, Value & v)
+    const Path & path, StringSet & attrs, Value & v)
 {
     Strings names = readDirectory(path);
     StringSet namesSorted(names.begin(), names.end());
@@ -126,6 +126,11 @@ static void getAllExprs(EvalState & state,
             string attrName = *i;
             if (hasSuffix(attrName, ".nix"))
                 attrName = string(attrName, 0, attrName.size() - 4);
+            if (attrs.find(attrName) != attrs.end()) {
+                printMsg(lvlError, format("warning: name collision in input Nix expressions, skipping `%1%'") % path2);
+                continue;
+            }
+            attrs.insert(attrName);
             // FIXME: make loading lazy.
             Value & v2(*state.allocAttr(v, state.symbols.create(attrName)));
             state.evalFile(path2, v2);
@@ -133,7 +138,7 @@ static void getAllExprs(EvalState & state,
         else if (S_ISDIR(st.st_mode))
             /* `path2' is a directory (with no default.nix in it);
                recurse into it. */
-            getAllExprs(state, path2, v);
+            getAllExprs(state, path2, attrs, v);
     }
 }
 
@@ -158,7 +163,8 @@ static void loadSourceExpr(EvalState & state, const Path & path, Value & v)
     if (S_ISDIR(st.st_mode)) {
         state.mkAttrs(v, 16);
         state.mkList(*state.allocAttr(v, state.symbols.create("_combineChannels")), 0);
-        getAllExprs(state, path, v);
+        StringSet attrs;
+        getAllExprs(state, path, attrs, v);
         v.attrs->sort();
     }
 }
