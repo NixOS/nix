@@ -209,6 +209,10 @@ also <xref linkend="sec-common-options" />.</phrase></para>
     <arg choice='plain'><option>--preserve-installed</option></arg>
     <arg choice='plain'><option>-P</option></arg>
   </group>
+  <group choice='opt'>
+    <arg choice='plain'><option>--remove-all</option></arg>
+    <arg choice='plain'><option>-r</option></arg>
+  </group>
   <arg choice='plain' rep='repeat'><replaceable>args</replaceable></arg>
 </cmdsynopsis>
 
@@ -315,6 +319,16 @@ number of possible ways:
     profile will lead to an error in building the generation, due to
     file name clashes between the two versions.  However, this is not
     the case for all packages.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--remove-all</option></term>
+    <term><option>-r</option></term>
+
+    <listitem><para>Remove all previously installed packages first.
+    This is equivalent to running <literal>nix-env -e '*'</literal>
+    first, except that everything happens in a single
+    transaction.</para></listitem>
 
   </varlistentry>
 

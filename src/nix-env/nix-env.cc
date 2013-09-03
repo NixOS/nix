@@ -54,6 +54,7 @@ struct Globals
     EvalState state;
     bool dryRun;
     bool preserveInstalled;
+    bool removeAll;
     string forceName;
     bool prebuiltOnly;
 };
@@ -489,29 +490,33 @@ static void installDerivations(Globals & globals,
         newNames.insert(DrvName(i->name).name);
     }
 
-    /* Add in the already installed derivations, unless they have the
-       same name as a to-be-installed element. */
 
     while (true) {
         string lockToken = optimisticLockProfile(profile);
 
-        DrvInfos installedElems = queryInstalled(globals.state, profile);
-
         DrvInfos allElems(newElems);
-        foreach (DrvInfos::iterator, i, installedElems) {
-            DrvName drvName(i->name);
-            MetaInfo meta = i->queryMetaInfo(globals.state);
-            if (!globals.preserveInstalled &&
-                newNames.find(drvName.name) != newNames.end() &&
-                !keep(meta))
-                printMsg(lvlInfo,
-                    format("replacing old `%1%'") % i->name);
-            else
-                allElems.push_back(*i);
-        }
 
-        foreach (DrvInfos::iterator, i, newElems)
-            printMsg(lvlInfo, format("installing `%1%'") % i->name);
+        /* Add in the already installed derivations, unless they have
+           the same name as a to-be-installed element. */
+        if (!globals.removeAll) {
+            printMsg(lvlError, "FOO");
+            
+            DrvInfos installedElems = queryInstalled(globals.state, profile);
+
+            foreach (DrvInfos::iterator, i, installedElems) {
+                DrvName drvName(i->name);
+                MetaInfo meta = i->queryMetaInfo(globals.state);
+                if (!globals.preserveInstalled &&
+                    newNames.find(drvName.name) != newNames.end() &&
+                    !keep(meta))
+                    printMsg(lvlInfo, format("replacing old `%1%'") % i->name);
+                else
+                    allElems.push_back(*i);
+            }
+
+            foreach (DrvInfos::iterator, i, newElems)
+                printMsg(lvlInfo, format("installing `%1%'") % i->name);
+        }
 
         printMissing(globals.state, newElems);
 
@@ -531,6 +536,8 @@ static void opInstall(Globals & globals,
         if (parseInstallSourceOptions(globals, i, opFlags, arg)) ;
         else if (arg == "--preserve-installed" || arg == "-P")
             globals.preserveInstalled = true;
+        else if (arg == "--remove-all" || arg == "-r")
+            globals.removeAll = true;
         else throw UsageError(format("unknown flag `%1%'") % arg);
     }
 
@@ -1298,6 +1305,7 @@ void run(Strings args)
 
     globals.dryRun = false;
     globals.preserveInstalled = false;
+    globals.removeAll = false;
     globals.prebuiltOnly = false;
 
     for (Strings::iterator i = args.begin(); i != args.end(); ) {
