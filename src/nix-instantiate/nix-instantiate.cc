@@ -39,44 +39,46 @@ void processExpr(EvalState & state, const Strings & attrPaths,
     bool parseOnly, bool strict, Bindings & autoArgs,
     bool evalOnly, bool xmlOutput, bool location, Expr * e)
 {
-    if (parseOnly)
+    if (parseOnly) {
         std::cout << format("%1%\n") % *e;
-    else
-        foreach (Strings::const_iterator, i, attrPaths) {
-            Value v;
-            findAlongAttrPath(state, *i, autoArgs, e, v);
-            state.forceValue(v);
+        return;
+    }
 
-            PathSet context;
-            if (evalOnly)
-                if (xmlOutput)
-                    printValueAsXML(state, strict, location, v, std::cout, context);
-                else {
-                    if (strict) state.strictForceValue(v);
-                    std::cout << v << std::endl;
-                }
+    foreach (Strings::const_iterator, i, attrPaths) {
+        Value v;
+        findAlongAttrPath(state, *i, autoArgs, e, v);
+        state.forceValue(v);
+
+        PathSet context;
+        if (evalOnly)
+            if (xmlOutput)
+                printValueAsXML(state, strict, location, v, std::cout, context);
             else {
-                DrvInfos drvs;
-                getDerivations(state, v, "", autoArgs, drvs, false);
-                foreach (DrvInfos::iterator, i, drvs) {
-                    Path drvPath = i->queryDrvPath(state);
+                if (strict) state.strictForceValue(v);
+                std::cout << v << std::endl;
+            }
+        else {
+            DrvInfos drvs;
+            getDerivations(state, v, "", autoArgs, drvs, false);
+            foreach (DrvInfos::iterator, i, drvs) {
+                Path drvPath = i->queryDrvPath(state);
 
-                    /* What output do we want? */
-                    string outputName = i->queryOutputName(state);
-                    if (outputName == "")
-                        throw Error(format("derivation `%1%' lacks an `outputName' attribute ") % drvPath);
+                /* What output do we want? */
+                string outputName = i->queryOutputName(state);
+                if (outputName == "")
+                    throw Error(format("derivation `%1%' lacks an `outputName' attribute ") % drvPath);
 
-                    if (gcRoot == "")
-                        printGCWarning();
-                    else {
-                        Path rootName = gcRoot;
-                        if (++rootNr > 1) rootName += "-" + int2String(rootNr);
-                        drvPath = addPermRoot(*store, drvPath, rootName, indirectRoot);
-                    }
-                    std::cout << format("%1%%2%\n") % drvPath % (outputName != "out" ? "!" + outputName : "");
+                if (gcRoot == "")
+                    printGCWarning();
+                else {
+                    Path rootName = gcRoot;
+                    if (++rootNr > 1) rootName += "-" + int2String(rootNr);
+                    drvPath = addPermRoot(*store, drvPath, rootName, indirectRoot);
                 }
+                std::cout << format("%1%%2%\n") % drvPath % (outputName != "out" ? "!" + outputName : "");
             }
         }
+    }
 }
 
 
