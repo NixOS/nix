@@ -243,13 +243,13 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
     const Strings & args, bool newestOnly)
 {
     DrvNames selectors = drvNamesFromArgs(args);
+    if (selectors.empty())
+        selectors.push_back(DrvName("*"));
 
     DrvInfos elems;
     set<unsigned int> done;
 
-    for (DrvNames::iterator i = selectors.begin();
-         i != selectors.end(); ++i)
-    {
+    foreach (DrvNames::iterator, i, selectors) {
         typedef list<std::pair<DrvInfo, unsigned int> > Matches;
         Matches matches;
         unsigned int n = 0;
@@ -321,8 +321,7 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
     }
 
     /* Check that all selectors have been used. */
-    for (DrvNames::iterator i = selectors.begin();
-         i != selectors.end(); ++i)
+    foreach (DrvNames::iterator, i, selectors)
         if (i->hits == 0 && i->fullName != "*")
             throw Error(format("selector `%1%' matches no derivations")
                 % i->fullName);
@@ -912,9 +911,6 @@ static void opQuery(Globals & globals,
             throw UsageError(format("unknown flag `%1%'") % arg);
         else remaining.push_back(arg);
     }
-
-    if (remaining.size() == 0)
-        printMsg(lvlInfo, "warning: you probably meant to specify the argument '*' to show all packages");
 
 
     /* Obtain derivation information from the specified source. */

@@ -55,7 +55,7 @@ static string nextComponent(string::const_iterator & p,
     else
         while (p != end && (!isdigit(*p) && *p != '.' && *p != '-'))
             s += *p++;
-    
+
     return s;
 }
 
@@ -80,7 +80,7 @@ int compareVersions(const string & v1, const string & v2)
 {
     string::const_iterator p1 = v1.begin();
     string::const_iterator p2 = v2.begin();
-    
+
     while (p1 != v1.end() || p2 != v2.end()) {
         string c1 = nextComponent(p1, v1.end());
         string c2 = nextComponent(p2, v2.end());
@@ -95,11 +95,10 @@ int compareVersions(const string & v1, const string & v2)
 DrvNames drvNamesFromArgs(const Strings & opArgs)
 {
     DrvNames result;
-    for (Strings::const_iterator i = opArgs.begin();
-         i != opArgs.end(); ++i)
+    foreach (Strings::const_iterator, i, opArgs)
         result.push_back(DrvName(*i));
     return result;
 }
 
- 
+
 }
