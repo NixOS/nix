@@ -714,7 +714,7 @@ configureFlags = "
     text on the initial line.</para>
 
     <para>Antiquotation
-    (<literal>${<replaceable>expr</replaceable>}}</literal>) is
+    (<literal>${<replaceable>expr</replaceable>}</literal>) is
     supported in indented strings.</para>
 
     <para>Since <literal>${</literal> and <literal>''</literal> have
