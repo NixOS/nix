@@ -140,13 +140,15 @@ void NixRepl::processLine(string line)
 {
     if (line == "") return;
 
-    if (string(line, 0, 2) == ":a") {
+    string command = string(line, 0, 2);
+
+    if (command == ":a") {
         Value v;
         evalString(string(line, 2), v);
         addAttrsToScope(v);
     }
 
-    else if (string(line, 0, 2) == ":l") {
+    else if (command == ":l") {
         state.resetFileCache();
         Path path = lookupFileArg(state, removeWhitespace(string(line, 2)));
         Value v, v2;
@@ -156,13 +158,13 @@ void NixRepl::processLine(string line)
         addAttrsToScope(v2);
     }
 
-    else if (string(line, 0, 2) == ":t") {
+    else if (command == ":t") {
         Value v;
         evalString(string(line, 2), v);
         std::cout << showType(v) << std::endl;
     }
 
-    else if (string(line, 0, 2) == ":b") {
+    else if (command == ":b" || command == ":s") {
         Value v;
         evalString(string(line, 2), v);
         DrvInfo drvInfo;
@@ -171,15 +173,21 @@ void NixRepl::processLine(string line)
         Path drvPath = drvInfo.queryDrvPath(state);
         if (drvPath == "" || !store->isValidPath(drvPath))
             throw Error("expression did not evaluate to a valid derivation");
-        /* We could do the build in this process using buildPaths(),
-           but doing it in a child makes it easier to recover from
-           problems / SIGINT. */
-        if (system(("nix-store -r " + drvPath + " > /dev/null").c_str()) == -1)
-            throw SysError("starting nix-store");
-        Derivation drv = parseDerivation(readFile(drvPath));
-        std::cout << "this derivation produced the following outputs:" << std::endl;
-        foreach (DerivationOutputs::iterator, i, drv.outputs)
-            std::cout << format("  %1% -> %2%") % i->first % i->second.path << std::endl;
+
+        if (command == ":b") {
+            /* We could do the build in this process using buildPaths(),
+               but doing it in a child makes it easier to recover from
+               problems / SIGINT. */
+            if (system(("nix-store -r " + drvPath + " > /dev/null").c_str()) == -1)
+                throw SysError("starting nix-store");
+            Derivation drv = parseDerivation(readFile(drvPath));
+            std::cout << "this derivation produced the following outputs:" << std::endl;
+            foreach (DerivationOutputs::iterator, i, drv.outputs)
+                std::cout << format("  %1% -> %2%") % i->first % i->second.path << std::endl;
+        } else {
+            if (system(("nix-shell " + drvPath).c_str()) == -1)
+                throw SysError("starting nix-shell");
+        }
     }
 
     else if (string(line, 0, 1) == ":")
