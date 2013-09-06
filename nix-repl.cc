@@ -31,8 +31,9 @@ struct NixRepl
     int displ;
 
     NixRepl();
-    void mainLoop();
+    void mainLoop(const Strings & args);
     void processLine(string line);
+    void loadFile(const Path & path);
     void addAttrsToScope(Value & attrs);
     void addVarToScope(const Symbol & name, Value * v);
     Expr * parseString(string s);
@@ -110,9 +111,15 @@ NixRepl::NixRepl()
 }
 
 
-void NixRepl::mainLoop()
+void NixRepl::mainLoop(const Strings & args)
 {
-    std::cerr << "Welcome to Nix version " << NIX_VERSION << ". Type :? for help." << std::endl << std::endl;
+    std::cout << "Welcome to Nix version " << NIX_VERSION << ". Type :? for help." << std::endl << std::endl;
+
+    foreach (Strings::const_iterator, i, args) {
+        std::cout << format("Loading ‘%1%’...") % *i << std::endl;
+        loadFile(*i);
+        std::cout << std::endl;
+    }
 
     using_history();
     read_history(0);
@@ -150,12 +157,7 @@ void NixRepl::processLine(string line)
 
     else if (command == ":l") {
         state.resetFileCache();
-        Path path = lookupFileArg(state, removeWhitespace(string(line, 2)));
-        Value v, v2;
-        state.evalFile(path, v);
-        Bindings bindings;
-        state.autoCallFunction(bindings, v, v2);
-        addAttrsToScope(v2);
+        loadFile(removeWhitespace(string(line, 2)));
     }
 
     else if (command == ":t") {
@@ -202,12 +204,22 @@ void NixRepl::processLine(string line)
 }
 
 
+void NixRepl::loadFile(const Path & path)
+{
+    Value v, v2;
+    state.evalFile(lookupFileArg(state, path), v);
+    Bindings bindings;
+    state.autoCallFunction(bindings, v, v2);
+    addAttrsToScope(v2);
+}
+
+
 void NixRepl::addAttrsToScope(Value & attrs)
 {
     state.forceAttrs(attrs);
     foreach (Bindings::iterator, i, *attrs.attrs)
         addVarToScope(i->name, i->value);
-    std::cout << format("added %1% variables") % attrs.attrs->size() << std::endl;
+    std::cout << format("Added %1% variables.") % attrs.attrs->size() << std::endl;
 }
 
 
@@ -233,8 +245,8 @@ void NixRepl::evalString(string s, Value & v)
 }
 
 
-void run(nix::Strings args)
+void run(Strings args)
 {
     NixRepl repl;
-    repl.mainLoop();
+    repl.mainLoop(args);
 }
