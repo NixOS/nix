@@ -29,9 +29,15 @@ struct NixRepl
     StaticEnv staticEnv;
     Env * env;
     int displ;
+    StringSet varNames;
+
+    StringSet completions;
+    StringSet::iterator curCompletion;
 
     NixRepl();
     void mainLoop(const Strings & args);
+    void completePrefix(string prefix);
+    bool getLine(string & line);
     void processLine(string line);
     void loadFile(const Path & path);
     void addAttrsToScope(Value & attrs);
@@ -44,48 +50,6 @@ struct NixRepl
 void printHelp()
 {
     std::cout << "Usage: nix-repl\n";
-}
-
-
-/* Apparently, the only way to get readline() to return on Ctrl-C
-   (SIGINT) is to use siglongjmp().  That's fucked up... */
-static sigjmp_buf sigintJmpBuf;
-
-
-static void sigintHandler(int signo)
-{
-    siglongjmp(sigintJmpBuf, 1);
-}
-
-
-bool getLine(string & line)
-{
-    struct sigaction act, old;
-    act.sa_handler = sigintHandler;
-    sigfillset(&act.sa_mask);
-    act.sa_flags = 0;
-    if (sigaction(SIGINT, &act, &old))
-        throw SysError("installing handler for SIGINT");
-
-    if (sigsetjmp(sigintJmpBuf, 1))
-        line = "";
-    else {
-        char * s = readline("nix-repl> ");
-        if (!s) return false;
-        line = chomp(string(s));
-        free(s);
-        if (line != "") {
-            add_history(line.c_str());
-            append_history(1, 0);
-        }
-    }
-
-    _isInterrupted = 0;
-
-    if (sigaction(SIGINT, &old, 0))
-        throw SysError("restoring handler for SIGINT");
-
-    return true;
 }
 
 
@@ -140,6 +104,86 @@ void NixRepl::mainLoop(const Strings & args)
     }
 
     std::cout << std::endl;
+}
+
+
+/* Apparently, the only way to get readline() to return on Ctrl-C
+   (SIGINT) is to use siglongjmp().  That's fucked up... */
+static sigjmp_buf sigintJmpBuf;
+
+
+static void sigintHandler(int signo)
+{
+    siglongjmp(sigintJmpBuf, 1);
+}
+
+
+/* Oh, if only g++ had nested functions... */
+NixRepl * curRepl;
+
+char * completerThunk(const char * s, int state)
+{
+    string prefix(s);
+
+    /* If the prefix has a slash in it, use readline's builtin filename
+       completer. */
+    if (prefix.find('/') != string::npos)
+        return rl_filename_completion_function(s, state);
+
+    /* Otherwise, return all symbols that start with the prefix. */
+    if (state == 0) {
+        curRepl->completePrefix(s);
+        curRepl->curCompletion = curRepl->completions.begin();
+    }
+    if (curRepl->curCompletion == curRepl->completions.end()) return 0;
+    return strdup((curRepl->curCompletion++)->c_str());
+}
+
+
+bool NixRepl::getLine(string & line)
+{
+    struct sigaction act, old;
+    act.sa_handler = sigintHandler;
+    sigfillset(&act.sa_mask);
+    act.sa_flags = 0;
+    if (sigaction(SIGINT, &act, &old))
+        throw SysError("installing handler for SIGINT");
+
+    if (sigsetjmp(sigintJmpBuf, 1))
+        line = "";
+    else {
+        curRepl = this;
+        rl_completion_entry_function = completerThunk;
+
+        char * s = readline("nix-repl> ");
+        if (!s) return false;
+        line = chomp(string(s));
+        free(s);
+        if (line != "") {
+            add_history(line.c_str());
+            append_history(1, 0);
+        }
+    }
+
+    _isInterrupted = 0;
+
+    if (sigaction(SIGINT, &old, 0))
+        throw SysError("restoring handler for SIGINT");
+
+    return true;
+}
+
+
+void NixRepl::completePrefix(string prefix)
+{
+    completions.clear();
+
+    StringSet::iterator i = varNames.lower_bound(prefix);
+    while (i != varNames.end()) {
+        if (string(*i, 0, prefix.size()) != prefix) break;
+        completions.insert(*i);
+        i++;
+    }
 }
 
 
@@ -227,6 +271,7 @@ void NixRepl::addVarToScope(const Symbol & name, Value * v)
 {
     staticEnv.vars[name] = displ;
     env->values[displ++] = v;
+    varNames.insert((string) name);
 }
 
 
