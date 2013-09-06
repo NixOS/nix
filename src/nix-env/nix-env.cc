@@ -499,8 +499,6 @@ static void installDerivations(Globals & globals,
         /* Add in the already installed derivations, unless they have
            the same name as a to-be-installed element. */
         if (!globals.removeAll) {
-            printMsg(lvlError, "FOO");
-            
             DrvInfos installedElems = queryInstalled(globals.state, profile);
 
             foreach (DrvInfos::iterator, i, installedElems) {
