@@ -123,6 +123,8 @@ void NixRepl::mainLoop()
             processLine(removeWhitespace(line));
         } catch (Error & e) {
             printMsg(lvlError, e.msg());
+        } catch (Interrupted & e) {
+            printMsg(lvlError, e.msg());
         }
 
         std::cout << std::endl;
@@ -176,6 +178,7 @@ void NixRepl::addAttrsToScope(Value & attrs)
     state.forceAttrs(attrs);
     foreach (Bindings::iterator, i, *attrs.attrs)
         addVarToScope(i->name, i->value);
+    printMsg(lvlError, format("added %1% variables") % attrs.attrs->size());
 }
 
 
