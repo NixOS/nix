@@ -71,7 +71,10 @@ bool getLine(string & line)
         if (!s) return false;
         line = chomp(string(s));
         free(s);
-        if (line != "") add_history(line.c_str());
+        if (line != "") {
+            add_history(line.c_str());
+            append_history(1, 0);
+        }
     }
 
     _isInterrupted = 0;
@@ -108,6 +111,9 @@ NixRepl::NixRepl()
 void NixRepl::mainLoop()
 {
     std::cerr << "Welcome to Nix version " << NIX_VERSION << ". Type :? for help." << std::endl << std::endl;
+
+    using_history();
+    read_history(0);
 
     while (true) {
         string line;
