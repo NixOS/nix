@@ -1,6 +1,8 @@
 #include <iostream>
 #include <cstdlib>
 
+#include <setjmp.h>
+
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -42,13 +44,41 @@ void printHelp()
 }
 
 
+/* Apparently, the only way to get readline() to return on Ctrl-C
+   (SIGINT) is to use siglongjmp().  That's fucked up... */
+static sigjmp_buf sigintJmpBuf;
+
+
+static void sigintHandler(int signo)
+{
+    siglongjmp(sigintJmpBuf, 1);
+}
+
+
 bool getLine(string & line)
 {
-    char * s = readline("nix-repl> ");
-    if (!s) return false;
-    line = chomp(string(s));
-    free(s);
-    if (line != "") add_history(line.c_str());
+    struct sigaction act, old;
+    act.sa_handler = sigintHandler;
+    sigfillset(&act.sa_mask);
+    act.sa_flags = 0;
+    if (sigaction(SIGINT, &act, &old))
+        throw SysError("installing handler for SIGINT");
+
+    if (sigsetjmp(sigintJmpBuf, 1))
+        line = "";
+    else {
+        char * s = readline("nix-repl> ");
+        if (!s) return false;
+        line = chomp(string(s));
+        free(s);
+        if (line != "") add_history(line.c_str());
+    }
+
+    _isInterrupted = 0;
+
+    if (sigaction(SIGINT, &old, 0))
+        throw SysError("restoring handler for SIGINT");
+
     return true;
 }
 
@@ -98,6 +128,8 @@ void NixRepl::mainLoop()
 
 void NixRepl::processLine(string line)
 {
+    if (line == "") return;
+
     if (string(line, 0, 2) == ":a") {
         Value v;
         evalString(string(line, 2), v);
