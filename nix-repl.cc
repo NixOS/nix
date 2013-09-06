@@ -11,6 +11,8 @@
 #include "eval-inline.hh"
 #include "store-api.hh"
 #include "common-opts.hh"
+#include "get-drvs.hh"
+#include "derivations.hh"
 
 using namespace std;
 using namespace nix;
@@ -122,9 +124,9 @@ void NixRepl::mainLoop()
         try {
             processLine(removeWhitespace(line));
         } catch (Error & e) {
-            printMsg(lvlError, e.msg());
+            printMsg(lvlError, "error: " + e.msg());
         } catch (Interrupted & e) {
-            printMsg(lvlError, e.msg());
+            printMsg(lvlError, "error: " + e.msg());
         }
 
         std::cout << std::endl;
@@ -160,9 +162,28 @@ void NixRepl::processLine(string line)
         std::cout << showType(v) << std::endl;
     }
 
-    else if (string(line, 0, 1) == ":") {
-        throw Error(format("unknown command ‘%1%’") % string(line, 0, 2));
+    else if (string(line, 0, 2) == ":b") {
+        Value v;
+        evalString(string(line, 2), v);
+        DrvInfo drvInfo;
+        if (!getDerivation(state, v, drvInfo, false))
+            throw Error("expression does not evaluation to a derivation, so I can't build it");
+        Path drvPath = drvInfo.queryDrvPath(state);
+        if (drvPath == "" || !store->isValidPath(drvPath))
+            throw Error("expression did not evaluate to a valid derivation");
+        /* We could do the build in this process using buildPaths(),
+           but doing it in a child makes it easier to recover from
+           problems / SIGINT. */
+        if (system(("nix-store -r " + drvPath + " > /dev/null").c_str()) == -1)
+            throw SysError("starting nix-store");
+        Derivation drv = parseDerivation(readFile(drvPath));
+        std::cout << "this derivation produced the following outputs:" << std::endl;
+        foreach (DerivationOutputs::iterator, i, drv.outputs)
+            std::cout << format("  %1% -> %2%") % i->first % i->second.path << std::endl;
     }
+
+    else if (string(line, 0, 1) == ":")
+        throw Error(format("unknown command ‘%1%’") % string(line, 0, 2));
 
     else {
         Value v;
@@ -178,7 +199,7 @@ void NixRepl::addAttrsToScope(Value & attrs)
     state.forceAttrs(attrs);
     foreach (Bindings::iterator, i, *attrs.attrs)
         addVarToScope(i->name, i->value);
-    printMsg(lvlError, format("added %1% variables") % attrs.attrs->size());
+    std::cout << format("added %1% variables") % attrs.attrs->size() << std::endl;
 }
 
 
