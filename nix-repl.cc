@@ -45,6 +45,7 @@ struct NixRepl
     void addVarToScope(const Symbol & name, Value * v);
     Expr * parseString(string s);
     void evalString(string s, Value & v);
+    std::ostream &  printValue(std::ostream & str, Value & v, unsigned int maxDepth);
 };
 
 
@@ -255,14 +256,19 @@ void NixRepl::processLine(string line)
             runProgram("nix-shell", Strings{drvPath});
     }
 
+    else if (command == ":p") {
+        Value v;
+        evalString(string(line, 2), v);
+        printValue(std::cout, v, 1000000000) << std::endl;
+    }
+
     else if (string(line, 0, 1) == ":")
         throw Error(format("unknown command ‘%1%’") % string(line, 0, 2));
 
     else {
         Value v;
         evalString(line, v);
-        state.strictForceValue(v);
-        std::cout << v << std::endl;
+        printValue(std::cout, v, 1) << std::endl;
     }
 }
 
@@ -306,6 +312,114 @@ void NixRepl::evalString(string s, Value & v)
     Expr * e = parseString(s);
     e->eval(state, *env, v);
     state.forceValue(v);
+}
+
+
+// FIXME: lot of cut&paste from Nix's eval.cc.
+std::ostream &  NixRepl::printValue(std::ostream & str, Value & v, unsigned int maxDepth)
+{
+    str.flush();
+    checkInterrupt();
+
+    state.forceValue(v);
+
+    switch (v.type) {
+
+    case tInt:
+        str << v.integer;
+        break;
+
+    case tBool:
+        str << (v.boolean ? "true" : "false");
+        break;
+
+    case tString:
+        str << "\"";
+        for (const char * i = v.string.s; *i; i++)
+            if (*i == '\"' || *i == '\\') str << "\\" << *i;
+            else if (*i == '\n') str << "\\n";
+            else if (*i == '\r') str << "\\r";
+            else if (*i == '\t') str << "\\t";
+            else str << *i;
+        str << "\"";
+        break;
+
+    case tPath:
+        str << v.path; // !!! escaping?
+        break;
+
+    case tNull:
+        str << "null";
+        break;
+
+    case tAttrs: {
+        bool isDrv = state.isDerivation(v);
+        if (isDrv) str << "(derivation ";
+        str << "{ ";
+
+        if (maxDepth > 0) {
+            typedef std::map<string, Value *> Sorted;
+            Sorted sorted;
+            foreach (Bindings::iterator, i, *v.attrs)
+                sorted[i->name] = i->value;
+
+            /* If this is a derivation, then don't show the
+               self-references ("all", "out", etc.). */
+            StringSet hidden;
+            if (isDrv) {
+                hidden.insert("all");
+                Bindings::iterator i = v.attrs->find(state.sOutputs);
+                if (i == v.attrs->end())
+                    hidden.insert("out");
+                else {
+                    state.forceList(*i->value);
+                    for (unsigned int j = 0; j < i->value->list.length; ++j)
+                        hidden.insert(state.forceStringNoCtx(*i->value->list.elems[j]));
+                }
+            }
+
+            foreach (Sorted::iterator, i, sorted)
+                if (hidden.find(i->first) == hidden.end())
+                    printValue(str << i->first << " = ", *i->second, maxDepth - 1) << "; ";
+                else
+                    str << i->first << " = ...; ";
+
+        } else
+            str << "... ";
+
+        str << "}";
+        if (isDrv) str << ")";
+        break;
+    }
+
+    case tList:
+        str << "[ ";
+        if (maxDepth > 0)
+            for (unsigned int n = 0; n < v.list.length; ++n)
+                printValue(str, *v.list.elems[n], maxDepth - 1) << " ";
+        else
+            str << "... ";
+        str << "]";
+        break;
+
+    case tLambda:
+        str << "«lambda»";
+        break;
+
+    case tPrimOp:
+        str << "«primop»";
+        break;
+
+    case tPrimOpApp:
+        str << "«primop-app»";
+        break;
+
+    default:
+        str << "«unknown»";
+        break;
+    }
+
+    return str;
 }
 
 
