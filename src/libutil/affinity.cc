@@ -33,13 +33,12 @@ void setAffinityTo(int cpu)
 int lockToCurrentCPU()
 {
 #if HAVE_SCHED_SETAFFINITY
-    if (getEnv("NIX_AFFINITY_HACK", "1") == "1") {
-        int cpu = sched_getcpu();
-        if (cpu != -1) setAffinityTo(cpu);
-        return cpu;
-    }
-#endif
+    int cpu = sched_getcpu();
+    if (cpu != -1) setAffinityTo(cpu);
+    return cpu;
+#else
     return -1;
+#endif
 }
 
 

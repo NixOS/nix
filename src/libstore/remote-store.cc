@@ -73,7 +73,7 @@ void RemoteStore::openConnection(bool reserveSpace)
         writeInt(PROTOCOL_VERSION, to);
 
         if (GET_PROTOCOL_MINOR(daemonVersion) >= 14) {
-            int cpu = lockToCurrentCPU();
+            int cpu = settings.lockCPU ? lockToCurrentCPU() : -1;
             if (cpu != -1) {
                 writeInt(1, to);
                 writeInt(cpu, to);

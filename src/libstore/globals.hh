@@ -183,6 +183,9 @@ struct Settings {
        (to prevent them from being GCed). */
     bool envKeepDerivations;
 
+    /* Whether to lock the Nix client and worker to the same CPU. */
+    bool lockCPU;
+
 private:
     SettingsMap settings, overrides;
 

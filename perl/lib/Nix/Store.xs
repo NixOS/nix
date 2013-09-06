@@ -20,6 +20,7 @@ void doInit()
     if (!store) {
         try {
             settings.processEnvironment();
+            settings.lockCPU = false;
             store = openStore();
         } catch (Error & e) {
             croak(e.what());
