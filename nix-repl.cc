@@ -13,6 +13,7 @@
 #include "common-opts.hh"
 #include "get-drvs.hh"
 #include "derivations.hh"
+#include "affinity.hh"
 
 using namespace std;
 using namespace nix;
@@ -187,6 +188,27 @@ void NixRepl::completePrefix(string prefix)
 }
 
 
+static int runProgram(const string & program, const Strings & args)
+{
+    std::vector<const char *> cargs; /* careful with c_str()! */
+    cargs.push_back(program.c_str());
+    for (Strings::const_iterator i = args.begin(); i != args.end(); ++i)
+        cargs.push_back(i->c_str());
+    cargs.push_back(0);
+
+    Pid pid;
+    pid = fork();
+    if (pid == -1) throw SysError("forking");
+    if (pid == 0) {
+        restoreAffinity();
+        execvp(program.c_str(), (char * *) &cargs[0]);
+        _exit(1);
+    }
+
+    return pid.wait(true);
+}
+
+
 void NixRepl::processLine(string line)
 {
     if (line == "") return;
@@ -224,16 +246,13 @@ void NixRepl::processLine(string line)
             /* We could do the build in this process using buildPaths(),
                but doing it in a child makes it easier to recover from
                problems / SIGINT. */
-            if (system(("nix-store -r " + drvPath + " > /dev/null").c_str()) == -1)
-                throw SysError("starting nix-store");
+            if (runProgram("nix-store", Strings{"-r", drvPath}) != 0) return;
             Derivation drv = parseDerivation(readFile(drvPath));
-            std::cout << "this derivation produced the following outputs:" << std::endl;
+            std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
             foreach (DerivationOutputs::iterator, i, drv.outputs)
                 std::cout << format("  %1% -> %2%") % i->first % i->second.path << std::endl;
-        } else {
-            if (system(("nix-shell " + drvPath).c_str()) == -1)
-                throw SysError("starting nix-shell");
-        }
+        } else
+            runProgram("nix-shell", Strings{drvPath});
     }
 
     else if (string(line, 0, 1) == ":")
