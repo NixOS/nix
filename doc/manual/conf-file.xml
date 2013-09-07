@@ -435,6 +435,15 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
 
   </varlistentry>
 
+  <varlistentry><term><literal>daemon-use-cgroups</literal></term>
+
+      <listitem><para>If set to <literal>true</literal>, Nix will use cgroups
+      of process invoking the build also for nix-daemon process running
+      given build (to prevent escaping from cgroup).</para>
+      <para>Daemon process must be able to write to tasks file of all cgroups
+      that will be used this way.</para></listitem>
+
+  </varlistentry>
 
 </variablelist>
 
