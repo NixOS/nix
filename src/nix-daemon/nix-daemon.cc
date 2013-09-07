@@ -280,8 +280,19 @@ struct SavingSourceAdapter : Source
 };
 
 
+static Cgroups setupCgroups(pid_t clientPid) {
+    if (settings.daemonUseCgroups) {
+        Cgroups save = getCgroups(getpid(), true);
+        Cgroups cgs = getCgroups(clientPid);
+        joinCgroups(cgs);
+        return save;
+    } else {
+        return Cgroups();
+    }
+}
+
 static void performOp(bool trusted, unsigned int clientVersion,
-    Source & from, Sink & to, unsigned int op)
+    Source & from, Sink & to, unsigned int op, pid_t clientPid)
 {
     switch (op) {
 
@@ -454,7 +465,9 @@ static void performOp(bool trusted, unsigned int clientVersion,
     case wopBuildPaths: {
         PathSet drvs = readStorePaths<PathSet>(from);
         startWork();
+        Cgroups saved = setupCgroups(clientPid);
         store->buildPaths(drvs);
+        joinCgroups(saved); // restore cgroups
         stopWork();
         writeInt(1, to);
         break;
@@ -650,7 +663,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
 }
 
 
-static void processConnection(bool trusted)
+static void processConnection(bool trusted, pid_t clientPid)
 {
     canSendStderr = false;
     myPid = getpid();
@@ -721,7 +734,7 @@ static void processConnection(bool trusted)
         opCount++;
 
         try {
-            performOp(trusted, clientVersion, from, to, op);
+            performOp(trusted, clientVersion, from, to, op, clientPid);
         } catch (Error & e) {
             /* If we're not in a state were we can send replies, then
                something went wrong processing the input of the
@@ -762,13 +775,6 @@ static void setSigChldAction(bool autoReap)
 
 
 #define SD_LISTEN_FDS_START 3
-
-static void setupCgroups(long pid) {
-    if (settings.daemonUseCgroups) {
-        Cgroups cgs = getCgroups(pid);
-        joinCgroups(cgs);
-    }
-}
 
 static void daemonLoop()
 {
@@ -894,12 +900,10 @@ static void daemonLoop()
                         strncpy(argvSaved[1], processName.c_str(), strlen(argvSaved[1]));
                     }
 
-                    setupCgroups(clientPid);
-
                     /* Handle the connection. */
                     from.fd = remote;
                     to.fd = remote;
-                    processConnection(trusted);
+                    processConnection(trusted, clientPid);
 
                 } catch (std::exception & e) {
                     writeToStderr("child error: " + string(e.what()) + "\n");
