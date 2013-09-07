@@ -6,6 +6,7 @@
 #include "archive.hh"
 #include "affinity.hh"
 #include "globals.hh"
+#include "cgroups.hh"
 
 #include <cstring>
 #include <unistd.h>
