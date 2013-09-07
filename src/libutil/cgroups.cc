@@ -45,7 +45,7 @@ static string toCgPath(std::pair<string, string> cg) {
     return cg.first + ":" + cg.second;
 }
 
-Cgroups getCgroups(long pid) {
+Cgroups getCgroups(pid_t pid, bool all) {
     string raw = readFile(pid == -1
             ? "/proc/self/cgroup"
             : (format("/proc/%1%/cgroup") % pid).str(), true); // drain -- stat reports size 0
@@ -54,7 +54,7 @@ Cgroups getCgroups(long pid) {
     for (string::const_iterator i = raw.begin(); i != raw.end(); ++i ) {
         if (*i == '\n') {
             std::pair<string, string> pair = procCgpath(lineStart, i);
-            if (goodCgroup(pair))
+            if (all || goodCgroup(pair))
                 cgroups.push_back(toCgPath(pair));
             lineStart = i + 1;
         }

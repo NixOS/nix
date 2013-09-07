@@ -15,7 +15,7 @@ namespace nix {
 
 /* group handling functions */
 
-Cgroups getCgroups(long pid = -1);
+Cgroups getCgroups(pid_t pid = -1, bool all = false);
 void joinCgroups(const Cgroups &);
 
 }
