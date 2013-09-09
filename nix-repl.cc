@@ -248,7 +248,19 @@ void NixRepl::processLine(string line)
 
     string command = string(line, 0, 2);
 
-    if (command == ":a") {
+    if (command == ":?") {
+        cout << "The following commands are available:\n"
+             << "\n"
+             << "  <expr>     Evaluate and print expression\n"
+             << "  :a <expr>  Add attributes from resulting set to scope\n"
+             << "  :b <expr>  Build derivation\n"
+             << "  :l <path>  Load Nix expression and add it to scope\n"
+             << "  :p <expr>  Evaluate and print expression recursively\n"
+             << "  :s <expr>  Build dependencies of derivation, then start nix-shell\n"
+             << "  :t <expr>  Describe result of evaluation\n";
+    }
+
+    else if (command == ":a") {
         Value v;
         evalString(string(line, 2), v);
         addAttrsToScope(v);
