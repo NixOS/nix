@@ -1,6 +1,6 @@
-{ nixpkgs ? <nixpkgs> }:
+{ nixpkgs ? <nixpkgs>, system ? builtins.currentSystem }:
 
-with import nixpkgs { };
+with import nixpkgs { inherit system; };
 
 runCommand "nix-repl"
   { buildInputs = [ readline nixUnstable boehmgc ]; }
