@@ -27,6 +27,8 @@ struct NixRepl
     string curDir;
     EvalState state;
 
+    Strings loadedFiles;
+
     StaticEnv staticEnv;
     Env * env;
     int displ;
@@ -41,6 +43,7 @@ struct NixRepl
     bool getLine(string & line);
     bool processLine(string line);
     void loadFile(const Path & path);
+    void reloadFiles();
     void addAttrsToScope(Value & attrs);
     void addVarToScope(const Symbol & name, Value & v);
     Expr * parseString(string s);
@@ -84,9 +87,11 @@ void NixRepl::mainLoop(const Strings & args)
 {
     std::cout << "Welcome to Nix version " << NIX_VERSION << ". Type :? for help." << std::endl << std::endl;
 
-    foreach (Strings::const_iterator, i, args) {
-        std::cout << format("Loading ‘%1%’...") % *i << std::endl;
-        loadFile(*i);
+    foreach (Strings::const_iterator, i, args)
+        loadedFiles.push_back(*i);
+
+    if (!loadedFiles.empty()) {
+        reloadFiles();
         std::cout << std::endl;
     }
 
@@ -110,7 +115,6 @@ void NixRepl::mainLoop(const Strings & args)
 
         std::cout << std::endl;
     }
-
 }
 
 
@@ -271,7 +275,7 @@ bool NixRepl::processLine(string line)
         arg = line;
     }
 
-    if (command == ":?") {
+    if (command == ":?" || command == ":help") {
         cout << "The following commands are available:\n"
              << "\n"
              << "  <expr>        Evaluate and print expression\n"
@@ -281,19 +285,25 @@ bool NixRepl::processLine(string line)
              << "  :l <path>     Load Nix expression and add it to scope\n"
              << "  :p <expr>     Evaluate and print expression recursively\n"
              << "  :q            Exit nix-repl\n"
+             << "  :r            Reload all files\n"
              << "  :s <expr>     Build dependencies of derivation, then start nix-shell\n"
              << "  :t <expr>     Describe result of evaluation\n";
     }
 
-    else if (command == ":a") {
+    else if (command == ":a" || command == ":add") {
         Value v;
         evalString(arg, v);
         addAttrsToScope(v);
     }
 
-    else if (command == ":l") {
+    else if (command == ":l" || command == ":load") {
         state.resetFileCache();
         loadFile(arg);
+    }
+
+    else if (command == ":r" || command == ":reload") {
+        state.resetFileCache();
+        reloadFiles();
     }
 
     else if (command == ":t") {
@@ -326,7 +336,7 @@ bool NixRepl::processLine(string line)
             runProgram("nix-shell", Strings{drvPath});
     }
 
-    else if (command == ":p") {
+    else if (command == ":p" || command == ":print") {
         Value v;
         evalString(arg, v);
         printValue(std::cout, v, 1000000000) << std::endl;
@@ -363,11 +373,26 @@ bool NixRepl::processLine(string line)
 
 void NixRepl::loadFile(const Path & path)
 {
+    loadedFiles.remove(path);
+    loadedFiles.push_back(path);
     Value v, v2;
     state.evalFile(lookupFileArg(state, path), v);
     Bindings bindings;
     state.autoCallFunction(bindings, v, v2);
     addAttrsToScope(v2);
+}
+
+
+void NixRepl::reloadFiles()
+{
+    Strings old = loadedFiles;
+    loadedFiles.clear();
+
+    foreach (Strings::iterator, i, old) {
+        if (i != old.begin()) std::cout << std::endl;
+        std::cout << format("Loading ‘%1%’...") % *i << std::endl;
+        loadFile(*i);
+    }
 }
 
 
