@@ -39,7 +39,7 @@ struct NixRepl
     void mainLoop(const Strings & args);
     void completePrefix(string prefix);
     bool getLine(string & line);
-    void processLine(string line);
+    bool processLine(string line);
     void loadFile(const Path & path);
     void addAttrsToScope(Value & attrs);
     void addVarToScope(const Symbol & name, Value & v);
@@ -95,10 +95,13 @@ void NixRepl::mainLoop(const Strings & args)
 
     while (true) {
         string line;
-        if (!getLine(line)) break;
+        if (!getLine(line)) {
+            std::cout << std::endl;
+            break;
+        }
 
         try {
-            processLine(removeWhitespace(line));
+            if (!processLine(removeWhitespace(line))) return;
         } catch (Error & e) {
             printMsg(lvlError, "error: " + e.msg());
         } catch (Interrupted & e) {
@@ -108,7 +111,6 @@ void NixRepl::mainLoop(const Strings & args)
         std::cout << std::endl;
     }
 
-    std::cout << std::endl;
 }
 
 
@@ -255,11 +257,19 @@ bool isVarName(const string & s)
 }
 
 
-void NixRepl::processLine(string line)
+bool NixRepl::processLine(string line)
 {
-    if (line == "") return;
+    if (line == "") return true;
 
-    string command = string(line, 0, 2);
+    string command, arg;
+
+    if (line[0] == ':') {
+        size_t p = line.find(' ');
+        command = string(line, 0, p);
+        if (p != string::npos) arg = removeWhitespace(string(line, p));
+    } else {
+        arg = line;
+    }
 
     if (command == ":?") {
         cout << "The following commands are available:\n"
@@ -270,30 +280,31 @@ void NixRepl::processLine(string line)
              << "  :b <expr>     Build derivation\n"
              << "  :l <path>     Load Nix expression and add it to scope\n"
              << "  :p <expr>     Evaluate and print expression recursively\n"
+             << "  :q            Exit nix-repl\n"
              << "  :s <expr>     Build dependencies of derivation, then start nix-shell\n"
              << "  :t <expr>     Describe result of evaluation\n";
     }
 
     else if (command == ":a") {
         Value v;
-        evalString(string(line, 2), v);
+        evalString(arg, v);
         addAttrsToScope(v);
     }
 
     else if (command == ":l") {
         state.resetFileCache();
-        loadFile(removeWhitespace(string(line, 2)));
+        loadFile(arg);
     }
 
     else if (command == ":t") {
         Value v;
-        evalString(string(line, 2), v);
+        evalString(arg, v);
         std::cout << showType(v) << std::endl;
     }
 
     else if (command == ":b" || command == ":s") {
         Value v;
-        evalString(string(line, 2), v);
+        evalString(arg, v);
         DrvInfo drvInfo;
         if (!getDerivation(state, v, drvInfo, false))
             throw Error("expression does not evaluation to a derivation, so I can't build it");
@@ -305,23 +316,27 @@ void NixRepl::processLine(string line)
             /* We could do the build in this process using buildPaths(),
                but doing it in a child makes it easier to recover from
                problems / SIGINT. */
-            if (runProgram("nix-store", Strings{"-r", drvPath}) != 0) return;
-            Derivation drv = parseDerivation(readFile(drvPath));
-            std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
-            foreach (DerivationOutputs::iterator, i, drv.outputs)
-                std::cout << format("  %1% -> %2%") % i->first % i->second.path << std::endl;
+            if (runProgram("nix-store", Strings{"-r", drvPath}) == 0) {
+                Derivation drv = parseDerivation(readFile(drvPath));
+                std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
+                foreach (DerivationOutputs::iterator, i, drv.outputs)
+                    std::cout << format("  %1% -> %2%") % i->first % i->second.path << std::endl;
+            }
         } else
             runProgram("nix-shell", Strings{drvPath});
     }
 
     else if (command == ":p") {
         Value v;
-        evalString(string(line, 2), v);
+        evalString(arg, v);
         printValue(std::cout, v, 1000000000) << std::endl;
     }
 
-    else if (string(line, 0, 1) == ":")
-        throw Error(format("unknown command ‘%1%’") % string(line, 0, 2));
+    else if (command == ":q" || command == ":quit")
+        return false;
+
+    else if (command != "")
+        throw Error(format("unknown command ‘%1%’") % command);
 
     else {
         size_t p = line.find('=');
@@ -341,6 +356,8 @@ void NixRepl::processLine(string line)
             printValue(std::cout, v, 1) << std::endl;
         }
     }
+
+    return true;
 }
 
 
