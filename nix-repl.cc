@@ -183,11 +183,40 @@ void NixRepl::completePrefix(string prefix)
 {
     completions.clear();
 
-    StringSet::iterator i = varNames.lower_bound(prefix);
-    while (i != varNames.end()) {
-        if (string(*i, 0, prefix.size()) != prefix) break;
-        completions.insert(*i);
-        i++;
+    size_t dot = prefix.rfind('.');
+
+    if (dot == string::npos) {
+        /* This is a variable name; look it up in the current scope. */
+        StringSet::iterator i = varNames.lower_bound(prefix);
+        while (i != varNames.end()) {
+            if (string(*i, 0, prefix.size()) != prefix) break;
+            completions.insert(*i);
+            i++;
+        }
+    } else {
+        try {
+            /* This is an expression that should evaluate to an
+               attribute set.  Evaluate it to get the names of the
+               attributes. */
+            string expr(prefix, 0, dot);
+            string prefix2 = string(prefix, dot + 1);
+
+            Expr * e = parseString(expr);
+            Value v;
+            e->eval(state, *env, v);
+            state.forceAttrs(v);
+
+            foreach (Bindings::iterator, i, *v.attrs) {
+                string name = i->name;
+                if (string(name, 0, prefix2.size()) != prefix2) continue;
+                completions.insert(expr + "." + name);
+            }
+
+        } catch (ParseError & e) {
+            // Quietly ignore parse errors.
+        }catch (EvalError & e) {
+            // Quietly ignore evaluation errors.
+        }
     }
 }
 
