@@ -390,13 +390,20 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
                 }
             }
 
-            foreach (Sorted::iterator, i, sorted)
+            foreach (Sorted::iterator, i, sorted) {
+                str << i->first << " = ";
                 if (hidden.find(i->first) != hidden.end())
-                    str << i->first << " = «...»; ";
+                    str << "«...»";
                 else if (seen.find(i->second) != seen.end())
-                    str << i->first << " = «repeated»; ";
+                    str << "«repeated»";
                 else
-                    printValue(str << i->first << " = ", *i->second, maxDepth - 1, seen) << "; ";
+                    try {
+                        printValue(str, *i->second, maxDepth - 1, seen);
+                    } catch (AssertionError & e) {
+                        str << "«error: " << e.msg() << "»";
+                    }
+                str << "; ";
+            }
 
         } else
             str << "... ";
@@ -413,9 +420,14 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         if (maxDepth > 0)
             for (unsigned int n = 0; n < v.list.length; ++n) {
                 if (seen.find(v.list.elems[n]) != seen.end())
-                    str << "«repeated» ";
+                    str << "«repeated»";
                 else
-                    printValue(str, *v.list.elems[n], maxDepth - 1, seen) << " ";
+                    try {
+                        printValue(str, *v.list.elems[n], maxDepth - 1, seen);
+                    } catch (AssertionError & e) {
+                        str << "«error: " << e.msg() << "»";
+                    }
+                str << " ";
             }
         else
             str << "... ";
