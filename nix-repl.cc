@@ -384,8 +384,11 @@ void NixRepl::initEnv()
     env = &state.allocEnv(envSize);
     env->up = &state.baseEnv;
     displ = 0;
-    varNames.clear();
     staticEnv.vars.clear();
+
+    varNames.clear();
+    foreach (StaticEnv::Vars::iterator, i, state.staticBaseEnv.vars)
+        varNames.insert(i->first);
 }
 
 
