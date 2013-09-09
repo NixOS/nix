@@ -45,7 +45,10 @@ struct NixRepl
     void addVarToScope(const Symbol & name, Value * v);
     Expr * parseString(string s);
     void evalString(string s, Value & v);
+
+    typedef set<Value *> ValuesSeen;
     std::ostream &  printValue(std::ostream & str, Value & v, unsigned int maxDepth);
+    std::ostream &  printValue(std::ostream & str, Value & v, unsigned int maxDepth, ValuesSeen & seen);
 };
 
 
@@ -315,8 +318,15 @@ void NixRepl::evalString(string s, Value & v)
 }
 
 
+std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int maxDepth)
+{
+    ValuesSeen seen;
+    return printValue(str, v, maxDepth, seen);
+}
+
+
 // FIXME: lot of cut&paste from Nix's eval.cc.
-std::ostream &  NixRepl::printValue(std::ostream & str, Value & v, unsigned int maxDepth)
+std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int maxDepth, ValuesSeen & seen)
 {
     str.flush();
     checkInterrupt();
@@ -353,6 +363,8 @@ std::ostream &  NixRepl::printValue(std::ostream & str, Value & v, unsigned int 
         break;
 
     case tAttrs: {
+        seen.insert(&v);
+
         bool isDrv = state.isDerivation(v);
         if (isDrv) str << "(derivation ";
         str << "{ ";
@@ -379,10 +391,12 @@ std::ostream &  NixRepl::printValue(std::ostream & str, Value & v, unsigned int 
             }
 
             foreach (Sorted::iterator, i, sorted)
-                if (hidden.find(i->first) == hidden.end())
-                    printValue(str << i->first << " = ", *i->second, maxDepth - 1) << "; ";
+                if (hidden.find(i->first) != hidden.end())
+                    str << i->first << " = «...»; ";
+                else if (seen.find(i->second) != seen.end())
+                    str << i->first << " = «repeated»; ";
                 else
-                    str << i->first << " = ...; ";
+                    printValue(str << i->first << " = ", *i->second, maxDepth - 1, seen) << "; ";
 
         } else
             str << "... ";
@@ -393,10 +407,16 @@ std::ostream &  NixRepl::printValue(std::ostream & str, Value & v, unsigned int 
     }
 
     case tList:
+        seen.insert(&v);
+
         str << "[ ";
         if (maxDepth > 0)
-            for (unsigned int n = 0; n < v.list.length; ++n)
-                printValue(str, *v.list.elems[n], maxDepth - 1) << " ";
+            for (unsigned int n = 0; n < v.list.length; ++n) {
+                if (seen.find(v.list.elems[n]) != seen.end())
+                    str << "«repeated» ";
+                else
+                    printValue(str, *v.list.elems[n], maxDepth - 1, seen) << " ";
+            }
         else
             str << "... ";
         str << "]";
