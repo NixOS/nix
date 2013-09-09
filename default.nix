@@ -1,4 +1,6 @@
-with import <nixpkgs> { };
+{ nixpkgs ? <nixpkgs> }:
+
+with import nixpkgs { };
 
 runCommand "nix-repl"
   { buildInputs = [ readline nixUnstable boehmgc ]; }
