@@ -42,7 +42,7 @@ struct NixRepl
     void processLine(string line);
     void loadFile(const Path & path);
     void addAttrsToScope(Value & attrs);
-    void addVarToScope(const Symbol & name, Value * v);
+    void addVarToScope(const Symbol & name, Value & v);
     Expr * parseString(string s);
     void evalString(string s, Value & v);
 
@@ -242,6 +242,19 @@ static int runProgram(const string & program, const Strings & args)
 }
 
 
+bool isVarName(const string & s)
+{
+    // FIXME: not quite correct.
+    foreach (string::const_iterator, i, s)
+        if (!((*i >= 'a' && *i <= 'z') ||
+              (*i >= 'A' && *i <= 'Z') ||
+              (*i >= '0' && *i <= '9') ||
+              *i == '_' || *i == '\''))
+            return false;
+    return true;
+}
+
+
 void NixRepl::processLine(string line)
 {
     if (line == "") return;
@@ -251,13 +264,14 @@ void NixRepl::processLine(string line)
     if (command == ":?") {
         cout << "The following commands are available:\n"
              << "\n"
-             << "  <expr>     Evaluate and print expression\n"
-             << "  :a <expr>  Add attributes from resulting set to scope\n"
-             << "  :b <expr>  Build derivation\n"
-             << "  :l <path>  Load Nix expression and add it to scope\n"
-             << "  :p <expr>  Evaluate and print expression recursively\n"
-             << "  :s <expr>  Build dependencies of derivation, then start nix-shell\n"
-             << "  :t <expr>  Describe result of evaluation\n";
+             << "  <expr>        Evaluate and print expression\n"
+             << "  <x> = <expr>  Bind expression to variable\n"
+             << "  :a <expr>     Add attributes from resulting set to scope\n"
+             << "  :b <expr>     Build derivation\n"
+             << "  :l <path>     Load Nix expression and add it to scope\n"
+             << "  :p <expr>     Evaluate and print expression recursively\n"
+             << "  :s <expr>     Build dependencies of derivation, then start nix-shell\n"
+             << "  :t <expr>     Describe result of evaluation\n";
     }
 
     else if (command == ":a") {
@@ -310,9 +324,22 @@ void NixRepl::processLine(string line)
         throw Error(format("unknown command ‘%1%’") % string(line, 0, 2));
 
     else {
-        Value v;
-        evalString(line, v);
-        printValue(std::cout, v, 1) << std::endl;
+        size_t p = line.find('=');
+        string name;
+        if (p != string::npos &&
+            isVarName(name = removeWhitespace(string(line, 0, p))))
+        {
+            Expr * e = parseString(string(line, p + 1));
+            Value & v(*state.allocValue());
+            v.type = tThunk;
+            v.thunk.env = env;
+            v.thunk.expr = e;
+            addVarToScope(state.symbols.create(name), v);
+        } else {
+            Value v;
+            evalString(line, v);
+            printValue(std::cout, v, 1) << std::endl;
+        }
     }
 }
 
@@ -331,15 +358,15 @@ void NixRepl::addAttrsToScope(Value & attrs)
 {
     state.forceAttrs(attrs);
     foreach (Bindings::iterator, i, *attrs.attrs)
-        addVarToScope(i->name, i->value);
+        addVarToScope(i->name, *i->value);
     std::cout << format("Added %1% variables.") % attrs.attrs->size() << std::endl;
 }
 
 
-void NixRepl::addVarToScope(const Symbol & name, Value * v)
+void NixRepl::addVarToScope(const Symbol & name, Value & v)
 {
     staticEnv.vars[name] = displ;
-    env->values[displ++] = v;
+    env->values[displ++] = &v;
     varNames.insert((string) name);
 }
 
