@@ -9,5 +9,5 @@ runCommand "nix-repl"
     g++ -O3 -Wall -std=c++0x \
       -o $out/bin/nix-repl ${./nix-repl.cc} \
       -I${nixUnstable}/include/nix -L${nixUnstable}/lib/nix \
-      -lexpr -lmain -lreadline -lgc
+      -lformat -lutil -lstore -lexpr -lmain -lreadline -lgc
   ''
