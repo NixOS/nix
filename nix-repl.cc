@@ -29,6 +29,7 @@ struct NixRepl
 
     Strings loadedFiles;
 
+    const static int envSize = 32768;
     StaticEnv staticEnv;
     Env * env;
     int displ;
@@ -43,6 +44,7 @@ struct NixRepl
     bool getLine(string & line);
     bool processLine(string line);
     void loadFile(const Path & path);
+    void initEnv();
     void reloadFiles();
     void addAttrsToScope(Value & attrs);
     void addVarToScope(const Symbol & name, Value & v);
@@ -75,10 +77,6 @@ NixRepl::NixRepl()
 {
     curDir = absPath(".");
 
-    env = &state.allocEnv(32768);
-    env->up = &state.baseEnv;
-    displ = 0;
-
     store = openStore();
 }
 
@@ -90,10 +88,8 @@ void NixRepl::mainLoop(const Strings & args)
     foreach (Strings::const_iterator, i, args)
         loadedFiles.push_back(*i);
 
-    if (!loadedFiles.empty()) {
-        reloadFiles();
-        std::cout << std::endl;
-    }
+    reloadFiles();
+    if (!loadedFiles.empty()) std::cout << std::endl;
 
     using_history();
     read_history(0);
@@ -383,8 +379,20 @@ void NixRepl::loadFile(const Path & path)
 }
 
 
+void NixRepl::initEnv()
+{
+    env = &state.allocEnv(envSize);
+    env->up = &state.baseEnv;
+    displ = 0;
+    varNames.clear();
+    staticEnv.vars.clear();
+}
+
+
 void NixRepl::reloadFiles()
 {
+    initEnv();
+
     Strings old = loadedFiles;
     loadedFiles.clear();
 
@@ -407,6 +415,8 @@ void NixRepl::addAttrsToScope(Value & attrs)
 
 void NixRepl::addVarToScope(const Symbol & name, Value & v)
 {
+    if (displ >= envSize)
+        throw Error("environment full; cannot add more variables");
     staticEnv.vars[name] = displ;
     env->values[displ++] = &v;
     varNames.insert((string) name);
