@@ -9,9 +9,9 @@ Installation
 
 Assuming you have Nix installed, just do
 
-  $ git clone https://github.com/edolstra/nix-repl.git
-  $ cd nix-repl
-  $ nix-env -f . -i nix-repl
+    $ git clone https://github.com/edolstra/nix-repl.git
+    $ cd nix-repl
+    $ nix-env -f . -i nix-repl
 
 Example
 -------
