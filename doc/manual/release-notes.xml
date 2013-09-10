@@ -8,7 +8,7 @@
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-1.6.0"><title>Release 1.6.0 (TBA)</title>
+<section xml:id="ssec-relnotes-1.6.0"><title>Release 1.6.0 (September 10, 2013)</title>
 
 <para>In addition to the usual bug fixes, this release has several new
 features:</para>
@@ -39,6 +39,38 @@ features:</para>
     <para><command>nix-shell</command> now sets the shell prompt
     (<envar>PS1</envar>) to ensure that Nix shells are distinguishable
     from your regular shells.</para>
+  </listitem>
+
+  <listitem>
+    <para><command>nix-env</command> no longer requires a
+    <literal>*</literal> argument to match all packages, so
+    <literal>nix-env -qa</literal> is equivalent to <literal>nix-env
+    -qa '*'</literal>.</para>
+  </listitem>
+
+  <listitem>
+    <para><command>nix-env -i</command> has a new flag
+    <option>--remove-all</option> (<option>-r</option>) to remove all
+    previous packages from the profile.  This makes it easier to do
+    declarative package management similar to NixOS’s
+    <option>environment.systemPackages</option>.  For instance, if you
+    have a specification <filename>my-packages.nix</filename> like this:
+
+<programlisting>
+with import &lt;nixpkgs> {};
+[ thunderbird
+  geeqie
+  ...
+]
+</programlisting>
+
+    then after any change to this file, you can run:
+
+<screen>
+$ nix-env -f my-packages.nix -ir
+</screen>
+
+    to update your profile to match the specification.</para>
   </listitem>
 
   <listitem>
@@ -91,6 +123,10 @@ in pkgs.bar
   </listitem>
 
 </itemizedlist>
+
+<para>This release has contributions from Domen Kožar, Eelco Dolstra,
+Florian Friesdorf, Gergely Risko, Ivan Kozik, Ludovic Courtès and Shea
+Levy.</para>
 
 </section>
 
