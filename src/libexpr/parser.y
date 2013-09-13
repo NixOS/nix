@@ -375,7 +375,7 @@ expr_simple
          ‘abort’. */
       $$ = path2 == ""
           ? (Expr * ) new ExprApp(
-              new ExprVar(data->symbols.create("throw")),
+              new ExprBuiltin(data->symbols.create("throw")),
               new ExprString(data->symbols.create(
                       (format("file `%1%' was not found in the Nix search path (add it using $NIX_PATH or -I)") % path).str())))
           : (Expr * ) new ExprPath(path2);
