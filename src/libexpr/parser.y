@@ -311,13 +311,13 @@ expr_if
 
 expr_op
   : '!' expr_op %prec NOT { $$ = new ExprOpNot($2); }
-| '-' expr_op %prec NEGATE { $$ = new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__sub")), new ExprInt(0)), $2); }
+| '-' expr_op %prec NEGATE { $$ = new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("sub")), new ExprInt(0)), $2); }
   | expr_op EQ expr_op { $$ = new ExprOpEq($1, $3); }
   | expr_op NEQ expr_op { $$ = new ExprOpNEq($1, $3); }
-  | expr_op '<' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__lessThan")), $1), $3); }
-  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__lessThan")), $3), $1)); }
-  | expr_op '>' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__lessThan")), $3), $1); }
-  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__lessThan")), $1), $3)); }
+  | expr_op '<' expr_op { $$ = new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("lessThan")), $1), $3); }
+  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("lessThan")), $3), $1)); }
+  | expr_op '>' expr_op { $$ = new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("lessThan")), $3), $1); }
+  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("lessThan")), $1), $3)); }
   | expr_op AND expr_op { $$ = new ExprOpAnd($1, $3); }
   | expr_op OR expr_op { $$ = new ExprOpOr($1, $3); }
   | expr_op IMPL expr_op { $$ = new ExprOpImpl($1, $3); }
@@ -329,9 +329,9 @@ expr_op
       l->push_back($3);
       $$ = new ExprConcatStrings(false, l);
     }
-  | expr_op '-' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__sub")), $1), $3); }
-  | expr_op '*' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__mul")), $1), $3); }
-  | expr_op '/' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__div")), $1), $3); }
+  | expr_op '-' expr_op { $$ = new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("sub")), $1), $3); }
+  | expr_op '*' expr_op { $$ = new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("mul")), $1), $3); }
+  | expr_op '/' expr_op { $$ = new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("div")), $1), $3); }
   | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists($1, $3); }
   | expr_app
   ;
@@ -381,7 +381,7 @@ expr_simple
          ‘throw’. */
       $$ = path2 == ""
           ? (Expr * ) new ExprApp(
-              new ExprVar(noPos, data->symbols.create("throw")),
+              new ExprBuiltin(data->symbols.create("throw")),
               new ExprString(data->symbols.create(
                       (format("file `%1%' was not found in the Nix search path (add it using $NIX_PATH or -I)") % path).str())))
           : (Expr * ) new ExprPath(path2);

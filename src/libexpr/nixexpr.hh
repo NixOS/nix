@@ -248,6 +248,13 @@ struct ExprOpNot : Expr
     COMMON_METHODS
 };
 
+struct ExprBuiltin : Expr
+{
+    Symbol name;
+    ExprBuiltin(Symbol name) : name(name) { };
+    COMMON_METHODS
+};
+
 #define MakeBinOp(name, s) \
     struct Expr##name : Expr \
     { \
