@@ -282,6 +282,7 @@ struct RestoreSink : ParseSink
     void createRegularFile(const Path & path)
     {
         Path p = dstPath + path;
+        fd.close();
         fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY, 0666);
         if (fd == -1) throw SysError(format("creating file `%1%'") % p);
     }
