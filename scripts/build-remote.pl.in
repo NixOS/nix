@@ -263,7 +263,7 @@ close UPLOADLOCK;
 my $buildFlags =
     "--max-silent-time $maxSilentTime --option build-timeout $buildTimeout"
     . " --fallback --add-root $rootsDir/\$PPID.out --quiet"
-    . " --option build-keep-log false";
+    . " --option build-keep-log false --option build-use-substitutes false";
 
 # We let the remote side kill its process group when the connection is
 # closed unexpectedly.  This is necessary to ensure that no processes
