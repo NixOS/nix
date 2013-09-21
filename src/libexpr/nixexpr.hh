@@ -163,6 +163,14 @@ struct ExprAttrs : Expr
     };
     typedef std::map<Symbol, AttrDef> AttrDefs;
     AttrDefs attrs;
+    struct DynamicAttrDef {
+        Expr * nameExpr;
+        Expr * valueExpr;
+        Pos pos;
+        DynamicAttrDef(Expr * nameExpr, Expr * valueExpr, const Pos & pos) : nameExpr(nameExpr), valueExpr(valueExpr), pos(pos) { };
+    };
+    typedef std::vector<DynamicAttrDef> DynamicAttrDefs;
+    DynamicAttrDefs dynamicAttrs;
     ExprAttrs() : recursive(false) { };
     COMMON_METHODS
 };
@@ -251,7 +259,7 @@ struct ExprOpNot : Expr
 struct ExprBuiltin : Expr
 {
     Symbol name;
-    ExprBuiltin(Symbol name) : name(name) { };
+    ExprBuiltin(const Symbol & name) : name(name) { };
     COMMON_METHODS
 };
 
