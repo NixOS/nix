@@ -175,6 +175,7 @@ struct ExprList : Expr
 {
     std::vector<Expr *> elems;
     ExprList() { };
+    ExprList(const std::vector<Expr *> & elems) : elems(elems) { };
     COMMON_METHODS
 };
 
@@ -255,7 +256,7 @@ struct ExprOpNot : Expr
 struct ExprBuiltin : Expr
 {
     Symbol name;
-    ExprBuiltin(Symbol name) : name(name) { };
+    ExprBuiltin(const Symbol & name) : name(name) { };
     COMMON_METHODS
 };
 
