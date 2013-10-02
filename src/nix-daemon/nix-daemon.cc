@@ -722,7 +722,7 @@ static void processConnection(bool trusted)
         try {
             performOp(trusted, clientVersion, from, to, op);
         } catch (Error & e) {
-            /* If we're not in a state were we can send replies, then
+            /* If we're not in a state where we can send replies, then
                something went wrong processing the input of the
                client.  This can happen especially if I/O errors occur
                during addTextToStore() / importPath().  If that
