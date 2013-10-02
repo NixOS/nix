@@ -303,6 +303,9 @@ int main(int argc, char * * argv)
         if (e.prefix() != "" && !showTrace)
             printMsg(lvlError, "(use `--show-trace' to show detailed location information)");
         return e.status;
+    } catch (std::bad_alloc & e) {
+        printMsg(lvlError, "error: out of memory");
+        return 1;
     } catch (std::exception & e) {
         printMsg(lvlError, format("error: %1%") % e.what());
         return 1;

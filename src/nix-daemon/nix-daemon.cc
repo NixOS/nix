@@ -731,6 +731,10 @@ static void processConnection(bool trusted)
             if (!errorAllowed) printMsg(lvlError, format("error processing client input: %1%") % e.msg());
             stopWork(false, e.msg(), GET_PROTOCOL_MINOR(clientVersion) >= 8 ? e.status : 0);
             if (!errorAllowed) break;
+        } catch (std::bad_alloc & e) {
+            if (canSendStderr)
+                stopWork(false, "Nix daemon out of memory", GET_PROTOCOL_MINOR(clientVersion) >= 8 ? 1 : 0);
+            throw;
         }
 
         to.flush();
@@ -893,7 +897,7 @@ static void daemonLoop()
                     processConnection(trusted);
 
                 } catch (std::exception & e) {
-                    writeToStderr("child error: " + string(e.what()) + "\n");
+                    writeToStderr("unexpected Nix daemon error: " + string(e.what()) + "\n");
                 }
                 exit(0);
             }
