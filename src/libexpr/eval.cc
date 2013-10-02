@@ -319,9 +319,9 @@ inline Value * EvalState::lookupVar(Env * env, const VarRef & var, bool noEval)
     while (1) {
         if (!env->haveWithAttrs) {
             if (noEval) return 0;
-            Expr * attrs = (Expr *) env->values[0];
-            env->values[0] = allocValue();
-            evalAttrs(*env->up, attrs, *env->values[0]);
+            Value * v = allocValue();
+            evalAttrs(*env->up, (Expr *) env->values[0], *v);
+            env->values[0] = v;
             env->haveWithAttrs = true;
         }
         Bindings::iterator j = env->values[0]->attrs->find(var.name);
