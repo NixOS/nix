@@ -728,12 +728,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
             /* And call the primop. */
             nrPrimOpCalls++;
             if (countCalls) primOpCalls[primOp->primOp->name]++;
-            try {
-                primOp->primOp->fun(*this, vArgs, v);
-            } catch (Error & e) {
-                addErrorPrefix(e, "while evaluating the builtin function `%1%':\n", primOp->primOp->name);
-                throw;
-            }
+            primOp->primOp->fun(*this, vArgs, v);
         } else {
             v.type = tPrimOpApp;
             v.primOpApp.left = allocValue();
