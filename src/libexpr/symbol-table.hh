@@ -89,6 +89,8 @@ public:
     {
         return symbols.size();
     }
+
+    size_t totalSize() const;
 };
 
 }

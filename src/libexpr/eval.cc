@@ -1262,6 +1262,7 @@ void EvalState::printStats()
     printMsg(v, format("  right-biased unions: %1%") % nrOpUpdates);
     printMsg(v, format("  values copied in right-biased unions: %1%") % nrOpUpdateValuesCopied);
     printMsg(v, format("  symbols in symbol table: %1%") % symbols.size());
+    printMsg(v, format("  size of symbol table: %1%") % symbols.totalSize());
     printMsg(v, format("  number of thunks: %1%") % nrThunks);
     printMsg(v, format("  number of thunks avoided: %1%") % nrAvoided);
     printMsg(v, format("  number of attr lookups: %1%") % nrLookups);

@@ -336,4 +336,16 @@ string ExprLambda::showNamePos()
 }
 
 
+
+/* Symbol table. */
+
+size_t SymbolTable::totalSize() const
+{
+    size_t n = 0;
+    foreach (Symbols::const_iterator, i, symbols)
+        n += i->size();
+    return n;
+}
+
+
 }
