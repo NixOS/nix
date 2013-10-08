@@ -209,7 +209,7 @@ public:
 
 private:
 
-    inline Value * lookupVar(Env * env, const VarRef & var, bool noEval);
+    inline Value * lookupVar(Env * env, const ExprVar & var, bool noEval);
 
     friend class ExprVar;
     friend class ExprAttrs;

@@ -107,7 +107,7 @@ struct ExprPath : Expr
     Value * maybeThunk(EvalState & state, Env & env);
 };
 
-struct VarRef
+struct ExprVar : Expr
 {
     Symbol name;
 
@@ -124,15 +124,7 @@ struct VarRef
     unsigned int level;
     unsigned int displ;
 
-    VarRef() { };
-    VarRef(const Symbol & name) : name(name) { };
-    void bind(const StaticEnv & env);
-};
-
-struct ExprVar : Expr
-{
-    VarRef info;
-    ExprVar(const Symbol & name) : info(name) { };
+    ExprVar(const Symbol & name) : name(name) { };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };
