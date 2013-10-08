@@ -23,14 +23,16 @@ MakeError(UndefinedVarError, Error)
 
 struct Pos
 {
-    string file;
+    Symbol file;
     unsigned int line, column;
     Pos() : line(0), column(0) { };
-    Pos(const string & file, unsigned int line, unsigned int column)
+    Pos(const Symbol & file, unsigned int line, unsigned int column)
         : file(file), line(line), column(column) { };
     bool operator < (const Pos & p2) const
     {
-        int d = file.compare(p2.file);
+        if (!line) return p2.line;
+        if (!p2.line) return false;
+        int d = ((string) file).compare((string) p2.file);
         if (d < 0) return true;
         if (d > 0) return false;
         if (line < p2.line) return true;

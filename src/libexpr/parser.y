@@ -29,7 +29,7 @@ namespace nix {
         SymbolTable & symbols;
         Expr * result;
         Path basePath;
-        Path path;
+        Symbol path;
         string error;
         Symbol sLetBody;
         ParseData(EvalState & state)
@@ -486,7 +486,7 @@ Expr * EvalState::parse(const char * text,
     yyscan_t scanner;
     ParseData data(*this);
     data.basePath = basePath;
-    data.path = path;
+    data.path = data.symbols.create(path);
 
     yylex_init(&scanner);
     yy_scan_string(text, scanner);
