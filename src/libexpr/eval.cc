@@ -258,6 +258,11 @@ LocalNoInlineNoReturn(void throwAssertionError(const char * s, const Pos & pos))
     throw AssertionError(format(s) % pos);
 }
 
+LocalNoInlineNoReturn(void throwUndefinedVarError(const char * s, const string & s1, const Pos & pos))
+{
+    throw UndefinedVarError(format(s) % s1 % pos);
+}
+
 LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2))
 {
     e.addPrefix(format(s) % s2);
@@ -315,7 +320,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             return j->value;
         }
         if (!env->prevWith)
-            throw EvalError(format("undefined variable `%1%' at %2%") % var.name % var.pos);
+            throwUndefinedVarError("undefined variable `%1%' at %2%", var.name, var.pos);
         for (unsigned int l = env->prevWith; l; --l, env = env->up) ;
     }
 }
