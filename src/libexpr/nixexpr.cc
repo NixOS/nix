@@ -198,7 +198,7 @@ void ExprVar::bindVars(const StaticEnv & env)
     /* Otherwise, the variable must be obtained from the nearest
        enclosing `with'.  If there is no `with', then we can issue an
        "undefined variable" error now. */
-    if (withLevel == -1) throw EvalError(format("undefined variable `%1%'") % name);
+    if (withLevel == -1) throw ParseError(format("undefined variable `%1%' at %2%") % name % pos);
 
     fromWith = true;
     this->level = withLevel;

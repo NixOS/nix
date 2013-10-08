@@ -310,13 +310,13 @@ expr_if
 
 expr_op
   : '!' expr_op %prec NOT { $$ = new ExprOpNot($2); }
-  | '-' expr_op %prec NEGATE { $$ = new ExprApp(new ExprApp(new ExprVar(data->symbols.create("__sub")), new ExprInt(0)), $2); }
+| '-' expr_op %prec NEGATE { $$ = new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__sub")), new ExprInt(0)), $2); }
   | expr_op EQ expr_op { $$ = new ExprOpEq($1, $3); }
   | expr_op NEQ expr_op { $$ = new ExprOpNEq($1, $3); }
-  | expr_op '<' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $1), $3); }
-  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprApp(new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $3), $1)); }
-  | expr_op '>' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $3), $1); }
-  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprApp(new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $1), $3)); }
+  | expr_op '<' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__lessThan")), $1), $3); }
+  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__lessThan")), $3), $1)); }
+  | expr_op '>' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__lessThan")), $3), $1); }
+  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__lessThan")), $1), $3)); }
   | expr_op AND expr_op { $$ = new ExprOpAnd($1, $3); }
   | expr_op OR expr_op { $$ = new ExprOpOr($1, $3); }
   | expr_op IMPL expr_op { $$ = new ExprOpImpl($1, $3); }
@@ -328,9 +328,9 @@ expr_op
       l->push_back($3);
       $$ = new ExprConcatStrings(false, l);
     }
-  | expr_op '-' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(data->symbols.create("__sub")), $1), $3); }
-  | expr_op '*' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(data->symbols.create("__mul")), $1), $3); }
-  | expr_op '/' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(data->symbols.create("__div")), $1), $3); }
+  | expr_op '-' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__sub")), $1), $3); }
+  | expr_op '*' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__mul")), $1), $3); }
+  | expr_op '/' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__div")), $1), $3); }
   | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists($1, $3); }
   | expr_app
   ;
@@ -349,12 +349,12 @@ expr_select
   | /* Backwards compatibility: because Nixpkgs has a rarely used
        function named ‘or’, allow stuff like ‘map or [...]’. */
     expr_simple OR_KW
-    { $$ = new ExprApp($1, new ExprVar(data->symbols.create("or"))); }
+    { $$ = new ExprApp($1, new ExprVar(CUR_POS, data->symbols.create("or"))); }
   | expr_simple { $$ = $1; }
   ;
 
 expr_simple
-  : ID { $$ = new ExprVar(data->symbols.create($1)); }
+  : ID { $$ = new ExprVar(CUR_POS, data->symbols.create($1)); }
   | INT { $$ = new ExprInt($1); }
   | '"' string_parts '"' {
       /* For efficiency, and to simplify parse trees a bit. */
@@ -372,10 +372,10 @@ expr_simple
       /* The file wasn't found in the search path.  However, we can't
          throw an error here, because the expression might never be
          evaluated.  So return an expression that lazily calls
-         ‘abort’. */
+         ‘throw’. */
       $$ = path2 == ""
           ? (Expr * ) new ExprApp(
-              new ExprVar(data->symbols.create("throw")),
+              new ExprVar(noPos, data->symbols.create("throw")),
               new ExprString(data->symbols.create(
                       (format("file `%1%' was not found in the Nix search path (add it using $NIX_PATH or -I)") % path).str())))
           : (Expr * ) new ExprPath(path2);
@@ -413,7 +413,7 @@ binds
           if ($$->attrs.find(*i) != $$->attrs.end())
               dupAttr(*i, makeCurPos(@3, data), $$->attrs[*i].pos);
           Pos pos = makeCurPos(@3, data);
-          $$->attrs[*i] = ExprAttrs::AttrDef(new ExprVar(*i), pos, true);
+          $$->attrs[*i] = ExprAttrs::AttrDef(new ExprVar(CUR_POS, *i), pos, true);
       }
     }
   | binds INHERIT '(' expr ')' attrs ';'
@@ -495,11 +495,7 @@ Expr * EvalState::parse(const char * text,
 
     if (res) throw ParseError(data.error);
 
-    try {
-        data.result->bindVars(staticEnv);
-    } catch (Error & e) {
-        throw ParseError(format("%1%, in `%2%'") % e.msg() % path);
-    }
+    data.result->bindVars(staticEnv);
 
     return data.result;
 }

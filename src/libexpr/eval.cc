@@ -315,7 +315,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             return j->value;
         }
         if (!env->prevWith)
-            throwEvalError("undefined variable `%1%'", var.name);
+            throw EvalError(format("undefined variable `%1%' at %2%") % var.name % var.pos);
         for (unsigned int l = env->prevWith; l; --l, env = env->up) ;
     }
 }
