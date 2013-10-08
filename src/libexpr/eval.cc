@@ -248,19 +248,9 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s))
     throw TypeError(s);
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const char * s, const Pos & pos, const string & s2))
-{
-    throw TypeError(format(s) % pos % s2);
-}
-
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1, const string & s2))
 {
     throw TypeError(format(s) % s1 % s2);
-}
-
-LocalNoInlineNoReturn(void throwTypeError(const char * s, const Pos & pos))
-{
-    throw TypeError(format(s) % pos);
 }
 
 LocalNoInlineNoReturn(void throwAssertionError(const char * s, const Pos & pos))
@@ -271,11 +261,6 @@ LocalNoInlineNoReturn(void throwAssertionError(const char * s, const Pos & pos))
 LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2))
 {
     e.addPrefix(format(s) % s2);
-}
-
-LocalNoInline(void addErrorPrefix(Error & e, const char * s, const Pos & pos))
-{
-    e.addPrefix(format(s) % pos);
 }
 
 LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, const Pos & pos))
