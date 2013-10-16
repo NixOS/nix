@@ -9,14 +9,14 @@ let {
 
   input2 = mkDerivation {
     name = "dependencies-input-2";
-    builder = ./dependencies.builder2.sh;
+    builder = "${./dependencies.builder2.sh}";
   };
 
   body = mkDerivation {
     name = "dependencies";
-    builder = ./dependencies.builder0.sh  + "/FOOBAR/../.";
+    builder = ./dependencies.builder0.sh + "/FOOBAR/../.";
     input1 = input1 + "/.";
-    inherit input2;
+    input2 = "${input2}/.";
     meta.description = "Random test package";
   };
 
