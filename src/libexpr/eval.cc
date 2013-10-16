@@ -959,8 +959,8 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     std::ostringstream s;
     NixInt n = 0;
 
-    bool first = true;
-    ValueType firstType;
+    bool first = !forceString;
+    ValueType firstType = tString;
 
     foreach (vector<Expr *>::iterator, i, *es) {
         Value vTmp;
@@ -975,12 +975,12 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
             first = false;
         }
 
-        if (firstType == tInt && !forceString) {
+        if (firstType == tInt) {
             if (vTmp.type != tInt)
                 throwEvalError("cannot add %1% to an integer", showType(vTmp));
             n += vTmp.integer;
         } else
-            s << state.coerceToString(vTmp, context, false, firstType != tPath);
+            s << state.coerceToString(vTmp, context, false, firstType == tString);
     }
 
     if (firstType == tInt)
