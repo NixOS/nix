@@ -48,7 +48,7 @@ static void throwSQLiteError(sqlite3 * db, const format & f)
 static void throwSQLiteError(sqlite3 * db, const format & f)
 {
     int err = sqlite3_errcode(db);
-    if (err == SQLITE_BUSY) {
+    if (err == SQLITE_BUSY || err == SQLITE_PROTOCOL) {
         static bool warned = false;
         if (!warned) {
             printMsg(lvlError, "warning: SQLite database is busy");
