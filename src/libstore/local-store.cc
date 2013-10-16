@@ -75,6 +75,11 @@ static void throwSQLiteError(sqlite3 * db, const format & f)
 }
 
 
+/* Convenience macros for retrying a SQLite transaction. */
+#define retry_sqlite while (1) { try {
+#define end_retry_sqlite break; } catch (SQLiteBusy & e) { } }
+
+
 SQLite::~SQLite()
 {
     try {
@@ -1219,39 +1224,33 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
      * expense of some speed of the path registering operation. */
     if (settings.syncBeforeRegistering) sync();
 
-    while (1) {
-        try {
-            SQLiteTxn txn(db);
-            PathSet paths;
+    retry_sqlite {
+        SQLiteTxn txn(db);
+        PathSet paths;
 
-            foreach (ValidPathInfos::const_iterator, i, infos) {
-                assert(i->hash.type == htSHA256);
-                if (isValidPath(i->path))
-                    updatePathInfo(*i);
-                else
-                    addValidPath(*i);
-                paths.insert(i->path);
-            }
-
-            foreach (ValidPathInfos::const_iterator, i, infos) {
-                unsigned long long referrer = queryValidPathId(i->path);
-                foreach (PathSet::iterator, j, i->references)
-                    addReference(referrer, queryValidPathId(*j));
-            }
-
-            /* Do a topological sort of the paths.  This will throw an
-               error if a cycle is detected and roll back the
-               transaction.  Cycles can only occur when a derivation
-               has multiple outputs. */
-            topoSortPaths(*this, paths);
-
-            txn.commit();
-            break;
-        } catch (SQLiteBusy & e) {
-            /* Retry; the `txn' destructor will roll back the current
-               transaction. */
+        foreach (ValidPathInfos::const_iterator, i, infos) {
+            assert(i->hash.type == htSHA256);
+            if (isValidPath(i->path))
+                updatePathInfo(*i);
+            else
+                addValidPath(*i);
+            paths.insert(i->path);
         }
-    }
+
+        foreach (ValidPathInfos::const_iterator, i, infos) {
+            unsigned long long referrer = queryValidPathId(i->path);
+            foreach (PathSet::iterator, j, i->references)
+                addReference(referrer, queryValidPathId(*j));
+        }
+
+        /* Do a topological sort of the paths.  This will throw an
+           error if a cycle is detected and roll back the
+           transaction.  Cycles can only occur when a derivation
+           has multiple outputs. */
+        topoSortPaths(*this, paths);
+
+        txn.commit();
+    } end_retry_sqlite;
 }
 
 
@@ -1642,23 +1641,20 @@ void LocalStore::invalidatePathChecked(const Path & path)
 {
     assertStorePath(path);
 
-    while (1) {
-        try {
-            SQLiteTxn txn(db);
+    retry_sqlite {
+        SQLiteTxn txn(db);
 
-            if (isValidPath(path)) {
-                PathSet referrers; queryReferrers(path, referrers);
-                referrers.erase(path); /* ignore self-references */
-                if (!referrers.empty())
-                    throw PathInUse(format("cannot delete path `%1%' because it is in use by %2%")
-                        % path % showPaths(referrers));
-                invalidatePath(path);
-            }
+        if (isValidPath(path)) {
+            PathSet referrers; queryReferrers(path, referrers);
+            referrers.erase(path); /* ignore self-references */
+            if (!referrers.empty())
+                throw PathInUse(format("cannot delete path `%1%' because it is in use by %2%")
+                    % path % showPaths(referrers));
+            invalidatePath(path);
+        }
 
-            txn.commit();
-            break;
-        } catch (SQLiteBusy & e) { };
-    }
+        txn.commit();
+    } end_retry_sqlite;
 }
 
 
