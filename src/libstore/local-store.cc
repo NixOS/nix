@@ -421,7 +421,7 @@ void LocalStore::openDB(bool create)
     stmtInvalidatePath.create(db,
         "delete from ValidPaths where path = ?;");
     stmtRegisterFailedPath.create(db,
-        "insert into FailedPaths (path, time) values (?, ?);");
+        "insert or ignore into FailedPaths (path, time) values (?, ?);");
     stmtHasPathFailed.create(db,
         "select time from FailedPaths where path = ?;");
     stmtQueryFailedPaths.create(db,
@@ -692,7 +692,6 @@ void LocalStore::addReference(unsigned long long referrer, unsigned long long re
 
 void LocalStore::registerFailedPath(const Path & path)
 {
-    if (hasPathFailed(path)) return;
     SQLiteStmtUse use(stmtRegisterFailedPath);
     stmtRegisterFailedPath.bind(path);
     stmtRegisterFailedPath.bind(time(0));
