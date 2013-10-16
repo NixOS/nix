@@ -701,7 +701,7 @@ configureFlags = "
     number of spaces equal to the minimal indentation of the string as
     a whole (disregarding the indentation of empty lines).  For
     instance, the first and second line are indented two space, while
-    the third line is indented three spaces.  Thus, two spaces are
+    the third line is indented four spaces.  Thus, two spaces are
     stripped from each line, so the resulting string is
 
 <programlisting>
@@ -827,7 +827,7 @@ by a semicolon.  For example:
 }</programlisting>
 
 This defines an attribute set with attributes named
-<varname>x</varname>, <varname>test</varname>, <varname>y</varname>.
+<varname>x</varname>, <varname>text</varname>, <varname>y</varname>.
 The order of the attributes is irrelevant.  An attribute name may only
 occur once.</para>
 
