@@ -203,7 +203,8 @@ static Expr * stripIndentation(SymbolTable & symbols, vector<Expr *> & es)
         es2->push_back(new ExprString(symbols.create(s2)));
     }
 
-    return es2->size() == 1 ? (*es2)[0] : new ExprConcatStrings(true, es2);
+    /* If this is a single string, then don't do a concatenation. */
+    return es2->size() == 1 && dynamic_cast<ExprString *>((*es2)[0]) ? (*es2)[0] : new ExprConcatStrings(true, es2);
 }
 
 
@@ -359,7 +360,7 @@ expr_simple
   | '"' string_parts '"' {
       /* For efficiency, and to simplify parse trees a bit. */
       if ($2->empty()) $$ = new ExprString(data->symbols.create(""));
-      else if ($2->size() == 1) $$ = $2->front();
+      else if ($2->size() == 1 && dynamic_cast<ExprString *>($2->front())) $$ = $2->front();
       else $$ = new ExprConcatStrings(true, $2);
   }
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
