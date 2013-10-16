@@ -304,6 +304,10 @@ private:
     void checkDerivationOutputs(const Path & drvPath, const Derivation & drv);
 
     void optimisePath_(OptimiseStats & stats, const Path & path);
+
+    // Internal versions that are not wrapped in retry_sqlite.
+    bool isValidPath_(const Path & path);
+    void queryReferrers_(const Path & path, PathSet & referrers);
 };
 
 
