@@ -929,8 +929,6 @@ PathSet LocalStore::queryValidDerivers(const Path & path)
 
 PathSet LocalStore::queryDerivationOutputs(const Path & path)
 {
-    SQLiteTxn txn(db);
-
     SQLiteStmtUse use(stmtQueryDerivationOutputs);
     stmtQueryDerivationOutputs.bind(queryValidPathId(path));
 
@@ -951,8 +949,6 @@ PathSet LocalStore::queryDerivationOutputs(const Path & path)
 
 StringSet LocalStore::queryDerivationOutputNames(const Path & path)
 {
-    SQLiteTxn txn(db);
-
     SQLiteStmtUse use(stmtQueryDerivationOutputs);
     stmtQueryDerivationOutputs.bind(queryValidPathId(path));
 
@@ -974,8 +970,6 @@ StringSet LocalStore::queryDerivationOutputNames(const Path & path)
 Path LocalStore::queryPathFromHashPart(const string & hashPart)
 {
     if (hashPart.size() != 32) throw Error("invalid hash part");
-
-    SQLiteTxn txn(db);
 
     Path prefix = settings.nixStore + "/" + hashPart;
 
