@@ -17,5 +17,6 @@ in
   mkDerivation {
     name = "build-hook";
     builder = ./dependencies.builder0.sh;
-    inherit input1 input2;
+    input1 = " " + input1 + "/.";
+    input2 = " ${input2}/.";
   }
