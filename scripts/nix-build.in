@@ -202,7 +202,8 @@ foreach my $expr (@exprs) {
         my $rcfile = "$tmpDir/rc";
         writeFile(
             $rcfile,
-            '[ -e ~/.bashrc ] && source ~/.bashrc; ' .
+            'unset BASH_ENV; ' .
+            '[ -n "$PS1" ] && [ -e ~/.bashrc ] && source ~/.bashrc; ' .
             ($pure ? '' : 'p=$PATH; ' ) .
             'dontAddDisableDepTrack=1; ' .
             '[ -e $stdenv/setup ] && source $stdenv/setup; ' .
@@ -212,6 +213,7 @@ foreach my $expr (@exprs) {
             'unset NIX_ENFORCE_PURITY; ' .
             'shopt -u nullglob; ' .
             $envCommand);
+        $ENV{BASH_ENV} = $rcfile;
         exec($ENV{NIX_BUILD_SHELL} // "bash", "--rcfile", $rcfile);
         die;
     }
