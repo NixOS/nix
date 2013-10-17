@@ -639,7 +639,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
         state.forceValue(*vAttrs);
 
     } catch (Error & e) {
-        if (pos)
+        if (pos && pos->file != state.sDerivationNix)
             addErrorPrefix(e, "while evaluating the attribute `%1%' at %2%:\n",
                 showAttrPath(attrPath), *pos);
         throw;

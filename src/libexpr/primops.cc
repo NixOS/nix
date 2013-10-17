@@ -1262,7 +1262,9 @@ void EvalState::createBaseEnv()
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
-    evalFile(findFile("nix/derivation.nix"), v);
+    string path = findFile("nix/derivation.nix");
+    sDerivationNix = symbols.create(path);
+    evalFile(path, v);
     addConstant("derivation", v);
 
     /* Now that we've added all primops, sort the `builtins' attribute
