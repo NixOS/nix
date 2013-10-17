@@ -394,10 +394,8 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
             }
 
         } catch (Error & e) {
-            e.addPrefix(format("while evaluating the derivation attribute `%1%' at %2%:\n")
-                % key % *i->pos);
-            e.addPrefix(format("while instantiating the derivation named `%1%' at %2%:\n")
-                % drvName % posDrvName);
+            e.addPrefix(format("while evaluating the attribute `%1%' of the derivation `%2%' at %3%:\n")
+                % key % drvName % posDrvName);
             throw;
         }
     }

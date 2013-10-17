@@ -57,8 +57,9 @@ are:</para>
   </listitem>
 
   <listitem>
-    <para>In order to be less verbose, stack traces no longer show
-    calls to builtin functions.</para>
+    <para>Stack traces are less verbose: they no longer show calls to
+    builtin functions and only show a single line for each derivation
+    on the call stack.</para>
   </listitem>
 
 </itemizedlist>
