@@ -329,7 +329,7 @@ static void findRoots(StoreAPI & store, const Path & path, Roots & roots)
                     struct stat st2 = lstat(target);
                     if (!S_ISLNK(st2.st_mode)) return;
                     Path target2 = readLink(target);
-                    if (isInStore(target2)) foundRoot(store, path, target2, roots);
+                    if (isInStore(target2)) foundRoot(store, target, target2, roots);
                 }
             }
         }
