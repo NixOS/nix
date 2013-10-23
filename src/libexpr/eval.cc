@@ -436,10 +436,14 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 
 void EvalState::evalFile(const Path & path, Value & v)
 {
-    Path path2 = resolveExprPath(path);
+    FileEvalCache::iterator i;
+    if ((i = fileEvalCache.find(path)) != fileEvalCache.end()) {
+        v = i->second;
+        return;
+    }
 
-    FileEvalCache::iterator i = fileEvalCache.find(path2);
-    if (i != fileEvalCache.end()) {
+    Path path2 = resolveExprPath(path);
+    if ((i = fileEvalCache.find(path2)) != fileEvalCache.end()) {
         v = i->second;
         return;
     }
@@ -452,8 +456,9 @@ void EvalState::evalFile(const Path & path, Value & v)
         addErrorPrefix(e, "while evaluating the file `%1%':\n", path2);
         throw;
     }
+
     fileEvalCache[path2] = v;
-    //if (path != path2) fileEvalCache[path2] = v;
+    if (path != path2) fileEvalCache[path] = v;
 }
 
 
