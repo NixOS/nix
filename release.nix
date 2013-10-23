@@ -173,15 +173,15 @@ let
     rpm_fedora16x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora16x86_64) 50;
     rpm_fedora18i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora18i386) 60;
     rpm_fedora18x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora18x86_64) 60;
+    rpm_fedora19i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora19i386) 70;
+    rpm_fedora19x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora19x86_64) 70;
 
 
     deb_debian60i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian60i386) 50;
     deb_debian60x86_64 = makeDeb_x86_64 (diskImageFunsFun: diskImageFunsFun.debian60x86_64) 50;
-    deb_debian70i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian70i386) 60;
-    deb_debian70x86_64 = makeDeb_x86_64 (diskImageFunsFun: diskImageFunsFun.debian70x86_64) 60;
+    deb_debian7i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian7i386) 60;
+    deb_debian7x86_64 = makeDeb_x86_64 (diskImageFunsFun: diskImageFunsFun.debian7x86_64) 60;
 
-    deb_ubuntu1004i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1004i386) 50;
-    deb_ubuntu1004x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1004x86_64) 50;
     deb_ubuntu1010i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1010i386) 50;
     deb_ubuntu1010x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1010x86_64) 50;
     deb_ubuntu1110i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1110i386) 60;
@@ -192,6 +192,8 @@ let
     deb_ubuntu1210x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1210x86_64) 70;
     deb_ubuntu1304i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1304i386) 80;
     deb_ubuntu1304x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1304x86_64) 80;
+    deb_ubuntu1310i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1310i386) 90;
+    deb_ubuntu1310x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1310x86_64) 90;
 
 
     # System tests.
@@ -202,6 +204,36 @@ let
     tests.nix_copy_closure = (import ./tests/nix-copy-closure.nix rec {
       nix = build.x86_64-linux; system = "x86_64-linux";
     }).test;
+
+
+    # Aggregate job containing the release-critical jobs.
+    release = pkgs.releaseTools.aggregate {
+      name = "nix-${tarball.version}";
+      meta.description = "Release-critical builds";
+      constituents =
+        [ tarball
+          build.i686-freebsd
+          build.i686-linux
+          build.x86_64-darwin
+          build.x86_64-freebsd
+          build.x86_64-linux
+          binaryTarball.i686-freebsd
+          binaryTarball.i686-linux
+          binaryTarball.x86_64-darwin
+          binaryTarball.x86_64-freebsd
+          binaryTarball.x86_64-linux
+          deb_debian7i386
+          deb_debian7x86_64
+          deb_ubuntu1304i386
+          deb_ubuntu1304x86_64
+          deb_ubuntu1310i386
+          deb_ubuntu1310x86_64
+          #rpm_fedora19i386
+          rpm_fedora19x86_64
+          tests.remote_builds
+          tests.nix_copy_closure
+        ];
+    };
 
   };
 
