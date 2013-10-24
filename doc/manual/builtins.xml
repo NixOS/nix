@@ -901,6 +901,19 @@ stdenv.mkDerivation (rec {
   </varlistentry>
 
 
+  <varlistentry><term><function>builtins.typeOf</function>
+  <replaceable>e</replaceable></term>
+
+    <listitem><para>Return a string representing the type of the value
+    <replaceable>e</replaceable>, namely <literal>"int"</literal>,
+    <literal>"bool"</literal>, <literal>"string"</literal>,
+    <literal>"path"</literal>, <literal>"null"</literal>,
+    <literal>"attrs"</literal>, <literal>"list"</literal> or
+    <literal>"lambda"</literal>.</para></listitem>
+
+  </varlistentry>
+
+
 </variablelist>
 
 
