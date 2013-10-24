@@ -1,6 +1,7 @@
 #! @perl@ -w @perlFlags@
 
 use DBI;
+use DBD::SQLite;
 use File::Basename;
 use IO::Select;
 use Nix::Config;

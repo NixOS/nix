@@ -2,6 +2,7 @@ package Nix::Manifest;
 
 use strict;
 use DBI;
+use DBD::SQLite;
 use Cwd;
 use File::stat;
 use File::Path;
