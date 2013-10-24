@@ -1083,7 +1083,7 @@ bool EvalState::isDerivation(Value & v)
     if (i == v.attrs->end()) return false;
     forceValue(*i->value);
     if (i->value->type != tString) return false;
-    return forceStringNoCtx(*i->value) == "derivation";
+    return strcmp(i->value->string.s, "derivation") == 0;
 }
 
 
