@@ -1275,6 +1275,7 @@ void EvalState::printStats()
     printMsg(v, format("  number of function calls: %1%") % nrFunctionCalls);
 
     if (countCalls) {
+        v = lvlInfo;
 
         printMsg(v, format("calls to %1% primops:") % primOpCalls.size());
         typedef std::multimap<unsigned int, Symbol> PrimOpCalls_;
