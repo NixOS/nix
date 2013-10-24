@@ -49,7 +49,7 @@ available as <function>builtins.derivation</function>.</para>
     define it yourself:
 
 <programlisting>
-attrValues = attrs: map (name: builtins.getAttr name attrs) (builtins.attrNames attrs);</programlisting>
+attrValues = set: map (name: builtins.getAttr name set) (builtins.attrNames set);</programlisting>
 
     </para></listitem>
 
@@ -908,7 +908,7 @@ stdenv.mkDerivation (rec {
     <replaceable>e</replaceable>, namely <literal>"int"</literal>,
     <literal>"bool"</literal>, <literal>"string"</literal>,
     <literal>"path"</literal>, <literal>"null"</literal>,
-    <literal>"attrs"</literal>, <literal>"list"</literal> or
+    <literal>"set"</literal>, <literal>"list"</literal> or
     <literal>"lambda"</literal>.</para></listitem>
 
   </varlistentry>
