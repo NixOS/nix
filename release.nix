@@ -228,7 +228,7 @@ let
           deb_ubuntu1304x86_64
           deb_ubuntu1310i386
           deb_ubuntu1310x86_64
-          #rpm_fedora19i386
+          rpm_fedora19i386
           rpm_fedora19x86_64
           tests.remote_builds
           tests.nix_copy_closure
