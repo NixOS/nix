@@ -15,7 +15,7 @@ on to a more in-depth look at the Nix expression language.</para>
 For more extensive information on adding packages to the Nix Packages
 collection (such as functions in the standard environment and coding
 conventions), please consult <link
-xlink:href="http://hydra.nixos.org/job/nixpkgs/trunk/tarball/latest/download-by-type/doc/manual">its
+xlink:href="http://nixos.org/nixpkgs/manual/">its
 manual</link>.</para></note>
 
 
