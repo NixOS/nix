@@ -902,8 +902,8 @@ encountered</quote>).</para></footnote>.</para>
 
 <simplesect><title>Let-expressions</title>
 
-<para>A let-expression allows you define local
-variables for an expression.  For instance,
+<para>A let-expression allows you define local variables for an
+expression.  For instance,
 
 <programlisting>
 let
@@ -914,12 +914,6 @@ in x + y</programlisting>
 evaluates to <literal>"foobar"</literal>.
 
 </para>
-
-<note><para>There is also an obsolete form of let-expression,
-<literal>let { <replaceable>attrs</replaceable> }</literal>, which is
-translated to <literal>rec { <replaceable>attrs</replaceable>
-}.body</literal>.  That is, the body of the let-expression is the
-<literal>body</literal> attribute of the set.</para></note>
 
 </simplesect>
 
