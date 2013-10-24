@@ -92,6 +92,30 @@ static void prim_import(EvalState & state, Value * * args, Value & v)
 }
 
 
+/* Return a string representing the type of the expression. */
+static void prim_typeOf(EvalState & state, Value * * args, Value & v)
+{
+    state.forceValue(*args[0]);
+    string t;
+    switch (args[0]->type) {
+        case tInt: t = "int"; break;
+        case tBool: t = "bool"; break;
+        case tString: t = "string"; break;
+        case tPath: t = "path"; break;
+        case tNull: t = "null"; break;
+        case tAttrs: t = "attrs"; break;
+        case tList: t = "list"; break;
+        case tLambda:
+        case tPrimOp:
+        case tPrimOpApp:
+            t = "lambda";
+            break;
+        default: abort();
+    }
+    mkString(v, state.symbols.create(t));
+}
+
+
 /* Determine whether the argument is the null value. */
 static void prim_isNull(EvalState & state, Value * * args, Value & v)
 {
@@ -108,7 +132,7 @@ static void prim_isFunction(EvalState & state, Value * * args, Value & v)
 }
 
 
-/* Determine whether the argument is an Int. */
+/* Determine whether the argument is an integer. */
 static void prim_isInt(EvalState & state, Value * * args, Value & v)
 {
     state.forceValue(*args[0]);
@@ -116,7 +140,7 @@ static void prim_isInt(EvalState & state, Value * * args, Value & v)
 }
 
 
-/* Determine whether the argument is an String. */
+/* Determine whether the argument is a string. */
 static void prim_isString(EvalState & state, Value * * args, Value & v)
 {
     state.forceValue(*args[0]);
@@ -124,7 +148,7 @@ static void prim_isString(EvalState & state, Value * * args, Value & v)
 }
 
 
-/* Determine whether the argument is an Bool. */
+/* Determine whether the argument is a Boolean. */
 static void prim_isBool(EvalState & state, Value * * args, Value & v)
 {
     state.forceValue(*args[0]);
@@ -1189,6 +1213,7 @@ void EvalState::createBaseEnv()
 
     // Miscellaneous
     addPrimOp("import", 1, prim_import);
+    addPrimOp("__typeOf", 1, prim_typeOf);
     addPrimOp("isNull", 1, prim_isNull);
     addPrimOp("__isFunction", 1, prim_isFunction);
     addPrimOp("__isString", 1, prim_isString);
