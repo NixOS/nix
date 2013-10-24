@@ -13,11 +13,10 @@
 namespace nix {
 
 /* Symbol table used by the parser and evaluator to represent and look
-   up identifiers and attribute sets efficiently.
-   SymbolTable::create() converts a string into a symbol.  Symbols
-   have the property that they can be compared efficiently (using a
-   pointer equality test), because the symbol table stores only one
-   copy of each string. */
+   up identifiers and attributes efficiently.  SymbolTable::create()
+   converts a string into a symbol.  Symbols have the property that
+   they can be compared efficiently (using a pointer equality test),
+   because the symbol table stores only one copy of each string. */
 
 class Symbol
 {

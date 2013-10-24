@@ -41,7 +41,7 @@ DrvInfo::Outputs DrvInfo::queryOutputs(EvalState & state)
 
             /* For each output... */
             for (unsigned int j = 0; j < i->value->list.length; ++j) {
-                /* Evaluate the corresponding attribute set. */
+                /* Evaluate the corresponding set. */
                 string name = state.forceStringNoCtx(*i->value->list.elems[j]);
                 Bindings::iterator out = attrs->find(state.symbols.create(name));
                 if (out == attrs->end()) continue; // FIXME: throw error?
@@ -119,11 +119,10 @@ void DrvInfo::setMetaInfo(const MetaInfo & meta)
 typedef set<Bindings *> Done;
 
 
-/* Evaluate value `v'.  If it evaluates to an attribute set of type
-   `derivation', then put information about it in `drvs' (unless it's
-   already in `doneExprs').  The result boolean indicates whether it
-   makes sense for the caller to recursively search for derivations in
-   `v'. */
+/* Evaluate value `v'.  If it evaluates to a set of type `derivation',
+   then put information about it in `drvs' (unless it's already in
+   `doneExprs').  The result boolean indicates whether it makes sense
+   for the caller to recursively search for derivations in `v'. */
 static bool getDerivation(EvalState & state, Value & v,
     const string & attrPath, DrvInfos & drvs, Done & done,
     bool ignoreAssertionFailures)
@@ -132,8 +131,8 @@ static bool getDerivation(EvalState & state, Value & v,
         state.forceValue(v);
         if (!state.isDerivation(v)) return true;
 
-        /* Remove spurious duplicates (e.g., an attribute set like
-           `rec { x = derivation {...}; y = x;}'. */
+        /* Remove spurious duplicates (e.g., a set like `rec { x =
+           derivation {...}; y = x;}'. */
         if (done.find(v.attrs) != done.end()) return false;
         done.insert(v.attrs);
 
@@ -218,10 +217,9 @@ static void getDerivations(EvalState & state, Value & vIn,
             if (combineChannels)
                 getDerivations(state, v2, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
             else if (getDerivation(state, v2, pathPrefix2, drvs, done, ignoreAssertionFailures)) {
-                /* If the value of this attribute is itself an
-                   attribute set, should we recurse into it?  => Only
-                   if it has a `recurseForDerivations = true'
-                   attribute. */
+                /* If the value of this attribute is itself a set,
+                   should we recurse into it?  => Only if it has a
+                   `recurseForDerivations = true' attribute. */
                 if (v2.type == tAttrs) {
                     Bindings::iterator j = v2.attrs->find(state.symbols.create("recurseForDerivations"));
                     if (j != v2.attrs->end() && state.forceBool(*j->value))

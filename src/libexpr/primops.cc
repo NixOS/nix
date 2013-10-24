@@ -103,7 +103,7 @@ static void prim_typeOf(EvalState & state, Value * * args, Value & v)
         case tString: t = "string"; break;
         case tPath: t = "path"; break;
         case tNull: t = "null"; break;
-        case tAttrs: t = "attrs"; break;
+        case tAttrs: t = "set"; break;
         case tList: t = "list"; break;
         case tLambda:
         case tPrimOp:
@@ -729,12 +729,12 @@ static void prim_filterSource(EvalState & state, Value * * args, Value & v)
 
 
 /*************************************************************
- * Attribute sets
+ * Sets
  *************************************************************/
 
 
-/* Return the names of the attributes in an attribute set as a sorted
-   list of strings. */
+/* Return the names of the attributes in a set as a sorted list of
+   strings. */
 static void prim_attrNames(EvalState & state, Value * * args, Value & v)
 {
     state.forceAttrs(*args[0]);
@@ -776,7 +776,7 @@ static void prim_hasAttr(EvalState & state, Value * * args, Value & v)
 }
 
 
-/* Determine whether the argument is an attribute set. */
+/* Determine whether the argument is a set. */
 static void prim_isAttrs(EvalState & state, Value * * args, Value & v)
 {
     state.forceValue(*args[0]);
@@ -807,10 +807,10 @@ static void prim_removeAttrs(EvalState & state, Value * * args, Value & v)
 }
 
 
-/* Builds an attribute set from a list specifying (name, value)
-   pairs.  To be precise, a list [{name = "name1"; value = value1;}
-   ... {name = "nameN"; value = valueN;}] is transformed to {name1 =
-   value1; ... nameN = valueN;}. */
+/* Builds a set from a list specifying (name, value) pairs.  To be
+   precise, a list [{name = "name1"; value = value1;} ... {name =
+   "nameN"; value = valueN;}] is transformed to {name1 = value1;
+   ... nameN = valueN;}. */
 static void prim_listToAttrs(EvalState & state, Value * * args, Value & v)
 {
     state.forceList(*args[0]);
@@ -844,9 +844,9 @@ static void prim_listToAttrs(EvalState & state, Value * * args, Value & v)
 }
 
 
-/* Return the right-biased intersection of two attribute sets as1 and
-   as2, i.e. a set that contains every attribute from as2 that is also
-   a member of as1. */
+/* Return the right-biased intersection of two sets as1 and as2,
+   i.e. a set that contains every attribute from as2 that is also a
+   member of as1. */
 static void prim_intersectAttrs(EvalState & state, Value * * args, Value & v)
 {
     state.forceAttrs(*args[0]);
@@ -1240,7 +1240,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__toFile", 2, prim_toFile);
     addPrimOp("__filterSource", 2, prim_filterSource);
 
-    // Attribute sets
+    // Sets
     addPrimOp("__attrNames", 1, prim_attrNames);
     addPrimOp("__getAttr", 2, prim_getAttr);
     addPrimOp("__hasAttr", 2, prim_hasAttr);
@@ -1290,8 +1290,8 @@ void EvalState::createBaseEnv()
     evalFile(path, v);
     addConstant("derivation", v);
 
-    /* Now that we've added all primops, sort the `builtins' attribute
-       set, because attribute lookups expect it to be sorted. */
+    /* Now that we've added all primops, sort the `builtins' set,
+       because attribute lookups expect it to be sorted. */
     baseEnv.values[0]->attrs->sort();
 }
 

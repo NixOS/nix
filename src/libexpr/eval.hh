@@ -19,8 +19,8 @@ class EvalState;
 struct Attr;
 
 
-/* Attribute sets are represented as a vector of attributes, sorted by
-   symbol (i.e. pointer to the attribute name in the symbol table). */
+/* Sets are represented as a vector of attributes, sorted by symbol
+   (i.e. pointer to the attribute name in the symbol table). */
 #if HAVE_BOEHMGC
 typedef std::vector<Attr, gc_allocator<Attr> > BindingsBase;
 #else

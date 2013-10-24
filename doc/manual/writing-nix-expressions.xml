@@ -118,10 +118,10 @@ the single Nix expression in that directory
     <varname>stdenv.mkDerivation</varname>.
     <varname>mkDerivation</varname> is a function provided by
     <varname>stdenv</varname> that builds a package from a set of
-    <emphasis>attributes</emphasis>.  An attribute set is just a list
-    of key/value pairs where each value is an arbitrary Nix
-    expression.  They take the general form
-    <literal>{ <replaceable>name1</replaceable> =
+    <emphasis>attributes</emphasis>.  A set is just a list of
+    key/value pairs where each key is a string and each value is an
+    arbitrary Nix expression.  They take the general form <literal>{
+    <replaceable>name1</replaceable> =
     <replaceable>expr1</replaceable>; <replaceable>...</replaceable>
     <replaceable>nameN</replaceable> =
     <replaceable>exprN</replaceable>; }</literal>.</para>
@@ -384,9 +384,9 @@ some fragments of
 
     <para>This is where the actual composition takes place.  Here we
     <emphasis>call</emphasis> the function imported from
-    <filename>../applications/misc/hello/ex-1</filename> with an
-    attribute set containing the things that the function expects,
-    namely <varname>fetchurl</varname>, <varname>stdenv</varname>, and
+    <filename>../applications/misc/hello/ex-1</filename> with a set
+    containing the things that the function expects, namely
+    <varname>fetchurl</varname>, <varname>stdenv</varname>, and
     <varname>perl</varname>.  We use inherit again to use the
     attributes defined in the surrounding scope (we could also have
     written <literal>fetchurl = fetchurl;</literal>, etc.).</para>
@@ -805,20 +805,21 @@ to be enclosed in parentheses.  If they had been omitted, e.g.,
 [ 123 ./foo.nix "abc" f { x = y; } ]</programlisting>
 
 the result would be a list of five elements, the fourth one being a
-function and the fifth being an attribute set.</para>
+function and the fifth being a set.</para>
 
 </simplesect>
 
 
-<simplesect><title>Attribute sets</title>
+<simplesect><title>Sets</title>
 
-<para>Attribute sets are really the core of the language, since
-ultimately it's all about creating derivations, which are really just
+<para>Sets are really the core of the language, since ultimately the
+Nix language is all about creating derivations, which are really just
 sets of attributes to be passed to build scripts.</para>
 
-<para>Attribute sets are just a list of name/value pairs enclosed in
-curly brackets, where each value is an arbitrary expression terminated
-by a semicolon.  For example:
+<para>Sets are just a list of name/value pairs (called
+<emphasis>attributes</emphasis>) enclosed in curly brackets, where
+each value is an arbitrary expression terminated by a semicolon.  For
+example:
 
 <programlisting>
 { x = 123;
@@ -826,12 +827,12 @@ by a semicolon.  For example:
   y = f { bla = 456; };
 }</programlisting>
 
-This defines an attribute set with attributes named
-<varname>x</varname>, <varname>text</varname>, <varname>y</varname>.
-The order of the attributes is irrelevant.  An attribute name may only
-occur once.</para>
+This defines a set with attributes named <varname>x</varname>,
+<varname>text</varname>, <varname>y</varname>.  The order of the
+attributes is irrelevant.  An attribute name may only occur
+once.</para>
 
-<para>Attributes can be selected from an attribute set using the
+<para>Attributes can be selected from a set using the
 <literal>.</literal> operator.  For instance,
 
 <programlisting>
@@ -864,10 +865,10 @@ This will evaluate to <literal>123</literal>.</para>
 <section><title>Language constructs</title>
 
 
-<simplesect><title>Recursive attribute sets</title>
+<simplesect><title>Recursive sets</title>
 
-<para>Recursive attribute sets are just normal attribute sets, but the
-attributes can refer to each other.  For example,
+<para>Recursive sets are just normal sets, but the attributes can
+refer to each other.  For example,
 
 <programlisting>
 rec {
@@ -880,11 +881,11 @@ evaluates to <literal>123</literal>.  Note that without
 <literal>rec</literal> the binding <literal>x = y;</literal> would
 refer to the variable <varname>y</varname> in the surrounding scope,
 if one exists, and would be invalid if no such variable exists.  That
-is, in a normal (non-recursive) attribute set, attributes are not
-added to the lexical scope; in a recursive set, they are.</para>
+is, in a normal (non-recursive) set, attributes are not added to the
+lexical scope; in a recursive set, they are.</para>
 
-<para>Recursive attribute sets of course introduce the danger of
-infinite recursion.  For example,
+<para>Recursive sets of course introduce the danger of infinite
+recursion.  For example,
 
 <programlisting>
 rec {
@@ -918,16 +919,16 @@ evaluates to <literal>"foobar"</literal>.
 <literal>let { <replaceable>attrs</replaceable> }</literal>, which is
 translated to <literal>rec { <replaceable>attrs</replaceable>
 }.body</literal>.  That is, the body of the let-expression is the
-<literal>body</literal> attribute of the attribute set.</para></note>
+<literal>body</literal> attribute of the set.</para></note>
 
 </simplesect>
 
 
 <simplesect><title>Inheriting attributes</title>
 
-<para>When defining an attribute set it is often convenient to copy
-variables from the surrounding lexical scope (e.g., when you want to
-propagate attributes).  This can be shortened using the
+<para>When defining a set it is often convenient to copy variables
+from the surrounding lexical scope (e.g., when you want to propagate
+attributes).  This can be shortened using the
 <literal>inherit</literal> keyword.  For instance,
 
 <programlisting>
@@ -936,10 +937,10 @@ let x = 123; in
   y = 456;
 }</programlisting>
 
-evaluates to <literal>{ x = 123; y = 456; }</literal>.  (Note that this
-works because <varname>x</varname> is added to the lexical scope by
-the <literal>let</literal> construct.)  It is also possible to inherit
-attributes from another attribute set.  For instance, in this fragment
+evaluates to <literal>{ x = 123; y = 456; }</literal>.  (Note that
+this works because <varname>x</varname> is added to the lexical scope
+by the <literal>let</literal> construct.)  It is also possible to
+inherit attributes from another set.  For instance, in this fragment
 from <filename>all-packages.nix</filename>,
 
 <programlisting>
@@ -958,13 +959,12 @@ from <filename>all-packages.nix</filename>,
   libjpg = ...;
   ...</programlisting>
 
-the attribute set used in the function call to the function defined in
+the set used in the function call to the function defined in
 <filename>../tools/graphics/graphviz</filename> inherits a number of
 variables from the surrounding scope (<varname>fetchurl</varname>
 ... <varname>yacc</varname>), but also inherits
 <varname>libXaw</varname> (the X Athena Widgets) from the
-<varname>xlibs</varname> (X11 client-side libraries) attribute
-set.</para>
+<varname>xlibs</varname> (X11 client-side libraries) set.</para>
 
 </simplesect>
 
@@ -1003,11 +1003,11 @@ map (concat "foo") [ "bar" "bla" "abc" ]</programlisting>
   "fooabc" ]</literal>.</para></listitem>
 
 
-  <listitem><para>An <emphasis>attribute set pattern</emphasis> of the
-  form <literal>{ name1, name2, …, nameN }</literal>
-  matches an attribute set containing the listed attributes, and binds
-  the values of those attributes to variables in the function body.
-  For example, the function
+  <listitem><para>A <emphasis>set pattern</emphasis> of the form
+  <literal>{ name1, name2, …, nameN }</literal> matches a set
+  containing the listed attributes, and binds the values of those
+  attributes to variables in the function body.  For example, the
+  function
 
 <programlisting>
 { x, y, z }: z + y + x</programlisting>
@@ -1174,9 +1174,8 @@ used in the Nix expression for Subversion.</para>
 <programlisting>
 with <replaceable>e1</replaceable>; <replaceable>e2</replaceable></programlisting>
 
-introduces the attribute set <replaceable>e1</replaceable> into the
-lexical scope of the expression <replaceable>e2</replaceable>.  For
-instance,
+introduces the set <replaceable>e1</replaceable> into the lexical
+scope of the expression <replaceable>e2</replaceable>.  For instance,
 
 <programlisting>
 let as = { x = "foo"; y = "bar"; };
@@ -1235,7 +1234,7 @@ weakest binding).</para>
         </entry>
         <entry>none</entry>
         <entry>Select attribute denoted by the attribute path
-        <replaceable>attrpath</replaceable> from attribute set
+        <replaceable>attrpath</replaceable> from set
         <replaceable>e</replaceable>.  (An attribute path is a
         dot-separated list of attribute names.)  If the attribute
         doesn’t exist, return <replaceable>def</replaceable> if
@@ -1251,8 +1250,8 @@ weakest binding).</para>
         <entry><replaceable>e</replaceable> <literal>?</literal>
         <replaceable>attrpath</replaceable></entry>
         <entry>none</entry>
-        <entry>Test whether attribute set <replaceable>e</replaceable>
-        contains the attribute denoted by <replaceable>attrpath</replaceable>;
+        <entry>Test whether set <replaceable>e</replaceable> contains
+        the attribute denoted by <replaceable>attrpath</replaceable>;
         return <literal>true</literal> or
         <literal>false</literal>.</entry>
       </row>
@@ -1275,10 +1274,11 @@ weakest binding).</para>
         <entry><replaceable>e1</replaceable> <literal>//</literal>
         <replaceable>e2</replaceable></entry>
         <entry>right</entry>
-        <entry>Return an attribute set consisting of the attributes in
+        <entry>Return a set consisting of the attributes in
         <replaceable>e1</replaceable> and
         <replaceable>e2</replaceable> (with the latter taking
-        precedence over the former in case of equally named attributes).</entry>
+        precedence over the former in case of equally named
+        attributes).</entry>
       </row>
       <row>
         <entry><replaceable>e1</replaceable> <literal>==</literal>
@@ -1322,9 +1322,9 @@ weakest binding).</para>
 <section xml:id="ssec-derivation"><title>Derivations</title>
 
 <para>The most important built-in function is
-<function>derivation</function>, which is used to describe a
-single derivation (a build action).  It takes as input an attribute
-set, the attributes of which specify the inputs of the build.</para>
+<function>derivation</function>, which is used to describe a single
+derivation (a build action).  It takes as input a set, the attributes
+of which specify the inputs of the build.</para>
 
 <itemizedlist>
 

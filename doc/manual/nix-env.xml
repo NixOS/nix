@@ -153,11 +153,10 @@ also <xref linkend="sec-common-options" />.</phrase></para>
     default.</para>
 
     <para>The Nix expressions in this directory are combined into a
-    single attribute set, with each file as an attribute that has the
-    name of the file.  Thus, if <filename>~/.nix-defexpr</filename>
-    contains two files, <filename>foo</filename> and
-    <filename>bar</filename>, then the default Nix expression will
-    essentially be
+    single set, with each file as an attribute that has the name of
+    the file.  Thus, if <filename>~/.nix-defexpr</filename> contains
+    two files, <filename>foo</filename> and <filename>bar</filename>,
+    then the default Nix expression will essentially be
 
 <programlisting>
 {
@@ -405,7 +404,7 @@ $ nix-env -f ./foo.nix -i -E \
 I.e., this evaluates to <literal>(f: (f {system =
 "i686-linux";}).subversionWithJava) (import ./foo.nix)</literal>, thus
 selecting the <literal>subversionWithJava</literal> attribute from the
-attribute set returned by calling the function defined in
+set returned by calling the function defined in
 <filename>./foo.nix</filename>.</para>
 
 <para>A dry-run tells you which paths will be downloaded or built from

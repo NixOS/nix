@@ -35,15 +35,14 @@ Value * findAlongAttrPath(EvalState & state, const string & attrPath,
         v = vNew;
         state.forceValue(*v);
 
-        /* It should evaluate to either an attribute set or an
-           expression, according to what is specified in the
-           attrPath. */
+        /* It should evaluate to either a set or an expression,
+           according to what is specified in the attrPath. */
 
         if (apType == apAttr) {
 
             if (v->type != tAttrs)
                 throw TypeError(
-                    format("the expression selected by the selection path `%1%' should be an attribute set but is %2%")
+                    format("the expression selected by the selection path `%1%' should be a set but is %2%")
                     % curPath % showType(*v));
 
             Bindings::iterator a = v->attrs->find(state.symbols.create(attr));

@@ -45,7 +45,7 @@ inline void EvalState::forceAttrs(Value & v)
 {
     forceValue(v);
     if (v.type != tAttrs)
-        throwTypeError("value is %1% while an attribute set was expected", showType(v));
+        throwTypeError("value is %1% while a set was expected", showType(v));
 }
 
 

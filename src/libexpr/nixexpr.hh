@@ -123,8 +123,8 @@ struct ExprVar : Expr
        levels up from the current environment and getting the
        `displ'th value in that environment.  In the latter case, the
        value is obtained by getting the attribute named `name' from
-       the attribute set stored in the environment that is `level'
-       levels up from the current one.*/
+       the set stored in the environment that is `level' levels up
+       from the current one.*/
     unsigned int level;
     unsigned int displ;
 

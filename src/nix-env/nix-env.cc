@@ -159,11 +159,11 @@ static void loadSourceExpr(EvalState & state, const Path & path, Value & v)
     }
 
     /* The path is a directory.  Put the Nix expressions in the
-       directory in an attribute set, with the file name of each
-       expression as the attribute name.  Recurse into subdirectories
-       (but keep the attribute set flat, not nested, to make it easier
-       for a user to have a ~/.nix-defexpr directory that includes
-       some system-wide directory). */
+       directory in a set, with the file name of each expression as
+       the attribute name.  Recurse into subdirectories (but keep the
+       set flat, not nested, to make it easier for a user to have a
+       ~/.nix-defexpr directory that includes some system-wide
+       directory). */
     if (S_ISDIR(st.st_mode)) {
         state.mkAttrs(v, 16);
         state.mkList(*state.allocAttr(v, state.symbols.create("_combineChannels")), 0);

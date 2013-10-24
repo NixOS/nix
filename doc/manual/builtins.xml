@@ -12,9 +12,9 @@ such as <function>derivation</function>, are always in scope of every
 Nix expression; you can just access them right away.  But to prevent
 polluting the namespace too much, most built-ins are not in scope.
 Instead, you can access them through the <varname>builtins</varname>
-built-in value, which is an attribute set that contains all built-in
-functions and values.  For instance, <function>derivation</function>
-is also available as <function>builtins.derivation</function>.</para>
+built-in value, which is a set that contains all built-in functions
+and values.  For instance, <function>derivation</function> is also
+available as <function>builtins.derivation</function>.</para>
 
 
 <variablelist>
@@ -39,14 +39,14 @@ is also available as <function>builtins.derivation</function>.</para>
 
 
   <varlistentry><term><function>builtins.attrNames</function>
-  <replaceable>attrs</replaceable></term>
+  <replaceable>set</replaceable></term>
 
-    <listitem><para>Return the names of the attributes in the
-    attribute set <replaceable>attrs</replaceable> in a sorted list.
-    For instance, <literal>builtins.attrNames { y = 1; x = "foo";
-    }</literal> evaluates to <literal>[ "x" "y" ]</literal>.  There is
-    no built-in function <function>attrValues</function>, but you can
-    easily define it yourself:
+    <listitem><para>Return the names of the attributes in the set
+    <replaceable>set</replaceable> in a sorted list.  For instance,
+    <literal>builtins.attrNames { y = 1; x = "foo"; }</literal>
+    evaluates to <literal>[ "x" "y" ]</literal>.  There is no built-in
+    function <function>attrValues</function>, but you can easily
+    define it yourself:
 
 <programlisting>
 attrValues = attrs: map (name: builtins.getAttr name attrs) (builtins.attrNames attrs);</programlisting>
@@ -68,8 +68,8 @@ attrValues = attrs: map (name: builtins.getAttr name attrs) (builtins.attrNames 
 
   <varlistentry><term><varname>builtins</varname></term>
 
-    <listitem><para>The attribute set <varname>builtins</varname>
-    contains all the built-in functions and values.  You can use
+    <listitem><para>The set <varname>builtins</varname> contains all
+    the built-in functions and values.  You can use
     <varname>builtins</varname> to test for the availability of
     features in the Nix installation, e.g.,
 
@@ -258,11 +258,11 @@ stdenv.mkDerivation {
 
 
   <varlistentry><term><function>builtins.getAttr</function>
-  <replaceable>s</replaceable> <replaceable>attrs</replaceable></term>
+  <replaceable>s</replaceable> <replaceable>set</replaceable></term>
 
     <listitem><para><function>getAttr</function> returns the attribute
-    named <replaceable>s</replaceable> from the attribute set
-    <replaceable>attrs</replaceable>.  Evaluation aborts if the
+    named <replaceable>s</replaceable> from
+    <replaceable>set</replaceable>.  Evaluation aborts if the
     attribute doesn’t exist.  This is a dynamic version of the
     <literal>.</literal> operator, since <replaceable>s</replaceable>
     is an expression rather than an identifier.</para></listitem>
@@ -289,15 +289,15 @@ stdenv.mkDerivation {
 
 
   <varlistentry><term><function>builtins.hasAttr</function>
-  <replaceable>s</replaceable> <replaceable>attrs</replaceable></term>
+  <replaceable>s</replaceable> <replaceable>set</replaceable></term>
 
     <listitem><para><function>hasAttr</function> returns
-    <literal>true</literal> if the attribute set
-    <replaceable>attrs</replaceable> has an attribute named
-    <replaceable>s</replaceable>, and <literal>false</literal>
-    otherwise.  This is a dynamic version of the <literal>?</literal>
-    operator, since <replaceable>s</replaceable> is an expression
-    rather than an identifier.</para></listitem>
+    <literal>true</literal> if <replaceable>set</replaceable> has an
+    attribute named <replaceable>s</replaceable>, and
+    <literal>false</literal> otherwise.  This is a dynamic version of
+    the <literal>?</literal>  operator, since
+    <replaceable>s</replaceable> is an expression rather than an
+    identifier.</para></listitem>
 
   </varlistentry>
 
@@ -331,12 +331,12 @@ stdenv.mkDerivation {
     <listitem><para>Load, parse and return the Nix expression in the
     file <replaceable>path</replaceable>.  If <replaceable>path
     </replaceable> is a directory, the file <filename>default.nix
-    </filename> in that directory is loaded.  Evaluation aborts if
-    the file doesn’t exist or contains an incorrect Nix
-    expression.  <function>import</function> implements Nix’s module
-    system: you can put any Nix expression (such as an attribute set
-    or a function) in a separate file, and use it from Nix expressions
-    in other files.</para>
+    </filename> in that directory is loaded.  Evaluation aborts if the
+    file doesn’t exist or contains an incorrect Nix expression.
+    <function>import</function> implements Nix’s module system: you
+    can put any Nix expression (such as a set or a function) in a
+    separate file, and use it from Nix expressions in other
+    files.</para>
 
     <para>A Nix expression loaded by <function>import</function> must
     not contain any <emphasis>free variables</emphasis> (identifiers
@@ -383,9 +383,9 @@ x: x + 456</programlisting>
   <varlistentry><term><function>builtins.intersectAttrs</function>
   <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
 
-    <listitem><para>Return an attribute set consisting of the
-    attributes in the set <replaceable>e2</replaceable> that also
-    exist in the set <replaceable>e1</replaceable>.</para></listitem>
+    <listitem><para>Return a set consisting of the attributes in the
+    set <replaceable>e2</replaceable> that also exist in the set
+    <replaceable>e1</replaceable>.</para></listitem>
 
   </varlistentry>
 
@@ -394,7 +394,7 @@ x: x + 456</programlisting>
   <replaceable>e</replaceable></term>
 
     <listitem><para>Return <literal>true</literal> if
-    <replaceable>e</replaceable> evaluates to an attribute set, and
+    <replaceable>e</replaceable> evaluates to a set, and
     <literal>false</literal> otherwise.</para></listitem>
 
   </varlistentry>
@@ -490,9 +490,9 @@ x: x + 456</programlisting>
   <varlistentry><term><function>builtins.listToAttrs</function>
   <replaceable>e</replaceable></term>
 
-    <listitem><para>Construct an attribute set from a list specifying
-    the names and values of each attribute.  Each element of the list
-    should be an attribute set consisting of a string-valued attribute
+    <listitem><para>Construct a set from a list specifying the names
+    and values of each attribute.  Each element of the list should be
+    a set consisting of a string-valued attribute
     <varname>name</varname> specifying the name of the attribute, and
     an attribute <varname>value</varname> specifying its value.
     Example:
@@ -547,7 +547,7 @@ map (x: "foo" + x) [ "bar" "bla" "abc" ]</programlisting>
     a package name and version.  The package name is everything up to
     but not including the first dash followed by a digit, and the
     version is everything following that dash.  The result is returned
-    in an attribute set <literal>{ name, version }</literal>.  Thus,
+    in a set <literal>{ name, version }</literal>.  Thus,
     <literal>builtins.parseDrvName "nix-0.12pre12876"</literal>
     returns <literal>{ name = "nix"; version = "0.12pre12876";
     }</literal>.</para></listitem>
@@ -598,12 +598,12 @@ in config.someSetting</programlisting>
 
 
   <varlistentry><term><function>removeAttrs</function>
-  <replaceable>attrs</replaceable> <replaceable>list</replaceable></term>
+  <replaceable>set</replaceable> <replaceable>list</replaceable></term>
 
     <listitem><para>Remove the attributes listed in
-    <replaceable>list</replaceable> from the attribute set
-    <replaceable>attrs</replaceable>.  The attributes don’t have to
-    exist in <replaceable>attrs</replaceable>. For instance,
+    <replaceable>list</replaceable> from
+    <replaceable>set</replaceable>.  The attributes don’t have to
+    exist in <replaceable>set</replaceable>. For instance,
 
 <screen>
 removeAttrs { x = 1; y = 2; z = 3; } [ "a" "x" "z" ]</screen>
@@ -792,7 +792,7 @@ in foo</programlisting>
     servlet container</link>.  A servlet container contains a number
     of servlets (<filename>*.war</filename> files) each exported under
     a specific URI prefix.  So the servlet configuration is a list of
-    attribute sets containing the <varname>path</varname> and
+    sets containing the <varname>path</varname> and
     <varname>war</varname> of the servlet (<xref
     linkend='ex-toxml-co-servlets' />).  This kind of information is
     difficult to communicate with the normal method of passing
