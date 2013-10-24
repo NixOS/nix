@@ -312,6 +312,24 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 </varlistentry>
 
 
+<varlistentry><term><envar>NIX_SHOW_STATS</envar></term>
+
+  <listitem><para>If set to <literal>1</literal>, Nix will print some
+  evaluation statistics, such as the number of values
+  allocated.</para></listitem>
+
+</varlistentry>
+
+
+<varlistentry><term><envar>NIX_COUNT_CALLS</envar></term>
+
+  <listitem><para>If set to <literal>1</literal>, Nix will print how
+  often functions were called during Nix expression evaluation.  This
+  is useful for profiling your Nix expressions.</para></listitem>
+
+</varlistentry>
+
+
 <varlistentry><term><envar>GC_INITIAL_HEAP_SIZE</envar></term>
 
   <listitem><para>If Nix has been configured to use the Boehm garbage
