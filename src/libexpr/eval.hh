@@ -93,7 +93,7 @@ class EvalState
 public:
     SymbolTable symbols;
 
-    const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName,
+    const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue,
         sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls;
     Symbol sDerivationNix;
 

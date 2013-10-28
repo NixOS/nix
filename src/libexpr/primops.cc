@@ -277,10 +277,10 @@ static void prim_tryEval(EvalState & state, Value * * args, Value & v)
     state.mkAttrs(v, 2);
     try {
         state.forceValue(*args[0]);
-        v.attrs->push_back(Attr(state.symbols.create("value"), args[0]));
+        v.attrs->push_back(Attr(state.sValue, args[0]));
         mkBool(*state.allocAttr(v, state.symbols.create("success")), true);
     } catch (AssertionError & e) {
-        mkBool(*state.allocAttr(v, state.symbols.create("value")), false);
+        mkBool(*state.allocAttr(v, state.sValue), false);
         mkBool(*state.allocAttr(v, state.symbols.create("success")), false);
     }
     v.attrs->sort();
@@ -810,7 +810,8 @@ static void prim_removeAttrs(EvalState & state, Value * * args, Value & v)
 /* Builds a set from a list specifying (name, value) pairs.  To be
    precise, a list [{name = "name1"; value = value1;} ... {name =
    "nameN"; value = valueN;}] is transformed to {name1 = value1;
-   ... nameN = valueN;}. */
+   ... nameN = valueN;}.  In case of duplicate occurences of the same
+   name, the first takes precedence. */
 static void prim_listToAttrs(EvalState & state, Value * * args, Value & v)
 {
     state.forceList(*args[0]);
@@ -828,16 +829,15 @@ static void prim_listToAttrs(EvalState & state, Value * * args, Value & v)
             throw TypeError("`name' attribute missing in a call to `listToAttrs'");
         string name = state.forceStringNoCtx(*j->value);
 
-        Bindings::iterator j2 = v2.attrs->find(state.symbols.create("value"));
-        if (j2 == v2.attrs->end())
-            throw TypeError("`value' attribute missing in a call to `listToAttrs'");
-
         Symbol sym = state.symbols.create(name);
         if (seen.find(sym) == seen.end()) {
+            Bindings::iterator j2 = v2.attrs->find(state.symbols.create(state.sValue));
+            if (j2 == v2.attrs->end())
+                throw TypeError("`value' attribute missing in a call to `listToAttrs'");
+
             v.attrs->push_back(Attr(sym, j2->value, j2->pos));
             seen.insert(sym);
         }
-        /* !!! Throw an error if `name' already exists? */
     }
 
     v.attrs->sort();
