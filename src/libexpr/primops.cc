@@ -158,22 +158,29 @@ static void prim_isBool(EvalState & state, Value * * args, Value & v)
 
 struct CompareValues
 {
-    bool operator () (const Value & v1, const Value & v2) const
+    bool operator () (const Value * v1, const Value * v2) const
     {
-        if (v1.type != v2.type)
+        if (v1->type != v2->type)
             throw EvalError("cannot compare values of different types");
-        switch (v1.type) {
+        switch (v1->type) {
             case tInt:
-                return v1.integer < v2.integer;
+                return v1->integer < v2->integer;
             case tString:
-                return strcmp(v1.string.s, v2.string.s) < 0;
+                return strcmp(v1->string.s, v2->string.s) < 0;
             case tPath:
-                return strcmp(v1.path, v2.path) < 0;
+                return strcmp(v1->path, v2->path) < 0;
             default:
-                throw EvalError(format("cannot compare %1% with %2%") % showType(v1) % showType(v2));
+                throw EvalError(format("cannot compare %1% with %2%") % showType(*v1) % showType(*v2));
         }
     }
 };
+
+
+#if HAVE_BOEHMGC
+typedef list<Value *, gc_allocator<Value *> > ValueVector;
+#else
+typedef vector<Value *> ValueVector;
+#endif
 
 
 static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
@@ -189,7 +196,7 @@ static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
         throw EvalError("attribute `startSet' required");
     state.forceList(*startSet->value);
 
-    list<Value *> workSet;
+    ValueVector workSet;
     for (unsigned int n = 0; n < startSet->value->list.length; ++n)
         workSet.push_back(startSet->value->list.elems[n]);
 
@@ -203,8 +210,10 @@ static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
     /* Construct the closure by applying the operator to element of
        `workSet', adding the result to `workSet', continuing until
        no new elements are found. */
-    list<Value> res;
-    set<Value, CompareValues> doneKeys; // !!! use Value *?
+    ValueVector res;
+    // `doneKeys' doesn't need to be a GC root, because its values are
+    // reachable from res.
+    set<Value *, CompareValues> doneKeys;
     while (!workSet.empty()) {
         Value * e = *(workSet.begin());
         workSet.pop_front();
@@ -217,9 +226,9 @@ static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
             throw EvalError("attribute `key' required");
         state.forceValue(*key->value);
 
-        if (doneKeys.find(*key->value) != doneKeys.end()) continue;
-        doneKeys.insert(*key->value);
-        res.push_back(*e);
+        if (doneKeys.find(key->value) != doneKeys.end()) continue;
+        doneKeys.insert(key->value);
+        res.push_back(e);
 
         /* Call the `operator' function with `e' as argument. */
         Value call;
@@ -236,8 +245,8 @@ static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
     /* Create the result list. */
     state.mkList(v, res.size());
     unsigned int n = 0;
-    foreach (list<Value>::iterator, i, res)
-        *(v.list.elems[n++] = state.allocValue()) = *i;
+    foreach (ValueVector::iterator, i, res)
+        v.list.elems[n++] = *i;
 }
 
 
@@ -1056,7 +1065,7 @@ static void prim_lessThan(EvalState & state, Value * * args, Value & v)
     state.forceValue(*args[0]);
     state.forceValue(*args[1]);
     CompareValues comp;
-    mkBool(v, comp(*args[0], *args[1]));
+    mkBool(v, comp(args[0], args[1]));
 }
 
 
