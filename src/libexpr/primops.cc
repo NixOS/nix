@@ -177,9 +177,9 @@ struct CompareValues
 
 
 #if HAVE_BOEHMGC
-typedef list<Value *, gc_allocator<Value *> > ValueVector;
+typedef list<Value *, gc_allocator<Value *> > ValueList;
 #else
-typedef vector<Value *> ValueVector;
+typedef list<Value *> ValueList;
 #endif
 
 
@@ -196,7 +196,7 @@ static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
         throw EvalError("attribute `startSet' required");
     state.forceList(*startSet->value);
 
-    ValueVector workSet;
+    ValueList workSet;
     for (unsigned int n = 0; n < startSet->value->list.length; ++n)
         workSet.push_back(startSet->value->list.elems[n]);
 
@@ -210,7 +210,7 @@ static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
     /* Construct the closure by applying the operator to element of
        `workSet', adding the result to `workSet', continuing until
        no new elements are found. */
-    ValueVector res;
+    ValueList res;
     // `doneKeys' doesn't need to be a GC root, because its values are
     // reachable from res.
     set<Value *, CompareValues> doneKeys;
@@ -245,7 +245,7 @@ static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
     /* Create the result list. */
     state.mkList(v, res.size());
     unsigned int n = 0;
-    foreach (ValueVector::iterator, i, res)
+    foreach (ValueList::iterator, i, res)
         v.list.elems[n++] = *i;
 }
 
