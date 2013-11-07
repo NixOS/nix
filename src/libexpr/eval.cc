@@ -480,13 +480,19 @@ void EvalState::eval(Expr * e, Value & v)
 }
 
 
-inline bool EvalState::evalBool(Env & env, Expr * e)
+inline bool EvalState::evalBool(Env & env, Expr * e, Value & v)
 {
-    Value v;
     e->eval(*this, env, v);
     if (v.type != tBool)
         throwTypeError("value is %1% while a Boolean was expected", v);
     return v.boolean;
+}
+
+
+inline bool EvalState::evalBool(Env & env, Expr * e)
+{
+    Value v;
+    return evalBool(env, e, v);
 }
 
 
@@ -838,13 +844,13 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
 
 void ExprIf::eval(EvalState & state, Env & env, Value & v)
 {
-    (state.evalBool(env, cond) ? then : else_)->eval(state, env, v);
+    (state.evalBool(env, cond, v) ? then : else_)->eval(state, env, v);
 }
 
 
 void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 {
-    if (!state.evalBool(env, cond))
+    if (!state.evalBool(env, cond, v))
         throwAssertionError("assertion failed at %1%", pos);
     body->eval(state, env, v);
 }
