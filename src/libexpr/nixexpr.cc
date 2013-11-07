@@ -330,7 +330,7 @@ void ExprLambda::setName(Symbol & name)
 }
 
 
-string ExprLambda::showNamePos()
+string ExprLambda::showNamePos() const
 {
     return (format("%1% at %2%") % (name.set() ? "`" + (string) name + "'" : "an anonymous function") % pos).str();
 }

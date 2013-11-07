@@ -259,6 +259,11 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1, con
     throw TypeError(format(s) % s1 % s2);
 }
 
+LocalNoInlineNoReturn(void throwTypeError(const char * s, const ExprLambda & fun, const Symbol & s2))
+{
+    throw TypeError(format(s) % fun.showNamePos() % s2);
+}
+
 LocalNoInlineNoReturn(void throwAssertionError(const char * s, const Pos & pos))
 {
     throw AssertionError(format(s) % pos);
@@ -700,47 +705,52 @@ void ExprLambda::eval(EvalState & state, Env & env, Value & v)
 
 void ExprApp::eval(EvalState & state, Env & env, Value & v)
 {
-    Value vFun;
-    e1->eval(state, env, vFun);
-    state.callFunction(vFun, *(e2->maybeThunk(state, env)), v);
+    e1->eval(state, env, v);
+    state.callFunction(v, *(e2->maybeThunk(state, env)), v);
+}
+
+
+void EvalState::callPrimOp(Value & fun, Value & arg, Value & v)
+{
+    /* Figure out the number of arguments still needed. */
+    unsigned int argsDone = 0;
+    Value * primOp = &fun;
+    while (primOp->type == tPrimOpApp) {
+        argsDone++;
+        primOp = primOp->primOpApp.left;
+    }
+    assert(primOp->type == tPrimOp);
+    unsigned int arity = primOp->primOp->arity;
+    unsigned int argsLeft = arity - argsDone;
+
+    if (argsLeft == 1) {
+        /* We have all the arguments, so call the primop. */
+
+        /* Put all the arguments in an array. */
+        Value * vArgs[arity];
+        unsigned int n = arity - 1;
+        vArgs[n--] = &arg;
+        for (Value * arg = &fun; arg->type == tPrimOpApp; arg = arg->primOpApp.left)
+            vArgs[n--] = arg->primOpApp.right;
+
+        /* And call the primop. */
+        nrPrimOpCalls++;
+        if (countCalls) primOpCalls[primOp->primOp->name]++;
+        primOp->primOp->fun(*this, vArgs, v);
+    } else {
+        Value * fun2 = allocValue();
+        *fun2 = fun;
+        v.type = tPrimOpApp;
+        v.primOpApp.left = fun2;
+        v.primOpApp.right = &arg;
+    }
 }
 
 
 void EvalState::callFunction(Value & fun, Value & arg, Value & v)
 {
     if (fun.type == tPrimOp || fun.type == tPrimOpApp) {
-
-        /* Figure out the number of arguments still needed. */
-        unsigned int argsDone = 0;
-        Value * primOp = &fun;
-        while (primOp->type == tPrimOpApp) {
-            argsDone++;
-            primOp = primOp->primOpApp.left;
-        }
-        assert(primOp->type == tPrimOp);
-        unsigned int arity = primOp->primOp->arity;
-        unsigned int argsLeft = arity - argsDone;
-
-        if (argsLeft == 1) {
-            /* We have all the arguments, so call the primop. */
-
-            /* Put all the arguments in an array. */
-            Value * vArgs[arity];
-            unsigned int n = arity - 1;
-            vArgs[n--] = &arg;
-            for (Value * arg = &fun; arg->type == tPrimOpApp; arg = arg->primOpApp.left)
-                vArgs[n--] = arg->primOpApp.right;
-
-            /* And call the primop. */
-            nrPrimOpCalls++;
-            if (countCalls) primOpCalls[primOp->primOp->name]++;
-            primOp->primOp->fun(*this, vArgs, v);
-        } else {
-            v.type = tPrimOpApp;
-            v.primOpApp.left = allocValue();
-            *v.primOpApp.left = fun;
-            v.primOpApp.right = &arg;
-        }
+        callPrimOp(fun, arg, v);
         return;
     }
 
@@ -772,7 +782,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
             Bindings::iterator j = arg.attrs->find(i->name);
             if (j == arg.attrs->end()) {
                 if (!i->def) throwTypeError("%1% called without required argument `%2%'",
-                    fun.lambda.fun->showNamePos(), i->name);
+                    *fun.lambda.fun, i->name);
                 env2.values[displ++] = i->def->maybeThunk(*this, env2);
             } else {
                 attrsUsed++;
@@ -787,20 +797,32 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
                user. */
             foreach (Bindings::iterator, i, *arg.attrs)
                 if (fun.lambda.fun->formals->argNames.find(i->name) == fun.lambda.fun->formals->argNames.end())
-                    throwTypeError("%1% called with unexpected argument `%2%'", fun.lambda.fun->showNamePos(), i->name);
+                    throwTypeError("%1% called with unexpected argument `%2%'", *fun.lambda.fun, i->name);
             abort(); // can't happen
         }
     }
 
     nrFunctionCalls++;
-    if (countCalls) functionCalls[fun.lambda.fun]++;
+    if (countCalls) incrFunctionCall(fun.lambda.fun);
 
+    fun.lambda.fun->body->eval(*this, env2, v);
+
+#if 0
     try {
         fun.lambda.fun->body->eval(*this, env2, v);
     } catch (Error & e) {
         addErrorPrefix(e, "while evaluating %1%:\n", fun.lambda.fun->showNamePos());
         throw;
     }
+#endif
+}
+
+
+// Lifted out of callFunction() because it creates a temporary that
+// prevents tail-call optimisation.
+void EvalState::incrFunctionCall(ExprLambda * fun)
+{
+    functionCalls[fun]++;
 }
 
 

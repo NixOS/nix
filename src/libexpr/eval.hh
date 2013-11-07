@@ -227,6 +227,7 @@ public:
     bool eqValues(Value & v1, Value & v2);
 
     void callFunction(Value & fun, Value & arg, Value & v);
+    void callPrimOp(Value & fun, Value & arg, Value & v);
 
     /* Automatically call a function for which each argument has a
        default value or has a binding in the `args' map. */
@@ -267,6 +268,8 @@ private:
 
     typedef std::map<ExprLambda *, unsigned int> FunctionCalls;
     FunctionCalls functionCalls;
+
+    void incrFunctionCall(ExprLambda * fun);
 
     typedef std::map<Pos, unsigned int> AttrSelects;
     AttrSelects attrSelects;

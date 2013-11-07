@@ -205,7 +205,7 @@ struct ExprLambda : Expr
                 % arg % pos);
     };
     void setName(Symbol & name);
-    string showNamePos();
+    string showNamePos() const;
     COMMON_METHODS
 };
 
