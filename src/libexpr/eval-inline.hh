@@ -12,9 +12,9 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s))
     throw EvalError(s);
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s2))
+LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v))
 {
-    throw TypeError(format(s) % s2);
+    throw TypeError(format(s) % showType(v));
 }
 
 
@@ -45,7 +45,7 @@ inline void EvalState::forceAttrs(Value & v)
 {
     forceValue(v);
     if (v.type != tAttrs)
-        throwTypeError("value is %1% while a set was expected", showType(v));
+        throwTypeError("value is %1% while a set was expected", v);
 }
 
 
@@ -53,7 +53,7 @@ inline void EvalState::forceList(Value & v)
 {
     forceValue(v);
     if (v.type != tList)
-        throwTypeError("value is %1% while a list was expected", showType(v));
+        throwTypeError("value is %1% while a list was expected", v);
 }
 
 }

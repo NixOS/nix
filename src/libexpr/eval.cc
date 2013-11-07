@@ -249,6 +249,11 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s))
     throw TypeError(s);
 }
 
+LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1))
+{
+    throw TypeError(format(s) % s1);
+}
+
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1, const string & s2))
 {
     throw TypeError(format(s) % s1 % s2);
@@ -480,7 +485,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e)
     Value v;
     e->eval(*this, env, v);
     if (v.type != tBool)
-        throwTypeError("value is %1% while a Boolean was expected", showType(v));
+        throwTypeError("value is %1% while a Boolean was expected", v);
     return v.boolean;
 }
 
@@ -489,7 +494,7 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v)
 {
     e->eval(*this, env, v);
     if (v.type != tAttrs)
-        throwTypeError("value is %1% while a set was expected", showType(v));
+        throwTypeError("value is %1% while a set was expected", v);
 }
 
 
@@ -734,8 +739,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
     }
 
     if (fun.type != tLambda)
-        throwTypeError("attempt to call something which is not a function but %1%",
-            showType(fun));
+        throwTypeError("attempt to call something which is not a function but %1%", fun);
 
     unsigned int size =
         (fun.lambda.fun->arg.empty() ? 0 : 1) +
@@ -1019,7 +1023,7 @@ NixInt EvalState::forceInt(Value & v)
 {
     forceValue(v);
     if (v.type != tInt)
-        throwTypeError("value is %1% while an integer was expected", showType(v));
+        throwTypeError("value is %1% while an integer was expected", v);
     return v.integer;
 }
 
@@ -1028,7 +1032,7 @@ bool EvalState::forceBool(Value & v)
 {
     forceValue(v);
     if (v.type != tBool)
-        throwTypeError("value is %1% while a Boolean was expected", showType(v));
+        throwTypeError("value is %1% while a Boolean was expected", v);
     return v.boolean;
 }
 
@@ -1037,7 +1041,7 @@ void EvalState::forceFunction(Value & v)
 {
     forceValue(v);
     if (v.type != tLambda && v.type != tPrimOp && v.type != tPrimOpApp)
-        throwTypeError("value is %1% while a function was expected", showType(v));
+        throwTypeError("value is %1% while a function was expected", v);
 }
 
 
@@ -1045,7 +1049,7 @@ string EvalState::forceString(Value & v)
 {
     forceValue(v);
     if (v.type != tString)
-        throwTypeError("value is %1% while a string was expected", showType(v));
+        throwTypeError("value is %1% while a string was expected", v);
     return string(v.string.s);
 }
 
@@ -1152,7 +1156,7 @@ string EvalState::coerceToString(Value & v, PathSet & context,
         }
     }
 
-    throwTypeError("cannot coerce %1% to a string", showType(v));
+    throwTypeError("cannot coerce %1% to a string", v);
 }
 
 
