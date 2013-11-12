@@ -89,9 +89,6 @@ static void setLogType(string lt)
 }
 
 
-static bool showTrace = false;
-
-
 string getArg(const string & opt,
     Strings::iterator & i, const Strings::iterator & end)
 {
@@ -214,7 +211,7 @@ static void initAndRun(int argc, char * * argv)
         else if (arg == "--no-build-hook")
             settings.useBuildHook = false;
         else if (arg == "--show-trace")
-            showTrace = true;
+            settings.showTrace = true;
         else if (arg == "--option") {
             ++i; if (i == args.end()) throw UsageError("`--option' requires two arguments");
             string name = *i;
@@ -299,8 +296,8 @@ int main(int argc, char * * argv)
             % e.what() % programId);
         return 1;
     } catch (BaseError & e) {
-        printMsg(lvlError, format("error: %1%%2%") % (showTrace ? e.prefix() : "") % e.msg());
-        if (e.prefix() != "" && !showTrace)
+        printMsg(lvlError, format("error: %1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
+        if (e.prefix() != "" && !settings.showTrace)
             printMsg(lvlError, "(use `--show-trace' to show detailed location information)");
         return e.status;
     } catch (std::bad_alloc & e) {

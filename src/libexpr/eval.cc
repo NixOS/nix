@@ -279,6 +279,11 @@ LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2))
     e.addPrefix(format(s) % s2);
 }
 
+LocalNoInline(void addErrorPrefix(Error & e, const char * s, const ExprLambda & fun))
+{
+    e.addPrefix(format(s) % fun.showNamePos());
+}
+
 LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, const Pos & pos))
 {
     e.addPrefix(format(s) % s2 % pos);
@@ -757,32 +762,34 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
     if (fun.type != tLambda)
         throwTypeError("attempt to call something which is not a function but %1%", fun);
 
+    ExprLambda & lambda(*fun.lambda.fun);
+
     unsigned int size =
-        (fun.lambda.fun->arg.empty() ? 0 : 1) +
-        (fun.lambda.fun->matchAttrs ? fun.lambda.fun->formals->formals.size() : 0);
+        (lambda.arg.empty() ? 0 : 1) +
+        (lambda.matchAttrs ? lambda.formals->formals.size() : 0);
     Env & env2(allocEnv(size));
     env2.up = fun.lambda.env;
 
     unsigned int displ = 0;
 
-    if (!fun.lambda.fun->matchAttrs)
+    if (!lambda.matchAttrs)
         env2.values[displ++] = &arg;
 
     else {
         forceAttrs(arg);
 
-        if (!fun.lambda.fun->arg.empty())
+        if (!lambda.arg.empty())
             env2.values[displ++] = &arg;
 
         /* For each formal argument, get the actual argument.  If
            there is no matching actual argument but the formal
            argument has a default, use the default. */
         unsigned int attrsUsed = 0;
-        foreach (Formals::Formals_::iterator, i, fun.lambda.fun->formals->formals) {
+        foreach (Formals::Formals_::iterator, i, lambda.formals->formals) {
             Bindings::iterator j = arg.attrs->find(i->name);
             if (j == arg.attrs->end()) {
                 if (!i->def) throwTypeError("%1% called without required argument `%2%'",
-                    *fun.lambda.fun, i->name);
+                    lambda, i->name);
                 env2.values[displ++] = i->def->maybeThunk(*this, env2);
             } else {
                 attrsUsed++;
@@ -792,29 +799,30 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
 
         /* Check that each actual argument is listed as a formal
            argument (unless the attribute match specifies a `...'). */
-        if (!fun.lambda.fun->formals->ellipsis && attrsUsed != arg.attrs->size()) {
+        if (!lambda.formals->ellipsis && attrsUsed != arg.attrs->size()) {
             /* Nope, so show the first unexpected argument to the
                user. */
             foreach (Bindings::iterator, i, *arg.attrs)
-                if (fun.lambda.fun->formals->argNames.find(i->name) == fun.lambda.fun->formals->argNames.end())
-                    throwTypeError("%1% called with unexpected argument `%2%'", *fun.lambda.fun, i->name);
+                if (lambda.formals->argNames.find(i->name) == lambda.formals->argNames.end())
+                    throwTypeError("%1% called with unexpected argument `%2%'", lambda, i->name);
             abort(); // can't happen
         }
     }
 
     nrFunctionCalls++;
-    if (countCalls) incrFunctionCall(fun.lambda.fun);
+    if (countCalls) incrFunctionCall(&lambda);
 
-    fun.lambda.fun->body->eval(*this, env2, v);
-
-#if 0
-    try {
+    /* Evaluate the body.  This is conditional on showTrace, because
+       catching exceptions makes this function not tail-recursive. */
+    if (settings.showTrace)
+        try {
+            lambda.body->eval(*this, env2, v);
+        } catch (Error & e) {
+            addErrorPrefix(e, "while evaluating %1%:\n", lambda);
+            throw;
+        }
+    else
         fun.lambda.fun->body->eval(*this, env2, v);
-    } catch (Error & e) {
-        addErrorPrefix(e, "while evaluating %1%:\n", fun.lambda.fun->showNamePos());
-        throw;
-    }
-#endif
 }
 
 

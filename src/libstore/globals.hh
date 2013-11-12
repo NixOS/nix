@@ -186,6 +186,9 @@ struct Settings {
     /* Whether to lock the Nix client and worker to the same CPU. */
     bool lockCPU;
 
+    /* Whether to show a stack trace if Nix evaluation fails. */
+    bool showTrace;
+
 private:
     SettingsMap settings, overrides;
 

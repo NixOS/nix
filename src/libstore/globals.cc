@@ -55,6 +55,7 @@ Settings::Settings()
     autoOptimiseStore = false;
     envKeepDerivations = false;
     lockCPU = getEnv("NIX_AFFINITY_HACK", "1") == "1";
+    showTrace = false;
 }
 
 
