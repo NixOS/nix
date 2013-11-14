@@ -7,6 +7,22 @@
 
 <!--==================================================================-->
 
+<section xml:id="ssec-relnotes-1.7"><title>Release 1.7 (TBA)</title>
+
+<para>This release has the following changes:</para>
+
+<itemizedlist>
+
+  <listitem><para><command>nix-setuid-helper</command> is
+  gone.</para></listitem>
+
+</itemizedlist>
+
+</section>
+
+
+<!--==================================================================-->
+
 <section xml:id="ssec-relnotes-1.6.1"><title>Release 1.6.1 (October 28, 2013)</title>
 
 <para>This is primarily a bug fix release.  Changes of interest

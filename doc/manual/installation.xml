@@ -380,7 +380,7 @@ group should be the build users group, and it should have the sticky
 bit turned on (like <filename>/tmp</filename>):
 
 <screen>
-$ chgrp nixbld /nix/store
+$ chown root.nixbld /nix/store
 $ chmod 1775 /nix/store
 </screen>
 
@@ -401,15 +401,7 @@ build-users-group = nixbld
 </section>
 
 
-<section><title>Nix store/database owned by root</title>
-
-<para>The simplest setup is to let <literal>root</literal> own the Nix
-store and database.  I.e.,
-
-<screen>
-$ chown -R root /nix/store /nix/var/nix</screen>
-
-</para>
+<section><title>Running the daemon</title>
 
 <para>The <link linkend="sec-nix-daemon">Nix daemon</link> should be
 started as follows (as <literal>root</literal>):
@@ -429,72 +421,6 @@ line like
 export NIX_REMOTE=daemon</programlisting>
 
 into the users’ login scripts.</para>
-
-</section>
-
-
-<section><title>Nix store/database not owned by root</title>
-
-<para>It is also possible to let the Nix store and database be owned
-by a non-root user, which should be more secure<footnote><para>Note
-however that even when the Nix daemon runs as root, not
-<emphasis>that</emphasis> much code is executed as root: Nix
-expression evaluation is performed by the calling (unprivileged) user,
-and builds are performed under the special build user accounts.  So
-only the code that accesses the database and starts builds is executed
-as <literal>root</literal>.</para></footnote>.  Typically, this user
-is a special account called <literal>nix</literal>, but it can be
-named anything.  It should own the Nix store and database:
-
-<screen>
-$ chown -R nix /nix/store /nix/var/nix</screen>
-
-and of course <command>nix-daemon</command> should be started under
-that user, e.g.,
-
-<screen>
-$ su - nix -c "exec /nix/bin/nix-daemon"</screen>
-
-</para>
-
-<para>There is a catch, though: non-<literal>root</literal> users
-cannot start builds under the build user accounts, since the
-<function>setuid</function> system call is obviously privileged.  To
-allow a non-<literal>root</literal> Nix daemon to use the build user
-feature, it calls a setuid-root helper program,
-<command>nix-setuid-helper</command>.  This program is installed in
-<filename><replaceable>prefix</replaceable>/libexec/nix-setuid-helper</filename>.
-To set the permissions properly (Nix’s <command>make install</command>
-doesn’t do this, since we don’t want to ship setuid-root programs
-out-of-the-box):
-
-<screen>
-$ chown root.root /nix/libexec/nix-setuid-helper
-$ chmod 4755 /nix/libexec/nix-setuid-helper
-</screen>
-
-(This example assumes that the Nix binaries are installed in
-<filename>/nix</filename>.)</para>
-
-<para>Of course, the <command>nix-setuid-helper</command> command
-should not be usable by just anybody, since then anybody could run
-commands under the Nix build user accounts.  For that reason there is
-a configuration file <filename>/etc/nix-setuid.conf</filename> that
-restricts the use of the helper.  This file should be a text file
-containing precisely two lines, the first being the Nix daemon user
-and the second being the build users group, e.g.,
-
-<programlisting>
-nix
-nixbld
-</programlisting>
-
-The setuid-helper barfs if it is called by a user other than the one
-specified on the first line, or if it is asked to execute a build
-under a user who is not a member of the group specified on the second
-line.  The file <filename>/etc/nix-setuid.conf</filename> must be
-owned by root, and must not be group- or world-writable.  The
-setuid-helper barfs if this is not the case.</para>
 
 </section>
 

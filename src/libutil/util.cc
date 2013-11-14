@@ -968,19 +968,6 @@ void closeOnExec(int fd)
 }
 
 
-void setuidCleanup()
-{
-    /* Don't trust the environment. */
-    environ = 0;
-
-    /* Make sure that file descriptors 0, 1, 2 are open. */
-    for (int fd = 0; fd <= 2; ++fd) {
-        struct stat st;
-        if (fstat(fd, &st) == -1) abort();
-    }
-}
-
-
 #if HAVE_VFORK
 pid_t (*maybeVfork)() = vfork;
 #else

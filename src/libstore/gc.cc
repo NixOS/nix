@@ -415,7 +415,7 @@ bool LocalStore::isActiveTempFile(const GCState & state,
 void LocalStore::deleteGarbage(GCState & state, const Path & path)
 {
     unsigned long long bytesFreed;
-    deletePathWrapped(path, bytesFreed);
+    deletePath(path, bytesFreed);
     state.results.bytesFreed += bytesFreed;
 }
 

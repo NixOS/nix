@@ -100,9 +100,6 @@ Makefile.in
 /src/nix-log2xml/*.xml
 /src/nix-log2xml/*.html
 
-# /src/nix-setuid-helper/
-/src/nix-setuid-helper/nix-setuid-helper
-
 # /src/nix-store/
 /src/nix-store/nix-store
 

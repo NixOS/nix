@@ -268,10 +268,6 @@ void closeMostFDs(const set<int> & exceptions);
 /* Set the close-on-exec flag for the given file descriptor. */
 void closeOnExec(int fd);
 
-/* Common initialisation for setuid programs: clear the environment,
-   sanitize file handles 0, 1 and 2. */
-void setuidCleanup();
-
 /* Call vfork() if available, otherwise fork(). */
 extern pid_t (*maybeVfork)();
 

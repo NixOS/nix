@@ -322,24 +322,12 @@ typedef set<Inode> InodesSeen;
    - the permissions are set of 444 or 555 (i.e., read-only with or
      without execute permission; setuid bits etc. are cleared)
    - the owner and group are set to the Nix user and group, if we're
-     in a setuid Nix installation. */
+     running as root. */
 void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen);
 void canonicalisePathMetaData(const Path & path, uid_t fromUid);
 
 void canonicaliseTimestampAndPermissions(const Path & path);
 
 MakeError(PathInUse, Error);
-
-/* Whether we are root. */
-bool amPrivileged();
-
-/* Recursively change the ownership of `path' to the current uid. */
-void getOwnership(const Path & path);
-
-/* Like deletePath(), but changes the ownership of `path' using the
-   setuid wrapper if necessary (and possible). */
-void deletePathWrapped(const Path & path, unsigned long long & bytesFreed);
-
-void deletePathWrapped(const Path & path);
 
 }

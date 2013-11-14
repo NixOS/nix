@@ -549,93 +549,10 @@ void UserLock::release()
 }
 
 
-static void runSetuidHelper(const string & command,
-    const string & arg)
-{
-    Path program = getEnv("NIX_SETUID_HELPER",
-        settings.nixLibexecDir + "/nix-setuid-helper");
-
-    /* Fork. */
-    Pid pid;
-    pid = fork();
-    switch (pid) {
-
-    case -1:
-        throw SysError("unable to fork");
-
-    case 0: /* child */
-        try {
-            std::vector<const char *> args; /* careful with c_str()! */
-            args.push_back(program.c_str());
-            args.push_back(command.c_str());
-            args.push_back(arg.c_str());
-            args.push_back(0);
-
-            restoreSIGPIPE();
-            restoreAffinity();
-
-            execve(program.c_str(), (char * *) &args[0], 0);
-            throw SysError(format("executing `%1%'") % program);
-        }
-        catch (std::exception & e) {
-            writeToStderr("error: " + string(e.what()) + "\n");
-        }
-        _exit(1);
-    }
-
-    /* Parent. */
-
-    /* Wait for the child to finish. */
-    int status = pid.wait(true);
-    if (!statusOk(status))
-        throw Error(format("program `%1%' %2%")
-            % program % statusToString(status));
-}
-
-
 void UserLock::kill()
 {
     assert(enabled());
-    if (amPrivileged())
-        killUser(uid);
-    else
-        runSetuidHelper("kill", user);
-}
-
-
-bool amPrivileged()
-{
-    return geteuid() == 0;
-}
-
-
-void getOwnership(const Path & path)
-{
-    runSetuidHelper("get-ownership", path);
-}
-
-
-void deletePathWrapped(const Path & path, unsigned long long & bytesFreed)
-{
-    try {
-        /* First try to delete it ourselves. */
-        deletePath(path, bytesFreed);
-    } catch (SysError & e) {
-        /* If this failed due to a permission error, then try it with
-           the setuid helper. */
-        if (settings.buildUsersGroup != "" && !amPrivileged()) {
-            getOwnership(path);
-            deletePath(path, bytesFreed);
-        } else
-            throw;
-    }
-}
-
-
-void deletePathWrapped(const Path & path)
-{
-    unsigned long long dummy1;
-    deletePathWrapped(path, dummy1);
+    killUser(uid);
 }
 
 
@@ -971,15 +888,11 @@ void DerivationGoal::killChild()
         worker.childTerminated(pid);
 
         if (buildUser.enabled()) {
-            /* We can't use pid.kill(), since we may not have the
-               appropriate privilege.  I.e., if we're not root, then
-               setuid helper should do it).
-
-               Also, if we're using a build user, then there is a
-               tricky race condition: if we kill the build user before
-               the child has done its setuid() to the build user uid,
-               then it won't be killed, and we'll potentially lock up
-               in pid.wait().  So also send a conventional kill to the
+            /* If we're using a build user, then there is a tricky
+               race condition: if we kill the build user before the
+               child has done its setuid() to the build user uid, then
+               it won't be killed, and we'll potentially lock up in
+               pid.wait().  So also send a conventional kill to the
                child. */
             ::kill(-pid, SIGKILL); /* ignore the result */
             buildUser.kill();
@@ -1349,7 +1262,7 @@ void DerivationGoal::tryToBuild()
         if (worker.store.isValidPath(path)) continue;
         if (!pathExists(path)) continue;
         debug(format("removing unregistered path `%1%'") % path);
-        deletePathWrapped(path);
+        deletePath(path);
     }
 
     /* Check again whether any output previously failed to build,
@@ -1427,7 +1340,7 @@ void replaceValidPath(const Path & storePath, const Path tmpPath)
     if (rename(tmpPath.c_str(), storePath.c_str()) == -1)
         throw SysError(format("moving `%1%' to `%2%'") % tmpPath % storePath);
     if (pathExists(oldPath))
-        deletePathWrapped(oldPath);
+        deletePath(oldPath);
 }
 
 
@@ -1532,13 +1445,6 @@ void DerivationGoal::buildDone()
 
                 rewrittenPaths.insert(path);
             }
-
-            /* Gain ownership of the build result using the setuid
-               wrapper if we're not root.  If we *are* root, then
-               canonicalisePathMetaData() will take care of this later
-               on. */
-            if (buildUser.enabled() && !amPrivileged())
-                getOwnership(path);
         }
 
         /* Check the exit status. */
@@ -1846,13 +1752,9 @@ void DerivationGoal::startBuilder()
            uid. */
         buildUser.kill();
 
-        /* Change ownership of the temporary build directory, if we're
-           root.  If we're not root, then the setuid helper will do it
-           just before it starts the builder. */
-        if (amPrivileged()) {
-            if (chown(tmpDir.c_str(), buildUser.getUID(), buildUser.getGID()) == -1)
-                throw SysError(format("cannot change ownership of `%1%'") % tmpDir);
-        }
+        /* Change ownership of the temporary build directory. */
+        if (chown(tmpDir.c_str(), buildUser.getUID(), buildUser.getGID()) == -1)
+            throw SysError(format("cannot change ownership of `%1%'") % tmpDir);
 
         /* Check that the Nix store has the appropriate permissions,
            i.e., owned by root and mode 1775 (sticky bit on so that
@@ -2212,30 +2114,18 @@ void DerivationGoal::initChild()
         if (buildUser.enabled()) {
             printMsg(lvlChatty, format("switching to user `%1%'") % buildUser.getUser());
 
-            if (amPrivileged()) {
+            if (setgroups(0, 0) == -1)
+                throw SysError("cannot clear the set of supplementary groups");
 
-                if (setgroups(0, 0) == -1)
-                    throw SysError("cannot clear the set of supplementary groups");
+            if (setgid(buildUser.getGID()) == -1 ||
+                getgid() != buildUser.getGID() ||
+                getegid() != buildUser.getGID())
+                throw SysError("setgid failed");
 
-                if (setgid(buildUser.getGID()) == -1 ||
-                    getgid() != buildUser.getGID() ||
-                    getegid() != buildUser.getGID())
-                    throw SysError("setgid failed");
-
-                if (setuid(buildUser.getUID()) == -1 ||
-                    getuid() != buildUser.getUID() ||
-                    geteuid() != buildUser.getUID())
-                    throw SysError("setuid failed");
-
-            } else {
-                /* Let the setuid helper take care of it. */
-                program = settings.nixLibexecDir + "/nix-setuid-helper";
-                args.push_back(program.c_str());
-                args.push_back("run-builder");
-                user = buildUser.getUser().c_str();
-                args.push_back(user.c_str());
-                args.push_back(drv.builder.c_str());
-            }
+            if (setuid(buildUser.getUID()) == -1 ||
+                getuid() != buildUser.getUID() ||
+                geteuid() != buildUser.getUID())
+                throw SysError("setuid failed");
         }
 
         /* Fill in the arguments. */
@@ -2466,12 +2356,10 @@ void DerivationGoal::deleteTmpDir(bool force)
             printMsg(lvlError,
                 format("note: keeping build directory `%2%'")
                 % drvPath % tmpDir);
-            if (buildUser.enabled() && !amPrivileged())
-                getOwnership(tmpDir);
             chmod(tmpDir.c_str(), 0755);
         }
         else
-            deletePathWrapped(tmpDir);
+            deletePath(tmpDir);
         tmpDir = "";
     }
 }
@@ -2548,7 +2436,7 @@ Path DerivationGoal::addHashRewrite(const Path & path)
     string h1 = string(path, settings.nixStore.size() + 1, 32);
     string h2 = string(printHash32(hashString(htSHA256, "rewrite:" + drvPath + ":" + path)), 0, 32);
     Path p = settings.nixStore + "/" + h2 + string(path, settings.nixStore.size() + 33);
-    if (pathExists(p)) deletePathWrapped(p);
+    if (pathExists(p)) deletePath(p);
     assert(path.size() == p.size());
     rewritesToTmp[h1] = h2;
     rewritesFromTmp[h2] = h1;
@@ -2639,9 +2527,6 @@ SubstitutionGoal::SubstitutionGoal(const Path & storePath, Worker & worker, bool
 
 SubstitutionGoal::~SubstitutionGoal()
 {
-    /* !!! Once we let substitution goals run under a build user, we
-       need to use the setuid helper just as in ~DerivationGoal().
-       Idem for cancel. */
     if (pid != -1) worker.childTerminated(pid);
 }
 
@@ -2792,7 +2677,7 @@ void SubstitutionGoal::tryToRun()
 
     /* Remove the (stale) output path if it exists. */
     if (pathExists(destPath))
-        deletePathWrapped(destPath);
+        deletePath(destPath);
 
     worker.store.setSubstituterEnv();
 
