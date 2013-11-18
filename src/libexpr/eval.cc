@@ -142,6 +142,9 @@ EvalState::EvalState()
     , sOutputs(symbols.create("outputs"))
     , sOutputName(symbols.create("outputName"))
     , sIgnoreNulls(symbols.create("__ignoreNulls"))
+    , sFile(symbols.create("file"))
+    , sLine(symbols.create("line"))
+    , sColumn(symbols.create("column"))
     , repair(false)
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
@@ -1036,6 +1039,16 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
         mkPath(v, s.str().c_str());
     } else
         mkString(v, s.str(), context);
+}
+
+
+void ExprPos::eval(EvalState & state, Env & env, Value & v)
+{
+    state.mkAttrs(v, 3);
+    mkString(*state.allocAttr(v, state.sFile), pos.file);
+    mkInt(*state.allocAttr(v, state.sLine), pos.line);
+    mkInt(*state.allocAttr(v, state.sColumn), pos.column);
+    v.attrs->sort();
 }
 
 

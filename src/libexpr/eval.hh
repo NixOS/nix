@@ -94,7 +94,8 @@ public:
     SymbolTable symbols;
 
     const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue,
-        sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls;
+        sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
+        sFile, sLine, sColumn;
     Symbol sDerivationNix;
 
     /* If set, force copying files to the Nix store even if they

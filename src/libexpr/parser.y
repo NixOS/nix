@@ -355,7 +355,12 @@ expr_select
   ;
 
 expr_simple
-  : ID { $$ = new ExprVar(CUR_POS, data->symbols.create($1)); }
+  : ID {
+      if (strcmp($1, "__curPos") == 0)
+          $$ = new ExprPos(CUR_POS);
+      else
+          $$ = new ExprVar(CUR_POS, data->symbols.create($1));
+  }
   | INT { $$ = new ExprInt($1); }
   | '"' string_parts '"' {
       /* For efficiency, and to simplify parse trees a bit. */

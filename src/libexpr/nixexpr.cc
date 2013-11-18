@@ -130,6 +130,11 @@ void ExprConcatStrings::show(std::ostream & str)
     }
 }
 
+void ExprPos::show(std::ostream & str)
+{
+    str << "__curPos";
+}
+
 
 std::ostream & operator << (std::ostream & str, const Pos & pos)
 {
@@ -313,6 +318,10 @@ void ExprConcatStrings::bindVars(const StaticEnv & env)
 {
     foreach (vector<Expr *>::iterator, i, *es)
         (*i)->bindVars(env);
+}
+
+void ExprPos::bindVars(const StaticEnv & env)
+{
 }
 
 

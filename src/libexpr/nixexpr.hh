@@ -282,6 +282,13 @@ struct ExprConcatStrings : Expr
     COMMON_METHODS
 };
 
+struct ExprPos : Expr
+{
+    Pos pos;
+    ExprPos(const Pos & pos) : pos(pos) { };
+    COMMON_METHODS
+};
+
 
 /* Static environments are used to map variable names onto (level,
    displacement) pairs used to obtain the value of the variable at
