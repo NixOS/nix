@@ -11,6 +11,7 @@
 #include "store-api.hh"
 #include "user-env.hh"
 #include "util.hh"
+#include "value-to-json.hh"
 
 #include <cerrno>
 #include <ctime>
@@ -874,6 +875,35 @@ static string colorString(const string & s)
 }
 
 
+static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
+{
+    JSONObject topObj(cout);
+    foreach (vector<DrvInfo>::iterator, i, elems) {
+        topObj.attr(i->attrPath);
+        JSONObject pkgObj(cout);
+
+        pkgObj.attr("name", i->name);
+        pkgObj.attr("system", i->system);
+
+        pkgObj.attr("meta");
+        JSONObject metaObj(cout);
+        MetaInfo meta = i->queryMetaInfo(globals.state);
+        foreach (MetaInfo::iterator, j, meta) {
+            metaObj.attr(j->first);
+            if (j->second.type == MetaValue::tpString) {
+                escapeJSON(cout, j->second.stringValue);
+            } else if (j->second.type == MetaValue::tpInt) {
+                cout << j->second.intValue;
+            } else if (j->second.type == MetaValue::tpStrings) {
+                JSONList l(cout);
+                foreach (Strings::iterator, k, j->second.stringValues)
+                    l.elem(*k);
+            }
+        }
+    }
+}
+
+
 static void opQuery(Globals & globals,
     Strings args, Strings opFlags, Strings opArgs)
 {
@@ -891,6 +921,7 @@ static void opQuery(Globals & globals,
     bool printMeta = false;
     bool compareVersions = false;
     bool xmlOutput = false;
+    bool jsonOutput = false;
 
     enum { sInstalled, sAvailable } source = sInstalled;
 
@@ -909,6 +940,7 @@ static void opQuery(Globals & globals,
         else if (arg == "--installed") source = sInstalled;
         else if (arg == "--available" || arg == "-a") source = sAvailable;
         else if (arg == "--xml") xmlOutput = true;
+        else if (arg == "--json") jsonOutput = true;
         else if (arg == "--attr-path" || arg == "-P") printAttrPath = true;
         else if (arg == "--attr" || arg == "-A")
             attrPath = needArg(i, args, arg);
@@ -929,7 +961,7 @@ static void opQuery(Globals & globals,
             globals.instSource.systemFilter, globals.instSource.autoArgs,
             attrPath, availElems);
 
-    DrvInfos elems = filterBySelector(globals.state,
+    DrvInfos elems_ = filterBySelector(globals.state,
         source == sInstalled ? installedElems : availElems,
         remaining, false);
 
@@ -938,10 +970,10 @@ static void opQuery(Globals & globals,
 
     /* Sort them by name. */
     /* !!! */
-    vector<DrvInfo> elems2;
-    for (DrvInfos::iterator i = elems.begin(); i != elems.end(); ++i)
-        elems2.push_back(*i);
-    sort(elems2.begin(), elems2.end(), cmpElemByName);
+    vector<DrvInfo> elems;
+    for (DrvInfos::iterator i = elems_.begin(); i != elems_.end(); ++i)
+        elems.push_back(*i);
+    sort(elems.begin(), elems.end(), cmpElemByName);
 
 
     /* We only need to know the installed paths when we are querying
@@ -959,7 +991,7 @@ static void opQuery(Globals & globals,
     PathSet validPaths, substitutablePaths;
     if (printStatus || globals.prebuiltOnly) {
         PathSet paths;
-        foreach (vector<DrvInfo>::iterator, i, elems2)
+        foreach (vector<DrvInfo>::iterator, i, elems)
             try {
                 paths.insert(i->queryOutPath(globals.state));
             } catch (AssertionError & e) {
@@ -972,12 +1004,17 @@ static void opQuery(Globals & globals,
 
 
     /* Print the desired columns, or XML output. */
+    if (jsonOutput) {
+        queryJSON(globals, elems);
+        return;
+    }
+
     Table table;
     std::ostringstream dummy;
     XMLWriter xml(true, *(xmlOutput ? &cout : &dummy));
     XMLOpenElement xmlRoot(xml, "items");
 
-    foreach (vector<DrvInfo>::iterator, i, elems2) {
+    foreach (vector<DrvInfo>::iterator, i, elems) {
         try {
             if (i->hasFailed()) continue;
 
@@ -1098,7 +1135,7 @@ static void opQuery(Globals & globals,
                     }
                     if (printMeta) {
                         MetaInfo meta = i->queryMetaInfo(globals.state);
-                        for (MetaInfo::iterator j = meta.begin(); j != meta.end(); ++j) {
+                        foreach (MetaInfo::iterator, j, meta) {
                             XMLAttrs attrs2;
                             attrs2["name"] = j->first;
                             if (j->second.type == MetaValue::tpString) {
