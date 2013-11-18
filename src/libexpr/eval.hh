@@ -243,6 +243,7 @@ public:
     void mkList(Value & v, unsigned int length);
     void mkAttrs(Value & v, unsigned int expected);
     void mkThunk_(Value & v, Expr * expr);
+    void mkPos(Value & v, Pos * pos);
 
     void concatLists(Value & v, unsigned int nrLists, Value * * lists);
 

@@ -410,6 +410,19 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 }
 
 
+void EvalState::mkPos(Value & v, Pos * pos)
+{
+    if (pos) {
+        mkAttrs(v, 3);
+        mkString(*allocAttr(v, sFile), pos->file);
+        mkInt(*allocAttr(v, sLine), pos->line);
+        mkInt(*allocAttr(v, sColumn), pos->column);
+        v.attrs->sort();
+    } else
+        mkNull(v);
+}
+
+
 /* Create a thunk for the delayed computation of the given expression
    in the given environment.  But if the expression is a variable,
    then look it up right away.  This significantly reduces the number
@@ -1044,11 +1057,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 
 void ExprPos::eval(EvalState & state, Env & env, Value & v)
 {
-    state.mkAttrs(v, 3);
-    mkString(*state.allocAttr(v, state.sFile), pos.file);
-    mkInt(*state.allocAttr(v, state.sLine), pos.line);
-    mkInt(*state.allocAttr(v, state.sColumn), pos.column);
-    v.attrs->sort();
+    state.mkPos(v, &pos);
 }
 
 

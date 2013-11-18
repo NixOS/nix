@@ -116,6 +116,13 @@ static inline void mkBool(Value & v, bool b)
 }
 
 
+static inline void mkNull(Value & v)
+{
+    v.type = tNull;
+    v.app.left = v.app.right = 00; // scrub
+}
+
+
 static inline void mkApp(Value & v, Value & left, Value & right)
 {
     v.type = tApp;

@@ -776,6 +776,19 @@ void prim_getAttr(EvalState & state, Value * * args, Value & v)
 }
 
 
+/* Return position information of the specified attribute. */
+void prim_unsafeGetAttrPos(EvalState & state, Value * * args, Value & v)
+{
+    string attr = state.forceStringNoCtx(*args[0]);
+    state.forceAttrs(*args[1]);
+    Bindings::iterator i = args[1]->attrs->find(state.symbols.create(attr));
+    if (i == args[1]->attrs->end())
+        mkNull(v);
+    else
+        state.mkPos(v, i->pos);
+}
+
+
 /* Dynamic version of the `?' operator. */
 static void prim_hasAttr(EvalState & state, Value * * args, Value & v)
 {
@@ -1201,7 +1214,7 @@ void EvalState::createBaseEnv()
     mkBool(v, false);
     addConstant("false", v);
 
-    v.type = tNull;
+    mkNull(v);
     addConstant("null", v);
 
     mkInt(v, time(0));
@@ -1252,6 +1265,7 @@ void EvalState::createBaseEnv()
     // Sets
     addPrimOp("__attrNames", 1, prim_attrNames);
     addPrimOp("__getAttr", 2, prim_getAttr);
+    addPrimOp("__unsafeGetAttrPos", 2, prim_unsafeGetAttrPos);
     addPrimOp("__hasAttr", 2, prim_hasAttr);
     addPrimOp("__isAttrs", 1, prim_isAttrs);
     addPrimOp("removeAttrs", 2, prim_removeAttrs);
