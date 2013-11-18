@@ -1,5 +1,4 @@
-#include "value-to-xml.hh"
-#include "xml-writer.hh"
+#include "value-to-json.hh"
 #include "eval-inline.hh"
 #include "util.hh"
 
@@ -9,7 +8,7 @@
 namespace nix {
 
 
-static void escapeJSON(std::ostream & str, const string & s)
+void escapeJSON(std::ostream & str, const string & s)
 {
     str << "\"";
     foreach (string::const_iterator, i, s)
@@ -55,32 +54,26 @@ void printValueAsJSON(EvalState & state, bool strict,
         case tAttrs: {
             Bindings::iterator i = v.attrs->find(state.sOutPath);
             if (i == v.attrs->end()) {
-                str << "{";
+                JSONObject json(str);
                 StringSet names;
                 foreach (Bindings::iterator, i, *v.attrs)
                     names.insert(i->name);
-                bool first = true;
                 foreach (StringSet::iterator, i, names) {
-                    if (!first) str << ","; else first = false;
                     Attr & a(*v.attrs->find(state.symbols.create(*i)));
-                    escapeJSON(str, *i);
-                    str << ":";
+                    json.attr(*i);
                     printValueAsJSON(state, strict, *a.value, str, context);
                 }
-                str << "}";
             } else
                 printValueAsJSON(state, strict, *i->value, str, context);
             break;
         }
 
         case tList: {
-            str << "[";
-            bool first = true;
+            JSONList json(str);
             for (unsigned int n = 0; n < v.list.length; ++n) {
-                if (!first) str << ","; else first = false;
+                json.elem();
                 printValueAsJSON(state, strict, *v.list.elems[n], str, context);
             }
-            str << "]";
             break;
         }
 
