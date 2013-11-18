@@ -5,6 +5,7 @@
 #include "util.hh"
 #include "archive.hh"
 #include "value-to-xml.hh"
+#include "value-to-json.hh"
 #include "names.hh"
 #include "eval-inline.hh"
 
@@ -647,6 +648,18 @@ static void prim_toXML(EvalState & state, Value * * args, Value & v)
 }
 
 
+/* Convert the argument (which can be any Nix expression) to a JSON
+   string.  Not all Nix expressions can be sensibly or completely
+   represented (e.g., functions). */
+static void prim_toJSON(EvalState & state, Value * * args, Value & v)
+{
+    std::ostringstream out;
+    PathSet context;
+    printValueAsJSON(state, true, *args[0], out, context);
+    mkString(v, out.str(), context);
+}
+
+
 /* Store a string in the Nix store as a source file that can be used
    as an input by derivations. */
 static void prim_toFile(EvalState & state, Value * * args, Value & v)
@@ -1259,6 +1272,7 @@ void EvalState::createBaseEnv()
 
     // Creating files
     addPrimOp("__toXML", 1, prim_toXML);
+    addPrimOp("__toJSON", 1, prim_toJSON);
     addPrimOp("__toFile", 2, prim_toFile);
     addPrimOp("__filterSource", 2, prim_filterSource);
 

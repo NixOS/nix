@@ -181,6 +181,8 @@ public:
     string coerceToString(Value & v, PathSet & context,
         bool coerceMore = false, bool copyToStore = true);
 
+    string copyPathToStore(PathSet & context, const Path & path);
+
     /* Path coercion.  Converts strings, paths and derivations to a
        path.  The result is guaranteed to be a canonicalised, absolute
        path.  Nothing is copied to the store. */

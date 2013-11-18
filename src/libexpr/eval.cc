@@ -1163,26 +1163,7 @@ string EvalState::coerceToString(Value & v, PathSet & context,
 
     if (v.type == tPath) {
         Path path(canonPath(v.path));
-
-        if (!copyToStore) return path;
-
-        if (nix::isDerivation(path))
-            throwEvalError("file names are not allowed to end in `%1%'", drvExtension);
-
-        Path dstPath;
-        if (srcToStore[path] != "")
-            dstPath = srcToStore[path];
-        else {
-            dstPath = settings.readOnlyMode
-                ? computeStorePathForPath(path).first
-                : store->addToStore(path, true, htSHA256, defaultPathFilter, repair);
-            srcToStore[path] = dstPath;
-            printMsg(lvlChatty, format("copied source `%1%' -> `%2%'")
-                % path % dstPath);
-        }
-
-        context.insert(dstPath);
-        return dstPath;
+        return copyToStore ? copyPathToStore(context, path) : path;
     }
 
     if (v.type == tAttrs) {
@@ -1215,6 +1196,28 @@ string EvalState::coerceToString(Value & v, PathSet & context,
     }
 
     throwTypeError("cannot coerce %1% to a string", v);
+}
+
+
+string EvalState::copyPathToStore(PathSet & context, const Path & path)
+{
+    if (nix::isDerivation(path))
+        throwEvalError("file names are not allowed to end in `%1%'", drvExtension);
+
+    Path dstPath;
+    if (srcToStore[path] != "")
+        dstPath = srcToStore[path];
+    else {
+        dstPath = settings.readOnlyMode
+            ? computeStorePathForPath(path).first
+            : store->addToStore(path, true, htSHA256, defaultPathFilter, repair);
+        srcToStore[path] = dstPath;
+        printMsg(lvlChatty, format("copied source `%1%' -> `%2%'")
+            % path % dstPath);
+    }
+
+    context.insert(dstPath);
+    return dstPath;
 }
 
 

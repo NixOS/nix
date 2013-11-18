@@ -13,6 +13,11 @@
 
 <itemizedlist>
 
+  <listitem>
+    <para>New built-in function: <function>builtins.toJSON</function>,
+    which returns a JSON representation of a value.</para>
+  </listitem>
+
   <listitem><para><command>nix-setuid-helper</command> is
   gone.</para></listitem>
 

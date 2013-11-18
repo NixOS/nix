@@ -2,13 +2,13 @@ pkglib_LTLIBRARIES = libexpr.la
 
 libexpr_la_SOURCES = \
  nixexpr.cc eval.cc primops.cc lexer-tab.cc parser-tab.cc \
- get-drvs.cc attr-path.cc value-to-xml.cc common-opts.cc \
- names.cc
+ get-drvs.cc attr-path.cc value-to-xml.cc value-to-json.cc \
+ common-opts.cc names.cc
 
 pkginclude_HEADERS = \
  nixexpr.hh eval.hh eval-inline.hh lexer-tab.hh parser-tab.hh \
- get-drvs.hh attr-path.hh value-to-xml.hh common-opts.hh \
- names.hh symbol-table.hh value.hh
+ get-drvs.hh attr-path.hh value-to-xml.hh value-to-json.hh \
+ common-opts.hh names.hh symbol-table.hh value.hh
 
 libexpr_la_LIBADD = ../libutil/libutil.la ../libstore/libstore.la \
  ../boost/format/libformat.la @BDW_GC_LIBS@
