@@ -2,116 +2,155 @@
 #include "util.hh"
 #include "eval-inline.hh"
 
+#include <cstring>
+
 
 namespace nix {
 
 
-string DrvInfo::queryDrvPath(EvalState & state) const
+string DrvInfo::queryDrvPath()
 {
     if (drvPath == "" && attrs) {
-        Bindings::iterator i = attrs->find(state.sDrvPath);
+        Bindings::iterator i = attrs->find(state->sDrvPath);
         PathSet context;
-        (string &) drvPath = i != attrs->end() ? state.coerceToPath(*i->value, context) : "";
+        drvPath = i != attrs->end() ? state->coerceToPath(*i->value, context) : "";
     }
     return drvPath;
 }
 
 
-string DrvInfo::queryOutPath(EvalState & state) const
+string DrvInfo::queryOutPath()
 {
     if (outPath == "" && attrs) {
-        Bindings::iterator i = attrs->find(state.sOutPath);
+        Bindings::iterator i = attrs->find(state->sOutPath);
         PathSet context;
-        (string &) outPath = i != attrs->end() ? state.coerceToPath(*i->value, context) : "";
+        outPath = i != attrs->end() ? state->coerceToPath(*i->value, context) : "";
     }
     return outPath;
 }
 
 
-DrvInfo::Outputs DrvInfo::queryOutputs(EvalState & state)
+DrvInfo::Outputs DrvInfo::queryOutputs()
 {
     if (outputs.empty()) {
         /* Get the ‘outputs’ list. */
-        Bindings::iterator i = attrs->find(state.sOutputs);
-
-        if (i == attrs->end())
-            outputs["out"] = queryOutPath(state);
-        else {
-            state.forceList(*i->value);
+        Bindings::iterator i;
+        if (attrs && (i = attrs->find(state->sOutputs)) != attrs->end()) {
+            state->forceList(*i->value);
 
             /* For each output... */
             for (unsigned int j = 0; j < i->value->list.length; ++j) {
                 /* Evaluate the corresponding set. */
-                string name = state.forceStringNoCtx(*i->value->list.elems[j]);
-                Bindings::iterator out = attrs->find(state.symbols.create(name));
+                string name = state->forceStringNoCtx(*i->value->list.elems[j]);
+                Bindings::iterator out = attrs->find(state->symbols.create(name));
                 if (out == attrs->end()) continue; // FIXME: throw error?
-                state.forceAttrs(*out->value);
+                state->forceAttrs(*out->value);
 
                 /* And evaluate its ‘outPath’ attribute. */
-                Bindings::iterator outPath = out->value->attrs->find(state.sOutPath);
+                Bindings::iterator outPath = out->value->attrs->find(state->sOutPath);
                 if (outPath == out->value->attrs->end()) continue; // FIXME: throw error?
                 PathSet context;
-                outputs[name] = state.coerceToPath(*outPath->value, context);
+                outputs[name] = state->coerceToPath(*outPath->value, context);
             }
-        }
+        } else
+            outputs["out"] = queryOutPath();
     }
     return outputs;
 }
 
 
-string DrvInfo::queryOutputName(EvalState & state) const
+string DrvInfo::queryOutputName()
 {
     if (outputName == "" && attrs) {
-        Bindings::iterator i = attrs->find(state.sOutputName);
-        (string &) outputName = i != attrs->end() ? state.forceStringNoCtx(*i->value) : "";
+        Bindings::iterator i = attrs->find(state->sOutputName);
+        outputName = i != attrs->end() ? state->forceStringNoCtx(*i->value) : "";
     }
     return outputName;
 }
 
 
-MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
+Bindings * DrvInfo::getMeta()
 {
-    if (metaInfoRead) return meta;
-
-    (bool &) metaInfoRead = true;
-
-    Bindings::iterator a = attrs->find(state.sMeta);
-    if (a == attrs->end()) return meta; /* fine, empty meta information */
-
-    state.forceAttrs(*a->value);
-
-    foreach (Bindings::iterator, i, *a->value->attrs) {
-        MetaValue value;
-        state.forceValue(*i->value);
-        if (i->value->type == tString) {
-            value.type = MetaValue::tpString;
-            value.stringValue = i->value->string.s;
-        } else if (i->value->type == tInt) {
-            value.type = MetaValue::tpInt;
-            value.intValue = i->value->integer;
-        } else if (i->value->type == tList) {
-            value.type = MetaValue::tpStrings;
-            for (unsigned int j = 0; j < i->value->list.length; ++j)
-                value.stringValues.push_back(state.forceStringNoCtx(*i->value->list.elems[j]));
-        } else continue;
-        ((MetaInfo &) meta)[i->name] = value;
-    }
-
+    if (meta) return meta;
+    if (!attrs) return 0;
+    Bindings::iterator a = attrs->find(state->sMeta);
+    if (a == attrs->end()) return 0;
+    state->forceAttrs(*a->value);
+    meta = a->value->attrs;
     return meta;
 }
 
 
-MetaValue DrvInfo::queryMetaInfo(EvalState & state, const string & name) const
+StringSet DrvInfo::queryMetaNames()
 {
-    /* !!! evaluates all meta attributes => inefficient */
-    return queryMetaInfo(state)[name];
+    StringSet res;
+    if (!getMeta()) return res;
+    foreach (Bindings::iterator, i, *meta)
+        res.insert(i->name);
+    return res;
 }
 
 
-void DrvInfo::setMetaInfo(const MetaInfo & meta)
+Value * DrvInfo::queryMeta(const string & name)
 {
-    metaInfoRead = true;
-    this->meta = meta;
+    if (!getMeta()) return 0;
+    Bindings::iterator a = meta->find(state->symbols.create(name));
+    if (a == meta->end()) return 0;
+    state->forceValue(*a->value);
+    return a->value;
+}
+
+
+string DrvInfo::queryMetaString(const string & name)
+{
+    Value * v = queryMeta(name);
+    if (!v || v->type != tString) return "";
+    return v->string.s;
+}
+
+
+int DrvInfo::queryMetaInt(const string & name, int def)
+{
+    Value * v = queryMeta(name);
+    if (!v) return def;
+    if (v->type == tInt) return v->integer;
+    if (v->type == tString) {
+        /* Backwards compatibility with before we had support for
+           integer meta fields. */
+        int n;
+        if (string2Int(v->string.s, n)) return n;
+    }
+    return def;
+}
+
+
+bool DrvInfo::queryMetaBool(const string & name, bool def)
+{
+    Value * v = queryMeta(name);
+    if (!v) return def;
+    if (v->type == tBool) return v->boolean;
+    if (v->type == tString) {
+        /* Backwards compatibility with before we had support for
+           Boolean meta fields. */
+        if (strcmp(v->string.s, "true") == 0) return true;
+        if (strcmp(v->string.s, "false") == 0) return false;
+    }
+    return def;
+}
+
+
+void DrvInfo::setMeta(const string & name, Value * v)
+{
+    getMeta();
+    Bindings * old = meta;
+    meta = new Bindings();
+    Symbol sym = state->symbols.create(name);
+    if (old)
+        foreach (Bindings::iterator, i, *old)
+            if (i->name != sym)
+                meta->push_back(*i);
+    if (v) meta->push_back(Attr(sym, v));
+    meta->sort();
 }
 
 
@@ -136,22 +175,18 @@ static bool getDerivation(EvalState & state, Value & v,
         if (done.find(v.attrs) != done.end()) return false;
         done.insert(v.attrs);
 
-        DrvInfo drv;
-
         Bindings::iterator i = v.attrs->find(state.sName);
         /* !!! We really would like to have a decent back trace here. */
         if (i == v.attrs->end()) throw TypeError("derivation name missing");
-        drv.name = state.forceStringNoCtx(*i->value);
 
         Bindings::iterator i2 = v.attrs->find(state.sSystem);
-        if (i2 == v.attrs->end())
-            drv.system = "unknown";
-        else
-            drv.system = state.forceStringNoCtx(*i2->value);
 
-        drv.attrs = v.attrs;
-
-        drv.attrPath = attrPath;
+        DrvInfo drv(
+            state,
+            state.forceStringNoCtx(*i->value),
+            attrPath,
+            i2 == v.attrs->end() ? "unknown" : state.forceStringNoCtx(*i2->value),
+            v.attrs);
 
         drvs.push_back(drv);
         return false;
@@ -190,8 +225,6 @@ static void getDerivations(EvalState & state, Value & vIn,
     state.autoCallFunction(autoArgs, vIn, v);
 
     /* Process the expression. */
-    DrvInfo drv;
-
     if (!getDerivation(state, v, pathPrefix, drvs, done, ignoreAssertionFailures)) ;
 
     else if (v.type == tAttrs) {

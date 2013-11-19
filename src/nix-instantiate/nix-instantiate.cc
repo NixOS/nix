@@ -63,10 +63,10 @@ void processExpr(EvalState & state, const Strings & attrPaths,
             DrvInfos drvs;
             getDerivations(state, v, "", autoArgs, drvs, false);
             foreach (DrvInfos::iterator, i, drvs) {
-                Path drvPath = i->queryDrvPath(state);
+                Path drvPath = i->queryDrvPath();
 
                 /* What output do we want? */
-                string outputName = i->queryOutputName(state);
+                string outputName = i->queryOutputName();
                 if (outputName == "")
                     throw Error(format("derivation `%1%' lacks an `outputName' attribute ") % drvPath);
 

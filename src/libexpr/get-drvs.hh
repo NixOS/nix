@@ -11,50 +11,50 @@
 namespace nix {
 
 
-struct MetaValue
-{
-    enum { tpNone, tpString, tpStrings, tpInt } type;
-    string stringValue;
-    Strings stringValues;
-    int intValue;
-};
-
-
-typedef std::map<string, MetaValue> MetaInfo;
-
-
 struct DrvInfo
 {
 public:
     typedef std::map<string, Path> Outputs;
 
 private:
+    EvalState * state;
+
     string drvPath;
     string outPath;
     string outputName;
     Outputs outputs;
 
-    bool metaInfoRead;
-    MetaInfo meta;
-
     bool failed; // set if we get an AssertionError
+
+    Bindings * attrs, * meta;
+
+    Bindings * getMeta();
 
 public:
     string name;
     string attrPath; /* path towards the derivation */
     string system;
 
-    /* !!! make this private */
-    Bindings * attrs;
+    DrvInfo(EvalState & state) : state(&state), failed(false), attrs(0), meta(0) { };
+    DrvInfo(EvalState & state, const string & name, const string & attrPath, const string & system, Bindings * attrs)
+        : state(&state), failed(false), attrs(attrs), meta(0), name(name), attrPath(attrPath), system(system) { };
 
-    DrvInfo() : metaInfoRead(false), failed(false), attrs(0) { };
+    string queryDrvPath();
+    string queryOutPath();
+    string queryOutputName();
+    Outputs queryOutputs();
 
-    string queryDrvPath(EvalState & state) const;
-    string queryOutPath(EvalState & state) const;
-    string queryOutputName(EvalState & state) const;
-    Outputs queryOutputs(EvalState & state);
+    StringSet queryMetaNames();
+    Value * queryMeta(const string & name);
+    string queryMetaString(const string & name);
+    int queryMetaInt(const string & name, int def);
+    bool queryMetaBool(const string & name, bool def);
+    void setMeta(const string & name, Value * v);
+
+    /*
     MetaInfo queryMetaInfo(EvalState & state) const;
     MetaValue queryMetaInfo(EvalState & state, const string & name) const;
+    */
 
     void setDrvPath(const string & s)
     {
@@ -65,8 +65,6 @@ public:
     {
         outPath = s;
     }
-
-    void setMetaInfo(const MetaInfo & meta);
 
     void setFailed() { failed = true; };
     bool hasFailed() { return failed; };
