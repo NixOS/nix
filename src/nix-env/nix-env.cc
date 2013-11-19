@@ -873,8 +873,12 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
         foreach (StringSet::iterator, j, metaNames) {
             metaObj.attr(*j);
             Value * v = i->queryMeta(*j);
-            PathSet context;
-            printValueAsJSON(globals.state, true, *v, cout, context);
+            if (!v)
+                printMsg(lvlError, format("derivation `%1%' has invalid meta attribute `%2%'") % i->name % *j);
+            else {
+                PathSet context;
+                printValueAsJSON(globals.state, true, *v, cout, context);
+            }
         }
     }
 }
@@ -1112,27 +1116,31 @@ static void opQuery(Globals & globals,
                         foreach (StringSet::iterator, j, metaNames) {
                             XMLAttrs attrs2;
                             attrs2["name"] = *j;
-                            Value & v(*i->queryMeta(*j));
-                            if (v.type == tString) {
-                                attrs2["type"] = "string";
-                                attrs2["value"] = v.string.s;
-                                xml.writeEmptyElement("meta", attrs2);
-                            } else if (v.type == tInt) {
-                                attrs2["type"] = "int";
-                                attrs2["value"] = (format("%1%") % v.integer).str();
-                                xml.writeEmptyElement("meta", attrs2);
-                            } else if (v.type == tBool) {
-                                attrs2["type"] = "bool";
-                                attrs2["value"] = v.boolean ? "true" : "false";
-                                xml.writeEmptyElement("meta", attrs2);
-                            } else if (v.type == tList) {
-                                attrs2["type"] = "strings";
-                                XMLOpenElement m(xml, "meta", attrs2);
-                                for (unsigned int j = 0; j < v.list.length; ++j) {
-                                    string s = globals.state.forceStringNoCtx(*v.list.elems[j]);
-                                    XMLAttrs attrs3;
-                                    attrs3["value"] = s;
-                                    xml.writeEmptyElement("string", attrs3);
+                            Value * v = i->queryMeta(*j);
+                            if (!v)
+                                printMsg(lvlError, format("derivation `%1%' has invalid meta attribute `%2%'") % i->name % *j);
+                            else {
+                                if (v->type == tString) {
+                                    attrs2["type"] = "string";
+                                    attrs2["value"] = v->string.s;
+                                    xml.writeEmptyElement("meta", attrs2);
+                                } else if (v->type == tInt) {
+                                    attrs2["type"] = "int";
+                                    attrs2["value"] = (format("%1%") % v->integer).str();
+                                    xml.writeEmptyElement("meta", attrs2);
+                                } else if (v->type == tBool) {
+                                    attrs2["type"] = "bool";
+                                    attrs2["value"] = v->boolean ? "true" : "false";
+                                    xml.writeEmptyElement("meta", attrs2);
+                                } else if (v->type == tList) {
+                                    attrs2["type"] = "strings";
+                                    XMLOpenElement m(xml, "meta", attrs2);
+                                    for (unsigned int j = 0; j < v->list.length; ++j) {
+                                        if (v->list.elems[j]->type != tString) continue;
+                                        XMLAttrs attrs3;
+                                        attrs3["value"] = v->list.elems[j]->string.s;
+                                        xml.writeEmptyElement("string", attrs3);
+                                    }
                                 }
                             }
                         }

@@ -91,12 +91,30 @@ StringSet DrvInfo::queryMetaNames()
 }
 
 
+bool DrvInfo::checkMeta(Value & v)
+{
+    state->forceValue(v);
+    if (v.type == tList) {
+        for (unsigned int n = 0; n < v.list.length; ++n)
+            if (!checkMeta(*v.list.elems[n])) return false;
+        return true;
+    }
+    else if (v.type == tAttrs) {
+        Bindings::iterator i = v.attrs->find(state->sOutPath);
+        if (i != v.attrs->end()) return false;
+        foreach (Bindings::iterator, i, *v.attrs)
+            if (!checkMeta(*i->value)) return false;
+        return true;
+    }
+    else return v.type == tInt || v.type == tBool || v.type == tString;
+}
+
+
 Value * DrvInfo::queryMeta(const string & name)
 {
     if (!getMeta()) return 0;
     Bindings::iterator a = meta->find(state->symbols.create(name));
-    if (a == meta->end()) return 0;
-    state->forceValue(*a->value);
+    if (a == meta->end() || !checkMeta(*a->value)) return 0;
     return a->value;
 }
 

@@ -88,7 +88,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         StringSet metaNames = i->queryMetaNames();
         foreach (StringSet::iterator, j, metaNames) {
             Value * v = i->queryMeta(*j);
-            state.strictForceValue(*v); // FIXME
+            if (!v) continue;
             vMeta.attrs->push_back(Attr(state.symbols.create(*j), v));
         }
         v.attrs->sort();

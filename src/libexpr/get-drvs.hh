@@ -30,6 +30,8 @@ private:
 
     Bindings * getMeta();
 
+    bool checkMeta(Value & v);
+
 public:
     string name;
     string attrPath; /* path towards the derivation */
