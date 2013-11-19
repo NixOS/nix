@@ -262,8 +262,7 @@ static void prim_abort(EvalState & state, Value * * args, Value & v)
 static void prim_throw(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
-    throw ThrownError(format("user-thrown exception: %1%") %
-        state.coerceToString(*args[0], context));
+    throw ThrownError(format("%1%") % state.coerceToString(*args[0], context));
 }
 
 
