@@ -1,9 +1,6 @@
 AC_INIT(nix, m4_esyscmd([echo -n $(cat ./version)$VERSION_SUFFIX]))
 AC_CONFIG_SRCDIR(README)
 AC_CONFIG_AUX_DIR(config)
-AM_INIT_AUTOMAKE([dist-bzip2 foreign])
-
-AC_DEFINE_UNQUOTED(NIX_VERSION, ["$VERSION"], [Nix version.])
 
 AC_PROG_SED
 
@@ -252,8 +249,8 @@ AC_DEFINE_UNQUOTED(OPENSSL_PATH, ["$openssl_prog"], [Path of the OpenSSL binary]
 PKG_CHECK_MODULES([OPENSSL], [libcrypto],
   [AC_DEFINE([HAVE_OPENSSL], [1], [Whether to use OpenSSL.])
    CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"
-   have_openssl=1], [true])
-AM_CONDITIONAL(HAVE_OPENSSL, test "$have_openssl" = 1)
+   have_openssl=1], [have_openssl=])
+AC_SUBST(HAVE_OPENSSL, [$have_openssl])
 
 
 # Look for libbz2, a required dependency.
@@ -319,7 +316,6 @@ if test "$enable_shared" = no; then
    # Perl bindings require shared libraries.
    perlbindings=no
 fi
-AM_CONDITIONAL(PERL_BINDINGS, test "$perlbindings" = "yes")
 AC_SUBST(perlbindings)
 AC_MSG_RESULT($perlbindings)
 
@@ -327,7 +323,7 @@ AC_MSG_RESULT($perlbindings)
 AC_ARG_ENABLE(init-state, AC_HELP_STRING([--disable-init-state],
   [do not initialise DB etc. in `make install']),
   init_state=$enableval, init_state=yes)
-AM_CONDITIONAL(INIT_STATE, test "$init_state" = "yes")
+#AM_CONDITIONAL(INIT_STATE, test "$init_state" = "yes")
 
 
 # Setuid installations.
@@ -361,7 +357,7 @@ fi
 AC_SUBST(tarFlags)
 
 
-AM_CONFIG_HEADER([config.h])
+AC_CONFIG_HEADER([config.h])
 AC_CONFIG_FILES([Makefile
    src/Makefile
    src/boost/Makefile

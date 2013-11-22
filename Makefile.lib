@@ -1,6 +1,13 @@
 default: all
 
 
+# Include Autoconf variables.
+Makefile.config: Makefile.config.in
+	./config.status
+
+include Makefile.config
+
+
 # Include all sub-Makefiles.
 define include_sub_makefile =
   d := $$(patsubst %/, %, $$(dir $(1)))
@@ -9,12 +16,6 @@ endef
 
 $(foreach mf, $(SUBS), $(eval $(call include_sub_makefile, $(mf))))
 
-
-# Include Autoconf variables.
-Makefile.config: Makefile.config.in
-	./config.status
-
-include Makefile.config
 
 clean_list :=
 dist_files :=

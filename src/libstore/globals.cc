@@ -212,7 +212,7 @@ Settings::SettingsMap Settings::getOverrides()
 }
 
 
-const string nixVersion = NIX_VERSION;
+const string nixVersion = PACKAGE_VERSION;
 
 
 }
