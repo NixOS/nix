@@ -1,4 +1,5 @@
-VERSION = @VERSION@
+PACKAGE_NAME = @PACKAGE_NAME@
+PACKAGE_VERSION = @PACKAGE_VERSION@
 bindir = @bindir@
 datadir = @datadir@
 datarootdir = @datarootdir@

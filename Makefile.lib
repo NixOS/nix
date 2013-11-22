@@ -16,7 +16,8 @@ libs_list :=
 
 define LIBS_template =
   _d := $$($(1)_DIR)
-  _objs := $$(foreach src, $$($(1)_SOURCES), $$(_d)$$(basename $$(src)).o)
+  _srcs := $$(foreach src, $$($(1)_SOURCES), $$(_d)$$(src))
+  _objs := $$(addsuffix .o, $$(basename $$(_srcs)))
   _libs := $$(foreach lib, $$($(1)_LIBS), $$(lib).a)
   _lib := $$(_d)$(1).a
 
@@ -28,8 +29,9 @@ define LIBS_template =
 
   include $$(wildcard $$(_d)/*.dep)
 
-  clean_list += $$(_d)*.a $$(_d)*.o $$(_d)*.dep
   libs_list += $$(_lib)
+  clean_list += $$(_d)*.a $$(_d)*.o $$(_d)*.dep
+  dist_files += $$(_srcs)
 endef
 
 
@@ -38,7 +40,8 @@ programs_list :=
 
 define PROGRAMS_template =
   _d := $$($(1)_DIR)
-  _objs := $$(foreach src, $$($(1)_SOURCES), $$(_d)$$(basename $$(src)).o)
+  _srcs := $$(foreach src, $$($(1)_SOURCES), $$(_d)$$(src))
+  _objs := $$(addsuffix .o, $$(basename $$(_srcs)))
   _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_DIR)$$(lib).a)
   _prog := $$(_d)$(1)
 
@@ -48,9 +51,22 @@ define PROGRAMS_template =
   # Propagate CXXFLAGS to the individual object files.
   $$(foreach obj, $$(_objs), $$(eval $$(obj)_CXXFLAGS=$$($(1)_CXXFLAGS)))
 
-  clean_list += $$(_prog) $$(_d)*.o $$(_d)*.dep
+  include $$(wildcard $$(_d)/*.dep)
+
   programs_list += $$(_prog)
+  clean_list += $$(_prog) $$(_d)*.o $$(_d)*.dep
+  dist_files += $$(_srcs)
 endef
+
+
+# Distributing stuff.
+dist_files :=
+
+dist_name = $(PACKAGE_NAME)-$(PACKAGE_VERSION)
+
+dist:
+	@echo $(dist_files)
+	$(QUIET) tar cvfj $(dist_name).tar.bz2 $(dist_files) --transform 's,^,$(dist_name)/,'
 
 
 # Cleaning stuff.
