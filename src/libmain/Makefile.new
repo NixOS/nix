@@ -4,4 +4,4 @@ libmain_DIR := $(d)
 
 libmain_SOURCES = shared.cc stack.cc
 
-libmain_LDFLAGS = -lgc
+libmain_LDFLAGS = $(BDW_GC_LIBS)
