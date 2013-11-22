@@ -1,0 +1,22 @@
+include Makefile.config
+include Makefile.lib
+
+include src/boost/format/Makefile.new
+include src/libutil/Makefile.new
+include src/libstore/Makefile.new
+include src/libmain/Makefile.new
+include src/libexpr/Makefile.new
+include src/nix-hash/Makefile.new
+include src/nix-store/Makefile.new
+include src/nix-instantiate/Makefile.new
+include src/nix-env/Makefile.new
+include src/nix-daemon/Makefile.new
+
+CXXFLAGS = -I . -I src -I src/libutil -I src/libstore -I src/libmain -I src/libexpr
+
+CFLAGS =
+
+$(foreach lib, $(LIBS), $(eval $(call LIBS_template,$(lib))))
+$(foreach prog, $(PROGRAMS), $(eval $(call PROGRAMS_template,$(prog))))
+
+all: $(programs_list)

@@ -1,0 +1,7 @@
+LIBS += libmain
+
+libmain_DIR := $(here)
+
+libmain_SOURCES = shared.cc stack.cc
+
+libmain_LDFLAGS = -lgc

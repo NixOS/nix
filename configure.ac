@@ -385,5 +385,6 @@ AC_CONFIG_FILES([Makefile
    misc/Makefile
    misc/emacs/Makefile
    tests/Makefile
+   Makefile.config
   ])
 AC_OUTPUT

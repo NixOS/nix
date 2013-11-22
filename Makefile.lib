@@ -1,0 +1,63 @@
+default: all
+
+here = $(dir $(lastword $(MAKEFILE_LIST)))
+
+LIBS =
+
+QUIET = @
+
+%.o: %.cc
+	$(QUIET) g++ -o $@ -c $^ -g -fPIC $(CXXFLAGS) $($@_CXXFLAGS)
+
+%.o: %.c
+	$(QUIET) gcc -o $@ -c $^ -g -fPIC $(CFLAGS) $($@_CFLAGS)
+
+
+# Generate Make rules for libraries.
+libs_list :=
+
+define LIBS_template =
+  _d := $$($(1)_DIR)
+  _objs := $$(foreach src, $$($(1)_SOURCES), $$(_d)$$(basename $$(src)).o)
+  _libs := $$(foreach lib, $$($(1)_LIBS), $$(lib).a)
+  _lib := $$(_d)$(1).a
+
+  $$(_lib): $$(_objs)
+	$(QUIET) ar crs $$@ $$?
+
+  # Propagate CXXFLAGS to the individual object files.
+  $$(foreach obj, $$(_objs), $$(eval $$(obj)_CXXFLAGS=$$($(1)_CXXFLAGS)))
+
+  clean_list += $$(_lib) $$(_objs)
+  libs_list += $$(_lib)
+endef
+
+
+# Generate Make rules for programs.
+programs_list :=
+
+define PROGRAMS_template =
+  _d := $$($(1)_DIR)
+  _objs := $$(foreach src, $$($(1)_SOURCES), $$(_d)$$(basename $$(src)).o)
+  _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_DIR)$$(lib).a)
+  _prog := $$(_d)$(1)
+
+  $$(_prog): $$(_objs) $$(_libs)
+	$(QUIET) g++ -o $$@ $$^ $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS))
+
+  # Propagate CXXFLAGS to the individual object files.
+  $$(foreach obj, $$(_objs), $$(eval $$(obj)_CXXFLAGS=$$($(1)_CXXFLAGS)))
+
+  clean_list += $$(_prog) $$(_objs)
+  programs_list += $$(_prog)
+endef
+
+
+# Cleaning stuff.
+clean_list :=
+
+clean:
+	rm -fv $(clean_list)
+
+dryclean:
+	@echo $(clean_list)

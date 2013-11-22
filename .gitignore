@@ -1,5 +1,6 @@
 Makefile
 Makefile.in
+Makefile.config
 
 # /
 /aclocal.m4

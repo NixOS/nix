@@ -1,0 +1,10 @@
+VERSION = @VERSION@
+bindir = @bindir@
+datadir = @datadir@
+datarootdir = @datarootdir@
+exec_prefix = @exec_prefix@
+libexecdir = @libexecdir@
+localstatedir = @localstatedir@
+prefix = @prefix@
+storedir = @storedir@
+sysconfdir = @sysconfdir@

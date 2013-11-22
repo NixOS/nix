@@ -1,0 +1,7 @@
+PROGRAMS += nix-env
+
+nix-env_DIR := $(here)
+
+nix-env_SOURCES = nix-env.cc profiles.cc profiles.hh user-env.cc user-env.hh
+
+nix-env_LIBS = libexpr libmain libstore libutil libformat

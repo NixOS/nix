@@ -1,0 +1,10 @@
+LIBS += libutil
+
+libutil_DIR := $(here)
+
+libutil_SOURCES = util.cc hash.cc serialise.cc archive.cc xml-writer.cc affinity.cc \
+  md5.c sha1.c sha256.c
+
+# FIXME: md5.c et al. should only be built when we don't have OpenSSL.
+
+libutil_LIBS = src/boost/format/libformat

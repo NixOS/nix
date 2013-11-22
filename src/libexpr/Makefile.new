@@ -1,0 +1,10 @@
+LIBS += libexpr
+
+libexpr_DIR := $(here)
+
+libexpr_SOURCES = \
+  nixexpr.cc eval.cc primops.cc lexer-tab.cc parser-tab.cc \
+  get-drvs.cc attr-path.cc value-to-xml.cc value-to-json.cc \
+  common-opts.cc names.cc
+
+# FIXME: add rules for parser-tab.cc / lexer-tab.cc.

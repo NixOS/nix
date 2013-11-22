@@ -1,0 +1,5 @@
+LIBS += libformat
+
+libformat_DIR := $(here)
+
+libformat_SOURCES = format_implementation.cc free_funcs.cc parsing.cc

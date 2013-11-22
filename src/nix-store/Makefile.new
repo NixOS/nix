@@ -1,0 +1,7 @@
+PROGRAMS += nix-store
+
+nix-store_DIR := $(here)
+
+nix-store_SOURCES = nix-store.cc dotgraph.cc xmlgraph.cc
+
+nix-store_LIBS = libmain libstore libutil libformat
