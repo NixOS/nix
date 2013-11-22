@@ -2,8 +2,6 @@ default: all
 
 here = $(dir $(lastword $(MAKEFILE_LIST)))
 
-LIBS =
-
 QUIET = @
 
 %.o: %.cc
