@@ -1,5 +1,6 @@
-include Makefile.config
-include Makefile.lib
+default: all
+
+here = $(dir $(lastword $(MAKEFILE_LIST)))
 
 include src/boost/format/Makefile.new
 include src/libutil/Makefile.new
@@ -12,9 +13,6 @@ include src/nix-instantiate/Makefile.new
 include src/nix-env/Makefile.new
 include src/nix-daemon/Makefile.new
 
+include Makefile.lib
+
 CXXFLAGS += -I . -I src -I src/libutil -I src/libstore -I src/libmain -I src/libexpr
-
-$(foreach lib, $(LIBS), $(eval $(call LIBS_template,$(lib))))
-$(foreach prog, $(PROGRAMS), $(eval $(call PROGRAMS_template,$(prog))))
-
-all: $(programs_list)

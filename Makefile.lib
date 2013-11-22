@@ -1,6 +1,12 @@
-default: all
+# Include Autoconf variables.
+Makefile.config: Makefile.config.in
+	./config.status
 
-here = $(dir $(lastword $(MAKEFILE_LIST)))
+include Makefile.config
+
+clean_list :=
+dist_files :=
+
 
 QUIET = @
 
@@ -34,6 +40,8 @@ define LIBS_template =
   dist_files += $$(_srcs)
 endef
 
+$(foreach lib, $(LIBS), $(eval $(call LIBS_template,$(lib))))
+
 
 # Generate Make rules for programs.
 programs_list :=
@@ -58,10 +66,10 @@ define PROGRAMS_template =
   dist_files += $$(_srcs)
 endef
 
+$(foreach prog, $(PROGRAMS), $(eval $(call PROGRAMS_template,$(prog))))
+
 
 # Distributing stuff.
-dist_files :=
-
 dist_name = $(PACKAGE_NAME)-$(PACKAGE_VERSION)
 
 dist:
@@ -70,10 +78,12 @@ dist:
 
 
 # Cleaning stuff.
-clean_list :=
 
 clean:
 	rm -fv $(clean_list)
 
 dryclean:
 	@echo $(clean_list)
+
+
+all: $(programs_list)
