@@ -30,7 +30,7 @@ define LIBS_template =
 
   include $$(wildcard $$(_d)/*.dep)
 
-  clean_list += $$(_lib) $$(_objs) $$(_d)*.dep
+  clean_list += $$(_d)*.a $$(_d)*.o $$(_d)*.dep
   libs_list += $$(_lib)
 endef
 
@@ -50,7 +50,7 @@ define PROGRAMS_template =
   # Propagate CXXFLAGS to the individual object files.
   $$(foreach obj, $$(_objs), $$(eval $$(obj)_CXXFLAGS=$$($(1)_CXXFLAGS)))
 
-  clean_list += $$(_prog) $$(_objs) $$(_d)*.dep
+  clean_list += $$(_prog) $$(_d)*.o $$(_d)*.dep
   programs_list += $$(_prog)
 endef
 
