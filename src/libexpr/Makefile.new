@@ -7,4 +7,8 @@ libexpr_SOURCES = \
   get-drvs.cc attr-path.cc value-to-xml.cc value-to-json.cc \
   common-opts.cc names.cc
 
-# FIXME: add rules for parser-tab.cc / lexer-tab.cc.
+$(here)parser-tab.cc $(here)parser-tab.hh: $(here)parser.y
+	bison -v -o $(here)parser-tab.cc $< -d
+
+$(here)lexer-tab.cc $(here)lexer-tab.hh: $(here)lexer.l
+	flex --outfile $(here)lexer-tab.cc --header-file=$(here)lexer-tab.hh $<
