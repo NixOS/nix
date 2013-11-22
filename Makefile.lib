@@ -17,17 +17,33 @@ endef
 $(foreach mf, $(SUBS), $(eval $(call include_sub_makefile, $(mf))))
 
 
+# Initialise some variables.
 clean_list :=
 dist_files :=
-
-
 QUIET = @
 
+
+# Pass -fPIC if we're building dynamic libraries.
+ifeq ($(BUILD_SHARED_LIBS), 1)
+GLOBAL_CFLAGS += -fPIC
+GLOBAL_CXXFLAGS += -fPIC
+endif
+
+
+# Pass -g if we want debug info.
+ifeq ($(BUILD_DEBUG), 1)
+GLOBAL_CFLAGS += -g
+GLOBAL_CXXFLAGS += -g
+endif
+
+
+# Pattern rules.
+
 %.o: %.cc
-	$(QUIET) $(CXX) -o $@ -c $< -g -fPIC $(GLOBAL_CXXFLAGS) $(CXXFLAGS) $($@_CXXFLAGS) -MMD -MF $(basename $@).dep -MP
+	$(QUIET) $(CXX) -o $@ -c $< $(GLOBAL_CXXFLAGS) $(CXXFLAGS) $($@_CXXFLAGS) -MMD -MF $(basename $@).dep -MP
 
 %.o: %.c
-	$(QUIET) $(CC) -o $@ -c $< -g -fPIC $(GLOBAL_CFLAGS) $(CFLAGS) $($@_CFLAGS) -MMD -MF $(basename $@).dep -MP
+	$(QUIET) $(CC) -o $@ -c $< $(GLOBAL_CFLAGS) $(CFLAGS) $($@_CFLAGS) -MMD -MF $(basename $@).dep -MP
 
 
 # Generate Make rules for libraries.
@@ -91,7 +107,6 @@ dist:
 
 
 # Cleaning stuff.
-
 clean:
 	rm -fv $(clean_list)
 

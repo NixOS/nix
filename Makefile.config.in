@@ -1,3 +1,4 @@
+BUILD_DEBUG = 1
 CC = @CC@
 CFLAGS = @CFLAGS@
 CXX = @CXX@
