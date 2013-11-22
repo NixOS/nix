@@ -1,6 +1,6 @@
 LIBS += libmain
 
-libmain_DIR := $(here)
+libmain_DIR := $(d)
 
 libmain_SOURCES = shared.cc stack.cc
 

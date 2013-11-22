@@ -1,6 +1,6 @@
 PROGRAMS += nix-env
 
-nix-env_DIR := $(here)
+nix-env_DIR := $(d)
 
 nix-env_SOURCES = nix-env.cc profiles.cc profiles.hh user-env.cc user-env.hh
 

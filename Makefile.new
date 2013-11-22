@@ -1,18 +1,15 @@
-default: all
-
-here = $(dir $(lastword $(MAKEFILE_LIST)))
-
-include src/boost/format/Makefile.new
-include src/libutil/Makefile.new
-include src/libstore/Makefile.new
-include src/libmain/Makefile.new
-include src/libexpr/Makefile.new
-include src/nix-hash/Makefile.new
-include src/nix-store/Makefile.new
-include src/nix-instantiate/Makefile.new
-include src/nix-env/Makefile.new
-include src/nix-daemon/Makefile.new
+SUBS = \
+  src/boost/format/Makefile.new \
+  src/libutil/Makefile.new \
+  src/libstore/Makefile.new \
+  src/libmain/Makefile.new \
+  src/libexpr/Makefile.new \
+  src/nix-hash/Makefile.new \
+  src/nix-store/Makefile.new \
+  src/nix-instantiate/Makefile.new \
+  src/nix-env/Makefile.new \
+  src/nix-daemon/Makefile.new
 
 include Makefile.lib
 
-CXXFLAGS += -I . -I src -I src/libutil -I src/libstore -I src/libmain -I src/libexpr
+CXXFLAGS += -I . -I src -I src/libutil -I src/libstore -I src/libmain -I src/libexpr -O0

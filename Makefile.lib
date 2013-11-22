@@ -1,3 +1,15 @@
+default: all
+
+
+# Include all sub-Makefiles.
+define include_sub_makefile =
+  d := $$(patsubst %/, %, $$(dir $(1)))
+  include $(1)
+endef
+
+$(foreach mf, $(SUBS), $(eval $(call include_sub_makefile, $(mf))))
+
+
 # Include Autoconf variables.
 Makefile.config: Makefile.config.in
 	./config.status
@@ -22,10 +34,10 @@ libs_list :=
 
 define LIBS_template =
   _d := $$($(1)_DIR)
-  _srcs := $$(foreach src, $$($(1)_SOURCES), $$(_d)$$(src))
+  _srcs := $$(foreach src, $$($(1)_SOURCES), $$(_d)/$$(src))
   _objs := $$(addsuffix .o, $$(basename $$(_srcs)))
   _libs := $$(foreach lib, $$($(1)_LIBS), $$(lib).a)
-  _lib := $$(_d)$(1).a
+  _lib := $$(_d)/$(1).a
 
   $$(_lib): $$(_objs)
 	$(QUIET) ar crs $$@ $$?
@@ -36,7 +48,7 @@ define LIBS_template =
   include $$(wildcard $$(_d)/*.dep)
 
   libs_list += $$(_lib)
-  clean_list += $$(_d)*.a $$(_d)*.o $$(_d)*.dep
+  clean_list += $$(_d)/*.a $$(_d)/*.o $$(_d)/*.dep
   dist_files += $$(_srcs)
 endef
 
@@ -48,10 +60,10 @@ programs_list :=
 
 define PROGRAMS_template =
   _d := $$($(1)_DIR)
-  _srcs := $$(foreach src, $$($(1)_SOURCES), $$(_d)$$(src))
+  _srcs := $$(foreach src, $$($(1)_SOURCES), $$(_d)/$$(src))
   _objs := $$(addsuffix .o, $$(basename $$(_srcs)))
-  _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_DIR)$$(lib).a)
-  _prog := $$(_d)$(1)
+  _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_DIR)/$$(lib).a)
+  _prog := $$(_d)/$(1)
 
   $$(_prog): $$(_objs) $$(_libs)
 	$(QUIET) g++ -o $$@ $$^ $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS))
@@ -62,7 +74,7 @@ define PROGRAMS_template =
   include $$(wildcard $$(_d)/*.dep)
 
   programs_list += $$(_prog)
-  clean_list += $$(_prog) $$(_d)*.o $$(_d)*.dep
+  clean_list += $$(_prog) $$(_d)/*.o $$(_d)/*.dep
   dist_files += $$(_srcs)
 endef
 

@@ -1,6 +1,6 @@
 PROGRAMS += nix-instantiate
 
-nix-instantiate_DIR := $(here)
+nix-instantiate_DIR := $(d)
 
 nix-instantiate_SOURCES = nix-instantiate.cc
 

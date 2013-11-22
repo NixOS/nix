@@ -1,6 +1,6 @@
 LIBS += libstore
 
-libstore_DIR := $(here)
+libstore_DIR := $(d)
 
 libstore_SOURCES = \
   store-api.cc local-store.cc remote-store.cc derivations.cc build.cc misc.cc \

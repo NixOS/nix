@@ -1,14 +1,14 @@
 LIBS += libexpr
 
-libexpr_DIR := $(here)
+libexpr_DIR := $(d)
 
 libexpr_SOURCES = \
   nixexpr.cc eval.cc primops.cc lexer-tab.cc parser-tab.cc \
   get-drvs.cc attr-path.cc value-to-xml.cc value-to-json.cc \
   common-opts.cc names.cc
 
-$(here)parser-tab.cc $(here)parser-tab.hh: $(here)parser.y
-	bison -v -o $(here)parser-tab.cc $< -d
+$(d)/parser-tab.cc $(d)/parser-tab.hh: $(d)/parser.y
+	bison -v -o $(libexpr_DIR)/parser-tab.cc $< -d
 
-$(here)lexer-tab.cc $(here)lexer-tab.hh: $(here)lexer.l
-	flex --outfile $(here)lexer-tab.cc --header-file=$(here)lexer-tab.hh $<
+$(d)/lexer-tab.cc $(d)/lexer-tab.hh: $(d)/lexer.l
+	flex --outfile $(libexpr_DIR)/lexer-tab.cc --header-file=$(libexpr_DIR)/lexer-tab.hh $<
