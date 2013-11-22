@@ -12,9 +12,7 @@ include src/nix-instantiate/Makefile.new
 include src/nix-env/Makefile.new
 include src/nix-daemon/Makefile.new
 
-CXXFLAGS = -I . -I src -I src/libutil -I src/libstore -I src/libmain -I src/libexpr
-
-CFLAGS =
+CXXFLAGS += -I . -I src -I src/libutil -I src/libstore -I src/libmain -I src/libexpr
 
 $(foreach lib, $(LIBS), $(eval $(call LIBS_template,$(lib))))
 $(foreach prog, $(PROGRAMS), $(eval $(call PROGRAMS_template,$(prog))))

@@ -5,10 +5,10 @@ here = $(dir $(lastword $(MAKEFILE_LIST)))
 QUIET = @
 
 %.o: %.cc
-	$(QUIET) g++ -o $@ -c $< -g -fPIC $(CXXFLAGS) $($@_CXXFLAGS) -MMD -MF $(basename $@).dep -MP
+	$(QUIET) $(CXX) -o $@ -c $< -g -fPIC $(CXXFLAGS) $($@_CXXFLAGS) -MMD -MF $(basename $@).dep -MP
 
 %.o: %.c
-	$(QUIET) gcc -o $@ -c $< -g -fPIC $(CFLAGS) $($@_CFLAGS) -MMD -MF $(basename $@).dep -MP
+	$(QUIET) $(CC) -o $@ -c $< -g -fPIC $(CFLAGS) $($@_CFLAGS) -MMD -MF $(basename $@).dep -MP
 
 
 # Generate Make rules for libraries.
