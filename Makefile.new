@@ -10,6 +10,7 @@ SUBS = \
   src/nix-env/Makefile.new \
   src/nix-daemon/Makefile.new
 
+GLOBAL_CXXFLAGS = -I . -I src -I src/libutil -I src/libstore -I src/libmain -I src/libexpr
+
 include Makefile.lib
 
-CXXFLAGS += -I . -I src -I src/libutil -I src/libstore -I src/libmain -I src/libexpr -O0
