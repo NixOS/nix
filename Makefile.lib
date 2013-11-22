@@ -7,10 +7,10 @@ LIBS =
 QUIET = @
 
 %.o: %.cc
-	$(QUIET) g++ -o $@ -c $^ -g -fPIC $(CXXFLAGS) $($@_CXXFLAGS)
+	$(QUIET) g++ -o $@ -c $< -g -fPIC $(CXXFLAGS) $($@_CXXFLAGS) -MMD -MF $(basename $@).dep -MP
 
 %.o: %.c
-	$(QUIET) gcc -o $@ -c $^ -g -fPIC $(CFLAGS) $($@_CFLAGS)
+	$(QUIET) gcc -o $@ -c $< -g -fPIC $(CFLAGS) $($@_CFLAGS) -MMD -MF $(basename $@).dep -MP
 
 
 # Generate Make rules for libraries.
@@ -28,7 +28,9 @@ define LIBS_template =
   # Propagate CXXFLAGS to the individual object files.
   $$(foreach obj, $$(_objs), $$(eval $$(obj)_CXXFLAGS=$$($(1)_CXXFLAGS)))
 
-  clean_list += $$(_lib) $$(_objs)
+  include $$(wildcard $$(_d)/*.dep)
+
+  clean_list += $$(_lib) $$(_objs) $$(_d)*.dep
   libs_list += $$(_lib)
 endef
 
@@ -48,7 +50,7 @@ define PROGRAMS_template =
   # Propagate CXXFLAGS to the individual object files.
   $$(foreach obj, $$(_objs), $$(eval $$(obj)_CXXFLAGS=$$($(1)_CXXFLAGS)))
 
-  clean_list += $$(_prog) $$(_objs)
+  clean_list += $$(_prog) $$(_objs) $$(_d)*.dep
   programs_list += $$(_prog)
 endef
 

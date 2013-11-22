@@ -129,6 +129,7 @@ Makefile.config
 *.la
 *.o
 *.so
+*.dep
 *~
 
 # GNU Global
