@@ -55,20 +55,40 @@ define LIBS_template =
   _objs := $$(addsuffix .o, $$(basename $$(_srcs)))
 
   $(1)_LDFLAGS_USE :=
+  $(1)_LDFLAGS_USE_INSTALLED :=
 
   ifeq ($(BUILD_SHARED_LIBS), 1)
+
     _lib := $$(_d)/$(1).so
     $$(_lib): $$(_objs)
 	$(QUIET) $(CC) -o $$@ -shared $$^ $$($(1)_LDFLAGS)
+
     $(1)_LDFLAGS_USE += -L$$(_d) -Wl,-rpath,$$(abspath $$(_d)) -l$$(patsubst lib%,%,$$(strip $(1)))
+
+    $(1)_INSTALL_DIR := $$(pkglibdir)
+
+    $(1)_INSTALL_PATH := $$($(1)_INSTALL_DIR)/$(1).so
+
+    $$($(1)_INSTALL_PATH): $$(_objs)
+	install -d $$($(1)_INSTALL_DIR)
+	$(QUIET) $(CC) -o $$@ -shared $$^ $$($(1)_LDFLAGS)
+
+    $(1)_LDFLAGS_USE_INSTALLED += -L$$($(1)_INSTALL_DIR) -Wl,-rpath,$$($(1)_INSTALL_DIR) -l$$(patsubst lib%,%,$$(strip $(1)))
+
   else
+
     _lib := $$(_d)/$(1).a
     $$(_lib): $$(_objs)
 	$(QUIET) ar crs $$@ $$?
+
     $(1)_LDFLAGS_USE += $$(_lib) $$($(1)_LDFLAGS)
+
+    $(1)_INSTALL_PATH := $$(pkglibdir)/$(1).a
+
   endif
 
   $(1)_LDFLAGS_USE += $$($(1)_LDFLAGS_PROPAGATED)
+  $(1)_LDFLAGS_USE_INSTALLED += $$($(1)_LDFLAGS_PROPAGATED)
   $(1)_NAME := $$(_lib)
 
   # Propagate CXXFLAGS to the individual object files.
@@ -99,19 +119,31 @@ define PROGRAMS_template =
 
   $(1)_INSTALL_PATH := $$(bindir)/$(1)
 
-  $$($(1)_INSTALL_PATH): $$($(1)_PATH)
-	mkdir -p $$(dir $$@)
+  install:: $$($(1)_INSTALL_PATH)
+
+  ifeq ($(BUILD_SHARED_LIBS), 1)
+
+    _libs_final := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_INSTALL_PATH))
+
+    $$($(1)_INSTALL_PATH): $$($(1)_OBJS) $$(_libs_final)
+	install -d $$(dir $$($(1)_INSTALL_PATH))
+	$(QUIET) $(CXX) -o $$($(1)_INSTALL_PATH) -Wl,--no-copy-dt-needed-entries $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
+
+  else
+
+    $$($(1)_INSTALL_PATH): $$($(1)_PATH)
+	install -d $$(dir $$($(1)_INSTALL_PATH))
 	cp $$< $$@
 
-  install:: $$($(1)_INSTALL_PATH)
+  endif
 
   # Propagate CXXFLAGS to the individual object files.
   $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj)_CXXFLAGS=$$($(1)_CXXFLAGS)))
 
   include $$(wildcard $$(_d)/*.dep)
 
-  programs_list += $$(_prog)
-  clean_list += $$(_prog) $$(_d)/*.o $$(_d)/*.dep
+  programs_list += $$($(1)_PATH)
+  clean_list += $$($(1)_PATH) $$(_d)/*.o $$(_d)/*.dep
   dist_files += $$(_srcs)
 endef
 
