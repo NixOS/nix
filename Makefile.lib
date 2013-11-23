@@ -92,10 +92,18 @@ define PROGRAMS_template =
   _srcs := $$(foreach src, $$($(1)_SOURCES), $$(_d)/$$(src))
   $(1)_OBJS := $$(addsuffix .o, $$(basename $$(_srcs)))
   _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_NAME))
-  _prog := $$(_d)/$(1)
+  $(1)_PATH := $$(_d)/$(1)
 
-  $$(_prog): $$($(1)_OBJS) $$(_libs)
+  $$($(1)_PATH): $$($(1)_OBJS) $$(_libs)
 	$(QUIET) $(CXX) -o $$@ -Wl,--no-copy-dt-needed-entries $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
+
+  $(1)_INSTALL_PATH := $$(bindir)/$(1)
+
+  $$($(1)_INSTALL_PATH): $$($(1)_PATH)
+	mkdir -p $$(dir $$@)
+	cp $$< $$@
+
+  install:: $$($(1)_INSTALL_PATH)
 
   # Propagate CXXFLAGS to the individual object files.
   $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj)_CXXFLAGS=$$($(1)_CXXFLAGS)))
