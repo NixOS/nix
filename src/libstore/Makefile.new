@@ -1,5 +1,7 @@
 LIBS += libstore
 
+libstore_NAME = libnixstore
+
 libstore_DIR := $(d)
 
 libstore_SOURCES = \

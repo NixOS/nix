@@ -1,5 +1,7 @@
 LIBS += libexpr
 
+libexpr_NAME = libnixexpr
+
 libexpr_DIR := $(d)
 
 libexpr_SOURCES = \

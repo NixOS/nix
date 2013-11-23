@@ -1,5 +1,7 @@
 LIBS += libutil
 
+libutil_NAME = libnixutil
+
 libutil_DIR := $(d)
 
 libutil_SOURCES = util.cc hash.cc serialise.cc archive.cc xml-writer.cc affinity.cc

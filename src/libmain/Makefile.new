@@ -1,5 +1,7 @@
 LIBS += libmain
 
+libmain_NAME = libnixmain
+
 libmain_DIR := $(d)
 
 libmain_SOURCES = shared.cc stack.cc
