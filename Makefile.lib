@@ -51,6 +51,7 @@ endif
 libs_list :=
 
 define LIBS_template =
+  $(1)_NAME ?= $(1)
   _d := $$(strip $$($(1)_DIR))
   _srcs := $$(foreach src, $$($(1)_SOURCES), $$(_d)/$$(src))
   $(1)_OBJS := $$(addsuffix .o, $$(basename $$(_srcs)))
@@ -65,16 +66,16 @@ define LIBS_template =
       $(1)_LDFLAGS += -z defs
     endif
 
-    $(1)_PATH := $$(_d)/$(1).so
+    $(1)_PATH := $$(_d)/$$($(1)_NAME).so
 
     $$($(1)_PATH): $$($(1)_OBJS) $$(_libs)
 	$(QUIET) $(CXX) -o $$@ -shared $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
 
-    $(1)_LDFLAGS_USE += -L$$(_d) -Wl,-rpath,$$(abspath $$(_d)) -l$$(patsubst lib%,%,$$(strip $(1)))
+    $(1)_LDFLAGS_USE += -L$$(_d) -Wl,-rpath,$$(abspath $$(_d)) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
 
     $(1)_INSTALL_DIR := $$(pkglibdir)
 
-    $(1)_INSTALL_PATH := $$($(1)_INSTALL_DIR)/$(1).so
+    $(1)_INSTALL_PATH := $$($(1)_INSTALL_DIR)/$$($(1)_NAME).so
 
     _libs_final := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_INSTALL_PATH))
 
@@ -82,18 +83,18 @@ define LIBS_template =
 	install -d $$($(1)_INSTALL_DIR)
 	$(QUIET) $(CXX) -o $$@ -shared $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
 
-    $(1)_LDFLAGS_USE_INSTALLED += -L$$($(1)_INSTALL_DIR) -Wl,-rpath,$$($(1)_INSTALL_DIR) -l$$(patsubst lib%,%,$$(strip $(1)))
+    $(1)_LDFLAGS_USE_INSTALLED += -L$$($(1)_INSTALL_DIR) -Wl,-rpath,$$($(1)_INSTALL_DIR) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
 
   else
 
-    $(1)_PATH := $$(_d)/$(1).a
+    $(1)_PATH := $$(_d)/$$($(1)_NAME).a
 
     $$($(1)_PATH): $$($(1)_OBJS)
 	$(QUIET) ar crs $$@ $$?
 
     $(1)_LDFLAGS_USE += $$($(1)_PATH) $$($(1)_LDFLAGS)
 
-    $(1)_INSTALL_PATH := $$(pkglibdir)/$(1).a
+    $(1)_INSTALL_PATH := $$(pkglibdir)/$$($(1)_NAME).a
 
   endif
 
