@@ -54,7 +54,7 @@ define LIBS_template =
   _d := $$(strip $$($(1)_DIR))
   _srcs := $$(foreach src, $$($(1)_SOURCES), $$(_d)/$$(src))
   $(1)_OBJS := $$(addsuffix .o, $$(basename $$(_srcs)))
-  _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_NAME))
+  _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_PATH))
 
   $(1)_LDFLAGS_USE :=
   $(1)_LDFLAGS_USE_INSTALLED :=
@@ -65,8 +65,9 @@ define LIBS_template =
       $(1)_LDFLAGS += -z defs
     endif
 
-    _lib := $$(_d)/$(1).so
-    $$(_lib): $$($(1)_OBJS) $$(_libs)
+    $(1)_PATH := $$(_d)/$(1).so
+
+    $$($(1)_PATH): $$($(1)_OBJS) $$(_libs)
 	$(QUIET) $(CXX) -o $$@ -shared $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
 
     $(1)_LDFLAGS_USE += -L$$(_d) -Wl,-rpath,$$(abspath $$(_d)) -l$$(patsubst lib%,%,$$(strip $(1)))
@@ -85,11 +86,12 @@ define LIBS_template =
 
   else
 
-    _lib := $$(_d)/$(1).a
-    $$(_lib): $$($(1)_OBJS)
+    $(1)_PATH := $$(_d)/$(1).a
+
+    $$($(1)_PATH): $$($(1)_OBJS)
 	$(QUIET) ar crs $$@ $$?
 
-    $(1)_LDFLAGS_USE += $$(_lib) $$($(1)_LDFLAGS)
+    $(1)_LDFLAGS_USE += $$($(1)_PATH) $$($(1)_LDFLAGS)
 
     $(1)_INSTALL_PATH := $$(pkglibdir)/$(1).a
 
@@ -98,14 +100,12 @@ define LIBS_template =
   $(1)_LDFLAGS_USE += $$($(1)_LDFLAGS_PROPAGATED)
   $(1)_LDFLAGS_USE_INSTALLED += $$($(1)_LDFLAGS_PROPAGATED)
 
-  $(1)_NAME := $$(_lib)
-
   # Propagate CXXFLAGS to the individual object files.
   $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj)_CXXFLAGS=$$($(1)_CXXFLAGS)))
 
   include $$(wildcard $$(_d)/*.dep)
 
-  libs_list += $$(_lib)
+  libs_list += $$($(1)_PATH)
   clean_list += $$(_d)/*.a $$(_d)/*.so $$(_d)/*.o $$(_d)/*.dep
   dist_files += $$(_srcs)
 endef
@@ -120,7 +120,7 @@ define PROGRAMS_template =
   _d := $$($(1)_DIR)
   _srcs := $$(foreach src, $$($(1)_SOURCES), $$(_d)/$$(src))
   $(1)_OBJS := $$(addsuffix .o, $$(basename $$(_srcs)))
-  _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_NAME))
+  _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_PATH))
   $(1)_PATH := $$(_d)/$(1)
 
   $$($(1)_PATH): $$($(1)_OBJS) $$(_libs)
