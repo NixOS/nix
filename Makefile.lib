@@ -73,7 +73,7 @@ define LIBS_template =
 
     $(1)_LDFLAGS_USE += -L$$(_d) -Wl,-rpath,$$(abspath $$(_d)) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
 
-    $(1)_INSTALL_DIR := $$(pkglibdir)
+    $(1)_INSTALL_DIR := $$(libdir)
 
     $(1)_INSTALL_PATH := $$($(1)_INSTALL_DIR)/$$($(1)_NAME).so
 
@@ -94,7 +94,7 @@ define LIBS_template =
 
     $(1)_LDFLAGS_USE += $$($(1)_PATH) $$($(1)_LDFLAGS)
 
-    $(1)_INSTALL_PATH := $$(pkglibdir)/$$($(1)_NAME).a
+    $(1)_INSTALL_PATH := $$(libdir)/$$($(1)_NAME).a
 
   endif
 
