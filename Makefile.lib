@@ -27,6 +27,7 @@ QUIET = @
 ifeq ($(BUILD_SHARED_LIBS), 1)
   GLOBAL_CFLAGS += -fPIC
   GLOBAL_CXXFLAGS += -fPIC
+  GLOBAL_LDFLAGS += -Wl,--no-copy-dt-needed-entries
 endif
 
 
@@ -60,9 +61,13 @@ define LIBS_template =
 
   ifeq ($(BUILD_SHARED_LIBS), 1)
 
+    ifndef $(1)_ALLOW_UNDEFINED
+      $(1)_LDFLAGS += -z defs
+    endif
+
     _lib := $$(_d)/$(1).so
     $$(_lib): $$($(1)_OBJS) $$(_libs)
-	$(QUIET) $(CC) -o $$@ -shared -Wl,--no-copy-dt-needed-entries $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
+	$(QUIET) $(CXX) -o $$@ -shared $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
 
     $(1)_LDFLAGS_USE += -L$$(_d) -Wl,-rpath,$$(abspath $$(_d)) -l$$(patsubst lib%,%,$$(strip $(1)))
 
@@ -74,7 +79,7 @@ define LIBS_template =
 
     $$($(1)_INSTALL_PATH): $$($(1)_OBJS) $$(_libs_final)
 	install -d $$($(1)_INSTALL_DIR)
-	$(QUIET) $(CC) -o $$@ -shared -Wl,--no-copy-dt-needed-entries $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
+	$(QUIET) $(CXX) -o $$@ -shared $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
 
     $(1)_LDFLAGS_USE_INSTALLED += -L$$($(1)_INSTALL_DIR) -Wl,-rpath,$$($(1)_INSTALL_DIR) -l$$(patsubst lib%,%,$$(strip $(1)))
 
@@ -92,6 +97,7 @@ define LIBS_template =
 
   $(1)_LDFLAGS_USE += $$($(1)_LDFLAGS_PROPAGATED)
   $(1)_LDFLAGS_USE_INSTALLED += $$($(1)_LDFLAGS_PROPAGATED)
+
   $(1)_NAME := $$(_lib)
 
   # Propagate CXXFLAGS to the individual object files.
@@ -118,7 +124,7 @@ define PROGRAMS_template =
   $(1)_PATH := $$(_d)/$(1)
 
   $$($(1)_PATH): $$($(1)_OBJS) $$(_libs)
-	$(QUIET) $(CXX) -o $$@ -Wl,--no-copy-dt-needed-entries $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
+	$(QUIET) $(CXX) -o $$@ $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
 
   $(1)_INSTALL_PATH := $$(bindir)/$(1)
 
@@ -130,7 +136,7 @@ define PROGRAMS_template =
 
     $$($(1)_INSTALL_PATH): $$($(1)_OBJS) $$(_libs_final)
 	install -d $$(dir $$($(1)_INSTALL_PATH))
-	$(QUIET) $(CXX) -o $$($(1)_INSTALL_PATH) -Wl,--no-copy-dt-needed-entries $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
+	$(QUIET) $(CXX) -o $$($(1)_INSTALL_PATH) $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
 
   else
 
