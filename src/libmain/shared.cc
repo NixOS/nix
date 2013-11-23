@@ -15,10 +15,6 @@
 #include <unistd.h>
 #include <signal.h>
 
-#if HAVE_BOEHMGC
-#include <gc/gc.h>
-#endif
-
 
 namespace nix {
 
@@ -231,14 +227,6 @@ static void initAndRun(int argc, char * * argv)
 }
 
 
-/* Called when the Boehm GC runs out of memory. */
-static void * oomHandler(size_t requested)
-{
-    /* Convert this to a proper C++ exception. */
-    throw std::bad_alloc();
-}
-
-
 void showManPage(const string & name)
 {
     string cmd = "man " + name;
@@ -267,14 +255,6 @@ int main(int argc, char * * argv)
 #endif
 
     std::ios::sync_with_stdio(false);
-
-#if HAVE_BOEHMGC
-    /* Initialise the Boehm garbage collector.  This isn't necessary
-       on most platforms, but for portability we do it anyway. */
-    GC_INIT();
-
-    GC_oom_fn = oomHandler;
-#endif
 
     try {
         try {

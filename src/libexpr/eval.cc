@@ -129,6 +129,14 @@ string showType(const Value & v)
 }
 
 
+/* Called when the Boehm GC runs out of memory. */
+static void * oomHandler(size_t requested)
+{
+    /* Convert this to a proper C++ exception. */
+    throw std::bad_alloc();
+}
+
+
 EvalState::EvalState()
     : sWith(symbols.create("<with>"))
     , sOutPath(symbols.create("outPath"))
@@ -158,6 +166,14 @@ EvalState::EvalState()
 #if HAVE_BOEHMGC
     static bool gcInitialised = false;
     if (!gcInitialised) {
+
+        /* Initialise the Boehm garbage collector.  This isn't
+           necessary on most platforms, but for portability we do it
+           anyway. */
+        GC_INIT();
+
+        GC_oom_fn = oomHandler;
+
         /* Set the initial heap size to something fairly big (25% of
            physical RAM, up to a maximum of 384 MiB) so that in most
            cases we don't need to garbage collect at all.  (Collection
@@ -181,6 +197,7 @@ EvalState::EvalState()
             debug(format("setting initial heap size to %1% bytes") % size);
             GC_expand_hp(size);
         }
+
         gcInitialised = true;
     }
 #endif
