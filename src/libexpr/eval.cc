@@ -156,8 +156,8 @@ EvalState::EvalState()
     countCalls = getEnv("NIX_COUNT_CALLS", "0") != "0";
 
 #if HAVE_BOEHMGC
-    static bool gcInitialised = true;
-    if (gcInitialised) {
+    static bool gcInitialised = false;
+    if (!gcInitialised) {
         /* Set the initial heap size to something fairly big (25% of
            physical RAM, up to a maximum of 384 MiB) so that in most
            cases we don't need to garbage collect at all.  (Collection
