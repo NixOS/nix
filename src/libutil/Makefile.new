@@ -10,4 +10,4 @@ else
   libutil_SOURCES += md5.c sha1.c sha256.c
 endif
 
-libutil_LIBS = src/boost/format/libformat
+libutil_LIBS = libformat

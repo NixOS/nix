@@ -7,6 +7,8 @@ libexpr_SOURCES = \
   get-drvs.cc attr-path.cc value-to-xml.cc value-to-json.cc \
   common-opts.cc names.cc
 
+libexpr_LIBS = libutil libstore libformat
+
 $(d)/parser-tab.cc $(d)/parser-tab.hh: $(d)/parser.y
 	bison -v -o $(libexpr_DIR)/parser-tab.cc $< -d
 

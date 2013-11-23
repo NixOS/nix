@@ -4,4 +4,6 @@ libmain_DIR := $(d)
 
 libmain_SOURCES = shared.cc stack.cc
 
+libmain_LIBS = libstore libutil libformat
+
 libmain_LDFLAGS_PROPAGATED = $(BDW_GC_LIBS)
