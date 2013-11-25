@@ -59,16 +59,6 @@ CXXFLAGS=${CXXFLAGS:--g -O3 -Wall}
 AC_PROG_CC
 AC_PROG_CXX
 
-# To build programs to be run in the build machine.
-if test "$CC_FOR_BUILD" = ""; then
-    if test "$cross_compiling" = "yes"; then
-        AC_CHECK_PROGS(CC_FOR_BUILD, gcc cc)
-    else
-        CC_FOR_BUILD="$CC"
-    fi
-fi
-AC_SUBST([CC_FOR_BUILD])
-
 
 # Use 64-bit file system calls so that we can support files > 2 GiB.
 AC_SYS_LARGEFILE
