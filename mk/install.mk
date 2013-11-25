@@ -51,5 +51,3 @@ define install-symlink =
 	$(QUIET) ln -sfn $(1) $(2)
 
 endef
-
-

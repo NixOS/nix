@@ -180,7 +180,7 @@ AC_MSG_RESULT(yes)
 AC_MSG_CHECKING([for the Perl installation prefix])
 perlversion=$($perl -e 'use Config; print $Config{version};')
 perlarchname=$($perl -e 'use Config; print $Config{archname};')
-AC_SUBST(perllibdir, [$\(libdir\)/perl5/site_perl/$perlversion/$perlarchname])
+AC_SUBST(perllibdir, [${libdir}/perl5/site_perl/$perlversion/$perlarchname])
 AC_MSG_RESULT($perllibdir)
 
 
@@ -330,6 +330,15 @@ else
 fi
 AC_SUBST(tarFlags)
 
+
+# Expand all variables in config.status.
+test "$prefix" = NONE && prefix=$ac_default_prefix
+test "$exec_prefix" = NONE && exec_prefix='${prefix}'
+for name in $ac_subst_vars; do
+    declare $name="$(eval echo "${!name}")"
+    declare $name="$(eval echo "${!name}")"
+    declare $name="$(eval echo "${!name}")"
+done
 
 AC_CONFIG_HEADER([config.h])
 AC_CONFIG_FILES([])
