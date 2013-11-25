@@ -5,4 +5,6 @@ define instantiate-template =
   $(1): $(1).in
 	./config.status --file $(1)
 
+  clean_files += $(1)
+
 endef
