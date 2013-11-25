@@ -13,7 +13,8 @@ programs_list :=
 #
 # - $(1)_LDFLAGS: additional linker flags.
 #
-# - bindir: the directory where the program will be installed.
+# - $(1)_INSTALL_DIR: the directory where the program will be
+#   installed; defaults to $(bindir).
 define build-program =
   _d := $$($(1)_DIR)
   _srcs := $$(foreach src, $$($(1)_SOURCES), $$(_d)/$$(src))
@@ -24,7 +25,7 @@ define build-program =
   $$($(1)_PATH): $$($(1)_OBJS) $$(_libs)
 	$(QUIET) $(CXX) -o $$@ $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
 
-  $(1)_INSTALL_DIR := $$(bindir)
+  $(1)_INSTALL_DIR ?= $$(bindir)
   $(1)_INSTALL_PATH := $$($(1)_INSTALL_DIR)/$(1)
 
   $$(eval $$(call create-dir,$$($(1)_INSTALL_DIR)))

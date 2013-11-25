@@ -9,6 +9,7 @@ OPENSSL_LIBS = @OPENSSL_LIBS@
 PACKAGE_NAME = @PACKAGE_NAME@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 bindir = @bindir@
+bsddiff_compat_include = @bsddiff_compat_include@
 datadir = @datadir@
 datarootdir = @datarootdir@
 exec_prefix = @exec_prefix@
