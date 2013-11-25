@@ -358,29 +358,5 @@ AC_SUBST(tarFlags)
 
 
 AC_CONFIG_HEADER([config.h])
-AC_CONFIG_FILES([Makefile
-   src/Makefile
-   src/boost/Makefile
-   src/boost/format/Makefile
-   src/libutil/Makefile
-   src/libstore/Makefile
-   src/libmain/Makefile
-   src/nix-store/Makefile
-   src/nix-hash/Makefile
-   src/libexpr/Makefile
-   src/nix-instantiate/Makefile
-   src/nix-env/Makefile
-   src/nix-daemon/Makefile
-   src/nix-log2xml/Makefile
-   src/bsdiff-4.3/Makefile
-   perl/Makefile
-   scripts/Makefile
-   corepkgs/Makefile
-   doc/Makefile
-   doc/manual/Makefile
-   misc/Makefile
-   misc/emacs/Makefile
-   tests/Makefile
-   Makefile.config
-  ])
+AC_CONFIG_FILES([])
 AC_OUTPUT
