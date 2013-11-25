@@ -2,9 +2,9 @@
 # substitutes all ‘@var@’ variables set by the configure script).
 define instantiate-template =
 
-  $(1): $(1).in
-	./config.status --file $(1)
-
   clean_files += $(1)
 
 endef
+
+%: %.in
+	$(QUIET) ./config.status --quiet --file $@

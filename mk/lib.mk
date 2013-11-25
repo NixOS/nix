@@ -6,8 +6,14 @@ template_files += Makefile.config
 include Makefile.config
 
 
+# Get rid of default suffixes. FIXME: is this a good idea?
+.SUFFIXES:
+
+
 # Initialise some variables.
 QUIET = @
+bin_SCRIPTS :=
+noinst_SCRIPTS :=
 
 
 # Pass -fPIC if we're building dynamic libraries.
@@ -46,6 +52,9 @@ $(foreach mf, $(SUBS), $(eval $(call include-sub-makefile, $(mf))))
 # Instantiate stuff.
 $(foreach lib, $(LIBS), $(eval $(call build-library,$(lib))))
 $(foreach prog, $(PROGRAMS), $(eval $(call build-program,$(prog))))
+$(foreach script, $(bin_SCRIPTS), $(eval $(call install-program-in,$(script),$(bindir))))
+$(foreach script, $(bin_SCRIPTS), $(eval programs_list += $(script)))
+$(foreach script, $(noinst_SCRIPTS), $(eval programs_list += $(script)))
 $(foreach template, $(template_files), $(eval $(call instantiate-template,$(template))))
 
 

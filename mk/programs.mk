@@ -30,7 +30,7 @@ define build-program =
 
   $$(eval $$(call create-dir,$$($(1)_INSTALL_DIR)))
 
-  install:: $$($(1)_INSTALL_PATH)
+  install: $$($(1)_INSTALL_PATH)
 
   ifeq ($(BUILD_SHARED_LIBS), 1)
 

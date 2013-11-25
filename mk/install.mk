@@ -9,15 +9,47 @@ define create-dir =
 endef
 
 
-# Add a rule for installing file $(2) in directory $(1).  The
-# directory will be created automatically.
-define install-file-in =
+# Add a rule for installing file $(1) as file $(2) with mode $(3).
+# The directory containing $(2) will be created automatically.
+define install-file-as =
 
-  install:: $(1)/$(notdir $(2))
+  install: $(2)
 
-  $$(eval $$(call create-dir,$(1)))
+  $$(eval $$(call create-dir,$$(dir $(2))))
 
-  $(1)/$(notdir $(2)): $(2) | $(1)
-	$(QUIET) install -t $(1) $(2)
+  $(2): $(1) | $$(dir $(2))
+	$(QUIET) install -m $(3) $(1) $(2)
 
 endef
+
+
+# Add a rule for installing file $(1) in directory $(2) with mode
+# $(3).  The directory will be created automatically.
+define install-file-in =
+  $$(eval $$(call install-file-as,$(1),$(2)/$$(notdir $(1)),$(3)))
+endef
+
+
+define install-program-in =
+  $$(eval $$(call install-file-in,$(1),$(2),0755))
+endef
+
+
+define install-data-in =
+  $$(eval $$(call install-file-in,$(1),$(2),0644))
+endef
+
+
+# Install a symlink from $(2) to $(1).  Note that $(1) need not exist.
+define install-symlink =
+
+  install: $(2)
+
+  $$(eval $$(call create-dir,$$(dir $(2))))
+
+  $(2): | $$(dir $(2))
+	ln -sfn $(1) $(2)
+
+endef
+
+

@@ -11,6 +11,7 @@ SUBS = \
   src/nix-daemon/Makefile.new \
   src/nix-log2xml/Makefile.new \
   src/bsdiff-4.3/Makefile.new \
+  scripts/Makefile.new \
   corepkgs/Makefile.new
 
 GLOBAL_CXXFLAGS = -I . -I src -I src/libutil -I src/libstore -I src/libmain -I src/libexpr
