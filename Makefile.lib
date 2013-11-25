@@ -3,9 +3,21 @@ default: all
 
 # Include Autoconf variables.
 Makefile.config: Makefile.config.in
-	./config.status
+	./config.status --file $@
 
 include Makefile.config
+
+
+# Installing stuff.
+define install-file-in =
+
+  install:: $(1)/$(notdir $(2))
+
+  $(1)/$(notdir $(2)): $(2)
+	install -d $(1)
+	install -t $(1) $(2)
+
+endef
 
 
 # Include all sub-Makefiles.
