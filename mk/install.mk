@@ -48,7 +48,7 @@ define install-symlink =
   $$(eval $$(call create-dir,$$(dir $(2))))
 
   $(2): | $$(dir $(2))
-	ln -sfn $(1) $(2)
+	$(QUIET) ln -sfn $(1) $(2)
 
 endef
 
