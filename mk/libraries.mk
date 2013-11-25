@@ -22,17 +22,22 @@ libs_list :=
 # - $(1)_LDFLAGS_PROPAGATED: additional linker flags, also propagated
 #   to the linking of programs/libraries that use this library.
 #
+# - $(1)_FORCE_INSTALL: if defined, the library will be installed even
+#   if it's not needed (i.e. dynamically linked) by a program.
+#
+# - $(1)_INSTALL_DIR: the directory where the library will be
+#   installed.  Defaults to $(libdir).
+#
 # - BUILD_SHARED_LIBS: if equal to ‘1’, a dynamic library will be
 #   built, otherwise a static library.
-#
-# - libdir: the directory where the library will be installed (if
-#   required).
 define build-library =
   $(1)_NAME ?= $(1)
   _d := $$(strip $$($(1)_DIR))
   _srcs := $$(foreach src, $$($(1)_SOURCES), $$(_d)/$$(src))
   $(1)_OBJS := $$(addsuffix .o, $$(basename $$(_srcs)))
   _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_PATH))
+
+  $(1)_INSTALL_DIR ?= $$(libdir)
 
   $(1)_LDFLAGS_USE :=
   $(1)_LDFLAGS_USE_INSTALLED :=
@@ -50,8 +55,6 @@ define build-library =
 
     $(1)_LDFLAGS_USE += -L$$(_d) -Wl,-rpath,$$(abspath $$(_d)) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
 
-    $(1)_INSTALL_DIR := $$(libdir)
-
     $(1)_INSTALL_PATH := $$($(1)_INSTALL_DIR)/$$($(1)_NAME).so
 
     _libs_final := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_INSTALL_PATH))
@@ -62,6 +65,10 @@ define build-library =
 	$(QUIET) $(CXX) -o $$@ -shared $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
 
     $(1)_LDFLAGS_USE_INSTALLED += -L$$($(1)_INSTALL_DIR) -Wl,-rpath,$$($(1)_INSTALL_DIR) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
+
+    ifdef $(1)_FORCE_INSTALL
+      install: $$($(1)_INSTALL_PATH)
+    endif
 
   else
 

@@ -11,6 +11,7 @@ SUBS = \
   src/nix-daemon/Makefile \
   src/nix-log2xml/Makefile \
   src/bsdiff-4.3/Makefile \
+  perl/Makefile \
   scripts/Makefile \
   corepkgs/Makefile
 

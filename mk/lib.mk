@@ -58,4 +58,4 @@ $(foreach script, $(noinst_SCRIPTS), $(eval programs_list += $(script)))
 $(foreach template, $(template_files), $(eval $(call instantiate-template,$(template))))
 
 
-all: $(programs_list)
+all: $(programs_list) $(libs_list)
