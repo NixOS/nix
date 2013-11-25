@@ -1,7 +1,7 @@
 set -e
 
 datadir="@datadir@"
-profiledir="@profiledir@"
+profiledir="@sysconfdir@/profile.d"
 
 export TEST_ROOT=$(pwd)/test-tmp
 export NIX_STORE_DIR
@@ -16,7 +16,7 @@ export NIX_STATE_DIR=$TEST_ROOT/var/nix
 export NIX_DB_DIR=$TEST_ROOT/db
 export NIX_CONF_DIR=$TEST_ROOT/etc
 export NIX_MANIFESTS_DIR=$TEST_ROOT/var/nix/manifests
-export SHARED=$TEST_ROOT/shared
+export _NIX_TEST_SHARED=$TEST_ROOT/shared
 export NIX_REMOTE=$NIX_REMOTE_
 
 export PATH=@bindir@:$PATH
@@ -26,9 +26,9 @@ export dot=@dot@
 export xmllint="@xmllint@"
 export xmlflags="@xmlflags@"
 export xsltproc="@xsltproc@"
-export SHELL="@shell@"
+export SHELL="@bash@"
 
-export version=@version@
+export version=@PACKAGE_VERSION@
 export system=@system@
 
 readLink() {

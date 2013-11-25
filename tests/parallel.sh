@@ -6,7 +6,7 @@ echo "testing nix-build -j..."
 
 clearStore
 
-rm -f $SHARED.cur $SHARED.max
+rm -f $_NIX_TEST_SHARED.cur $_NIX_TEST_SHARED.max
 
 outPath=$(nix-build -j10000 parallel.nix --no-out-link)
 
@@ -15,8 +15,8 @@ echo "output path is $outPath"
 text=$(cat "$outPath")
 if test "$text" != "abacade"; then exit 1; fi
 
-if test "$(cat $SHARED.cur)" != 0; then fail "wrong current process count"; fi
-if test "$(cat $SHARED.max)" != 3; then fail "not enough parallelism"; fi
+if test "$(cat $_NIX_TEST_SHARED.cur)" != 0; then fail "wrong current process count"; fi
+if test "$(cat $_NIX_TEST_SHARED.max)" != 3; then fail "not enough parallelism"; fi
 
 
 # Second, test that parallel invocations of nix-build perform builds
@@ -25,7 +25,7 @@ echo "testing multiple nix-build -j1..."
 
 clearStore
 
-rm -f $SHARED.cur $SHARED.max
+rm -f $_NIX_TEST_SHARED.cur $_NIX_TEST_SHARED.max
 
 drvPath=$(nix-instantiate parallel.nix --argstr sleepTime 15)
 
@@ -52,5 +52,5 @@ wait $pid2 || fail "instance 2 failed: $?"
 wait $pid3 || fail "instance 3 failed: $?"
 wait $pid4 || fail "instance 4 failed: $?"
 
-if test "$(cat $SHARED.cur)" != 0; then fail "wrong current process count"; fi
-if test "$(cat $SHARED.max)" != 3; then fail "not enough parallelism"; fi
+if test "$(cat $_NIX_TEST_SHARED.cur)" != 0; then fail "wrong current process count"; fi
+if test "$(cat $_NIX_TEST_SHARED.max)" != 3; then fail "not enough parallelism"; fi

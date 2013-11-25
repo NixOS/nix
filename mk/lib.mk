@@ -17,6 +17,8 @@ noinst_SCRIPTS :=
 
 
 # Pass -fPIC if we're building dynamic libraries.
+BUILD_SHARED_LIBS = 1
+
 ifeq ($(BUILD_SHARED_LIBS), 1)
   GLOBAL_CFLAGS += -fPIC
   GLOBAL_CXXFLAGS += -fPIC
@@ -25,6 +27,8 @@ endif
 
 
 # Pass -g if we want debug info.
+BUILD_DEBUG = 1
+
 ifeq ($(BUILD_DEBUG), 1)
   GLOBAL_CFLAGS += -g
   GLOBAL_CXXFLAGS += -g
@@ -38,6 +42,7 @@ include mk/libraries.mk
 include mk/programs.mk
 include mk/patterns.mk
 include mk/templates.mk
+include mk/tests.mk
 
 
 # Include all sub-Makefiles.
@@ -56,6 +61,7 @@ $(foreach script, $(bin_SCRIPTS), $(eval $(call install-program-in,$(script),$(b
 $(foreach script, $(bin_SCRIPTS), $(eval programs_list += $(script)))
 $(foreach script, $(noinst_SCRIPTS), $(eval programs_list += $(script)))
 $(foreach template, $(template_files), $(eval $(call instantiate-template,$(template))))
+$(foreach test, $(INSTALL_TESTS), $(eval $(call run-install-test,$(test))))
 
 
 all: $(programs_list) $(libs_list)

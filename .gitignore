@@ -85,10 +85,6 @@ Makefile.config
 
 # /src/nix-log2xml/
 /src/nix-log2xml/nix-log2xml
-/src/nix-log2xml/test*.*
-/src/nix-log2xml/*.log
-/src/nix-log2xml/*.xml
-/src/nix-log2xml/*.html
 
 # /src/nix-store/
 /src/nix-store/nix-store
@@ -98,7 +94,6 @@ Makefile.config
 
 # /tests/
 /tests/test-tmp
-/tests/config.nix
 /tests/common.sh
 /tests/dummy
 /tests/result*
@@ -111,11 +106,7 @@ Makefile.config
 /perl/lib/Nix/Config.pm
 /perl/lib/Nix/Store.cc
 
-.deps
-.libs
 *.a
-*.lo
-*.la
 *.o
 *.so
 *.dep

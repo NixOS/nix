@@ -1,12 +1,14 @@
+with import <nix/config.nix>;
+
 rec {
-  shell = "@shell@";
+  inherit shell;
 
-  path = "@testPath@";
+  path = coreutils;
 
-  system = "@system@";
+  system = builtins.currentSystem;
 
-  shared = "@extra1@";
-    
+  shared = builtins.getEnv "_NIX_TEST_SHARED";
+
   mkDerivation = args:
     derivation ({
       inherit system;

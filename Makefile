@@ -13,7 +13,8 @@ SUBS = \
   src/bsdiff-4.3/Makefile \
   perl/Makefile \
   scripts/Makefile \
-  corepkgs/Makefile
+  corepkgs/Makefile \
+  tests/Makefile
 
 GLOBAL_CXXFLAGS = -I . -I src -I src/libutil -I src/libstore -I src/libmain -I src/libexpr
 

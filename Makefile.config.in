@@ -1,5 +1,4 @@
 BDW_GC_LIBS = @BDW_GC_LIBS@
-BUILD_DEBUG = 1
 CC = @CC@
 CFLAGS = @CFLAGS@
 CXX = @CXX@
@@ -8,6 +7,7 @@ HAVE_OPENSSL = @HAVE_OPENSSL@
 OPENSSL_LIBS = @OPENSSL_LIBS@
 PACKAGE_NAME = @PACKAGE_NAME@
 PACKAGE_VERSION = @PACKAGE_VERSION@
+bash = @bash@
 bindir = @bindir@
 bsddiff_compat_include = @bsddiff_compat_include@
 datadir = @datadir@
