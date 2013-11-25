@@ -4,7 +4,7 @@ define create-dir =
   ifndef $(1)_SEEN
     $(1)_SEEN = 1
     $(1):
-	install -d $(1)
+	$(QUIET) install -d $(1)
   endif
 endef
 
@@ -18,6 +18,6 @@ define install-file-in =
   $$(eval $$(call create-dir,$(1)))
 
   $(1)/$(notdir $(2)): $(2) | $(1)
-	install -t $(1) $(2)
+	$(QUIET) install -t $(1) $(2)
 
 endef
