@@ -13,15 +13,6 @@ Makefile.config
 /NEWS
 /libtool
 
-# /config/
-/config/config.guess
-/config/config.sub
-/config/depcomp
-/config/install-sh
-/config/missing
-/config/mkinstalldirs
-/config/ltmain.sh
-
 /corepkgs/config.nix
 
 # /corepkgs/buildenv/
