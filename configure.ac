@@ -47,17 +47,6 @@ AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier (`cpu-os')])
 test "$localstatedir" = '${prefix}/var' && localstatedir=/nix/var
 
 
-# Windows-specific stuff.  On Cygwin, dynamically linking against the
-# ATerm DLL works, except that it requires the ATerm "lib" directory
-# to be in $PATH, as Windows doesn't have anything like an RPATH
-# embedded in executable.  Since this is kind of annoying, we use
-# static libraries for now.
-if test "$sys_name" = "cygwin"; then
-    AC_DISABLE_SHARED
-    AC_ENABLE_STATIC
-fi
-
-
 # Solaris-specific stuff.
 if test "$sys_name" = sunos; then
     # Solaris requires -lsocket -lnsl for network functions
@@ -79,11 +68,6 @@ if test "$CC_FOR_BUILD" = ""; then
     fi
 fi
 AC_SUBST([CC_FOR_BUILD])
-
-# We are going to use libtool.
-AC_DISABLE_STATIC
-AC_ENABLE_SHARED
-AC_PROG_LIBTOOL
 
 
 # Use 64-bit file system calls so that we can support files > 2 GiB.
