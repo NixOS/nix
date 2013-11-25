@@ -9,12 +9,21 @@ include Makefile.config
 
 
 # Installing stuff.
+define create-dir =
+  ifndef $(1)_SEEN
+    $(1)_SEEN = 1
+    $(1):
+	install -d $(1)
+  endif
+endef
+
 define install-file-in =
 
   install:: $(1)/$(notdir $(2))
 
-  $(1)/$(notdir $(2)): $(2)
-	install -d $(1)
+  $$(eval $$(call create-dir,$(1)))
+
+  $(1)/$(notdir $(2)): $(2) | $(1)
 	install -t $(1) $(2)
 
 endef
@@ -139,7 +148,10 @@ define PROGRAMS_template =
   $$($(1)_PATH): $$($(1)_OBJS) $$(_libs)
 	$(QUIET) $(CXX) -o $$@ $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
 
-  $(1)_INSTALL_PATH := $$(bindir)/$(1)
+  $(1)_INSTALL_DIR := $$(bindir)
+  $(1)_INSTALL_PATH := $$($(1)_INSTALL_DIR)/$(1)
+
+  $$(eval $$(call create-dir,$$($(1)_INSTALL_DIR)))
 
   install:: $$($(1)_INSTALL_PATH)
 
@@ -147,15 +159,13 @@ define PROGRAMS_template =
 
     _libs_final := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_INSTALL_PATH))
 
-    $$($(1)_INSTALL_PATH): $$($(1)_OBJS) $$(_libs_final)
-	install -d $$(dir $$($(1)_INSTALL_PATH))
-	$(QUIET) $(CXX) -o $$($(1)_INSTALL_PATH) $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
+    $$($(1)_INSTALL_PATH): $$($(1)_OBJS) $$(_libs_final) | $$($(1)_INSTALL_DIR)
+	$(QUIET) $(CXX) -o $$@ $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
 
   else
 
-    $$($(1)_INSTALL_PATH): $$($(1)_PATH)
-	install -d $$(dir $$($(1)_INSTALL_PATH))
-	cp $$< $$@
+    $$($(1)_INSTALL_PATH): $$($(1)_PATH) | $$($(1)_INSTALL_DIR)
+	install -t $$($(1)_INSTALL_DIR) $$<
 
   endif
 
