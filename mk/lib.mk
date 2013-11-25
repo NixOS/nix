@@ -2,9 +2,7 @@ default: all
 
 
 # Include Autoconf variables.
-Makefile.config: Makefile.config.in
-	./config.status --file $@
-
+template_files += Makefile.config
 include Makefile.config
 
 
@@ -33,6 +31,7 @@ include mk/install.mk
 include mk/libraries.mk
 include mk/programs.mk
 include mk/patterns.mk
+include mk/templates.mk
 
 
 # Include all sub-Makefiles.
@@ -44,9 +43,10 @@ endef
 $(foreach mf, $(SUBS), $(eval $(call include-sub-makefile, $(mf))))
 
 
-# Instantiate libraries and programs.
+# Instantiate stuff.
 $(foreach lib, $(LIBS), $(eval $(call build-library,$(lib))))
 $(foreach prog, $(PROGRAMS), $(eval $(call build-program,$(prog))))
+$(foreach template, $(template_files), $(eval $(call instantiate-template,$(template))))
 
 
 all: $(programs_list)
