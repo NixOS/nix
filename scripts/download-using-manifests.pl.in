@@ -317,7 +317,7 @@ while (scalar @path > 0) {
         # Apply the patch to the NAR archive produced in step 1 (for
         # the already present path) or a later step (for patch sequences).
         print STDERR "  applying patch...\n";
-        system("$Nix::Config::libexecDir/bspatch $tmpNar $tmpNar2 $patchPath") == 0
+        system("$Nix::Config::libexecDir/nix/bspatch $tmpNar $tmpNar2 $patchPath") == 0
             or die "cannot apply patch `$patchPath' to $tmpNar\n";
 
         if ($curStep < $maxStep) {
