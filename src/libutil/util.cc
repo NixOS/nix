@@ -854,6 +854,18 @@ void killUser(uid_t uid)
             if (setuid(uid) == -1)
                 throw SysError("setting uid");
 
+#if defined(__FreeBSD__)
+            /* In FreeBSD, if the current process is the only
+	       process with current uid, kill(-1, signo) will
+               failed with EPERM
+             */
+	    if ( fork() == 0 ) {
+                while(1) {
+                   sleep(100);
+                }
+  	        exit(0);
+            }
+#endif
             while (true) {
 #ifdef __APPLE__
                 /* OSX's kill syscall takes a third parameter that, among other
