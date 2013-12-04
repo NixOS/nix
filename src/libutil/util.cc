@@ -854,6 +854,14 @@ void killUser(uid_t uid)
             if (setuid(uid) == -1)
                 throw SysError("setting uid");
 
+#if defined(__FreeBSD__)
+	    if ( fork() == 0 ) {
+                while(1) {
+		    sleep(1);
+                }
+	    }
+#endif
+
             while (true) {
 #ifdef __APPLE__
                 /* OSX's kill syscall takes a third parameter that, among other
