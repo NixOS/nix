@@ -582,8 +582,8 @@ static void prim_storePath(EvalState & state, Value * * args, Value & v)
     if (!isInStore(path))
         throw EvalError(format("path `%1%' is not in the Nix store") % path);
     Path path2 = toStorePath(path);
-    if (!store->isValidPath(path2))
-        throw EvalError(format("store path `%1%' is not valid") % path2);
+    if (!settings.readOnlyMode)
+        store->ensurePath(path2);
     context.insert(path2);
     mkString(v, path, context);
 }
