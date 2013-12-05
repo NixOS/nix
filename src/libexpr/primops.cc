@@ -1242,7 +1242,7 @@ void EvalState::createBaseEnv()
        language feature gets added.  It's not necessary to increase it
        when primops get added, because you can just use `builtins ?
        primOp' to check. */
-    mkInt(v, 1);
+    mkInt(v, 2);
     addConstant("__langVersion", v);
 
     // Miscellaneous
