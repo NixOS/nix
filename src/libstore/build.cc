@@ -1623,10 +1623,13 @@ void DerivationGoal::startBuilder()
     startNest(nest, lvlInfo, format(repair ? "repairing path(s) %1%" : "building path(s) %1%") % showPaths(missingPaths));
 
     /* Right platform? */
-    if (!canBuildLocally(drv.platform))
+    if (!canBuildLocally(drv.platform)) {
+        if (settings.printBuildTrace)
+            printMsg(lvlError, format("@ unsupported-platform %1% %2%") % drvPath % drv.platform);
         throw Error(
             format("a `%1%' is required to build `%3%', but I am a `%2%'")
             % drv.platform % settings.thisSystem % drvPath);
+    }
 
     /* Construct the environment passed to the builder. */
 
