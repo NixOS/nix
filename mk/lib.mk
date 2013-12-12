@@ -47,7 +47,7 @@ include mk/tests.mk
 
 # Include all sub-Makefiles.
 define include-sub-makefile =
-  d := $$(patsubst %/, %, $$(dir $(1)))
+  d := $$(patsubst %/,%,$$(dir $(1)))
   include $(1)
 endef
 
