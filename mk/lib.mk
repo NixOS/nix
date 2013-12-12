@@ -65,3 +65,27 @@ $(foreach test, $(INSTALL_TESTS), $(eval $(call run-install-test,$(test))))
 
 
 all: $(programs_list) $(libs_list)
+
+
+help:
+	@echo "The following targets are available:"
+	@echo ""
+	@echo "  default: Build default targets"
+	@echo "  install: Install into \$$(prefix) (currently set to '$(prefix)')"
+	@echo "  clean: Delete generated files"
+	@echo "  dryclean: Show what files would be deleted by 'make clean'"
+ifdef PACKAGE_NAME
+	@echo "  dist: Generate a source distribution"
+endif
+ifdef programs_list
+	@echo ""
+	@echo "The following programs can be built:"
+	@echo ""
+	@for i in $(programs_list); do echo "  $$i"; done
+endif
+ifdef libs_list
+	@echo ""
+	@echo "The following libraries can be built:"
+	@echo ""
+	@for i in $(libs_list); do echo "  $$i"; done
+endif
