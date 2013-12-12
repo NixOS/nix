@@ -89,9 +89,11 @@ define build-library =
   # Propagate CXXFLAGS to the individual object files.
   $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj)_CXXFLAGS=$$($(1)_CXXFLAGS)))
 
-  include $$(wildcard $$(_d)/*.dep)
+  # Include .dep files, if they exist.
+  $(1)_DEPS := $$(addsuffix .dep, $$(basename $$(_srcs)))
+  -include $$($(1)_DEPS)
 
   libs_list += $$($(1)_PATH)
-  clean_files += $$(_d)/*.a $$(_d)/*.so $$(_d)/*.o $$(_d)/*.dep
+  clean_files += $$(_d)/*.a $$(_d)/*.so $$(_d)/*.o $$(_d)/*.dep $$($(1)_DEPS) $$($(1)_OBJS)
   dist_files += $$(_srcs)
 endef
