@@ -1,7 +1,7 @@
 clean_files :=
 
 clean:
-	rm -fv $(clean_files)
+	$(QUIET) rm -fv -- $(clean_files)
 
 dryclean:
-	@echo $(clean_files)
+	@for i in $(clean_files); do if [ -e $$i ]; then echo $$i; fi; done
