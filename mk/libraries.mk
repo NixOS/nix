@@ -6,10 +6,12 @@ libs_list :=
 # - $(1)_NAME: the name of the library (e.g. ‘libfoo’); defaults to
 #   $(1).
 #
-# - $(1)_DIR: the directory containing the sources of the library, and
-#   where the (non-installed) library will be placed.
+# - $(1)_DIR: the directory where the (non-installed) library will be
+#   placed.
 #
 # - $(1)_SOURCES: the source files of the library.
+#
+# - $(1)_CXXFLAGS: additional C++ compiler flags.
 #
 # - $(1)_LIBS: the symbolic names of other libraries on which this
 #   library depends.
@@ -33,7 +35,7 @@ libs_list :=
 define build-library =
   $(1)_NAME ?= $(1)
   _d := $$(strip $$($(1)_DIR))
-  _srcs := $$(foreach src, $$($(1)_SOURCES), $$(_d)/$$(src))
+  _srcs := $$(foreach src, $$($(1)_SOURCES), $$(src))
   $(1)_OBJS := $$(addsuffix .o, $$(basename $$(_srcs)))
   _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_PATH))
 
@@ -88,6 +90,9 @@ define build-library =
 
   # Propagate CXXFLAGS to the individual object files.
   $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj)_CXXFLAGS=$$($(1)_CXXFLAGS)))
+
+  # Make each object file depend on the common dependencies.
+  $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj): $$($(1)_COMMON_DEPS)))
 
   # Include .dep files, if they exist.
   $(1)_DEPS := $$(addsuffix .dep, $$(basename $$(_srcs)))

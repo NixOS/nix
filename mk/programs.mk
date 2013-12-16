@@ -3,8 +3,8 @@ programs_list :=
 # Build a program with symbolic name $(1).  The program is defined by
 # various variables prefixed by ‘$(1)_’:
 #
-# - $(1)_DIR: the directory containing the sources of the program, and
-#   where the (non-installed) program will be placed.
+# - $(1)_DIR: the directory where the (non-installed) program will be
+#   placed.
 #
 # - $(1)_SOURCES: the source files of the program.
 #
@@ -17,7 +17,7 @@ programs_list :=
 #   installed; defaults to $(bindir).
 define build-program =
   _d := $$($(1)_DIR)
-  _srcs := $$(foreach src, $$($(1)_SOURCES), $$(_d)/$$(src))
+  _srcs := $$(foreach src, $$($(1)_SOURCES), $$(src))
   $(1)_OBJS := $$(addsuffix .o, $$(basename $$(_srcs)))
   _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_PATH))
   $(1)_PATH := $$(_d)/$(1)
@@ -49,9 +49,14 @@ define build-program =
   # Propagate CXXFLAGS to the individual object files.
   $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj)_CXXFLAGS=$$($(1)_CXXFLAGS)))
 
-  include $$(wildcard $$(_d)/*.dep)
+  # Make each object file depend on the common dependencies.
+  $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj): $$($(1)_COMMON_DEPS)))
+
+  # Include .dep files, if they exist.
+  $(1)_DEPS := $$(addsuffix .dep, $$(basename $$(_srcs)))
+  -include $$($(1)_DEPS)
 
   programs_list += $$($(1)_PATH)
-  clean_files += $$($(1)_PATH) $$(_d)/*.o $$(_d)/*.dep
+  clean_files += $$($(1)_PATH) $$(_d)/*.o $$(_d)/*.dep $$($(1)_DEPS) $$($(1)_OBJS)
   dist_files += $$(_srcs)
 endef
