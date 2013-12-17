@@ -1,11 +1,6 @@
 default: all
 
 
-# Include Autoconf variables.
-template_files += Makefile.config
-include Makefile.config
-
-
 # Get rid of default suffixes. FIXME: is this a good idea?
 .SUFFIXES:
 
@@ -16,8 +11,18 @@ bin_SCRIPTS :=
 noinst_SCRIPTS :=
 
 
+# Default installation paths.
+prefix ?= /usr/local
+libdir ?= $(prefix)/lib
+bindir ?= $(prefix)/bin
+libexecdir ?= $(prefix)/libexec
+datadir ?= $(prefix)/share
+localstatedir ?= $(prefix)/var
+sysconfdir ?= $(prefix)/etc
+
+
 # Pass -fPIC if we're building dynamic libraries.
-BUILD_SHARED_LIBS = 1
+BUILD_SHARED_LIBS ?= 1
 
 ifeq ($(BUILD_SHARED_LIBS), 1)
   GLOBAL_CFLAGS += -fPIC
@@ -27,7 +32,7 @@ endif
 
 
 # Pass -g if we want debug info.
-BUILD_DEBUG = 1
+BUILD_DEBUG ?= 1
 
 ifeq ($(BUILD_DEBUG), 1)
   GLOBAL_CFLAGS += -g
