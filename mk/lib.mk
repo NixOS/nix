@@ -37,6 +37,7 @@ BUILD_DEBUG ?= 1
 ifeq ($(BUILD_DEBUG), 1)
   GLOBAL_CFLAGS += -g
   GLOBAL_CXXFLAGS += -g
+  GLOBAL_JAVACFLAGS += -g
 endif
 
 
@@ -50,6 +51,7 @@ include mk/dist.mk
 include mk/install.mk
 include mk/libraries.mk
 include mk/programs.mk
+include mk/jars.mk
 include mk/patterns.mk
 include mk/templates.mk
 include mk/tests.mk
@@ -67,6 +69,7 @@ $(foreach mf, $(SUBS), $(eval $(call include-sub-makefile, $(mf))))
 # Instantiate stuff.
 $(foreach lib, $(LIBS), $(eval $(call build-library,$(lib))))
 $(foreach prog, $(PROGRAMS), $(eval $(call build-program,$(prog))))
+$(foreach jar, $(JARS), $(eval $(call build-jar,$(jar))))
 $(foreach script, $(bin_SCRIPTS), $(eval $(call install-program-in,$(script),$(bindir))))
 $(foreach script, $(bin_SCRIPTS), $(eval programs_list += $(script)))
 $(foreach script, $(noinst_SCRIPTS), $(eval programs_list += $(script)))
@@ -74,7 +77,7 @@ $(foreach template, $(template_files), $(eval $(call instantiate-template,$(temp
 $(foreach test, $(INSTALL_TESTS), $(eval $(call run-install-test,$(test))))
 
 
-all: $(programs_list) $(libs_list)
+all: $(programs_list) $(libs_list) $(jars_list)
 
 
 help:
@@ -98,4 +101,10 @@ ifdef libs_list
 	@echo "The following libraries can be built:"
 	@echo ""
 	@for i in $(libs_list); do echo "  $$i"; done
+endif
+ifdef jars_list
+	@echo ""
+	@echo "The following JARs can be built:"
+	@echo ""
+	@for i in $(jars_list); do echo "  $$i"; done
 endif
