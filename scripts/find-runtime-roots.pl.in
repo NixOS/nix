@@ -15,8 +15,6 @@ sub readProc {
 
         my $process = "/proc/$name";
 
-        #print STDERR "=== $process\n";
-
         my $target;
         print "$target\n" if $target = readlink "$process/exe";
         print "$target\n" if $target = readlink "$process/cwd";
@@ -38,11 +36,17 @@ sub readProc {
         }
 
         # Get all store paths that appear in the environment of this process.
+        my $re = "\Q$Nix::Config::storeDir\E\/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*";
         eval {
             my $env = Nix::Utils::readFile "$process/environ";
-            my @matches = $env =~ /\Q$Nix::Config::storeDir\E\/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*/g;
+            my @matches = $env =~ /$re/g;
             print "$_\n" foreach @matches;
-        }
+        };
+        eval {
+            my $cmdline = Nix::Utils::readFile "$process/cmdline";
+            my @matches = $cmdline =~ /$re/g;
+            print "$_\n" foreach @matches;
+        };
     }
 
     closedir DIR;
