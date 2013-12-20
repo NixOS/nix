@@ -233,6 +233,15 @@ static bool isPrebuilt(EvalState & state, DrvInfo & elem)
 }
 
 
+static void checkSelectorUse(DrvNames & selectors)
+{
+    /* Check that all selectors have been used. */
+    foreach (DrvNames::iterator, i, selectors)
+        if (i->hits == 0 && i->fullName != "*")
+            throw Error(format("selector `%1%' matches no derivations") % i->fullName);
+}
+
+
 static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
     const Strings & args, bool newestOnly)
 {
@@ -315,11 +324,7 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
             }
     }
 
-    /* Check that all selectors have been used. */
-    foreach (DrvNames::iterator, i, selectors)
-        if (i->hits == 0 && i->fullName != "*")
-            throw Error(format("selector `%1%' matches no derivations")
-                % i->fullName);
+    checkSelectorUse(selectors);
 
     return elems;
 }
@@ -673,10 +678,13 @@ static void opSetFlag(Globals & globals,
             foreach (DrvNames::iterator, j, selectors)
                 if (j->matches(drvName)) {
                     printMsg(lvlInfo, format("setting flag on `%1%'") % i->name);
+                    j->hits++;
                     setMetaFlag(globals.state, *i, flagName, flagValue);
                     break;
                 }
         }
+
+        checkSelectorUse(selectors);
 
         /* Write the new user environment. */
         if (createUserEnv(globals.state, installedElems,
