@@ -35,8 +35,11 @@ static void sigintHandler(int signo)
 }
 
 
+static bool gcWarning = true;
+
 void printGCWarning()
 {
+    if (!gcWarning) return;
     static bool haveWarned = false;
     warnOnce(haveWarned,
         "you did not specify `--add-root'; "
@@ -212,6 +215,8 @@ static void initAndRun(int argc, char * * argv)
             settings.useBuildHook = false;
         else if (arg == "--show-trace")
             settings.showTrace = true;
+        else if (arg == "--no-gc-warning")
+            gcWarning = false;
         else if (arg == "--option") {
             ++i; if (i == args.end()) throw UsageError("`--option' requires two arguments");
             string name = *i;
