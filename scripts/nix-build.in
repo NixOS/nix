@@ -177,7 +177,7 @@ foreach my $expr (@exprs) {
 
         # Build or fetch all dependencies of the derivation.
         my @inputDrvs = grep { my $x = $_; (grep { $x =~ $_ } @envExclude) == 0 } @{$drv->{inputDrvs}};
-        system("$Nix::Config::binDir/nix-store -r @buildArgs @inputDrvs @{$drv->{inputSrcs}} > /dev/null") == 0
+        system("$Nix::Config::binDir/nix-store", "-r", "--no-output", @buildArgs, @inputDrvs, @{$drv->{inputSrcs}}) == 0
             or die "$0: failed to build all dependencies\n";
 
         # Set the environment.

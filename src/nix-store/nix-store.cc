@@ -35,6 +35,7 @@ void printHelp()
 static Path gcRoot;
 static int rootNr = 0;
 static bool indirectRoot = false;
+static bool noOutput = true;
 
 
 LocalStore & ensureLocalStore()
@@ -139,8 +140,9 @@ static void opRealise(Strings opFlags, Strings opArgs)
     if (!ignoreUnknown)
         foreach (Paths::iterator, i, paths) {
             PathSet paths = realisePath(*i, false);
-            foreach (PathSet::iterator, j, paths)
-                cout << format("%1%\n") % *j;
+            if (!noOutput)
+                foreach (PathSet::iterator, j, paths)
+                    cout << format("%1%\n") % *j;
         }
 }
 
@@ -900,6 +902,8 @@ void run(Strings args)
         }
         else if (arg == "--indirect")
             indirectRoot = true;
+        else if (arg == "--no-output")
+            noOutput = true;
         else if (arg[0] == '-') {
             opFlags.push_back(arg);
             if (arg == "--max-freed" || arg == "--max-links" || arg == "--max-atime") { /* !!! hack */
