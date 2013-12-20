@@ -35,7 +35,7 @@ void printHelp()
 static Path gcRoot;
 static int rootNr = 0;
 static bool indirectRoot = false;
-static bool noOutput = true;
+static bool noOutput = false;
 
 
 LocalStore & ensureLocalStore()
