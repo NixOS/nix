@@ -50,10 +50,19 @@ struct Env;
 struct Value;
 struct EvalState;
 struct StaticEnv;
+struct Expr;
 
 
 /* An attribute path is a sequence of attribute names. */
-typedef vector<Symbol> AttrPath;
+struct AttrName
+{
+    Symbol symbol;
+    Expr *expr;
+    AttrName(const Symbol & s) : symbol(s) {};
+    AttrName(Expr *e) : expr(e) {};
+};
+
+typedef std::vector<AttrName> AttrPath;
 
 string showAttrPath(const AttrPath & attrPath);
 
@@ -138,7 +147,7 @@ struct ExprSelect : Expr
     Expr * e, * def;
     AttrPath attrPath;
     ExprSelect(Expr * e, const AttrPath & attrPath, Expr * def) : e(e), def(def), attrPath(attrPath) { };
-    ExprSelect(Expr * e, const Symbol & name) : e(e), def(0) { attrPath.push_back(name); };
+    ExprSelect(Expr * e, const Symbol & name) : e(e), def(0) { attrPath.push_back(AttrName(name)); };
     COMMON_METHODS
 };
 

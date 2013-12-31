@@ -39,15 +39,6 @@ namespace nix {
             { };
     };
 
-    struct AttrName
-    {
-        Symbol symbol;
-        Expr *expr;
-        AttrName(const Symbol & s) : symbol(s) {};
-        AttrName(Expr *e) : expr(e) {};
-    };
-
-    typedef std::vector<AttrName> AttrNames;
 }
 
 #define YY_DECL int yylex \
@@ -83,32 +74,28 @@ static void dupAttr(const AttrPath & attrPath, const Pos & pos, const Pos & prev
 
 static void dupAttr(Symbol attr, const Pos & pos, const Pos & prevPos)
 {
-    AttrPath attrPath; attrPath.push_back(attr);
     throw ParseError(format("attribute `%1%' at %2% already defined at %3%")
-        % showAttrPath(attrPath) % pos % prevPos);
+        % attr % pos % prevPos);
 }
 
 
-static void addAttr(ExprAttrs * attrs, AttrNames & attrNames,
+static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
     Expr * e, const Pos & pos)
 {
-    AttrPath path;
-    AttrNames::iterator i;
+    AttrPath::iterator i;
     // All attrpaths have at least one attr
-    assert(!attrNames.empty());
-    for (i = attrNames.begin(); i + 1 < attrNames.end(); i++) {
+    assert(!attrPath.empty());
+    for (i = attrPath.begin(); i + 1 < attrPath.end(); i++) {
         if (i->symbol.set()) {
-            path.push_back(i->symbol);
             ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(i->symbol);
             if (j != attrs->attrs.end()) {
                 if (!j->second.inherited) {
                     ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(j->second.e);
-                    if (!attrs2) dupAttr(path, pos, j->second.pos);
+                    if (!attrs2) dupAttr(attrPath, pos, j->second.pos);
                     attrs = attrs2;
                 } else
-                    dupAttr(path, pos, j->second.pos);
+                    dupAttr(attrPath, pos, j->second.pos);
             } else {
-                path.clear();
                 ExprAttrs * nested = new ExprAttrs;
                 attrs->attrs[i->symbol] = ExprAttrs::AttrDef(nested, pos);
                 attrs = nested;
@@ -122,7 +109,7 @@ static void addAttr(ExprAttrs * attrs, AttrNames & attrNames,
     if (i->symbol.set()) {
         ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(i->symbol);
         if (j != attrs->attrs.end()) {
-            dupAttr(path, pos, j->second.pos);
+            dupAttr(attrPath, pos, j->second.pos);
         } else {
             attrs->attrs[i->symbol] = ExprAttrs::AttrDef(e, pos);
             e->setName(i->symbol);
@@ -268,8 +255,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   char * id; // !!! -> Symbol
   char * path;
   char * uri;
-  std::vector<nix::AttrName> * attrpath;
-  std::vector<nix::Symbol> * attrlist;
+  std::vector<nix::AttrName> * attrNames;
   std::vector<nix::Expr *> * string_parts;
 }
 
@@ -279,8 +265,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %type <attrs> binds
 %type <formals> formals
 %type <formal> formal
-%type <attrpath> attrpath
-%type <attrlist> attrs
+%type <attrNames> attrs attrpath
 %type <string_parts> string_parts_interpolated ind_string_parts
 %type <e> string_parts string_attr
 %type <id> attr
@@ -354,39 +339,7 @@ expr_op
   | expr_op OR expr_op { $$ = new ExprOpOr($1, $3); }
   | expr_op IMPL expr_op { $$ = new ExprOpImpl($1, $3); }
   | expr_op UPDATE expr_op { $$ = new ExprOpUpdate($1, $3); }
-  | expr_op '?' attrpath
-    { AttrPath path;
-      vector<AttrName>::iterator i;
-      $$ = $1;
-      // All attrpaths have at least one attr
-      assert(!$3->empty());
-      for (i = $3->begin(); i + 1 != $3->end(); i++) {
-          if (i->symbol.set()) {
-              path.push_back(i->symbol);
-          } else {
-              if (!path.empty()) {
-                  $$ = new ExprSelect($$, path, new ExprAttrs());
-                  path.clear();
-              }
-              $$ = new ExprIf(
-                new ExprOpAnd(
-                  new ExprApp(new ExprBuiltin(data->symbols.create("isAttrs")), $$),
-                  new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("hasAttr")), i->expr), $$)),
-                new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("getAttr")), i->expr), $$),
-                new ExprAttrs());
-          }
-      }
-      if (i->symbol.set()) {
-          path.push_back(i->symbol);
-          $$ = new ExprOpHasAttr($$, path);
-      } else {
-          if (!path.empty())
-              $$ = new ExprSelect($$, path, new ExprAttrs());
-          $$ = new ExprOpAnd(
-            new ExprApp(new ExprBuiltin(data->symbols.create("isAttrs")), $$),
-            new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("hasAttr")), i->expr), $$));
-      }
-    }
+  | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, *$3); }
   | expr_op '+' expr_op
     { vector<Expr *> * l = new vector<Expr *>;
       l->push_back($1);
@@ -408,58 +361,9 @@ expr_app
 
 expr_select
   : expr_simple '.' attrpath
-    { AttrPath path;
-      $$ = $1;
-      foreach (vector<AttrName>::iterator, i, *$3) {
-          if (i->symbol.set()) {
-              path.push_back(i->symbol);
-          } else {
-              if (!path.empty()) {
-                  $$ = new ExprSelect($$, path, 0);
-                  path.clear();
-              }
-              $$ = new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("getAttr")), i->expr), $$);
-          }
-      }
-      if (!path.empty())
-          $$ = new ExprSelect($$, path, 0);
-    }
+    { $$ = new ExprSelect($1, *$3, 0); }
   | expr_simple '.' attrpath OR_KW expr_select
-    { AttrPath path;
-      vector<AttrName>::iterator i;
-      $$ = $1;
-      // All attrpaths have at least one attr
-      assert(!$3->empty());
-      for (i = $3->begin(); i + 1 != $3->end(); i++) {
-          if (i->symbol.set()) {
-              path.push_back(i->symbol);
-          } else {
-              if (!path.empty()) {
-                  $$ = new ExprSelect($$, path, new ExprAttrs());
-                  path.clear();
-              }
-              $$ = new ExprIf(
-                new ExprOpAnd(
-                  new ExprApp(new ExprBuiltin(data->symbols.create("isAttrs")), $$),
-                  new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("hasAttr")), i->expr), $$)),
-                new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("getAttr")), i->expr), $$),
-                new ExprAttrs());
-          }
-      }
-      if (i->symbol.set()) {
-          path.push_back(i->symbol);
-          $$ = new ExprSelect($$, path, $5);
-      } else {
-          if (!path.empty())
-              $$ = new ExprSelect($$, path, new ExprAttrs());
-          $$ = new ExprIf(
-            new ExprOpAnd(
-                new ExprApp(new ExprBuiltin(data->symbols.create("isAttrs")), $$),
-                new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("hasAttr")), i->expr), $$)),
-            new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("getAttr")), i->expr), $$),
-            $5);
-      }
-    }
+    { $$ = new ExprSelect($1, *$3, $5); }
   | /* Backwards compatibility: because Nixpkgs has a rarely used
        function named ‘or’, allow stuff like ‘map or [...]’. */
     expr_simple OR_KW
@@ -542,37 +446,37 @@ binds
   | binds INHERIT attrs ';'
     { $$ = $1;
       foreach (AttrPath::iterator, i, *$3) {
-          if ($$->attrs.find(*i) != $$->attrs.end())
-              dupAttr(*i, makeCurPos(@3, data), $$->attrs[*i].pos);
+          if ($$->attrs.find(i->symbol) != $$->attrs.end())
+              dupAttr(i->symbol, makeCurPos(@3, data), $$->attrs[i->symbol].pos);
           Pos pos = makeCurPos(@3, data);
-          $$->attrs[*i] = ExprAttrs::AttrDef(new ExprVar(CUR_POS, *i), pos, true);
+          $$->attrs[i->symbol] = ExprAttrs::AttrDef(new ExprVar(CUR_POS, i->symbol), pos, true);
       }
     }
   | binds INHERIT '(' expr ')' attrs ';'
     { $$ = $1;
       /* !!! Should ensure sharing of the expression in $4. */
-      foreach (vector<Symbol>::iterator, i, *$6) {
-          if ($$->attrs.find(*i) != $$->attrs.end())
-              dupAttr(*i, makeCurPos(@6, data), $$->attrs[*i].pos);
-          $$->attrs[*i] = ExprAttrs::AttrDef(new ExprSelect($4, *i), makeCurPos(@6, data));
+      foreach (AttrPath::iterator, i, *$6) {
+          if ($$->attrs.find(i->symbol) != $$->attrs.end())
+              dupAttr(i->symbol, makeCurPos(@6, data), $$->attrs[i->symbol].pos);
+          $$->attrs[i->symbol] = ExprAttrs::AttrDef(new ExprSelect($4, i->symbol), makeCurPos(@6, data));
       }
     }
   | { $$ = new ExprAttrs; }
   ;
 
 attrs
-  : attrs attr { $$ = $1; $1->push_back(data->symbols.create($2)); /* !!! dangerous */ }
+  : attrs attr { $$ = $1; $1->push_back(AttrName(data->symbols.create($2))); }
   | attrs string_attr
     { $$ = $1;
       ExprString *str = dynamic_cast<ExprString *>($2);
       if (str) {
-          $$->push_back(str->s);
+          $$->push_back(AttrName(str->s));
           delete str;
       } else
         throw ParseError(format("dynamic attributes not allowed in inherit at %1%")
             % makeCurPos(@2, data));
     }
-  | { $$ = new vector<Symbol>; }
+  | { $$ = new AttrPath; }
   ;
 
 attrpath

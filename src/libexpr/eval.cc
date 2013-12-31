@@ -129,6 +129,18 @@ string showType(const Value & v)
 }
 
 
+Symbol getName(const AttrName & name, EvalState & state, Env & env) {
+    if (name.symbol.set()) {
+        return name.symbol;
+    } else {
+        Value nameValue;
+        name.expr->eval(state, env, nameValue);
+        state.forceStringNoCtx(nameValue);
+        return state.symbols.create(nameValue.string.s);
+    }
+}
+
+
 EvalState::EvalState()
     : sWith(symbols.create("<with>"))
     , sOutPath(symbols.create("outPath"))
@@ -683,17 +695,18 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
         foreach (AttrPath::const_iterator, i, attrPath) {
             nrLookups++;
             Bindings::iterator j;
+            Symbol name = getName(*i, state, env);
             if (def) {
                 state.forceValue(*vAttrs);
                 if (vAttrs->type != tAttrs ||
-                    (j = vAttrs->attrs->find(*i)) == vAttrs->attrs->end())
+                    (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
                 {
                     def->eval(state, env, v);
                     return;
                 }
             } else {
                 state.forceAttrs(*vAttrs);
-                if ((j = vAttrs->attrs->find(*i)) == vAttrs->attrs->end())
+                if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
                     throwEvalError("attribute `%1%' missing", showAttrPath(attrPath));
             }
             vAttrs = j->value;
@@ -724,8 +737,9 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
     foreach (AttrPath::const_iterator, i, attrPath) {
         state.forceValue(*vAttrs);
         Bindings::iterator j;
+        Symbol name = getName(*i, state, env);
         if (vAttrs->type != tAttrs ||
-            (j = vAttrs->attrs->find(*i)) == vAttrs->attrs->end())
+            (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
         {
             mkBool(v, false);
             return;

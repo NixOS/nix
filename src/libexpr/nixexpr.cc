@@ -155,12 +155,19 @@ std::ostream & operator << (std::ostream & str, const Pos & pos)
 
 string showAttrPath(const AttrPath & attrPath)
 {
-    string s;
+    std::ostringstream out;
+    bool first = true;
     foreach (AttrPath::const_iterator, i, attrPath) {
-        if (!s.empty()) s += '.';
-        s += *i;
+        if (!first)
+            out << '.';
+        else
+            first = false;
+        if (i->symbol.set())
+            out << i->symbol;
+        else
+            out << "\"${" << *i->expr << "}\"";
     }
-    return s;
+    return out.str();
 }
 
 
@@ -220,11 +227,17 @@ void ExprSelect::bindVars(const StaticEnv & env)
 {
     e->bindVars(env);
     if (def) def->bindVars(env);
+    foreach (AttrPath::iterator, i, attrPath)
+        if (!i->symbol.set())
+            i->expr->bindVars(env);
 }
 
 void ExprOpHasAttr::bindVars(const StaticEnv & env)
 {
     e->bindVars(env);
+    foreach (AttrPath::iterator, i, attrPath)
+        if (!i->symbol.set())
+            i->expr->bindVars(env);
 }
 
 void ExprAttrs::bindVars(const StaticEnv & env)
