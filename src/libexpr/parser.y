@@ -89,31 +89,47 @@ static void dupAttr(Symbol attr, const Pos & pos, const Pos & prevPos)
 }
 
 
-static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
+static void addAttr(ExprAttrs * attrs, AttrNames & attrNames,
     Expr * e, const Pos & pos)
 {
-    unsigned int n = 0;
-    foreach (AttrPath::const_iterator, i, attrPath) {
-        n++;
-        ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(*i);
-        if (j != attrs->attrs.end()) {
-            if (!j->second.inherited) {
-                ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(j->second.e);
-                if (!attrs2 || n == attrPath.size()) dupAttr(attrPath, pos, j->second.pos);
-                attrs = attrs2;
-            } else
-                dupAttr(attrPath, pos, j->second.pos);
-        } else {
-            if (n == attrPath.size())
-                attrs->attrs[*i] = ExprAttrs::AttrDef(e, pos);
-            else {
+    AttrPath path;
+    AttrNames::iterator i;
+    // All attrpaths have at least one attr
+    assert(!attrNames.empty());
+    for (i = attrNames.begin(); i + 1 < attrNames.end(); i++) {
+        if (i->symbol.set()) {
+            path.push_back(i->symbol);
+            ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(i->symbol);
+            if (j != attrs->attrs.end()) {
+                if (!j->second.inherited) {
+                    ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(j->second.e);
+                    if (!attrs2) dupAttr(path, pos, j->second.pos);
+                    attrs = attrs2;
+                } else
+                    dupAttr(path, pos, j->second.pos);
+            } else {
+                path.clear();
                 ExprAttrs * nested = new ExprAttrs;
-                attrs->attrs[*i] = ExprAttrs::AttrDef(nested, pos);
+                attrs->attrs[i->symbol] = ExprAttrs::AttrDef(nested, pos);
                 attrs = nested;
             }
+        } else {
+            ExprAttrs *nested = new ExprAttrs;
+            attrs->dynamicAttrs.push_back(ExprAttrs::DynamicAttrDef(i->expr, nested, pos));
+            attrs = nested;
         }
     }
-    e->setName(attrPath.back());
+    if (i->symbol.set()) {
+        ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(i->symbol);
+        if (j != attrs->attrs.end()) {
+            dupAttr(path, pos, j->second.pos);
+        } else {
+            attrs->attrs[i->symbol] = ExprAttrs::AttrDef(e, pos);
+            e->setName(i->symbol);
+        }
+    } else {
+        attrs->dynamicAttrs.push_back(ExprAttrs::DynamicAttrDef(i->expr, e, pos));
+    }
 }
 
 
@@ -522,43 +538,7 @@ ind_string_parts
   ;
 
 binds
-  : binds attrpath '=' expr ';'
-    {
-        ExprAttrs *curAttrs = $1;
-        AttrPath path;
-        vector<AttrName>::iterator i;
-        // All attrpaths have at least one attr
-        assert(!$2->empty());
-        for (i = $2->begin(); i + 1 < $2->end(); i++) {
-          if (i->symbol.set()) {
-            path.push_back(i->symbol);
-          } else {
-            ExprAttrs *temp;
-            if (!path.empty()) {
-              temp = curAttrs;
-              curAttrs = new ExprAttrs;
-              addAttr(temp, path, curAttrs, makeCurPos(@2, data));
-            }
-            path.clear();
-
-            temp = curAttrs;
-            curAttrs = new ExprAttrs;
-            temp->dynamicAttrs.push_back(ExprAttrs::DynamicAttrDef(i->expr, curAttrs, makeCurPos(@2, data)));
-          }
-        }
-        if (i->symbol.set()) {
-          path.push_back(i->symbol);
-          addAttr(curAttrs, path, $4, makeCurPos(@2, data));
-        } else {
-          if (!path.empty()) {
-            ExprAttrs *temp = curAttrs;
-            curAttrs = new ExprAttrs;
-            addAttr(temp, path, curAttrs, makeCurPos(@2, data));
-          }
-          curAttrs->dynamicAttrs.push_back(ExprAttrs::DynamicAttrDef(i->expr, $4, makeCurPos(@2, data)));
-        }
-        $$ = $1;
-    }
+  : binds attrpath '=' expr ';' { $$ = $1; addAttr($$, *$2, $4, makeCurPos(@2, data)); }
   | binds INHERIT attrs ';'
     { $$ = $1;
       foreach (AttrPath::iterator, i, *$3) {
