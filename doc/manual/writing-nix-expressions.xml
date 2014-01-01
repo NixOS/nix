@@ -778,6 +778,13 @@ stdenv.mkDerivation {
   <filename>../xyzzy/fnord.nix</filename>, the absolute path is
   <filename>/foo/xyzzy/fnord.nix</filename>.</para></listitem>
 
+  <listitem><para><emphasis>Paths enclosed in angle brackets found in
+  search paths</emphasis>, e.g., <literal>&lt;nixpkgs/default.nix></literal>.
+  Nix would search for path <literal>nixpkgs/default.nix</literal> relative
+  to an ordered list of paths passed to Nix via environement variable
+  <envar>NIX_PATH</envar> or command line option <option>-I</option>.
+  </para></listitem>
+
   <listitem><para><emphasis>Booleans</emphasis> with values
   <literal>true</literal> and
   <literal>false</literal>.</para></listitem>
