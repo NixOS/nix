@@ -764,6 +764,8 @@ stdenv.mkDerivation {
   <listitem><para><emphasis>Integers</emphasis>, e.g.,
   <literal>123</literal>.</para></listitem>
 
+  <listitem><para>A <literal>null</literal>.</para></listitem>
+
   <listitem><para><emphasis>Paths</emphasis>, e.g.,
   <filename>/bin/sh</filename> or <filename>./builder.sh</filename>.
   A path must contain at least one slash to be recognised as such; for
