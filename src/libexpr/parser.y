@@ -509,7 +509,7 @@ attr
 
 string_attr
   : '"' string_parts '"' { $$ = $2; }
-  | DOLLAR_CURLY expr '}' { $$ = $2; }
+  | DOLLAR_CURLY expr '}' { $$ = new ExprConcatStrings(true, new vector<Expr*>(1, $2)); }
   ;
 
 expr_list
