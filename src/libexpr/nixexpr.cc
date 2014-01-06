@@ -61,6 +61,8 @@ void ExprAttrs::show(std::ostream & str)
             str << "inherit " << i->first << " " << "; ";
         else
             str << i->first << " = " << *i->second.e << "; ";
+    foreach (DynamicAttrDefs::iterator, i, dynamicAttrs)
+        str << "\"${" << *i->nameExpr << "}\" = " << *i->valueExpr << "; ";
     str << "}";
 }
 
@@ -119,6 +121,11 @@ void ExprAssert::show(std::ostream & str)
 void ExprOpNot::show(std::ostream & str)
 {
     str << "! " << *e;
+}
+
+void ExprBuiltin::show(std::ostream & str)
+{
+    str << "builtins." << name;
 }
 
 void ExprConcatStrings::show(std::ostream & str)
@@ -222,8 +229,10 @@ void ExprOpHasAttr::bindVars(const StaticEnv & env)
 
 void ExprAttrs::bindVars(const StaticEnv & env)
 {
+    const StaticEnv *dynamicEnv = &env;
     if (recursive) {
         StaticEnv newEnv(false, &env);
+        dynamicEnv = &newEnv;
 
         unsigned int displ = 0;
         foreach (AttrDefs::iterator, i, attrs)
@@ -236,6 +245,11 @@ void ExprAttrs::bindVars(const StaticEnv & env)
     else
         foreach (AttrDefs::iterator, i, attrs)
             i->second.e->bindVars(env);
+
+    foreach (DynamicAttrDefs::iterator, i, dynamicAttrs) {
+        i->nameExpr->bindVars(*dynamicEnv);
+        i->valueExpr->bindVars(*dynamicEnv);
+    }
 }
 
 void ExprList::bindVars(const StaticEnv & env)
@@ -312,6 +326,10 @@ void ExprAssert::bindVars(const StaticEnv & env)
 void ExprOpNot::bindVars(const StaticEnv & env)
 {
     e->bindVars(env);
+}
+
+void ExprBuiltin::bindVars(const StaticEnv & env)
+{
 }
 
 void ExprConcatStrings::bindVars(const StaticEnv & env)
