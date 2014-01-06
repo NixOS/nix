@@ -509,6 +509,7 @@ attr
 
 string_attr
   : '"' string_parts '"' { $$ = $2; }
+  | DOLLAR_CURLY expr '}' { $$ = $2; }
   ;
 
 expr_list
