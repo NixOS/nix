@@ -175,8 +175,6 @@ foreach my $expr (@exprs) {
         $drvPath = readlink $drvPath or die "cannot read symlink `$drvPath'" if -l $drvPath;
         my $drv = derivationFromPath($drvPath);
 
-        $ENV{'IN_NIX_SHELL'} = 1;
-
         # Build or fetch all dependencies of the derivation.
         my @inputDrvs = grep { my $x = $_; (grep { $x =~ $_ } @envExclude) == 0 } @{$drv->{inputDrvs}};
         system("$Nix::Config::binDir/nix-store", "-r", "--no-output", "--no-gc-warning", @buildArgs, @inputDrvs, @{$drv->{inputSrcs}}) == 0
@@ -194,6 +192,8 @@ foreach my $expr (@exprs) {
         $ENV{'NIX_BUILD_TOP'} = $ENV{'TMPDIR'} = $ENV{'TEMPDIR'} = $ENV{'TMP'} = $ENV{'TEMP'} = $ENV{'TMPDIR'} // "/tmp";
         $ENV{'NIX_STORE'} = $Nix::Config::storeDir;
         $ENV{$_} = $drv->{env}->{$_} foreach keys %{$drv->{env}};
+
+        $ENV{'IN_NIX_SHELL'} = 1;
 
         # Run a shell using the derivation's environment.  For
         # convenience, source $stdenv/setup to setup additional
