@@ -40,6 +40,14 @@ nix-store --check-validity $outPath
 nix-store -qR $outPath | grep input-2
 
 
+# Test whether this unsigned cache is rejected if the user requires signed caches.
+clearStore
+
+rm -f $NIX_STATE_DIR/binary-cache*
+
+nix-store --option binary-caches "file://$cacheDir" --option signed-binary-caches 1 -r $outPath
+
+
 # Test whether fallback works if we have cached info but the
 # corresponding NAR has disappeared.
 clearStore

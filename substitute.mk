@@ -35,6 +35,7 @@
 	 -e "s^@version\@^$(VERSION)^g" \
 	 -e "s^@perlbindings\@^$(perlbindings)^g" \
 	 -e "s^@testPath\@^$(coreutils):$$(dirname $$(type -p expr))^g" \
+	 -e "s^@openssl\@^$(openssl_prog)^g" \
 	 < $< > $@ || rm $@
 	if test -x $<; then chmod +x $@; fi
 
