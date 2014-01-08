@@ -2749,6 +2749,7 @@ void SubstitutionGoal::finished()
     logPipe.readSide.close();
 
     /* Get the hash info from stdout. */
+    string dummy = readLine(outPipe.readSide);
     string expectedHashStr = statusOk(status) ? readLine(outPipe.readSide) : "";
     outPipe.readSide.close();
 
