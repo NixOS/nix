@@ -59,7 +59,10 @@ clearStore
 
 rm -f $NIX_STATE_DIR/binary-cache*
 
-nix-store --option binary-caches "file://$cacheDir" --option signed-binary-caches 1 -r $outPath
+if nix-store --option binary-caches "file://$cacheDir" --option signed-binary-caches '*' -r $outPath; then
+    echo "unsigned binary cache incorrectly accepted"
+    exit 1
+fi
 
 
 # Test whether fallback works if we have cached info but the
