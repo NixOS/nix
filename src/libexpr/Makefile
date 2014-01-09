@@ -4,10 +4,7 @@ libexpr_NAME = libnixexpr
 
 libexpr_DIR := $(d)
 
-libexpr_SOURCES = \
-  nixexpr.cc eval.cc primops.cc lexer-tab.cc parser-tab.cc \
-  get-drvs.cc attr-path.cc value-to-xml.cc value-to-json.cc \
-  common-opts.cc names.cc
+libexpr_SOURCES := $(wildcard $(d)/*.cc) $(d)/lexer-tab.cc $(d)/parser-tab.cc
 
 libexpr_LIBS = libutil libstore libformat
 

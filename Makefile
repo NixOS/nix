@@ -14,8 +14,10 @@ SUBS = \
   perl/Makefile \
   scripts/Makefile \
   corepkgs/Makefile \
-  tests/Makefile
+  tests/Makefile \
 
 GLOBAL_CXXFLAGS = -I . -I src -I src/libutil -I src/libstore -I src/libmain -I src/libexpr
+
+include Makefile.config
 
 include mk/lib.mk

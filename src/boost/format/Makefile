@@ -4,4 +4,4 @@ libformat_NAME = libnixformat
 
 libformat_DIR := $(d)
 
-libformat_SOURCES = format_implementation.cc free_funcs.cc parsing.cc
+libformat_SOURCES := $(wildcard $(d)/*.cc)

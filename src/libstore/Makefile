@@ -4,9 +4,7 @@ libstore_NAME = libnixstore
 
 libstore_DIR := $(d)
 
-libstore_SOURCES = \
-  store-api.cc local-store.cc remote-store.cc derivations.cc build.cc misc.cc \
-  globals.cc references.cc pathlocks.cc gc.cc optimise-store.cc
+libstore_SOURCES := $(wildcard $(d)/*.cc)
 
 libstore_LIBS = libutil libformat
 

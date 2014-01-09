@@ -20,7 +20,7 @@ ifeq ($(perlbindings), yes)
 
   Store_DIR := $(d)/lib/Nix
 
-  Store_SOURCES = Store.cc
+  Store_SOURCES := $(Store_DIR)/Store.cc
 
   Store_LIBS = libstore
 
