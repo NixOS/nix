@@ -17,7 +17,7 @@ programs_list :=
 #   installed; defaults to $(bindir).
 define build-program =
   _d := $$($(1)_DIR)
-  _srcs := $$(foreach src, $$($(1)_SOURCES), $$(src))
+  _srcs := $$(sort $$(foreach src, $$($(1)_SOURCES), $$(src)))
   $(1)_OBJS := $$(addsuffix .o, $$(basename $$(_srcs)))
   _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_PATH))
   $(1)_PATH := $$(_d)/$(1)

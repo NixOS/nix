@@ -35,7 +35,7 @@ libs_list :=
 define build-library =
   $(1)_NAME ?= $(1)
   _d := $$(strip $$($(1)_DIR))
-  _srcs := $$(foreach src, $$($(1)_SOURCES), $$(src))
+  _srcs := $$(sort $$(foreach src, $$($(1)_SOURCES), $$(src)))
   $(1)_OBJS := $$(addsuffix .o, $$(basename $$(_srcs)))
   _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_PATH))
 
