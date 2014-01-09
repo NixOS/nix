@@ -19,3 +19,8 @@ libstore_CXXFLAGS = \
  -DNIX_LIBEXEC_DIR=\"$(libexecdir)\" \
  -DNIX_BIN_DIR=\"$(bindir)\" \
  -DPACKAGE_VERSION=\"$(PACKAGE_VERSION)\"
+
+$(d)/local-store.cc: $(d)/schema.sql.hh
+
+%.sql.hh: %.sql
+	sed -e 's/"/\\"/g' -e 's/\(.*\)/"\1\\n"/' < $< > $@ || (rm $@ && exit 1)
