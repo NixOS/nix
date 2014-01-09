@@ -9,6 +9,7 @@ default: all
 QUIET = @
 bin_SCRIPTS :=
 noinst_SCRIPTS :=
+OS = $(shell uname -s)
 
 
 # Default installation paths.
@@ -27,7 +28,9 @@ BUILD_SHARED_LIBS ?= 1
 ifeq ($(BUILD_SHARED_LIBS), 1)
   GLOBAL_CFLAGS += -fPIC
   GLOBAL_CXXFLAGS += -fPIC
-  GLOBAL_LDFLAGS += -Wl,--no-copy-dt-needed-entries
+  ifneq ($(OS), Darwin)
+    GLOBAL_LDFLAGS += -Wl,--no-copy-dt-needed-entries
+  endif
 endif
 
 

@@ -1,5 +1,11 @@
 libs_list :=
 
+ifeq ($(OS), Darwin)
+  SO_EXT = dylib
+else
+  SO_EXT = so
+endif
+
 # Build a library with symbolic name $(1).  The library is defined by
 # various variables prefixed by ‘$(1)_’:
 #
@@ -46,18 +52,24 @@ define build-library =
 
   ifeq ($(BUILD_SHARED_LIBS), 1)
 
-    ifndef $(1)_ALLOW_UNDEFINED
-      $(1)_LDFLAGS += -z defs
+    ifdef $(1)_ALLOW_UNDEFINED
+      ifeq ($(OS), Darwin)
+        $(1)_LDFLAGS += -undefined suppress -flat_namespace
+      endif
+    else
+      ifneq ($(OS), Darwin)
+        $(1)_LDFLAGS += -z defs
+      endif
     endif
 
-    $(1)_PATH := $$(_d)/$$($(1)_NAME).so
+    $(1)_PATH := $$(_d)/$$($(1)_NAME).$(SO_EXT)
 
     $$($(1)_PATH): $$($(1)_OBJS) $$(_libs)
 	$(QUIET) $(CXX) -o $$@ -shared $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
 
     $(1)_LDFLAGS_USE += -L$$(_d) -Wl,-rpath,$$(abspath $$(_d)) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
 
-    $(1)_INSTALL_PATH := $$($(1)_INSTALL_DIR)/$$($(1)_NAME).so
+    $(1)_INSTALL_PATH := $$($(1)_INSTALL_DIR)/$$($(1)_NAME).$(SO_EXT)
 
     _libs_final := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_INSTALL_PATH))
 
@@ -99,6 +111,6 @@ define build-library =
   -include $$($(1)_DEPS)
 
   libs_list += $$($(1)_PATH)
-  clean_files += $$(_d)/*.a $$(_d)/*.so $$(_d)/*.o $$(_d)/*.dep $$($(1)_DEPS) $$($(1)_OBJS)
+  clean_files += $$(_d)/*.a $$(_d)/*.$(SO_EXT) $$(_d)/*.o $$(_d)/*.dep $$($(1)_DEPS) $$($(1)_OBJS)
   dist_files += $$(_srcs)
 endef
