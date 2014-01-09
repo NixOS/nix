@@ -1,4 +1,4 @@
-AC_INIT(nix, m4_esyscmd([echo -n $(cat ./version)$VERSION_SUFFIX]))
+AC_INIT(nix, m4_esyscmd([bash -c "echo -n $(cat ./version)$VERSION_SUFFIX"]))
 AC_CONFIG_SRCDIR(README)
 AC_CONFIG_AUX_DIR(config)
 
