@@ -23,7 +23,7 @@ define build-program =
   $(1)_PATH := $$(_d)/$(1)
 
   $$($(1)_PATH): $$($(1)_OBJS) $$(_libs)
-	$(QUIET) $(CXX) -o $$@ $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
+	$$(trace-ld) $(CXX) -o $$@ $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
 
   $(1)_INSTALL_DIR ?= $$(bindir)
   $(1)_INSTALL_PATH := $$($(1)_INSTALL_DIR)/$(1)
@@ -37,7 +37,7 @@ define build-program =
     _libs_final := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_INSTALL_PATH))
 
     $$($(1)_INSTALL_PATH): $$($(1)_OBJS) $$(_libs_final) | $$($(1)_INSTALL_DIR)
-	$(QUIET) $(CXX) -o $$@ $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
+	$$(trace-ld) $(CXX) -o $$@ $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
 
   else
 

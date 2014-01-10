@@ -10,8 +10,8 @@ define build-jar =
   $$($(1)_PATH): $$($(1)_SOURCES)
 	@rm -rf $$($(1)_TMPDIR)
 	@mkdir -p $$($(1)_TMPDIR)
-	$(QUIET) javac $(GLOBAL_JAVACFLAGS) $$($(1)_JAVACFLAGS) -d $$($(1)_TMPDIR) $$($(1)_SOURCES)
-	$(QUIET) jar cf $$($(1)_PATH) -C $$($(1)_TMPDIR) .
+	$$(trace-javac) javac $(GLOBAL_JAVACFLAGS) $$($(1)_JAVACFLAGS) -d $$($(1)_TMPDIR) $$($(1)_SOURCES)
+	$$(trace-jar) jar cf $$($(1)_PATH) -C $$($(1)_TMPDIR) .
 	@rm -rf $$($(1)_TMPDIR)
 
   $(1)_INSTALL_DIR ?= $$(libdir)/java

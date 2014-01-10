@@ -65,7 +65,7 @@ define build-library =
     $(1)_PATH := $$(_d)/$$($(1)_NAME).$(SO_EXT)
 
     $$($(1)_PATH): $$($(1)_OBJS) $$(_libs)
-	$(QUIET) $(CXX) -o $$@ -shared $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
+	$$(trace-ld) $(CXX) -o $$@ -shared $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
 
     $(1)_LDFLAGS_USE += -L$$(_d) -Wl,-rpath,$$(abspath $$(_d)) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
 
@@ -76,7 +76,7 @@ define build-library =
     $$(eval $$(call create-dir,$$($(1)_INSTALL_DIR)))
 
     $$($(1)_INSTALL_PATH): $$($(1)_OBJS) $$(_libs_final) | $$($(1)_INSTALL_DIR)
-	$(QUIET) $(CXX) -o $$@ -shared $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
+	$$(trace-ld) $(CXX) -o $$@ -shared $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
 
     $(1)_LDFLAGS_USE_INSTALLED += -L$$($(1)_INSTALL_DIR) -Wl,-rpath,$$($(1)_INSTALL_DIR) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
 
@@ -89,7 +89,7 @@ define build-library =
     $(1)_PATH := $$(_d)/$$($(1)_NAME).a
 
     $$($(1)_PATH): $$($(1)_OBJS)
-	$(QUIET) ar crs $$@ $$?
+	$(trace-ar) ar crs $$@ $$?
 
     $(1)_LDFLAGS_USE += $$($(1)_PATH) $$($(1)_LDFLAGS)
 

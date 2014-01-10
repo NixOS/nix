@@ -9,4 +9,4 @@ define instantiate-template =
 endef
 
 %: %.in
-	$(QUIET) ./config.status --quiet --file $@
+	$(trace-gen) ./config.status --quiet --file $@

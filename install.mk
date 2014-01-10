@@ -4,7 +4,7 @@ define create-dir =
   ifndef $(1)_SEEN
     $(1)_SEEN = 1
     $(1):
-	$(QUIET) install -d $(1)
+	$$(trace-install) install -d $(1)
   endif
 endef
 
@@ -18,7 +18,7 @@ define install-file-as =
   $$(eval $$(call create-dir,$$(dir $(2))))
 
   $(2): $(1) | $$(dir $(2))
-	$(QUIET) install -m $(3) $(1) $(2)
+	$$(trace-install) install -m $(3) $(1) $(2)
 
 endef
 
@@ -48,6 +48,6 @@ define install-symlink =
   $$(eval $$(call create-dir,$$(dir $(2))))
 
   $(2): | $$(dir $(2))
-	$(QUIET) ln -sfn $(1) $(2)
+	$$(trace-install) ln -sfn $(1) $(2)
 
 endef

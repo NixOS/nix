@@ -6,7 +6,6 @@ default: all
 
 
 # Initialise some variables.
-QUIET = @
 bin_SCRIPTS :=
 noinst_SCRIPTS :=
 OS = $(shell uname -s)
@@ -49,6 +48,7 @@ endif
 rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst *,%,$2),$d))
 
 
+include mk/tracing.mk
 include mk/clean.mk
 include mk/dist.mk
 include mk/install.mk
