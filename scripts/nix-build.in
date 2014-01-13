@@ -152,6 +152,8 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
 
 @exprs = ("./default.nix") if scalar @exprs == 0;
 
+$ENV{'IN_NIX_SHELL'} = 1 if $runEnv;
+
 
 foreach my $expr (@exprs) {
 
@@ -192,8 +194,6 @@ foreach my $expr (@exprs) {
         $ENV{'NIX_BUILD_TOP'} = $ENV{'TMPDIR'} = $ENV{'TEMPDIR'} = $ENV{'TMP'} = $ENV{'TEMP'} = $ENV{'TMPDIR'} // "/tmp";
         $ENV{'NIX_STORE'} = $Nix::Config::storeDir;
         $ENV{$_} = $drv->{env}->{$_} foreach keys %{$drv->{env}};
-
-        $ENV{'IN_NIX_SHELL'} = 1;
 
         # Run a shell using the derivation's environment.  For
         # convenience, source $stdenv/setup to setup additional
