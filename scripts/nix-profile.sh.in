@@ -8,10 +8,15 @@ if test -n "$HOME"; then
         @coreutils@/ln -s "$_NIX_DEF_LINK" "$NIX_LINK"
     fi
 
+    export PATH=$NIX_LINK/bin:$PATH
+
     # Subscribe the root user to the Nixpkgs channel by default.
     if [ ! -e $HOME/.nix-channels ]; then
         echo "http://nixos.org/channels/nixpkgs-unstable nixpkgs" > $HOME/.nix-channels
     fi
 
-    export PATH=$NIX_LINK/bin:$PATH
+    # Append ~/.nix-defexpr/channels/nixpkgs to $NIX_PATH so that
+    # <nixpkgs> paths work when the user has fetched the Nixpkgs
+    # channel.
+    export NIX_PATH=${NIX_PATH:+$NIX_PATH:}nixpkgs=$HOME/.nix-defexpr/channels/nixpkgs
 fi
