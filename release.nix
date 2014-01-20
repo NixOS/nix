@@ -175,6 +175,8 @@ let
     rpm_fedora18x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora18x86_64) 60;
     rpm_fedora19i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora19i386) 70;
     rpm_fedora19x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora19x86_64) 70;
+    rpm_fedora20i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora20i386) 70;
+    rpm_fedora20x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora20x86_64) 70;
 
 
     deb_debian60i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian60i386) 50;
@@ -230,6 +232,8 @@ let
           deb_ubuntu1310x86_64
           rpm_fedora19i386
           rpm_fedora19x86_64
+          rpm_fedora20i386
+          rpm_fedora20x86_64
           tests.remote_builds
           tests.nix_copy_closure
         ];
