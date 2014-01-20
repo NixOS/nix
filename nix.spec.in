@@ -152,10 +152,6 @@ cp -p misc/emacs/nix-mode.elc $RPM_BUILD_ROOT%{_emacs_sitelispdir}/
 rm $RPM_BUILD_ROOT%{_defaultdocdir}/%{name}-doc-%{version}/README
 
 
-%check
-make check
-
-
 %clean
 rm -rf $RPM_BUILD_ROOT
 
