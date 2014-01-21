@@ -8,6 +8,7 @@ use File::stat;
 use File::Path;
 use Fcntl ':flock';
 use Nix::Config;
+use Nix::Crypto;
 
 our @ISA = qw(Exporter);
 our @EXPORT = qw(readManifest writeManifest updateManifestDB addPatch deleteOldManifests parseNARInfo);
@@ -394,9 +395,10 @@ sub deleteOldManifests {
 
 # Parse a NAR info file.
 sub parseNARInfo {
-    my ($storePath, $content) = @_;
+    my ($storePath, $content, $requireValidSig, $location) = @_;
 
-    my ($storePath2, $url, $fileHash, $fileSize, $narHash, $narSize, $deriver, $system);
+    my ($storePath2, $url, $fileHash, $fileSize, $narHash, $narSize, $deriver, $system, $sig);
+    my $signedData = "";
     my $compression = "bzip2";
     my @refs;
 
@@ -412,11 +414,13 @@ sub parseNARInfo {
         elsif ($1 eq "References") { @refs = split / /, $2; }
         elsif ($1 eq "Deriver") { $deriver = $2; }
         elsif ($1 eq "System") { $system = $2; }
+        elsif ($1 eq "Signature") { $sig = $2; last; }
+        $signedData .= "$line\n";
     }
 
     return undef if $storePath ne $storePath2 || !defined $url || !defined $narHash;
 
-    return
+    my $res =
         { url => $url
         , compression => $compression
         , fileHash => $fileHash
@@ -427,6 +431,36 @@ sub parseNARInfo {
         , deriver => $deriver
         , system => $system
         };
+
+    if ($requireValidSig) {
+        if (!defined $sig) {
+            warn "NAR info file `$location' lacks a signature; ignoring\n";
+            return undef;
+        }
+        my ($sigVersion, $keyName, $sig64) = split ";", $sig;
+        $sigVersion //= 0;
+        if ($sigVersion != 1) {
+            warn "NAR info file `$location' has unsupported version $sigVersion; ignoring\n";
+            return undef;
+        }
+        return undef unless defined $keyName && defined $sig64;
+        my $publicKeyFile = $Nix::Config::config{"binary-cache-public-key-$keyName"};
+        if (!defined $publicKeyFile) {
+            warn "NAR info file `$location' is signed by unknown key `$keyName'; ignoring\n";
+            return undef;
+        }
+        if (! -f $publicKeyFile) {
+            die "binary cache public key file `$publicKeyFile' does not exist\n";
+            return undef;
+        }
+        if (!isValidSignature($publicKeyFile, $sig64, $signedData)) {
+            warn "NAR info file `$location' has an invalid signature; ignoring\n";
+            return undef;
+        }
+        $res->{signedBy} = $keyName;
+    }
+
+    return $res;
 }
 
 

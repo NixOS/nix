@@ -20,6 +20,8 @@ void doInit()
     if (!store) {
         try {
             settings.processEnvironment();
+            settings.loadConfFile();
+            settings.update();
             settings.lockCPU = false;
             store = openStore();
         } catch (Error & e) {

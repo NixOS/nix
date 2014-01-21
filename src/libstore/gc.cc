@@ -734,6 +734,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     /* Allow other processes to add to the store from here on. */
     fdGCLock.close();
+    fds.clear();
 
     /* Delete the trash directory. */
     printMsg(lvlInfo, format("deleting `%1%'") % state.trashDir);

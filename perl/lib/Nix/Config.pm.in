@@ -13,6 +13,7 @@ $storeDir = $ENV{"NIX_STORE_DIR"} || "@storedir@";
 $bzip2 = "@bzip2@";
 $xz = "@xz@";
 $curl = "@curl@";
+$openssl = "@openssl@";
 
 $useBindings = "@perlbindings@" eq "yes";
 
@@ -32,7 +33,7 @@ sub readConfig {
 
     open CONFIG, "<$config" or die "cannot open `$config'";
     while (<CONFIG>) {
-        /^\s*([\w|-]+)\s*=\s*(.*)$/ or next;
+        /^\s*([\w\-\.]+)\s*=\s*(.*)$/ or next;
         $config{$1} = $2;
     }
     close CONFIG;

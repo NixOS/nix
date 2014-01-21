@@ -782,6 +782,9 @@ stdenv.mkDerivation {
   <literal>true</literal> and
   <literal>false</literal>.</para></listitem>
 
+  <listitem><para>The null value, denoted as
+  <literal>null</literal>.</para></listitem>
+
 </itemizedlist>
 
 </para>

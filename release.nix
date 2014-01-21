@@ -6,7 +6,7 @@ let
 
   pkgs = import <nixpkgs> {};
 
-  systems = [ "x86_64-linux" "i686-linux" "x86_64-darwin" "x86_64-freebsd" "i686-freebsd" ];
+  systems = [ "x86_64-linux" "i686-linux" "x86_64-darwin" /* "x86_64-freebsd" "i686-freebsd" */ ];
 
 
   jobs = rec {
@@ -23,7 +23,7 @@ let
         inherit officialRelease;
 
         buildInputs =
-          [ curl bison flex2535 perl libxml2 libxslt w3m bzip2
+          [ curl bison flex perl libxml2 libxslt w3m bzip2
             tetex dblatex nukeReferences pkgconfig sqlite git
           ];
 
@@ -175,6 +175,8 @@ let
     rpm_fedora18x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora18x86_64) 60;
     rpm_fedora19i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora19i386) 70;
     rpm_fedora19x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora19x86_64) 70;
+    rpm_fedora20i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora20i386) 70;
+    rpm_fedora20x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora20x86_64) 70;
 
 
     deb_debian60i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian60i386) 50;
@@ -212,15 +214,15 @@ let
       meta.description = "Release-critical builds";
       constituents =
         [ tarball
-          build.i686-freebsd
+          #build.i686-freebsd
           build.i686-linux
           build.x86_64-darwin
-          build.x86_64-freebsd
+          #build.x86_64-freebsd
           build.x86_64-linux
-          binaryTarball.i686-freebsd
+          #binaryTarball.i686-freebsd
           binaryTarball.i686-linux
           binaryTarball.x86_64-darwin
-          binaryTarball.x86_64-freebsd
+          #binaryTarball.x86_64-freebsd
           binaryTarball.x86_64-linux
           deb_debian7i386
           deb_debian7x86_64
@@ -230,6 +232,8 @@ let
           deb_ubuntu1310x86_64
           rpm_fedora19i386
           rpm_fedora19x86_64
+          rpm_fedora20i386
+          rpm_fedora20x86_64
           tests.remote_builds
           tests.nix_copy_closure
         ];

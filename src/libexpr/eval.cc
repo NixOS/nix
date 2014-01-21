@@ -137,6 +137,18 @@ static void * oomHandler(size_t requested)
 }
 
 
+static Symbol getName(const AttrName & name, EvalState & state, Env & env) {
+    if (name.symbol.set()) {
+        return name.symbol;
+    } else {
+        Value nameValue;
+        name.expr->eval(state, env, nameValue);
+        state.forceStringNoCtx(nameValue);
+        return state.symbols.create(nameValue.string.s);
+    }
+}
+
+
 EvalState::EvalState()
     : sWith(symbols.create("<with>"))
     , sOutPath(symbols.create("outPath"))
@@ -262,6 +274,11 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2))
 LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3))
 {
     throw EvalError(format(s) % s2 % s3);
+}
+
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const Symbol & sym, const Pos & p1, const Pos & p2))
+{
+    throw EvalError(format(s) % sym % p1 % p2);
 }
 
 LocalNoInlineNoReturn(void throwTypeError(const char * s))
@@ -574,12 +591,14 @@ void ExprPath::eval(EvalState & state, Env & env, Value & v)
 void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 {
     state.mkAttrs(v, attrs.size());
+    Env *dynamicEnv = &env;
 
     if (recursive) {
         /* Create a new environment that contains the attributes in
            this `rec'. */
         Env & env2(state.allocEnv(attrs.size()));
         env2.up = &env;
+        dynamicEnv = &env2;
 
         AttrDefs::iterator overrides = attrs.find(state.sOverrides);
         bool hasOverrides = overrides != attrs.end();
@@ -622,9 +641,24 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         }
     }
 
-    else {
+    else
         foreach (AttrDefs::iterator, i, attrs)
             v.attrs->push_back(Attr(i->first, i->second.e->maybeThunk(state, env), &i->second.pos));
+
+    /* dynamic attrs apply *after* rec and __overrides */
+    foreach (DynamicAttrDefs::iterator, i, dynamicAttrs) {
+        Value nameVal;
+        i->nameExpr->eval(state, *dynamicEnv, nameVal);
+        state.forceStringNoCtx(nameVal);
+        Symbol nameSym = state.symbols.create(nameVal.string.s);
+        Bindings::iterator j = v.attrs->find(nameSym);
+        if (j != v.attrs->end())
+            throwEvalError("dynamic attribute `%1%' at %2% already defined at %3%", nameSym, i->pos, *j->pos);
+
+        i->valueExpr->setName(nameSym);
+        /* Keep sorted order so find can catch duplicates */
+        v.attrs->insert(lower_bound(v.attrs->begin(), v.attrs->end(), Attr(nameSym, 0)),
+                Attr(nameSym, i->valueExpr->maybeThunk(state, *dynamicEnv), &i->pos));
     }
 }
 
@@ -678,17 +712,18 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
         foreach (AttrPath::const_iterator, i, attrPath) {
             nrLookups++;
             Bindings::iterator j;
+            Symbol name = getName(*i, state, env);
             if (def) {
                 state.forceValue(*vAttrs);
                 if (vAttrs->type != tAttrs ||
-                    (j = vAttrs->attrs->find(*i)) == vAttrs->attrs->end())
+                    (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
                 {
                     def->eval(state, env, v);
                     return;
                 }
             } else {
                 state.forceAttrs(*vAttrs);
-                if ((j = vAttrs->attrs->find(*i)) == vAttrs->attrs->end())
+                if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
                     throwEvalError("attribute `%1%' missing", showAttrPath(attrPath));
             }
             vAttrs = j->value;
@@ -719,8 +754,9 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
     foreach (AttrPath::const_iterator, i, attrPath) {
         state.forceValue(*vAttrs);
         Bindings::iterator j;
+        Symbol name = getName(*i, state, env);
         if (vAttrs->type != tAttrs ||
-            (j = vAttrs->attrs->find(*i)) == vAttrs->attrs->end())
+            (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
         {
             mkBool(v, false);
             return;
@@ -922,6 +958,17 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 void ExprOpNot::eval(EvalState & state, Env & env, Value & v)
 {
     mkBool(v, !state.evalBool(env, e));
+}
+
+
+void ExprBuiltin::eval(EvalState & state, Env & env, Value & v)
+{
+    // Not a hot path at all, but would be nice to access state.baseEnv directly
+    Env *baseEnv = &env;
+    while (baseEnv->up) baseEnv = baseEnv->up;
+    Bindings::iterator binding = baseEnv->values[0]->attrs->find(name);
+    assert(binding != baseEnv->values[0]->attrs->end());
+    v = *binding->value;
 }
 
 

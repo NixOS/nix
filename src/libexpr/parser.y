@@ -74,37 +74,49 @@ static void dupAttr(const AttrPath & attrPath, const Pos & pos, const Pos & prev
 
 static void dupAttr(Symbol attr, const Pos & pos, const Pos & prevPos)
 {
-    AttrPath attrPath; attrPath.push_back(attr);
     throw ParseError(format("attribute `%1%' at %2% already defined at %3%")
-        % showAttrPath(attrPath) % pos % prevPos);
+        % attr % pos % prevPos);
 }
 
 
 static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
     Expr * e, const Pos & pos)
 {
-    unsigned int n = 0;
-    foreach (AttrPath::const_iterator, i, attrPath) {
-        n++;
-        ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(*i);
-        if (j != attrs->attrs.end()) {
-            if (!j->second.inherited) {
-                ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(j->second.e);
-                if (!attrs2 || n == attrPath.size()) dupAttr(attrPath, pos, j->second.pos);
-                attrs = attrs2;
-            } else
-                dupAttr(attrPath, pos, j->second.pos);
-        } else {
-            if (n == attrPath.size())
-                attrs->attrs[*i] = ExprAttrs::AttrDef(e, pos);
-            else {
+    AttrPath::iterator i;
+    // All attrpaths have at least one attr
+    assert(!attrPath.empty());
+    for (i = attrPath.begin(); i + 1 < attrPath.end(); i++) {
+        if (i->symbol.set()) {
+            ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(i->symbol);
+            if (j != attrs->attrs.end()) {
+                if (!j->second.inherited) {
+                    ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(j->second.e);
+                    if (!attrs2) dupAttr(attrPath, pos, j->second.pos);
+                    attrs = attrs2;
+                } else
+                    dupAttr(attrPath, pos, j->second.pos);
+            } else {
                 ExprAttrs * nested = new ExprAttrs;
-                attrs->attrs[*i] = ExprAttrs::AttrDef(nested, pos);
+                attrs->attrs[i->symbol] = ExprAttrs::AttrDef(nested, pos);
                 attrs = nested;
             }
+        } else {
+            ExprAttrs *nested = new ExprAttrs;
+            attrs->dynamicAttrs.push_back(ExprAttrs::DynamicAttrDef(i->expr, nested, pos));
+            attrs = nested;
         }
     }
-    e->setName(attrPath.back());
+    if (i->symbol.set()) {
+        ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(i->symbol);
+        if (j != attrs->attrs.end()) {
+            dupAttr(attrPath, pos, j->second.pos);
+        } else {
+            attrs->attrs[i->symbol] = ExprAttrs::AttrDef(e, pos);
+            e->setName(i->symbol);
+        }
+    } else {
+        attrs->dynamicAttrs.push_back(ExprAttrs::DynamicAttrDef(i->expr, e, pos));
+    }
 }
 
 
@@ -243,7 +255,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   char * id; // !!! -> Symbol
   char * path;
   char * uri;
-  std::vector<nix::Symbol> * attrNames;
+  std::vector<nix::AttrName> * attrNames;
   std::vector<nix::Expr *> * string_parts;
 }
 
@@ -254,7 +266,8 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %type <formals> formals
 %type <formal> formal
 %type <attrNames> attrs attrpath
-%type <string_parts> string_parts ind_string_parts
+%type <string_parts> string_parts_interpolated ind_string_parts
+%type <e> string_parts string_attr
 %type <id> attr
 %token <id> ID ATTRPATH
 %token <e> STR IND_STR
@@ -300,7 +313,11 @@ expr_function
   | WITH expr ';' expr_function
     { $$ = new ExprWith(CUR_POS, $2, $4); }
   | LET binds IN expr_function
-    { $$ = new ExprLet($2, $4); }
+    { if (!$2->dynamicAttrs.empty())
+        throw ParseError(format("dynamic attributes not allowed in let at %1%")
+            % CUR_POS);
+      $$ = new ExprLet($2, $4);
+    }
   | expr_if
   ;
 
@@ -311,13 +328,13 @@ expr_if
 
 expr_op
   : '!' expr_op %prec NOT { $$ = new ExprOpNot($2); }
-| '-' expr_op %prec NEGATE { $$ = new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__sub")), new ExprInt(0)), $2); }
+| '-' expr_op %prec NEGATE { $$ = new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("sub")), new ExprInt(0)), $2); }
   | expr_op EQ expr_op { $$ = new ExprOpEq($1, $3); }
   | expr_op NEQ expr_op { $$ = new ExprOpNEq($1, $3); }
-  | expr_op '<' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__lessThan")), $1), $3); }
-  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__lessThan")), $3), $1)); }
-  | expr_op '>' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__lessThan")), $3), $1); }
-  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__lessThan")), $1), $3)); }
+  | expr_op '<' expr_op { $$ = new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("lessThan")), $1), $3); }
+  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("lessThan")), $3), $1)); }
+  | expr_op '>' expr_op { $$ = new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("lessThan")), $3), $1); }
+  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("lessThan")), $1), $3)); }
   | expr_op AND expr_op { $$ = new ExprOpAnd($1, $3); }
   | expr_op OR expr_op { $$ = new ExprOpOr($1, $3); }
   | expr_op IMPL expr_op { $$ = new ExprOpImpl($1, $3); }
@@ -329,9 +346,9 @@ expr_op
       l->push_back($3);
       $$ = new ExprConcatStrings(false, l);
     }
-  | expr_op '-' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__sub")), $1), $3); }
-  | expr_op '*' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__mul")), $1), $3); }
-  | expr_op '/' expr_op { $$ = new ExprApp(new ExprApp(new ExprVar(noPos, data->symbols.create("__div")), $1), $3); }
+  | expr_op '-' expr_op { $$ = new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("sub")), $1), $3); }
+  | expr_op '*' expr_op { $$ = new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("mul")), $1), $3); }
+  | expr_op '/' expr_op { $$ = new ExprApp(new ExprApp(new ExprBuiltin(data->symbols.create("div")), $1), $3); }
   | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists($1, $3); }
   | expr_app
   ;
@@ -362,12 +379,7 @@ expr_simple
           $$ = new ExprVar(CUR_POS, data->symbols.create($1));
   }
   | INT { $$ = new ExprInt($1); }
-  | '"' string_parts '"' {
-      /* For efficiency, and to simplify parse trees a bit. */
-      if ($2->empty()) $$ = new ExprString(data->symbols.create(""));
-      else if ($2->size() == 1 && dynamic_cast<ExprString *>($2->front())) $$ = $2->front();
-      else $$ = new ExprConcatStrings(true, $2);
-  }
+  | '"' string_parts '"' { $$ = $2; }
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
       $$ = stripIndentation(data->symbols, *$2);
   }
@@ -381,7 +393,7 @@ expr_simple
          ‘throw’. */
       $$ = path2 == ""
           ? (Expr * ) new ExprApp(
-              new ExprVar(noPos, data->symbols.create("throw")),
+              new ExprBuiltin(data->symbols.create("throw")),
               new ExprString(data->symbols.create(
                       (format("file `%1%' was not found in the Nix search path (add it using $NIX_PATH or -I)") % path).str())))
           : (Expr * ) new ExprPath(path2);
@@ -400,9 +412,27 @@ expr_simple
   ;
 
 string_parts
-  : string_parts STR { $$ = $1; $1->push_back($2); }
-  | string_parts DOLLAR_CURLY expr '}' { backToString(scanner); $$ = $1; $1->push_back($3); }
-  | { $$ = new vector<Expr *>; }
+  : STR
+  | string_parts_interpolated { $$ = new ExprConcatStrings(true, $1); }
+  | { $$ = new ExprString(data->symbols.create("")) }
+  ;
+
+string_parts_interpolated
+  : string_parts_interpolated STR { $$ = $1; $1->push_back($2); }
+  | string_parts_interpolated DOLLAR_CURLY expr '}' { backToString(scanner); $$ = $1; $1->push_back($3); }
+  | STR DOLLAR_CURLY expr '}'
+    {
+      backToString(scanner);
+      $$ = new vector<Expr *>;
+      $$->push_back($1);
+      $$->push_back($3);
+    }
+  | DOLLAR_CURLY expr '}'
+    {
+      backToString(scanner);
+      $$ = new vector<Expr *>;
+      $$->push_back($2);
+    }
   ;
 
 ind_string_parts
@@ -416,39 +446,70 @@ binds
   | binds INHERIT attrs ';'
     { $$ = $1;
       foreach (AttrPath::iterator, i, *$3) {
-          if ($$->attrs.find(*i) != $$->attrs.end())
-              dupAttr(*i, makeCurPos(@3, data), $$->attrs[*i].pos);
+          if ($$->attrs.find(i->symbol) != $$->attrs.end())
+              dupAttr(i->symbol, makeCurPos(@3, data), $$->attrs[i->symbol].pos);
           Pos pos = makeCurPos(@3, data);
-          $$->attrs[*i] = ExprAttrs::AttrDef(new ExprVar(CUR_POS, *i), pos, true);
+          $$->attrs[i->symbol] = ExprAttrs::AttrDef(new ExprVar(CUR_POS, i->symbol), pos, true);
       }
     }
   | binds INHERIT '(' expr ')' attrs ';'
     { $$ = $1;
       /* !!! Should ensure sharing of the expression in $4. */
-      foreach (vector<Symbol>::iterator, i, *$6) {
-          if ($$->attrs.find(*i) != $$->attrs.end())
-              dupAttr(*i, makeCurPos(@6, data), $$->attrs[*i].pos);
-          $$->attrs[*i] = ExprAttrs::AttrDef(new ExprSelect($4, *i), makeCurPos(@6, data));
+      foreach (AttrPath::iterator, i, *$6) {
+          if ($$->attrs.find(i->symbol) != $$->attrs.end())
+              dupAttr(i->symbol, makeCurPos(@6, data), $$->attrs[i->symbol].pos);
+          $$->attrs[i->symbol] = ExprAttrs::AttrDef(new ExprSelect($4, i->symbol), makeCurPos(@6, data));
       }
     }
   | { $$ = new ExprAttrs; }
   ;
 
 attrs
-  : attrs attr { $$ = $1; $1->push_back(data->symbols.create($2)); /* !!! dangerous */ }
-  | { $$ = new vector<Symbol>; }
+  : attrs attr { $$ = $1; $1->push_back(AttrName(data->symbols.create($2))); }
+  | attrs string_attr
+    { $$ = $1;
+      ExprString *str = dynamic_cast<ExprString *>($2);
+      if (str) {
+          $$->push_back(AttrName(str->s));
+          delete str;
+      } else
+        throw ParseError(format("dynamic attributes not allowed in inherit at %1%")
+            % makeCurPos(@2, data));
+    }
+  | { $$ = new AttrPath; }
   ;
 
 attrpath
-  : attrpath '.' attr { $$ = $1; $1->push_back(data->symbols.create($3)); }
-  | attr { $$ = new vector<Symbol>; $$->push_back(data->symbols.create($1)); }
+  : attrpath '.' attr { $$ = $1; $1->push_back(AttrName(data->symbols.create($3))); }
+  | attrpath '.' string_attr
+    { $$ = $1;
+      ExprString *str = dynamic_cast<ExprString *>($3);
+      if (str) {
+          $$->push_back(AttrName(str->s));
+          delete str;
+      } else
+          $$->push_back(AttrName($3));
+    }
+  | attr { $$ = new vector<AttrName>; $$->push_back(AttrName(data->symbols.create($1))); }
+  | string_attr
+    { $$ = new vector<AttrName>;
+      ExprString *str = dynamic_cast<ExprString *>($1);
+      if (str) {
+          $$->push_back(AttrName(str->s));
+          delete str;
+      } else
+          $$->push_back(AttrName($1));
+    }
   ;
 
 attr
   : ID { $$ = $1; }
   | OR_KW { $$ = "or"; }
-  | '"' STR '"'
-    { $$ = strdup(((string) ((ExprString *) $2)->s).c_str()); delete $2; }
+  ;
+
+string_attr
+  : '"' string_parts '"' { $$ = $2; }
+  | DOLLAR_CURLY expr '}' { $$ = new ExprConcatStrings(true, new vector<Expr*>(1, $2)); }
   ;
 
 expr_list
