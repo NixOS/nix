@@ -895,7 +895,6 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
 static void opQuery(Globals & globals,
     Strings args, Strings opFlags, Strings opArgs)
 {
-    typedef vector< map<string, string> > ResultSet;
     Strings remaining;
     string attrPath;
 
