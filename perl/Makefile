@@ -5,7 +5,8 @@ nix_perl_sources := \
   $(d)/lib/Nix/SSH.pm \
   $(d)/lib/Nix/CopyClosure.pm \
   $(d)/lib/Nix/Config.pm.in \
-  $(d)/lib/Nix/Utils.pm
+  $(d)/lib/Nix/Utils.pm \
+  $(d)/lib/Nix/Crypto.pm
 
 nix_perl_modules := $(nix_perl_sources:.in=)
 
