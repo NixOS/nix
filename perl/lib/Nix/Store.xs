@@ -35,6 +35,10 @@ MODULE = Nix::Store PACKAGE = Nix::Store
 PROTOTYPES: ENABLE
 
 
+#undef dNOOP // Hack to work around "error: declaration of 'Perl___notused' has a different language linkage" error message on clang.
+#define dNOOP
+
+
 void init()
     CODE:
         doInit();
