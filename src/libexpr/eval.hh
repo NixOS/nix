@@ -82,8 +82,6 @@ void copyContext(const Value & v, PathSet & context);
    paths. */
 typedef std::map<Path, Path> SrcToStore;
 
-struct EvalState;
-
 
 std::ostream & operator << (std::ostream & str, const Value & v);
 
@@ -216,9 +214,9 @@ private:
 
     inline Value * lookupVar(Env * env, const ExprVar & var, bool noEval);
 
-    friend class ExprVar;
-    friend class ExprAttrs;
-    friend class ExprLet;
+    friend struct ExprVar;
+    friend struct ExprAttrs;
+    friend struct ExprLet;
 
     Expr * parse(const char * text, const Path & path,
         const Path & basePath, StaticEnv & staticEnv);
@@ -278,9 +276,9 @@ private:
     typedef std::map<Pos, unsigned int> AttrSelects;
     AttrSelects attrSelects;
 
-    friend class ExprOpUpdate;
-    friend class ExprOpConcatLists;
-    friend class ExprSelect;
+    friend struct ExprOpUpdate;
+    friend struct ExprOpConcatLists;
+    friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, Value * * args, Value & v);
 };
 

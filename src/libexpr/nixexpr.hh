@@ -48,7 +48,7 @@ std::ostream & operator << (std::ostream & str, const Pos & pos);
 
 struct Env;
 struct Value;
-struct EvalState;
+class EvalState;
 struct StaticEnv;
 struct Expr;
 
@@ -71,6 +71,7 @@ string showAttrPath(const AttrPath & attrPath);
 
 struct Expr
 {
+    virtual ~Expr() { };
     virtual void show(std::ostream & str);
     virtual void bindVars(const StaticEnv & env);
     virtual void eval(EvalState & state, Env & env, Value & v);

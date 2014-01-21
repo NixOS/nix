@@ -22,8 +22,6 @@ static string gcLockName = "gc.lock";
 static string tempRootsDir = "temproots";
 static string gcRootsDir = "gcroots";
 
-static const int defaultGcLevel = 1000;
-
 
 /* Acquire the global GC lock.  This is used to prevent new Nix
    processes from starting after the temporary root files have been

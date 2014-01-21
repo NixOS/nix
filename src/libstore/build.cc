@@ -75,12 +75,9 @@ using std::map;
 static string pathNullDevice = "/dev/null";
 
 
-static const uid_t rootUserId = 0;
-
-
 /* Forward definition. */
 class Worker;
-class HookInstance;
+struct HookInstance;
 
 
 /* A pointer to a goal. */
