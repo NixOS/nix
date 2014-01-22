@@ -21,6 +21,12 @@
   <listitem><para><command>nix-setuid-helper</command> is
   gone.</para></listitem>
 
+  <listitem><para>Now antiquotation is allowed inside of quoted
+  attribute names (e.g. <literal>set."${foo}"</literal>). In the
+  case where the attribute name is just a single antiquotation,
+  the quotes can be dropped (e.g. the above example can be written
+  <literal>set.${foo}</literal>).</para></listitem>
+
 </itemizedlist>
 
 </section>
