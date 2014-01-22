@@ -851,13 +851,26 @@ default value in an attribute selection using the
 will evaluate to <literal>"Xyzzy"</literal> because there is no
 <varname>c</varname> attribute in the set.</para>
 
-<para>You can use arbitrary string constants as attribute names by
-enclosing them in quotes:
+<para>You can use arbitrary double-quoted strings as attribute
+names:
 
 <programlisting>
-{ "foo bar" = 123; "nix-1.0" = 456; }."foo bar" </programlisting>
+{ "foo ${bar}" = 123; "nix-1.0" = 456; }."foo ${bar}"
+</programlisting>
 
-This will evaluate to <literal>123</literal>.</para>
+This will evaluate to <literal>123</literal> (Assuming
+<literal>bar</literal> is antiquotable). In the case where an
+attribute name is just a single antiquotation, the quotes can be
+dropped:
+
+<programlisting>
+{ foo = 123; }.${bar} or 456 </programlisting>
+
+This will evaluate to <literal>123</literal> if
+<literal>bar</literal> evaluates to <literal>"foo"</literal> when
+coerced to a string and <literal>456</literal> otherwise (again
+assuming <literal>bar</literal> is antiquotable).</para>
+
 
 </simplesect>
 
