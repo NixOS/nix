@@ -414,7 +414,7 @@ expr_simple
 string_parts
   : STR
   | string_parts_interpolated { $$ = new ExprConcatStrings(true, $1); }
-  | { $$ = new ExprString(data->symbols.create("")) }
+  | { $$ = new ExprString(data->symbols.create("")); }
   ;
 
 string_parts_interpolated
