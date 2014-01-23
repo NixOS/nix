@@ -185,7 +185,7 @@ foreach my $expr (@exprs) {
         # Set the environment.
         if ($pure) {
             foreach my $name (keys %ENV) {
-                next if grep { $_ eq $name } ("HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL");
+                next if grep { $_ eq $name } ("HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL", "TZ");
                 delete $ENV{$name};
             }
             # NixOS hack: prevent /etc/bashrc from sourcing /etc/profile.
@@ -207,12 +207,13 @@ foreach my $expr (@exprs) {
             ($pure ? '' : 'p=$PATH; ' ) .
             'dontAddDisableDepTrack=1; ' .
             '[ -e $stdenv/setup ] && source $stdenv/setup; ' .
-            ($pure ? '' : 'PATH=$PATH:$p; ') .
+            ($pure ? '' : 'PATH=$PATH:$p; unset p; ') .
             'set +e; ' .
             '[ -n "$PS1" ] && PS1="\n\[\033[1;32m\][nix-shell:\w]$\[\033[0m\] "; ' .
             'unset NIX_ENFORCE_PURITY; ' .
             'unset NIX_INDENT_MAKE; ' .
             'shopt -u nullglob; ' .
+            'unset TZ; ' . (defined $ENV{'TZ'} ? "export TZ='${ENV{'TZ'}}'; " : '') .
             $envCommand);
         $ENV{BASH_ENV} = $rcfile;
         exec($ENV{NIX_BUILD_SHELL} // "bash", "--rcfile", $rcfile);
