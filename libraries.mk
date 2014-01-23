@@ -58,7 +58,7 @@ define build-library =
       endif
     else
       ifneq ($(OS), Darwin)
-        $(1)_LDFLAGS += -z defs
+        $(1)_LDFLAGS += -Wl,-z,defs
       endif
     endif
 
