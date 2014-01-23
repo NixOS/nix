@@ -137,9 +137,8 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
         push @envExclude, $ARGV[$n];
     }
 
-    elsif ($arg eq "--pure") {
-        $pure = 1;
-    }
+    elsif ($arg eq "--pure") { $pure = 1; }
+    elsif ($arg eq "--impure") { $pure = 0; }
 
     elsif (substr($arg, 0, 1) eq "-") {
         push @buildArgs, $arg;
