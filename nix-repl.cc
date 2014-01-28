@@ -489,10 +489,18 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         seen.insert(&v);
 
         bool isDrv = state.isDerivation(v);
-        if (isDrv) str << "(derivation ";
-        str << "{ ";
 
-        if (maxDepth > 0) {
+        if (isDrv) {
+            str << "«derivation ";
+            Bindings::iterator i = v.attrs->find(state.sDrvPath);
+            PathSet context;
+            Path drvPath = i != v.attrs->end() ? state.coerceToPath(*i->value, context) : "???";
+            str << drvPath << "»";
+        }
+
+        else if (maxDepth > 0) {
+            str << "{ ";
+
             typedef std::map<string, Value *> Sorted;
             Sorted sorted;
             foreach (Bindings::iterator, i, *v.attrs)
@@ -528,11 +536,10 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
                 str << "; ";
             }
 
+            str << "}";
         } else
-            str << "... ";
+            str << "{ ... }";
 
-        str << "}";
-        if (isDrv) str << ")";
         break;
     }
 
