@@ -311,10 +311,10 @@ bool NixRepl::processLine(string line)
     else if (command == ":b" || command == ":s") {
         Value v;
         evalString(arg, v);
-        DrvInfo drvInfo;
+        DrvInfo drvInfo(state);
         if (!getDerivation(state, v, drvInfo, false))
             throw Error("expression does not evaluation to a derivation, so I can't build it");
-        Path drvPath = drvInfo.queryDrvPath(state);
+        Path drvPath = drvInfo.queryDrvPath();
         if (drvPath == "" || !store->isValidPath(drvPath))
             throw Error("expression did not evaluate to a valid derivation");
 
