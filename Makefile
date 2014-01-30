@@ -1,20 +1,20 @@
 SUBS = \
-  src/boost/format/Makefile \
-  src/libutil/Makefile \
-  src/libstore/Makefile \
-  src/libmain/Makefile \
-  src/libexpr/Makefile \
-  src/nix-hash/Makefile \
-  src/nix-store/Makefile \
-  src/nix-instantiate/Makefile \
-  src/nix-env/Makefile \
-  src/nix-daemon/Makefile \
-  src/nix-log2xml/Makefile \
-  src/bsdiff-4.3/Makefile \
-  perl/Makefile \
-  scripts/Makefile \
-  corepkgs/Makefile \
-  tests/Makefile \
+  src/boost/format/local.mk \
+  src/libutil/local.mk \
+  src/libstore/local.mk \
+  src/libmain/local.mk \
+  src/libexpr/local.mk \
+  src/nix-hash/local.mk \
+  src/nix-store/local.mk \
+  src/nix-instantiate/local.mk \
+  src/nix-env/local.mk \
+  src/nix-daemon/local.mk \
+  src/nix-log2xml/local.mk \
+  src/bsdiff-4.3/local.mk \
+  perl/local.mk \
+  scripts/local.mk \
+  corepkgs/local.mk \
+  tests/local.mk \
 
 GLOBAL_CXXFLAGS = -I . -I src -I src/libutil -I src/libstore -I src/libmain -I src/libexpr
 
