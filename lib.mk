@@ -8,6 +8,7 @@ default: all
 # Initialise some variables.
 bin_SCRIPTS :=
 noinst_SCRIPTS :=
+man-pages :=
 OS = $(shell uname -s)
 
 
@@ -19,6 +20,7 @@ libexecdir ?= $(prefix)/libexec
 datadir ?= $(prefix)/share
 localstatedir ?= $(prefix)/var
 sysconfdir ?= $(prefix)/etc
+mandir ?= $(prefix)/share/man
 
 
 # Pass -fPIC if we're building dynamic libraries.
@@ -78,9 +80,14 @@ $(foreach script, $(bin_SCRIPTS), $(eval programs_list += $(script)))
 $(foreach script, $(noinst_SCRIPTS), $(eval programs_list += $(script)))
 $(foreach template, $(template_files), $(eval $(call instantiate-template,$(template))))
 $(foreach test, $(INSTALL_TESTS), $(eval $(call run-install-test,$(test))))
+$(foreach file, $(man-pages), $(eval $(call install-data-in, $(file), $(mandir)/man$(patsubst .%,%,$(suffix $(file))))))
 
 
-all: $(programs_list) $(libs_list) $(jars_list)
+.PHONY: all man help
+
+all: $(programs_list) $(libs_list) $(jars_list) $(man-pages)
+
+man: $(man-pages)
 
 
 help:
@@ -92,6 +99,9 @@ help:
 	@echo "  dryclean: Show what files would be deleted by 'make clean'"
 ifdef PACKAGE_NAME
 	@echo "  dist: Generate a source distribution"
+endif
+ifdef man-pages
+	@echo "  man: Generate manual pages"
 endif
 ifdef programs_list
 	@echo ""
