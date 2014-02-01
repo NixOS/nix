@@ -28,7 +28,7 @@ $(d)/manual.is-valid: $(d)/manual.xmli
 
 clean-files += $(d)/manual.xmli $(d)/version.txt $(d)/manual.is-valid
 
-clean-files += $(d)/manual.xmli $(d)/version.txt $(d)/manual.is-valid
+dist-files += $(d)/manual.xmli $(d)/version.txt $(d)/manual.is-valid
 
 
 # Generate man pages.
@@ -46,6 +46,8 @@ $(man-pages): $(d)/manual.xmli $(d)/manual.is-valid
 	  (cd doc/manual && $(XSLTPROC) $(docbookxsl)/manpages/docbook.xsl -)
 
 clean-files += $(d)/*.1 $(d)/*.5 $(d)/*.8
+
+dist-files += $(d)/*.1 $(d)/*.5 $(d)/*.8
 
 
 # Generate the HTML manual.

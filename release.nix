@@ -48,14 +48,13 @@ let
         distPhase =
           ''
             runHook preDist
-            make dist-gzip
-            make dist-xz
+            make dist
             mkdir -p $out/tarballs
             cp *.tar.* $out/tarballs
           '';
 
         preDist = ''
-          make install prefix=$out makefiles=doc/manual/local.mk
+          make install docdir=$out/share/doc/nix makefiles=doc/manual/local.mk
 
           make doc/manual/manual.pdf
           cp doc/manual/manual.pdf $out/manual.pdf
@@ -97,6 +96,8 @@ let
         enableParallelBuilding = true;
 
         makeFlags = "profiledir=$(out)/etc/profile.d";
+
+        preBuild = "unset NIX_INDENT_MAKE";
 
         installFlags = "sysconfdir=$(out)/etc";
 
