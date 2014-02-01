@@ -79,7 +79,7 @@ $(foreach test, $(INSTALL_TESTS), $(eval $(call run-install-test,$(test))))
 $(foreach file, $(man-pages), $(eval $(call install-data-in, $(file), $(mandir)/man$(patsubst .%,%,$(suffix $(file))))))
 
 
-.PHONY: all man help
+.PHONY: default all man help
 
 all: $(programs_list) $(libs_list) $(jars_list) $(man-pages)
 
@@ -90,15 +90,10 @@ help:
 	@echo "The following targets are available:"
 	@echo ""
 	@echo "  default: Build default targets"
-	@echo "  install: Install into \$$(prefix) (currently set to '$(prefix)')"
-	@echo "  clean: Delete generated files"
-	@echo "  dryclean: Show what files would be deleted by 'make clean'"
-ifdef PACKAGE_NAME
-	@echo "  dist: Generate a source distribution"
-endif
 ifdef man-pages
 	@echo "  man: Generate manual pages"
 endif
+	@$(print-top-help)
 ifdef programs_list
 	@echo ""
 	@echo "The following programs can be built:"
@@ -117,3 +112,13 @@ ifdef jars_list
 	@echo ""
 	@for i in $(jars_list); do echo "  $$i"; done
 endif
+	@echo ""
+	@echo "The following variables control the build:"
+	@echo ""
+	@echo "  BUILD_SHARED_LIBS ($(BUILD_SHARED_LIBS)): Whether to build shared libraries"
+	@echo "  BUILD_DEBUG ($(BUILD_DEBUG)): Whether to include debug symbols"
+	@echo "  CC ($(CC)): C compiler to be used"
+	@echo "  CFLAGS: Flags for the C compiler"
+	@echo "  CXX ($(CXX)): C++ compiler to be used"
+	@echo "  CXXFLAGS: Flags for the C++ compiler"
+	@$(print-var-help)
