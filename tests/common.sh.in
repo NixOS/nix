@@ -1,7 +1,6 @@
 set -e
 
 datadir="@datadir@"
-profiledir="@sysconfdir@/profile.d"
 
 export TEST_ROOT=$(pwd)/test-tmp
 export NIX_STORE_DIR

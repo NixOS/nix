@@ -102,6 +102,7 @@ let
         installFlags = "sysconfdir=$(out)/etc";
 
         doInstallCheck = true;
+        installCheckFlags = "sysconfdir=$(out)/etc";
       });
 
 
