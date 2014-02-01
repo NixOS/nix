@@ -1,4 +1,4 @@
-programs_list :=
+programs-list :=
 
 # Build a program with symbolic name $(1).  The program is defined by
 # various variables prefixed by ‘$(1)_’:
@@ -56,7 +56,7 @@ define build-program =
   $(1)_DEPS := $$(foreach fn, $$($(1)_OBJS), $$(call filename-to-dep, $$(fn)))
   -include $$($(1)_DEPS)
 
-  programs_list += $$($(1)_PATH)
-  clean_files += $$($(1)_PATH) $$(_d)/*.o $$(_d)/.*.dep $$($(1)_DEPS) $$($(1)_OBJS)
-  dist_files += $$(_srcs)
+  programs-list += $$($(1)_PATH)
+  clean-files += $$($(1)_PATH) $$(_d)/*.o $$(_d)/.*.dep $$($(1)_DEPS) $$($(1)_OBJS)
+  dist-files += $$(_srcs)
 endef

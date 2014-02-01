@@ -1,10 +1,10 @@
-clean_files :=
+clean-files :=
 
 clean:
-	$(suppress) rm -fv -- $(clean_files)
+	$(suppress) rm -fv -- $(clean-files)
 
 dryclean:
-	@for i in $(clean_files); do if [ -e $$i ]; then echo $$i; fi; done | sort
+	@for i in $(clean-files); do if [ -e $$i ]; then echo $$i; fi; done | sort
 
 print-top-help += \
   echo "  clean: Delete generated files"; \

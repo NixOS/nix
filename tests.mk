@@ -6,15 +6,15 @@ define run-install-test =
   # Run the test in its own directory to mimick Automake behaviour.
   $1.run: $1 $(_PREV_TEST)
 
-  _installcheck_list += $1
+  _installcheck-list += $1
 
 endef
 
 installcheck: install
-	@total=0; failed=0; for i in $(_installcheck_list); do \
+	@total=0; failed=0; for i in $(_installcheck-list); do \
 	  total=$$((total + 1)); \
 	  echo "running test $$i"; \
-	  if (cd $$(dirname $$i) && $(TESTS_ENVIRONMENT) $$(basename $$i)); then \
+	  if (cd $$(dirname $$i) && $(tests-environment) $$(basename $$i)); then \
 	    echo "PASS: $$i"; \
 	  else \
 	    echo "FAIL: $$i"; \

@@ -1,4 +1,4 @@
-libs_list :=
+libs-list :=
 
 ifeq ($(OS), Darwin)
   SO_EXT = dylib
@@ -110,7 +110,7 @@ define build-library =
   $(1)_DEPS := $$(foreach fn, $$($(1)_OBJS), $$(call filename-to-dep, $$(fn)))
   -include $$($(1)_DEPS)
 
-  libs_list += $$($(1)_PATH)
-  clean_files += $$(_d)/*.a $$(_d)/*.$(SO_EXT) $$(_d)/*.o $$(_d)/.*.dep $$($(1)_DEPS) $$($(1)_OBJS)
-  dist_files += $$(_srcs)
+  libs-list += $$($(1)_PATH)
+  clean-files += $$(_d)/*.a $$(_d)/*.$(SO_EXT) $$(_d)/*.o $$(_d)/.*.dep $$($(1)_DEPS) $$($(1)_OBJS)
+  dist-files += $$(_srcs)
 endef

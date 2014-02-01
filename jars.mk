@@ -22,8 +22,8 @@ define build-jar =
 
   install: $$($(1)_INSTALL_PATH)
 
-  jars_list += $$($(1)_PATH)
+  jars-list += $$($(1)_PATH)
 
-  clean_files += $$($(1)_PATH)
+  clean-files += $$($(1)_PATH)
 
 endef

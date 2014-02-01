@@ -1,15 +1,15 @@
 ifdef PACKAGE_NAME
 
-dist_name = $(PACKAGE_NAME)-$(PACKAGE_VERSION)
+dist-name = $(PACKAGE_NAME)-$(PACKAGE_VERSION)
 
-dist_files :=
+dist-files :=
 
-dist: $(dist_name).tar.bz2
+dist: $(dist-name).tar.bz2
 
-$(dist_name).tar.bz2: $(dist_files)
-	$(suppress) tar cvfj $@ $(dist_files) --transform 's,^,$(dist_name)/,'
+$(dist-name).tar.bz2: $(dist-files)
+	$(suppress) tar cvfj $@ $(dist-files) --transform 's,^,$(dist-name)/,'
 
-clean_files += $(dist_name).tar.bz2
+clean-files += $(dist-name).tar.bz2
 
 print-top-help += echo "  dist: Generate a source distribution";
 

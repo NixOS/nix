@@ -6,9 +6,10 @@ default: all
 
 
 # Initialise some variables.
-bin_SCRIPTS :=
-noinst_SCRIPTS :=
+bin-scripts :=
+noinst-scripts :=
 man-pages :=
+install-tests :=
 OS = $(shell uname -s)
 
 
@@ -64,24 +65,24 @@ define include-sub-makefile =
   include $(1)
 endef
 
-$(foreach mf, $(SUBS), $(eval $(call include-sub-makefile, $(mf))))
+$(foreach mf, $(makefiles), $(eval $(call include-sub-makefile, $(mf))))
 
 
 # Instantiate stuff.
-$(foreach lib, $(LIBS), $(eval $(call build-library,$(lib))))
-$(foreach prog, $(PROGRAMS), $(eval $(call build-program,$(prog))))
-$(foreach jar, $(JARS), $(eval $(call build-jar,$(jar))))
-$(foreach script, $(bin_SCRIPTS), $(eval $(call install-program-in,$(script),$(bindir))))
-$(foreach script, $(bin_SCRIPTS), $(eval programs_list += $(script)))
-$(foreach script, $(noinst_SCRIPTS), $(eval programs_list += $(script)))
-$(foreach template, $(template_files), $(eval $(call instantiate-template,$(template))))
-$(foreach test, $(INSTALL_TESTS), $(eval $(call run-install-test,$(test))))
+$(foreach lib, $(libraries), $(eval $(call build-library,$(lib))))
+$(foreach prog, $(programs), $(eval $(call build-program,$(prog))))
+$(foreach jar, $(jars), $(eval $(call build-jar,$(jar))))
+$(foreach script, $(bin-scripts), $(eval $(call install-program-in,$(script),$(bindir))))
+$(foreach script, $(bin-scripts), $(eval programs-list += $(script)))
+$(foreach script, $(noinst-scripts), $(eval programs-list += $(script)))
+$(foreach template, $(template-files), $(eval $(call instantiate-template,$(template))))
+$(foreach test, $(install-tests), $(eval $(call run-install-test,$(test))))
 $(foreach file, $(man-pages), $(eval $(call install-data-in, $(file), $(mandir)/man$(patsubst .%,%,$(suffix $(file))))))
 
 
 .PHONY: default all man help
 
-all: $(programs_list) $(libs_list) $(jars_list) $(man-pages)
+all: $(programs-list) $(libs-list) $(jars-list) $(man-pages)
 
 man: $(man-pages)
 
@@ -94,23 +95,23 @@ ifdef man-pages
 	@echo "  man: Generate manual pages"
 endif
 	@$(print-top-help)
-ifdef programs_list
+ifdef programs-list
 	@echo ""
 	@echo "The following programs can be built:"
 	@echo ""
-	@for i in $(programs_list); do echo "  $$i"; done
+	@for i in $(programs-list); do echo "  $$i"; done
 endif
-ifdef libs_list
+ifdef libs-list
 	@echo ""
 	@echo "The following libraries can be built:"
 	@echo ""
-	@for i in $(libs_list); do echo "  $$i"; done
+	@for i in $(libs-list); do echo "  $$i"; done
 endif
-ifdef jars_list
+ifdef jars-list
 	@echo ""
 	@echo "The following JARs can be built:"
 	@echo ""
-	@for i in $(jars_list); do echo "  $$i"; done
+	@for i in $(jars-list); do echo "  $$i"; done
 endif
 	@echo ""
 	@echo "The following variables control the build:"
