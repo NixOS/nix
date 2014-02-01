@@ -203,12 +203,6 @@ AC_ARG_WITH(docbook-xsl, AC_HELP_STRING([--with-docbook-xsl=PATH],
 AC_SUBST(docbookxsl)
 
 
-AC_ARG_WITH(xml-flags, AC_HELP_STRING([--with-xml-flags=FLAGS],
-  [extra flags to be passed to xmllint and xsltproc]),
-  xmlflags=$withval, xmlflags=)
-AC_SUBST(xmlflags)
-
-
 AC_ARG_WITH(store-dir, AC_HELP_STRING([--with-store-dir=PATH],
   [path of the Nix store (defaults to /nix/store)]),
   storedir=$withval, storedir='/nix/store')

@@ -14,7 +14,9 @@ SUBS = \
   perl/local.mk \
   scripts/local.mk \
   corepkgs/local.mk \
-  tests/local.mk \
+  misc/emacs/local.mk \
+  doc/manual/local.mk \
+  tests/local.mk
 
 GLOBAL_CXXFLAGS = -I . -I src -I src/libutil -I src/libstore -I src/libmain -I src/libexpr
 
