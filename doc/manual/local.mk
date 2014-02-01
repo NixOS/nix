@@ -28,6 +28,8 @@ $(d)/manual.is-valid: $(d)/manual.xmli
 
 clean-files += $(d)/manual.xmli $(d)/version.txt $(d)/manual.is-valid
 
+clean-files += $(d)/manual.xmli $(d)/version.txt $(d)/manual.is-valid
+
 
 # Generate man pages.
 man-pages := $(foreach n, \
@@ -64,6 +66,8 @@ all: $(d)/manual.html
 
 clean-files += $(d)/manual.html
 
+dist-files += $(d)/manual.html
+
 
 # Generate the PDF manual.
 $(d)/manual.pdf: $(d)/manual.xml $(MANUAL_SRCS) $(d)/manual.is-valid
@@ -77,3 +81,4 @@ $(d)/manual.pdf: $(d)/manual.xml $(MANUAL_SRCS) $(d)/manual.is-valid
 	fi
 
 clean-files += $(d)/manual.pdf
+

@@ -9,5 +9,3 @@ bspatch_DIR := $(d)
 bspatch_SOURCES := $(d)/bspatch.c
 bspatch_LDFLAGS = -lbz2 $(bsddiff_compat_include)
 bspatch_INSTALL_DIR = $(libexecdir)/nix
-
-dist-files += $(d)/compat-include/*

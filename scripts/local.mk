@@ -35,5 +35,3 @@ $(foreach prog, $(nix_substituters), $(eval $(call install-program-in, $(prog), 
 $(eval $(call install-symlink, nix-build, $(bindir)/nix-shell))
 
 clean-files += $(nix_bin_scripts) $(nix_noinst_scripts)
-
-dist-files += $(d)/*.in

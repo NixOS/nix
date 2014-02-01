@@ -23,4 +23,6 @@ libstore_CXXFLAGS = \
 $(d)/local-store.cc: $(d)/schema.sql.hh
 
 %.sql.hh: %.sql
-	sed -e 's/"/\\"/g' -e 's/\(.*\)/"\1\\n"/' < $< > $@ || (rm $@ && exit 1)
+	$(trace-gen) sed -e 's/"/\\"/g' -e 's/\(.*\)/"\1\\n"/' < $< > $@ || (rm $@ && exit 1)
+
+clean-files += $(d)/schema.sql.hh

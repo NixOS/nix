@@ -15,7 +15,7 @@ $(foreach x, $(nix_perl_modules), $(eval $(call install-data-in, $(x), $(perllib
 ifeq ($(perlbindings), yes)
 
   $(d)/lib/Nix/Store.cc: $(d)/lib/Nix/Store.xs
-	xsubpp $^ -output $@
+	$(trace-gen) xsubpp $^ -output $@
 
   libraries += Store
 
@@ -38,5 +38,3 @@ ifeq ($(perlbindings), yes)
 endif
 
 clean-files += $(d)/lib/Nix/Config.pm $(d)/lib/Nix/Store.cc
-
-dist-files += $(nix_perl_sources)

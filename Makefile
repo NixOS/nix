@@ -1,4 +1,5 @@
 makefiles = \
+  local.mk \
   src/boost/format/local.mk \
   src/libutil/local.mk \
   src/libstore/local.mk \
@@ -17,8 +18,6 @@ makefiles = \
   misc/emacs/local.mk \
   doc/manual/local.mk \
   tests/local.mk
-
-GLOBAL_CXXFLAGS = -I . -I src -I src/libutil -I src/libstore -I src/libmain -I src/libexpr
 
 include Makefile.config
 

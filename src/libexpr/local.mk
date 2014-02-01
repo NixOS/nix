@@ -14,7 +14,9 @@ libexpr_LIBS = libutil libstore libformat
 libexpr_LDFLAGS_PROPAGATED = $(BDW_GC_LIBS)
 
 $(d)/parser-tab.cc $(d)/parser-tab.hh: $(d)/parser.y
-	bison -v -o $(libexpr_DIR)/parser-tab.cc $< -d
+	$(trace-gen) bison -v -o $(libexpr_DIR)/parser-tab.cc $< -d
 
 $(d)/lexer-tab.cc $(d)/lexer-tab.hh: $(d)/lexer.l
-	flex --outfile $(libexpr_DIR)/lexer-tab.cc --header-file=$(libexpr_DIR)/lexer-tab.hh $<
+	$(trace-gen) flex --outfile $(libexpr_DIR)/lexer-tab.cc --header-file=$(libexpr_DIR)/lexer-tab.hh $<
+
+clean-files += $(d)/parser-tab.cc $(d)/parser-tab.hh $(d)/lexer-tab.cc $(d)/lexer-tab.hh
