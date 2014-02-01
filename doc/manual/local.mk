@@ -47,7 +47,7 @@ $(man-pages): $(d)/manual.xmli $(d)/manual.is-valid
 
 clean-files += $(d)/*.1 $(d)/*.5 $(d)/*.8
 
-dist-files += $(d)/*.1 $(d)/*.5 $(d)/*.8
+dist-files += $(man-pages)
 
 
 # Generate the HTML manual.

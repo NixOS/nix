@@ -1,4 +1,6 @@
-dist-files += $(shell git ls-files) $(shell git ls-files)
+ifeq ($(MAKECMDGOALS), dist)
+  dist-files += $(shell git ls-files) $(shell git ls-files)
+endif
 
 dist-files += configure config.h.in
 
