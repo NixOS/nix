@@ -11,7 +11,7 @@ nix-log2xml < $TEST_ROOT/log.esc > $TEST_ROOT/log.xml
 
 # Is this well-formed XML?
 if test "$xmllint" != "false"; then
-    $xmllint $xmlflags --noout $TEST_ROOT/log.xml || fail "malformed XML"
+    $xmllint --noout $TEST_ROOT/log.xml || fail "malformed XML"
 fi
 
 # Convert to HTML.
