@@ -10,7 +10,7 @@ define run-install-test =
 
 endef
 
-installcheck: install
+installcheck:
 	@total=0; failed=0; for i in $(_installcheck-list); do \
 	  total=$$((total + 1)); \
 	  echo "running test $$i"; \
