@@ -51,3 +51,7 @@ define install-symlink =
 	$$(trace-install) ln -sfn $(1) $(2)
 
 endef
+
+
+print-top-help += \
+  echo "  install: Install into \$$(prefix) (currently set to '$(prefix)')";

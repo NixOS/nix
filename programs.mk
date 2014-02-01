@@ -53,10 +53,10 @@ define build-program =
   $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj): $$($(1)_COMMON_DEPS)))
 
   # Include .dep files, if they exist.
-  $(1)_DEPS := $$(addsuffix .dep, $$(basename $$(_srcs)))
+  $(1)_DEPS := $$(foreach fn, $$($(1)_OBJS), $$(call filename-to-dep, $$(fn)))
   -include $$($(1)_DEPS)
 
   programs_list += $$($(1)_PATH)
-  clean_files += $$($(1)_PATH) $$(_d)/*.o $$(_d)/*.dep $$($(1)_DEPS) $$($(1)_OBJS)
+  clean_files += $$($(1)_PATH) $$(_d)/*.o $$(_d)/.*.dep $$($(1)_DEPS) $$($(1)_OBJS)
   dist_files += $$(_srcs)
 endef

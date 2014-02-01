@@ -11,4 +11,6 @@ $(dist_name).tar.bz2: $(dist_files)
 
 clean_files += $(dist_name).tar.bz2
 
+print-top-help += echo "  dist: Generate a source distribution";
+
 endif

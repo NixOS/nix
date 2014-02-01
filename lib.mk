@@ -45,11 +45,7 @@ ifeq ($(BUILD_DEBUG), 1)
 endif
 
 
-# Utility function for recursively finding files, e.g.
-# ‘$(call rwildcard, path/to/dir, *.c *.h)’.
-rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst *,%,$2),$d))
-
-
+include mk/functions.mk
 include mk/tracing.mk
 include mk/clean.mk
 include mk/dist.mk
