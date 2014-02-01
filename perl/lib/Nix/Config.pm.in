@@ -1,6 +1,6 @@
 package Nix::Config;
 
-$version = "@version@";
+$version = "@PACKAGE_VERSION@";
 
 $binDir = $ENV{"NIX_BIN_DIR"} || "@bindir@";
 $libexecDir = $ENV{"NIX_LIBEXEC_DIR"} || "@libexecdir@";

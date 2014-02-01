@@ -225,7 +225,7 @@ sub generatePatches {
             }
         
             my $time1 = time();
-            my $res = system("ulimit -t $timeLimit; $Nix::Config::libexecDir/bsdiff $tmpDir/A $tmpDir/B $tmpDir/DIFF");
+            my $res = system("ulimit -t $timeLimit; $Nix::Config::libexecDir/nix/bsdiff $tmpDir/A $tmpDir/B $tmpDir/DIFF");
             my $time2 = time();
             if ($res) {
                 warn "binary diff computation aborted after ", $time2 - $time1, " seconds\n";

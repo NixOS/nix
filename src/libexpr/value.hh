@@ -22,13 +22,13 @@ typedef enum {
 } ValueType;
 
 
-struct Bindings;
+class Bindings;
 struct Env;
 struct Expr;
 struct ExprLambda;
 struct PrimOp;
 struct PrimOp;
-struct Symbol;
+class Symbol;
 
 
 typedef long NixInt;

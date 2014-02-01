@@ -4,7 +4,7 @@ let
     if val != "" then val else def;
 in {
   perl = "@perl@";
-  shell = "@shell@";
+  shell = "@bash@";
   coreutils = "@coreutils@";
   bzip2 = "@bzip2@";
   gzip = "@gzip@";

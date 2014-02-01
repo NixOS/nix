@@ -30,7 +30,6 @@ let
         configureFlags = ''
           --with-docbook-rng=${docbook5}/xml/rng/docbook
           --with-docbook-xsl=${docbook5_xsl}/xml/xsl/docbook
-          --with-xml-flags=--nonet
           --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
           --with-www-curl=${perlPackages.WWWCurl}/${perl.libPrefix}
@@ -49,16 +48,15 @@ let
         distPhase =
           ''
             runHook preDist
-            make dist-gzip
-            make dist-xz
+            make dist
             mkdir -p $out/tarballs
             cp *.tar.* $out/tarballs
           '';
 
         preDist = ''
-          make -C doc/manual install prefix=$out
+          make install docdir=$out/share/doc/nix makefiles=doc/manual/local.mk
 
-          make -C doc/manual manual.pdf prefix=$out
+          make doc/manual/manual.pdf
           cp doc/manual/manual.pdf $out/manual.pdf
 
           # The PDF containes filenames of included graphics (see
@@ -99,9 +97,12 @@ let
 
         makeFlags = "profiledir=$(out)/etc/profile.d";
 
+        preBuild = "unset NIX_INDENT_MAKE";
+
         installFlags = "sysconfdir=$(out)/etc";
 
         doInstallCheck = true;
+        installCheckFlags = "sysconfdir=$(out)/etc";
       });
 
 

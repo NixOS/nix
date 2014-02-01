@@ -252,7 +252,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   nix::Formals * formals;
   nix::Formal * formal;
   nix::NixInt n;
-  char * id; // !!! -> Symbol
+  const char * id; // !!! -> Symbol
   char * path;
   char * uri;
   std::vector<nix::AttrName> * attrNames;
@@ -414,7 +414,7 @@ expr_simple
 string_parts
   : STR
   | string_parts_interpolated { $$ = new ExprConcatStrings(true, $1); }
-  | { $$ = new ExprString(data->symbols.create("")) }
+  | { $$ = new ExprString(data->symbols.create("")); }
   ;
 
 string_parts_interpolated
