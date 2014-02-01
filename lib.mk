@@ -10,6 +10,7 @@ bin-scripts :=
 noinst-scripts :=
 man-pages :=
 install-tests :=
+dist-files :=
 OS = $(shell uname -s)
 
 
@@ -49,7 +50,6 @@ endif
 include mk/functions.mk
 include mk/tracing.mk
 include mk/clean.mk
-include mk/dist.mk
 include mk/install.mk
 include mk/libraries.mk
 include mk/programs.mk
@@ -78,6 +78,9 @@ $(foreach script, $(noinst-scripts), $(eval programs-list += $(script)))
 $(foreach template, $(template-files), $(eval $(call instantiate-template,$(template))))
 $(foreach test, $(install-tests), $(eval $(call run-install-test,$(test))))
 $(foreach file, $(man-pages), $(eval $(call install-data-in, $(file), $(mandir)/man$(patsubst .%,%,$(suffix $(file))))))
+
+
+include mk/dist.mk
 
 
 .PHONY: default all man help
