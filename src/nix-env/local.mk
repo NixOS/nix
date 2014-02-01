@@ -1,4 +1,4 @@
-PROGRAMS += nix-env
+programs += nix-env
 
 nix-env_DIR := $(d)
 

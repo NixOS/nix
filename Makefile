@@ -1,4 +1,4 @@
-SUBS = \
+makefiles = \
   src/boost/format/local.mk \
   src/libutil/local.mk \
   src/libstore/local.mk \

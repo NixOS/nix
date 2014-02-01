@@ -9,7 +9,7 @@ nix_bin_scripts := \
   $(d)/nix-pull \
   $(d)/nix-push
 
-bin_SCRIPTS += $(nix_bin_scripts)
+bin-scripts += $(nix_bin_scripts)
 
 nix_substituters := \
   $(d)/copy-from-other-stores.pl \
@@ -24,7 +24,7 @@ nix_noinst_scripts := \
   $(d)/nix-reduce-build \
   $(nix_substituters)
 
-noinst_SCRIPTS += $(nix_noinst_scripts)
+noinst-scripts += $(nix_noinst_scripts)
 
 profiledir = $(sysconfdir)/profile.d
 
@@ -34,6 +34,6 @@ $(eval $(call install-program-in, $(d)/build-remote.pl, $(libexecdir)/nix))
 $(foreach prog, $(nix_substituters), $(eval $(call install-program-in, $(prog), $(libexecdir)/nix/substituters)))
 $(eval $(call install-symlink, nix-build, $(bindir)/nix-shell))
 
-clean_files += $(nix_bin_scripts) $(nix_noinst_scripts)
+clean-files += $(nix_bin_scripts) $(nix_noinst_scripts)
 
-dist_files += $(d)/*.in
+dist-files += $(d)/*.in

@@ -1,4 +1,4 @@
-LIBS += libexpr
+libraries += libexpr
 
 libexpr_NAME = libnixexpr
 

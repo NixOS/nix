@@ -1,4 +1,4 @@
-PROGRAMS += nix-instantiate
+programs += nix-instantiate
 
 nix-instantiate_DIR := $(d)
 

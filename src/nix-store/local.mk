@@ -1,4 +1,4 @@
-PROGRAMS += nix-store
+programs += nix-store
 
 nix-store_DIR := $(d)
 

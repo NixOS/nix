@@ -1,4 +1,4 @@
-PROGRAMS += nix-hash
+programs += nix-hash
 
 nix-hash_DIR := $(d)
 

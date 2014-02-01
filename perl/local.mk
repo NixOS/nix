@@ -17,7 +17,7 @@ ifeq ($(perlbindings), yes)
   $(d)/lib/Nix/Store.cc: $(d)/lib/Nix/Store.xs
 	xsubpp $^ -output $@
 
-  LIBS += Store
+  libraries += Store
 
   Store_DIR := $(d)/lib/Nix
 
@@ -37,6 +37,6 @@ ifeq ($(perlbindings), yes)
 
 endif
 
-clean_files += $(d)/lib/Nix/Config.pm $(d)/lib/Nix/Store.cc
+clean-files += $(d)/lib/Nix/Config.pm $(d)/lib/Nix/Store.cc
 
-dist_files += $(nix_perl_sources)
+dist-files += $(nix_perl_sources)

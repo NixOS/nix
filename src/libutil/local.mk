@@ -1,4 +1,4 @@
-LIBS += libutil
+libraries += libutil
 
 libutil_NAME = libnixutil
 

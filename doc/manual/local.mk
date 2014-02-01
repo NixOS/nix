@@ -26,7 +26,7 @@ $(d)/manual.is-valid: $(d)/manual.xmli
 	  $(xmllint) --nonet --noout --relaxng $(docbookrng)/docbook.rng -
 	@touch $@
 
-clean_files += $(d)/manual.xmli $(d)/version.txt $(d)/manual.is-valid
+clean-files += $(d)/manual.xmli $(d)/version.txt $(d)/manual.is-valid
 
 
 # Generate man pages.
@@ -43,7 +43,7 @@ $(man-pages): $(d)/manual.xmli $(d)/manual.is-valid
 	  $(docbookxsl)/profiling/profile.xsl $< 2> /dev/null | \
 	  (cd doc/manual && $(XSLTPROC) $(docbookxsl)/manpages/docbook.xsl -)
 
-clean_files += $(d)/*.1 $(d)/*.5 $(d)/*.8
+clean-files += $(d)/*.1 $(d)/*.5 $(d)/*.8
 
 
 # Generate the HTML manual.
@@ -62,7 +62,7 @@ $(eval $(call install-symlink, manual.html, $(docdir)/manual/index.html))
 
 all: $(d)/manual.html
 
-clean_files += $(d)/manual.html
+clean-files += $(d)/manual.html
 
 
 # Generate the PDF manual.
@@ -76,4 +76,4 @@ $(d)/manual.pdf: $(d)/manual.xml $(MANUAL_SRCS) $(d)/manual.is-valid
 		exit 1; \
 	fi
 
-clean_files += $(d)/manual.pdf
+clean-files += $(d)/manual.pdf

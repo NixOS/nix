@@ -1,4 +1,4 @@
-PROGRAMS += nix-daemon
+programs += nix-daemon
 
 nix-daemon_DIR := $(d)
 

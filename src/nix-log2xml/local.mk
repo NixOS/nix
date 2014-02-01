@@ -1,4 +1,4 @@
-PROGRAMS += nix-log2xml
+programs += nix-log2xml
 
 nix-log2xml_DIR := $(d)
 

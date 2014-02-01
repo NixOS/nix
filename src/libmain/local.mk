@@ -1,4 +1,4 @@
-LIBS += libmain
+libraries += libmain
 
 libmain_NAME = libnixmain
 

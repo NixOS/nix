@@ -2,4 +2,4 @@ corepkgs_FILES = nar.nix buildenv.nix buildenv.pl unpack-channel.nix derivation.
 
 $(foreach file,config.nix $(corepkgs_FILES),$(eval $(call install-data-in,$(d)/$(file),$(datadir)/nix/corepkgs)))
 
-template_files += $(d)/config.nix
+template-files += $(d)/config.nix

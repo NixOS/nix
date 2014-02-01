@@ -12,10 +12,10 @@ nix_tests = \
   multiple-outputs.sh import-derivation.sh fetchurl.sh optimise-store.sh \
   binary-cache.sh nix-profile.sh
 
-INSTALL_TESTS += $(foreach x, $(nix_tests), tests/$(x))
+install-tests += $(foreach x, $(nix_tests), tests/$(x))
 
-TESTS_ENVIRONMENT = NIX_REMOTE= $(bash) -e
+tests-environment = NIX_REMOTE= $(bash) -e
 
-clean_files += $(d)/common.sh
+clean-files += $(d)/common.sh
 
 installcheck: $(d)/common.sh

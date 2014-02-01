@@ -1,4 +1,4 @@
-LIBS += libstore
+libraries += libstore
 
 libstore_NAME = libnixstore
 

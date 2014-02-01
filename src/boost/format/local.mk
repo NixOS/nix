@@ -1,4 +1,4 @@
-LIBS += libformat
+libraries += libformat
 
 libformat_NAME = libnixformat
 
