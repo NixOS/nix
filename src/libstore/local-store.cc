@@ -354,10 +354,14 @@ int LocalStore::getSchema()
 
 void LocalStore::openDB(bool create)
 {
+    if (access(settings.nixDBPath.c_str(), R_OK | W_OK))
+        throw SysError(format("Nix database directory `%1%' is not writable") % settings.nixDBPath);
+
     /* Open the Nix database. */
-    if (sqlite3_open_v2((settings.nixDBPath + "/db.sqlite").c_str(), &db.db,
+    string dbPath = settings.nixDBPath + "/db.sqlite";
+    if (sqlite3_open_v2(dbPath.c_str(), &db.db,
             SQLITE_OPEN_READWRITE | (create ? SQLITE_OPEN_CREATE : 0), 0) != SQLITE_OK)
-        throw Error("cannot open SQLite database");
+        throw Error(format("cannot open Nix database `%1%'") % dbPath);
 
     if (sqlite3_busy_timeout(db, 60 * 60 * 1000) != SQLITE_OK)
         throwSQLiteError(db, "setting timeout");
