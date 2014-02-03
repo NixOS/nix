@@ -1274,7 +1274,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
             if (isValidPath_(i->path))
                 updatePathInfo(*i);
             else
-                addValidPath(*i);
+                addValidPath(*i, false);
             paths.insert(i->path);
         }
 
@@ -1283,6 +1283,17 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
             foreach (PathSet::iterator, j, i->references)
                 addReference(referrer, queryValidPathId(*j));
         }
+
+        /* Check that the derivation outputs are correct.  We can't do
+           this in addValidPath() above, because the references might
+           not be valid yet. */
+        foreach (ValidPathInfos::const_iterator, i, infos)
+            if (isDerivation(i->path)) {
+                // FIXME: inefficient; we already loaded the
+                // derivation in addValidPath().
+                Derivation drv = parseDerivation(readFile(i->path));
+                checkDerivationOutputs(i->path, drv);
+            }
 
         /* Do a topological sort of the paths.  This will throw an
            error if a cycle is detected and roll back the
