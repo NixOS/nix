@@ -35,7 +35,7 @@
         <arg choice='plain'>
           <option>--eval-only</option>
           <arg><option>--strict</option></arg>
-          <arg><option>--no-readonly-mode</option></arg>
+          <arg><option>--read-write-mode</option></arg>
         </arg>
         <arg choice='plain'><option>--find-file</option></arg>
       </group>
@@ -141,7 +141,7 @@ policies.</para>
 
   </varlistentry>
 
-  <varlistentry><term><option>--no-readonly-mode</option></term>
+  <varlistentry><term><option>--read-write-mode</option></term>
 
     <listitem><para>When used with <option>--eval-only</option>,
     perform evaluation in read/write mode so nix language features
