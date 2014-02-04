@@ -379,6 +379,7 @@ expr_simple
           $$ = new ExprVar(CUR_POS, data->symbols.create($1));
   }
   | INT { $$ = new ExprInt($1); }
+  | DOLLAR_CURLY expr '}' { $$ = new ExprConcatStrings(true, new vector<Expr*>(1, $2)); }
   | '"' string_parts '"' { $$ = $2; }
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
       $$ = stripIndentation(data->symbols, *$2);
