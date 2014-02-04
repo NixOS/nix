@@ -107,7 +107,7 @@ void run(Strings args)
             settings.readOnlyMode = true;
             evalOnly = true;
         }
-        else if (arg == "--no-readonly-mode") {
+        else if (arg == "--read-write-mode") {
             settings.readOnlyMode = false;
         }
         else if (arg == "--parse-only") {
