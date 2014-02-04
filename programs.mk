@@ -15,7 +15,7 @@ programs-list :=
 #
 # - $(1)_INSTALL_DIR: the directory where the program will be
 #   installed; defaults to $(bindir).
-define build-program =
+define build-program
   _d := $$($(1)_DIR)
   _srcs := $$(sort $$(foreach src, $$($(1)_SOURCES), $$(src)))
   $(1)_OBJS := $$(addsuffix .o, $$(basename $$(_srcs)))

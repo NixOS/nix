@@ -1,5 +1,5 @@
 # Run program $1 as part of ‘make installcheck’.
-define run-install-test =
+define run-install-test
 
   installcheck: $1
 
