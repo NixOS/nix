@@ -35,6 +35,7 @@
         <arg choice='plain'>
           <option>--eval-only</option>
           <arg><option>--strict</option></arg>
+          <arg><option>--no-readonly-mode</option></arg>
         </arg>
         <arg choice='plain'><option>--find-file</option></arg>
       </group>
@@ -135,6 +136,17 @@ policies.</para>
 
     <warning><para>This option can cause non-termination, because lazy
     data structures can be infinitely large.</para></warning>
+
+    </listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--no-readonly-mode</option></term>
+
+    <listitem><para>When used with <option>--eval-only</option>,
+    perform evaluation in read/write mode so nix language features
+    that require it will still work (at the cost of needing to do
+    instantiation of every evaluated derivation).</para>
 
     </listitem>
 
