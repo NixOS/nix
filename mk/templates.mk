@@ -2,7 +2,7 @@ template-files :=
 
 # Create the file $(1) from $(1).in by running config.status (which
 # substitutes all ‘@var@’ variables set by the configure script).
-define instantiate-template =
+define instantiate-template
 
   clean-files += $(1)
 

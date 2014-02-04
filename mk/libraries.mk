@@ -38,7 +38,7 @@ endif
 #
 # - BUILD_SHARED_LIBS: if equal to ‘1’, a dynamic library will be
 #   built, otherwise a static library.
-define build-library =
+define build-library
   $(1)_NAME ?= $(1)
   _d := $$(strip $$($(1)_DIR))
   _srcs := $$(sort $$(foreach src, $$($(1)_SOURCES), $$(src)))

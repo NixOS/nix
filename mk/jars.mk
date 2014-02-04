@@ -1,4 +1,4 @@
-define build-jar =
+define build-jar
   $(1)_NAME ?= $(1)
 
   _d := $$(strip $$($(1)_DIR))
