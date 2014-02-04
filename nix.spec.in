@@ -3,14 +3,14 @@
 
 Summary: The Nix software deployment system
 Name: nix
-Version: @version@
+Version: @PACKAGE_VERSION@
 Release: 2%{?dist}
 License: LGPLv2+
 %if 0%{?rhel}
 Group: Applications/System
 %endif
 URL: http://nixos.org/
-Source0: %{name}-%{version}.tar.gz
+Source0: %{name}-%{version}.tar.bz2
 %if 0%{?el5}
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 %endif
@@ -29,7 +29,7 @@ BuildRequires: sqlite-devel
 
 # Hack to make that shitty RPM scanning hack shut up.
 Provides: perl(Nix::SSH)
-                                                               
+
 %description
 Nix is a purely functional package manager. It allows multiple
 versions of a package to be installed side-by-side, ensures that
@@ -138,7 +138,7 @@ done
 chmod -x $RPM_BUILD_ROOT%{_sysconfdir}/profile.d/nix.sh
 
 # systemd not available on RHEL yet
-%if ! 0%{?rhel} 
+%if ! 0%{?rhel}
 # install systemd service descriptor
 mkdir -p $RPM_BUILD_ROOT%{_prefix}/lib/systemd/system
 cp -p misc/systemd/nix-daemon.service \
