@@ -22,7 +22,9 @@ define build-program
   _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_PATH))
   $(1)_PATH := $$(_d)/$(1)
 
-  $$($(1)_PATH): $$($(1)_OBJS) $$(_libs)
+  $$(eval $$(call create-dir,$$(_d)))
+
+  $$($(1)_PATH): $$($(1)_OBJS) $$(_libs) | $$(_d)
 	$$(trace-ld) $(CXX) -o $$@ $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
 
   $(1)_INSTALL_DIR ?= $$(bindir)

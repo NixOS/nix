@@ -4,7 +4,7 @@ define create-dir
   ifndef $(1)_SEEN
     $(1)_SEEN = 1
     $(1):
-	$$(trace-install) install -d $(1)
+	$$(trace-mkdir) install -d $(1)
   endif
 endef
 
