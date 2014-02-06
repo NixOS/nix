@@ -834,6 +834,24 @@ static void opClearFailedPaths(Strings opFlags, Strings opArgs)
 }
 
 
+// Serve the nix store in a way usable by a restricted ssh user
+static void opServe(Strings opFlags, Strings opArgs)
+{
+    if (!opArgs.empty())
+        throw UsageError("no arguments expected");
+    // Could eventually take a username argument?
+    bool sign;
+    foreach (Strings::iterator, i, opFlags)
+        if (*i == "--sign") sign = true;
+        else throw UsageError(format("unknown flag `%1%'") % *i);
+
+    FdSource in(STDIN_FILENO);
+    FdSink out(STDOUT_FILENO);
+
+    store->serve(in, out, sign);
+}
+
+
 /* Scan the arguments; find the operation, set global flags, put all
    other flags in a list, and put all other arguments in another
    list. */
@@ -904,6 +922,8 @@ void run(Strings args)
             indirectRoot = true;
         else if (arg == "--no-output")
             noOutput = true;
+        else if (arg == "--serve")
+            op = opServe;
         else if (arg[0] == '-') {
             opFlags.push_back(arg);
             if (arg == "--max-freed" || arg == "--max-links" || arg == "--max-atime") { /* !!! hack */
