@@ -3,9 +3,6 @@ define run-install-test
 
   installcheck: $1
 
-  # Run the test in its own directory to mimick Automake behaviour.
-  $1.run: $1 $(_PREV_TEST)
-
   _installcheck-list += $1
 
 endef
