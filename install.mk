@@ -1,10 +1,11 @@
 # Add a rule for creating $(1) as a directory.  This template may be
 # called multiple times for the same directory.
 define create-dir
-  ifndef $(1)_SEEN
-    $(1)_SEEN = 1
-    $(1):
-	$$(trace-mkdir) install -d $(1)
+   _i := $(DESTDIR)$$(strip $(1))
+  ifndef $$(_i)_SEEN
+    $$(_i)_SEEN = 1
+    $$(_i):
+	$$(trace-mkdir) install -d "$$@"
   endif
 endef
 
@@ -13,12 +14,14 @@ endef
 # The directory containing $(2) will be created automatically.
 define install-file-as
 
-  install: $(2)
+  _i := $(DESTDIR)$$(strip $(2))
 
-  $$(eval $$(call create-dir,$$(dir $(2))))
+  install: $$(_i)
 
-  $(2): $(1) | $$(dir $(2))
-	$$(trace-install) install -m $(3) $(1) $(2)
+  $$(_i): $(1) | $$(dir $$(_i))
+	$$(trace-install) install -m $(3) $(1) "$$@"
+
+  $$(eval $$(call create-dir, $$(dir $(2))))
 
 endef
 
@@ -43,12 +46,14 @@ endef
 # Install a symlink from $(2) to $(1).  Note that $(1) need not exist.
 define install-symlink
 
-  install: $(2)
+  _i := $(DESTDIR)$$(strip $(2))
 
-  $$(eval $$(call create-dir,$$(dir $(2))))
+  install: $$(_i)
 
-  $(2): | $$(dir $(2))
-	$$(trace-install) ln -sfn $(1) $(2)
+  $$(_i): | $$(dir $$(_i))
+	$$(trace-install) ln -sfn $(1) "$$@"
+
+  $$(eval $$(call create-dir, $$(dir $(2))))
 
 endef
 
