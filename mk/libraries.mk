@@ -50,6 +50,8 @@ define build-library
   $(1)_LDFLAGS_USE :=
   $(1)_LDFLAGS_USE_INSTALLED :=
 
+  $$(eval $$(call create-dir, $$(_d)))
+
   ifeq ($(BUILD_SHARED_LIBS), 1)
 
     ifdef $(1)_ALLOW_UNDEFINED
@@ -64,21 +66,21 @@ define build-library
 
     $(1)_PATH := $$(_d)/$$($(1)_NAME).$(SO_EXT)
 
-    $$($(1)_PATH): $$($(1)_OBJS) $$(_libs)
+    $$($(1)_PATH): $$($(1)_OBJS) $$(_libs) | $$(_d)
 	$$(trace-ld) $(CXX) -o $$@ -shared $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
 
     $(1)_LDFLAGS_USE += -L$$(_d) -Wl,-rpath,$$(abspath $$(_d)) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
 
-    $(1)_INSTALL_PATH := $$($(1)_INSTALL_DIR)/$$($(1)_NAME).$(SO_EXT)
+    $(1)_INSTALL_PATH := $(DESTDIR)$$($(1)_INSTALL_DIR)/$$($(1)_NAME).$(SO_EXT)
 
     _libs_final := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_INSTALL_PATH))
 
-    $$(eval $$(call create-dir,$$($(1)_INSTALL_DIR)))
+    $$(eval $$(call create-dir, $$($(1)_INSTALL_DIR)))
 
-    $$($(1)_INSTALL_PATH): $$($(1)_OBJS) $$(_libs_final) | $$($(1)_INSTALL_DIR)
+    $$($(1)_INSTALL_PATH): $$($(1)_OBJS) $$(_libs_final) | $(DESTDIR)$$($(1)_INSTALL_DIR)
 	$$(trace-ld) $(CXX) -o $$@ -shared $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
 
-    $(1)_LDFLAGS_USE_INSTALLED += -L$$($(1)_INSTALL_DIR) -Wl,-rpath,$$($(1)_INSTALL_DIR) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
+    $(1)_LDFLAGS_USE_INSTALLED += -L$$(DESTDIR)$$($(1)_INSTALL_DIR) -Wl,-rpath,$$($(1)_INSTALL_DIR) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
 
     ifdef $(1)_FORCE_INSTALL
       install: $$($(1)_INSTALL_PATH)
@@ -88,7 +90,7 @@ define build-library
 
     $(1)_PATH := $$(_d)/$$($(1)_NAME).a
 
-    $$($(1)_PATH): $$($(1)_OBJS)
+    $$($(1)_PATH): $$($(1)_OBJS) | $$(_d)
 	$(trace-ar) ar crs $$@ $$?
 
     $(1)_LDFLAGS_USE += $$($(1)_PATH) $$($(1)_LDFLAGS)

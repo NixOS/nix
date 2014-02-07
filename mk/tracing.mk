@@ -10,6 +10,7 @@ ifeq ($(V), 0)
   trace-install = @echo "  INST  " $@;
   trace-javac   = @echo "  JAVAC " $@;
   trace-jar     = @echo "  JAR   " $@;
+  trace-mkdir   = @echo "  MKDIR " $@;
 
   suppress  = @
 
