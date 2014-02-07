@@ -17,6 +17,7 @@ docbookrng = @docbookrng@
 docbookxsl = @docbookxsl@
 docdir = @docdir@
 exec_prefix = @exec_prefix@
+includedir = @includedir@
 libdir = @libdir@
 libexecdir = @libexecdir@
 localstatedir = @localstatedir@
