@@ -260,32 +260,31 @@ string StoreAPI::makeValidityRegistration(const PathSet & paths,
 
 void StoreAPI::serve(Source & in, Sink & out, bool sign)
 {
-    for (string cmd = readString(in); !cmd.empty(); cmd = readString(in)) {
-        if (cmd == "query") {
-            for (cmd = readString(in); !cmd.empty(); cmd = readString(in)) {
-                PathSet paths = readStrings<PathSet>(in);
-                if (cmd == "have") {
-                    writeStrings(queryValidPaths(paths), out);
-                } else if (cmd == "info") {
-                    // !!! Maybe we want a queryPathInfos?
-                    foreach (PathSet::iterator, i, paths) {
-                        ValidPathInfo info = queryPathInfo(*i);
-                        writeString(info.path, out);
-                        writeString(info.deriver, out);
-                        writeStrings(info.references, out);
-                        // !!! Maybe we want compression?
-                        writeLongLong(info.narSize, out); // downloadSize
-                        writeLongLong(info.narSize, out);
-                    }
-                    writeString("", out);
-                } else
-                    throw Error(format("Unknown serve query `%1%'") % cmd);
-            }
-        } else if (cmd == "substitute")
-            exportPath(readString(in), sign, out);
-        else
-            throw Error(format("Unknown serve command `%1%'") % cmd);
-    }
+    string cmd = readString(in);
+    if (cmd == "query") {
+        for (cmd = readString(in); !cmd.empty(); cmd = readString(in)) {
+            PathSet paths = readStrings<PathSet>(in);
+            if (cmd == "have") {
+                writeStrings(queryValidPaths(paths), out);
+            } else if (cmd == "info") {
+                // !!! Maybe we want a queryPathInfos?
+                foreach (PathSet::iterator, i, paths) {
+                    ValidPathInfo info = queryPathInfo(*i);
+                    writeString(info.path, out);
+                    writeString(info.deriver, out);
+                    writeStrings(info.references, out);
+                    // !!! Maybe we want compression?
+                    writeLongLong(info.narSize, out); // downloadSize
+                    writeLongLong(info.narSize, out);
+                }
+                writeString("", out);
+            } else
+                throw Error(format("Unknown serve query `%1%'") % cmd);
+        }
+    } else if (cmd == "substitute")
+        exportPath(readString(in), sign, out);
+    else
+        throw Error(format("Unknown serve command `%1%'") % cmd);
 }
 
 
