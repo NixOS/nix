@@ -97,20 +97,19 @@ void run(Strings args)
     bool strict = false;
     Strings attrPaths;
     Bindings autoArgs;
+    bool wantsReadWrite = false;
 
     for (Strings::iterator i = args.begin(); i != args.end(); ) {
         string arg = *i++;
 
         if (arg == "-")
             readStdin = true;
-        else if (arg == "--eval-only") {
-            settings.readOnlyMode = true;
+        else if (arg == "--eval-only")
             evalOnly = true;
-        }
-        else if (arg == "--parse-only") {
-            settings.readOnlyMode = true;
+        else if (arg == "--read-write-mode")
+            wantsReadWrite = true;
+        else if (arg == "--parse-only")
             parseOnly = evalOnly = true;
-        }
         else if (arg == "--find-file")
             findFile = true;
         else if (arg == "--attr" || arg == "-A") {
@@ -142,6 +141,9 @@ void run(Strings args)
         else
             files.push_back(arg);
     }
+
+    if (evalOnly && !wantsReadWrite)
+        settings.readOnlyMode = true;
 
     if (attrPaths.empty()) attrPaths.push_back("");
 
