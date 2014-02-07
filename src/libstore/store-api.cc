@@ -259,7 +259,7 @@ string StoreAPI::makeValidityRegistration(const PathSet & paths,
 }
 
 
-void StoreAPI::serve(Source & in, Sink & out)
+void StoreAPI::serve(Source & in, BufferedSink & out)
 {
     string cmd = readString(in);
     if (cmd == "query") {
@@ -283,6 +283,7 @@ void StoreAPI::serve(Source & in, Sink & out)
                 writeString("", out);
             } else
                 throw Error(format("Unknown serve query `%1%'") % cmd);
+            out.flush();
         }
     } else if (cmd == "substitute")
         dumpPath(readString(in), out);

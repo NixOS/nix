@@ -251,7 +251,7 @@ public:
 
     /* Serve the store for ssh substituters by taking commands
      * from in and printing results to out */
-    void serve(Source & in, Sink & out);
+    void serve(Source & in, BufferedSink & out);
 };
 
 
