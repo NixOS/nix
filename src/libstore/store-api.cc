@@ -269,6 +269,8 @@ void StoreAPI::serve(Source & in, Sink & out, bool sign)
             } else if (cmd == "info") {
                 // !!! Maybe we want a queryPathInfos?
                 foreach (PathSet::iterator, i, paths) {
+                    if (!isValidPath(*i))
+                        continue;
                     ValidPathInfo info = queryPathInfo(*i);
                     writeString(info.path, out);
                     writeString(info.deriver, out);
