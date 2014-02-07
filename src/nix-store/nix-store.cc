@@ -837,18 +837,12 @@ static void opClearFailedPaths(Strings opFlags, Strings opArgs)
 // Serve the nix store in a way usable by a restricted ssh user
 static void opServe(Strings opFlags, Strings opArgs)
 {
-    if (!opArgs.empty())
-        throw UsageError("no arguments expected");
-    // Could eventually take a username argument?
-    bool sign;
-    foreach (Strings::iterator, i, opFlags)
-        if (*i == "--sign") sign = true;
-        else throw UsageError(format("unknown flag `%1%'") % *i);
-
+    if (!opArgs.empty() || !opFlags.empty())
+        throw UsageError("no arguments or flags expected");
     FdSource in(STDIN_FILENO);
     FdSink out(STDOUT_FILENO);
 
-    store->serve(in, out, sign);
+    store->serve(in, out);
 }
 
 

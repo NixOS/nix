@@ -1,6 +1,7 @@
 #include "store-api.hh"
 #include "globals.hh"
 #include "util.hh"
+#include "archive.hh"
 
 #include <climits>
 
@@ -258,7 +259,7 @@ string StoreAPI::makeValidityRegistration(const PathSet & paths,
 }
 
 
-void StoreAPI::serve(Source & in, Sink & out, bool sign)
+void StoreAPI::serve(Source & in, Sink & out)
 {
     string cmd = readString(in);
     if (cmd == "query") {
@@ -284,7 +285,7 @@ void StoreAPI::serve(Source & in, Sink & out, bool sign)
                 throw Error(format("Unknown serve query `%1%'") % cmd);
         }
     } else if (cmd == "substitute")
-        exportPath(readString(in), sign, out);
+        dumpPath(readString(in), out);
     else
         throw Error(format("Unknown serve command `%1%'") % cmd);
 }
