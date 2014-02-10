@@ -124,15 +124,19 @@ let
           storePaths=$(perl ${pathsFromGraph} ./closure)
           printRegistration=1 perl ${pathsFromGraph} ./closure > $TMPDIR/reginfo
           substitute ${./scripts/install-nix-from-closure.sh} $TMPDIR/install \
-            --subst-var-by nix ${toplevel} --subst-var-by regInfo /nix/store/reginfo
+            --subst-var-by nix ${toplevel}
           chmod +x $TMPDIR/install
-          fn=$out/nix-${version}-${system}.tar.bz2
+          dir=nix-${version}-${system}
+          fn=$out/$dir.tar.bz2
           mkdir -p $out/nix-support
           echo "file binary-dist $fn" >> $out/nix-support/hydra-build-products
           tar cvfj $fn \
-            --owner=0 --group=0 --absolute-names \
-            --transform "s,$TMPDIR/install,/usr/bin/nix-finish-install," \
-            --transform "s,$TMPDIR/reginfo,/nix/store/reginfo," \
+            --owner=0 --group=0 --mode=u+rw,uga+r \
+            --absolute-names \
+            --hard-dereference \
+            --transform "s,$TMPDIR/install,$dir/install," \
+            --transform "s,$TMPDIR/reginfo,$dir/.reginfo," \
+            --transform "s,$NIX_STORE,$dir/store,S" \
             $TMPDIR/install $TMPDIR/reginfo $storePaths
         '');
 

@@ -69,27 +69,26 @@ $ dpkg -i nix_1.0-1_amd64.deb</screen>
 
 <para>For other platforms, including Mac OS X (Darwin), FreeBSD and
 other Linux distributions, you can download a binary tarball.  It
-contains Nix and all its dependencies.  You should unpack it in the
-root directory, then run <command>nix-finish-install</command>:
+contains Nix and all its dependencies.  You should unpack it somewhere
+(e.g. in <filename>/tmp</filename>), and then run the script named
+<command>install</command> inside the binary tarball:
 
 <screen>
-$ cd /
-$ tar xfj nix-1.1-x86_64-darwin.tar.bz2
-$ nix-finish-install
+alice$ cd /tmp
+alice$ tar xfj nix-1.1-x86_64-darwin.tar.bz2
+alice$ cd nix-1.1-x86_64-darwin
+alice$ ./install
 </screen>
 
-After this you can delete
-<filename>/usr/bin/nix-finish-install</filename>.</para>
-
-<para>If you plan to use Nix from a single non-root user account, it’s
-probably convenient to change the ownership of the entire Nix store
-and database to that user account.  In that case, install as follows:
+You should run this under your usual user account,
+<emphasis>not</emphasis> as root.  The script will invoke
+<command>sudo</command> to create <filename>/nix</filename> if it
+doesn’t already exist.  If you don’t have <command>sudo</command>, you
+should manually create <command>/nix</command> first as root:
 
 <screen>
-alice$ cd /
-alice$ sudo tar xfj nix-1.1-x86_64-darwin.tar.bz2
-alice$ sudo chown -R alice /nix
-alice$ nix-finish-install
+$ mkdir /nix
+$ chown alice /nix
 </screen>
 
 </para>
