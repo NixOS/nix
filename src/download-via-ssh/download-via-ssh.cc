@@ -4,6 +4,7 @@
 #include "archive.hh"
 #include "affinity.hh"
 #include "globals.hh"
+#include "serve-protocol.hh"
 
 #include <iostream>
 #include <unistd.h>
@@ -54,7 +55,7 @@ static pair<FdSink, FdSource> connect(string conn) {
 }
 
 static void substitute(pair<FdSink, FdSource> & pipes, Path storePath, Path destPath) {
-    writeString("substitute", pipes.first);
+    writeInt(cmdSubstitute, pipes.first);
     writeString(storePath, pipes.first);
     pipes.first.flush();
     restorePath(destPath, pipes.second);
@@ -63,20 +64,24 @@ static void substitute(pair<FdSink, FdSource> & pipes, Path storePath, Path dest
 
 static void query(pair<FdSink, FdSource> & pipes) {
     using std::cin;
-    writeString("query", pipes.first);
+    writeInt(cmdQuery, pipes.first);
     for (string line; getline(cin, line);) {
         Strings tokenized = tokenizeString<Strings>(line);
         string cmd = tokenized.front();
-        writeString(cmd, pipes.first);
         tokenized.pop_front();
-        foreach (Strings::iterator, i, tokenized)
-        writeStrings(tokenized, pipes.first);
-        pipes.first.flush();
         if (cmd == "have") {
+            writeInt(qCmdHave, pipes.first);
+            foreach (Strings::iterator, i, tokenized)
+            writeStrings(tokenized, pipes.first);
+            pipes.first.flush();
             PathSet paths = readStrings<PathSet>(pipes.second);
             foreach (PathSet::iterator, i, paths)
                 cout << *i << endl;
         } else if (cmd == "info") {
+            writeInt(qCmdInfo, pipes.first);
+            foreach (Strings::iterator, i, tokenized)
+            writeStrings(tokenized, pipes.first);
+            pipes.first.flush();
             for (Path path = readString(pipes.second); !path.empty(); path = readString(pipes.second)) {
                 cout << path << endl;
                 cout << readString(pipes.second) << endl;
@@ -91,7 +96,6 @@ static void query(pair<FdSink, FdSource> & pipes) {
             throw Error(format("Unknown substituter query `%1%'") % cmd);
         cout << endl;
     }
-    writeString("", pipes.first);
 }
 
 void run(Strings args)
@@ -105,6 +109,16 @@ void run(Strings args)
     cout << endl;
 
     pair<FdSink, FdSource> pipes = connect(settings.sshSubstituterHosts.front());
+
+    /* Exchange the greeting */
+    writeInt(SERVE_MAGIC_1, pipes.first);
+    pipes.first.flush();
+    unsigned int magic = readInt(pipes.second);
+    if (magic != SERVE_MAGIC_2)
+        throw Error("protocol mismatch");
+    readInt(pipes.second); // Server version, unused for now
+    writeInt(SERVE_PROTOCOL_VERSION, pipes.first);
+    pipes.first.flush();
 
     Strings::iterator i = args.begin();
     if (*i == "--query")

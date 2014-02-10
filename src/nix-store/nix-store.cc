@@ -6,6 +6,7 @@
 #include "xmlgraph.hh"
 #include "local-store.hh"
 #include "util.hh"
+#include "serve-protocol.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -843,34 +844,61 @@ static void opServe(Strings opFlags, Strings opArgs)
     FdSource in(STDIN_FILENO);
     FdSink out(STDOUT_FILENO);
 
-    string cmd = readString(in);
-    if (cmd == "query") {
-        for (cmd = readString(in); !cmd.empty(); cmd = readString(in)) {
-            PathSet paths = readStrings<PathSet>(in);
-            if (cmd == "have") {
-                writeStrings(store->queryValidPaths(paths), out);
-            } else if (cmd == "info") {
-                // !!! Maybe we want a queryPathInfos?
-                foreach (PathSet::iterator, i, paths) {
-                    if (!store->isValidPath(*i))
-                        continue;
-                    ValidPathInfo info = store->queryPathInfo(*i);
-                    writeString(info.path, out);
-                    writeString(info.deriver, out);
-                    writeStrings(info.references, out);
-                    // !!! Maybe we want compression?
-                    writeLongLong(info.narSize, out); // downloadSize
-                    writeLongLong(info.narSize, out);
+    /* Exchange the greeting. */
+    unsigned int magic = readInt(in);
+    if (magic != SERVE_MAGIC_1) throw Error("protocol mismatch");
+    writeInt(SERVE_MAGIC_2, out);
+    writeInt(SERVE_PROTOCOL_VERSION, out);
+    out.flush();
+    readInt(in); // Client version, unused for now
+
+    ServeCommand cmd = (ServeCommand) readInt(in);
+    switch (cmd) {
+        case cmdQuery:
+            while (true) {
+                QueryCommand qCmd;
+                try {
+                    qCmd = (QueryCommand) readInt(in);
+                } catch (EndOfFile & e) {
+                    break;
                 }
-                writeString("", out);
-            } else
-                throw Error(format("Unknown serve query `%1%'") % cmd);
-            out.flush();
-        }
-    } else if (cmd == "substitute")
-        dumpPath(readString(in), out);
-    else
-        throw Error(format("Unknown serve command `%1%'") % cmd);
+                switch (qCmd) {
+                    case qCmdHave:
+                        {
+                            PathSet paths = readStrings<PathSet>(in);
+                            writeStrings(store->queryValidPaths(paths), out);
+                        }
+                        break;
+                    case qCmdInfo:
+                        {
+                            PathSet paths = readStrings<PathSet>(in);
+                            // !!! Maybe we want a queryPathInfos?
+                            foreach (PathSet::iterator, i, paths) {
+                                if (!store->isValidPath(*i))
+                                    continue;
+                                ValidPathInfo info = store->queryPathInfo(*i);
+                                writeString(info.path, out);
+                                writeString(info.deriver, out);
+                                writeStrings(info.references, out);
+                                // !!! Maybe we want compression?
+                                writeLongLong(info.narSize, out); // downloadSize
+                                writeLongLong(info.narSize, out);
+                            }
+                            writeString("", out);
+                        }
+                        break;
+                    default:
+                        throw Error(format("Unknown serve query `%1%'") % cmd);
+                }
+                out.flush();
+            }
+            break;
+        case cmdSubstitute:
+            dumpPath(readString(in), out);
+            break;
+        default:
+            throw Error(format("Unknown serve command `%1%'") % cmd);
+    }
 }
 
 
