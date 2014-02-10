@@ -46,7 +46,8 @@ static pair<FdSink, FdSource> connect(string conn) {
             }
             _exit(1);
     }
-    // If child exits unexpectedly, we'll EPIPE. If we exit unexpectedly, child will
+    // If child exits unexpectedly, we'll EPIPE or EOF early.
+    // If we exit unexpectedly, child will EPIPE or EOF early.
     // So no need to keep track of it.
 
     return pair<FdSink, FdSource>(to.writeSide.borrow(), from.readSide.borrow());
