@@ -149,7 +149,8 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
     }
 }
 
-@exprs = ("./default.nix") if scalar @exprs == 0;
+@exprs = ("shell.nix") if scalar @exprs == 0 && $runEnv && -e "shell.nix";
+@exprs = ("default.nix") if scalar @exprs == 0;
 
 $ENV{'IN_NIX_SHELL'} = 1 if $runEnv;
 
