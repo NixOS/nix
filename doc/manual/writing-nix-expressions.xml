@@ -1745,7 +1745,8 @@ impureEnvVars = [ "http_proxy" "https_proxy" <replaceable>...</replaceable> ];
     enabled</link>, then, if possible, perform this build locally
     instead of forwarding it to a remote machine.  This is appropriate
     for trivial builders where the cost of doing a remote build would
-    exceed the cost of building locally.</para></listitem>
+    exceed the cost of building locally.  No binary substitutes are made
+    using this option.</para></listitem>
 
   </varlistentry>
 
