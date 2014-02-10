@@ -1,7 +1,6 @@
 #include "store-api.hh"
 #include "globals.hh"
 #include "util.hh"
-#include "archive.hh"
 
 #include <climits>
 
@@ -256,39 +255,6 @@ string StoreAPI::makeValidityRegistration(const PathSet & paths,
     }
 
     return s;
-}
-
-
-void StoreAPI::serve(Source & in, BufferedSink & out)
-{
-    string cmd = readString(in);
-    if (cmd == "query") {
-        for (cmd = readString(in); !cmd.empty(); cmd = readString(in)) {
-            PathSet paths = readStrings<PathSet>(in);
-            if (cmd == "have") {
-                writeStrings(queryValidPaths(paths), out);
-            } else if (cmd == "info") {
-                // !!! Maybe we want a queryPathInfos?
-                foreach (PathSet::iterator, i, paths) {
-                    if (!isValidPath(*i))
-                        continue;
-                    ValidPathInfo info = queryPathInfo(*i);
-                    writeString(info.path, out);
-                    writeString(info.deriver, out);
-                    writeStrings(info.references, out);
-                    // !!! Maybe we want compression?
-                    writeLongLong(info.narSize, out); // downloadSize
-                    writeLongLong(info.narSize, out);
-                }
-                writeString("", out);
-            } else
-                throw Error(format("Unknown serve query `%1%'") % cmd);
-            out.flush();
-        }
-    } else if (cmd == "substitute")
-        dumpPath(readString(in), out);
-    else
-        throw Error(format("Unknown serve command `%1%'") % cmd);
 }
 
 

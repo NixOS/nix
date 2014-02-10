@@ -248,10 +248,6 @@ public:
        `nix-store --register-validity'. */
     string makeValidityRegistration(const PathSet & paths,
         bool showDerivers, bool showHash);
-
-    /* Serve the store for ssh substituters by taking commands
-     * from in and printing results to out */
-    void serve(Source & in, BufferedSink & out);
 };
 
 

@@ -839,10 +839,38 @@ static void opServe(Strings opFlags, Strings opArgs)
 {
     if (!opArgs.empty() || !opFlags.empty())
         throw UsageError("no arguments or flags expected");
+
     FdSource in(STDIN_FILENO);
     FdSink out(STDOUT_FILENO);
 
-    store->serve(in, out);
+    string cmd = readString(in);
+    if (cmd == "query") {
+        for (cmd = readString(in); !cmd.empty(); cmd = readString(in)) {
+            PathSet paths = readStrings<PathSet>(in);
+            if (cmd == "have") {
+                writeStrings(store->queryValidPaths(paths), out);
+            } else if (cmd == "info") {
+                // !!! Maybe we want a queryPathInfos?
+                foreach (PathSet::iterator, i, paths) {
+                    if (!store->isValidPath(*i))
+                        continue;
+                    ValidPathInfo info = store->queryPathInfo(*i);
+                    writeString(info.path, out);
+                    writeString(info.deriver, out);
+                    writeStrings(info.references, out);
+                    // !!! Maybe we want compression?
+                    writeLongLong(info.narSize, out); // downloadSize
+                    writeLongLong(info.narSize, out);
+                }
+                writeString("", out);
+            } else
+                throw Error(format("Unknown serve query `%1%'") % cmd);
+            out.flush();
+        }
+    } else if (cmd == "substitute")
+        dumpPath(readString(in), out);
+    else
+        throw Error(format("Unknown serve command `%1%'") % cmd);
 }
 
 
