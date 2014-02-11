@@ -8,6 +8,10 @@ programs-list :=
 #
 # - $(1)_SOURCES: the source files of the program.
 #
+# - $(1)_CFLAGS: additional C compiler flags.
+#
+# - $(1)_CXXFLAGS: additional C++ compiler flags.
+#
 # - $(1)_LIBS: the symbolic names of libraries on which this program
 #   depends.
 #
@@ -48,7 +52,8 @@ define build-program
 
   endif
 
-  # Propagate CXXFLAGS to the individual object files.
+  # Propagate CFLAGS and CXXFLAGS to the individual object files.
+  $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj)_CFLAGS=$$($(1)_CFLAGS)))
   $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj)_CXXFLAGS=$$($(1)_CXXFLAGS)))
 
   # Make each object file depend on the common dependencies.
