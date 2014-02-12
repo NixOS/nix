@@ -67,7 +67,6 @@ static void query(std::pair<FdSink, FdSource> & pipes) {
         tokenized.pop_front();
         if (cmd == "have") {
             writeInt(qCmdHave, pipes.first);
-            foreach (Strings::iterator, i, tokenized)
             writeStrings(tokenized, pipes.first);
             pipes.first.flush();
             PathSet paths = readStrings<PathSet>(pipes.second);
@@ -75,7 +74,6 @@ static void query(std::pair<FdSink, FdSource> & pipes) {
                 std::cout << *i << std::endl;
         } else if (cmd == "info") {
             writeInt(qCmdInfo, pipes.first);
-            foreach (Strings::iterator, i, tokenized)
             writeStrings(tokenized, pipes.first);
             pipes.first.flush();
             for (Path path = readString(pipes.second); !path.empty(); path = readString(pipes.second)) {
