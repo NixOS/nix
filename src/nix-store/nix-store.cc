@@ -888,7 +888,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                         }
                         break;
                     default:
-                        throw Error(format("Unknown serve query `%1%'") % cmd);
+                        throw Error(format("unknown serve query `%1%'") % cmd);
                 }
                 out.flush();
             }
@@ -897,7 +897,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             dumpPath(readString(in), out);
             break;
         default:
-            throw Error(format("Unknown serve command `%1%'") % cmd);
+            throw Error(format("unknown serve command `%1%'") % cmd);
     }
 }
 

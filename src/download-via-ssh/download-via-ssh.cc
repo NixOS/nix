@@ -89,7 +89,7 @@ static void query(std::pair<FdSink, FdSource> & pipes) {
                 std::cout << readLongLong(pipes.second) << std::endl;
             }
         } else
-            throw Error(format("Unknown substituter query `%1%'") % cmd);
+            throw Error(format("unknown substituter query `%1%'") % cmd);
         std::cout << std::endl;
     }
 }
