@@ -10,16 +10,13 @@
 #include <unistd.h>
 
 using namespace nix;
-using std::pair;
-using std::cout;
-using std::endl;
 
 // !!! TODO:
 // * Respect more than the first host
 // * use a database
 // * show progress
 
-static pair<FdSink, FdSource> connect(string conn) {
+static std::pair<FdSink, FdSource> connect(string conn) {
     Pipe to, from;
     to.create();
     from.create();
@@ -51,21 +48,20 @@ static pair<FdSink, FdSource> connect(string conn) {
     // If we exit unexpectedly, child will EPIPE or EOF early.
     // So no need to keep track of it.
 
-    return pair<FdSink, FdSource>(to.writeSide.borrow(), from.readSide.borrow());
+    return std::pair<FdSink, FdSource>(to.writeSide.borrow(), from.readSide.borrow());
 }
 
-static void substitute(pair<FdSink, FdSource> & pipes, Path storePath, Path destPath) {
+static void substitute(std::pair<FdSink, FdSource> & pipes, Path storePath, Path destPath) {
     writeInt(cmdSubstitute, pipes.first);
     writeString(storePath, pipes.first);
     pipes.first.flush();
     restorePath(destPath, pipes.second);
-    cout << endl;
+    std::cout << std::endl;
 }
 
-static void query(pair<FdSink, FdSource> & pipes) {
-    using std::cin;
+static void query(std::pair<FdSink, FdSource> & pipes) {
     writeInt(cmdQuery, pipes.first);
-    for (string line; getline(cin, line);) {
+    for (string line; getline(std::cin, line);) {
         Strings tokenized = tokenizeString<Strings>(line);
         string cmd = tokenized.front();
         tokenized.pop_front();
@@ -76,25 +72,25 @@ static void query(pair<FdSink, FdSource> & pipes) {
             pipes.first.flush();
             PathSet paths = readStrings<PathSet>(pipes.second);
             foreach (PathSet::iterator, i, paths)
-                cout << *i << endl;
+                std::cout << *i << std::endl;
         } else if (cmd == "info") {
             writeInt(qCmdInfo, pipes.first);
             foreach (Strings::iterator, i, tokenized)
             writeStrings(tokenized, pipes.first);
             pipes.first.flush();
             for (Path path = readString(pipes.second); !path.empty(); path = readString(pipes.second)) {
-                cout << path << endl;
-                cout << readString(pipes.second) << endl;
+                std::cout << path << std::endl;
+                std::cout << readString(pipes.second) << std::endl;
                 PathSet references = readStrings<PathSet>(pipes.second);
-                cout << references.size() << endl;
+                std::cout << references.size() << std::endl;
                 foreach (PathSet::iterator, i, references)
-                    cout << *i << endl;
-                cout << readLongLong(pipes.second) << endl;
-                cout << readLongLong(pipes.second) << endl;
+                    std::cout << *i << std::endl;
+                std::cout << readLongLong(pipes.second) << std::endl;
+                std::cout << readLongLong(pipes.second) << std::endl;
             }
         } else
             throw Error(format("Unknown substituter query `%1%'") % cmd);
-        cout << endl;
+        std::cout << std::endl;
     }
 }
 
@@ -106,9 +102,9 @@ void run(Strings args)
     if (settings.sshSubstituterHosts.empty())
         return;
 
-    cout << endl;
+    std::cout << std::endl;
 
-    pair<FdSink, FdSource> pipes = connect(settings.sshSubstituterHosts.front());
+    std::pair<FdSink, FdSource> pipes = connect(settings.sshSubstituterHosts.front());
 
     /* Exchange the greeting */
     writeInt(SERVE_MAGIC_1, pipes.first);
