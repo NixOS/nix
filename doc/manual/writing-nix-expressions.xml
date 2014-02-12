@@ -1740,12 +1740,15 @@ impureEnvVars = [ "http_proxy" "https_proxy" <replaceable>...</replaceable> ];
   <varlistentry><term><varname>preferLocalBuild</varname></term>
 
     <listitem><para>If this attribute is set to
-    <literal>true</literal> and <link
+    <literal>true</literal>, it has two effects.  First, the
+    derivation will always be built, not substituted, even if a
+    substitute is available.  Second, if <link
     linkend="chap-distributed-builds">distributed building is
-    enabled</link>, then, if possible, perform this build locally
-    instead of forwarding it to a remote machine.  This is appropriate
-    for trivial builders where the cost of doing a remote build would
-    exceed the cost of building locally.</para></listitem>
+    enabled</link>, then, if possible, the derivaton will be built
+    locally instead of forwarded to a remote machine.  This is
+    appropriate for trivial builders where the cost of doing a
+    download or remote build would exceed the cost of building
+    locally.</para></listitem>
 
   </varlistentry>
 
