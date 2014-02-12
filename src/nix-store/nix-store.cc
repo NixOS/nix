@@ -863,30 +863,28 @@ static void opServe(Strings opFlags, Strings opArgs)
                     break;
                 }
                 switch (qCmd) {
-                    case qCmdHave:
-                        {
-                            PathSet paths = readStrings<PathSet>(in);
-                            writeStrings(store->queryValidPaths(paths), out);
-                        }
+                    case qCmdHave: {
+                        PathSet paths = readStrings<PathSet>(in);
+                        writeStrings(store->queryValidPaths(paths), out);
                         break;
-                    case qCmdInfo:
-                        {
-                            PathSet paths = readStrings<PathSet>(in);
-                            // !!! Maybe we want a queryPathInfos?
-                            foreach (PathSet::iterator, i, paths) {
-                                if (!store->isValidPath(*i))
-                                    continue;
-                                ValidPathInfo info = store->queryPathInfo(*i);
-                                writeString(info.path, out);
-                                writeString(info.deriver, out);
-                                writeStrings(info.references, out);
-                                // !!! Maybe we want compression?
-                                writeLongLong(info.narSize, out); // downloadSize
-                                writeLongLong(info.narSize, out);
-                            }
-                            writeString("", out);
+                    }
+                    case qCmdInfo: {
+                        PathSet paths = readStrings<PathSet>(in);
+                        // !!! Maybe we want a queryPathInfos?
+                        foreach (PathSet::iterator, i, paths) {
+                            if (!store->isValidPath(*i))
+                                continue;
+                            ValidPathInfo info = store->queryPathInfo(*i);
+                            writeString(info.path, out);
+                            writeString(info.deriver, out);
+                            writeStrings(info.references, out);
+                            // !!! Maybe we want compression?
+                            writeLongLong(info.narSize, out); // downloadSize
+                            writeLongLong(info.narSize, out);
                         }
+                        writeString("", out);
                         break;
+                    }
                     default:
                         throw Error(format("unknown serve query `%1%'") % cmd);
                 }
