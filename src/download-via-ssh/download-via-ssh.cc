@@ -5,6 +5,8 @@
 #include "affinity.hh"
 #include "globals.hh"
 #include "serve-protocol.hh"
+#include "worker-protocol.hh"
+#include "store-api.hh"
 
 #include <iostream>
 #include <unistd.h>
@@ -82,10 +84,15 @@ static void query(std::pair<FdSink, FdSource> & pipes)
             writeInt(qCmdInfo, pipes.first);
             writeStrings(tokenized, pipes.first);
             pipes.first.flush();
-            for (Path path = readString(pipes.second); !path.empty(); path = readString(pipes.second)) {
+            while (1) {
+                Path path = readString(pipes.second);
+                if (path.empty()) break;
+                assertStorePath(path);
                 std::cout << path << std::endl;
-                std::cout << readString(pipes.second) << std::endl;
-                PathSet references = readStrings<PathSet>(pipes.second);
+                string deriver = readString(pipes.second);
+                if (!deriver.empty()) assertStorePath(deriver);
+                std::cout << deriver << std::endl;
+                PathSet references = readStorePaths<PathSet>(pipes.second);
                 std::cout << references.size() << std::endl;
                 foreach (PathSet::iterator, i, references)
                     std::cout << *i << std::endl;

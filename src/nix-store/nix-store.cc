@@ -7,6 +7,7 @@
 #include "local-store.hh"
 #include "util.hh"
 #include "serve-protocol.hh"
+#include "worker-protocol.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -864,12 +865,12 @@ static void opServe(Strings opFlags, Strings opArgs)
                 }
                 switch (qCmd) {
                     case qCmdHave: {
-                        PathSet paths = readStrings<PathSet>(in);
+                        PathSet paths = readStorePaths<PathSet>(in);
                         writeStrings(store->queryValidPaths(paths), out);
                         break;
                     }
                     case qCmdInfo: {
-                        PathSet paths = readStrings<PathSet>(in);
+                        PathSet paths = readStorePaths<PathSet>(in);
                         // !!! Maybe we want a queryPathInfos?
                         foreach (PathSet::iterator, i, paths) {
                             if (!store->isValidPath(*i))
