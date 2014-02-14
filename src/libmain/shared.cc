@@ -223,6 +223,9 @@ static void initAndRun(int argc, char * * argv)
         else remaining.push_back(arg);
     }
 
+    if (char *pack = getenv("_NIX_OPTIONS"))
+        settings.unpack(pack);
+
     settings.update();
 
     run(remaining);

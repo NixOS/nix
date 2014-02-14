@@ -25,6 +25,8 @@ struct Settings {
 
     string pack();
 
+    void unpack(const string &pack);
+
     SettingsMap getOverrides();
 
     /* The directory where we store sources and derived files. */
@@ -144,6 +146,9 @@ struct Settings {
        chroot. */
     StringSet dirsInChroot;
 
+    /* Set of ssh connection strings for the ssh substituter */
+    Strings sshSubstituterHosts;
+
     /* Whether to impersonate a Linux 2.6 machine on newer kernels. */
     bool impersonateLinux26;
 
@@ -195,6 +200,7 @@ private:
     void get(string & res, const string & name);
     void get(bool & res, const string & name);
     void get(StringSet & res, const string & name);
+    void get(Strings & res, const string & name);
     template<class N> void get(N & res, const string & name);
 };
 

@@ -79,6 +79,7 @@ void Settings::processEnvironment()
 #endif
         substituters.push_back(nixLibexecDir + "/nix/substituters/download-using-manifests.pl");
         substituters.push_back(nixLibexecDir + "/nix/substituters/download-from-binary-cache.pl");
+        substituters.push_back(nixLibexecDir + "/nix/substituters/download-via-ssh");
     } else
         substituters = tokenizeString<Strings>(subs, ":");
 }
@@ -151,6 +152,7 @@ void Settings::update()
     get(gcKeepDerivations, "gc-keep-derivations");
     get(autoOptimiseStore, "auto-optimise-store");
     get(envKeepDerivations, "env-keep-derivations");
+    get(sshSubstituterHosts, "ssh-substituter-hosts");
 }
 
 
@@ -182,6 +184,13 @@ void Settings::get(StringSet & res, const string & name)
     res.insert(ss.begin(), ss.end());
 }
 
+void Settings::get(Strings & res, const string & name)
+{
+    SettingsMap::iterator i = settings.find(name);
+    if (i == settings.end()) return;
+    res = tokenizeString<Strings>(i->second);
+}
+
 
 template<class N> void Settings::get(N & res, const string & name)
 {
@@ -203,6 +212,17 @@ string Settings::pack()
         s += i->first; s += '='; s += i->second; s += '\n';
     }
     return s;
+}
+
+
+void Settings::unpack(const string &pack) {
+    Strings lines = tokenizeString<Strings>(pack, "\n");
+    foreach (Strings::iterator, i, lines) {
+        string::size_type eq = i->find('=');
+        if (eq == string::npos)
+            throw Error("illegal option name/value");
+        set(i->substr(0, eq), i->substr(eq + 1));
+    }
 }
 
 

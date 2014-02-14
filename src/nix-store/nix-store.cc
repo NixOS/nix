@@ -6,6 +6,7 @@
 #include "xmlgraph.hh"
 #include "local-store.hh"
 #include "util.hh"
+#include "serve-protocol.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -834,6 +835,71 @@ static void opClearFailedPaths(Strings opFlags, Strings opArgs)
 }
 
 
+// Serve the nix store in a way usable by a restricted ssh user
+static void opServe(Strings opFlags, Strings opArgs)
+{
+    if (!opArgs.empty() || !opFlags.empty())
+        throw UsageError("no arguments or flags expected");
+
+    FdSource in(STDIN_FILENO);
+    FdSink out(STDOUT_FILENO);
+
+    /* Exchange the greeting. */
+    unsigned int magic = readInt(in);
+    if (magic != SERVE_MAGIC_1) throw Error("protocol mismatch");
+    writeInt(SERVE_MAGIC_2, out);
+    writeInt(SERVE_PROTOCOL_VERSION, out);
+    out.flush();
+    readInt(in); // Client version, unused for now
+
+    ServeCommand cmd = (ServeCommand) readInt(in);
+    switch (cmd) {
+        case cmdQuery:
+            while (true) {
+                QueryCommand qCmd;
+                try {
+                    qCmd = (QueryCommand) readInt(in);
+                } catch (EndOfFile & e) {
+                    break;
+                }
+                switch (qCmd) {
+                    case qCmdHave: {
+                        PathSet paths = readStrings<PathSet>(in);
+                        writeStrings(store->queryValidPaths(paths), out);
+                        break;
+                    }
+                    case qCmdInfo: {
+                        PathSet paths = readStrings<PathSet>(in);
+                        // !!! Maybe we want a queryPathInfos?
+                        foreach (PathSet::iterator, i, paths) {
+                            if (!store->isValidPath(*i))
+                                continue;
+                            ValidPathInfo info = store->queryPathInfo(*i);
+                            writeString(info.path, out);
+                            writeString(info.deriver, out);
+                            writeStrings(info.references, out);
+                            // !!! Maybe we want compression?
+                            writeLongLong(info.narSize, out); // downloadSize
+                            writeLongLong(info.narSize, out);
+                        }
+                        writeString("", out);
+                        break;
+                    }
+                    default:
+                        throw Error(format("unknown serve query `%1%'") % cmd);
+                }
+                out.flush();
+            }
+            break;
+        case cmdSubstitute:
+            dumpPath(readString(in), out);
+            break;
+        default:
+            throw Error(format("unknown serve command `%1%'") % cmd);
+    }
+}
+
+
 /* Scan the arguments; find the operation, set global flags, put all
    other flags in a list, and put all other arguments in another
    list. */
@@ -904,6 +970,8 @@ void run(Strings args)
             indirectRoot = true;
         else if (arg == "--no-output")
             noOutput = true;
+        else if (arg == "--serve")
+            op = opServe;
         else if (arg[0] == '-') {
             opFlags.push_back(arg);
             if (arg == "--max-freed" || arg == "--max-links" || arg == "--max-atime") { /* !!! hack */
