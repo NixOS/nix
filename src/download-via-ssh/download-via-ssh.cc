@@ -109,7 +109,8 @@ void run(Strings args)
 
     std::cout << std::endl;
 
-    std::pair<FdSink, FdSource> pipes = connect(settings.sshSubstituterHosts.front());
+    string host = settings.sshSubstituterHosts.front();
+    std::pair<FdSink, FdSource> pipes = connect(host);
 
     /* Exchange the greeting */
     writeInt(SERVE_MAGIC_1, pipes.first);
@@ -130,6 +131,7 @@ void run(Strings args)
         else {
             Path storePath = *++i;
             Path destPath = *++i;
+            printMsg(lvlError, format("downloading `%1%' via SSH from `%2%'...") % storePath % host);
             substitute(pipes, storePath, destPath);
         }
     else
