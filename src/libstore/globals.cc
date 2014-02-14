@@ -215,7 +215,7 @@ string Settings::pack()
 }
 
 
-void Settings::unpack(const string &pack) {
+void Settings::unpack(const string & pack) {
     Strings lines = tokenizeString<Strings>(pack, "\n");
     foreach (Strings::iterator, i, lines) {
         string::size_type eq = i->find('=');

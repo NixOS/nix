@@ -16,7 +16,9 @@ using namespace nix;
 // * use a database
 // * show progress
 
-static std::pair<FdSink, FdSource> connect(string conn) {
+
+static std::pair<FdSink, FdSource> connect(const string & conn)
+{
     Pipe to, from;
     to.create();
     from.create();
@@ -51,7 +53,9 @@ static std::pair<FdSink, FdSource> connect(string conn) {
     return std::pair<FdSink, FdSource>(to.writeSide.borrow(), from.readSide.borrow());
 }
 
-static void substitute(std::pair<FdSink, FdSource> & pipes, Path storePath, Path destPath) {
+
+static void substitute(std::pair<FdSink, FdSource> & pipes, Path storePath, Path destPath)
+{
     writeInt(cmdSubstitute, pipes.first);
     writeString(storePath, pipes.first);
     pipes.first.flush();
@@ -59,7 +63,9 @@ static void substitute(std::pair<FdSink, FdSource> & pipes, Path storePath, Path
     std::cout << std::endl;
 }
 
-static void query(std::pair<FdSink, FdSource> & pipes) {
+
+static void query(std::pair<FdSink, FdSource> & pipes)
+{
     writeInt(cmdQuery, pipes.first);
     for (string line; getline(std::cin, line);) {
         Strings tokenized = tokenizeString<Strings>(line);
@@ -91,6 +97,7 @@ static void query(std::pair<FdSink, FdSource> & pipes) {
         std::cout << std::endl;
     }
 }
+
 
 void run(Strings args)
 {
@@ -128,6 +135,7 @@ void run(Strings args)
     else
         throw UsageError(format("download-via-ssh: unknown command `%1%'") % *i);
 }
+
 
 void printHelp()
 {

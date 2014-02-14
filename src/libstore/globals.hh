@@ -25,7 +25,7 @@ struct Settings {
 
     string pack();
 
-    void unpack(const string &pack);
+    void unpack(const string & pack);
 
     SettingsMap getOverrides();
 

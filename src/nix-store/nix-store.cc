@@ -835,7 +835,7 @@ static void opClearFailedPaths(Strings opFlags, Strings opArgs)
 }
 
 
-// Serve the nix store in a way usable by a restricted ssh user
+/* Serve the nix store in a way usable by a restricted ssh user. */
 static void opServe(Strings opFlags, Strings opArgs)
 {
     if (!opArgs.empty() || !opFlags.empty())
