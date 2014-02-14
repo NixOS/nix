@@ -22,7 +22,7 @@ my $channelsList = "$home/.nix-channels";
 my $nixDefExpr = "$home/.nix-defexpr";
 
 # Figure out the name of the channels profile.
-my $userName = getpwuid($<) or die "cannot figure out user name";
+my $userName = getpwuid($<) or $ENV{"USER"} or die "cannot figure out user name");
 my $profile = "$Nix::Config::stateDir/profiles/per-user/$userName/channels";
 mkpath(dirname $profile, 0, 0755);
 
