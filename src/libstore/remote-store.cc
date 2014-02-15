@@ -16,6 +16,13 @@
 #include <unistd.h>
 #include <cstring>
 
+extern "C" {
+    struct ancillary {
+        struct cmsghdr hdr;
+        int fd;
+    };
+}
+
 namespace nix {
 
 
@@ -54,8 +61,55 @@ void RemoteStore::openConnection(bool reserveSpace)
         /* Connect to a daemon that does the privileged work for
            us. */
         connectToDaemon();
-    else
+    else if (remoteMode == "recursive") {
+        unsigned int daemonRecursiveVersion;
+        if (!string2Int(getEnv("NIX_REMOTE_RECURSIVE_PROTOCOL_VERSION"), daemonRecursiveVersion))
+            throw Error("Expected an integer in NIX_REMOTE_RECURSIVE_PROTOCOL_VERSION");
+
+        if (GET_PROTOCOL_MAJOR(daemonRecursiveVersion) != GET_PROTOCOL_MAJOR(RECURSIVE_PROTOCOL_VERSION))
+            throw Error("nix daemon recursive protocol version not supported");
+
+        int sfd;
+        if (!string2Int(getEnv("NIX_REMOTE_RECURSIVE_FD"), sfd))
+            throw Error("Expected an integer in NIX_REMOTE_RECURSIVE_FD");
+
+        int fds[2];
+        if (socketpair(PF_UNIX, SOCK_STREAM, 0, fds) == -1)
+            throw SysError("creating recursive daemon socketpair");
+
+        /* Send our protocol version and a socket to the daemon */
+        unsigned char buf[sizeof RECURSIVE_PROTOCOL_VERSION];
+        for (size_t byte = 0; byte < sizeof buf; ++byte)
+            buf[sizeof buf - (byte + 1)] =
+                (unsigned char) ((RECURSIVE_PROTOCOL_VERSION >> (8 * byte)) & 0xFF);
+        struct iovec iov;
+        iov.iov_base = buf;
+        iov.iov_len = sizeof buf;
+        struct msghdr msg;
+        memset(&msg, 0, sizeof msg);
+        msg.msg_iov = &iov;
+        msg.msg_iovlen = 1;
+        ancillary data;
+        msg.msg_control = &data;
+        msg.msg_controllen = sizeof data;
+        struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
+        cmsg->cmsg_len = msg.msg_controllen;
+        cmsg->cmsg_level = SOL_SOCKET;
+        cmsg->cmsg_type = SCM_RIGHTS;
+        memmove(CMSG_DATA(cmsg), &fds[1], sizeof fds[1]);
+        ssize_t count = sendmsg(sfd, &msg, 0);
+        if (count == -1)
+            throw SysError("sending socket descriptor to daemon");
+        else if ((size_t) count != iov.iov_len)
+            throw Error(format("Tried to send %1% bytes to the daemon, but only %2% were sent")
+                    % iov.iov_len % count);
+        close(fds[1]);
+
+        fdSocket = fds[0];
+    } else
         throw Error(format("invalid setting for NIX_REMOTE, `%1%'") % remoteMode);
+
+    closeOnExec(fdSocket);
 
     from.fd = fdSocket;
     to.fd = fdSocket;
@@ -100,7 +154,6 @@ void RemoteStore::connectToDaemon()
     fdSocket = socket(PF_UNIX, SOCK_STREAM, 0);
     if (fdSocket == -1)
         throw SysError("cannot create Unix domain socket");
-    closeOnExec(fdSocket);
 
     string socketPath = settings.nixDaemonSocketFile;
 
