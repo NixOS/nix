@@ -19,6 +19,10 @@ $(d)/parser-tab.cc $(d)/parser-tab.hh: $(d)/parser.y
 $(d)/lexer-tab.cc $(d)/lexer-tab.hh: $(d)/lexer.l
 	$(trace-gen) flex --outfile $(libexpr_DIR)/lexer-tab.cc --header-file=$(libexpr_DIR)/lexer-tab.hh $<
 
+$(d)/lexer-tab.o: $(d)/lexer-tab.hh $(d)/parser-tab.hh
+
+$(d)/parser-tab.o: $(d)/lexer-tab.hh $(d)/parser-tab.hh
+
 clean-files += $(d)/parser-tab.cc $(d)/parser-tab.hh $(d)/lexer-tab.cc $(d)/lexer-tab.hh
 
 dist-files += $(d)/parser-tab.cc $(d)/parser-tab.hh $(d)/lexer-tab.cc $(d)/lexer-tab.hh
