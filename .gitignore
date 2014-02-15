@@ -92,6 +92,9 @@ Makefile.config
 # /src/nix-daemon/
 /src/nix-daemon/nix-daemon
 
+# /src/download-via-ssh/
+/src/download-via-ssh/download-via-ssh
+
 # /tests/
 /tests/test-tmp
 /tests/common.sh
