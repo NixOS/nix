@@ -196,6 +196,9 @@ struct Child
 typedef map<pid_t, Child> Children;
 
 
+enum BuildMode { bmNormal, bmRepair };
+
+
 /* The worker class. */
 class Worker
 {
@@ -248,7 +251,7 @@ public:
     ~Worker();
 
     /* Make a goal (with caching). */
-    GoalPtr makeDerivationGoal(const Path & drvPath, const StringSet & wantedOutputs, bool repair = false);
+    GoalPtr makeDerivationGoal(const Path & drvPath, const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
     GoalPtr makeSubstitutionGoal(const Path & storePath, bool repair = false);
 
     /* Remove a dead goal. */
@@ -706,7 +709,8 @@ private:
     /* Referenceable paths (i.e., input and output paths). */
     PathSet allPaths;
 
-    /* Outputs that are already valid. */
+    /* Outputs that are already valid.  If we're repairing, these are
+       the outputs that are valid *and* not corrupt. */
     PathSet validPaths;
 
     /* Outputs that are corrupt or not valid. */
@@ -762,9 +766,12 @@ private:
     HashRewrites rewritesToTmp, rewritesFromTmp;
     PathSet redirectedOutputs;
 
-    /* Whether we're repairing.  If set, a derivation will be rebuilt
-       if its outputs are valid but corrupt or missing. */
-    bool repair;
+    BuildMode buildMode;
+
+    /* If we're repairing without a chroot, there may be outputs that
+       are valid but corrupt.  So we redirect these outputs to
+       temporary paths.  This contains the mapping from outputs to
+       temporary paths. */
     map<Path, Path> redirectedBadOutputs;
 
     /* Set of inodes seen during calls to canonicalisePathMetaData()
@@ -778,7 +785,7 @@ private:
     const static int childSetupFailed = 189;
 
 public:
-    DerivationGoal(const Path & drvPath, const StringSet & wantedOutputs, Worker & worker, bool repair = false);
+    DerivationGoal(const Path & drvPath, const StringSet & wantedOutputs, Worker & worker, BuildMode buildMode = bmNormal);
     ~DerivationGoal();
 
     void cancel(bool timeout);
@@ -846,7 +853,7 @@ private:
 };
 
 
-DerivationGoal::DerivationGoal(const Path & drvPath, const StringSet & wantedOutputs, Worker & worker, bool repair)
+DerivationGoal::DerivationGoal(const Path & drvPath, const StringSet & wantedOutputs, Worker & worker, BuildMode buildMode)
     : Goal(worker)
     , wantedOutputs(wantedOutputs)
     , needRestart(false)
@@ -854,7 +861,7 @@ DerivationGoal::DerivationGoal(const Path & drvPath, const StringSet & wantedOut
     , fLogFile(0)
     , bzLogFile(0)
     , useChroot(false)
-    , repair(repair)
+    , buildMode(buildMode)
 {
     this->drvPath = drvPath;
     state = &DerivationGoal::init;
@@ -974,10 +981,10 @@ void DerivationGoal::haveDerivation()
         worker.store.addTempRoot(i->second.path);
 
     /* Check what outputs paths are not already valid. */
-    PathSet invalidOutputs = checkPathValidity(false, repair);
+    PathSet invalidOutputs = checkPathValidity(false, buildMode == bmRepair);
 
     /* If they are all valid, then we're done. */
-    if (invalidOutputs.size() == 0 && !repair) {
+    if (invalidOutputs.size() == 0 && buildMode == bmNormal) {
         amDone(ecSuccess);
         return;
     }
@@ -992,7 +999,7 @@ void DerivationGoal::haveDerivation()
        them. */
     if (settings.useSubstitutes && !willBuildLocally(drv))
         foreach (PathSet::iterator, i, invalidOutputs)
-            addWaitee(worker.makeSubstitutionGoal(*i, repair));
+            addWaitee(worker.makeSubstitutionGoal(*i, buildMode == bmRepair));
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
         outputsSubstituted();
@@ -1021,8 +1028,8 @@ void DerivationGoal::outputsSubstituted()
         return;
     }
 
-    if (checkPathValidity(false, repair).size() == 0) {
-        if (repair) repairClosure(); else amDone(ecSuccess);
+    if (checkPathValidity(false, buildMode == bmRepair).size() == 0) {
+        if (buildMode == bmRepair) repairClosure(); else amDone(ecSuccess);
         return;
     }
 
@@ -1035,7 +1042,7 @@ void DerivationGoal::outputsSubstituted()
 
     /* The inputs must be built before we can build this goal. */
     foreach (DerivationInputs::iterator, i, drv.inputDrvs)
-        addWaitee(worker.makeDerivationGoal(i->first, i->second, repair));
+        addWaitee(worker.makeDerivationGoal(i->first, i->second, buildMode == bmRepair ? bmRepair : bmNormal));
 
     foreach (PathSet::iterator, i, drv.inputSrcs)
         addWaitee(worker.makeSubstitutionGoal(*i));
@@ -1085,7 +1092,7 @@ void DerivationGoal::repairClosure()
         if (drvPath2 == "")
             addWaitee(worker.makeSubstitutionGoal(*i, true));
         else
-            addWaitee(worker.makeDerivationGoal(drvPath2, PathSet(), true));
+            addWaitee(worker.makeDerivationGoal(drvPath2, PathSet(), bmRepair));
     }
 
     if (waitees.empty()) {
@@ -1238,7 +1245,7 @@ void DerivationGoal::tryToBuild()
        omitted, but that would be less efficient.)  Note that since we
        now hold the locks on the output paths, no other process can
        build this derivation, so no further checks are necessary. */
-    validPaths = checkPathValidity(true, repair);
+    validPaths = checkPathValidity(true, buildMode == bmRepair);
     if (validPaths.size() == drv.outputs.size()) {
         debug(format("skipping build of derivation `%1%', someone beat us to it") % drvPath);
         outputLocks.setDeletion(true);
@@ -1582,7 +1589,7 @@ int childEntry(void * arg)
 
 void DerivationGoal::startBuilder()
 {
-    startNest(nest, lvlInfo, format(repair ? "repairing path(s) %1%" : "building path(s) %1%") % showPaths(missingPaths));
+    startNest(nest, lvlInfo, format(buildMode == bmRepair ? "repairing path(s) %1%" : "building path(s) %1%") % showPaths(missingPaths));
 
     /* Right platform? */
     if (!canBuildLocally(drv.platform)) {
@@ -1838,10 +1845,11 @@ void DerivationGoal::startBuilder()
             }
         }
 
-        /* If we're repairing, it's possible that we're rebuilding a
-           path that is in settings.dirsInChroot (typically the
-           dependencies of /bin/sh).  Throw them out. */
-        if (repair)
+        /* If we're repairing or checking, it's possible that we're
+           rebuilding a path that is in settings.dirsInChroot
+           (typically the dependencies of /bin/sh).  Throw them
+           out. */
+        if (buildMode != bmNormal)
             foreach (DerivationOutputs::iterator, i, drv.outputs)
                 dirsInChroot.erase(i->second.path);
 
@@ -1871,7 +1879,7 @@ void DerivationGoal::startBuilder()
 
         /* If we're repairing, then we don't want to delete the
            corrupt outputs in advance.  So rewrite them as well. */
-        if (repair)
+        if (buildMode == bmRepair)
             foreach (PathSet::iterator, i, missingPaths)
                 if (worker.store.isValidPath(*i) && pathExists(*i))
                     redirectedBadOutputs[*i] = addHashRewrite(*i);
@@ -1879,8 +1887,7 @@ void DerivationGoal::startBuilder()
 
 
     /* Run the builder. */
-    printMsg(lvlChatty, format("executing builder `%1%'") %
-        drv.builder);
+    printMsg(lvlChatty, format("executing builder `%1%'") % drv.builder);
 
     /* Create the log file. */
     Path logFile = openLogFile();
@@ -2162,7 +2169,7 @@ void DerivationGoal::registerOutputs()
         if (useChroot) {
             if (pathExists(chrootRootDir + path)) {
                 /* Move output paths from the chroot to the Nix store. */
-                if (repair)
+                if (buildMode == bmRepair)
                     replaceValidPath(path, chrootRootDir + path);
                 else
                     if (rename((chrootRootDir + path).c_str(), path.c_str()) == -1)
@@ -2170,7 +2177,7 @@ void DerivationGoal::registerOutputs()
             }
         } else {
             Path redirected;
-            if (repair && (redirected = redirectedBadOutputs[path]) != "" && pathExists(redirected))
+            if (buildMode == bmRepair && (redirected = redirectedBadOutputs[path]) != "" && pathExists(redirected))
                 replaceValidPath(path, redirected);
         }
 
@@ -2877,11 +2884,11 @@ Worker::~Worker()
 }
 
 
-GoalPtr Worker::makeDerivationGoal(const Path & path, const StringSet & wantedOutputs, bool repair)
+GoalPtr Worker::makeDerivationGoal(const Path & path, const StringSet & wantedOutputs, BuildMode buildMode)
 {
     GoalPtr goal = derivationGoals[path].lock();
     if (!goal) {
-        goal = GoalPtr(new DerivationGoal(path, wantedOutputs, *this, repair));
+        goal = GoalPtr(new DerivationGoal(path, wantedOutputs, *this, buildMode));
         derivationGoals[path] = goal;
         wakeUp(goal);
     } else
@@ -3216,7 +3223,7 @@ void LocalStore::buildPaths(const PathSet & drvPaths, bool repair)
     foreach (PathSet::const_iterator, i, drvPaths) {
         DrvPathWithOutputs i2 = parseDrvPathWithOutputs(*i);
         if (isDerivation(i2.first))
-            goals.insert(worker.makeDerivationGoal(i2.first, i2.second, repair));
+            goals.insert(worker.makeDerivationGoal(i2.first, i2.second, repair ? bmRepair : bmNormal));
         else
             goals.insert(worker.makeSubstitutionGoal(*i, repair));
     }
