@@ -42,6 +42,7 @@ using namespace nix;
 
 static FdSource from(STDIN_FILENO);
 static FdSink to(STDOUT_FILENO);
+static AutoCloseFD fdRecursiveTo;
 
 bool canSendStderr;
 pid_t myPid;
@@ -695,8 +696,8 @@ static void processConnection(bool trusted)
             throw Error("if you run `nix-daemon' as root, then you MUST set `build-users-group'!");
 #endif
 
-        /* Open the store. */
-        store = boost::shared_ptr<StoreAPI>(new LocalStore(reserveSpace));
+        /* Open the store, with this process's parent socket used for recursive nix */
+        store = boost::shared_ptr<StoreAPI>(new LocalStore(reserveSpace, fdRecursiveTo.borrow()));
 
         stopWork();
         to.flush();
@@ -776,6 +777,7 @@ static void daemonLoop()
 
     AutoCloseFD fdSocket;
 
+    AutoCloseFD fdRecursiveFrom;
     /* Handle socket-based activation by systemd. */
     if (getEnv("LISTEN_FDS") != "") {
         if (getEnv("LISTEN_PID") != int2String(getpid()) || getEnv("LISTEN_FDS") != "1")
@@ -783,10 +785,24 @@ static void daemonLoop()
         fdSocket = SD_LISTEN_FDS_START;
     }
 
+    /* Handle nix-daemon run as a child of build.cc for recursive nix */
+    else if (getEnv("NIX_RECURSIVE_FDS") != "") {
+        Strings tokenized = tokenizeString<Strings>(getEnv("NIX_RECURSIVE_FDS"));
+        string first = tokenized.front();
+        int fd;
+        if (!string2Int(first, fd))
+            throw Error(format("invalid value for NIX_RECURSIVE_FDS, `%1%'") % getEnv("NIX_RECURSIVE_FDS"));
+        fdRecursiveFrom = fd;
+
+        tokenized.pop_front();
+        string second = tokenized.front();
+        if (!string2Int(second, fd))
+            throw Error(format("invalid value for NIX_RECURSIVE_FDS, `%1%'") % getEnv("NIX_RECURSIVE_FDS"));
+        fdRecursiveTo = fd;
+    }
+
     /* Otherwise, create and bind to a Unix domain socket. */
     else {
-
-        /* Create and bind to a Unix domain socket. */
         fdSocket = socket(PF_UNIX, SOCK_STREAM, 0);
         if (fdSocket == -1)
             throw SysError("cannot create Unix domain socket");
@@ -824,7 +840,24 @@ static void daemonLoop()
             throw SysError(format("cannot listen on socket `%1%'") % socketPath);
     }
 
-    closeOnExec(fdSocket);
+    if (fdRecursiveFrom == -1) {
+        int fds[2];
+        if (socketpair(PF_UNIX, SOCK_STREAM, 0, fds) == -1)
+            throw SysError("creating recursive daemon socketpair");
+        fdRecursiveFrom = fds[0];
+        fdRecursiveTo = fds[1];
+        if (shutdown(fdRecursiveFrom, SHUT_WR) == -1)
+            throw SysError("disabling writes to fdRecursiveFrom");
+        if (shutdown(fdRecursiveTo, SHUT_RD) == -1)
+            throw SysError("disabling reads from fdRecursiveTo");
+    }
+
+    closeOnExec(fdRecursiveFrom);
+
+    if (fdSocket != -1) {
+        setNonBlocking(fdSocket);
+        closeOnExec(fdSocket);
+    }
 
     /* Loop accepting connections. */
     while (1) {
@@ -834,18 +867,71 @@ static void daemonLoop()
                database, because it doesn't like forks very much. */
             assert(!store);
 
-            /* Accept a connection. */
-            struct sockaddr_un remoteAddr;
-            socklen_t remoteAddrLen = sizeof(remoteAddr);
+            fd_set set;
+            FD_ZERO(&set);
+            FD_SET(fdRecursiveFrom, &set);
+            /* Sigh, POSIX requires valid fds for FD_SET/FD_ISSET */
+            if (fdSocket != -1)
+                FD_SET(fdSocket, &set);
+            int nfds =
+                ((fdSocket > fdRecursiveFrom) ? fdSocket : fdRecursiveFrom) + 1;
 
-            AutoCloseFD remote = accept(fdSocket,
-                (struct sockaddr *) &remoteAddr, &remoteAddrLen);
+            int res = select(nfds, &set, 0, 0, 0);
             checkInterrupt();
-            if (remote == -1) {
-                if (errno == EINTR)
-                    continue;
-                else
-                    throw SysError("accepting connection");
+            if (res == -1) {
+                if (errno == EINTR) continue;
+                throw SysError("waiting for a new connection");
+            }
+
+            AutoCloseFD remote;
+            if ((fdSocket != -1) && FD_ISSET(fdSocket, &set)) {
+                /* Accept a connection. */
+                struct sockaddr_un remoteAddr;
+                socklen_t remoteAddrLen = sizeof(remoteAddr);
+
+                remote = accept(fdSocket,
+                    (struct sockaddr *) &remoteAddr, &remoteAddrLen);
+                checkInterrupt();
+                if (remote == -1) {
+                    if (errno == EINTR || errno == EWOULDBLOCK || errno == EAGAIN)
+                        continue;
+                    else
+                        throw SysError("accepting connection");
+                }
+
+            } else {
+                /* Lots of connections on fdSocket could theoretically starve
+                   the recursive socket, oh well */
+                assert(FD_ISSET(fdRecursiveFrom, &set));
+
+                /* Get the socket from the other end */
+                int fd;
+                char buf[sizeof RECURSIVE_PROTOCOL_VERSION];
+                struct iovec iov;
+                iov.iov_base = buf;
+                iov.iov_len = sizeof buf;
+                struct msghdr msg;
+                memset(&msg, 0, sizeof msg);
+                msg.msg_iov = &iov;
+                msg.msg_iovlen = 1;
+                ancillary data;
+                msg.msg_control = &data;
+                msg.msg_controllen = sizeof data;
+                ssize_t count = recvmsg(fdRecursiveFrom, &msg, 0);
+                if (count == -1)
+                    throw SysError("recieving socket descriptor from client");
+                else if (((size_t) count) < sizeof buf)
+                    throw Error(format("Expected to receive %1% bytes from client, got %2%") % sizeof buf % count);
+
+                memmove(&fd, CMSG_DATA(CMSG_FIRSTHDR(&msg)), sizeof fd);
+
+                remote = fd;
+
+                unsigned int recursiveClientVersion = 0;
+                for (size_t byte = 0; byte < sizeof RECURSIVE_PROTOCOL_VERSION; ++byte)
+                    recursiveClientVersion += ((int) buf[byte]) << (8 * byte);
+                if (GET_PROTOCOL_MAJOR(recursiveClientVersion) != GET_PROTOCOL_MAJOR(RECURSIVE_PROTOCOL_VERSION))
+                    throw Error("nix client recursive protocol version not supported");
             }
 
             closeOnExec(remote);

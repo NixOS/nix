@@ -93,7 +93,7 @@ public:
 
     /* Initialise the local store, upgrading the schema if
        necessary. */
-    LocalStore(bool reserveSpace = true);
+    LocalStore(bool reserveSpace = true, int fd = -1);
 
     ~LocalStore();
 
@@ -308,6 +308,8 @@ private:
     // Internal versions that are not wrapped in retry_sqlite.
     bool isValidPath_(const Path & path);
     void queryReferrers_(const Path & path, PathSet & referrers);
+
+    AutoCloseFD fdRecursiveDaemon;
 };
 
 

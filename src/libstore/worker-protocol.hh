@@ -1,4 +1,12 @@
 #pragma once
+#include <sys/socket.h>
+
+extern "C" {
+    struct ancillary {
+        struct cmsghdr hdr;
+        int fd;
+    };
+}
 
 namespace nix {
 

@@ -17,13 +17,6 @@
 #include <unistd.h>
 #include <cstring>
 
-extern "C" {
-    struct ancillary {
-        struct cmsghdr hdr;
-        int fd;
-    };
-}
-
 namespace nix {
 
 

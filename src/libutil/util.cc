@@ -921,6 +921,15 @@ void closeOnExec(int fd)
 }
 
 
+void setNonBlocking(int fd)
+{
+    int prev;
+    if ((prev = fcntl(fd, F_GETFL, 0)) == -1 ||
+        fcntl(fd, F_SETFL, prev | O_NONBLOCK) == -1)
+        throw SysError("setting non-blocking flag");
+}
+
+
 #if HAVE_VFORK
 pid_t (*maybeVfork)() = vfork;
 #else
