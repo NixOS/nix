@@ -2810,11 +2810,11 @@ void SubstitutionGoal::finished()
         return;
     }
 
-    canonicalisePathMetaData(destPath, -1);
-
-    worker.store.optimisePath(destPath); // FIXME: combine with hashPath()
-
     if (repair) replaceValidPath(storePath, destPath);
+
+    canonicalisePathMetaData(storePath, -1);
+
+    worker.store.optimisePath(storePath); // FIXME: combine with hashPath()
 
     ValidPathInfo info2;
     info2.path = storePath;
