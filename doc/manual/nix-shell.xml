@@ -51,6 +51,22 @@ derivation for development.</para>
 <filename>shell.nix</filename> if it exists, and
 <filename>default.nix</filename> otherwise.</para>
 
+<para>If the derivation defines the variable
+<varname>shellHook</varname>, it will be evaluated after
+<literal>$stdenv/setup</literal> has been sourced.  Since this hook is
+not executed by regular Nix builds, it allows you to perform
+initialisation specific to <command>nix-shell</command>.  For example,
+the derivation attribute
+
+<programlisting>
+shellHook =
+  ''
+    echo "Hello shell!"
+  '';
+</programlisting>
+
+will cause <command>nix-shell</command> to print <literal>Hello shell!</literal>.</para>
+
 </refsection>
 
 
