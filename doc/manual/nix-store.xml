@@ -296,8 +296,12 @@ options control what gets deleted and in what order:
   <varlistentry><term><option>--max-freed</option> <replaceable>bytes</replaceable></term>
   
     <listitem><para>Keep deleting paths until at least
-    <replaceable>bytes</replaceable> bytes have been
-    deleted, then stop.</para></listitem>
+    <replaceable>bytes</replaceable> bytes have been deleted, then
+    stop.  The argument <replaceable>bytes</replaceable> can be
+    followed by the multiplicative suffix <literal>K</literal>,
+    <literal>M</literal>, <literal>G</literal> or
+    <literal>T</literal>, denoting KiB, MiB, GiB or TiB
+    units.</para></listitem>
     
   </varlistentry>
 

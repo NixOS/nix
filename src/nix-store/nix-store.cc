@@ -619,7 +619,7 @@ static void opGC(Strings opFlags, Strings opArgs)
         else if (*i == "--print-dead") options.action = GCOptions::gcReturnDead;
         else if (*i == "--delete") options.action = GCOptions::gcDeleteDead;
         else if (*i == "--max-freed") {
-            long long maxFreed = getIntArg<long long>(*i, i, opFlags.end());
+            long long maxFreed = getIntArg<long long>(*i, i, opFlags.end(), true);
             options.maxFreed = maxFreed >= 0 ? maxFreed : 0;
         }
         else throw UsageError(format("bad sub-operation `%1%' in GC") % *i);
