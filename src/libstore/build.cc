@@ -33,7 +33,6 @@
 
 #include <bzlib.h>
 
-
 /* Includes required for chroot support. */
 #if HAVE_SYS_PARAM_H
 #include <sys/param.h>
@@ -60,10 +59,13 @@
 #include <netinet/ip.h>
 #endif
 
-
 #if HAVE_SYS_PERSONALITY_H
 #include <sys/personality.h>
 #define CAN_DO_LINUX32_BUILDS
+#endif
+
+#if HAVE_STATVFS
+#include <sys/statvfs.h>
 #endif
 
 
@@ -1383,6 +1385,25 @@ void DerivationGoal::buildDone()
        root. */
     if (buildUser.enabled()) buildUser.kill();
 
+    /* If the build failed, heuristically check whether this may have
+       been caused by a disk full condition.  We have no way of
+       knowing whether the build actually got an ENOSPC.  So instead,
+       check if the disk is (nearly) full now.  If so, we don't mark
+       this build as a permanent failure. */
+    bool diskFull = false;
+#if HAVE_STATVFS
+    if (!statusOk(status)) {
+        unsigned long long required = 8ULL * 1024 * 1024; // FIXME: make configurable
+        struct statvfs st;
+        if (statvfs(settings.nixStore.c_str(), &st) == 0 &&
+            (unsigned long long) st.f_bavail * st.f_bsize < required)
+            diskFull = true;
+        if (statvfs(tmpDir.c_str(), &st) == 0 &&
+            (unsigned long long) st.f_bavail * st.f_bsize < required)
+            diskFull = true;
+    }
+#endif
+
     try {
 
         /* Some cleanup per path.  We do this here and not in
@@ -1449,6 +1470,8 @@ void DerivationGoal::buildDone()
             deleteTmpDir(false);
             if (WIFEXITED(status) && WEXITSTATUS(status) == childSetupFailed)
                 throw Error(format("failed to set up the build environment for `%1%'") % drvPath);
+            if (diskFull)
+                printMsg(lvlError, "note: build failure may have been caused by lack of free disk space");
             throw BuildError(format("builder for `%1%' %2%")
                 % drvPath % statusToString(status));
         }
@@ -1504,7 +1527,7 @@ void DerivationGoal::buildDone()
             foreach (DerivationOutputs::iterator, i, drv.outputs)
                 worker.store.registerFailedPath(i->second.path);
 
-        worker.permanentFailure = !hookError && !fixedOutput;
+        worker.permanentFailure = !hookError && !fixedOutput && !diskFull;
         amDone(ecFailed);
         return;
     }

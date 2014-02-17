@@ -456,8 +456,8 @@ void LocalStore::makeStoreWritable()
     if (getuid() != 0) return;
     /* Check if /nix/store is on a read-only mount. */
     struct statvfs stat;
-    if (statvfs(settings.nixStore.c_str(), &stat) !=0)
-        throw SysError("Getting info of nix store mountpoint");
+    if (statvfs(settings.nixStore.c_str(), &stat) != 0)
+        throw SysError("getting info about the Nix store mount point");
 
     if (stat.f_flag & ST_RDONLY) {
         if (unshare(CLONE_NEWNS) == -1)
