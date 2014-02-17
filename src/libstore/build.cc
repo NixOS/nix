@@ -712,9 +712,6 @@ private:
     /* Outputs that are corrupt or not valid. */
     PathSet missingPaths;
 
-    /* Paths that have been subject to hash rewriting. */
-    PathSet rewrittenPaths;
-
     /* User selected for running the builder. */
     UserLock buildUser;
 
@@ -817,10 +814,9 @@ private:
 
     friend int childEntry(void *);
 
-    /* Must be called after the output paths have become valid (either
-       due to a successful build or hook, or because they already
-       were). */
-    void computeClosure();
+    /* Check that the derivation outputs all exist and register them
+       as valid. */
+    void registerOutputs();
 
     /* Open a log file and a pipe to it. */
     Path openLogFile();
@@ -1385,89 +1381,38 @@ void DerivationGoal::buildDone()
        root. */
     if (buildUser.enabled()) buildUser.kill();
 
-    /* If the build failed, heuristically check whether this may have
-       been caused by a disk full condition.  We have no way of
-       knowing whether the build actually got an ENOSPC.  So instead,
-       check if the disk is (nearly) full now.  If so, we don't mark
-       this build as a permanent failure. */
     bool diskFull = false;
-#if HAVE_STATVFS
-    if (!statusOk(status)) {
-        unsigned long long required = 8ULL * 1024 * 1024; // FIXME: make configurable
-        struct statvfs st;
-        if (statvfs(settings.nixStore.c_str(), &st) == 0 &&
-            (unsigned long long) st.f_bavail * st.f_bsize < required)
-            diskFull = true;
-        if (statvfs(tmpDir.c_str(), &st) == 0 &&
-            (unsigned long long) st.f_bavail * st.f_bsize < required)
-            diskFull = true;
-    }
-#endif
 
     try {
 
-        /* Some cleanup per path.  We do this here and not in
-           computeClosure() for convenience when the build has
-           failed. */
-        foreach (PathSet::iterator, i, missingPaths) {
-            Path path = *i;
-
-            /* If the output was already valid, just skip (discard) it. */
-            if (validPaths.find(path) != validPaths.end()) continue;
-
-            if (useChroot && pathExists(chrootRootDir + path)) {
-                /* Move output paths from the chroot to the Nix store. */
-                if (repair)
-                    replaceValidPath(path, chrootRootDir + path);
-                else
-                    if (rename((chrootRootDir + path).c_str(), path.c_str()) == -1)
-                        throw SysError(format("moving build output `%1%' from the chroot to the Nix store") % path);
-            }
-
-            Path redirected;
-            if (repair && (redirected = redirectedBadOutputs[path]) != "" && pathExists(redirected))
-                replaceValidPath(path, redirected);
-
-            if (!pathExists(path)) continue;
-
-            struct stat st;
-            if (lstat(path.c_str(), &st) == -1)
-                throw SysError(format("getting attributes of path `%1%'") % path);
-
-#ifndef __CYGWIN__
-            /* Check that the output is not group or world writable,
-               as that means that someone else can have interfered
-               with the build.  Also, the output should be owned by
-               the build user. */
-            if ((!S_ISLNK(st.st_mode) && (st.st_mode & (S_IWGRP | S_IWOTH))) ||
-                (buildUser.enabled() && st.st_uid != buildUser.getUID()))
-                throw BuildError(format("suspicious ownership or permission on `%1%'; rejecting this build output") % path);
-#endif
-
-            /* Apply hash rewriting if necessary. */
-            if (!rewritesFromTmp.empty()) {
-                printMsg(lvlError, format("warning: rewriting hashes in `%1%'; cross fingers") % path);
-
-                /* Canonicalise first.  This ensures that the path
-                   we're rewriting doesn't contain a hard link to
-                   /etc/shadow or something like that. */
-                canonicalisePathMetaData(path, buildUser.enabled() ? buildUser.getUID() : -1, inodesSeen);
-
-                /* FIXME: this is in-memory. */
-                StringSink sink;
-                dumpPath(path, sink);
-                deletePath(path);
-                sink.s = rewriteHashes(sink.s, rewritesFromTmp);
-                StringSource source(sink.s);
-                restorePath(path, source);
-
-                rewrittenPaths.insert(path);
-            }
-        }
-
         /* Check the exit status. */
         if (!statusOk(status)) {
+
+            /* Heuristically check whether the build failure may have
+               been caused by a disk full condition.  We have no way
+               of knowing whether the build actually got an ENOSPC.
+               So instead, check if the disk is (nearly) full now.  If
+               so, we don't mark this build as a permanent failure. */
+#if HAVE_STATVFS
+            unsigned long long required = 8ULL * 1024 * 1024; // FIXME: make configurable
+            struct statvfs st;
+            if (statvfs(settings.nixStore.c_str(), &st) == 0 &&
+                (unsigned long long) st.f_bavail * st.f_bsize < required)
+                diskFull = true;
+            if (statvfs(tmpDir.c_str(), &st) == 0 &&
+                (unsigned long long) st.f_bavail * st.f_bsize < required)
+                diskFull = true;
+#endif
+
             deleteTmpDir(false);
+
+            /* Move paths out of the chroot for easier debugging of
+               build failures. */
+            if (useChroot)
+                foreach (PathSet::iterator, i, missingPaths)
+                    if (pathExists(chrootRootDir + *i))
+                        rename((chrootRootDir + *i).c_str(), i->c_str());
+
             if (WIFEXITED(status) && WEXITSTATUS(status) == childSetupFailed)
                 throw Error(format("failed to set up the build environment for `%1%'") % drvPath);
             if (diskFull)
@@ -1476,16 +1421,16 @@ void DerivationGoal::buildDone()
                 % drvPath % statusToString(status));
         }
 
-        /* Delete the chroot (if we were using one). */
-        autoDelChroot.reset(); /* this runs the destructor */
-
         /* Delete redirected outputs (when doing hash rewriting). */
         foreach (PathSet::iterator, i, redirectedOutputs)
             deletePath(*i);
 
         /* Compute the FS closure of the outputs and register them as
            being valid. */
-        computeClosure();
+        registerOutputs();
+
+        /* Delete the chroot (if we were using one). */
+        autoDelChroot.reset(); /* this runs the destructor */
 
         deleteTmpDir(true);
 
@@ -2195,7 +2140,7 @@ PathSet parseReferenceSpecifiers(const Derivation & drv, string attr)
 }
 
 
-void DerivationGoal::computeClosure()
+void DerivationGoal::registerOutputs()
 {
     map<Path, PathSet> allReferences;
     map<Path, HashResult> contentHashes;
@@ -2217,15 +2162,60 @@ void DerivationGoal::computeClosure()
         Path path = i->second.path;
         if (missingPaths.find(path) == missingPaths.end()) continue;
 
-        if (!pathExists(path)) {
-            throw BuildError(
-                format("builder for `%1%' failed to produce output path `%2%'")
-                % drvPath % path);
+        if (useChroot) {
+            if (pathExists(chrootRootDir + path)) {
+                /* Move output paths from the chroot to the Nix store. */
+                if (repair)
+                    replaceValidPath(path, chrootRootDir + path);
+                else
+                    if (rename((chrootRootDir + path).c_str(), path.c_str()) == -1)
+                        throw SysError(format("moving build output `%1%' from the chroot to the Nix store") % path);
+            }
+        } else {
+            Path redirected;
+            if (repair && (redirected = redirectedBadOutputs[path]) != "" && pathExists(redirected))
+                replaceValidPath(path, redirected);
         }
 
         struct stat st;
-        if (lstat(path.c_str(), &st) == -1)
+        if (lstat(path.c_str(), &st) == -1) {
+            if (errno == ENOENT)
+                throw BuildError(
+                    format("builder for `%1%' failed to produce output path `%2%'")
+                    % drvPath % path);
             throw SysError(format("getting attributes of path `%1%'") % path);
+        }
+
+#ifndef __CYGWIN__
+        /* Check that the output is not group or world writable, as
+           that means that someone else can have interfered with the
+           build.  Also, the output should be owned by the build
+           user. */
+        if ((!S_ISLNK(st.st_mode) && (st.st_mode & (S_IWGRP | S_IWOTH))) ||
+            (buildUser.enabled() && st.st_uid != buildUser.getUID()))
+            throw BuildError(format("suspicious ownership or permission on `%1%'; rejecting this build output") % path);
+#endif
+
+        /* Apply hash rewriting if necessary. */
+        bool rewritten = false;
+        if (!rewritesFromTmp.empty()) {
+            printMsg(lvlError, format("warning: rewriting hashes in `%1%'; cross fingers") % path);
+
+            /* Canonicalise first.  This ensures that the path we're
+               rewriting doesn't contain a hard link to /etc/shadow or
+               something like that. */
+            canonicalisePathMetaData(path, buildUser.enabled() ? buildUser.getUID() : -1, inodesSeen);
+
+            /* FIXME: this is in-memory. */
+            StringSink sink;
+            dumpPath(path, sink);
+            deletePath(path);
+            sink.s = rewriteHashes(sink.s, rewritesFromTmp);
+            StringSource source(sink.s);
+            restorePath(path, source);
+
+            rewritten = true;
+        }
 
         startNest(nest, lvlTalkative,
             format("scanning for references inside `%1%'") % path);
@@ -2258,7 +2248,7 @@ void DerivationGoal::computeClosure()
         /* Get rid of all weird permissions.  This also checks that
            all files are owned by the build user, if applicable. */
         canonicalisePathMetaData(path,
-            buildUser.enabled() && rewrittenPaths.find(path) == rewrittenPaths.end() ? buildUser.getUID() : -1, inodesSeen);
+            buildUser.enabled() && !rewritten ? buildUser.getUID() : -1, inodesSeen);
 
         /* For this output path, find the references to other paths
            contained in it.  Compute the SHA-256 NAR hash at the same
