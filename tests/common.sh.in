@@ -29,6 +29,8 @@ export SHELL="@bash@"
 export version=@PACKAGE_VERSION@
 export system=@system@
 
+cacheDir=$TEST_ROOT/binary-cache
+
 readLink() {
     ls -l "$1" | sed 's/.*->\ //'
 }
@@ -53,6 +55,10 @@ clearStore() {
 
 clearManifests() {
     rm -f $NIX_STATE_DIR/manifests/*
+}
+
+clearCache() {
+    rm -rf "$cacheDir"
 }
 
 startDaemon() {

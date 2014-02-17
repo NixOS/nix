@@ -2,11 +2,9 @@ source common.sh
 
 clearStore
 clearManifests
+clearCache
 
 # Create the binary cache.
-cacheDir=$TEST_ROOT/binary-cache
-rm -rf "$cacheDir"
-
 outPath=$(nix-build dependencies.nix --no-out-link)
 
 nix-push --dest $cacheDir $outPath
