@@ -1240,8 +1240,7 @@ void DerivationGoal::tryToBuild()
        build this derivation, so no further checks are necessary. */
     validPaths = checkPathValidity(true, repair);
     if (validPaths.size() == drv.outputs.size()) {
-        debug(format("skipping build of derivation `%1%', someone beat us to it")
-            % drvPath);
+        debug(format("skipping build of derivation `%1%', someone beat us to it") % drvPath);
         outputLocks.setDeletion(true);
         amDone(ecSuccess);
         return;
@@ -1525,8 +1524,7 @@ HookReply DerivationGoal::tryBuildHook()
     else if (reply != "accept")
         throw Error(format("bad hook reply `%1%'") % reply);
 
-    printMsg(lvlTalkative, format("using hook to build path(s) %1%")
-        % showPaths(outputPaths(drv.outputs)));
+    printMsg(lvlTalkative, format("using hook to build path(s) %1%") % showPaths(missingPaths));
 
     hook = worker.hook;
     worker.hook.reset();
@@ -1541,14 +1539,13 @@ HookReply DerivationGoal::tryBuildHook()
     computeFSClosure(worker.store, drvPath, allInputs);
 
     string s;
-    foreach (PathSet::iterator, i, allInputs) s += *i + " ";
+    foreach (PathSet::iterator, i, allInputs) { s += *i; s += ' '; }
     writeLine(hook->toHook.writeSide, s);
 
-    /* Tell the hooks the outputs that have to be copied back from the
-       remote system. */
+    /* Tell the hooks the missing outputs that have to be copied back
+       from the remote system. */
     s = "";
-    foreach (DerivationOutputs::iterator, i, drv.outputs)
-        s += i->second.path + " ";
+    foreach (PathSet::iterator, i, missingPaths) { s += *i; s += ' '; }
     writeLine(hook->toHook.writeSide, s);
 
     hook->toHook.writeSide.close();
