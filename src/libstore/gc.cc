@@ -147,69 +147,105 @@ Path addPermRoot(StoreAPI & store, const Path & _storePath,
 
 
 /* The file to which we write our temporary roots. */
-static Path fnTempRoots;
-static AutoCloseFD fdTempRoots;
-
+static Path dnTempRoots;
+static AutoCloseFD fdTempRootsDirLock;
+static AutoCloseFD fdTempRootsMain;
 
 void LocalStore::addTempRoot(const Path & path)
 {
-    /* Create the temporary roots file for this process. */
-    if (fdTempRoots == -1) {
+    /* Create the temporary roots directory for this process. */
+    if (fdTempRootsDirLock == -1) {
+        Path dir = (format("%1%/%2%") % settings.nixStateDir % tempRootsDir).str();
+        createDirs(dir);
 
-        while (1) {
-            Path dir = (format("%1%/%2%") % settings.nixStateDir % tempRootsDir).str();
-            createDirs(dir);
+        dnTempRoots = (format("%1%/%2%")
+            % dir % getpid()).str();
 
-            fnTempRoots = (format("%1%/%2%")
-                % dir % getpid()).str();
+        Path fnTempRootsDirLock = (format("%1%/lock") % dnTempRoots).str();
 
-            AutoCloseFD fdGCLock = openGCLock(ltRead);
+        AutoCloseFD fdGCLock = openGCLock(ltRead);
 
-            if (pathExists(fnTempRoots))
-                /* It *must* be stale, since there can be no two
-                   processes with the same pid. */
-                unlink(fnTempRoots.c_str());
+        if (pathExists(dnTempRoots))
+            /* It *must* be stale, since there can be no two
+               processes with the same pid. Since we're in the gclock,
+               we're the only process who can be deleting this right now */
+            deletePath(dnTempRoots);
 
-            fdTempRoots = openLockFile(fnTempRoots, true);
+        if (mkdir(dnTempRoots.c_str(), 0700) == -1)
+            throw SysError("creating temporary roots directory");
 
-            fdGCLock.close();
+        fdTempRootsDirLock = openLockFile(fnTempRootsDirLock, true);
 
-            debug(format("acquiring read lock on `%1%'") % fnTempRoots);
-            lockFile(fdTempRoots, ltRead, true);
+        /* We need to take this lock before releasing the gc lock so
+           that the gc doesn't delete the directory */
+        debug(format("acquiring read lock on `%1%/lock'") % dnTempRoots);
+        lockFile(fdTempRootsDirLock, ltRead, true);
 
-            /* Check whether the garbage collector didn't get in our
-               way. */
-            struct stat st;
-            if (fstat(fdTempRoots, &st) == -1)
-                throw SysError(format("statting `%1%'") % fnTempRoots);
-            if (st.st_size == 0) break;
+        fdGCLock.close();
+    }
 
-            /* The garbage collector deleted this file before we could
-               get a lock.  (It won't delete the file after we get a
-               lock.)  Try again. */
-        }
+    /* Create the main temporary roots file for this process. */
+    if (fdTempRootsMain == -1) {
+        /* Upgrade the dir lock to a write lock.  This will cause us to block
+           if the garbage collector is holding our lock. */
+        debug(format("acquiring write lock on `%1%/lock'") % dnTempRoots);
+        lockFile(fdTempRootsDirLock, ltWrite, true);
+
+        Path fnMainTempRoots = (format("%1%/main") % dnTempRoots).str();
+
+        fdTempRootsMain = openLockFile(fnMainTempRoots, true);
+
+        /* Downgrade to a read lock. */
+        debug(format("downgrading to read lock on `%1%/lock'") % dnTempRoots);
+        lockFile(fdTempRootsDirLock, ltRead, true);
 
     }
 
-    /* Upgrade the lock to a write lock.  This will cause us to block
-       if the garbage collector is holding our lock. */
-    debug(format("acquiring write lock on `%1%'") % fnTempRoots);
-    lockFile(fdTempRoots, ltWrite, true);
+    /* Get a write lock on the main temp roots file so we don't write
+       to it after the gc has already started reading from it but before
+       gc has finished */
+    debug(format("acquiring write lock on `%1%/main'") % dnTempRoots);
+    lockFile(fdTempRootsMain, ltWrite, true);
 
     string s = path + '\0';
-    writeFull(fdTempRoots, (const unsigned char *) s.data(), s.size());
+    writeFull(fdTempRootsMain, (const unsigned char *) s.data(), s.size());
 
-    /* Downgrade to a read lock. */
-    debug(format("downgrading to read lock on `%1%'") % fnTempRoots);
-    lockFile(fdTempRoots, ltRead, true);
+    /* Release the lock */
+    debug(format("releasing write lock on `%1%/main'") % dnTempRoots);
+    lockFile(fdTempRootsMain, ltNone, true);
+}
+
+
+void removeDir(const Path & dir) {
+    /* First delete all files in the directory */
+    Paths files;
+    try {
+        files = readDirectory(dir);
+    } catch (SysError e) {
+        if (e.errNo == ENOENT)
+            return;
+        throw;
+    }
+    foreach (Paths::iterator, i, files) {
+        Path file = (format("%1%/%2%") % dir % *i).str();
+        if (unlink(file.c_str()) == -1)
+            /* OK if it's already deleted */
+            if (errno != ENOENT)
+                throw SysError(format("unlinking %1%") % file);
+    }
+    if (rmdir(dir.c_str()) == -1)
+        /* OK if it's already deleted */
+        if (errno != ENOENT)
+            throw SysError(format("removing %1%") % dir);
 }
 
 
 void removeTempRoots()
 {
-    if (fdTempRoots != -1) {
-        fdTempRoots.close();
-        unlink(fnTempRoots.c_str());
+    if (fdTempRootsDirLock != -1) {
+        fdTempRootsDirLock.close();
+        fdTempRootsMain.close();
+        removeDir(dnTempRoots);
     }
 }
 
@@ -233,32 +269,31 @@ typedef list<FDPtr> FDs;
 static void readTempRoots(PathSet & tempRoots, FDs & fds)
 {
     /* Read the `temproots' directory for per-process temporary root
-       files. */
+       directories. */
     Strings tempRootFiles = readDirectory(
         (format("%1%/%2%") % settings.nixStateDir % tempRootsDir).str());
 
     foreach (Strings::iterator, i, tempRootFiles) {
-        Path path = (format("%1%/%2%/%3%") % settings.nixStateDir % tempRootsDir % *i).str();
+        Path dir = (format("%1%/%2%/%3%") % settings.nixStateDir % tempRootsDir % *i).str();
+        Path path = (format("%1%/lock") % dir).str();
 
-        debug(format("reading temporary root file `%1%'") % path);
-        FDPtr fd(new AutoCloseFD(open(path.c_str(), O_RDWR, 0666)));
+        debug(format("reading temporary roots directory lock `%1%'") % path);
+        FDPtr fd(new AutoCloseFD(open(path.c_str(), O_RDWR)));
         if (*fd == -1) {
-            /* It's okay if the file has disappeared. */
-            if (errno == ENOENT) continue;
-            throw SysError(format("opening temporary roots file `%1%'") % path);
+            /* It's okay if the directory lock has disappeared. */
+            if (errno == ENOENT) {
+                removeDir(dir);
+                continue;
+            }
+            throw SysError(format("opening temporary roots directory lock `%1%'") % path);
         }
-
-        /* This should work, but doesn't, for some reason. */
-        //FDPtr fd(new AutoCloseFD(openLockFile(path, false)));
-        //if (*fd == -1) continue;
 
         /* Try to acquire a write lock without blocking.  This can
            only succeed if the owning process has died.  In that case
            we don't care about its temporary roots. */
         if (lockFile(*fd, ltWrite, false)) {
-            printMsg(lvlError, format("removing stale temporary roots file `%1%'") % path);
-            unlink(path.c_str());
-            writeFull(*fd, (const unsigned char *) "d", 1);
+            printMsg(lvlError, format("removing stale temporary roots directory `%1%'") % dir);
+            removeDir(dir);
             continue;
         }
 
@@ -268,20 +303,43 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
         debug(format("waiting for read lock on `%1%'") % path);
         lockFile(*fd, ltRead, true);
 
-        /* Read the entire file. */
-        string contents = readFile(*fd);
+        /* Each file in this directory contains roots */
+        Strings files = readDirectory(dir);
+        foreach (Strings::iterator, j, files) {
+            if (*j == "lock")
+                continue;
+            Path root = (format("%1%/%2%") % dir % *j).str();
 
-        /* Extract the roots. */
-        string::size_type pos = 0, end;
+            debug(format("reading temporary root file `%1%'") % root);
+            FDPtr fdRoot(new AutoCloseFD(open(root.c_str(), O_RDONLY)));
+            if (*fdRoot == -1) {
+                /* It's okay if the file has disappeared. */
+                if (errno == ENOENT) continue;
+                throw SysError(format("opening temporary roots file `%1%'") % root);
+            }
 
-        while ((end = contents.find((char) 0, pos)) != string::npos) {
-            Path root(contents, pos, end - pos);
-            debug(format("got temporary root `%1%'") % root);
-            assertStorePath(root);
-            tempRoots.insert(root);
-            pos = end + 1;
+            /* Acquire a read lock on this root. Will cause owning process
+               to block in addTempRoot or when reporting recursive paths
+               until gc is done */
+            debug(format("waiting for read lock on `%1%'") % root);
+            lockFile(*fdRoot, ltRead, true);
+
+            /* Read the entire file. */
+            string contents = readFile(*fdRoot);
+
+            /* Extract the roots. */
+            string::size_type pos = 0, end;
+
+            while ((end = contents.find((char) 0, pos)) != string::npos) {
+                Path r(contents, pos, end - pos);
+                debug(format("got temporary root `%1%'") % r);
+                assertStorePath(r);
+                tempRoots.insert(r);
+                pos = end + 1;
+            }
+
+            fds.push_back(fdRoot); /* keep open */
         }
-
         fds.push_back(fd); /* keep open */
     }
 }
