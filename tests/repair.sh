@@ -45,3 +45,21 @@ if [ "$(nix-hash $path2)" != "$hash" -o -e $path2/bad ]; then
     echo "path not repaired properly" >&2
     exit 1
 fi
+
+# Check --verify-path and --repair-path.
+nix-store --verify-path $path2
+
+chmod u+w $path2
+rm -rf $path2
+
+if nix-store --verify-path $path2; then
+    echo "nix-store --verify-path succeeded unexpectedly" >&2
+    exit 1
+fi
+
+nix-store --repair-path $path2 --option binary-caches "file://$cacheDir"
+
+if [ "$(nix-hash $path2)" != "$hash" -o -e $path2/bad ]; then
+    echo "path not repaired properly" >&2
+    exit 1
+fi
