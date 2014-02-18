@@ -2163,9 +2163,6 @@ PathSet parseReferenceSpecifiers(const Derivation & drv, string attr)
 
 void DerivationGoal::registerOutputs()
 {
-    map<Path, PathSet> allReferences;
-    map<Path, HashResult> contentHashes;
-
     /* When using a build hook, the build hook can register the output
        as valid (by doing `nix-store --import').  If so we don't have
        to do anything here. */
@@ -2175,6 +2172,8 @@ void DerivationGoal::registerOutputs()
             if (!worker.store.isValidPath(i->second.path)) allValid = false;
         if (allValid) return;
     }
+
+    ValidPathInfos infos;
 
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all
@@ -2291,8 +2290,6 @@ void DerivationGoal::registerOutputs()
             continue;
         }
 
-        contentHashes[path] = hash;
-
         /* For debugging, print out the referenced and unreferenced
            paths. */
         foreach (PathSet::iterator, i, inputPaths) {
@@ -2302,8 +2299,6 @@ void DerivationGoal::registerOutputs()
             else
                 debug(format("referenced input: `%1%'") % *i);
         }
-
-        allReferences[path] = references;
 
         /* If the derivation specifies an `allowedReferences'
            attribute (containing a list of paths that the output may
@@ -2319,6 +2314,14 @@ void DerivationGoal::registerOutputs()
         worker.store.optimisePath(path); // FIXME: combine with scanForReferences()
 
         worker.store.markContentsGood(path);
+
+        ValidPathInfo info;
+        info.path = path;
+        info.hash = hash.first;
+        info.narSize = hash.second;
+        info.references = references;
+        info.deriver = drvPath;
+        infos.push_back(info);
     }
 
     if (buildMode == bmCheck) return;
@@ -2326,16 +2329,6 @@ void DerivationGoal::registerOutputs()
     /* Register each output path as valid, and register the sets of
        paths referenced by each of them.  If there are cycles in the
        outputs, this will fail. */
-    ValidPathInfos infos;
-    foreach (PathSet::iterator, i, missingPaths) {
-        ValidPathInfo info;
-        info.path = *i;
-        info.hash = contentHashes[*i].first;
-        info.narSize = contentHashes[*i].second;
-        info.references = allReferences[*i];
-        info.deriver = drvPath;
-        infos.push_back(info);
-    }
     worker.store.registerValidPaths(infos);
 }
 
