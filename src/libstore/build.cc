@@ -196,9 +196,6 @@ struct Child
 typedef map<pid_t, Child> Children;
 
 
-enum BuildMode { bmNormal, bmRepair };
-
-
 /* The worker class. */
 class Worker
 {
@@ -764,15 +761,15 @@ private:
 
     /* Hash rewriting. */
     HashRewrites rewritesToTmp, rewritesFromTmp;
-    PathSet redirectedOutputs;
+    typedef map<Path, Path> RedirectedOutputs;
+    RedirectedOutputs redirectedOutputs;
 
     BuildMode buildMode;
 
     /* If we're repairing without a chroot, there may be outputs that
        are valid but corrupt.  So we redirect these outputs to
-       temporary paths.  This contains the mapping from outputs to
        temporary paths. */
-    map<Path, Path> redirectedBadOutputs;
+    PathSet redirectedBadOutputs;
 
     /* Set of inodes seen during calls to canonicalisePathMetaData()
        for this build's outputs.  This needs to be shared between
@@ -1028,10 +1025,17 @@ void DerivationGoal::outputsSubstituted()
         return;
     }
 
-    if (checkPathValidity(false, buildMode == bmRepair).size() == 0) {
-        if (buildMode == bmRepair) repairClosure(); else amDone(ecSuccess);
+    unsigned int nrInvalid = checkPathValidity(false, buildMode == bmRepair).size();
+    if (buildMode == bmNormal && nrInvalid == 0) {
+        amDone(ecSuccess);
         return;
     }
+    if (buildMode == bmRepair && nrInvalid == 0) {
+        repairClosure();
+        return;
+    }
+    if (buildMode == bmCheck && nrInvalid > 0)
+        throw Error(format("some outputs of `%1%' are not valid, so checking is not possible") % drvPath);
 
     /* Otherwise, at least one of the output paths could not be
        produced using a substitute.  So we have to build instead. */
@@ -1119,8 +1123,7 @@ void DerivationGoal::inputsRealised()
 
     if (nrFailed != 0) {
         printMsg(lvlError,
-            format("cannot build derivation `%1%': "
-                "%2% dependencies couldn't be built")
+            format("cannot build derivation `%1%': %2% dependencies couldn't be built")
             % drvPath % nrFailed);
         amDone(ecFailed);
         return;
@@ -1246,7 +1249,8 @@ void DerivationGoal::tryToBuild()
        now hold the locks on the output paths, no other process can
        build this derivation, so no further checks are necessary. */
     validPaths = checkPathValidity(true, buildMode == bmRepair);
-    if (validPaths.size() == drv.outputs.size()) {
+    assert(buildMode != bmCheck || validPaths.size() == drv.outputs.size());
+    if (buildMode != bmCheck && validPaths.size() == drv.outputs.size()) {
         debug(format("skipping build of derivation `%1%', someone beat us to it") % drvPath);
         outputLocks.setDeletion(true);
         amDone(ecSuccess);
@@ -1254,7 +1258,8 @@ void DerivationGoal::tryToBuild()
     }
 
     missingPaths = outputPaths(drv.outputs);
-    foreach (PathSet::iterator, i, validPaths) missingPaths.erase(*i);
+    if (buildMode != bmCheck)
+        foreach (PathSet::iterator, i, validPaths) missingPaths.erase(*i);
 
     /* If any of the outputs already exist but are not valid, delete
        them. */
@@ -1262,7 +1267,7 @@ void DerivationGoal::tryToBuild()
         Path path = i->second.path;
         if (worker.store.isValidPath(path)) continue;
         if (!pathExists(path)) continue;
-        debug(format("removing unregistered path `%1%'") % path);
+        debug(format("removing invalid path `%1%'") % path);
         deletePath(path);
     }
 
@@ -1273,8 +1278,9 @@ void DerivationGoal::tryToBuild()
         if (pathFailed(i->second.path)) return;
 
     /* Don't do a remote build if the derivation has the attribute
-       `preferLocalBuild' set. */
-    bool buildLocally = willBuildLocally(drv);
+       `preferLocalBuild' set.  Also, check and repair modes are only
+       supported for local builds. */
+    bool buildLocally = buildMode != bmNormal || willBuildLocally(drv);
 
     /* Is the build hook willing to accept this job? */
     if (!buildLocally) {
@@ -1414,26 +1420,33 @@ void DerivationGoal::buildDone()
 
             /* Move paths out of the chroot for easier debugging of
                build failures. */
-            if (useChroot)
+            if (useChroot && buildMode == bmNormal)
                 foreach (PathSet::iterator, i, missingPaths)
                     if (pathExists(chrootRootDir + *i))
                         rename((chrootRootDir + *i).c_str(), i->c_str());
 
             if (WIFEXITED(status) && WEXITSTATUS(status) == childSetupFailed)
                 throw Error(format("failed to set up the build environment for `%1%'") % drvPath);
+
             if (diskFull)
                 printMsg(lvlError, "note: build failure may have been caused by lack of free disk space");
+
             throw BuildError(format("builder for `%1%' %2%")
                 % drvPath % statusToString(status));
         }
 
-        /* Delete redirected outputs (when doing hash rewriting). */
-        foreach (PathSet::iterator, i, redirectedOutputs)
-            deletePath(*i);
-
         /* Compute the FS closure of the outputs and register them as
            being valid. */
         registerOutputs();
+
+        if (buildMode == bmCheck) {
+            amDone(ecSuccess);
+            return;
+        }
+
+        /* Delete unused redirected outputs (when doing hash rewriting). */
+        foreach (RedirectedOutputs::iterator, i, redirectedOutputs)
+            if (pathExists(i->second)) deletePath(i->second);
 
         /* Delete the chroot (if we were using one). */
         autoDelChroot.reset(); /* this runs the destructor */
@@ -1589,7 +1602,10 @@ int childEntry(void * arg)
 
 void DerivationGoal::startBuilder()
 {
-    startNest(nest, lvlInfo, format(buildMode == bmRepair ? "repairing path(s) %1%" : "building path(s) %1%") % showPaths(missingPaths));
+    startNest(nest, lvlInfo, format(
+            buildMode == bmRepair ? "repairing path(s) %1%" :
+            buildMode == bmCheck ? "checking path(s) %1%" :
+            "building path(s) %1%") % showPaths(missingPaths));
 
     /* Right platform? */
     if (!canBuildLocally(drv.platform)) {
@@ -1873,16 +1889,17 @@ void DerivationGoal::startBuilder()
            contents of the new outputs to replace the dummy strings
            with the actual hashes. */
         if (validPaths.size() > 0)
-            //throw Error(format("derivation `%1%' is blocked by its output path(s) %2%") % drvPath % showPaths(validPaths));
             foreach (PathSet::iterator, i, validPaths)
-                redirectedOutputs.insert(addHashRewrite(*i));
+                addHashRewrite(*i);
 
         /* If we're repairing, then we don't want to delete the
            corrupt outputs in advance.  So rewrite them as well. */
         if (buildMode == bmRepair)
             foreach (PathSet::iterator, i, missingPaths)
-                if (worker.store.isValidPath(*i) && pathExists(*i))
-                    redirectedBadOutputs[*i] = addHashRewrite(*i);
+                if (worker.store.isValidPath(*i) && pathExists(*i)) {
+                    addHashRewrite(*i);
+                    redirectedBadOutputs.insert(*i);
+                }
     }
 
 
@@ -2166,28 +2183,35 @@ void DerivationGoal::registerOutputs()
         Path path = i->second.path;
         if (missingPaths.find(path) == missingPaths.end()) continue;
 
+        Path actualPath = path;
         if (useChroot) {
-            if (pathExists(chrootRootDir + path)) {
+            actualPath = chrootRootDir + path;
+            if (pathExists(actualPath)) {
                 /* Move output paths from the chroot to the Nix store. */
                 if (buildMode == bmRepair)
-                    replaceValidPath(path, chrootRootDir + path);
+                    replaceValidPath(path, actualPath);
                 else
-                    if (rename((chrootRootDir + path).c_str(), path.c_str()) == -1)
+                    if (buildMode != bmCheck && rename(actualPath.c_str(), path.c_str()) == -1)
                         throw SysError(format("moving build output `%1%' from the chroot to the Nix store") % path);
             }
+            if (buildMode != bmCheck) actualPath = path;
         } else {
-            Path redirected;
-            if (buildMode == bmRepair && (redirected = redirectedBadOutputs[path]) != "" && pathExists(redirected))
+            Path redirected = redirectedOutputs[path];
+            if (buildMode == bmRepair
+                && redirectedBadOutputs.find(path) != redirectedBadOutputs.end()
+                && pathExists(redirected))
                 replaceValidPath(path, redirected);
+            if (buildMode == bmCheck)
+                actualPath = redirected;
         }
 
         struct stat st;
-        if (lstat(path.c_str(), &st) == -1) {
+        if (lstat(actualPath.c_str(), &st) == -1) {
             if (errno == ENOENT)
                 throw BuildError(
                     format("builder for `%1%' failed to produce output path `%2%'")
                     % drvPath % path);
-            throw SysError(format("getting attributes of path `%1%'") % path);
+            throw SysError(format("getting attributes of path `%1%'") % actualPath);
         }
 
 #ifndef __CYGWIN__
@@ -2208,15 +2232,15 @@ void DerivationGoal::registerOutputs()
             /* Canonicalise first.  This ensures that the path we're
                rewriting doesn't contain a hard link to /etc/shadow or
                something like that. */
-            canonicalisePathMetaData(path, buildUser.enabled() ? buildUser.getUID() : -1, inodesSeen);
+            canonicalisePathMetaData(actualPath, buildUser.enabled() ? buildUser.getUID() : -1, inodesSeen);
 
             /* FIXME: this is in-memory. */
             StringSink sink;
-            dumpPath(path, sink);
-            deletePath(path);
+            dumpPath(actualPath, sink);
+            deletePath(actualPath);
             sink.s = rewriteHashes(sink.s, rewritesFromTmp);
             StringSource source(sink.s);
-            restorePath(path, source);
+            restorePath(actualPath, source);
 
             rewritten = true;
         }
@@ -2237,12 +2261,11 @@ void DerivationGoal::registerOutputs()
                    execute permission. */
                 if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
                     throw BuildError(
-                        format("output path `%1% should be a non-executable regular file")
-                        % path);
+                        format("output path `%1% should be a non-executable regular file") % path);
             }
 
             /* Check the hash. */
-            Hash h2 = recursive ? hashPath(ht, path).first : hashFile(ht, path);
+            Hash h2 = recursive ? hashPath(ht, actualPath).first : hashFile(ht, actualPath);
             if (h != h2)
                 throw BuildError(
                     format("output path `%1%' should have %2% hash `%3%', instead has `%4%'")
@@ -2251,7 +2274,7 @@ void DerivationGoal::registerOutputs()
 
         /* Get rid of all weird permissions.  This also checks that
            all files are owned by the build user, if applicable. */
-        canonicalisePathMetaData(path,
+        canonicalisePathMetaData(actualPath,
             buildUser.enabled() && !rewritten ? buildUser.getUID() : -1, inodesSeen);
 
         /* For this output path, find the references to other paths
@@ -2259,7 +2282,15 @@ void DerivationGoal::registerOutputs()
            time.  The hash is stored in the database so that we can
            verify later on whether nobody has messed with the store. */
         HashResult hash;
-        PathSet references = scanForReferences(path, allPaths, hash);
+        PathSet references = scanForReferences(actualPath, allPaths, hash);
+
+        if (buildMode == bmCheck) {
+            ValidPathInfo info = worker.store.queryPathInfo(path);
+            if (hash.first != info.hash)
+                throw Error(format("derivation `%2%' may not be deterministic: hash mismatch in output `%1%'") % drvPath % path);
+            continue;
+        }
+
         contentHashes[path] = hash;
 
         /* For debugging, print out the referenced and unreferenced
@@ -2289,6 +2320,8 @@ void DerivationGoal::registerOutputs()
 
         worker.store.markContentsGood(path);
     }
+
+    if (buildMode == bmCheck) return;
 
     /* Register each output path as valid, and register the sets of
        paths referenced by each of them.  If there are cycles in the
@@ -2457,6 +2490,7 @@ Path DerivationGoal::addHashRewrite(const Path & path)
     assert(path.size() == p.size());
     rewritesToTmp[h1] = h2;
     rewritesFromTmp[h2] = h1;
+    redirectedOutputs[path] = p;
     return p;
 }
 
@@ -3212,7 +3246,7 @@ unsigned int Worker::exitStatus()
 //////////////////////////////////////////////////////////////////////
 
 
-void LocalStore::buildPaths(const PathSet & drvPaths, bool repair)
+void LocalStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
 {
     startNest(nest, lvlDebug,
         format("building %1%") % showPaths(drvPaths));
@@ -3223,9 +3257,9 @@ void LocalStore::buildPaths(const PathSet & drvPaths, bool repair)
     foreach (PathSet::const_iterator, i, drvPaths) {
         DrvPathWithOutputs i2 = parseDrvPathWithOutputs(*i);
         if (isDerivation(i2.first))
-            goals.insert(worker.makeDerivationGoal(i2.first, i2.second, repair ? bmRepair : bmNormal));
+            goals.insert(worker.makeDerivationGoal(i2.first, i2.second, buildMode));
         else
-            goals.insert(worker.makeSubstitutionGoal(*i, repair));
+            goals.insert(worker.makeSubstitutionGoal(*i, buildMode));
     }
 
     worker.run(goals);

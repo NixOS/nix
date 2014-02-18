@@ -447,9 +447,9 @@ Paths RemoteStore::importPaths(bool requireSignature, Source & source)
 }
 
 
-void RemoteStore::buildPaths(const PathSet & drvPaths, bool repair)
+void RemoteStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
 {
-    if (repair) throw Error("repairing is not supported when building through the Nix daemon");
+    if (buildMode != bmNormal) throw Error("repairing or checking is not supported when building through the Nix daemon");
     openConnection();
     writeInt(wopBuildPaths, to);
     if (GET_PROTOCOL_MINOR(daemonVersion) >= 13)

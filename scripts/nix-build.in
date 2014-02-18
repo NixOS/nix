@@ -121,6 +121,10 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
         push @instArgs, $arg;
     }
 
+    elsif ($arg eq "--check") {
+        push @buildArgs, $arg;
+    }
+
     elsif ($arg eq "--run-env") { # obsolete
         $runEnv = 1;
     }

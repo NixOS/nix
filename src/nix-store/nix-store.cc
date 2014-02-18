@@ -104,12 +104,13 @@ static PathSet realisePath(const Path & path, bool build = true)
 static void opRealise(Strings opFlags, Strings opArgs)
 {
     bool dryRun = false;
-    bool repair = false;
+    BuildMode buildMode = bmNormal;
     bool ignoreUnknown = false;
 
     foreach (Strings::iterator, i, opFlags)
         if (*i == "--dry-run") dryRun = true;
-        else if (*i == "--repair") repair = true;
+        else if (*i == "--repair") buildMode = bmRepair;
+        else if (*i == "--check") buildMode = bmCheck;
         else if (*i == "--ignore-unknown") ignoreUnknown = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
@@ -137,7 +138,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
     if (dryRun) return;
 
     /* Build all paths at the same time to exploit parallelism. */
-    store->buildPaths(PathSet(paths.begin(), paths.end()), repair);
+    store->buildPaths(PathSet(paths.begin(), paths.end()), buildMode);
 
     if (!ignoreUnknown)
         foreach (Paths::iterator, i, paths) {
