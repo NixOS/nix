@@ -1693,17 +1693,17 @@ void DerivationGoal::startBuilder()
     env["PWD"] = tmpDir;
 
     /* Set up recursive nix */
-    /* !!! Should we set all of these to real values, or can we set some to
-       /var/empty ? */
     env["NIX_STORE_DIR"] = settings.nixStore;
-    env["NIX_DATA_DIR"] = settings.nixDataDir;
-    env["NIX_LOG_DIR"] = settings.nixLogDir;
-    env["NIX_STATE_DIR"] = settings.nixStateDir;
-    env["NIX_DB_DIR"] = settings.nixDBPath;
-    /* This isn't in the chroot, but we pass the settings pack */
-    env["NIX_CONF_DIR"] = settings.nixConfDir;
-    /* Can't set NIX_LIBEXEC_DIR or NIX_BIN_DIR, obviously */
-    env["NIX_SUBSTITUTERS"] = getEnv("NIX_SUBSTITUTERS", "default");
+    /* NIX_DATA_DIR, NIX_LIBEXEC_DIR, NIX_BIN_DIR purposefully not set */
+    /* If we want log reading from recursive nix, we'll
+       need to put the log dir in the chroot */
+    env["NIX_LOG_DIR"] = "/var/empty";
+    env["NIX_STATE_DIR"] = "/var/empty";
+    env["NIX_DB_DIR"] = "/var/empty";
+    /* We pass the settings pack. Would need to put this
+       in the chroot if we really wanted it */
+    env["NIX_CONF_DIR"] = "/var/empty";
+    env["NIX_SUBSTITUTERS"] = "";
     env["NIX_AFFINITY_HACK"] = settings.lockCPU ? "1" : "";
     env["_NIX_OPTIONS"] = settings.pack();
     env["NIX_REMOTE"] = "recursive";
