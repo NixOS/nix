@@ -15,5 +15,5 @@ if test "$text" != "Hello World!"; then exit 1; fi
 
 # Directed delete: $outPath is not reachable from a root, so it should
 # be deleteable.
-nix-store --delete $outPath
-if test -e $outPath/hello; then false; fi
+nix-store --delete $(readlink $outPath)
+if test -e $outPath; then false; fi
