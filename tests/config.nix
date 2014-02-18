@@ -1,7 +1,7 @@
 with import <nix/config.nix>;
 
 rec {
-  inherit shell;
+  inherit shell nixBinDir;
 
   path = coreutils;
 
