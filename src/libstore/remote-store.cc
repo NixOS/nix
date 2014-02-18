@@ -94,9 +94,9 @@ void RemoteStore::openConnection(bool reserveSpace)
         ssize_t count = sendmsg(sfd, &msg, 0);
         if (count == -1)
             throw SysError("sending socket descriptor to daemon");
-        else if ((size_t) count != iov.iov_len)
-            throw Error(format("Tried to send %1% bytes to the daemon, but only %2% were sent")
-                    % iov.iov_len % count);
+        else if ((size_t) count != sizeof buf)
+            throw Error(format("tried to send %1% bytes to the daemon, but only %2% were sent")
+                    % sizeof buf % count);
         close(fds[1]);
 
         fdSocket = fds[0];

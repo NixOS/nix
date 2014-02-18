@@ -223,8 +223,8 @@ void checkStoreNotSymlink()
 
 
 LocalStore::LocalStore(bool reserveSpace, int fd)
-    : didSetSubstituterEnv(false)
-    , fdRecursiveDaemon(fd)
+    : fdRecursiveDaemon(fd)
+    , didSetSubstituterEnv(false)
 {
     schemaPath = settings.nixDBPath + "/schema";
 

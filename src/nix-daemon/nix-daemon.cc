@@ -778,6 +778,8 @@ static void daemonLoop()
     AutoCloseFD fdSocket;
 
     AutoCloseFD fdRecursiveFrom;
+    AutoCloseFD fdRecursiveClose;
+    string fds;
     /* Handle socket-based activation by systemd. */
     if (getEnv("LISTEN_FDS") != "") {
         if (getEnv("LISTEN_PID") != int2String(getpid()) || getEnv("LISTEN_FDS") != "1")
@@ -786,19 +788,33 @@ static void daemonLoop()
     }
 
     /* Handle nix-daemon run as a child of build.cc for recursive nix */
-    else if (getEnv("NIX_RECURSIVE_FDS") != "") {
-        Strings tokenized = tokenizeString<Strings>(getEnv("NIX_RECURSIVE_FDS"));
-        string first = tokenized.front();
+    else if ((fds = getEnv("NIX_RECURSIVE_FDS")) != "") {
+        Strings tokenized = tokenizeString<Strings>(fds);
+
+        Strings::iterator token = tokenized.begin();
+        if (token == tokenized.end())
+            throw Error(format("invalid value for NIX_RECURSIVE_FDS, `%1%'") % fds);
         int fd;
-        if (!string2Int(first, fd))
-            throw Error(format("invalid value for NIX_RECURSIVE_FDS, `%1%'") % getEnv("NIX_RECURSIVE_FDS"));
+        if (!string2Int(*token, fd))
+            throw Error(format("invalid value for NIX_RECURSIVE_FDS, `%1%'") % fds);
         fdRecursiveFrom = fd;
 
-        tokenized.pop_front();
-        string second = tokenized.front();
-        if (!string2Int(second, fd))
-            throw Error(format("invalid value for NIX_RECURSIVE_FDS, `%1%'") % getEnv("NIX_RECURSIVE_FDS"));
+        ++token;
+        if (token == tokenized.end())
+            throw Error(format("invalid value for NIX_RECURSIVE_FDS, `%1%'") % fds);
+        if (!string2Int(*token, fd))
+            throw Error(format("invalid value for NIX_RECURSIVE_FDS, `%1%'") % fds);
         fdRecursiveTo = fd;
+
+        ++token;
+        if (token == tokenized.end())
+            throw Error(format("invalid value for NIX_RECURSIVE_FDS, `%1%'") % fds);
+        if (!string2Int(*token, fd))
+            throw Error(format("invalid value for NIX_RECURSIVE_FDS, `%1%'") % fds);
+        fdRecursiveClose = fd;
+        closeOnExec(fdRecursiveClose);
+
+        unsetenv("NIX_RECURSIVE_FDS");
     }
 
     /* Otherwise, create and bind to a Unix domain socket. */
@@ -871,10 +887,16 @@ static void daemonLoop()
             FD_ZERO(&set);
             FD_SET(fdRecursiveFrom, &set);
             /* Sigh, POSIX requires valid fds for FD_SET/FD_ISSET */
-            if (fdSocket != -1)
+            int nfds;
+            if (fdSocket != -1) {
                 FD_SET(fdSocket, &set);
-            int nfds =
-                ((fdSocket > fdRecursiveFrom) ? fdSocket : fdRecursiveFrom) + 1;
+                nfds =
+                    ((fdSocket > fdRecursiveFrom) ? fdSocket : fdRecursiveFrom) + 1;
+            } else {
+                FD_SET(fdRecursiveClose, &set);
+                nfds =
+                    ((fdRecursiveClose > fdRecursiveFrom) ? fdRecursiveClose : fdRecursiveFrom) + 1;
+            }
 
             int res = select(nfds, &set, 0, 0, 0);
             checkInterrupt();
@@ -899,6 +921,9 @@ static void daemonLoop()
                         throw SysError("accepting connection");
                 }
 
+            } else if (fdRecursiveClose != -1 && FD_ISSET(fdRecursiveClose, &set)) {
+                /* Parent died, so we're done */
+                return;
             } else {
                 /* Lots of connections on fdSocket could theoretically starve
                    the recursive socket, oh well */
@@ -920,8 +945,8 @@ static void daemonLoop()
                 ssize_t count = recvmsg(fdRecursiveFrom, &msg, 0);
                 if (count == -1)
                     throw SysError("recieving socket descriptor from client");
-                else if (((size_t) count) < sizeof buf)
-                    throw Error(format("Expected to receive %1% bytes from client, got %2%") % sizeof buf % count);
+                else if (((size_t) count) != sizeof buf)
+                    throw Error(format("expected to receive %1% bytes from client, got %2%") % sizeof buf % count);
 
                 memmove(&fd, CMSG_DATA(CMSG_FIRSTHDR(&msg)), sizeof fd);
 
@@ -929,7 +954,7 @@ static void daemonLoop()
 
                 unsigned int recursiveClientVersion = 0;
                 for (size_t byte = 0; byte < sizeof RECURSIVE_PROTOCOL_VERSION; ++byte)
-                    recursiveClientVersion += ((int) buf[byte]) << (8 * byte);
+                    recursiveClientVersion += ((unsigned int) buf[byte]) << (8 * byte);
                 if (GET_PROTOCOL_MAJOR(recursiveClientVersion) != GET_PROTOCOL_MAJOR(RECURSIVE_PROTOCOL_VERSION))
                     throw Error("nix client recursive protocol version not supported");
             }

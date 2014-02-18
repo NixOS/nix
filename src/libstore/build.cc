@@ -8,6 +8,7 @@
 #include "util.hh"
 #include "archive.hh"
 #include "affinity.hh"
+#include "worker-protocol.hh"
 
 #include <map>
 #include <sstream>
@@ -1435,6 +1436,35 @@ void DerivationGoal::buildDone()
                 % drvPath % statusToString(status));
         }
 
+        if (!hook) {
+            /* !!! Should hooks get a recursive paths fd, or just use importPaths? */
+            AutoCloseFD recursivePaths = worker.store.openTempRootsFile(baseNameOf(drvPath));
+
+            /* Read the entire file. */
+            string contents = readFile(recursivePaths);
+
+            /* Extract the paths. */
+            string::size_type pos = 0, end;
+
+            PathSet newPaths;
+
+            while ((end = contents.find((char) 0, pos)) != string::npos) {
+                Path r(contents, pos, end - pos);
+                debug(format("got recursive path `%1%'") % r);
+                assertStorePath(r);
+                /* If a derivation was made visible to the build, we
+                   need to also check for its outputs */
+                computeFSClosure(worker.store, r, newPaths, false, true);
+                pos = end + 1;
+            }
+
+            foreach (PathSet::iterator, i, newPaths)
+                worker.store.addTempRoot(*i);
+            allPaths.insert(newPaths.begin(), newPaths.end());
+            worker.store.deleteTempRootsFile(baseNameOf(drvPath));
+        }
+
+
         /* Compute the FS closure of the outputs and register them as
            being valid. */
         registerOutputs();
@@ -1661,6 +1691,68 @@ void DerivationGoal::startBuilder()
        inode of the current directory doesn't appear in .. (because
        getdents returns the inode of the mount point). */
     env["PWD"] = tmpDir;
+
+    /* Set up recursive nix */
+    /* !!! Should we set all of these to real values, or can we set some to
+       /var/empty ? */
+    env["NIX_STORE_DIR"] = settings.nixStore;
+    env["NIX_DATA_DIR"] = settings.nixDataDir;
+    env["NIX_LOG_DIR"] = settings.nixLogDir;
+    env["NIX_STATE_DIR"] = settings.nixStateDir;
+    env["NIX_DB_DIR"] = settings.nixDBPath;
+    /* This isn't in the chroot, but we pass the settings pack */
+    env["NIX_CONF_DIR"] = settings.nixConfDir;
+    /* Can't set NIX_LIBEXEC_DIR or NIX_BIN_DIR, obviously */
+    env["NIX_SUBSTITUTERS"] = getEnv("NIX_SUBSTITUTERS", "default");
+    env["NIX_AFFINITY_HACK"] = settings.lockCPU ? "1" : "";
+    env["_NIX_OPTIONS"] = settings.pack();
+    env["NIX_REMOTE"] = "recursive";
+    env["NIX_REMOTE_RECURSIVE_PROTOCOL_VERSION"] = int2String(RECURSIVE_PROTOCOL_VERSION);
+    if (worker.store.fdRecursiveDaemon == -1) {
+        /* This process isn't a daemon worker, and we haven't spawned a child daemon yet */
+        int sockets[2];
+        if (socketpair(PF_UNIX, SOCK_STREAM, 0, sockets) == -1)
+            throw SysError("creating recursive daemon socketpair");
+
+        if (shutdown(sockets[0], SHUT_WR) == -1)
+            throw SysError("disabling writes to listening side of daemon socketpair");
+
+        if (shutdown(sockets[1], SHUT_RD) == -1)
+            throw SysError("disabling reads from connecting side of daemon socketpair");
+
+        /* No portable way to kill children when parents die, so
+           we pass the daemon the read side of a pipe, when it gets
+           EOF there it knows we died and it exits */
+        int close_pipe[2];
+        closeOnExec(close_pipe[1]);
+        if (pipe(close_pipe) == -1)
+            throw SysError("creating recursive nix daemon close notification pipe");
+
+        set<int> kept;
+        kept.insert(sockets[0]);
+        kept.insert(sockets[1]);
+        kept.insert(close_pipe[0]);
+        string recursiveFds = (format("%1% %2% %3%") % sockets[0] % sockets[1] % close_pipe[0]).str();
+        Path progPath = (format("%1%/nix-daemon") % settings.nixBinDir).str();
+        switch (fork()) {
+            case -1:
+                throw SysError("forking to run recursive nix-daemon");
+            case 0:
+                setenv("NIX_RECURSIVE_FDS", recursiveFds.c_str(), true);
+                setenv("_NIX_OPTIONS", env["_NIX_OPTIONS"].c_str(), true);
+                closeMostFDs(kept);
+                execl(progPath.c_str(), "nix-daemon", NULL);
+                throw SysError("executing nix-daemon");
+        }
+        close(close_pipe[0]);
+        /* close_pipe[1] purposefully leaked here */
+        close(sockets[0]);
+        worker.store.fdRecursiveDaemon = sockets[1];
+    }
+    env["NIX_REMOTE_RECURSIVE_SOCKET_FD"] = int2String((int) worker.store.fdRecursiveDaemon);
+
+    AutoCloseFD recursivePaths = worker.store.openTempRootsFile(baseNameOf(drvPath));
+    env["NIX_REMOTE_RECURSIVE_PATHS_FD"] = int2String((int) recursivePaths);
 
     /* Compatibility hack with Nix <= 0.7: if this is a fixed-output
        derivation, tell the builder, so that for instance `fetchurl'
@@ -2061,8 +2153,17 @@ void DerivationGoal::initChild()
         if (chdir(tmpDir.c_str()) == -1)
             throw SysError(format("changing into `%1%'") % tmpDir);
 
-        /* Close all other file descriptors. */
-        closeMostFDs(set<int>());
+        /* Close all file descriptors except stdio and recursive nix files. */
+        set<int> kept;
+        int fd;
+        bool ok = string2Int(env["NIX_REMOTE_RECURSIVE_SOCKET_FD"], fd);
+        kept.insert(fd);
+        assert(ok);
+        ok = string2Int(env["NIX_REMOTE_RECURSIVE_PATHS_FD"], fd);
+        kept.insert(fd);
+        assert(ok);
+
+        closeMostFDs(kept);
 
 #ifdef CAN_DO_LINUX32_BUILDS
         /* Change the personality to 32-bit if we're doing an

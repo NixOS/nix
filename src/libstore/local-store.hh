@@ -210,6 +210,14 @@ public:
 
     void setSubstituterEnv();
 
+    /* create/open a new temproot file */
+    int openTempRootsFile(const string & name);
+
+    /* delete a temproot file */
+    void deleteTempRootsFile(const string & name);
+
+    AutoCloseFD fdRecursiveDaemon;
+
 private:
 
     Path schemaPath;
@@ -308,8 +316,6 @@ private:
     // Internal versions that are not wrapped in retry_sqlite.
     bool isValidPath_(const Path & path);
     void queryReferrers_(const Path & path, PathSet & referrers);
-
-    AutoCloseFD fdRecursiveDaemon;
 };
 
 
