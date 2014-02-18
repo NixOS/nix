@@ -9,3 +9,6 @@ filename-to-dep = $(dir $1).$(notdir $1).dep
 # Return the full path to a program by looking it up in $PATH, or the
 # empty string if not found.
 find-program = $(shell for i in $$(IFS=: ; echo $$PATH); do p=$$i/$(strip $1); if [ -e $$p ]; then echo $$p; break; fi; done)
+
+# Remove trailing slash.
+remove-trailing-slash = $(patsubst %/,%,$(1))
