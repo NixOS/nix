@@ -9,7 +9,7 @@ namespace nix {
 /* Open (possibly create) a lock file and return the file descriptor.
    -1 is returned if create is false and the lock could not be opened
    because it doesn't exist.  Any other error throws an exception. */
-int openLockFile(const Path & path, bool create);
+int openLockFile(const Path & path, bool create, bool append = false);
 
 /* Delete an open lock file. */
 void deleteLockFile(const Path & path, int fd);

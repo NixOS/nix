@@ -187,7 +187,7 @@ int LocalStore::openTempRootsFile(const string & name) {
 
     /* If the file already exists, just return it */
     Path fn = (format("%1%/%2%") % dnTempRoots % name).str();
-    AutoCloseFD res = openLockFile(fn, false);
+    AutoCloseFD res = openLockFile(fn, false, true);
     if (res == -1) {
         /* file doesn't exist yet */
         /* Upgrade the dir lock to a write lock.  This will cause us to block
@@ -195,7 +195,7 @@ int LocalStore::openTempRootsFile(const string & name) {
         debug(format("acquiring write lock on `%1%/lock'") % dnTempRoots);
         lockFile(fdTempRootsDirLock, ltWrite, true);
 
-        res = openLockFile(fn, true);
+        res = openLockFile(fn, true, true);
 
         /* Downgrade to a read lock. */
         debug(format("downgrading to read lock on `%1%/lock'") % dnTempRoots);

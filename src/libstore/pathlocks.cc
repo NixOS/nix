@@ -12,11 +12,11 @@
 namespace nix {
 
 
-int openLockFile(const Path & path, bool create)
+int openLockFile(const Path & path, bool create, bool append)
 {
     AutoCloseFD fd;
 
-    fd = open(path.c_str(), O_RDWR | (create ? O_CREAT : 0), 0600);
+    fd = open(path.c_str(), O_RDWR | (create ? O_CREAT : 0) | (append ? O_APPEND : 0), 0600);
     if (fd == -1 && (create || errno != ENOENT))
         throw SysError(format("opening lock file `%1%'") % path);
 
