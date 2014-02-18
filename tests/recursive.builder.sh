@@ -1,1 +1,1 @@
-nix-store -r $(nix-instantiate $simple) --add-root $out
+ln -sv $(nix-store -r $(nix-instantiate $simple)) $out
