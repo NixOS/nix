@@ -28,7 +28,7 @@ define build-program
 
   $$(eval $$(call create-dir, $$(_d)))
 
-  $$($(1)_PATH): $$($(1)_OBJS) $$(_libs) | $$(_d)
+  $$($(1)_PATH): $$($(1)_OBJS) $$(_libs) | $$(_d)/
 	$$(trace-ld) $(CXX) -o $$@ $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
 
   $(1)_INSTALL_DIR ?= $$(bindir)
@@ -42,12 +42,12 @@ define build-program
 
     _libs_final := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_INSTALL_PATH))
 
-    $(DESTDIR)$$($(1)_INSTALL_PATH): $$($(1)_OBJS) $$(_libs_final) | $(DESTDIR)$$($(1)_INSTALL_DIR)
+    $(DESTDIR)$$($(1)_INSTALL_PATH): $$($(1)_OBJS) $$(_libs_final) | $(DESTDIR)$$($(1)_INSTALL_DIR)/
 	$$(trace-ld) $(CXX) -o $$@ $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
 
   else
 
-    $(DESTDIR)$$($(1)_INSTALL_PATH): $$($(1)_PATH) | $(DESTDIR)$$($(1)_INSTALL_DIR)
+    $(DESTDIR)$$($(1)_INSTALL_PATH): $$($(1)_PATH) | $(DESTDIR)$$($(1)_INSTALL_DIR)/
 	install -t $$($(1)_INSTALL_DIR) $$<
 
   endif

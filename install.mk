@@ -1,7 +1,7 @@
 # Add a rule for creating $(1) as a directory.  This template may be
 # called multiple times for the same directory.
 define create-dir
-   _i := $$(call remove-trailing-slash, $(DESTDIR)$$(strip $(1)))
+   _i := $$(call add-trailing-slash, $(DESTDIR)$$(strip $(1)))
   ifndef $$(_i)_SEEN
     $$(_i)_SEEN = 1
     $$(_i):

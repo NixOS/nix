@@ -11,4 +11,4 @@ filename-to-dep = $(dir $1).$(notdir $1).dep
 find-program = $(shell for i in $$(IFS=: ; echo $$PATH); do p=$$i/$(strip $1); if [ -e $$p ]; then echo $$p; break; fi; done)
 
 # Remove trailing slash.
-remove-trailing-slash = $(patsubst %/,%,$(1))
+add-trailing-slash = $(patsubst %/,%,$(1))/
