@@ -74,7 +74,7 @@ void RemoteStore::openConnection(bool reserveSpace)
         /* Send our protocol version and a socket to the daemon */
         unsigned char buf[sizeof RECURSIVE_PROTOCOL_VERSION];
         for (size_t byte = 0; byte < sizeof buf; ++byte)
-            buf[sizeof buf - (byte + 1)] =
+            buf[byte] =
                 (unsigned char) ((RECURSIVE_PROTOCOL_VERSION >> (8 * byte)) & 0xFF);
         struct iovec iov;
         iov.iov_base = buf;
