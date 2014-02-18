@@ -261,6 +261,9 @@ void closeMostFDs(const set<int> & exceptions);
 /* Set the close-on-exec flag for the given file descriptor. */
 void closeOnExec(int fd);
 
+/* Unset the close-on-exec flag for the given file descriptor. */
+void noCloseOnExec(int fd);
+
 /* Put the given file descriptor into non-blocking mode. */
 void setNonBlocking(int fd);
 

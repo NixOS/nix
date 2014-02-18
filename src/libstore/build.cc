@@ -1752,6 +1752,7 @@ void DerivationGoal::startBuilder()
     env["NIX_REMOTE_RECURSIVE_SOCKET_FD"] = int2String((int) worker.store.fdRecursiveDaemon);
 
     AutoCloseFD recursivePaths = worker.store.openTempRootsFile(baseNameOf(drvPath));
+    noCloseOnExec(recursivePaths);
     env["NIX_REMOTE_RECURSIVE_PATHS_FD"] = int2String((int) recursivePaths);
 
     /* Compatibility hack with Nix <= 0.7: if this is a fixed-output
