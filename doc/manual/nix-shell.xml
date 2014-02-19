@@ -18,7 +18,6 @@
 <refsynopsisdiv>
   <cmdsynopsis>
     <command>nix-shell</command>
-    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common-syn.xml#xmlns(db=http://docbook.org/ns/docbook)xpointer(/db:nop/*)" />
     <arg><option>--arg</option> <replaceable>name</replaceable> <replaceable>value</replaceable></arg>
     <arg><option>--argstr</option> <replaceable>name</replaceable> <replaceable>value</replaceable></arg>
     <arg>
@@ -31,7 +30,16 @@
     <arg><option>--command</option> <replaceable>cmd</replaceable></arg>
     <arg><option>--exclude</option> <replaceable>regexp</replaceable></arg>
     <arg><option>--pure</option></arg>
-    <arg><replaceable>path</replaceable></arg>
+    <group choice='req'>
+      <group choice='plain'>
+        <group>
+          <arg choice='plain'><option>--packages</option></arg>
+          <arg choice='plain'><option>-p</option></arg>
+        </group>
+        <replaceable>packages</replaceable>
+      </group>
+      <arg><replaceable>path</replaceable></arg>
+    </group>
   </cmdsynopsis>
 </refsynopsisdiv>
 
@@ -114,6 +122,18 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 
   </varlistentry>
 
+  <varlistentry><term><option>--packages</option> / <option>-p</option></term>
+
+    <listitem><para>Set up an environment in which the specified
+    packages are present.  The command line arguments are interpreted
+    as attribute names inside the Nix Packages collection.  Thus,
+    <literal>nix-shell -p libjpeg openjdk</literal> will start a shell
+    in which the packages denoted by the attribute names
+    <varname>libjpeg</varname> and <varname>openjdk</varname> are
+    present.</para></listitem>
+
+  </varlistentry>
+
 </variablelist>
 
 <para>The following common options are supported:</para>
@@ -153,6 +173,14 @@ the following starts a shell containing the packages
 
 <screen>
 $ nix-shell -E 'with import &lt;nixpkgs> { }; runCommand "dummy" { buildInputs = [ sqlite xorg.libX11 ]; } ""'
+</screen>
+
+A shorter way to do the same is:
+
+<screen>
+$ nix-shell -p sqlite xorg.libX11
+[nix-shell]$ echo $NIX_LDFLAGS
+… -L/nix/store/j1zg5v…-sqlite-3.8.0.2/lib -L/nix/store/0gmcz9…-libX11-1.6.1/lib …
 </screen>
 
 </para>

@@ -12,6 +12,7 @@ my $verbose = 0;
 my $runEnv = $0 =~ /nix-shell$/;
 my $pure = 0;
 my $fromArgs = 0;
+my $packages = 0;
 
 my @instArgs = ();
 my @buildArgs = ();
@@ -150,6 +151,10 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
         push @instArgs, "--expr";
     }
 
+    elsif ($arg eq "--packages" || $arg eq "-p") {
+        $packages = 1;
+    }
+
     elsif (substr($arg, 0, 1) eq "-") {
         push @buildArgs, $arg;
     }
@@ -159,7 +164,12 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
     }
 }
 
-if (!$fromArgs) {
+if ($packages) {
+    push @instArgs, "--expr";
+    @exprs = (
+        'with import <nixpkgs> { }; runCommand "shell" { buildInputs = [ '
+        . (join " ", map { "($_)" } @exprs) . ']; } ""');
+} elsif (!$fromArgs) {
     @exprs = ("shell.nix") if scalar @exprs == 0 && $runEnv && -e "shell.nix";
     @exprs = ("default.nix") if scalar @exprs == 0;
 }
