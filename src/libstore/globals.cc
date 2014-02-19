@@ -41,6 +41,7 @@ Settings::Settings()
     syncBeforeRegistering = false;
     useSubstitutes = true;
     useChroot = false;
+    useSshSubstituter = false;
     dirsInChroot.insert("/dev");
     dirsInChroot.insert("/dev/pts");
     impersonateLinux26 = false;
@@ -153,6 +154,7 @@ void Settings::update()
     get(autoOptimiseStore, "auto-optimise-store");
     get(envKeepDerivations, "env-keep-derivations");
     get(sshSubstituterHosts, "ssh-substituter-hosts");
+    get(useSshSubstituter, "use-ssh-substituter");
 }
 
 
