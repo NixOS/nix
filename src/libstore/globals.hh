@@ -149,6 +149,9 @@ struct Settings {
     /* Set of ssh connection strings for the ssh substituter */
     Strings sshSubstituterHosts;
 
+    /* Whether to use the ssh substituter at all */
+    bool useSshSubstituter;
+
     /* Whether to impersonate a Linux 2.6 machine on newer kernels. */
     bool impersonateLinux26;
 

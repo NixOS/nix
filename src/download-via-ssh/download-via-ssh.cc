@@ -111,6 +111,18 @@ void run(Strings args)
     if (args.empty())
         throw UsageError("download-via-ssh requires an argument");
 
+    Settings::SettingsMap overrides = settings.getOverrides();
+    Settings::SettingsMap::iterator use = overrides.find("untrusted-use-ssh-substituter");
+    if (use != overrides.end()) {
+        if (use->second == "true") settings.useSshSubstituter = true;
+        else if (use->second == "false") settings.useSshSubstituter = false;
+        else throw Error(format("configuration option `use-ssh-substituter' should be either `true' or `false', not `%1%'")
+                        % use->second);
+    }
+
+    if (!settings.useSshSubstituter)
+        return;
+
     if (settings.sshSubstituterHosts.empty())
         return;
 
