@@ -44,23 +44,23 @@
     <section>
       <title>Main commands</title>
       <xi:include href="nix-env.xml" />
-      <xi:include href="nix-instantiate.xml" />
+      <xi:include href="nix-build.xml" />
+      <xi:include href="nix-shell.xml" />
       <xi:include href="nix-store.xml" />
     </section>
 
     <section>
       <title>Utilities</title>
-      <xi:include href="nix-build.xml" />
-      <xi:include href="nix-shell.xml" />
       <xi:include href="nix-channel.xml" />
       <xi:include href="nix-collect-garbage.xml" />
       <xi:include href="nix-copy-closure.xml" />
+      <xi:include href="nix-daemon.xml" />
       <xi:include href="nix-hash.xml" />
       <xi:include href="nix-install-package.xml" />
+      <xi:include href="nix-instantiate.xml" />
       <xi:include href="nix-prefetch-url.xml" />
       <xi:include href="nix-pull.xml" />
       <xi:include href="nix-push.xml" />
-      <xi:include href="nix-daemon.xml" />
     </section>
 
     <section>
