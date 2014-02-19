@@ -206,6 +206,7 @@ foreach my $expr (@exprs) {
         my $rcfile = "$tmpDir/rc";
         writeFile(
             $rcfile,
+            "rm -rf '$tmpDir'; " .
             'unset BASH_ENV; ' .
             '[ -n "$PS1" ] && [ -e ~/.bashrc ] && source ~/.bashrc; ' .
             ($pure ? '' : 'p=$PATH; ' ) .
