@@ -19,9 +19,9 @@
   <cmdsynopsis>
     <command>nix-instantiate</command>
     <group>
-      <arg choice='plain'><option>--parse-only</option></arg>
+      <arg choice='plain'><option>--parse</option></arg>
       <arg choice='plain'>
-        <option>--eval-only</option>
+        <option>--eval</option>
         <arg><option>--strict</option></arg>
         <arg><option>--xml</option></arg>
       </arg>
@@ -84,7 +84,7 @@ input.</para>
 
   </varlistentry>
 
-  <varlistentry><term><option>--parse-only</option></term>
+  <varlistentry><term><option>--parse</option></term>
 
     <listitem><para>Just parse the input files, and print their
     abstract syntax trees on standard output in ATerm
@@ -92,7 +92,7 @@ input.</para>
 
   </varlistentry>
 
-  <varlistentry><term><option>--eval-only</option></term>
+  <varlistentry><term><option>--eval</option></term>
 
     <listitem><para>Just parse and evaluate the input files, and print
     the resulting values on standard output.  No instantiation of
@@ -115,8 +115,8 @@ input.</para>
 
   <varlistentry><term><option>--xml</option></term>
 
-    <listitem><para>When used with <option>--parse-only</option> and
-    <option>--eval-only</option>, print the resulting expression as an
+    <listitem><para>When used with <option>--parse</option> and
+    <option>--eval</option>, print the resulting expression as an
     XML representation of the abstract syntax tree rather than as an
     ATerm.  The schema is the same as that used by the <link
     linkend="builtin-toXML"><function>toXML</function>
@@ -126,7 +126,7 @@ input.</para>
 
   <varlistentry><term><option>--strict</option></term>
 
-    <listitem><para>When used with <option>--eval-only</option>,
+    <listitem><para>When used with <option>--eval</option>,
     recursively evaluate list elements and attributes.  Normally, such
     sub-expressions are left unevaluated (since the Nix expression
     language is lazy).</para>
@@ -140,9 +140,9 @@ input.</para>
 
   <varlistentry><term><option>--read-write-mode</option></term>
 
-    <listitem><para>When used with <option>--eval-only</option>,
-    perform evaluation in read/write mode so nix language features
-    that require it will still work (at the cost of needing to do
+    <listitem><para>When used with <option>--eval</option>, perform
+    evaluation in read/write mode so nix language features that
+    require it will still work (at the cost of needing to do
     instantiation of every evaluated derivation).</para>
 
     </listitem>
@@ -195,13 +195,13 @@ $ nix-instantiate '&lt;nixpkgs>' -A hello
 <para>Parsing and evaluating Nix expressions:
 
 <screen>
-$ nix-instantiate --parse-only -E '1 + 2'
+$ nix-instantiate --parse -E '1 + 2'
 1 + 2
 
-$ nix-instantiate --eval-only -E '1 + 2'
+$ nix-instantiate --eval -E '1 + 2'
 3
 
-$ nix-instantiate --eval-only --xml -E '1 + 2'
+$ nix-instantiate --eval --xml -E '1 + 2'
 <![CDATA[<?xml version='1.0' encoding='utf-8'?>
 <expr>
   <int value="3" />
@@ -212,7 +212,7 @@ $ nix-instantiate --eval-only --xml -E '1 + 2'
 <para>The difference between non-strict and strict evaluation:
 
 <screen>
-$ nix-instantiate --eval-only --xml -E 'rec { x = "foo"; y = x; }'
+$ nix-instantiate --eval --xml -E 'rec { x = "foo"; y = x; }'
 <replaceable>...</replaceable><![CDATA[
   <attr name="x">
     <string value="foo" />
@@ -226,7 +226,7 @@ Note that <varname>y</varname> is left unevaluated (the XML
 representation doesn’t attempt to show non-normal forms).
 
 <screen>
-$ nix-instantiate --eval-only --xml --strict -E 'rec { x = "foo"; y = x; }'
+$ nix-instantiate --eval --xml --strict -E 'rec { x = "foo"; y = x; }'
 <replaceable>...</replaceable><![CDATA[
   <attr name="x">
     <string value="foo" />

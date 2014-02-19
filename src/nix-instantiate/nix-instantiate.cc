@@ -107,11 +107,11 @@ void run(Strings args)
             readStdin = true;
         else if (arg == "--expr" || arg == "-E")
             fromArgs = true;
-        else if (arg == "--eval-only")
+        else if (arg == "--eval" || arg == "--eval-only")
             evalOnly = true;
         else if (arg == "--read-write-mode")
             wantsReadWrite = true;
-        else if (arg == "--parse-only")
+        else if (arg == "--parse" || arg == "--parse-only")
             parseOnly = evalOnly = true;
         else if (arg == "--find-file")
             findFile = true;

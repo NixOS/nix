@@ -5,7 +5,7 @@ source common.sh
 # Do all commands have help?
 #nix-env --help | grep -q install
 #nix-store --help | grep -q realise
-#nix-instantiate --help | grep -q eval-only
+#nix-instantiate --help | grep -q eval
 #nix-hash --help | grep -q base32
 
 # Can we ask for the version number?
