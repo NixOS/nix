@@ -2,7 +2,7 @@
           xmlns:xlink="http://www.w3.org/1999/xlink"
           xmlns:xi="http://www.w3.org/2001/XInclude"
           xml:id="sec-nix-instantiate">
-  
+
 <refmeta>
   <refentrytitle>nix-instantiate</refentrytitle>
   <manvolnum>1</manvolnum>
@@ -18,7 +18,15 @@
 <refsynopsisdiv>
   <cmdsynopsis>
     <command>nix-instantiate</command>
-    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common-syn.xml#xmlns(db=http://docbook.org/ns/docbook)xpointer(/db:nop/*)" />
+    <group>
+      <arg choice='plain'><option>--parse-only</option></arg>
+      <arg choice='plain'>
+        <option>--eval-only</option>
+        <arg><option>--strict</option></arg>
+        <arg><option>--xml</option></arg>
+      </arg>
+    </group>
+    <arg><option>--read-write-mode</option></arg>
     <arg><option>--arg</option> <replaceable>name</replaceable> <replaceable>value</replaceable></arg>
     <arg>
       <group choice='req'>
@@ -29,18 +37,14 @@
     </arg>
     <arg><option>--add-root</option> <replaceable>path</replaceable></arg>
     <arg><option>--indirect</option></arg>
-    <arg>
-      <group choice='req'>
-        <arg choice='plain'><option>--parse-only</option></arg>
-        <arg choice='plain'>
-          <option>--eval-only</option>
-          <arg><option>--strict</option></arg>
-          <arg><option>--read-write-mode</option></arg>
-        </arg>
-        <arg choice='plain'><option>--find-file</option></arg>
-      </group>
-      <arg><option>--xml</option></arg>
-    </arg>
+    <group choice='req'>
+      <arg choice='plain'><option>--expr</option></arg>
+      <arg choice='plain'><option>-E</option></arg>
+    </group>
+    <arg choice='plain' rep='repeat'><replaceable>files</replaceable></arg>
+    <sbr/>
+    <command>nix-instantiate</command>
+    <arg choice='plain'><option>--file-file</option></arg>
     <arg choice='plain' rep='repeat'><replaceable>files</replaceable></arg>
   </cmdsynopsis>
 </refsynopsisdiv>
@@ -50,8 +54,8 @@
 
 <para>The command <command>nix-instantiate</command> generates <link
 linkend="gloss-derivation">store derivations</link> from (high-level)
-Nix expressions.  It loads and evaluates the Nix expressions in each
-of <replaceable>files</replaceable> (which defaults to
+Nix expressions.  It evaluates the Nix expressions in each of
+<replaceable>files</replaceable> (which defaults to
 <replaceable>./default.nix</replaceable>).  Each top-level expression
 should evaluate to a derivation, a list of derivations, or a set of
 derivations.  The paths of the resulting store derivations are printed
@@ -60,12 +64,6 @@ on standard output.</para>
 <para>If <replaceable>files</replaceable> is the character
 <literal>-</literal>, then a Nix expression will be read from standard
 input.</para>
-
-<para>Most users and developers don’t need to use this command
-(<command>nix-env</command> and <command>nix-build</command> perform
-store derivation instantiation from Nix expressions automatically).
-It is most commonly used for implementing new deployment
-policies.</para>
 
 <para condition="manual">See also <xref linkend="sec-common-options"
 /> for a list of common options.</para>
@@ -86,25 +84,24 @@ policies.</para>
 
   </varlistentry>
 
-    
   <varlistentry><term><option>--parse-only</option></term>
-  
+
     <listitem><para>Just parse the input files, and print their
     abstract syntax trees on standard output in ATerm
     format.</para></listitem>
-    
+
   </varlistentry>
-      
+
   <varlistentry><term><option>--eval-only</option></term>
-  
+
     <listitem><para>Just parse and evaluate the input files, and print
     the resulting values on standard output.  No instantiation of
     store derivations takes place.</para></listitem>
-    
+
   </varlistentry>
 
   <varlistentry><term><option>--find-file</option></term>
-  
+
     <listitem><para>Look up the given files in Nix’s search path (as
     specified by the <envar>NIX_PATH</envar> environment variable).
     If found, print the corresponding absolute paths on standard
@@ -113,9 +110,9 @@ policies.</para>
     <literal>nix-instantiate --find-file nixpkgs/default.nix</literal>
     will print
     <literal>/home/alice/nixpkgs/default.nix</literal>.</para></listitem>
-    
+
   </varlistentry>
-      
+
   <varlistentry><term><option>--xml</option></term>
 
     <listitem><para>When used with <option>--parse-only</option> and
@@ -180,19 +177,34 @@ dr-xr-xr-x    2 eelco    users        4096 1970-01-01 01:00 lib
 
 </para>
 
+<para>You can also give a Nix expression on the command line:
+
+<screen>
+$ nix-instantiate -E 'with import &lt;nixpkgs> { }; hello'
+/nix/store/j8s4zyv75a724q38cb0r87rlczaiag4y-hello-2.8.drv
+</screen>
+
+This is equivalent to:
+
+<screen>
+$ nix-instantiate '&lt;nixpkgs>' -A hello
+</screen>
+
+</para>
+
 <para>Parsing and evaluating Nix expressions:
 
 <screen>
-$ echo '"foo" + "bar"' | nix-instantiate --parse-only -
-OpPlus(Str("foo"),Str("bar"))
+$ nix-instantiate --parse-only -E '1 + 2'
+1 + 2
 
-$ echo '"foo" + "bar"' | nix-instantiate --eval-only -
-Str("foobar")
+$ nix-instantiate --eval-only -E '1 + 2'
+3
 
-$ echo '"foo" + "bar"' | nix-instantiate --eval-only --xml -
+$ nix-instantiate --eval-only --xml -E '1 + 2'
 <![CDATA[<?xml version='1.0' encoding='utf-8'?>
 <expr>
-  <string value="foobar" />
+  <int value="3" />
 </expr>]]></screen>
 
 </para>
@@ -200,28 +212,28 @@ $ echo '"foo" + "bar"' | nix-instantiate --eval-only --xml -
 <para>The difference between non-strict and strict evaluation:
 
 <screen>
-$ echo 'rec { x = "foo"; y = x; }' | nix-instantiate --eval-only --xml -
+$ nix-instantiate --eval-only --xml -E 'rec { x = "foo"; y = x; }'
 <replaceable>...</replaceable><![CDATA[
-    <attr name="x">
-      <string value="foo" />
-    </attr>
-    <attr name="y">
-      <unevaluated />
-    </attr>]]>
+  <attr name="x">
+    <string value="foo" />
+  </attr>
+  <attr name="y">
+    <unevaluated />
+  </attr>]]>
 <replaceable>...</replaceable></screen>
 
 Note that <varname>y</varname> is left unevaluated (the XML
 representation doesn’t attempt to show non-normal forms).
 
 <screen>
-$ echo 'rec { x = "foo"; y = x; }' | nix-instantiate --eval-only --xml --strict -
+$ nix-instantiate --eval-only --xml --strict -E 'rec { x = "foo"; y = x; }'
 <replaceable>...</replaceable><![CDATA[
-    <attr name="x">
-      <string value="foo" />
-    </attr>
-    <attr name="y">
-      <string value="foo" />
-    </attr>]]>
+  <attr name="x">
+    <string value="foo" />
+  </attr>
+  <attr name="y">
+    <string value="foo" />
+  </attr>]]>
 <replaceable>...</replaceable></screen>
 
 </para>
@@ -236,6 +248,6 @@ $ echo 'rec { x = "foo"; y = x; }' | nix-instantiate --eval-only --xml --strict 
 </variablelist>
 
 </refsection>
-  
+
 
 </refentry>

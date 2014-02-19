@@ -61,11 +61,11 @@ the derivation attribute
 <programlisting>
 shellHook =
   ''
-    echo "Hello shell!"
+    echo "Hello shell"
   '';
 </programlisting>
 
-will cause <command>nix-shell</command> to print <literal>Hello shell!</literal>.</para>
+will cause <command>nix-shell</command> to print <literal>Hello shell</literal>.</para>
 
 </refsection>
 
@@ -132,11 +132,11 @@ interactive shell in which to build it:
 
 <screen>
 $ nix-shell '&lt;nixpkgs>' -A pan
-$ unpackPhase
-$ cd pan-*
-$ configurePhase
-$ buildPhase
-$ ./pan/gui/pan
+[nix-shell]$ unpackPhase
+[nix-shell]$ cd pan-*
+[nix-shell]$ configurePhase
+[nix-shell]$ buildPhase
+[nix-shell]$ ./pan/gui/pan
 </screen>
 
 To clear the environment first, and do some additional automatic
@@ -145,6 +145,14 @@ initialisation of the interactive shell:
 <screen>
 $ nix-shell '&lt;nixpkgs>' -A pan --pure \
     --command 'export NIX_DEBUG=1; export NIX_CORES=8; return'
+</screen>
+
+Nix expressions can also be given on the command line.  For instance,
+the following starts a shell containing the packages
+<literal>sqlite</literal> and <literal>libX11</literal>:
+
+<screen>
+$ nix-shell -E 'with import &lt;nixpkgs> { }; runCommand "dummy" { buildInputs = [ sqlite xorg.libX11 ]; } ""'
 </screen>
 
 </para>

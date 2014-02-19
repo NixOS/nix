@@ -89,6 +89,7 @@ void run(Strings args)
     EvalState state;
     Strings files;
     bool readStdin = false;
+    bool fromArgs = false;
     bool findFile = false;
     bool evalOnly = false;
     bool parseOnly = false;
@@ -104,6 +105,8 @@ void run(Strings args)
 
         if (arg == "-")
             readStdin = true;
+        else if (arg == "--expr" || arg == "-E")
+            fromArgs = true;
         else if (arg == "--eval-only")
             evalOnly = true;
         else if (arg == "--read-write-mode")
@@ -162,11 +165,13 @@ void run(Strings args)
         Expr * e = parseStdin(state);
         processExpr(state, attrPaths, parseOnly, strict, autoArgs,
             evalOnly, xmlOutput, xmlOutputSourceLocation, e);
-    } else if (files.empty())
+    } else if (files.empty() && !fromArgs)
         files.push_back("./default.nix");
 
     foreach (Strings::iterator, i, files) {
-        Expr * e = state.parseExprFromFile(resolveExprPath(lookupFileArg(state, *i)));
+        Expr * e = fromArgs
+            ? state.parseExprFromString(*i, absPath("."))
+            : state.parseExprFromFile(resolveExprPath(lookupFileArg(state, *i)));
         processExpr(state, attrPaths, parseOnly, strict, autoArgs,
             evalOnly, xmlOutput, xmlOutputSourceLocation, e);
     }

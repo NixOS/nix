@@ -11,6 +11,7 @@ my $dryRun = 0;
 my $verbose = 0;
 my $runEnv = $0 =~ /nix-shell$/;
 my $pure = 0;
+my $fromArgs = 0;
 
 my @instArgs = ();
 my @buildArgs = ();
@@ -49,7 +50,7 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
         $drvLink = "./derivation";
     }
 
-    elsif ($arg eq "--no-out-link" or $arg eq "--no-link") {
+    elsif ($arg eq "--no-out-link" || $arg eq "--no-link") {
         $outLink = "$tmpDir/result";
     }
 
@@ -59,13 +60,13 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
         $drvLink = $ARGV[$n];
     }
 
-    elsif ($arg eq "--out-link" or $arg eq "-o") {
+    elsif ($arg eq "--out-link" || $arg eq "-o") {
         $n++;
         die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
         $outLink = $ARGV[$n];
     }
 
-    elsif ($arg eq "--attr" or $arg eq "-A" or $arg eq "-I") {
+    elsif ($arg eq "--attr" || $arg eq "-A" || $arg eq "-I") {
         $n++;
         die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
         push @instArgs, ($arg, $ARGV[$n]);
@@ -91,7 +92,7 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
         $n += 2;
     }
 
-    elsif ($arg eq "--max-jobs" or $arg eq "-j" or $arg eq "--max-silent-time" or $arg eq "--log-type" or $arg eq "--cores" or $arg eq "--timeout") {
+    elsif ($arg eq "--max-jobs" || $arg eq "-j" || $arg eq "--max-silent-time" || $arg eq "--log-type" || $arg eq "--c||es" || $arg eq "--timeout") {
         $n++;
         die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
         push @buildArgs, ($arg, $ARGV[$n]);
@@ -110,7 +111,7 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
         @exprs = ("-");
     }
 
-    elsif ($arg eq "--verbose" or substr($arg, 0, 2) eq "-v") {
+    elsif ($arg eq "--verbose" || substr($arg, 0, 2) eq "-v") {
         push @buildArgs, $arg;
         push @instArgs, $arg;
         $verbose = 1;
@@ -144,6 +145,11 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
     elsif ($arg eq "--pure") { $pure = 1; }
     elsif ($arg eq "--impure") { $pure = 0; }
 
+    elsif ($arg eq "--expr" || $arg eq "-E") {
+        $fromArgs = 1;
+        push @instArgs, "--expr";
+    }
+
     elsif (substr($arg, 0, 1) eq "-") {
         push @buildArgs, $arg;
     }
@@ -153,8 +159,10 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
     }
 }
 
-@exprs = ("shell.nix") if scalar @exprs == 0 && $runEnv && -e "shell.nix";
-@exprs = ("default.nix") if scalar @exprs == 0;
+if (!$fromArgs) {
+    @exprs = ("shell.nix") if scalar @exprs == 0 && $runEnv && -e "shell.nix";
+    @exprs = ("default.nix") if scalar @exprs == 0;
+}
 
 $ENV{'IN_NIX_SHELL'} = 1 if $runEnv;
 

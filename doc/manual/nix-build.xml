@@ -164,6 +164,16 @@ $ nix-build '&lt;nixpkgs>' -A openssl.man
 </screen>
 This will create a symlink <literal>result-man</literal>.</para>
 
+<para>Build a Nix expression given on the command line:
+
+<screen>
+$ nix-build -E 'with import &lt;nixpkgs> { }; runCommand "foo" { } "echo bar > $out"'
+$ cat ./result
+bar
+</screen>
+
+</para>
+
 </refsection>
 
 

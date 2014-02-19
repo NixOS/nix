@@ -8,15 +8,15 @@
 <variablelist xml:id="opt-common">
 
 <varlistentry><term><option>--help</option></term>
-  
+
   <listitem><para>Prints out a summary of the command syntax and
   exits.</para></listitem>
-  
+
 </varlistentry>
 
 
 <varlistentry><term><option>--version</option></term>
-  
+
   <listitem><para>Prints out the Nix version number on standard output
   and exits.</para></listitem>
 </varlistentry>
@@ -26,7 +26,7 @@
   <term><option>-v</option></term>
 
   <listitem>
-    
+
   <para>Increases the level of verbosity of diagnostic messages
   printed on standard error.  For each Nix operation, the information
   printed on standard output is well-defined; any diagnostic
@@ -37,18 +37,18 @@
   following verbosity levels exist:</para>
 
   <variablelist>
-    
+
     <varlistentry><term>0</term>
     <listitem><para>“Errors only”: only print messages
     explaining why the Nix invocation failed.</para></listitem>
     </varlistentry>
-      
+
     <varlistentry><term>1</term>
     <listitem><para>“Informational”: print
     <emphasis>useful</emphasis> messages about what Nix is doing.
     This is the default.</para></listitem>
     </varlistentry>
-      
+
     <varlistentry><term>2</term>
     <listitem><para>“Talkative”: print more informational
     messages.</para></listitem>
@@ -68,11 +68,11 @@
     <listitem><para>“Vomit”: print vast amounts of debug
     information.</para></listitem>
     </varlistentry>
-    
+
   </variablelist>
 
   </listitem>
-  
+
 </varlistentry>
 
 
@@ -85,7 +85,7 @@
   builder's standard output and error are always written to a log file
   in
   <filename><replaceable>prefix</replaceable>/nix/var/log/nix</filename>.</para></listitem>
-  
+
 </varlistentry>
 
 
@@ -99,7 +99,7 @@
   configuration setting, which itself defaults to
   <literal>1</literal>.  A higher value is useful on SMP systems or to
   exploit I/O latency.</para></listitem>
-  
+
 </varlistentry>
 
 
@@ -117,7 +117,7 @@
   configuration setting, if set, or <literal>1</literal> otherwise.
   The value <literal>0</literal> means that the builder should use all
   available CPU cores in the system.</para></listitem>
-  
+
 </varlistentry>
 
 
@@ -151,7 +151,7 @@
   derivation itself.  Without this option, Nix stops if any build
   fails (except for builds of substitutes), possibly killing builds in
   progress (in case of parallel or distributed builds).</para></listitem>
-  
+
 </varlistentry>
 
 
@@ -188,7 +188,7 @@
   resources).</para>
 
   </listitem>
-  
+
 </varlistentry>
 
 
@@ -197,7 +197,7 @@
   <listitem><para>When this option is used, no attempt is made to open
   the Nix database.  Most Nix operations do need database access, so
   those operations will fail.</para></listitem>
-  
+
 </varlistentry>
 
 
@@ -247,12 +247,12 @@
 
     </varlistentry>
 
-  </variablelist>    
-  
+  </variablelist>
+
   </para>
 
   </listitem>
-  
+
 </varlistentry>
 
 
@@ -310,10 +310,10 @@
 <varlistentry xml:id="opt-attr"><term><option>--attr</option> / <option>-A</option>
 <replaceable>attrPath</replaceable></term>
 
-  <listitem><para>In <command>nix-env</command>,
-  <command>nix-instantiate</command> and <command>nix-build</command>,
-  <option>--attr</option> allows you to select an attribute from the
-  top-level Nix expression being evaluated.  The <emphasis>attribute
+  <listitem><para>Select an attribute from the top-level Nix
+  expression being evaluated.  (<command>nix-env</command>,
+  <command>nix-instantiate</command>, <command>nix-build</command> and
+  <command>nix-shell</command> only.)  The <emphasis>attribute
   path</emphasis> <replaceable>attrPath</replaceable> is a sequence of
   attribute names separated by dots.  For instance, given a top-level
   Nix expression <replaceable>e</replaceable>, the attribute path
@@ -333,8 +333,18 @@
 </varlistentry>
 
 
+<varlistentry><term><option>--expr</option> / <option>-E</option></term>
+
+  <listitem><para>Interpret the command line arguments as a list of
+  Nix expressions to be parsed and evaluated, rather than as a list
+  of file names of Nix expressions.
+  (<command>nix-instantiate</command>, <command>nix-build</command>
+  and <command>nix-shell</command> only.)</para></listitem>
+
+</varlistentry>
+
 <varlistentry><term><option>--show-trace</option></term>
-  
+
   <listitem><para>Causes Nix to print out a stack trace in case of Nix
   expression evaluation errors.</para></listitem>
 
@@ -342,23 +352,23 @@
 
 
 <varlistentry><term><option>-I</option> <replaceable>path</replaceable></term>
-  
+
   <listitem><para>Add a path to the Nix expression search path.  This
   option may be given multiple times.  See the <envar>NIX_PATH</envar>
   environment variable for information on the semantics of the Nix
   search path.  Paths added through <option>-I</option> take
   precedence over <envar>NIX_PATH</envar>.</para></listitem>
-  
+
 </varlistentry>
 
 
 <varlistentry><term><option>--option</option> <replaceable>name</replaceable> <replaceable>value</replaceable></term>
-  
+
   <listitem><para>Set the Nix configuration option
   <replaceable>name</replaceable> to <replaceable>value</replaceable>.
   This overrides settings in the Nix configuration file (see
   <citerefentry><refentrytitle>nix.conf</refentrytitle><manvolnum>5</manvolnum></citerefentry>).</para></listitem>
-  
+
 </varlistentry>
 
 
