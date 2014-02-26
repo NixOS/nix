@@ -557,11 +557,12 @@ static void performOp(bool trusted, unsigned int clientVersion,
             for (unsigned int i = 0; i < n; i++) {
                 string name = readString(from);
                 string value = readString(from);
-                if (name == "build-timeout")
-                    string2Int(value, settings.buildTimeout);
+                if (name == "build-timeout" || name == "use-ssh-substituter")
+                    settings.set(name, value);
                 else
                     settings.set(trusted ? name : "untrusted-" + name, value);
             }
+            settings.update();
         }
         startWork();
         stopWork();
