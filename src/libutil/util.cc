@@ -326,25 +326,6 @@ void deletePath(const Path & path, unsigned long long & bytesFreed)
 }
 
 
-void makePathReadOnly(const Path & path)
-{
-    checkInterrupt();
-
-    struct stat st = lstat(path);
-
-    if (!S_ISLNK(st.st_mode) && (st.st_mode & S_IWUSR)) {
-        if (chmod(path.c_str(), st.st_mode & ~S_IWUSR) == -1)
-            throw SysError(format("making `%1%' read-only") % path);
-    }
-
-    if (S_ISDIR(st.st_mode)) {
-        Strings names = readDirectory(path);
-        for (Strings::iterator i = names.begin(); i != names.end(); ++i)
-            makePathReadOnly(path + "/" + *i);
-    }
-}
-
-
 static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
     int & counter)
 {

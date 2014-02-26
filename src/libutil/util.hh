@@ -85,9 +85,6 @@ void deletePath(const Path & path);
 
 void deletePath(const Path & path, unsigned long long & bytesFreed);
 
-/* Make a path read-only recursively. */
-void makePathReadOnly(const Path & path);
-
 /* Create a temporary directory. */
 Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
     bool includePid = true, bool useGlobalCounter = true, mode_t mode = 0755);
