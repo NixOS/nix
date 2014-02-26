@@ -86,7 +86,9 @@ if nix-env -q '*' | grep -q foo; then false; fi
 nix-env -q '*' | grep -q bar
 
 # Rollback: should bring "foo" back.
+oldGen="$(nix-store -q --resolve $profiles/test)"
 nix-env --rollback
+[ "$(nix-store -q --resolve $profiles/test)" != "$oldGen" ]
 nix-env -q '*' | grep -q foo-2.0
 nix-env -q '*' | grep -q bar
 
@@ -98,6 +100,10 @@ if nix-env -q '*' | grep -q bar; then false; fi
 # Count generations.
 nix-env --list-generations
 test "$(nix-env --list-generations | wc -l)" -eq 7
+
+# Switch to a specified generation.
+nix-env --switch-generation 7
+[ "$(nix-store -q --resolve $profiles/test)" = "$oldGen" ]
 
 # Install foo-1.0, now using its store path.
 nix-env -i "$outPath10"
