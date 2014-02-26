@@ -21,6 +21,8 @@ nix-env --option binary-caches "file://$cacheDir" -f dependencies.nix -qas \* | 
 
 nix-store --option binary-caches "file://$cacheDir" -r $outPath
 
+[ -x $outPath/program ]
+
 
 # But with the right configuration, "nix-env -qas" should also work.
 clearStore

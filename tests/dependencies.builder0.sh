@@ -9,4 +9,8 @@ ln -s $input2 $out/input-2
 # Self-reference.
 ln -s $out $out/self
 
+# Executable.
+echo program > $out/program
+chmod +x $out/program
+
 echo FOO
