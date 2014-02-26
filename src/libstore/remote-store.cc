@@ -6,6 +6,7 @@
 #include "affinity.hh"
 #include "globals.hh"
 #include "pathlocks.hh"
+#include "derivations.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -557,6 +558,17 @@ void RemoteStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
     }
     processStderr();
     readInt(from);
+
+    /* Report paths again so new ones can be added to chroot */
+    PathSet recursivePaths;
+    foreach (PathSet::const_iterator, i, drvPaths) {
+        DrvPathWithOutputs i2 = parseDrvPathWithOutputs(*i);
+        if (isDerivation(i2.first))
+            recursivePaths.insert(i2.first);
+        else
+            recursivePaths.insert(*i);
+    }
+    reportRecursivePaths(recursivePaths);
 }
 
 
@@ -567,6 +579,8 @@ void RemoteStore::ensurePath(const Path & path)
     writeString(path, to);
     processStderr();
     readInt(from);
+    /* Report path again so it can be added to chroot if new */
+    reportRecursivePath(path);
 }
 
 
@@ -685,7 +699,7 @@ void RemoteStore::reportRecursivePaths(const PathSet & paths)
 {
     if (fdRecursivePaths != -1 && !paths.empty()) {
         string s = "";
-        foreach (PathSet::const_iterator, i, recursivePaths) {
+        foreach (PathSet::const_iterator, i, paths) {
             if (s.size() + i->size() >= 4096) {
                 if (i->size() >= 4096)
                     throw Error("reporting a path name bigger than 4096 bytes not allowed");

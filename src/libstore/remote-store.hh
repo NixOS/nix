@@ -91,7 +91,6 @@ private:
     unsigned int daemonVersion;
     bool initialised;
     AutoCloseFD fdRecursivePaths;
-    PathSet recursivePaths;
 
     void openConnection(bool reserveSpace = true);
 
