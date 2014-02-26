@@ -48,7 +48,7 @@ for i in $(cd $self/store && echo *); do
         rm -rf "$i_tmp"
     fi
     if ! [ -e "$dest/store/$i" ]; then
-        cp -rp "$self/store/$i" "$i_tmp"
+        cp -Rp "$self/store/$i" "$i_tmp"
         mv "$i_tmp" "$dest/store/$i"
     fi
 done
