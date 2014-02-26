@@ -154,3 +154,9 @@ nix-env -i foo-0.1 foo-1.0
 [ "$($profiles/test/bin/foo)" = "foo-1.0" ]
 nix-env --set-flag priority 1 foo-0.1
 [ "$($profiles/test/bin/foo)" = "foo-0.1" ]
+
+# Test nix-env --set.
+nix-env --set $outPath10
+[ "$(nix-store -q --resolve $profiles/test)" = $outPath10 ]
+nix-env --set $drvPath10
+[ "$(nix-store -q --resolve $profiles/test)" = $outPath10 ]
