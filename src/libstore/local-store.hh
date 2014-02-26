@@ -210,12 +210,6 @@ public:
 
     void setSubstituterEnv();
 
-    /* create/open a new temproot file */
-    int openTempRootsFile(const string & name);
-
-    /* delete a temproot file */
-    void deleteTempRootsFile(const string & name);
-
     AutoCloseFD fdRecursiveDaemon;
 
 private:

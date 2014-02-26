@@ -97,6 +97,10 @@ private:
 
     void processStderr(Sink * sink = 0, Source * source = 0);
 
+    void reportRecursivePath(const Path & path);
+
+    void reportRecursivePaths(const PathSet & paths);
+
     void connectToDaemon();
 
     void setOptions();

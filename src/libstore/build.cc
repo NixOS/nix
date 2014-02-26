@@ -734,6 +734,9 @@ private:
     /* Pipe for the builder's standard output/error. */
     Pipe builderOut;
 
+    /* Our end of the recursive paths reporting socket. */
+    AutoCloseFD recursivePathsParentSide;
+
     /* The build hook. */
     boost::shared_ptr<HookInstance> hook;
 
@@ -1436,35 +1439,6 @@ void DerivationGoal::buildDone()
                 % drvPath % statusToString(status));
         }
 
-        if (!hook) {
-            /* !!! Should hooks get a recursive paths fd, or just use importPaths? */
-            AutoCloseFD recursivePaths = worker.store.openTempRootsFile(baseNameOf(drvPath));
-
-            /* Read the entire file. */
-            string contents = readFile(recursivePaths);
-
-            /* Extract the paths. */
-            string::size_type pos = 0, end;
-
-            PathSet newPaths;
-
-            while ((end = contents.find((char) 0, pos)) != string::npos) {
-                Path r(contents, pos, end - pos);
-                debug(format("got recursive path `%1%'") % r);
-                assertStorePath(r);
-                /* If a derivation was made visible to the build, we
-                   need to also check for its outputs */
-                computeFSClosure(worker.store, r, newPaths, false, true);
-                pos = end + 1;
-            }
-
-            foreach (PathSet::iterator, i, newPaths)
-                worker.store.addTempRoot(*i);
-            allPaths.insert(newPaths.begin(), newPaths.end());
-            worker.store.deleteTempRootsFile(baseNameOf(drvPath));
-        }
-
-
         /* Compute the FS closure of the outputs and register them as
            being valid. */
         registerOutputs();
@@ -1751,9 +1725,17 @@ void DerivationGoal::startBuilder()
     }
     env["NIX_REMOTE_RECURSIVE_SOCKET_FD"] = int2String((int) worker.store.fdRecursiveDaemon);
 
-    AutoCloseFD recursivePaths = worker.store.openTempRootsFile(baseNameOf(drvPath));
-    noCloseOnExec(recursivePaths);
-    env["NIX_REMOTE_RECURSIVE_PATHS_FD"] = int2String((int) recursivePaths);
+    int recursivePaths[2];
+    if (socketpair(PF_UNIX, SOCK_STREAM, 0, recursivePaths) == -1)
+        throw SysError("creating recursive paths socketpair");
+
+    AutoCloseFD recursivePathsChildSide = recursivePaths[0];
+    recursivePathsParentSide = recursivePaths[1];
+    /* We set our end of the socket non-blocking, so a malicious
+       builder can't make us block writing the confirmation */
+    setNonBlocking(recursivePathsParentSide);
+    closeOnExec(recursivePathsParentSide);
+    env["NIX_REMOTE_RECURSIVE_PATHS_FD"] = int2String((int) recursivePathsChildSide);
 
     /* Compatibility hack with Nix <= 0.7: if this is a fixed-output
        derivation, tell the builder, so that for instance `fetchurl'
@@ -2051,8 +2033,10 @@ void DerivationGoal::startBuilder()
     /* parent */
     pid.setSeparatePG(true);
     builderOut.writeSide.close();
-    worker.childStarted(shared_from_this(), pid,
-        singleton<set<int> >(builderOut.readSide), true, true);
+    set<int> fds;
+    fds.insert(builderOut.readSide);
+    fds.insert(recursivePathsParentSide);
+    worker.childStarted(shared_from_this(), pid, fds, true, true);
 
     if (settings.printBuildTrace) {
         printMsg(lvlError, format("@ build-started %1% - %2% %3%")
@@ -2531,16 +2515,78 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
             if (err != BZ_OK) throw Error(format("cannot write to compressed log file (BZip2 error = %1%)") % err);
         } else if (fdLogFile != -1)
             writeFull(fdLogFile, (unsigned char *) data.data(), data.size());
-    }
+    } else if (!hook && fd == recursivePathsParentSide) {
+        /* Extract the paths. */
+        string::size_type pos = 0, end;
 
-    if (hook && fd == hook->fromHook.readSide)
+        PathSet newPaths;
+
+        while ((end = data.find((char) 0, pos)) != string::npos) {
+            Path r(data, pos, end - pos);
+            debug(format("got recursive path `%1%'") % r);
+            assertStorePath(r);
+            /* If a derivation was made visible to the build, we
+               need to also check for its outputs */
+            computeFSClosure(worker.store, r, newPaths, false, true);
+            pos = end + 1;
+        }
+
+        foreach (PathSet::iterator, i, newPaths) {
+            worker.store.addTempRoot(*i);
+#if CHROOT_ENABLED
+            if (useChroot && worker.store.isValidPath(*i)) {
+                /* We need this path to be available in the chroot */
+                Path target = chrootRootDir + *i;
+                if (access(target.c_str(), F_OK) == 0)
+                    /* Path already exists, assume it's the right one */
+                    continue;
+                struct stat st;
+                if (lstat(i->c_str(), &st))
+                    throw SysError(format("getting attributes of path `%1%'") % *i);
+                if (S_ISDIR(st.st_mode)) {
+                    debug(format("bind mounting `%1%' to `%2%'") % *i % target);
+                    createDirs(target);
+                    if (mount(i->c_str(), target.c_str(), "", MS_BIND, 0) == -1)
+                        throw SysError(format("bind mount from `%1%' to `%2%' failed") % *i % target);
+                } else {
+                    if (link(i->c_str(), target.c_str()) == -1) {
+                        /* Hard-linking fails if we exceed the maximum
+                           link count on a file (e.g. 32000 of ext3),
+                           which is quite possible after a `nix-store
+                           --optimise'. */
+                        if (errno != EMLINK)
+                            throw SysError(format("linking `%1%' to `%2%'") % target % *i);
+                        StringSink sink;
+                        dumpPath(*i, sink);
+                        StringSource source(sink.s);
+                        restorePath(target, source);
+                    }
+                }
+            }
+#endif
+        }
+
+        allPaths.insert(newPaths.begin(), newPaths.end());
+
+        /* Notify the child that we're done */
+        unsigned char c = '\0';
+        try {
+            writeFull(fd, &c, sizeof c);
+        } catch (SysError & e) {
+            /* Don't let a rogue builder kill us */
+            printMsg(lvlError, format("error confirming recursive paths read: %1%") % e.what());
+        }
+    } else if (hook && fd == hook->fromHook.readSide)
         writeToStderr(data);
 }
 
 
 void DerivationGoal::handleEOF(int fd)
 {
-    worker.wakeUp(shared_from_this());
+    if (!hook && fd == recursivePathsParentSide)
+        recursivePathsParentSide.close();
+    else
+        worker.wakeUp(shared_from_this());
 }
 
 
