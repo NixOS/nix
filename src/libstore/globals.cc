@@ -71,18 +71,6 @@ void Settings::processEnvironment()
     nixLibexecDir = canonPath(getEnv("NIX_LIBEXEC_DIR", NIX_LIBEXEC_DIR));
     nixBinDir = canonPath(getEnv("NIX_BIN_DIR", NIX_BIN_DIR));
     nixDaemonSocketFile = canonPath(nixStateDir + DEFAULT_SOCKET_PATH);
-
-    string subs = getEnv("NIX_SUBSTITUTERS", "default");
-    if (subs == "default") {
-#if 0
-        if (getEnv("NIX_OTHER_STORES") != "")
-            substituters.push_back(nixLibexecDir + "/nix/substituters/copy-from-other-stores.pl");
-#endif
-        substituters.push_back(nixLibexecDir + "/nix/substituters/download-using-manifests.pl");
-        substituters.push_back(nixLibexecDir + "/nix/substituters/download-from-binary-cache.pl");
-        substituters.push_back(nixLibexecDir + "/nix/substituters/download-via-ssh");
-    } else
-        substituters = tokenizeString<Strings>(subs, ":");
 }
 
 
@@ -155,6 +143,20 @@ void Settings::update()
     get(envKeepDerivations, "env-keep-derivations");
     get(sshSubstituterHosts, "ssh-substituter-hosts");
     get(useSshSubstituter, "use-ssh-substituter");
+
+    string subs = getEnv("NIX_SUBSTITUTERS", "default");
+    if (subs == "default") {
+        substituters.clear();
+#if 0
+        if (getEnv("NIX_OTHER_STORES") != "")
+            substituters.push_back(nixLibexecDir + "/nix/substituters/copy-from-other-stores.pl");
+#endif
+        substituters.push_back(nixLibexecDir + "/nix/substituters/download-using-manifests.pl");
+        substituters.push_back(nixLibexecDir + "/nix/substituters/download-from-binary-cache.pl");
+        if (useSshSubstituter)
+            substituters.push_back(nixLibexecDir + "/nix/substituters/download-via-ssh");
+    } else
+        substituters = tokenizeString<Strings>(subs, ":");
 }
 
 
