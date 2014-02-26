@@ -2,11 +2,6 @@ with import ./lib.nix;
 
 let {
 
-  range = first: last:
-    if builtins.lessThan last first
-    then []
-    else [first] ++ range (builtins.add first 1) last;
-
   /* Supposedly tail recursive version:
 
   range_ = accum: first: last:

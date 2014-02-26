@@ -10,6 +10,8 @@ with builtins;
   (isInt { x = 123; })
   (isBool (true && false))
   (isBool null)
+  (isAttrs { x = 123; })
+  (isAttrs null)
   (typeOf (3 * 4))
   (typeOf true)
   (typeOf "xyzzy")

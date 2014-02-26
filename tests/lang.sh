@@ -2,6 +2,8 @@ source common.sh
 
 export TEST_VAR=foo # for eval-okay-getenv.nix
 
+set +x
+
 fail=0
 
 for i in lang/parse-fail-*.nix; do
@@ -48,7 +50,7 @@ for i in lang/eval-okay-*.nix; do
             fail=1
         fi
     fi
-    
+
     if test -e lang/$i.exp.xml; then
         if ! nix-instantiate --eval --xml --no-location --strict \
                 lang/$i.nix > lang/$i.out.xml; then

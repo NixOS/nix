@@ -53,4 +53,9 @@ rec {
 
   const = x: y: x;
 
+  range = first: last:
+    if builtins.lessThan last first
+    then []
+    else [first] ++ range (builtins.add first 1) last;
+
 }
