@@ -451,6 +451,20 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
   </varlistentry>
 
 
+  <varlistentry xml:id="conf-connect-timeout"><term><literal>connect-timeout</literal></term>
+
+    <listitem>
+
+      <para>The timeout (in seconds) for establishing connections in
+      the binary cache substituter.  It corresponds to
+      <command>curl</command>’s <option>--connect-timeout</option>
+      option.</para>
+
+    </listitem>
+
+  </varlistentry>
+
+
 </variablelist>
 
 </para>

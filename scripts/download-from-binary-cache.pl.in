@@ -44,7 +44,10 @@ my $userName = getpwuid($<) || $ENV{"USER"} or die "cannot figure out user name"
 
 my $requireSignedBinaryCaches = ($Nix::Config::config{"signed-binary-caches"} // "0") ne "0";
 
-my $curlConnectTimeout = int($ENV{"NIX_CONNECT_TIMEOUT"} // 0);
+my $curlConnectTimeout = int(
+    $Nix::Config::config{"untrusted-connect-timeout"} //
+    $Nix::Config::config{"connect-timeout"} //
+    $ENV{"NIX_CONNECT_TIMEOUT"} // 0);
 
 
 sub addRequest {
