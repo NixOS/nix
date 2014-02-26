@@ -4,7 +4,7 @@ clearStore
 
 # Produce an escaped log file.
 set -x
-nix-build --log-type escapes -vv dependencies.nix --no-out-link 2> $TEST_ROOT/log.esc
+path=$(nix-build --log-type escapes -vv dependencies.nix --no-out-link 2> $TEST_ROOT/log.esc)
 
 # Convert it to an XML representation.
 nix-log2xml < $TEST_ROOT/log.esc > $TEST_ROOT/log.xml
@@ -22,3 +22,13 @@ if test "$xsltproc" != "false"; then
     # A few checks...
     grep "<code>.*FOO" $TEST_ROOT/log.html || fail "bad HTML output"
 fi
+
+# Test nix-store -l.
+[ "$(nix-store -l $path)" = FOO ]
+
+# Test compressed logs.
+clearStore
+rm -rf $NIX_LOG_DIR
+! nix-store -l $path
+nix-build dependencies.nix --no-out-link --option build-compress-log true
+[ "$(nix-store -l $path)" = FOO ]
