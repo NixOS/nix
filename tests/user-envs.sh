@@ -18,10 +18,13 @@ drvPath10=$(nix-env -f ./user-envs.nix -qa --drv-path --no-name '*' | grep foo-1
 [ -n "$outPath10" -a -n "$drvPath10" ]
 
 # Query descriptions.
-nix-env -f ./user-envs.nix -qa '*' --description | grep silly
+nix-env -f ./user-envs.nix -qa '*' --description | grep -q silly
+rm -f $HOME/.nix-defexpr
+ln -s $(pwd)/user-envs.nix $HOME/.nix-defexpr
+nix-env -qa '*' --description | grep -q silly
 
 # Install "foo-1.0".
-nix-env -f ./user-envs.nix -i foo-1.0
+nix-env -i foo-1.0
 
 # Query installed: should contain foo-1.0 now (which should be
 # executable).
@@ -43,7 +46,7 @@ echo "foo-1.0 = $outPath10"
 [ "$outPath10" = "$outPath10_" ]
 
 # Install "foo-2.0pre1": should remove foo-1.0.
-nix-env -f ./user-envs.nix -i foo-2.0pre1
+nix-env -i foo-2.0pre1
 
 # Query installed: should contain foo-2.0pre1 now.
 test "$(nix-env -q '*' | wc -l)" -eq 1
@@ -63,8 +66,8 @@ outPath20=$(nix-env -q --out-path --no-name '*' | grep foo-2.0)
 test -n "$outPath20"
 
 # Install bar-0.1, uninstall foo.
-nix-env -f ./user-envs.nix -i bar-0.1
-nix-env -f ./user-envs.nix -e foo
+nix-env -i bar-0.1
+nix-env -e foo
 
 # Query installed: should only contain bar-0.1 now.
 if nix-env -q '*' | grep -q foo; then false; fi
@@ -111,22 +114,22 @@ test -e "$outPath10"
 ! [ -e "$outPath20" ]
 
 # Uninstall everything
-nix-env -f ./user-envs.nix -e '*'
+nix-env -e '*'
 test "$(nix-env -q '*' | wc -l)" -eq 0
 
 # Installing "foo" should only install the newest foo.
-nix-env -f ./user-envs.nix -i foo
+nix-env -i foo
 test "$(nix-env -q '*' | grep foo- | wc -l)" -eq 1
 nix-env -q '*' | grep -q foo-2.0
 
 # On the other hand, this should install both (and should fail due to
 # a collision).
-nix-env -f ./user-envs.nix -e '*'
-! nix-env -f ./user-envs.nix -i foo-1.0 foo-2.0
+nix-env -e '*'
+! nix-env -i foo-1.0 foo-2.0
 
 # Installing "*" should install one foo and one bar.
-nix-env -f ./user-envs.nix -e '*'
-nix-env -f ./user-envs.nix -i '*'
+nix-env -e '*'
+nix-env -i '*'
 test "$(nix-env -q '*' | wc -l)" -eq 2
 nix-env -q '*' | grep -q foo-2.0
 nix-env -q '*' | grep -q bar-0.1.1
@@ -134,8 +137,8 @@ nix-env -q '*' | grep -q bar-0.1.1
 # Test priorities: foo-0.1 has a lower priority than foo-1.0, so it
 # should be possible to install both without a collision.  Also test
 # ‘--set-flag priority’ to manually override the declared priorities.
-nix-env -f ./user-envs.nix -e '*'
-nix-env -f ./user-envs.nix -i foo-0.1 foo-1.0
+nix-env -e '*'
+nix-env -i foo-0.1 foo-1.0
 [ "$($profiles/test/bin/foo)" = "foo-1.0" ]
-nix-env -f ./user-envs.nix --set-flag priority 1 foo-0.1
+nix-env --set-flag priority 1 foo-0.1
 [ "$($profiles/test/bin/foo)" = "foo-0.1" ]
