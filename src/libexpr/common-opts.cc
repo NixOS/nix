@@ -13,7 +13,7 @@ bool parseOptionArg(const string & arg, Strings::iterator & i,
     if (arg != "--arg" && arg != "--argstr") return false;
 
     UsageError error(format("`%1%' requires two arguments") % arg);
-    
+
     if (i == argsEnd) throw error;
     string name = *i++;
     if (i == argsEnd) throw error;
@@ -39,7 +39,7 @@ bool parseSearchPathArg(const string & arg, Strings::iterator & i,
 {
     if (arg != "-I") return false;
     if (i == argsEnd) throw UsageError(format("`%1%' requires an argument") % arg);;
-    state.addToSearchPath(*i++);
+    state.addToSearchPath(*i++, true);
     return true;
 }
 

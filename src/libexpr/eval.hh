@@ -120,7 +120,7 @@ public:
     EvalState();
     ~EvalState();
 
-    void addToSearchPath(const string & s);
+    void addToSearchPath(const string & s, bool warn = false);
 
     /* Parse a Nix expression from the specified file. */
     Expr * parseExprFromFile(const Path & path);

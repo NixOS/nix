@@ -608,7 +608,7 @@ Expr * EvalState::parseExprFromString(const string & s, const Path & basePath)
 }
 
 
-void EvalState::addToSearchPath(const string & s)
+ void EvalState::addToSearchPath(const string & s, bool warn)
 {
     size_t pos = s.find('=');
     string prefix;
@@ -624,7 +624,8 @@ void EvalState::addToSearchPath(const string & s)
     if (pathExists(path)) {
         debug(format("adding path `%1%' to the search path") % path);
         searchPath.insert(searchPathInsertionPoint, std::pair<string, Path>(prefix, path));
-    }
+    } else if (warn)
+        printMsg(lvlError, format("warning: Nix search path entry `%1%' does not exist, ignoring") % path);
 }
 
 
