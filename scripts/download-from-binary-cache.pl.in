@@ -40,7 +40,7 @@ my %requests;
 my %scheduled;
 my $caBundle = $ENV{"CURL_CA_BUNDLE"} // $ENV{"OPENSSL_X509_CERT_FILE"};
 
-my $userName = getpwuid($<) or $ENV{"USER"} or die "cannot figure out user name";
+my $userName = getpwuid($<) || $ENV{"USER"} or die "cannot figure out user name";
 
 my $requireSignedBinaryCaches = ($Nix::Config::config{"signed-binary-caches"} // "0") ne "0";
 
