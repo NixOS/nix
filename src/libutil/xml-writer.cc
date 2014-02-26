@@ -71,18 +71,6 @@ void XMLWriter::writeEmptyElement(const string & name,
 }
 
 
-void XMLWriter::writeCharData(const string & data)
-{
-    assert(!pendingElems.empty());
-    for (unsigned int i = 0; i < data.size(); ++i) {
-        char c = data[i];
-        if (c == '<') output << "&lt;";
-        else if (c == '&') output << "&amp;";
-        else output << c;
-    }
-}
-
-
 void XMLWriter::writeAttrs(const XMLAttrs & attrs)
 {
     for (XMLAttrs::const_iterator i = attrs.begin(); i != attrs.end(); ++i) {
@@ -103,29 +91,4 @@ void XMLWriter::writeAttrs(const XMLAttrs & attrs)
 }
 
 
-#if 0
-int main(int argc, char * * argv)
-{
-    XMLWriter doc(cout);
-    
-    //    OpenElement e(doc, "foo");
-
-    doc.openElement("foo");
-
-    doc.writeCharData("dit is een test &\n");
-    doc.writeCharData("<foo>\n");
-
-    for (int i = 0; i < 5; ++i) {
-        XMLAttrs attrs;
-        attrs["a"] = "b";
-        attrs["bla"] = "<foo>'&\">";
-        XMLOpenElement e(doc, "item", attrs);
-        doc.writeCharData("x");
-    }
-
-    return 0;
-}
-#endif
-
- 
 }

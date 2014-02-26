@@ -19,7 +19,7 @@ typedef map<string, string> XMLAttrs;
 class XMLWriter
 {
 private:
-    
+
     std::ostream & output;
 
     bool indent;
@@ -40,8 +40,6 @@ public:
 
     void writeEmptyElement(const string & name,
         const XMLAttrs & attrs = XMLAttrs());
-    
-    void writeCharData(const string & data);
 
 private:
     void writeAttrs(const XMLAttrs & attrs);
@@ -67,5 +65,5 @@ public:
     }
 };
 
- 
+
 }
