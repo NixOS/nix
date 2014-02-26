@@ -78,10 +78,6 @@ string readLine(int fd);
 /* Write a line to a file descriptor. */
 void writeLine(int fd, string s);
 
-/* Compute the sum of the sizes of all files in `path'. */
-void computePathSize(const Path & path,
-    unsigned long long & bytes, unsigned long long & blocks);
-
 /* Delete a path; i.e., in the case of a directory, it is deleted
    recursively.  Don't use this at home, kids.  The second variant
    returns the number of bytes and blocks freed. */

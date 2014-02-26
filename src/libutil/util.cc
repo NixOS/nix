@@ -281,34 +281,6 @@ void writeLine(int fd, string s)
 }
 
 
-static void _computePathSize(const Path & path,
-    unsigned long long & bytes, unsigned long long & blocks)
-{
-    checkInterrupt();
-
-    struct stat st = lstat(path);
-
-    bytes += st.st_size;
-    blocks += st.st_blocks;
-
-    if (S_ISDIR(st.st_mode)) {
-        Strings names = readDirectory(path);
-
-        for (Strings::iterator i = names.begin(); i != names.end(); ++i)
-            _computePathSize(path + "/" + *i, bytes, blocks);
-    }
-}
-
-
-void computePathSize(const Path & path,
-    unsigned long long & bytes, unsigned long long & blocks)
-{
-    bytes = 0;
-    blocks = 0;
-    _computePathSize(path, bytes, blocks);
-}
-
-
 static void _deletePath(const Path & path, unsigned long long & bytesFreed)
 {
     checkInterrupt();
