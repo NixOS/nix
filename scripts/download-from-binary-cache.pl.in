@@ -44,6 +44,8 @@ my $userName = getpwuid($<) || $ENV{"USER"} or die "cannot figure out user name"
 
 my $requireSignedBinaryCaches = ($Nix::Config::config{"signed-binary-caches"} // "0") ne "0";
 
+my $curlConnectTimeout = int($ENV{"NIX_CONNECT_TIMEOUT"} // 0);
+
 
 sub addRequest {
     my ($storePath, $url, $head) = @_;
@@ -62,7 +64,7 @@ sub addRequest {
     $curl->setopt(CURLOPT_USERAGENT, "Nix/$Nix::Config::version");
     $curl->setopt(CURLOPT_NOBODY, 1) if $head;
     $curl->setopt(CURLOPT_FAILONERROR, 1);
-    $curl->setopt(CURLOPT_TIMEOUT, int($ENV{"NIX_CONNECT_TIMEOUT"} // 0));
+    $curl->setopt(CURLOPT_CONNECTTIMEOUT, $curlConnectTimeout);
 
     if ($activeRequests >= $maxParallelRequests) {
         $scheduled{$curlId} = 1;
@@ -535,7 +537,7 @@ sub downloadBinary {
         die if $requireSignedBinaryCaches && !defined $info->{signedBy};
         print STDERR "\n*** Downloading ‘$url’ ", ($requireSignedBinaryCaches ? "(signed by ‘$info->{signedBy}’) " : ""), "to ‘$storePath’...\n";
         checkURL $url;
-        if (system("$Nix::Config::curl --fail --location --insecure '$url' $decompressor | $Nix::Config::binDir/nix-store --restore $destPath") != 0) {
+        if (system("$Nix::Config::curl --fail --location --insecure --connect-timeout $curlConnectTimeout '$url' $decompressor | $Nix::Config::binDir/nix-store --restore $destPath") != 0) {
             warn "download of `$url' failed" . ($! ? ": $!" : "") . "\n";
             next;
         }
