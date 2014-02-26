@@ -61,7 +61,7 @@ static Path useDeriver(Path path)
 
 /* Realise the given path.  For a derivation that means build it; for
    other paths it means ensure their validity. */
-static PathSet realisePath(const Path & path, bool build = true)
+static PathSet realisePath(Path path, bool build = true)
 {
     DrvPathWithOutputs p = parseDrvPathWithOutputs(path);
 
@@ -95,6 +95,14 @@ static PathSet realisePath(const Path & path, bool build = true)
     else {
         if (build) store->ensurePath(path);
         else if (!store->isValidPath(path)) throw Error(format("path `%1%' does not exist and cannot be created") % path);
+        if (gcRoot == "")
+            printGCWarning();
+        else {
+            Path rootName = gcRoot;
+            rootNr++;
+            if (rootNr > 1) rootName += "-" + int2String(rootNr);
+            path = addPermRoot(*store, path, rootName, indirectRoot);
+        }
         return singleton<PathSet>(path);
     }
 }
