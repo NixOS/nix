@@ -1,5 +1,6 @@
 source common.sh
 
+clearStore
 clearProfiles
 
 set -x
@@ -31,6 +32,17 @@ nix-env -i foo-1.0
 test "$(nix-env -q '*' | wc -l)" -eq 1
 nix-env -q '*' | grep -q foo-1.0
 test "$($profiles/test/bin/foo)" = "foo-1.0"
+
+# Test nix-env -qc to compare installed against available packages, and vice versa.
+nix-env -qc '*' | grep -q '< 2.0'
+nix-env -qac '*' | grep -q '> 1.0'
+
+# Test the -b flag to filter out source-only packages.
+[ "$(nix-env -qab | wc -l)" -eq 1 ]
+
+# Test the -s flag to get package status.
+nix-env -qas | grep -q 'IP-  foo-1.0'
+nix-env -qas | grep -q -- '---  bar-0.1'
 
 # Disable foo.
 nix-env --set-flag active false foo
