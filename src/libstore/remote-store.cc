@@ -84,11 +84,11 @@ void RemoteStore::openConnection(bool reserveSpace)
         memset(&msg, 0, sizeof msg);
         msg.msg_iov = &iov;
         msg.msg_iovlen = 1;
-        ancillary data;
-        msg.msg_control = &data;
+        char data[CMSG_SPACE(sizeof fds[1])];
+        msg.msg_control = data;
         msg.msg_controllen = sizeof data;
         struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
-        cmsg->cmsg_len = msg.msg_controllen;
+        cmsg->cmsg_len = CMSG_LEN(sizeof fds[1]);
         cmsg->cmsg_level = SOL_SOCKET;
         cmsg->cmsg_type = SCM_RIGHTS;
         memmove(CMSG_DATA(cmsg), &fds[1], sizeof fds[1]);

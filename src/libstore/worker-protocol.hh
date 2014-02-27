@@ -1,13 +1,6 @@
 #pragma once
 #include <sys/socket.h>
 
-extern "C" {
-    struct ancillary {
-        struct cmsghdr hdr;
-        int fd;
-    };
-}
-
 namespace nix {
 
 
@@ -67,3 +60,23 @@ template<class T> T readStorePaths(Source & from);
 
 
 }
+
+/* Borrowed from http://swtch.com/usr/local/plan9/src/lib9/sendfd.c, should
+   really be part of POSIX.
+   Copyright (C) 2003, Lucent Technologies Inc. and others. All Rights Reserved. */
+
+#ifndef CMSG_ALIGN
+#   ifdef __sun__
+#       define CMSG_ALIGN _CMSG_DATA_ALIGN
+#   else
+#       define CMSG_ALIGN(len) (((len)+sizeof(long)-1) & ~(sizeof(long)-1))
+#   endif
+#endif
+
+#ifndef CMSG_SPACE
+#   define CMSG_SPACE(len) (CMSG_ALIGN(sizeof(struct cmsghdr))+CMSG_ALIGN(len))
+#endif
+
+#ifndef CMSG_LEN
+#   define CMSG_LEN(len) (CMSG_ALIGN(sizeof(struct cmsghdr))+(len))
+#endif

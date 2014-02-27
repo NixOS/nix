@@ -939,8 +939,8 @@ static void daemonLoop()
                 memset(&msg, 0, sizeof msg);
                 msg.msg_iov = &iov;
                 msg.msg_iovlen = 1;
-                ancillary data;
-                msg.msg_control = &data;
+                char data[CMSG_SPACE(sizeof fdRecursiveFrom)];
+                msg.msg_control = data;
                 msg.msg_controllen = sizeof data;
                 ssize_t count = recvmsg(fdRecursiveFrom, &msg, 0);
                 if (count == -1)
