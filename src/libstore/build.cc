@@ -2531,6 +2531,23 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
             pos = end + 1;
         }
 
+#if CHROOT_ENABLED
+        AutoCloseFD myNs, childNs;
+        if (useChroot && !newPaths.empty()) {
+            /* Enter the child's mount namespace */
+            myNs = open("/proc/self/ns/mnt", O_RDONLY);
+            if (myNs == -1)
+                throw SysError("opening own mount namespace");
+            Path childNsPath = (format("/proc/%1%/ns/mnt") % pid).str();
+            childNs = open(childNsPath.c_str(), O_RDONLY);
+            if (childNs == -1)
+                throw SysError("opening child's mount namespace");
+
+            if (setns(childNs, 0) == -1)
+                throw SysError("entering child's mount namespace");
+        }
+#endif
+
         foreach (PathSet::iterator, i, newPaths) {
             worker.store.addTempRoot(*i);
 #if CHROOT_ENABLED
@@ -2565,6 +2582,14 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
             }
 #endif
         }
+
+#if CHROOT_ENABLED
+        if (myNs != -1) {
+            /* Back in our own namespace */
+            if (setns(myNs, 0) == -1)
+                throw SysError("leaving child's mount namespace");
+        }
+#endif
 
         allPaths.insert(newPaths.begin(), newPaths.end());
 
