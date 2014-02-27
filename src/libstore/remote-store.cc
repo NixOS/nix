@@ -7,6 +7,7 @@
 #include "globals.hh"
 #include "pathlocks.hh"
 #include "derivations.hh"
+#include "errno.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -298,8 +299,6 @@ void RemoteStore::querySubstitutablePathInfos(const PathSet & paths,
 
     if (GET_PROTOCOL_MINOR(daemonVersion) < 3) return;
 
-    PathSet recursivePaths;
-
     if (GET_PROTOCOL_MINOR(daemonVersion) < 12) {
 
         foreach (PathSet::const_iterator, i, paths) {
@@ -310,12 +309,8 @@ void RemoteStore::querySubstitutablePathInfos(const PathSet & paths,
             unsigned int reply = readInt(from);
             if (reply == 0) continue;
             info.deriver = readString(from);
-            if (info.deriver != "") {
-                assertStorePath(info.deriver);
-                recursivePaths.insert(info.deriver);
-            }
+            if (info.deriver != "") assertStorePath(info.deriver);
             info.references = readStorePaths<PathSet>(from);
-            recursivePaths.insert(info.references.begin(), info.references.end());
             info.downloadSize = readLongLong(from);
             info.narSize = GET_PROTOCOL_MINOR(daemonVersion) >= 7 ? readLongLong(from) : 0;
             infos[*i] = info;
@@ -331,19 +326,13 @@ void RemoteStore::querySubstitutablePathInfos(const PathSet & paths,
             Path path = readStorePath(from);
             SubstitutablePathInfo & info(infos[path]);
             info.deriver = readString(from);
-            if (info.deriver != "") {
-                assertStorePath(info.deriver);
-                recursivePaths.insert(info.deriver);
-            }
+            if (info.deriver != "") assertStorePath(info.deriver);
             info.references = readStorePaths<PathSet>(from);
-            recursivePaths.insert(info.references.begin(), info.references.end());
             info.downloadSize = readLongLong(from);
             info.narSize = readLongLong(from);
         }
 
     }
-
-    reportRecursivePaths(recursivePaths);
 }
 
 
@@ -356,18 +345,15 @@ ValidPathInfo RemoteStore::queryPathInfo(const Path & path)
     ValidPathInfo info;
     info.path = path;
     info.deriver = readString(from);
-    PathSet recursivePaths;
     if (info.deriver != "") {
         assertStorePath(info.deriver);
-        recursivePaths.insert(info.deriver);
+        if (fdRecursivePaths != -1 && isValidPath(info.deriver))
+            _reportRecursivePath(info.deriver);
     }
     info.hash = parseHash(htSHA256, readString(from));
     info.references = readStorePaths<PathSet>(from);
-    recursivePaths.insert(info.references.begin(), info.references.end());
     info.registrationTime = readInt(from);
     info.narSize = readLongLong(from);
-
-    reportRecursivePaths(recursivePaths);
     return info;
 }
 
@@ -391,7 +377,7 @@ void RemoteStore::queryReferences(const Path & path,
     writeString(path, to);
     processStderr();
     PathSet references2 = readStorePaths<PathSet>(from);
-    reportRecursivePaths(references2);
+    /* References are brought in automatically, no need to report */
     references.insert(references2.begin(), references2.end());
 }
 
@@ -404,7 +390,7 @@ void RemoteStore::queryReferrers(const Path & path,
     writeString(path, to);
     processStderr();
     PathSet referrers2 = readStorePaths<PathSet>(from);
-    /* no need to add to recursive paths, they're brought in automatically */
+    reportRecursivePaths(referrers2);
     referrers.insert(referrers2.begin(), referrers2.end());
 }
 
@@ -418,7 +404,8 @@ Path RemoteStore::queryDeriver(const Path & path)
     Path drvPath = readString(from);
     if (drvPath != "") {
         assertStorePath(drvPath);
-        reportRecursivePath(drvPath);
+        if (fdRecursivePaths != -1 && isValidPath(drvPath))
+            _reportRecursivePath(drvPath);
     }
     return drvPath;
 }
@@ -442,10 +429,8 @@ PathSet RemoteStore::queryDerivationOutputs(const Path & path)
     writeInt(wopQueryDerivationOutputs, to);
     writeString(path, to);
     processStderr();
-    /* derivations are treated specially: Unless they became accessible
-       via unsafeDiscardOutputDependency, their outputs are treated as
-       inputs to scan for even if, in the case of recursive nix, they
-       may not be valid. So no need to add them to recursivePaths */
+    /* Paths determined via queryDerivationOutputs can't be assumed valid,
+       so we don't report them */
     return readStorePaths<PathSet>(from);
 }
 
@@ -559,16 +544,34 @@ void RemoteStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
     processStderr();
     readInt(from);
 
-    /* Report paths again so new ones can be added to chroot */
-    PathSet recursivePaths;
-    foreach (PathSet::const_iterator, i, drvPaths) {
-        DrvPathWithOutputs i2 = parseDrvPathWithOutputs(*i);
-        if (isDerivation(i2.first))
-            recursivePaths.insert(i2.first);
-        else
-            recursivePaths.insert(*i);
+    if (fdRecursivePaths != -1) {
+        PathSet recursivePaths;
+        foreach (PathSet::const_iterator, i, drvPaths) {
+            DrvPathWithOutputs i2 = parseDrvPathWithOutputs(*i);
+            if (isDerivation(i2.first)) {
+                Derivation drv;
+                try {
+                    drv = parseDerivation(readFile(i2.first));
+                    recursivePaths.insert(i2.first);
+                } catch (SysError & e) {
+                    if (e.errNo == ENOENT) {
+                        /* Need to ask for the drv to be added to chroot */
+                        _reportRecursivePath(i2.first);
+                        drv = parseDerivation(readFile(i2.first));
+                    } else
+                        throw;
+                }
+                if (i2.second.empty())
+                    foreach (DerivationOutputs::iterator, j, drv.outputs)
+                        recursivePaths.insert(j->second.path);
+                else
+                    foreach (StringSet::iterator, j, i2.second)
+                        recursivePaths.insert(drv.outputs[*j].path);
+            } else
+                recursivePaths.insert(*i);
+        }
+        _reportRecursivePaths(recursivePaths);
     }
-    reportRecursivePaths(recursivePaths);
 }
 
 
@@ -579,7 +582,6 @@ void RemoteStore::ensurePath(const Path & path)
     writeString(path, to);
     processStderr();
     readInt(from);
-    /* Report path again so it can be added to chroot if new */
     reportRecursivePath(path);
 }
 
@@ -684,20 +686,25 @@ static void writeRecursivePaths(int fd, const string & s) {
 }
 
 
-void RemoteStore::reportRecursivePath(const Path & path)
+void RemoteStore::_reportRecursivePath(const Path & path)
 {
-    if (fdRecursivePaths != -1) {
-        if (path.size() >= 4096)
-            throw Error("reporting a path name bigger than 4096 bytes not allowed");
-        string s = path + '\0';
-        writeRecursivePaths(fdRecursivePaths, s);
-    }
+    if (path.size() >= 4096)
+        throw Error("reporting a path name bigger than 4096 bytes not allowed");
+    string s = path + '\0';
+    writeRecursivePaths(fdRecursivePaths, s);
 }
 
 
-void RemoteStore::reportRecursivePaths(const PathSet & paths)
+void RemoteStore::reportRecursivePath(const Path & path)
 {
-    if (fdRecursivePaths != -1 && !paths.empty()) {
+    if (fdRecursivePaths != -1)
+        _reportRecursivePath(path);
+}
+
+
+void RemoteStore::_reportRecursivePaths(const PathSet & paths)
+{
+    if (!paths.empty()) {
         string s = "";
         foreach (PathSet::const_iterator, i, paths) {
             if (s.size() + i->size() >= 4096) {
@@ -710,6 +717,13 @@ void RemoteStore::reportRecursivePaths(const PathSet & paths)
         }
         writeRecursivePaths(fdRecursivePaths, s);
     }
+}
+
+
+void RemoteStore::reportRecursivePaths(const PathSet & paths)
+{
+    if (fdRecursivePaths != -1)
+        _reportRecursivePaths(paths);
 }
 
 

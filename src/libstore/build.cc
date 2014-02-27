@@ -2524,16 +2524,13 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
         while ((end = data.find((char) 0, pos)) != string::npos) {
             Path r(data, pos, end - pos);
             debug(format("got recursive path `%1%'") % r);
-            assertStorePath(r);
-            /* If a derivation was made visible to the build, we
-               need to also check for its outputs */
-            computeFSClosure(worker.store, r, newPaths, false, true);
+            computeFSClosure(worker.store, r, newPaths);
             pos = end + 1;
         }
 
 #if CHROOT_ENABLED
         AutoCloseFD myNs, childNs;
-        if (useChroot && !newPaths.empty()) {
+        if (useChroot) {
             /* Enter the child's mount namespace */
             myNs = open("/proc/self/ns/mnt", O_RDONLY);
             if (myNs == -1)
@@ -2551,7 +2548,7 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
         foreach (PathSet::iterator, i, newPaths) {
             worker.store.addTempRoot(*i);
 #if CHROOT_ENABLED
-            if (useChroot && worker.store.isValidPath(*i)) {
+            if (useChroot) {
                 /* We need this path to be available in the chroot */
                 Path target = chrootRootDir + *i;
                 if (access(target.c_str(), F_OK) == 0)
