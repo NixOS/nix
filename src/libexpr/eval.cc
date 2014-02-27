@@ -779,8 +779,10 @@ void ExprLambda::eval(EvalState & state, Env & env, Value & v)
 
 void ExprApp::eval(EvalState & state, Env & env, Value & v)
 {
-    e1->eval(state, env, v);
-    state.callFunction(v, *(e2->maybeThunk(state, env)), v);
+    /* FIXME: vFun prevents GCC from doing tail call optimisation. */
+    Value vFun;
+    e1->eval(state, env, vFun);
+    state.callFunction(vFun, *(e2->maybeThunk(state, env)), v);
 }
 
 
