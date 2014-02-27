@@ -2852,6 +2852,7 @@ void SubstitutionGoal::finished()
     worker.store.registerValidPath(info2);
 
     outputLock->setDeletion(true);
+    outputLock.reset();
 
     worker.store.markContentsGood(storePath);
 
