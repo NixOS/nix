@@ -2516,68 +2516,81 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
         } else if (fdLogFile != -1)
             writeFull(fdLogFile, (unsigned char *) data.data(), data.size());
     } else if (!hook && fd == recursivePathsParentSide) {
-        /* Extract the paths. */
-        string::size_type pos = 0, end;
-
-        PathSet newPaths;
-
-        while ((end = data.find((char) 0, pos)) != string::npos) {
-            Path r(data, pos, end - pos);
-            debug(format("got recursive path `%1%'") % r);
-            computeFSClosure(worker.store, r, newPaths);
-            pos = end + 1;
-        }
-
 #if CHROOT_ENABLED
-        AutoCloseFD myNs, childNs;
-        if (useChroot) {
-            /* Enter the child's mount namespace */
-            myNs = open("/proc/self/ns/mnt", O_RDONLY);
-            if (myNs == -1)
-                throw SysError("opening own mount namespace");
-            Path childNsPath = (format("/proc/%1%/ns/mnt") % pid).str();
-            childNs = open(childNsPath.c_str(), O_RDONLY);
-            if (childNs == -1)
-                throw SysError("opening child's mount namespace");
-
-            if (setns(childNs, 0) == -1)
-                throw SysError("entering child's mount namespace");
-        }
+        AutoCloseFD myNs;
 #endif
+        try {
+            /* Extract the paths. */
+            string::size_type pos = 0, end;
 
-        foreach (PathSet::iterator, i, newPaths) {
-            worker.store.addTempRoot(*i);
+            PathSet newPaths;
+
+            while ((end = data.find((char) 0, pos)) != string::npos) {
+                Path r(data, pos, end - pos);
+                debug(format("got recursive path `%1%'") % r);
+                computeFSClosure(worker.store, r, newPaths);
+                pos = end + 1;
+            }
+
 #if CHROOT_ENABLED
             if (useChroot) {
-                /* We need this path to be available in the chroot */
-                Path target = chrootRootDir + *i;
-                if (access(target.c_str(), F_OK) == 0)
-                    /* Path already exists, assume it's the right one */
-                    continue;
-                struct stat st;
-                if (lstat(i->c_str(), &st))
-                    throw SysError(format("getting attributes of path `%1%'") % *i);
-                if (S_ISDIR(st.st_mode)) {
-                    debug(format("bind mounting `%1%' to `%2%'") % *i % target);
-                    createDirs(target);
-                    if (mount(i->c_str(), target.c_str(), "", MS_BIND, 0) == -1)
-                        throw SysError(format("bind mount from `%1%' to `%2%' failed") % *i % target);
-                } else {
-                    if (link(i->c_str(), target.c_str()) == -1) {
-                        /* Hard-linking fails if we exceed the maximum
-                           link count on a file (e.g. 32000 of ext3),
-                           which is quite possible after a `nix-store
-                           --optimise'. */
-                        if (errno != EMLINK)
-                            throw SysError(format("linking `%1%' to `%2%'") % target % *i);
-                        StringSink sink;
-                        dumpPath(*i, sink);
-                        StringSource source(sink.s);
-                        restorePath(target, source);
-                    }
-                }
+                /* Enter the child's mount namespace */
+                myNs = open("/proc/self/ns/mnt", O_RDONLY);
+                if (myNs == -1)
+                    throw SysError("opening own mount namespace");
+                Path childNsPath = (format("/proc/%1%/ns/mnt") % pid).str();
+                AutoCloseFD childNs = open(childNsPath.c_str(), O_RDONLY);
+                if (childNs == -1)
+                    throw SysError("opening child's mount namespace");
+
+                if (setns(childNs, 0) == -1)
+                    throw SysError("entering child's mount namespace");
             }
 #endif
+
+            foreach (PathSet::iterator, i, newPaths) {
+                worker.store.addTempRoot(*i);
+#if CHROOT_ENABLED
+                if (useChroot) {
+                    /* We need this path to be available in the chroot */
+                    Path target = chrootRootDir + *i;
+                    if (access(target.c_str(), F_OK) == 0)
+                        /* Path already exists, assume it's the right one */
+                        continue;
+                    struct stat st;
+                    if (lstat(i->c_str(), &st))
+                        throw SysError(format("getting attributes of path `%1%'") % *i);
+                    if (S_ISDIR(st.st_mode)) {
+                        debug(format("bind mounting `%1%' to `%2%'") % *i % target);
+                        createDirs(target);
+                        if (mount(i->c_str(), target.c_str(), "", MS_BIND, 0) == -1)
+                            throw SysError(format("bind mount from `%1%' to `%2%' failed") % *i % target);
+                    } else {
+                        if (link(i->c_str(), target.c_str()) == -1) {
+                            /* Hard-linking fails if we exceed the maximum
+                               link count on a file (e.g. 32000 of ext3),
+                               which is quite possible after a `nix-store
+                               --optimise'. */
+                            if (errno != EMLINK)
+                                throw SysError(format("linking `%1%' to `%2%'") % target % *i);
+                            StringSink sink;
+                            dumpPath(*i, sink);
+                            StringSource source(sink.s);
+                            restorePath(target, source);
+                        }
+                    }
+                }
+#endif
+            }
+
+            allPaths.insert(newPaths.begin(), newPaths.end());
+
+            /* Notify the child that we're done */
+            unsigned char c = '\0';
+            writeFull(fd, &c, sizeof c);
+        } catch (std::exception & e) {
+            /* Don't let a rogue builder kill us */
+            printMsg(lvlError, format("error getting reported recursive paths: %1%") % e.what());
         }
 
 #if CHROOT_ENABLED
@@ -2587,17 +2600,6 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
                 throw SysError("leaving child's mount namespace");
         }
 #endif
-
-        allPaths.insert(newPaths.begin(), newPaths.end());
-
-        /* Notify the child that we're done */
-        unsigned char c = '\0';
-        try {
-            writeFull(fd, &c, sizeof c);
-        } catch (SysError & e) {
-            /* Don't let a rogue builder kill us */
-            printMsg(lvlError, format("error confirming recursive paths read: %1%") % e.what());
-        }
     } else if (hook && fd == hook->fromHook.readSide)
         writeToStderr(data);
 }
