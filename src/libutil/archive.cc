@@ -319,8 +319,7 @@ struct RestoreSink : ParseSink
     void createSymlink(const Path & path, const string & target)
     {
         Path p = dstPath + path;
-        if (symlink(target.c_str(), p.c_str()) == -1)
-            throw SysError(format("creating symlink `%1%'") % p);
+        nix::createSymlink(target, p);
     }
 };
 

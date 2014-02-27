@@ -2013,6 +2013,26 @@ void DerivationGoal::initChild()
                     throw SysError(format("unable to make filesystem `%1%' private") % fs);
             }
 
+            /* Set up a nearly empty /dev, unless the user asked to
+               bind-mount the host /dev. */
+            if (dirsInChroot.find("/dev") == dirsInChroot.end()) {
+                createDirs(chrootRootDir + "/dev/shm");
+                Strings ss;
+                ss.push_back("/dev/full");
+                ss.push_back("/dev/kvm");
+                ss.push_back("/dev/null");
+                ss.push_back("/dev/ptmx");
+                ss.push_back("/dev/random");
+                ss.push_back("/dev/tty");
+                ss.push_back("/dev/urandom");
+                ss.push_back("/dev/zero");
+                foreach (Strings::iterator, i, ss) dirsInChroot[*i] = *i;
+                createSymlink("/proc/self/fd", chrootRootDir + "/dev/fd");
+                createSymlink("/proc/self/fd/0", chrootRootDir + "/dev/stdin");
+                createSymlink("/proc/self/fd/1", chrootRootDir + "/dev/stdout");
+                createSymlink("/proc/self/fd/2", chrootRootDir + "/dev/stderr");
+            }
+
             /* Bind-mount all the directories from the "host"
                filesystem that we want in the chroot
                environment. */
@@ -2042,9 +2062,8 @@ void DerivationGoal::initChild()
 
             /* Mount a new tmpfs on /dev/shm to ensure that whatever
                the builder puts in /dev/shm is cleaned up automatically. */
-            if (pathExists("/dev/shm"))
-                if (mount("none", (chrootRootDir + "/dev/shm").c_str(), "tmpfs", 0, 0) == -1)
-                    throw SysError("mounting /dev/shm");
+            if (pathExists("/dev/shm") && mount("none", (chrootRootDir + "/dev/shm").c_str(), "tmpfs", 0, 0) == -1)
+                throw SysError("mounting /dev/shm");
 
             /* Do the chroot().  Below we do a chdir() to the
                temporary build directory to make sure the current

@@ -42,7 +42,6 @@ Settings::Settings()
     useSubstitutes = true;
     useChroot = false;
     useSshSubstituter = false;
-    dirsInChroot.insert("/dev");
     dirsInChroot.insert("/dev/pts");
     impersonateLinux26 = false;
     keepLog = true;

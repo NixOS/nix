@@ -386,6 +386,13 @@ Paths createDirs(const Path & path)
 }
 
 
+void createSymlink(const Path & target, const Path & link)
+{
+    if (symlink(target.c_str(), link.c_str()))
+        throw SysError(format("creating symlink from `%1%' to `%2%'") % link % target);
+}
+
+
 LogType logType = ltPretty;
 Verbosity verbosity = lvlInfo;
 

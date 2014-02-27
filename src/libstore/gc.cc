@@ -53,7 +53,7 @@ int LocalStore::openGCLock(LockType lockType)
 }
 
 
-void createSymlink(const Path & link, const Path & target)
+static void makeSymlink(const Path & link, const Path & target)
 {
     /* Create directories up to `gcRoot'. */
     createDirs(dirOf(link));
@@ -61,9 +61,7 @@ void createSymlink(const Path & link, const Path & target)
     /* Create the new symlink. */
     Path tempLink = (format("%1%.tmp-%2%-%3%")
         % link % getpid() % rand()).str();
-    if (symlink(target.c_str(), tempLink.c_str()) == -1)
-        throw SysError(format("symlinking `%1%' to `%2%'")
-            % tempLink % target);
+    createSymlink(target, tempLink);
 
     /* Atomically replace the old one. */
     if (rename(tempLink.c_str(), link.c_str()) == -1)
@@ -83,7 +81,7 @@ void LocalStore::addIndirectRoot(const Path & path)
     string hash = printHash32(hashString(htSHA1, path));
     Path realRoot = canonPath((format("%1%/%2%/auto/%3%")
         % settings.nixStateDir % gcRootsDir % hash).str());
-    createSymlink(realRoot, path);
+    makeSymlink(realRoot, path);
 }
 
 
@@ -104,7 +102,7 @@ Path addPermRoot(StoreAPI & store, const Path & _storePath,
            point to the Nix store. */
         if (pathExists(gcRoot) && (!isLink(gcRoot) || !isInStore(readLink(gcRoot))))
             throw Error(format("cannot create symlink `%1%'; already exists") % gcRoot);
-        createSymlink(gcRoot, storePath);
+        makeSymlink(gcRoot, storePath);
         store.addIndirectRoot(gcRoot);
     }
 
@@ -119,7 +117,7 @@ Path addPermRoot(StoreAPI & store, const Path & _storePath,
                     % gcRoot % rootsDir);
         }
 
-        createSymlink(gcRoot, storePath);
+        makeSymlink(gcRoot, storePath);
     }
 
     /* Check that the root can be found by the garbage collector.

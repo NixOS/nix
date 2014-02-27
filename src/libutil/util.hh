@@ -93,6 +93,9 @@ Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
    list of created directories, in order of creation. */
 Paths createDirs(const Path & path);
 
+/* Create a symlink. */
+void createSymlink(const Path & target, const Path & link);
+
 
 template<class T, class A>
 T singleton(const A & a)

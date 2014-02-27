@@ -118,8 +118,7 @@ void switchLink(Path link, Path target)
     if (dirOf(target) == dirOf(link)) target = baseNameOf(target);
 
     Path tmp = canonPath(dirOf(link) + "/.new_" + baseNameOf(link));
-    if (symlink(target.c_str(), tmp.c_str()) != 0)
-        throw SysError(format("creating symlink `%1%'") % tmp);
+    createSymlink(target, tmp);
     /* The rename() system call is supposed to be essentially atomic
        on Unix.  That is, if we have links `current -> X' and
        `new_current -> Y', and we rename new_current to current, a

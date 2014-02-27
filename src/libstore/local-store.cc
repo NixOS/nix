@@ -243,8 +243,7 @@ LocalStore::LocalStore(bool reserveSpace)
     Path gcRootsDir = settings.nixStateDir + "/gcroots";
     if (!pathExists(gcRootsDir)) {
         createDirs(gcRootsDir);
-        if (symlink(profilesDir.c_str(), (gcRootsDir + "/profiles").c_str()) == -1)
-            throw SysError(format("creating symlink to `%1%'") % profilesDir);
+        createSymlink(profilesDir, gcRootsDir + "/profiles");
     }
 
     checkStoreNotSymlink();
