@@ -2017,11 +2017,11 @@ void DerivationGoal::initChild()
                bind-mount the host /dev. */
             if (dirsInChroot.find("/dev") == dirsInChroot.end()) {
                 createDirs(chrootRootDir + "/dev/shm");
+                createDirs(chrootRootDir + "/dev/pts");
                 Strings ss;
                 ss.push_back("/dev/full");
                 ss.push_back("/dev/kvm");
                 ss.push_back("/dev/null");
-                ss.push_back("/dev/ptmx");
                 ss.push_back("/dev/random");
                 ss.push_back("/dev/tty");
                 ss.push_back("/dev/urandom");
@@ -2064,6 +2064,19 @@ void DerivationGoal::initChild()
                the builder puts in /dev/shm is cleaned up automatically. */
             if (pathExists("/dev/shm") && mount("none", (chrootRootDir + "/dev/shm").c_str(), "tmpfs", 0, 0) == -1)
                 throw SysError("mounting /dev/shm");
+
+            /* Mount a new devpts on /dev/pts.  Note that this
+               requires the kernel to be compiled with
+               CONFIG_DEVPTS_MULTIPLE_INSTANCES=y (which is the case
+               if /dev/ptx/ptmx exists). */
+            if (pathExists("/dev/pts/ptmx") &&
+                !pathExists(chrootRootDir + "/dev/ptmx")
+                && dirsInChroot.find("/dev/pts") == dirsInChroot.end())
+            {
+                if (mount("none", (chrootRootDir + "/dev/pts").c_str(), "devpts", 0, "newinstance,mode=0620") == -1)
+                    throw SysError("mounting /dev/pts");
+                createSymlink("/dev/pts/ptmx", chrootRootDir + "/dev/ptmx");
+            }
 
             /* Do the chroot().  Below we do a chdir() to the
                temporary build directory to make sure the current
