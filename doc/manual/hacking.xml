@@ -8,7 +8,7 @@
 the latest version of Nix from GitHub:
 <screen>
 $ git clone git://github.com/NixOS/nix.git
-$ cd hydra
+$ cd nix
 </screen>
 </para>
 
