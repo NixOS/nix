@@ -1,4 +1,5 @@
 #pragma once
+#include <sys/socket.h>
 
 namespace nix {
 
@@ -7,6 +8,7 @@ namespace nix {
 #define WORKER_MAGIC_2 0x6478696f
 
 #define PROTOCOL_VERSION 0x10e
+#define RECURSIVE_PROTOCOL_VERSION 0x101
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
@@ -58,3 +60,23 @@ template<class T> T readStorePaths(Source & from);
 
 
 }
+
+/* Borrowed from http://swtch.com/usr/local/plan9/src/lib9/sendfd.c, should
+   really be part of POSIX.
+   Copyright (C) 2003, Lucent Technologies Inc. and others. All Rights Reserved. */
+
+#ifndef CMSG_ALIGN
+#   ifdef __sun__
+#       define CMSG_ALIGN _CMSG_DATA_ALIGN
+#   else
+#       define CMSG_ALIGN(len) (((len)+sizeof(long)-1) & ~(sizeof(long)-1))
+#   endif
+#endif
+
+#ifndef CMSG_SPACE
+#   define CMSG_SPACE(len) (CMSG_ALIGN(sizeof(struct cmsghdr))+CMSG_ALIGN(len))
+#endif
+
+#ifndef CMSG_LEN
+#   define CMSG_LEN(len) (CMSG_ALIGN(sizeof(struct cmsghdr))+(len))
+#endif

@@ -8,6 +8,7 @@
 #include "util.hh"
 #include "archive.hh"
 #include "affinity.hh"
+#include "worker-protocol.hh"
 
 #include <map>
 #include <sstream>
@@ -732,6 +733,9 @@ private:
 
     /* Pipe for the builder's standard output/error. */
     Pipe builderOut;
+
+    /* Our end of the recursive paths reporting socket. */
+    AutoCloseFD recursivePathsParentSide;
 
     /* The build hook. */
     boost::shared_ptr<HookInstance> hook;
@@ -1662,6 +1666,77 @@ void DerivationGoal::startBuilder()
        getdents returns the inode of the mount point). */
     env["PWD"] = tmpDir;
 
+    /* Set up recursive nix */
+    env["NIX_STORE_DIR"] = settings.nixStore;
+    /* NIX_DATA_DIR, NIX_LIBEXEC_DIR, NIX_BIN_DIR purposefully not set */
+    /* If we want log reading from recursive nix, we'll
+       need to put the log dir in the chroot */
+    env["NIX_LOG_DIR"] = "/var/empty";
+    env["NIX_STATE_DIR"] = "/var/empty";
+    env["NIX_DB_DIR"] = "/var/empty";
+    /* We pass the settings pack. Would need to put this
+       in the chroot if we really wanted it */
+    env["NIX_CONF_DIR"] = "/var/empty";
+    env["NIX_SUBSTITUTERS"] = "";
+    env["NIX_AFFINITY_HACK"] = settings.lockCPU ? "1" : "";
+    env["_NIX_OPTIONS"] = settings.pack();
+    env["NIX_REMOTE"] = "recursive";
+    env["NIX_REMOTE_RECURSIVE_PROTOCOL_VERSION"] = int2String(RECURSIVE_PROTOCOL_VERSION);
+    if (worker.store.fdRecursiveDaemon == -1) {
+        /* This process isn't a daemon worker, and we haven't spawned a child daemon yet */
+        int sockets[2];
+        if (socketpair(PF_UNIX, SOCK_STREAM, 0, sockets) == -1)
+            throw SysError("creating recursive daemon socketpair");
+
+        if (shutdown(sockets[0], SHUT_WR) == -1)
+            throw SysError("disabling writes to listening side of daemon socketpair");
+
+        if (shutdown(sockets[1], SHUT_RD) == -1)
+            throw SysError("disabling reads from connecting side of daemon socketpair");
+
+        /* No portable way to kill children when parents die, so
+           we pass the daemon the read side of a pipe, when it gets
+           EOF there it knows we died and it exits */
+        int close_pipe[2];
+        closeOnExec(close_pipe[1]);
+        if (pipe(close_pipe) == -1)
+            throw SysError("creating recursive nix daemon close notification pipe");
+
+        set<int> kept;
+        kept.insert(sockets[0]);
+        kept.insert(sockets[1]);
+        kept.insert(close_pipe[0]);
+        string recursiveFds = (format("%1% %2% %3%") % sockets[0] % sockets[1] % close_pipe[0]).str();
+        Path progPath = (format("%1%/nix-daemon") % settings.nixBinDir).str();
+        switch (fork()) {
+            case -1:
+                throw SysError("forking to run recursive nix-daemon");
+            case 0:
+                setenv("NIX_RECURSIVE_FDS", recursiveFds.c_str(), true);
+                setenv("_NIX_OPTIONS", env["_NIX_OPTIONS"].c_str(), true);
+                closeMostFDs(kept);
+                execl(progPath.c_str(), "nix-daemon", NULL);
+                throw SysError("executing nix-daemon");
+        }
+        close(close_pipe[0]);
+        /* close_pipe[1] purposefully leaked here */
+        close(sockets[0]);
+        worker.store.fdRecursiveDaemon = sockets[1];
+    }
+    env["NIX_REMOTE_RECURSIVE_SOCKET_FD"] = int2String((int) worker.store.fdRecursiveDaemon);
+
+    int recursivePaths[2];
+    if (socketpair(PF_UNIX, SOCK_STREAM, 0, recursivePaths) == -1)
+        throw SysError("creating recursive paths socketpair");
+
+    AutoCloseFD recursivePathsChildSide = recursivePaths[0];
+    recursivePathsParentSide = recursivePaths[1];
+    /* We set our end of the socket non-blocking, so a malicious
+       builder can't make us block writing the confirmation */
+    setNonBlocking(recursivePathsParentSide);
+    closeOnExec(recursivePathsParentSide);
+    env["NIX_REMOTE_RECURSIVE_PATHS_FD"] = int2String((int) recursivePathsChildSide);
+
     /* Compatibility hack with Nix <= 0.7: if this is a fixed-output
        derivation, tell the builder, so that for instance `fetchurl'
        can skip checking the output.  On older Nixes, this environment
@@ -1958,8 +2033,10 @@ void DerivationGoal::startBuilder()
     /* parent */
     pid.setSeparatePG(true);
     builderOut.writeSide.close();
-    worker.childStarted(shared_from_this(), pid,
-        singleton<set<int> >(builderOut.readSide), true, true);
+    set<int> fds;
+    fds.insert(builderOut.readSide);
+    fds.insert(recursivePathsParentSide);
+    worker.childStarted(shared_from_this(), pid, fds, true, true);
 
     if (settings.printBuildTrace) {
         printMsg(lvlError, format("@ build-started %1% - %2% %3%")
@@ -2093,8 +2170,17 @@ void DerivationGoal::initChild()
         if (chdir(tmpDir.c_str()) == -1)
             throw SysError(format("changing into `%1%'") % tmpDir);
 
-        /* Close all other file descriptors. */
-        closeMostFDs(set<int>());
+        /* Close all file descriptors except stdio and recursive nix files. */
+        set<int> kept;
+        int fd;
+        bool ok = string2Int(env["NIX_REMOTE_RECURSIVE_SOCKET_FD"], fd);
+        kept.insert(fd);
+        assert(ok);
+        ok = string2Int(env["NIX_REMOTE_RECURSIVE_PATHS_FD"], fd);
+        kept.insert(fd);
+        assert(ok);
+
+        closeMostFDs(kept);
 
 #ifdef CAN_DO_LINUX32_BUILDS
         /* Change the personality to 32-bit if we're doing an
@@ -2461,16 +2547,102 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
             if (err != BZ_OK) throw Error(format("cannot write to compressed log file (BZip2 error = %1%)") % err);
         } else if (fdLogFile != -1)
             writeFull(fdLogFile, (unsigned char *) data.data(), data.size());
-    }
+    } else if (!hook && fd == recursivePathsParentSide) {
+#if CHROOT_ENABLED
+        AutoCloseFD myNs;
+#endif
+        try {
+            /* Extract the paths. */
+            string::size_type pos = 0, end;
 
-    if (hook && fd == hook->fromHook.readSide)
+            PathSet newPaths;
+
+            while ((end = data.find((char) 0, pos)) != string::npos) {
+                Path r(data, pos, end - pos);
+                debug(format("got recursive path `%1%'") % r);
+                computeFSClosure(worker.store, r, newPaths);
+                pos = end + 1;
+            }
+
+#if CHROOT_ENABLED
+            if (useChroot) {
+                /* Enter the child's mount namespace */
+                myNs = open("/proc/self/ns/mnt", O_RDONLY);
+                if (myNs == -1)
+                    throw SysError("opening own mount namespace");
+                Path childNsPath = (format("/proc/%1%/ns/mnt") % pid).str();
+                AutoCloseFD childNs = open(childNsPath.c_str(), O_RDONLY);
+                if (childNs == -1)
+                    throw SysError("opening child's mount namespace");
+
+                if (setns(childNs, 0) == -1)
+                    throw SysError("entering child's mount namespace");
+            }
+#endif
+
+            foreach (PathSet::iterator, i, newPaths) {
+                worker.store.addTempRoot(*i);
+#if CHROOT_ENABLED
+                if (useChroot) {
+                    /* We need this path to be available in the chroot */
+                    Path target = chrootRootDir + *i;
+                    if (access(target.c_str(), F_OK) == 0)
+                        /* Path already exists, assume it's the right one */
+                        continue;
+                    struct stat st;
+                    if (lstat(i->c_str(), &st))
+                        throw SysError(format("getting attributes of path `%1%'") % *i);
+                    if (S_ISDIR(st.st_mode)) {
+                        debug(format("bind mounting `%1%' to `%2%'") % *i % target);
+                        createDirs(target);
+                        if (mount(i->c_str(), target.c_str(), "", MS_BIND, 0) == -1)
+                            throw SysError(format("bind mount from `%1%' to `%2%' failed") % *i % target);
+                    } else {
+                        if (link(i->c_str(), target.c_str()) == -1) {
+                            /* Hard-linking fails if we exceed the maximum
+                               link count on a file (e.g. 32000 of ext3),
+                               which is quite possible after a `nix-store
+                               --optimise'. */
+                            if (errno != EMLINK)
+                                throw SysError(format("linking `%1%' to `%2%'") % target % *i);
+                            StringSink sink;
+                            dumpPath(*i, sink);
+                            StringSource source(sink.s);
+                            restorePath(target, source);
+                        }
+                    }
+                }
+#endif
+            }
+
+            allPaths.insert(newPaths.begin(), newPaths.end());
+
+            /* Notify the child that we're done */
+            unsigned char c = '\0';
+            writeFull(fd, &c, sizeof c);
+        } catch (std::exception & e) {
+            /* Don't let a rogue builder kill us */
+            printMsg(lvlError, format("error getting reported recursive paths: %1%") % e.what());
+        }
+
+#if CHROOT_ENABLED
+        if (myNs != -1) {
+            /* Back in our own namespace */
+            if (setns(myNs, 0) == -1)
+                throw SysError("leaving child's mount namespace");
+        }
+#endif
+    } else if (hook && fd == hook->fromHook.readSide)
         writeToStderr(data);
 }
 
 
 void DerivationGoal::handleEOF(int fd)
 {
-    worker.wakeUp(shared_from_this());
+    if (!hook && fd == recursivePathsParentSide)
+        recursivePathsParentSide.close();
+    else
+        worker.wakeUp(shared_from_this());
 }
 
 

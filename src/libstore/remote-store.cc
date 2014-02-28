@@ -5,6 +5,9 @@
 #include "archive.hh"
 #include "affinity.hh"
 #include "globals.hh"
+#include "pathlocks.hh"
+#include "derivations.hh"
+#include "errno.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -54,8 +57,60 @@ void RemoteStore::openConnection(bool reserveSpace)
         /* Connect to a daemon that does the privileged work for
            us. */
         connectToDaemon();
-    else
+    else if (remoteMode == "recursive") {
+        unsigned int daemonRecursiveVersion;
+        if (!string2Int(getEnv("NIX_REMOTE_RECURSIVE_PROTOCOL_VERSION"), daemonRecursiveVersion))
+            throw Error("expected an integer in NIX_REMOTE_RECURSIVE_PROTOCOL_VERSION");
+
+        if (GET_PROTOCOL_MAJOR(daemonRecursiveVersion) != GET_PROTOCOL_MAJOR(RECURSIVE_PROTOCOL_VERSION))
+            throw Error("nix daemon recursive protocol version not supported");
+
+        int sfd;
+        if (!string2Int(getEnv("NIX_REMOTE_RECURSIVE_SOCKET_FD"), sfd))
+            throw Error("expected an fd in NIX_REMOTE_RECURSIVE_SOCKET_FD");
+
+        int fds[2];
+        if (socketpair(PF_UNIX, SOCK_STREAM, 0, fds) == -1)
+            throw SysError("creating recursive daemon socketpair");
+
+        /* Send our protocol version and a socket to the daemon */
+        unsigned char buf[sizeof RECURSIVE_PROTOCOL_VERSION];
+        for (size_t byte = 0; byte < sizeof buf; ++byte)
+            buf[byte] =
+                (unsigned char) ((RECURSIVE_PROTOCOL_VERSION >> (8 * byte)) & 0xFF);
+        struct iovec iov;
+        iov.iov_base = buf;
+        iov.iov_len = sizeof buf;
+        struct msghdr msg;
+        memset(&msg, 0, sizeof msg);
+        msg.msg_iov = &iov;
+        msg.msg_iovlen = 1;
+        char data[CMSG_SPACE(sizeof fds[1])];
+        msg.msg_control = data;
+        msg.msg_controllen = sizeof data;
+        struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
+        cmsg->cmsg_len = CMSG_LEN(sizeof fds[1]);
+        cmsg->cmsg_level = SOL_SOCKET;
+        cmsg->cmsg_type = SCM_RIGHTS;
+        memmove(CMSG_DATA(cmsg), &fds[1], sizeof fds[1]);
+        ssize_t count = sendmsg(sfd, &msg, 0);
+        if (count == -1)
+            throw SysError("sending socket descriptor to daemon");
+        else if ((size_t) count != sizeof buf)
+            throw Error(format("tried to send %1% bytes to the daemon, but only %2% were sent")
+                    % sizeof buf % count);
+        close(fds[1]);
+
+        fdSocket = fds[0];
+
+        int pathsFd;
+        if (!string2Int(getEnv("NIX_REMOTE_RECURSIVE_PATHS_FD"), pathsFd))
+            throw Error("expected an fd in NIX_REMOTE_RECURSIVE_PATHS_FD");
+        fdRecursivePaths = pathsFd;
+    } else
         throw Error(format("invalid setting for NIX_REMOTE, `%1%'") % remoteMode);
+
+    closeOnExec(fdSocket);
 
     from.fd = fdSocket;
     to.fd = fdSocket;
@@ -100,7 +155,6 @@ void RemoteStore::connectToDaemon()
     fdSocket = socket(PF_UNIX, SOCK_STREAM, 0);
     if (fdSocket == -1)
         throw SysError("cannot create Unix domain socket");
-    closeOnExec(fdSocket);
 
     string socketPath = settings.nixDaemonSocketFile;
 
@@ -209,7 +263,9 @@ PathSet RemoteStore::queryAllValidPaths()
     openConnection();
     writeInt(wopQueryAllValidPaths, to);
     processStderr();
-    return readStorePaths<PathSet>(from);
+    PathSet res = readStorePaths<PathSet>(from);
+    reportRecursivePaths(res);
+    return res;
 }
 
 
@@ -289,7 +345,11 @@ ValidPathInfo RemoteStore::queryPathInfo(const Path & path)
     ValidPathInfo info;
     info.path = path;
     info.deriver = readString(from);
-    if (info.deriver != "") assertStorePath(info.deriver);
+    if (info.deriver != "") {
+        assertStorePath(info.deriver);
+        if (fdRecursivePaths != -1 && isValidPath(info.deriver))
+            _reportRecursivePath(info.deriver);
+    }
     info.hash = parseHash(htSHA256, readString(from));
     info.references = readStorePaths<PathSet>(from);
     info.registrationTime = readInt(from);
@@ -317,6 +377,7 @@ void RemoteStore::queryReferences(const Path & path,
     writeString(path, to);
     processStderr();
     PathSet references2 = readStorePaths<PathSet>(from);
+    /* References are brought in automatically, no need to report */
     references.insert(references2.begin(), references2.end());
 }
 
@@ -329,6 +390,7 @@ void RemoteStore::queryReferrers(const Path & path,
     writeString(path, to);
     processStderr();
     PathSet referrers2 = readStorePaths<PathSet>(from);
+    reportRecursivePaths(referrers2);
     referrers.insert(referrers2.begin(), referrers2.end());
 }
 
@@ -340,7 +402,11 @@ Path RemoteStore::queryDeriver(const Path & path)
     writeString(path, to);
     processStderr();
     Path drvPath = readString(from);
-    if (drvPath != "") assertStorePath(drvPath);
+    if (drvPath != "") {
+        assertStorePath(drvPath);
+        if (fdRecursivePaths != -1 && isValidPath(drvPath))
+            _reportRecursivePath(drvPath);
+    }
     return drvPath;
 }
 
@@ -351,7 +417,9 @@ PathSet RemoteStore::queryValidDerivers(const Path & path)
     writeInt(wopQueryValidDerivers, to);
     writeString(path, to);
     processStderr();
-    return readStorePaths<PathSet>(from);
+    PathSet res = readStorePaths<PathSet>(from);
+    reportRecursivePaths(res);
+    return res;
 }
 
 
@@ -361,6 +429,8 @@ PathSet RemoteStore::queryDerivationOutputs(const Path & path)
     writeInt(wopQueryDerivationOutputs, to);
     writeString(path, to);
     processStderr();
+    /* Paths determined via queryDerivationOutputs can't be assumed valid,
+       so we don't report them */
     return readStorePaths<PathSet>(from);
 }
 
@@ -382,7 +452,10 @@ Path RemoteStore::queryPathFromHashPart(const string & hashPart)
     writeString(hashPart, to);
     processStderr();
     Path path = readString(from);
-    if (!path.empty()) assertStorePath(path);
+    if (!path.empty()) {
+        assertStorePath(path);
+        reportRecursivePath(path);
+    }
     return path;
 }
 
@@ -404,7 +477,9 @@ Path RemoteStore::addToStore(const Path & _srcPath,
     writeString(printHashType(hashAlgo), to);
     dumpPath(srcPath, to, filter);
     processStderr();
-    return readStorePath(from);
+    Path res = readStorePath(from);
+    reportRecursivePath(res);
+    return res;
 }
 
 
@@ -420,7 +495,9 @@ Path RemoteStore::addTextToStore(const string & name, const string & s,
     writeStrings(references, to);
 
     processStderr();
-    return readStorePath(from);
+    Path res = readStorePath(from);
+    reportRecursivePath(res);
+    return res;
 }
 
 
@@ -443,7 +520,9 @@ Paths RemoteStore::importPaths(bool requireSignature, Source & source)
     /* We ignore requireSignature, since the worker forces it to true
        anyway. */
     processStderr(0, &source);
-    return readStorePaths<Paths>(from);
+    Paths res = readStorePaths<Paths>(from);
+    reportRecursivePaths(PathSet(res.begin(), res.end()));
+    return res;
 }
 
 
@@ -464,6 +543,35 @@ void RemoteStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
     }
     processStderr();
     readInt(from);
+
+    if (fdRecursivePaths != -1) {
+        PathSet recursivePaths;
+        foreach (PathSet::const_iterator, i, drvPaths) {
+            DrvPathWithOutputs i2 = parseDrvPathWithOutputs(*i);
+            if (isDerivation(i2.first)) {
+                Derivation drv;
+                try {
+                    drv = parseDerivation(readFile(i2.first));
+                    recursivePaths.insert(i2.first);
+                } catch (SysError & e) {
+                    if (e.errNo == ENOENT) {
+                        /* Need to ask for the drv to be added to chroot */
+                        _reportRecursivePath(i2.first);
+                        drv = parseDerivation(readFile(i2.first));
+                    } else
+                        throw;
+                }
+                if (i2.second.empty())
+                    foreach (DerivationOutputs::iterator, j, drv.outputs)
+                        recursivePaths.insert(j->second.path);
+                else
+                    foreach (StringSet::iterator, j, i2.second)
+                        recursivePaths.insert(drv.outputs[*j].path);
+            } else
+                recursivePaths.insert(*i);
+        }
+        _reportRecursivePaths(recursivePaths);
+    }
 }
 
 
@@ -474,6 +582,7 @@ void RemoteStore::ensurePath(const Path & path)
     writeString(path, to);
     processStderr();
     readInt(from);
+    reportRecursivePath(path);
 }
 
 
@@ -513,11 +622,14 @@ Roots RemoteStore::findRoots()
     processStderr();
     unsigned int count = readInt(from);
     Roots result;
+    PathSet recursivePaths;
     while (count--) {
         Path link = readString(from);
         Path target = readStorePath(from);
+        recursivePaths.insert(target);
         result[link] = target;
     }
+    reportRecursivePaths(recursivePaths);
     return result;
 }
 
@@ -562,6 +674,56 @@ void RemoteStore::clearFailedPaths(const PathSet & paths)
     writeStrings(paths, to);
     processStderr();
     readInt(from);
+}
+
+
+static void writeRecursivePaths(int fd, const string & s) {
+    lockFile(fd, ltWrite, true);
+    writeFull(fd, (const unsigned char *) s.data(), s.size());
+    unsigned char c;
+    readFull(fd, &c, sizeof c);
+    lockFile(fd, ltNone, true);
+}
+
+
+void RemoteStore::_reportRecursivePath(const Path & path)
+{
+    if (path.size() >= 4096)
+        throw Error("reporting a path name bigger than 4096 bytes not allowed");
+    string s = path + '\0';
+    writeRecursivePaths(fdRecursivePaths, s);
+}
+
+
+void RemoteStore::reportRecursivePath(const Path & path)
+{
+    if (fdRecursivePaths != -1)
+        _reportRecursivePath(path);
+}
+
+
+void RemoteStore::_reportRecursivePaths(const PathSet & paths)
+{
+    if (!paths.empty()) {
+        string s = "";
+        foreach (PathSet::const_iterator, i, paths) {
+            if (s.size() + i->size() >= 4096) {
+                if (i->size() >= 4096)
+                    throw Error("reporting a path name bigger than 4096 bytes not allowed");
+                writeRecursivePaths(fdRecursivePaths, s);
+                s = "";
+            }
+            s += *i + '\0';
+        }
+        writeRecursivePaths(fdRecursivePaths, s);
+    }
+}
+
+
+void RemoteStore::reportRecursivePaths(const PathSet & paths)
+{
+    if (fdRecursivePaths != -1)
+        _reportRecursivePaths(paths);
 }
 
 

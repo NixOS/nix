@@ -928,6 +928,24 @@ void closeOnExec(int fd)
 }
 
 
+void noCloseOnExec(int fd)
+{
+    int prev;
+    if ((prev = fcntl(fd, F_GETFD, 0)) == -1 ||
+        fcntl(fd, F_SETFD, prev & ~FD_CLOEXEC) == -1)
+        throw SysError("unsetting close-on-exec flag");
+}
+
+
+void setNonBlocking(int fd)
+{
+    int prev;
+    if ((prev = fcntl(fd, F_GETFL, 0)) == -1 ||
+        fcntl(fd, F_SETFL, prev | O_NONBLOCK) == -1)
+        throw SysError("setting non-blocking flag");
+}
+
+
 #if HAVE_VFORK
 pid_t (*maybeVfork)() = vfork;
 #else

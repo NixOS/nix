@@ -90,10 +90,19 @@ private:
     Pid child;
     unsigned int daemonVersion;
     bool initialised;
+    AutoCloseFD fdRecursivePaths;
 
     void openConnection(bool reserveSpace = true);
 
     void processStderr(Sink * sink = 0, Source * source = 0);
+
+    void _reportRecursivePath(const Path & path);
+
+    void _reportRecursivePaths(const PathSet & paths);
+
+    void reportRecursivePath(const Path & path);
+
+    void reportRecursivePaths(const PathSet & paths);
 
     void connectToDaemon();
 

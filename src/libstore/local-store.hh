@@ -93,7 +93,7 @@ public:
 
     /* Initialise the local store, upgrading the schema if
        necessary. */
-    LocalStore(bool reserveSpace = true);
+    LocalStore(bool reserveSpace = true, int fd = -1);
 
     ~LocalStore();
 
@@ -209,6 +209,8 @@ public:
     void markContentsGood(const Path & path);
 
     void setSubstituterEnv();
+
+    AutoCloseFD fdRecursiveDaemon;
 
 private:
 
