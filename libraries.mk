@@ -109,7 +109,7 @@ define build-library
   $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj)_CXXFLAGS=$$($(1)_CXXFLAGS)))
 
   # Make each object file depend on the common dependencies.
-  $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj): $$($(1)_COMMON_DEPS)))
+  $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj): $$($(1)_COMMON_DEPS) $$(GLOBAL_COMMON_DEPS)))
 
   # Include .dep files, if they exist.
   $(1)_DEPS := $$(foreach fn, $$($(1)_OBJS), $$(call filename-to-dep, $$(fn)))
