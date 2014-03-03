@@ -66,6 +66,10 @@ define build-library
       endif
     endif
 
+    ifneq ($(OS), Darwin)
+      $(1)_LDFLAGS += -Wl,-soname=$$($(1)_NAME).$(SO_EXT)
+    endif
+
     $(1)_PATH := $$(_d)/$$($(1)_NAME).$(SO_EXT)
 
     $$($(1)_PATH): $$($(1)_OBJS) $$(_libs) | $$(_d)/
