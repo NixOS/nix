@@ -34,6 +34,7 @@ ifeq ($(BUILD_SHARED_LIBS), 1)
   ifneq ($(OS), Darwin)
     GLOBAL_LDFLAGS += -Wl,--no-copy-dt-needed-entries
   endif
+  SET_RPATH_TO_LIBS ?= 1
 endif
 
 
