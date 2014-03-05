@@ -144,7 +144,6 @@ public:
 
     /* Evaluation the expression, then verify that it has the expected
        type. */
-    inline bool evalBool(Env & env, Expr * e, Value & v);
     inline bool evalBool(Env & env, Expr * e);
     inline void evalAttrs(Env & env, Expr * e, Value & v);
 
