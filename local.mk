@@ -7,3 +7,5 @@ dist-files += configure config.h.in nix.spec
 GLOBAL_CXXFLAGS += -I . -I src -I src/libutil -I src/libstore -I src/libmain -I src/libexpr
 
 $(foreach i, config.h $(call rwildcard, src/lib*, *.hh), $(eval $(call install-file-in, $(i), $(includedir)/nix, 0644)))
+
+$(foreach i, config.h $(call rwildcard, src/boost, *.hpp), $(eval $(call install-file-in, $(i), $(includedir)/nix/$(patsubst src/%/,%,$(dir $(i))), 0644)))
