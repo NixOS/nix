@@ -642,15 +642,13 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
     /* dynamic attrs apply *after* rec and __overrides */
     foreach (DynamicAttrDefs::iterator, i, dynamicAttrs) {
         Value nameVal;
-        assert(dynamic_cast<ExprConcatStrings *>(i->nameExpr));
-        ExprConcatStrings * nameExpr = static_cast<ExprConcatStrings *>(i->nameExpr);
-        if (nameExpr->es->size() == 1) {
-            nameExpr->es->front()->eval(state, *dynamicEnv, nameVal);
+        if (i->nameExpr->es->size() == 1) {
+            i->nameExpr->es->front()->eval(state, *dynamicEnv, nameVal);
             state.forceValue(nameVal);
             if (nameVal.type == tNull)
                 continue;
         }
-        nameExpr->eval(state, *dynamicEnv, nameVal);
+        i->nameExpr->eval(state, *dynamicEnv, nameVal);
         state.forceStringNoCtx(nameVal);
         Symbol nameSym = state.symbols.create(nameVal.string.s);
         Bindings::iterator j = v.attrs->find(nameSym);

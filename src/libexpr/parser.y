@@ -488,7 +488,7 @@ attrpath
           $$->push_back(AttrName(str->s));
           delete str;
       } else
-          $$->push_back(AttrName($3));
+          $$->push_back(AttrName(static_cast<ExprConcatStrings *>($3)));
     }
   | attr { $$ = new vector<AttrName>; $$->push_back(AttrName(data->symbols.create($1))); }
   | string_attr
@@ -498,7 +498,7 @@ attrpath
           $$->push_back(AttrName(str->s));
           delete str;
       } else
-          $$->push_back(AttrName($1));
+          $$->push_back(AttrName(static_cast<ExprConcatStrings *>($1)));
     }
   ;
 
