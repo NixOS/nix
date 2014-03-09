@@ -50,16 +50,16 @@ struct Env;
 struct Value;
 class EvalState;
 struct StaticEnv;
-struct Expr;
+struct ExprConcatStrings;
 
 
 /* An attribute path is a sequence of attribute names. */
 struct AttrName
 {
     Symbol symbol;
-    Expr *expr;
+    ExprConcatStrings * expr;
     AttrName(const Symbol & s) : symbol(s) {};
-    AttrName(Expr *e) : expr(e) {};
+    AttrName(ExprConcatStrings * e) : expr(e) {};
 };
 
 typedef std::vector<AttrName> AttrPath;
@@ -174,10 +174,10 @@ struct ExprAttrs : Expr
     typedef std::map<Symbol, AttrDef> AttrDefs;
     AttrDefs attrs;
     struct DynamicAttrDef {
-        Expr * nameExpr;
+        ExprConcatStrings * nameExpr;
         Expr * valueExpr;
         Pos pos;
-        DynamicAttrDef(Expr * nameExpr, Expr * valueExpr, const Pos & pos) : nameExpr(nameExpr), valueExpr(valueExpr), pos(pos) { };
+        DynamicAttrDef(ExprConcatStrings * nameExpr, Expr * valueExpr, const Pos & pos) : nameExpr(nameExpr), valueExpr(valueExpr), pos(pos) { };
     };
     typedef std::vector<DynamicAttrDef> DynamicAttrDefs;
     DynamicAttrDefs dynamicAttrs;
