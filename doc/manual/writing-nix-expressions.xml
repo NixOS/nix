@@ -871,6 +871,17 @@ This will evaluate to <literal>123</literal> if
 coerced to a string and <literal>456</literal> otherwise (again
 assuming <literal>bar</literal> is antiquotable).</para>
 
+<para>In the special case where an attribute name inside of a set declaration
+evaluates to <literal>"${null}"</literal> (which is normally an error, as
+<literal>null</literal> is not antiquotable), that attribute is simply not
+added to the set:
+
+<programlisting>
+{ ${if foo then "bar" else null} = true; }</programlisting>
+
+This will evaluate to <literal>{}</literal> if <literal>foo</literal>
+evaluates to <literal>false</literal>.</para>
+
 
 </simplesect>
 
