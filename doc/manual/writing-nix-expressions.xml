@@ -872,7 +872,7 @@ coerced to a string and <literal>456</literal> otherwise (again
 assuming <literal>bar</literal> is antiquotable).</para>
 
 <para>In the special case where an attribute name inside of a set declaration
-evaluates to <literal>"${null}"</literal> (which is normally an error, as
+evaluates to <literal>null</literal> (which is normally an error, as
 <literal>null</literal> is not antiquotable), that attribute is simply not
 added to the set:
 

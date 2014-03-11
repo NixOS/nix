@@ -26,8 +26,8 @@
   case where the attribute name is just a single antiquotation,
   the quotes can be dropped (e.g. the above example can be written
   <literal>set.${foo}</literal>). If an attribute name inside of a
-  set declaration evaluates to <literal>"${null}"</literal> (e.g.
-  <literal>{ ${null} = false; }</literal>), then that attribute is not added
+  set declaration evaluates to <literal>null</literal> (e.g.
+  <literal>{ ${null} = false; }</literal>), then that attribute is not
   added to the set.</para></listitem>
 
 </itemizedlist>
