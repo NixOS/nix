@@ -91,6 +91,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
             if (!v) continue;
             vMeta.attrs->push_back(Attr(state.symbols.create(*j), v));
         }
+        vMeta.attrs->sort();
         v.attrs->sort();
 
         if (drvPath != "") references.insert(drvPath);
