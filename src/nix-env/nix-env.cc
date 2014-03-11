@@ -1304,9 +1304,24 @@ static void opDeleteGenerations(Globals & globals,
             for (Generations::iterator j = gens.begin(); j != gens.end(); ++j)
                 if (j->number != curGen)
                     deleteGeneration2(globals, j->number);
-        }
+        } else if (i->size() >= 2 && tolower(*i->rbegin()) == 'd') {
+            time_t curTime = time(NULL);
+            time_t oldTime;
+            string strDays = string(*i, 0, i->size() - 1);
+            int days;
 
-        else {
+            if (!string2Int(strDays, days) || days < 1)
+                throw UsageError(format("invalid number of days specifier `%1%'") % *i);
+
+            oldTime = curTime - days * 24 * 3600;
+
+            for (Generations::iterator j = gens.begin(); j != gens.end(); ++j) {
+                if (j->number == curGen) continue;
+
+                if (j->creationTime < oldTime)
+                    deleteGeneration2(globals, j->number);
+            }
+        } else {
             int n;
             if (!string2Int(*i, n) || n < 0)
                 throw UsageError(format("invalid generation specifier `%1%'")  % *i);
