@@ -20,6 +20,7 @@
     <command>nix-collect-garbage</command>
     <arg><option>--delete-old</option></arg>
     <arg><option>-d</option></arg>
+    <arg><option>--delete-older-than</option> <replaceable>period</replaceable></arg>
     <group choice='opt'>
       <arg choice='plain'><option>--print-roots</option></arg>
       <arg choice='plain'><option>--print-live</option></arg>
@@ -35,13 +36,18 @@
 <para>The command <command>nix-collect-garbage</command> is mostly an
 alias of <link linkend="rsec-nix-store-gc"><command>nix-store
 --gc</command></link>, that is, it deletes all unreachable paths in
-the Nix store to clean up your system.  However, it provides an
-additional option <option>-d</option> (<option>--delete-old</option>)
-that deletes all old generations of all profiles in
+the Nix store to clean up your system.  However, it provides two
+additional options: <option>-d</option> (<option>--delete-old</option>),
+which deletes all old generations of all profiles in
 <filename>/nix/var/nix/profiles</filename> by invoking
-<literal>nix-env --delete-generations old</literal> on all profiles.
-Of course, this makes rollbacks to previous configurations
-impossible.</para>
+<literal>nix-env --delete-generations old</literal> on all profiles
+(of course, this makes rollbacks to previous configurations
+impossible); and
+<option>--delete-older-than</option> <replaceable>period</replaceable>,
+where period is a value such as <literal>30d</literal>, which deletes
+all non-current generations that are older than the specified number of
+days in all profiles in <filename>/nix/var/nix/profiles</filename>.
+</para>
 
 </refsection>
 
