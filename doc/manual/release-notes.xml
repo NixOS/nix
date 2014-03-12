@@ -9,26 +9,228 @@
 
 <section xml:id="ssec-relnotes-1.7"><title>Release 1.7 (TBA)</title>
 
-<para>This release has the following changes:</para>
+<para>In addition to the usual bug fixes, this release has the
+following new features:</para>
 
 <itemizedlist>
+
+  <listitem>
+    <para>Antiquotation is now allowed inside of quoted attribute
+    names (e.g. <literal>set."${foo}"</literal>). In the case where
+    the attribute name is just a single antiquotation, the quotes can
+    be dropped (e.g. the above example can be written
+    <literal>set.${foo}</literal>). If an attribute name inside of a
+    set declaration evaluates to <literal>null</literal> (e.g.
+    <literal>{ ${null} = false; }</literal>), then that attribute is
+    not added to the set.</para>
+  </listitem>
+
+  <listitem>
+    <para>Experimental support for cryptographically signed binary
+    caches.  See <link
+    xlink:href="https://github.com/NixOS/nix/commit/0fdf4da0e979f992db75cc17376e455ddc5a96d8">the
+    commit for details</link>.</para>
+  </listitem>
+
+  <listitem>
+    <para>An experimental new substituter,
+    <command>download-via-ssh</command>, that fetches binaries from
+    remote machines via SSH.  Specifying the flags <literal>--option
+    use-ssh-substituter true --option ssh-substituter-hosts
+    <replaceable>user@hostname</replaceable></literal> will cause Nix
+    to download binaries from the specified machine, if it has
+    them.</para>
+  </listitem>
+
+  <listitem>
+    <para><command>nix-store -r</command> and
+    <command>nix-build</command> have a new flag,
+    <option>--check</option>, that builds a previously built
+    derivation again, and prints an error message if the output is not
+    exactly the same. This helps to verify whether a derivation is
+    truly deterministic.  For example:
+
+<screen>
+$ nix-build '&lt;nixpkgs>' -A patchelf
+<replaceable>…</replaceable>
+$ nix-build '&lt;nixpkgs>' -A patchelf --check
+<replaceable>…</replaceable>
+error: derivation `/nix/store/1ipvxs…-patchelf-0.6' may not be deterministic:
+  hash mismatch in output `/nix/store/4pc1dm…-patchelf-0.6.drv'
+</screen>
+
+    </para>
+
+  </listitem>
+
+  <listitem>
+    <para>The <command>nix-instantiate</command> flags
+    <option>--eval-only</option> and <option>--parse-only</option>
+    have been renamed to <option>--eval</option> and
+    <option>--parse</option>, respectively.</para>
+  </listitem>
+
+  <listitem>
+    <para><command>nix-instantiate</command>,
+    <command>nix-build</command> and <command>nix-shell</command> now
+    have a flag <option>--expr</option> (or <option>-E</option>) that
+    allows you to specify the expression to be evaluated as a command
+    line argument.  For instance, <literal>nix-instantiate --eval -E
+    '1 + 2'</literal> will print <literal>3</literal>.</para>
+  </listitem>
+
+  <listitem>
+    <para><command>nix-shell</command> improvements:</para>
+
+    <itemizedlist>
+
+      <listitem>
+        <para>It has a new flag, <option>--packages</option> (or
+        <option>-p</option>), that sets up a build environment
+        containing the specified packages from Nixpkgs. For example,
+        the command
+
+<screen>
+$ nix-shell -p sqlite xorg.libX11 hello
+</screen>
+
+        will start a shell in which the given packages are
+        present.</para>
+      </listitem>
+
+      <listitem>
+        <para>It now uses <filename>shell.nix</filename> as the
+        default expression, falling back to
+        <filename>default.nix</filename> if the former doesn’t
+        exist.  This makes it convenient to have a
+        <filename>shell.nix</filename> in your project to set up a
+        nice development environment.</para>
+      </listitem>
+
+      <listitem>
+        <para>It evaluates the derivation attribute
+        <varname>shellHook</varname>, if set. Since
+        <literal>stdenv</literal> does not normally execute this hook,
+        it allows you to do <command>nix-shell</command>-specific
+        setup.</para>
+      </listitem>
+
+      <listitem>
+        <para>It preserves the user’s timezone setting.</para>
+      </listitem>
+
+    </itemizedlist>
+
+  </listitem>
+
+  <listitem>
+    <para>In chroots, Nix now sets up a <filename>/dev</filename>
+    containing only a minimal set of devices (such as
+    <filename>/dev/null</filename>). Note that it only does this if
+    you <emphasis>don’t</emphasis> have <filename>/dev</filename>
+    listed in your <option>build-chroot-dirs</option> setting;
+    otherwise, it will bind-mount the <literal>/dev</literal> from
+    outside the chroot.</para>
+
+    <para>Similarly, if you don’t have <filename>/dev/pts</filename> listed
+    in <option>build-chroot-dirs</option>, Nix will mount a private
+    <literal>devpts</literal> filesystem on the chroot’s
+    <filename>/dev/pts</filename>.</para>
+
+  </listitem>
 
   <listitem>
     <para>New built-in function: <function>builtins.toJSON</function>,
     which returns a JSON representation of a value.</para>
   </listitem>
 
-  <listitem><para><command>nix-setuid-helper</command> is
-  gone.</para></listitem>
+  <listitem>
+    <para><command>nix-env -q</command> has a new flag
+    <option>--json</option> to print a JSON representation of the
+    installed or available packages.</para>
+  </listitem>
 
-  <listitem><para>Now antiquotation is allowed inside of quoted
-  attribute names (e.g. <literal>set."${foo}"</literal>). In the
-  case where the attribute name is just a single antiquotation,
-  the quotes can be dropped (e.g. the above example can be written
-  <literal>set.${foo}</literal>). If an attribute name inside of a
-  set declaration evaluates to <literal>null</literal> (e.g.
-  <literal>{ ${null} = false; }</literal>), then that attribute is not
-  added to the set.</para></listitem>
+  <listitem>
+    <para><command>nix-env</command> now supports meta attributes with
+    more complex values, such as attribute sets.</para>
+  </listitem>
+
+  <listitem>
+    <para>The <option>-A</option> flag now allows attribute names with
+    dots in them, e.g.
+
+<screen>
+$ nix-instantiate --eval '&lt;nixos>' -A 'config.systemd.units."nscd.service".text'
+</screen>
+
+    </para>
+  </listitem>
+
+  <listitem>
+    <para>The <option>--max-freed</option> option to
+    <command>nix-store --gc</command> now accepts a unit
+    specifier. For example, <literal>nix-store --gc --max-freed
+    1G</literal> will free up to 1 gigabyte of disk space.</para>
+  </listitem>
+
+  <listitem>
+    <para>Nix now heuristically detects whether a build failure was
+    due to a disk-full condition. In that case, the build is not
+    flagged as “permanently failed”. This is mostly useful for Hydra,
+    which needs to distinguish between permanent and transient build
+    failures.</para>
+  </listitem>
+
+  <listitem>
+    <para>There is a new symbol <literal>__curPos</literal> that
+    expands to an attribute set containing its file name and line and
+    column numbers, e.g. <literal>{ file = "foo.nix"; line = 10;
+    column = 5; }</literal>.  There also is a new builtin function,
+    <varname>unsafeGetAttrPos</varname>, that returns the position of
+    an attribute.  This is used by Nixpkgs to provide location
+    information in error messages, e.g.
+
+<screen>
+$ nix-build '&lt;nixpkgs>' -A libreoffice --argstr system x86_64-darwin
+error: the package ‘libreoffice-4.0.5.2’ in ‘.../applications/office/libreoffice/default.nix:263’
+  is not supported on ‘x86_64-darwin’
+</screen>
+
+    </para>
+  </listitem>
+
+  <listitem>
+    <para>The garbage collector is now more concurrent with other Nix
+    processes because it releases certain locks earlier.</para>
+  </listitem>
+
+  <listitem>
+    <para>The binary tarball installer has been improved.  You can now
+    install Nix by running:
+
+<screen>
+$ bash &lt;(curl https://nixos.org/nix/install)
+</screen>
+
+    </para>
+  </listitem>
+
+  <listitem>
+    <para>The command <command>nix-setuid-helper</command> is
+    gone.</para>
+  </listitem>
+
+  <listitem>
+    <para>Nix no longer uses Automake, but instead has a
+    non-recursive, GNU Make-based build system.</para>
+  </listitem>
+
+  <listitem>
+    <para>All installed libraries now have the prefix
+    <literal>libnix</literal>.  In particular, this gets rid of
+    <literal>libutil</literal>, which could clash with libraries with
+    the same name from other packages.</para>
+  </listitem>
 
 </itemizedlist>
 
@@ -606,7 +808,7 @@ Friesdorf, Mats Erik Andersson and Shea Levy.</para>
     <para>When using the Nix daemon, the <option>-s</option> flag in
     <command>nix-env -qa</command> is now much faster.</para>
   </listitem>
-    
+
 </itemizedlist>
 
 </section>
@@ -636,7 +838,7 @@ previous release.  Here are the most significant:</para>
     <filename>/nix/var/nix/manifests</filename>, resulting in a
     significant speedup.</para>
   </listitem>
-    
+
   <listitem>
     <para>Nix now has an search path for expressions.  The search path
     is set using the environment variable <envar>NIX_PATH</envar> and
@@ -673,7 +875,7 @@ previous release.  Here are the most significant:</para>
     you can write <literal>{ "foo-1.2" = …; "bla bla" = …; }."bla
     bla"</literal>.</para>
   </listitem>
-    
+
   <listitem>
     <para>Attribute selection can now provide a default value using
     the <literal>or</literal> operator.  For instance, the expression
@@ -872,7 +1074,7 @@ features:</para>
 </programlisting>
 
     This is useful, for instance, in NixOS configuration files.</para>
-    
+
   </listitem>
 
   <listitem>
@@ -889,7 +1091,7 @@ features:</para>
     which causes <command>uname</command> to return
     <literal>i686</literal> in child processes.</para>
   </listitem>
-  
+
   <listitem>
     <para>Various improvements to the <literal>chroot</literal>
     support.  Building in a <literal>chroot</literal> works quite well
@@ -906,12 +1108,12 @@ features:</para>
   <listitem>
     <para>Support for large (> 4 GiB) files in NAR archives.</para>
   </listitem>
-    
+
   <listitem>
     <para>Various (performance) improvements to the remote build
     mechanism.</para>
   </listitem>
-    
+
   <listitem>
     <para>New primops: <varname>builtins.addErrorContext</varname> (to
     add a string to stack traces — useful for debugging),
@@ -1050,8 +1252,8 @@ the following derivations will be built:
 the following paths will be downloaded/copied (30.02 MiB):
   /nix/store/4m8pvgy2dcjgppf5b4cj5l6wyshjhalj-samba-3.2.4
   /nix/store/7h1kwcj29ip8vk26rhmx6bfjraxp0g4l-libunwind-0.98.6
-  ...</screen>      
-  
+  ...</screen>
+
   </para></listitem>
 
   <listitem><para>Language features:
@@ -1091,7 +1293,7 @@ the following paths will be downloaded/copied (30.02 MiB):
       division).
       <!-- <varname>builtins.genericClosure</varname> -->
       </para></listitem>
-      
+
     </itemizedlist>
 
   </para></listitem>
@@ -1162,7 +1364,7 @@ on Nix.  Here is an (incomplete) list:</para>
   <literal>nix-env -p /nix/var/nix/profiles/browser --set
   firefox</literal> lets the profile named
   <filename>browser</filename> contain just Firefox.</para></listitem>
-  
+
 
   <listitem><para><command>nix-env</command> now maintains
   meta-information about installed packages in profiles.  The
@@ -1171,7 +1373,7 @@ on Nix.  Here is an (incomplete) list:</para>
   <varname>homepage</varname>.  The command <literal>nix-env -q --xml
   --meta</literal> shows all meta-information.</para></listitem>
 
-  
+
   <listitem><para><command>nix-env</command> now uses the
   <varname>meta.priority</varname> attribute of derivations to resolve
   filename collisions between packages.  Lower priority values denote
@@ -1227,7 +1429,7 @@ on Nix.  Here is an (incomplete) list:</para>
 
   </para></listitem>
 
-  
+
   <listitem><para><command>nix-env -q</command> now has a flag
   <option>--prebuilt-only</option> (<option>-b</option>) that causes
   <command>nix-env</command> to show only those derivations whose
@@ -1238,7 +1440,7 @@ on Nix.  Here is an (incomplete) list:</para>
   <command>nix-env -i</command> and <command>nix-env -u</command> to
   filter out derivations for which no pre-built binary is
   available.</para></listitem>
-  
+
 
   <listitem><para>The new option <option>--argstr</option> (in
   <command>nix-env</command>, <command>nix-instantiate</command> and
@@ -1254,7 +1456,7 @@ on Nix.  Here is an (incomplete) list:</para>
   <parameter>paths</parameter> that shows the build log of the given
   paths.</para></listitem>
 
-  
+
   <!--
   <listitem><para>TODO: semantic cleanups of string concatenation
   etc. (mostly in r6740).</para></listitem>
@@ -1312,12 +1514,12 @@ on Nix.  Here is an (incomplete) list:</para>
   <literal>md5</literal>.  You can pass either a hexadecimal or a
   base-32 encoding of the hash.</para></listitem>
 
-  
+
   <listitem><para>Nix can now perform builds in an automatically
   generated “chroot”.  This prevents a builder from accessing stuff
   outside of the Nix store, and thus helps ensure purity.  This is an
   experimental feature.</para></listitem>
-  
+
 
   <listitem><para>The new command <command>nix-store
   --optimise</command> reduces Nix store disk space usage by finding
@@ -1325,7 +1527,7 @@ on Nix.  Here is an (incomplete) list:</para>
   It typically reduces the size of the store by something like
   25-35%.</para></listitem>
 
-  
+
   <listitem><para><filename>~/.nix-defexpr</filename> can now be a
   directory, in which case the Nix expressions in that directory are
   combined into an attribute set, with the file names used as the
@@ -1411,10 +1613,10 @@ irreversible.</para></warning>
 
 <itemizedlist>
 
-  
+
   <!-- Usability / features -->
 
-  
+
   <listitem><para><command>nix-env</command> usability improvements:
 
     <itemizedlist>
@@ -1450,9 +1652,9 @@ irreversible.</para></warning>
       most packages in Nixpkgs don’t have yet).</para></listitem>
 
     </itemizedlist>
-  
+
   </para></listitem>
-  
+
 
   <listitem><para>New language features:
 
@@ -1475,7 +1677,7 @@ irreversible.</para></warning>
       You can write arbitrary expressions within
       <literal>${<replaceable>...</replaceable>}</literal>, not just
       identifiers.</para></listitem>
-      
+
       <listitem><para>Multi-line string literals.</para></listitem>
 
       <listitem><para>String concatenations can now involve
@@ -1517,7 +1719,7 @@ irreversible.</para></warning>
   Very convenient whenever you have some package on your machine and
   you want to copy it somewhere else.</para></listitem>
 
-  
+
   <listitem><para>XML support:
 
     <itemizedlist>
@@ -1540,7 +1742,7 @@ irreversible.</para></warning>
     </itemizedlist>
 
   </para></listitem>
-  
+
 
   <listitem><para>You can now unambiguously specify which derivation to
   build or install in <command>nix-env</command>,
@@ -1554,7 +1756,7 @@ irreversible.</para></warning>
   <replaceable>foo</replaceable></literal>.  <literal>nix-env -q
   --attr</literal> shows the attribute names corresponding to each
   derivation.</para></listitem>
-  
+
 
   <listitem><para>If the top-level Nix expression used by
   <command>nix-env</command>, <command>nix-instantiate</command> or
@@ -1565,7 +1767,7 @@ irreversible.</para></warning>
   <replaceable>value</replaceable></option> can be used to specify
   function arguments on the command line.</para></listitem>
 
-  
+
   <listitem><para><literal>nix-install-package --url
   <replaceable>URL</replaceable></literal> allows a package to be
   installed directly from the given URL.</para></listitem>
@@ -1611,7 +1813,7 @@ irreversible.</para></warning>
 
   </para></listitem>
 
-  
+
   <listitem><para>Garbage collector improvements:
 
     <itemizedlist>
@@ -1643,12 +1845,12 @@ irreversible.</para></warning>
       from the Nix store.  It won’t delete reachable (non-garbage)
       paths unless <option>--ignore-liveness</option> is
       specified.</para></listitem>
-      
+
     </itemizedlist>
 
   </para></listitem>
 
-  
+
   <listitem><para>Berkeley DB 4.4’s process registry feature is used
   to recover from crashed Nix processes.</para></listitem>
 
@@ -1814,7 +2016,7 @@ svnService = derivation {
 };</programlisting>
 
   Previously, this would yield a black hole (infinite recursion).</para>
-  
+
   </listitem>
 
   <listitem><para><command>nix-build</command> now defaults to using
@@ -1956,7 +2158,7 @@ $ nix-store -q --referrers-closure \
     /nix/store/8lz9yc6zgmc0vlqmn2ipcpkjlmbi51vv-glibc-2.3.4</screen>
 
   </para>
-  
+
   </listitem>
 
   <listitem><para>The concept of fixed-output derivations has been
@@ -2220,7 +2422,7 @@ $ nix-env -f .../i686-linux.nix -i -E 'x: x.firefoxWrapper'</screen>
       columnised).</para></listitem>
 
     </itemizedlist>
-    
+
     </para>
 
   </listitem>
@@ -2234,7 +2436,7 @@ $ nix-env -f .../i686-linux.nix -i -E 'x: x.firefoxWrapper'</screen>
     <para>Nix expression language changes:
 
     <itemizedlist>
-      
+
       <listitem><para>New language construct: <literal>with
       <replaceable>E1</replaceable>;
       <replaceable>E2</replaceable></literal> brings all attributes
