@@ -1,7 +1,7 @@
 /* This is the implementation of the ‘derivation’ builtin function.
    It's actually a wrapper around the ‘derivationStrict’ primop. */
 
-drvAttrs @ { outputs ? [ "out" ], ... }:
+drvAttrs @ { outputs ? [ "out" ], __ignoreNulls ? false, ... }:
 
 let
 
@@ -22,6 +22,8 @@ let
       };
     };
 
-  outputsList = map outputToAttrListElement outputs;
+  outputsList = map outputToAttrListElement (
+    if __ignoreNulls && (outputs == null) then [ "out" ] else outputs
+  );
 
 in (builtins.head outputsList).value
