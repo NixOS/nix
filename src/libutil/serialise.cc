@@ -13,7 +13,7 @@ BufferedSink::~BufferedSink()
     /* We can't call flush() here, because C++ for some insane reason
        doesn't allow you to call virtual methods from a destructor. */
     assert(!bufPos);
-    if (buffer) delete[] buffer;
+    delete[] buffer;
 }
 
     
@@ -71,7 +71,7 @@ void Source::operator () (unsigned char * data, size_t len)
 
 BufferedSource::~BufferedSource()
 {
-    if (buffer) delete[] buffer;
+    delete[] buffer;
 }
 
 
