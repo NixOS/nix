@@ -784,6 +784,7 @@ $ nix-env --set-flag priority 10 gcc</screen>
   <sbr />
 
   <arg><option>--xml</option></arg>
+  <arg><option>--json</option></arg>
   <arg>
     <group choice='req'>
       <arg choice='plain'><option>--prebuilt-only</option></arg>
@@ -874,6 +875,13 @@ user environment elements, etc. -->
     derivation.  The fields discussed below are all stored in
     attributes of the <literal>item</literal>
     elements.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--json</option></term>
+
+    <listitem><para>Print the result in a JSON representation suitable
+    for automatic processing by other tools.</para></listitem>
 
   </varlistentry>
 
