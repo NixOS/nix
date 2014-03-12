@@ -33,8 +33,7 @@ Makefile.config
 /doc/manual/*.8
 /doc/manual/images
 /doc/manual/version.txt
-/doc/manual/NEWS.html
-/doc/manual/NEWS.txt
+/doc/manual/release-notes.html
 
 # /scripts/
 /scripts/nix-profile.sh

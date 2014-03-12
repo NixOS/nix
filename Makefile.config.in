@@ -29,5 +29,6 @@ pkglibdir = $(libdir)/$(PACKAGE_NAME)
 prefix = @prefix@
 storedir = @storedir@
 sysconfdir = @sysconfdir@
+w3m = @w3m@
 xmllint = @xmllint@
 xsltproc = @xsltproc@

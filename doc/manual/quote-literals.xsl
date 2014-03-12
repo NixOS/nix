@@ -7,9 +7,9 @@
   extension-element-prefixes="str">
 
   <xsl:output method="xml"/>
-  
+
   <xsl:template match="function|command|literal|varname|filename|option|quote">`<xsl:apply-templates/>'</xsl:template>
-  
+
   <xsl:template match="token"><xsl:text>    </xsl:text><xsl:apply-templates /><xsl:text>
 </xsl:text></xsl:template>
 
@@ -21,7 +21,7 @@
     <section>
       <xsl:apply-templates />
       <screen><xsl:text>
-      </xsl:text></screen>        
+      </xsl:text></screen>
     </section>
   </xsl:template>
 
@@ -37,8 +37,4 @@
     </xsl:element>
   </xsl:template>
 
-  <xsl:template match="text()">
-    <xsl:value-of select="translate(., '‘’“”—', concat(&quot;`'&quot;, '&quot;&quot;-'))" />
-  </xsl:template>
-  
 </xsl:stylesheet>
