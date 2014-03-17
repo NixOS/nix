@@ -537,10 +537,10 @@ static void performOp(bool trusted, unsigned int clientVersion,
     case wopSetOptions: {
         settings.keepFailed = readInt(from) != 0;
         settings.keepGoing = readInt(from) != 0;
-        settings.tryFallback = readInt(from) != 0;
+        settings.set("build-fallback", readInt(from) ? "true" : "false");
         verbosity = (Verbosity) readInt(from);
-        settings.maxBuildJobs = readInt(from);
-        settings.maxSilentTime = readInt(from);
+        settings.set("build-max-jobs", int2String(readInt(from)));
+        settings.set("build-max-silent-time", int2String(readInt(from)));
         if (GET_PROTOCOL_MINOR(clientVersion) >= 2)
             settings.useBuildHook = readInt(from) != 0;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 4) {
@@ -549,9 +549,9 @@ static void performOp(bool trusted, unsigned int clientVersion,
             settings.printBuildTrace = readInt(from) != 0;
         }
         if (GET_PROTOCOL_MINOR(clientVersion) >= 6)
-            settings.buildCores = readInt(from);
+            settings.set("build-cores", int2String(readInt(from)));
         if (GET_PROTOCOL_MINOR(clientVersion) >= 10)
-            settings.useSubstitutes = readInt(from) != 0;
+            settings.set("build-use-substitutes", readInt(from) ? "true" : "false");
         if (GET_PROTOCOL_MINOR(clientVersion) >= 12) {
             unsigned int n = readInt(from);
             for (unsigned int i = 0; i < n; i++) {
@@ -562,8 +562,8 @@ static void performOp(bool trusted, unsigned int clientVersion,
                 else
                     settings.set(trusted ? name : "untrusted-" + name, value);
             }
-            settings.update();
         }
+        settings.update();
         startWork();
         stopWork();
         break;
