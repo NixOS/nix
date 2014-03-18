@@ -294,14 +294,14 @@ static void performOp(bool trusted, unsigned int clientVersion,
 #endif
 
     case wopIsValidPath: {
-	/* 'readStorePath' could raise an error leading to the connection
-	   being closed.  To be able to recover from an invalid path error,
-	   call 'startWork' early, and do 'assertStorePath' afterwards so
-	   that the 'Error' exception handler doesn't close the
-	   connection.  */
+        /* 'readStorePath' could raise an error leading to the connection
+           being closed.  To be able to recover from an invalid path error,
+           call 'startWork' early, and do 'assertStorePath' afterwards so
+           that the 'Error' exception handler doesn't close the
+           connection.  */
         Path path = readString(from);
         startWork();
-	assertStorePath(path);
+        assertStorePath(path);
         bool result = store->isValidPath(path);
         stopWork();
         writeInt(result, to);
