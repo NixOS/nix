@@ -2020,7 +2020,10 @@ void DerivationGoal::initChild()
                 createDirs(chrootRootDir + "/dev/pts");
                 Strings ss;
                 ss.push_back("/dev/full");
-                ss.push_back("/dev/kvm");
+#ifdef __linux__
+                if (pathExists("/dev/kvm"))
+                    ss.push_back("/dev/kvm");
+#endif
                 ss.push_back("/dev/null");
                 ss.push_back("/dev/random");
                 ss.push_back("/dev/tty");
