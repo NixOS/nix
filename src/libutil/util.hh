@@ -125,11 +125,11 @@ private:
 public:
     Nest();
     ~Nest();
-    void open(Verbosity level, const format & f);
+    void open(Verbosity level, const FormatOrString & fs);
     void close();
 };
 
-void printMsg_(Verbosity level, const format & f);
+void printMsg_(Verbosity level, const FormatOrString & fs);
 
 #define startNest(varName, level, f) \
     Nest varName; \
@@ -146,7 +146,7 @@ void printMsg_(Verbosity level, const format & f);
 
 #define debug(f) printMsg(lvlDebug, f)
 
-void warnOnce(bool & haveWarned, const format & f);
+void warnOnce(bool & haveWarned, const FormatOrString & fs);
 
 void writeToStderr(const string & s);
 

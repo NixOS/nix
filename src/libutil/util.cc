@@ -25,22 +25,22 @@ extern char * * environ;
 namespace nix {
 
 
-BaseError::BaseError(const format & f, unsigned int status)
+BaseError::BaseError(const FormatOrString & fs, unsigned int status)
     : status(status)
 {
-    err = f.str();
+    err = fs.s;
 }
 
 
-BaseError & BaseError::addPrefix(const format & f)
+BaseError & BaseError::addPrefix(const FormatOrString & fs)
 {
-    prefix_ = f.str() + prefix_;
+    prefix_ = fs.s + prefix_;
     return *this;
 }
 
 
-SysError::SysError(const format & f)
-    : Error(format("%1%: %2%") % f.str() % strerror(errno))
+SysError::SysError(const FormatOrString & fs)
+    : Error(format("%1%: %2%") % fs.s % strerror(errno))
     , errNo(errno)
 {
 }
@@ -417,14 +417,14 @@ static string escVerbosity(Verbosity level)
 }
 
 
-void Nest::open(Verbosity level, const format & f)
+void Nest::open(Verbosity level, const FormatOrString & fs)
 {
     if (level <= verbosity) {
         if (logType == ltEscapes)
             std::cerr << "\033[" << escVerbosity(level) << "p"
-                      << f.str() << "\n";
+                      << fs.s << "\n";
         else
-            printMsg_(level, f);
+            printMsg_(level, fs);
         nest = true;
         nestingLevel++;
     }
@@ -442,7 +442,7 @@ void Nest::close()
 }
 
 
-void printMsg_(Verbosity level, const format & f)
+void printMsg_(Verbosity level, const FormatOrString & fs)
 {
     checkInterrupt();
     if (level > verbosity) return;
@@ -452,15 +452,15 @@ void printMsg_(Verbosity level, const format & f)
             prefix += "|   ";
     else if (logType == ltEscapes && level != lvlInfo)
         prefix = "\033[" + escVerbosity(level) + "s";
-    string s = (format("%1%%2%\n") % prefix % f.str()).str();
+    string s = (format("%1%%2%\n") % prefix % fs.s).str();
     writeToStderr(s);
 }
 
 
-void warnOnce(bool & haveWarned, const format & f)
+void warnOnce(bool & haveWarned, const FormatOrString & fs)
 {
     if (!haveWarned) {
-        printMsg(lvlError, format("warning: %1%") % f.str());
+        printMsg(lvlError, format("warning: %1%") % fs.s);
         haveWarned = true;
     }
 }
