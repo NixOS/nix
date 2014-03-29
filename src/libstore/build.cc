@@ -413,6 +413,7 @@ static void restoreSIGPIPE()
     struct sigaction act, oact;
     act.sa_handler = SIG_DFL;
     act.sa_flags = 0;
+    sigemptyset(&act.sa_mask);
     if (sigaction(SIGPIPE, &act, &oact)) throw SysError("resetting SIGPIPE");
 }
 

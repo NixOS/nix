@@ -110,7 +110,7 @@ static void initAndRun(int argc, char * * argv)
     /* Catch SIGINT. */
     struct sigaction act;
     act.sa_handler = sigintHandler;
-    sigfillset(&act.sa_mask);
+    sigemptyset(&act.sa_mask);
     act.sa_flags = 0;
     if (sigaction(SIGINT, &act, 0))
         throw SysError("installing handler for SIGINT");
