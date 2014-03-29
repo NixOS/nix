@@ -12,9 +12,6 @@
 #include <map>
 #include <sstream>
 #include <algorithm>
-#include <boost/shared_ptr.hpp>
-#include <boost/weak_ptr.hpp>
-#include <boost/enable_shared_from_this.hpp>
 
 #include <time.h>
 #include <sys/time.h>
@@ -84,19 +81,19 @@ struct HookInstance;
 
 /* A pointer to a goal. */
 class Goal;
-typedef boost::shared_ptr<Goal> GoalPtr;
-typedef boost::weak_ptr<Goal> WeakGoalPtr;
+typedef std::shared_ptr<Goal> GoalPtr;
+typedef std::weak_ptr<Goal> WeakGoalPtr;
 
 /* Set of goals. */
 typedef set<GoalPtr> Goals;
-typedef set<WeakGoalPtr> WeakGoals;
+typedef list<WeakGoalPtr> WeakGoals;
 
 /* A map of paths to goals (and the other way around). */
 typedef map<Path, WeakGoalPtr> WeakGoalMap;
 
 
 
-class Goal : public boost::enable_shared_from_this<Goal>
+class Goal : public std::enable_shared_from_this<Goal>
 {
 public:
     typedef enum {ecBusy, ecSuccess, ecFailed, ecNoSubstituters, ecIncompleteClosure} ExitCode;
@@ -242,7 +239,7 @@ public:
 
     LocalStore & store;
 
-    boost::shared_ptr<HookInstance> hook;
+    std::shared_ptr<HookInstance> hook;
 
     Worker(LocalStore & store);
     ~Worker();
@@ -300,10 +297,19 @@ public:
 //////////////////////////////////////////////////////////////////////
 
 
+void addToWeakGoals(WeakGoals & goals, GoalPtr p)
+{
+    // FIXME: necessary?
+    foreach (WeakGoals::iterator, i, goals)
+        if (i->lock() == p) return;
+    goals.push_back(p);
+}
+
+
 void Goal::addWaitee(GoalPtr waitee)
 {
     waitees.insert(waitee);
-    waitee->waiters.insert(shared_from_this());
+    addToWeakGoals(waitee->waiters, shared_from_this());
 }
 
 
@@ -329,7 +335,7 @@ void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
             GoalPtr goal = *i;
             WeakGoals waiters2;
             foreach (WeakGoals::iterator, j, goal->waiters)
-                if (j->lock() != shared_from_this()) waiters2.insert(*j);
+                if (j->lock() != shared_from_this()) waiters2.push_back(*j);
             goal->waiters = waiters2;
         }
         waitees.clear();
@@ -735,7 +741,7 @@ private:
     Pipe builderOut;
 
     /* The build hook. */
-    boost::shared_ptr<HookInstance> hook;
+    std::shared_ptr<HookInstance> hook;
 
     /* Whether we're currently doing a chroot build. */
     bool useChroot;
@@ -743,7 +749,7 @@ private:
     Path chrootRootDir;
 
     /* RAII object to delete the chroot directory. */
-    boost::shared_ptr<AutoDelete> autoDelChroot;
+    std::shared_ptr<AutoDelete> autoDelChroot;
 
     /* All inputs that are regular files. */
     PathSet regularInputPaths;
@@ -1512,7 +1518,7 @@ HookReply DerivationGoal::tryBuildHook()
     if (!settings.useBuildHook || getEnv("NIX_BUILD_HOOK") == "") return rpDecline;
 
     if (!worker.hook)
-        worker.hook = boost::shared_ptr<HookInstance>(new HookInstance);
+        worker.hook = std::shared_ptr<HookInstance>(new HookInstance);
 
     /* Tell the hook about system features (beyond the system type)
        required from the build machine.  (The hook could parse the
@@ -1784,7 +1790,7 @@ void DerivationGoal::startBuilder()
         if (pathExists(chrootRootDir)) deletePath(chrootRootDir);
 
         /* Clean up the chroot directory automatically. */
-        autoDelChroot = boost::shared_ptr<AutoDelete>(new AutoDelete(chrootRootDir));
+        autoDelChroot = std::shared_ptr<AutoDelete>(new AutoDelete(chrootRootDir));
 
         printMsg(lvlChatty, format("setting up chroot environment in `%1%'") % chrootRootDir);
 
@@ -2557,7 +2563,7 @@ private:
     Pid pid;
 
     /* Lock on the store path. */
-    boost::shared_ptr<PathLocks> outputLock;
+    std::shared_ptr<PathLocks> outputLock;
 
     /* Whether to try to repair a valid path. */
     bool repair;
@@ -2734,7 +2740,7 @@ void SubstitutionGoal::tryToRun()
     }
 
     /* Acquire a lock on the output path. */
-    outputLock = boost::shared_ptr<PathLocks>(new PathLocks);
+    outputLock = std::shared_ptr<PathLocks>(new PathLocks);
     if (!outputLock->lockPaths(singleton<PathSet>(storePath), "", false)) {
         worker.waitForAWhile(shared_from_this());
         return;
@@ -3012,7 +3018,7 @@ void Worker::removeGoal(GoalPtr goal)
 void Worker::wakeUp(GoalPtr goal)
 {
     goal->trace("woken up");
-    awake.insert(goal);
+    addToWeakGoals(awake, goal);
 }
 
 
@@ -3070,21 +3076,21 @@ void Worker::waitForBuildSlot(GoalPtr goal)
     if (getNrLocalBuilds() < settings.maxBuildJobs)
         wakeUp(goal); /* we can do it right away */
     else
-        wantingToBuild.insert(goal);
+        addToWeakGoals(wantingToBuild, goal);
 }
 
 
 void Worker::waitForAnyGoal(GoalPtr goal)
 {
     debug("wait for any goal");
-    waitingForAnyGoal.insert(goal);
+    addToWeakGoals(waitingForAnyGoal, goal);
 }
 
 
 void Worker::waitForAWhile(GoalPtr goal)
 {
     debug("wait for a while");
-    waitingForAWhile.insert(goal);
+    addToWeakGoals(waitingForAWhile, goal);
 }
 
 

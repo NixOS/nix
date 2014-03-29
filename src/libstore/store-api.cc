@@ -316,15 +316,15 @@ void exportPaths(StoreAPI & store, const Paths & paths,
 namespace nix {
 
 
-boost::shared_ptr<StoreAPI> store;
+std::shared_ptr<StoreAPI> store;
 
 
-boost::shared_ptr<StoreAPI> openStore(bool reserveSpace)
+std::shared_ptr<StoreAPI> openStore(bool reserveSpace)
 {
     if (getEnv("NIX_REMOTE") == "")
-        return boost::shared_ptr<StoreAPI>(new LocalStore(reserveSpace));
+        return std::shared_ptr<StoreAPI>(new LocalStore(reserveSpace));
     else
-        return boost::shared_ptr<StoreAPI>(new RemoteStore());
+        return std::shared_ptr<StoreAPI>(new RemoteStore());
 }
 
 

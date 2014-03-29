@@ -6,6 +6,7 @@
 #include "globals.hh"
 #include "eval-inline.hh"
 
+#include <algorithm>
 #include <cstring>
 #include <unistd.h>
 #include <sys/time.h>

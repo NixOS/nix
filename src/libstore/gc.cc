@@ -2,8 +2,6 @@
 #include "misc.hh"
 #include "local-store.hh"
 
-#include <boost/shared_ptr.hpp>
-
 #include <functional>
 #include <queue>
 #include <algorithm>
@@ -224,7 +222,7 @@ struct RemoveTempRoots
 static RemoveTempRoots autoRemoveTempRoots __attribute__((unused));
 
 
-typedef boost::shared_ptr<AutoCloseFD> FDPtr;
+typedef std::shared_ptr<AutoCloseFD> FDPtr;
 typedef list<FDPtr> FDs;
 
 

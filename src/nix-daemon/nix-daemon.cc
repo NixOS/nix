@@ -702,7 +702,7 @@ static void processConnection(bool trusted)
 #endif
 
         /* Open the store. */
-        store = boost::shared_ptr<StoreAPI>(new LocalStore(reserveSpace));
+        store = std::shared_ptr<StoreAPI>(new LocalStore(reserveSpace));
 
         stopWork();
         to.flush();

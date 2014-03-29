@@ -20,6 +20,8 @@ makefiles = \
   doc/manual/local.mk \
   tests/local.mk
 
+GLOBAL_CXXFLAGS += -std=c++0x
+
 include Makefile.config
 
 include mk/lib.mk

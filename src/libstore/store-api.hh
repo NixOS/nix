@@ -5,8 +5,7 @@
 
 #include <string>
 #include <map>
-
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 
 namespace nix {
@@ -337,12 +336,12 @@ Paths topoSortPaths(StoreAPI & store, const PathSet & paths);
 
 /* For now, there is a single global store API object, but we'll
    purify that in the future. */
-extern boost::shared_ptr<StoreAPI> store;
+extern std::shared_ptr<StoreAPI> store;
 
 
 /* Factory method: open the Nix database, either through the local or
    remote implementation. */
-boost::shared_ptr<StoreAPI> openStore(bool reserveSpace = true);
+std::shared_ptr<StoreAPI> openStore(bool reserveSpace = true);
 
 
 /* Display a set of paths in human-readable form (i.e., between quotes
