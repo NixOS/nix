@@ -5,8 +5,6 @@
 #include <string>
 #include <map>
 
-#include <boost/shared_ptr.hpp>
-
 
 namespace nix {
 
