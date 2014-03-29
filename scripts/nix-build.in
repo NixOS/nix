@@ -196,6 +196,7 @@ foreach my $expr (@exprs) {
     if ($runEnv) {
         die "$0: a single derivation is required\n" if scalar @drvPaths != 1;
         my $drvPath = $drvPaths[0];
+        $drvPath = (split '!',$drvPath)[0];
         $drvPath = readlink $drvPath or die "cannot read symlink `$drvPath'" if -l $drvPath;
         my $drv = derivationFromPath($drvPath);
 
