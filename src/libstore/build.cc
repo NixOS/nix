@@ -3229,13 +3229,14 @@ void Worker::waitForInput()
                     printMsg(lvlVomit, format("%1%: read %2% bytes")
                         % goal->getName() % rd);
                     string data((char *) buffer, rd);
-                    goal->handleChildOutput(*k, data);
                     j->second.lastOutput = after;
+                    goal->handleChildOutput(*k, data);
                 }
             }
         }
 
-        if (settings.maxSilentTime != 0 &&
+        if (goal->getExitCode() == Goal::ecBusy &&
+            settings.maxSilentTime != 0 &&
             j->second.respectTimeouts &&
             after - j->second.lastOutput >= (time_t) settings.maxSilentTime)
         {
@@ -3245,7 +3246,8 @@ void Worker::waitForInput()
             goal->cancel(true);
         }
 
-        if (settings.buildTimeout != 0 &&
+        else if (goal->getExitCode() == Goal::ecBusy &&
+            settings.buildTimeout != 0 &&
             j->second.respectTimeouts &&
             after - j->second.timeStarted >= (time_t) settings.buildTimeout)
         {
