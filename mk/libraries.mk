@@ -17,6 +17,8 @@ endif
 #
 # - $(1)_SOURCES: the source files of the library.
 #
+# - $(1)_CFLAGS: additional C compiler flags.
+#
 # - $(1)_CXXFLAGS: additional C++ compiler flags.
 #
 # - $(1)_LIBS: the symbolic names of other libraries on which this
@@ -64,10 +66,14 @@ define build-library
       endif
     endif
 
+    ifneq ($(OS), Darwin)
+      $(1)_LDFLAGS += -Wl,-soname=$$($(1)_NAME).$(SO_EXT)
+    endif
+
     $(1)_PATH := $$(_d)/$$($(1)_NAME).$(SO_EXT)
 
-    $$($(1)_PATH): $$($(1)_OBJS) $$(_libs) | $$(_d)
-	$$(trace-ld) $(CXX) -o $$@ -shared $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
+    $$($(1)_PATH): $$($(1)_OBJS) $$(_libs) | $$(_d)/
+	$$(trace-ld) $(CXX) -o $$@ -shared $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
 
     $(1)_LDFLAGS_USE += -L$$(_d) -Wl,-rpath,$$(abspath $$(_d)) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
 
@@ -77,10 +83,13 @@ define build-library
 
     $$(eval $$(call create-dir, $$($(1)_INSTALL_DIR)))
 
-    $$($(1)_INSTALL_PATH): $$($(1)_OBJS) $$(_libs_final) | $(DESTDIR)$$($(1)_INSTALL_DIR)
-	$$(trace-ld) $(CXX) -o $$@ -shared $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
+    $$($(1)_INSTALL_PATH): $$($(1)_OBJS) $$(_libs_final) | $(DESTDIR)$$($(1)_INSTALL_DIR)/
+	$$(trace-ld) $(CXX) -o $$@ -shared $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
 
-    $(1)_LDFLAGS_USE_INSTALLED += -L$$(DESTDIR)$$($(1)_INSTALL_DIR) -Wl,-rpath,$$($(1)_INSTALL_DIR) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
+    $(1)_LDFLAGS_USE_INSTALLED += -L$$(DESTDIR)$$($(1)_INSTALL_DIR) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
+    ifeq ($(SET_RPATH_TO_LIBS), 1)
+      $(1)_LDFLAGS_USE_INSTALLED += -Wl,-rpath,$$($(1)_INSTALL_DIR)
+    endif
 
     ifdef $(1)_FORCE_INSTALL
       install: $$($(1)_INSTALL_PATH)
@@ -90,7 +99,7 @@ define build-library
 
     $(1)_PATH := $$(_d)/$$($(1)_NAME).a
 
-    $$($(1)_PATH): $$($(1)_OBJS) | $$(_d)
+    $$($(1)_PATH): $$($(1)_OBJS) | $$(_d)/
 	$(trace-ar) ar crs $$@ $$?
 
     $(1)_LDFLAGS_USE += $$($(1)_PATH) $$($(1)_LDFLAGS)
@@ -102,11 +111,12 @@ define build-library
   $(1)_LDFLAGS_USE += $$($(1)_LDFLAGS_PROPAGATED)
   $(1)_LDFLAGS_USE_INSTALLED += $$($(1)_LDFLAGS_PROPAGATED)
 
-  # Propagate CXXFLAGS to the individual object files.
+  # Propagate CFLAGS and CXXFLAGS to the individual object files.
+  $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj)_CFLAGS=$$($(1)_CFLAGS)))
   $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj)_CXXFLAGS=$$($(1)_CXXFLAGS)))
 
   # Make each object file depend on the common dependencies.
-  $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj): $$($(1)_COMMON_DEPS)))
+  $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj): $$($(1)_COMMON_DEPS) $$(GLOBAL_COMMON_DEPS)))
 
   # Include .dep files, if they exist.
   $(1)_DEPS := $$(foreach fn, $$($(1)_OBJS), $$(call filename-to-dep, $$(fn)))

@@ -8,6 +8,10 @@ programs-list :=
 #
 # - $(1)_SOURCES: the source files of the program.
 #
+# - $(1)_CFLAGS: additional C compiler flags.
+#
+# - $(1)_CXXFLAGS: additional C++ compiler flags.
+#
 # - $(1)_LIBS: the symbolic names of libraries on which this program
 #   depends.
 #
@@ -24,8 +28,8 @@ define build-program
 
   $$(eval $$(call create-dir, $$(_d)))
 
-  $$($(1)_PATH): $$($(1)_OBJS) $$(_libs) | $$(_d)
-	$$(trace-ld) $(CXX) -o $$@ $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
+  $$($(1)_PATH): $$($(1)_OBJS) $$(_libs) | $$(_d)/
+	$$(trace-ld) $(CXX) -o $$@ $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
 
   $(1)_INSTALL_DIR ?= $$(bindir)
   $(1)_INSTALL_PATH := $$($(1)_INSTALL_DIR)/$(1)
@@ -38,21 +42,22 @@ define build-program
 
     _libs_final := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_INSTALL_PATH))
 
-    $(DESTDIR)$$($(1)_INSTALL_PATH): $$($(1)_OBJS) $$(_libs_final) | $(DESTDIR)$$($(1)_INSTALL_DIR)
-	$$(trace-ld) $(CXX) -o $$@ $(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
+    $(DESTDIR)$$($(1)_INSTALL_PATH): $$($(1)_OBJS) $$(_libs_final) | $(DESTDIR)$$($(1)_INSTALL_DIR)/
+	$$(trace-ld) $(CXX) -o $$@ $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
 
   else
 
-    $(DESTDIR)$$($(1)_INSTALL_PATH): $$($(1)_PATH) | $(DESTDIR)$$($(1)_INSTALL_DIR)
+    $(DESTDIR)$$($(1)_INSTALL_PATH): $$($(1)_PATH) | $(DESTDIR)$$($(1)_INSTALL_DIR)/
 	install -t $$($(1)_INSTALL_DIR) $$<
 
   endif
 
-  # Propagate CXXFLAGS to the individual object files.
+  # Propagate CFLAGS and CXXFLAGS to the individual object files.
+  $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj)_CFLAGS=$$($(1)_CFLAGS)))
   $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj)_CXXFLAGS=$$($(1)_CXXFLAGS)))
 
   # Make each object file depend on the common dependencies.
-  $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj): $$($(1)_COMMON_DEPS)))
+  $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj): $$($(1)_COMMON_DEPS) $$(GLOBAL_COMMON_DEPS)))
 
   # Include .dep files, if they exist.
   $(1)_DEPS := $$(foreach fn, $$($(1)_OBJS), $$(call filename-to-dep, $$(fn)))
