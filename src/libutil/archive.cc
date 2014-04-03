@@ -104,7 +104,7 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
         writeString(readLink(path), sink);
     }
 
-    else throw Error(format("file `%1%' has an unknown type") % path);
+    else throw Error(format("file `%1%' has an unsupported type") % path);
 
     writeString(")", sink);
 }
