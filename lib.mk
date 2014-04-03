@@ -32,7 +32,9 @@ ifeq ($(BUILD_SHARED_LIBS), 1)
   GLOBAL_CFLAGS += -fPIC
   GLOBAL_CXXFLAGS += -fPIC
   ifneq ($(OS), Darwin)
+   ifneq ($(OS), SunOS)
     GLOBAL_LDFLAGS += -Wl,--no-copy-dt-needed-entries
+   endif
   endif
   SET_RPATH_TO_LIBS ?= 1
 endif
