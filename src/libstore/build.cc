@@ -13,6 +13,7 @@
 #include <sstream>
 #include <algorithm>
 
+#include <limits.h>
 #include <time.h>
 #include <sys/time.h>
 #include <sys/wait.h>
