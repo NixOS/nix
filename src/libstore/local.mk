@@ -10,6 +10,10 @@ libstore_LIBS = libutil libformat
 
 libstore_LDFLAGS = -lsqlite3 -lbz2
 
+ifeq ($(OS), SunOS)
+	libstore_LDFLAGS += -lsocket
+endif
+
 libstore_CXXFLAGS = \
  -DNIX_STORE_DIR=\"$(storedir)\" \
  -DNIX_DATA_DIR=\"$(datadir)\" \
