@@ -736,7 +736,7 @@ unsigned long nrLookups = 0;
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 {
     Value vTmp;
-    Pos * pos = 0;
+    Pos * pos2 = 0;
     Value * vAttrs = &vTmp;
 
     e->eval(state, env, vTmp);
@@ -756,21 +756,21 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                     return;
                 }
             } else {
-                state.forceAttrs(*vAttrs);
+                state.forceAttrs(*vAttrs, pos);
                 if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
-                    throwEvalError("attribute `%1%' missing", showAttrPath(attrPath));
+                    throwEvalError("attribute `%1%' missing, at %2%", showAttrPath(attrPath), pos);
             }
             vAttrs = j->value;
-            pos = j->pos;
-            if (state.countCalls && pos) state.attrSelects[*pos]++;
+            pos2 = j->pos;
+            if (state.countCalls && pos2) state.attrSelects[*pos2]++;
         }
 
         state.forceValue(*vAttrs);
 
     } catch (Error & e) {
-        if (pos && pos->file != state.sDerivationNix)
+        if (pos2 && pos2->file != state.sDerivationNix)
             addErrorPrefix(e, "while evaluating the attribute `%1%' at %2%:\n",
-                showAttrPath(attrPath), *pos);
+                showAttrPath(attrPath), *pos2);
         throw;
     }
 

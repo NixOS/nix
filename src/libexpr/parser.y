@@ -361,9 +361,9 @@ expr_app
 
 expr_select
   : expr_simple '.' attrpath
-    { $$ = new ExprSelect($1, *$3, 0); }
+    { $$ = new ExprSelect(CUR_POS, $1, *$3, 0); }
   | expr_simple '.' attrpath OR_KW expr_select
-    { $$ = new ExprSelect($1, *$3, $5); }
+    { $$ = new ExprSelect(CUR_POS, $1, *$3, $5); }
   | /* Backwards compatibility: because Nixpkgs has a rarely used
        function named ‘or’, allow stuff like ‘map or [...]’. */
     expr_simple OR_KW
@@ -403,7 +403,7 @@ expr_simple
   /* Let expressions `let {..., body = ...}' are just desugared
      into `(rec {..., body = ...}).body'. */
   | LET '{' binds '}'
-    { $3->recursive = true; $$ = new ExprSelect($3, data->symbols.create("body")); }
+    { $3->recursive = true; $$ = new ExprSelect(noPos, $3, data->symbols.create("body")); }
   | REC '{' binds '}'
     { $3->recursive = true; $$ = $3; }
   | '{' binds '}'
@@ -458,7 +458,7 @@ binds
       foreach (AttrPath::iterator, i, *$6) {
           if ($$->attrs.find(i->symbol) != $$->attrs.end())
               dupAttr(i->symbol, makeCurPos(@6, data), $$->attrs[i->symbol].pos);
-          $$->attrs[i->symbol] = ExprAttrs::AttrDef(new ExprSelect($4, i->symbol), makeCurPos(@6, data));
+          $$->attrs[i->symbol] = ExprAttrs::AttrDef(new ExprSelect(CUR_POS, $4, i->symbol), makeCurPos(@6, data));
       }
     }
   | { $$ = new ExprAttrs; }
