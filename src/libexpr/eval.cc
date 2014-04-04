@@ -794,7 +794,7 @@ void ExprApp::eval(EvalState & state, Env & env, Value & v)
 }
 
 
-void EvalState::callPrimOp(Value & fun, Value & arg, Value & v)
+void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
 {
     /* Figure out the number of arguments still needed. */
     unsigned int argsDone = 0;
@@ -820,7 +820,7 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v)
         /* And call the primop. */
         nrPrimOpCalls++;
         if (countCalls) primOpCalls[primOp->primOp->name]++;
-        primOp->primOp->fun(*this, vArgs, v);
+        primOp->primOp->fun(*this, pos, vArgs, v);
     } else {
         Value * fun2 = allocValue();
         *fun2 = fun;
@@ -834,7 +834,7 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v)
 void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & pos)
 {
     if (fun.type == tPrimOp || fun.type == tPrimOpApp) {
-        callPrimOp(fun, arg, v);
+        callPrimOp(fun, arg, v, pos);
         return;
     }
 

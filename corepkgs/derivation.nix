@@ -1,7 +1,7 @@
 /* This is the implementation of the ‘derivation’ builtin function.
    It's actually a wrapper around the ‘derivationStrict’ primop. */
 
-drvAttrs @ { outputs ? [ "out" ], ... }:
+drvAttrs @ { outputs ? [ "out" ], name, builder, system, ... }:
 
 let
 

@@ -36,7 +36,7 @@ public:
 };
 
 
-typedef void (* PrimOpFun) (EvalState & state, Value * * args, Value & v);
+typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, Value & v);
 
 
 struct PrimOp
@@ -227,7 +227,7 @@ public:
     bool eqValues(Value & v1, Value & v2);
 
     void callFunction(Value & fun, Value & arg, Value & v, const Pos & pos);
-    void callPrimOp(Value & fun, Value & arg, Value & v);
+    void callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos);
 
     /* Automatically call a function for which each argument has a
        default value or has a binding in the `args' map. */
@@ -278,7 +278,7 @@ private:
     friend struct ExprOpUpdate;
     friend struct ExprOpConcatLists;
     friend struct ExprSelect;
-    friend void prim_getAttr(EvalState & state, Value * * args, Value & v);
+    friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
 };
 
 
