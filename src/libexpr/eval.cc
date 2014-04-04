@@ -574,6 +574,16 @@ inline bool EvalState::evalBool(Env & env, Expr * e)
 }
 
 
+inline bool EvalState::evalBool(Env & env, Expr * e, const Pos & pos)
+{
+    Value v;
+    e->eval(*this, env, v);
+    if (v.type != tBool)
+        throwTypeError("value is %1% while a Boolean was expected, at %2%", v, pos);
+    return v.boolean;
+}
+
+
 inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v)
 {
     e->eval(*this, env, v);
@@ -975,7 +985,7 @@ void ExprIf::eval(EvalState & state, Env & env, Value & v)
 
 void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 {
-    if (!state.evalBool(env, cond))
+    if (!state.evalBool(env, cond, pos))
         throwAssertionError("assertion failed at %1%", pos);
     body->eval(state, env, v);
 }
@@ -1016,19 +1026,19 @@ void ExprOpNEq::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpAnd::eval(EvalState & state, Env & env, Value & v)
 {
-    mkBool(v, state.evalBool(env, e1) && state.evalBool(env, e2));
+    mkBool(v, state.evalBool(env, e1, pos) && state.evalBool(env, e2, pos));
 }
 
 
 void ExprOpOr::eval(EvalState & state, Env & env, Value & v)
 {
-    mkBool(v, state.evalBool(env, e1) || state.evalBool(env, e2));
+    mkBool(v, state.evalBool(env, e1, pos) || state.evalBool(env, e2, pos));
 }
 
 
 void ExprOpImpl::eval(EvalState & state, Env & env, Value & v)
 {
-    mkBool(v, !state.evalBool(env, e1) || state.evalBool(env, e2));
+    mkBool(v, !state.evalBool(env, e1, pos) || state.evalBool(env, e2, pos));
 }
 
 
@@ -1073,18 +1083,18 @@ void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
     Value v1; e1->eval(state, env, v1);
     Value v2; e2->eval(state, env, v2);
     Value * lists[2] = { &v1, &v2 };
-    state.concatLists(v, 2, lists);
+    state.concatLists(v, 2, lists, pos);
 }
 
 
-void EvalState::concatLists(Value & v, unsigned int nrLists, Value * * lists)
+void EvalState::concatLists(Value & v, unsigned int nrLists, Value * * lists, const Pos & pos)
 {
     nrListConcats++;
 
     Value * nonEmpty = 0;
     unsigned int len = 0;
     for (unsigned int n = 0; n < nrLists; ++n) {
-        forceList(*lists[n]);
+        forceList(*lists[n], pos);
         unsigned int l = lists[n]->list.length;
         len += l;
         if (l) nonEmpty = lists[n];

@@ -145,6 +145,7 @@ public:
     /* Evaluation the expression, then verify that it has the expected
        type. */
     inline bool evalBool(Env & env, Expr * e);
+    inline bool evalBool(Env & env, Expr * e, const Pos & pos);
     inline void evalAttrs(Env & env, Expr * e, Value & v);
 
     /* If `v' is a thunk, enter it and overwrite `v' with the result
@@ -246,7 +247,7 @@ public:
     void mkThunk_(Value & v, Expr * expr);
     void mkPos(Value & v, Pos * pos);
 
-    void concatLists(Value & v, unsigned int nrLists, Value * * lists);
+    void concatLists(Value & v, unsigned int nrLists, Value * * lists, const Pos & pos);
 
     /* Print statistics. */
     void printStats();

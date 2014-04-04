@@ -1042,7 +1042,7 @@ static void prim_elem(EvalState & state, const Pos & pos, Value * * args, Value 
 static void prim_concatLists(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceList(*args[0], pos);
-    state.concatLists(v, args[0]->list.length, args[0]->list.elems);
+    state.concatLists(v, args[0]->list.length, args[0]->list.elems, pos);
 }
 
 

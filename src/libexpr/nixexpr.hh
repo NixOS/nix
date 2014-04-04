@@ -277,28 +277,13 @@ struct ExprBuiltin : Expr
     COMMON_METHODS
 };
 
-struct ExprApp : Expr
-{
-    Pos pos;
-    Expr * e1, * e2;
-    ExprApp(Expr * e1, Expr * e2) : e1(e1), e2(e2) { };
-    ExprApp(const Pos & pos, Expr * e1, Expr * e2) : pos(pos), e1(e1), e2(e2) { };
-    void show(std::ostream & str)
-    {
-        str << *e1 << " " << *e2;
-    }
-    void bindVars(const StaticEnv & env)
-    {
-        e1->bindVars(env); e2->bindVars(env);
-    }
-    void eval(EvalState & state, Env & env, Value & v);
-};
-
 #define MakeBinOp(name, s) \
     struct Expr##name : Expr \
     { \
+        Pos pos; \
         Expr * e1, * e2; \
         Expr##name(Expr * e1, Expr * e2) : e1(e1), e2(e2) { }; \
+        Expr##name(const Pos & pos, Expr * e1, Expr * e2) : pos(pos), e1(e1), e2(e2) { }; \
         void show(std::ostream & str) \
         { \
             str << *e1 << " " s " " << *e2; \
@@ -310,6 +295,7 @@ struct ExprApp : Expr
         void eval(EvalState & state, Env & env, Value & v); \
     };
 
+MakeBinOp(App, "")
 MakeBinOp(OpEq, "==")
 MakeBinOp(OpNEq, "!=")
 MakeBinOp(OpAnd, "&&")

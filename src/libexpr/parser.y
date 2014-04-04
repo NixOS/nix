@@ -335,10 +335,10 @@ expr_op
   | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprApp(CUR_POS, new ExprApp(new ExprBuiltin(data->symbols.create("lessThan")), $3), $1)); }
   | expr_op '>' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprBuiltin(data->symbols.create("lessThan")), $3), $1); }
   | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprApp(CUR_POS, new ExprApp(new ExprBuiltin(data->symbols.create("lessThan")), $1), $3)); }
-  | expr_op AND expr_op { $$ = new ExprOpAnd($1, $3); }
-  | expr_op OR expr_op { $$ = new ExprOpOr($1, $3); }
-  | expr_op IMPL expr_op { $$ = new ExprOpImpl($1, $3); }
-  | expr_op UPDATE expr_op { $$ = new ExprOpUpdate($1, $3); }
+  | expr_op AND expr_op { $$ = new ExprOpAnd(CUR_POS, $1, $3); }
+  | expr_op OR expr_op { $$ = new ExprOpOr(CUR_POS, $1, $3); }
+  | expr_op IMPL expr_op { $$ = new ExprOpImpl(CUR_POS, $1, $3); }
+  | expr_op UPDATE expr_op { $$ = new ExprOpUpdate(CUR_POS, $1, $3); }
   | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, *$3); }
   | expr_op '+' expr_op
     { vector<Expr *> * l = new vector<Expr *>;
@@ -349,7 +349,7 @@ expr_op
   | expr_op '-' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprBuiltin(data->symbols.create("sub")), $1), $3); }
   | expr_op '*' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprBuiltin(data->symbols.create("mul")), $1), $3); }
   | expr_op '/' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprBuiltin(data->symbols.create("div")), $1), $3); }
-  | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists($1, $3); }
+  | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists(CUR_POS, $1, $3); }
   | expr_app
   ;
 
