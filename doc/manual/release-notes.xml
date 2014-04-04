@@ -232,6 +232,10 @@ $ bash &lt;(curl https://nixos.org/nix/install)
     the same name from other packages.</para>
   </listitem>
 
+  <listitem>
+    <para>Nix now requires a compiler that supports C++11.</para>
+  </listitem>
+
 </itemizedlist>
 
 </section>
