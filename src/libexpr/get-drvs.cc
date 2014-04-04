@@ -36,7 +36,7 @@ DrvInfo::Outputs DrvInfo::queryOutputs()
         /* Get the ‘outputs’ list. */
         Bindings::iterator i;
         if (attrs && (i = attrs->find(state->sOutputs)) != attrs->end()) {
-            state->forceList(*i->value);
+            state->forceList(*i->value, *i->pos);
 
             /* For each output... */
             for (unsigned int j = 0; j < i->value->list.length; ++j) {

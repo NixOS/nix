@@ -84,7 +84,7 @@ static void prim_import(EvalState & state, const Pos & pos, Value * * args, Valu
         w.attrs->sort();
         Value fun;
         state.evalFile(state.findFile("nix/imported-drv-to-derivation.nix"), fun);
-        state.forceFunction(fun);
+        state.forceFunction(fun, pos);
         mkApp(v, fun, w);
         state.forceAttrs(v);
     } else {
@@ -195,7 +195,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
         args[0]->attrs->find(state.symbols.create("startSet"));
     if (startSet == args[0]->attrs->end())
         throw EvalError(format("attribute `startSet' required, at %1%") % pos);
-    state.forceList(*startSet->value);
+    state.forceList(*startSet->value, pos);
 
     ValueList workSet;
     for (unsigned int n = 0; n < startSet->value->list.length; ++n)
@@ -234,7 +234,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
         /* Call the `operator' function with `e' as argument. */
         Value call;
         mkApp(call, *op->value, *e);
-        state.forceList(call);
+        state.forceList(call, pos);
 
         /* Add the values returned by the operator to the work set. */
         for (unsigned int n = 0; n < call.list.length; ++n) {
@@ -381,7 +381,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
             if (key == "args") {
-                state.forceList(*i->value);
+                state.forceList(*i->value, pos);
                 for (unsigned int n = 0; n < i->value->list.length; ++n) {
                     string s = state.coerceToString(*i->value->list.elems[n], context, true);
                     drv.args.push_back(s);
@@ -821,7 +821,7 @@ static void prim_isAttrs(EvalState & state, const Pos & pos, Value * * args, Val
 static void prim_removeAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceAttrs(*args[0]);
-    state.forceList(*args[1]);
+    state.forceList(*args[1], pos);
 
     /* Get the attribute names to be removed. */
     std::set<Symbol> names;
@@ -848,7 +848,7 @@ static void prim_removeAttrs(EvalState & state, const Pos & pos, Value * * args,
    name, the first takes precedence. */
 static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceList(*args[0]);
+    state.forceList(*args[0], pos);
 
     state.mkAttrs(v, args[0]->list.length);
 
@@ -943,7 +943,7 @@ static void prim_isList(EvalState & state, const Pos & pos, Value * * args, Valu
 
 static void elemAt(EvalState & state, const Pos & pos, Value & list, int n, Value & v)
 {
-    state.forceList(list);
+    state.forceList(list, pos);
     if (n < 0 || n >= list.list.length)
         throw Error(format("list index %1% is out of bounds, at %2%") % n % pos);
     state.forceValue(*list.list.elems[n]);
@@ -970,7 +970,7 @@ static void prim_head(EvalState & state, const Pos & pos, Value * * args, Value 
    don't want to use it!  */
 static void prim_tail(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceList(*args[0]);
+    state.forceList(*args[0], pos);
     if (args[0]->list.length == 0)
         throw Error(format("`tail' called on an empty list, at %1%") % pos);
     state.mkList(v, args[0]->list.length - 1);
@@ -982,8 +982,8 @@ static void prim_tail(EvalState & state, const Pos & pos, Value * * args, Value 
 /* Apply a function to every element of a list. */
 static void prim_map(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceFunction(*args[0]);
-    state.forceList(*args[1]);
+    state.forceFunction(*args[0], pos);
+    state.forceList(*args[1], pos);
 
     state.mkList(v, args[1]->list.length);
 
@@ -998,8 +998,8 @@ static void prim_map(EvalState & state, const Pos & pos, Value * * args, Value &
    returns true. */
 static void prim_filter(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceFunction(*args[0]);
-    state.forceList(*args[1]);
+    state.forceFunction(*args[0], pos);
+    state.forceList(*args[1], pos);
 
     // FIXME: putting this on the stack is risky.
     Value * vs[args[1]->list.length];
@@ -1028,7 +1028,7 @@ static void prim_filter(EvalState & state, const Pos & pos, Value * * args, Valu
 static void prim_elem(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     bool res = false;
-    state.forceList(*args[1]);
+    state.forceList(*args[1], pos);
     for (unsigned int n = 0; n < args[1]->list.length; ++n)
         if (state.eqValues(*args[0], *args[1]->list.elems[n])) {
             res = true;
@@ -1041,7 +1041,7 @@ static void prim_elem(EvalState & state, const Pos & pos, Value * * args, Value 
 /* Concatenate a list of lists. */
 static void prim_concatLists(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceList(*args[0]);
+    state.forceList(*args[0], pos);
     state.concatLists(v, args[0]->list.length, args[0]->list.elems);
 }
 
@@ -1049,7 +1049,7 @@ static void prim_concatLists(EvalState & state, const Pos & pos, Value * * args,
 /* Return the length of a list.  This is an O(1) time operation. */
 static void prim_length(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceList(*args[0]);
+    state.forceList(*args[0], pos);
     mkInt(v, args[0]->list.length);
 }
 

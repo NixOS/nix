@@ -294,11 +294,6 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1))
     throw TypeError(format(s) % s1);
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v, const Pos & pos))
-{
-    throw TypeError(format(s) % showType(v) % pos);
-}
-
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1, const string & s2))
 {
     throw TypeError(format(s) % s1 % s2);
@@ -1169,11 +1164,11 @@ bool EvalState::forceBool(Value & v)
 }
 
 
-void EvalState::forceFunction(Value & v)
+void EvalState::forceFunction(Value & v, const Pos & pos)
 {
     forceValue(v);
     if (v.type != tLambda && v.type != tPrimOp && v.type != tPrimOpApp)
-        throwTypeError("value is %1% while a function was expected", v);
+        throwTypeError("value is %1% while a function was expected, at %2%", v, pos);
 }
 
 

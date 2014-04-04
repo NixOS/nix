@@ -18,6 +18,12 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v))
 }
 
 
+LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v, const Pos & pos))
+{
+    throw TypeError(format(s) % showType(v) % pos);
+}
+
+
 void EvalState::forceValue(Value & v)
 {
     if (v.type == tThunk) {
@@ -55,5 +61,14 @@ inline void EvalState::forceList(Value & v)
     if (v.type != tList)
         throwTypeError("value is %1% while a list was expected", v);
 }
+
+
+inline void EvalState::forceList(Value & v, const Pos & pos)
+{
+    forceValue(v);
+    if (v.type != tList)
+        throwTypeError("value is %1% while a list was expected, at %2%", v, pos);
+}
+
 
 }
