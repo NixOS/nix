@@ -145,7 +145,7 @@ void ExprPos::show(std::ostream & str)
 
 std::ostream & operator << (std::ostream & str, const Pos & pos)
 {
-    if (!pos.line)
+    if (!pos)
         str << "undefined position";
     else
         str << (format("%1%:%2%:%3%") % pos.file % pos.line % pos.column).str();

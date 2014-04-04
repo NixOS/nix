@@ -299,7 +299,7 @@ static void prim_tryEval(EvalState & state, const Pos & pos, Value * * args, Val
 /* Return an environment variable.  Use with care. */
 static void prim_getEnv(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string name = state.forceStringNoCtx(*args[0]);
+    string name = state.forceStringNoCtx(*args[0], pos);
     mkString(v, getEnv(name));
 }
 
@@ -343,7 +343,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     string drvName;
     Pos & posDrvName(*attr->pos);
     try {
-        drvName = state.forceStringNoCtx(*attr->value);
+        drvName = state.forceStringNoCtx(*attr->value, pos);
     } catch (Error & e) {
         e.addPrefix(format("while evaluating the derivation attribute `name' at %1%:\n") % posDrvName);
         throw;
@@ -664,7 +664,7 @@ static void prim_toJSON(EvalState & state, const Pos & pos, Value * * args, Valu
 static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    string name = state.forceStringNoCtx(*args[0]);
+    string name = state.forceStringNoCtx(*args[0], pos);
     string contents = state.forceString(*args[1], context);
 
     PathSet refs;
@@ -775,7 +775,7 @@ static void prim_attrNames(EvalState & state, const Pos & pos, Value * * args, V
 /* Dynamic version of the `.' operator. */
 void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string attr = state.forceStringNoCtx(*args[0]);
+    string attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
     // !!! Should we create a symbol here or just do a lookup?
     Bindings::iterator i = args[1]->attrs->find(state.symbols.create(attr));
@@ -791,7 +791,7 @@ void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
 /* Return position information of the specified attribute. */
 void prim_unsafeGetAttrPos(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string attr = state.forceStringNoCtx(*args[0]);
+    string attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
     Bindings::iterator i = args[1]->attrs->find(state.symbols.create(attr));
     if (i == args[1]->attrs->end())
@@ -804,7 +804,7 @@ void prim_unsafeGetAttrPos(EvalState & state, const Pos & pos, Value * * args, V
 /* Dynamic version of the `?' operator. */
 static void prim_hasAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string attr = state.forceStringNoCtx(*args[0]);
+    string attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
     mkBool(v, args[1]->attrs->find(state.symbols.create(attr)) != args[1]->attrs->end());
 }
@@ -826,7 +826,7 @@ static void prim_removeAttrs(EvalState & state, const Pos & pos, Value * * args,
     /* Get the attribute names to be removed. */
     std::set<Symbol> names;
     for (unsigned int i = 0; i < args[1]->list.length; ++i) {
-        state.forceStringNoCtx(*args[1]->list.elems[i]);
+        state.forceStringNoCtx(*args[1]->list.elems[i], pos);
         names.insert(state.symbols.create(args[1]->list.elems[i]->string.s));
     }
 
@@ -861,7 +861,7 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
         Bindings::iterator j = v2.attrs->find(state.sName);
         if (j == v2.attrs->end())
             throw TypeError(format("`name' attribute missing in a call to `listToAttrs', at %1%") % pos);
-        string name = state.forceStringNoCtx(*j->value);
+        string name = state.forceStringNoCtx(*j->value, pos);
 
         Symbol sym = state.symbols.create(name);
         if (seen.find(sym) == seen.end()) {
@@ -1168,7 +1168,7 @@ static void prim_unsafeDiscardOutputDependency(EvalState & state, const Pos & po
 /* Return the cryptographic hash of a string in base-16. */
 static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string type = state.forceStringNoCtx(*args[0]);
+    string type = state.forceStringNoCtx(*args[0], pos);
     HashType ht = parseHashType(type);
     if (ht == htUnknown)
       throw Error(format("unknown hash type `%1%', at %2%") % type % pos);
@@ -1187,7 +1187,7 @@ static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, 
 
 static void prim_parseDrvName(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string name = state.forceStringNoCtx(*args[0]);
+    string name = state.forceStringNoCtx(*args[0], pos);
     DrvName parsed(name);
     state.mkAttrs(v, 2);
     mkString(*state.allocAttr(v, state.sName), parsed.name);
@@ -1198,8 +1198,8 @@ static void prim_parseDrvName(EvalState & state, const Pos & pos, Value * * args
 
 static void prim_compareVersions(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    string version1 = state.forceStringNoCtx(*args[0]);
-    string version2 = state.forceStringNoCtx(*args[1]);
+    string version1 = state.forceStringNoCtx(*args[0], pos);
+    string version2 = state.forceStringNoCtx(*args[1], pos);
     mkInt(v, compareVersions(version1, version2));
 }
 

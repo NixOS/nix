@@ -41,7 +41,7 @@ DrvInfo::Outputs DrvInfo::queryOutputs()
             /* For each output... */
             for (unsigned int j = 0; j < i->value->list.length; ++j) {
                 /* Evaluate the corresponding set. */
-                string name = state->forceStringNoCtx(*i->value->list.elems[j]);
+                string name = state->forceStringNoCtx(*i->value->list.elems[j], *i->pos);
                 Bindings::iterator out = attrs->find(state->symbols.create(name));
                 if (out == attrs->end()) continue; // FIXME: throw error?
                 state->forceAttrs(*out->value);
@@ -199,11 +199,8 @@ static bool getDerivation(EvalState & state, Value & v,
 
         Bindings::iterator i2 = v.attrs->find(state.sSystem);
 
-        DrvInfo drv(
-            state,
-            state.forceStringNoCtx(*i->value),
-            attrPath,
-            i2 == v.attrs->end() ? "unknown" : state.forceStringNoCtx(*i2->value),
+        DrvInfo drv(state, state.forceStringNoCtx(*i->value), attrPath,
+            i2 == v.attrs->end() ? "unknown" : state.forceStringNoCtx(*i2->value, *i2->pos),
             v.attrs);
 
         drvs.push_back(drv);

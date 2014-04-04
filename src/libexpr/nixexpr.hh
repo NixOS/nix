@@ -28,6 +28,10 @@ struct Pos
     Pos() : line(0), column(0) { };
     Pos(const Symbol & file, unsigned int line, unsigned int column)
         : file(file), line(line), column(column) { };
+    operator bool() const
+    {
+        return line != 0;
+    }
     bool operator < (const Pos & p2) const
     {
         if (!line) return p2.line;

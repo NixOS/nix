@@ -140,7 +140,8 @@ static void * oomHandler(size_t requested)
 #endif
 
 
-static Symbol getName(const AttrName & name, EvalState & state, Env & env) {
+static Symbol getName(const AttrName & name, EvalState & state, Env & env)
+{
     if (name.symbol.set()) {
         return name.symbol;
     } else {
@@ -277,6 +278,11 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2))
 LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3))
 {
     throw EvalError(format(s) % s2 % s3);
+}
+
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3, const Pos & pos))
+{
+    throw EvalError(format(s) % s2 % s3 % pos);
 }
 
 LocalNoInlineNoReturn(void throwEvalError(const char * s, const Symbol & sym, const Pos & p1, const Pos & p2))
@@ -1172,11 +1178,15 @@ void EvalState::forceFunction(Value & v, const Pos & pos)
 }
 
 
-string EvalState::forceString(Value & v)
+string EvalState::forceString(Value & v, const Pos & pos)
 {
     forceValue(v);
-    if (v.type != tString)
-        throwTypeError("value is %1% while a string was expected", v);
+    if (v.type != tString) {
+        if (pos)
+            throwTypeError("value is %1% while a string was expected, at %2%", v, pos);
+        else
+            throwTypeError("value is %1% while a string was expected", v);
+    }
     return string(v.string.s);
 }
 
@@ -1197,12 +1207,17 @@ string EvalState::forceString(Value & v, PathSet & context)
 }
 
 
-string EvalState::forceStringNoCtx(Value & v)
+string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
 {
-    string s = forceString(v);
-    if (v.string.context)
-        throwEvalError("the string `%1%' is not allowed to refer to a store path (such as `%2%')",
-            v.string.s, v.string.context[0]);
+    string s = forceString(v, pos);
+    if (v.string.context) {
+        if (pos)
+            throwEvalError("the string `%1%' is not allowed to refer to a store path (such as `%2%'), at %3%",
+                v.string.s, v.string.context[0], pos);
+        else
+            throwEvalError("the string `%1%' is not allowed to refer to a store path (such as `%2%')",
+                v.string.s, v.string.context[0]);
+    }
     return s;
 }
 
