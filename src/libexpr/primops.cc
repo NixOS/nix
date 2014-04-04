@@ -954,7 +954,7 @@ static void elemAt(EvalState & state, const Pos & pos, Value & list, int n, Valu
 /* Return the n-1'th element of a list. */
 static void prim_elemAt(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    elemAt(state, pos, *args[0], state.forceInt(*args[1]), v);
+    elemAt(state, pos, *args[0], state.forceInt(*args[1], pos), v);
 }
 
 
@@ -1061,27 +1061,27 @@ static void prim_length(EvalState & state, const Pos & pos, Value * * args, Valu
 
 static void prim_add(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    mkInt(v, state.forceInt(*args[0]) + state.forceInt(*args[1]));
+    mkInt(v, state.forceInt(*args[0], pos) + state.forceInt(*args[1], pos));
 }
 
 
 static void prim_sub(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    mkInt(v, state.forceInt(*args[0]) - state.forceInt(*args[1]));
+    mkInt(v, state.forceInt(*args[0], pos) - state.forceInt(*args[1], pos));
 }
 
 
 static void prim_mul(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    mkInt(v, state.forceInt(*args[0]) * state.forceInt(*args[1]));
+    mkInt(v, state.forceInt(*args[0], pos) * state.forceInt(*args[1], pos));
 }
 
 
 static void prim_div(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    NixInt i2 = state.forceInt(*args[1]);
+    NixInt i2 = state.forceInt(*args[1], pos);
     if (i2 == 0) throw EvalError(format("division by zero, at %1%") % pos);
-    mkInt(v, state.forceInt(*args[0]) / i2);
+    mkInt(v, state.forceInt(*args[0], pos) / i2);
 }
 
 
@@ -1116,8 +1116,8 @@ static void prim_toString(EvalState & state, const Pos & pos, Value * * args, Va
    non-negative. */
 static void prim_substring(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    int start = state.forceInt(*args[0]);
-    int len = state.forceInt(*args[1]);
+    int start = state.forceInt(*args[0], pos);
+    int len = state.forceInt(*args[1], pos);
     PathSet context;
     string s = state.coerceToString(*args[2], context);
 

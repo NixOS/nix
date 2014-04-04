@@ -1151,11 +1151,11 @@ void EvalState::strictForceValue(Value & v)
 }
 
 
-NixInt EvalState::forceInt(Value & v)
+NixInt EvalState::forceInt(Value & v, const Pos & pos)
 {
     forceValue(v);
     if (v.type != tInt)
-        throwTypeError("value is %1% while an integer was expected", v);
+        throwTypeError("value is %1% while an integer was expected, at %2%", v, pos);
     return v.integer;
 }
 
