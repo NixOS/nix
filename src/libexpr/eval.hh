@@ -161,6 +161,7 @@ public:
     NixInt forceInt(Value & v, const Pos & pos);
     bool forceBool(Value & v);
     inline void forceAttrs(Value & v);
+    inline void forceAttrs(Value & v, const Pos & pos);
     inline void forceList(Value & v);
     inline void forceList(Value & v, const Pos & pos);
     void forceFunction(Value & v, const Pos & pos); // either lambda or primop

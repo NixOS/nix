@@ -75,7 +75,7 @@ Bindings * DrvInfo::getMeta()
     if (!attrs) return 0;
     Bindings::iterator a = attrs->find(state->sMeta);
     if (a == attrs->end()) return 0;
-    state->forceAttrs(*a->value);
+    state->forceAttrs(*a->value, *a->pos);
     meta = a->value->attrs;
     return meta;
 }

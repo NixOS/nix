@@ -850,7 +850,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         env2.values[displ++] = &arg;
 
     else {
-        forceAttrs(arg);
+        forceAttrs(arg, pos);
 
         if (!lambda.arg.empty())
             env2.values[displ++] = &arg;

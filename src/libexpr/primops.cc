@@ -86,7 +86,7 @@ static void prim_import(EvalState & state, const Pos & pos, Value * * args, Valu
         state.evalFile(state.findFile("nix/imported-drv-to-derivation.nix"), fun);
         state.forceFunction(fun, pos);
         mkApp(v, fun, w);
-        state.forceAttrs(v);
+        state.forceAttrs(v, pos);
     } else {
         state.evalFile(path, v);
     }
@@ -188,7 +188,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
 {
     startNest(nest, lvlDebug, "finding dependencies");
 
-    state.forceAttrs(*args[0]);
+    state.forceAttrs(*args[0], pos);
 
     /* Get the start set. */
     Bindings::iterator startSet =
@@ -219,7 +219,7 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
         Value * e = *(workSet.begin());
         workSet.pop_front();
 
-        state.forceAttrs(*e);
+        state.forceAttrs(*e, pos);
 
         Bindings::iterator key =
             e->attrs->find(state.symbols.create("key"));
@@ -334,7 +334,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 {
     startNest(nest, lvlVomit, "evaluating derivation");
 
-    state.forceAttrs(*args[0]);
+    state.forceAttrs(*args[0], pos);
 
     /* Figure out the name first (for stack backtraces). */
     Bindings::iterator attr = args[0]->attrs->find(state.sName);
@@ -758,7 +758,7 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
    strings. */
 static void prim_attrNames(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceAttrs(*args[0]);
+    state.forceAttrs(*args[0], pos);
 
     state.mkList(v, args[0]->attrs->size());
 
@@ -776,7 +776,7 @@ static void prim_attrNames(EvalState & state, const Pos & pos, Value * * args, V
 void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string attr = state.forceStringNoCtx(*args[0]);
-    state.forceAttrs(*args[1]);
+    state.forceAttrs(*args[1], pos);
     // !!! Should we create a symbol here or just do a lookup?
     Bindings::iterator i = args[1]->attrs->find(state.symbols.create(attr));
     if (i == args[1]->attrs->end())
@@ -792,7 +792,7 @@ void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
 void prim_unsafeGetAttrPos(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string attr = state.forceStringNoCtx(*args[0]);
-    state.forceAttrs(*args[1]);
+    state.forceAttrs(*args[1], pos);
     Bindings::iterator i = args[1]->attrs->find(state.symbols.create(attr));
     if (i == args[1]->attrs->end())
         mkNull(v);
@@ -805,7 +805,7 @@ void prim_unsafeGetAttrPos(EvalState & state, const Pos & pos, Value * * args, V
 static void prim_hasAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string attr = state.forceStringNoCtx(*args[0]);
-    state.forceAttrs(*args[1]);
+    state.forceAttrs(*args[1], pos);
     mkBool(v, args[1]->attrs->find(state.symbols.create(attr)) != args[1]->attrs->end());
 }
 
@@ -820,7 +820,7 @@ static void prim_isAttrs(EvalState & state, const Pos & pos, Value * * args, Val
 
 static void prim_removeAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceAttrs(*args[0]);
+    state.forceAttrs(*args[0], pos);
     state.forceList(*args[1], pos);
 
     /* Get the attribute names to be removed. */
@@ -856,7 +856,7 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
 
     for (unsigned int i = 0; i < args[0]->list.length; ++i) {
         Value & v2(*args[0]->list.elems[i]);
-        state.forceAttrs(v2);
+        state.forceAttrs(v2, pos);
 
         Bindings::iterator j = v2.attrs->find(state.sName);
         if (j == v2.attrs->end())
@@ -883,8 +883,8 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
    member of as1. */
 static void prim_intersectAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceAttrs(*args[0]);
-    state.forceAttrs(*args[1]);
+    state.forceAttrs(*args[0], pos);
+    state.forceAttrs(*args[1], pos);
 
     state.mkAttrs(v, std::min(args[0]->attrs->size(), args[1]->attrs->size()));
 
