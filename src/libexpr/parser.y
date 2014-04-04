@@ -224,7 +224,7 @@ void backToString(yyscan_t scanner);
 void backToIndString(yyscan_t scanner);
 
 
-static Pos makeCurPos(const YYLTYPE & loc, ParseData * data)
+static inline Pos makeCurPos(const YYLTYPE & loc, ParseData * data)
 {
     return Pos(data->path, loc.first_line, loc.first_column);
 }
@@ -355,7 +355,7 @@ expr_op
 
 expr_app
   : expr_app expr_select
-    { $$ = new ExprApp($1, $2); }
+    { $$ = new ExprApp(CUR_POS, $1, $2); }
   | expr_select { $$ = $1; }
   ;
 
@@ -367,7 +367,7 @@ expr_select
   | /* Backwards compatibility: because Nixpkgs has a rarely used
        function named ‘or’, allow stuff like ‘map or [...]’. */
     expr_simple OR_KW
-    { $$ = new ExprApp($1, new ExprVar(CUR_POS, data->symbols.create("or"))); }
+    { $$ = new ExprApp(CUR_POS, $1, new ExprVar(CUR_POS, data->symbols.create("or"))); }
   | expr_simple { $$ = $1; }
   ;
 

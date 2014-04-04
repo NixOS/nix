@@ -130,12 +130,14 @@ string showType(const Value & v)
 }
 
 
+#if HAVE_BOEHMGC
 /* Called when the Boehm GC runs out of memory. */
 static void * oomHandler(size_t requested)
 {
     /* Convert this to a proper C++ exception. */
     throw std::bad_alloc();
 }
+#endif
 
 
 static Symbol getName(const AttrName & name, EvalState & state, Env & env) {
@@ -292,14 +294,19 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1))
     throw TypeError(format(s) % s1);
 }
 
+LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v, const Pos & pos))
+{
+    throw TypeError(format(s) % showType(v) % pos);
+}
+
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1, const string & s2))
 {
     throw TypeError(format(s) % s1 % s2);
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const char * s, const ExprLambda & fun, const Symbol & s2))
+LocalNoInlineNoReturn(void throwTypeError(const char * s, const ExprLambda & fun, const Symbol & s2, const Pos & pos))
 {
-    throw TypeError(format(s) % fun.showNamePos() % s2);
+    throw TypeError(format(s) % fun.showNamePos() % s2 % pos);
 }
 
 LocalNoInlineNoReturn(void throwAssertionError(const char * s, const Pos & pos))
@@ -317,9 +324,9 @@ LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2))
     e.addPrefix(format(s) % s2);
 }
 
-LocalNoInline(void addErrorPrefix(Error & e, const char * s, const ExprLambda & fun))
+LocalNoInline(void addErrorPrefix(Error & e, const char * s, const ExprLambda & fun, const Pos & pos))
 {
-    e.addPrefix(format(s) % fun.showNamePos());
+    e.addPrefix(format(s) % fun.showNamePos() % pos);
 }
 
 LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, const Pos & pos))
@@ -783,7 +790,7 @@ void ExprApp::eval(EvalState & state, Env & env, Value & v)
     /* FIXME: vFun prevents GCC from doing tail call optimisation. */
     Value vFun;
     e1->eval(state, env, vFun);
-    state.callFunction(vFun, *(e2->maybeThunk(state, env)), v);
+    state.callFunction(vFun, *(e2->maybeThunk(state, env)), v, pos);
 }
 
 
@@ -824,7 +831,7 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v)
 }
 
 
-void EvalState::callFunction(Value & fun, Value & arg, Value & v)
+void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & pos)
 {
     if (fun.type == tPrimOp || fun.type == tPrimOpApp) {
         callPrimOp(fun, arg, v);
@@ -832,7 +839,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
     }
 
     if (fun.type != tLambda)
-        throwTypeError("attempt to call something which is not a function but %1%", fun);
+        throwTypeError("attempt to call something which is not a function but %1%, at %2%", fun, pos);
 
     ExprLambda & lambda(*fun.lambda.fun);
 
@@ -860,8 +867,8 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
         foreach (Formals::Formals_::iterator, i, lambda.formals->formals) {
             Bindings::iterator j = arg.attrs->find(i->name);
             if (j == arg.attrs->end()) {
-                if (!i->def) throwTypeError("%1% called without required argument `%2%'",
-                    lambda, i->name);
+                if (!i->def) throwTypeError("%1% called without required argument `%2%', at %3%",
+                    lambda, i->name, pos);
                 env2.values[displ++] = i->def->maybeThunk(*this, env2);
             } else {
                 attrsUsed++;
@@ -876,7 +883,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
                user. */
             foreach (Bindings::iterator, i, *arg.attrs)
                 if (lambda.formals->argNames.find(i->name) == lambda.formals->argNames.end())
-                    throwTypeError("%1% called with unexpected argument `%2%'", lambda, i->name);
+                    throwTypeError("%1% called with unexpected argument `%2%', at %3%", lambda, i->name, pos);
             abort(); // can't happen
         }
     }
@@ -890,7 +897,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
         try {
             lambda.body->eval(*this, env2, v);
         } catch (Error & e) {
-            addErrorPrefix(e, "while evaluating %1%:\n", lambda);
+            addErrorPrefix(e, "while evaluating %1%, called from %2%:\n", lambda, pos);
             throw;
         }
     else
@@ -928,7 +935,7 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
 
     actualArgs->attrs->sort();
 
-    callFunction(fun, *actualArgs, res);
+    callFunction(fun, *actualArgs, res, noPos);
 }
 
 

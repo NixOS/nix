@@ -35,7 +35,7 @@ void EvalState::forceValue(Value & v)
         }
     }
     else if (v.type == tApp)
-        callFunction(*v.app.left, *v.app.right, v);
+        callFunction(*v.app.left, *v.app.right, v, noPos);
     else if (v.type == tBlackhole)
         throwEvalError("infinite recursion encountered");
 }

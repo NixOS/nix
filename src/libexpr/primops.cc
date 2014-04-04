@@ -711,7 +711,7 @@ struct FilterFromExpr : PathFilter
         mkString(arg1, path);
 
         Value fun2;
-        state.callFunction(filter, arg1, fun2);
+        state.callFunction(filter, arg1, fun2, noPos);
 
         Value arg2;
         mkString(arg2,
@@ -721,7 +721,7 @@ struct FilterFromExpr : PathFilter
             "unknown" /* not supported, will fail! */);
 
         Value res;
-        state.callFunction(fun2, arg2, res);
+        state.callFunction(fun2, arg2, res, noPos);
 
         return state.forceBool(res);
     }
@@ -1008,7 +1008,7 @@ static void prim_filter(EvalState & state, Value * * args, Value & v)
     bool same = true;
     for (unsigned int n = 0; n < args[1]->list.length; ++n) {
         Value res;
-        state.callFunction(*args[0], *args[1]->list.elems[n], res);
+        state.callFunction(*args[0], *args[1]->list.elems[n], res, noPos);
         if (state.forceBool(res))
             vs[k++] = args[1]->list.elems[n];
         else
