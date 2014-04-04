@@ -320,10 +320,11 @@ MakeBinOp(OpConcatLists, "++")
 
 struct ExprConcatStrings : Expr
 {
+    Pos pos;
     bool forceString;
     vector<Expr *> * es;
-    ExprConcatStrings(bool forceString, vector<Expr *> * es)
-        : forceString(forceString), es(es) { };
+    ExprConcatStrings(const Pos & pos, bool forceString, vector<Expr *> * es)
+        : pos(pos), forceString(forceString), es(es) { };
     COMMON_METHODS
 };
 

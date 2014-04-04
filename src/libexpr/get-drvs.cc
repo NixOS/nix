@@ -13,7 +13,7 @@ string DrvInfo::queryDrvPath()
     if (drvPath == "" && attrs) {
         Bindings::iterator i = attrs->find(state->sDrvPath);
         PathSet context;
-        drvPath = i != attrs->end() ? state->coerceToPath(*i->value, context) : "";
+        drvPath = i != attrs->end() ? state->coerceToPath(*i->pos, *i->value, context) : "";
     }
     return drvPath;
 }
@@ -24,7 +24,7 @@ string DrvInfo::queryOutPath()
     if (outPath == "" && attrs) {
         Bindings::iterator i = attrs->find(state->sOutPath);
         PathSet context;
-        outPath = i != attrs->end() ? state->coerceToPath(*i->value, context) : "";
+        outPath = i != attrs->end() ? state->coerceToPath(*i->pos, *i->value, context) : "";
     }
     return outPath;
 }
@@ -50,7 +50,7 @@ DrvInfo::Outputs DrvInfo::queryOutputs()
                 Bindings::iterator outPath = out->value->attrs->find(state->sOutPath);
                 if (outPath == out->value->attrs->end()) continue; // FIXME: throw error?
                 PathSet context;
-                outputs[name] = state->coerceToPath(*outPath->value, context);
+                outputs[name] = state->coerceToPath(*outPath->pos, *outPath->value, context);
             }
         } else
             outputs["out"] = queryOutPath();

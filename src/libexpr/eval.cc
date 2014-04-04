@@ -275,6 +275,16 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2))
     throw EvalError(format(s) % s2);
 }
 
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const Pos & pos))
+{
+    throw EvalError(format(s) % pos);
+}
+
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const Pos & pos))
+{
+    throw EvalError(format(s) % s2 % pos);
+}
+
 LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3))
 {
     throw EvalError(format(s) % s2 % s3);
@@ -293,6 +303,11 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const Symbol & sym, co
 LocalNoInlineNoReturn(void throwTypeError(const char * s))
 {
     throw TypeError(s);
+}
+
+LocalNoInlineNoReturn(void throwTypeError(const char * s, const Pos & pos))
+{
+    throw TypeError(format(s) % pos);
 }
 
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1))
@@ -648,7 +663,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         foreach (AttrDefs::iterator, i, attrs)
             v.attrs->push_back(Attr(i->first, i->second.e->maybeThunk(state, env), &i->second.pos));
 
-    /* dynamic attrs apply *after* rec and __overrides */
+    /* Dynamic attrs apply *after* rec and __overrides. */
     foreach (DynamicAttrDefs::iterator, i, dynamicAttrs) {
         Value nameVal;
         if (i->nameExpr->es->size() == 1) {
@@ -1113,17 +1128,17 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 
         if (firstType == tInt) {
             if (vTmp.type != tInt)
-                throwEvalError("cannot add %1% to an integer", showType(vTmp));
+                throwEvalError("cannot add %1% to an integer, at %2%", showType(vTmp), pos);
             n += vTmp.integer;
         } else
-            s << state.coerceToString(vTmp, context, false, firstType == tString);
+            s << state.coerceToString(pos, vTmp, context, false, firstType == tString);
     }
 
     if (firstType == tInt)
         mkInt(v, n);
     else if (firstType == tPath) {
         if (!context.empty())
-            throwEvalError("a string that refers to a store path cannot be appended to a path, in `%1%'", s.str());
+            throwEvalError("a string that refers to a store path cannot be appended to a path, at %1%", pos);
         mkPath(v, s.str().c_str());
     } else
         mkString(v, s.str(), context);
@@ -1233,7 +1248,7 @@ bool EvalState::isDerivation(Value & v)
 }
 
 
-string EvalState::coerceToString(Value & v, PathSet & context,
+string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     bool coerceMore, bool copyToStore)
 {
     forceValue(v);
@@ -1252,8 +1267,8 @@ string EvalState::coerceToString(Value & v, PathSet & context,
 
     if (v.type == tAttrs) {
         Bindings::iterator i = v.attrs->find(sOutPath);
-        if (i == v.attrs->end()) throwTypeError("cannot coerce a set to a string");
-        return coerceToString(*i->value, context, coerceMore, copyToStore);
+        if (i == v.attrs->end()) throwTypeError("cannot coerce a set to a string, at %1%", pos);
+        return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
     }
 
     if (coerceMore) {
@@ -1268,7 +1283,7 @@ string EvalState::coerceToString(Value & v, PathSet & context,
         if (v.type == tList) {
             string result;
             for (unsigned int n = 0; n < v.list.length; ++n) {
-                result += coerceToString(*v.list.elems[n],
+                result += coerceToString(pos, *v.list.elems[n],
                     context, coerceMore, copyToStore);
                 if (n < v.list.length - 1
                     /* !!! not quite correct */
@@ -1279,7 +1294,7 @@ string EvalState::coerceToString(Value & v, PathSet & context,
         }
     }
 
-    throwTypeError("cannot coerce %1% to a string", v);
+    throwTypeError("cannot coerce %1% to a string, at %2%", v, pos);
 }
 
 
@@ -1305,11 +1320,11 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
 }
 
 
-Path EvalState::coerceToPath(Value & v, PathSet & context)
+Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
 {
-    string path = coerceToString(v, context, false, false);
+    string path = coerceToString(pos, v, context, false, false);
     if (path == "" || path[0] != '/')
-        throwEvalError("string `%1%' doesn't represent an absolute path", path);
+        throwEvalError("string `%1%' doesn't represent an absolute path, at %1%", path, pos);
     return path;
 }
 

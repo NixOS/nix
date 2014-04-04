@@ -121,8 +121,10 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     debug("evaluating user environment builder");
     state.forceValue(topLevel);
     PathSet context;
-    Path topLevelDrv = state.coerceToPath(*topLevel.attrs->find(state.sDrvPath)->value, context);
-    Path topLevelOut = state.coerceToPath(*topLevel.attrs->find(state.sOutPath)->value, context);
+    Attr & aDrvPath(*topLevel.attrs->find(state.sDrvPath));
+    Path topLevelDrv = state.coerceToPath(aDrvPath.pos ? *(aDrvPath.pos) : noPos, *(aDrvPath.value), context);
+    Attr & aOutPath(*topLevel.attrs->find(state.sOutPath));
+    Path topLevelOut = state.coerceToPath(aOutPath.pos ? *(aOutPath.pos) : noPos, *(aOutPath.value), context);
 
     /* Realise the resulting store expression. */
     debug("building user environment");

@@ -130,7 +130,7 @@ static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
 }
 
 
-static Expr * stripIndentation(SymbolTable & symbols, vector<Expr *> & es)
+static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Expr *> & es)
 {
     if (es.empty()) return new ExprString(symbols.create(""));
 
@@ -216,7 +216,7 @@ static Expr * stripIndentation(SymbolTable & symbols, vector<Expr *> & es)
     }
 
     /* If this is a single string, then don't do a concatenation. */
-    return es2->size() == 1 && dynamic_cast<ExprString *>((*es2)[0]) ? (*es2)[0] : new ExprConcatStrings(true, es2);
+    return es2->size() == 1 && dynamic_cast<ExprString *>((*es2)[0]) ? (*es2)[0] : new ExprConcatStrings(pos, true, es2);
 }
 
 
@@ -344,7 +344,7 @@ expr_op
     { vector<Expr *> * l = new vector<Expr *>;
       l->push_back($1);
       l->push_back($3);
-      $$ = new ExprConcatStrings(false, l);
+      $$ = new ExprConcatStrings(CUR_POS, false, l);
     }
   | expr_op '-' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprBuiltin(data->symbols.create("sub")), $1), $3); }
   | expr_op '*' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprBuiltin(data->symbols.create("mul")), $1), $3); }
@@ -381,7 +381,7 @@ expr_simple
   | INT { $$ = new ExprInt($1); }
   | '"' string_parts '"' { $$ = $2; }
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
-      $$ = stripIndentation(data->symbols, *$2);
+      $$ = stripIndentation(CUR_POS, data->symbols, *$2);
   }
   | PATH { $$ = new ExprPath(absPath($1, data->basePath)); }
   | SPATH {
@@ -413,7 +413,7 @@ expr_simple
 
 string_parts
   : STR
-  | string_parts_interpolated { $$ = new ExprConcatStrings(true, $1); }
+  | string_parts_interpolated { $$ = new ExprConcatStrings(CUR_POS, true, $1); }
   | { $$ = new ExprString(data->symbols.create("")); }
   ;
 
@@ -509,7 +509,7 @@ attr
 
 string_attr
   : '"' string_parts '"' { $$ = $2; }
-  | DOLLAR_CURLY expr '}' { $$ = new ExprConcatStrings(true, new vector<Expr*>(1, $2)); }
+  | DOLLAR_CURLY expr '}' { $$ = new ExprConcatStrings(CUR_POS, true, new vector<Expr*>(1, $2)); }
   ;
 
 expr_list

@@ -177,7 +177,7 @@ public:
        string.  If `coerceMore' is set, also converts nulls, integers,
        booleans and lists to a string.  If `copyToStore' is set,
        referenced paths are copied to the Nix store as a side effect. */
-    string coerceToString(Value & v, PathSet & context,
+    string coerceToString(const Pos & pos, Value & v, PathSet & context,
         bool coerceMore = false, bool copyToStore = true);
 
     string copyPathToStore(PathSet & context, const Path & path);
@@ -185,7 +185,7 @@ public:
     /* Path coercion.  Converts strings, paths and derivations to a
        path.  The result is guaranteed to be a canonicalised, absolute
        path.  Nothing is copied to the store. */
-    Path coerceToPath(Value & v, PathSet & context);
+    Path coerceToPath(const Pos & pos, Value & v, PathSet & context);
 
 public:
 

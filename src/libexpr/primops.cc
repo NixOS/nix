@@ -42,7 +42,7 @@ std::pair<string, string> decodeContext(const string & s)
 static void prim_import(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    Path path = state.coerceToPath(*args[0], context);
+    Path path = state.coerceToPath(pos, *args[0], context);
 
     foreach (PathSet::iterator, i, context) {
         Path ctx = decodeContext(*i).first;
@@ -255,14 +255,14 @@ static void prim_abort(EvalState & state, const Pos & pos, Value * * args, Value
 {
     PathSet context;
     throw Abort(format("evaluation aborted with the following error message: `%1%'") %
-        state.coerceToString(*args[0], context));
+        state.coerceToString(pos, *args[0], context));
 }
 
 
 static void prim_throw(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    throw ThrownError(format("%1%") % state.coerceToString(*args[0], context));
+    throw ThrownError(format("%1%") % state.coerceToString(pos, *args[0], context));
 }
 
 
@@ -273,7 +273,7 @@ static void prim_addErrorContext(EvalState & state, const Pos & pos, Value * * a
         v = *args[1];
     } catch (Error & e) {
         PathSet context;
-        e.addPrefix(format("%1%\n") % state.coerceToString(*args[0], context));
+        e.addPrefix(format("%1%\n") % state.coerceToString(pos, *args[0], context));
         throw;
     }
 }
@@ -383,7 +383,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             if (key == "args") {
                 state.forceList(*i->value, pos);
                 for (unsigned int n = 0; n < i->value->list.length; ++n) {
-                    string s = state.coerceToString(*i->value->list.elems[n], context, true);
+                    string s = state.coerceToString(posDrvName, *i->value->list.elems[n], context, true);
                     drv.args.push_back(s);
                 }
             }
@@ -391,7 +391,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             /* All other attributes are passed to the builder through
                the environment. */
             else {
-                string s = state.coerceToString(*i->value, context, true);
+                string s = state.coerceToString(posDrvName, *i->value, context, true);
                 drv.env[key] = s;
                 if (key == "builder") drv.builder = s;
                 else if (i->name == state.sSystem) drv.platform = s;
@@ -558,7 +558,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 static void prim_toPath(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    Path path = state.coerceToPath(*args[0], context);
+    Path path = state.coerceToPath(pos, *args[0], context);
     mkString(v, canonPath(path), context);
 }
 
@@ -574,7 +574,7 @@ static void prim_toPath(EvalState & state, const Pos & pos, Value * * args, Valu
 static void prim_storePath(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    Path path = state.coerceToPath(*args[0], context);
+    Path path = state.coerceToPath(pos, *args[0], context);
     /* Resolve symlinks in ‘path’, unless ‘path’ itself is a symlink
        directly in the store.  The latter condition is necessary so
        e.g. nix-push does the right thing. */
@@ -592,7 +592,7 @@ static void prim_storePath(EvalState & state, const Pos & pos, Value * * args, V
 static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    Path path = state.coerceToPath(*args[0], context);
+    Path path = state.coerceToPath(pos, *args[0], context);
     if (!context.empty())
         throw EvalError(format("string `%1%' cannot refer to other paths, at %2%") % path % pos);
     mkBool(v, pathExists(path));
@@ -604,7 +604,7 @@ static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, 
 static void prim_baseNameOf(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    mkString(v, baseNameOf(state.coerceToString(*args[0], context)), context);
+    mkString(v, baseNameOf(state.coerceToString(pos, *args[0], context)), context);
 }
 
 
@@ -614,7 +614,7 @@ static void prim_baseNameOf(EvalState & state, const Pos & pos, Value * * args, 
 static void prim_dirOf(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    Path dir = dirOf(state.coerceToPath(*args[0], context));
+    Path dir = dirOf(state.coerceToPath(pos, *args[0], context));
     if (args[0]->type == tPath) mkPath(v, dir.c_str()); else mkString(v, dir, context);
 }
 
@@ -623,7 +623,7 @@ static void prim_dirOf(EvalState & state, const Pos & pos, Value * * args, Value
 static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    Path path = state.coerceToPath(*args[0], context);
+    Path path = state.coerceToPath(pos, *args[0], context);
     if (!context.empty())
         throw EvalError(format("string `%1%' cannot refer to other paths, at %2%") % path % pos);
     mkString(v, readFile(path).c_str());
@@ -731,7 +731,7 @@ struct FilterFromExpr : PathFilter
 static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    Path path = state.coerceToPath(*args[1], context);
+    Path path = state.coerceToPath(pos, *args[1], context);
     if (!context.empty())
         throw EvalError(format("string `%1%' cannot refer to other paths, at %2%") % path % pos);
 
@@ -1105,7 +1105,7 @@ static void prim_lessThan(EvalState & state, const Pos & pos, Value * * args, Va
 static void prim_toString(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    string s = state.coerceToString(*args[0], context, true, false);
+    string s = state.coerceToString(pos, *args[0], context, true, false);
     mkString(v, s, context);
 }
 
@@ -1119,7 +1119,7 @@ static void prim_substring(EvalState & state, const Pos & pos, Value * * args, V
     int start = state.forceInt(*args[0], pos);
     int len = state.forceInt(*args[1], pos);
     PathSet context;
-    string s = state.coerceToString(*args[2], context);
+    string s = state.coerceToString(pos, *args[2], context);
 
     if (start < 0) throw EvalError(format("negative start position in `substring', at %1%") % pos);
 
@@ -1130,7 +1130,7 @@ static void prim_substring(EvalState & state, const Pos & pos, Value * * args, V
 static void prim_stringLength(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    string s = state.coerceToString(*args[0], context);
+    string s = state.coerceToString(pos, *args[0], context);
     mkInt(v, s.size());
 }
 
@@ -1138,7 +1138,7 @@ static void prim_stringLength(EvalState & state, const Pos & pos, Value * * args
 static void prim_unsafeDiscardStringContext(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    string s = state.coerceToString(*args[0], context);
+    string s = state.coerceToString(pos, *args[0], context);
     mkString(v, s, PathSet());
 }
 
@@ -1152,7 +1152,7 @@ static void prim_unsafeDiscardStringContext(EvalState & state, const Pos & pos, 
 static void prim_unsafeDiscardOutputDependency(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    string s = state.coerceToString(*args[0], context);
+    string s = state.coerceToString(pos, *args[0], context);
 
     PathSet context2;
     foreach (PathSet::iterator, i, context) {
