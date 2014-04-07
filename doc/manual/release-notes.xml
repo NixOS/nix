@@ -7,7 +7,7 @@
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-1.7"><title>Release 1.7 (TBA)</title>
+<section xml:id="ssec-relnotes-1.7"><title>Release 1.7 (April 8, 2014)</title>
 
 <para>In addition to the usual bug fixes, this release has the
 following new features:</para>
@@ -220,6 +220,17 @@ error: the package ‘libreoffice-4.0.5.2’ in ‘.../applications/office/libre
 
 <screen>
 $ bash &lt;(curl https://nixos.org/nix/install)
+</screen>
+
+    </para>
+  </listitem>
+
+  <listitem>
+    <para>More evaluation errors include position information. For
+    instance, selecting a missing attribute will print something like
+
+<screen>
+error: attribute `nixUnstabl' missing, at /etc/nixos/configurations/misc/eelco/mandark.nix:216:15
 </screen>
 
     </para>
