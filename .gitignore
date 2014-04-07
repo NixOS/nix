@@ -108,6 +108,9 @@ Makefile.config
 /perl/lib/Nix/Config.pm
 /perl/lib/Nix/Store.cc
 
+/misc/systemd/nix-daemon.service
+/misc/systemd/nix-daemon.socket
+
 *.a
 *.o
 *.so

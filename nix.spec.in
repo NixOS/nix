@@ -132,14 +132,6 @@ done
 # (until this is fixed in the relevant Makefile)
 chmod -x $RPM_BUILD_ROOT%{_sysconfdir}/profile.d/nix.sh
 
-# systemd not available on RHEL yet
-%if ! 0%{?rhel}
-# install systemd service descriptor
-mkdir -p $RPM_BUILD_ROOT%{_prefix}/lib/systemd/system
-cp -p misc/systemd/nix-daemon.service \
-  $RPM_BUILD_ROOT%{_prefix}/lib/systemd/system/
-%endif
-
 # Copy the byte-compiled mode file by hand
 cp -p misc/emacs/nix-mode.elc $RPM_BUILD_ROOT%{_emacs_sitelispdir}/
 
