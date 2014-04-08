@@ -158,8 +158,8 @@ chgrp %{nixbld_group} /nix/store
 chmod 1775 /nix/store
 %if ! 0%{?rhel}
 # Enable and start Nix worker
-systemctl enable nix-daemon.service
-systemctl start  nix-daemon.service
+systemctl enable nix-daemon.socket nix-daemon.service
+systemctl start  nix-daemon.socket
 %endif
 
 %files
@@ -169,6 +169,7 @@ systemctl start  nix-daemon.service
 %exclude %dir %{perl_vendorarch}/auto/
 %{_prefix}/libexec/*
 %if ! 0%{?rhel}
+%{_prefix}/lib/systemd/system/nix-daemon.socket
 %{_prefix}/lib/systemd/system/nix-daemon.service
 %endif
 %{_datadir}/emacs/site-lisp/nix-mode.el
