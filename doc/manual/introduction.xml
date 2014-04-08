@@ -254,33 +254,6 @@ xlink:href="http://nixos.org/">NixOS homepage</link>.</para>
 </section>
 
 
-<section><title>About us</title>
-
-<para>Nix was originally developed at the <link
-xlink:href="http://www.cs.uu.nl/">Department of Information and
-Computing Sciences</link>, Utrecht University by the <link
-xlink:href="http://www.cs.uu.nl/wiki/Trace/WebHome">TraCE
-project</link> (2003-2008).  The project was funded by the Software
-Engineering Research Program <link
-xlink:href="http://www.jacquard.nl/">Jacquard</link> to improve the
-support for variability in software systems.  Further funding was
-provided by the NIRICT LaQuSo Build Farm project.  Development is
-currently supported by <link
-xlink:href="http://www.logicblox.com/">LogicBlox</link>.</para>
-
-</section>
-
-
-<section><title>About this manual</title>
-
-<para>This manual tells you how to install and use Nix and how to
-write Nix expressions for software not already in the Nix Packages
-collection.  It also discusses some advanced topics, such as setting
-up distributed multi-platform building.</para>
-
-</section>
-
-
 <section><title>License</title>
 
 <para>Nix is free software; you can redistribute it and/or modify it
@@ -293,43 +266,6 @@ version.  Nix is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 Lesser General Public License for more details.</para>
-
-</section>
-
-
-<section><title>More information</title>
-
-<para>Some background information on Nix can be found in a number of
-papers.  The ICSE 2004 paper <citetitle
-xlink:href='http://www.st.ewi.tudelft.nl/~dolstra/pubs/immdsd-icse2004-final.pdf'>Imposing
-a Memory Management Discipline on Software Deployment</citetitle>
-discusses the hashing mechanism used to ensure reliable dependency
-identification and non-interference between different versions and
-variants of packages.  The LISA 2004 paper <citetitle
-xlink:href='http://www.st.ewi.tudelft.nl/~dolstra/pubs/nspfssd-lisa2004-final.pdf'>Nix:
-A Safe and Policy-Free System for Software Deployment</citetitle>
-gives a more general discussion of Nix from a system-administration
-perspective.  The CBSE 2005 paper <citetitle
-xlink:href='http://www.st.ewi.tudelft.nl/~dolstra/pubs/eupfcdm-cbse2005-final.pdf'>Efficient
-Upgrading in a Purely Functional Component Deployment Model
-</citetitle> is about transparent patch deployment in Nix.  The SCM-12
-paper <citetitle
-xlink:href='http://www.st.ewi.tudelft.nl/~dolstra/pubs/servicecm-scm12-final.pdf'>
-Service Configuration Management</citetitle> shows how services (e.g.,
-web servers) can be deployed and managed through Nix.  An overview of
-NixOS is given in the JFP article <citetitle
-xlink:href="http://www.st.ewi.tudelft.nl/~dolstra/pubs/nixos-jfp-final.pdf">NixOS:
-A Purely Functional Linux Distribution</citetitle>.  The Nix homepage
-has <link xlink:href="http://nixos.org/docs/papers.html">an up-to-date
-list of Nix-related papers</link>.</para>
-
-<para>Nix is the subject of Eelco Dolstra’s PhD thesis <citetitle
-xlink:href="http://igitur-archive.library.uu.nl/dissertations/2006-0118-200031/index.htm">The
-Purely Functional Software Deployment Model</citetitle>, which
-contains most of the papers listed above.</para>
-
-<para>Nix has a homepage at <link
-xlink:href="http://nixos.org/"/>.</para>
 
 </section>
 
