@@ -208,7 +208,7 @@ foreach my $expr (@exprs) {
         # Set the environment.
         if ($pure) {
             foreach my $name (keys %ENV) {
-                next if grep { $_ eq $name } ("HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL", "TZ");
+                next if grep { $_ eq $name } ("HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL", "TZ", "PAGER");
                 delete $ENV{$name};
             }
             # NixOS hack: prevent /etc/bashrc from sourcing /etc/profile.
