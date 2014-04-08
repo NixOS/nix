@@ -48,7 +48,7 @@ static Path parsePath(std::istream & str)
 {
     string s = parseString(str);
     if (s.size() == 0 || s[0] != '/')
-        throw Error(format("bad path `%1%' in derivation") % s);
+        throw FormatError(format("bad path `%1%' in derivation") % s);
     return s;
 }
 
@@ -62,7 +62,7 @@ static StringSet parseStrings(std::istream & str, bool arePaths)
 }
 
 
-Derivation parseDerivation(const string & s)
+static Derivation parseDerivation(const string & s)
 {
     Derivation drv;
     std::istringstream str(s);
@@ -109,6 +109,16 @@ Derivation parseDerivation(const string & s)
 
     expect(str, ")");
     return drv;
+}
+
+
+Derivation readDerivation(const Path & drvPath)
+{
+    try {
+        return parseDerivation(readFile(drvPath));
+    } catch (FormatError & e) {
+        throw Error(format("error parsing derivation `%1%': %2%") % drvPath % e.msg());
+    }
 }
 
 
@@ -240,7 +250,7 @@ Hash hashDerivationModulo(StoreAPI & store, Derivation drv)
         Hash h = drvHashes[i->first];
         if (h.type == htUnknown) {
             assert(store.isValidPath(i->first));
-            Derivation drv2 = parseDerivation(readFile(i->first));
+            Derivation drv2 = readDerivation(i->first);
             h = hashDerivationModulo(store, drv2);
             drvHashes[i->first] = h;
         }

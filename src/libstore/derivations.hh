@@ -59,8 +59,8 @@ class StoreAPI;
 Path writeDerivation(StoreAPI & store,
     const Derivation & drv, const string & name, bool repair = false);
 
-/* Parse a derivation. */
-Derivation parseDerivation(const string & s);
+/* Read a derivation from a file. */
+Derivation readDerivation(const Path & drvPath);
 
 /* Print a derivation. */
 string unparseDerivation(const Derivation & drv);

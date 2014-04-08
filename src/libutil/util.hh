@@ -326,6 +326,8 @@ bool hasSuffix(const string & s, const string & suffix);
 /* Read string `s' from stream `str'. */
 void expect(std::istream & str, const string & s);
 
+MakeError(FormatError, Error)
+
 
 /* Read a C-style string from stream `str'. */
 string parseString(std::istream & str);

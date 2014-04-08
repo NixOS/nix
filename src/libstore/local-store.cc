@@ -661,7 +661,7 @@ unsigned long long LocalStore::addValidPath(const ValidPathInfo & info, bool che
        efficiently query whether a path is an output of some
        derivation. */
     if (isDerivation(info.path)) {
-        Derivation drv = parseDerivation(readFile(info.path));
+        Derivation drv = readDerivation(info.path);
 
         /* Verify that the output paths in the derivation are correct
            (i.e., follow the scheme for computing output paths from
@@ -1290,7 +1290,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
             if (isDerivation(i->path)) {
                 // FIXME: inefficient; we already loaded the
                 // derivation in addValidPath().
-                Derivation drv = parseDerivation(readFile(i->path));
+                Derivation drv = readDerivation(i->path);
                 checkDerivationOutputs(i->path, drv);
             }
 

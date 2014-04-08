@@ -1041,7 +1041,7 @@ void expect(std::istream & str, const string & s)
     char s2[s.size()];
     str.read(s2, s.size());
     if (string(s2, s.size()) != s)
-        throw Error(format("expected string `%1%'") % s);
+        throw FormatError(format("expected string `%1%'") % s);
 }
 
 
