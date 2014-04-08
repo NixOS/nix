@@ -42,7 +42,28 @@ platforms as well.</para>
 
 <section><title>Installing a binary distribution</title>
 
-<para>The easiest way to install Nix is to use a binary package.
+<para>The easiest way to install Nix is to run the following:
+
+<screen>
+$ bash &lt;(curl https://nixos.org/nix/install)
+</screen>
+
+This will perform a single-user installation of Nix, meaning that
+<filename>/nix</filename> is owned by the invoking user.  You should
+run this under your usual user account, <emphasis>not</emphasis> as
+root.  The script will invoke <command>sudo</command> to create
+<filename>/nix</filename> if it doesn’t already exist.  If you don’t
+have <command>sudo</command>, you should manually create
+<command>/nix</command> first as root:
+
+<screen>
+$ mkdir /nix
+$ chown alice /nix
+</screen>
+
+</para>
+
+<para>You can also manually download and install a binary package.
 Binary packages of the latest stable release are available for Fedora,
 Debian, Ubuntu, Mac OS X and various other systems from the <link
 xlink:href="http://nixos.org/nix/download.html">Nix homepage</link>.
@@ -55,7 +76,7 @@ build system</link>.</para>
 or upgraded using <command>rpm -U</command>.  For example,
 
 <screen>
-$ rpm -U nix-1.0-1.i386.rpm</screen>
+$ rpm -U nix-1.7-1.i386.rpm</screen>
 
 </para>
 
@@ -63,32 +84,22 @@ $ rpm -U nix-1.0-1.i386.rpm</screen>
 install it like this:
 
 <screen>
-$ dpkg -i nix_1.0-1_amd64.deb</screen>
+$ dpkg -i nix_1.7-1_amd64.deb</screen>
 
 </para>
 
 <para>For other platforms, including Mac OS X (Darwin), FreeBSD and
-other Linux distributions, you can download a binary tarball.  It
-contains Nix and all its dependencies.  You should unpack it somewhere
-(e.g. in <filename>/tmp</filename>), and then run the script named
-<command>install</command> inside the binary tarball:
+other Linux distributions, you can download a binary tarball that
+contains Nix and all its dependencies.  (This is what the install
+script at <uri>https://nixos.org/nix/install</uri> uses.)  You should
+unpack it somewhere (e.g. in <filename>/tmp</filename>), and then run
+the script named <command>install</command> inside the binary tarball:
 
 <screen>
 alice$ cd /tmp
-alice$ tar xfj nix-1.1-x86_64-darwin.tar.bz2
-alice$ cd nix-1.1-x86_64-darwin
+alice$ tar xfj nix-1.7-x86_64-darwin.tar.bz2
+alice$ cd nix-1.7-x86_64-darwin
 alice$ ./install
-</screen>
-
-You should run this under your usual user account,
-<emphasis>not</emphasis> as root.  The script will invoke
-<command>sudo</command> to create <filename>/nix</filename> if it
-doesn’t already exist.  If you don’t have <command>sudo</command>, you
-should manually create <command>/nix</command> first as root:
-
-<screen>
-$ mkdir /nix
-$ chown alice /nix
 </screen>
 
 </para>
@@ -117,8 +128,7 @@ a source distribution.</para>
 
   <listitem><para>GNU Make.</para></listitem>
 
-  <listitem><para>A fairly recent version of GCC/G++.  Version 2.95
-  and higher should work.  Clang will also work.</para></listitem>
+  <listitem><para>A version of GCC or Clang that supports C++11.</para></listitem>
 
   <listitem><para>Perl 5.8 or higher.</para></listitem>
 
