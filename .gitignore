@@ -31,7 +31,6 @@ Makefile.config
 /doc/manual/*.1
 /doc/manual/*.5
 /doc/manual/*.8
-/doc/manual/images
 /doc/manual/version.txt
 /doc/manual/release-notes.html
 

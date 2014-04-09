@@ -60,7 +60,7 @@ $(foreach file, $(d)/manual.html $(d)/style.css, $(eval $(call install-data-in, 
 
 $(foreach file, $(wildcard $(d)/figures/*.png), $(eval $(call install-data-in, $(file), $(docdir)/manual/figures)))
 
-$(foreach file, $(wildcard $(docbookxsl)/images/callouts/*.gif), $(eval $(call install-data-in, $(file), $(docdir)/manual/images/callouts)))
+$(foreach file, $(wildcard $(d)/images/callouts/*.gif), $(eval $(call install-data-in, $(file), $(docdir)/manual/images/callouts)))
 
 $(eval $(call install-symlink, manual.html, $(docdir)/manual/index.html))
 
