@@ -18,7 +18,6 @@ fi
 
 if [ "$(id -u)" -eq 0 ]; then
     echo "warning: installing Nix as root is not recommended" >&2
-    exit 1
 fi
 
 echo "performing a single-user installation of Nix..." >&2
