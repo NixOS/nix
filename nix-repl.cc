@@ -323,7 +323,7 @@ bool NixRepl::processLine(string line)
                but doing it in a child makes it easier to recover from
                problems / SIGINT. */
             if (runProgram("nix-store", Strings{"-r", drvPath}) == 0) {
-                Derivation drv = parseDerivation(readFile(drvPath));
+                Derivation drv = readDerivation(drvPath);
                 std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
                 foreach (DerivationOutputs::iterator, i, drv.outputs)
                     std::cout << format("  %1% -> %2%") % i->first % i->second.path << std::endl;
@@ -494,7 +494,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
             str << "«derivation ";
             Bindings::iterator i = v.attrs->find(state.sDrvPath);
             PathSet context;
-            Path drvPath = i != v.attrs->end() ? state.coerceToPath(*i->value, context) : "???";
+            Path drvPath = i != v.attrs->end() ? state.coerceToPath(*i->pos, *i->value, context) : "???";
             str << drvPath << "»";
         }
 
