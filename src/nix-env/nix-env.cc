@@ -1315,11 +1315,17 @@ static void opDeleteGenerations(Globals & globals,
 
             oldTime = curTime - days * 24 * 3600;
 
-            for (Generations::iterator j = gens.begin(); j != gens.end(); ++j) {
-                if (j->number == curGen) continue;
-
-                if (j->creationTime < oldTime)
+            bool canDelete = false;
+            for (Generations::reverse_iterator j = gens.rbegin(); j != gens.rend(); ++j) {
+                if (canDelete) {
+                    assert(j->creationTime < oldTime);
                     deleteGeneration2(globals, j->number);
+                } else if (j->creationTime < oldTime) {
+                    /* We may now start deleting generations, but we don't delete
+                       this generation yet, because this generation was still the
+                       one that was active at the requested point in time. */
+                    canDelete = true;
+                }
             }
         } else {
             int n;
