@@ -216,8 +216,10 @@ void NixRepl::completePrefix(string prefix)
 
         } catch (ParseError & e) {
             // Quietly ignore parse errors.
-        }catch (EvalError & e) {
+        } catch (EvalError & e) {
             // Quietly ignore evaluation errors.
+        } catch (UndefinedVarError & e) {
+            // Quietly ignore undefined variable errors.
         }
     }
 }
