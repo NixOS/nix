@@ -4,7 +4,7 @@
 
 with import <nixpkgs/nixos/lib/testing.nix> { inherit system; };
 
-makeTest ({ pkgs, ... }:
+makeTest (
 
 let
 
@@ -57,7 +57,7 @@ in
             ];
           virtualisation.writableStore = true;
           virtualisation.pathsInNixDB = [ config.system.build.extraUtils ];
-          environment.nix = nix;
+          nix.package = nix;
         };
     };
 

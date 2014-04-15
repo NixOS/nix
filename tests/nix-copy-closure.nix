@@ -4,14 +4,14 @@
 
 with import <nixpkgs/nixos/lib/testing.nix> { inherit system; };
 
-makeTest ({ pkgs, ... }: let pkgA = pkgs.aterm; pkgB = pkgs.wget; in {
+makeTest (let pkgA = pkgs.aterm; pkgB = pkgs.wget; in {
 
   nodes =
     { client =
         { config, pkgs, ... }:
         { virtualisation.writableStore = true;
           virtualisation.pathsInNixDB = [ pkgA ];
-          environment.nix = nix;
+          nix.package = nix;
         };
 
       server =
@@ -19,7 +19,7 @@ makeTest ({ pkgs, ... }: let pkgA = pkgs.aterm; pkgB = pkgs.wget; in {
         { services.openssh.enable = true;
           virtualisation.writableStore = true;
           virtualisation.pathsInNixDB = [ pkgB ];
-          environment.nix = nix;
+          nix.package = nix;
         };
     };
 
