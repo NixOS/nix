@@ -45,8 +45,9 @@ which deletes all old generations of all profiles in
 impossible); and
 <option>--delete-older-than</option> <replaceable>period</replaceable>,
 where period is a value such as <literal>30d</literal>, which deletes
-all non-current generations that are older than the specified number of
-days in all profiles in <filename>/nix/var/nix/profiles</filename>.
+all generations older than the specified number of days in all profiles
+in <filename>/nix/var/nix/profiles</filename> (except for the generations
+that were active at that point in time).
 </para>
 
 </refsection>
