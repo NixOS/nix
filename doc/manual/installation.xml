@@ -69,7 +69,7 @@ Debian, Ubuntu, Mac OS X and various other systems from the <link
 xlink:href="http://nixos.org/nix/download.html">Nix homepage</link>.
 You can also get builds of the latest development release from our
 <link
-xlink:href="http://hydra.nixos.org/job/nix/trunk/release/latest-finished#tabs-constituents">continuous
+xlink:href="http://hydra.nixos.org/job/nix/master/release/latest-finished#tabs-constituents">continuous
 build system</link>.</para>
 
 <para>For Fedora, RPM packages are available.  These can be installed
@@ -197,7 +197,7 @@ a source distribution.</para>
 downloaded from the <link
 xlink:href="http://nixos.org/nix/download.html">Nix homepage</link>.
 You can also grab the <link
-xlink:href="http://hydra.nixos.org/job/nix/trunk/release/latest-finished#tabs-constituents">most
+xlink:href="http://hydra.nixos.org/job/nix/master/release/latest-finished#tabs-constituents">most
 recent development release</link>.</para>
 
 <para>Alternatively, the most recent sources of Nix can be obtained
