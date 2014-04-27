@@ -1060,9 +1060,9 @@ command.</para>
 
 <refsection><title>Description</title>
             
-<para>The operation <option>--export</option> reads a serialisation of
+<para>The operation <option>--import</option> reads a serialisation of
 a set of store paths produced by <command
-linkend="refsec-nix-store-export">nix-store --import</command> from
+linkend="refsec-nix-store-export">nix-store --export</command> from
 standard input and adds those store paths to the Nix store.  Paths
 that already exist in the Nix store are ignored.  If a path refers to
 another path that doesn’t exist in the Nix store, the import
