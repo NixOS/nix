@@ -117,10 +117,6 @@ make DESTDIR=$RPM_BUILD_ROOT install
 
 find $RPM_BUILD_ROOT -name '*.la' -exec rm -f {} ';'
 
-# Specify build users group
-mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/nix
-echo "build-users-group = %{nixbld_group}" > $RPM_BUILD_ROOT%{_sysconfdir}/nix/nix.conf
-
 # make per-user directories
 for d in profiles gcroots;
 do
@@ -137,6 +133,9 @@ cp -p misc/emacs/nix-mode.elc $RPM_BUILD_ROOT%{_emacs_sitelispdir}/
 
 # we ship this file in the base package
 rm -f $RPM_BUILD_ROOT%{_defaultdocdir}/%{name}-doc-%{version}/README
+
+# Get rid of Upstart job.
+rm -rf $RPM_BUILD_ROOT%{_sysconfdir}/init
 
 
 %clean
