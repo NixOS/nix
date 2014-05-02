@@ -5,6 +5,7 @@
 
 #include <map>
 #include <algorithm>
+#include <unistd.h>
 
 
 namespace nix {
@@ -29,6 +30,10 @@ Settings::Settings()
     buildVerbosity = lvlError;
     maxBuildJobs = 1;
     buildCores = 1;
+#ifdef _SC_NPROCESSORS_ONLN
+    long res = sysconf(_SC_NPROCESSORS_ONLN);
+    if (res > 0) buildCores = res;
+#endif
     readOnlyMode = false;
     thisSystem = SYSTEM;
     maxSilentTime = 0;
