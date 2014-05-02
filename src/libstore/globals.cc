@@ -40,6 +40,7 @@ Settings::Settings()
     useSQLiteWAL = true;
     syncBeforeRegistering = false;
     useSubstitutes = true;
+    buildUsersGroup = getuid() == 0 ? "nixbld" : "";
     useChroot = false;
     useSshSubstituter = false;
     impersonateLinux26 = false;
