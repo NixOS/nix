@@ -308,7 +308,7 @@ a Trojan horse.</para>
 
 
 <section><title>Single-user mode</title>
-  
+
 <para>In single-user mode, all Nix operations that access the database
 in <filename><replaceable>prefix</replaceable>/var/nix/db</filename>
 or modify the Nix store in
@@ -354,58 +354,21 @@ done by <systemitem class="username">root</systemitem>.</para></note>
 
 <para>The <emphasis>build users</emphasis> are the special UIDs under
 which builds are performed.  They should all be members of the
-<emphasis>build users group</emphasis> (usually called
-<literal>nixbld</literal>).  This group should have no other members.
-The build users should not be members of any other group.</para>
-
-<para>Here is a typical <filename>/etc/group</filename> definition of
-the build users group with 10 build users:
-
-<programlisting>
-nixbld:!:30000:nixbld1,nixbld2,nixbld3,nixbld4,nixbld5,nixbld6,nixbld7,nixbld8,nixbld9,nixbld10
-</programlisting>
-
-In this example the <literal>nixbld</literal> group has UID 30000, but
-of course it can be anything that doesn’t collide with an existing
-group.</para>
-
-<para>Here is the corresponding part of
-<filename>/etc/passwd</filename>:
-
-<programlisting>
-nixbld1:x:30001:65534:Nix build user 1:/var/empty:/noshell
-nixbld2:x:30002:65534:Nix build user 2:/var/empty:/noshell
-nixbld3:x:30003:65534:Nix build user 3:/var/empty:/noshell
-...
-nixbld10:x:30010:65534:Nix build user 10:/var/empty:/noshell
-</programlisting>
-
-The home directory of the build users should not exist or should be an
-empty directory to which they do not have write access.</para>
-
-<para>The build users should have write access to the Nix store, but
-they should not have the right to delete files.  Thus the Nix store’s
-group should be the build users group, and it should have the sticky
-bit turned on (like <filename>/tmp</filename>):
+<emphasis>build users group</emphasis> <literal>nixbld</literal>.
+This group should have no other members.  The build users should not
+be members of any other group. On Linux, you can create the group and
+users as follows:
 
 <screen>
-$ chown root.nixbld /nix/store
-$ chmod 1775 /nix/store
+$ groupadd -r nixbld
+$ for n in $(seq 1 10); do useradd -c "Nix build user $n" \
+    -d /var/empty -g nixbld -G nixbld -M -N -r -s "$(which nologin)" \
+    nixbld$n; done
 </screen>
 
-</para>
-
-<para>Finally, you should tell Nix to use the build users by
-specifying the build users group in the <link
-linkend="conf-build-users-group"><literal>build-users-group</literal>
-option</link> in the <link linkend="sec-conf-file">Nix configuration
-file</link> (usually <literal>/etc/nix/nix.conf</literal>):
-
-<programlisting>
-build-users-group = nixbld
-</programlisting>
-
-</para>
+This creates 10 build users. There can never be more concurrent builds
+than the number of build users, so you may want to increase this if
+you expect to do many builds at the same time.</para>
 
 </section>
 
