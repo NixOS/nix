@@ -109,6 +109,7 @@ Makefile.config
 
 /misc/systemd/nix-daemon.service
 /misc/systemd/nix-daemon.socket
+/misc/upstart/nix-daemon.conf
 
 *.a
 *.o
