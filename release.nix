@@ -201,6 +201,8 @@ let
     deb_ubuntu1304x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1304x86_64) 80;
     deb_ubuntu1310i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1310i386) 90;
     deb_ubuntu1310x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1310x86_64) 90;
+    deb_ubuntu1404i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1404i386) 90;
+    deb_ubuntu1404x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1404x86_64) 90;
 
 
     # System tests.
@@ -235,6 +237,8 @@ let
           deb_ubuntu1304x86_64
           deb_ubuntu1310i386
           deb_ubuntu1310x86_64
+          deb_ubuntu1404i386
+          deb_ubuntu1404x86_64
           rpm_fedora19i386
           rpm_fedora19x86_64
           rpm_fedora20i386
