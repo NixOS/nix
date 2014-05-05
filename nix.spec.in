@@ -179,7 +179,6 @@ systemctl start  nix-daemon.socket
 %config(noreplace) %{_sysconfdir}/profile.d/nix.sh
 /nix
 %dir %{_sysconfdir}/nix
-%config(noreplace) %{_sysconfdir}/nix/nix.conf
 
 %files devel
 %{_includedir}/nix
