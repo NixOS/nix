@@ -178,7 +178,6 @@ systemctl start  nix-daemon.socket
 %{_mandir}/man8/*.8*
 %config(noreplace) %{_sysconfdir}/profile.d/nix.sh
 /nix
-%dir %{_sysconfdir}/nix
 
 %files devel
 %{_includedir}/nix
