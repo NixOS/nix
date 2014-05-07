@@ -375,8 +375,11 @@ expr_select
 
 expr_simple
   : ID {
+      /* !!! Should we disallow unknown expr_simple IDs starting with __ ? */
       if (strcmp($1, "__curPos") == 0)
           $$ = new ExprPos(CUR_POS);
+      else if (strcmp($1, "__curSettings") == 0)
+          $$ = data->settings.toExpr(data->state);
       else if (strcmp($1, "import") == 0)
           $$ = new ExprApp(CUR_POS, new ExprBuiltin(data->symbols.create("importWithSettings")),
               data->settings.toExpr(data->state));

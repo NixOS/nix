@@ -1,1 +1,1 @@
-<this> == ./test-nix-path.nix
+<nix> == <nix> && <this> == ./test-nix-path.nix
