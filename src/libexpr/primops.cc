@@ -42,6 +42,7 @@ std::pair<string, string> decodeContext(const string & s)
 static void prim_import(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
+    ParseSettings settings(state, pos, *args[0], context);
     Path path = state.coerceToPath(pos, *args[1], context);
 
     foreach (PathSet::iterator, i, context) {
@@ -88,7 +89,7 @@ static void prim_import(EvalState & state, const Pos & pos, Value * * args, Valu
         mkApp(v, fun, w);
         state.forceAttrs(v, pos);
     } else {
-        state.evalFile(path, v);
+        state.evalFile(path, v, settings);
     }
 }
 

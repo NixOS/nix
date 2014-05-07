@@ -547,6 +547,7 @@ formal
 #include <unistd.h>
 
 #include <eval.hh>
+#include <eval-inline.hh>
 
 
 namespace nix {
@@ -667,6 +668,35 @@ Path EvalState::findFile(const string & path)
 
 ParseSettings::ParseSettings() : expr(nullptr)
 {
+}
+
+
+ParseSettings::ParseSettings(EvalState & state, const Pos & pos, Value & v, PathSet & context)
+    : expr(nullptr)
+{
+    state.forceAttrs(v, pos);
+    auto nixPathIterator = v.attrs->find(state.symbols.create("nix-path"));
+    if (nixPathIterator == v.attrs->end()) {
+        searchPath = state.baseParseSettings.searchPath;
+    } else {
+        Value & list = *nixPathIterator->value;
+        Pos & listPos = *nixPathIterator->pos;
+        state.forceList(list, listPos);
+        for (unsigned int i = 0; i < list.list.length; ++i) {
+            Value & attrs = *list.list.elems[i];
+            state.forceAttrs(attrs, listPos);
+            auto prefixIterator = attrs.attrs->find(state.symbols.create("prefix"));
+            SearchPath::value_type pathEntry;
+            if (prefixIterator != attrs.attrs->end()) {
+                pathEntry.first = state.forceStringNoCtx(*prefixIterator->value, *prefixIterator->pos);
+            }
+            auto valueIterator = attrs.attrs->find(state.symbols.create("value"));
+            if (valueIterator == attrs.attrs->end())
+                throw EvalError(format("required attribute `value' missing, at %1%") % listPos);
+            pathEntry.second = state.coerceToPath(*valueIterator->pos, *valueIterator->value, context);
+            searchPath.push_back(pathEntry);
+        }
+    }
 }
 
 

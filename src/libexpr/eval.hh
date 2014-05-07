@@ -98,6 +98,10 @@ class ParseSettings {
 
     ParseSettings();
 
+    /* Initialize a settings from a nix value, putting any
+     * needed context into the passed set */
+    ParseSettings(EvalState & state, const Pos & pos, Value & v, PathSet & context);
+
     ExprAttrs *toExpr(EvalState & state) const;
 };
 
@@ -128,10 +132,10 @@ private:
 #endif
     FileEvalCache fileEvalCache;
 
-    ParseSettings baseParseSettings;
     SearchPath::iterator searchPathInsertionPoint;
 
 public:
+    ParseSettings baseParseSettings;
 
     EvalState();
     ~EvalState();
