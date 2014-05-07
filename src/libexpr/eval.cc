@@ -219,11 +219,11 @@ EvalState::EvalState()
 #endif
 
     /* Initialise the Nix expression search path. */
-    searchPathInsertionPoint = searchPath.end();
+    searchPathInsertionPoint = baseParseSettings.searchPath.end();
     Strings paths = tokenizeString<Strings>(getEnv("NIX_PATH", ""), ":");
     foreach (Strings::iterator, i, paths) addToSearchPath(*i);
     addToSearchPath("nix=" + settings.nixDataDir + "/nix/corepkgs");
-    searchPathInsertionPoint = searchPath.begin();
+    searchPathInsertionPoint = baseParseSettings.searchPath.begin();
 
     createBaseEnv();
 }
@@ -524,22 +524,24 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 }
 
 
-void EvalState::evalFile(const Path & path, Value & v)
+void EvalState::evalFile(const Path & path, Value & v, const ParseSettings & settings)
 {
     FileEvalCache::iterator i;
-    if ((i = fileEvalCache.find(path)) != fileEvalCache.end()) {
+    FileEvalCacheKey key(path, settings);
+    if ((i = fileEvalCache.find(key)) != fileEvalCache.end()) {
         v = i->second;
         return;
     }
 
     Path path2 = resolveExprPath(path);
-    if ((i = fileEvalCache.find(path2)) != fileEvalCache.end()) {
+    FileEvalCacheKey key2(path2, settings);
+    if ((i = fileEvalCache.find(key2)) != fileEvalCache.end()) {
         v = i->second;
         return;
     }
 
     startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path2);
-    Expr * e = parseExprFromFile(path2);
+    Expr * e = parseExprFromFile(path2, settings);
     try {
         eval(e, v);
     } catch (Error & e) {
@@ -547,8 +549,14 @@ void EvalState::evalFile(const Path & path, Value & v)
         throw;
     }
 
-    fileEvalCache[path2] = v;
-    if (path != path2) fileEvalCache[path] = v;
+    fileEvalCache[key2] = v;
+    if (path != path2) fileEvalCache[key] = v;
+}
+
+
+void EvalState::evalFile(const Path & path, Value & v)
+{
+    return evalFile(path, v, baseParseSettings);
 }
 
 
