@@ -88,10 +88,17 @@ std::ostream & operator << (std::ostream & str, const Value & v);
 
 typedef list<std::pair<string, Path> > SearchPath;
 
-struct ParseSettings {
+class ParseSettings {
+    mutable ExprAttrs *expr;
+
+    public:
     SearchPath searchPath;
 
     bool operator < (const ParseSettings & s) const;
+
+    ParseSettings();
+
+    ExprAttrs *toExpr(EvalState & state) const;
 };
 
 

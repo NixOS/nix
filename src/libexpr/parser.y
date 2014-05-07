@@ -378,7 +378,8 @@ expr_simple
       if (strcmp($1, "__curPos") == 0)
           $$ = new ExprPos(CUR_POS);
       else if (strcmp($1, "import") == 0)
-          $$ = new ExprApp(CUR_POS, new ExprBuiltin(data->symbols.create("importWithSettings")), new ExprAttrs());
+          $$ = new ExprApp(CUR_POS, new ExprBuiltin(data->symbols.create("importWithSettings")),
+              data->settings.toExpr(data->state));
       else
           $$ = new ExprVar(CUR_POS, data->symbols.create($1));
   }
@@ -664,8 +665,39 @@ Path EvalState::findFile(const string & path)
 }
 
 
-bool ParseSettings::operator < (const ParseSettings & s) const {
+ParseSettings::ParseSettings() : expr(nullptr)
+{
+}
+
+
+bool ParseSettings::operator < (const ParseSettings & s) const
+{
     return searchPath < s.searchPath;
+}
+
+
+ExprAttrs *ParseSettings::toExpr(EvalState & state) const
+{
+    /* !!! Must ensure it is safe to bindVars etc. expr in any context */
+    if (expr == nullptr) {
+        /* !!! If nix is ever multithreaded, need to ensure thread safety here */
+        expr = new ExprAttrs();
+        ExprList *nixPathExpr = new ExprList();
+        nixPathExpr->elems.reserve(searchPath.size());
+        for (auto i : searchPath) {
+            ExprAttrs *pathElementExpr = new ExprAttrs();
+            if (!i.first.empty()) {
+                pathElementExpr->attrs[state.symbols.create("prefix")] =
+                    ExprAttrs::AttrDef(new ExprString(state.symbols.create(i.first)), noPos, false);
+            }
+            pathElementExpr->attrs[state.symbols.create("value")] =
+                ExprAttrs::AttrDef(new ExprString(state.symbols.create(i.second)), noPos, false);
+            nixPathExpr->elems.push_back(pathElementExpr);
+        }
+        expr->attrs[state.symbols.create("nix-path")] =
+            ExprAttrs::AttrDef(nixPathExpr, noPos, false);
+    }
+    return expr;
 }
 
 
