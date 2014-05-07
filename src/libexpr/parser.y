@@ -375,6 +375,8 @@ expr_simple
   : ID {
       if (strcmp($1, "__curPos") == 0)
           $$ = new ExprPos(CUR_POS);
+      else if (strcmp($1, "import") == 0)
+          $$ = new ExprApp(CUR_POS, new ExprBuiltin(data->symbols.create("importWithSettings")), new ExprAttrs());
       else
           $$ = new ExprVar(CUR_POS, data->symbols.create($1));
   }
