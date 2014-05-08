@@ -776,7 +776,71 @@ stdenv.mkDerivation {
   expression that contained it.  For instance, if a Nix expression in
   <filename>/foo/bar/bla.nix</filename> refers to
   <filename>../xyzzy/fnord.nix</filename>, the absolute path is
-  <filename>/foo/xyzzy/fnord.nix</filename>.</para></listitem>
+  <filename>/foo/xyzzy/fnord.nix</filename>.</para>
+
+  <para>As an alternative syntax for paths, nix
+  has a search path known as the <emphasis>nix path</emphasis>. A nix
+  path lookup looks something like <literal>&lt;foo/bar&gt;</literal>.
+  The nix path is a list of components, each of which is a path with an
+  optional prefix. At parse time, a path in this format is looked up in
+  the nix path by iterating through each component with the following
+  aglorithm:
+
+  <orderedlist>
+    <listitem><para>If the component has a prefix and it doesn't match
+    the part of the path before the first slash, go to the next
+    component</para></listitem>
+
+    <listitem><para>If the component has a prefix and it matches the
+    part of the path before the first slash, remove the prefix from the
+    path for the rest of the steps for this component.</para></listitem>
+
+    <listitem><para>Append the path to the path of the component.
+    </para></listitem>
+
+    <listitem><para>If the appended path exists on the filesystem, use
+    that path and stop.</para></listitem>
+
+    <listitem><para>If the appended path doesn't exists on the
+    filesystem, go to the next component.</para></listitem>
+  </orderedlist>
+
+  If the process goes through all of the components without a match,
+  the path is replaced with a value that lazily throws an error when
+  forced. For example, consider the <literal>&lt;foo/bar&gt;</literal>
+  example with a nix path whose first component has no prefix and has
+  the path <filename>/baz</filename> and whose second component has the
+  prefix <literal>foo</literal> and the path <filename>/qux</filename>.
+  If <filename>/baz/foo/bar</filename> exists it will be used,
+  otherwise if <filename>/qux/bar</filename> exists it will be used,
+  otherwise forcing the value will throw an error.</para>
+
+  <para>The nix path can be specified in three ways, in reverse order
+  of precedence:<orderedlist>
+    <listitem><para>The <envar>NIX_PATH</envar> can be a <literal>:
+    </literal>-separated list of components, with prefixes represented
+    by prepending the path with <replaceable>prefix</replaceable>
+    <literal>=</literal>. For example, <literal>/baz:foo=/qux</literal>
+    would correspond to the nix path in the above example.</para>
+    </listitem>
+
+    <listitem><para>The <literal>-I</literal> command line flag can
+    be used multiple times for all nix commands to specify entries on
+    the path. For example, <command>nix-instantiate -I /baz -I foo=/qux
+    </command> would correspond to the nix path in the above example.
+    </para></listitem>
+
+    <listitem><para>The <literal>importWithSettings</literal> builtin
+    allows specifying a nix path as a list of sets, each of which
+    contains a <literal>value</literal> attribute and an optional
+    <literal>prefix</literal> attribute. For example, <programlisting>
+      builtins.importWithSettings { nix-path = [
+        { value = /baz; }
+        { prefix = "foo"; value = /qux; }
+      ]; } foo.nix
+    </programlisting> would import <literal>foo.nix</literal> with the
+    nix path given in the above example.</para></listitem>
+  </orderedlist></para></listitem>
 
   <listitem><para><emphasis>Booleans</emphasis> with values
   <literal>true</literal> and
