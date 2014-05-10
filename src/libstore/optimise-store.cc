@@ -71,6 +71,16 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
         return;
     }
 
+    stats.totalFiles++;
+
+    /* If a store inode has 2 or more links we presume that it was
+       already linked by us */
+    /* TODO: allow overriding this behavior */
+    if (st.st_nlink > 1) {
+        printMsg(lvlDebug, format("`%1%' is already linked, with %2% other file(s).") % path % (st.st_nlink - 2));
+        return;
+    }
+
     /* Hash the file.  Note that hashPath() returns the hash over the
        NAR serialisation, which includes the execute bit on the file.
        Thus, executable and non-executable files with the same
@@ -81,7 +91,6 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
        contents of the symlink (i.e. the result of readlink()), not
        the contents of the target (which may not even exist). */
     Hash hash = hashPath(htSHA256, path).first;
-    stats.totalFiles++;
     printMsg(lvlDebug, format("`%1%' has hash `%2%'") % path % printHash(hash));
 
     /* Check if this is a known hash. */
