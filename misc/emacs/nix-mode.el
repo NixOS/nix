@@ -1,3 +1,9 @@
+;;; nix-mode.el --- Major mode for editing Nix expressions.
+
+;; Author: Eelco Dolstra
+;; URL: https://github.com/NixOS/nix/tree/master/misc/emacs
+;; Version: 1.0
+
 (defun nix-mode ()
   "Major mode for editing Nix expressions.
 
@@ -21,9 +27,9 @@ The hook `nix-mode-hook' is run when Nix mode is started.
 "
 
   (interactive)
-  
+
   (kill-all-local-variables)
-  
+
   (setq major-mode 'nix-mode)
   (setq mode-name "Nix")
 
@@ -53,9 +59,8 @@ The hook `nix-mode-hook' is run when Nix mode is started.
   (setq paragraph-start "[ \t]*\\(#+[ \t]*\\)?$")
   (make-local-variable 'paragraph-separate)
   (setq paragraph-separate paragraph-start)
-  
-  (run-hooks 'nix-mode-hook)
-  )
+
+  (run-hooks 'nix-mode-hook))
 
 
 (defvar nix-mode-map nil
@@ -83,8 +88,7 @@ The hook `nix-mode-hook' is run when Nix mode is started.
     ("<[a-zA-Z0-9._\\+-]+\\(/[a-zA-Z0-9._\\+-]+\\)*>"
      . font-lock-constant-face)
     ("[a-zA-Z0-9._\\+-]*\\(/[a-zA-Z0-9._\\+-]+\\)+"
-     . font-lock-constant-face)
-    ))
+     . font-lock-constant-face)))
 
 
 (defvar nix-mode-syntax-table nil
@@ -97,8 +101,7 @@ The hook `nix-mode-hook' is run when Nix mode is started.
       (modify-syntax-entry ?/ ". 14" nix-mode-syntax-table)
       (modify-syntax-entry ?* ". 23" nix-mode-syntax-table)
       (modify-syntax-entry ?# "< b" nix-mode-syntax-table)
-      (modify-syntax-entry ?\n "> b" nix-mode-syntax-table)
-      ))
+      (modify-syntax-entry ?\n "> b" nix-mode-syntax-table)))
 
 
 (defun nix-indent-line ()
@@ -111,3 +114,5 @@ The hook `nix-mode-hook' is run when Nix mode is started.
 (setq auto-mode-alist (cons '("\\.nix.in\\'" . nix-mode) auto-mode-alist))
 
 (provide 'nix-mode)
+
+;;; nix-mode.el ends here
