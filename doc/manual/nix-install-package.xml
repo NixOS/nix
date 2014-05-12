@@ -125,7 +125,7 @@ format:
 <screen>
 NIXPKG1 <replaceable>manifestURL</replaceable> <replaceable>name</replaceable> <replaceable>system</replaceable> <replaceable>drvPath</replaceable> <replaceable>outPath</replaceable></screen>
 
-The elemens are as follows:
+The elements are as follows:
 
 <variablelist>
 
