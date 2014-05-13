@@ -52,14 +52,19 @@ void processExpr(EvalState & state, const Strings & attrPaths,
         state.forceValue(v);
 
         PathSet context;
-        if (evalOnly)
+        if (evalOnly) {
+            Value vRes;
+            if (autoArgs.empty())
+                vRes = v;
+            else
+                state.autoCallFunction(autoArgs, v, vRes);
             if (xmlOutput)
-                printValueAsXML(state, strict, location, v, std::cout, context);
+                printValueAsXML(state, strict, location, vRes, std::cout, context);
             else {
-                if (strict) state.strictForceValue(v);
-                std::cout << v << std::endl;
+                if (strict) state.strictForceValue(vRes);
+                std::cout << vRes << std::endl;
             }
-        else {
+        } else {
             DrvInfos drvs;
             getDerivations(state, v, "", autoArgs, drvs, false);
             foreach (DrvInfos::iterator, i, drvs) {
