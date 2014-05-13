@@ -39,8 +39,22 @@ struct MakeReadOnly
     }
 };
 
+// TODO Make this a map and keep count and size stats, for giggles
+void LocalStore::loadHashes(Hashes & hashes)
+{
+    printMsg(lvlDebug, "loading hash inodes in memory");
+    Strings names = readDirectory(linksDir);
+    foreach (Strings::iterator, i, names) {
+        struct stat st;
+        string path = linksDir + "/" + *i;
+        if (lstat(path.c_str(), &st))
+            throw SysError(format("getting attributes of path `%1%'") % path);
+        hashes.insert(st.st_ino);
+    }
+    printMsg(lvlDebug, format("loaded %1% hashes") % hashes.size());
+}
 
-void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
+void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, Hashes & hashes)
 {
     checkInterrupt();
     
@@ -51,7 +65,7 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
     if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectory(path);
         foreach (Strings::iterator, i, names)
-            optimisePath_(stats, path + "/" + *i);
+            optimisePath_(stats, path + "/" + *i, hashes);
         return;
     }
 
@@ -73,10 +87,7 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
 
     stats.totalFiles++;
 
-    /* If a store inode has 2 or more links we presume that it was
-       already linked by us */
-    /* TODO: allow overriding this behavior */
-    if (st.st_nlink > 1) {
+    if (st.st_nlink > 1 && hashes.count(st.st_ino)) {
         printMsg(lvlDebug, format("`%1%' is already linked, with %2% other file(s).") % path % (st.st_nlink - 2));
         return;
     }
@@ -98,7 +109,10 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
 
     if (!pathExists(linkPath)) {
         /* Nope, create a hard link in the links directory. */
-        if (link(path.c_str(), linkPath.c_str()) == 0) return;
+        if (link(path.c_str(), linkPath.c_str()) == 0) {
+            hashes.insert(st.st_ino);
+            return;
+	}
         if (errno != EEXIST)
             throw SysError(format("cannot link `%1%' to `%2%'") % linkPath % path);
         /* Fall through if another process created ‘linkPath’ before
@@ -169,12 +183,15 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
 void LocalStore::optimiseStore(OptimiseStats & stats)
 {
     PathSet paths = queryAllValidPaths();
+    Hashes hashes;
+
+    loadHashes(hashes);
 
     foreach (PathSet::iterator, i, paths) {
         addTempRoot(*i);
         if (!isValidPath(*i)) continue; /* path was GC'ed, probably */
         startNest(nest, lvlChatty, format("hashing files in `%1%'") % *i);
-        optimisePath_(stats, *i);
+        optimisePath_(stats, *i, hashes);
     }
 }
 
@@ -182,7 +199,9 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
 void LocalStore::optimisePath(const Path & path)
 {
     OptimiseStats stats;
-    if (settings.autoOptimiseStore) optimisePath_(stats, path);
+    Hashes hashes;
+
+    if (settings.autoOptimiseStore) optimisePath_(stats, path, hashes);
 }
 
 

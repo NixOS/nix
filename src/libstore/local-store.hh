@@ -6,6 +6,11 @@
 #include "util.hh"
 #include "pathlocks.hh"
 
+#if HAVE_TR1_UNORDERED_SET
+#include <tr1/unordered_set>
+#endif
+
+
 
 class sqlite3;
 class sqlite3_stmt;
@@ -303,7 +308,14 @@ private:
 
     void checkDerivationOutputs(const Path & drvPath, const Derivation & drv);
 
-    void optimisePath_(OptimiseStats & stats, const Path & path);
+#if HAVE_TR1_UNORDERED_SET
+    typedef std::tr1::unordered_set<ino_t> Hashes;
+#else
+    typedef std::set<ino_t> Hashes;
+#endif
+
+    void loadHashes(Hashes & hashes);
+    void optimisePath_(OptimiseStats & stats, const Path & path, Hashes & hashes);
 
     // Internal versions that are not wrapped in retry_sqlite.
     bool isValidPath_(const Path & path);
