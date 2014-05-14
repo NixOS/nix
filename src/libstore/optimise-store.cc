@@ -39,22 +39,28 @@ struct MakeReadOnly
     }
 };
 
-// TODO Make this a map and keep count and size stats, for giggles
-void LocalStore::loadHashes(Hashes & hashes)
+LocalStore::InodeHash LocalStore::loadInodeHash()
 {
     printMsg(lvlDebug, "loading hash inodes in memory");
-    Strings names = readDirectory(linksDir);
-    foreach (Strings::iterator, i, names) {
-        struct stat st;
-        string path = linksDir + "/" + *i;
-        if (lstat(path.c_str(), &st))
-            throw SysError(format("getting attributes of path `%1%'") % path);
-        hashes.insert(st.st_ino);
+    InodeHash hashes;
+
+    AutoCloseDir dir = opendir(linksDir.c_str());
+    if (!dir) throw SysError(format("opening directory `%1%'") % linksDir);
+
+    struct dirent * dirent;
+    while (errno = 0, dirent = readdir(dir)) { /* sic */
+        checkInterrupt();
+        // We don't care if we hit non-hash files, anything goes
+        hashes.insert(dirent->d_ino);
     }
-    printMsg(lvlDebug, format("loaded %1% hashes") % hashes.size());
+    if (errno) throw SysError(format("reading directory `%1%'") % linksDir);
+
+    printMsg(lvlInfo, format("loaded %1% hash inodes") % hashes.size());
+
+    return hashes;
 }
 
-void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, Hashes & hashes)
+void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHash & hashes)
 {
     checkInterrupt();
     
@@ -183,15 +189,13 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, Hashes 
 void LocalStore::optimiseStore(OptimiseStats & stats)
 {
     PathSet paths = queryAllValidPaths();
-    Hashes hashes;
-
-    loadHashes(hashes);
+    InodeHash inodeHash = loadInodeHash();
 
     foreach (PathSet::iterator, i, paths) {
         addTempRoot(*i);
         if (!isValidPath(*i)) continue; /* path was GC'ed, probably */
         startNest(nest, lvlChatty, format("hashing files in `%1%'") % *i);
-        optimisePath_(stats, *i, hashes);
+        optimisePath_(stats, *i, inodeHash);
     }
 }
 
@@ -199,9 +203,9 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
 void LocalStore::optimisePath(const Path & path)
 {
     OptimiseStats stats;
-    Hashes hashes;
+    InodeHash inodeHash;
 
-    if (settings.autoOptimiseStore) optimisePath_(stats, path, hashes);
+    if (settings.autoOptimiseStore) optimisePath_(stats, path, inodeHash);
 }
 
 

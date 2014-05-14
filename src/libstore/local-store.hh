@@ -309,13 +309,13 @@ private:
     void checkDerivationOutputs(const Path & drvPath, const Derivation & drv);
 
 #if HAVE_TR1_UNORDERED_SET
-    typedef std::tr1::unordered_set<ino_t> Hashes;
+    typedef std::tr1::unordered_set<ino_t> InodeHash;
 #else
-    typedef std::set<ino_t> Hashes;
+    typedef std::set<ino_t> InodeHash;
 #endif
 
-    void loadHashes(Hashes & hashes);
-    void optimisePath_(OptimiseStats & stats, const Path & path, Hashes & hashes);
+    InodeHash loadInodeHash();
+    void optimisePath_(OptimiseStats & stats, const Path & path, InodeHash & inodeHash);
 
     // Internal versions that are not wrapped in retry_sqlite.
     bool isValidPath_(const Path & path);
