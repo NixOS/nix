@@ -89,7 +89,7 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
 void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHash & inodeHash)
 {
     checkInterrupt();
-    
+
     struct stat st;
     if (lstat(path.c_str(), &st))
         throw SysError(format("getting attributes of path `%1%'") % path);
@@ -145,7 +145,7 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
         if (link(path.c_str(), linkPath.c_str()) == 0) {
             inodeHash.insert(st.st_ino);
             return;
-	}
+        }
         if (errno != EEXIST)
             throw SysError(format("cannot link `%1%' to `%2%'") % linkPath % path);
         /* Fall through if another process created ‘linkPath’ before
