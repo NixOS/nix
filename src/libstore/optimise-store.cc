@@ -56,7 +56,7 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
     }
     if (errno) throw SysError(format("reading directory `%1%'") % linksDir);
 
-    printMsg(lvlInfo, format("loaded %1% hash inodes") % inodeHash.size());
+    printMsg(lvlTalkative, format("loaded %1% hash inodes") % inodeHash.size());
 
     return inodeHash;
 }
