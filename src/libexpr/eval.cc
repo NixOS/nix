@@ -757,8 +757,16 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                 }
             } else {
                 state.forceAttrs(*vAttrs, pos);
-                if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
-                    throwEvalError("attribute `%1%' missing, at %2%", showAttrPath(attrPath), pos);
+                if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end()) {
+                    AttrPath staticPath;
+                    AttrPath::const_iterator j;
+                    for (j = attrPath.begin(); j != i; ++j)
+                        staticPath.push_back(AttrName(getName(*j, state, env)));
+                    staticPath.push_back(AttrName(getName(*j, state, env)));
+                    for (j = j + 1; j != attrPath.end(); ++j)
+                        staticPath.push_back(*j);
+                    throwEvalError("attribute `%1%' missing, at %2%", showAttrPath(staticPath), pos);
+                }
             }
             vAttrs = j->value;
             pos2 = j->pos;
