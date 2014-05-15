@@ -42,7 +42,7 @@ struct MakeReadOnly
 LocalStore::InodeHash LocalStore::loadInodeHash()
 {
     printMsg(lvlDebug, "loading hash inodes in memory");
-    InodeHash hashes;
+    InodeHash inodeHash;
 
     AutoCloseDir dir = opendir(linksDir.c_str());
     if (!dir) throw SysError(format("opening directory `%1%'") % linksDir);
@@ -51,16 +51,42 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
     while (errno = 0, dirent = readdir(dir)) { /* sic */
         checkInterrupt();
         // We don't care if we hit non-hash files, anything goes
-        hashes.insert(dirent->d_ino);
+        inodeHash.insert(dirent->d_ino);
     }
     if (errno) throw SysError(format("reading directory `%1%'") % linksDir);
 
-    printMsg(lvlInfo, format("loaded %1% hash inodes") % hashes.size());
+    printMsg(lvlInfo, format("loaded %1% hash inodes") % inodeHash.size());
 
-    return hashes;
+    return inodeHash;
 }
 
-void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHash & hashes)
+Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash, OptimiseStats & stats)
+{
+    Strings names;
+
+    AutoCloseDir dir = opendir(path.c_str());
+    if (!dir) throw SysError(format("opening directory `%1%'") % path);
+
+    struct dirent * dirent;
+    while (errno = 0, dirent = readdir(dir)) { /* sic */
+        checkInterrupt();
+
+        if (inodeHash.count(dirent->d_ino)) {
+            printMsg(lvlDebug, format("`%1%' is already linked") % dirent->d_name);
+            stats.totalFiles++;
+            continue;
+        }
+
+        string name = dirent->d_name;
+        if (name == "." || name == "..") continue;
+        names.push_back(name);
+    }
+    if (errno) throw SysError(format("reading directory `%1%'") % path);
+
+    return names;
+}
+
+void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHash & inodeHash)
 {
     checkInterrupt();
     
@@ -69,9 +95,9 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
         throw SysError(format("getting attributes of path `%1%'") % path);
 
     if (S_ISDIR(st.st_mode)) {
-        Strings names = readDirectory(path);
+        Strings names = readDirectoryIgnoringInodes(path, inodeHash, stats);
         foreach (Strings::iterator, i, names)
-            optimisePath_(stats, path + "/" + *i, hashes);
+            optimisePath_(stats, path + "/" + *i, inodeHash);
         return;
     }
 
@@ -93,7 +119,8 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
 
     stats.totalFiles++;
 
-    if (st.st_nlink > 1 && hashes.count(st.st_ino)) {
+    /* This can still happen on top-level files */
+    if (st.st_nlink > 1 && inodeHash.count(st.st_ino)) {
         printMsg(lvlDebug, format("`%1%' is already linked, with %2% other file(s).") % path % (st.st_nlink - 2));
         return;
     }
@@ -116,7 +143,7 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
     if (!pathExists(linkPath)) {
         /* Nope, create a hard link in the links directory. */
         if (link(path.c_str(), linkPath.c_str()) == 0) {
-            hashes.insert(st.st_ino);
+            inodeHash.insert(st.st_ino);
             return;
 	}
         if (errno != EEXIST)

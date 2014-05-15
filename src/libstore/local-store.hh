@@ -315,6 +315,7 @@ private:
 #endif
 
     InodeHash loadInodeHash();
+    Strings readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash, OptimiseStats & stats);
     void optimisePath_(OptimiseStats & stats, const Path & path, InodeHash & inodeHash);
 
     // Internal versions that are not wrapped in retry_sqlite.
