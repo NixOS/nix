@@ -39,8 +39,54 @@ struct MakeReadOnly
     }
 };
 
+LocalStore::InodeHash LocalStore::loadInodeHash()
+{
+    printMsg(lvlDebug, "loading hash inodes in memory");
+    InodeHash inodeHash;
 
-void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
+    AutoCloseDir dir = opendir(linksDir.c_str());
+    if (!dir) throw SysError(format("opening directory `%1%'") % linksDir);
+
+    struct dirent * dirent;
+    while (errno = 0, dirent = readdir(dir)) { /* sic */
+        checkInterrupt();
+        // We don't care if we hit non-hash files, anything goes
+        inodeHash.insert(dirent->d_ino);
+    }
+    if (errno) throw SysError(format("reading directory `%1%'") % linksDir);
+
+    printMsg(lvlInfo, format("loaded %1% hash inodes") % inodeHash.size());
+
+    return inodeHash;
+}
+
+Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash, OptimiseStats & stats)
+{
+    Strings names;
+
+    AutoCloseDir dir = opendir(path.c_str());
+    if (!dir) throw SysError(format("opening directory `%1%'") % path);
+
+    struct dirent * dirent;
+    while (errno = 0, dirent = readdir(dir)) { /* sic */
+        checkInterrupt();
+
+        if (inodeHash.count(dirent->d_ino)) {
+            printMsg(lvlDebug, format("`%1%' is already linked") % dirent->d_name);
+            stats.totalFiles++;
+            continue;
+        }
+
+        string name = dirent->d_name;
+        if (name == "." || name == "..") continue;
+        names.push_back(name);
+    }
+    if (errno) throw SysError(format("reading directory `%1%'") % path);
+
+    return names;
+}
+
+void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHash & inodeHash)
 {
     checkInterrupt();
     
@@ -49,9 +95,9 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
         throw SysError(format("getting attributes of path `%1%'") % path);
 
     if (S_ISDIR(st.st_mode)) {
-        Strings names = readDirectory(path);
+        Strings names = readDirectoryIgnoringInodes(path, inodeHash, stats);
         foreach (Strings::iterator, i, names)
-            optimisePath_(stats, path + "/" + *i);
+            optimisePath_(stats, path + "/" + *i, inodeHash);
         return;
     }
 
@@ -71,6 +117,14 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
         return;
     }
 
+    stats.totalFiles++;
+
+    /* This can still happen on top-level files */
+    if (st.st_nlink > 1 && inodeHash.count(st.st_ino)) {
+        printMsg(lvlDebug, format("`%1%' is already linked, with %2% other file(s).") % path % (st.st_nlink - 2));
+        return;
+    }
+
     /* Hash the file.  Note that hashPath() returns the hash over the
        NAR serialisation, which includes the execute bit on the file.
        Thus, executable and non-executable files with the same
@@ -81,7 +135,6 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
        contents of the symlink (i.e. the result of readlink()), not
        the contents of the target (which may not even exist). */
     Hash hash = hashPath(htSHA256, path).first;
-    stats.totalFiles++;
     printMsg(lvlDebug, format("`%1%' has hash `%2%'") % path % printHash(hash));
 
     /* Check if this is a known hash. */
@@ -89,7 +142,10 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
 
     if (!pathExists(linkPath)) {
         /* Nope, create a hard link in the links directory. */
-        if (link(path.c_str(), linkPath.c_str()) == 0) return;
+        if (link(path.c_str(), linkPath.c_str()) == 0) {
+            inodeHash.insert(st.st_ino);
+            return;
+	}
         if (errno != EEXIST)
             throw SysError(format("cannot link `%1%' to `%2%'") % linkPath % path);
         /* Fall through if another process created ‘linkPath’ before
@@ -160,12 +216,13 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path)
 void LocalStore::optimiseStore(OptimiseStats & stats)
 {
     PathSet paths = queryAllValidPaths();
+    InodeHash inodeHash = loadInodeHash();
 
     foreach (PathSet::iterator, i, paths) {
         addTempRoot(*i);
         if (!isValidPath(*i)) continue; /* path was GC'ed, probably */
         startNest(nest, lvlChatty, format("hashing files in `%1%'") % *i);
-        optimisePath_(stats, *i);
+        optimisePath_(stats, *i, inodeHash);
     }
 }
 
@@ -173,7 +230,9 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
 void LocalStore::optimisePath(const Path & path)
 {
     OptimiseStats stats;
-    if (settings.autoOptimiseStore) optimisePath_(stats, path);
+    InodeHash inodeHash;
+
+    if (settings.autoOptimiseStore) optimisePath_(stats, path, inodeHash);
 }
 
 
