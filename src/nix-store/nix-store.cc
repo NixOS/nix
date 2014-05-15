@@ -801,11 +801,9 @@ static void opRepairPath(Strings opFlags, Strings opArgs)
 static void showOptimiseStats(OptimiseStats & stats)
 {
     printMsg(lvlError,
-        format("%1% freed by hard-linking %2% files; there are %3% files with equal contents out of %4% files in total")
+        format("%1% freed by hard-linking %2% files")
         % showBytes(stats.bytesFreed)
-        % stats.filesLinked
-        % stats.sameContents
-        % stats.totalFiles);
+        % stats.filesLinked);
 }
 
 

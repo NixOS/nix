@@ -39,6 +39,7 @@ struct MakeReadOnly
     }
 };
 
+
 LocalStore::InodeHash LocalStore::loadInodeHash()
 {
     printMsg(lvlDebug, "loading hash inodes in memory");
@@ -60,7 +61,8 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
     return inodeHash;
 }
 
-Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash, OptimiseStats & stats)
+
+Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash)
 {
     Strings names;
 
@@ -73,7 +75,6 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
 
         if (inodeHash.count(dirent->d_ino)) {
             printMsg(lvlDebug, format("`%1%' is already linked") % dirent->d_name);
-            stats.totalFiles++;
             continue;
         }
 
@@ -86,6 +87,7 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
     return names;
 }
 
+
 void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHash & inodeHash)
 {
     checkInterrupt();
@@ -95,7 +97,7 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
         throw SysError(format("getting attributes of path `%1%'") % path);
 
     if (S_ISDIR(st.st_mode)) {
-        Strings names = readDirectoryIgnoringInodes(path, inodeHash, stats);
+        Strings names = readDirectoryIgnoringInodes(path, inodeHash);
         foreach (Strings::iterator, i, names)
             optimisePath_(stats, path + "/" + *i, inodeHash);
         return;
@@ -116,8 +118,6 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
         printMsg(lvlError, format("skipping suspicious writable file `%1%'") % path);
         return;
     }
-
-    stats.totalFiles++;
 
     /* This can still happen on top-level files */
     if (st.st_nlink > 1 && inodeHash.count(st.st_ino)) {
@@ -158,7 +158,6 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
     if (lstat(linkPath.c_str(), &stLink))
         throw SysError(format("getting attributes of path `%1%'") % linkPath);
 
-    stats.sameContents++;
     if (st.st_ino == stLink.st_ino) {
         printMsg(lvlDebug, format("`%1%' is already linked to `%2%'") % path % linkPath);
         return;

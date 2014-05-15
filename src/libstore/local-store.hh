@@ -34,14 +34,12 @@ struct Derivation;
 
 struct OptimiseStats
 {
-    unsigned long totalFiles;
-    unsigned long sameContents;
     unsigned long filesLinked;
     unsigned long long bytesFreed;
     unsigned long long blocksFreed;
     OptimiseStats()
     {
-        totalFiles = sameContents = filesLinked = 0;
+        filesLinked = 0;
         bytesFreed = blocksFreed = 0;
     }
 };
@@ -315,7 +313,7 @@ private:
 #endif
 
     InodeHash loadInodeHash();
-    Strings readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash, OptimiseStats & stats);
+    Strings readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash);
     void optimisePath_(OptimiseStats & stats, const Path & path, InodeHash & inodeHash);
 
     // Internal versions that are not wrapped in retry_sqlite.
