@@ -629,6 +629,21 @@ static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Va
     mkString(v, readFile(path).c_str());
 }
 
+/* Read a directory (without . or ..) */
+static void prim_readdir(EvalState & state, Value * * args, Value & v)
+{
+    PathSet context;
+    Path path = state.coerceToPath(*args[0], context);
+    if (!context.empty())
+        throw EvalError(format("string `%1%' cannot refer to other paths") % path);
+    Strings entries = readDirectory(path);
+    state.mkList(v, entries.size());
+    entries.sort();
+    unsigned int index = 0;
+    foreach (Strings::iterator, i, entries)
+        mkString(*(v.list.elems[index++] = state.allocValue()), *i);
+}
+
 
 /*************************************************************
  * Creating files
@@ -1268,6 +1283,7 @@ void EvalState::createBaseEnv()
     addPrimOp("baseNameOf", 1, prim_baseNameOf);
     addPrimOp("dirOf", 1, prim_dirOf);
     addPrimOp("__readFile", 1, prim_readFile);
+    addPrimOp("__readdir", 1, prim_readdir);
 
     // Creating files
     addPrimOp("__toXML", 1, prim_toXML);
