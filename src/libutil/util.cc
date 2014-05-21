@@ -901,7 +901,7 @@ string runProgram(Path program, bool searchPath, const Strings & args)
     /* Wait for the child to finish. */
     int status = pid.wait(true);
     if (!statusOk(status))
-        throw Error(format("program `%1%' %2%")
+        throw ExecError(format("program `%1%' %2%")
             % program % statusToString(status));
 
     return result;

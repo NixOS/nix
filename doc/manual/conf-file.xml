@@ -465,6 +465,20 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
   </varlistentry>
 
 
+  <varlistentry xml:id="conf-log-servers"><term><literal>log-servers</literal></term>
+
+    <listitem>
+
+      <para>A list of URL prefixes (such as
+      <literal>http://hydra.nixos.org/log</literal>) from which
+      <command>nix-store -l</command> will try to fetch build logs if
+      they’re not available locally.</para>
+
+    </listitem>
+
+  </varlistentry>
+
+
 </variablelist>
 
 </para>

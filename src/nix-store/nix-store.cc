@@ -467,10 +467,11 @@ static void opReadLog(Strings opFlags, Strings opArgs)
     foreach (Strings::iterator, i, opArgs) {
         Path path = useDeriver(followLinksToStorePath(*i));
 
-        for (int j = 0; j <= 2; j++) {
-            if (j == 2) throw Error(format("build log of derivation `%1%' is not available") % path);
+        string baseName = baseNameOf(path);
+        bool found = false;
 
-            string baseName = baseNameOf(path);
+        for (int j = 0; j < 2; j++) {
+
             Path logPath =
                 j == 0
                 ? (format("%1%/%2%/%3%/%4%") % settings.nixLogDir % drvsLogDir % string(baseName, 0, 2) % string(baseName, 2)).str()
@@ -481,6 +482,7 @@ static void opReadLog(Strings opFlags, Strings opArgs)
                 /* !!! Make this run in O(1) memory. */
                 string log = readFile(logPath);
                 writeFull(STDOUT_FILENO, (const unsigned char *) log.data(), log.size());
+                found = true;
                 break;
             }
 
@@ -500,9 +502,30 @@ static void opReadLog(Strings opFlags, Strings opArgs)
                     writeFull(STDOUT_FILENO, buf, n);
                 } while (err != BZ_STREAM_END);
                 BZ2_bzReadClose(&err, bz);
+                found = true;
                 break;
             }
         }
+
+        if (!found) {
+            for (auto & i : settings.logServers) {
+                string prefix = i;
+                if (!prefix.empty() && prefix.back() != '/') prefix += '/';
+                string url = prefix + baseName;
+                try {
+                    string log = runProgram(CURL, true, {"--fail", "--location", "--silent", "--", url});
+                    std::cout << "(using build log from " << url << ")" << std::endl;
+                    std::cout << log;
+                    found = true;
+                    break;
+                } catch (ExecError & e) {
+                    /* Ignore errors from curl. FIXME: actually, might be
+                       nice to print a warning on HTTP status != 404. */
+                }
+            }
+        }
+
+        if (!found) throw Error(format("build log of derivation `%1%' is not available") % path);
     }
 }
 

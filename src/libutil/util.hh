@@ -257,6 +257,8 @@ void killUser(uid_t uid);
 string runProgram(Path program, bool searchPath = false,
     const Strings & args = Strings());
 
+MakeError(ExecError, Error)
+
 /* Close all file descriptors except stdin, stdout, stderr, and those
    listed in the given set.  Good practice in child processes. */
 void closeMostFDs(const set<int> & exceptions);

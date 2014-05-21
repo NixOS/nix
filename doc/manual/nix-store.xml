@@ -111,7 +111,7 @@ lrwxrwxrwx    1 ... 2005-03-13 21:10 /home/eelco/bla/result -> /nix/store/1r1134
     </listitem>
 
   </varlistentry>
-    
+
 </variablelist>
 
 <variablelist condition="manpage">
@@ -120,7 +120,7 @@ lrwxrwxrwx    1 ... 2005-03-13 21:10 /home/eelco/bla/result -> /nix/store/1r1134
 
 </refsection>
 
-  
+
 
 <!--######################################################################-->
 
@@ -141,7 +141,7 @@ lrwxrwxrwx    1 ... 2005-03-13 21:10 /home/eelco/bla/result -> /nix/store/1r1134
 </refsection>
 
 <refsection><title>Description</title>
-            
+
 <para>The operation <option>--realise</option> essentially “builds”
 the specified store paths.  Realisation is a somewhat overloaded term:
 
@@ -196,14 +196,14 @@ printed.)</para>
 </variablelist>
 
 </refsection>
-            
+
 
 <refsection><title>Examples</title>
 
 <para>This operation is typically used to build store derivations
 produced by <link
 linkend="sec-nix-instantiate"><command>nix-instantiate</command></link>:
-    
+
 <screen>
 $ nix-store -r $(nix-instantiate ./test.nix)
 /nix/store/31axcgrlbfsxzmfff1gyj1bf62hvkby2-aterm-2.3.1</screen>
@@ -216,7 +216,7 @@ linkend="sec-nix-build"><command>nix-build</command></link> does.</para>
 
 </refsection>
 
-  
+
 
 <!--######################################################################-->
 
@@ -239,7 +239,7 @@ linkend="sec-nix-build"><command>nix-build</command></link> does.</para>
 </refsection>
 
 <refsection><title>Description</title>
-            
+
 <para>Without additional flags, the operation <option>--gc</option>
 performs a garbage collection on the Nix store.  That is, all paths in
 the Nix store not reachable via file system references from a set of
@@ -250,40 +250,40 @@ the Nix store not reachable via file system references from a set of
 <variablelist>
 
   <varlistentry><term><option>--print-roots</option></term>
-  
+
     <listitem><para>This operation prints on standard output the set
     of roots used by the garbage collector.  What constitutes a root
     is described in <xref linkend="ssec-gc-roots"
     />.</para></listitem>
-    
+
   </varlistentry>
 
   <varlistentry><term><option>--print-live</option></term>
-  
+
     <listitem><para>This operation prints on standard output the set
     of “live” store paths, which are all the store paths reachable
     from the roots.  Live paths should never be deleted, since that
     would break consistency — it would become possible that
     applications are installed that reference things that are no
     longer present in the store.</para></listitem>
-    
+
   </varlistentry>
 
   <varlistentry><term><option>--print-dead</option></term>
-  
+
     <listitem><para>This operation prints out on standard output the
     set of “dead” store paths, which is just the opposite of the set
     of live paths: any path in the store that is not live (with
     respect to the roots) is dead.</para></listitem>
-    
+
   </varlistentry>
 
   <varlistentry><term><option>--delete</option></term>
-  
+
     <listitem><para>This operation performs an actual garbage
     collection.  All dead paths are removed from the
     store.  This is the default.</para></listitem>
-    
+
   </varlistentry>
 
 </variablelist>
@@ -294,7 +294,7 @@ options control what gets deleted and in what order:
 <variablelist>
 
   <varlistentry><term><option>--max-freed</option> <replaceable>bytes</replaceable></term>
-  
+
     <listitem><para>Keep deleting paths until at least
     <replaceable>bytes</replaceable> bytes have been deleted, then
     stop.  The argument <replaceable>bytes</replaceable> can be
@@ -302,7 +302,7 @@ options control what gets deleted and in what order:
     <literal>M</literal>, <literal>G</literal> or
     <literal>T</literal>, denoting KiB, MiB, GiB or TiB
     units.</para></listitem>
-    
+
   </varlistentry>
 
 </variablelist>
@@ -326,7 +326,7 @@ would be freed.</para>
 <refsection><title>Examples</title>
 
 <para>To delete all unreachable paths, just do:
-    
+
 <screen>
 $ nix-store --gc
 deleting `/nix/store/kq82idx6g0nyzsp2s14gfsc38npai7lf-cairo-1.0.4.tar.gz.drv'
@@ -348,7 +348,7 @@ $ nix-store --gc --max-freed $((100 * 1024 * 1024))</screen>
 </refsection>
 
 
-  
+
 <!--######################################################################-->
 
 <refsection><title>Operation <option>--delete</option></title>
@@ -433,7 +433,7 @@ error: cannot delete path `/nix/store/zq0h41l75vlb4z45kzgjjmsjxvcv1qk7-mesa-6.4'
 
 
 <refsection><title>Description</title>
-            
+
 <para>The operation <option>--query</option> displays various bits of
 information about the store paths .  The queries are described below.  At
 most one query can be specified.  The default query is
@@ -453,16 +453,16 @@ query is applied to the target of the symlink.</para>
 
   <varlistentry><term><option>--use-output</option></term>
     <term><option>-u</option></term>
-  
+
     <listitem><para>For each argument to the query that is a store
     derivation, apply the query to the output path of the derivation
     instead.</para></listitem>
-    
+
   </varlistentry>
 
   <varlistentry><term><option>--force-realise</option></term>
     <term><option>-f</option></term>
-  
+
     <listitem><para>Realise each argument to the query first (see
     <link linkend="rsec-nix-store-realise"><command>nix-store
     --realise</command></link>).</para></listitem>
@@ -470,12 +470,12 @@ query is applied to the target of the symlink.</para>
   </varlistentry>
 
 </variablelist>
-        
+
 </refsection>
-    
+
 
 <refsection xml:id='nixref-queries'><title>Queries</title>
-            
+
 <variablelist>
 
   <varlistentry><term><option>--outputs</option></term>
@@ -485,7 +485,7 @@ query is applied to the target of the symlink.</para>
     derivations <replaceable>paths</replaceable>.  These are the paths
     that will be produced when the derivation is
     built.</para></listitem>
-    
+
   </varlistentry>
 
   <varlistentry><term><option>--requisites</option></term>
@@ -500,10 +500,10 @@ query is applied to the target of the symlink.</para>
     <variablelist>
 
       <varlistentry><term><option>--include-outputs</option></term>
-      
+
         <listitem><para>Also include the output path of store
         derivations, and their closures.</para></listitem>
-        
+
       </varlistentry>
 
     </variablelist>
@@ -517,13 +517,13 @@ query is applied to the target of the symlink.</para>
     including binaries of build-time-only dependencies) is obtained by
     distributing the closure of a store derivation and specifying the
     option <option>--include-outputs</option>.</para>
-    
+
     </listitem>
 
   </varlistentry>
 
   <varlistentry><term><option>--references</option></term>
-  
+
     <listitem><para>Prints the set of <link
     linkend="gloss-reference">references</link> of the store paths
     <replaceable>paths</replaceable>, that is, their immediate
@@ -531,9 +531,9 @@ query is applied to the target of the symlink.</para>
     <option>--requisites</option>.)</para></listitem>
 
   </varlistentry>
-  
+
   <varlistentry><term><option>--referrers</option></term>
-  
+
     <listitem><para>Prints the set of <emphasis>referrers</emphasis> of
     the store paths <replaceable>paths</replaceable>, that is, the
     store paths currently existing in the Nix store that refer to one
@@ -542,9 +542,9 @@ query is applied to the target of the symlink.</para>
     store paths are added or removed.</para></listitem>
 
   </varlistentry>
-  
+
   <varlistentry><term><option>--referrers-closure</option></term>
-  
+
     <listitem><para>Prints the closure of the set of store paths
     <replaceable>paths</replaceable> under the referrers relation; that
     is, all store paths that directly or indirectly refer to one of
@@ -555,7 +555,7 @@ query is applied to the target of the symlink.</para>
   </varlistentry>
 
   <varlistentry><term><option>--deriver</option></term>
-  
+
     <listitem><para>Prints the <link
     linkend="gloss-deriver">deriver</link> of the store paths
     <replaceable>paths</replaceable>.  If the path has no deriver
@@ -566,7 +566,7 @@ query is applied to the target of the symlink.</para>
   </varlistentry>
 
   <varlistentry><term><option>--graph</option></term>
-  
+
     <listitem><para>Prints the references graph of the store paths
     <replaceable>paths</replaceable> in the format of the
     <command>dot</command> tool of AT&amp;T's <link
@@ -579,7 +579,7 @@ query is applied to the target of the symlink.</para>
   </varlistentry>
 
   <varlistentry><term><option>--tree</option></term>
-  
+
     <listitem><para>Prints the references graph of the store paths
     <replaceable>paths</replaceable> as a nested ASCII tree.
     References are ordered by descending closure size; this tends to
@@ -591,7 +591,7 @@ query is applied to the target of the symlink.</para>
   </varlistentry>
 
   <varlistentry><term><option>--binding</option> <replaceable>name</replaceable></term>
-  
+
     <listitem><para>Prints the value of the attribute
     <replaceable>name</replaceable> (i.e., environment variable) of
     the store derivations <replaceable>paths</replaceable>.  It is an
@@ -601,7 +601,7 @@ query is applied to the target of the symlink.</para>
   </varlistentry>
 
   <varlistentry><term><option>--hash</option></term>
-  
+
     <listitem><para>Prints the SHA-256 hash of the contents of the
     store paths <replaceable>paths</replaceable> (that is, the hash of
     the output of <command>nix-store --dump</command> on the given
@@ -611,7 +611,7 @@ query is applied to the target of the symlink.</para>
   </varlistentry>
 
   <varlistentry><term><option>--size</option></term>
-  
+
     <listitem><para>Prints the size in bytes of the contents of the
     store paths <replaceable>paths</replaceable> — to be precise, the
     size of the output of <command>nix-store --dump</command> on the
@@ -622,7 +622,7 @@ query is applied to the target of the symlink.</para>
   </varlistentry>
 
   <varlistentry><term><option>--roots</option></term>
-  
+
     <listitem><para>Prints the garbage collector roots that point,
     directly or indirectly, at the store paths
     <replaceable>paths</replaceable>.</para></listitem>
@@ -638,7 +638,7 @@ query is applied to the target of the symlink.</para>
 
 <para>Print the closure (runtime dependencies) of the
 <command>svn</command> program in the current user environment:
-    
+
 <screen>
 $ nix-store -qR $(which svn)
 /nix/store/5mbglq5ldqld8sj57273aljwkfvj22mc-subversion-1.1.4
@@ -723,7 +723,7 @@ $ nix-store -q --roots $(which svn)
 
 </refsection>
 
-  
+
 
 <!--######################################################################-->
 
@@ -739,11 +739,11 @@ $ nix-store -q --roots $(which svn)
 </refsection>
 
 <refsection><title>Description</title>
-            
+
 <para>TODO</para>
 
 </refsection>
-            
+
 </refsection>
 -->
 
@@ -798,7 +798,7 @@ $ nix-store --add ./foo.c
 </refsection>
 
 <refsection><title>Description</title>
-            
+
 <para>The operation <option>--verify</option> verifies the internal
 consistency of the Nix database, and the consistency between the Nix
 database and the Nix store.  Any inconsistencies encountered are
@@ -811,32 +811,32 @@ in Nix itself.</para>
 <variablelist>
 
   <varlistentry><term><option>--check-contents</option></term>
-  
+
     <listitem><para>Checks that the contents of every valid store path
     has not been altered by computing a SHA-256 hash of the contents
     and comparing it with the hash stored in the Nix database at build
     time.  Paths that have been modified are printed out.  For large
     stores, <option>--check-contents</option> is obviously quite
     slow.</para></listitem>
-    
+
   </varlistentry>
-  
+
   <varlistentry><term><option>--repair</option></term>
-  
+
     <listitem><para>If any valid path is missing from the store, or
     (if <option>--check-contents</option> is given) the contents of a
     valid path has been modified, then try to repair the path by
     redownloading it.  See <command>nix-store --repair-path</command>
     for details.</para></listitem>
-    
+
   </varlistentry>
-  
+
 </variablelist>
 
 </para>
 
 </refsection>
-            
+
 
 </refsection>
 
@@ -855,7 +855,7 @@ in Nix itself.</para>
 </refsection>
 
 <refsection><title>Description</title>
-            
+
 <para>The operation <option>--verify-path</option> compares the
 contents of the given store paths to their cryptographic hashes stored
 in Nix’s database.  For every changed path, it prints a warning
@@ -863,7 +863,7 @@ message.  The exit status is 0 if no path has changed, and 1
 otherwise.</para>
 
 </refsection>
-            
+
 <refsection><title>Example</title>
 
 <para>To verify the integrity of the <command>svn</command> command and all its dependencies:
@@ -875,7 +875,7 @@ $ nix-store --verify-path $(nix-store -qR $(which svn))
 </para>
 
 </refsection>
-            
+
 </refsection>
 
 
@@ -893,7 +893,7 @@ $ nix-store --verify-path $(nix-store -qR $(which svn))
 </refsection>
 
 <refsection><title>Description</title>
-            
+
 <para>The operation <option>--repair-path</option> attempts to
 “repair” the specified paths by redownloading them using the available
 substituters.  If no substitutes are available, then repair is not
@@ -906,7 +906,7 @@ system may be left in a broken state (e.g., if the path contains a
 critical system component like the GNU C Library).</para></warning>
 
 </refsection>
-            
+
 <refsection><title>Example</title>
 
 <screen>
@@ -921,7 +921,7 @@ fetching path `/nix/store/d7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13'...
 </screen>
 
 </refsection>
-            
+
 </refsection>
 
 
@@ -939,7 +939,7 @@ fetching path `/nix/store/d7a81wsm1ijwwpkks3725661h3263p5-glibc-2.13'...
 </refsection>
 
 <refsection><title>Description</title>
-            
+
 <para>The operation <option>--dump</option> produces a NAR (Nix
 ARchive) file containing the contents of the file system tree rooted
 at <replaceable>path</replaceable>.  The archive is written to
@@ -970,7 +970,7 @@ links, but not other types of files (such as device nodes).</para>
 --restore</literal>.</para>
 
 </refsection>
-            
+
 
 </refsection>
 
@@ -989,13 +989,13 @@ links, but not other types of files (such as device nodes).</para>
 </refsection>
 
 <refsection><title>Description</title>
-            
+
 <para>The operation <option>--restore</option> unpacks a NAR archive
 to <replaceable>path</replaceable>, which must not already exist.  The
 archive is read from standard input.</para>
 
 </refsection>
-            
+
 
 </refsection>
 
@@ -1014,7 +1014,7 @@ archive is read from standard input.</para>
 </refsection>
 
 <refsection><title>Description</title>
-            
+
 <para>The operation <option>--export</option> writes a serialisation
 of the specified store paths to standard output in a format that can
 be imported into another Nix store with <command
@@ -1041,7 +1041,7 @@ linkend="sec-nix-copy-closure">nix-copy-closure</command>
 command.</para>
 
 </refsection>
-            
+
 
 </refsection>
 
@@ -1059,7 +1059,7 @@ command.</para>
 </refsection>
 
 <refsection><title>Description</title>
-            
+
 <para>The operation <option>--import</option> reads a serialisation of
 a set of store paths produced by <command
 linkend="refsec-nix-store-export">nix-store --export</command> from
@@ -1069,7 +1069,7 @@ another path that doesn’t exist in the Nix store, the import
 fails.</para>
 
 </refsection>
-            
+
 
 </refsection>
 
@@ -1087,7 +1087,7 @@ fails.</para>
 </refsection>
 
 <refsection><title>Description</title>
-            
+
 <para>The operation <option>--optimise</option> reduces Nix store disk
 space usage by finding identical files in the store and hard-linking
 them to each other.  It typically reduces the size of the store by
@@ -1104,7 +1104,7 @@ on the achieved savings is printed on standard error.</para>
 progress indication.</para>
 
 </refsection>
-            
+
 <refsection><title>Example</title>
 
 <screen>
@@ -1138,7 +1138,7 @@ there are 114486 files with equal contents out of 215894 files in total
 </refsection>
 
 <refsection><title>Description</title>
-            
+
 <para>The operation <option>--read-log</option> prints the build log
 of the specified store paths on standard output.  The build log is
 whatever the builder of a derivation wrote to standard output and
@@ -1147,12 +1147,17 @@ the store path is used.</para>
 
 <para>Build logs are kept in
 <filename>/nix/var/log/nix/drvs</filename>.  However, there is no
-guarantee that a build log is available for any particular store
-path.  For instance, if the path was downloaded as a pre-built binary
-through a substitute, then the log is unavailable.</para>
+guarantee that a build log is available for any particular store path.
+For instance, if the path was downloaded as a pre-built binary through
+a substitute, then the log is unavailable. If the log is not available
+locally, then <command>nix-store</command> will try to download the
+log from the servers specified in the Nix option
+<option>log-servers</option>. For example, if it’s set to
+<literal>http://hydra.nixos.org/log</literal>, then Nix will check
+<literal>http://hydra.nixos.org/log/<replaceable>base-name</replaceable></literal>.</para>
 
 </refsection>
-            
+
 <refsection><title>Example</title>
 
 <screen>
@@ -1184,14 +1189,14 @@ ktorrent-2.2.1/NEWS
 </refsection>
 
 <refsection><title>Description</title>
-            
+
 <para>The operation <option>--dump-db</option> writes a dump of the
 Nix database to standard output.  It can be loaded into an empty Nix
 store using <option>--load-db</option>.  This is useful for making
 backups and when migrating to different database schemas.</para>
 
 </refsection>
-            
+
 </refsection>
 
 
@@ -1208,13 +1213,13 @@ backups and when migrating to different database schemas.</para>
 </refsection>
 
 <refsection><title>Description</title>
-            
+
 <para>The operation <option>--load-db</option> reads a dump of the Nix
 database created by <option>--dump-db</option> from standard input and
 loads it into the Nix database.</para>
 
 </refsection>
-            
+
 </refsection>
 
 
@@ -1232,14 +1237,14 @@ loads it into the Nix database.</para>
 </refsection>
 
 <refsection><title>Description</title>
-            
+
 <para>The operation <option>--print-env</option> prints out the
 environment of a derivation in a format that can be evaluated by a
 shell.  The command line arguments of the builder are placed in the
 variable <envar>_args</envar>.</para>
 
 </refsection>
-            
+
 <refsection><title>Example</title>
 
 <screen>
@@ -1252,7 +1257,7 @@ export _args; _args='-e /nix/store/9krlzvny65gdc8s7kpb6lkx8cd02c25c-default-buil
 </screen>
 
 </refsection>
-            
+
 </refsection>
 
 
@@ -1269,14 +1274,14 @@ export _args; _args='-e /nix/store/9krlzvny65gdc8s7kpb6lkx8cd02c25c-default-buil
 </refsection>
 
 <refsection><title>Description</title>
-            
+
 <para>If build failure caching is enabled through the
 <literal>build-cache-failures</literal> configuration option, the
 operation <option>--query-failed-paths</option> will print out all
 store paths that have failed to build.</para>
 
 </refsection>
-            
+
 <refsection><title>Example</title>
 
 <screen>
@@ -1288,7 +1293,7 @@ $ nix-store --query-failed-paths
 </screen>
 
 </refsection>
-            
+
 </refsection>
 
 
@@ -1306,7 +1311,7 @@ $ nix-store --query-failed-paths
 </refsection>
 
 <refsection><title>Description</title>
-            
+
 <para>If build failure caching is enabled through the
 <literal>build-cache-failures</literal> configuration option, the
 operation <option>--clear-failed-paths</option> clears the “failed”
@@ -1319,7 +1324,7 @@ You can provide the argument <literal>*</literal> to clear all store
 paths.</para>
 
 </refsection>
-            
+
 <refsection><title>Example</title>
 
 <screen>
@@ -1328,7 +1333,7 @@ $ nix-store --clear-failed-paths *
 </screen>
 
 </refsection>
-            
+
 </refsection>
 
 
@@ -1341,6 +1346,6 @@ $ nix-store --clear-failed-paths *
 </variablelist>
 
 </refsection>
-  
+
 
 </refentry>

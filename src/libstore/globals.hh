@@ -197,6 +197,9 @@ struct Settings {
     /* Whether to show a stack trace if Nix evaluation fails. */
     bool showTrace;
 
+    /* A list of URL prefixes that can return Nix build logs. */
+    Strings logServers;
+
 private:
     SettingsMap settings, overrides;
 
