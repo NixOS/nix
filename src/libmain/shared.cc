@@ -220,6 +220,13 @@ static void initAndRun(int argc, char * * argv)
             string value = *i;
             settings.set(name, value);
         }
+        else if (arg == "--arg" || arg == "--argstr") {
+            remaining.push_back(arg);
+            ++i; if (i == args.end()) throw UsageError(format("`%1%' requires two arguments") % arg);
+            remaining.push_back(*i);
+            ++i; if (i == args.end()) throw UsageError(format("`%1%' requires two arguments") % arg);
+            remaining.push_back(*i);
+        }
         else remaining.push_back(arg);
     }
 
