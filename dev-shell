@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/usr/bin/env bash
 if [ -e tests/test-tmp ]; then
     chmod -R u+w tests/test-tmp
     rm -rf tests/test-tmp
