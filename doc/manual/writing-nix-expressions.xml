@@ -1060,15 +1060,14 @@ map (concat "foo") [ "bar" "bla" "abc" ]</programlisting>
   and <varname>z</varname>.</para></listitem>
 
 
-  <listitem><para>An <literal>@</literal>-pattern requires that the
-  argument matches with the patterns on the left- and right-hand side
-  of the <literal>@</literal>-sign.  For example:
+  <listitem><para>An <literal>@</literal>-pattern provides a means of referring
+  to the whole value being matched:
 
 <programlisting>
 args@{ x, y, z, ... }: z + y + x + args.a</programlisting>
 
   Here <varname>args</varname> is bound to the entire argument, which
-  is further matches against the pattern <literal>{ x, y, z,
+  is further matched against the pattern <literal>{ x, y, z,
   ... }</literal>.</para></listitem>
 
 
