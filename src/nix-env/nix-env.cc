@@ -135,10 +135,16 @@ static void getAllExprs(EvalState & state,
             attrs.insert(attrName);
             /* Load the expression on demand. */
             Value & vFun(*state.allocValue());
-            Value & vArg(*state.allocValue());
-            state.getBuiltin("import", vFun);
-            mkString(vArg, path2);
-            mkApp(*state.allocAttr(v, state.symbols.create(attrName)), vFun, vArg);
+            Value & vArg1(*state.allocValue());
+            Value & vApp(*state.allocValue());
+            Value & vArg2(*state.allocValue());
+            state.getBuiltin("importWithSettings", vFun);
+            state.mkAttrs(vArg1, 0);
+            vApp.type = tPrimOpApp;
+            vApp.primOpApp.left = &vFun;
+            vApp.primOpApp.right = &vArg1;
+            mkString(vArg2, path2);
+            mkApp(*state.allocAttr(v, state.symbols.create(attrName)), vApp, vArg2);
         }
         else if (S_ISDIR(st.st_mode))
             /* `path2' is a directory (with no default.nix in it);

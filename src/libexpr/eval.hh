@@ -86,6 +86,26 @@ typedef std::map<Path, Path> SrcToStore;
 std::ostream & operator << (std::ostream & str, const Value & v);
 
 
+typedef list<std::pair<string, Path> > SearchPath;
+
+class ParseSettings {
+    mutable ExprAttrs *expr;
+
+    public:
+    SearchPath searchPath;
+
+    bool operator < (const ParseSettings & s) const;
+
+    ParseSettings();
+
+    /* Initialize a settings from a nix value, putting any
+     * needed context into the passed set */
+    ParseSettings(EvalState & state, const Pos & pos, Value & v, PathSet & context);
+
+    ExprAttrs *toExpr(EvalState & state) const;
+};
+
+
 class EvalState
 {
 public:
@@ -104,18 +124,18 @@ private:
     SrcToStore srcToStore;
 
     /* A cache from path names to values. */
+    typedef std::pair<Path, ParseSettings> FileEvalCacheKey;
 #if HAVE_BOEHMGC
-    typedef std::map<Path, Value, std::less<Path>, gc_allocator<std::pair<const Path, Value> > > FileEvalCache;
+    typedef std::map<FileEvalCacheKey, Value, std::less<FileEvalCacheKey>, gc_allocator<std::pair<const Path, Value> > > FileEvalCache;
 #else
-    typedef std::map<Path, Value> FileEvalCache;
+    typedef std::map<FileEvalCacheKey, Value> FileEvalCache;
 #endif
     FileEvalCache fileEvalCache;
 
-    typedef list<std::pair<string, Path> > SearchPath;
-    SearchPath searchPath;
     SearchPath::iterator searchPathInsertionPoint;
 
 public:
+    ParseSettings baseParseSettings;
 
     EvalState();
     ~EvalState();
@@ -123,6 +143,7 @@ public:
     void addToSearchPath(const string & s, bool warn = false);
 
     /* Parse a Nix expression from the specified file. */
+    Expr * parseExprFromFile(const Path & path, const ParseSettings & settings);
     Expr * parseExprFromFile(const Path & path);
 
     /* Parse a Nix expression from the specified string. */
@@ -131,11 +152,13 @@ public:
 
     /* Evaluate an expression read from the given file to normal
        form. */
+    void evalFile(const Path & path, Value & v, const ParseSettings & settings);
     void evalFile(const Path & path, Value & v);
 
     void resetFileCache();
 
     /* Look up a file in the search path. */
+    Path findFile(const string & path, const SearchPath & searchPath);
     Path findFile(const string & path);
 
     /* Evaluate an expression to normal form, storing the result in
@@ -221,7 +244,7 @@ private:
     friend struct ExprLet;
 
     Expr * parse(const char * text, const Path & path,
-        const Path & basePath, StaticEnv & staticEnv);
+        const Path & basePath, StaticEnv & staticEnv, const ParseSettings & settings);
 
 public:
 

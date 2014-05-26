@@ -32,10 +32,12 @@ namespace nix {
         Symbol path;
         string error;
         Symbol sLetBody;
-        ParseData(EvalState & state)
+        ParseSettings settings;
+        ParseData(EvalState & state, const ParseSettings & settings)
             : state(state)
             , symbols(state.symbols)
             , sLetBody(symbols.create("<let-body>"))
+            , settings(settings)
             { };
     };
 
@@ -373,8 +375,14 @@ expr_select
 
 expr_simple
   : ID {
+      /* !!! Should we disallow unknown expr_simple IDs starting with __ ? */
       if (strcmp($1, "__curPos") == 0)
           $$ = new ExprPos(CUR_POS);
+      else if (strcmp($1, "__curSettings") == 0)
+          $$ = data->settings.toExpr(data->state);
+      else if (strcmp($1, "import") == 0)
+          $$ = new ExprApp(CUR_POS, new ExprBuiltin(data->symbols.create("importWithSettings")),
+              data->settings.toExpr(data->state));
       else
           $$ = new ExprVar(CUR_POS, data->symbols.create($1));
   }
@@ -386,7 +394,7 @@ expr_simple
   | PATH { $$ = new ExprPath(absPath($1, data->basePath)); }
   | SPATH {
       string path($1 + 1, strlen($1) - 2);
-      Path path2 = data->state.findFile(path);
+      Path path2 = data->state.findFile(path, data->settings.searchPath);
       /* The file wasn't found in the search path.  However, we can't
          throw an error here, because the expression might never be
          evaluated.  So return an expression that lazily calls
@@ -542,16 +550,17 @@ formal
 #include <unistd.h>
 
 #include <eval.hh>
+#include <eval-inline.hh>
 
 
 namespace nix {
 
 
-Expr * EvalState::parse(const char * text,
-    const Path & path, const Path & basePath, StaticEnv & staticEnv)
+Expr * EvalState::parse(const char * text, const Path & path,
+    const Path & basePath, StaticEnv & staticEnv, const ParseSettings & settings)
 {
     yyscan_t scanner;
-    ParseData data(*this);
+    ParseData data(*this, settings);
     data.basePath = basePath;
     data.path = data.symbols.create(path);
 
@@ -590,15 +599,21 @@ Path resolveExprPath(Path path)
 }
 
 
+Expr * EvalState::parseExprFromFile(const Path & path, const ParseSettings & settings)
+{
+    return parse(readFile(path).c_str(), path, dirOf(path), staticBaseEnv, settings);
+}
+
+
 Expr * EvalState::parseExprFromFile(const Path & path)
 {
-    return parse(readFile(path).c_str(), path, dirOf(path), staticBaseEnv);
+    return parseExprFromFile(path, baseParseSettings);
 }
 
 
 Expr * EvalState::parseExprFromString(const string & s, const Path & basePath, StaticEnv & staticEnv)
 {
-    return parse(s.c_str(), "(string)", basePath, staticEnv);
+    return parse(s.c_str(), "(string)", basePath, staticEnv, baseParseSettings);
 }
 
 
@@ -623,15 +638,15 @@ Expr * EvalState::parseExprFromString(const string & s, const Path & basePath)
     path = absPath(path);
     if (pathExists(path)) {
         debug(format("adding path `%1%' to the search path") % path);
-        searchPath.insert(searchPathInsertionPoint, std::pair<string, Path>(prefix, path));
+        baseParseSettings.searchPath.insert(searchPathInsertionPoint, std::pair<string, Path>(prefix, path));
     } else if (warn)
         printMsg(lvlError, format("warning: Nix search path entry `%1%' does not exist, ignoring") % path);
 }
 
 
-Path EvalState::findFile(const string & path)
+Path EvalState::findFile(const string & path, const SearchPath & searchPath)
 {
-    foreach (SearchPath::iterator, i, searchPath) {
+    foreach (SearchPath::const_iterator, i, searchPath) {
         Path res;
         if (i->first.empty())
             res = i->second + "/" + path;
@@ -645,6 +660,77 @@ Path EvalState::findFile(const string & path)
         if (pathExists(res)) return canonPath(res);
     }
     return "";
+}
+
+
+Path EvalState::findFile(const string & path)
+{
+    return findFile(path, baseParseSettings.searchPath);
+}
+
+
+ParseSettings::ParseSettings() : expr(nullptr)
+{
+}
+
+
+ParseSettings::ParseSettings(EvalState & state, const Pos & pos, Value & v, PathSet & context)
+    : expr(nullptr)
+{
+    state.forceAttrs(v, pos);
+    auto nixPathIterator = v.attrs->find(state.symbols.create("nix-path"));
+    if (nixPathIterator == v.attrs->end()) {
+        searchPath = state.baseParseSettings.searchPath;
+    } else {
+        Value & list = *nixPathIterator->value;
+        Pos & listPos = *nixPathIterator->pos;
+        state.forceList(list, listPos);
+        for (unsigned int i = 0; i < list.list.length; ++i) {
+            Value & attrs = *list.list.elems[i];
+            state.forceAttrs(attrs, listPos);
+            auto prefixIterator = attrs.attrs->find(state.symbols.create("prefix"));
+            SearchPath::value_type pathEntry;
+            if (prefixIterator != attrs.attrs->end()) {
+                pathEntry.first = state.forceStringNoCtx(*prefixIterator->value, *prefixIterator->pos);
+            }
+            auto valueIterator = attrs.attrs->find(state.symbols.create("value"));
+            if (valueIterator == attrs.attrs->end())
+                throw EvalError(format("required attribute `value' missing, at %1%") % listPos);
+            pathEntry.second = state.coerceToPath(*valueIterator->pos, *valueIterator->value, context);
+            searchPath.push_back(pathEntry);
+        }
+    }
+}
+
+
+bool ParseSettings::operator < (const ParseSettings & s) const
+{
+    return searchPath < s.searchPath;
+}
+
+
+ExprAttrs *ParseSettings::toExpr(EvalState & state) const
+{
+    /* !!! Must ensure it is safe to bindVars etc. expr in any context */
+    if (expr == nullptr) {
+        /* !!! If nix is ever multithreaded, need to ensure thread safety here */
+        expr = new ExprAttrs();
+        ExprList *nixPathExpr = new ExprList();
+        nixPathExpr->elems.reserve(searchPath.size());
+        for (auto i : searchPath) {
+            ExprAttrs *pathElementExpr = new ExprAttrs();
+            if (!i.first.empty()) {
+                pathElementExpr->attrs[state.symbols.create("prefix")] =
+                    ExprAttrs::AttrDef(new ExprString(state.symbols.create(i.first)), noPos, false);
+            }
+            pathElementExpr->attrs[state.symbols.create("value")] =
+                ExprAttrs::AttrDef(new ExprString(state.symbols.create(i.second)), noPos, false);
+            nixPathExpr->elems.push_back(pathElementExpr);
+        }
+        expr->attrs[state.symbols.create("nix-path")] =
+            ExprAttrs::AttrDef(nixPathExpr, noPos, false);
+    }
+    return expr;
 }
 
 
