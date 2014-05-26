@@ -3,7 +3,7 @@ with builtins;
 
 assert pathExists <nix/buildenv.nix>;
 
-assert length nixPath == 3;
+assert length nixPath == 6;
 assert length (filter (x: x.prefix == "nix") nixPath) == 1;
 assert length (filter (x: baseNameOf x.path == "dir4") nixPath) == 1;
 

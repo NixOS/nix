@@ -58,6 +58,7 @@ struct Globals
     bool removeAll;
     string forceName;
     bool prebuiltOnly;
+    Globals(const Strings & searchPath) : state(searchPath) { }
 };
 
 
@@ -1351,7 +1352,17 @@ void run(Strings args)
     Strings opFlags, opArgs, remaining;
     Operation op = 0;
 
-    Globals globals;
+    /* FIXME: hack. */
+    Strings searchPath;
+    Strings args2;
+    for (Strings::iterator i = args.begin(); i != args.end(); ) {
+        string arg = *i++;
+        if (!parseSearchPathArg(arg, i, args.end(), searchPath))
+            args2.push_back(arg);
+    }
+    args = args2;
+
+    Globals globals(searchPath);
 
     globals.instSource.type = srcUnknown;
     globals.instSource.nixExprPath = getDefNixExprPath();
@@ -1371,8 +1382,6 @@ void run(Strings args)
             op = opInstall;
         else if (parseOptionArg(arg, i, args.end(),
                      globals.state, globals.instSource.autoArgs))
-            ;
-        else if (parseSearchPathArg(arg, i, args.end(), globals.state))
             ;
         else if (arg == "--force-name") // undocumented flag for nix-install-package
             globals.forceName = needArg(i, args, arg);

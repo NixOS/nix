@@ -91,7 +91,17 @@ void processExpr(EvalState & state, const Strings & attrPaths,
 
 void run(Strings args)
 {
-    EvalState state;
+    /* FIXME: hack. */
+    Strings searchPath;
+    Strings args2;
+    for (Strings::iterator i = args.begin(); i != args.end(); ) {
+        string arg = *i++;
+        if (!parseSearchPathArg(arg, i, args.end(), searchPath))
+            args2.push_back(arg);
+    }
+    args = args2;
+
+    EvalState state(searchPath);
     Strings files;
     bool readStdin = false;
     bool fromArgs = false;
@@ -126,8 +136,6 @@ void run(Strings args)
             attrPaths.push_back(*i++);
         }
         else if (parseOptionArg(arg, i, args.end(), state, autoArgs))
-            ;
-        else if (parseSearchPathArg(arg, i, args.end(), state))
             ;
         else if (arg == "--add-root") {
             if (i == args.end())

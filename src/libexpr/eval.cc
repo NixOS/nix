@@ -153,7 +153,7 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
 }
 
 
-EvalState::EvalState()
+EvalState::EvalState(const Strings & _searchPath)
     : sWith(symbols.create("<with>"))
     , sOutPath(symbols.create("outPath"))
     , sDrvPath(symbols.create("drvPath"))
@@ -219,11 +219,10 @@ EvalState::EvalState()
 #endif
 
     /* Initialise the Nix expression search path. */
-    searchPathInsertionPoint = searchPath.end();
     Strings paths = tokenizeString<Strings>(getEnv("NIX_PATH", ""), ":");
-    foreach (Strings::iterator, i, paths) addToSearchPath(*i);
+    for (auto & i : _searchPath) addToSearchPath(i);
+    for (auto & i : paths) addToSearchPath(i);
     addToSearchPath("nix=" + settings.nixDataDir + "/nix/corepkgs");
-    searchPathInsertionPoint = searchPath.begin();
 
     createBaseEnv();
 }

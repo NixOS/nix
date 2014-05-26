@@ -8,9 +8,9 @@ namespace nix {
 bool parseOptionArg(const string & arg, Strings::iterator & i,
     const Strings::iterator & argsEnd, EvalState & state,
     Bindings & autoArgs);
-    
+
 bool parseSearchPathArg(const string & arg, Strings::iterator & i,
-    const Strings::iterator & argsEnd, EvalState & state);
+    const Strings::iterator & argsEnd, Strings & searchPath);
 
 Path lookupFileArg(EvalState & state, string s);
 

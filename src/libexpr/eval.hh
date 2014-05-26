@@ -113,11 +113,10 @@ private:
 
     typedef list<std::pair<string, Path> > SearchPath;
     SearchPath searchPath;
-    SearchPath::iterator searchPathInsertionPoint;
 
 public:
 
-    EvalState();
+    EvalState(const Strings & _searchPath);
     ~EvalState();
 
     void addToSearchPath(const string & s, bool warn = false);
