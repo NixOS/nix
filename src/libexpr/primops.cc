@@ -1352,6 +1352,17 @@ void EvalState::createBaseEnv()
     evalFile(path, v);
     addConstant("derivation", v);
 
+    /* Add a value containing the current Nix expression search path. */
+    mkList(v, searchPath.size());
+    int n = 0;
+    for (auto & i : searchPath) {
+        Value * v2 = v.list.elems[n++] = allocValue();
+        mkAttrs(*v2, 2);
+        mkString(*allocAttr(*v2, symbols.create("path")), i.second);
+        mkString(*allocAttr(*v2, symbols.create("prefix")), i.first);
+    }
+    addConstant("nixPath", v);
+
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */
     baseEnv.values[0]->attrs->sort();
