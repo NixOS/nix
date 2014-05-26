@@ -142,6 +142,7 @@ struct ExprVar : Expr
     unsigned int level;
     unsigned int displ;
 
+    ExprVar(const Symbol & name) : name(name) { };
     ExprVar(const Pos & pos, const Symbol & name) : pos(pos), name(name) { };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);

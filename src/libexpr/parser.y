@@ -386,17 +386,10 @@ expr_simple
   | PATH { $$ = new ExprPath(absPath($1, data->basePath)); }
   | SPATH {
       string path($1 + 1, strlen($1) - 2);
-      Path path2 = data->state.findFile(path);
-      /* The file wasn't found in the search path.  However, we can't
-         throw an error here, because the expression might never be
-         evaluated.  So return an expression that lazily calls
-         ‘throw’. */
-      $$ = path2 == ""
-          ? (Expr * ) new ExprApp(
-              new ExprBuiltin(data->symbols.create("throw")),
-              new ExprString(data->symbols.create(
-                      (format("file `%1%' was not found in the Nix search path (add it using $NIX_PATH or -I)") % path).str())))
-          : (Expr * ) new ExprPath(path2);
+      $$ = new ExprApp(CUR_POS,
+          new ExprApp(new ExprVar(data->symbols.create("__findFile")),
+              new ExprVar(data->symbols.create("nixPath"))),
+          new ExprString(data->symbols.create(path)));
   }
   | URI { $$ = new ExprString(data->symbols.create($1)); }
   | '(' expr ')' { $$ = $2; }
@@ -637,6 +630,12 @@ void EvalState::addToSearchPath(const string & s, bool warn)
 
 Path EvalState::findFile(const string & path)
 {
+    return findFile(searchPath, path);
+}
+
+
+Path EvalState::findFile(SearchPath & searchPath, const string & path)
+{
     foreach (SearchPath::iterator, i, searchPath) {
         Path res;
         if (i->first.empty())
@@ -650,7 +649,7 @@ Path EvalState::findFile(const string & path)
         }
         if (pathExists(res)) return canonPath(res);
     }
-    return "";
+    throw ThrownError(format("file `%1%' was not found in the Nix search path (add it using $NIX_PATH or -I)") % path);
 }
 
 

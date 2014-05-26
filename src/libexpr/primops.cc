@@ -654,6 +654,37 @@ static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Va
 }
 
 
+/* Find a file in the Nix search path. Used to implement <x> paths,
+   which are desugared to ‘findFile nixPath "x"’. */
+static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceList(*args[0], pos);
+
+    SearchPath searchPath;
+
+    for (unsigned int n = 0; n < args[0]->list.length; ++n) {
+        Value & v2(*args[0]->list.elems[n]);
+        state.forceAttrs(v2, pos);
+
+        string prefix;
+        Bindings::iterator i = v2.attrs->find(state.symbols.create("prefix"));
+        if (i != v2.attrs->end())
+            prefix = state.forceStringNoCtx(*i->value, pos);
+
+        i = v2.attrs->find(state.symbols.create("path"));
+        if (i == v2.attrs->end())
+            throw EvalError(format("attribute `path' missing, at %1%") % pos);
+        PathSet context;
+        string path = state.coerceToPath(pos, *i->value, context);
+
+        searchPath.push_back(std::pair<string, Path>(prefix, path));
+    }
+
+    string path = state.forceStringNoCtx(*args[1], pos);
+    mkPath(v, state.findFile(searchPath, path).c_str());
+}
+
+
 /*************************************************************
  * Creating files
  *************************************************************/
@@ -1293,6 +1324,7 @@ void EvalState::createBaseEnv()
     addPrimOp("baseNameOf", 1, prim_baseNameOf);
     addPrimOp("dirOf", 1, prim_dirOf);
     addPrimOp("__readFile", 1, prim_readFile);
+    addPrimOp("__findFile", 2, prim_findFile);
 
     // Creating files
     addPrimOp("__toXML", 1, prim_toXML);
