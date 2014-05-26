@@ -328,13 +328,13 @@ expr_if
 
 expr_op
   : '!' expr_op %prec NOT { $$ = new ExprOpNot($2); }
-| '-' expr_op %prec NEGATE { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprBuiltin(data->symbols.create("sub")), new ExprInt(0)), $2); }
+  | '-' expr_op %prec NEGATE { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__sub")), new ExprInt(0)), $2); }
   | expr_op EQ expr_op { $$ = new ExprOpEq($1, $3); }
   | expr_op NEQ expr_op { $$ = new ExprOpNEq($1, $3); }
-  | expr_op '<' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprBuiltin(data->symbols.create("lessThan")), $1), $3); }
-  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprApp(CUR_POS, new ExprApp(new ExprBuiltin(data->symbols.create("lessThan")), $3), $1)); }
-  | expr_op '>' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprBuiltin(data->symbols.create("lessThan")), $3), $1); }
-  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprApp(CUR_POS, new ExprApp(new ExprBuiltin(data->symbols.create("lessThan")), $1), $3)); }
+  | expr_op '<' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $1), $3); }
+  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $3), $1)); }
+  | expr_op '>' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $3), $1); }
+  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $1), $3)); }
   | expr_op AND expr_op { $$ = new ExprOpAnd(CUR_POS, $1, $3); }
   | expr_op OR expr_op { $$ = new ExprOpOr(CUR_POS, $1, $3); }
   | expr_op IMPL expr_op { $$ = new ExprOpImpl(CUR_POS, $1, $3); }
@@ -346,9 +346,9 @@ expr_op
       l->push_back($3);
       $$ = new ExprConcatStrings(CUR_POS, false, l);
     }
-  | expr_op '-' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprBuiltin(data->symbols.create("sub")), $1), $3); }
-  | expr_op '*' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprBuiltin(data->symbols.create("mul")), $1), $3); }
-  | expr_op '/' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprBuiltin(data->symbols.create("div")), $1), $3); }
+  | expr_op '-' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__sub")), $1), $3); }
+  | expr_op '*' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__mul")), $1), $3); }
+  | expr_op '/' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__div")), $1), $3); }
   | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists(CUR_POS, $1, $3); }
   | expr_app
   ;
