@@ -944,7 +944,7 @@ static void prim_isList(EvalState & state, const Pos & pos, Value * * args, Valu
 static void elemAt(EvalState & state, const Pos & pos, Value & list, int n, Value & v)
 {
     state.forceList(list, pos);
-    if (n < 0 || n >= list.list.length)
+    if (n < 0 || (unsigned int) n >= list.list.length)
         throw Error(format("list index %1% is out of bounds, at %2%") % n % pos);
     state.forceValue(*list.list.elems[n]);
     v = *list.list.elems[n];
@@ -1123,7 +1123,7 @@ static void prim_substring(EvalState & state, const Pos & pos, Value * * args, V
 
     if (start < 0) throw EvalError(format("negative start position in `substring', at %1%") % pos);
 
-    mkString(v, start >= s.size() ? "" : string(s, start, len), context);
+    mkString(v, (unsigned int) start >= s.size() ? "" : string(s, start, len), context);
 }
 
 
