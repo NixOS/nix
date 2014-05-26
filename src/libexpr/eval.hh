@@ -124,6 +124,7 @@ public:
 
     /* Parse a Nix expression from the specified file. */
     Expr * parseExprFromFile(const Path & path);
+    Expr * parseExprFromFile(const Path & path, StaticEnv & staticEnv);
 
     /* Parse a Nix expression from the specified string. */
     Expr * parseExprFromString(const string & s, const Path & basePath, StaticEnv & staticEnv);

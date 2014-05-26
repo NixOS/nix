@@ -592,7 +592,13 @@ Path resolveExprPath(Path path)
 
 Expr * EvalState::parseExprFromFile(const Path & path)
 {
-    return parse(readFile(path).c_str(), path, dirOf(path), staticBaseEnv);
+    return parseExprFromFile(path, staticBaseEnv);
+}
+
+
+Expr * EvalState::parseExprFromFile(const Path & path, StaticEnv & staticEnv)
+{
+    return parse(readFile(path).c_str(), path, dirOf(path), staticEnv);
 }
 
 
@@ -608,7 +614,7 @@ Expr * EvalState::parseExprFromString(const string & s, const Path & basePath)
 }
 
 
- void EvalState::addToSearchPath(const string & s, bool warn)
+void EvalState::addToSearchPath(const string & s, bool warn)
 {
     size_t pos = s.find('=');
     string prefix;

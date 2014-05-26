@@ -93,6 +93,30 @@ static void prim_import(EvalState & state, const Pos & pos, Value * * args, Valu
 }
 
 
+static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    PathSet context;
+    state.forceAttrs(*args[0]);
+    Path path = resolveExprPath(state.coerceToPath(pos, *args[1], context));
+
+    Env * env = &state.allocEnv(args[0]->attrs->size());
+    env->up = &state.baseEnv;
+
+    StaticEnv staticEnv(false, &state.staticBaseEnv);
+
+    unsigned int displ = 0;
+    for (auto & attr : *args[0]->attrs) {
+        staticEnv.vars[attr.name] = displ;
+        env->values[displ++] = attr.value;
+    }
+
+    startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path);
+    Expr * e = state.parseExprFromFile(path, staticEnv);
+
+    e->eval(state, *env, v);
+}
+
+
 /* Return a string representing the type of the expression. */
 static void prim_typeOf(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -1247,6 +1271,7 @@ void EvalState::createBaseEnv()
 
     // Miscellaneous
     addPrimOp("import", 1, prim_import);
+    addPrimOp("scopedImport", 2, prim_scopedImport);
     addPrimOp("__typeOf", 1, prim_typeOf);
     addPrimOp("isNull", 1, prim_isNull);
     addPrimOp("__isFunction", 1, prim_isFunction);
