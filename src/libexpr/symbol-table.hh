@@ -3,10 +3,7 @@
 #include "config.h"
 
 #include <map>
-
-#if HAVE_TR1_UNORDERED_SET
-#include <tr1/unordered_set>
-#endif
+#include <unordered_set>
 
 #include "types.hh"
 
@@ -70,11 +67,7 @@ inline std::ostream & operator << (std::ostream & str, const Symbol & sym)
 class SymbolTable
 {
 private:
-#if HAVE_TR1_UNORDERED_SET
-    typedef std::tr1::unordered_set<string> Symbols;
-#else
-    typedef std::set<string> Symbols;
-#endif
+    typedef std::unordered_set<string> Symbols;
     Symbols symbols;
 
 public:

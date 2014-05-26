@@ -1,15 +1,11 @@
 #pragma once
 
 #include <string>
+#include <unordered_set>
 
 #include "store-api.hh"
 #include "util.hh"
 #include "pathlocks.hh"
-
-#if HAVE_TR1_UNORDERED_SET
-#include <tr1/unordered_set>
-#endif
-
 
 
 class sqlite3;
@@ -306,11 +302,7 @@ private:
 
     void checkDerivationOutputs(const Path & drvPath, const Derivation & drv);
 
-#if HAVE_TR1_UNORDERED_SET
-    typedef std::tr1::unordered_set<ino_t> InodeHash;
-#else
-    typedef std::set<ino_t> InodeHash;
-#endif
+    typedef std::unordered_set<ino_t> InodeHash;
 
     InodeHash loadInodeHash();
     Strings readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash);

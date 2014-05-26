@@ -134,12 +134,6 @@ AC_CHECK_HEADERS([sys/personality.h])
 AC_CHECK_HEADERS([linux/fs.h])
 
 
-# Check for tr1/unordered_set.
-AC_LANG_PUSH(C++)
-AC_CHECK_HEADERS([tr1/unordered_set])
-AC_LANG_POP(C++)
-
-
 AC_DEFUN([NEED_PROG],
 [
 AC_PATH_PROG($1, $2)

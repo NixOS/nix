@@ -21,8 +21,7 @@ libstore_CXXFLAGS = \
  -DNIX_LOG_DIR=\"$(localstatedir)/log/nix\" \
  -DNIX_CONF_DIR=\"$(sysconfdir)/nix\" \
  -DNIX_LIBEXEC_DIR=\"$(libexecdir)\" \
- -DNIX_BIN_DIR=\"$(bindir)\" \
- -DPACKAGE_VERSION=\"$(PACKAGE_VERSION)\"
+ -DNIX_BIN_DIR=\"$(bindir)\"
 
 $(d)/local-store.cc: $(d)/schema.sql.hh
 
