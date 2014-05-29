@@ -1392,6 +1392,7 @@ void EvalState::createBaseEnv()
         mkAttrs(*v2, 2);
         mkString(*allocAttr(*v2, symbols.create("path")), i.second);
         mkString(*allocAttr(*v2, symbols.create("prefix")), i.first);
+        v2->attrs->sort();
     }
     addConstant("nixPath", v);
 
