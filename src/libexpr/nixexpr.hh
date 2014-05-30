@@ -16,6 +16,7 @@ MakeError(ThrownError, AssertionError)
 MakeError(Abort, EvalError)
 MakeError(TypeError, EvalError)
 MakeError(ImportError, EvalError) // error building an imported derivation
+MakeError(FindError, EvalError) // error building a nix-path component
 MakeError(UndefinedVarError, Error)
 
 

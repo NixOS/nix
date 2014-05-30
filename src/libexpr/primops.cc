@@ -37,6 +37,38 @@ std::pair<string, string> decodeContext(const string & s)
 }
 
 
+struct InvalidPathError : EvalError
+{
+    Path path;
+    InvalidPathError(const Path & path) :
+        EvalError(format("path `%1%' is not valid") % path), path(path) {};
+};
+
+
+static void realiseContext(const PathSet & context)
+{
+    PathSet drvs;
+    for (auto & i : context) {
+        std::pair<string, string> decoded = decodeContext(i);
+        Path ctx = decoded.first;
+        assert(isStorePath(ctx));
+        if (!store->isValidPath(ctx))
+            throw InvalidPathError(ctx);
+        if (isDerivation(ctx))
+            drvs.insert(decoded.first + "!" + decoded.second);
+    }
+    if (!drvs.empty()) {
+        /* For performance, prefetch all substitute info. */
+        PathSet willBuild, willSubstitute, unknown;
+        unsigned long long downloadSize, narSize;
+        queryMissing(*store, drvs,
+            willBuild, willSubstitute, unknown, downloadSize, narSize);
+
+        store->buildPaths(drvs);
+    }
+}
+
+
 /* Load and evaluate an expression from path specified by the
    argument. */
 static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -44,29 +76,13 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
     PathSet context;
     Path path = state.coerceToPath(pos, *args[1], context);
 
-    PathSet drvs;
-    for (auto & i : context) {
-        std::pair<string, string> decoded = decodeContext(i);
-        Path ctx = decoded.first;
-        assert(isStorePath(ctx));
-        if (!store->isValidPath(ctx))
-            throw EvalError(format("cannot import `%1%', since path `%2%' is not valid, at %3%")
-                % path % ctx % pos);
-        if (isDerivation(ctx))
-            drvs.insert(decoded.first + "!" + decoded.second);
-    }
-    if (!drvs.empty()) {
-        try {
-            /* For performance, prefetch all substitute info. */
-            PathSet willBuild, willSubstitute, unknown;
-            unsigned long long downloadSize, narSize;
-            queryMissing(*store, drvs,
-                willBuild, willSubstitute, unknown, downloadSize, narSize);
-
-            store->buildPaths(drvs);
-        } catch (Error & e) {
-            throw ImportError(e.msg());
-        }
+    try {
+        realiseContext(context);
+    } catch (InvalidPathError & e) {
+        throw EvalError(format("cannot import `%1%', since path `%2%' is not valid, at %3%")
+            % path % e.path % pos);
+    } catch (Error & e) {
+        throw ImportError(e.msg());
     }
 
     if (isStorePath(path) && store->isValidPath(path) && isDerivation(path)) {
@@ -660,6 +676,7 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
 
     SearchPath searchPath;
 
+    PathSet context;
     for (unsigned int n = 0; n < args[0]->list.length; ++n) {
         Value & v2(*args[0]->list.elems[n]);
         state.forceAttrs(v2, pos);
@@ -672,13 +689,22 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
         i = v2.attrs->find(state.symbols.create("path"));
         if (i == v2.attrs->end())
             throw EvalError(format("attribute `path' missing, at %1%") % pos);
-        PathSet context;
         string path = state.coerceToPath(pos, *i->value, context);
 
         searchPath.push_back(std::pair<string, Path>(prefix, path));
     }
 
     string path = state.forceStringNoCtx(*args[1], pos);
+
+    try {
+        realiseContext(context);
+    } catch (InvalidPathError & e) {
+        throw EvalError(format("cannot find `%1%', since path `%2%' is not valid, at %3%")
+            % path % e.path % pos);
+    } catch (Error & e) {
+        throw FindError(e.msg());
+    }
+
     mkPath(v, state.findFile(searchPath, path).c_str());
 }
 
