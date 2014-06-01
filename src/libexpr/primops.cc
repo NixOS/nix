@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <dlfcn.h>
 
 
 namespace nix {
@@ -126,6 +127,46 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
             e->eval(state, *env, v);
         }
     }
+}
+
+
+/* Want reasonable symbol names, so extern C */
+/* !!! Should we pass the Pos or the file name too? */
+extern "C" typedef void (*ValueInitializer)(EvalState & state, Value & v);
+
+/* Load a ValueInitializer from a dso and return whatever it initializes */
+static void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    PathSet context;
+    Path path = state.coerceToPath(pos, *args[0], context);
+
+    try {
+        realiseContext(context);
+    } catch (InvalidPathError & e) {
+        throw EvalError(format("cannot import `%1%', since path `%2%' is not valid, at %3%")
+            % path % e.path % pos);
+    }
+
+    string sym = state.forceStringNoCtx(*args[1], pos);
+
+    void *handle = dlopen(path.c_str(), RTLD_LAZY | RTLD_LOCAL);
+    if (!handle)
+        throw EvalError(format("could not open `%1%': %2%") % path % dlerror());
+
+    dlerror();
+    ValueInitializer func = (ValueInitializer) dlsym(handle, sym.c_str());
+    if(!func) {
+        char *message = dlerror();
+        if (message)
+            throw EvalError(format("could not load symbol `%1%' from `%2%': %3%") % sym % path % message);
+        else
+            throw EvalError(format("symbol `%1%' from `%2%' resolved to NULL when a function pointer was expected")
+                    % sym % path);
+    }
+
+    (func)(state, v);
+
+    /* We don't dlclose because v may be a primop referencing a function in the shared object file */
 }
 
 
@@ -1327,6 +1368,7 @@ void EvalState::createBaseEnv()
     mkApp(v, *baseEnv.values[baseEnvDispl - 1], *v2);
     forceValue(v);
     addConstant("import", v);
+    addPrimOp("__importNative", 2, prim_importNative);
     addPrimOp("__typeOf", 1, prim_typeOf);
     addPrimOp("isNull", 1, prim_isNull);
     addPrimOp("__isFunction", 1, prim_isFunction);
