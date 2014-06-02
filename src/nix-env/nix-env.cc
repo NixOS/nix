@@ -882,9 +882,10 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
         foreach (StringSet::iterator, j, metaNames) {
             metaObj.attr(*j);
             Value * v = i->queryMeta(*j);
-            if (!v)
+            if (!v) {
                 printMsg(lvlError, format("derivation `%1%' has invalid meta attribute `%2%'") % i->name % *j);
-            else {
+                cout << "null";
+            } else {
                 PathSet context;
                 printValueAsJSON(globals.state, true, *v, cout, context);
             }
