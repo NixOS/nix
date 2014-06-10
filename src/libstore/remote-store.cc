@@ -402,11 +402,23 @@ Path RemoteStore::addToStore(const Path & _srcPath,
     writeInt((hashAlgo == htSHA256 && recursive) ? 0 : 1, to);
     writeInt(recursive ? 1 : 0, to);
     writeString(printHashType(hashAlgo), to);
-    to.written = 0;
-    to.warn = true;
-    dumpPath(srcPath, to, filter);
-    to.warn = false;
-    processStderr();
+
+    try {
+        to.written = 0;
+        to.warn = true;
+        dumpPath(srcPath, to, filter);
+        to.warn = false;
+        processStderr();
+    } catch (SysError & e) {
+        /* Daemon closed while we were sending the path. Probably OOM
+           or I/O error. */
+        if (e.errNo == EPIPE)
+            try {
+                processStderr();
+            } catch (EndOfFile & e) { }
+        throw;
+    }
+
     return readStorePath(from);
 }
 

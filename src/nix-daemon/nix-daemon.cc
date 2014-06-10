@@ -735,12 +735,10 @@ static void processConnection(bool trusted)
                during addTextToStore() / importPath().  If that
                happens, just send the error message and exit. */
             bool errorAllowed = canSendStderr;
-            if (!errorAllowed) printMsg(lvlError, format("error processing client input: %1%") % e.msg());
             stopWork(false, e.msg(), GET_PROTOCOL_MINOR(clientVersion) >= 8 ? e.status : 0);
-            if (!errorAllowed) break;
+            if (!errorAllowed) throw;
         } catch (std::bad_alloc & e) {
-            if (canSendStderr)
-                stopWork(false, "Nix daemon out of memory", GET_PROTOCOL_MINOR(clientVersion) >= 8 ? 1 : 0);
+            stopWork(false, "Nix daemon out of memory", GET_PROTOCOL_MINOR(clientVersion) >= 8 ? 1 : 0);
             throw;
         }
 
