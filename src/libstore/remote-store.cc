@@ -402,7 +402,10 @@ Path RemoteStore::addToStore(const Path & _srcPath,
     writeInt((hashAlgo == htSHA256 && recursive) ? 0 : 1, to);
     writeInt(recursive ? 1 : 0, to);
     writeString(printHashType(hashAlgo), to);
+    to.written = 0;
+    to.warn = true;
     dumpPath(srcPath, to, filter);
+    to.warn = false;
     processStderr();
     return readStorePath(from);
 }
