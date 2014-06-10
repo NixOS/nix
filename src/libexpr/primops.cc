@@ -37,33 +37,52 @@ std::pair<string, string> decodeContext(const string & s)
 }
 
 
-/* Load and evaluate an expression from path specified by the
-   argument. */
-static void prim_import(EvalState & state, const Pos & pos, Value * * args, Value & v)
+struct InvalidPathError : EvalError
 {
-    PathSet context;
-    Path path = state.coerceToPath(pos, *args[0], context);
+    Path path;
+    InvalidPathError(const Path & path) :
+        EvalError(format("path `%1%' is not valid") % path), path(path) {};
+};
 
-    foreach (PathSet::iterator, i, context) {
-        Path ctx = decodeContext(*i).first;
+
+static void realiseContext(const PathSet & context)
+{
+    PathSet drvs;
+    for (auto & i : context) {
+        std::pair<string, string> decoded = decodeContext(i);
+        Path ctx = decoded.first;
         assert(isStorePath(ctx));
         if (!store->isValidPath(ctx))
-            throw EvalError(format("cannot import `%1%', since path `%2%' is not valid, at %3%")
-                % path % ctx % pos);
+            throw InvalidPathError(ctx);
         if (isDerivation(ctx))
-            try {
-                /* For performance, prefetch all substitute info. */
-                PathSet willBuild, willSubstitute, unknown;
-                unsigned long long downloadSize, narSize;
-                queryMissing(*store, singleton<PathSet>(ctx),
-                    willBuild, willSubstitute, unknown, downloadSize, narSize);
+            drvs.insert(decoded.first + "!" + decoded.second);
+    }
+    if (!drvs.empty()) {
+        /* For performance, prefetch all substitute info. */
+        PathSet willBuild, willSubstitute, unknown;
+        unsigned long long downloadSize, narSize;
+        queryMissing(*store, drvs,
+            willBuild, willSubstitute, unknown, downloadSize, narSize);
 
-                /* !!! If using a substitute, we only need to fetch
-                   the selected output of this derivation. */
-                store->buildPaths(singleton<PathSet>(ctx));
-            } catch (Error & e) {
-                throw ImportError(e.msg());
-            }
+        store->buildPaths(drvs);
+    }
+}
+
+
+/* Load and evaluate an expression from path specified by the
+   argument. */
+static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    PathSet context;
+    Path path = state.coerceToPath(pos, *args[1], context);
+
+    try {
+        realiseContext(context);
+    } catch (InvalidPathError & e) {
+        throw EvalError(format("cannot import `%1%', since path `%2%' is not valid, at %3%")
+            % path % e.path % pos);
+    } catch (Error & e) {
+        throw ImportError(e.msg());
     }
 
     if (isStorePath(path) && store->isValidPath(path) && isDerivation(path)) {
@@ -88,32 +107,27 @@ static void prim_import(EvalState & state, const Pos & pos, Value * * args, Valu
         mkApp(v, fun, w);
         state.forceAttrs(v, pos);
     } else {
-        state.evalFile(path, v);
+        state.forceAttrs(*args[0]);
+        if (args[0]->attrs->empty())
+            state.evalFile(path, v);
+        else {
+            Env * env = &state.allocEnv(args[0]->attrs->size());
+            env->up = &state.baseEnv;
+
+            StaticEnv staticEnv(false, &state.staticBaseEnv);
+
+            unsigned int displ = 0;
+            for (auto & attr : *args[0]->attrs) {
+                staticEnv.vars[attr.name] = displ;
+                env->values[displ++] = attr.value;
+            }
+
+            startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path);
+            Expr * e = state.parseExprFromFile(resolveExprPath(path), staticEnv);
+
+            e->eval(state, *env, v);
+        }
     }
-}
-
-
-static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args, Value & v)
-{
-    PathSet context;
-    state.forceAttrs(*args[0]);
-    Path path = resolveExprPath(state.coerceToPath(pos, *args[1], context));
-
-    Env * env = &state.allocEnv(args[0]->attrs->size());
-    env->up = &state.baseEnv;
-
-    StaticEnv staticEnv(false, &state.staticBaseEnv);
-
-    unsigned int displ = 0;
-    for (auto & attr : *args[0]->attrs) {
-        staticEnv.vars[attr.name] = displ;
-        env->values[displ++] = attr.value;
-    }
-
-    startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path);
-    Expr * e = state.parseExprFromFile(path, staticEnv);
-
-    e->eval(state, *env, v);
 }
 
 
@@ -662,6 +676,7 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
 
     SearchPath searchPath;
 
+    PathSet context;
     for (unsigned int n = 0; n < args[0]->list.length; ++n) {
         Value & v2(*args[0]->list.elems[n]);
         state.forceAttrs(v2, pos);
@@ -674,13 +689,22 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
         i = v2.attrs->find(state.symbols.create("path"));
         if (i == v2.attrs->end())
             throw EvalError(format("attribute `path' missing, at %1%") % pos);
-        PathSet context;
         string path = state.coerceToPath(pos, *i->value, context);
 
         searchPath.push_back(std::pair<string, Path>(prefix, path));
     }
 
     string path = state.forceStringNoCtx(*args[1], pos);
+
+    try {
+        realiseContext(context);
+    } catch (InvalidPathError & e) {
+        throw EvalError(format("cannot find `%1%', since path `%2%' is not valid, at %3%")
+            % path % e.path % pos);
+    } catch (Error & e) {
+        throw FindError(e.msg());
+    }
+
     mkPath(v, state.findFile(searchPath, path).c_str());
 }
 
@@ -1301,8 +1325,12 @@ void EvalState::createBaseEnv()
     addConstant("__langVersion", v);
 
     // Miscellaneous
-    addPrimOp("import", 1, prim_import);
     addPrimOp("scopedImport", 2, prim_scopedImport);
+    Value * v2 = allocValue();
+    mkAttrs(*v2, 0);
+    mkApp(v, *baseEnv.values[baseEnvDispl - 1], *v2);
+    forceValue(v);
+    addConstant("import", v);
     addPrimOp("__typeOf", 1, prim_typeOf);
     addPrimOp("isNull", 1, prim_isNull);
     addPrimOp("__isFunction", 1, prim_isFunction);
@@ -1388,7 +1416,7 @@ void EvalState::createBaseEnv()
     mkList(v, searchPath.size());
     int n = 0;
     for (auto & i : searchPath) {
-        Value * v2 = v.list.elems[n++] = allocValue();
+        v2 = v.list.elems[n++] = allocValue();
         mkAttrs(*v2, 2);
         mkString(*allocAttr(*v2, symbols.create("path")), i.second);
         mkString(*allocAttr(*v2, symbols.create("prefix")), i.first);
