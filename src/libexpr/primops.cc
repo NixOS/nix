@@ -81,8 +81,6 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
     } catch (InvalidPathError & e) {
         throw EvalError(format("cannot import `%1%', since path `%2%' is not valid, at %3%")
             % path % e.path % pos);
-    } catch (Error & e) {
-        throw ImportError(e.msg());
     }
 
     if (isStorePath(path) && store->isValidPath(path) && isDerivation(path)) {
@@ -701,8 +699,6 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
     } catch (InvalidPathError & e) {
         throw EvalError(format("cannot find `%1%', since path `%2%' is not valid, at %3%")
             % path % e.path % pos);
-    } catch (Error & e) {
-        throw FindError(e.msg());
     }
 
     mkPath(v, state.findFile(searchPath, path).c_str());
