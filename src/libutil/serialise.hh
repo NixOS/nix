@@ -72,8 +72,8 @@ struct BufferedSource : Source
 struct FdSink : BufferedSink
 {
     int fd;
-    bool warn;
-    size_t written;
+    bool warn = false;
+    size_t written = 0;
 
     FdSink() : fd(-1) { }
     FdSink(int fd) : fd(fd) { }
