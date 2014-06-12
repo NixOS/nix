@@ -72,11 +72,11 @@ struct BufferedSource : Source
 struct FdSink : BufferedSink
 {
     int fd;
-    bool warn = false;
-    size_t written = 0;
+    bool warn;
+    size_t written;
 
-    FdSink() : fd(-1) { }
-    FdSink(int fd) : fd(fd) { }
+    FdSink() : fd(-1), warn(false), written(0) { }
+    FdSink(int fd) : fd(fd), warn(false), written(0) { }
     ~FdSink();
     
     void write(const unsigned char * data, size_t len);
