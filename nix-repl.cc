@@ -350,6 +350,8 @@ bool NixRepl::processLine(string line)
         size_t p = line.find('=');
         string name;
         if (p != string::npos &&
+            p < line.size() &&
+            line[p + 1] != '=' &&
             isVarName(name = removeWhitespace(string(line, 0, p))))
         {
             Expr * e = parseString(string(line, p + 1));
