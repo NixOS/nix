@@ -868,7 +868,7 @@ string runProgram(Path program, bool searchPath, const Strings & args)
 
     /* Fork. */
     Pid pid;
-    pid = maybeVfork();
+    pid = fork();
 
     switch (pid) {
 
@@ -926,13 +926,6 @@ void closeOnExec(int fd)
         fcntl(fd, F_SETFD, prev | FD_CLOEXEC) == -1)
         throw SysError("setting close-on-exec flag");
 }
-
-
-#if HAVE_VFORK
-pid_t (*maybeVfork)() = vfork;
-#else
-pid_t (*maybeVfork)() = fork;
-#endif
 
 
 //////////////////////////////////////////////////////////////////////

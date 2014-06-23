@@ -602,7 +602,7 @@ HookInstance::HookInstance()
     builderOut.create();
 
     /* Fork the hook. */
-    pid = maybeVfork();
+    pid = fork();
     switch (pid) {
 
     case -1:
@@ -2781,7 +2781,7 @@ void SubstitutionGoal::tryToRun()
     const char * * argArr = strings2CharPtrs(args);
 
     /* Fork the substitute program. */
-    pid = maybeVfork();
+    pid = fork();
 
     switch (pid) {
 

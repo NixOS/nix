@@ -266,9 +266,6 @@ void closeMostFDs(const set<int> & exceptions);
 /* Set the close-on-exec flag for the given file descriptor. */
 void closeOnExec(int fd);
 
-/* Call vfork() if available, otherwise fork(). */
-extern pid_t (*maybeVfork)();
-
 
 /* User interruption. */
 

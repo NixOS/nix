@@ -1083,7 +1083,7 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
 
     setSubstituterEnv();
 
-    run.pid = maybeVfork();
+    run.pid = fork();
 
     switch (run.pid) {
 
