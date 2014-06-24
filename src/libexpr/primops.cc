@@ -1368,7 +1368,8 @@ void EvalState::createBaseEnv()
     mkApp(v, *baseEnv.values[baseEnvDispl - 1], *v2);
     forceValue(v);
     addConstant("import", v);
-    addPrimOp("__importNative", 2, prim_importNative);
+    if (settings.enableImportNative)
+        addPrimOp("__importNative", 2, prim_importNative);
     addPrimOp("__typeOf", 1, prim_typeOf);
     addPrimOp("isNull", 1, prim_isNull);
     addPrimOp("__isFunction", 1, prim_isFunction);

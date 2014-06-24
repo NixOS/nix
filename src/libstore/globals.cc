@@ -61,6 +61,7 @@ Settings::Settings()
     envKeepDerivations = false;
     lockCPU = getEnv("NIX_AFFINITY_HACK", "1") == "1";
     showTrace = false;
+    enableImportNative = false;
 }
 
 
@@ -148,6 +149,7 @@ void Settings::update()
     get(sshSubstituterHosts, "ssh-substituter-hosts");
     get(useSshSubstituter, "use-ssh-substituter");
     get(logServers, "log-servers");
+    get(enableImportNative, "allow-arbitrary-code-during-evaluation");
 
     string subs = getEnv("NIX_SUBSTITUTERS", "default");
     if (subs == "default") {
