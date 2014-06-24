@@ -124,6 +124,15 @@ input.</para>
 
   </varlistentry>
 
+  <varlistentry><term><option>--json</option></term>
+
+    <listitem><para>When used with <option>--parse</option> and
+    <option>--eval</option>, print the resulting expression as an
+    JSON representation of the abstract syntax tree rather than as an
+    ATerm.</para></listitem>
+
+  </varlistentry>
+
   <varlistentry><term><option>--strict</option></term>
 
     <listitem><para>When used with <option>--eval</option>,
