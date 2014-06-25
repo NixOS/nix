@@ -1,5 +1,6 @@
 <appendix xmlns="http://docbook.org/ns/docbook"
-          xmlns:xlink="http://www.w3.org/1999/xlink">
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xml:id="appx-glossary">
 
 <title>Glossary</title>
 
@@ -12,7 +13,7 @@
   <glossdef><para>A description of a build action.  The result of a
   derivation is a store object.  Derivations are typically specified
   in Nix expressions using the <link
-  linkend="ssec-derivation"><function>derivation</function>
+  linkend="sec-derivations"><function>derivation</function>
   primitive</link>.  These are translated into low-level
   <emphasis>store derivations</emphasis> (implicitly by
   <command>nix-env</command> and <command>nix-build</command>, or
@@ -144,10 +145,10 @@
   consists of a set of symlinks to “active” applications, i.e., other
   store paths.  These are generated automatically by <link
   linkend="sec-nix-env"><command>nix-env</command></link>.  See <xref
-  linkend="sec-profiles" />.</para>
+  linkend="sec-basic-package-management" />.</para>
 
   </glossdef>
-  
+
 </glossentry>
 
 

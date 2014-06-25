@@ -1,5 +1,6 @@
 <appendix xmlns="http://docbook.org/ns/docbook"
-          xmlns:xlink="http://www.w3.org/1999/xlink">
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xml:id="appx-troubleshooting">
 
 <title>Troubleshooting</title>
 
@@ -9,7 +10,8 @@ the <link xlink:href="http://bugs.strategoxt.org/browse/NIX">Nix
 bug tracker</link> for a list of currently known issues.</para>
 
 
-<section><title>Collisions in <command>nix-env</command></title>
+<section xml:id="sec-collitions-in-nix-env">
+    <title>Collisions in <command>nix-env</command></title>
 
 <para>Symptom: when installing or upgrading, you get an error message such as
 
@@ -48,8 +50,8 @@ other.</para>
 </section>
 
 
-<section><title><quote>Too many links</quote> error in the Nix
-store</title>
+<section xml:id="sec-too-many-links-error-in-the-nix-store">
+    <title><quote>Too many links</quote> error in the Nix store</title>
 
 
 <para>Symptom: when building something, you get an error message such as
@@ -86,7 +88,7 @@ ReiserFS lies to the kernel by reporting a link count of 1 if it
 exceeds the limit.)</para>
 
 </section>
-  
+
 
 
 </appendix>

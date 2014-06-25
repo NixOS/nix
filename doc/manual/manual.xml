@@ -36,12 +36,12 @@
   <xi:include href="build-farm.xml" />
 
 
-  <appendix>
+  <appendix xml:id='appx-command-reference'>
     <title>Command Reference</title>
     <xi:include href="opt-common.xml" />
     <xi:include href="env-common.xml" />
 
-    <section>
+    <section xml:id="sec-main-commands">
       <title>Main commands</title>
       <xi:include href="nix-env.xml" />
       <xi:include href="nix-build.xml" />
@@ -49,7 +49,7 @@
       <xi:include href="nix-store.xml" />
     </section>
 
-    <section>
+    <section xml:id="sec-main-utilities">
       <title>Utilities</title>
       <xi:include href="nix-channel.xml" />
       <xi:include href="nix-collect-garbage.xml" />
@@ -63,7 +63,7 @@
       <xi:include href="nix-push.xml" />
     </section>
 
-    <section>
+    <section xml:id="sec-files">
       <title>Files</title>
       <xi:include href="conf-file.xml" />
     </section>
@@ -75,7 +75,7 @@
   <xi:include href="glossary.xml" />
   <xi:include href="hacking.xml" />
 
-  <appendix>
+  <appendix xml:id="appx-nix-release-notes">
     <title>Nix Release Notes</title>
     <xi:include href="release-notes.xml"
                 xpointer="xmlns(x=http://docbook.org/ns/docbook)xpointer(x:article/x:section)" />

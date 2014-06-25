@@ -1,6 +1,6 @@
 <section xmlns="http://docbook.org/ns/docbook"
          xmlns:xlink="http://www.w3.org/1999/xlink"
-         xml:id='ssec-builtins'>
+         xml:id='sec-builtins'>
 
 <title>Built-in functions</title>
 
@@ -147,7 +147,7 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
   <replaceable>attrs</replaceable></term>
 
     <listitem><para><function>derivation</function> is described in
-    <xref linkend='ssec-derivation' />.</para></listitem>
+    <xref linkend='sec-derivations' />.</para></listitem>
 
   </varlistentry>
 
@@ -729,7 +729,7 @@ stdenv.mkDerivation {
   ";</programlisting>
 
     Note that <literal>${configFile}</literal> is an antiquotation
-    (see <xref linkend='ssec-values' />), so the result of the
+    (see <xref linkend='sec-values' />), so the result of the
     expression <literal>configFile</literal> (i.e., a path like
     <filename>/nix/store/m7p7jfny445k...-foo.conf</filename>) will be
     spliced into the resulting string.</para>

@@ -1,13 +1,12 @@
 <article xmlns="http://docbook.org/ns/docbook"
-         xmlns:xlink="http://www.w3.org/1999/xlink"
-         xml:id="sec-relnotes">
+         xmlns:xlink="http://www.w3.org/1999/xlink">
 
 <title>Nix Release Notes</title>
 
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-1.7"><title>Release 1.7 (April 11, 2014)</title>
+<section xml:id="sec-relnotes-1.7"><title>Release 1.7 (April 11, 2014)</title>
 
 <para>In addition to the usual bug fixes, this release has the
 following new features:</para>
@@ -268,7 +267,7 @@ Rockai, Ricardo M. Correia and Shea Levy.</para>
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-1.6.1"><title>Release 1.6.1 (October 28, 2013)</title>
+<section xml:id="sec-relnotes-1.6.1"><title>Release 1.6.1 (October 28, 2013)</title>
 
 <para>This is primarily a bug fix release.  Changes of interest
 are:</para>
@@ -335,7 +334,7 @@ are:</para>
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-1.6.0"><title>Release 1.6 (September 10, 2013)</title>
+<section xml:id="sec-relnotes-1.6.0"><title>Release 1.6 (September 10, 2013)</title>
 
 <para>In addition to the usual bug fixes, this release has several new
 features:</para>
@@ -460,7 +459,7 @@ Levy.</para>
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-1.5.3"><title>Release 1.5.3 (June 17, 2013)</title>
+<section xml:id="sec-relnotes-1.5.3"><title>Release 1.5.3 (June 17, 2013)</title>
 
 <para>This is primarily a bug fix release.  The following changes are
 noteworthy:</para>
@@ -508,7 +507,7 @@ while evaluating `concatMapStrings' at `<replaceable>...</replaceable>/nixpkgs/p
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-1.5.2"><title>Release 1.5.2 (May 13, 2013)</title>
+<section xml:id="sec-relnotes-1.5.2"><title>Release 1.5.2 (May 13, 2013)</title>
 
 <para>This is primarily a bug fix release.  It has contributions from
 Eelco Dolstra, Lluís Batlle i Rossell and Shea Levy.</para>
@@ -518,7 +517,7 @@ Eelco Dolstra, Lluís Batlle i Rossell and Shea Levy.</para>
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-1.5.1"><title>Release 1.5.1 (February 28, 2013)</title>
+<section xml:id="sec-relnotes-1.5.1"><title>Release 1.5.1 (February 28, 2013)</title>
 
 <para>The bug fix to the bug fix had a bug itself, of course.  But
 this time it will work for sure!</para>
@@ -528,7 +527,7 @@ this time it will work for sure!</para>
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-1.5"><title>Release 1.5 (February 27, 2013)</title>
+<section xml:id="sec-relnotes-1.5"><title>Release 1.5 (February 27, 2013)</title>
 
 <para>This is a brown paper bag release to fix a regression introduced
 by the hard link security fix in 1.4.</para>
@@ -538,7 +537,7 @@ by the hard link security fix in 1.4.</para>
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-1.4"><title>Release 1.4 (February 26, 2013)</title>
+<section xml:id="sec-relnotes-1.4"><title>Release 1.4 (February 26, 2013)</title>
 
 <para>This release fixes a security bug in multi-user operation.  It
 was possible for derivations to cause the mode of files outside of the
@@ -575,7 +574,7 @@ xlink:href="https://github.com/NixOS/nix/commit/5526a282b5b44e9296e61e07d7d2626a
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-1.3"><title>Release 1.3 (January 4, 2013)</title>
+<section xml:id="sec-relnotes-1.3"><title>Release 1.3 (January 4, 2013)</title>
 
 <para>This is primarily a bug fix release.  When this version is first
 run on Linux, it removes any immutable bits from the Nix store and
@@ -592,7 +591,7 @@ Pernsteiner.</para>
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-1.2"><title>Release 1.2 (December 6, 2012)</title>
+<section xml:id="sec-relnotes-1.2"><title>Release 1.2 (December 6, 2012)</title>
 
 <para>This release has the following improvements and changes:</para>
 
@@ -747,7 +746,7 @@ Friesdorf, Mats Erik Andersson and Shea Levy.</para>
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-1.1"><title>Release 1.1 (July 18, 2012)</title>
+<section xml:id="sec-relnotes-1.1"><title>Release 1.1 (July 18, 2012)</title>
 
 <para>This release has the following improvements:</para>
 
@@ -845,7 +844,7 @@ Friesdorf, Mats Erik Andersson and Shea Levy.</para>
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-1.0"><title>Release 1.0 (May 11, 2012)</title>
+<section xml:id="sec-relnotes-1.0"><title>Release 1.0 (May 11, 2012)</title>
 
 <para>There have been numerous improvements and bug fixes since the
 previous release.  Here are the most significant:</para>
@@ -962,7 +961,7 @@ previous release.  Here are the most significant:</para>
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-0.16"><title>Release 0.16 (August 17, 2010)</title>
+<section xml:id="sec-relnotes-0.16"><title>Release 0.16 (August 17, 2010)</title>
 
 <para>This release has the following improvements:</para>
 
@@ -1015,7 +1014,7 @@ previous release.  Here are the most significant:</para>
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-0.15"><title>Release 0.15 (March 17, 2010)</title>
+<section xml:id="sec-relnotes-0.15"><title>Release 0.15 (March 17, 2010)</title>
 
 <para>This is a bug-fix release.  Among other things, it fixes
 building on Mac OS X (Snow Leopard), and improves the contents of
@@ -1027,7 +1026,7 @@ in <literal>chroot</literal> builds.</para>
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-0.14"><title>Release 0.14 (February 4, 2010)</title>
+<section xml:id="sec-relnotes-0.14"><title>Release 0.14 (February 4, 2010)</title>
 
 <para>This release has the following improvements:</para>
 
@@ -1071,7 +1070,7 @@ in <literal>chroot</literal> builds.</para>
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-0.13"><title>Release 0.13 (November 5,
+<section xml:id="sec-relnotes-0.13"><title>Release 0.13 (November 5,
 2009)</title>
 
 <para>This is primarily a bug fix release.  It has some new
@@ -1176,7 +1175,7 @@ features:</para>
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-0.12"><title>Release 0.12 (November 20,
+<section xml:id="sec-relnotes-0.12"><title>Release 0.12 (November 20,
 2008)</title>
 
 <itemizedlist>
@@ -1350,7 +1349,7 @@ the following paths will be downloaded/copied (30.02 MiB):
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-0.11"><title>Release 0.11 (December 31,
+<section xml:id="sec-relnotes-0.11"><title>Release 0.11 (December 31,
 2007)</title>
 
 <para>Nix 0.11 has many improvements over the previous stable release.
@@ -1611,7 +1610,7 @@ on Nix.  Here is an (incomplete) list:</para>
 
 <!--==================================================================-->
 
-<section><title>Release 0.10.1 (October 11, 2006)</title>
+<section xml:id="sec-relnotes-0.10.1"><title>Release 0.10.1 (October 11, 2006)</title>
 
 <para>This release fixes two somewhat obscure bugs that occur when
 evaluating Nix expressions that are stored inside the Nix store
@@ -1623,7 +1622,7 @@ evaluating Nix expressions that are stored inside the Nix store
 
 <!--==================================================================-->
 
-<section><title>Release 0.10 (October 6, 2006)</title>
+<section xml:id="sec-relnotes-0.10"><title>Release 0.10 (October 6, 2006)</title>
 
 <note><para>This version of Nix uses Berkeley DB 4.4 instead of 4.3.
 The database is upgraded automatically, but you should be careful not
@@ -1945,7 +1944,7 @@ irreversible.</para></warning>
 
 <!--==================================================================-->
 
-<section><title>Release 0.9.2 (September 21, 2005)</title>
+<section xml:id="sec-relnotes-0.9.2"><title>Release 0.9.2 (September 21, 2005)</title>
 
 <para>This bug fix release fixes two problems on Mac OS X:
 
@@ -1972,7 +1971,7 @@ irreversible.</para></warning>
 
 <!--==================================================================-->
 
-<section><title>Release 0.9.1 (September 20, 2005)</title>
+<section xml:id="sec-relnotes-0.9.1"><title>Release 0.9.1 (September 20, 2005)</title>
 
 <para>This bug fix release addresses a problem with the ATerm library
 when the <option>--with-aterm</option> flag in
@@ -1984,7 +1983,7 @@ when the <option>--with-aterm</option> flag in
 
 <!--==================================================================-->
 
-<section><title>Release 0.9 (September 16, 2005)</title>
+<section xml:id="sec-relnotes-0.9"><title>Release 0.9 (September 16, 2005)</title>
 
 <para>NOTE: this version of Nix uses Berkeley DB 4.3 instead of 4.2.
 The database is upgraded automatically, but you should be careful not
@@ -2081,7 +2080,7 @@ svnService = derivation {
 
 <!--==================================================================-->
 
-<section><title>Release 0.8.1 (April 13, 2005)</title>
+<section xml:id="sec-relnotes-0.8.1"><title>Release 0.8.1 (April 13, 2005)</title>
 
 <para>This is a bug fix release.</para>
 
@@ -2101,7 +2100,7 @@ svnService = derivation {
 
 <!--==================================================================-->
 
-<section><title>Release 0.8 (April 11, 2005)</title>
+<section xml:id="sec-relnotes-0.8"><title>Release 0.8 (April 11, 2005)</title>
 
 <para>NOTE: the hashing scheme in Nix 0.8 changed (as detailed below).
 As a result, <command>nix-pull</command> manifests and channels built
@@ -2346,7 +2345,7 @@ $ nix-env -f .../i686-linux.nix -i -E 'x: x.firefoxWrapper'</screen>
 
 <!--==================================================================-->
 
-<section><title>Release 0.7 (January 12, 2005)</title>
+<section xml:id="sec-relnotes-0.7"><title>Release 0.7 (January 12, 2005)</title>
 
 <itemizedlist>
 
@@ -2380,7 +2379,7 @@ $ nix-env -f .../i686-linux.nix -i -E 'x: x.firefoxWrapper'</screen>
 
 <!--==================================================================-->
 
-<section><title>Release 0.6 (November 14, 2004)</title>
+<section xml:id="sec-relnotes-0.6"><title>Release 0.6 (November 14, 2004)</title>
 
 <itemizedlist>
 
@@ -2501,7 +2500,8 @@ $ nix-env -f .../i686-linux.nix -i -E 'x: x.firefoxWrapper'</screen>
 
 <!--==================================================================-->
 
-<section><title>Release 0.5 and earlier</title>
+<section xml:id="sec-relnotes-0.5-and-earlier">
+  <title>Release 0.5 and earlier</title>
 
 <para>Please refer to the Subversion commit log messages.</para>
 

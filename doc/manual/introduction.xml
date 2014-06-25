@@ -5,7 +5,7 @@
 <title>Introduction</title>
 
 
-<section><title>About Nix</title>
+<section xml:id="sec-about-nix"><title>About Nix</title>
 
 <para>Nix is a <emphasis>purely functional package manager</emphasis>.
 This means that it treats packages like values in purely functional
@@ -254,7 +254,7 @@ xlink:href="http://nixos.org/">NixOS homepage</link>.</para>
 </section>
 
 
-<section><title>License</title>
+<section xml:id="sec-license"><title>License</title>
 
 <para>Nix is free software; you can redistribute it and/or modify it
 under the terms of the <link

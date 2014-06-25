@@ -5,8 +5,8 @@
 
 <title>Installation</title>
 
-
-<section><title>Supported platforms</title>
+<section xml:id="sec-supported-platform">
+  <title>Supported platforms</title>
 
 <para>Nix is currently supported on the following platforms:
 
@@ -40,7 +40,8 @@ platforms as well.</para>
 </section>
 
 
-<section><title>Installing a binary distribution</title>
+<section xml:id="sec-installing-a-binary-distribution">
+  <title>Installing a binary distribution</title>
 
 <para>The easiest way to install Nix is to run the following:
 
@@ -117,12 +118,13 @@ $ rm -rf /nix</screen>
 </section>
 
 
-<section><title>Installing Nix from source</title>
+<section xml:id="sec-installing-nix-from-source">
+  <title>Installing Nix from source</title>
 
 <para>If no binary package is available, you can download and compile
 a source distribution.</para>
 
-<section><title>Prerequisites</title>
+<section xml:id="sec-prerequisites"><title>Prerequisites</title>
 
 <itemizedlist>
 
@@ -191,7 +193,8 @@ a source distribution.</para>
 </section>
 
 
-<section><title>Obtaining a source distribution</title>
+<section xml:id="sec-obtaining-a-source-distribution">
+  <title>Obtaining a source distribution</title>
 
 <para>The source tarball of the most recent stable release can be
 downloaded from the <link
@@ -217,7 +220,8 @@ repository.</para>
 </section>
 
 
-<section><title>Building Nix from source</title>
+<section xml:id="sec-building-nix-from-source">
+  <title>Building Nix from source</title>
 
 <para>After unpacking or checking out the Nix sources, issue the
 following commands:
@@ -274,14 +278,15 @@ options.</para>
 
 
 <!-- TODO: should be updated
-<section><title>Upgrading Nix through Nix</title>
+<section xml:id="sec-upgrading-nix-through-nix">
+  <title>Upgrading Nix through Nix</title>
 
 <para>You can install the latest stable version of Nix through Nix
 itself by subscribing to the channel <link
 xlink:href="http://nixos.org/releases/nix/channels/nix-stable" />,
 or the latest unstable version by subscribing to the channel <link
 xlink:href="http://nixos.org/releases/nix/channels/nix-unstable" />.
-You can also do a <link linkend="sec-one-click">one-click
+You can also do a <link linkend="sec-one-click-installs">one-click
 installation</link> by clicking on the package links at <link
 xlink:href="http://nixos.org/releases/full-index-nix.html" />.</para>
 
@@ -289,7 +294,7 @@ xlink:href="http://nixos.org/releases/full-index-nix.html" />.</para>
 -->
 
 
-<section><title>Security</title>
+<section xml:id="sec-security"><title>Security</title>
 
 <para>Nix has two basic security models.  First, it can be used in
 “single-user mode”, which is similar to what most other package
@@ -307,7 +312,8 @@ possible for one user to overwrite a package used by another user with
 a Trojan horse.</para>
 
 
-<section><title>Single-user mode</title>
+<section xml:id="sec-single-user-mode">
+  <title>Single-user mode</title>
 
 <para>In single-user mode, all Nix operations that access the database
 in <filename><replaceable>prefix</replaceable>/var/nix/db</filename>
@@ -324,7 +330,8 @@ class="username">root</systemitem> all the time.</para>
 </section>
 
 
-<section xml:id="ssec-multi-user"><title>Multi-user mode</title>
+<section xml:id="sec-multi-user-mode">
+  <title>Multi-user mode</title>
 
 <para>To allow a Nix store to be shared safely among multiple users,
 it is important that users are not able to run builders that modify
@@ -350,7 +357,8 @@ users, so they still get the benefit from <command>nix-pull</command>s
 done by <systemitem class="username">root</systemitem>.</para></note>
 
 
-<section><title>Setting up the build users</title>
+<section xml:id="sec-setting-up-the-build-users">
+  <title>Setting up the build users</title>
 
 <para>The <emphasis>build users</emphasis> are the special UIDs under
 which builds are performed.  They should all be members of the
@@ -373,7 +381,8 @@ you expect to do many builds at the same time.</para>
 </section>
 
 
-<section><title>Running the daemon</title>
+<section xml:id="sec-running-the-daemon">
+  <title>Running the daemon</title>
 
 <para>The <link linkend="sec-nix-daemon">Nix daemon</link> should be
 started as follows (as <literal>root</literal>):
@@ -397,7 +406,8 @@ into the users’ login scripts.</para>
 </section>
 
 
-<section><title>Restricting access</title>
+<section xml:id="sec-restricting-access">
+  <title>Restricting access</title>
 
 <para>To limit which users can perform Nix operations, you can use the
 permissions on the directory
@@ -424,7 +434,7 @@ perform Nix operations.</para>
 </section> <!-- end of security -->
 
 
-<section><title>Using Nix</title>
+<section xml:id="sec-using-nix"><title>Using Nix</title>
 
 <para>To use Nix, some environment variables should be set.  In
 particular, <envar>PATH</envar> should contain the directories

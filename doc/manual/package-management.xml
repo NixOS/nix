@@ -12,7 +12,8 @@ who want to <emphasis>create</emphasis> packages should consult
 <xref linkend='chap-writing-nix-expressions' />.</para>
 
 
-<section><title>Basic package management</title>
+<section xml:id="sec-basic-package-management">
+    <title>Basic package management</title>
 
 <para>The main command for package management is <link
 linkend="sec-nix-env"><command>nix-env</command></link>.  You can use
@@ -178,7 +179,8 @@ upgrading `coreutils-5.0' to `coreutils-5.2.1'</screen>
 </section>
 
 
-<section xml:id="sec-profiles"><title>Profiles</title>
+<section xml:id="sec-profiles">
+    <title>Profiles</title>
 
 <para>Profiles and user environments are Nix’s mechanism for
 implementing the ability to allow different users to have different
@@ -333,7 +335,8 @@ This will <emphasis>not</emphasis> change the
 </section>
 
 
-<section xml:id='sec-garbage-collection'><title>Garbage collection</title>
+<section xml:id='sec-garbage-collection'>
+    <title>Garbage collection</title>
 
 <para><command>nix-env</command> operations such as upgrades
 (<option>-u</option>) and uninstall (<option>-e</option>) never
@@ -395,9 +398,8 @@ $ nix-collect-garbage -d</screen>
 is a quick and easy way to clean up your system.</para>
 
 
-
-
-<section xml:id="ssec-gc-roots"><title>Garbage collector roots</title>
+<section xml:id="sec-garbage-collector-roots">
+    <title>Garbage collector roots</title>
 
 <para>The roots of the garbage collector are all store paths to which
 there are symlinks in the directory
@@ -407,7 +409,7 @@ For instance, the following command makes the path
 
 <screen>
 $ ln -s /nix/store/d718ef...-foo /nix/var/nix/gcroots/bar</screen>
-	
+
 That is, after this command, the garbage collector will not remove
 <filename>/nix/store/d718ef...-foo</filename> or any of its
 dependencies.</para>
@@ -477,7 +479,8 @@ available in the subscribed channels.</para>
 </section>
 
 
-<section xml:id="sec-one-click"><title>One-click installs</title>
+<section xml:id="sec-one-click-installs">
+    <title>One-click installs</title>
 
 <para>Often, when you want to install a specific package (e.g., from
 the <link
@@ -510,7 +513,8 @@ linkend='sec-nix-install-package' /> for details.</para>
 </section>
 
 
-<section xml:id="sec-sharing-packages"><title>Sharing packages between machines</title>
+<section xml:id="sec-sharing-packages-between-machines">
+    <title>Sharing packages between machines</title>
 
 <para>Sometimes you want to copy a package from one machine to
 another.  Or, you want to install some packages and you know that

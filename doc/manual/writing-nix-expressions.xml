@@ -19,7 +19,8 @@ xlink:href="http://nixos.org/nixpkgs/manual/">its
 manual</link>.</para></note>
 
 
-<section><title>A simple Nix expression</title>
+<section xml:id="sec-a-simple-nix-expression">
+  <title>A simple Nix expression</title>
 
 <para>This section shows how to add and test the <link
 xlink:href='http://www.gnu.org/software/hello/hello.html'>GNU Hello
@@ -54,7 +55,8 @@ need to do three things:
 </para>
 
 
-<section><title>The Nix expression</title>
+<section xml:id="sec-the-nix-expression">
+  <title>The Nix expression</title>
 
 <example xml:id='ex-hello-nix'><title>Nix expression for GNU Hello
 (<filename>default.nix</filename>)</title>
@@ -198,7 +200,8 @@ perl = perl;</programlisting>
 </section>
 
 
-<section><title>The builder</title>
+<section xml:id="sec-the-builder">
+  <title>The builder</title>
 
 <example xml:id='ex-hello-builder'><title>Build script for GNU Hello
 (<filename>builder.sh</filename>)</title>
@@ -313,7 +316,8 @@ error check.</para>
 </section>
 
 
-<section><title>Composition</title>
+<section xml:id="sec-composition">
+  <title>Composition</title>
 
 <example xml:id='ex-hello-composition'><title>Composing GNU Hello
 (<filename>all-packages.nix</filename>)</title>
@@ -428,7 +432,7 @@ hello = callPackage ../applications/misc/hello/ex-1 { stdenv = myStdenv; };
 </section>
 
 
-<section><title>Testing</title>
+<section xml:id="sec-testing"><title>Testing</title>
 
 <para>You can now try to build Hello.  Of course, you could do
 <literal>nix-env -f pkgs/top-level/all-packages.nix -i hello</literal>,
@@ -510,7 +514,8 @@ CPUs.</para>
 </section>
 
 
-<section><title>The generic builder</title>
+<section xml:id="sec-the-generic-builder">
+  <title>The generic builder</title>
 
 <para>Recall from <xref linkend='ex-hello-builder' /> that the builder
 looked something like this:
@@ -608,7 +613,8 @@ builder for Hello entirely.</para>
 
 
 
-<section><title>The Nix expression language</title>
+<section xml:id="sec-the-nix-expression-language">
+  <title>The Nix expression language</title>
 
 <para>The Nix expression language is a pure, lazy, functional
 language.  Purity means that operations in the language don't have
@@ -625,7 +631,7 @@ packages.</para>
 language.</para>
 
 
-<section xml:id='ssec-values'><title>Values</title>
+<section xml:id='sec-values'><title>Values</title>
 
 
 <simplesect><title>Simple values</title>
@@ -889,8 +895,8 @@ evaluates to <literal>false</literal>.</para>
 </section>
 
 
-<section><title>Language constructs</title>
-
+<section xml:id="sec-language-constructs">
+  <title>Language constructs</title>
 
 <simplesect><title>Recursive sets</title>
 
@@ -1230,7 +1236,8 @@ character, or inline/multi-line, enclosed within <literal>/*
 </section>
 
 
-<section><title>Operators</title>
+<section xml:id="sec-operators">
+  <title>Operators</title>
 
 <para><xref linkend='table-operators' /> lists the operators in the
 Nix expression language, in order of precedence (from strongest to
@@ -1339,7 +1346,8 @@ weakest binding).</para>
 </section>
 
 
-<section xml:id="ssec-derivation"><title>Derivations</title>
+<section xml:id="sec-derivations">
+  <title>Derivations</title>
 
 <para>The most important built-in function is
 <function>derivation</function>, which is used to describe a single
@@ -1542,7 +1550,7 @@ command-line argument.  See <xref linkend='sec-standard-environment'
 </para>
 
 
-<section><title>Advanced attributes</title>
+<section xml:id="sec-advanced-attributes"><title>Advanced attributes</title>
 
 <para>Derivations can declare some infrequently used optional
 attributes.</para>
@@ -1791,7 +1799,8 @@ impureEnvVars = [ "http_proxy" "https_proxy" <replaceable>...</replaceable> ];
 
 
 
-<section xml:id='sec-standard-environment'><title>The standard environment</title>
+<section xml:id='sec-standard-environment'>
+  <title>The standard environment</title>
 
 
 <para>The standard environment is used by passing it as an input
@@ -1842,7 +1851,8 @@ is the source itself, which resides in
 <filename>pkgs/stdenv/generic/setup.sh</filename>.</para>
 
 
-<section><title>Customising the generic builder</title>
+<section xml:id="sec-customizing-the-generic-builder">
+  <title>Customising the generic builder</title>
 
 <para>The operation of the generic builder can be modified in many
 places by setting certain variables.  These <emphasis>hook
@@ -1865,7 +1875,7 @@ myPostInstall() {
 </section>
 
 
-<section><title>Debugging failed builds</title>
+<section xml:id="sec-debugging-failed-builds"><title>Debugging failed builds</title>
 
 <para>At the beginning of each phase, the set of all shell variables
 is written to the file <filename>env-vars</filename> at the top-level

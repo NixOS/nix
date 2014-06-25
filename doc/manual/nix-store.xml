@@ -59,7 +59,7 @@ options.</phrase></para>
     <listitem><para>Causes the result of a realisation
     (<option>--realise</option> and <option>--force-realise</option>)
     to be registered as a root of the garbage collector<phrase
-    condition="manual"> (see <xref linkend="ssec-gc-roots"
+    condition="manual"> (see <xref linkend="sec-garbage-collector-roots"
     />)</phrase>.  The root is stored in
     <replaceable>path</replaceable>, which must be inside a directory
     that is scanned for roots by the garbage collector (i.e.,
@@ -253,7 +253,7 @@ the Nix store not reachable via file system references from a set of
 
     <listitem><para>This operation prints on standard output the set
     of roots used by the garbage collector.  What constitutes a root
-    is described in <xref linkend="ssec-gc-roots"
+    is described in <xref linkend="sec-garbage-collector-roots"
     />.</para></listitem>
 
   </varlistentry>

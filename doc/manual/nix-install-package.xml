@@ -2,7 +2,7 @@
           xmlns:xlink="http://www.w3.org/1999/xlink"
           xmlns:xi="http://www.w3.org/2001/XInclude"
           xml:id="sec-nix-install-package">
-  
+
 <refmeta>
   <refentrytitle>nix-install-package</refentrytitle>
   <manvolnum>1</manvolnum>
@@ -52,7 +52,7 @@ manifest</link>.  The Nix Package file is either
 used.</para>
 
 <para><command>nix-install-package</command> is used in <link
-linkend="sec-one-click">one-click installs</link> to download and
+linkend="sec-one-click-installs">one-click installs</link> to download and
 install pre-built binary packages with all necessary dependencies.
 <command>nix-install-package</command> is intended to be associated
 with the MIME type <literal>application/nix-package</literal> in a web
@@ -74,7 +74,7 @@ to restart itself with <command>xterm</command>,
 <refsection><title>Options</title>
 
 <variablelist>
-  
+
   <varlistentry><term><option>--non-interactive</option></term>
 
     <listitem><para>Do not open a new terminal window and do not ask
@@ -130,14 +130,14 @@ The elements are as follows:
 <variablelist>
 
   <varlistentry><term><literal>NIXPKG1</literal></term>
-  
+
     <listitem><para>The version of the Nix Package
     file.</para></listitem>
 
   </varlistentry>
 
   <varlistentry><term><replaceable>manifestURL</replaceable></term>
-  
+
     <listitem><para>The manifest to be pulled by
     <command>nix-pull</command>.  The manifest must contain
     <replaceable>outPath</replaceable>.</para></listitem>
@@ -145,21 +145,21 @@ The elements are as follows:
   </varlistentry>
 
   <varlistentry><term><replaceable>name</replaceable></term>
-  
+
     <listitem><para>The symbolic name and version of the
     package.</para></listitem>
 
   </varlistentry>
 
   <varlistentry><term><replaceable>system</replaceable></term>
-  
+
     <listitem><para>The platform identifier of the platform for which
     this binary package is intended.</para></listitem>
 
   </varlistentry>
 
   <varlistentry><term><replaceable>drvPath</replaceable></term>
-  
+
     <listitem><para>The path in the Nix store of the derivation from
     which <replaceable>outPath</replaceable> was built.  Not currently
     used.</para></listitem>
@@ -167,7 +167,7 @@ The elements are as follows:
   </varlistentry>
 
   <varlistentry><term><replaceable>outPath</replaceable></term>
-  
+
     <listitem><para>The path in the Nix store of the package.  After
     <command>nix-install-package</command> has obtained the manifest
     from <replaceable>manifestURL</replaceable>, it performs a
@@ -177,7 +177,7 @@ The elements are as follows:
   </varlistentry>
 
 </variablelist>
-  
+
 </para>
 
 <para>An example follows:

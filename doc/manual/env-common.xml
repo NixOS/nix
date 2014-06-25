@@ -1,6 +1,6 @@
 <section xmlns="http://docbook.org/ns/docbook"
          xmlns:xlink="http://www.w3.org/1999/xlink"
-         xml:id="sec-common-env">
+         xml:id="sec-common-environment-variables">
 
 <title>Common environment variables</title>
 
@@ -9,7 +9,7 @@
 
 <variablelist xml:id="env-common">
 
-  
+
 <varlistentry><term><envar>NIX_PATH</envar></term>
 
   <listitem>
@@ -26,7 +26,7 @@
     <filename>/home/eelco/Dev</filename> and
     <filename>/etc/nixos</filename>, in that order.  It is also
     possible to match paths against a prefix.  For example, the value
-    
+
     <screen>
 nixpkgs=/home/eelco/Dev/nixpkgs-branch:/etc/nixos</screen>
 
@@ -42,7 +42,7 @@ nixpkgs=/home/eelco/Dev/nixpkgs-branch:/etc/nixos</screen>
     <envar>NIX_PATH</envar>.</para></listitem>
 
 </varlistentry>
-    
+
 
 <varlistentry><term><envar>NIX_IGNORE_SYMLINK_STORE</envar></term>
 
@@ -65,7 +65,7 @@ nixpkgs=/home/eelco/Dev/nixpkgs-branch:/etc/nixos</screen>
   you’re better off using <literal>bind</literal> mount points, e.g.,
 
   <screen>
-$ mkdir /nix   
+$ mkdir /nix
 $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 
   Consult the <citerefentry><refentrytitle>mount</refentrytitle>
@@ -80,7 +80,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 
   <listitem><para>Overrides the location of the Nix store (default
   <filename><replaceable>prefix</replaceable>/store</filename>).</para></listitem>
-  
+
 </varlistentry>
 
 
@@ -89,7 +89,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
   <listitem><para>Overrides the location of the Nix static data
   directory (default
   <filename><replaceable>prefix</replaceable>/share</filename>).</para></listitem>
-  
+
 </varlistentry>
 
 
@@ -97,7 +97,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 
   <listitem><para>Overrides the location of the Nix log directory
   (default <filename><replaceable>prefix</replaceable>/log/nix</filename>).</para></listitem>
-  
+
 </varlistentry>
 
 
@@ -105,7 +105,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 
   <listitem><para>Overrides the location of the Nix state directory
   (default <filename><replaceable>prefix</replaceable>/var/nix</filename>).</para></listitem>
-  
+
 </varlistentry>
 
 
@@ -114,7 +114,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
   <listitem><para>Overrides the location of the Nix database (default
   <filename><replaceable>$NIX_STATE_DIR</replaceable>/db</filename>, i.e.,
   <filename><replaceable>prefix</replaceable>/var/nix/db</filename>).</para></listitem>
-  
+
 </varlistentry>
 
 
@@ -123,7 +123,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
   <listitem><para>Overrides the location of the Nix configuration
   directory (default
   <filename><replaceable>prefix</replaceable>/etc/nix</filename>).</para></listitem>
-  
+
 </varlistentry>
 
 
@@ -134,7 +134,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
   option</link>.</para></listitem>
 
 </varlistentry>
-  
+
 
 <varlistentry><term><envar>TMPDIR</envar></term>
 
@@ -142,7 +142,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
   files.  In particular, this includes temporary build directories;
   these can take up substantial amounts of disk space.  The default is
   <filename>/tmp</filename>.</para></listitem>
-  
+
 </varlistentry>
 
 
@@ -240,7 +240,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
       store derivation itself).</para></listitem>
 
     </varlistentry>
-  
+
     <varlistentry><term><filename>outputs</filename></term>
 
       <listitem><para>The set of store paths that are outputs of the
@@ -284,17 +284,18 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
   <listitem><para>This variable should be set to
   <literal>daemon</literal> if you want to use the Nix daemon to
   execute Nix operations. This is necessary in <link
-  linkend="ssec-multi-user">multi-user Nix installations</link>.
+  linkend="sec-multi-user-mode">multi-user Nix installations</link>.
   Otherwise, it should be left unset.</para></listitem>
 
 </varlistentry>
 
-    
+
 <varlistentry xml:id="envar-other-stores"><term><envar>NIX_OTHER_STORES</envar></term>
 
   <listitem><para>This variable contains the paths of remote Nix
   installations from which packages can be copied, separated by colons.
-  <phrase condition="manual">See <xref linkend="sec-sharing-packages"
+  <phrase condition="manual">See
+  <xref linkend="sec-sharing-packages-between-machines"
   /> for details.</phrase>  Each path should be the
   <filename>/nix</filename> directory of a remote Nix installation
   (i.e., not the <filename>/nix/store</filename> directory).  The
@@ -340,7 +341,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 
 </varlistentry>
 
-    
+
 </variablelist>
 
 
