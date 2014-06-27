@@ -149,7 +149,7 @@ void Settings::update()
     get(sshSubstituterHosts, "ssh-substituter-hosts");
     get(useSshSubstituter, "use-ssh-substituter");
     get(logServers, "log-servers");
-    get(enableImportNative, "allow-arbitrary-code-during-evaluation");
+    get(enableImportNative, "allow-unsafe-native-code-during-evaluation");
 
     string subs = getEnv("NIX_SUBSTITUTERS", "default");
     if (subs == "default") {
