@@ -14,12 +14,6 @@
 #include <map>
 #include <iostream>
 
-enum OutputKind {
-    OUTPUT_PLAIN,
-    OUTPUT_XML,
-    OUTPUT_JSON,
-};
-
 
 using namespace nix;
 
@@ -40,6 +34,9 @@ static Expr * parseStdin(EvalState & state)
 static Path gcRoot;
 static int rootNr = 0;
 static bool indirectRoot = false;
+
+
+enum OutputKind { okPlain, okXML, okJSON };
 
 
 void processExpr(EvalState & state, const Strings & attrPaths,
@@ -65,9 +62,9 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 vRes = v;
             else
                 state.autoCallFunction(autoArgs, v, vRes);
-            if (output == OUTPUT_XML)
+            if (output == okXML)
                 printValueAsXML(state, strict, location, vRes, std::cout, context);
-            else if (output == OUTPUT_JSON)
+            else if (output == okJSON)
                 printValueAsJSON(state, strict, vRes, std::cout, context);
             else {
                 if (strict) state.strictForceValue(vRes);
@@ -117,7 +114,7 @@ void run(Strings args)
     bool findFile = false;
     bool evalOnly = false;
     bool parseOnly = false;
-    OutputKind outputKind = OUTPUT_PLAIN;
+    OutputKind outputKind = okPlain;
     bool xmlOutputSourceLocation = true;
     bool strict = false;
     Strings attrPaths;
@@ -154,9 +151,9 @@ void run(Strings args)
         else if (arg == "--indirect")
             indirectRoot = true;
         else if (arg == "--xml")
-            outputKind = OUTPUT_XML;
+            outputKind = okXML;
         else if (arg == "--json")
-            outputKind = OUTPUT_JSON;
+            outputKind = okJSON;
         else if (arg == "--no-location")
             xmlOutputSourceLocation = false;
         else if (arg == "--strict")
