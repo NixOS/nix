@@ -242,6 +242,44 @@ static void checkSelectorUse(DrvNames & selectors)
             throw Error(format("selector `%1%' matches no derivations") % i->fullName);
 }
 
+static bool caseInsensitiveTest (char a, char b) {
+  return tolower(a) == tolower(b);
+}
+
+static bool substringMatchCaseIns(const string &haystack, const string &needle) {
+    string::const_iterator it = std::search(haystack.begin(), haystack.end(),
+        needle.begin(), needle.end(), caseInsensitiveTest);
+    return it != haystack.end();
+}
+
+static bool drvMatches(DrvInfo &elem, const Strings & words) {
+    foreach (Strings::const_iterator, i, words) {
+        string name = elem.name;
+        if (!substringMatchCaseIns(elem.name, *i) &&
+            !substringMatchCaseIns(elem.attrPath, *i) &&
+            !substringMatchCaseIns(elem.queryMetaString("description"), *i)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static DrvInfos filterByWords(EvalState & state, const DrvInfos & allElems,
+    const Strings & words)
+{
+    DrvInfos elems;
+    for (DrvInfos::const_iterator j = allElems.begin();
+         j != allElems.end(); ++j)
+    {
+        DrvInfo elem = *j;
+        if (drvMatches(elem, words)) {
+            elems.push_back(elem);
+        }
+    }
+
+    return elems;
+}
+
 
 static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
     const Strings & args, bool newestOnly)
@@ -437,7 +475,6 @@ static void queryInstSources(EvalState & state,
         }
     }
 }
-
 
 static void printMissing(EvalState & state, DrvInfos & elems)
 {
@@ -911,6 +948,7 @@ static void opQuery(Globals & globals,
     bool compareVersions = false;
     bool xmlOutput = false;
     bool jsonOutput = false;
+    bool search = false;
 
     enum { sInstalled, sAvailable } source = sInstalled;
 
@@ -931,6 +969,7 @@ static void opQuery(Globals & globals,
         else if (arg == "--xml") xmlOutput = true;
         else if (arg == "--json") jsonOutput = true;
         else if (arg == "--attr-path" || arg == "-P") printAttrPath = true;
+        else if (arg == "--search") search = true;
         else if (arg == "--attr" || arg == "-A")
             attrPath = needArg(i, args, arg);
         else if (arg[0] == '-')
@@ -950,9 +989,16 @@ static void opQuery(Globals & globals,
             globals.instSource.systemFilter, globals.instSource.autoArgs,
             attrPath, availElems);
 
-    DrvInfos elems_ = filterBySelector(globals.state,
-        source == sInstalled ? installedElems : availElems,
-        remaining, false);
+    DrvInfos elems_;
+
+    if (search) {
+        elems_ = filterByWords(globals.state,
+            source == sInstalled ? installedElems : availElems, remaining);
+    } else {
+        elems_ = filterBySelector(globals.state,
+            source == sInstalled ? installedElems : availElems,
+            remaining, false);
+    }
 
     DrvInfos & otherElems(source == sInstalled ? availElems : installedElems);
 
