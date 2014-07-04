@@ -6,6 +6,7 @@
 #include "archive.hh"
 #include "value-to-xml.hh"
 #include "value-to-json.hh"
+#include "json-to-value.hh"
 #include "names.hh"
 #include "eval-inline.hh"
 
@@ -775,6 +776,14 @@ static void prim_toJSON(EvalState & state, const Pos & pos, Value * * args, Valu
 }
 
 
+/* Parse a JSON string to a value. */
+static void prim_fromJSON(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    string s = state.forceStringNoCtx(*args[0], pos);
+    parseJSON(state, s, v);
+}
+
+
 /* Store a string in the Nix store as a source file that can be used
    as an input by derivations. */
 static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -1396,6 +1405,7 @@ void EvalState::createBaseEnv()
     // Creating files
     addPrimOp("__toXML", 1, prim_toXML);
     addPrimOp("__toJSON", 1, prim_toJSON);
+    addPrimOp("__fromJSON", 1, prim_fromJSON);
     addPrimOp("__toFile", 2, prim_toFile);
     addPrimOp("__filterSource", 2, prim_filterSource);
 
