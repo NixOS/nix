@@ -257,6 +257,22 @@ stdenv.mkDerivation {
   </varlistentry>
 
 
+  <varlistentry><term><function>builtins.fromJSON</function> <replaceable>e</replaceable></term>
+
+    <listitem><para>Convert a JSON string to a Nix
+    value. For example,
+
+<programlisting>
+builtins.fromJSON ''{"x": [1, 2, 3], "y": null}''
+</programlisting>
+
+    returns the value <literal>{ x = [ 1 2 3 ]; y = null;
+    }</literal>. Floating point numbers are not
+    supported.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry><term><function>builtins.getAttr</function>
   <replaceable>s</replaceable> <replaceable>set</replaceable></term>
 
@@ -761,6 +777,7 @@ in foo</programlisting>
     string of the resulting store path.</para></listitem>
 
   </varlistentry>
+
 
   <varlistentry><term><function>builtins.toPath</function> <replaceable>s</replaceable></term>
 

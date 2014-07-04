@@ -5,6 +5,7 @@
 #include "get-drvs.hh"
 #include "attr-path.hh"
 #include "value-to-xml.hh"
+#include "value-to-json.hh"
 #include "util.hh"
 #include "store-api.hh"
 #include "common-opts.hh"
@@ -35,9 +36,12 @@ static int rootNr = 0;
 static bool indirectRoot = false;
 
 
+enum OutputKind { okPlain, okXML, okJSON };
+
+
 void processExpr(EvalState & state, const Strings & attrPaths,
     bool parseOnly, bool strict, Bindings & autoArgs,
-    bool evalOnly, bool xmlOutput, bool location, Expr * e)
+    bool evalOnly, OutputKind output, bool location, Expr * e)
 {
     if (parseOnly) {
         std::cout << format("%1%\n") % *e;
@@ -58,8 +62,10 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 vRes = v;
             else
                 state.autoCallFunction(autoArgs, v, vRes);
-            if (xmlOutput)
+            if (output == okXML)
                 printValueAsXML(state, strict, location, vRes, std::cout, context);
+            else if (output == okJSON)
+                printValueAsJSON(state, strict, vRes, std::cout, context);
             else {
                 if (strict) state.strictForceValue(vRes);
                 std::cout << vRes << std::endl;
@@ -108,7 +114,7 @@ void run(Strings args)
     bool findFile = false;
     bool evalOnly = false;
     bool parseOnly = false;
-    bool xmlOutput = false;
+    OutputKind outputKind = okPlain;
     bool xmlOutputSourceLocation = true;
     bool strict = false;
     Strings attrPaths;
@@ -145,7 +151,9 @@ void run(Strings args)
         else if (arg == "--indirect")
             indirectRoot = true;
         else if (arg == "--xml")
-            xmlOutput = true;
+            outputKind = okXML;
+        else if (arg == "--json")
+            outputKind = okJSON;
         else if (arg == "--no-location")
             xmlOutputSourceLocation = false;
         else if (arg == "--strict")
@@ -179,7 +187,7 @@ void run(Strings args)
     if (readStdin) {
         Expr * e = parseStdin(state);
         processExpr(state, attrPaths, parseOnly, strict, autoArgs,
-            evalOnly, xmlOutput, xmlOutputSourceLocation, e);
+            evalOnly, outputKind, xmlOutputSourceLocation, e);
     } else if (files.empty() && !fromArgs)
         files.push_back("./default.nix");
 
@@ -188,7 +196,7 @@ void run(Strings args)
             ? state.parseExprFromString(*i, absPath("."))
             : state.parseExprFromFile(resolveExprPath(lookupFileArg(state, *i)));
         processExpr(state, attrPaths, parseOnly, strict, autoArgs,
-            evalOnly, xmlOutput, xmlOutputSourceLocation, e);
+            evalOnly, outputKind, xmlOutputSourceLocation, e);
     }
 
     state.printStats();
