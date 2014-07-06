@@ -10,7 +10,8 @@
   <refmiscinfo class="version"><xi:include href="version.txt" parse="text"/></refmiscinfo>
 </refmeta>
 
-<refnamediv>
+<!-- backward compatible link (old naming convention) -->
+<refnamediv xml:id="sec-conf-file">
   <refname>nix.conf</refname>
   <refpurpose>Nix configuration file</refpurpose>
 </refnamediv>

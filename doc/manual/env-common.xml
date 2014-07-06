@@ -2,7 +2,10 @@
          xmlns:xlink="http://www.w3.org/1999/xlink"
          xml:id="sec-common-environment-variables">
 
-<title>Common environment variables</title>
+<title>Common environment variables
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="sec-common-env" />
+</title>
 
 
 <para>Most Nix commands interpret the following environment variables:</para>

@@ -331,7 +331,10 @@ class="username">root</systemitem> all the time.</para>
 
 
 <section xml:id="sec-multi-user-mode">
-  <title>Multi-user mode</title>
+<title>Multi-user mode
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="ssec-multi-user" />
+</title>
 
 <para>To allow a Nix store to be shared safely among multiple users,
 it is important that users are not able to run builders that modify

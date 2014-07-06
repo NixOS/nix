@@ -2,7 +2,10 @@
           xmlns:xlink="http://www.w3.org/1999/xlink"
           xml:id="appx-hacking">
 
-<title>Hacking</title>
+<title>Hacking
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="chap-hacking" />
+</title>
 
 <para>This section provides some notes on how to hack on Nix.  To get
 the latest version of Nix from GitHub:

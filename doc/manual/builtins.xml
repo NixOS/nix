@@ -2,8 +2,10 @@
          xmlns:xlink="http://www.w3.org/1999/xlink"
          xml:id='sec-builtins'>
 
-<title>Built-in functions</title>
-
+<title>Built-in functions
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="ssec-builtins" />
+</title>
 
 <para>This section lists the functions and constants built into the
 Nix expression evaluator.  (The built-in function

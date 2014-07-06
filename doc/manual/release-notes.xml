@@ -6,7 +6,11 @@
 
 <!--==================================================================-->
 
-<section xml:id="sec-relnotes-1.7"><title>Release 1.7 (April 11, 2014)</title>
+<section xml:id="sec-relnotes-1.7">
+<title>Release 1.7 (April 11, 2014)
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="ssec-relnotes-1.7" />
+</title>
 
 <para>In addition to the usual bug fixes, this release has the
 following new features:</para>
@@ -267,7 +271,11 @@ Rockai, Ricardo M. Correia and Shea Levy.</para>
 
 <!--==================================================================-->
 
-<section xml:id="sec-relnotes-1.6.1"><title>Release 1.6.1 (October 28, 2013)</title>
+<section xml:id="sec-relnotes-1.6.1">
+<title>Release 1.6.1 (October 28, 2013)
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="ssec-relnotes-1.6.1" />
+</title>
 
 <para>This is primarily a bug fix release.  Changes of interest
 are:</para>
@@ -334,7 +342,11 @@ are:</para>
 
 <!--==================================================================-->
 
-<section xml:id="sec-relnotes-1.6.0"><title>Release 1.6 (September 10, 2013)</title>
+<section xml:id="sec-relnotes-1.6.0">
+<title>Release 1.6 (September 10, 2013)
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="ssec-relnotes-1.6.0" />
+</title>
 
 <para>In addition to the usual bug fixes, this release has several new
 features:</para>
@@ -459,7 +471,11 @@ Levy.</para>
 
 <!--==================================================================-->
 
-<section xml:id="sec-relnotes-1.5.3"><title>Release 1.5.3 (June 17, 2013)</title>
+<section xml:id="sec-relnotes-1.5.3">
+<title>Release 1.5.3 (June 17, 2013)
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="ssec-relnotes-1.5.3" />
+</title>
 
 <para>This is primarily a bug fix release.  The following changes are
 noteworthy:</para>
@@ -507,7 +523,11 @@ while evaluating `concatMapStrings' at `<replaceable>...</replaceable>/nixpkgs/p
 
 <!--==================================================================-->
 
-<section xml:id="sec-relnotes-1.5.2"><title>Release 1.5.2 (May 13, 2013)</title>
+<section xml:id="sec-relnotes-1.5.2">
+<title>Release 1.5.2 (May 13, 2013)
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="ssec-relnotes-1.5.2" />
+</title>
 
 <para>This is primarily a bug fix release.  It has contributions from
 Eelco Dolstra, Lluís Batlle i Rossell and Shea Levy.</para>
@@ -517,7 +537,11 @@ Eelco Dolstra, Lluís Batlle i Rossell and Shea Levy.</para>
 
 <!--==================================================================-->
 
-<section xml:id="sec-relnotes-1.5.1"><title>Release 1.5.1 (February 28, 2013)</title>
+<section xml:id="sec-relnotes-1.5.1">
+<title>Release 1.5.1 (February 28, 2013)
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="ssec-relnotes-1.5.1" />
+</title>
 
 <para>The bug fix to the bug fix had a bug itself, of course.  But
 this time it will work for sure!</para>
@@ -527,7 +551,11 @@ this time it will work for sure!</para>
 
 <!--==================================================================-->
 
-<section xml:id="sec-relnotes-1.5"><title>Release 1.5 (February 27, 2013)</title>
+<section xml:id="sec-relnotes-1.5">
+<title>Release 1.5 (February 27, 2013)
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="ssec-relnotes-1.5" />
+</title>
 
 <para>This is a brown paper bag release to fix a regression introduced
 by the hard link security fix in 1.4.</para>
@@ -537,7 +565,11 @@ by the hard link security fix in 1.4.</para>
 
 <!--==================================================================-->
 
-<section xml:id="sec-relnotes-1.4"><title>Release 1.4 (February 26, 2013)</title>
+<section xml:id="sec-relnotes-1.4">
+<title>Release 1.4 (February 26, 2013)
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="ssec-relnotes-1.4" />
+</title>
 
 <para>This release fixes a security bug in multi-user operation.  It
 was possible for derivations to cause the mode of files outside of the
@@ -574,7 +606,11 @@ xlink:href="https://github.com/NixOS/nix/commit/5526a282b5b44e9296e61e07d7d2626a
 
 <!--==================================================================-->
 
-<section xml:id="sec-relnotes-1.3"><title>Release 1.3 (January 4, 2013)</title>
+<section xml:id="sec-relnotes-1.3">
+<title>Release 1.3 (January 4, 2013)
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="ssec-relnotes-1.3" />
+</title>
 
 <para>This is primarily a bug fix release.  When this version is first
 run on Linux, it removes any immutable bits from the Nix store and
@@ -591,7 +627,11 @@ Pernsteiner.</para>
 
 <!--==================================================================-->
 
-<section xml:id="sec-relnotes-1.2"><title>Release 1.2 (December 6, 2012)</title>
+<section xml:id="sec-relnotes-1.2">
+<title>Release 1.2 (December 6, 2012)
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="ssec-relnotes-1.2" />
+</title>
 
 <para>This release has the following improvements and changes:</para>
 
@@ -746,7 +786,11 @@ Friesdorf, Mats Erik Andersson and Shea Levy.</para>
 
 <!--==================================================================-->
 
-<section xml:id="sec-relnotes-1.1"><title>Release 1.1 (July 18, 2012)</title>
+<section xml:id="sec-relnotes-1.1">
+<title>Release 1.1 (July 18, 2012)
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="ssec-relnotes-1.1" />
+</title>
 
 <para>This release has the following improvements:</para>
 
@@ -844,7 +888,11 @@ Friesdorf, Mats Erik Andersson and Shea Levy.</para>
 
 <!--==================================================================-->
 
-<section xml:id="sec-relnotes-1.0"><title>Release 1.0 (May 11, 2012)</title>
+<section xml:id="sec-relnotes-1.0">
+<title>Release 1.0 (May 11, 2012)
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="ssec-relnotes-1.0" />
+</title>
 
 <para>There have been numerous improvements and bug fixes since the
 previous release.  Here are the most significant:</para>
@@ -961,7 +1009,11 @@ previous release.  Here are the most significant:</para>
 
 <!--==================================================================-->
 
-<section xml:id="sec-relnotes-0.16"><title>Release 0.16 (August 17, 2010)</title>
+<section xml:id="sec-relnotes-0.16">
+<title>Release 0.16 (August 17, 2010)
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="ssec-relnotes-0.16" />
+</title>
 
 <para>This release has the following improvements:</para>
 
@@ -1014,7 +1066,11 @@ previous release.  Here are the most significant:</para>
 
 <!--==================================================================-->
 
-<section xml:id="sec-relnotes-0.15"><title>Release 0.15 (March 17, 2010)</title>
+<section xml:id="sec-relnotes-0.15">
+<title>Release 0.15 (March 17, 2010)
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="ssec-relnotes-0.15" />
+</title>
 
 <para>This is a bug-fix release.  Among other things, it fixes
 building on Mac OS X (Snow Leopard), and improves the contents of
@@ -1026,7 +1082,11 @@ in <literal>chroot</literal> builds.</para>
 
 <!--==================================================================-->
 
-<section xml:id="sec-relnotes-0.14"><title>Release 0.14 (February 4, 2010)</title>
+<section xml:id="sec-relnotes-0.14">
+<title>Release 0.14 (February 4, 2010)
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="ssec-relnotes-0.14" />
+</title>
 
 <para>This release has the following improvements:</para>
 
@@ -1070,8 +1130,11 @@ in <literal>chroot</literal> builds.</para>
 
 <!--==================================================================-->
 
-<section xml:id="sec-relnotes-0.13"><title>Release 0.13 (November 5,
-2009)</title>
+<section xml:id="sec-relnotes-0.13">
+<title>Release 0.13 (November 5, 2009)
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="ssec-relnotes-0.13" />
+</title>
 
 <para>This is primarily a bug fix release.  It has some new
 features:</para>
@@ -1175,8 +1238,11 @@ features:</para>
 
 <!--==================================================================-->
 
-<section xml:id="sec-relnotes-0.12"><title>Release 0.12 (November 20,
-2008)</title>
+<section xml:id="sec-relnotes-0.12">
+<title>Release 0.12 (November 20, 2008)
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="ssec-relnotes-0.12" />
+</title>
 
 <itemizedlist>
 
@@ -1349,8 +1415,11 @@ the following paths will be downloaded/copied (30.02 MiB):
 
 <!--==================================================================-->
 
-<section xml:id="sec-relnotes-0.11"><title>Release 0.11 (December 31,
-2007)</title>
+<section xml:id="sec-relnotes-0.11">
+<title>Release 0.11 (December 31, 2007)
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="ssec-relnotes-0.11" />
+</title>
 
 <para>Nix 0.11 has many improvements over the previous stable release.
 The most important improvement is secure multi-user support.  It also
@@ -2501,7 +2570,7 @@ $ nix-env -f .../i686-linux.nix -i -E 'x: x.firefoxWrapper'</screen>
 <!--==================================================================-->
 
 <section xml:id="sec-relnotes-0.5-and-earlier">
-  <title>Release 0.5 and earlier</title>
+<title>Release 0.5 and earlier</title>
 
 <para>Please refer to the Subversion commit log messages.</para>
 

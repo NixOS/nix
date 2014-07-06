@@ -399,7 +399,10 @@ is a quick and easy way to clean up your system.</para>
 
 
 <section xml:id="sec-garbage-collector-roots">
-    <title>Garbage collector roots</title>
+<title>Garbage collector roots
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="ssec-gc-roots" />
+</title>
 
 <para>The roots of the garbage collector are all store paths to which
 there are symlinks in the directory
@@ -480,7 +483,10 @@ available in the subscribed channels.</para>
 
 
 <section xml:id="sec-one-click-installs">
-    <title>One-click installs</title>
+<title>One-click installs
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="sec-one-click" />
+</title>
 
 <para>Often, when you want to install a specific package (e.g., from
 the <link
@@ -514,7 +520,10 @@ linkend='sec-nix-install-package' /> for details.</para>
 
 
 <section xml:id="sec-sharing-packages-between-machines">
-    <title>Sharing packages between machines</title>
+<title>Sharing packages between machines
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="sec-sharing-packages" />
+</title>
 
 <para>Sometimes you want to copy a package from one machine to
 another.  Or, you want to install some packages and you know that

@@ -1347,7 +1347,10 @@ weakest binding).</para>
 
 
 <section xml:id="sec-derivations">
-  <title>Derivations</title>
+<title>Derivations
+<!-- backward compatible link (old naming convention) -->
+<anchor xml:id="ssec-derivation" />
+</title>
 
 <para>The most important built-in function is
 <function>derivation</function>, which is used to describe a single
