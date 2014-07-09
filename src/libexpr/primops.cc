@@ -44,6 +44,7 @@ struct InvalidPathError : EvalError
     Path path;
     InvalidPathError(const Path & path) :
         EvalError(format("path `%1%' is not valid") % path), path(path) {};
+    ~InvalidPathError() throw () { };
 };
 
 
