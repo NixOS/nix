@@ -4,7 +4,7 @@
 
 with import <nixpkgs/nixos/lib/testing.nix> { inherit system; };
 
-makeTest (let pkgA = pkgs.aterm; pkgB = pkgs.wget; in {
+makeTest (let pkgA = pkgs.aterm; pkgB = pkgs.wget; pkgC = pkgs.hello; in {
 
   nodes =
     { client =
@@ -12,13 +12,14 @@ makeTest (let pkgA = pkgs.aterm; pkgB = pkgs.wget; in {
         { virtualisation.writableStore = true;
           virtualisation.pathsInNixDB = [ pkgA ];
           nix.package = nix;
+          nix.binaryCaches = [ ];
         };
 
       server =
         { config, pkgs, ... }:
         { services.openssh.enable = true;
           virtualisation.writableStore = true;
-          virtualisation.pathsInNixDB = [ pkgB ];
+          virtualisation.pathsInNixDB = [ pkgB pkgC ];
           nix.package = nix;
         };
     };
@@ -49,6 +50,14 @@ makeTest (let pkgA = pkgs.aterm; pkgB = pkgs.wget; in {
       $client->fail("nix-store --check-validity ${pkgB}");
       $client->succeed("nix-copy-closure --from server --gzip ${pkgB} >&2");
       $client->succeed("nix-store --check-validity ${pkgB}");
+
+      # Copy the closure of package C via the SSH substituter.
+      $client->fail("nix-store -r ${pkgC}");
+      $client->succeed(
+        "nix-store --option use-ssh-substituter true"
+        . " --option ssh-substituter-hosts root\@server"
+        . " -r ${pkgC} >&2");
+      $client->succeed("nix-store --check-validity ${pkgC}");
     '';
 
 })
