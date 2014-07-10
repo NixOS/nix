@@ -7,11 +7,24 @@ use List::Util qw(sum);
 use IPC::Open2;
 
 
+sub readN {
+    my ($bytes, $from) = @_;
+    my $res = "";
+    while ($bytes > 0) {
+        my $s;
+        my $n = sysread($from, $s, $bytes);
+        die "I/O error reading from remote side\n" if !defined $n;
+        die "got EOF while expecting $bytes bytes from remote side\n" if !$n;
+        $bytes -= $n;
+        $res .= $s;
+    }
+    return $res;
+}
+
+
 sub readInt {
     my ($from) = @_;
-    my $resp;
-    sysread($from, $resp, 8) == 8 or die "did not receive valid reply from remote host\n";
-    return unpack("L<x4", $resp);
+    return unpack("L<x4", readN(8, $from));
 }
 
 
@@ -66,10 +79,9 @@ sub copyTo {
     my $n = readInt($from);
     while ($n--) {
         my $len = readInt($from);
-        my $s;
-        sysread($from, $s, $len) == $len or die;
+        my $s = readN($len, $from);
         $present{$s} = 1;
-        sysread($from, $s, 8 - $len % 8) if $len % 8; # skip padding
+        readN(8 - $len % 8, $from) if $len % 8; # skip padding
     }
 
     my @missing = grep { !$present{$_} } @closure;
