@@ -58,7 +58,7 @@ static std::pair<FdSink, FdSource> connect(const string & conn)
 
 static void substitute(std::pair<FdSink, FdSource> & pipes, Path storePath, Path destPath)
 {
-    writeInt(cmdSubstitute, pipes.first);
+    writeInt(cmdDumpStorePath, pipes.first);
     writeString(storePath, pipes.first);
     pipes.first.flush();
     restorePath(destPath, pipes.second);
@@ -68,20 +68,20 @@ static void substitute(std::pair<FdSink, FdSource> & pipes, Path storePath, Path
 
 static void query(std::pair<FdSink, FdSource> & pipes)
 {
-    writeInt(cmdQuery, pipes.first);
     for (string line; getline(std::cin, line);) {
         Strings tokenized = tokenizeString<Strings>(line);
         string cmd = tokenized.front();
         tokenized.pop_front();
         if (cmd == "have") {
-            writeInt(qCmdHave, pipes.first);
+            writeInt(cmdQueryValidPaths, pipes.first);
+            writeInt(0, pipes.first); // don't lock
             writeStrings(tokenized, pipes.first);
             pipes.first.flush();
             PathSet paths = readStrings<PathSet>(pipes.second);
             foreach (PathSet::iterator, i, paths)
                 std::cout << *i << std::endl;
         } else if (cmd == "info") {
-            writeInt(qCmdInfo, pipes.first);
+            writeInt(cmdQueryPathInfos, pipes.first);
             writeStrings(tokenized, pipes.first);
             pipes.first.flush();
             while (1) {

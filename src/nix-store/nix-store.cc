@@ -869,8 +869,12 @@ static void opClearFailedPaths(Strings opFlags, Strings opArgs)
 /* Serve the nix store in a way usable by a restricted ssh user. */
 static void opServe(Strings opFlags, Strings opArgs)
 {
-    if (!opArgs.empty() || !opFlags.empty())
-        throw UsageError("no arguments or flags expected");
+    bool writeAllowed = false;
+    foreach (Strings::iterator, i, opFlags)
+        if (*i == "--write") writeAllowed = true;
+        else throw UsageError(format("unknown flag `%1%'") % *i);
+
+    if (!opArgs.empty()) throw UsageError("no arguments expected");
 
     FdSource in(STDIN_FILENO);
     FdSink out(STDOUT_FILENO);
@@ -883,50 +887,56 @@ static void opServe(Strings opFlags, Strings opArgs)
     out.flush();
     readInt(in); // Client version, unused for now
 
-    ServeCommand cmd = (ServeCommand) readInt(in);
-    switch (cmd) {
-        case cmdQuery:
-            while (true) {
-                QueryCommand qCmd;
-                try {
-                    qCmd = (QueryCommand) readInt(in);
-                } catch (EndOfFile & e) {
-                    break;
-                }
-                switch (qCmd) {
-                    case qCmdHave: {
-                        PathSet paths = readStorePaths<PathSet>(in);
-                        writeStrings(store->queryValidPaths(paths), out);
-                        break;
-                    }
-                    case qCmdInfo: {
-                        PathSet paths = readStorePaths<PathSet>(in);
-                        // !!! Maybe we want a queryPathInfos?
-                        foreach (PathSet::iterator, i, paths) {
-                            if (!store->isValidPath(*i))
-                                continue;
-                            ValidPathInfo info = store->queryPathInfo(*i);
-                            writeString(info.path, out);
-                            writeString(info.deriver, out);
-                            writeStrings(info.references, out);
-                            // !!! Maybe we want compression?
-                            writeLongLong(info.narSize, out); // downloadSize
-                            writeLongLong(info.narSize, out);
-                        }
-                        writeString("", out);
-                        break;
-                    }
-                    default:
-                        throw Error(format("unknown serve query `%1%'") % cmd);
-                }
+    while (true) {
+        ServeCommand cmd;
+        try {
+            cmd = (ServeCommand) readInt(in);
+        } catch (EndOfFile & e) {
+            break;
+        }
+
+        switch (cmd) {
+            case cmdQueryValidPaths: {
+                bool lock = readInt(in);
+                PathSet paths = readStorePaths<PathSet>(in);
+                if (lock && writeAllowed)
+                    for (auto & path : paths)
+                        store->addTempRoot(path);
+                writeStrings(store->queryValidPaths(paths), out);
                 out.flush();
+                break;
             }
-            break;
-        case cmdSubstitute:
-            dumpPath(readStorePath(in), out);
-            break;
-        default:
-            throw Error(format("unknown serve command `%1%'") % cmd);
+            case cmdQueryPathInfos: {
+                PathSet paths = readStorePaths<PathSet>(in);
+                // !!! Maybe we want a queryPathInfos?
+                foreach (PathSet::iterator, i, paths) {
+                    if (!store->isValidPath(*i))
+                        continue;
+                    ValidPathInfo info = store->queryPathInfo(*i);
+                    writeString(info.path, out);
+                    writeString(info.deriver, out);
+                    writeStrings(info.references, out);
+                    // !!! Maybe we want compression?
+                    writeLongLong(info.narSize, out); // downloadSize
+                    writeLongLong(info.narSize, out);
+                }
+                writeString("", out);
+                out.flush();
+                break;
+            }
+            case cmdDumpStorePath:
+                dumpPath(readStorePath(in), out);
+                out.flush();
+                break;
+            case cmdImportPaths:
+                if (!writeAllowed) throw Error("importing paths not allowed");
+                store->importPaths(false, in);
+                writeInt(1, out); // indicate success
+                out.flush();
+                break;
+            default:
+                throw Error(format("unknown serve command %1%") % cmd);
+        }
     }
 }
 
