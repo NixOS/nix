@@ -923,7 +923,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             }
             break;
         case cmdSubstitute:
-            dumpPath(readString(in), out);
+            dumpPath(readStorePath(in), out);
             break;
         default:
             throw Error(format("unknown serve command `%1%'") % cmd);
