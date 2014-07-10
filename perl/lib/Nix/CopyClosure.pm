@@ -29,15 +29,11 @@ sub copyTo {
     my ($sshHost, $sshOpts, $storePaths, $compressor, $decompressor,
         $includeOutputs, $dryRun, $sign, $progressViewer, $useSubstitutes) = @_;
 
+    $useSubstitutes = 0 if $dryRun;
+
     # Get the closure of this path.
     my @closure = reverse(topoSortPaths(computeFSClosure(0, $includeOutputs,
         map { followLinksToStorePath $_ } @{$storePaths})));
-
-    # Optionally use substitutes on the remote host.
-    if (!$dryRun && $useSubstitutes) {
-        system "ssh $sshHost @{$sshOpts} nix-store -r --ignore-unknown @closure";
-        # Ignore exit status because this is just an optimisation.
-    }
 
     # Start ‘nix-store --serve’ on the remote host.
     my ($from, $to);
@@ -60,8 +56,9 @@ sub copyTo {
 
     # Send the "query valid paths" command with the "lock" option
     # enabled. This prevents a race where the remote host
-    # garbage-collect paths that are already there.
-    syswrite($to, pack("L<x4L<x4L<x4", 1, 1, scalar @closure)) or die;
+    # garbage-collect paths that are already there. Optionally, ask
+    # the remote host to substitute missing paths.
+    syswrite($to, pack("L<x4L<x4L<x4L<x4", 1, 1, $useSubstitutes, scalar @closure)) or die;
     writeString($_, $to) foreach @closure;
 
     # Get back the set of paths that are already valid on the remote host.
@@ -118,6 +115,12 @@ sub copyTo {
 sub oldCopyTo {
     my ($closure, $sshHost, $sshOpts, $storePaths, $compressor, $decompressor,
         $includeOutputs, $dryRun, $sign, $progressViewer, $useSubstitutes) = @_;
+
+    # Optionally use substitutes on the remote host.
+    if (!$dryRun && $useSubstitutes) {
+        system "ssh $sshHost @{$sshOpts} nix-store -r --ignore-unknown @$closure";
+        # Ignore exit status because this is just an optimisation.
+    }
 
     # Ask the remote host which paths are invalid.  Because of limits
     # to the command line length, do this in chunks.  Eventually,

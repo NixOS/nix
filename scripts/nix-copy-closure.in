@@ -81,9 +81,6 @@ while (@ARGV) {
 die "$0: you did not specify a host name\n" unless defined $sshHost;
 
 
-openSSHConnection $sshHost or die "$0: unable to start SSH\n";
-
-
 if ($toMode) { # Copy TO the remote machine.
     Nix::CopyClosure::copyTo(
         $sshHost, [ @sshOpts ], [ @storePaths ], $compressor, $decompressor,
@@ -91,6 +88,8 @@ if ($toMode) { # Copy TO the remote machine.
 }
 
 else { # Copy FROM the remote machine.
+
+    openSSHConnection $sshHost or die "$0: unable to start SSH\n";
 
     # Query the closure of the given store paths on the remote
     # machine.  Paths are assumed to be store paths; there is no

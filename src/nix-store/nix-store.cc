@@ -896,16 +896,42 @@ static void opServe(Strings opFlags, Strings opArgs)
         }
 
         switch (cmd) {
+
             case cmdQueryValidPaths: {
                 bool lock = readInt(in);
+                bool substitute = readInt(in);
                 PathSet paths = readStorePaths<PathSet>(in);
                 if (lock && writeAllowed)
                     for (auto & path : paths)
                         store->addTempRoot(path);
+
+                /* If requested, substitute missing paths. This
+                   implements nix-copy-closure's --use-substitutes
+                   flag. */
+                if (substitute && writeAllowed) {
+                    /* Filter out .drv files (we don't want to build anything). */
+                    PathSet paths2;
+                    for (auto & path : paths)
+                        if (!isDerivation(path)) paths2.insert(path);
+                    unsigned long long downloadSize, narSize;
+                    PathSet willBuild, willSubstitute, unknown;
+                    queryMissing(*store, PathSet(paths2.begin(), paths2.end()),
+                        willBuild, willSubstitute, unknown, downloadSize, narSize);
+                    /* FIXME: should use ensurePath(), but it only
+                       does one path at a time. */
+                    if (!willSubstitute.empty())
+                        try {
+                            store->buildPaths(willSubstitute);
+                        } catch (Error & e) {
+                            printMsg(lvlError, format("warning: %1%") % e.msg());
+                        }
+                }
+
                 writeStrings(store->queryValidPaths(paths), out);
                 out.flush();
                 break;
             }
+
             case cmdQueryPathInfos: {
                 PathSet paths = readStorePaths<PathSet>(in);
                 // !!! Maybe we want a queryPathInfos?
@@ -924,10 +950,12 @@ static void opServe(Strings opFlags, Strings opArgs)
                 out.flush();
                 break;
             }
+
             case cmdDumpStorePath:
                 dumpPath(readStorePath(in), out);
                 out.flush();
                 break;
+
             case cmdImportPaths: {
                 if (!writeAllowed) throw Error("importing paths not allowed");
                 string compression = readString(in);
@@ -966,6 +994,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 break;
             }
+
             default:
                 throw Error(format("unknown serve command %1%") % cmd);
         }

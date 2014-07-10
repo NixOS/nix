@@ -59,6 +59,7 @@ static void query(std::pair<FdSink, FdSource> & pipes)
         if (cmd == "have") {
             writeInt(cmdQueryValidPaths, pipes.first);
             writeInt(0, pipes.first); // don't lock
+            writeInt(0, pipes.first); // don't substitute
             writeStrings(tokenized, pipes.first);
             pipes.first.flush();
             PathSet paths = readStrings<PathSet>(pipes.second);
