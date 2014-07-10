@@ -928,12 +928,57 @@ static void opServe(Strings opFlags, Strings opArgs)
                 dumpPath(readStorePath(in), out);
                 out.flush();
                 break;
-            case cmdImportPaths:
+            case cmdImportPaths: {
                 if (!writeAllowed) throw Error("importing paths not allowed");
-                store->importPaths(false, in);
+                string compression = readString(in);
+
+                if (compression != "") {
+                    if (compression != "gzip" && compression != "bzip2" && compression != "xz")
+                        throw Error(format("unsupported compression method `%1%'") % compression);
+
+                    Pipe fromDecompressor;
+                    fromDecompressor.create();
+
+                    Pid pid;
+                    pid = fork();
+
+                    switch (pid) {
+
+                        case -1:
+                            throw SysError("unable to fork");
+
+                        case 0: /* child */
+                            try {
+                                fromDecompressor.readSide.close();
+                                if (dup2(fromDecompressor.writeSide, STDOUT_FILENO) == -1)
+                                    throw SysError("dupping stdout");
+                                // FIXME: use absolute path.
+                                execlp(compression.c_str(), compression.c_str(), "-d", NULL);
+                                throw SysError(format("executing `%1%'") % compression);
+                            } catch (std::exception & e) {
+                                std::cerr << "error: " << e.what() << std::endl;
+                            }
+                            _exit(1);
+                    }
+
+                    fromDecompressor.writeSide.close();
+
+                    FdSource fromDecompressor_(fromDecompressor.readSide);
+                    store->importPaths(false, fromDecompressor_);
+
+                    pid.wait(true);
+                } else
+                    store->importPaths(false, in);
+
                 writeInt(1, out); // indicate success
                 out.flush();
+
+                /* The decompressor will have left stdin in an
+                   undefined state, so we can't continue. */
+                if (compression != "") return;
+
                 break;
+            }
             default:
                 throw Error(format("unknown serve command %1%") % cmd);
         }

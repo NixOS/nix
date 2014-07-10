@@ -42,11 +42,11 @@ while (@ARGV) {
     }
     elsif ($arg eq "--gzip") {
         $compressor = "gzip";
-        $decompressor = "gunzip";
+        $decompressor = "gzip -d";
     }
     elsif ($arg eq "--bzip2") {
         $compressor = "bzip2";
-        $decompressor = "bunzip2";
+        $decompressor = "bzip2 -d";
     }
     elsif ($arg eq "--xz") {
         $compressor = "xz";

@@ -15,6 +15,16 @@ sub readInt {
 }
 
 
+sub writeString {
+    my ($s, $to) = @_;
+    my $len = length $s;
+    my $req .= pack("L<x4", $len);
+    $req .= $s;
+    $req .= "\000" x (8 - $len % 8) if $len % 8;
+    syswrite($to, $req) or die;
+}
+
+
 sub copyTo {
     my ($sshHost, $sshOpts, $storePaths, $compressor, $decompressor,
         $includeOutputs, $dryRun, $sign, $progressViewer, $useSubstitutes) = @_;
@@ -49,16 +59,10 @@ sub copyTo {
     }
 
     # Send the "query valid paths" command with the "lock" option
-    # enabled. This prevens a race where the remote host
+    # enabled. This prevents a race where the remote host
     # garbage-collect paths that are already there.
-    my $req = pack("L<x4L<x4L<x4", 1, 1, scalar @closure);
-    for my $s (@closure) {
-        my $len = length $s;
-        $req .= pack("L<x4", $len);
-        $req .= $s;
-        $req .= "\000" x (8 - $len % 8) if $len % 8;
-    }
-    syswrite($to, $req) or die;
+    syswrite($to, pack("L<x4L<x4L<x4", 1, 1, scalar @closure)) or die;
+    writeString($_, $to) foreach @closure;
 
     # Get back the set of paths that are already valid on the remote host.
     my %present;
@@ -76,11 +80,35 @@ sub copyTo {
 
     # Send the "import paths" command.
     syswrite($to, pack("L<x4", 4)) or die;
-    exportPaths(fileno($to), $sign, @missing);
-    readInt($from) == 1 or die;
+    writeString($compressor, $to);
+
+    if ($compressor || $progressViewer) {
+
+        # Compute the size of the closure for the progress viewer.
+        if ($progressViewer) {
+            my $missingSize = 0;
+            $missingSize += (queryPathInfo($_, 1))[3] foreach @missing;
+            $progressViewer = "$progressViewer -s $missingSize";
+        }
+
+        # Start the compressor and/or progress viewer in between us
+        # and the remote host.
+        my $to_;
+        my $pid2 = open2(">&" . fileno($to), $to_,
+            $progressViewer && $compressor ? "$progressViewer | $compressor" : $progressViewer || $compressor);
+        close $to;
+        exportPaths(fileno($to_), $sign, @missing);
+        close $to_;
+        waitpid $pid2, 0;
+
+    } else {
+        exportPaths(fileno($to), $sign, @missing);
+        close $to;
+    }
+
+    readInt($from) == 1 or die "remote machine \`$sshHost' failed to import closure\n";
 
     # Shut down the server process.
-    close $to;
     waitpid $pid, 0;
 }
 
