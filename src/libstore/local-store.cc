@@ -1083,31 +1083,16 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
 
     setSubstituterEnv();
 
-    run.pid = fork();
-
-    switch (run.pid) {
-
-    case -1:
-        throw SysError("unable to fork");
-
-    case 0: /* child */
-        try {
-            restoreAffinity();
-            if (dup2(toPipe.readSide, STDIN_FILENO) == -1)
-                throw SysError("dupping stdin");
-            if (dup2(fromPipe.writeSide, STDOUT_FILENO) == -1)
-                throw SysError("dupping stdout");
-            if (dup2(errorPipe.writeSide, STDERR_FILENO) == -1)
-                throw SysError("dupping stderr");
-            execl(substituter.c_str(), substituter.c_str(), "--query", NULL);
-            throw SysError(format("executing `%1%'") % substituter);
-        } catch (std::exception & e) {
-            std::cerr << "error: " << e.what() << std::endl;
-        }
-        _exit(1);
-    }
-
-    /* Parent. */
+    run.pid = startProcess([&]() {
+        if (dup2(toPipe.readSide, STDIN_FILENO) == -1)
+            throw SysError("dupping stdin");
+        if (dup2(fromPipe.writeSide, STDOUT_FILENO) == -1)
+            throw SysError("dupping stdout");
+        if (dup2(errorPipe.writeSide, STDERR_FILENO) == -1)
+            throw SysError("dupping stderr");
+        execl(substituter.c_str(), substituter.c_str(), "--query", NULL);
+        throw SysError(format("executing `%1%'") % substituter);
+    });
 
     run.program = baseNameOf(substituter);
     run.to = toPipe.writeSide.borrow();

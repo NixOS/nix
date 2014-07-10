@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <signal.h>
+#include <functional>
 
 #include <cstdio>
 
@@ -237,6 +238,7 @@ class Pid
     int killSignal;
 public:
     Pid();
+    Pid(pid_t pid);
     ~Pid();
     void operator =(pid_t pid);
     operator pid_t();
@@ -250,6 +252,11 @@ public:
 /* Kill all processes running under the specified uid by sending them
    a SIGKILL. */
 void killUser(uid_t uid);
+
+
+/* Fork a process that runs the given function, and return the child
+   pid to the caller. */
+pid_t startProcess(std::function<void()> fun, const string & errorPrefix = "error: ");
 
 
 /* Run a program and return its stdout in a string (i.e., like the

@@ -24,30 +24,14 @@ static std::pair<FdSink, FdSource> connect(const string & conn)
     Pipe to, from;
     to.create();
     from.create();
-    pid_t child = fork();
-    switch (child) {
-        case -1:
-            throw SysError("unable to fork");
-        case 0:
-            try {
-                restoreAffinity();
-                if (dup2(to.readSide, STDIN_FILENO) == -1)
-                    throw SysError("dupping stdin");
-                if (dup2(from.writeSide, STDOUT_FILENO) == -1)
-                    throw SysError("dupping stdout");
-                execlp("ssh"
-                      , "ssh"
-                      , "-x"
-                      , "-T"
-                      , conn.c_str()
-                      , "nix-store --serve"
-                      , NULL);
-                throw SysError("executing ssh");
-            } catch (std::exception & e) {
-                std::cerr << "error: " << e.what() << std::endl;
-            }
-            _exit(1);
-    }
+    startProcess([&]() {
+        if (dup2(to.readSide, STDIN_FILENO) == -1)
+            throw SysError("dupping stdin");
+        if (dup2(from.writeSide, STDOUT_FILENO) == -1)
+            throw SysError("dupping stdout");
+        execlp("ssh", "ssh", "-x", "-T", conn.c_str(), "nix-store --serve", NULL);
+        throw SysError("executing ssh");
+    });
     // If child exits unexpectedly, we'll EPIPE or EOF early.
     // If we exit unexpectedly, child will EPIPE or EOF early.
     // So no need to keep track of it.

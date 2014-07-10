@@ -939,27 +939,14 @@ static void opServe(Strings opFlags, Strings opArgs)
                     Pipe fromDecompressor;
                     fromDecompressor.create();
 
-                    Pid pid;
-                    pid = fork();
-
-                    switch (pid) {
-
-                        case -1:
-                            throw SysError("unable to fork");
-
-                        case 0: /* child */
-                            try {
-                                fromDecompressor.readSide.close();
-                                if (dup2(fromDecompressor.writeSide, STDOUT_FILENO) == -1)
-                                    throw SysError("dupping stdout");
-                                // FIXME: use absolute path.
-                                execlp(compression.c_str(), compression.c_str(), "-d", NULL);
-                                throw SysError(format("executing `%1%'") % compression);
-                            } catch (std::exception & e) {
-                                std::cerr << "error: " << e.what() << std::endl;
-                            }
-                            _exit(1);
-                    }
+                    Pid pid = startProcess([&]() {
+                        fromDecompressor.readSide.close();
+                        if (dup2(fromDecompressor.writeSide, STDOUT_FILENO) == -1)
+                            throw SysError("dupping stdout");
+                        // FIXME: use absolute path.
+                        execlp(compression.c_str(), compression.c_str(), "-d", NULL);
+                        throw SysError(format("executing `%1%'") % compression);
+                    });
 
                     fromDecompressor.writeSide.close();
 

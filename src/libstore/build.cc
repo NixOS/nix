@@ -602,42 +602,29 @@ HookInstance::HookInstance()
     builderOut.create();
 
     /* Fork the hook. */
-    pid = fork();
-    switch (pid) {
+    pid = startProcess([&]() {
 
-    case -1:
-        throw SysError("unable to fork");
+        commonChildInit(fromHook);
 
-    case 0:
-        try { /* child */
+        if (chdir("/") == -1) throw SysError("changing into `/");
 
-            commonChildInit(fromHook);
+        /* Dup the communication pipes. */
+        if (dup2(toHook.readSide, STDIN_FILENO) == -1)
+            throw SysError("dupping to-hook read side");
 
-            if (chdir("/") == -1) throw SysError("changing into `/");
+        /* Use fd 4 for the builder's stdout/stderr. */
+        if (dup2(builderOut.writeSide, 4) == -1)
+            throw SysError("dupping builder's stdout/stderr");
 
-            /* Dup the communication pipes. */
-            if (dup2(toHook.readSide, STDIN_FILENO) == -1)
-                throw SysError("dupping to-hook read side");
+        execl(buildHook.c_str(), buildHook.c_str(), settings.thisSystem.c_str(),
+            (format("%1%") % settings.maxSilentTime).str().c_str(),
+            (format("%1%") % settings.printBuildTrace).str().c_str(),
+            (format("%1%") % settings.buildTimeout).str().c_str(),
+            NULL);
 
-            /* Use fd 4 for the builder's stdout/stderr. */
-            if (dup2(builderOut.writeSide, 4) == -1)
-                throw SysError("dupping builder's stdout/stderr");
+        throw SysError(format("executing `%1%'") % buildHook);
+    });
 
-            execl(buildHook.c_str(), buildHook.c_str(), settings.thisSystem.c_str(),
-                (format("%1%") % settings.maxSilentTime).str().c_str(),
-                (format("%1%") % settings.printBuildTrace).str().c_str(),
-                (format("%1%") % settings.buildTimeout).str().c_str(),
-                NULL);
-
-            throw SysError(format("executing `%1%'") % buildHook);
-
-        } catch (std::exception & e) {
-            writeToStderr("build hook error: " + string(e.what()) + "\n");
-        }
-        _exit(1);
-    }
-
-    /* parent */
     pid.setSeparatePG(true);
     pid.setKillSignal(SIGTERM);
     fromHook.writeSide.close();
@@ -2781,32 +2768,18 @@ void SubstitutionGoal::tryToRun()
     const char * * argArr = strings2CharPtrs(args);
 
     /* Fork the substitute program. */
-    pid = fork();
+    pid = startProcess([&]() {
 
-    switch (pid) {
+        commonChildInit(logPipe);
 
-    case -1:
-        throw SysError("unable to fork");
+        if (dup2(outPipe.writeSide, STDOUT_FILENO) == -1)
+            throw SysError("cannot dup output pipe into stdout");
 
-    case 0:
-        try { /* child */
+        execv(sub.c_str(), (char * *) argArr);
 
-            commonChildInit(logPipe);
+        throw SysError(format("executing `%1%'") % sub);
+    });
 
-            if (dup2(outPipe.writeSide, STDOUT_FILENO) == -1)
-                throw SysError("cannot dup output pipe into stdout");
-
-            execv(sub.c_str(), (char * *) argArr);
-
-            throw SysError(format("executing `%1%'") % sub);
-
-        } catch (std::exception & e) {
-            writeToStderr("substitute error: " + string(e.what()) + "\n");
-        }
-        _exit(1);
-    }
-
-    /* parent */
     pid.setSeparatePG(true);
     pid.setKillSignal(SIGTERM);
     outPipe.writeSide.close();
