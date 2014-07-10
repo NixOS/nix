@@ -78,6 +78,13 @@ sub copyTo {
     my @missing = grep { !$present{$_} } @closure;
     return if !@missing;
 
+    my $missingSize = 0;
+    $missingSize += (queryPathInfo($_, 1))[3] foreach @missing;
+
+    printf STDERR "copying %d missing paths (%.2f MiB) to ‘$sshHost’...\n",
+        scalar(@missing), $missingSize / (1024.0^2);
+    return if $dryRun;
+
     # Send the "import paths" command.
     syswrite($to, pack("L<x4", 4)) or die;
     writeString($compressor, $to);
@@ -85,11 +92,7 @@ sub copyTo {
     if ($compressor || $progressViewer) {
 
         # Compute the size of the closure for the progress viewer.
-        if ($progressViewer) {
-            my $missingSize = 0;
-            $missingSize += (queryPathInfo($_, 1))[3] foreach @missing;
-            $progressViewer = "$progressViewer -s $missingSize";
-        }
+        $progressViewer = "$progressViewer -s $missingSize" if $progressViewer;
 
         # Start the compressor and/or progress viewer in between us
         # and the remote host.
@@ -107,9 +110,6 @@ sub copyTo {
     }
 
     readInt($from) == 1 or die "remote machine \`$sshHost' failed to import closure\n";
-
-    # Shut down the server process.
-    waitpid $pid, 0;
 }
 
 
