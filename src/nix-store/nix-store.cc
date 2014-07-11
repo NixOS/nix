@@ -928,7 +928,6 @@ static void opServe(Strings opFlags, Strings opArgs)
                 }
 
                 writeStrings(store->queryValidPaths(paths), out);
-                out.flush();
                 break;
             }
 
@@ -947,17 +946,15 @@ static void opServe(Strings opFlags, Strings opArgs)
                     writeLongLong(info.narSize, out);
                 }
                 writeString("", out);
-                out.flush();
                 break;
             }
 
             case cmdDumpStorePath:
                 dumpPath(readStorePath(in), out);
-                out.flush();
                 break;
 
             case cmdImportPaths: {
-                if (!writeAllowed) throw Error("importing paths not allowed");
+                if (!writeAllowed) throw Error("importing paths is not allowed");
                 string compression = readString(in);
 
                 if (compression != "") {
@@ -986,7 +983,6 @@ static void opServe(Strings opFlags, Strings opArgs)
                     store->importPaths(false, in);
 
                 writeInt(1, out); // indicate success
-                out.flush();
 
                 /* The decompressor will have left stdin in an
                    undefined state, so we can't continue. */
@@ -995,9 +991,40 @@ static void opServe(Strings opFlags, Strings opArgs)
                 break;
             }
 
+            case cmdExportPaths: {
+                exportPaths(*store, readStorePaths<Paths>(in), false, out);
+                break;
+            }
+
+            case cmdBuildPaths: {
+                /* Used by build-remote.pl. */
+                if (!writeAllowed) throw Error("building paths is not allowed");
+                PathSet paths = readStorePaths<PathSet>(in);
+
+                // FIXME: changing options here doesn't work if we're
+                // building through the daemon.
+                verbosity = lvlError;
+                settings.keepLog = false;
+                settings.useSubstitutes = false;
+                settings.maxSilentTime = readInt(in);
+                settings.buildTimeout = readInt(in);
+
+                int res = 0;
+                try {
+                    store->buildPaths(paths);
+                } catch (Error & e) {
+                    printMsg(lvlError, format("error: %1%") % e.msg());
+                    res = e.status;
+                }
+                writeInt(res, out);
+                break;
+            }
+
             default:
                 throw Error(format("unknown serve command %1%") % cmd);
         }
+
+        out.flush();
     }
 }
 

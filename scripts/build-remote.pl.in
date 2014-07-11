@@ -4,7 +4,7 @@ use Fcntl qw(:DEFAULT :flock);
 use English '-no_match_vars';
 use IO::Handle;
 use Nix::Config;
-use Nix::SSH qw/sshOpts openSSHConnection/;
+use Nix::SSH;
 use Nix::CopyClosure;
 use Nix::Store;
 no warnings('once');
@@ -90,6 +90,7 @@ if (defined $conf && -e $conf) {
 
 # Wait for the calling process to ask us whether we can build some derivation.
 my ($drvPath, $hostName, $slotLock);
+my ($from, $to);
 
 REQ: while (1) {
     $_ = <STDIN> || exit 0;
@@ -195,13 +196,15 @@ REQ: while (1) {
         # Connect to the selected machine.
         @sshOpts = ("-i", $machine->{sshKeys}, "-x");
         $hostName = $machine->{hostName};
-        if (openSSHConnection($hostName)) {
-            last REQ if system("ssh $hostName @sshOpts nix-builds-inhibited < /dev/null > /dev/null 2>&1") != 0;
-            warn "machine `$hostName' is refusing builds, trying other available machines...\n";
-            closeSSHConnection;
-        } else {
-            warn "unable to open SSH connection to `$hostName', trying other available machines...\n";
-        }
+        eval {
+            ($from, $to) = connectToRemoteNix($hostName, \@sshOpts);
+            # FIXME: check if builds are inhibited.
+        };
+        last REQ unless $@;
+        print STDERR "$@";
+        warn "unable to open SSH connection to `$hostName', trying other available machines...\n";
+        $from = undef;
+        $to = undef;
         $machine->{enabled} = 0;
     }
 }
@@ -218,18 +221,6 @@ print STDERR "@ build-remote $drvPath $hostName\n" if $printBuildTrace;
 
 my $maybeSign = "";
 $maybeSign = "--sign" if -e "$Nix::Config::confDir/signing-key.sec";
-
-
-# Register the derivation as a temporary GC root.  Note that $PPID is
-# the PID of the remote SSH process, which, due to the use of a
-# persistant SSH connection, should be the same across all remote
-# command invocations for this session.
-my $rootsDir = "@localstatedir@/nix/gcroots/tmp";
-system("ssh $hostName @sshOpts 'mkdir -m 1777 -p $rootsDir; ln -sfn $drvPath $rootsDir/\$PPID.drv'");
-
-sub removeRoots {
-    system("ssh $hostName @sshOpts 'rm -f $rootsDir/\$PPID.drv $rootsDir/\$PPID.out'");
-}
 
 
 # Copy the derivation and its dependencies to the build machine.  This
@@ -255,48 +246,33 @@ if ($@) {
     print STDERR "somebody is hogging $uploadLock, continuing...\n";
     unlink $uploadLock;
 }
-Nix::CopyClosure::copyTo($hostName, [ @sshOpts ], [ $drvPath, @inputs ], "", "", 0, 0, $maybeSign ne "", "");
+Nix::CopyClosure::copyToOpen($from, $to, $hostName, [ $drvPath, @inputs ], "", "", 0, 0, $maybeSign ne "", "");
 close UPLOADLOCK;
 
 
 # Perform the build.
-my $buildFlags =
-    "--max-silent-time $maxSilentTime --option build-timeout $buildTimeout"
-    . " --fallback --add-root $rootsDir/\$PPID.out --quiet"
-    . " --option build-keep-log false --option build-use-substitutes false";
-
-# We let the remote side kill its process group when the connection is
-# closed unexpectedly.  This is necessary to ensure that no processes
-# are left running on the remote system if the local Nix process is
-# killed.  (SSH itself doesn't kill child processes if the connection
-# is interrupted unless the `-tt' flag is used to force a pseudo-tty,
-# in which case every child receives SIGHUP; however, `-tt' doesn't
-# work on some platforms when connection sharing is used.)
 print STDERR "building `$drvPath' on `$hostName'\n";
-pipe STDIN, DUMMY; # make sure we have a readable STDIN
-if (system("exec ssh $hostName @sshOpts '(read; kill -INT -\$\$) <&0 & exec nix-store -r $drvPath $buildFlags > /dev/null' 2>&4") != 0) {
+writeInt(6, $to) or die; # == cmdBuildPaths
+writeStrings([$drvPath], $to);
+writeInt($maxSilentTime, $to);
+writeInt($buildTimeout, $to);
+my $res = readInt($from);
+if ($res != 0) {
     # Note that if we get exit code 100 from `nix-store -r', it
     # denotes a permanent build failure (as opposed to an SSH problem
     # or a temporary Nix problem).  We propagate this to the caller to
     # allow it to distinguish between transient and permanent
     # failures.
-    my $res = $? >> 8;
     print STDERR "build of `$drvPath' on `$hostName' failed with exit code $res\n";
-    removeRoots;
     exit $res;
 }
-
-#print "build of `$drvPath' on `$hostName' succeeded\n";
 
 
 # Copy the output from the build machine.
 my @outputs2 = grep { !isValidPath($_) } @outputs;
 if (scalar @outputs2 > 0) {
-    system("exec ssh $hostName @sshOpts 'nix-store --export @outputs2'" .
-           "| NIX_HELD_LOCKS='@outputs2' @bindir@/nix-store --import > /dev/null") == 0
-        or die("cannot copy paths " . join(", ", @outputs) . " from `$hostName': $?");
+    writeInt(5, $to) or die; # == cmdExportPaths
+    writeStrings(\@outputs2, $to);
+    $ENV{'NIX_HELD_LOCKS'} = "@outputs2"; # FIXME: ugly
+    importPaths(fileno($from));
 }
-
-
-# Get rid of the temporary GC roots.
-removeRoots;
