@@ -1,6 +1,6 @@
 source common.sh
 
-export NIX_BUILD_HOOK="build-hook.hook.sh"
+export NIX_BUILD_HOOK="$(pwd)/build-hook.hook.sh"
 
 outPath=$(nix-build build-hook.nix --no-out-link)
 
