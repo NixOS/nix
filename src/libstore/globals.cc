@@ -38,7 +38,7 @@ Settings::Settings()
     thisSystem = SYSTEM;
     maxSilentTime = 0;
     buildTimeout = 0;
-    useBuildHook = true;
+    useBuildHook = getEnv("NIX_BUILD_HOOK") != "";
     printBuildTrace = false;
     reservedSize = 1024 * 1024;
     fsyncMetadata = true;
