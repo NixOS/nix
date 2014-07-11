@@ -91,7 +91,7 @@ sub copyTo {
     $missingSize += (queryPathInfo($_, 1))[3] foreach @missing;
 
     printf STDERR "copying %d missing paths (%.2f MiB) to ‘$sshHost’...\n",
-        scalar(@missing), $missingSize / (1024.0^2);
+        scalar(@missing), $missingSize / (1024**2);
     return if $dryRun;
 
     # Send the "import paths" command.
