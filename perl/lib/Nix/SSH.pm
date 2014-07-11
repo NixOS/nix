@@ -107,11 +107,13 @@ sub writeStrings {
 
 
 sub connectToRemoteNix {
-    my ($sshHost, $sshOpts) = @_;
+    my ($sshHost, $sshOpts, $extraFlags) = @_;
+
+    $extraFlags ||= "";
 
     # Start ‘nix-store --serve’ on the remote host.
     my ($from, $to);
-    my $pid = open2($from, $to, "ssh $sshHost @{$sshOpts} nix-store --serve --write");
+    my $pid = open2($from, $to, "ssh $sshHost @{$sshOpts} nix-store --serve --write $extraFlags");
 
     # Do the handshake.
     my $SERVE_MAGIC_1 = 0x390c9deb; # FIXME

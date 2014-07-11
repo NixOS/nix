@@ -197,7 +197,7 @@ REQ: while (1) {
         @sshOpts = ("-i", $machine->{sshKeys}, "-x");
         $hostName = $machine->{hostName};
         eval {
-            ($from, $to) = connectToRemoteNix($hostName, \@sshOpts);
+            ($from, $to) = connectToRemoteNix($hostName, \@sshOpts, "2>&4");
             # FIXME: check if builds are inhibited.
         };
         last REQ unless $@;
