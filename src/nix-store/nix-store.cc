@@ -992,7 +992,9 @@ static void opServe(Strings opFlags, Strings opArgs)
             }
 
             case cmdExportPaths: {
-                exportPaths(*store, readStorePaths<Paths>(in), false, out);
+                Paths sorted = topoSortPaths(*store, readStorePaths<PathSet>(in));
+                reverse(sorted.begin(), sorted.end());
+                exportPaths(*store, sorted, false, out);
                 break;
             }
 

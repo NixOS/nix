@@ -35,7 +35,6 @@ template<class T> T readStorePaths(Source & from)
 }
 
 template PathSet readStorePaths(Source & from);
-template Paths readStorePaths(Source & from);
 
 
 RemoteStore::RemoteStore()

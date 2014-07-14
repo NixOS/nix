@@ -25,7 +25,8 @@ let
         system = "i686-linux";
         PATH = "''${utils}/bin";
         builder = "''${utils}/bin/sh";
-        args = [ "-c" "echo Hello; mkdir $out; cat /proc/sys/kernel/hostname > $out/host; sleep 3" ];
+        args = [ "-c" "echo Hello; mkdir $out $foo; cat /proc/sys/kernel/hostname > $out/host; ln -s $out $foo/bar; sleep 5" ];
+        outputs = [ "out" "foo" ];
       }
     '';
 
@@ -86,7 +87,7 @@ in
 
       # And a parallel build.
       my ($out1, $out2) = split /\s/,
-          $client->succeed("nix-store -r \$(nix-instantiate ${expr nodes.client.config 2} ${expr nodes.client.config 3})");
+          $client->succeed('nix-store -r $(nix-instantiate ${expr nodes.client.config 2})\!out $(nix-instantiate ${expr nodes.client.config 3})\!out');
       $slave1->succeed("test -e $out1 -o -e $out2");
       $slave2->succeed("test -e $out1 -o -e $out2");
 
