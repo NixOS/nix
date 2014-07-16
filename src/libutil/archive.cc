@@ -231,7 +231,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
         }
 
         else if (s == "entry" && type == tpDirectory) {
-            string name;
+            string name, prevName;
 
             s = readString(source);
             if (s != "(") throw badArchive("expected open tag");
@@ -245,6 +245,11 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
                     break;
                 } else if (s == "name") {
                     name = readString(source);
+                    if (name.empty() || name == "." || name == ".." || name.find('/') != string::npos || name.find((char) 0) != string::npos)
+                        throw Error(format("NAR contains invalid file name `%1%'") % name);
+                    if (name <= prevName)
+                        throw Error("NAR directory is not sorted");
+                    prevName = name;
                     if (useCaseHack) {
                         auto i = names.find(name);
                         if (i != names.end()) {
