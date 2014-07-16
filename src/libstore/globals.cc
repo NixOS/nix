@@ -2,6 +2,7 @@
 
 #include "globals.hh"
 #include "util.hh"
+#include "archive.hh"
 
 #include <map>
 #include <algorithm>
@@ -150,6 +151,7 @@ void Settings::update()
     get(useSshSubstituter, "use-ssh-substituter");
     get(logServers, "log-servers");
     get(enableImportNative, "allow-unsafe-native-code-during-evaluation");
+    get(useCaseHack, "use-case-hack");
 
     string subs = getEnv("NIX_SUBSTITUTERS", "default");
     if (subs == "default") {
