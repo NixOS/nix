@@ -26,7 +26,7 @@ $ ./dev-shell
 </screen>
 To build Nix itself in this shell:
 <screen>
-[nix-shell]$ ./bootstrap
+[nix-shell]$ ./bootstrap.sh
 [nix-shell]$ configurePhase
 [nix-shell]$ make
 </screen>
