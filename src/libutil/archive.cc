@@ -1,3 +1,5 @@
+#define _XOPEN_SOURCE 600
+
 #include "config.h"
 
 #include <cerrno>
@@ -6,7 +8,6 @@
 #include <map>
 #include <cstring>
 
-#define _XOPEN_SOURCE 600
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
