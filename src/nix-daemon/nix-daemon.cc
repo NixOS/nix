@@ -17,6 +17,7 @@
 #include <sys/un.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <pwd.h>
 
 using namespace nix;
 
@@ -855,23 +856,23 @@ static void daemonLoop()
             closeOnExec(remote);
 
             bool trusted = false;
-
             pid_t clientPid = -1;
 
 #if defined(SO_PEERCRED)
             /* Get the identity of the caller, if possible. */
-            uid_t clientUid = -1;
-
             ucred cred;
             socklen_t credLen = sizeof(cred);
             if (getsockopt(remote, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) == -1)
                 throw SysError("getting peer credentials");
 
             clientPid = cred.pid;
-            clientUid = cred.uid;
-            if (clientUid == 0) trusted = true;
 
-            printMsg(lvlInfo, format("accepted connection from pid %1%, uid %2%") % clientPid % clientUid);
+            struct passwd * pw = getpwuid(cred.uid);
+            string user = pw ? pw->pw_name : int2String(cred.uid);
+
+            if (cred.uid == 0) trusted = true;
+
+            printMsg(lvlInfo, format("accepted connection from pid %1%, user %2%") % clientPid % user);
 #endif
 
             /* Fork a child to handle the connection. */
