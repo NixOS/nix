@@ -6,7 +6,10 @@
 #include <algorithm>
 #include <vector>
 #include <map>
+
+#define _DARWIN_C_SOURCE // hack to get strcasecmp on old Darwin versions
 #include <cstring>
+#undef _DARWIN_C_SOURCE
 
 #include <sys/types.h>
 #include <sys/stat.h>
