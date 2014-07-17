@@ -63,6 +63,8 @@ Settings::Settings()
     lockCPU = getEnv("NIX_AFFINITY_HACK", "1") == "1";
     showTrace = false;
     enableImportNative = false;
+    trustedUsers = Strings({"root"});
+    allowedUsers = Strings({"*"});
 }
 
 
@@ -152,6 +154,8 @@ void Settings::update()
     get(logServers, "log-servers");
     get(enableImportNative, "allow-unsafe-native-code-during-evaluation");
     get(useCaseHack, "use-case-hack");
+    get(trustedUsers, "trusted-users");
+    get(allowedUsers, "allowed-users");
 
     string subs = getEnv("NIX_SUBSTITUTERS", "default");
     if (subs == "default") {

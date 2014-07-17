@@ -7,6 +7,8 @@
 #include "affinity.hh"
 #include "globals.hh"
 
+#include <algorithm>
+
 #include <cstring>
 #include <unistd.h>
 #include <signal.h>
@@ -18,6 +20,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <pwd.h>
+#include <grp.h>
 
 using namespace nix;
 
@@ -451,7 +454,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
     case wopImportPaths: {
         startWork();
         TunnelSource source(from);
-        Paths paths = store->importPaths(true, source);
+        Paths paths = store->importPaths(!trusted, source);
         stopWork();
         writeStrings(paths, to);
         break;
@@ -770,6 +773,27 @@ static void setSigChldAction(bool autoReap)
 }
 
 
+bool matchUser(const string & user, const string & group, const Strings & users)
+{
+    if (find(users.begin(), users.end(), "*") != users.end())
+        return true;
+
+    if (find(users.begin(), users.end(), user) != users.end())
+        return true;
+
+    for (auto & i : users)
+        if (string(i, 0, 1) == "@") {
+            if (group == string(i, 1)) return true;
+            struct group * gr = getgrnam(i.c_str() + 1);
+            if (!gr) continue;
+            for (char * * mem = gr->gr_mem; *mem; mem++)
+                if (user == string(*mem)) return true;
+        }
+
+    return false;
+}
+
+
 #define SD_LISTEN_FDS_START 3
 
 
@@ -870,9 +894,17 @@ static void daemonLoop()
             struct passwd * pw = getpwuid(cred.uid);
             string user = pw ? pw->pw_name : int2String(cred.uid);
 
-            if (cred.uid == 0) trusted = true;
+            struct group * gr = getgrgid(cred.gid);
+            string group = gr ? gr->gr_name : int2String(cred.gid);
 
-            printMsg(lvlInfo, format("accepted connection from pid %1%, user %2%") % clientPid % user);
+            if (matchUser(user, group, settings.trustedUsers))
+                trusted = true;
+
+            if (!trusted && !matchUser(user, group, settings.allowedUsers))
+                throw Error(format("user `%1%' is not allowed to connect to the Nix daemon") % user);
+
+            printMsg(lvlInfo, format((string) "accepted connection from pid %1%, user %2%"
+                    + (trusted ? " (trusted)" : "")) % clientPid % user);
 #endif
 
             /* Fork a child to handle the connection. */
