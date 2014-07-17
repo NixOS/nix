@@ -854,22 +854,25 @@ static void daemonLoop()
 
             closeOnExec(remote);
 
-            /* Get the identity of the caller, if possible. */
-            uid_t clientUid = -1;
-            pid_t clientPid = -1;
             bool trusted = false;
 
+            pid_t clientPid = -1;
+
 #if defined(SO_PEERCRED)
+            /* Get the identity of the caller, if possible. */
+            uid_t clientUid = -1;
+
             ucred cred;
             socklen_t credLen = sizeof(cred);
-            if (getsockopt(remote, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) != -1) {
-                clientPid = cred.pid;
-                clientUid = cred.uid;
-                if (clientUid == 0) trusted = true;
-            }
-#endif
+            if (getsockopt(remote, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) == -1)
+                throw SysError("getting peer credentials");
+
+            clientPid = cred.pid;
+            clientUid = cred.uid;
+            if (clientUid == 0) trusted = true;
 
             printMsg(lvlInfo, format("accepted connection from pid %1%, uid %2%") % clientPid % clientUid);
+#endif
 
             /* Fork a child to handle the connection. */
             startProcess([&]() {
