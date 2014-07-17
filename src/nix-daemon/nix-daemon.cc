@@ -548,7 +548,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
         settings.set("build-max-jobs", int2String(readInt(from)));
         settings.set("build-max-silent-time", int2String(readInt(from)));
         if (GET_PROTOCOL_MINOR(clientVersion) >= 2)
-            settings.useBuildHook = readInt(from) != 0;
+            if (readInt(from) != 0) settings.useBuildHook = true;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 4) {
             settings.buildVerbosity = (Verbosity) readInt(from);
             logType = (LogType) readInt(from);
