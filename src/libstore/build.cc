@@ -1505,7 +1505,7 @@ void DerivationGoal::buildDone()
 
 HookReply DerivationGoal::tryBuildHook()
 {
-    if (!settings.useBuildHook) return rpDecline;
+    if (!settings.useBuildHook || getEnv("NIX_BUILD_HOOK") == "") return rpDecline;
 
     if (!worker.hook)
         worker.hook = std::shared_ptr<HookInstance>(new HookInstance);
