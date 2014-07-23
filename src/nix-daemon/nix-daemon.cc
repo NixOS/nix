@@ -151,15 +151,6 @@ static void performOp(bool trusted, unsigned int clientVersion,
 {
     switch (op) {
 
-#if 0
-    case wopQuit: {
-        /* Close the database. */
-        store.reset((StoreAPI *) 0);
-        writeInt(1, to);
-        break;
-    }
-#endif
-
     case wopIsValidPath: {
         /* 'readStorePath' could raise an error leading to the connection
            being closed.  To be able to recover from an invalid path error,
