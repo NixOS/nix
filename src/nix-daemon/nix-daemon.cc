@@ -608,7 +608,7 @@ static void processConnection(bool trusted)
         assert(!canSendStderr);
     };
 
-    printMsg(lvlError, format("%1% operations") % opCount);
+    printMsg(lvlDebug, format("%1% operations") % opCount);
 }
 
 
