@@ -854,8 +854,10 @@ pid_t startProcess(std::function<void()> fun, const string & errorPrefix)
             restoreAffinity();
             fun();
         } catch (std::exception & e) {
-            writeToStderr(errorPrefix + string(e.what()) + "\n");
-        }
+            try {
+                std::cerr << errorPrefix << e.what() << "\n";
+            } catch (...) { }
+        } catch (...) { }
         _exit(1);
     }
 
