@@ -8,6 +8,7 @@
 #include "util.hh"
 #include "serve-protocol.hh"
 #include "worker-protocol.hh"
+#include "monitor-fd.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -878,6 +879,8 @@ static void opServe(Strings opFlags, Strings opArgs)
 
     FdSource in(STDIN_FILENO);
     FdSink out(STDOUT_FILENO);
+
+    MonitorFdHup monitor(in.fd);
 
     /* Exchange the greeting. */
     unsigned int magic = readInt(in);
