@@ -31,6 +31,7 @@ public:
                 assert(quit);
                 return; // destructor is asking us to exit
             }
+            fprintf(stderr, "GOT: %d\n", fds[0].revents);
             assert(fds[0].revents & POLLHUP);
             /* We got POLLHUP, so send an INT signal to the main thread. */
             kill(getpid(), SIGINT);
