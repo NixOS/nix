@@ -133,8 +133,6 @@ RemoteStore::~RemoteStore()
     try {
         to.flush();
         fdSocket.close();
-        if (child != -1)
-            child.wait(true);
     } catch (...) {
         ignoreException();
     }
