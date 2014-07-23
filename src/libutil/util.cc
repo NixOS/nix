@@ -850,6 +850,7 @@ pid_t startProcess(std::function<void()> fun, const string & errorPrefix)
     if (pid == -1) throw SysError("unable to fork");
 
     if (pid == 0) {
+        _writeToStderr = defaultWriteToStderr;
         try {
             restoreAffinity();
             fun();
