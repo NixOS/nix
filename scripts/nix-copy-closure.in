@@ -41,8 +41,7 @@ while (@ARGV) {
         $sign = 1;
     }
     elsif ($arg eq "--gzip") {
-        $compressor = "gzip";
-        $decompressor = "gzip -d";
+        push @globalSshOpts, "-C";
     }
     elsif ($arg eq "--bzip2") {
         $compressor = "bzip2";
