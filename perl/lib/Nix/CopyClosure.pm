@@ -94,13 +94,15 @@ sub oldCopyTo {
     my ($sshHost, $sshOpts, $storePaths, $compressor, $decompressor,
         $includeOutputs, $dryRun, $sign, $progressViewer, $useSubstitutes) = @_;
 
+    my @sshOptsFinal = (@{$sshOpts}, split ' ', ($ENV{"NIX_SSHOPTS"} or ""));
+
     # Get the closure of this path.
     my @closure = reverse(topoSortPaths(computeFSClosure(0, $includeOutputs,
         map { followLinksToStorePath $_ } @{$storePaths})));
 
     # Optionally use substitutes on the remote host.
     if (!$dryRun && $useSubstitutes) {
-        system "ssh $sshHost @{$sshOpts} nix-store -r --ignore-unknown @closure";
+        system "ssh $sshHost @sshOptsFinal nix-store -r --ignore-unknown @closure";
         # Ignore exit status because this is just an optimisation.
     }
 
@@ -112,7 +114,7 @@ sub oldCopyTo {
     my $missingSize = 0;
     while (scalar(@closure) > 0) {
         my @ps = splice(@closure, 0, 1500);
-        open(READ, "set -f; ssh $sshHost @{$sshOpts} nix-store --check-validity --print-invalid @ps|");
+        open(READ, "set -f; ssh $sshHost @sshOptsFinal nix-store --check-validity --print-invalid @ps|");
         while (<READ>) {
             chomp;
             push @missing, $_;
@@ -130,7 +132,7 @@ sub oldCopyTo {
     if (scalar @missing > 0) {
         print STDERR "copying ", scalar @missing, " missing paths to ‘$sshHost’...\n";
         unless ($dryRun) {
-            open SSH, "| $progressViewer $compressor ssh $sshHost @{$sshOpts} '$decompressor nix-store --import' > /dev/null" or die;
+            open SSH, "| $progressViewer $compressor ssh $sshHost @sshOptsFinal '$decompressor nix-store --import' > /dev/null" or die;
             exportPaths(fileno(SSH), $sign, @missing);
             close SSH or die "copying store paths to remote machine `$sshHost' failed: $?";
         }

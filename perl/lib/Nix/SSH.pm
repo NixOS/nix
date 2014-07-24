@@ -133,7 +133,7 @@ sub connectToRemoteNix {
     # Start ‘nix-store --serve’ on the remote host.
     my ($from, $to);
     # FIXME: don't start a shell, start ssh directly.
-    my $pid = open2($from, $to, "exec ssh $sshHost @{$sshOpts} nix-store --serve --write $extraFlags");
+    my $pid = open2($from, $to, "exec ssh $sshHost @{[@{$sshOpts}, @sshOpts]} nix-store --serve --write $extraFlags");
 
     # Do the handshake.
     my $SERVE_MAGIC_1 = 0x390c9deb; # FIXME
