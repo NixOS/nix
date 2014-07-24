@@ -880,7 +880,7 @@ user environment elements, etc. -->
 
   <varlistentry><term><option>--json</option></term>
 
-    <listitem><para>Print the result in a JSON representation suitable
+    <listitem><para>Print the result in JSON representation suitable
     for automatic processing by other tools.</para></listitem>
 
   </varlistentry>
