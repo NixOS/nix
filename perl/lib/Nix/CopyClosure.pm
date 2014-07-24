@@ -9,8 +9,7 @@ use IPC::Open2;
 
 
 sub copyToOpen {
-    my ($from, $to, $sshHost, $storePaths, $compressor, $decompressor,
-        $includeOutputs, $dryRun, $sign, $progressViewer, $useSubstitutes) = @_;
+    my ($from, $to, $sshHost, $storePaths, $includeOutputs, $dryRun, $sign, $useSubstitutes) = @_;
 
     $useSubstitutes = 0 if $dryRun || !defined $useSubstitutes;
 
@@ -41,34 +40,13 @@ sub copyToOpen {
 
     # Send the "import paths" command.
     syswrite($to, pack("L<x4", 4)) or die;
-    writeString($compressor, $to);
-
-    if ($compressor || $progressViewer) {
-
-        # Compute the size of the closure for the progress viewer.
-        $progressViewer = "$progressViewer -s $missingSize" if $progressViewer;
-
-        # Start the compressor and/or progress viewer in between us
-        # and the remote host.
-        my $to_;
-        my $pid2 = open2(">&" . fileno($to), $to_,
-            $progressViewer && $compressor ? "$progressViewer | $compressor" : $progressViewer || $compressor);
-        close $to;
-        exportPaths(fileno($to_), $sign, @missing);
-        close $to_;
-        waitpid $pid2, 0;
-
-    } else {
-        exportPaths(fileno($to), $sign, @missing);
-    }
-
+    exportPaths(fileno($to), $sign, @missing);
     readInt($from) == 1 or die "remote machine \`$sshHost' failed to import closure\n";
 }
 
 
 sub copyTo {
-    my ($sshHost, $sshOpts, $storePaths, $compressor, $decompressor,
-        $includeOutputs, $dryRun, $sign, $progressViewer, $useSubstitutes) = @_;
+    my ($sshHost, $sshOpts, $storePaths, $includeOutputs, $dryRun, $sign, $useSubstitutes) = @_;
 
     # Connect to the remote host.
     my ($from, $to);
@@ -81,8 +59,7 @@ sub copyTo {
         return oldCopyTo(@_);
     }
 
-    copyToOpen($from, $to, $sshHost, $storePaths, $compressor, $decompressor,
-               $includeOutputs, $dryRun, $sign, $progressViewer, $useSubstitutes);
+    copyToOpen($from, $to, $sshHost, $storePaths, $includeOutputs, $dryRun, $sign, $useSubstitutes);
 
     close $to;
 }
@@ -91,8 +68,7 @@ sub copyTo {
 # For backwards compatibility with Nix <= 1.7. Will be removed
 # eventually.
 sub oldCopyTo {
-    my ($sshHost, $sshOpts, $storePaths, $compressor, $decompressor,
-        $includeOutputs, $dryRun, $sign, $progressViewer, $useSubstitutes) = @_;
+    my ($sshHost, $sshOpts, $storePaths, $includeOutputs, $dryRun, $sign, $useSubstitutes) = @_;
 
     # Get the closure of this path.
     my @closure = reverse(topoSortPaths(computeFSClosure(0, $includeOutputs,
@@ -122,15 +98,12 @@ sub oldCopyTo {
         close READ or die;
     }
 
-    $compressor = "$compressor |" if $compressor ne "";
-    $decompressor = "$decompressor |" if $decompressor ne "";
-    $progressViewer = "$progressViewer -s $missingSize |" if $progressViewer ne "";
-
     # Export the store paths and import them on the remote machine.
     if (scalar @missing > 0) {
         print STDERR "copying ", scalar @missing, " missing paths to ‘$sshHost’...\n";
+        print STDERR "@missing\n";
         unless ($dryRun) {
-            open SSH, "| $progressViewer $compressor ssh $sshHost @{$sshOpts} @globalSshOpts '$decompressor nix-store --import' > /dev/null" or die;
+            open SSH, "| ssh $sshHost @{$sshOpts} @globalSshOpts 'nix-store --import' > /dev/null" or die;
             exportPaths(fileno(SSH), $sign, @missing);
             close SSH or die "copying store paths to remote machine `$sshHost' failed: $?";
         }

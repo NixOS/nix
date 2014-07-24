@@ -19,9 +19,6 @@ EOF
 # Get the target host.
 my $sshHost;
 my $sign = 0;
-my $compressor = "";
-my $decompressor = "";
-my $progressViewer = "";
 my $toMode = 1;
 my $includeOutputs = 0;
 my $dryRun = 0;
@@ -40,16 +37,9 @@ while (@ARGV) {
     elsif ($arg eq "--sign") {
         $sign = 1;
     }
-    elsif ($arg eq "--gzip") {
+    elsif ($arg eq "--gzip" || $arg eq "--bzip2" || $arg eq "--xz") {
+        warn "$0: `$arg' is not implemented\n" if $arg ne "--gzip";
         push @globalSshOpts, "-C";
-    }
-    elsif ($arg eq "--bzip2") {
-        $compressor = "bzip2";
-        $decompressor = "bzip2 -d";
-    }
-    elsif ($arg eq "--xz") {
-        $compressor = "xz";
-        $decompressor = "xz -d";
     }
     elsif ($arg eq "--from") {
         $toMode = 0;
@@ -61,7 +51,7 @@ while (@ARGV) {
         $includeOutputs = 1;
     }
     elsif ($arg eq "--show-progress") {
-        $progressViewer = "@pv@";
+        warn "$0: `$arg' is not implemented\n";
     }
     elsif ($arg eq "--dry-run") {
         $dryRun = 1;
@@ -82,8 +72,8 @@ die "$0: you did not specify a host name\n" unless defined $sshHost;
 
 if ($toMode) { # Copy TO the remote machine.
     Nix::CopyClosure::copyTo(
-        $sshHost, [ @sshOpts ], [ @storePaths ], $compressor, $decompressor,
-        $includeOutputs, $dryRun, $sign, $progressViewer, $useSubstitutes);
+        $sshHost, [ @sshOpts ], [ @storePaths ],
+        $includeOutputs, $dryRun, $sign, $useSubstitutes);
 }
 
 else { # Copy FROM the remote machine.

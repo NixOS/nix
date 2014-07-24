@@ -956,39 +956,8 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             case cmdImportPaths: {
                 if (!writeAllowed) throw Error("importing paths is not allowed");
-                string compression = readString(in);
-
-                if (compression != "") {
-                    if (compression != "gzip" && compression != "bzip2" && compression != "xz")
-                        throw Error(format("unsupported compression method `%1%'") % compression);
-
-                    Pipe fromDecompressor;
-                    fromDecompressor.create();
-
-                    Pid pid = startProcess([&]() {
-                        fromDecompressor.readSide.close();
-                        if (dup2(fromDecompressor.writeSide, STDOUT_FILENO) == -1)
-                            throw SysError("dupping stdout");
-                        // FIXME: use absolute path.
-                        execlp(compression.c_str(), compression.c_str(), "-d", NULL);
-                        throw SysError(format("executing `%1%'") % compression);
-                    });
-
-                    fromDecompressor.writeSide.close();
-
-                    FdSource fromDecompressor_(fromDecompressor.readSide);
-                    store->importPaths(false, fromDecompressor_);
-
-                    pid.wait(true);
-                } else
-                    store->importPaths(false, in);
-
+                store->importPaths(false, in);
                 writeInt(1, out); // indicate success
-
-                /* The decompressor will have left stdin in an
-                   undefined state, so we can't continue. */
-                if (compression != "") return;
-
                 break;
             }
 
