@@ -10,5 +10,5 @@ runCommand "nix-repl"
       -o $out/bin/nix-repl ${./nix-repl.cc} \
       -I${nix}/include/nix \
       -lnixformat -lnixutil -lnixstore -lnixexpr -lnixmain -lreadline -lgc \
-      -DNIX_VERSION=${(builtins.parseDrvName nix.name).version}
+      -DNIX_VERSION=\"${(builtins.parseDrvName nix.name).version}\"
   ''
