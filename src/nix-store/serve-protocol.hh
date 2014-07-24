@@ -16,6 +16,7 @@ typedef enum {
     cmdImportPaths = 4,
     cmdExportPaths = 5,
     cmdBuildPaths = 6,
+    cmdQueryClosure = 7,
 } ServeCommand;
 
 }

@@ -89,42 +89,22 @@ if ($toMode) { # Copy TO the remote machine.
 
 else { # Copy FROM the remote machine.
 
-    openSSHConnection $sshHost or die "$0: unable to start SSH\n";
+    my ($from, $to) = connectToRemoteNix($sshHost, [ @sshOpts ]);
 
     # Query the closure of the given store paths on the remote
     # machine.  Paths are assumed to be store paths; there is no
     # resolution (following of symlinks).
-    my $extraOpts = $includeOutputs ? "--include-outputs" : "";
-    my $pid = open(READ,
-        "set -f; ssh @sshOpts $sshHost nix-store --query --requisites $extraOpts @storePaths|") or die;
-
-    while (<READ>) {
-        chomp;
-        die "bad: $_" unless /^\//;
-        push @missing, $_ unless isValidPath($_);
-    }
-
-    close READ or die "nix-store on remote machine `$sshHost' failed: $?";
-
-    my $missingSize = 0;
-    if ($progressViewer ne "") {
-        $missingSize = sum (split ' ', `set -f; ssh @sshOpts $sshHost nix-store -q --size @missing`) or die;
-    }
+    syswrite($to, pack("L<x4L<x4", 7, $includeOutputs ? 1 : 0)) or die;
+    writeStrings(\@storePaths, $to);
+    my @missing = grep { !isValidPath($_) } readStrings($from);
 
     # Export the store paths on the remote machine and import them locally.
     if (scalar @missing > 0) {
         print STDERR "copying ", scalar @missing, " missing paths from ‘$sshHost’...\n";
-        unless ($dryRun) {
-            if ($useSubstitutes) {
-                system "$Nix::Config::binDir/nix-store -r --ignore-unknown @missing";
-            }
-            $compressor = "| $compressor" if $compressor ne "";
-            $decompressor = "$decompressor |" if $decompressor ne "";
-            $progressViewer = "$progressViewer -s $missingSize |" if $progressViewer ne "";
-            my $extraOpts = $sign ? "--sign" : "";
-            system("set -f; ssh $sshHost @sshOpts 'nix-store --export $extraOpts @missing $compressor' | $decompressor $progressViewer $Nix::Config::binDir/nix-store --import > /dev/null") == 0
-                or die "copying store paths from remote machine `$sshHost' failed: $?";
-        }
+        writeInt(5, $to); # == cmdExportPaths
+        writeInt($sign ? 1 : 0, $to);
+        writeStrings(\@missing, $to);
+        importPaths(fileno($from));
     }
 
 }

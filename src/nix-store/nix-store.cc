@@ -993,9 +993,10 @@ static void opServe(Strings opFlags, Strings opArgs)
             }
 
             case cmdExportPaths: {
+                bool sign = readInt(in);
                 Paths sorted = topoSortPaths(*store, readStorePaths<PathSet>(in));
                 reverse(sorted.begin(), sorted.end());
-                exportPaths(*store, sorted, false, out);
+                exportPaths(*store, sorted, sign, out);
                 break;
             }
 
@@ -1022,6 +1023,16 @@ static void opServe(Strings opFlags, Strings opArgs)
                     writeInt(e.status, out);
                     writeString(e.msg(), out);
                 }
+                break;
+            }
+
+            case cmdQueryClosure: {
+                bool includeOutputs = readInt(in);
+                PathSet paths = readStorePaths<PathSet>(in);
+                PathSet closure;
+                for (auto & i : paths)
+                    computeFSClosure(*store, i, closure, false, includeOutputs);
+                writeStrings(closure, out);
                 break;
             }
 

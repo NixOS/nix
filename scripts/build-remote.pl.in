@@ -272,7 +272,8 @@ if ($res != 0) {
 # Copy the output from the build machine.
 my @outputs2 = grep { !isValidPath($_) } @outputs;
 if (scalar @outputs2 > 0) {
-    writeInt(5, $to) or die; # == cmdExportPaths
+    writeInt(5, $to); # == cmdExportPaths
+    writeInt(0, $to); # don't sign
     writeStrings(\@outputs2, $to);
     $ENV{'NIX_HELD_LOCKS'} = "@outputs2"; # FIXME: ugly
     importPaths(fileno($from));
