@@ -73,7 +73,8 @@ string removeWhitespace(string s)
 
 
 NixRepl::NixRepl()
-    : staticEnv(false, &state.staticBaseEnv)
+    : state(Strings()) 
+    , staticEnv(false, &state.staticBaseEnv)
 {
     curDir = absPath(".");
 
