@@ -880,8 +880,6 @@ static void opServe(Strings opFlags, Strings opArgs)
     FdSource in(STDIN_FILENO);
     FdSink out(STDOUT_FILENO);
 
-    MonitorFdHup monitor(in.fd);
-
     /* Exchange the greeting. */
     unsigned int magic = readInt(in);
     if (magic != SERVE_MAGIC_1) throw Error("protocol mismatch");
@@ -1002,6 +1000,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             }
 
             case cmdBuildPaths: {
+
                 /* Used by build-remote.pl. */
                 if (!writeAllowed) throw Error("building paths is not allowed");
                 PathSet paths = readStorePaths<PathSet>(in);
@@ -1016,6 +1015,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 int res = 0;
                 try {
+                    MonitorFdHup monitor(in.fd);
                     store->buildPaths(paths);
                 } catch (Error & e) {
                     printMsg(lvlError, format("error: %1%") % e.msg());
