@@ -27,13 +27,7 @@ sub copyToOpen {
 
     # Get back the set of paths that are already valid on the remote host.
     my %present;
-    my $n = readInt($from);
-    while ($n--) {
-        my $len = readInt($from);
-        my $s = readN($len, $from);
-        $present{$s} = 1;
-        readN(8 - $len % 8, $from) if $len % 8; # skip padding
-    }
+    $present{$_} = 1 foreach readStrings($from);
 
     my @missing = grep { !$present{$_} } @closure;
     return if !@missing;

@@ -7,7 +7,8 @@ use IPC::Open2;
 our @ISA = qw(Exporter);
 our @EXPORT = qw(
   sshOpts openSSHConnection closeSSHConnection
-  readN readInt writeInt writeString writeStrings
+  readN readInt readString readStrings
+  writeInt writeString writeStrings
   connectToRemoteNix
 );
 
@@ -80,6 +81,24 @@ sub readN {
 sub readInt {
     my ($from) = @_;
     return unpack("L<x4", readN(8, $from));
+}
+
+
+sub readString {
+    my ($from) = @_;
+    my $len = readInt($from);
+    my $s = readN($len, $from);
+    readN(8 - $len % 8, $from) if $len % 8; # skip padding
+    return $s;
+}
+
+
+sub readStrings {
+    my ($from) = @_;
+    my $n = readInt($from);
+    my @res;
+    push @res, readString($from) while $n--;
+    return @res;
 }
 
 
