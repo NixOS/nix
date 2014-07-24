@@ -6,10 +6,14 @@ use IPC::Open2;
 
 our @ISA = qw(Exporter);
 our @EXPORT = qw(
+  @globalSshOpts
   readN readInt readString readStrings
   writeInt writeString writeStrings
   connectToRemoteNix
 );
+
+
+our @globalSshOpts = split ' ', ($ENV{"NIX_SSHOPTS"} or "");
 
 
 sub readN {
@@ -82,7 +86,7 @@ sub connectToRemoteNix {
     # Start ‘nix-store --serve’ on the remote host.
     my ($from, $to);
     # FIXME: don't start a shell, start ssh directly.
-    my $pid = open2($from, $to, "exec ssh -x -a $sshHost @{$sshOpts} nix-store --serve --write $extraFlags");
+    my $pid = open2($from, $to, "exec ssh -x -a $sshHost @globalSshOpts @{$sshOpts} nix-store --serve --write $extraFlags");
 
     # Do the handshake.
     my $SERVE_MAGIC_1 = 0x390c9deb; # FIXME
