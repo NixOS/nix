@@ -24,10 +24,7 @@ public:
             struct pollfd fds[1];
             fds[0].fd = fd;
             fds[0].events = 0;
-            if (poll(fds, 1, -1) == -1) {
-                if (errno != EINTR) abort(); // can't happen
-                return; // destructor is asking us to exit
-            }
+            if (poll(fds, 1, -1) == -1) abort(); // can't happen
             assert(fds[0].revents & POLLHUP);
             /* We got POLLHUP, so send an INT signal to the main thread. */
             kill(getpid(), SIGINT);
@@ -36,7 +33,7 @@ public:
 
     ~MonitorFdHup()
     {
-        pthread_kill(thread.native_handle(), SIGINT);
+        pthread_cancel(thread.native_handle());
         thread.join();
     }
 };
