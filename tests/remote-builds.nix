@@ -59,6 +59,7 @@ in
           virtualisation.writableStore = true;
           virtualisation.pathsInNixDB = [ config.system.build.extraUtils ];
           nix.package = nix;
+          nix.binaryCaches = [ ];
         };
     };
 
