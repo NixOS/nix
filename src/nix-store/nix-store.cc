@@ -1013,15 +1013,15 @@ static void opServe(Strings opFlags, Strings opArgs)
                 settings.maxSilentTime = readInt(in);
                 settings.buildTimeout = readInt(in);
 
-                int res = 0;
                 try {
                     MonitorFdHup monitor(in.fd);
                     store->buildPaths(paths);
+                    writeInt(0, out);
                 } catch (Error & e) {
-                    printMsg(lvlError, format("error: %1%") % e.msg());
-                    res = e.status;
+                    assert(e.status);
+                    writeInt(e.status, out);
+                    writeString(e.msg(), out);
                 }
-                writeInt(res, out);
                 break;
             }
 

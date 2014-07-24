@@ -263,7 +263,8 @@ if ($res != 0) {
     # or a temporary Nix problem).  We propagate this to the caller to
     # allow it to distinguish between transient and permanent
     # failures.
-    print STDERR "build of `$drvPath' on `$hostName' failed with exit code $res\n";
+    my $msg = readString($from);
+    print STDERR "error: $msg (on `$hostName')\n";
     exit $res;
 }
 
