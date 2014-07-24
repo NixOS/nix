@@ -25,7 +25,7 @@ let
         system = "i686-linux";
         PATH = "''${utils}/bin";
         builder = "''${utils}/bin/sh";
-        args = [ "-c" "echo Hello; mkdir $out $foo; cat /proc/sys/kernel/hostname > $out/host; ln -s $out $foo/bar; sleep 5" ];
+        args = [ "-c" "if [ ${toString nr} = 5 ]; then echo FAIL; exit 1; fi; echo Hello; mkdir $out $foo; cat /proc/sys/kernel/hostname > $out/host; ln -s $out $foo/bar; sleep 5" ];
         outputs = [ "out" "foo" ];
       }
     '';
@@ -91,6 +91,9 @@ in
           $client->succeed('nix-store -r $(nix-instantiate ${expr nodes.client.config 2})\!out $(nix-instantiate ${expr nodes.client.config 3})\!out');
       $slave1->succeed("test -e $out1 -o -e $out2");
       $slave2->succeed("test -e $out1 -o -e $out2");
+
+      # And a failing build.
+      $client->fail("nix-build ${expr nodes.client.config 5}");
 
       # Test whether the build hook automatically skips unavailable slaves.
       $slave1->block;
