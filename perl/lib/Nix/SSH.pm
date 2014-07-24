@@ -6,61 +6,10 @@ use IPC::Open2;
 
 our @ISA = qw(Exporter);
 our @EXPORT = qw(
-  sshOpts openSSHConnection closeSSHConnection
   readN readInt readString readStrings
   writeInt writeString writeStrings
   connectToRemoteNix
 );
-
-
-our @sshOpts = split ' ', ($ENV{"NIX_SSHOPTS"} or "");
-
-push @sshOpts, "-x";
-
-my $sshStarted = 0;
-my $sshHost;
-
-
-# Open a master SSH connection to `host', unless there already is a
-# running master connection (as determined by `-O check').
-sub openSSHConnection {
-    my ($host) = @_;
-    die if $sshStarted;
-    $sshHost = $host;
-    return 1 if system("ssh $sshHost @sshOpts -O check 2> /dev/null") == 0;
-
-    my $tmpDir = tempdir("nix-ssh.XXXXXX", CLEANUP => 1, TMPDIR => 1)
-        or die "cannot create a temporary directory";
-
-    push @sshOpts, "-S", "$tmpDir/control";
-
-    # Start the master.  We can't use the `-f' flag (fork into
-    # background after establishing the connection) because then the
-    # child continues to run if we are killed.  So instead make SSH
-    # print "started" when it has established the connection, and wait
-    # until we see that.
-    open SSHPIPE, "ssh $sshHost @sshOpts -M -N -o LocalCommand='echo started' -o PermitLocalCommand=yes |" or die;
-
-    while (<SSHPIPE>) {
-        chomp;
-        if ($_ eq "started") {
-            $sshStarted = 1;
-            return 1;
-        }
-    }
-
-    return 0;
-}
-
-
-# Tell the master SSH client to exit.
-sub closeSSHConnection {
-    if ($sshStarted) {
-        system("ssh $sshHost @sshOpts -O exit 2> /dev/null") == 0
-            or warn "unable to stop SSH master: $?";
-        $sshStarted = 0;
-    }
-}
 
 
 sub readN {
@@ -133,7 +82,7 @@ sub connectToRemoteNix {
     # Start ‘nix-store --serve’ on the remote host.
     my ($from, $to);
     # FIXME: don't start a shell, start ssh directly.
-    my $pid = open2($from, $to, "exec ssh $sshHost @{$sshOpts} nix-store --serve --write $extraFlags");
+    my $pid = open2($from, $to, "exec ssh -x -a $sshHost @{$sshOpts} nix-store --serve --write $extraFlags");
 
     # Do the handshake.
     my $SERVE_MAGIC_1 = 0x390c9deb; # FIXME
@@ -146,7 +95,5 @@ sub connectToRemoteNix {
     return ($from, $to, $pid);
 }
 
-
-END { my $saved = $?; closeSSHConnection; $? = $saved; }
 
 1;

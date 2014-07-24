@@ -194,7 +194,7 @@ REQ: while (1) {
 
 
         # Connect to the selected machine.
-        @sshOpts = ("-i", $machine->{sshKeys}, "-x");
+        my @sshOpts = ("-i", $machine->{sshKeys});
         $hostName = $machine->{hostName};
         eval {
             ($from, $to) = connectToRemoteNix($hostName, \@sshOpts, "2>&4");
