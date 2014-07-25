@@ -48,7 +48,7 @@ Settings::Settings()
     useSubstitutes = true;
     buildUsersGroup = getuid() == 0 ? "nixbld" : "";
     useChroot = false;
-    useSshSubstituter = false;
+    useSshSubstituter = true;
     impersonateLinux26 = false;
     keepLog = true;
     compressLog = true;
@@ -166,7 +166,7 @@ void Settings::update()
 #endif
         substituters.push_back(nixLibexecDir + "/nix/substituters/download-using-manifests.pl");
         substituters.push_back(nixLibexecDir + "/nix/substituters/download-from-binary-cache.pl");
-        if (useSshSubstituter)
+        if (useSshSubstituter && !sshSubstituterHosts.empty())
             substituters.push_back(nixLibexecDir + "/nix/substituters/download-via-ssh");
     } else
         substituters = tokenizeString<Strings>(subs, ":");
