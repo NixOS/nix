@@ -20,7 +20,7 @@ sub createLinks {
     my $dstDir = shift;
     my $priority = shift;
 
-    my @srcFiles = glob("$srcDir/*");
+    my @srcFiles = glob("$srcDir/{.[!.],.??*,*}");
 
     foreach my $srcFile (@srcFiles) {
         my $baseName = $srcFile;
