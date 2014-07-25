@@ -21,6 +21,8 @@ struct Settings {
 
     void set(const string & name, const string & value);
 
+    string get(const string & name, const string & def = "");
+
     void update();
 
     string pack();

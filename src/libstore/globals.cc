@@ -122,6 +122,14 @@ void Settings::set(const string & name, const string & value)
 }
 
 
+string Settings::get(const string & name, const string & def)
+{
+    auto i = settings.find(name);
+    if (i == settings.end()) return def;
+    return i->second;
+}
+
+
 void Settings::update()
 {
     get(tryFallback, "build-fallback");

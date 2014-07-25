@@ -163,6 +163,8 @@ void RemoteStore::setOptions()
 
     if (GET_PROTOCOL_MINOR(daemonVersion) >= 12) {
         Settings::SettingsMap overrides = settings.getOverrides();
+        if (overrides["ssh-auth-sock"] == "")
+            overrides["ssh-auth-sock"] = getEnv("SSH_AUTH_SOCK");
         writeInt(overrides.size(), to);
         foreach (Settings::SettingsMap::iterator, i, overrides) {
             writeString(i->first, to);
