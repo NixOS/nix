@@ -868,7 +868,7 @@ user environment elements, etc. -->
 
   <varlistentry><term><option>--xml</option></term>
 
-    <listitem><para>Print the result in an XML representation suitable
+    <listitem><para>Print the result in XML representation suitable
     for automatic processing by other tools.  The root element is
     called <literal>items</literal>, which contains a
     <literal>item</literal> element for each available or installed
@@ -880,7 +880,7 @@ user environment elements, etc. -->
 
   <varlistentry><term><option>--json</option></term>
 
-    <listitem><para>Print the result in a JSON representation suitable
+    <listitem><para>Print the result in JSON representation suitable
     for automatic processing by other tools.</para></listitem>
 
   </varlistentry>
