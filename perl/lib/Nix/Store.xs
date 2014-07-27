@@ -179,6 +179,17 @@ void exportPaths(int fd, int sign, ...)
         }
 
 
+void importPaths(int fd)
+    PPCODE:
+        try {
+            doInit();
+            FdSource source(fd);
+            store->importPaths(false, source);
+        } catch (Error & e) {
+            croak(e.what());
+        }
+
+
 SV * hashPath(char * algo, int base32, char * path)
     PPCODE:
         try {

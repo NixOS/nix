@@ -21,6 +21,8 @@ struct Settings {
 
     void set(const string & name, const string & value);
 
+    string get(const string & name, const string & def = "");
+
     void update();
 
     string pack();
@@ -202,6 +204,15 @@ struct Settings {
 
     /* Whether the importNative primop should be enabled */
     bool enableImportNative;
+
+    /* List of users that have elevated rights in the Nix daemon, such
+       as the ability to specify additional binary caches, or to
+       import unsigned NARs. */
+    Strings trustedUsers;
+
+    /* List of users that are allowed to connect to the daemon, in
+       addition to the trusted users. These have normal rights. */
+    Strings allowedUsers;
 
 private:
     SettingsMap settings, overrides;

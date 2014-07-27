@@ -6,6 +6,9 @@
 #include "archive.hh"
 #include "affinity.hh"
 #include "globals.hh"
+#include "monitor-fd.hh"
+
+#include <algorithm>
 
 #include <cstring>
 #include <unistd.h>
@@ -15,37 +18,17 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <fcntl.h>
 #include <errno.h>
+#include <pwd.h>
+#include <grp.h>
 
 using namespace nix;
-
-
-/* On platforms that have O_ASYNC, we can detect when a client
-   disconnects and immediately kill any ongoing builds.  On platforms
-   that lack it, we only notice the disconnection the next time we try
-   to write to the client.  So if you have a builder that never
-   generates output on stdout/stderr, the daemon will never notice
-   that the client has disconnected until the builder terminates.
-
-   GNU/Hurd does have O_ASYNC, but its Unix-domain socket translator
-   (pflocal) does not implement F_SETOWN.  See
-   <http://lists.gnu.org/archive/html/bug-guix/2013-07/msg00021.html> for
-   details.*/
-#if defined O_ASYNC && !defined __GNU__
-#define HAVE_HUP_NOTIFICATION
-#ifndef SIGPOLL
-#define SIGPOLL SIGIO
-#endif
-#endif
 
 
 static FdSource from(STDIN_FILENO);
 static FdSink to(STDOUT_FILENO);
 
 bool canSendStderr;
-pid_t myPid;
-
 
 
 /* This function is called anytime we want to write something to
@@ -54,11 +37,7 @@ pid_t myPid;
    socket. */
 static void tunnelStderr(const unsigned char * buf, size_t count)
 {
-    /* Don't send the message to the client if we're a child of the
-       process handling the connection.  Otherwise we could screw up
-       the protocol.  It's up to the parent to redirect stderr and
-       send it to the client somehow (e.g., as in build.cc). */
-    if (canSendStderr && myPid == getpid()) {
+    if (canSendStderr) {
         try {
             writeInt(STDERR_NEXT, to);
             writeString(buf, count, to);
@@ -74,111 +53,11 @@ static void tunnelStderr(const unsigned char * buf, size_t count)
 }
 
 
-/* Return true if the remote side has closed its end of the
-   connection, false otherwise.  Should not be called on any socket on
-   which we expect input! */
-static bool isFarSideClosed(int socket)
-{
-    struct timeval timeout;
-    timeout.tv_sec = timeout.tv_usec = 0;
-
-    fd_set fds;
-    FD_ZERO(&fds);
-    FD_SET(socket, &fds);
-
-    while (select(socket + 1, &fds, 0, 0, &timeout) == -1)
-        if (errno != EINTR) throw SysError("select()");
-
-    if (!FD_ISSET(socket, &fds)) return false;
-
-    /* Destructive read to determine whether the select() marked the
-       socket as readable because there is actual input or because
-       we've reached EOF (i.e., a read of size 0 is available). */
-    char c;
-    int rd;
-    if ((rd = read(socket, &c, 1)) > 0)
-        throw Error("EOF expected (protocol error?)");
-    else if (rd == -1 && errno != ECONNRESET)
-        throw SysError("expected connection reset or EOF");
-
-    return true;
-}
-
-
-/* A SIGPOLL signal is received when data is available on the client
-   communication socket, or when the client has closed its side of the
-   socket.  This handler is enabled at precisely those moments in the
-   protocol when we're doing work and the client is supposed to be
-   quiet.  Thus, if we get a SIGPOLL signal, it means that the client
-   has quit.  So we should quit as well.
-
-   Too bad most operating systems don't support the POLL_HUP value for
-   si_code in siginfo_t.  That would make most of the SIGPOLL
-   complexity unnecessary, i.e., we could just enable SIGPOLL all the
-   time and wouldn't have to worry about races. */
-static void sigPollHandler(int sigNo)
-{
-    using namespace std;
-    try {
-        /* Check that the far side actually closed.  We're still
-           getting spurious signals every once in a while.  I.e.,
-           there is no input available, but we get a signal with
-           POLL_IN set.  Maybe it's delayed or something. */
-        if (isFarSideClosed(from.fd)) {
-            if (!blockInt) {
-                _isInterrupted = 1;
-                blockInt = 1;
-                canSendStderr = false;
-                const char * s = "SIGPOLL\n";
-                write(STDERR_FILENO, s, strlen(s));
-            }
-        } else {
-            const char * s = "spurious SIGPOLL\n";
-            write(STDERR_FILENO, s, strlen(s));
-        }
-    }
-    catch (Error & e) {
-        /* Shouldn't happen. */
-        string s = "impossible: " + e.msg() + '\n';
-        write(STDERR_FILENO, s.data(), s.size());
-        throw;
-    }
-}
-
-
-static void setSigPollAction(bool enable)
-{
-#ifdef HAVE_HUP_NOTIFICATION
-    struct sigaction act, oact;
-    act.sa_handler = enable ? sigPollHandler : SIG_IGN;
-    sigfillset(&act.sa_mask);
-    act.sa_flags = 0;
-    if (sigaction(SIGPOLL, &act, &oact))
-        throw SysError("setting handler for SIGPOLL");
-#endif
-}
-
-
 /* startWork() means that we're starting an operation for which we
    want to send out stderr to the client. */
 static void startWork()
 {
     canSendStderr = true;
-
-    /* Handle client death asynchronously. */
-    setSigPollAction(true);
-
-    /* Of course, there is a race condition here: the socket could
-       have closed between when we last read from / wrote to it, and
-       between the time we set the handler for SIGPOLL.  In that case
-       we won't get the signal.  So do a non-blocking select() to find
-       out if any input is available on the socket.  If there is, it
-       has to be the 0-byte read that indicates that the socket has
-       closed. */
-    if (isFarSideClosed(from.fd)) {
-        _isInterrupted = 1;
-        checkInterrupt();
-    }
 }
 
 
@@ -186,11 +65,6 @@ static void startWork()
    client. */
 static void stopWork(bool success = true, const string & msg = "", unsigned int status = 0)
 {
-    /* Stop handling async client death; we're going to a state where
-       we're either sending or receiving from the client, so we'll be
-       notified of client death anyway. */
-    setSigPollAction(false);
-
     canSendStderr = false;
 
     if (success)
@@ -221,17 +95,10 @@ struct TunnelSource : BufferedSource
     TunnelSource(Source & from) : from(from) { }
     size_t readUnbuffered(unsigned char * data, size_t len)
     {
-        /* Careful: we're going to receive data from the client now,
-           so we have to disable the SIGPOLL handler. */
-        setSigPollAction(false);
-        canSendStderr = false;
-
         writeInt(STDERR_READ, to);
         writeInt(len, to);
         to.flush();
         size_t n = readString(data, len, from);
-
-        startWork();
         if (n == 0) throw EndOfFile("unexpected end-of-file");
         return n;
     }
@@ -283,15 +150,6 @@ static void performOp(bool trusted, unsigned int clientVersion,
     Source & from, Sink & to, unsigned int op)
 {
     switch (op) {
-
-#if 0
-    case wopQuit: {
-        /* Close the database. */
-        store.reset((StoreAPI *) 0);
-        writeInt(1, to);
-        break;
-    }
-#endif
 
     case wopIsValidPath: {
         /* 'readStorePath' could raise an error leading to the connection
@@ -450,7 +308,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
     case wopImportPaths: {
         startWork();
         TunnelSource source(from);
-        Paths paths = store->importPaths(true, source);
+        Paths paths = store->importPaths(!trusted, source);
         stopWork();
         writeStrings(paths, to);
         break;
@@ -658,18 +516,10 @@ static void performOp(bool trusted, unsigned int clientVersion,
 
 static void processConnection(bool trusted)
 {
-    canSendStderr = false;
-    myPid = getpid();
-    _writeToStderr = tunnelStderr;
+    MonitorFdHup monitor(from.fd);
 
-#ifdef HAVE_HUP_NOTIFICATION
-    /* Allow us to receive SIGPOLL for events on the client socket. */
-    setSigPollAction(false);
-    if (fcntl(from.fd, F_SETOWN, getpid()) == -1)
-        throw SysError("F_SETOWN");
-    if (fcntl(from.fd, F_SETFL, fcntl(from.fd, F_GETFL, 0) | O_ASYNC) == -1)
-        throw SysError("F_SETFL");
-#endif
+    canSendStderr = false;
+    _writeToStderr = tunnelStderr;
 
     /* Exchange the greeting. */
     unsigned int magic = readInt(from);
@@ -720,6 +570,8 @@ static void processConnection(bool trusted)
         WorkerOp op;
         try {
             op = (WorkerOp) readInt(from);
+        } catch (Interrupted & e) {
+            break;
         } catch (EndOfFile & e) {
             break;
         }
@@ -747,7 +599,7 @@ static void processConnection(bool trusted)
         assert(!canSendStderr);
     };
 
-    printMsg(lvlError, format("%1% operations") % opCount);
+    printMsg(lvlDebug, format("%1% operations") % opCount);
 }
 
 
@@ -766,6 +618,27 @@ static void setSigChldAction(bool autoReap)
     act.sa_flags = 0;
     if (sigaction(SIGCHLD, &act, &oact))
         throw SysError("setting SIGCHLD handler");
+}
+
+
+bool matchUser(const string & user, const string & group, const Strings & users)
+{
+    if (find(users.begin(), users.end(), "*") != users.end())
+        return true;
+
+    if (find(users.begin(), users.end(), user) != users.end())
+        return true;
+
+    for (auto & i : users)
+        if (string(i, 0, 1) == "@") {
+            if (group == string(i, 1)) return true;
+            struct group * gr = getgrnam(i.c_str() + 1);
+            if (!gr) continue;
+            for (char * * mem = gr->gr_mem; *mem; mem++)
+                if (user == string(*mem)) return true;
+        }
+
+    return false;
 }
 
 
@@ -846,66 +719,62 @@ static void daemonLoop()
                 (struct sockaddr *) &remoteAddr, &remoteAddrLen);
             checkInterrupt();
             if (remote == -1) {
-                if (errno == EINTR)
-                    continue;
-                else
-                    throw SysError("accepting connection");
+                if (errno == EINTR) continue;
+                throw SysError("accepting connection");
             }
 
             closeOnExec(remote);
 
-            /* Get the identity of the caller, if possible. */
-            uid_t clientUid = -1;
-            pid_t clientPid = -1;
             bool trusted = false;
+            pid_t clientPid = -1;
 
 #if defined(SO_PEERCRED)
+            /* Get the identity of the caller, if possible. */
             ucred cred;
             socklen_t credLen = sizeof(cred);
-            if (getsockopt(remote, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) != -1) {
-                clientPid = cred.pid;
-                clientUid = cred.uid;
-                if (clientUid == 0) trusted = true;
-            }
+            if (getsockopt(remote, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) == -1)
+                throw SysError("getting peer credentials");
+
+            clientPid = cred.pid;
+
+            struct passwd * pw = getpwuid(cred.uid);
+            string user = pw ? pw->pw_name : int2String(cred.uid);
+
+            struct group * gr = getgrgid(cred.gid);
+            string group = gr ? gr->gr_name : int2String(cred.gid);
+
+            if (matchUser(user, group, settings.trustedUsers))
+                trusted = true;
+
+            if (!trusted && !matchUser(user, group, settings.allowedUsers))
+                throw Error(format("user `%1%' is not allowed to connect to the Nix daemon") % user);
+
+            printMsg(lvlInfo, format((string) "accepted connection from pid %1%, user %2%"
+                    + (trusted ? " (trusted)" : "")) % clientPid % user);
 #endif
 
-            printMsg(lvlInfo, format("accepted connection from pid %1%, uid %2%") % clientPid % clientUid);
-
             /* Fork a child to handle the connection. */
-            pid_t child;
-            child = fork();
+            startProcess([&]() {
+                /* Background the daemon. */
+                if (setsid() == -1)
+                    throw SysError(format("creating a new session"));
 
-            switch (child) {
+                /* Restore normal handling of SIGCHLD. */
+                setSigChldAction(false);
 
-            case -1:
-                throw SysError("unable to fork");
-
-            case 0:
-                try { /* child */
-
-                    /* Background the daemon. */
-                    if (setsid() == -1)
-                        throw SysError(format("creating a new session"));
-
-                    /* Restore normal handling of SIGCHLD. */
-                    setSigChldAction(false);
-
-                    /* For debugging, stuff the pid into argv[1]. */
-                    if (clientPid != -1 && argvSaved[1]) {
-                        string processName = int2String(clientPid);
-                        strncpy(argvSaved[1], processName.c_str(), strlen(argvSaved[1]));
-                    }
-
-                    /* Handle the connection. */
-                    from.fd = remote;
-                    to.fd = remote;
-                    processConnection(trusted);
-
-                } catch (std::exception & e) {
-                    writeToStderr("unexpected Nix daemon error: " + string(e.what()) + "\n");
+                /* For debugging, stuff the pid into argv[1]. */
+                if (clientPid != -1 && argvSaved[1]) {
+                    string processName = int2String(clientPid);
+                    strncpy(argvSaved[1], processName.c_str(), strlen(argvSaved[1]));
                 }
-                exit(0);
-            }
+
+                /* Handle the connection. */
+                from.fd = remote;
+                to.fd = remote;
+                processConnection(trusted);
+
+                _exit(0);
+            }, "unexpected Nix daemon error: ");
 
         } catch (Interrupted & e) {
             throw;

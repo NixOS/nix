@@ -24,30 +24,14 @@ static std::pair<FdSink, FdSource> connect(const string & conn)
     Pipe to, from;
     to.create();
     from.create();
-    pid_t child = fork();
-    switch (child) {
-        case -1:
-            throw SysError("unable to fork");
-        case 0:
-            try {
-                restoreAffinity();
-                if (dup2(to.readSide, STDIN_FILENO) == -1)
-                    throw SysError("dupping stdin");
-                if (dup2(from.writeSide, STDOUT_FILENO) == -1)
-                    throw SysError("dupping stdout");
-                execlp("ssh"
-                      , "ssh"
-                      , "-x"
-                      , "-T"
-                      , conn.c_str()
-                      , "nix-store --serve"
-                      , NULL);
-                throw SysError("executing ssh");
-            } catch (std::exception & e) {
-                std::cerr << "error: " << e.what() << std::endl;
-            }
-            _exit(1);
-    }
+    startProcess([&]() {
+        if (dup2(to.readSide, STDIN_FILENO) == -1)
+            throw SysError("dupping stdin");
+        if (dup2(from.writeSide, STDOUT_FILENO) == -1)
+            throw SysError("dupping stdout");
+        execlp("ssh", "ssh", "-x", "-T", conn.c_str(), "nix-store --serve", NULL);
+        throw SysError("executing ssh");
+    });
     // If child exits unexpectedly, we'll EPIPE or EOF early.
     // If we exit unexpectedly, child will EPIPE or EOF early.
     // So no need to keep track of it.
@@ -58,7 +42,7 @@ static std::pair<FdSink, FdSource> connect(const string & conn)
 
 static void substitute(std::pair<FdSink, FdSource> & pipes, Path storePath, Path destPath)
 {
-    writeInt(cmdSubstitute, pipes.first);
+    writeInt(cmdDumpStorePath, pipes.first);
     writeString(storePath, pipes.first);
     pipes.first.flush();
     restorePath(destPath, pipes.second);
@@ -68,20 +52,21 @@ static void substitute(std::pair<FdSink, FdSource> & pipes, Path storePath, Path
 
 static void query(std::pair<FdSink, FdSource> & pipes)
 {
-    writeInt(cmdQuery, pipes.first);
     for (string line; getline(std::cin, line);) {
         Strings tokenized = tokenizeString<Strings>(line);
         string cmd = tokenized.front();
         tokenized.pop_front();
         if (cmd == "have") {
-            writeInt(qCmdHave, pipes.first);
+            writeInt(cmdQueryValidPaths, pipes.first);
+            writeInt(0, pipes.first); // don't lock
+            writeInt(0, pipes.first); // don't substitute
             writeStrings(tokenized, pipes.first);
             pipes.first.flush();
             PathSet paths = readStrings<PathSet>(pipes.second);
             foreach (PathSet::iterator, i, paths)
                 std::cout << *i << std::endl;
         } else if (cmd == "info") {
-            writeInt(qCmdInfo, pipes.first);
+            writeInt(cmdQueryPathInfos, pipes.first);
             writeStrings(tokenized, pipes.first);
             pipes.first.flush();
             while (1) {
@@ -115,6 +100,11 @@ void run(Strings args)
         return;
 
     std::cout << std::endl;
+
+    /* Pass on the location of the daemon client's SSH authentication
+       socket. */
+    string sshAuthSock = settings.get("ssh-auth-sock");
+    if (sshAuthSock != "") setenv("SSH_AUTH_SOCK", sshAuthSock.c_str(), 1);
 
     string host = settings.sshSubstituterHosts.front();
     std::pair<FdSink, FdSource> pipes = connect(host);

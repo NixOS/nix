@@ -1,5 +1,8 @@
 #include "config.h"
 
+#include "util.hh"
+#include "affinity.hh"
+
 #include <iostream>
 #include <cerrno>
 #include <cstdio>
@@ -15,8 +18,6 @@
 #ifdef __APPLE__
 #include <sys/syscall.h>
 #endif
-
-#include "util.hh"
 
 
 extern char * * environ;
@@ -707,10 +708,14 @@ void AutoCloseDir::close()
 
 
 Pid::Pid()
+    : pid(-1), separatePG(false), killSignal(SIGKILL)
 {
-    pid = -1;
-    separatePG = false;
-    killSignal = SIGKILL;
+}
+
+
+Pid::Pid(pid_t pid)
+    : pid(pid), separatePG(false), killSignal(SIGKILL)
+{
 }
 
 
@@ -801,43 +806,30 @@ void killUser(uid_t uid)
        users to which the current process can send signals.  So we
        fork a process, switch to uid, and send a mass kill. */
 
-    Pid pid;
-    pid = fork();
-    switch (pid) {
+    Pid pid = startProcess([&]() {
 
-    case -1:
-        throw SysError("unable to fork");
+        if (setuid(uid) == -1)
+            throw SysError("setting uid");
 
-    case 0:
-        try { /* child */
-
-            if (setuid(uid) == -1)
-                throw SysError("setting uid");
-
-            while (true) {
+        while (true) {
 #ifdef __APPLE__
-                /* OSX's kill syscall takes a third parameter that, among other
-                   things, determines if kill(-1, signo) affects the calling
-                   process. In the OSX libc, it's set to true, which means
-                   "follow POSIX", which we don't want here
+            /* OSX's kill syscall takes a third parameter that, among
+               other things, determines if kill(-1, signo) affects the
+               calling process. In the OSX libc, it's set to true,
+               which means "follow POSIX", which we don't want here
                  */
-                if (syscall(SYS_kill, -1, SIGKILL, false) == 0) break;
+            if (syscall(SYS_kill, -1, SIGKILL, false) == 0) break;
 #else
-                if (kill(-1, SIGKILL) == 0) break;
+            if (kill(-1, SIGKILL) == 0) break;
 #endif
-                if (errno == ESRCH) break; /* no more processes */
-                if (errno != EINTR)
-                    throw SysError(format("cannot kill processes for uid `%1%'") % uid);
-            }
-
-        } catch (std::exception & e) {
-            writeToStderr((format("killing processes belonging to uid `%1%': %2%\n") % uid % e.what()).str());
-            _exit(1);
+            if (errno == ESRCH) break; /* no more processes */
+            if (errno != EINTR)
+                throw SysError(format("cannot kill processes for uid `%1%'") % uid);
         }
-        _exit(0);
-    }
 
-    /* parent */
+        _exit(0);
+    });
+
     int status = pid.wait(true);
     if (status != 0)
         throw Error(format("cannot kill processes for uid `%1%': %2%") % uid % statusToString(status));
@@ -850,6 +842,28 @@ void killUser(uid_t uid)
 
 
 //////////////////////////////////////////////////////////////////////
+
+
+pid_t startProcess(std::function<void()> fun, const string & errorPrefix)
+{
+    pid_t pid = fork();
+    if (pid == -1) throw SysError("unable to fork");
+
+    if (pid == 0) {
+        _writeToStderr = defaultWriteToStderr;
+        try {
+            restoreAffinity();
+            fun();
+        } catch (std::exception & e) {
+            try {
+                std::cerr << errorPrefix << e.what() << "\n";
+            } catch (...) { }
+        } catch (...) { }
+        _exit(1);
+    }
+
+    return pid;
+}
 
 
 string runProgram(Path program, bool searchPath, const Strings & args)
@@ -867,32 +881,17 @@ string runProgram(Path program, bool searchPath, const Strings & args)
     pipe.create();
 
     /* Fork. */
-    Pid pid;
-    pid = maybeVfork();
+    Pid pid = startProcess([&]() {
+        if (dup2(pipe.writeSide, STDOUT_FILENO) == -1)
+            throw SysError("dupping stdout");
 
-    switch (pid) {
+        if (searchPath)
+            execvp(program.c_str(), (char * *) &cargs[0]);
+        else
+            execv(program.c_str(), (char * *) &cargs[0]);
 
-    case -1:
-        throw SysError("unable to fork");
-
-    case 0: /* child */
-        try {
-            if (dup2(pipe.writeSide, STDOUT_FILENO) == -1)
-                throw SysError("dupping stdout");
-
-            if (searchPath)
-                execvp(program.c_str(), (char * *) &cargs[0]);
-            else
-                execv(program.c_str(), (char * *) &cargs[0]);
-            throw SysError(format("executing `%1%'") % program);
-
-        } catch (std::exception & e) {
-            writeToStderr("error: " + string(e.what()) + "\n");
-        }
-        _exit(1);
-    }
-
-    /* Parent. */
+        throw SysError(format("executing `%1%'") % program);
+    });
 
     pipe.writeSide.close();
 
@@ -926,13 +925,6 @@ void closeOnExec(int fd)
         fcntl(fd, F_SETFD, prev | FD_CLOEXEC) == -1)
         throw SysError("setting close-on-exec flag");
 }
-
-
-#if HAVE_VFORK
-pid_t (*maybeVfork)() = vfork;
-#else
-pid_t (*maybeVfork)() = fork;
-#endif
 
 
 //////////////////////////////////////////////////////////////////////

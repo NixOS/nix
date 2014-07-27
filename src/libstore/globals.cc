@@ -2,6 +2,7 @@
 
 #include "globals.hh"
 #include "util.hh"
+#include "archive.hh"
 
 #include <map>
 #include <algorithm>
@@ -47,7 +48,7 @@ Settings::Settings()
     useSubstitutes = true;
     buildUsersGroup = getuid() == 0 ? "nixbld" : "";
     useChroot = false;
-    useSshSubstituter = false;
+    useSshSubstituter = true;
     impersonateLinux26 = false;
     keepLog = true;
     compressLog = true;
@@ -62,6 +63,8 @@ Settings::Settings()
     lockCPU = getEnv("NIX_AFFINITY_HACK", "1") == "1";
     showTrace = false;
     enableImportNative = false;
+    trustedUsers = Strings({"root"});
+    allowedUsers = Strings({"*"});
 }
 
 
@@ -119,6 +122,14 @@ void Settings::set(const string & name, const string & value)
 }
 
 
+string Settings::get(const string & name, const string & def)
+{
+    auto i = settings.find(name);
+    if (i == settings.end()) return def;
+    return i->second;
+}
+
+
 void Settings::update()
 {
     get(tryFallback, "build-fallback");
@@ -150,6 +161,9 @@ void Settings::update()
     get(useSshSubstituter, "use-ssh-substituter");
     get(logServers, "log-servers");
     get(enableImportNative, "allow-unsafe-native-code-during-evaluation");
+    get(useCaseHack, "use-case-hack");
+    get(trustedUsers, "trusted-users");
+    get(allowedUsers, "allowed-users");
 
     string subs = getEnv("NIX_SUBSTITUTERS", "default");
     if (subs == "default") {
@@ -160,7 +174,7 @@ void Settings::update()
 #endif
         substituters.push_back(nixLibexecDir + "/nix/substituters/download-using-manifests.pl");
         substituters.push_back(nixLibexecDir + "/nix/substituters/download-from-binary-cache.pl");
-        if (useSshSubstituter)
+        if (useSshSubstituter && !sshSubstituterHosts.empty())
             substituters.push_back(nixLibexecDir + "/nix/substituters/download-via-ssh");
     } else
         substituters = tokenizeString<Strings>(subs, ":");

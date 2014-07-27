@@ -480,6 +480,48 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
   </varlistentry>
 
 
+  <varlistentry xml:id="conf-trusted-users"><term><literal>trusted-users</literal></term>
+
+    <listitem>
+
+      <para>A list of names of users (separated by whitespace) that
+      have additional rights when connecting to the Nix daemon, such
+      as the ability to specify additional binary caches, or to import
+      unsigned NARs. You can also specify groups by prefixing them
+      with <literal>@</literal>; for instance,
+      <literal>@wheel</literal> means all users in the
+      <literal>wheel</literal> group. The default is
+      <literal>root</literal>.</para>
+
+      <warning><para>The users listed here have the ability to
+      compromise the security of a multi-user Nix store. For instance,
+      they could install Trojan horses subsequently executed by other
+      users. So you should consider carefully whether to add users to
+      this list.</para></warning>
+
+    </listitem>
+
+  </varlistentry>
+
+
+  <varlistentry xml:id="conf-allowed-users"><term><literal>allowed-users</literal></term>
+
+    <listitem>
+
+      <para>A list of names of users (separated by whitespace) that
+      are allowed to connect to the Nix daemon. As with the
+      <option>trusted-users</option> option, you can specify groups by
+      prefixing them with <literal>@</literal>. Also, you can allow
+      all users by specifying <literal>*</literal>. The default is
+      <literal>*</literal>.</para>
+
+      <para>Note that trusted users are always allowed to connect.</para>
+
+    </listitem>
+
+  </varlistentry>
+
+
 </variablelist>
 
 </para>

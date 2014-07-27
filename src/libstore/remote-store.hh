@@ -87,7 +87,6 @@ private:
     AutoCloseFD fdSocket;
     FdSink to;
     FdSource from;
-    Pid child;
     unsigned int daemonVersion;
     bool initialised;
 

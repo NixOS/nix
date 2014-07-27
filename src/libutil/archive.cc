@@ -1,10 +1,14 @@
+#define _XOPEN_SOURCE 600
+
 #include "config.h"
 
 #include <cerrno>
 #include <algorithm>
 #include <vector>
+#include <map>
 
-#define _XOPEN_SOURCE 600
+#include <strings.h> // for strcasecmp
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -18,39 +22,21 @@
 namespace nix {
 
 
+bool useCaseHack =
+#if __APPLE__
+    true;
+#else
+    false;
+#endif
+
 static string archiveVersion1 = "nix-archive-1";
 
+static string caseHackSuffix = "~nix~case~hack~";
 
 PathFilter defaultPathFilter;
 
 
-static void dump(const string & path, Sink & sink, PathFilter & filter);
-
-
-static void dumpEntries(const Path & path, Sink & sink, PathFilter & filter)
-{
-    Strings names = readDirectory(path);
-    vector<string> names2(names.begin(), names.end());
-    sort(names2.begin(), names2.end());
-
-    for (vector<string>::iterator i = names2.begin();
-         i != names2.end(); ++i)
-    {
-        Path entry = path + "/" + *i;
-        if (filter(entry)) {
-            writeString("entry", sink);
-            writeString("(", sink);
-            writeString("name", sink);
-            writeString(*i, sink);
-            writeString("node", sink);
-            dump(entry, sink, filter);
-            writeString(")", sink);
-        }
-    }
-}
-
-
-static void dumpContents(const Path & path, size_t size, 
+static void dumpContents(const Path & path, size_t size,
     Sink & sink)
 {
     writeString("contents", sink);
@@ -58,7 +44,7 @@ static void dumpContents(const Path & path, size_t size,
 
     AutoCloseFD fd = open(path.c_str(), O_RDONLY);
     if (fd == -1) throw SysError(format("opening file `%1%'") % path);
-    
+
     unsigned char buf[65536];
     size_t left = size;
 
@@ -89,12 +75,41 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
             writeString("", sink);
         }
         dumpContents(path, (size_t) st.st_size, sink);
-    } 
+    }
 
     else if (S_ISDIR(st.st_mode)) {
         writeString("type", sink);
         writeString("directory", sink);
-        dumpEntries(path, sink, filter);
+
+        /* If we're on a case-insensitive system like Mac OS X, undo
+           the case hack applied by restorePath(). */
+        Strings names = readDirectory(path);
+        std::map<string, string> unhacked;
+        for (auto & i : names)
+            if (useCaseHack) {
+                string name(i);
+                size_t pos = i.find(caseHackSuffix);
+                if (pos != string::npos) {
+                    printMsg(lvlDebug, format("removing case hack suffix from `%1%'") % (path + "/" + i));
+                    name.erase(pos);
+                }
+                if (unhacked.find(name) != unhacked.end())
+                    throw Error(format("file name collision in between `%1%' and `%2%'")
+                        % (path + "/" + unhacked[name]) % (path + "/" + i));
+                unhacked[name] = i;
+            } else
+                unhacked[i] = i;
+
+        for (auto & i : unhacked)
+            if (filter(path + "/" + i.first)) {
+                writeString("entry", sink);
+                writeString("(", sink);
+                writeString("name", sink);
+                writeString(i.first, sink);
+                writeString("node", sink);
+                dump(path + "/" + i.second, sink, filter);
+                writeString(")", sink);
+            }
     }
 
     else if (S_ISLNK(st.st_mode)) {
@@ -123,6 +138,7 @@ static SerialisationError badArchive(string s)
 }
 
 
+#if 0
 static void skipGeneric(Source & source)
 {
     if (readString(source) == "(") {
@@ -130,43 +146,13 @@ static void skipGeneric(Source & source)
             skipGeneric(source);
     }
 }
-
-
-static void parse(ParseSink & sink, Source & source, const Path & path);
-
-
-
-static void parseEntry(ParseSink & sink, Source & source, const Path & path)
-{
-    string s, name;
-
-    s = readString(source);
-    if (s != "(") throw badArchive("expected open tag");
-
-    while (1) {
-        checkInterrupt();
-
-        s = readString(source);
-
-        if (s == ")") {
-            break;
-        } else if (s == "name") {
-            name = readString(source);
-        } else if (s == "node") {
-            if (s == "") throw badArchive("entry name missing");
-            parse(sink, source, path + "/" + name);
-        } else {
-            throw badArchive("unknown field " + s);
-            skipGeneric(source);
-        }
-    }
-}
+#endif
 
 
 static void parseContents(ParseSink & sink, Source & source, const Path & path)
 {
     unsigned long long size = readLongLong(source);
-    
+
     sink.preallocateContents(size);
 
     unsigned long long left = size;
@@ -185,6 +171,15 @@ static void parseContents(ParseSink & sink, Source & source, const Path & path)
 }
 
 
+struct CaseInsensitiveCompare
+{
+    bool operator() (const string & a, const string & b) const
+    {
+        return strcasecmp(a.c_str(), b.c_str()) < 0;
+    }
+};
+
+
 static void parse(ParseSink & sink, Source & source, const Path & path)
 {
     string s;
@@ -193,6 +188,8 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
     if (s != "(") throw badArchive("expected open tag");
 
     enum { tpUnknown, tpRegular, tpDirectory, tpSymlink } type = tpUnknown;
+
+    std::map<Path, int, CaseInsensitiveCompare> names;
 
     while (1) {
         checkInterrupt();
@@ -221,9 +218,9 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
             else if (t == "symlink") {
                 type = tpSymlink;
             }
-            
+
             else throw badArchive("unknown file type " + t);
-            
+
         }
 
         else if (s == "contents" && type == tpRegular) {
@@ -236,7 +233,40 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
         }
 
         else if (s == "entry" && type == tpDirectory) {
-            parseEntry(sink, source, path);
+            string name, prevName;
+
+            s = readString(source);
+            if (s != "(") throw badArchive("expected open tag");
+
+            while (1) {
+                checkInterrupt();
+
+                s = readString(source);
+
+                if (s == ")") {
+                    break;
+                } else if (s == "name") {
+                    name = readString(source);
+                    if (name.empty() || name == "." || name == ".." || name.find('/') != string::npos || name.find((char) 0) != string::npos)
+                        throw Error(format("NAR contains invalid file name `%1%'") % name);
+                    if (name <= prevName)
+                        throw Error("NAR directory is not sorted");
+                    prevName = name;
+                    if (useCaseHack) {
+                        auto i = names.find(name);
+                        if (i != names.end()) {
+                            printMsg(lvlDebug, format("case collision between `%1%' and `%2%'") % i->first % name);
+                            name += caseHackSuffix;
+                            name += int2String(++i->second);
+                        } else
+                            names[name] = 0;
+                    }
+                } else if (s == "node") {
+                    if (s.empty()) throw badArchive("entry name missing");
+                    parse(sink, source, path + "/" + name);
+                } else
+                    throw badArchive("unknown field " + s);
+            }
         }
 
         else if (s == "target" && type == tpSymlink) {
@@ -244,17 +274,15 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
             sink.createSymlink(path, target);
         }
 
-        else {
+        else
             throw badArchive("unknown field " + s);
-            skipGeneric(source);
-        }
     }
 }
 
 
 void parseDump(ParseSink & sink, Source & source)
 {
-    string version;    
+    string version;
     try {
         version = readString(source);
     } catch (SerialisationError & e) {
@@ -323,7 +351,7 @@ struct RestoreSink : ParseSink
     }
 };
 
- 
+
 void restorePath(const Path & path, Source & source)
 {
     RestoreSink sink;
@@ -331,5 +359,5 @@ void restorePath(const Path & path, Source & source)
     parseDump(sink, source);
 }
 
- 
+
 }

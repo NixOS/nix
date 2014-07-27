@@ -27,7 +27,7 @@ ifeq ($(perlbindings), yes)
 
   Store_CXXFLAGS = \
     -I$(shell $(perl) -e 'use Config; print $$Config{archlibexp};')/CORE \
-    -D_FILE_OFFSET_BITS=64
+    -D_FILE_OFFSET_BITS=64 -Wno-unused-variable -Wno-literal-suffix
 
   Store_ALLOW_UNDEFINED = 1
 
