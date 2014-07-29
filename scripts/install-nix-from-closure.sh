@@ -77,6 +77,9 @@ if ! $nix/bin/nix-channel --list | grep -q "^nixpkgs "; then
 fi
 $nix/bin/nix-channel --update nixpkgs
 
+# Install an SSL certificate bundle.
+$nix/bin/nix-env -iA nixpkgs.cacert || true
+
 # Make the shell source nix.sh during login.
 p=$NIX_LINK/etc/profile.d/nix.sh
 
