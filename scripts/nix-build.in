@@ -5,6 +5,7 @@ use Nix::Config;
 use Nix::Store;
 use Nix::Utils;
 use File::Temp qw(tempdir);
+use Cwd 'abs_path';
 
 
 my $dryRun = 0;
@@ -175,6 +176,12 @@ if ($packages) {
 }
 
 $ENV{'IN_NIX_SHELL'} = 1 if $runEnv;
+my @absoluteExprs = ();
+foreach my $expr (@exprs) {
+    push @absoluteExprs, abs_path($expr);
+};
+$ENV{'NIX_SHELL_EXPRESSIONS'} = "@absoluteExprs" if $runEnv;
+undef @absoluteExprs;
 
 
 foreach my $expr (@exprs) {
@@ -208,7 +215,7 @@ foreach my $expr (@exprs) {
         # Set the environment.
         if ($pure) {
             foreach my $name (keys %ENV) {
-                next if grep { $_ eq $name } ("HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL", "TZ", "PAGER");
+                next if grep { $_ eq $name } ("HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL", "NIX_SHELL_EXPRESSIONS", "TZ", "PAGER");
                 delete $ENV{$name};
             }
             # NixOS hack: prevent /etc/bashrc from sourcing /etc/profile.
