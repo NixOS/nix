@@ -710,7 +710,7 @@ static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Va
 
 
 /* Find a file in the Nix search path. Used to implement <x> paths,
-   which are desugared to ‘findFile nixPath "x"’. */
+   which are desugared to ‘findFile __nixPath "x"’. */
 static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceList(*args[0], pos);
@@ -1472,7 +1472,7 @@ void EvalState::createBaseEnv()
         mkString(*allocAttr(*v2, symbols.create("prefix")), i.first);
         v2->attrs->sort();
     }
-    addConstant("nixPath", v);
+    addConstant("__nixPath", v);
 
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */

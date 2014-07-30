@@ -388,7 +388,7 @@ expr_simple
       string path($1 + 1, strlen($1) - 2);
       $$ = new ExprApp(CUR_POS,
           new ExprApp(new ExprVar(data->symbols.create("__findFile")),
-              new ExprVar(data->symbols.create("nixPath"))),
+              new ExprVar(data->symbols.create("__nixPath"))),
           new ExprString(data->symbols.create(path)));
   }
   | URI { $$ = new ExprString(data->symbols.create($1)); }
