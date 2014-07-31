@@ -273,6 +273,10 @@ void closeMostFDs(const set<int> & exceptions);
 /* Set the close-on-exec flag for the given file descriptor. */
 void closeOnExec(int fd);
 
+/* Restore default handling of SIGPIPE, otherwise some programs will
+   randomly say "Broken pipe". */
+void restoreSIGPIPE();
+
 
 /* User interruption. */
 

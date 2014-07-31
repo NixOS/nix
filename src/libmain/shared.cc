@@ -244,9 +244,9 @@ static void initAndRun(int argc, char * * argv)
 
 void showManPage(const string & name)
 {
-    string cmd = "man " + name;
-    if (system(cmd.c_str()) != 0)
-        throw Error(format("command `%1%' failed") % cmd);
+    restoreSIGPIPE();
+    execlp("man", "man", name.c_str(), NULL);
+    throw SysError(format("command `man %1%' failed") % name.c_str());
 }
 
 
