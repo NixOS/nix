@@ -230,11 +230,11 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
 {
     /* Read the `temproots' directory for per-process temporary root
        files. */
-    Strings tempRootFiles = readDirectory(
+    DirEntries tempRootFiles = readDirectory(
         (format("%1%/%2%") % settings.nixStateDir % tempRootsDir).str());
 
-    foreach (Strings::iterator, i, tempRootFiles) {
-        Path path = (format("%1%/%2%/%3%") % settings.nixStateDir % tempRootsDir % *i).str();
+    for (auto & i : tempRootFiles) {
+        Path path = (format("%1%/%2%/%3%") % settings.nixStateDir % tempRootsDir % i.name).str();
 
         debug(format("reading temporary root file `%1%'") % path);
         FDPtr fd(new AutoCloseFD(open(path.c_str(), O_RDWR, 0666)));
@@ -301,9 +301,8 @@ static void findRoots(StoreAPI & store, const Path & path, Roots & roots)
         struct stat st = lstat(path);
 
         if (S_ISDIR(st.st_mode)) {
-            Strings names = readDirectory(path);
-            foreach (Strings::iterator, i, names)
-                findRoots(store, path + "/" + *i, roots);
+            for (auto & i : readDirectory(path))
+                findRoots(store, path + "/" + i.name, roots);
         }
 
         else if (S_ISLNK(st.st_mode)) {
@@ -455,7 +454,6 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
         // if the path was not valid, need to determine the actual
         // size.
         state.bytesInvalidated += size;
-        // Mac OS X cannot rename directories if they are read-only.
         if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
             throw SysError(format("making `%1%' writable") % path);
         Path tmp = state.trashDir + "/" + baseNameOf(path);
@@ -655,7 +653,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     /* After this point the set of roots or temporary roots cannot
        increase, since we hold locks on everything.  So everything
-       that is not reachable from `roots'. */
+       that is not reachable from `roots' is garbage. */
 
     if (state.shouldDelete) {
         if (pathExists(state.trashDir)) deleteGarbage(state, state.trashDir);

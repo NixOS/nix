@@ -42,12 +42,11 @@ Generations findGenerations(Path profile, int & curGen)
     Path profileDir = dirOf(profile);
     string profileName = baseNameOf(profile);
 
-    Strings names = readDirectory(profileDir);
-    for (Strings::iterator i = names.begin(); i != names.end(); ++i) {
+    for (auto & i : readDirectory(profileDir)) {
         int n;
-        if ((n = parseName(profileName, *i)) != -1) {
+        if ((n = parseName(profileName, i.name)) != -1) {
             Generation gen;
-            gen.path = profileDir + "/" + *i;
+            gen.path = profileDir + "/" + i.name;
             gen.number = n;
             struct stat st;
             if (lstat(gen.path.c_str(), &st) != 0)

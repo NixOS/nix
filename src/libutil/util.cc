@@ -203,9 +203,10 @@ bool isLink(const Path & path)
 }
 
 
-Strings readDirectory(const Path & path)
+DirEntries readDirectory(const Path & path)
 {
-    Strings names;
+    DirEntries entries;
+    entries.reserve(64);
 
     AutoCloseDir dir = opendir(path.c_str());
     if (!dir) throw SysError(format("opening directory `%1%'") % path);
@@ -215,11 +216,11 @@ Strings readDirectory(const Path & path)
         checkInterrupt();
         string name = dirent->d_name;
         if (name == "." || name == "..") continue;
-        names.push_back(name);
+        entries.emplace_back(DirEntry({ name, dirent->d_ino, dirent->d_type }));
     }
     if (errno) throw SysError(format("reading directory `%1%'") % path);
 
-    return names;
+    return entries;
 }
 
 
@@ -294,16 +295,14 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
         bytesFreed += st.st_blocks * 512;
 
     if (S_ISDIR(st.st_mode)) {
-        Strings names = readDirectory(path);
-
         /* Make the directory writable. */
         if (!(st.st_mode & S_IWUSR)) {
             if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
                 throw SysError(format("making `%1%' writable") % path);
         }
 
-        for (Strings::iterator i = names.begin(); i != names.end(); ++i)
-            _deletePath(path + "/" + *i, bytesFreed);
+        for (auto & i : readDirectory(path))
+            _deletePath(path + "/" + i.name, bytesFreed);
     }
 
     if (remove(path.c_str()) == -1)

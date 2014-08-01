@@ -64,7 +64,16 @@ bool isLink(const Path & path);
 
 /* Read the contents of a directory.  The entries `.' and `..' are
    removed. */
-Strings readDirectory(const Path & path);
+struct DirEntry
+{
+    string name;
+    ino_t ino;
+    unsigned char type; // one of DT_*
+};
+
+typedef vector<DirEntry> DirEntries;
+
+DirEntries readDirectory(const Path & path);
 
 /* Read the contents of a file into a string. */
 string readFile(int fd);

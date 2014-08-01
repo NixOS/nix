@@ -83,22 +83,21 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
 
         /* If we're on a case-insensitive system like Mac OS X, undo
            the case hack applied by restorePath(). */
-        Strings names = readDirectory(path);
         std::map<string, string> unhacked;
-        for (auto & i : names)
+        for (auto & i : readDirectory(path))
             if (useCaseHack) {
-                string name(i);
-                size_t pos = i.find(caseHackSuffix);
+                string name(i.name);
+                size_t pos = i.name.find(caseHackSuffix);
                 if (pos != string::npos) {
-                    printMsg(lvlDebug, format("removing case hack suffix from `%1%'") % (path + "/" + i));
+                    printMsg(lvlDebug, format("removing case hack suffix from `%1%'") % (path + "/" + i.name));
                     name.erase(pos);
                 }
                 if (unhacked.find(name) != unhacked.end())
                     throw Error(format("file name collision in between `%1%' and `%2%'")
-                        % (path + "/" + unhacked[name]) % (path + "/" + i));
-                unhacked[name] = i;
+                        % (path + "/" + unhacked[name]) % (path + "/" + i.name));
+                unhacked[name] = i.name;
             } else
-                unhacked[i] = i;
+                unhacked[i.name] = i.name;
 
         for (auto & i : unhacked)
             if (filter(path + "/" + i.first)) {

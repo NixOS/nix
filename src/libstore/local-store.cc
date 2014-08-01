@@ -593,9 +593,9 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
     }
 
     if (S_ISDIR(st.st_mode)) {
-        Strings names = readDirectory(path);
-        foreach (Strings::iterator, i, names)
-            canonicalisePathMetaData_(path + "/" + *i, fromUid, inodesSeen);
+        DirEntries entries = readDirectory(path);
+        for (auto & i : entries)
+            canonicalisePathMetaData_(path + "/" + i.name, fromUid, inodesSeen);
     }
 }
 
@@ -1730,8 +1730,8 @@ bool LocalStore::verifyStore(bool checkContents, bool repair)
     /* Acquire the global GC lock to prevent a garbage collection. */
     AutoCloseFD fdGCLock = openGCLock(ltWrite);
 
-    Paths entries = readDirectory(settings.nixStore);
-    PathSet store(entries.begin(), entries.end());
+    PathSet store;
+    for (auto & i : readDirectory(settings.nixStore)) store.insert(i.name);
 
     /* Check whether all valid paths actually exist. */
     printMsg(lvlInfo, "checking path existence...");
@@ -1881,9 +1881,8 @@ void LocalStore::markContentsGood(const Path & path)
 PathSet LocalStore::queryValidPathsOld()
 {
     PathSet paths;
-    Strings entries = readDirectory(settings.nixDBPath + "/info");
-    foreach (Strings::iterator, i, entries)
-        if (i->at(0) != '.') paths.insert(settings.nixStore + "/" + *i);
+    for (auto & i : readDirectory(settings.nixDBPath + "/info"))
+        if (i.name.at(0) != '.') paths.insert(settings.nixStore + "/" + i.name);
     return paths;
 }
 
@@ -1970,9 +1969,8 @@ static void makeMutable(const Path & path)
     if (!S_ISDIR(st.st_mode) && !S_ISREG(st.st_mode)) return;
 
     if (S_ISDIR(st.st_mode)) {
-        Strings names = readDirectory(path);
-        foreach (Strings::iterator, i, names)
-            makeMutable(path + "/" + *i);
+        for (auto & i : readDirectory(path))
+            makeMutable(path + "/" + i.name);
     }
 
     /* The O_NOFOLLOW is important to prevent us from changing the

@@ -106,16 +106,16 @@ static bool isNixExpr(const Path & path, struct stat & st)
 static void getAllExprs(EvalState & state,
     const Path & path, StringSet & attrs, Value & v)
 {
-    Strings names = readDirectory(path);
-    StringSet namesSorted(names.begin(), names.end());
+    StringSet namesSorted;
+    for (auto & i : readDirectory(path)) namesSorted.insert(i.name);
 
-    foreach (StringSet::iterator, i, namesSorted) {
+    for (auto & i : namesSorted) {
         /* Ignore the manifest.nix used by profiles.  This is
            necessary to prevent it from showing up in channels (which
            are implemented using profiles). */
-        if (*i == "manifest.nix") continue;
+        if (i == "manifest.nix") continue;
 
-        Path path2 = path + "/" + *i;
+        Path path2 = path + "/" + i;
 
         struct stat st;
         if (stat(path2.c_str(), &st) == -1)
@@ -126,7 +126,7 @@ static void getAllExprs(EvalState & state,
                otherwise the attribute cannot be selected with the
                `-A' option.  Useful if you want to stick a Nix
                expression directly in ~/.nix-defexpr. */
-            string attrName = *i;
+            string attrName = i;
             if (hasSuffix(attrName, ".nix"))
                 attrName = string(attrName, 0, attrName.size() - 4);
             if (attrs.find(attrName) != attrs.end()) {
