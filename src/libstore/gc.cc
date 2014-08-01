@@ -328,6 +328,12 @@ static void findRoots(StoreAPI & store, const Path & path, Roots & roots)
             }
         }
 
+        else if (S_ISREG(st.st_mode)) {
+            Path storePath = settings.nixStore + "/" + baseNameOf(path);
+            if (store.isValidPath(storePath))
+                roots[path] = storePath;
+        }
+
     }
 
     catch (SysError & e) {
