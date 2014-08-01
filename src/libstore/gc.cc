@@ -294,18 +294,23 @@ static void foundRoot(StoreAPI & store,
 }
 
 
-static void findRoots(StoreAPI & store, const Path & path, Roots & roots)
+static void findRoots(StoreAPI & store, const Path & path, unsigned char type, Roots & roots)
 {
     try {
 
-        struct stat st = lstat(path);
-
-        if (S_ISDIR(st.st_mode)) {
-            for (auto & i : readDirectory(path))
-                findRoots(store, path + "/" + i.name, roots);
+        if (type == DT_UNKNOWN) {
+            struct stat st = lstat(path);
+            if (S_ISDIR(st.st_mode)) type = DT_DIR;
+            else if (S_ISLNK(st.st_mode)) type = DT_LNK;
+            else if (S_ISREG(st.st_mode)) type = DT_REG;
         }
 
-        else if (S_ISLNK(st.st_mode)) {
+        if (type == DT_DIR) {
+            for (auto & i : readDirectory(path))
+                findRoots(store, path + "/" + i.name, i.type, roots);
+        }
+
+        else if (type == DT_LNK) {
             Path target = readLink(path);
             if (isInStore(target))
                 foundRoot(store, path, target, roots);
@@ -327,7 +332,7 @@ static void findRoots(StoreAPI & store, const Path & path, Roots & roots)
             }
         }
 
-        else if (S_ISREG(st.st_mode)) {
+        else if (type == DT_REG) {
             Path storePath = settings.nixStore + "/" + baseNameOf(path);
             if (store.isValidPath(storePath))
                 roots[path] = storePath;
@@ -350,9 +355,9 @@ Roots LocalStore::findRoots()
     Roots roots;
 
     /* Process direct roots in {gcroots,manifests,profiles}. */
-    nix::findRoots(*this, settings.nixStateDir + "/" + gcRootsDir, roots);
-    nix::findRoots(*this, settings.nixStateDir + "/manifests", roots);
-    nix::findRoots(*this, settings.nixStateDir + "/profiles", roots);
+    nix::findRoots(*this, settings.nixStateDir + "/" + gcRootsDir, DT_UNKNOWN, roots);
+    nix::findRoots(*this, settings.nixStateDir + "/manifests", DT_UNKNOWN, roots);
+    nix::findRoots(*this, settings.nixStateDir + "/profiles", DT_UNKNOWN, roots);
 
     return roots;
 }
