@@ -759,11 +759,6 @@ private:
        outputs to allow hard links between outputs. */
     InodesSeen inodesSeen;
 
-    /* Magic exit code denoting that setting up the child environment
-       failed.  (It's possible that the child actually returns the
-       exit code, but ah well.) */
-    const static int childSetupFailed = 189;
-
 public:
     DerivationGoal(const Path & drvPath, const StringSet & wantedOutputs, Worker & worker, BuildMode buildMode = bmNormal);
     ~DerivationGoal();
@@ -1408,9 +1403,6 @@ void DerivationGoal::buildDone()
                     if (pathExists(chrootRootDir + *i))
                         rename((chrootRootDir + *i).c_str(), i->c_str());
 
-            if (WIFEXITED(status) && WEXITSTATUS(status) == childSetupFailed)
-                throw Error(format("failed to set up the build environment for `%1%'") % drvPath);
-
             if (diskFull)
                 printMsg(lvlError, "note: build failure may have been caused by lack of free disk space");
 
@@ -1944,10 +1936,15 @@ void DerivationGoal::startBuilder()
     worker.childStarted(shared_from_this(), pid,
         singleton<set<int> >(builderOut.readSide), true, true);
 
+    /* Check if setting up the build environment failed. */
+    string msg = readLine(builderOut.readSide);
+    if (!msg.empty()) throw Error(msg);
+
     if (settings.printBuildTrace) {
         printMsg(lvlError, format("@ build-started %1% - %2% %3%")
             % drvPath % drv.platform % logFile);
     }
+
 }
 
 
@@ -1955,8 +1952,6 @@ void DerivationGoal::initChild()
 {
     /* Warning: in the child we should absolutely not make any SQLite
        calls! */
-
-    bool inSetup = true;
 
     try { /* child */
 
@@ -2152,15 +2147,17 @@ void DerivationGoal::initChild()
 
         restoreSIGPIPE();
 
+        /* Indicate that we managed to set up the build environment. */
+        writeToStderr("\n");
+
         /* Execute the program.  This should not return. */
-        inSetup = false;
         execve(program.c_str(), (char * *) &args[0], (char * *) envArr);
 
         throw SysError(format("executing `%1%'") % drv.builder);
 
     } catch (std::exception & e) {
-        writeToStderr("build error: " + string(e.what()) + "\n");
-        _exit(inSetup ? childSetupFailed : 1);
+        writeToStderr("while setting up the build environment: " + string(e.what()) + "\n");
+        _exit(1);
     }
 
     abort(); /* never reached */
