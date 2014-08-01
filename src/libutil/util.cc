@@ -466,10 +466,18 @@ void warnOnce(bool & haveWarned, const FormatOrString & fs)
 }
 
 
+static void defaultWriteToStderr(const unsigned char * buf, size_t count)
+{
+    writeFull(STDERR_FILENO, buf, count);
+}
+
+
 void writeToStderr(const string & s)
 {
     try {
-        _writeToStderr((const unsigned char *) s.data(), s.size());
+        auto p = _writeToStderr;
+        if (!p) p = defaultWriteToStderr;
+        p((const unsigned char *) s.data(), s.size());
     } catch (SysError & e) {
         /* Ignore failing writes to stderr if we're in an exception
            handler, otherwise throw an exception.  We need to ignore
@@ -478,12 +486,6 @@ void writeToStderr(const string & s)
            been closed unexpectedly. */
         if (!std::uncaught_exception()) throw;
     }
-}
-
-
-static void defaultWriteToStderr(const unsigned char * buf, size_t count)
-{
-    writeFull(STDERR_FILENO, buf, count);
 }
 
 
@@ -849,7 +851,7 @@ pid_t startProcess(std::function<void()> fun, const string & errorPrefix)
     if (pid == -1) throw SysError("unable to fork");
 
     if (pid == 0) {
-        _writeToStderr = defaultWriteToStderr;
+        _writeToStderr = 0;
         try {
             restoreAffinity();
             fun();

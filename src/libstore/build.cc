@@ -374,8 +374,6 @@ void Goal::trace(const format & f)
 /* Common initialisation performed in child processes. */
 static void commonChildInit(Pipe & logPipe)
 {
-    restoreAffinity();
-
     /* Put the child in a separate session (and thus a separate
        process group) so that it has no controlling terminal (meaning
        that e.g. ssh cannot open /dev/tty) and it doesn't receive
@@ -1962,6 +1960,12 @@ void DerivationGoal::initChild()
 
     try { /* child */
 
+        _writeToStderr = 0;
+
+        restoreAffinity();
+
+        commonChildInit(builderOut);
+
 #if CHROOT_ENABLED
         if (useChroot) {
             /* Initialise the loopback interface. */
@@ -2079,8 +2083,6 @@ void DerivationGoal::initChild()
                 throw SysError(format("cannot change root directory to `%1%'") % chrootRootDir);
         }
 #endif
-
-        commonChildInit(builderOut);
 
         if (chdir(tmpDir.c_str()) == -1)
             throw SysError(format("changing into `%1%'") % tmpDir);
