@@ -69,6 +69,8 @@ struct DirEntry
     string name;
     ino_t ino;
     unsigned char type; // one of DT_*
+    DirEntry(const string & name, ino_t ino, unsigned char type)
+        : name(name), ino(ino), type(type) { }
 };
 
 typedef vector<DirEntry> DirEntries;

@@ -216,7 +216,7 @@ DirEntries readDirectory(const Path & path)
         checkInterrupt();
         string name = dirent->d_name;
         if (name == "." || name == "..") continue;
-        entries.emplace_back(DirEntry({ name, dirent->d_ino, dirent->d_type }));
+        entries.emplace_back(name, dirent->d_ino, dirent->d_type);
     }
     if (errno) throw SysError(format("reading directory `%1%'") % path);
 
