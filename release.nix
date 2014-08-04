@@ -19,7 +19,7 @@ let
         name = "nix-tarball";
         version = builtins.readFile ./version;
         versionSuffix = if officialRelease then "" else "pre${toString nix.revCount}_${nix.shortRev}";
-        src = nix;
+        src = if lib.inNixShell then null else nix;
         inherit officialRelease;
 
         buildInputs =
