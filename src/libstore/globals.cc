@@ -48,6 +48,9 @@ Settings::Settings()
     useSubstitutes = true;
     buildUsersGroup = getuid() == 0 ? "nixbld" : "";
     useChroot = false;
+#ifdef DEFAULT_CHROOT_DIRS
+    dirsInChroot = tokenizeString<StringSet>(DEFAULT_CHROOT_DIRS, ":");
+#endif
     useSshSubstituter = true;
     impersonateLinux26 = false;
     keepLog = true;

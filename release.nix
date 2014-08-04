@@ -93,6 +93,14 @@ let
           --sysconfdir=/etc
         '';
 
+        # Provide a default value for the ‘build-chroot-dirs’ setting
+        # that includes /bin/sh pointing to bash.
+        preHook = lib.optionalString stdenv.isLinux (
+          let sh = stdenv.shell; in
+          ''
+            NIX_CFLAGS_COMPILE+=" -DDEFAULT_CHROOT_DIRS=\"/bin/sh=${sh}:$(tr '\n' ':' < ${writeReferencesToFile sh})\""
+          '');
+
         enableParallelBuilding = true;
 
         makeFlags = "profiledir=$(out)/etc/profile.d";
