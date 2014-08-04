@@ -103,7 +103,7 @@ void run(Strings args)
 
     /* Pass on the location of the daemon client's SSH authentication
        socket. */
-    string sshAuthSock = settings.get("ssh-auth-sock");
+    string sshAuthSock = settings.get("ssh-auth-sock", "");
     if (sshAuthSock != "") setenv("SSH_AUTH_SOCK", sshAuthSock.c_str(), 1);
 
     string host = settings.sshSubstituterHosts.front();

@@ -63,8 +63,6 @@ Settings::Settings()
     lockCPU = getEnv("NIX_AFFINITY_HACK", "1") == "1";
     showTrace = false;
     enableImportNative = false;
-    trustedUsers = Strings({"root"});
-    allowedUsers = Strings({"*"});
 }
 
 
@@ -130,6 +128,14 @@ string Settings::get(const string & name, const string & def)
 }
 
 
+Strings Settings::get(const string & name, const Strings & def)
+{
+    auto i = settings.find(name);
+    if (i == settings.end()) return def;
+    return tokenizeString<Strings>(i->second);
+}
+
+
 void Settings::update()
 {
     _get(tryFallback, "build-fallback");
@@ -161,8 +167,6 @@ void Settings::update()
     _get(logServers, "log-servers");
     _get(enableImportNative, "allow-unsafe-native-code-during-evaluation");
     _get(useCaseHack, "use-case-hack");
-    _get(trustedUsers, "trusted-users");
-    _get(allowedUsers, "allowed-users");
 
     string subs = getEnv("NIX_SUBSTITUTERS", "default");
     if (subs == "default") {

@@ -743,6 +743,9 @@ static void daemonLoop()
             struct group * gr = getgrgid(cred.gid);
             string group = gr ? gr->gr_name : int2String(cred.gid);
 
+            Strings trustedUsers = settings.get("trusted-users", Strings({"root"}));
+            Strings allowedUsers = settings.get("allowed-users", Strings({"*"}));
+
             if (matchUser(user, group, settings.trustedUsers))
                 trusted = true;
 
