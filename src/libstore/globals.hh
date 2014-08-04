@@ -213,11 +213,11 @@ struct Settings {
 private:
     SettingsMap settings, overrides;
 
-    void get(string & res, const string & name);
-    void get(bool & res, const string & name);
-    void get(StringSet & res, const string & name);
-    void get(Strings & res, const string & name);
-    template<class N> void get(N & res, const string & name);
+    void _get(string & res, const string & name);
+    void _get(bool & res, const string & name);
+    void _get(StringSet & res, const string & name);
+    void _get(Strings & res, const string & name);
+    template<class N> void _get(N & res, const string & name);
 };
 
 
