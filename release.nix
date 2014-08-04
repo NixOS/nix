@@ -98,7 +98,7 @@ let
         preHook = lib.optionalString stdenv.isLinux (
           let sh = stdenv.shell; in
           ''
-            NIX_CFLAGS_COMPILE+=" -DDEFAULT_CHROOT_DIRS=\"/bin/sh=${sh}:$(tr '\n' ':' < ${writeReferencesToFile sh})\""
+            export DEFAULT_CHROOT_DIRS="/bin/sh=${sh} $(tr '\n' ' ' < ${writeReferencesToFile sh})"
           '');
 
         enableParallelBuilding = true;

@@ -1792,12 +1792,15 @@ void DerivationGoal::startBuilder()
 
         /* Bind-mount a user-configurable set of directories from the
            host file system. */
-        foreach (StringSet::iterator, i, settings.dirsInChroot) {
-            size_t p = i->find('=');
+        PathSet dirs = tokenizeString<StringSet>(settings.get(string("build-chroot-dirs"), DEFAULT_CHROOT_DIRS));
+        PathSet dirs2 = tokenizeString<StringSet>(settings.get(string("build-extra-chroot-dirs"), ""));
+        dirs.insert(dirs2.begin(), dirs2.end());
+        for (auto & i : dirs) {
+            size_t p = i.find('=');
             if (p == string::npos)
-                dirsInChroot[*i] = *i;
+                dirsInChroot[i] = i;
             else
-                dirsInChroot[string(*i, 0, p)] = string(*i, p + 1);
+                dirsInChroot[string(i, 0, p)] = string(i, p + 1);
         }
         dirsInChroot[tmpDir] = tmpDir;
 

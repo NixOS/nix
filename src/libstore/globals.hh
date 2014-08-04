@@ -144,10 +144,6 @@ struct Settings {
     /* Whether to build in chroot. */
     bool useChroot;
 
-    /* The directories from the host filesystem to be included in the
-       chroot. */
-    StringSet dirsInChroot;
-
     /* Set of ssh connection strings for the ssh substituter */
     Strings sshSubstituterHosts;
 
