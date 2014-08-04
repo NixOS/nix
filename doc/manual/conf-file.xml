@@ -229,21 +229,21 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
     <listitem><para>If set to <literal>true</literal>, builds will be
     performed in a <emphasis>chroot environment</emphasis>, i.e., the
     build will be isolated from the normal file system hierarchy and
-    will only see the Nix store, the temporary build directory, and
-    the directories configured with the <link
-    linkend='conf-build-chroot-dirs'><literal>build-chroot-dirs</literal>
-    option</link> (such as <filename>/proc</filename> and
-    <filename>/dev</filename>).  This is useful to prevent undeclared
-    dependencies on files in directories such as
+    will only see its dependencies in the Nix store, the temporary
+    build directory, private versions of <filename>/proc</filename>,
+    <filename>/dev</filename>, <filename>/dev/shm</filename> and
+    <filename>/dev/pts</filename>, and the paths configured with the
+    <link linkend='conf-build-chroot-dirs'><literal>build-chroot-dirs</literal>
+    option</link>. This is useful to prevent undeclared dependencies
+    on files in directories such as
     <filename>/usr/bin</filename>.</para>
 
-    <para>The use of a chroot requires that Nix is run as root (but
-    you can still use the <link
-    linkend='conf-build-users-group'>“build users” feature</link> to
-    perform builds under different users than root).  Currently,
-    chroot builds only work on Linux because Nix uses “bind mounts” to
-    make the Nix store and other directories available inside the
-    chroot.</para>
+    <para>The use of a chroot requires that Nix is run as root (so you
+    should use the <link linkend='conf-build-users-group'>“build
+    users” feature</link> to perform the actual builds under different
+    users than root).  Currently, chroot builds only work on Linux
+    because Nix uses “bind mounts” to make the Nix store and other
+    directories available inside the chroot.</para>
 
     </listitem>
 
@@ -252,20 +252,28 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
 
   <varlistentry xml:id="conf-build-chroot-dirs"><term><literal>build-chroot-dirs</literal></term>
 
-    <listitem><para>When builds are performed in a chroot environment,
-    Nix will mount some directories from the normal file system
-    hierarchy inside the chroot.  These are the Nix store, the
-    temporary build directory (usually
-    <filename>/tmp/nix-build-<replaceable>drvname</replaceable>-<replaceable>number</replaceable></filename>),
-    the <literal>/proc</literal> filesystem, and the directories
-    listed here.  The default is <literal>/dev /dev/pts</literal>,
-    since these contain files needed by many builds (such as
-    <filename>/dev/null</filename>).  You can use the syntax
+    <listitem><para>A list of paths bind-mounted into Nix chroot
+    environments.  Contrary to what the name suggests, the specified
+    paths do not have to be directories; you can bind-mount other
+    types of files as well.  You can use the syntax
     <literal><replaceable>target</replaceable>=<replaceable>source</replaceable></literal>
     to mount a path in a different location in the chroot; for
-    instance, <literal>/bin=/nix-bin</literal> will mount the
-    directory <literal>/nix-bin</literal> as <literal>/bin</literal>
-    inside the chroot.</para></listitem>
+    instance, <literal>/bin=/nix-bin</literal> will mount the path
+    <literal>/nix-bin</literal> as <literal>/bin</literal> inside the
+    chroot.</para>
+
+    <para>Depending on how Nix was built, the default value for this option
+    may be empty or provide <filename>/bin/sh</filename> as a
+    bind-mount of <command>bash</command>.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry xml:id="conf-build-extra-chroot-dirs"><term><literal>build-extra-chroot-dirs</literal></term>
+
+    <listitem><para>A list of additional paths appended to
+    <option>build-chroot-dirs</option>. Useful if you want to extend
+    its default value.</para></listitem>
 
   </varlistentry>
 
