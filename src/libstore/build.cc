@@ -623,7 +623,7 @@ HookInstance::HookInstance()
 HookInstance::~HookInstance()
 {
     try {
-        pid.kill();
+        pid.kill(true);
     } catch (...) {
         ignoreException();
     }

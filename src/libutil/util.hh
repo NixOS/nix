@@ -253,7 +253,7 @@ public:
     ~Pid();
     void operator =(pid_t pid);
     operator pid_t();
-    void kill();
+    void kill(bool quiet = false);
     int wait(bool block);
     void setSeparatePG(bool separatePG);
     void setKillSignal(int signal);

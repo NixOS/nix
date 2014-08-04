@@ -740,11 +740,12 @@ Pid::operator pid_t()
 }
 
 
-void Pid::kill()
+void Pid::kill(bool quiet)
 {
     if (pid == -1 || pid == 0) return;
 
-    printMsg(lvlError, format("killing process %1%") % pid);
+    if (!quiet)
+        printMsg(lvlError, format("killing process %1%") % pid);
 
     /* Send the requested signal to the child.  If it has its own
        process group, send the signal to every process in the child
