@@ -746,10 +746,10 @@ static void daemonLoop()
             Strings trustedUsers = settings.get("trusted-users", Strings({"root"}));
             Strings allowedUsers = settings.get("allowed-users", Strings({"*"}));
 
-            if (matchUser(user, group, settings.trustedUsers))
+            if (matchUser(user, group, trustedUsers))
                 trusted = true;
 
-            if (!trusted && !matchUser(user, group, settings.allowedUsers))
+            if (!trusted && !matchUser(user, group, allowedUsers))
                 throw Error(format("user `%1%' is not allowed to connect to the Nix daemon") % user);
 
             printMsg(lvlInfo, format((string) "accepted connection from pid %1%, user %2%"
