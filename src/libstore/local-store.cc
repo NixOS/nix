@@ -1488,7 +1488,6 @@ void LocalStore::exportPath(const Path & path, bool sign,
 
     printMsg(lvlInfo, format("exporting path `%1%'") % path);
 
-    addTempRoot(path);
     if (!isValidPath(path))
         throw Error(format("path `%1%' is not valid") % path);
 
