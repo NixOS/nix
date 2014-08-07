@@ -38,7 +38,7 @@ my $activeRequests = 0;
 my $curlIdCount = 1;
 my %requests;
 my %scheduled;
-my $caBundle = $ENV{"CURL_CA_BUNDLE"} // $ENV{"OPENSSL_X509_CERT_FILE"};
+my $caBundle = $ENV{"SSL_CERT_FILE"} // $ENV{"CURL_CA_BUNDLE"} // $ENV{"OPENSSL_X509_CERT_FILE"};
 
 my $userName = getpwuid($<) || $ENV{"USER"} or die "cannot figure out user name";
 
