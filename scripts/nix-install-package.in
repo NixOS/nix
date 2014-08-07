@@ -108,7 +108,7 @@ if ($interactive) {
 
 if (defined $binaryCacheURL) {
 
-    push @extraNixEnvArgs, "--option", "binary-caches", $binaryCacheURL;
+    push @extraNixEnvArgs, "--option", "extra-binary-caches", $binaryCacheURL;
 
 } else {
 
