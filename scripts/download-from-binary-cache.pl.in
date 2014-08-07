@@ -237,7 +237,7 @@ sub getAvailableCaches {
         my @untrustedUrls = strToList $Nix::Config::config{"untrusted-binary-caches"};
         @urls = ();
         foreach my $url (@untrustedUrls) {
-            die "binary cache ‘$url’ is not trusted (please add it to ‘trusted-binary-caches’ [@trustedUrls] in $Nix::Config::confDir/nix.conf)\n"
+            die "binary cache ‘$url’ is not trusted (please add it to ‘trusted-binary-caches’ in $Nix::Config::confDir/nix.conf)\n"
                 unless scalar(grep { $url eq $_ } @trustedUrls) > 0;
             push @urls, $url;
         }
@@ -245,7 +245,10 @@ sub getAvailableCaches {
 
     my @untrustedUrls = strToList $Nix::Config::config{"untrusted-extra-binary-caches"} // "";
     foreach my $url (@untrustedUrls) {
-        next unless scalar(grep { $url eq $_ } @trustedUrls) > 0;
+        unless (scalar(grep { $url eq $_ } @trustedUrls) > 0) {
+            warn "binary cache ‘$url’ is not trusted (please add it to ‘trusted-binary-caches’ in $Nix::Config::confDir/nix.conf)\n";
+            next;
+        }
         push @urls, $url;
     }
 
