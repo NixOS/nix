@@ -127,15 +127,6 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 </varlistentry>
 
 
-<varlistentry><term><envar>NIX_LOG_TYPE</envar></term>
-
-  <listitem><para>Equivalent to the <link
-  linkend="opt-log-type"><option>--log-type</option>
-  option</link>.</para></listitem>
-
-</varlistentry>
-  
-
 <varlistentry><term><envar>TMPDIR</envar></term>
 
   <listitem><para>Use the specified directory to store temporary

@@ -144,10 +144,6 @@ static void initAndRun(int argc, char * * argv)
     gettimeofday(&tv, 0);
     srandom(tv.tv_usec);
 
-    /* Process the NIX_LOG_TYPE environment variable. */
-    string lt = getEnv("NIX_LOG_TYPE");
-    if (lt != "") setLogType(lt);
-
     /* Put the arguments in a vector. */
     Strings args, remaining;
     while (argc--) args.push_back(*argv++);
