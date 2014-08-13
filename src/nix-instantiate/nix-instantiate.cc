@@ -18,12 +18,6 @@
 using namespace nix;
 
 
-void printHelp()
-{
-    showManPage("nix-instantiate");
-}
-
-
 static Expr * parseStdin(EvalState & state)
 {
     startNest(nest, lvlTalkative, format("parsing standard input"));
@@ -95,112 +89,108 @@ void processExpr(EvalState & state, const Strings & attrPaths,
 }
 
 
-void run(Strings args)
+int main(int argc, char * * argv)
 {
-    /* FIXME: hack. */
-    Strings searchPath;
-    Strings args2;
-    for (Strings::iterator i = args.begin(); i != args.end(); ) {
-        string arg = *i++;
-        if (!parseSearchPathArg(arg, i, args.end(), searchPath))
-            args2.push_back(arg);
-    }
-    args = args2;
+    return handleExceptions(argv[0], [&]() {
+        initNix();
 
-    EvalState state(searchPath);
-    Strings files;
-    bool readStdin = false;
-    bool fromArgs = false;
-    bool findFile = false;
-    bool evalOnly = false;
-    bool parseOnly = false;
-    OutputKind outputKind = okPlain;
-    bool xmlOutputSourceLocation = true;
-    bool strict = false;
-    Strings attrPaths;
-    Bindings autoArgs;
-    bool wantsReadWrite = false;
+        Strings files, searchPath;
+        bool readStdin = false;
+        bool fromArgs = false;
+        bool findFile = false;
+        bool evalOnly = false;
+        bool parseOnly = false;
+        OutputKind outputKind = okPlain;
+        bool xmlOutputSourceLocation = true;
+        bool strict = false;
+        Strings attrPaths;
+        bool wantsReadWrite = false;
+        std::map<string, string> autoArgs_;
+        bool repair = false;
 
-    for (Strings::iterator i = args.begin(); i != args.end(); ) {
-        string arg = *i++;
+        parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
+            if (*arg == "--help")
+                showManPage("nix-instantiate");
+            else if (*arg == "--version")
+                printVersion("nix-instantiate");
+            else if (*arg == "-")
+                readStdin = true;
+            else if (*arg == "--expr" || *arg == "-E")
+                fromArgs = true;
+            else if (*arg == "--eval" || *arg == "--eval-only")
+                evalOnly = true;
+            else if (*arg == "--read-write-mode")
+                wantsReadWrite = true;
+            else if (*arg == "--parse" || *arg == "--parse-only")
+                parseOnly = evalOnly = true;
+            else if (*arg == "--find-file")
+                findFile = true;
+            else if (*arg == "--attr" || *arg == "-A")
+                attrPaths.push_back(getArg(*arg, arg, end));
+            else if (parseAutoArgs(arg, end, autoArgs_))
+                ;
+            else if (parseSearchPathArg(arg, end, searchPath))
+                ;
+            else if (*arg == "--add-root")
+                gcRoot = getArg(*arg, arg, end);
+            else if (*arg == "--indirect")
+                indirectRoot = true;
+            else if (*arg == "--xml")
+                outputKind = okXML;
+            else if (*arg == "--json")
+                outputKind = okJSON;
+            else if (*arg == "--no-location")
+                xmlOutputSourceLocation = false;
+            else if (*arg == "--strict")
+                strict = true;
+            else if (*arg == "--repair")
+                repair = true;
+            else if (*arg == "--dry-run")
+                settings.readOnlyMode = true;
+            else if (*arg != "" && arg->at(0) == '-')
+                return false;
+            else
+                files.push_back(*arg);
+            return true;
+        });
 
-        if (arg == "-")
-            readStdin = true;
-        else if (arg == "--expr" || arg == "-E")
-            fromArgs = true;
-        else if (arg == "--eval" || arg == "--eval-only")
-            evalOnly = true;
-        else if (arg == "--read-write-mode")
-            wantsReadWrite = true;
-        else if (arg == "--parse" || arg == "--parse-only")
-            parseOnly = evalOnly = true;
-        else if (arg == "--find-file")
-            findFile = true;
-        else if (arg == "--attr" || arg == "-A") {
-            if (i == args.end())
-                throw UsageError("`--attr' requires an argument");
-            attrPaths.push_back(*i++);
-        }
-        else if (parseOptionArg(arg, i, args.end(), state, autoArgs))
-            ;
-        else if (arg == "--add-root") {
-            if (i == args.end())
-                throw UsageError("`--add-root' requires an argument");
-            gcRoot = absPath(*i++);
-        }
-        else if (arg == "--indirect")
-            indirectRoot = true;
-        else if (arg == "--xml")
-            outputKind = okXML;
-        else if (arg == "--json")
-            outputKind = okJSON;
-        else if (arg == "--no-location")
-            xmlOutputSourceLocation = false;
-        else if (arg == "--strict")
-            strict = true;
-        else if (arg == "--repair")
-            state.repair = true;
-        else if (arg == "--dry-run")
+        EvalState state(searchPath);
+        state.repair = repair;
+
+        Bindings autoArgs;
+        evalAutoArgs(state, autoArgs_, autoArgs);
+
+        if (evalOnly && !wantsReadWrite)
             settings.readOnlyMode = true;
-        else if (arg[0] == '-')
-            throw UsageError(format("unknown flag `%1%'") % arg);
-        else
-            files.push_back(arg);
-    }
 
-    if (evalOnly && !wantsReadWrite)
-        settings.readOnlyMode = true;
+        if (attrPaths.empty()) attrPaths.push_back("");
 
-    if (attrPaths.empty()) attrPaths.push_back("");
-
-    if (findFile) {
-        foreach (Strings::iterator, i, files) {
-            Path p = state.findFile(*i);
-            if (p == "") throw Error(format("unable to find `%1%'") % *i);
-            std::cout << p << std::endl;
+        if (findFile) {
+            foreach (Strings::iterator, i, files) {
+                Path p = state.findFile(*i);
+                if (p == "") throw Error(format("unable to find `%1%'") % *i);
+                std::cout << p << std::endl;
+            }
+            return;
         }
-        return;
-    }
 
-    store = openStore();
+        store = openStore();
 
-    if (readStdin) {
-        Expr * e = parseStdin(state);
-        processExpr(state, attrPaths, parseOnly, strict, autoArgs,
-            evalOnly, outputKind, xmlOutputSourceLocation, e);
-    } else if (files.empty() && !fromArgs)
-        files.push_back("./default.nix");
+        if (readStdin) {
+            Expr * e = parseStdin(state);
+            processExpr(state, attrPaths, parseOnly, strict, autoArgs,
+                evalOnly, outputKind, xmlOutputSourceLocation, e);
+        } else if (files.empty() && !fromArgs)
+            files.push_back("./default.nix");
 
-    foreach (Strings::iterator, i, files) {
-        Expr * e = fromArgs
-            ? state.parseExprFromString(*i, absPath("."))
-            : state.parseExprFromFile(resolveExprPath(lookupFileArg(state, *i)));
-        processExpr(state, attrPaths, parseOnly, strict, autoArgs,
-            evalOnly, outputKind, xmlOutputSourceLocation, e);
-    }
+        foreach (Strings::iterator, i, files) {
+            Expr * e = fromArgs
+                ? state.parseExprFromString(*i, absPath("."))
+                : state.parseExprFromFile(resolveExprPath(lookupFileArg(state, *i)));
+            processExpr(state, attrPaths, parseOnly, strict, autoArgs,
+                evalOnly, outputKind, xmlOutputSourceLocation, e);
+        }
 
-    state.printStats();
+        state.printStats();
+    });
 }
-
-
-string programId = "nix-instantiate";

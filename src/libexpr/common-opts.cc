@@ -6,40 +6,45 @@
 namespace nix {
 
 
-bool parseOptionArg(const string & arg, Strings::iterator & i,
-    const Strings::iterator & argsEnd, EvalState & state,
-    Bindings & autoArgs)
+bool parseAutoArgs(Strings::iterator & i,
+    const Strings::iterator & argsEnd, std::map<string, string> & res)
 {
+    string arg = *i;
     if (arg != "--arg" && arg != "--argstr") return false;
 
     UsageError error(format("`%1%' requires two arguments") % arg);
 
-    if (i == argsEnd) throw error;
-    string name = *i++;
-    if (i == argsEnd) throw error;
-    string value = *i++;
+    if (++i == argsEnd) throw error;
+    string name = *i;
+    if (++i == argsEnd) throw error;
+    string value = *i;
 
-    /* !!! check for duplicates! */
-    Value * v = state.allocValue();
-    autoArgs.push_back(Attr(state.symbols.create(name), v));
-
-    if (arg == "--arg")
-        state.mkThunk_(*v, state.parseExprFromString(value, absPath(".")));
-    else
-        mkString(*v, value);
-
-    autoArgs.sort(); // !!! inefficient
+    res[name] = (arg == "--arg" ? 'E' : 'S') + value;
 
     return true;
 }
 
 
-bool parseSearchPathArg(const string & arg, Strings::iterator & i,
+void evalAutoArgs(EvalState & state, std::map<string, string> & in, Bindings & out)
+{
+    for (auto & i: in) {
+        Value * v = state.allocValue();
+        if (i.second[0] == 'E')
+            state.mkThunk_(*v, state.parseExprFromString(string(i.second, 1), absPath(".")));
+        else
+            mkString(*v, string(i.second, 1));
+        out.push_back(Attr(state.symbols.create(i.first), v));
+    }
+    out.sort();
+}
+
+
+bool parseSearchPathArg(Strings::iterator & i,
     const Strings::iterator & argsEnd, Strings & searchPath)
 {
-    if (arg != "-I") return false;
-    if (i == argsEnd) throw UsageError(format("`%1%' requires an argument") % arg);;
-    searchPath.push_back(*i++);
+    if (*i != "-I") return false;
+    if (++i == argsEnd) throw UsageError("`-I' requires an argument");
+    searchPath.push_back(*i);
     return true;
 }
 

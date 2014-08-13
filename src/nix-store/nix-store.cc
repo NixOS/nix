@@ -29,12 +29,6 @@ using std::cout;
 typedef void (* Operation) (Strings opFlags, Strings opArgs);
 
 
-void printHelp()
-{
-    showManPage("nix-store");
-}
-
-
 static Path gcRoot;
 static int rootNr = 0;
 static bool indirectRoot = false;
@@ -782,7 +776,7 @@ static void opVerify(Strings opFlags, Strings opArgs)
 
     if (ensureLocalStore().verifyStore(checkContents, repair)) {
         printMsg(lvlError, "warning: not all errors were fixed");
-        exitCode = 1;
+        throw Exit(1);
     }
 }
 
@@ -793,6 +787,8 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
     if (!opFlags.empty())
         throw UsageError("no flags expected");
 
+    int status = 0;
+
     foreach (Strings::iterator, i, opArgs) {
         Path path = followLinksToStorePath(*i);
         printMsg(lvlTalkative, format("checking path `%1%'...") % path);
@@ -802,9 +798,11 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
             printMsg(lvlError,
                 format("path `%1%' was modified! expected hash `%2%', got `%3%'")
                 % path % printHash(info.hash) % printHash(current.first));
-            exitCode = 1;
+            status = 1;
         }
     }
+
+    throw Exit(status);
 }
 
 
@@ -1017,95 +1015,96 @@ static void opServe(Strings opFlags, Strings opArgs)
 /* Scan the arguments; find the operation, set global flags, put all
    other flags in a list, and put all other arguments in another
    list. */
-void run(Strings args)
+int main(int argc, char * * argv)
 {
-    Strings opFlags, opArgs;
-    Operation op = 0;
+    return handleExceptions(argv[0], [&]() {
+        initNix();
 
-    for (Strings::iterator i = args.begin(); i != args.end(); ) {
-        string arg = *i++;
+        Strings opFlags, opArgs;
+        Operation op = 0;
 
-        Operation oldOp = op;
+        parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
+            Operation oldOp = op;
 
-        if (arg == "--realise" || arg == "--realize" || arg == "-r")
-            op = opRealise;
-        else if (arg == "--add" || arg == "-A")
-            op = opAdd;
-        else if (arg == "--add-fixed")
-            op = opAddFixed;
-        else if (arg == "--print-fixed-path")
-            op = opPrintFixedPath;
-        else if (arg == "--delete")
-            op = opDelete;
-        else if (arg == "--query" || arg == "-q")
-            op = opQuery;
-        else if (arg == "--print-env")
-            op = opPrintEnv;
-        else if (arg == "--read-log" || arg == "-l")
-            op = opReadLog;
-        else if (arg == "--dump-db")
-            op = opDumpDB;
-        else if (arg == "--load-db")
-            op = opLoadDB;
-        else if (arg == "--register-validity")
-            op = opRegisterValidity;
-        else if (arg == "--check-validity")
-            op = opCheckValidity;
-        else if (arg == "--gc")
-            op = opGC;
-        else if (arg == "--dump")
-            op = opDump;
-        else if (arg == "--restore")
-            op = opRestore;
-        else if (arg == "--export")
-            op = opExport;
-        else if (arg == "--import")
-            op = opImport;
-        else if (arg == "--init")
-            op = opInit;
-        else if (arg == "--verify")
-            op = opVerify;
-        else if (arg == "--verify-path")
-            op = opVerifyPath;
-        else if (arg == "--repair-path")
-            op = opRepairPath;
-        else if (arg == "--optimise" || arg == "--optimize")
-            op = opOptimise;
-        else if (arg == "--query-failed-paths")
-            op = opQueryFailedPaths;
-        else if (arg == "--clear-failed-paths")
-            op = opClearFailedPaths;
-        else if (arg == "--add-root") {
-            if (i == args.end())
-                throw UsageError("`--add-root requires an argument");
-            gcRoot = absPath(*i++);
-        }
-        else if (arg == "--indirect")
-            indirectRoot = true;
-        else if (arg == "--no-output")
-            noOutput = true;
-        else if (arg == "--serve")
-            op = opServe;
-        else if (arg[0] == '-') {
-            opFlags.push_back(arg);
-            if (arg == "--max-freed" || arg == "--max-links" || arg == "--max-atime") { /* !!! hack */
-                if (i != args.end()) opFlags.push_back(*i++);
+            if (*arg == "--help")
+                showManPage("nix-store");
+            else if (*arg == "--version")
+                printVersion("nix-store");
+            else if (*arg == "--realise" || *arg == "--realize" || *arg == "-r")
+                op = opRealise;
+            else if (*arg == "--add" || *arg == "-A")
+                op = opAdd;
+            else if (*arg == "--add-fixed")
+                op = opAddFixed;
+            else if (*arg == "--print-fixed-path")
+                op = opPrintFixedPath;
+            else if (*arg == "--delete")
+                op = opDelete;
+            else if (*arg == "--query" || *arg == "-q")
+                op = opQuery;
+            else if (*arg == "--print-env")
+                op = opPrintEnv;
+            else if (*arg == "--read-log" || *arg == "-l")
+                op = opReadLog;
+            else if (*arg == "--dump-db")
+                op = opDumpDB;
+            else if (*arg == "--load-db")
+                op = opLoadDB;
+            else if (*arg == "--register-validity")
+                op = opRegisterValidity;
+            else if (*arg == "--check-validity")
+                op = opCheckValidity;
+            else if (*arg == "--gc")
+                op = opGC;
+            else if (*arg == "--dump")
+                op = opDump;
+            else if (*arg == "--restore")
+                op = opRestore;
+            else if (*arg == "--export")
+                op = opExport;
+            else if (*arg == "--import")
+                op = opImport;
+            else if (*arg == "--init")
+                op = opInit;
+            else if (*arg == "--verify")
+                op = opVerify;
+            else if (*arg == "--verify-path")
+                op = opVerifyPath;
+            else if (*arg == "--repair-path")
+                op = opRepairPath;
+            else if (*arg == "--optimise" || *arg == "--optimize")
+                op = opOptimise;
+            else if (*arg == "--query-failed-paths")
+                op = opQueryFailedPaths;
+            else if (*arg == "--clear-failed-paths")
+                op = opClearFailedPaths;
+            else if (*arg == "--add-root")
+                gcRoot = absPath(getArg(*arg, arg, end));
+            else if (*arg == "--indirect")
+                indirectRoot = true;
+            else if (*arg == "--no-output")
+                noOutput = true;
+            else if (*arg == "--serve")
+                op = opServe;
+            else if (*arg != "" && arg->at(0) == '-') {
+                opFlags.push_back(*arg);
+                if (*arg == "--max-freed" || *arg == "--max-links" || *arg == "--max-atime") /* !!! hack */
+                    opFlags.push_back(getArg(*arg, arg, end));
             }
-        }
-        else
-            opArgs.push_back(arg);
+            else
+                opArgs.push_back(*arg);
 
-        if (oldOp && oldOp != op)
-            throw UsageError("only one operation may be specified");
-    }
+            if (oldOp && oldOp != op)
+                throw UsageError("only one operation may be specified");
 
-    if (!op) throw UsageError("no operation specified");
+            return true;
+        });
 
-    if (op != opDump && op != opRestore) /* !!! hack */
-        store = openStore(op != opGC);
+        if (!op) throw UsageError("no operation specified");
 
-    op(opFlags, opArgs);
+        if (op != opDump && op != opRestore) /* !!! hack */
+            store = openStore(op != opGC);
+
+        op(opFlags, opArgs);
+    });
 }
-
-
-string programId = "nix-store";

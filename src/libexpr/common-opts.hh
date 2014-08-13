@@ -5,11 +5,12 @@
 namespace nix {
 
 /* Some common option parsing between nix-env and nix-instantiate. */
-bool parseOptionArg(const string & arg, Strings::iterator & i,
-    const Strings::iterator & argsEnd, EvalState & state,
-    Bindings & autoArgs);
+bool parseAutoArgs(Strings::iterator & i,
+    const Strings::iterator & argsEnd, std::map<string, string> & res);
 
-bool parseSearchPathArg(const string & arg, Strings::iterator & i,
+void evalAutoArgs(EvalState & state, std::map<string, string> & in, Bindings & out);
+
+bool parseSearchPathArg(Strings::iterator & i,
     const Strings::iterator & argsEnd, Strings & searchPath);
 
 Path lookupFileArg(EvalState & state, string s);

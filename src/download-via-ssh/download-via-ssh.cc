@@ -91,55 +91,49 @@ static void query(std::pair<FdSink, FdSource> & pipes)
 }
 
 
-void run(Strings args)
+int main(int argc, char * * argv)
 {
-    if (args.empty())
-        throw UsageError("download-via-ssh requires an argument");
+    return handleExceptions(argv[0], [&]() {
+        initNix();
 
-    if (settings.sshSubstituterHosts.empty())
-        return;
+        if (argc < 2)
+            throw UsageError("download-via-ssh requires an argument");
 
-    std::cout << std::endl;
+        if (settings.sshSubstituterHosts.empty())
+            return;
 
-    /* Pass on the location of the daemon client's SSH authentication
-       socket. */
-    string sshAuthSock = settings.get("ssh-auth-sock", "");
-    if (sshAuthSock != "") setenv("SSH_AUTH_SOCK", sshAuthSock.c_str(), 1);
+        std::cout << std::endl;
 
-    string host = settings.sshSubstituterHosts.front();
-    std::pair<FdSink, FdSource> pipes = connect(host);
+        /* Pass on the location of the daemon client's SSH
+           authentication socket. */
+        string sshAuthSock = settings.get("ssh-auth-sock", "");
+        if (sshAuthSock != "") setenv("SSH_AUTH_SOCK", sshAuthSock.c_str(), 1);
 
-    /* Exchange the greeting */
-    writeInt(SERVE_MAGIC_1, pipes.first);
-    pipes.first.flush();
-    unsigned int magic = readInt(pipes.second);
-    if (magic != SERVE_MAGIC_2)
-        throw Error("protocol mismatch");
-    readInt(pipes.second); // Server version, unused for now
-    writeInt(SERVE_PROTOCOL_VERSION, pipes.first);
-    pipes.first.flush();
+        string host = settings.sshSubstituterHosts.front();
+        std::pair<FdSink, FdSource> pipes = connect(host);
 
-    Strings::iterator i = args.begin();
-    if (*i == "--query")
-        query(pipes);
-    else if (*i == "--substitute")
-        if (args.size() != 3)
-            throw UsageError("download-via-ssh: --substitute takes exactly two arguments");
-        else {
-            Path storePath = *++i;
-            Path destPath = *++i;
+        /* Exchange the greeting */
+        writeInt(SERVE_MAGIC_1, pipes.first);
+        pipes.first.flush();
+        unsigned int magic = readInt(pipes.second);
+        if (magic != SERVE_MAGIC_2)
+            throw Error("protocol mismatch");
+        readInt(pipes.second); // Server version, unused for now
+        writeInt(SERVE_PROTOCOL_VERSION, pipes.first);
+        pipes.first.flush();
+
+        string arg = argv[1];
+        if (arg == "--query")
+            query(pipes);
+        else if (arg == "--substitute") {
+            if (argc != 4)
+                throw UsageError("download-via-ssh: --substitute takes exactly two arguments");
+            Path storePath = argv[2];
+            Path destPath = argv[3];
             printMsg(lvlError, format("downloading `%1%' via SSH from `%2%'...") % storePath % host);
             substitute(pipes, storePath, destPath);
         }
-    else
-        throw UsageError(format("download-via-ssh: unknown command `%1%'") % *i);
+        else
+            throw UsageError(format("download-via-ssh: unknown command `%1%'") % arg);
+    });
 }
-
-
-void printHelp()
-{
-    std::cerr << "Usage: download-via-ssh --query|--substitute store-path dest-path" << std::endl;
-}
-
-
-string programId = "download-via-ssh";
