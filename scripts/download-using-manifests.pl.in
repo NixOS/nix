@@ -6,7 +6,6 @@ use Nix::Manifest;
 use Nix::Store;
 use Nix::Utils;
 use POSIX qw(strftime);
-use File::Temp qw(tempdir);
 
 STDOUT->autoflush(1);
 
@@ -247,8 +246,7 @@ $fast = 0;
 
 
 # Create a temporary directory.
-my $tmpDir = tempdir("nix-download.XXXXXX", CLEANUP => 1, TMPDIR => 1)
-    or die "cannot create a temporary directory";
+my $tmpDir = mkTempDir("nix-download");
 
 my $tmpNar = "$tmpDir/nar";
 my $tmpNar2 = "$tmpDir/nar2";

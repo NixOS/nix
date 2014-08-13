@@ -4,7 +4,6 @@ use strict;
 use Nix::Config;
 use Nix::Store;
 use Nix::Utils;
-use File::Temp qw(tempdir);
 
 
 my $dryRun = 0;
@@ -25,8 +24,7 @@ my @envExclude = ();
 my $myName = $runEnv ? "nix-shell" : "nix-build";
 
 
-my $tmpDir = tempdir("$myName.XXXXXX", CLEANUP => 1, TMPDIR => 1)
-    or die "cannot create a temporary directory";
+my $tmpDir = mkTempDir($myName);
 
 my $outLink = "./result";
 my $drvLink = "$tmpDir/derivation";

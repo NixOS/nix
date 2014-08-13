@@ -2,7 +2,6 @@
 
 use strict;
 use File::Basename;
-use File::Temp qw(tempdir);
 use File::Path qw(mkpath);
 use File::stat;
 use File::Copy;
@@ -12,8 +11,7 @@ use Nix::Manifest;
 use Nix::Utils;
 use Nix::Crypto;
 
-my $tmpDir = tempdir("nix-push.XXXXXX", CLEANUP => 1, TMPDIR => 1)
-    or die "cannot create a temporary directory";
+my $tmpDir = mkTempDir("nix-push");
 
 my $nixExpr = "$tmpDir/create-nars.nix";
 

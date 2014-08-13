@@ -1,7 +1,9 @@
 package Nix::Utils;
 
+use File::Temp qw(tempdir);
+
 our @ISA = qw(Exporter);
-our @EXPORT = qw(checkURL uniq writeFile readFile);
+our @EXPORT = qw(checkURL uniq writeFile readFile mkTempDir);
 
 $urlRE = "(?: [a-zA-Z][a-zA-Z0-9\+\-\.]*\:[a-zA-Z0-9\%\/\?\:\@\&\=\+\$\,\-\_\.\!\~\*]+ )";
 
@@ -35,4 +37,10 @@ sub readFile {
     my $s = <TMP>;
     close TMP or die;
     return $s;
+}
+
+sub mkTempDir {
+    my ($name) = @_;
+    return tempdir("$name.XXXXXX", CLEANUP => 1, DIR => $ENV{"TMPDIR"} // $ENV{"XDG_RUNTIME_DIR"} // "/tmp")
+        or die "cannot create a temporary directory";
 }

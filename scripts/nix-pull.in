@@ -1,12 +1,8 @@
 #! @perl@ -w @perlFlags@
 
 use strict;
-use File::Temp qw(tempdir);
 use Nix::Config;
 use Nix::Manifest;
-
-my $tmpDir = tempdir("nix-pull.XXXXXX", CLEANUP => 1, TMPDIR => 1)
-    or die "cannot create a temporary directory";
 
 my $manifestDir = $Nix::Config::manifestDir;
 
