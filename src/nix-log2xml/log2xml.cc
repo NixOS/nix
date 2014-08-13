@@ -137,7 +137,7 @@ void Decoder::finishLine()
         if (line[i] == '<') cout << "&lt;";
         else if (line[i] == '&') cout << "&amp;";
         else if (line[i] == '\r') ; /* ignore carriage return */
-        else if (line[i] < 32 && line[i] != 9) cout << "&#xfffd;";
+        else if (line[i] >= 0 && line[i] < 32 && line[i] != 9) cout << "&#xfffd;";
         else if (i + sz + 33 < line.size() &&
             string(line, i, sz) == storeDir &&
             line[i + sz + 32] == '-')
