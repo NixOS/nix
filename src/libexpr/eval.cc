@@ -220,7 +220,7 @@ EvalState::EvalState(const Strings & _searchPath)
 
     /* Initialise the Nix expression search path. */
     Strings paths = tokenizeString<Strings>(getEnv("NIX_PATH", ""), ":");
-    for (auto & i : _searchPath) addToSearchPath(i);
+    for (auto & i : _searchPath) addToSearchPath(i, true);
     for (auto & i : paths) addToSearchPath(i);
     addToSearchPath("nix=" + settings.nixDataDir + "/nix/corepkgs");
 
