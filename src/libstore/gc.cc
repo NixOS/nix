@@ -115,7 +115,10 @@ Path addPermRoot(StoreAPI & store, const Path & _storePath,
                     % gcRoot % rootsDir);
         }
 
-        makeSymlink(gcRoot, storePath);
+        if (baseNameOf(gcRoot) == baseNameOf(storePath))
+            writeFile(gcRoot, "");
+        else
+            makeSymlink(gcRoot, storePath);
     }
 
     /* Check that the root can be found by the garbage collector.
