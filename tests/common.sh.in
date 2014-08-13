@@ -23,7 +23,6 @@ export PATH=@bindir@:$PATH
 export NIX_BUILD_HOOK=
 export dot=@dot@
 export xmllint="@xmllint@"
-export xsltproc="@xsltproc@"
 export SHELL="@bash@"
 
 export version=@PACKAGE_VERSION@
