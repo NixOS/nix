@@ -159,29 +159,28 @@ void parseCmdLine(int argc, char * * argv,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
 {
     /* Put the arguments in a vector. */
-    Strings args, remaining;
+    Strings args;
+    argc--; argv++;
     while (argc--) args.push_back(*argv++);
-    args.erase(args.begin());
-
-    /* Expand compound dash options (i.e., `-qlf' -> `-q -l -f'), and
-       ignore options for the ATerm library. */
-    for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
-        string arg = *i;
-        if (arg.length() > 2 && arg[0] == '-' && arg[1] != '-' && !isdigit(arg[1])) {
-            for (unsigned int j = 1; j < arg.length(); j++)
-                if (isalpha(arg[j]))
-                    remaining.push_back((string) "-" + arg[j]);
-                else     {
-                    remaining.push_back(string(arg, j));
-                    break;
-                }
-        } else remaining.push_back(arg);
-    }
-    args = remaining;
 
     /* Process default options. */
     for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
         string arg = *i;
+
+        /* Expand compound dash options (i.e., `-qlf' -> `-q -l -f'). */
+        if (arg.length() > 2 && arg[0] == '-' && arg[1] != '-' && isalpha(arg[1])) {
+            *i = (string) "-" + arg[1];
+            auto next = i; ++next;
+            for (unsigned int j = 2; j < arg.length(); j++)
+                if (isalpha(arg[j]))
+                    args.insert(next, (string) "-" + arg[j]);
+                else {
+                    args.insert(next, string(arg, j));
+                    break;
+                }
+            arg = *i;
+        }
+
         if (arg == "--verbose" || arg == "-v") verbosity = (Verbosity) (verbosity + 1);
         else if (arg == "--quiet") verbosity = verbosity > lvlError ? (Verbosity) (verbosity - 1) : lvlError;
         else if (arg == "--log-type") {
