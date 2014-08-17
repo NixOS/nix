@@ -258,13 +258,8 @@ writeInt($maxSilentTime, $to);
 writeInt($buildTimeout, $to);
 my $res = readInt($from);
 if ($res != 0) {
-    # Note that if we get exit code 100 from `nix-store -r', it
-    # denotes a permanent build failure (as opposed to an SSH problem
-    # or a temporary Nix problem).  We propagate this to the caller to
-    # allow it to distinguish between transient and permanent
-    # failures.
     my $msg = readString($from);
-    print STDERR "error: $msg (on `$hostName')\n";
+    print STDERR "error: $msg on `$hostName'\n";
     exit $res;
 }
 
