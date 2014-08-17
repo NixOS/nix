@@ -94,10 +94,12 @@ static void query(std::pair<FdSink, FdSource> & pipes)
 int main(int argc, char * * argv)
 {
     return handleExceptions(argv[0], [&]() {
-        initNix();
-
         if (argc < 2)
             throw UsageError("download-via-ssh requires an argument");
+
+        initNix();
+
+        settings.update();
 
         if (settings.sshSubstituterHosts.empty())
             return;
