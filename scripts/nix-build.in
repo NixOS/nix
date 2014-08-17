@@ -274,7 +274,7 @@ foreach my $expr (@exprs) {
     while (<OUTPATHS>) {chomp; push @outPaths, $_;}
     if (!close OUTPATHS) {
         die "nix-store killed by signal " . ($? & 127) . "\n" if ($? & 127);
-        exit 1;
+        exit $? >> 8 || 1;
     }
 
     next if $dryRun;
