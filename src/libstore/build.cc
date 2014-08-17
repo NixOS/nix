@@ -238,6 +238,9 @@ public:
        failure). */
     bool permanentFailure;
 
+    /* Set if at least one derivation had a timeout. */
+    bool timedOut;
+
     LocalStore & store;
 
     std::shared_ptr<HookInstance> hook;
@@ -1436,37 +1439,44 @@ void DerivationGoal::buildDone()
         outputLocks.unlock();
 
     } catch (BuildError & e) {
-        printMsg(lvlError, e.msg());
+        if (!hook)
+            printMsg(lvlError, e.msg());
         outputLocks.unlock();
         buildUser.release();
 
-        /* When using a build hook, the hook will return a remote
-           build failure using exit code 100.  Anything else is a hook
-           problem. */
-        bool hookError = hook &&
-            (!WIFEXITED(status) || WEXITSTATUS(status) != 100);
-
-        if (settings.printBuildTrace) {
-            if (hook && hookError)
-                printMsg(lvlError, format("@ hook-failed %1% - %2% %3%")
-                    % drvPath % status % e.msg());
-            else
-                printMsg(lvlError, format("@ build-failed %1% - %2% %3%")
-                    % drvPath % 1 % e.msg());
+        if (hook && WIFEXITED(status) && WEXITSTATUS(status) == 101) {
+            if (settings.printBuildTrace)
+                printMsg(lvlError, format("@ build-failed %1% - timeout") % drvPath);
+            worker.timedOut = true;
         }
 
-        /* Register the outputs of this build as "failed" so we won't
-           try to build them again (negative caching).  However, don't
-           do this for fixed-output derivations, since they're likely
-           to fail for transient reasons (e.g., fetchurl not being
-           able to access the network).  Hook errors (like
-           communication problems with the remote machine) shouldn't
-           be cached either. */
-        if (settings.cacheFailure && !hookError && !fixedOutput)
-            foreach (DerivationOutputs::iterator, i, drv.outputs)
-                worker.store.registerFailedPath(i->second.path);
+        else if (hook && (!WIFEXITED(status) || WEXITSTATUS(status) != 100)) {
+            if (settings.printBuildTrace)
+                printMsg(lvlError, format("@ hook-failed %1% - %2% %3%")
+                    % drvPath % status % e.msg());
+        }
 
-        worker.permanentFailure = !hookError && !fixedOutput && !diskFull;
+        else {
+            if (settings.printBuildTrace)
+                printMsg(lvlError, format("@ build-failed %1% - %2% %3%")
+                    % drvPath % 1 % e.msg());
+            worker.permanentFailure = !fixedOutput && !diskFull;
+
+            /* Register the outputs of this build as "failed" so we
+               won't try to build them again (negative caching).
+               However, don't do this for fixed-output derivations,
+               since they're likely to fail for transient reasons
+               (e.g., fetchurl not being able to access the network).
+               Hook errors (like communication problems with the
+               remote machine) shouldn't be cached either. */
+            if (/* settings.cacheFailure && */ !fixedOutput && !diskFull)
+            {
+                printMsg(lvlError, "REG");
+                foreach (DerivationOutputs::iterator, i, drv.outputs)
+                    worker.store.registerFailedPath(i->second.path);
+            }
+        }
+
         amDone(ecFailed);
         return;
     }
@@ -2909,6 +2919,7 @@ Worker::Worker(LocalStore & store)
     nrLocalBuilds = 0;
     lastWokenUp = 0;
     permanentFailure = false;
+    timedOut = false;
 }
 
 
@@ -3220,6 +3231,7 @@ void Worker::waitForInput()
                 format("%1% timed out after %2% seconds of silence")
                 % goal->getName() % settings.maxSilentTime);
             goal->cancel(true);
+            timedOut = true;
         }
 
         else if (goal->getExitCode() == Goal::ecBusy &&
@@ -3231,6 +3243,7 @@ void Worker::waitForInput()
                 format("%1% timed out after %2% seconds")
                 % goal->getName() % settings.buildTimeout);
             goal->cancel(true);
+            timedOut = true;
         }
     }
 
@@ -3247,7 +3260,7 @@ void Worker::waitForInput()
 
 unsigned int Worker::exitStatus()
 {
-    return permanentFailure ? 100 : 1;
+    return timedOut ? 101 : (permanentFailure ? 100 : 1);
 }
 
 
