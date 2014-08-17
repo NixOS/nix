@@ -1249,11 +1249,12 @@ static void opListGenerations(Globals & globals, Strings opFlags, Strings opArgs
     for (Generations::iterator i = gens.begin(); i != gens.end(); ++i) {
         tm t;
         if (!localtime_r(&i->creationTime, &t)) throw Error("cannot convert time");
-        cout << format("%|4|   %|4|-%|02|-%|02| %|02|:%|02|:%|02|   %||\n")
+        cout << format("%|4|   %|4|-%|02|-%|02| %|02|:%|02|:%|02|   %||   %s\n")
             % i->number
             % (t.tm_year + 1900) % (t.tm_mon + 1) % t.tm_mday
             % t.tm_hour % t.tm_min % t.tm_sec
-            % (i->number == curGen ? "(current)" : "");
+            % (i->number == curGen ? "(current)" : "         ")
+            % readLink(i->path);
     }
 }
 

@@ -1138,10 +1138,10 @@ generation.</para>
 
 <screen>
 $ nix-env --list-generations
-  95   2004-02-06 11:48:24
-  96   2004-02-06 11:49:01
-  97   2004-02-06 16:22:45
-  98   2004-02-06 16:24:33   (current)</screen>
+  42   2014-08-15 08:30:27               /nix/store/4fkx4zss4p6y6jwww8qblscf5bya9ga6-user-environment
+  43   2014-08-15 08:30:59               /nix/store/pbf9mxzcddj2fl6f1mjabdvwc82an3yf-user-environment
+  44   2014-08-15 08:33:00               /nix/store/swg3rl88avk9hp3bfk437frwm8c7nkyp-user-environment
+  45   2014-08-15 08:33:08   (current)   /nix/store/pbf9mxzcddj2fl6f1mjabdvwc82an3yf-user-environment</screen>
 
 </refsection>
 
