@@ -48,8 +48,8 @@ my $loadIncreased = 0;
 
 my ($localSystem, $maxSilentTime, $printBuildTrace, $buildTimeout) = @ARGV;
 
-my $currentLoad = $ENV{"NIX_CURRENT_LOAD"};
-my $conf = $ENV{"NIX_REMOTE_SYSTEMS"};
+my $currentLoad = $ENV{"NIX_CURRENT_LOAD"} // "/run/nix/current-load";
+my $conf = $ENV{"NIX_REMOTE_SYSTEMS"} // "@sysconfdir@/nix/machines";
 
 
 sub openSlotLock {
