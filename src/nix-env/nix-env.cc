@@ -1402,7 +1402,9 @@ int main(int argc, char * * argv)
                 repair = true;
             else if (*arg != "" && arg->at(0) == '-') {
                 opFlags.push_back(*arg);
-                if (*arg == "--from-profile" || *arg == "--atr" || *arg == "-A") /* !!! hack */
+                /* FIXME: hacky */
+                if (*arg == "--from-profile" ||
+                    (op == opQuery && (*arg == "--attr" || *arg == "-A")))
                     opFlags.push_back(getArg(*arg, arg, end));
             }
             else
