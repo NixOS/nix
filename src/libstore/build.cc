@@ -1469,12 +1469,9 @@ void DerivationGoal::buildDone()
                (e.g., fetchurl not being able to access the network).
                Hook errors (like communication problems with the
                remote machine) shouldn't be cached either. */
-            if (/* settings.cacheFailure && */ !fixedOutput && !diskFull)
-            {
-                printMsg(lvlError, "REG");
+            if (settings.cacheFailure && !fixedOutput && !diskFull)
                 foreach (DerivationOutputs::iterator, i, drv.outputs)
                     worker.store.registerFailedPath(i->second.path);
-            }
         }
 
         amDone(ecFailed);
