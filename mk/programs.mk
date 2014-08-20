@@ -12,6 +12,9 @@ programs-list :=
 #
 # - $(1)_CXXFLAGS: additional C++ compiler flags.
 #
+# - $(1)_ORDER_AFTER: a set of targets on which the object files of
+#   this program will have an order-only dependency.
+#
 # - $(1)_LIBS: the symbolic names of libraries on which this program
 #   depends.
 #
@@ -58,6 +61,13 @@ define build-program
 
   # Make each object file depend on the common dependencies.
   $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj): $$($(1)_COMMON_DEPS) $$(GLOBAL_COMMON_DEPS)))
+
+  # Make each object file have order-only dependencies on the common
+  # order-only dependencies. This includes the order-only dependencies
+  # of libraries we're depending on.
+  $(1)_ORDER_AFTER_CLOSED = $$($(1)_ORDER_AFTER) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_ORDER_AFTER_CLOSED))
+
+  $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj): | $$($(1)_ORDER_AFTER_CLOSED) $$(GLOBAL_ORDER_AFTER)))
 
   # Include .dep files, if they exist.
   $(1)_DEPS := $$(foreach fn, $$($(1)_OBJS), $$(call filename-to-dep, $$(fn)))

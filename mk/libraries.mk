@@ -21,6 +21,9 @@ endif
 #
 # - $(1)_CXXFLAGS: additional C++ compiler flags.
 #
+# - $(1)_ORDER_AFTER: a set of targets on which the object files of
+#   this libraries will have an order-only dependency.
+#
 # - $(1)_LIBS: the symbolic names of other libraries on which this
 #   library depends.
 #
@@ -89,6 +92,8 @@ define build-library
     $(1)_LDFLAGS_USE_INSTALLED += -L$$(DESTDIR)$$($(1)_INSTALL_DIR) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
     ifeq ($(SET_RPATH_TO_LIBS), 1)
       $(1)_LDFLAGS_USE_INSTALLED += -Wl,-rpath,$$($(1)_INSTALL_DIR)
+    else
+      $(1)_LDFLAGS_USE_INSTALLED += -Wl,-rpath-link,$$($(1)_INSTALL_DIR)
     endif
 
     ifdef $(1)_FORCE_INSTALL
@@ -117,6 +122,13 @@ define build-library
 
   # Make each object file depend on the common dependencies.
   $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj): $$($(1)_COMMON_DEPS) $$(GLOBAL_COMMON_DEPS)))
+
+  # Make each object file have order-only dependencies on the common
+  # order-only dependencies. This includes the order-only dependencies
+  # of libraries we're depending on.
+  $(1)_ORDER_AFTER_CLOSED = $$($(1)_ORDER_AFTER) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_ORDER_AFTER_CLOSED))
+
+  $$(foreach obj, $$($(1)_OBJS), $$(eval $$(obj): | $$($(1)_ORDER_AFTER_CLOSED) $$(GLOBAL_ORDER_AFTER)))
 
   # Include .dep files, if they exist.
   $(1)_DEPS := $$(foreach fn, $$($(1)_OBJS), $$(call filename-to-dep, $$(fn)))
