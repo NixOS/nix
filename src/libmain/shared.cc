@@ -305,13 +305,14 @@ RunPager::RunPager()
     pid = startProcess([&]() {
         if (dup2(toPager.readSide, STDIN_FILENO) == -1)
             throw SysError("dupping stdin");
+        if (!getenv("LESS"))
+            setenv("LESS", "FRSXMK", 1);
         execl("/bin/sh", "sh", "-c", pager.c_str(), NULL);
         throw SysError(format("executing ‘%1%’") % pager);
     });
 
     if (dup2(toPager.writeSide, STDOUT_FILENO) == -1)
         throw SysError("dupping stdout");
-
 }
 
 
