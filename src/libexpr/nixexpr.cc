@@ -143,7 +143,7 @@ std::ostream & operator << (std::ostream & str, const Pos & pos)
     if (!pos)
         str << "undefined position";
     else
-        str << (format("%1%:%2%:%3%") % pos.file % pos.line % pos.column).str();
+        str << (format(ANSI_BOLD "%1%" ANSI_NORMAL ":%2%:%3%") % pos.file % pos.line % pos.column).str();
     return str;
 }
 

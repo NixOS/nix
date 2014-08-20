@@ -247,6 +247,7 @@ void showManPage(const string & name)
 
 int handleExceptions(const string & programName, std::function<void()> fun)
 {
+    string error = ANSI_RED "error:" ANSI_NORMAL " ";
     try {
         try {
             fun();
@@ -263,21 +264,19 @@ int handleExceptions(const string & programName, std::function<void()> fun)
         return e.status;
     } catch (UsageError & e) {
         printMsg(lvlError,
-            format(
-                "error: %1%\n"
-                "Try `%2% --help' for more information.")
+            format(error + " %1%\nTry `%2% --help' for more information.")
             % e.what() % programName);
         return 1;
     } catch (BaseError & e) {
-        printMsg(lvlError, format("error: %1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
+        printMsg(lvlError, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
         if (e.prefix() != "" && !settings.showTrace)
             printMsg(lvlError, "(use `--show-trace' to show detailed location information)");
         return e.status;
     } catch (std::bad_alloc & e) {
-        printMsg(lvlError, "error: out of memory");
+        printMsg(lvlError, error + "out of memory");
         return 1;
     } catch (std::exception & e) {
-        printMsg(lvlError, format("error: %1%") % e.what());
+        printMsg(lvlError, error + e.what());
         return 1;
     }
 

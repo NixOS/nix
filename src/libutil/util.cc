@@ -453,6 +453,7 @@ void printMsg_(Verbosity level, const FormatOrString & fs)
     else if (logType == ltEscapes && level != lvlInfo)
         prefix = "\033[" + escVerbosity(level) + "s";
     string s = (format("%1%%2%\n") % prefix % fs.s).str();
+    if (!isatty(STDERR_FILENO)) s = filterANSIEscapes(s);
     writeToStderr(s);
 }
 
@@ -1103,6 +1104,40 @@ void ignoreException()
     } catch (std::exception & e) {
         printMsg(lvlError, format("error (ignored): %1%") % e.what());
     }
+}
+
+
+string filterANSIEscapes(const string & s, bool nixOnly)
+{
+    string t, r;
+    enum { stTop, stEscape, stCSI } state = stTop;
+    for (auto c : s) {
+        if (state == stTop) {
+            if (c == '\e') {
+                state = stEscape;
+                r = c;
+            } else
+                t += c;
+        } else if (state == stEscape) {
+            r += c;
+            if (c == '[')
+                state = stCSI;
+            else {
+                t += r;
+                state = stTop;
+            }
+        } else {
+            r += c;
+            if (c >= 0x40 && c != 0x7e) {
+                if (nixOnly && (c != 'p' && c != 'q' && c != 's' && c != 'a' && c != 'b'))
+                    t += r;
+                state = stTop;
+                r.clear();
+            }
+        }
+    }
+    t += r;
+    return t;
 }
 
 

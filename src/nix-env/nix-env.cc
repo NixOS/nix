@@ -847,13 +847,6 @@ static VersionDiff compareVersionAgainstSet(
 }
 
 
-static string colorString(const string & s)
-{
-    if (!isatty(STDOUT_FILENO)) return s;
-    return "\e[1;31m" + s + "\e[0m";
-}
-
-
 static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
 {
     JSONObject topObj(cout);
@@ -1056,7 +1049,8 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                     }
                 } else {
                     string column = (string) "" + ch + " " + version;
-                    if (diff == cvGreater) column = colorString(column);
+                    if (diff == cvGreater && isatty(STDOUT_FILENO))
+                        column = ANSI_RED + column + ANSI_NORMAL;
                     columns.push_back(column);
                 }
             }
