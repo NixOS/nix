@@ -48,7 +48,7 @@ static Path useDeriver(Path path)
     if (!isDerivation(path)) {
         path = store->queryDeriver(path);
         if (path == "")
-            throw Error(format("deriver of path `%1%' is not known") % path);
+            throw Error(format("deriver of path ‘%1%’ is not known") % path);
     }
     return path;
 }
@@ -72,7 +72,7 @@ static PathSet realisePath(Path path, bool build = true)
         foreach (StringSet::iterator, j, p.second) {
             DerivationOutputs::iterator i = drv.outputs.find(*j);
             if (i == drv.outputs.end())
-                throw Error(format("derivation `%1%' does not have an output named `%2%'") % p.first % *j);
+                throw Error(format("derivation ‘%1%’ does not have an output named ‘%2%’") % p.first % *j);
             Path outPath = i->second.path;
             if (gcRoot == "")
                 printGCWarning();
@@ -89,7 +89,7 @@ static PathSet realisePath(Path path, bool build = true)
 
     else {
         if (build) store->ensurePath(path);
-        else if (!store->isValidPath(path)) throw Error(format("path `%1%' does not exist and cannot be created") % path);
+        else if (!store->isValidPath(path)) throw Error(format("path ‘%1%’ does not exist and cannot be created") % path);
         if (gcRoot == "")
             printGCWarning();
         else {
@@ -115,7 +115,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
         else if (*i == "--repair") buildMode = bmRepair;
         else if (*i == "--check") buildMode = bmCheck;
         else if (*i == "--ignore-unknown") ignoreUnknown = true;
-        else throw UsageError(format("unknown flag `%1%'") % *i);
+        else throw UsageError(format("unknown flag ‘%1%’") % *i);
 
     Paths paths;
     foreach (Strings::iterator, i, opArgs) {
@@ -172,7 +172,7 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
         if (*i == "--recursive") recursive = true;
-        else throw UsageError(format("unknown flag `%1%'") % *i);
+        else throw UsageError(format("unknown flag ‘%1%’") % *i);
 
     if (opArgs.empty())
         throw UsageError("first argument must be hash algorithm");
@@ -193,10 +193,10 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
         if (*i == "--recursive") recursive = true;
-        else throw UsageError(format("unknown flag `%1%'") % *i);
+        else throw UsageError(format("unknown flag ‘%1%’") % *i);
 
     if (opArgs.size() != 3)
-        throw UsageError(format("`--print-fixed-path' requires three arguments"));
+        throw UsageError(format("‘--print-fixed-path’ requires three arguments"));
 
     Strings::iterator i = opArgs.begin();
     HashType hashAlgo = parseHashType(*i++);
@@ -297,7 +297,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (*i == "--use-output" || *i == "-u") useOutput = true;
         else if (*i == "--force-realise" || *i == "--force-realize" || *i == "-f") forceRealise = true;
         else if (*i == "--include-outputs") includeOutputs = true;
-        else throw UsageError(format("unknown flag `%1%'") % *i);
+        else throw UsageError(format("unknown flag ‘%1%’") % *i);
 
     switch (query) {
 
@@ -347,7 +347,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 Derivation drv = derivationFromPath(*store, path);
                 StringPairs::iterator j = drv.env.find(bindingName);
                 if (j == drv.env.end())
-                    throw Error(format("derivation `%1%' has no environment binding named `%2%'")
+                    throw Error(format("derivation ‘%1%’ has no environment binding named ‘%2%’")
                         % path % bindingName);
                 cout << format("%1%\n") % j->second;
             }
@@ -434,7 +434,7 @@ static string shellEscape(const string & s)
 static void opPrintEnv(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
-    if (opArgs.size() != 1) throw UsageError("`--print-env' requires one derivation store path");
+    if (opArgs.size() != 1) throw UsageError("‘--print-env’ requires one derivation store path");
 
     Path drvPath = opArgs.front();
     Derivation drv = derivationFromPath(*store, drvPath);
@@ -487,15 +487,15 @@ static void opReadLog(Strings opFlags, Strings opArgs)
                 AutoCloseFD fd = open(logBz2Path.c_str(), O_RDONLY);
                 FILE * f = 0;
                 if (fd == -1 || (f = fdopen(fd.borrow(), "r")) == 0)
-                    throw SysError(format("opening file `%1%'") % logBz2Path);
+                    throw SysError(format("opening file ‘%1%’") % logBz2Path);
                 int err;
                 BZFILE * bz = BZ2_bzReadOpen(&err, f, 0, 0, 0, 0);
-                if (!bz) throw Error(format("cannot open bzip2 file `%1%'") % logBz2Path);
+                if (!bz) throw Error(format("cannot open bzip2 file ‘%1%’") % logBz2Path);
                 unsigned char buf[128 * 1024];
                 do {
                     int n = BZ2_bzRead(&err, bz, buf, sizeof(buf));
                     if (err != BZ_OK && err != BZ_STREAM_END)
-                        throw Error(format("error reading bzip2 file `%1%'") % logBz2Path);
+                        throw Error(format("error reading bzip2 file ‘%1%’") % logBz2Path);
                     writeFull(STDOUT_FILENO, buf, n);
                 } while (err != BZ_STREAM_END);
                 BZ2_bzReadClose(&err, bz);
@@ -522,7 +522,7 @@ static void opReadLog(Strings opFlags, Strings opArgs)
             }
         }
 
-        if (!found) throw Error(format("build log of derivation `%1%' is not available") % path);
+        if (!found) throw Error(format("build log of derivation ‘%1%’ is not available") % path);
     }
 }
 
@@ -580,7 +580,7 @@ static void opRegisterValidity(Strings opFlags, Strings opArgs)
          i != opFlags.end(); ++i)
         if (*i == "--reregister") reregister = true;
         else if (*i == "--hash-given") hashGiven = true;
-        else throw UsageError(format("unknown flag `%1%'") % *i);
+        else throw UsageError(format("unknown flag ‘%1%’") % *i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
@@ -595,7 +595,7 @@ static void opCheckValidity(Strings opFlags, Strings opArgs)
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
         if (*i == "--print-invalid") printInvalid = true;
-        else throw UsageError(format("unknown flag `%1%'") % *i);
+        else throw UsageError(format("unknown flag ‘%1%’") % *i);
 
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); ++i)
@@ -605,7 +605,7 @@ static void opCheckValidity(Strings opFlags, Strings opArgs)
             if (printInvalid)
                 cout << format("%1%\n") % path;
             else
-                throw Error(format("path `%1%' is not valid") % path);
+                throw Error(format("path ‘%1%’ is not valid") % path);
         }
     }
 }
@@ -651,7 +651,7 @@ static void opGC(Strings opFlags, Strings opArgs)
             long long maxFreed = getIntArg<long long>(*i, i, opFlags.end(), true);
             options.maxFreed = maxFreed >= 0 ? maxFreed : 0;
         }
-        else throw UsageError(format("bad sub-operation `%1%' in GC") % *i);
+        else throw UsageError(format("bad sub-operation ‘%1%’ in GC") % *i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
@@ -682,7 +682,7 @@ static void opDelete(Strings opFlags, Strings opArgs)
 
     foreach (Strings::iterator, i, opFlags)
         if (*i == "--ignore-liveness") options.ignoreLiveness = true;
-        else throw UsageError(format("unknown flag `%1%'") % *i);
+        else throw UsageError(format("unknown flag ‘%1%’") % *i);
 
     foreach (Strings::iterator, i, opArgs)
         options.pathsToDelete.insert(followLinksToStorePath(*i));
@@ -724,7 +724,7 @@ static void opExport(Strings opFlags, Strings opArgs)
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
         if (*i == "--sign") sign = true;
-        else throw UsageError(format("unknown flag `%1%'") % *i);
+        else throw UsageError(format("unknown flag ‘%1%’") % *i);
 
     FdSink sink(STDOUT_FILENO);
     Paths sorted = topoSortPaths(*store, PathSet(opArgs.begin(), opArgs.end()));
@@ -738,7 +738,7 @@ static void opImport(Strings opFlags, Strings opArgs)
     bool requireSignature = false;
     foreach (Strings::iterator, i, opFlags)
         if (*i == "--require-signature") requireSignature = true;
-        else throw UsageError(format("unknown flag `%1%'") % *i);
+        else throw UsageError(format("unknown flag ‘%1%’") % *i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
@@ -774,7 +774,7 @@ static void opVerify(Strings opFlags, Strings opArgs)
          i != opFlags.end(); ++i)
         if (*i == "--check-contents") checkContents = true;
         else if (*i == "--repair") repair = true;
-        else throw UsageError(format("unknown flag `%1%'") % *i);
+        else throw UsageError(format("unknown flag ‘%1%’") % *i);
 
     if (ensureLocalStore().verifyStore(checkContents, repair)) {
         printMsg(lvlError, "warning: not all errors were fixed");
@@ -793,12 +793,12 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
 
     foreach (Strings::iterator, i, opArgs) {
         Path path = followLinksToStorePath(*i);
-        printMsg(lvlTalkative, format("checking path `%1%'...") % path);
+        printMsg(lvlTalkative, format("checking path ‘%1%’...") % path);
         ValidPathInfo info = store->queryPathInfo(path);
         HashResult current = hashPath(info.hash.type, path);
         if (current.first != info.hash) {
             printMsg(lvlError,
-                format("path `%1%' was modified! expected hash `%2%', got `%3%'")
+                format("path ‘%1%’ was modified! expected hash ‘%2%’, got ‘%3%’")
                 % path % printHash(info.hash) % printHash(current.first));
             status = 1;
         }
@@ -873,7 +873,7 @@ static void opServe(Strings opFlags, Strings opArgs)
     bool writeAllowed = false;
     foreach (Strings::iterator, i, opFlags)
         if (*i == "--write") writeAllowed = true;
-        else throw UsageError(format("unknown flag `%1%'") % *i);
+        else throw UsageError(format("unknown flag ‘%1%’") % *i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 

@@ -32,7 +32,7 @@ my %channels;
 # Reads the list of channels.
 sub readChannels {
     return if (!-f $channelsList);
-    open CHANNELS, "<$channelsList" or die "cannot open `$channelsList': $!";
+    open CHANNELS, "<$channelsList" or die "cannot open ‘$channelsList’: $!";
     while (<CHANNELS>) {
         chomp;
         next if /^\s*\#/;
@@ -47,7 +47,7 @@ sub readChannels {
 
 # Writes the list of channels.
 sub writeChannels {
-    open CHANNELS, ">$channelsList" or die "cannot open `$channelsList': $!";
+    open CHANNELS, ">$channelsList" or die "cannot open ‘$channelsList’: $!";
     foreach my $name (keys %channels) {
         print CHANNELS "$channels{$name} $name\n";
     }
@@ -74,7 +74,7 @@ sub removeChannel {
     writeChannels;
 
     system("$Nix::Config::binDir/nix-env --profile '$profile' -e '$name'") == 0
-        or die "cannot remove channel `$name'\n";
+        or die "cannot remove channel ‘$name’\n";
 }
 
 
@@ -97,7 +97,7 @@ sub update {
         # consistency if the redirection is changed between
         # downloading the manifest and the tarball.
         my $headers = `$Nix::Config::curl --silent --head '$url'`;
-        die "$0: unable to check `$url'\n" if $? != 0;
+        die "$0: unable to check ‘$url’\n" if $? != 0;
         $headers =~ s/\r//g;
         $url = $1 if $headers =~ /^Location:\s*(.*)\s*$/m;
 
@@ -115,19 +115,19 @@ sub update {
         if ($getManifest) {
             # No binary cache, so pull the channel manifest.
             mkdir $manifestDir, 0755 unless -e $manifestDir;
-            die "$0: you do not have write permission to `$manifestDir'!\n" unless -W $manifestDir;
+            die "$0: you do not have write permission to ‘$manifestDir’!\n" unless -W $manifestDir;
             $ENV{'NIX_ORIG_URL'} = $origUrl;
             system("$Nix::Config::binDir/nix-pull", "--skip-wrong-store", "$url/MANIFEST") == 0
-                or die "cannot pull manifest from `$url'\n";
+                or die "cannot pull manifest from ‘$url’\n";
         }
 
         # Download the channel tarball.
         my $fullURL = "$url/nixexprs.tar.xz";
         system("$Nix::Config::curl --fail --silent --head '$fullURL' > /dev/null") == 0 or
             $fullURL = "$url/nixexprs.tar.bz2";
-        print STDERR "downloading Nix expressions from `$fullURL'...\n";
+        print STDERR "downloading Nix expressions from ‘$fullURL’...\n";
         my ($hash, $path) = `PRINT_PATH=1 QUIET=1 $Nix::Config::binDir/nix-prefetch-url '$fullURL'`;
-        die "cannot fetch `$fullURL'\n" if $? != 0;
+        die "cannot fetch ‘$fullURL’\n" if $? != 0;
         chomp $path;
 
         # If the URL contains a version number, append it to the name
@@ -148,10 +148,10 @@ sub update {
 
     # Make the channels appear in nix-env.
     unlink $nixDefExpr if -l $nixDefExpr; # old-skool ~/.nix-defexpr
-    mkdir $nixDefExpr or die "cannot create directory `$nixDefExpr'" if !-e $nixDefExpr;
+    mkdir $nixDefExpr or die "cannot create directory ‘$nixDefExpr’" if !-e $nixDefExpr;
     my $channelLink = "$nixDefExpr/channels";
     unlink $channelLink; # !!! not atomic
-    symlink($profile, $channelLink) or die "cannot symlink `$channelLink' to `$profile'";
+    symlink($profile, $channelLink) or die "cannot symlink ‘$channelLink’ to ‘$profile’";
 }
 
 
@@ -162,7 +162,7 @@ while (scalar @ARGV) {
     my $arg = shift @ARGV;
 
     if ($arg eq "--add") {
-        die "$0: `--add' requires one or two arguments\n" if scalar @ARGV < 1 || scalar @ARGV > 2;
+        die "$0: ‘--add’ requires one or two arguments\n" if scalar @ARGV < 1 || scalar @ARGV > 2;
         my $url = shift @ARGV;
         my $name = shift @ARGV;
         unless (defined $name) {
@@ -175,13 +175,13 @@ while (scalar @ARGV) {
     }
 
     if ($arg eq "--remove") {
-        die "$0: `--remove' requires one argument\n" if scalar @ARGV != 1;
+        die "$0: ‘--remove’ requires one argument\n" if scalar @ARGV != 1;
         removeChannel(shift @ARGV);
         last;
     }
 
     if ($arg eq "--list") {
-        die "$0: `--list' requires one argument\n" if scalar @ARGV != 0;
+        die "$0: ‘--list’ requires one argument\n" if scalar @ARGV != 0;
         readChannels;
         foreach my $name (keys %channels) {
             print "$name $channels{$name}\n";
@@ -204,6 +204,6 @@ while (scalar @ARGV) {
     }
 
     else {
-        die "unknown argument `$arg'; try `--help'\n";
+        die "unknown argument ‘$arg’; try ‘--help’\n";
     }
 }

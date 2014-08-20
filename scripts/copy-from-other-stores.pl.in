@@ -1,5 +1,6 @@
 #! @perl@ -w @perlFlags@
 
+use utf8;
 use strict;
 use File::Basename;
 use IO::Handle;
@@ -57,16 +58,16 @@ if ($ARGV[0] eq "--query") {
                 $ENV{"NIX_DB_DIR"} = "$store/var/nix/db";
 
                 my $deriver = `$binDir/nix-store --query --deriver $storePath`;
-                die "cannot query deriver of `$storePath'" if $? != 0;
+                die "cannot query deriver of ‘$storePath’" if $? != 0;
                 chomp $deriver;
                 $deriver = "" if $deriver eq "unknown-deriver";
 
                 my @references = split "\n",
                     `$binDir/nix-store --query --references $storePath`;
-                die "cannot query references of `$storePath'" if $? != 0;
+                die "cannot query references of ‘$storePath’" if $? != 0;
 
                 my $narSize = `$binDir/nix-store --query --size $storePath`;
-                die "cannot query size of `$storePath'" if $? != 0;
+                die "cannot query size of ‘$storePath’" if $? != 0;
                 chomp $narSize;
 
                 print "$storePath\n";
@@ -80,7 +81,7 @@ if ($ARGV[0] eq "--query") {
             print "\n";
         }
 
-        else { die "unknown command `$cmd'"; }
+        else { die "unknown command ‘$cmd’"; }
     }
 }
 
@@ -91,9 +92,9 @@ elsif ($ARGV[0] eq "--substitute") {
     my $destPath = $ARGV[2];
     my ($store, $sourcePath) = findStorePath $storePath;
     die unless $store;
-    print STDERR "\n*** Copying `$storePath' from `$sourcePath'\n\n";
+    print STDERR "\n*** Copying ‘$storePath’ from ‘$sourcePath’\n\n";
     system("$binDir/nix-store --dump $sourcePath | $binDir/nix-store --restore $destPath") == 0
-        or die "cannot copy `$sourcePath' to `$storePath'";
+        or die "cannot copy ‘$sourcePath’ to ‘$storePath’";
     print "\n"; # no hash to verify
 }
 

@@ -31,7 +31,7 @@ int main(int argc, char * * argv)
                 string s = getArg(*arg, arg, end);
                 ht = parseHashType(s);
                 if (ht == htUnknown)
-                    throw UsageError(format("unknown hash type `%1%'") % s);
+                    throw UsageError(format("unknown hash type ‘%1%’") % s);
             }
             else if (*arg == "--to-base16") op = opTo16;
             else if (*arg == "--to-base32") op = opTo32;

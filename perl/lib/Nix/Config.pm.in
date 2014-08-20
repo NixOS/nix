@@ -31,7 +31,7 @@ sub readConfig {
     my $config = "$confDir/nix.conf";
     return unless -f $config;
 
-    open CONFIG, "<$config" or die "cannot open `$config'";
+    open CONFIG, "<$config" or die "cannot open ‘$config’";
     while (<CONFIG>) {
         /^\s*([\w\-\.]+)\s*=\s*(.*)$/ or next;
         $config{$1} = $2;

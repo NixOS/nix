@@ -55,7 +55,7 @@ void RemoteStore::openConnection(bool reserveSpace)
            us. */
         connectToDaemon();
     else
-        throw Error(format("invalid setting for NIX_REMOTE, `%1%'") % remoteMode);
+        throw Error(format("invalid setting for NIX_REMOTE, ‘%1%’") % remoteMode);
 
     from.fd = fdSocket;
     to.fd = fdSocket;
@@ -116,12 +116,12 @@ void RemoteStore::connectToDaemon()
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
     if (socketPathRel.size() >= sizeof(addr.sun_path))
-        throw Error(format("socket path `%1%' is too long") % socketPathRel);
+        throw Error(format("socket path ‘%1%’ is too long") % socketPathRel);
     using namespace std;
     strcpy(addr.sun_path, socketPathRel.c_str());
 
     if (connect(fdSocket, (struct sockaddr *) &addr, sizeof(addr)) == -1)
-        throw SysError(format("cannot connect to daemon at `%1%'") % socketPath);
+        throw SysError(format("cannot connect to daemon at ‘%1%’") % socketPath);
 
     if (fchdir(fdPrevDir) == -1)
         throw SysError("couldn't change back to previous directory");

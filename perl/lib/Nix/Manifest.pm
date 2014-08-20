@@ -1,5 +1,6 @@
 package Nix::Manifest;
 
+use utf8;
 use strict;
 use DBI;
 use DBD::SQLite;
@@ -58,10 +59,10 @@ sub readManifest_ {
     # Decompress the manifest if necessary.
     if ($manifest =~ /\.bz2$/) {
         open MANIFEST, "$Nix::Config::bzip2 -d < $manifest |"
-            or die "cannot decompress `$manifest': $!";
+            or die "cannot decompress ‘$manifest’: $!";
     } else {
         open MANIFEST, "<$manifest"
-            or die "cannot open `$manifest': $!";
+            or die "cannot open ‘$manifest’: $!";
     }
 
     my $inside = 0;
@@ -239,7 +240,7 @@ sub updateManifestDB {
 
     # Open/create the database.
     our $dbh = DBI->connect("dbi:SQLite:dbname=$dbPath", "", "")
-        or die "cannot open database `$dbPath'";
+        or die "cannot open database ‘$dbPath’";
     $dbh->{RaiseError} = 1;
     $dbh->{PrintError} = 0;
 
@@ -354,10 +355,10 @@ EOF
         my $version = readManifest_($manifest, \&addNARToDB, \&addPatchToDB);
 
         if ($version < 3) {
-            die "you have an old-style or corrupt manifest `$manifestLink'; please delete it\n";
+            die "you have an old-style or corrupt manifest ‘$manifestLink’; please delete it\n";
         }
         if ($version >= 10) {
-            die "manifest `$manifestLink' is too new; please delete it or upgrade Nix\n";
+            die "manifest ‘$manifestLink’ is too new; please delete it or upgrade Nix\n";
         }
     }
 
@@ -434,27 +435,27 @@ sub parseNARInfo {
 
     if ($requireValidSig) {
         if (!defined $sig) {
-            warn "NAR info file `$location' lacks a signature; ignoring\n";
+            warn "NAR info file ‘$location’ lacks a signature; ignoring\n";
             return undef;
         }
         my ($sigVersion, $keyName, $sig64) = split ";", $sig;
         $sigVersion //= 0;
         if ($sigVersion != 1) {
-            warn "NAR info file `$location' has unsupported version $sigVersion; ignoring\n";
+            warn "NAR info file ‘$location’ has unsupported version $sigVersion; ignoring\n";
             return undef;
         }
         return undef unless defined $keyName && defined $sig64;
         my $publicKeyFile = $Nix::Config::config{"binary-cache-public-key-$keyName"};
         if (!defined $publicKeyFile) {
-            warn "NAR info file `$location' is signed by unknown key `$keyName'; ignoring\n";
+            warn "NAR info file ‘$location’ is signed by unknown key ‘$keyName’; ignoring\n";
             return undef;
         }
         if (! -f $publicKeyFile) {
-            die "binary cache public key file `$publicKeyFile' does not exist\n";
+            die "binary cache public key file ‘$publicKeyFile’ does not exist\n";
             return undef;
         }
         if (!isValidSignature($publicKeyFile, $sig64, $signedData)) {
-            warn "NAR info file `$location' has an invalid signature; ignoring\n";
+            warn "NAR info file ‘$location’ has an invalid signature; ignoring\n";
             return undef;
         }
         $res->{signedBy} = $keyName;

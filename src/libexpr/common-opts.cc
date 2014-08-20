@@ -12,7 +12,7 @@ bool parseAutoArgs(Strings::iterator & i,
     string arg = *i;
     if (arg != "--arg" && arg != "--argstr") return false;
 
-    UsageError error(format("`%1%' requires two arguments") % arg);
+    UsageError error(format("‘%1%’ requires two arguments") % arg);
 
     if (++i == argsEnd) throw error;
     string name = *i;
@@ -43,7 +43,7 @@ bool parseSearchPathArg(Strings::iterator & i,
     const Strings::iterator & argsEnd, Strings & searchPath)
 {
     if (*i != "-I") return false;
-    if (++i == argsEnd) throw UsageError("`-I' requires an argument");
+    if (++i == argsEnd) throw UsageError("‘-I’ requires an argument");
     searchPath.push_back(*i);
     return true;
 }

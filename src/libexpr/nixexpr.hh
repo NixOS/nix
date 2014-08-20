@@ -224,7 +224,7 @@ struct ExprLambda : Expr
         : pos(pos), arg(arg), matchAttrs(matchAttrs), formals(formals), body(body)
     {
         if (!arg.empty() && formals && formals->argNames.find(arg) != formals->argNames.end())
-            throw ParseError(format("duplicate formal function argument `%1%' at %2%")
+            throw ParseError(format("duplicate formal function argument ‘%1%’ at %2%")
                 % arg % pos);
     };
     void setName(Symbol & name);

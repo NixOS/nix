@@ -38,7 +38,7 @@ while (@ARGV) {
         $sign = 1;
     }
     elsif ($arg eq "--gzip" || $arg eq "--bzip2" || $arg eq "--xz") {
-        warn "$0: `$arg' is not implemented\n" if $arg ne "--gzip";
+        warn "$0: ‘$arg’ is not implemented\n" if $arg ne "--gzip";
         push @globalSshOpts, "-C";
     }
     elsif ($arg eq "--from") {
@@ -51,7 +51,7 @@ while (@ARGV) {
         $includeOutputs = 1;
     }
     elsif ($arg eq "--show-progress") {
-        warn "$0: `$arg' is not implemented\n";
+        warn "$0: ‘$arg’ is not implemented\n";
     }
     elsif ($arg eq "--dry-run") {
         $dryRun = 1;

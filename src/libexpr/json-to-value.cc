@@ -65,7 +65,7 @@ static void parseJSON(EvalState & state, const char * & s, Value & v)
             values.push_back(v2);
             skipWhitespace(s);
             if (*s == ']') break;
-            if (*s != ',') throw JSONParseError("expected `,' or `]' after JSON array element");
+            if (*s != ',') throw JSONParseError("expected ‘,’ or ‘]’ after JSON array element");
             s++;
         }
         s++;
@@ -82,14 +82,14 @@ static void parseJSON(EvalState & state, const char * & s, Value & v)
             if (v.attrs->empty() && *s == '}') break;
             string name = parseJSONString(s);
             skipWhitespace(s);
-            if (*s != ':') throw JSONParseError("expected `:' in JSON object");
+            if (*s != ':') throw JSONParseError("expected ‘:’ in JSON object");
             s++;
             Value * v2 = state.allocValue();
             parseJSON(state, s, *v2);
             v.attrs->push_back(Attr(state.symbols.create(name), v2));
             skipWhitespace(s);
             if (*s == '}') break;
-            if (*s != ',') throw JSONParseError("expected `,' or `}' after JSON member");
+            if (*s != ',') throw JSONParseError("expected ‘,’ or ‘}’ after JSON member");
             s++;
         }
         v.attrs->sort();

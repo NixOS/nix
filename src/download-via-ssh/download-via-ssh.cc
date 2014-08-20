@@ -85,7 +85,7 @@ static void query(std::pair<FdSink, FdSource> & pipes)
                 std::cout << readLongLong(pipes.second) << std::endl;
             }
         } else
-            throw Error(format("unknown substituter query `%1%'") % cmd);
+            throw Error(format("unknown substituter query ‘%1%’") % cmd);
         std::cout << std::endl;
     }
 }
@@ -132,10 +132,10 @@ int main(int argc, char * * argv)
                 throw UsageError("download-via-ssh: --substitute takes exactly two arguments");
             Path storePath = argv[2];
             Path destPath = argv[3];
-            printMsg(lvlError, format("downloading `%1%' via SSH from `%2%'...") % storePath % host);
+            printMsg(lvlError, format("downloading ‘%1%’ via SSH from ‘%2%’...") % storePath % host);
             substitute(pipes, storePath, destPath);
         }
         else
-            throw UsageError(format("download-via-ssh: unknown command `%1%'") % arg);
+            throw UsageError(format("download-via-ssh: unknown command ‘%1%’") % arg);
     });
 }

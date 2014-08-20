@@ -77,7 +77,7 @@ void printClosure(const Path & nePath, const StoreExpr & fs)
 
 	    ClosureElems::const_iterator elem = fs.closure.elems.find(path);
 	    if (elem == fs.closure.elems.end())
-		throw Error(format("bad closure, missing path `%1%'") % path);
+		throw Error(format("bad closure, missing path ‘%1%’") % path);
 
 	    for (StringSet::const_iterator i = elem->second.refs.begin();
 		 i != elem->second.refs.end(); ++i)

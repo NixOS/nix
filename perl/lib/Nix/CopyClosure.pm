@@ -1,5 +1,6 @@
 package Nix::CopyClosure;
 
+use utf8;
 use strict;
 use Nix::Config;
 use Nix::Store;
@@ -41,7 +42,7 @@ sub copyToOpen {
     # Send the "import paths" command.
     syswrite($to, pack("L<x4", 4)) or die;
     exportPaths(fileno($to), $sign, @missing);
-    readInt($from) == 1 or die "remote machine \`$sshHost' failed to import closure\n";
+    readInt($from) == 1 or die "remote machine ‘$sshHost’ failed to import closure\n";
 }
 
 
@@ -105,7 +106,7 @@ sub oldCopyTo {
         unless ($dryRun) {
             open SSH, "| ssh $sshHost @{$sshOpts} @globalSshOpts 'nix-store --import' > /dev/null" or die;
             exportPaths(fileno(SSH), $sign, @missing);
-            close SSH or die "copying store paths to remote machine `$sshHost' failed: $?";
+            close SSH or die "copying store paths to remote machine ‘$sshHost’ failed: $?";
         }
     }
 }

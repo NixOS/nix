@@ -55,37 +55,37 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
 
     elsif ($arg eq "--drv-link") {
         $n++;
-        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
         $drvLink = $ARGV[$n];
     }
 
     elsif ($arg eq "--out-link" || $arg eq "-o") {
         $n++;
-        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
         $outLink = $ARGV[$n];
     }
 
     elsif ($arg eq "--attr" || $arg eq "-A" || $arg eq "-I") {
         $n++;
-        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
         push @instArgs, ($arg, $ARGV[$n]);
     }
 
     elsif ($arg eq "--arg" || $arg eq "--argstr") {
-        die "$0: `$arg' requires two arguments\n" unless $n + 2 < scalar @ARGV;
+        die "$0: ‘$arg’ requires two arguments\n" unless $n + 2 < scalar @ARGV;
         push @instArgs, ($arg, $ARGV[$n + 1], $ARGV[$n + 2]);
         $n += 2;
     }
 
     elsif ($arg eq "--log-type") {
         $n++;
-        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
         push @instArgs, ($arg, $ARGV[$n]);
         push @buildArgs, ($arg, $ARGV[$n]);
     }
 
     elsif ($arg eq "--option") {
-        die "$0: `$arg' requires two arguments\n" unless $n + 2 < scalar @ARGV;
+        die "$0: ‘$arg’ requires two arguments\n" unless $n + 2 < scalar @ARGV;
         push @instArgs, ($arg, $ARGV[$n + 1], $ARGV[$n + 2]);
         push @buildArgs, ($arg, $ARGV[$n + 1], $ARGV[$n + 2]);
         $n += 2;
@@ -93,7 +93,7 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
 
     elsif ($arg eq "--max-jobs" || $arg eq "-j" || $arg eq "--max-silent-time" || $arg eq "--log-type" || $arg eq "--cores" || $arg eq "--timeout" || $arg eq '--add-root') {
         $n++;
-        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
         push @buildArgs, ($arg, $ARGV[$n]);
     }
 
@@ -131,13 +131,13 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
 
     elsif ($arg eq "--command") {
         $n++;
-        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
         $envCommand = "$ARGV[$n]\nexit $!";
     }
 
     elsif ($arg eq "--exclude") {
         $n++;
-        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
         push @envExclude, $ARGV[$n];
     }
 
@@ -195,7 +195,7 @@ foreach my $expr (@exprs) {
         die "$0: a single derivation is required\n" if scalar @drvPaths != 1;
         my $drvPath = $drvPaths[0];
         $drvPath = (split '!',$drvPath)[0];
-        $drvPath = readlink $drvPath or die "cannot read symlink `$drvPath'" if -l $drvPath;
+        $drvPath = readlink $drvPath or die "cannot read symlink ‘$drvPath’" if -l $drvPath;
         my $drv = derivationFromPath($drvPath);
 
         # Build or fetch all dependencies of the derivation.
@@ -257,7 +257,7 @@ foreach my $expr (@exprs) {
         } else {
             $p = $drvPath;
         }
-        my $target = readlink $p or die "cannot read symlink `$p'";
+        my $target = readlink $p or die "cannot read symlink ‘$p’";
         print STDERR "derivation is $target\n" if $verbose;
         if ($target eq $prevDrvPath) {
             push @drvPaths2, (pop @drvPaths2) . "," . $output;
@@ -280,7 +280,7 @@ foreach my $expr (@exprs) {
     next if $dryRun;
 
     foreach my $outPath (@outPaths) {
-        my $target = readlink $outPath or die "cannot read symlink `$outPath'";
+        my $target = readlink $outPath or die "cannot read symlink ‘$outPath’";
         print "$target\n";
     }
 }

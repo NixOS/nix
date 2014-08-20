@@ -259,7 +259,7 @@ static void getDerivations(EvalState & state, Value & vIn,
             attrs.insert(std::pair<string, Symbol>(i->name, i->name));
 
         foreach (SortedSymbols::iterator, i, attrs) {
-            startNest(nest, lvlDebug, format("evaluating attribute `%1%'") % i->first);
+            startNest(nest, lvlDebug, format("evaluating attribute ‘%1%’") % i->first);
             string pathPrefix2 = addToPath(pathPrefix, i->first);
             Value & v2(*v.attrs->find(i->second)->value);
             if (combineChannels)

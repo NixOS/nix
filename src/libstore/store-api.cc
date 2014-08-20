@@ -32,14 +32,14 @@ bool isStorePath(const Path & path)
 void assertStorePath(const Path & path)
 {
     if (!isStorePath(path))
-        throw Error(format("path `%1%' is not in the Nix store") % path);
+        throw Error(format("path ‘%1%’ is not in the Nix store") % path);
 }
 
 
 Path toStorePath(const Path & path)
 {
     if (!isInStore(path))
-        throw Error(format("path `%1%' is not in the Nix store") % path);
+        throw Error(format("path ‘%1%’ is not in the Nix store") % path);
     Path::size_type slash = path.find('/', settings.nixStore.size() + 1);
     if (slash == Path::npos)
         return path;
@@ -57,7 +57,7 @@ Path followLinksToStore(const Path & _path)
         path = absPath(target, dirOf(path));
     }
     if (!isInStore(path))
-        throw Error(format("path `%1%' is not in the Nix store") % path);
+        throw Error(format("path ‘%1%’ is not in the Nix store") % path);
     return path;
 }
 
@@ -81,14 +81,14 @@ void checkStoreName(const string & name)
     /* Disallow names starting with a dot for possible security
        reasons (e.g., "." and ".."). */
     if (string(name, 0, 1) == ".")
-        throw Error(format("illegal name: `%1%'") % name);
+        throw Error(format("illegal name: ‘%1%’") % name);
     foreach (string::const_iterator, i, name)
         if (!((*i >= 'A' && *i <= 'Z') ||
               (*i >= 'a' && *i <= 'z') ||
               (*i >= '0' && *i <= '9') ||
               validChars.find(*i) != string::npos))
         {
-            throw Error(format("invalid character `%1%' in name `%2%'")
+            throw Error(format("invalid character ‘%1%’ in name ‘%2%’")
                 % *i % name);
         }
 }
@@ -288,7 +288,7 @@ string showPaths(const PathSet & paths)
     string s;
     foreach (PathSet::const_iterator, i, paths) {
         if (s.size() != 0) s += ", ";
-        s += "`" + *i + "'";
+        s += "‘" + *i + "’";
     }
     return s;
 }

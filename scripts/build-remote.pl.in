@@ -202,7 +202,7 @@ REQ: while (1) {
         };
         last REQ unless $@;
         print STDERR "$@";
-        warn "unable to open SSH connection to `$hostName', trying other available machines...\n";
+        warn "unable to open SSH connection to ‘$hostName’, trying other available machines...\n";
         $from = undef;
         $to = undef;
         $machine->{enabled} = 0;
@@ -251,7 +251,7 @@ close UPLOADLOCK;
 
 
 # Perform the build.
-print STDERR "building `$drvPath' on `$hostName'\n";
+print STDERR "building ‘$drvPath’ on ‘$hostName’\n";
 writeInt(6, $to) or die; # == cmdBuildPaths
 writeStrings([$drvPath], $to);
 writeInt($maxSilentTime, $to);
@@ -259,7 +259,7 @@ writeInt($buildTimeout, $to);
 my $res = readInt($from);
 if ($res != 0) {
     my $msg = readString($from);
-    print STDERR "error: $msg on `$hostName'\n";
+    print STDERR "error: $msg on ‘$hostName’\n";
     exit $res;
 }
 

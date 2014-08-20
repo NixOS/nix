@@ -63,7 +63,7 @@ Path findOutput(const Derivation & drv, string id)
 {
     foreach (DerivationOutputs::const_iterator, i, drv.outputs)
         if (i->first == id) return i->second.path;
-    throw Error(format("derivation has no output `%1%'") % id);
+    throw Error(format("derivation has no output ‘%1%’") % id);
 }
 
 
@@ -186,7 +186,7 @@ static void dfsVisit(StoreAPI & store, const PathSet & paths,
     PathSet & parents)
 {
     if (parents.find(path) != parents.end())
-        throw BuildError(format("cycle detected in the references of `%1%'") % path);
+        throw BuildError(format("cycle detected in the references of ‘%1%’") % path);
 
     if (visited.find(path) != visited.end()) return;
     visited.insert(path);

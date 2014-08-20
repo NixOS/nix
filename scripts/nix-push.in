@@ -41,33 +41,33 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
         $force = 1;
     } elsif ($arg eq "--dest") {
         $n++;
-        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
         $destDir = $ARGV[$n];
         mkpath($destDir, 0, 0755);
     } elsif ($arg eq "--manifest") {
         $writeManifest = 1;
     } elsif ($arg eq "--manifest-path") {
         $n++;
-        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
         $manifestPath = $ARGV[$n];
         $writeManifest = 1;
         mkpath(dirname($manifestPath), 0, 0755);
     } elsif ($arg eq "--url-prefix") {
         $n++;
-        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
         $archivesURL = $ARGV[$n];
     } elsif ($arg eq "--link") {
         $link = 1;
     } elsif ($arg eq "--key") {
         $n++;
-        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
         $privateKeyFile = $ARGV[$n];
     } elsif ($arg eq "--key-name") {
         $n++;
-        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
         $keyName = $ARGV[$n];
     } elsif (substr($arg, 0, 1) eq "-") {
-        die "$0: unknown flag `$arg'\n";
+        die "$0: unknown flag ‘$arg’\n";
     } else {
         push @roots, $arg;
     }
@@ -108,7 +108,7 @@ foreach my $storePath (@storePaths) {
     my $pathHash = substr(basename($storePath), 0, 32);
     my $narInfoFile = "$destDir/$pathHash.narinfo";
     if (-e $narInfoFile) {
-        my $narInfo = parseNARInfo($storePath, readFile($narInfoFile), 0, $narInfoFile) or die "cannot read `$narInfoFile'\n";
+        my $narInfo = parseNARInfo($storePath, readFile($narInfoFile), 0, $narInfoFile) or die "cannot read ‘$narInfoFile’\n";
         my $narFile = "$destDir/$narInfo->{url}";
         if (-e $narFile) {
             print STDERR "skipping existing $storePath\n";
@@ -197,7 +197,7 @@ for (my $n = 0; $n < scalar @storePaths2; $n++) {
         system("$Nix::Config::binDir/nix-store --dump $storePath > $nar") == 0
             or die "cannot dump $storePath\n";
         $narHash = `$Nix::Config::binDir/nix-hash --type sha256 --base32 --flat $nar`;
-        die "cannot hash `$nar'" if $? != 0;
+        die "cannot hash ‘$nar’" if $? != 0;
         chomp $narHash;
         $narHash = "sha256:$narHash";
         $narSize = stat("$nar")->size;

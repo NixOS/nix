@@ -38,7 +38,7 @@ void printGCWarning()
     if (!gcWarning) return;
     static bool haveWarned = false;
     warnOnce(haveWarned,
-        "you did not specify `--add-root'; "
+        "you did not specify ‘--add-root’; "
         "the result might be removed by the garbage collector");
 }
 
@@ -92,7 +92,7 @@ string getArg(const string & opt,
     Strings::iterator & i, const Strings::iterator & end)
 {
     ++i;
-    if (i == end) throw UsageError(format("`%1%' requires an argument") % opt);
+    if (i == end) throw UsageError(format("‘%1%’ requires an argument") % opt);
     return *i;
 }
 
@@ -214,15 +214,15 @@ void parseCmdLine(int argc, char * * argv,
         else if (arg == "--no-gc-warning")
             gcWarning = false;
         else if (arg == "--option") {
-            ++i; if (i == args.end()) throw UsageError("`--option' requires two arguments");
+            ++i; if (i == args.end()) throw UsageError("‘--option’ requires two arguments");
             string name = *i;
-            ++i; if (i == args.end()) throw UsageError("`--option' requires two arguments");
+            ++i; if (i == args.end()) throw UsageError("‘--option’ requires two arguments");
             string value = *i;
             settings.set(name, value);
         }
         else {
             if (!parseArg(i, args.end()))
-                throw UsageError(format("unrecognised option `%1%'") % *i);
+                throw UsageError(format("unrecognised option ‘%1%’") % *i);
         }
     }
 
@@ -241,7 +241,7 @@ void showManPage(const string & name)
 {
     restoreSIGPIPE();
     execlp("man", "man", name.c_str(), NULL);
-    throw SysError(format("command `man %1%' failed") % name.c_str());
+    throw SysError(format("command ‘man %1%’ failed") % name.c_str());
 }
 
 
@@ -264,13 +264,13 @@ int handleExceptions(const string & programName, std::function<void()> fun)
         return e.status;
     } catch (UsageError & e) {
         printMsg(lvlError,
-            format(error + " %1%\nTry `%2% --help' for more information.")
+            format(error + " %1%\nTry ‘%2% --help’ for more information.")
             % e.what() % programName);
         return 1;
     } catch (BaseError & e) {
         printMsg(lvlError, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
         if (e.prefix() != "" && !settings.showTrace)
-            printMsg(lvlError, "(use `--show-trace' to show detailed location information)");
+            printMsg(lvlError, "(use ‘--show-trace’ to show detailed location information)");
         return e.status;
     } catch (std::bad_alloc & e) {
         printMsg(lvlError, error + "out of memory");
@@ -306,7 +306,7 @@ RunPager::RunPager()
         if (dup2(toPager.readSide, STDIN_FILENO) == -1)
             throw SysError("dupping stdin");
         execl("/bin/sh", "sh", "-c", pager.c_str(), NULL);
-        throw SysError(format("executing `%1%'") % pager);
+        throw SysError(format("executing ‘%1%’") % pager);
     });
 
     if (dup2(toPager.writeSide, STDOUT_FILENO) == -1)

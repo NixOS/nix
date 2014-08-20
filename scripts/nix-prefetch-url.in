@@ -17,9 +17,9 @@ while ($arg = shift) {
         exec "man nix-prefetch-url" or die;
     } elsif ($arg eq "--type") {
         $hashType = shift;
-        die "$0: `$arg' requires an argument\n" unless defined $hashType;
+        die "$0: ‘$arg’ requires an argument\n" unless defined $hashType;
     } elsif (substr($arg, 0, 1) eq "-") {
-        die "$0: unknown flag `$arg'\n";
+        die "$0: unknown flag ‘$arg’\n";
     } else {
         push @args, $arg;
     }

@@ -212,7 +212,7 @@ void ExprVar::bindVars(const StaticEnv & env)
     /* Otherwise, the variable must be obtained from the nearest
        enclosing `with'.  If there is no `with', then we can issue an
        "undefined variable" error now. */
-    if (withLevel == -1) throw UndefinedVarError(format("undefined variable `%1%' at %2%") % name % pos);
+    if (withLevel == -1) throw UndefinedVarError(format("undefined variable ‘%1%’ at %2%") % name % pos);
 
     fromWith = true;
     this->level = withLevel;
@@ -364,7 +364,7 @@ void ExprLambda::setName(Symbol & name)
 
 string ExprLambda::showNamePos() const
 {
-    return (format("%1% at %2%") % (name.set() ? "`" + (string) name + "'" : "anonymous function") % pos).str();
+    return (format("%1% at %2%") % (name.set() ? "‘" + (string) name + "’" : "anonymous function") % pos).str();
 }
 
 

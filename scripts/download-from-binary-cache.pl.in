@@ -134,7 +134,7 @@ sub initCache {
 
     # Open/create the database.
     $dbh = DBI->connect("dbi:SQLite:dbname=$dbPath", "", "")
-        or die "cannot open database `$dbPath'";
+        or die "cannot open database ‘$dbPath’";
     $dbh->{RaiseError} = 1;
     $dbh->{PrintError} = 0;
 
@@ -544,7 +544,7 @@ sub downloadBinary {
         print STDERR "\n*** Downloading ‘$url’ ", ($requireSignedBinaryCaches ? "(signed by ‘$info->{signedBy}’) " : ""), "to ‘$storePath’...\n";
         checkURL $url;
         if (system("$Nix::Config::curl --fail --location --insecure --connect-timeout $curlConnectTimeout '$url' $decompressor | $Nix::Config::binDir/nix-store --restore $destPath") != 0) {
-            warn "download of `$url' failed" . ($! ? ": $!" : "") . "\n";
+            warn "download of ‘$url’ failed" . ($! ? ": $!" : "") . "\n";
             next;
         }
 
@@ -590,7 +590,7 @@ if ($ARGV[0] eq "--query") {
             print "\n";
         }
 
-        else { die "unknown command `$cmd'"; }
+        else { die "unknown command ‘$cmd’"; }
 
         flush STDOUT;
     }

@@ -67,14 +67,14 @@ namespace nix {
 
 static void dupAttr(const AttrPath & attrPath, const Pos & pos, const Pos & prevPos)
 {
-    throw ParseError(format("attribute `%1%' at %2% already defined at %3%")
+    throw ParseError(format("attribute ‘%1%’ at %2% already defined at %3%")
         % showAttrPath(attrPath) % pos % prevPos);
 }
 
 
 static void dupAttr(Symbol attr, const Pos & pos, const Pos & prevPos)
 {
-    throw ParseError(format("attribute `%1%' at %2% already defined at %3%")
+    throw ParseError(format("attribute ‘%1%’ at %2% already defined at %3%")
         % attr % pos % prevPos);
 }
 
@@ -123,7 +123,7 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
 static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
 {
     if (formals->argNames.find(formal.name) != formals->argNames.end())
-        throw ParseError(format("duplicate formal function argument `%1%' at %2%")
+        throw ParseError(format("duplicate formal function argument ‘%1%’ at %2%")
             % formal.name % pos);
     formals->formals.push_front(formal);
     formals->argNames.insert(formal.name);
@@ -570,7 +570,7 @@ Path resolveExprPath(Path path)
     struct stat st;
     while (true) {
         if (lstat(path.c_str(), &st))
-            throw SysError(format("getting status of `%1%'") % path);
+            throw SysError(format("getting status of ‘%1%’") % path);
         if (!S_ISLNK(st.st_mode)) break;
         path = absPath(readLink(path), dirOf(path));
     }
@@ -621,10 +621,10 @@ void EvalState::addToSearchPath(const string & s, bool warn)
 
     path = absPath(path);
     if (pathExists(path)) {
-        debug(format("adding path `%1%' to the search path") % path);
+        debug(format("adding path ‘%1%’ to the search path") % path);
         searchPath.push_back(std::pair<string, Path>(prefix, path));
     } else if (warn)
-        printMsg(lvlError, format("warning: Nix search path entry `%1%' does not exist, ignoring") % path);
+        printMsg(lvlError, format("warning: Nix search path entry ‘%1%’ does not exist, ignoring") % path);
 }
 
 
@@ -649,7 +649,7 @@ Path EvalState::findFile(SearchPath & searchPath, const string & path)
         }
         if (pathExists(res)) return canonPath(res);
     }
-    throw ThrownError(format("file `%1%' was not found in the Nix search path (add it using $NIX_PATH or -I)") % path);
+    throw ThrownError(format("file ‘%1%’ was not found in the Nix search path (add it using $NIX_PATH or -I)") % path);
 }
 
 

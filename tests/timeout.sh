@@ -5,7 +5,7 @@ source common.sh
 failed=0
 messages="`nix-build -Q timeout.nix --timeout 2 2>&1 || failed=1`"
 if [ $failed -ne 0 ]; then
-    echo "error: \`nix-store' succeeded; should have timed out"
+    echo "error: ‘nix-store’ succeeded; should have timed out"
     exit 1
 fi
 
