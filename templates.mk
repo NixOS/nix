@@ -8,5 +8,8 @@ define instantiate-template
 
 endef
 
+%.h: %.h.in
+	$(trace-gen) ./config.status --quiet --header=$@
+
 %: %.in
-	$(trace-gen) ./config.status --quiet --file $@
+	$(trace-gen) ./config.status --quiet --file=$@
