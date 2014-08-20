@@ -299,6 +299,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (*i == "--include-outputs") includeOutputs = true;
         else throw UsageError(format("unknown flag ‘%1%’") % *i);
 
+    RunPager pager;
+
     switch (query) {
 
         case qOutputs: {

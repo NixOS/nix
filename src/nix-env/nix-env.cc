@@ -977,6 +977,9 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         return;
     }
 
+    bool tty = isatty(STDOUT_FILENO);
+    RunPager pager;
+
     Table table;
     std::ostringstream dummy;
     XMLWriter xml(true, *(xmlOutput ? &cout : &dummy));
@@ -1049,7 +1052,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                     }
                 } else {
                     string column = (string) "" + ch + " " + version;
-                    if (diff == cvGreater && isatty(STDOUT_FILENO))
+                    if (diff == cvGreater && tty)
                         column = ANSI_RED + column + ANSI_NORMAL;
                     columns.push_back(column);
                 }
@@ -1239,6 +1242,8 @@ static void opListGenerations(Globals & globals, Strings opFlags, Strings opArgs
 
     int curGen;
     Generations gens = findGenerations(globals.profile, curGen);
+
+    RunPager pager;
 
     for (Generations::iterator i = gens.begin(); i != gens.end(); ++i) {
         tm t;
