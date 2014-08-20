@@ -69,6 +69,18 @@ template<class N> N getIntArg(const string & opt,
 /* Show the manual page for the specified program. */
 void showManPage(const string & name);
 
+/* The constructor of this class starts a pager if stdout is a
+   terminal and $PAGER is set. Stdout is redirected to the pager. */
+class RunPager
+{
+public:
+    RunPager();
+    ~RunPager();
+
+private:
+    Pid pid;
+};
+
 extern volatile ::sig_atomic_t blockInt;
 
 }

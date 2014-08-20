@@ -931,11 +931,11 @@ void closeOnExec(int fd)
 
 void restoreSIGPIPE()
 {
-    struct sigaction act, oact;
+    struct sigaction act;
     act.sa_handler = SIG_DFL;
     act.sa_flags = 0;
     sigemptyset(&act.sa_mask);
-    if (sigaction(SIGPIPE, &act, &oact)) throw SysError("resetting SIGPIPE");
+    if (sigaction(SIGPIPE, &act, 0)) throw SysError("resetting SIGPIPE");
 }
 
 

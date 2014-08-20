@@ -459,6 +459,8 @@ static void opReadLog(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
+    RunPager pager;
+
     foreach (Strings::iterator, i, opArgs) {
         Path path = useDeriver(followLinksToStorePath(*i));
 

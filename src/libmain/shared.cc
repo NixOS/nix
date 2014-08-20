@@ -285,4 +285,44 @@ int handleExceptions(const string & programName, std::function<void()> fun)
 }
 
 
+RunPager::RunPager()
+{
+    string pager = getEnv("PAGER");
+    if (!isatty(STDOUT_FILENO) || pager.empty()) return;
+
+    /* Ignore SIGINT. The pager will handle it (and we'll get
+       SIGPIPE). */
+    struct sigaction act;
+    act.sa_handler = SIG_IGN;
+    act.sa_flags = 0;
+    sigemptyset(&act.sa_mask);
+    if (sigaction(SIGINT, &act, 0)) throw SysError("ignoring SIGINT");
+
+    restoreSIGPIPE();
+
+    Pipe toPager;
+    toPager.create();
+
+    pid = startProcess([&]() {
+        if (dup2(toPager.readSide, STDIN_FILENO) == -1)
+            throw SysError("dupping stdin");
+        execl("/bin/sh", "sh", "-c", pager.c_str(), NULL);
+        throw SysError(format("executing `%1%'") % pager);
+    });
+
+    if (dup2(toPager.writeSide, STDOUT_FILENO) == -1)
+        throw SysError("dupping stdout");
+
+}
+
+
+RunPager::~RunPager()
+{
+    if (pid != -1) {
+        close(STDOUT_FILENO);
+        pid.wait(true);
+    }
+}
+
+
 }
