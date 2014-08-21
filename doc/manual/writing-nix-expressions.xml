@@ -1561,10 +1561,11 @@ allowedReferences = [];
 </programlisting>
 
     enforces that the output of a derivation cannot have any runtime
-    dependencies on its inputs.  This is used in NixOS to check that
-    generated files such as initial ramdisks for booting Linux don’t
-    have accidental dependencies on other paths in the Nix
-    store.</para></listitem>
+    dependencies on its inputs.  To allow an output to have a runtime
+    dependency on itself, use <literal>"out"</literal> as a list item.
+    This is used in NixOS to check that generated files such as
+    initial ramdisks for booting Linux don’t have accidental
+    dependencies on other paths in the Nix store.</para></listitem>
 
   </varlistentry>
 
