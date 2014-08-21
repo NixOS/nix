@@ -1575,13 +1575,6 @@ void chmod_(const Path & path, mode_t mode)
 }
 
 
-int childEntry(void * arg)
-{
-    ((DerivationGoal *) arg)->initChild();
-    return 1;
-}
-
-
 void DerivationGoal::startBuilder()
 {
     startNest(nest, lvlInfo, format(
@@ -1897,48 +1890,10 @@ void DerivationGoal::startBuilder()
     /* Create a pipe to get the output of the builder. */
     builderOut.create();
 
-    /* Fork a child to build the package.  Note that while we
-       currently use forks to run and wait for the children, it
-       shouldn't be hard to use threads for this on systems where
-       fork() is unavailable or inefficient.
-
-       If we're building in a chroot, then also set up private
-       namespaces for the build:
-
-       - The PID namespace causes the build to start as PID 1.
-         Processes outside of the chroot are not visible to those on
-         the inside, but processes inside the chroot are visible from
-         the outside (though with different PIDs).
-
-       - The private mount namespace ensures that all the bind mounts
-         we do will only show up in this process and its children, and
-         will disappear automatically when we're done.
-
-       - The private network namespace ensures that the builder cannot
-         talk to the outside world (or vice versa).  It only has a
-         private loopback interface.
-
-       - The IPC namespace prevents the builder from communicating
-         with outside processes using SysV IPC mechanisms (shared
-         memory, message queues, semaphores).  It also ensures that
-         all IPC objects are destroyed when the builder exits.
-
-       - The UTS namespace ensures that builders see a hostname of
-         localhost rather than the actual hostname.
-    */
-#if CHROOT_ENABLED
-    if (useChroot) {
-        char stack[32 * 1024];
-        pid = clone(childEntry, stack + sizeof(stack) - 8,
-            CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWNET | CLONE_NEWIPC | CLONE_NEWUTS | SIGCHLD, this);
-    } else
-#endif
-    {
-        pid = fork();
-        if (pid == 0) initChild();
-    }
-
-    if (pid == -1) throw SysError("unable to fork");
+    /* Fork a child to build the package. */
+    pid = startProcess([&]() {
+        initChild();
+    });
 
     /* parent */
     pid.setSeparatePG(true);
@@ -1965,14 +1920,41 @@ void DerivationGoal::initChild()
 
     try { /* child */
 
-        _writeToStderr = 0;
-
-        restoreAffinity();
-
         commonChildInit(builderOut);
 
 #if CHROOT_ENABLED
         if (useChroot) {
+
+            /* Set up private namespaces for the build:
+
+               - The PID namespace causes the build to start as PID 1.
+                 Processes outside of the chroot are not visible to
+                 those on the inside, but processes inside the chroot
+                 are visible from the outside (though with different
+                 PIDs).
+
+               - The private mount namespace ensures that all the bind
+                 mounts we do will only show up in this process and
+                 its children, and will disappear automatically when
+                 we're done.
+
+               - The private network namespace ensures that the
+                 builder cannot talk to the outside world (or vice
+                 versa).  It only has a private loopback interface.
+
+               - The IPC namespace prevents the builder from
+                 communicating with outside processes using SysV IPC
+                 mechanisms (shared memory, message queues,
+                 semaphores).  It also ensures that all IPC objects
+                 are destroyed when the builder exits.
+
+               - The UTS namespace ensures that builders see a
+                 hostname of localhost rather than the actual
+                 hostname.
+            */
+            if (unshare(CLONE_NEWNS | CLONE_NEWNET | CLONE_NEWIPC | CLONE_NEWUTS) == -1)
+                throw SysError("setting up private namespaces");
+
             /* Initialise the loopback interface. */
             AutoCloseFD fd(socket(PF_INET, SOCK_DGRAM, IPPROTO_IP));
             if (fd == -1) throw SysError("cannot open IP socket");
@@ -2169,8 +2151,6 @@ void DerivationGoal::initChild()
         writeToStderr("while setting up the build environment: " + string(e.what()) + "\n");
         _exit(1);
     }
-
-    abort(); /* never reached */
 }
 
 
