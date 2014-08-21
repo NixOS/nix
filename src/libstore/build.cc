@@ -2133,8 +2133,13 @@ void DerivationGoal::initChild()
         /* Fill in the arguments. */
         string builderBasename = baseNameOf(drv.builder);
         args.push_back(builderBasename.c_str());
-        foreach (Strings::iterator, i, drv.args)
-            args.push_back(rewriteHashes(*i, rewritesToTmp).c_str());
+        foreach (Strings::iterator, i, drv.args) {
+            auto re = rewriteHashes(*i, rewritesToTmp);
+            auto cstr = new char[re.length()+1];
+            std::strcpy(cstr, re.c_str());
+
+            args.push_back(cstr);
+        }
         args.push_back(0);
 
         restoreSIGPIPE();
