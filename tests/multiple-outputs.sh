@@ -18,7 +18,7 @@ grep -q 'multiple-outputs-b.drv",\["out"\]' $drvPath
 outPath=$(nix-build multiple-outputs.nix -A d --no-out-link)
 drvPath=$(cat $outPath/drv)
 outPath=$(nix-store -q $drvPath)
-! [ -e "$outPath" ]
+(! [ -e "$outPath" ])
 
 # Do a build of something that depends on a derivation with multiple
 # outputs.
@@ -30,7 +30,7 @@ echo "output path is $outPath"
 # Test nix-build on a derivation with multiple outputs.
 nix-build multiple-outputs.nix -A a -o $TEST_ROOT/result
 [ -e $TEST_ROOT/result-first ]
-! [ -e $TEST_ROOT/result-second ]
+(! [ -e $TEST_ROOT/result-second ])
 nix-build multiple-outputs.nix -A a.all -o $TEST_ROOT/result
 [ "$(cat $TEST_ROOT/result-first/file)" = "first" ]
 [ "$(cat $TEST_ROOT/result-second/file)" = "second" ]

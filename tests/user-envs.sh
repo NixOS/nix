@@ -3,8 +3,6 @@ source common.sh
 clearStore
 clearProfiles
 
-set -x
-
 # Query installed: should be empty.
 test "$(nix-env -p $profiles/test -q '*' | wc -l)" -eq 0
 
@@ -46,7 +44,7 @@ nix-env -qas | grep -q -- '---  bar-0.1'
 
 # Disable foo.
 nix-env --set-flag active false foo
-! [ -e "$profiles/test/bin/foo" ]
+(! [ -e "$profiles/test/bin/foo" ])
 
 # Enable foo.
 nix-env --set-flag active true foo
@@ -116,7 +114,7 @@ nix-store -q --referrers-closure $profiles/test | grep "$(nix-store -q --resolve
 ln -sfn $outPath10/bin/foo $TEST_ROOT/symlink
 nix-env -e $TEST_ROOT/symlink
 if nix-env -q '*' | grep -q foo; then false; fi
-! nix-store -qR $profiles/test | grep "$outPath10"
+(! nix-store -qR $profiles/test | grep "$outPath10")
 
 # Install foo-1.0, now using a symlink to its store path.
 nix-env -i $TEST_ROOT/symlink
@@ -129,7 +127,7 @@ nix-env --delete-generations old
 # foo-1.0.
 nix-collect-garbage
 test -e "$outPath10"
-! [ -e "$outPath20" ]
+(! [ -e "$outPath20" ])
 
 # Uninstall everything
 nix-env -e '*'
@@ -143,7 +141,7 @@ nix-env -q '*' | grep -q foo-2.0
 # On the other hand, this should install both (and should fail due to
 # a collision).
 nix-env -e '*'
-! nix-env -i foo-1.0 foo-2.0
+(! nix-env -i foo-1.0 foo-2.0)
 
 # Installing "*" should install one foo and one bar.
 nix-env -e '*'

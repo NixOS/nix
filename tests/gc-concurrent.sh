@@ -11,7 +11,7 @@ outPath2=$(nix-store -q $drvPath2)
 drvPath3=$(nix-instantiate simple.nix)
 outPath3=$(nix-store -r $drvPath3)
 
-! test -e $outPath3.lock
+(! test -e $outPath3.lock)
 touch $outPath3.lock
 
 rm -f "$NIX_STATE_DIR"/gcroots/foo*
@@ -50,9 +50,9 @@ rm -f "$NIX_STATE_DIR"/gcroots/foo*
 
 # The collector should have deleted lock files for paths that have
 # been built previously.
-! test -e $outPath3.lock
+(! test -e $outPath3.lock)
 
 # If we run the collector now, it should delete outPath1/2.
 nix-collect-garbage
-! test -e $outPath1
-! test -e $outPath2
+(! test -e $outPath1)
+(! test -e $outPath2)

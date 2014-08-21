@@ -3,7 +3,6 @@ source common.sh
 clearStore
 
 # Produce an escaped log file.
-set -x
 path=$(nix-build --log-type escapes -vv dependencies.nix --no-out-link 2> $TEST_ROOT/log.esc)
 
 # Convert it to an XML representation.
@@ -20,6 +19,6 @@ fi
 # Test compressed logs.
 clearStore
 rm -rf $NIX_LOG_DIR
-! nix-store -l $path
+(! nix-store -l $path)
 nix-build dependencies.nix --no-out-link --option build-compress-log true
 [ "$(nix-store -l $path)" = FOO ]
