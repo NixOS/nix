@@ -779,7 +779,7 @@ static void daemonLoop(char * * argv)
                 processConnection(trusted);
 
                 _exit(0);
-            }, "unexpected Nix daemon error: ");
+            }, false, "unexpected Nix daemon error: ");
 
         } catch (Interrupted & e) {
             throw;
