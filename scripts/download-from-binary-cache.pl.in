@@ -68,6 +68,7 @@ sub addRequest {
     $curl->setopt(CURLOPT_NOBODY, 1) if $head;
     $curl->setopt(CURLOPT_FAILONERROR, 1);
     $curl->setopt(CURLOPT_CONNECTTIMEOUT, $curlConnectTimeout);
+    $curl->setopt(CURLOPT_TIMEOUT, 20 * 60);
 
     if ($activeRequests >= $maxParallelRequests) {
         $scheduled{$curlId} = 1;
