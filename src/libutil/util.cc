@@ -1150,4 +1150,53 @@ string filterANSIEscapes(const string & s, bool nixOnly)
 }
 
 
+//////////////////////////////////////////////////////////////////////
+
+
+const string & publicUserName()
+{
+    static string userName("");
+    return userName;
+}
+
+
+const string & getCurrentUserName()
+{
+    static string userName("");
+    if (userName == "") {
+        char buf[256];
+        if (getlogin_r(buf, sizeof(buf)))
+            throw SysError("getting current user name");
+        userName = buf;
+    }
+
+    return userName;
+}
+
+
+SecretMode::SecretMode(const string & userName)
+  : userName_(userName),
+    filterMask_(0),
+    oldMask_(0)
+{
+    if (userName_ != publicUserName()) {
+        /* If we need to make private files, just make them only readable by
+           the store user, and later we will transfer the ownership with ACL
+           is the filesystem of the store supports it. */
+        filterMask_ = 0077;
+        oldMask_ = umask(filterMask_);
+    }
+}
+
+
+SecretMode::~SecretMode()
+{
+    if (isSecret()) {
+        mode_t filter = umask(filterMask_);
+        if (filter != filterMask_)
+            throw Error("umask got change, might leak secure content");
+    }
+}
+
+
 }

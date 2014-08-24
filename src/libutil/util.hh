@@ -382,4 +382,32 @@ void ignoreException();
 string filterANSIEscapes(const string & s, bool nixOnly = false);
 
 
+/* Returns a username which identify that the content is publicly
+   visible. */
+const string & publicUserName();
+
+
+/* Returns the user's name. */
+const string & getCurrentUserName();
+
+
+/* Ensure that files created within this scope are secure by default.  This
+   RAI does not protect against doing a chmod of the file. */
+class SecretMode
+{
+    const string & userName_;
+    mode_t filterMask_;
+    mode_t oldMask_;
+
+  public:
+    explicit SecretMode(const string & userName);
+    ~SecretMode();
+
+    mode_t filterMode(mode_t mode) const {
+        return mode & ~filterMask_;
+    }
+    bool isSecret() const { return filterMask_; }
+};
+
+
 }

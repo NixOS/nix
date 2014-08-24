@@ -10,7 +10,7 @@ nix_tests = \
   remote-store.sh export.sh export-graph.sh negative-caching.sh \
   binary-patching.sh timeout.sh secure-drv-outputs.sh nix-channel.sh \
   multiple-outputs.sh import-derivation.sh fetchurl.sh optimise-store.sh \
-  binary-cache.sh nix-profile.sh repair.sh dump-db.sh case-hack.sh
+  binary-cache.sh nix-profile.sh repair.sh dump-db.sh case-hack.sh sec-toSecretFile.sh
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))

@@ -168,10 +168,13 @@ public:
         bool recursive = true, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, bool repair = false) = 0;
 
-    /* Like addToStore, but the contents written to the output path is
-       a regular file containing the given string. */
+    /* Like addToStore, but the contents written to the output path is a
+       regular file containing the given string. A secret content is
+       indicated by a valid uid.  If the uid is not -1, then the content is
+       kept secret.  The secret would be associated to the given User
+       Identifier. */
     virtual Path addTextToStore(const string & name, const string & s,
-        const PathSet & references, bool repair = false) = 0;
+        const PathSet & references, const string &userName, bool repair = false) = 0;
 
     /* Export a store path, that is, create a NAR dump of the store
        path and append its references and its deriver.  Optionally, a

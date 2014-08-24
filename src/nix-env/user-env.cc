@@ -101,7 +101,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
        the store; we need it for future modifications of the
        environment. */
     Path manifestFile = store->addTextToStore("env-manifest.nix",
-        (format("%1%") % manifest).str(), references);
+        (format("%1%") % manifest).str(), references, publicUserName());
 
     /* Get the environment builder expression. */
     Value envBuilder;

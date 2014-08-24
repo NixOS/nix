@@ -3,6 +3,8 @@
 #include <string>
 #include <unordered_set>
 
+#include <sys/types.h>
+
 #include "store-api.hh"
 #include "util.hh"
 #include "pathlocks.hh"
@@ -142,7 +144,7 @@ public:
         bool recursive = true, HashType hashAlgo = htSHA256, bool repair = false);
 
     Path addTextToStore(const string & name, const string & s,
-        const PathSet & references, bool repair = false);
+        const PathSet & references, const string &userName, bool repair = false);
 
     void exportPath(const Path & path, bool sign,
         Sink & sink);
@@ -326,10 +328,10 @@ typedef set<Inode> InodesSeen;
      without execute permission; setuid bits etc. are cleared)
    - the owner and group are set to the Nix user and group, if we're
      running as root. */
-void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen);
-void canonicalisePathMetaData(const Path & path, uid_t fromUid);
+void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen, const SecretMode *secret = nullptr);
+void canonicalisePathMetaData(const Path & path, uid_t fromUid, const SecretMode *secret = nullptr);
 
-void canonicaliseTimestampAndPermissions(const Path & path);
+void canonicaliseTimestampAndPermissions(const Path & path, const SecretMode *secret = nullptr);
 
 MakeError(PathInUse, Error);
 
