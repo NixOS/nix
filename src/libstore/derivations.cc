@@ -27,7 +27,7 @@ void DerivationOutput::parseHashInfo(bool & recursive, HashType & hashType, Hash
 
 
 Path writeDerivation(StoreAPI & store,
-    const Derivation & drv, const string & name, bool repair)
+    const Derivation & drv, const string & name, const string & userName, bool repair)
 {
     PathSet references;
     references.insert(drv.inputSrcs.begin(), drv.inputSrcs.end());
@@ -40,7 +40,7 @@ Path writeDerivation(StoreAPI & store,
     string contents = unparseDerivation(drv);
     return settings.readOnlyMode
         ? computeStorePathForText(suffix, contents, references)
-        : store.addTextToStore(suffix, contents, references, publicUserName(), repair);
+        : store.addTextToStore(suffix, contents, references, userName, repair);
 }
 
 

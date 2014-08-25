@@ -608,7 +608,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     }
 
     /* Write the resulting term into the Nix store directory. */
-    Path drvPath = writeDerivation(*store, drv, drvName, state.repair);
+    Path drvPath = writeDerivation(*store, drv, drvName, publicUserName(), state.repair);
 
     printMsg(lvlChatty, format("instantiated ‘%1%’ -> ‘%2%’")
         % drvName % drvPath);
