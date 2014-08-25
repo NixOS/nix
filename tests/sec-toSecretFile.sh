@@ -1,6 +1,8 @@
-# Test that users cannot register specially-crafted derivations that
-# produce output paths belonging to other derivations.  This could be
-# used to inject malware into the store.
+# Test that toFile and toSecretFile are producing files with the right
+# ownership, such as the secret file is never readable by other users.
+#
+# Ideally we should use inotify to ensure that the file is never created as
+# being readable by others than the owner of the store.
 
 source common.sh
 

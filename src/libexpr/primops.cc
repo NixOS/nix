@@ -441,6 +441,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     string outputHash, outputHashAlgo;
     bool outputHashRecursive = false;
+    string visibility = publicUserName();
 
     StringSet outputs;
     outputs.insert("out");
@@ -455,6 +456,15 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             if (ignoreNulls) {
                 state.forceValue(*i->value);
                 if (i->value->type == tNull) continue;
+            }
+
+            /* The `secretDerivation' attribute is special: it supplies a
+               boolean which indicates if the derivation and its realisation
+               are restricted to the current user. */
+            if (key == "secret") {
+                if (state.forceBool(*i->value))
+                    visibility = getCurrentUserName();
+                continue;
             }
 
             /* The `args' attribute is special: it supplies the
@@ -608,7 +618,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     }
 
     /* Write the resulting term into the Nix store directory. */
-    Path drvPath = writeDerivation(*store, drv, drvName, publicUserName(), state.repair);
+    Path drvPath = writeDerivation(*store, drv, drvName, visibility, state.repair);
 
     printMsg(lvlChatty, format("instantiated ‘%1%’ -> ‘%2%’")
         % drvName % drvPath);
