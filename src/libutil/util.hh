@@ -391,6 +391,10 @@ const string & publicUserName();
 const string & getCurrentUserName();
 
 
+/* Returns the owner of a file if the file is secret */
+string getOwnerOfSecretFile(const Path & path);
+
+
 /* Ensure that files created within this scope are secure by default.  This
    RAI does not protect against doing a chmod of the file. */
 class SecretMode

@@ -12,6 +12,7 @@
 
 #include <sys/wait.h>
 #include <unistd.h>
+#include <pwd.h>
 #include <fcntl.h>
 #include <limits.h>
 
@@ -1169,6 +1170,51 @@ const string & getCurrentUserName()
             throw SysError("getting current user name");
         userName = buf;
     }
+
+    return userName;
+}
+
+
+string getOwnerOfSecretFile(const Path & path)
+{
+    /* Extract the uid of the file */
+    struct stat st;
+    if (stat(path.c_str(), &st) == -1)
+        throw SysError("statting file");
+
+    /* If the file is readable by the group, then this means this is a
+       public file. */
+    if (st.st_mode & S_IRGRP)
+        return publicUserName();
+
+    /* Map the uid of the private file to the user name */
+    struct passwd pwd;
+    struct passwd *ppwd;
+    char *buf;
+    size_t bufsize;
+    int err;
+
+    bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
+    if (bufsize == size_t(-1))
+        bufsize = 16 * 1024;
+
+    buf = new char[bufsize];
+    if (!buf)
+        throw SysError("allocating passwd entry");
+
+    err = getpwuid_r(st.st_uid, &pwd, buf, bufsize, &ppwd);
+    if (!ppwd) {
+        delete[] buf;
+        if (err)
+            throw SysError("finding owner of a file");
+
+        /* The uid does not match any user name, no need to keep any secret
+           for a non-existing user name. */
+        return publicUserName();
+    }
+
+    string userName(pwd.pw_name);
+    delete[] buf;
 
     return userName;
 }

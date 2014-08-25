@@ -2193,15 +2193,16 @@ void DerivationGoal::registerOutputs()
 
     ValidPathInfos infos;
 
+    /* Inherit ownership of outputs from the permission of the derivation
+       file. */
+    SecretMode smode(getOwnerOfSecretFile(drvPath));
+
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all
        output paths read-only. */
     foreach (DerivationOutputs::iterator, i, drv.outputs) {
         Path path = i->second.path;
         if (missingPaths.find(path) == missingPaths.end()) continue;
-
-        // :TODO: Transfer the user name down to here.
-        SecretMode smode(publicUserName());
 
         Path actualPath = path;
         if (useChroot) {

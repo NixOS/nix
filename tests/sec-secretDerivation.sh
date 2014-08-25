@@ -34,8 +34,32 @@ if ! test $publicDrvStat = $expected; then
     exit 1
 fi
 
+expected="dr-xr-xr-x"
+if ! test $publicOutStat = $expected; then
+    echo "Public derivation output directory should be readable by everybody."
+    exit 1
+fi
+
+expected="-r--r--r--"
+if ! test $publicOutFileStat = $expected; then
+    echo "Public derivation output file should be readable by everybody."
+    exit 1
+fi
+
 expected="-r--------"
 if ! test $secretDrvStat = $expected; then
     echo "Secret derivation should only be readable by root."
+    exit 1
+fi
+
+expected="dr-x------"
+if ! test $secretOutStat = $expected; then
+    echo "Secret derivation output directory should only be readable by root."
+    exit 1
+fi
+
+expected="-r--------"
+if ! test $secretOutFileStat = $expected; then
+    echo "Secret derivation output file should only be readable by root."
     exit 1
 fi
