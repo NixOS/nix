@@ -499,7 +499,7 @@ void LocalStore::makeStoreWritable()
 const time_t mtimeStore = 1; /* 1 second into the epoch */
 
 
-static void canonicaliseTimestampAndPermissions(const Path & path, const struct stat & st, const SecretMode *secret)
+static void canonicaliseTimestampAndPermissions(const Path & path, const struct stat & st, const SecretMode & smode)
 {
     if (!S_ISLNK(st.st_mode)) {
 
@@ -510,8 +510,7 @@ static void canonicaliseTimestampAndPermissions(const Path & path, const struct 
             mode = (st.st_mode & S_IFMT)
                  | 0444
                  | (st.st_mode & S_IXUSR ? 0111 : 0);
-            if (secret)
-                mode = secret->filterMode(mode);
+            mode = smode.filterMode(mode);
             if (chmod(path.c_str(), mode) == -1)
                 throw SysError(format("changing mode of ‘%1%’ to %2$o") % path % mode);
         }
@@ -536,7 +535,7 @@ static void canonicaliseTimestampAndPermissions(const Path & path, const struct 
 }
 
 
-void canonicaliseTimestampAndPermissions(const Path & path, const SecretMode *secret)
+void canonicaliseTimestampAndPermissions(const Path & path, const SecretMode & secret)
 {
     struct stat st;
     if (lstat(path.c_str(), &st))
@@ -545,7 +544,7 @@ void canonicaliseTimestampAndPermissions(const Path & path, const SecretMode *se
 }
 
 
-static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSeen & inodesSeen, const SecretMode *secret = nullptr)
+static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSeen & inodesSeen, const SecretMode & smode)
 {
     checkInterrupt();
 
@@ -574,7 +573,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
 
     inodesSeen.insert(Inode(st.st_dev, st.st_ino));
 
-    canonicaliseTimestampAndPermissions(path, st, secret);
+    canonicaliseTimestampAndPermissions(path, st, smode);
 
     /* Change ownership to the current uid.  If it's a symlink, use
        lchown if available, otherwise don't bother.  Wrong ownership
@@ -597,14 +596,14 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
     if (S_ISDIR(st.st_mode)) {
         DirEntries entries = readDirectory(path);
         for (auto & i : entries)
-            canonicalisePathMetaData_(path + "/" + i.name, fromUid, inodesSeen);
+            canonicalisePathMetaData_(path + "/" + i.name, fromUid, inodesSeen, smode);
     }
 }
 
 
-void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen, const SecretMode *secret)
+void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen, const SecretMode & smode)
 {
-    canonicalisePathMetaData_(path, fromUid, inodesSeen, secret);
+    canonicalisePathMetaData_(path, fromUid, inodesSeen, smode);
 
     /* On platforms that don't have lchown(), the top-level path can't
        be a symlink, since we can't change its ownership. */
@@ -619,10 +618,10 @@ void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & ino
 }
 
 
-void canonicalisePathMetaData(const Path & path, uid_t fromUid, const SecretMode *secret)
+void canonicalisePathMetaData(const Path & path, uid_t fromUid, const SecretMode & smode)
 {
     InodesSeen inodesSeen;
-    canonicalisePathMetaData(path, fromUid, inodesSeen, secret);
+    canonicalisePathMetaData(path, fromUid, inodesSeen, smode);
 }
 
 
@@ -1349,6 +1348,8 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
     addTempRoot(dstPath);
 
     if (repair || !isValidPath(dstPath)) {
+        // :TODO: Transfer the user name down to here.
+        SecretMode smode(publicUserName());
 
         /* The first check above is an optimisation to prevent
            unnecessary lock acquisition. */
@@ -1365,7 +1366,7 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
             } else
                 writeFile(dstPath, dump);
 
-            canonicalisePathMetaData(dstPath, -1);
+            canonicalisePathMetaData(dstPath, -1, smode);
 
             /* Register the SHA-256 hash of the NAR serialisation of
                the path in the database.  We may just have computed it
@@ -1431,7 +1432,7 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
 
             writeFile(dstPath, s);
 
-            canonicalisePathMetaData(dstPath, -1, &smode);
+            canonicalisePathMetaData(dstPath, -1, smode);
 
             HashResult hash = hashPath(htSHA256, dstPath);
 
@@ -1647,6 +1648,8 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
     addTempRoot(dstPath);
 
     if (!isValidPath(dstPath)) {
+        // :TODO: Infer the security of the path based on the ACL.
+        SecretMode smode(publicUserName());
 
         PathLocks outputLock;
 
@@ -1665,7 +1668,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
                 throw SysError(format("cannot move ‘%1%’ to ‘%2%’")
                     % unpacked % dstPath);
 
-            canonicalisePathMetaData(dstPath, -1);
+            canonicalisePathMetaData(dstPath, -1, smode);
 
             /* !!! if we were clever, we could prevent the hashPath()
                here. */

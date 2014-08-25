@@ -2200,6 +2200,9 @@ void DerivationGoal::registerOutputs()
         Path path = i->second.path;
         if (missingPaths.find(path) == missingPaths.end()) continue;
 
+        // :TODO: Transfer the user name down to here.
+        SecretMode smode(publicUserName());
+
         Path actualPath = path;
         if (useChroot) {
             actualPath = chrootRootDir + path;
@@ -2249,7 +2252,7 @@ void DerivationGoal::registerOutputs()
             /* Canonicalise first.  This ensures that the path we're
                rewriting doesn't contain a hard link to /etc/shadow or
                something like that. */
-            canonicalisePathMetaData(actualPath, buildUser.enabled() ? buildUser.getUID() : -1, inodesSeen);
+            canonicalisePathMetaData(actualPath, buildUser.enabled() ? buildUser.getUID() : -1, inodesSeen, smode);
 
             /* FIXME: this is in-memory. */
             StringSink sink;
@@ -2292,7 +2295,7 @@ void DerivationGoal::registerOutputs()
         /* Get rid of all weird permissions.  This also checks that
            all files are owned by the build user, if applicable. */
         canonicalisePathMetaData(actualPath,
-            buildUser.enabled() && !rewritten ? buildUser.getUID() : -1, inodesSeen);
+            buildUser.enabled() && !rewritten ? buildUser.getUID() : -1, inodesSeen, smode);
 
         /* For this output path, find the references to other paths
            contained in it.  Compute the SHA-256 NAR hash at the same
@@ -2841,9 +2844,12 @@ void SubstitutionGoal::finished()
         return;
     }
 
+    // :TODO: Transfer the user name down to here.
+    SecretMode smode(publicUserName());
+
     if (repair) replaceValidPath(storePath, destPath);
 
-    canonicalisePathMetaData(storePath, -1);
+    canonicalisePathMetaData(storePath, -1, smode);
 
     worker.store.optimisePath(storePath); // FIXME: combine with hashPath()
 

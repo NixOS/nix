@@ -308,7 +308,7 @@ private:
 
     InodeHash loadInodeHash();
     Strings readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash);
-    void optimisePath_(OptimiseStats & stats, const Path & path, InodeHash & inodeHash);
+    void optimisePath_(OptimiseStats & stats, const Path & path, InodeHash & inodeHash, const SecretMode & smode);
 
     // Internal versions that are not wrapped in retry_sqlite.
     bool isValidPath_(const Path & path);
@@ -328,10 +328,10 @@ typedef set<Inode> InodesSeen;
      without execute permission; setuid bits etc. are cleared)
    - the owner and group are set to the Nix user and group, if we're
      running as root. */
-void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen, const SecretMode *secret = nullptr);
-void canonicalisePathMetaData(const Path & path, uid_t fromUid, const SecretMode *secret = nullptr);
+void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen, const SecretMode & secret);
+void canonicalisePathMetaData(const Path & path, uid_t fromUid, const SecretMode & secret);
 
-void canonicaliseTimestampAndPermissions(const Path & path, const SecretMode *secret = nullptr);
+void canonicaliseTimestampAndPermissions(const Path & path, const SecretMode & secret);
 
 MakeError(PathInUse, Error);
 

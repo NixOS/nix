@@ -15,10 +15,16 @@ startDaemon
 # Get the public derivation rights.
 publicDrv=$(nix-instantiate ./sec-secretDerivation.nix -A public)
 publicDrvStat=$(stat --format=%A $publicDrv)
+publicOut=$(nix-store -rvv $publicDrv)
+publicOutStat=$(stat --format=%A $publicOut)
+publicOutFileStat=$(stat --format=%A $publicOut/file)
 
 # Get the secret derivation rights.
 secretDrv=$(nix-instantiate ./sec-secretDerivation.nix -A secret)
 secretDrvStat=$(stat --format=%A $secretDrv)
+secretOut=$(nix-store -rvv $secretDrv)
+secretOutStat=$(stat --format=%A $secretOut)
+secretOutFileStat=$(stat --format=%A $secretOut/file)
 
 # Check file ownership, and verify that only the owner of the store is the
 # only one capable of reading the secret file.

@@ -27,12 +27,17 @@ static void makeWritable(const Path & path)
 struct MakeReadOnly
 {
     Path path;
-    MakeReadOnly(const Path & path) : path(path) { }
+    const SecretMode & smode;
+
+    MakeReadOnly(const Path & path, const SecretMode & smode)
+        : path(path), smode(smode)
+    { }
+
     ~MakeReadOnly()
     {
         try {
             /* This will make the path read-only. */
-            if (path != "") canonicaliseTimestampAndPermissions(path);
+            if (path != "") canonicaliseTimestampAndPermissions(path, smode);
         } catch (...) {
             ignoreException();
         }
@@ -88,7 +93,8 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
 }
 
 
-void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHash & inodeHash)
+void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path,
+    InodeHash & inodeHash, const SecretMode & smode)
 {
     checkInterrupt();
 
@@ -99,7 +105,7 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
     if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectoryIgnoringInodes(path, inodeHash);
         foreach (Strings::iterator, i, names)
-            optimisePath_(stats, path + "/" + *i, inodeHash);
+            optimisePath_(stats, path + "/" + *i, inodeHash, smode);
         return;
     }
 
@@ -173,7 +179,7 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
 
     /* When we're done, make the directory read-only again and reset
        its timestamp back to 0. */
-    MakeReadOnly makeReadOnly(mustToggle ? dirOf(path) : "");
+    MakeReadOnly makeReadOnly(mustToggle ? dirOf(path) : "", smode);
 
     Path tempLink = (format("%1%/.tmp-link-%2%-%3%")
         % settings.nixStore % getpid() % rand()).str();
@@ -221,7 +227,9 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
         addTempRoot(*i);
         if (!isValidPath(*i)) continue; /* path was GC'ed, probably */
         startNest(nest, lvlChatty, format("hashing files in ‘%1%’") % *i);
-        optimisePath_(stats, *i, inodeHash);
+        // :TODO: Infer the security of the path based on the ACL.
+        SecretMode smode(publicUserName());
+        optimisePath_(stats, *i, inodeHash, smode);
     }
 }
 
@@ -231,7 +239,9 @@ void LocalStore::optimisePath(const Path & path)
     OptimiseStats stats;
     InodeHash inodeHash;
 
-    if (settings.autoOptimiseStore) optimisePath_(stats, path, inodeHash);
+    // :TODO: Infer the security of the path based on the ACL.
+    SecretMode smode(publicUserName());
+    if (settings.autoOptimiseStore) optimisePath_(stats, path, inodeHash, smode);
 }
 
 

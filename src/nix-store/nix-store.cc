@@ -549,8 +549,11 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
         if (info.path == "") break;
         if (!store->isValidPath(info.path) || reregister) {
             /* !!! races */
-            if (canonicalise)
-                canonicalisePathMetaData(info.path, -1);
+            if (canonicalise) {
+                // :TODO: Infer the security of the path based on the ACL.
+                SecretMode smode(publicUserName());
+                canonicalisePathMetaData(info.path, -1, smode);
+            }
             if (!hashGiven) {
                 HashResult hash = hashPath(htSHA256, info.path);
                 info.hash = hash.first;
