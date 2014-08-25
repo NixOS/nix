@@ -430,7 +430,8 @@ Path RemoteStore::addTextToStore(const string & name, const string & s,
 
     openConnection();
     writeInt(wopAddTextToStore, to);
-    writeString(userName, to);
+    if (GET_PROTOCOL_MINOR(daemonVersion) >= 15)
+        writeString(userName, to);
     writeString(name, to);
     writeString(s, to);
     writeStrings(references, to);
