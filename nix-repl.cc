@@ -38,7 +38,7 @@ struct NixRepl
     StringSet completions;
     StringSet::iterator curCompletion;
 
-    NixRepl();
+    NixRepl(const Strings & searchPath);
     void mainLoop(const Strings & files);
     void completePrefix(string prefix);
     bool getLine(string & line);
@@ -72,8 +72,8 @@ string removeWhitespace(string s)
 }
 
 
-NixRepl::NixRepl()
-    : state(Strings())
+NixRepl::NixRepl(const Strings & searchPath)
+    : state(searchPath)
     , staticEnv(false, &state.staticBaseEnv)
 {
     curDir = absPath(".");
@@ -595,11 +595,13 @@ int main(int argc, char * * argv)
     return handleExceptions(argv[0], [&]() {
         initNix();
 
-        Strings files;
+        Strings files, searchPath;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--version")
                 printVersion("nix-repl");
+            else if (parseSearchPathArg(arg, end, searchPath))
+                ;
             else if (*arg != "" && arg->at(0) == '-')
                 return false;
             else
@@ -607,7 +609,7 @@ int main(int argc, char * * argv)
             return true;
         });
 
-        NixRepl repl;
+        NixRepl repl(searchPath);
         repl.mainLoop(files);
     });
 }
