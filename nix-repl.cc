@@ -39,7 +39,7 @@ struct NixRepl
     StringSet::iterator curCompletion;
 
     NixRepl();
-    void mainLoop(const Strings & args);
+    void mainLoop(const Strings & files);
     void completePrefix(string prefix);
     bool getLine(string & line);
     bool processLine(string line);
@@ -73,7 +73,7 @@ string removeWhitespace(string s)
 
 
 NixRepl::NixRepl()
-    : state(Strings()) 
+    : state(Strings())
     , staticEnv(false, &state.staticBaseEnv)
 {
     curDir = absPath(".");
@@ -82,11 +82,11 @@ NixRepl::NixRepl()
 }
 
 
-void NixRepl::mainLoop(const Strings & args)
+void NixRepl::mainLoop(const Strings & files)
 {
     std::cout << "Welcome to Nix version " << NIX_VERSION << ". Type :? for help." << std::endl << std::endl;
 
-    foreach (Strings::const_iterator, i, args)
+    foreach (Strings::const_iterator, i, files)
         loadedFiles.push_back(*i);
 
     reloadFiles();
@@ -590,8 +590,24 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 }
 
 
-void run(Strings args)
+int main(int argc, char * * argv)
 {
-    NixRepl repl;
-    repl.mainLoop(args);
+    return handleExceptions(argv[0], [&]() {
+        initNix();
+
+        Strings files;
+
+        parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
+            if (*arg == "--version")
+                printVersion("nix-repl");
+            else if (*arg != "" && arg->at(0) == '-')
+                return false;
+            else
+                files.push_back(*arg);
+            return true;
+        });
+
+        NixRepl repl;
+        repl.mainLoop(files);
+    });
 }

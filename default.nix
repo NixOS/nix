@@ -2,6 +2,8 @@
 
 with import nixpkgs { inherit system; };
 
+let nix = nixUnstable; in
+
 runCommand "nix-repl"
   { buildInputs = [ readline nix boehmgc ]; }
   ''
