@@ -1,0 +1,20 @@
+<part xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id='part-command-ref'>
+
+<title>Command Reference</title>
+
+<partintro>
+<para>This section lists commands and options that you can use when you
+work with Nix.</para>
+</partintro>
+
+<xi:include href="opt-common.xml" />
+<xi:include href="env-common.xml" />
+<xi:include href="main-commands.xml" />
+<xi:include href="utilities.xml" />
+<xi:include href="files.xml" />
+
+</part>

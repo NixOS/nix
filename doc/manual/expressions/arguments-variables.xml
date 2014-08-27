@@ -1,0 +1,121 @@
+<section xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id='sec-arguments'>
+
+<title>Arguments and Variables</title>
+
+<example xml:id='ex-hello-composition'>
+
+<title>Composing GNU Hello
+(<filename>all-packages.nix</filename>)</title>
+<programlisting>
+...
+
+rec { <co xml:id='ex-hello-composition-co-1' />
+
+  hello = import ../applications/misc/hello/ex-1 <co xml:id='ex-hello-composition-co-2' /> { <co xml:id='ex-hello-composition-co-3' />
+    inherit fetchurl stdenv perl;
+  };
+
+  perl = import ../development/interpreters/perl { <co xml:id='ex-hello-composition-co-4' />
+    inherit fetchurl stdenv;
+  };
+
+  fetchurl = import ../build-support/fetchurl {
+    inherit stdenv; ...
+  };
+
+  stdenv = ...;
+
+}
+</programlisting>
+</example>
+
+<para>The Nix expression in <xref linkend='ex-hello-nix' /> is a
+function; it is missing some arguments that have to be filled in
+somewhere.  In the Nix Packages collection this is done in the file
+<filename>pkgs/top-level/all-packages.nix</filename>, where all
+Nix expressions for packages are imported and called with the
+appropriate arguments.  <xref linkend='ex-hello-composition' /> shows
+some fragments of
+<filename>all-packages.nix</filename>.</para>
+
+<calloutlist>
+
+  <callout arearefs='ex-hello-composition-co-1'>
+
+    <para>This file defines a set of attributes, all of which are
+    concrete derivations (i.e., not functions).  In fact, we define a
+    <emphasis>mutually recursive</emphasis> set of attributes.  That
+    is, the attributes can refer to each other.  This is precisely
+    what we want since we want to <quote>plug</quote> the
+    various packages into each other.</para>
+
+  </callout>
+
+  <callout arearefs='ex-hello-composition-co-2'>
+
+    <para>Here we <emphasis>import</emphasis> the Nix expression for
+    GNU Hello.  The import operation just loads and returns the
+    specified Nix expression. In fact, we could just have put the
+    contents of <xref linkend='ex-hello-nix' /> in
+    <filename>all-packages.nix</filename> at this point.  That
+    would be completely equivalent, but it would make the file rather
+    bulky.</para>
+
+    <para>Note that we refer to
+    <filename>../applications/misc/hello/ex-1</filename>, not
+    <filename>../applications/misc/hello/ex-1/default.nix</filename>.
+    When you try to import a directory, Nix automatically appends
+    <filename>/default.nix</filename> to the file name.</para>
+
+  </callout>
+
+  <callout arearefs='ex-hello-composition-co-3'>
+
+    <para>This is where the actual composition takes place.  Here we
+    <emphasis>call</emphasis> the function imported from
+    <filename>../applications/misc/hello/ex-1</filename> with a set
+    containing the things that the function expects, namely
+    <varname>fetchurl</varname>, <varname>stdenv</varname>, and
+    <varname>perl</varname>.  We use inherit again to use the
+    attributes defined in the surrounding scope (we could also have
+    written <literal>fetchurl = fetchurl;</literal>, etc.).</para>
+
+    <para>The result of this function call is an actual derivation
+    that can be built by Nix (since when we fill in the arguments of
+    the function, what we get is its body, which is the call to
+    <varname>stdenv.mkDerivation</varname> in <xref
+    linkend='ex-hello-nix' />).</para>
+
+    <note><para>Nixpkgs has a convenience function
+    <function>callPackage</function> that imports and calls a
+    function, filling in any missing arguments by passing the
+    corresponding attribute from the Nixpkgs set, like this:
+
+<programlisting>
+hello = callPackage ../applications/misc/hello/ex-1 { };
+</programlisting>
+
+    If necessary, you can set or override arguments:
+
+<programlisting>
+hello = callPackage ../applications/misc/hello/ex-1 { stdenv = myStdenv; };
+</programlisting>
+
+    </para></note>
+
+  </callout>
+
+  <callout arearefs='ex-hello-composition-co-4'>
+
+    <para>Likewise, we have to instantiate Perl,
+    <varname>fetchurl</varname>, and the standard environment.</para>
+
+  </callout>
+
+</calloutlist>
+
+</section>
