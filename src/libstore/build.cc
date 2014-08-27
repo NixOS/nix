@@ -2326,7 +2326,24 @@ void DerivationGoal::registerOutputs()
             PathSet allowed = parseReferenceSpecifiers(drv, get(drv.env, "allowedReferences"));
             foreach (PathSet::iterator, i, references)
                 if (allowed.find(*i) == allowed.end())
-                    throw BuildError(format("output is not allowed to refer to path ‘%1%’") % *i);
+                    throw BuildError(format("output (‘%1%’) is not allowed to refer to path ‘%2%’") % actualPath % *i);
+        }
+
+        /* If the derivation specifies an `allowedRequisites'
+           attribute (containing a list of paths that the output may
+           refer to), check that all requisites are in that list.  !!!
+           allowedRequisites should really be per-output. */
+        if (drv.env.find("allowedRequisites") != drv.env.end()) {
+            PathSet allowed = parseReferenceSpecifiers(drv, get(drv.env, "allowedRequisites"));
+            PathSet requisites;
+            /* Our requisites are the union of the closures of our references. */
+            foreach (PathSet::iterator, i, references)
+                /* Don't call computeFSClosure on ourselves. */
+                if (actualPath != *i)
+                    computeFSClosure(worker.store, *i, requisites);
+            foreach (PathSet::iterator, i, requisites)
+                if (allowed.find(*i) == allowed.end())
+                    throw BuildError(format("output (‘%1%’) is not allowed to refer to requisite path ‘%2%’") % actualPath % *i);
         }
 
         worker.store.optimisePath(path); // FIXME: combine with scanForReferences()
