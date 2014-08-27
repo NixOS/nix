@@ -1569,6 +1569,25 @@ allowedReferences = [];
 
   </varlistentry>
 
+  <varlistentry><term><varname>allowedRequisites</varname></term>
+
+    <listitem><para>This attribute is similar to
+    <varname>allowedReferences</varname>, but it specifies the legal
+    requisites of the whole closure, so all the dependencies
+    recursively.  For example,
+
+<programlisting>
+allowedReferences = [ foobar ];
+</programlisting>
+
+    enforces that the output of a derivation cannot have any other
+    runtime dependency than <varname>foobar</varname>, and in addition
+    it enforces that <varname>foobar</varname> itself doesn't
+    introduce any other dependency itself. This is used in NixOS when
+    rebuilding the stdenv on Linux to ensure that the resulting stdenv
+    doesn't have any surprising dependency, e.g. on bootstrapTools.
+
+  </varlistentry>
 
   <varlistentry><term><varname>exportReferencesGraph</varname></term>
 
