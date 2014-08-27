@@ -11,6 +11,20 @@
 
 <para>TODO</para>
 
+<itemizedlist>
+
+  <listitem><para>Derivations can specify the new special attribute
+  <varname>allowedRequisites</varname>, which has a similar meaning to
+  <varname>allowedReferences</varname>. But instead of only enforcing
+  to explicitly specify the immediate references, it requires the
+  derivation to specify all the dependencies recursively (hence the
+  name, requisites) that are used by the resulting output. This is
+  used in NixOS when rebuilding the stdenv on Linux to ensure that the
+  resulting stdenv doesn't have any surprising dependency, e.g. on
+  bootstrapTools.</para></listitem>
+
+</itemizedlist>
+
 </section>
 
 
