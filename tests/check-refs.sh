@@ -32,3 +32,9 @@ nix-build -o $RESULT check-refs.nix -A test7
 
 # test8 should fail (toFile depending on derivation output).
 (! nix-build -o $RESULT check-refs.nix -A test8)
+
+# test9 should fail (disallowed reference).
+(! nix-build -o $RESULT check-refs.nix -A test9)
+
+# test10 should succeed (no disallowed references).
+nix-build -o $RESULT check-refs.nix -A test10

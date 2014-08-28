@@ -40,4 +40,18 @@ rec {
   test3 = makeTest 3 [ dep1 deps ];
   test4 = makeTest 4 [ deps ];
   test5 = makeTest 5 [];
+
+  test6 = mkDerivation {
+    name = "check-reqs";
+    inherit deps;
+    builder = builtins.toFile "builder.sh" "mkdir $out; ln -s $deps $out/depdir1";
+    disallowedRequisites = [dep1];
+  };
+
+  test7 = mkDerivation {
+    name = "check-reqs";
+    inherit deps;
+    builder = builtins.toFile "builder.sh" "mkdir $out; ln -s $deps $out/depdir1";
+    disallowedRequisites = [test1];
+  };
 }

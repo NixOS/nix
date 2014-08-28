@@ -2318,33 +2318,36 @@ void DerivationGoal::registerOutputs()
                 debug(format("referenced input: ‘%1%’") % *i);
         }
 
-        /* If the derivation specifies an `allowedReferences'
-           attribute (containing a list of paths that the output may
-           refer to), check that all references are in that list.  !!!
-           allowedReferences should really be per-output. */
-        if (drv.env.find("allowedReferences") != drv.env.end()) {
-            PathSet allowed = parseReferenceSpecifiers(drv, get(drv.env, "allowedReferences"));
-            foreach (PathSet::iterator, i, references)
-                if (allowed.find(*i) == allowed.end())
-                    throw BuildError(format("output (‘%1%’) is not allowed to refer to path ‘%2%’") % actualPath % *i);
-        }
+        /* Enforce `allowedReferences' and friends. */
+        auto checkRefs = [&](const string & attrName, bool allowed, bool recursive) {
+            if (drv.env.find(attrName) == drv.env.end()) return;
 
-        /* If the derivation specifies an `allowedRequisites'
-           attribute (containing a list of paths that the output may
-           refer to), check that all requisites are in that list.  !!!
-           allowedRequisites should really be per-output. */
-        if (drv.env.find("allowedRequisites") != drv.env.end()) {
-            PathSet allowed = parseReferenceSpecifiers(drv, get(drv.env, "allowedRequisites"));
-            PathSet requisites;
-            /* Our requisites are the union of the closures of our references. */
-            foreach (PathSet::iterator, i, references)
-                /* Don't call computeFSClosure on ourselves. */
-                if (actualPath != *i)
-                    computeFSClosure(worker.store, *i, requisites);
-            foreach (PathSet::iterator, i, requisites)
-                if (allowed.find(*i) == allowed.end())
-                    throw BuildError(format("output (‘%1%’) is not allowed to refer to requisite path ‘%2%’") % actualPath % *i);
-        }
+            PathSet spec = parseReferenceSpecifiers(drv, get(drv.env, attrName));
+
+            PathSet used;
+            if (recursive) {
+                /* Our requisites are the union of the closures of our references. */
+                for (auto & i : references)
+                    /* Don't call computeFSClosure on ourselves. */
+                    if (actualPath != i)
+                        computeFSClosure(worker.store, i, used);
+            } else
+                used = references;
+
+            for (auto & i : used)
+                if (allowed) {
+                    if (spec.find(i) == spec.end())
+                        throw BuildError(format("output (‘%1%’) is not allowed to refer to path ‘%2%’") % actualPath % i);
+                } else {
+                    if (spec.find(i) != spec.end())
+                        throw BuildError(format("output (‘%1%’) is not allowed to refer to path ‘%2%’") % actualPath % i);
+                }
+        };
+
+        checkRefs("allowedReferences", true, false);
+        checkRefs("allowedRequisites", true, true);
+        checkRefs("disallowedReferences", false, false);
+        checkRefs("disallowedRequisites", false, true);
 
         worker.store.optimisePath(path); // FIXME: combine with scanForReferences()
 
