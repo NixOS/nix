@@ -442,12 +442,14 @@ Path RemoteStore::addTextToStore(const string & name, const string & s,
 
 
 void RemoteStore::exportPath(const Path & path, bool sign,
-    Sink & sink)
+    const string & userName, Sink & sink)
 {
     openConnection();
     writeInt(wopExportPath, to);
     writeString(path, to);
     writeInt(sign ? 1 : 0, to);
+    if (GET_PROTOCOL_MINOR(daemonVersion) >= 15)
+        writeString(userName, to);
     processStderr(&sink); /* sink receives the actual data */
     readInt(from);
 }

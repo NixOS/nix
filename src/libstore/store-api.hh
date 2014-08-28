@@ -181,7 +181,7 @@ public:
        cryptographic signature (created by OpenSSL) of the preceding
        data is attached. */
     virtual void exportPath(const Path & path, bool sign,
-        Sink & sink) = 0;
+        const string & userName, Sink & sink) = 0;
 
     /* Import a sequence of NAR dumps created by exportPaths() into
        the Nix store. */

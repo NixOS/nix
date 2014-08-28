@@ -61,7 +61,7 @@ public:
         const PathSet & references, const string &userName, bool repair = false);
 
     void exportPath(const Path & path, bool sign,
-        Sink & sink);
+        const string & userName, Sink & sink);
 
     Paths importPaths(bool requireSignature, Source & source);
     

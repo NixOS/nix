@@ -1486,7 +1486,7 @@ static void checkSecrecy(const Path & path)
 
 
 void LocalStore::exportPath(const Path & path, bool sign,
-    Sink & sink)
+    const string & userName, Sink & sink)
 {
     assertStorePath(path);
 
@@ -1494,6 +1494,10 @@ void LocalStore::exportPath(const Path & path, bool sign,
 
     if (!isValidPath(path))
         throw Error(format("path ‘%1%’ is not valid") % path);
+
+    string owner = getOwnerOfSecretFile(path);
+    if (owner != publicUserName() && owner != userName)
+        throw Error(format("path ‘%1%’ is not accessible by %2%") % path % userName);
 
     HashAndWriteSink hashAndWriteSink(sink);
 

@@ -297,9 +297,12 @@ string showPaths(const PathSet & paths)
 void exportPaths(StoreAPI & store, const Paths & paths,
     bool sign, Sink & sink)
 {
+    /* Ensure that the current user can read his own files */
+    string userName = getCurrentUserName();
+
     foreach (Paths::const_iterator, i, paths) {
         writeInt(1, sink);
-        store.exportPath(*i, sign, sink);
+        store.exportPath(*i, sign, userName, sink);
     }
     writeInt(0, sink);
 }

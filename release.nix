@@ -220,6 +220,10 @@ let
       nix = build.x86_64-linux; system = "x86_64-linux";
     }).test;
 
+    tests.sec_exportPath = (import ./tests/sec-exportPath.nix rec {
+      nix = build.x86_64-linux; system = "x86_64-linux";
+    }).test;
+
 
     # Aggregate job containing the release-critical jobs.
     release = pkgs.releaseTools.aggregate {
