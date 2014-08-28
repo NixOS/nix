@@ -18,10 +18,8 @@
   <varname>allowedReferences</varname>. But instead of only enforcing
   to explicitly specify the immediate references, it requires the
   derivation to specify all the dependencies recursively (hence the
-  name, requisites) that are used by the resulting output. This is
-  used in NixOS when rebuilding the stdenv on Linux to ensure that the
-  resulting stdenv doesn't have any surprising dependency, e.g. on
-  bootstrapTools.</para></listitem>
+  name, requisites) that are used by the resulting
+  output.</para></listitem>
 
 </itemizedlist>
 
