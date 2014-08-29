@@ -1,5 +1,6 @@
 #! @perl@ -w @perlFlags@
 
+use utf8;
 use DBI;
 use DBD::SQLite;
 use File::Basename;
@@ -12,6 +13,7 @@ use WWW::Curl::Easy;
 use WWW::Curl::Multi;
 use strict;
 
+binmode STDERR, ":encoding(utf8)";
 
 Nix::Config::readConfig;
 

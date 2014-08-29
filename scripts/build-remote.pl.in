@@ -1,5 +1,6 @@
 #! @perl@ -w @perlFlags@
 
+use utf8;
 use Fcntl qw(:DEFAULT :flock);
 use English '-no_match_vars';
 use IO::Handle;
@@ -8,6 +9,8 @@ use Nix::SSH;
 use Nix::CopyClosure;
 use Nix::Store;
 no warnings('once');
+
+binmode STDERR, ":encoding(utf8)";
 
 
 # General operation:

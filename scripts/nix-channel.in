@@ -1,10 +1,13 @@
 #! @perl@ -w @perlFlags@
 
+use utf8;
 use strict;
 use File::Basename;
 use File::Path qw(mkpath);
 use Nix::Config;
 use Nix::Manifest;
+
+binmode STDERR, ":encoding(utf8)";
 
 Nix::Config::readConfig;
 

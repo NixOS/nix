@@ -1,5 +1,6 @@
 #! @perl@ -w @perlFlags@
 
+use utf8;
 use strict;
 use File::Basename;
 use File::Path qw(mkpath);
@@ -10,6 +11,8 @@ use Nix::Store;
 use Nix::Manifest;
 use Nix::Utils;
 use Nix::Crypto;
+
+binmode STDERR, ":encoding(utf8)";
 
 my $tmpDir = mkTempDir("nix-push");
 

@@ -1,8 +1,11 @@
 #! @perl@ -w @perlFlags@
 
+use utf8;
 use strict;
 use Nix::Config;
 use Nix::Utils;
+
+binmode STDERR, ":encoding(utf8)";
 
 
 # Parse the command line arguments.

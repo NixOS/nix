@@ -1,10 +1,12 @@
 #! @perl@ -w @perlFlags@
 
+use utf8;
 use strict;
 use Nix::Config;
 use Nix::Store;
 use Nix::Utils;
 
+binmode STDERR, ":encoding(utf8)";
 
 my $dryRun = 0;
 my $verbose = 0;

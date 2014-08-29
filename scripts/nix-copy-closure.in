@@ -6,6 +6,7 @@ use Nix::Store;
 use Nix::CopyClosure;
 use List::Util qw(sum);
 
+binmode STDERR, ":encoding(utf8)";
 
 if (scalar @ARGV < 1) {
     print STDERR <<EOF
