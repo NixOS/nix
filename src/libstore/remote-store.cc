@@ -579,6 +579,13 @@ void RemoteStore::clearFailedPaths(const PathSet & paths)
     readInt(from);
 }
 
+void RemoteStore::optimiseStore()
+{
+    openConnection();
+    writeInt(wopOptimiseStore, to);
+    processStderr();
+    readInt(from);
+}
 
 void RemoteStore::processStderr(Sink * sink, Source * source)
 {

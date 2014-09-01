@@ -250,6 +250,10 @@ public:
        `nix-store --register-validity'. */
     string makeValidityRegistration(const PathSet & paths,
         bool showDerivers, bool showHash);
+
+    /* Optimise the disk space usage of the Nix store by hard-linking files
+       with the same contents. */
+    virtual void optimiseStore() = 0;
 };
 
 

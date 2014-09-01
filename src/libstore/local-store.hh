@@ -167,6 +167,9 @@ public:
        files with the same contents. */
     void optimiseStore(OptimiseStats & stats);
 
+    /* Generic variant of the above method.  */
+    void optimiseStore();
+
     /* Optimise a single store path. */
     void optimisePath(const Path & path);
 

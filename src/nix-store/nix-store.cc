@@ -823,16 +823,6 @@ static void opRepairPath(Strings opFlags, Strings opArgs)
     }
 }
 
-
-static void showOptimiseStats(OptimiseStats & stats)
-{
-    printMsg(lvlError,
-        format("%1% freed by hard-linking %2% files")
-        % showBytes(stats.bytesFreed)
-        % stats.filesLinked);
-}
-
-
 /* Optimise the disk space usage of the Nix store by hard-linking
    files with the same contents. */
 static void opOptimise(Strings opFlags, Strings opArgs)
@@ -840,16 +830,8 @@ static void opOptimise(Strings opFlags, Strings opArgs)
     if (!opArgs.empty() || !opFlags.empty())
         throw UsageError("no arguments expected");
 
-    OptimiseStats stats;
-    try {
-        ensureLocalStore().optimiseStore(stats);
-    } catch (...) {
-        showOptimiseStats(stats);
-        throw;
-    }
-    showOptimiseStats(stats);
+    store->optimiseStore();
 }
-
 
 static void opQueryFailedPaths(Strings opFlags, Strings opArgs)
 {
