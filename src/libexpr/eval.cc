@@ -1330,7 +1330,7 @@ Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
 {
     string path = coerceToString(pos, v, context, false, false);
     if (path == "" || path[0] != '/')
-        throwEvalError("string ‘%1%’ doesn't represent an absolute path, at %1%", path, pos);
+        throwEvalError("string ‘%1%’ doesn't represent an absolute path, at %2%", path, pos);
     return path;
 }
 
