@@ -40,6 +40,14 @@ ifeq ($(BUILD_SHARED_LIBS), 1)
 endif
 
 
+# On MacOS X, some boost libraries have an -mt suffix
+ifeq ($(OS), Darwin)
+  ifndef NIX_STORE
+    BOOST_SUFFIX = -mt
+  endif
+endif
+
+
 # Pass -g if we want debug info.
 BUILD_DEBUG ?= 1
 
