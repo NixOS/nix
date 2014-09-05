@@ -214,11 +214,11 @@ let
     # System tests.
     tests.remote_builds = (import ./tests/remote-builds.nix rec {
       nix = build.x86_64-linux; system = "x86_64-linux";
-    }).test;
+    });
 
     tests.nix_copy_closure = (import ./tests/nix-copy-closure.nix rec {
       nix = build.x86_64-linux; system = "x86_64-linux";
-    }).test;
+    });
 
 
     # Aggregate job containing the release-critical jobs.
