@@ -10,7 +10,10 @@ use Nix::CopyClosure;
 use Nix::Store;
 no warnings('once');
 
+STDERR->autoflush(1);
 binmode STDERR, ":encoding(utf8)";
+
+my $debug = defined $ENV{NIX_DEBUG_HOOK};
 
 
 # General operation:
@@ -151,7 +154,7 @@ REQ: while (1) {
             }
         }
 
-        if (defined $ENV{NIX_DEBUG_HOOK}) {
+        if ($debug) {
             print STDERR "load on " . $_->{machine}->{hostName} . " = " . $_->{load} . "\n"
                 foreach @available;
         }
