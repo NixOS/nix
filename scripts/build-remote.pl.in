@@ -8,6 +8,7 @@ use Nix::Config;
 use Nix::SSH;
 use Nix::CopyClosure;
 use Nix::Store;
+use Encode;
 no warnings('once');
 
 STDERR->autoflush(1);
@@ -264,7 +265,7 @@ writeInt($maxSilentTime, $to);
 writeInt($buildTimeout, $to);
 my $res = readInt($from);
 if ($res != 0) {
-    my $msg = readString($from);
+    my $msg = decode("utf-8", readString($from));
     print STDERR "error: $msg on ‘$hostName’\n";
     exit $res;
 }
