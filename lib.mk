@@ -25,6 +25,16 @@ sysconfdir ?= $(prefix)/etc
 mandir ?= $(prefix)/share/man
 
 
+# Initialise support for build directories.
+builddir ?=
+
+ifdef builddir
+  buildprefix = $(builddir)/
+else
+  buildprefix =
+endif
+
+
 # Pass -fPIC if we're building dynamic libraries.
 BUILD_SHARED_LIBS ?= 1
 

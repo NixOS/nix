@@ -45,9 +45,9 @@ endif
 #   built, otherwise a static library.
 define build-library
   $(1)_NAME ?= $(1)
-  _d := $$(strip $$($(1)_DIR))
+  _d := $(buildprefix)$$(strip $$($(1)_DIR))
   _srcs := $$(sort $$(foreach src, $$($(1)_SOURCES), $$(src)))
-  $(1)_OBJS := $$(addsuffix .o, $$(basename $$(_srcs)))
+  $(1)_OBJS := $$(addprefix $(buildprefix), $$(addsuffix .o, $$(basename $$(_srcs))))
   _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_PATH))
 
   $(1)_INSTALL_DIR ?= $$(libdir)
