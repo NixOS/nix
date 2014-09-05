@@ -8,8 +8,12 @@ define instantiate-template
 
 endef
 
+ifneq ($(MAKECMDGOALS), clean)
+
 %.h: %.h.in
 	$(trace-gen) rm -f $@ && ./config.status --quiet --header=$@
 
 %: %.in
 	$(trace-gen) rm -f $@ && ./config.status --quiet --file=$@
+
+endif
