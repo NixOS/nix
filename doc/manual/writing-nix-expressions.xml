@@ -1549,6 +1549,24 @@ attributes.</para>
 
 <variablelist>
 
+  <varlistentry><term><varname>passthru</varname></term>
+  
+      <listitem><para>The optional attribute
+      <varname>passthru</varname> specifies attribute set of values not
+      passed to the builder.
+  
+      <programlisting>
+      passthru = {
+        foo = "bar";
+      };
+      </programlisting>
+  
+      <varname>passthru</varname> attributes are accessible on the derivation itself: <literal>subversion.foo</literal>
+          
+      </para></listitem>
+  
+    </varlistentry>
+
   <varlistentry><term><varname>allowedReferences</varname></term>
 
     <listitem><para>The optional attribute
