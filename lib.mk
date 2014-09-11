@@ -36,6 +36,7 @@ libdir ?= $(prefix)/lib
 bindir ?= $(prefix)/bin
 libexecdir ?= $(prefix)/libexec
 datadir ?= $(prefix)/share
+jardir ?= $(datadir)/java
 localstatedir ?= $(prefix)/var
 sysconfdir ?= $(prefix)/etc
 mandir ?= $(prefix)/share/man
