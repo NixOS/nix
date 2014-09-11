@@ -14,6 +14,11 @@ dist-files :=
 OS = $(shell uname -s)
 
 
+# Hack to define a literal space.
+space :=
+space +=
+
+
 # Default installation paths.
 prefix ?= /usr/local
 libdir ?= $(prefix)/lib
