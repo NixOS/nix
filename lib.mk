@@ -14,10 +14,6 @@ dist-files :=
 OS = $(shell uname -s)
 
 
-# Use bash (required for process substitution in the JAR function).
-SHELL = bash
-
-
 # Hack to define a literal space.
 space :=
 space +=

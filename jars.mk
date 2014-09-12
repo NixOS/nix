@@ -16,7 +16,9 @@ define build-jar
 	$$(trace-javac) javac $(GLOBAL_JAVACFLAGS) $$($(1)_JAVACFLAGS) -d $$($(1)_TMPDIR) \
 	  $$(foreach fn, $$($(1)_SOURCES), '$$(fn)') \
 	  -cp "$$(subst $$(space),,$$(foreach jar,$$($(1)_JARS),$$($$(jar)_PATH):))$$$$CLASSPATH"
-	$$(trace-jar) jar cfm $$($(1)_PATH) <(echo -e '$$(subst $$(newline),\n,$$($(1)_MANIFEST))') -C $$($(1)_TMPDIR) .
+	@echo -e '$$(subst $$(newline),\n,$$($(1)_MANIFEST))' > $$($(1)_PATH).manifest
+	$$(trace-jar) jar cfm $$($(1)_PATH) $$($(1)_PATH).manifest -C $$($(1)_TMPDIR) .
+	@rm $$($(1)_PATH).manifest
 	@rm -rf $$($(1)_TMPDIR)
 
   $(1)_INSTALL_DIR ?= $$(jardir)
