@@ -700,6 +700,9 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
 
     DrvInfo & drv(elems.front());
 
+    if (globals.forceName != "")
+        drv.name = globals.forceName;
+
     if (drv.queryDrvPath() != "") {
         PathSet paths = singleton<PathSet>(drv.queryDrvPath());
         printMissing(*store, paths);
