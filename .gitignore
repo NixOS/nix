@@ -8,7 +8,6 @@ Makefile.config
 /nix.spec
 /stamp-h1
 /svn-revision
-/NEWS
 /libtool
 
 /corepkgs/config.nix
@@ -32,7 +31,6 @@ Makefile.config
 /doc/manual/*.5
 /doc/manual/*.8
 /doc/manual/version.txt
-/doc/manual/release-notes.html
 
 # /scripts/
 /scripts/nix-profile.sh

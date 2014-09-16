@@ -83,31 +83,3 @@ $(d)/manual.pdf: $(d)/manual.xml $(MANUAL_SRCS) $(d)/manual.is-valid
 	fi
 
 clean-files += $(d)/manual.pdf
-
-
-# Generate the release notes.
-
-NEWS_OPTS = \
- --stringparam generate.toc "article nop" \
- --stringparam section.autolabel.max.depth 0 \
- --stringparam header.rule 0
-
-$(d)/release-notes.html: $(d)/release-notes.xml
-	$(trace-gen) $(XSLTPROC) --xinclude --output $@ $(NEWS_OPTS) \
-	  $(docbookxsl)/xhtml/docbook.xsl $<
-
-NEWS: $(d)/release-notes.xml
-	$(trace-gen) $(XSLTPROC) --xinclude doc/manual/quote-literals.xsl $< | \
-	  $(XSLTPROC) --output $@.tmp.html $(NEWS_OPTS) \
-	  $(docbookxsl)/xhtml/docbook.xsl - && \
-	LANG=en_US.UTF-8 $(w3m) -dump $@.tmp.html > $@.tmp && \
-	sed -e 's/●/*/g' -e 's/○/-/g' -e 's/━/-/g' < $@.tmp > NEWS && \
-	rm $@.tmp $@.tmp.html
-
-dist-files += NEWS $(d)/release-notes.html
-
-clean-files += NEWS $(d)/release-notes.html
-
-all: $(d)/release-notes.html NEWS
-
-$(foreach file, $(d)/release-notes.html, $(eval $(call install-data-in, $(file), $(docdir)/manual)))
