@@ -40,10 +40,12 @@ man-pages := $(foreach n, \
   nix.conf.5 nix-daemon.8, \
   $(d)/$(n))
 
-$(man-pages): $(d)/manual.xmli $(d)/manual.is-valid
-	$(trace-gen) $(XSLTPROC) --stringparam profile.condition manpage \
+$(firstword $(man-pages)): $(d)/manual.xmli $(d)/manual.is-valid
+	$(trace-gen) $(XSLTPROC) --novalid --stringparam profile.condition manpage \
 	  $(docbookxsl)/profiling/profile.xsl $< 2> /dev/null | \
 	  (cd doc/manual && $(XSLTPROC) $(docbookxsl)/manpages/docbook.xsl -)
+
+$(wordlist 2, $(words $(man-pages)), $(man-pages)): $(firstword $(man-pages))
 
 clean-files += $(d)/*.1 $(d)/*.5 $(d)/*.8
 
