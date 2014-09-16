@@ -22,12 +22,12 @@ store (such as builds) are forwarded to a <emphasis>Nix
 daemon</emphasis> running under the owner of the Nix store/database
 that performs the operation.</para>
 
-<note>Multi-user mode has one important limitation: only
+<note><para>Multi-user mode has one important limitation: only
 <systemitem class="username">root</systemitem> can run <command
 linkend="sec-nix-pull">nix-pull</command> to register the availability
 of pre-built binaries.  However, those registrations are shared by all
 users, so they still get the benefit from <command>nix-pull</command>s
-done by <systemitem class="username">root</systemitem>.</note>
+done by <systemitem class="username">root</systemitem>.</para></note>
 
 
 <simplesect>
@@ -79,6 +79,7 @@ export NIX_REMOTE=daemon</programlisting>
 into the users’ login scripts.</para>
 
 </simplesect>
+
 
 <simplesect>
 

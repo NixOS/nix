@@ -11,7 +11,6 @@ a source distribution.</para>
 
 <xi:include href="prerequisites-source.xml" />
 <xi:include href="obtaining-source.xml" />
-<xi:include href="installing-source.xml" />
 <xi:include href="building-source.xml" />
 
 </chapter>

@@ -8,7 +8,7 @@ XSLTPROC = $(xsltproc) --nonet $(xmlflags) \
   --param callout.graphics.extension \'.gif\' \
   --param contrib.inline.enabled 0
 
-MANUAL_SRCS := $(wildcard $(d)/*.xml)
+MANUAL_SRCS := $(call rwildcard, $(d), *.xml)
 
 
 # Do XInclude processing / RelaxNG validation
