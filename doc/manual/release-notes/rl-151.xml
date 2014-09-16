@@ -1,0 +1,12 @@
+<chapter xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="ssec-relnotes-1.5.1">
+
+<title>Release 1.5.1 (February 28, 2013)</title>
+
+<para>The bug fix to the bug fix had a bug itself, of course.  But
+this time it will work for sure!</para>
+
+</chapter>

@@ -1,0 +1,113 @@
+<section xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="sec-language-operators">
+
+<title>Operators</title>
+
+<para><xref linkend='table-operators' /> lists the operators in the
+Nix expression language, in order of precedence (from strongest to
+weakest binding).</para>
+
+<table xml:id='table-operators'>
+  <title>Operators</title>
+  <tgroup cols='3'>
+    <thead>
+      <row>
+        <entry>Syntax</entry>
+        <entry>Associativity</entry>
+        <entry>Description</entry>
+      </row>
+    </thead>
+    <tbody>
+      <row>
+        <entry><replaceable>e</replaceable> <literal>.</literal>
+        <replaceable>attrpath</replaceable>
+        [ <literal>or</literal> <replaceable>def</replaceable> ]
+        </entry>
+        <entry>none</entry>
+        <entry>Select attribute denoted by the attribute path
+        <replaceable>attrpath</replaceable> from set
+        <replaceable>e</replaceable>.  (An attribute path is a
+        dot-separated list of attribute names.)  If the attribute
+        doesn’t exist, return <replaceable>def</replaceable> if
+        provided, otherwise abort evaluation.</entry>
+      </row>
+      <row>
+        <entry><replaceable>e1</replaceable> <replaceable>e2</replaceable></entry>
+        <entry>left</entry>
+        <entry>Call function <replaceable>e1</replaceable> with
+        argument <replaceable>e2</replaceable>.</entry>
+      </row>
+      <row>
+        <entry><replaceable>e</replaceable> <literal>?</literal>
+        <replaceable>attrpath</replaceable></entry>
+        <entry>none</entry>
+        <entry>Test whether set <replaceable>e</replaceable> contains
+        the attribute denoted by <replaceable>attrpath</replaceable>;
+        return <literal>true</literal> or
+        <literal>false</literal>.</entry>
+      </row>
+      <row>
+        <entry><replaceable>e1</replaceable> <literal>++</literal> <replaceable>e2</replaceable></entry>
+        <entry>right</entry>
+        <entry>List concatenation.</entry>
+      </row>
+      <row>
+        <entry><replaceable>e1</replaceable> <literal>+</literal> <replaceable>e2</replaceable></entry>
+        <entry>left</entry>
+        <entry>String or path concatenation.</entry>
+      </row>
+      <row>
+        <entry><literal>!</literal> <replaceable>e</replaceable></entry>
+        <entry>left</entry>
+        <entry>Boolean negation.</entry>
+      </row>
+      <row>
+        <entry><replaceable>e1</replaceable> <literal>//</literal>
+        <replaceable>e2</replaceable></entry>
+        <entry>right</entry>
+        <entry>Return a set consisting of the attributes in
+        <replaceable>e1</replaceable> and
+        <replaceable>e2</replaceable> (with the latter taking
+        precedence over the former in case of equally named
+        attributes).</entry>
+      </row>
+      <row>
+        <entry><replaceable>e1</replaceable> <literal>==</literal>
+        <replaceable>e2</replaceable></entry>
+        <entry>none</entry>
+        <entry>Equality.</entry>
+      </row>
+      <row>
+        <entry><replaceable>e1</replaceable> <literal>!=</literal>
+        <replaceable>e2</replaceable></entry>
+        <entry>none</entry>
+        <entry>Inequality.</entry>
+      </row>
+      <row>
+        <entry><replaceable>e1</replaceable> <literal>&amp;&amp;</literal>
+        <replaceable>e2</replaceable></entry>
+        <entry>left</entry>
+        <entry>Logical AND.</entry>
+      </row>
+      <row>
+        <entry><replaceable>e1</replaceable> <literal>||</literal>
+        <replaceable>e2</replaceable></entry>
+        <entry>left</entry>
+        <entry>Logical OR.</entry>
+      </row>
+      <row>
+        <entry><replaceable>e1</replaceable> <literal>-></literal>
+        <replaceable>e2</replaceable></entry>
+        <entry>none</entry>
+        <entry>Logical implication (equivalent to
+        <literal>!<replaceable>e1</replaceable> ||
+        <replaceable>e2</replaceable></literal>).</entry>
+      </row>
+    </tbody>
+  </tgroup>
+</table>
+
+</section>

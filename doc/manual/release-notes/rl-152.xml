@@ -1,0 +1,12 @@
+<chapter xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="ssec-relnotes-1.5.2">
+
+<title>Release 1.5.2 (May 13, 2013)</title>
+
+<para>This is primarily a bug fix release.  It has contributions from
+Eelco Dolstra, Lluís Batlle i Rossell and Shea Levy.</para>
+
+</chapter>

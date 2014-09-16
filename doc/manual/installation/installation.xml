@@ -1,0 +1,34 @@
+<part xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="chap-installation">
+
+<title>Installation</title>
+
+<partintro>
+<para>This section describes how to install and configure Nix for first-time use.</para>
+</partintro>
+
+<xi:include href="supported-platforms.xml" />
+<xi:include href="installing-binary.xml" />
+<xi:include href="installing-source.xml" />
+<xi:include href="nix-security.xml" />
+<xi:include href="env-variables.xml" />
+
+<!-- TODO: should be updated
+<section><title>Upgrading Nix through Nix</title>
+
+<para>You can install the latest stable version of Nix through Nix
+itself by subscribing to the channel <link
+xlink:href="http://nixos.org/releases/nix/channels/nix-stable" />,
+or the latest unstable version by subscribing to the channel <link
+xlink:href="http://nixos.org/releases/nix/channels/nix-unstable" />.
+You can also do a <link linkend="sec-one-click">one-click
+installation</link> by clicking on the package links at <link
+xlink:href="http://nixos.org/releases/full-index-nix.html" />.</para>
+
+</section>
+-->
+
+</part>

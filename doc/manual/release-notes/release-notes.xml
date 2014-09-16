@@ -1,0 +1,43 @@
+<part xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="sec-relnotes">
+
+<title>Nix Release Notes</title>
+
+<partintro>
+<para>This section lists the release notes for each stable version of Nix.</para>
+</partintro>
+
+<!-- TODO 
+<xi:include href="rl-18.xml" />
+-->
+<xi:include href="rl-17.xml" />
+<xi:include href="rl-161.xml" />
+<xi:include href="rl-16.xml" />
+<xi:include href="rl-152.xml" />
+<xi:include href="rl-15.xml" />
+<xi:include href="rl-14.xml" />
+<xi:include href="rl-13.xml" />
+<xi:include href="rl-12.xml" />
+<xi:include href="rl-11.xml" />
+<xi:include href="rl-10.xml" />
+<xi:include href="rl-016.xml" />
+<xi:include href="rl-015.xml" />
+<xi:include href="rl-014.xml" />
+<xi:include href="rl-013.xml" />
+<xi:include href="rl-012.xml" />
+<xi:include href="rl-011.xml" />
+<xi:include href="rl-0101.xml" />
+<xi:include href="rl-010.xml" />
+<xi:include href="rl-092.xml" />
+<xi:include href="rl-091.xml" />
+<xi:include href="rl-09.xml" />
+<xi:include href="rl-081.xml" />
+<xi:include href="rl-08.xml" />
+<xi:include href="rl-07.xml" />
+<xi:include href="rl-06.xml" />
+<xi:include href="rl-05.xml" />
+
+</part>
