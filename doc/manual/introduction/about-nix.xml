@@ -223,8 +223,8 @@ href="docs/papers.html#servicecm">SCM-12 paper</a>.</para>
 
 <simplesect><title>Portability</title>
 
-<para>Nix should run on most Unix systems, including Linux, FreeBSD and
-Mac OS X.<!-- It is also supported on Windows using Cygwin.--></para>
+<para>Nix should run on most Unix systems, including Linux and Mac OS
+X.
 
 </simplesect>
 
