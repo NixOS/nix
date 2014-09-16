@@ -33,11 +33,6 @@ environment (if already installed) using <command>nix-env
 -e</command>, or specify exactly which version should be installed
 (e.g., <literal>nix-env -i docbook-xml-4.2</literal>).</para>
 
-<para>Alternatively, you can modify the user environment builder
-script (in
-<filename><replaceable>prefix</replaceable>/share/nix/corepkgs/buildenv/builder.pl</filename>)
-to implement some conflict resolution policy.  E.g., the script could
-be modified to rename conflicting file names, or to pick one over the
-other.</para>
+<!-- FIXME: describe priorities -->
 
 </section>
