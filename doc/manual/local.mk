@@ -6,7 +6,8 @@ XSLTPROC = $(xsltproc) --nonet $(xmlflags) \
   --param toc.section.depth 3 \
   --param admon.style \'\' \
   --param callout.graphics.extension \'.gif\' \
-  --param contrib.inline.enabled 0
+  --param contrib.inline.enabled 0 \
+  --stringparam generate.toc "book toc"
 
 MANUAL_SRCS := $(call rwildcard, $(d), *.xml)
 
