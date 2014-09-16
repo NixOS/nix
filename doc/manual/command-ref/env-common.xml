@@ -283,28 +283,6 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 </varlistentry>
 
 
-<varlistentry xml:id="envar-other-stores"><term><envar>NIX_OTHER_STORES</envar></term>
-
-  <listitem><para>This variable contains the paths of remote Nix
-  installations from which packages can be copied, separated by colons.
-  <phrase condition="manual">See <xref linkend="sec-sharing-packages"
-  /> for details.</phrase>  Each path should be the
-  <filename>/nix</filename> directory of a remote Nix installation
-  (i.e., not the <filename>/nix/store</filename> directory).  The
-  paths are subject to globbing, so you can set it so something like
-  <literal>/var/run/nix/remote-stores/*/nix</literal> and mount
-  multiple remote filesystems in
-  <literal>/var/run/nix/remote-stores</literal>.</para>
-
-  <para>Note that if you’re building through the <link
-  linkend="sec-nix-daemon">Nix daemon</link>, the only setting for
-  this variable that matters is the one that the
-  <command>nix-daemon</command> process uses.  So if you want to
-  change it, you have to restart the daemon.</para></listitem>
-
-</varlistentry>
-
-
 <varlistentry><term><envar>NIX_SHOW_STATS</envar></term>
 
   <listitem><para>If set to <literal>1</literal>, Nix will print some
