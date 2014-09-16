@@ -1,4 +1,4 @@
-<chapter xmlns="http://docbook.org/ns/docbook"
+<section xmlns="http://docbook.org/ns/docbook"
       xmlns:xlink="http://www.w3.org/1999/xlink"
       xmlns:xi="http://www.w3.org/2001/XInclude"
       version="5.0"
@@ -260,4 +260,4 @@ error: attribute `nixUnstabl' missing, at /etc/nixos/configurations/misc/eelco/m
 Eelco Dolstra, Ian-Woo Kim, Ludovic Courtès, Maxim Ivanov, Petr
 Rockai, Ricardo M. Correia and Shea Levy.</para>
 
-</chapter>
+</section>

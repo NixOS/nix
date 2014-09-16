@@ -1,4 +1,4 @@
-<part xmlns="http://docbook.org/ns/docbook"
+<appendix xmlns="http://docbook.org/ns/docbook"
       xmlns:xlink="http://www.w3.org/1999/xlink"
       xmlns:xi="http://www.w3.org/2001/XInclude"
       version="5.0"
@@ -6,9 +6,11 @@
 
 <title>Nix Release Notes</title>
 
+<!--
 <partintro>
 <para>This section lists the release notes for each stable version of Nix.</para>
 </partintro>
+-->
 
 <xi:include href="rl-1.8.xml" />
 <xi:include href="rl-1.7.xml" />
@@ -38,4 +40,4 @@
 <xi:include href="rl-0.6.xml" />
 <xi:include href="rl-0.5.xml" />
 
-</part>
+</appendix>

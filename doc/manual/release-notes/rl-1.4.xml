@@ -1,4 +1,4 @@
-<chapter xmlns="http://docbook.org/ns/docbook"
+<section xmlns="http://docbook.org/ns/docbook"
       xmlns:xlink="http://www.w3.org/1999/xlink"
       xmlns:xi="http://www.w3.org/2001/XInclude"
       version="5.0"
@@ -36,4 +36,4 @@ xlink:href="https://github.com/NixOS/nix/commit/5526a282b5b44e9296e61e07d7d2626a
 
 </itemizedlist>
 
-</chapter>
+</section>

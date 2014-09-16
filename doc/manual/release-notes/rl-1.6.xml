@@ -1,4 +1,4 @@
-<chapter xmlns="http://docbook.org/ns/docbook"
+<section xmlns="http://docbook.org/ns/docbook"
       xmlns:xlink="http://www.w3.org/1999/xlink"
       xmlns:xi="http://www.w3.org/2001/XInclude"
       version="5.0"
@@ -124,4 +124,4 @@ in pkgs.bar
 Florian Friesdorf, Gergely Risko, Ivan Kozik, Ludovic Courtès and Shea
 Levy.</para>
 
-</chapter>
+</section>

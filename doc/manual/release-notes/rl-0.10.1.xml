@@ -1,4 +1,4 @@
-<chapter xmlns="http://docbook.org/ns/docbook"
+<section xmlns="http://docbook.org/ns/docbook"
       xmlns:xlink="http://www.w3.org/1999/xlink"
       xmlns:xi="http://www.w3.org/2001/XInclude"
       version="5.0"
@@ -10,4 +10,4 @@
 evaluating Nix expressions that are stored inside the Nix store
 (<literal>NIX-67</literal>).  These do not affect most users.</para>
 
-</chapter>
+</section>
