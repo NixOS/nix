@@ -8,7 +8,7 @@
   <refentrytitle>nix-daemon</refentrytitle>
   <manvolnum>8</manvolnum>
   <refmiscinfo class="source">Nix</refmiscinfo>
-  <refmiscinfo class="version"><xi:include href="version.txt" parse="text"/></refmiscinfo>
+  <refmiscinfo class="version"><xi:include href="../version.txt" parse="text"/></refmiscinfo>
 </refmeta>
 
 <refnamediv>
