@@ -6,11 +6,6 @@
 
 <title>Introduction</title>
 
-<partintro>
-<para>This section describes the main features of Nix and the license under which you can use Nix.</para>
-</partintro>
-
 <xi:include href="about-nix.xml" />
-<xi:include href="nix-license.xml" />
 
 </part>
