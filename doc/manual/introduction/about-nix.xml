@@ -4,7 +4,7 @@
       version="5.0"
       xml:id="ch-about-nix">
 
-<title>About Nix</title>
+<title>Introduction</title>
 
 <para>Nix is a <emphasis>purely functional package manager</emphasis>.
 This means that it treats packages like values in purely functional

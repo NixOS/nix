@@ -4,7 +4,7 @@
       version="5.0"
       xml:id='chap-writing-nix-expressions'>
 
-<title>Nix Expressions</title>
+<title>Writing Nix Expressions</title>
 
 <partintro>
 <para>This chapter shows you how to write Nix expressions, which 
