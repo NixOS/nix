@@ -103,9 +103,10 @@ input.</para>
   <varlistentry><term><option>--find-file</option></term>
 
     <listitem><para>Look up the given files in Nix’s search path (as
-    specified by the <envar>NIX_PATH</envar> environment variable).
-    If found, print the corresponding absolute paths on standard
-    output.  For instance, if <envar>NIX_PATH</envar> is
+    specified by the <envar linkend="env-NIX_PATH">NIX_PATH</envar>
+    environment variable).  If found, print the corresponding absolute
+    paths on standard output.  For instance, if
+    <envar>NIX_PATH</envar> is
     <literal>nixpkgs=/home/alice/nixpkgs</literal>, then
     <literal>nix-instantiate --find-file nixpkgs/default.nix</literal>
     will print
