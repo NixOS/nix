@@ -1,8 +1,8 @@
-<chapter xmlns="http://docbook.org/ns/docbook"
+<section xmlns="http://docbook.org/ns/docbook"
       xmlns:xlink="http://www.w3.org/1999/xlink"
       xmlns:xi="http://www.w3.org/2001/XInclude"
       version="5.0"
-      xml:id="ch-collisions-nixenv">
+      xml:id="sec-collisions-nixenv">
 
 <title>Collisions in <command>nix-env</command></title>
 
@@ -40,4 +40,4 @@ to implement some conflict resolution policy.  E.g., the script could
 be modified to rename conflicting file names, or to pick one over the
 other.</para>
 
-</chapter>
+</section>

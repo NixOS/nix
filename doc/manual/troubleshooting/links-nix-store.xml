@@ -1,8 +1,8 @@
-<chapter xmlns="http://docbook.org/ns/docbook"
+<section xmlns="http://docbook.org/ns/docbook"
       xmlns:xlink="http://www.w3.org/1999/xlink"
       xmlns:xi="http://www.w3.org/2001/XInclude"
       version="5.0"
-      xml:id="ch-links-nix-store">
+      xml:id="sec-links-nix-store">
 
 <title><quote>Too many links</quote> Error in the Nix store</title>
 
@@ -40,4 +40,4 @@ more than 32,000 subdirectories per directory, such as ReiserFS.
 ReiserFS lies to the kernel by reporting a link count of 1 if it
 exceeds the limit.)</para>
 
-</chapter>
+</section>
