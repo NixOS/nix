@@ -315,6 +315,10 @@ fi
 AC_SUBST(tarFlags)
 
 
+# Some platforms, such as Cygwin don't support srandom(). Detect if this is the case.
+AC_CHECK_LIB([c], [srandom], [HAVE_SRANDOM=1], [HAVE_SRANDOM=0])
+AC_SUBST(HAVE_SRANDOM)
+
 # Expand all variables in config.status.
 test "$prefix" = NONE && prefix=$ac_default_prefix
 test "$exec_prefix" = NONE && exec_prefix='${prefix}'

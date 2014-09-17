@@ -9,12 +9,16 @@
 #include <iostream>
 #include <cctype>
 #include <exception>
+#include <cstdlib>
 
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <signal.h>
 
+#ifndef HAVE_SRANDOM
+#define srandom srand
+#endif
 
 namespace nix {
 

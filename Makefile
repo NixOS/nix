@@ -22,7 +22,7 @@ makefiles = \
   doc/manual/local.mk \
   tests/local.mk
 
-GLOBAL_CXXFLAGS += -std=c++0x
+GLOBAL_CXXFLAGS += -std=gnu++0x
 
 include Makefile.config
 
