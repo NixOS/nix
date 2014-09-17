@@ -255,6 +255,8 @@ public:
     /* Print statistics. */
     void printStats();
 
+    void printCanaries();
+
 private:
 
     unsigned long nrEnvs;
@@ -285,6 +287,12 @@ private:
     friend struct ExprOpConcatLists;
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
+
+#if HAVE_BOEHMGC
+    std::set<Value *> gcCanaries;
+    friend void canaryFinalizer(GC_PTR obj, GC_PTR client_data);
+    friend void prim_gcCanary(EvalState & state, const Pos & pos, Value * * args, Value & v);
+#endif
 };
 
 

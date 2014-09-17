@@ -230,6 +230,8 @@ EvalState::EvalState(const Strings & _searchPath)
 
 EvalState::~EvalState()
 {
+    fileEvalCache.clear();
+    printCanaries();
 }
 
 
@@ -1461,6 +1463,26 @@ void EvalState::printStats()
             printMsg(v, format("%1$10d %2%") % i->first % i->second);
 
     }
+}
+
+
+void EvalState::printCanaries()
+{
+#if HAVE_BOEHMGC
+    if (!settings.get("debug-gc", false)) return;
+
+    GC_gcollect();
+
+    if (gcCanaries.empty()) {
+        printMsg(lvlError, "all canaries have been garbage-collected");
+        return;
+    }
+
+    printMsg(lvlError, "the following canaries have not been garbage-collected:");
+
+    for (auto i : gcCanaries)
+        printMsg(lvlError, format("  %1%") % i->string.s);
+#endif
 }
 
 

@@ -86,6 +86,8 @@ void processExpr(EvalState & state, const Strings & attrPaths,
             }
         }
     }
+
+    state.printCanaries();
 }
 
 
