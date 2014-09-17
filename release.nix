@@ -23,7 +23,7 @@ let
         inherit officialRelease;
 
         buildInputs =
-          [ curl bison flex perl libxml2 libxslt w3m bzip2
+          [ curl bison flex perl libxml2 libxslt bzip2
             tetex dblatex nukeReferences pkgconfig sqlite git
           ];
 
