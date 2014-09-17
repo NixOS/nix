@@ -57,9 +57,8 @@
 #include <netinet/ip.h>
 #endif
 
-#if HAVE_SYS_PERSONALITY_H
+#if __linux__
 #include <sys/personality.h>
-#define CAN_DO_LINUX32_BUILDS
 #endif
 
 #if HAVE_STATVFS
@@ -1182,7 +1181,7 @@ static string get(const StringPairs & map, const string & key)
 static bool canBuildLocally(const string & platform)
 {
     return platform == settings.thisSystem
-#ifdef CAN_DO_LINUX32_BUILDS
+#if __linux__
         || (platform == "i686-linux" && settings.thisSystem == "x86_64-linux")
 #endif
         ;
@@ -2077,7 +2076,7 @@ void DerivationGoal::initChild()
         /* Close all other file descriptors. */
         closeMostFDs(set<int>());
 
-#ifdef CAN_DO_LINUX32_BUILDS
+#if __linux__
         /* Change the personality to 32-bit if we're doing an
            i686-linux build on an x86_64-linux machine. */
         struct utsname utsbuf;
@@ -2085,7 +2084,7 @@ void DerivationGoal::initChild()
         if (drv.platform == "i686-linux" &&
             (settings.thisSystem == "x86_64-linux" ||
              (!strcmp(utsbuf.sysname, "Linux") && !strcmp(utsbuf.machine, "x86_64")))) {
-            if (personality(0x0008 | 0x8000000 /* == PER_LINUX32_3GB */) == -1)
+            if (personality(PER_LINUX32_3GB) == -1)
                 throw SysError("cannot set i686-linux personality");
         }
 
@@ -2095,6 +2094,11 @@ void DerivationGoal::initChild()
             int cur = personality(0xffffffff);
             if (cur != -1) personality(cur | 0x0020000 /* == UNAME26 */);
         }
+
+        /* Disable address space randomization for improved
+           determinism. */
+        int cur = personality(0xffffffff);
+        if (cur != -1) personality(cur | ADDR_NO_RANDOMIZE);
 #endif
 
         /* Fill in the environment. */

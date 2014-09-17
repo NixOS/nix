@@ -121,11 +121,6 @@ AC_CHECK_HEADER([err.h], [], [bsddiff_compat_include="-Icompat-include"])
 AC_SUBST([bsddiff_compat_include])
 
 
-# Check whether we have the personality() syscall, which allows us to
-# do i686-linux builds on x86_64-linux machines.
-AC_CHECK_HEADERS([sys/personality.h])
-
-
 # Check for <linux/fs.h> (for immutable file support).
 AC_CHECK_HEADERS([linux/fs.h])
 
