@@ -136,6 +136,14 @@ Strings Settings::get(const string & name, const Strings & def)
 }
 
 
+bool Settings::get(const string & name, bool def)
+{
+    bool res = def;
+    _get(res, name);
+    return res;
+}
+
+
 void Settings::update()
 {
     _get(tryFallback, "build-fallback");
