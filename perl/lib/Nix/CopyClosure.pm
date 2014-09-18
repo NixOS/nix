@@ -102,7 +102,6 @@ sub oldCopyTo {
     # Export the store paths and import them on the remote machine.
     if (scalar @missing > 0) {
         print STDERR "copying ", scalar @missing, " missing paths to ‘$sshHost’...\n";
-        print STDERR "@missing\n";
         unless ($dryRun) {
             open SSH, "| ssh $sshHost @{$sshOpts} @globalSshOpts 'nix-store --import' > /dev/null" or die;
             exportPaths(fileno(SSH), $sign, @missing);
