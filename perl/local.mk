@@ -23,7 +23,7 @@ ifeq ($(perlbindings), yes)
 
   Store_SOURCES := $(Store_DIR)/Store.cc
 
-  Store_LIBS = libstore
+  Store_LIBS = libstore libutil
 
   Store_CXXFLAGS = \
     -I$(shell $(perl) -e 'use Config; print $$Config{archlibexp};')/CORE \
