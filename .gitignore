@@ -114,6 +114,7 @@ Makefile.config
 *.so
 *.dep
 *~
+*.pc
 
 # GNU Global
 GPATH
