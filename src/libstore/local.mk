@@ -31,4 +31,4 @@ $(d)/local-store.cc: $(d)/schema.sql.hh
 
 clean-files += $(d)/schema.sql.hh
 
-$(eval $(call install-file-in, $(d)/nix-store.pc, $(libdir)/pkgconfig, 0644))
+$(eval $(call install-file-in, $(d)/nix-store.pc, $(prefix)/lib/pkgconfig, 0644))

@@ -181,6 +181,7 @@ systemctl start  nix-daemon.socket
 
 %files devel
 %{_includedir}/nix
+%{_prefix}/lib/pkgconfig/*.pc
 
 %files doc
 %docdir %{_defaultdocdir}/%{name}-doc-%{version}
