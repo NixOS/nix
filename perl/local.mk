@@ -29,6 +29,8 @@ ifeq ($(perlbindings), yes)
     -I$(shell $(perl) -e 'use Config; print $$Config{archlibexp};')/CORE \
     -D_FILE_OFFSET_BITS=64 -Wno-unused-variable -Wno-literal-suffix -Wno-reserved-user-defined-literal
 
+  Store_LDFLAGS = -lperl -pthread
+
   Store_ALLOW_UNDEFINED = 1
 
   Store_FORCE_INSTALL = 1
