@@ -27,6 +27,7 @@
       </group>
       <replaceable>path</replaceable>
     </arg>
+    <arg><option>--set</option></arg>
     <sbr />
     <group choice='req'>
       <arg choice='req'>
@@ -88,6 +89,13 @@ to restart itself with <command>xterm</command>,
 
     <listitem><para>Install the package into the specified profile
     rather than the user’s current profile.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--set</option></term>
+
+    <listitem><para>Install the package as the profile so that the
+    profile contains exactly the contents of the package.</para></listitem>
 
   </varlistentry>
 
