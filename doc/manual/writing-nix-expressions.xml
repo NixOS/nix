@@ -810,6 +810,9 @@ to be enclosed in parentheses.  If they had been omitted, e.g.,
 the result would be a list of five elements, the fourth one being a
 function and the fifth being a set.</para>
 
+<para>Note that lists are only lazy in values, and they are strict in length.
+</para>
+
 </simplesect>
 
 
