@@ -89,7 +89,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
     if (isStorePath(path) && store->isValidPath(path) && isDerivation(path)) {
         Derivation drv = readDerivation(path);
         Value & w = *state.allocValue();
-        state.mkAttrs(w, 1 + drv.outputs.size());
+        state.mkAttrs(w, 2 + drv.outputs.size());
         mkString(*state.allocAttr(w, state.sDrvPath), path, singleton<PathSet>("=" + path));
         state.mkList(*state.allocAttr(w, state.symbols.create("outputs")), drv.outputs.size());
         unsigned int outputs_index = 0;
