@@ -32,15 +32,6 @@
 namespace nix {
 
 
-Bindings::iterator Bindings::find(const Symbol & name)
-{
-    Attr key(name, 0);
-    iterator i = std::lower_bound(begin(), end(), key);
-    if (i != end() && i->name == name) return i;
-    return end();
-}
-
-
 void Bindings::sort()
 {
     std::sort(begin(), end());
