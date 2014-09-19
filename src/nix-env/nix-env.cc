@@ -44,7 +44,7 @@ struct InstallSourceInfo
     Path nixExprPath; /* for srcNixExprDrvs, srcNixExprs */
     Path profile; /* for srcProfile */
     string systemFilter; /* for srcNixExprDrvs */
-    Bindings autoArgs;
+    Bindings * autoArgs;
 };
 
 
@@ -350,7 +350,7 @@ static void queryInstSources(EvalState & state,
                Nix expression. */
             DrvInfos allElems;
             loadDerivations(state, instSource.nixExprPath,
-                instSource.systemFilter, instSource.autoArgs, "", allElems);
+                instSource.systemFilter, *instSource.autoArgs, "", allElems);
 
             elems = filterBySelector(state, allElems, args, newestOnly);
 
@@ -373,7 +373,7 @@ static void queryInstSources(EvalState & state,
                 Value vFun, vTmp;
                 state.eval(eFun, vFun);
                 mkApp(vTmp, vFun, vArg);
-                getDerivations(state, vTmp, "", instSource.autoArgs, elems, true);
+                getDerivations(state, vTmp, "", *instSource.autoArgs, elems, true);
             }
 
             break;
@@ -423,8 +423,8 @@ static void queryInstSources(EvalState & state,
             Value vRoot;
             loadSourceExpr(state, instSource.nixExprPath, vRoot);
             foreach (Strings::const_iterator, i, args) {
-                Value & v(*findAlongAttrPath(state, *i, instSource.autoArgs, vRoot));
-                getDerivations(state, v, "", instSource.autoArgs, elems, true);
+                Value & v(*findAlongAttrPath(state, *i, *instSource.autoArgs, vRoot));
+                getDerivations(state, v, "", *instSource.autoArgs, elems, true);
             }
             break;
         }
@@ -926,7 +926,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 
     if (source == sAvailable || compareVersions)
         loadDerivations(*globals.state, globals.instSource.nixExprPath,
-            globals.instSource.systemFilter, globals.instSource.autoArgs,
+            globals.instSource.systemFilter, *globals.instSource.autoArgs,
             attrPath, availElems);
 
     DrvInfos elems_ = filterBySelector(*globals.state,
@@ -1423,7 +1423,7 @@ int main(int argc, char * * argv)
         if (file != "")
             globals.instSource.nixExprPath = lookupFileArg(*globals.state, file);
 
-        evalAutoArgs(*globals.state, autoArgs_, globals.instSource.autoArgs);
+        globals.instSource.autoArgs = evalAutoArgs(*globals.state, autoArgs_);
 
         if (globals.profile == "")
             globals.profile = getEnv("NIX_PROFILE", "");

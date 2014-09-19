@@ -159,8 +159,7 @@ int main(int argc, char * * argv)
         EvalState state(searchPath);
         state.repair = repair;
 
-        Bindings autoArgs;
-        evalAutoArgs(state, autoArgs_, autoArgs);
+        Bindings & autoArgs(*evalAutoArgs(state, autoArgs_));
 
         if (evalOnly && !wantsReadWrite)
             settings.readOnlyMode = true;

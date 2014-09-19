@@ -8,7 +8,7 @@ namespace nix {
 bool parseAutoArgs(Strings::iterator & i,
     const Strings::iterator & argsEnd, std::map<string, string> & res);
 
-void evalAutoArgs(EvalState & state, std::map<string, string> & in, Bindings & out);
+Bindings * evalAutoArgs(EvalState & state, std::map<string, string> & in);
 
 bool parseSearchPathArg(Strings::iterator & i,
     const Strings::iterator & argsEnd, Strings & searchPath);

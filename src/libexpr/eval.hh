@@ -16,23 +16,59 @@ namespace nix {
 
 
 class EvalState;
-struct Attr;
 
 
-/* Sets are represented as a vector of attributes, sorted by symbol
-   (i.e. pointer to the attribute name in the symbol table). */
-#if HAVE_BOEHMGC
-typedef std::vector<Attr, gc_allocator<Attr> > BindingsBase;
-#else
-typedef std::vector<Attr> BindingsBase;
-#endif
+struct Attr
+{
+    Symbol name;
+    Value * value;
+    Pos * pos;
+    Attr(Symbol name, Value * value, Pos * pos = &noPos)
+        : name(name), value(value), pos(pos) { };
+    Attr() : pos(&noPos) { };
+    bool operator < (const Attr & a) const
+    {
+        return name < a.name;
+    }
+};
 
 
-class Bindings : public BindingsBase
+class Bindings
 {
 public:
+    typedef uint32_t size_t;
+
+private:
+    size_t size_, capacity;
+    Attr attrs[0];
+
+    Bindings(uint32_t capacity) : size_(0), capacity(capacity) { }
+
+public:
+    size_t size() { return size_; }
+
+    bool empty() { return !size_; }
+
+    typedef Attr * iterator;
+
+    void push_back(const Attr & attr)
+    {
+        assert(size_ < capacity);
+        attrs[size_++] = attr;
+    }
+
     iterator find(const Symbol & name);
+    iterator begin() { return &attrs[0]; }
+    iterator end() { return &attrs[size_]; }
+
+    Attr & operator[](size_t pos)
+    {
+        return attrs[pos];
+    }
+
     void sort();
+
+    friend class EvalState;
 };
 
 
@@ -55,21 +91,6 @@ struct Env
     unsigned short prevWith; // nr of levels up to next `with' environment
     bool haveWithAttrs;
     Value * values[0];
-};
-
-
-struct Attr
-{
-    Symbol name;
-    Value * value;
-    Pos * pos;
-    Attr(Symbol name, Value * value, Pos * pos = &noPos)
-        : name(name), value(value), pos(pos) { };
-    Attr() : pos(&noPos) { };
-    bool operator < (const Attr & a) const
-    {
-        return name < a.name;
-    }
 };
 
 
@@ -245,6 +266,8 @@ public:
 
     Value * allocAttr(Value & vAttrs, const Symbol & name);
 
+    Bindings * allocBindings(Bindings::size_t capacity);
+
     void mkList(Value & v, unsigned int length);
     void mkAttrs(Value & v, unsigned int expected);
     void mkThunk_(Value & v, Expr * expr);
@@ -264,6 +287,7 @@ private:
     unsigned long nrValues;
     unsigned long nrListElems;
     unsigned long nrAttrsets;
+    unsigned long nrAttrsInAttrsets;
     unsigned long nrOpUpdates;
     unsigned long nrOpUpdateValuesCopied;
     unsigned long nrListConcats;

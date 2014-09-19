@@ -35,7 +35,7 @@ namespace nix {
 Bindings::iterator Bindings::find(const Symbol & name)
 {
     Attr key(name, 0);
-    iterator i = lower_bound(begin(), end(), key);
+    iterator i = std::lower_bound(begin(), end(), key);
     if (i != end() && i->name == name) return i;
     return end();
 }
@@ -175,7 +175,7 @@ EvalState::EvalState(const Strings & _searchPath)
     , baseEnvDispl(0)
 {
     nrEnvs = nrValuesInEnvs = nrValues = nrListElems = 0;
-    nrAttrsets = nrOpUpdates = nrOpUpdateValuesCopied = 0;
+    nrAttrsets = nrAttrsInAttrsets = nrOpUpdates = nrOpUpdateValuesCopied = 0;
     nrListConcats = nrPrimOpCalls = nrFunctionCalls = 0;
     countCalls = getEnv("NIX_COUNT_CALLS", "0") != "0";
 
@@ -433,6 +433,12 @@ Value * EvalState::allocAttr(Value & vAttrs, const Symbol & name)
 }
 
 
+Bindings * EvalState::allocBindings(Bindings::size_t capacity)
+{
+    return new (GC_MALLOC(sizeof(Bindings) + sizeof(Attr) * capacity)) Bindings(capacity);
+}
+
+
 void EvalState::mkList(Value & v, unsigned int length)
 {
     v.type = tList;
@@ -446,9 +452,9 @@ void EvalState::mkAttrs(Value & v, unsigned int expected)
 {
     clearValue(v);
     v.type = tAttrs;
-    v.attrs = NEW Bindings;
-    v.attrs->reserve(expected);
+    v.attrs = allocBindings(expected);
     nrAttrsets++;
+    nrAttrsInAttrsets += expected;
 }
 
 
@@ -619,7 +625,7 @@ void ExprPath::eval(EvalState & state, Env & env, Value & v)
 
 void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 {
-    state.mkAttrs(v, attrs.size());
+    state.mkAttrs(v, attrs.size() + dynamicAttrs.size());
     Env *dynamicEnv = &env;
 
     if (recursive) {
@@ -658,15 +664,19 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         if (hasOverrides) {
             Value * vOverrides = (*v.attrs)[overrides->second.displ].value;
             state.forceAttrs(*vOverrides);
-            foreach (Bindings::iterator, i, *vOverrides->attrs) {
-                AttrDefs::iterator j = attrs.find(i->name);
+            Bindings * newBnds = state.allocBindings(v.attrs->size() + vOverrides->attrs->size());
+            for (auto & i : *v.attrs)
+                newBnds->push_back(i);
+            for (auto & i : *vOverrides->attrs) {
+                AttrDefs::iterator j = attrs.find(i.name);
                 if (j != attrs.end()) {
-                    (*v.attrs)[j->second.displ] = *i;
-                    env2.values[j->second.displ] = i->value;
+                    (*newBnds)[j->second.displ] = i;
+                    env2.values[j->second.displ] = i.value;
                 } else
-                    v.attrs->push_back(*i);
+                    newBnds->push_back(i);
             }
-            v.attrs->sort();
+            newBnds->sort();
+            v.attrs = newBnds;
         }
     }
 
@@ -692,8 +702,8 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 
         i->valueExpr->setName(nameSym);
         /* Keep sorted order so find can catch duplicates */
-        v.attrs->insert(lower_bound(v.attrs->begin(), v.attrs->end(), Attr(nameSym, 0)),
-                Attr(nameSym, i->valueExpr->maybeThunk(state, *dynamicEnv), &i->pos));
+        v.attrs->push_back(Attr(nameSym, i->valueExpr->maybeThunk(state, *dynamicEnv), &i->pos));
+        v.attrs->sort(); // FIXME: inefficient
     }
 }
 
@@ -1424,7 +1434,8 @@ void EvalState::printStats()
     printMsg(v, format("  list concatenations: %1%") % nrListConcats);
     printMsg(v, format("  values allocated: %1% (%2% bytes)")
         % nrValues % (nrValues * sizeof(Value)));
-    printMsg(v, format("  sets allocated: %1%") % nrAttrsets);
+    printMsg(v, format("  sets allocated: %1% (%2% bytes)")
+        % nrAttrsets % (nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Attr)));
     printMsg(v, format("  right-biased unions: %1%") % nrOpUpdates);
     printMsg(v, format("  values copied in right-biased unions: %1%") % nrOpUpdateValuesCopied);
     printMsg(v, format("  symbols in symbol table: %1%") % symbols.size());
