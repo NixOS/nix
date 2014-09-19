@@ -914,13 +914,11 @@ static void prim_attrNames(EvalState & state, const Pos & pos, Value * * args, V
 
     state.mkList(v, args[0]->attrs->size());
 
-    StringSet names;
-    foreach (Bindings::iterator, i, *args[0]->attrs)
-        names.insert(i->name);
-
     unsigned int n = 0;
-    foreach (StringSet::iterator, i, names)
-        mkString(*(v.list.elems[n++] = state.allocValue()), *i);
+    for (auto & i : *args[0]->attrs)
+        mkString(*(v.list.elems[n++] = state.allocValue()), i.name);
+
+    std::sort(v.list.elems, v.list.elems + n, [](Value * v1, Value * v2) { return strcmp(v1->string.s, v2->string.s) < 0; });
 }
 
 
