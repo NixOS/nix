@@ -130,7 +130,6 @@ Path canonPath(const Path & path, bool resolveSymlinks)
                 i = temp.begin(); /* restart */
                 end = temp.end();
                 s = "";
-                /* !!! potential for infinite loop */
             }
         }
     }
