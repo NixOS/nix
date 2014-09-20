@@ -22,7 +22,9 @@ makefiles = \
   doc/manual/local.mk \
   tests/local.mk
 
-GLOBAL_CXXFLAGS += -std=c++0x -g -Wall
+GLOBAL_CFLAGS   += -g -O2 -fstack-protector --param=ssp-buffer-size=4 -Wformat
+GLOBAL_CXXFLAGS += -g -O2 -fstack-protector --param=ssp-buffer-size=4 -Wformat -std=c++0x -Wall
+GLOBAL_LDFLAGS  += -Wl,-Bsymbolic-functions -Wl,-z,relro -Wl,--as-needed
 
 include Makefile.config
 
