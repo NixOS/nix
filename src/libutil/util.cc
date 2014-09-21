@@ -1161,14 +1161,52 @@ const string & publicUserName()
 }
 
 
+static string getLoginFromUid(uid_t uid)
+{
+    /* Map the uid of the private file to the user name */
+    struct passwd pwd;
+    struct passwd *ppwd;
+    char *buf;
+    size_t bufsize;
+    int err;
+
+    bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
+    if (bufsize == size_t(-1))
+        bufsize = 16 * 1024;
+
+    buf = new char[bufsize];
+    if (!buf)
+        throw SysError("allocating passwd entry");
+
+    err = getpwuid_r(uid, &pwd, buf, bufsize, &ppwd);
+    if (!ppwd) {
+        delete[] buf;
+        if (err)
+            throw SysError("User matching uid");
+
+        /* The uid does not match any user name, no need to keep any secret
+           for a non-existing user name. */
+        return publicUserName();
+    }
+
+    string login(pwd.pw_name);
+    delete[] buf;
+
+    return login;
+}
+
+
 const string & getCurrentUserName()
 {
     static string userName("");
     if (userName == "") {
-        char buf[256];
-        if (getlogin_r(buf, sizeof(buf)))
-            throw SysError("getting current user name");
-        userName = buf;
+        /* Map the uid of the effective user to the user name.
+
+           Note, getlogin_r sounds better but the manual page advices
+           against it for security related purposes.  Also it uses either
+           stdin or /dev/tty to get the current user name, which makes the
+           function fallible. */
+        userName = getLoginFromUid(geteuid());
     }
 
     return userName;
@@ -1188,35 +1226,7 @@ string getOwnerOfSecretFile(const Path & path)
         return publicUserName();
 
     /* Map the uid of the private file to the user name */
-    struct passwd pwd;
-    struct passwd *ppwd;
-    char *buf;
-    size_t bufsize;
-    int err;
-
-    bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
-    if (bufsize == size_t(-1))
-        bufsize = 16 * 1024;
-
-    buf = new char[bufsize];
-    if (!buf)
-        throw SysError("allocating passwd entry");
-
-    err = getpwuid_r(st.st_uid, &pwd, buf, bufsize, &ppwd);
-    if (!ppwd) {
-        delete[] buf;
-        if (err)
-            throw SysError("finding owner of a file");
-
-        /* The uid does not match any user name, no need to keep any secret
-           for a non-existing user name. */
-        return publicUserName();
-    }
-
-    string userName(pwd.pw_name);
-    delete[] buf;
-
-    return userName;
+    return getLoginFromUid(st.st_uid);
 }
 
 
