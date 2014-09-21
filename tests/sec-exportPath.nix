@@ -22,7 +22,7 @@ let
       let utils = builtins.storePath ${config.system.build.extraUtils}; in
       derivation {
         name = "hello-${toString nr}";
-        inherit system;
+        system = "${system}";
         PATH = "''${utils}/bin";
         builder = "''${utils}/bin/sh";
         args = [ "-c" "mkdir $out; echo Hello-${toString nr} > $out/host" ];
@@ -49,13 +49,6 @@ in
               description = "Alice Foobar";
               extraGroups = [ "wheel" ];
             };
-
-          users.extraUsers.bob =
-            { createHome = true;
-              home = "/home/bob";
-              description = "Bob Foobar";
-              extraGroups = [ "wheel" ];
-            };
         };
     };
 
@@ -63,17 +56,19 @@ in
     ''
       startAll;
 
-      $client->waitForFile("/home/alice");
-      $client->waitForUnit("nix-daemon.service");
+      $client->waitForUnit("multi-user.target");
 
-      # Perform a build and check that it was performed on the slave.
-      my $out = $client->succeed("su alice -c 'nix-build ${expr nodes.client.config 1}'");
-      client->succeed("test -e $out");
+      # Root builds the derivation
+      my $out = $client->succeed("nix-build ${expr nodes.client.config 1}");
+      $out =~ s/\s+$//;
+      my $outfile = $out . "/host";
 
-      $client->succeed("su alice -c 'nix-store --export $out'");
+      # Check that root can read & export the output of the derivation.
+      $client->succeed("cat $outfile");
+      $client->succeed("nix-store --export $out");
 
-      $client->waitForFile("/home/bob");
-      $client->fail("su bob -c 'nix-store --export $out'");
+      # Check that alice cannot read / export the output of the derivation.
+      $client->fail("su alice -c 'cat $outfile'");
+      $client->fail("su alice -c 'nix-store --export $out'");
     '';
-
 })

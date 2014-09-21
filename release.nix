@@ -255,6 +255,7 @@ let
           rpm_fedora20x86_64
           tests.remote_builds
           tests.nix_copy_closure
+          tests.sec_exportPath
         ];
     };
 
