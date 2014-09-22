@@ -1183,17 +1183,28 @@ void ExprPos::eval(EvalState & state, Env & env, Value & v)
 
 void EvalState::forceValueDeep(Value & v)
 {
-    forceValue(v);
+    std::set<const Value *> seen;
 
-    if (v.type == tAttrs) {
-        foreach (Bindings::iterator, i, *v.attrs)
-            forceValueDeep(*i->value);
-    }
+    std::function<void(Value & v)> recurse;
 
-    else if (v.type == tList) {
-        for (unsigned int n = 0; n < v.list.length; ++n)
-            forceValueDeep(*v.list.elems[n]);
-    }
+    recurse = [&](Value & v) {
+        if (seen.find(&v) != seen.end()) return;
+        seen.insert(&v);
+
+        forceValue(v);
+
+        if (v.type == tAttrs) {
+            foreach (Bindings::iterator, i, *v.attrs)
+                recurse(*i->value);
+        }
+
+        else if (v.type == tList) {
+            for (unsigned int n = 0; n < v.list.length; ++n)
+                recurse(*v.list.elems[n]);
+        }
+    };
+
+    recurse(v);
 }
 
 
