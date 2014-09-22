@@ -318,6 +318,8 @@ for name in $ac_subst_vars; do
     declare $name="$(eval echo "${!name}")"
 done
 
+rm -f Makefile.config
+
 AC_CONFIG_HEADER([config.h])
 AC_CONFIG_FILES([])
 AC_OUTPUT
