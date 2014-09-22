@@ -383,6 +383,15 @@ static void prim_getEnv(EvalState & state, const Pos & pos, Value * * args, Valu
 }
 
 
+/* Evaluate the first argument, then return the second argument. */
+void prim_seq(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceValue(*args[0]);
+    state.forceValue(*args[1]);
+    v = *args[1];
+}
+
+
 /* Evaluate the first expression and print it on standard error.  Then
    return the second expression.  Useful for debugging. */
 static void prim_trace(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -1423,6 +1432,9 @@ void EvalState::createBaseEnv()
     addPrimOp("__addErrorContext", 2, prim_addErrorContext);
     addPrimOp("__tryEval", 1, prim_tryEval);
     addPrimOp("__getEnv", 1, prim_getEnv);
+
+    // Strictness
+    addPrimOp("__seq", 2, prim_seq);
 
     // Debugging
     addPrimOp("__trace", 2, prim_trace);
