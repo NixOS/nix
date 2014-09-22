@@ -333,15 +333,16 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
 static void prim_abort(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    throw Abort(format("evaluation aborted with the following error message: ‘%1%’") %
-        state.coerceToString(pos, *args[0], context));
+    string s = state.coerceToString(pos, *args[0], context);
+    throw Abort(format("evaluation aborted with the following error message: ‘%1%’") % s);
 }
 
 
 static void prim_throw(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    throw ThrownError(format("%1%") % state.coerceToString(pos, *args[0], context));
+    string s = state.coerceToString(pos, *args[0], context);
+    throw ThrownError(s);
 }
 
 
