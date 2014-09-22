@@ -404,9 +404,12 @@ Value * EvalState::allocValue()
 
 Env & EvalState::allocEnv(unsigned int size)
 {
+    assert(size <= std::numeric_limits<decltype(Env::size)>::max());
+
     nrEnvs++;
     nrValuesInEnvs += size;
     Env * env = (Env *) GC_MALLOC(sizeof(Env) + size * sizeof(Value *));
+    env->size = size;
 
     /* Clear the values because maybeThunk() and lookupVar fromWith expects this. */
     for (unsigned i = 0; i < size; ++i)
@@ -1485,6 +1488,83 @@ void EvalState::printCanaries()
     for (auto i : gcCanaries)
         printMsg(lvlError, format("  %1%") % i->string.s);
 #endif
+}
+
+
+size_t valueSize(Value & v)
+{
+    std::set<const void *> seen;
+
+    auto doString = [&](const char * s) -> size_t {
+        if (seen.find(s) != seen.end()) return 0;
+        seen.insert(s);
+        return strlen(s) + 1;
+    };
+
+    std::function<size_t(Value & v)> doValue;
+    std::function<size_t(Env & v)> doEnv;
+
+    doValue = [&](Value & v) -> size_t {
+        if (seen.find(&v) != seen.end()) return 0;
+        seen.insert(&v);
+
+        size_t sz = sizeof(Value);
+
+        switch (v.type) {
+        case tString:
+            sz += doString(v.string.s);
+            if (v.string.context)
+                for (const char * * p = v.string.context; *p; ++p)
+                    sz += doString(*p);
+            break;
+        case tPath:
+            sz += doString(v.path);
+            break;
+        case tAttrs:
+            for (auto & i : *v.attrs)
+                sz += doValue(*i.value);
+            break;
+        case tList:
+            for (unsigned int n = 0; n < v.list.length; ++n)
+                sz += doValue(*v.list.elems[n]);
+            break;
+        case tThunk:
+            sz += doEnv(*v.thunk.env);
+            break;
+        case tApp:
+            sz += doValue(*v.app.left);
+            sz += doValue(*v.app.right);
+            break;
+        case tLambda:
+            sz += doEnv(*v.lambda.env);
+            break;
+        case tPrimOpApp:
+            sz += doValue(*v.primOpApp.left);
+            sz += doValue(*v.primOpApp.right);
+            break;
+        default:
+            ;
+        }
+
+        return sz;
+    };
+
+    doEnv = [&](Env & env) -> size_t {
+        if (seen.find(&env) != seen.end()) return 0;
+        seen.insert(&env);
+
+        size_t sz = sizeof(Env);
+
+        for (unsigned int i = 0; i < env.size; ++i)
+            if (env.values[i])
+                sz += doValue(*env.values[i]);
+
+        if (env.up) sz += doEnv(*env.up);
+
+        return sz;
+    };
+
+    return doValue(v);
 }
 
 

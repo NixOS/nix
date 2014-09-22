@@ -95,8 +95,9 @@ struct PrimOp
 struct Env
 {
     Env * up;
-    unsigned short prevWith; // nr of levels up to next `with' environment
-    bool haveWithAttrs;
+    unsigned short size; // used by ‘valueSize’
+    unsigned short prevWith:15; // nr of levels up to next `with' environment
+    unsigned short haveWithAttrs:1;
     Value * values[0];
 };
 

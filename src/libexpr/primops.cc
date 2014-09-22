@@ -423,6 +423,13 @@ void prim_gcCanary(EvalState & state, const Pos & pos, Value * * args, Value & v
 }
 
 
+void prim_valueSize(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    /* We're not forcing the argument on purpose. */
+    mkInt(v, valueSize(*args[0]));
+}
+
+
 /*************************************************************
  * Derivations
  *************************************************************/
@@ -1416,8 +1423,11 @@ void EvalState::createBaseEnv()
     addPrimOp("__addErrorContext", 2, prim_addErrorContext);
     addPrimOp("__tryEval", 1, prim_tryEval);
     addPrimOp("__getEnv", 1, prim_getEnv);
+
+    // Debugging
     addPrimOp("__trace", 2, prim_trace);
     addPrimOp("__gcCanary", 1, prim_gcCanary);
+    addPrimOp("__valueSize", 1, prim_valueSize);
 
     // Paths
     addPrimOp("__toPath", 1, prim_toPath);

@@ -159,4 +159,10 @@ static inline void mkPathNoCopy(Value & v, const char * s)
 void mkPath(Value & v, const char * s);
 
 
+/* Compute the size in bytes of the given value, including all values
+   and environments reachable from it. Static expressions (Exprs) are
+   not included. */
+size_t valueSize(Value & v);
+
+
 }
