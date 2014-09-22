@@ -38,8 +38,14 @@ void Bindings::sort()
 }
 
 
-std::ostream & operator << (std::ostream & str, const Value & v)
+static void printValue(std::ostream & str, std::set<const Value *> & seen, const Value & v)
 {
+    if (seen.find(&v) != seen.end()) {
+        str << "<CYCLE>";
+        return;
+    }
+    seen.insert(&v);
+
     switch (v.type) {
     case tInt:
         str << v.integer;
@@ -69,15 +75,20 @@ std::ostream & operator << (std::ostream & str, const Value & v)
         Sorted sorted;
         foreach (Bindings::iterator, i, *v.attrs)
             sorted[i->name] = i->value;
-        foreach (Sorted::iterator, i, sorted)
-            str << i->first << " = " << *i->second << "; ";
+        for (auto & i : sorted) {
+            str << i.first << " = ";
+            printValue(str, seen, *i.second);
+            str << "; ";
+        }
         str << "}";
         break;
     }
     case tList:
         str << "[ ";
-        for (unsigned int n = 0; n < v.list.length; ++n)
-            str << *v.list.elems[n] << " ";
+        for (unsigned int n = 0; n < v.list.length; ++n) {
+            printValue(str, seen, *v.list.elems[n]);
+            str << " ";
+        }
         str << "]";
         break;
     case tThunk:
@@ -96,6 +107,13 @@ std::ostream & operator << (std::ostream & str, const Value & v)
     default:
         throw Error("invalid value");
     }
+}
+
+
+std::ostream & operator << (std::ostream & str, const Value & v)
+{
+    std::set<const Value *> seen;
+    printValue(str, seen, v);
     return str;
 }
 
