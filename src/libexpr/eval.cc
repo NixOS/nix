@@ -1181,18 +1181,18 @@ void ExprPos::eval(EvalState & state, Env & env, Value & v)
 }
 
 
-void EvalState::strictForceValue(Value & v)
+void EvalState::forceValueDeep(Value & v)
 {
     forceValue(v);
 
     if (v.type == tAttrs) {
         foreach (Bindings::iterator, i, *v.attrs)
-            strictForceValue(*i->value);
+            forceValueDeep(*i->value);
     }
 
     else if (v.type == tList) {
         for (unsigned int n = 0; n < v.list.length; ++n)
-            strictForceValue(*v.list.elems[n]);
+            forceValueDeep(*v.list.elems[n]);
     }
 }
 

@@ -61,7 +61,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
             else if (output == okJSON)
                 printValueAsJSON(state, strict, vRes, std::cout, context);
             else {
-                if (strict) state.strictForceValue(vRes);
+                if (strict) state.forceValueDeep(vRes);
                 std::cout << vRes << std::endl;
             }
         } else {
