@@ -392,6 +392,16 @@ void prim_seq(EvalState & state, const Pos & pos, Value * * args, Value & v)
 }
 
 
+/* Evaluate the first argument deeply (i.e. recursing into lists and
+   attrsets), then return the second argument. */
+void prim_deepSeq(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceValueDeep(*args[0]);
+    state.forceValue(*args[1]);
+    v = *args[1];
+}
+
+
 /* Evaluate the first expression and print it on standard error.  Then
    return the second expression.  Useful for debugging. */
 static void prim_trace(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -1435,6 +1445,7 @@ void EvalState::createBaseEnv()
 
     // Strictness
     addPrimOp("__seq", 2, prim_seq);
+    addPrimOp("__deepSeq", 2, prim_deepSeq);
 
     // Debugging
     addPrimOp("__trace", 2, prim_trace);
