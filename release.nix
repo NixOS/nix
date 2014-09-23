@@ -69,7 +69,6 @@ let
 
           echo "doc manual $out/share/doc/nix/manual" >> $out/nix-support/hydra-build-products
           echo "doc-pdf manual $out/manual.pdf" >> $out/nix-support/hydra-build-products
-          echo "doc release-notes $out/share/doc/nix/manual release-notes.html" >> $out/nix-support/hydra-build-products
         '';
       };
 
