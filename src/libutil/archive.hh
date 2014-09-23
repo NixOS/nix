@@ -57,6 +57,11 @@ void dumpPath(const Path & path, Sink & sink,
 
 struct ParseSink
 {
+    /* This function is called before registering any file in the sink.  If it
+       is called, then any file created with the sink should be made visible
+       only to the nix-store owner */
+    virtual void setPrivateSink() { };
+
     virtual void createDirectory(const Path & path) { };
 
     virtual void createRegularFile(const Path & path) { };

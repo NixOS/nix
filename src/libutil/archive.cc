@@ -30,6 +30,7 @@ bool useCaseHack =
 #endif
 
 static string archiveVersion1 = "nix-archive-1";
+static string archiveVersion2 = "nix-archive-2";
 
 static string caseHackSuffix = "~nix~case~hack~";
 
@@ -126,8 +127,20 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
 
 void dumpPath(const Path & path, Sink & sink, PathFilter & filter)
 {
-    writeString(archiveVersion1, sink);
-    dump(path, sink, filter);
+    struct stat st;
+    if (lstat(path.c_str(), &st))
+        throw SysError(format("getting attributes of path ‘%1%’") % path);
+
+    /* In order to produce backward compatible NAR file, we do not insert
+       headers if the file is publicly readable */
+    if (st.st_mode & S_IRGRP) {
+        writeString(archiveVersion1, sink);
+        dump(path, sink, filter);
+    } else {
+        writeString(archiveVersion2, sink);
+        writeString("secret", sink);
+        dump(path, sink, filter);
+    }
 }
 
 
@@ -288,8 +301,19 @@ void parseDump(ParseSink & sink, Source & source)
         /* This generally means the integer at the start couldn't be
            decoded.  Ignore and throw the exception below. */
     }
-    if (version != archiveVersion1)
+
+    if (version != archiveVersion1 && version != archiveVersion2)
         throw badArchive("input doesn't look like a Nix archive");
+
+    if (version == archiveVersion2) {
+        /* Read the visibility field, it can be either "secret" or "public" */
+        string visibility = readString(source);
+        if (visibility == "secret")
+            sink.setPrivateSink();
+        else if (visibility != "public")
+            throw badArchive("unknow ownership type");
+    }
+
     parse(sink, source, "");
 }
 
@@ -298,11 +322,23 @@ struct RestoreSink : ParseSink
 {
     Path dstPath;
     AutoCloseFD fd;
+    bool isSecret;
+
+    RestoreSink()
+      : isSecret(false)
+    {
+    }
+
+    void setPrivateSink()
+    {
+        isSecret = true;
+    }
 
     void createDirectory(const Path & path)
     {
         Path p = dstPath + path;
-        if (mkdir(p.c_str(), 0777) == -1)
+        mode_t mode = isSecret ? 0700 : 0777;
+        if (mkdir(p.c_str(), mode) == -1)
             throw SysError(format("creating directory ‘%1%’") % p);
     };
 
@@ -310,7 +346,8 @@ struct RestoreSink : ParseSink
     {
         Path p = dstPath + path;
         fd.close();
-        fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY, 0666);
+        mode_t mode = isSecret ? 0600 : 0666;
+        fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY, mode);
         if (fd == -1) throw SysError(format("creating file ‘%1%’") % p);
     }
 
@@ -319,7 +356,8 @@ struct RestoreSink : ParseSink
         struct stat st;
         if (fstat(fd, &st) == -1)
             throw SysError("fstat");
-        if (fchmod(fd, st.st_mode | (S_IXUSR | S_IXGRP | S_IXOTH)) == -1)
+        mode_t mode = isSecret ? S_IXUSR : (S_IXUSR | S_IXGRP | S_IXOTH);
+        if (fchmod(fd, st.st_mode | mode) == -1)
             throw SysError("fchmod");
     }
 
@@ -345,8 +383,13 @@ struct RestoreSink : ParseSink
 
     void createSymlink(const Path & path, const string & target)
     {
-        Path p = dstPath + path;
-        nix::createSymlink(target, p);
+        mode_t mode = isSecret ? 0600 : 0666;
+        mode = umask(mode);
+        {
+            Path p = dstPath + path;
+            nix::createSymlink(target, p);
+        }
+        umask(mode);
     }
 };
 

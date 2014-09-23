@@ -114,6 +114,12 @@ struct RetrieveRegularNARSink : ParseSink
 
     RetrieveRegularNARSink() : regular(true) { }
 
+    /* Any content which is private content should not be considered as regular. */
+    void setPrivateSink()
+    {
+        regular = false;
+    }
+
     void createDirectory(const Path & path)
     {
         regular = false;
