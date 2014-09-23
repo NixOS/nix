@@ -385,7 +385,7 @@ static void prim_getEnv(EvalState & state, const Pos & pos, Value * * args, Valu
 
 
 /* Evaluate the first argument, then return the second argument. */
-void prim_seq(EvalState & state, const Pos & pos, Value * * args, Value & v)
+static void prim_seq(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0]);
     state.forceValue(*args[1]);
@@ -395,7 +395,7 @@ void prim_seq(EvalState & state, const Pos & pos, Value * * args, Value & v)
 
 /* Evaluate the first argument deeply (i.e. recursing into lists and
    attrsets), then return the second argument. */
-void prim_deepSeq(EvalState & state, const Pos & pos, Value * * args, Value & v)
+static void prim_deepSeq(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValueDeep(*args[0]);
     state.forceValue(*args[1]);
