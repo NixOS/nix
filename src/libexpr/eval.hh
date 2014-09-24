@@ -43,11 +43,12 @@ private:
     Attr attrs[0];
 
     Bindings(uint32_t capacity) : size_(0), capacity(capacity) { }
+    Bindings(const Bindings & bindings) = delete;
 
 public:
-    size_t size() { return size_; }
+    size_t size() const { return size_; }
 
-    bool empty() { return !size_; }
+    bool empty() const { return !size_; }
 
     typedef Attr * iterator;
 
