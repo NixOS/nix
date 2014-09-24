@@ -1652,8 +1652,10 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
     addTempRoot(dstPath);
 
     if (!isValidPath(dstPath)) {
-        // :TODO: Infer the security of the path based on the ACL.
-        SecretMode smode(publicUserName());
+        // The unpacked data have the right ownership taken from the NAR file.
+        // To canonicalize correctly, we have to infer the SecretMode from the
+        // ownership of the unpacked data.
+        SecretMode smode(getOwnerOfSecretFile(unpacked));
 
         PathLocks outputLock;
 
