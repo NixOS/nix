@@ -9,10 +9,10 @@
 <para>This tutorial takes you through the basic tasks you might perform when you start using Nix.</para>
 <procedure>
 
-<step><para>Install Nix by running the following:
+<step><para>Install single-user Nix by running the following:
 
 <screen>
-$ bash &lt;(curl https://nixos.org/nix/install)
+$ curl https://nixos.org/nix/install | sh
 </screen>
 
 This will install Nix in <filename>/nix</filename>. The install script
