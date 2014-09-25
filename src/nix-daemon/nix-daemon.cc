@@ -767,6 +767,8 @@ static void daemonLoop(char * * argv)
 
             /* Fork a child to handle the connection. */
             startProcess([&]() {
+                fdSocket.close();
+
                 /* Background the daemon. */
                 if (setsid() == -1)
                     throw SysError(format("creating a new session"));
