@@ -9,6 +9,7 @@
 #include <iostream>
 #include <cctype>
 #include <exception>
+#include <algorithm>
 
 #include <sys/time.h>
 #include <sys/stat.h>
@@ -58,23 +59,25 @@ void printMissing(const PathSet & willBuild,
 {
     if (!willBuild.empty()) {
         printMsg(lvlInfo, format("these derivations will be built:"));
-        foreach (PathSet::iterator, i, willBuild)
-            printMsg(lvlInfo, format("  %1%") % *i);
+        Paths sorted = topoSortPaths(*store, willBuild);
+        reverse(sorted.begin(), sorted.end());
+        for (auto & i : sorted)
+            printMsg(lvlInfo, format("  %1%") % i);
     }
 
     if (!willSubstitute.empty()) {
         printMsg(lvlInfo, format("these paths will be fetched (%.2f MiB download, %.2f MiB unpacked):")
             % (downloadSize / (1024.0 * 1024.0))
             % (narSize / (1024.0 * 1024.0)));
-        foreach (PathSet::iterator, i, willSubstitute)
-            printMsg(lvlInfo, format("  %1%") % *i);
+        for (auto & i : willSubstitute)
+            printMsg(lvlInfo, format("  %1%") % i);
     }
 
     if (!unknown.empty()) {
         printMsg(lvlInfo, format("don't know how to build these paths%1%:")
             % (settings.readOnlyMode ? " (may be caused by read-only store access)" : ""));
-        foreach (PathSet::iterator, i, unknown)
-            printMsg(lvlInfo, format("  %1%") % *i);
+        for (auto & i : unknown)
+            printMsg(lvlInfo, format("  %1%") % i);
     }
 }
 
