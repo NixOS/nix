@@ -36,6 +36,11 @@ struct JSONObject
         attr(s);
         escapeJSON(str, t);
     }
+    void attr(const string & s, int n)
+    {
+        attr(s);
+        str << n;
+    }
 };
 
 struct JSONList

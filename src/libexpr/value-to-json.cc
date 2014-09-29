@@ -3,6 +3,7 @@
 #include "util.hh"
 
 #include <cstdlib>
+#include <iomanip>
 
 
 namespace nix {
@@ -16,6 +17,8 @@ void escapeJSON(std::ostream & str, const string & s)
         else if (*i == '\n') str << "\\n";
         else if (*i == '\r') str << "\\r";
         else if (*i == '\t') str << "\\t";
+        else if (*i >= 0 && *i < 32)
+            str << "\\u" << std::setfill('0') << std::setw(4) << std::hex << (uint16_t) *i << std::dec;
         else str << *i;
     str << "\"";
 }
