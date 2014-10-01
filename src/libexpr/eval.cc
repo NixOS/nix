@@ -38,13 +38,13 @@ void Bindings::sort()
 }
 
 
-static void printValue(std::ostream & str, std::set<const Value *> & seen, const Value & v)
+static void printValue(std::ostream & str, std::set<const Value *> & active, const Value & v)
 {
-    if (seen.find(&v) != seen.end()) {
+    if (active.find(&v) != active.end()) {
         str << "<CYCLE>";
         return;
     }
-    seen.insert(&v);
+    active.insert(&v);
 
     switch (v.type) {
     case tInt:
@@ -77,7 +77,7 @@ static void printValue(std::ostream & str, std::set<const Value *> & seen, const
             sorted[i->name] = i->value;
         for (auto & i : sorted) {
             str << i.first << " = ";
-            printValue(str, seen, *i.second);
+            printValue(str, active, *i.second);
             str << "; ";
         }
         str << "}";
@@ -86,7 +86,7 @@ static void printValue(std::ostream & str, std::set<const Value *> & seen, const
     case tList:
         str << "[ ";
         for (unsigned int n = 0; n < v.list.length; ++n) {
-            printValue(str, seen, *v.list.elems[n]);
+            printValue(str, active, *v.list.elems[n]);
             str << " ";
         }
         str << "]";
@@ -107,13 +107,15 @@ static void printValue(std::ostream & str, std::set<const Value *> & seen, const
     default:
         throw Error("invalid value");
     }
+
+    active.erase(&v);
 }
 
 
 std::ostream & operator << (std::ostream & str, const Value & v)
 {
-    std::set<const Value *> seen;
-    printValue(str, seen, v);
+    std::set<const Value *> active;
+    printValue(str, active, v);
     return str;
 }
 
