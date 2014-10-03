@@ -383,6 +383,9 @@ Paths createDirs(const Path & path)
         created.push_back(path);
     }
 
+    if (S_ISLNK(st.st_mode) && stat(path.c_str(), &st) == -1)
+        throw SysError(format("statting symlink ‘%1%’") % path);
+
     if (!S_ISDIR(st.st_mode)) throw Error(format("‘%1%’ is not a directory") % path);
 
     return created;
