@@ -1,6 +1,9 @@
 #pragma once
 
+#include <memory>
+
 #include "types.hh"
+#include "regex.hh"
 
 namespace nix {
 
@@ -14,6 +17,9 @@ struct DrvName
     DrvName();
     DrvName(const string & s);
     bool matches(DrvName & n);
+
+private:
+    std::shared_ptr<Regex> regex;
 };
 
 typedef list<DrvName> DrvNames;

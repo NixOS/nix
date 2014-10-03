@@ -1,6 +1,5 @@
 #include "names.hh"
 #include "util.hh"
-#include "regex.hh"
 
 
 namespace nix {
@@ -34,8 +33,8 @@ DrvName::DrvName(const string & s) : hits(0)
 bool DrvName::matches(DrvName & n)
 {
     if (name != "*") {
-        Regex regex(name);
-        if (!regex.matches(n.name)) return false;
+        if (!regex) regex = std::shared_ptr<Regex>(new Regex(name));
+        if (!regex->matches(n.name)) return false;
     }
     if (version != "" && version != n.version) return false;
     return true;
