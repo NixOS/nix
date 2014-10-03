@@ -227,6 +227,16 @@ DirEntries readDirectory(const Path & path)
 }
 
 
+unsigned char getFileType(const Path & path)
+{
+    struct stat st = lstat(path);
+    if (S_ISDIR(st.st_mode)) return DT_DIR;
+    if (S_ISLNK(st.st_mode)) return DT_LNK;
+    if (S_ISREG(st.st_mode)) return DT_REG;
+    return DT_UNKNOWN;
+}
+
+
 string readFile(int fd)
 {
     struct stat st;
