@@ -68,6 +68,75 @@ be performed.  These are documented below.</para>
 
 <!--######################################################################-->
 
+<refsection><title>Selectors</title>
+
+<para>Several commands, such as <command>nix-env -q</command> and
+<command>nix-env -i</command>, take a list of arguments that specify
+the packages on which to operate. These are extended regular
+expressions that must match the entire name of the package. (For
+details on regular expressions, see
+<citerefentry><refentrytitle>regex</refentrytitle><manvolnum>7</manvolnum></citerefentry>.)
+The match is case-sensitive. The regular expression can optionally be
+followed by a dash and a version number; if omitted, any version of
+the package will match.  Here are some examples:
+
+<variablelist>
+
+  <varlistentry>
+    <term><literal>firefox</literal></term>
+    <listitem><para>Matches the package name
+    <literal>firefox</literal> and any version.</para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term><literal>firefox-32.0</literal></term>
+    <listitem><para>Matches the package name
+    <literal>firefox</literal> and version
+    <literal>32.0</literal>.</para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term><literal>gtk\\+</literal></term>
+    <listitem><para>Matches the package name
+    <literal>gtk+</literal>. The <literal>+</literal> character must
+    be escaped using a backslash to prevent it from being interpreted
+    as a quantifier, and the backslash must be escaped in turn with
+    another backslash to ensure that the shell passes it
+    on.</para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term><literal>.\*</literal></term>
+    <listitem><para>Matches any package name. This is the default for
+    most commands.</para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term><literal>'.*zip.*'</literal></term>
+    <listitem><para>Matches any package name containing the string
+    <literal>zip</literal>. Note the dots: <literal>'*zip*'</literal>
+    does not work, because in a regular expression, the character
+    <literal>*</literal> is interpreted as a
+    quantifier.</para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term><literal>'.*(firefox|chromium).*'</literal></term>
+    <listitem><para>Matches any package name containing the strings
+    <literal>firefox</literal> or
+    <literal>chromium</literal>.</para></listitem>
+  </varlistentry>
+
+</variablelist>
+
+</para>
+
+</refsection>
+
+
+
+<!--######################################################################-->
+
 <refsection><title>Common options</title>
 
 <para>This section lists the options that are common to all
@@ -262,7 +331,7 @@ number of possible ways:
   <emphasis>attribute paths</emphasis> that select attributes from the
   top-level Nix expression.  This is faster than using derivation
   names and unambiguous.  To find out the attribute paths of available
-  packages, use <literal>nix-env -qaP '*'</literal>.</para></listitem>
+  packages, use <literal>nix-env -qaP</literal>.</para></listitem>
 
   <listitem><para>If <option>--from-profile</option>
   <replaceable>path</replaceable> is given,
@@ -326,7 +395,7 @@ number of possible ways:
     <term><option>-r</option></term>
 
     <listitem><para>Remove all previously installed packages first.
-    This is equivalent to running <literal>nix-env -e '*'</literal>
+    This is equivalent to running <literal>nix-env -e '.*'</literal>
     first, except that everything happens in a single
     transaction.</para></listitem>
 
@@ -369,7 +438,7 @@ $ nix-env -i -A xorg.xorgserver</screen>
 <para>To install all derivations in the Nix expression <filename>foo.nix</filename>:
 
 <screen>
-$ nix-env -f ~/foo.nix -i '*'</screen>
+$ nix-env -f ~/foo.nix -i '.*'</screen>
 
 </para>
 
@@ -537,7 +606,7 @@ upgrading `gcc-3.4' to `gcc-3.3.2'
 $ nix-env --upgrade pan
 <lineannotation>(no upgrades available, so nothing happens)</lineannotation>
 
-$ nix-env -u '*' <lineannotation>(try to upgrade everything)</lineannotation>
+$ nix-env -u <lineannotation>(try to upgrade everything)</lineannotation>
 upgrading `hello-2.1.2' to `hello-2.1.3'
 upgrading `mozilla-1.2' to `mozilla-1.4'</screen>
 
@@ -624,7 +693,7 @@ paths designated by the symbolic names
 
 <screen>
 $ nix-env --uninstall gcc
-$ nix-env -e '*' <lineannotation>(remove everything)</lineannotation></screen>
+$ nix-env -e '.*' <lineannotation>(remove everything)</lineannotation></screen>
 
 </refsection>
 
@@ -700,7 +769,7 @@ After this, <command>nix-env -u</command> will ignore Firefox.</para>
 Firefox while the old remains part of the profile:
 
 <screen>
-$ nix-env -q \*
+$ nix-env -q
 firefox-2.0.0.9 <lineannotation>(the current one)</lineannotation>
 
 $ nix-env --preserve-installed -i firefox-2.0.0.11
@@ -716,7 +785,7 @@ setting flag on `firefox-2.0.0.9'
 $ nix-env --preserve-installed -i firefox-2.0.0.11
 installing `firefox-2.0.0.11'
 
-$ nix-env -q \*
+$ nix-env -q
 firefox-2.0.0.11 <lineannotation>(the enabled one)</lineannotation>
 firefox-2.0.0.9 <lineannotation>(the disabled one)</lineannotation></screen>
 
@@ -817,8 +886,7 @@ profile (<option>--installed</option>), or the derivations that are
 available for installation in the active Nix expression
 (<option>--available</option>).  It only prints information about
 derivations whose symbolic name matches one of
-<replaceable>names</replaceable>.  The wildcard <literal>*</literal>
-shows all derivations.</para>
+<replaceable>names</replaceable>.</para>
 
 <para>The derivations are sorted by their <literal>name</literal>
 attributes.</para>
@@ -1024,7 +1092,7 @@ user environment elements, etc. -->
 <refsection><title>Examples</title>
 
 <screen>
-$ nix-env -q '*' <lineannotation>(show installed derivations)</lineannotation>
+$ nix-env -q <lineannotation>(show installed derivations)</lineannotation>
 bison-1.875c
 docbook-xml-4.2
 firefox-1.0.4
@@ -1032,14 +1100,14 @@ MPlayer-1.0pre7
 ORBit2-2.8.3
 ...
 
-$ nix-env -qa '*' <lineannotation>(show available derivations)</lineannotation>
+$ nix-env -qa <lineannotation>(show available derivations)</lineannotation>
 firefox-1.0.7
 GConf-2.4.0.1
 MPlayer-1.0pre7
 ORBit2-2.8.3
 ...
 
-$ nix-env -qas '*' <lineannotation>(show status of available derivations)</lineannotation>
+$ nix-env -qas      <lineannotation>(show status of available derivations)</lineannotation>
 -P- firefox-1.0.7   <lineannotation>(not installed but present)</lineannotation>
 --S GConf-2.4.0.1   <lineannotation>(not present, but there is a substitute for fast installation)</lineannotation>
 --S MPlayer-1.0pre3 <lineannotation>(i.e., this is not the installed MPlayer, even though the version is the same!)</lineannotation>
@@ -1047,24 +1115,29 @@ IP- ORBit2-2.8.3    <lineannotation>(installed and by definition present)</linea
 ...
 
 <lineannotation>(show available derivations in the Nix expression <!-- !!! <filename>-->foo.nix<!-- </filename> -->)</lineannotation>
-$ nix-env -f ./foo.nix -qa '*'
+$ nix-env -f ./foo.nix -qa
 foo-1.2.3
 
-$ nix-env -qc '*' <lineannotation>(compare installed versions to what’s available)</lineannotation>
+$ nix-env -qc <lineannotation>(compare installed versions to what’s available)</lineannotation>
 <replaceable>...</replaceable>
 acrobat-reader-7.0 - ?      <lineannotation>(package is not available at all)</lineannotation>
 autoconf-2.59      = 2.59   <lineannotation>(same version)</lineannotation>
 firefox-1.0.4      &lt; 1.0.7  <lineannotation>(a more recent version is available)</lineannotation>
 <replaceable>...</replaceable>
 
-<lineannotation>(show info about a specific package, in XML)</lineannotation>
-$ nix-env -qa --xml --description firefox
-<![CDATA[<?xml version='1.0' encoding='utf-8'?>
-<items>
-  <item attrPath="0.0.firefoxWrapper"
-    description="Mozilla Firefox - the browser, reloaded (with various plugins)"
-    name="firefox-1.5.0.7" system="i686-linux" />
-</items>]]></screen>
+$ nix-env -qa '.*zip.*' <lineannotation>(show all packages with “zip” in the name)</lineannotation>
+bzip2-1.0.6
+gzip-1.6
+zip-3.0
+<replaceable>...</replaceable>
+
+$ nix-env -qa '.*(firefox|chromium).*' <lineannotation>(show all packages with “firefox” or “chromium” in the name)</lineannotation>
+chromium-37.0.2062.94
+chromium-beta-38.0.2125.24
+firefox-32.0.3
+firefox-with-plugins-13.0.1
+<replaceable>...</replaceable>
+</screen>
 
 </refsection>
 
