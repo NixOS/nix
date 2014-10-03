@@ -800,6 +800,42 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
     mkPath(v, state.findFile(searchPath, path).c_str());
 }
 
+/* Read a directory (without . or ..) */
+static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    PathSet ctx;
+    Path path = state.coerceToPath(pos, *args[0], ctx);
+    try {
+        realiseContext(ctx);
+    } catch (InvalidPathError & e) {
+        throw EvalError(format("cannot read ‘%1%’, since path ‘%2%’ is not valid, at %3%")
+            % path % e.path % pos);
+    }
+
+    DirEntries entries = readDirectory(path);
+    state.mkAttrs(v, entries.size());
+
+    for (const auto & ent : entries) {
+        Value * ent_val = state.allocAttr(v, state.symbols.create(ent.name));
+        if (ent.type == DT_UNKNOWN) {
+            struct stat st = lstat(path + "/" + ent.name);
+            mkString(*ent_val,
+                S_ISREG(st.st_mode) ? "regular" :
+                S_ISDIR(st.st_mode) ? "directory" :
+                S_ISLNK(st.st_mode) ? "symlink" :
+                "unknown");
+        } else {
+            mkString(*ent_val,
+                ent.type == DT_REG ? "regular" :
+                ent.type == DT_DIR ? "directory" :
+                ent.type == DT_LNK ? "symlink" :
+                "unknown");
+        }
+    }
+
+    v.attrs->sort();
+}
+
 
 /*************************************************************
  * Creating files
@@ -1460,6 +1496,7 @@ void EvalState::createBaseEnv()
     addPrimOp("baseNameOf", 1, prim_baseNameOf);
     addPrimOp("dirOf", 1, prim_dirOf);
     addPrimOp("__readFile", 1, prim_readFile);
+    addPrimOp("__readDir", 1, prim_readDir);
     addPrimOp("__findFile", 2, prim_findFile);
 
     // Creating files
