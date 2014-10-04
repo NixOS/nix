@@ -701,13 +701,10 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
     /* Dynamic attrs apply *after* rec and __overrides. */
     foreach (DynamicAttrDefs::iterator, i, dynamicAttrs) {
         Value nameVal;
-        if (i->nameExpr->es->size() == 1) {
-            i->nameExpr->es->front()->eval(state, *dynamicEnv, nameVal);
-            state.forceValue(nameVal);
-            if (nameVal.type == tNull)
-                continue;
-        }
         i->nameExpr->eval(state, *dynamicEnv, nameVal);
+        state.forceValue(nameVal);
+        if (nameVal.type == tNull)
+            continue;
         state.forceStringNoCtx(nameVal);
         Symbol nameSym = state.symbols.create(nameVal.string.s);
         Bindings::iterator j = v.attrs->find(nameSym);

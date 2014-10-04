@@ -53,16 +53,15 @@ struct Env;
 struct Value;
 class EvalState;
 struct StaticEnv;
-struct ExprConcatStrings;
 
 
 /* An attribute path is a sequence of attribute names. */
 struct AttrName
 {
     Symbol symbol;
-    ExprConcatStrings * expr;
+    Expr * expr;
     AttrName(const Symbol & s) : symbol(s) {};
-    AttrName(ExprConcatStrings * e) : expr(e) {};
+    AttrName(Expr * e) : expr(e) {};
 };
 
 typedef std::vector<AttrName> AttrPath;
@@ -173,16 +172,17 @@ struct ExprAttrs : Expr
         Expr * e;
         Pos pos;
         unsigned int displ; // displacement
-        AttrDef(Expr * e, const Pos & pos, bool inherited=false) : inherited(inherited), e(e), pos(pos) { };
+        AttrDef(Expr * e, const Pos & pos, bool inherited=false)
+            : inherited(inherited), e(e), pos(pos) { };
         AttrDef() { };
     };
     typedef std::map<Symbol, AttrDef> AttrDefs;
     AttrDefs attrs;
     struct DynamicAttrDef {
-        ExprConcatStrings * nameExpr;
-        Expr * valueExpr;
+        Expr * nameExpr, * valueExpr;
         Pos pos;
-        DynamicAttrDef(ExprConcatStrings * nameExpr, Expr * valueExpr, const Pos & pos) : nameExpr(nameExpr), valueExpr(valueExpr), pos(pos) { };
+        DynamicAttrDef(Expr * nameExpr, Expr * valueExpr, const Pos & pos)
+            : nameExpr(nameExpr), valueExpr(valueExpr), pos(pos) { };
     };
     typedef std::vector<DynamicAttrDef> DynamicAttrDefs;
     DynamicAttrDefs dynamicAttrs;
