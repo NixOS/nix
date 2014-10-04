@@ -819,7 +819,7 @@ static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Val
         Value * ent_val = state.allocAttr(v, state.symbols.create(ent.name));
         if (ent.type == DT_UNKNOWN)
             ent.type = getFileType(path);
-        mkString(*ent_val,
+        mkStringNoCopy(*ent_val,
             ent.type == DT_REG ? "regular" :
             ent.type == DT_DIR ? "directory" :
             ent.type == DT_LNK ? "symlink" :
