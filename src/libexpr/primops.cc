@@ -1123,6 +1123,35 @@ static void prim_intersectAttrs(EvalState & state, const Pos & pos, Value * * ar
 }
 
 
+/* Collect each attribute named `attr' from a list of attribute sets.
+   Sets that don't contain the named attribute are ignored.
+
+   Example:
+     catAttrs "a" [{a = 1;} {b = 0;} {a = 2;}]
+     => [1 2]
+*/
+static void prim_catAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    Symbol attrName = state.symbols.create(state.forceStringNoCtx(*args[0], pos));
+    state.forceList(*args[1], pos);
+
+    Value * res[args[1]->list.length];
+    unsigned int found = 0;
+
+    for (unsigned int n = 0; n < args[1]->list.length; ++n) {
+        Value & v2(*args[1]->list.elems[n]);
+        state.forceAttrs(v2, pos);
+        Bindings::iterator i = v2.attrs->find(attrName);
+        if (i != v2.attrs->end())
+            res[found++] = i->value;
+    }
+
+    state.mkList(v, found);
+    for (unsigned int n = 0; n < found; ++n)
+        v.list.elems[n] = res[n];
+}
+
+
 /* Return a set containing the names of the formal arguments expected
    by the function `f'.  The value of each attribute is a Boolean
    denoting whether has a default value.  For instance,
@@ -1530,6 +1559,7 @@ void EvalState::createBaseEnv()
     addPrimOp("removeAttrs", 2, prim_removeAttrs);
     addPrimOp("__listToAttrs", 1, prim_listToAttrs);
     addPrimOp("__intersectAttrs", 2, prim_intersectAttrs);
+    addPrimOp("__catAttrs", 2, prim_catAttrs);
     addPrimOp("__functionArgs", 1, prim_functionArgs);
 
     // Lists
