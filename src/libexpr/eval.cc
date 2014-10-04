@@ -1450,17 +1450,18 @@ void EvalState::printStats()
     getrusage(RUSAGE_SELF, &buf);
     float cpuTime = buf.ru_utime.tv_sec + ((float) buf.ru_utime.tv_usec / 1000000);
 
+    uint64_t bEnvs = nrEnvs * sizeof(Env) + nrValuesInEnvs * sizeof(Value *);
+    uint64_t bLists = nrListElems * sizeof(Value *);
+    uint64_t bValues = nrValues * sizeof(Value);
+    uint64_t bAttrsets = nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Attr);
+
     printMsg(v, format("  time elapsed: %1%") % cpuTime);
     printMsg(v, format("  size of a value: %1%") % sizeof(Value));
-    printMsg(v, format("  environments allocated: %1% (%2% bytes)")
-        % nrEnvs % (nrEnvs * sizeof(Env) + nrValuesInEnvs * sizeof(Value *)));
-    printMsg(v, format("  list elements: %1% (%2% bytes)")
-        % nrListElems % (nrListElems * sizeof(Value *)));
+    printMsg(v, format("  environments allocated: %1% (%2% bytes)") % nrEnvs % bEnvs);
+    printMsg(v, format("  list elements: %1% (%2% bytes)") % nrListElems % bLists);
     printMsg(v, format("  list concatenations: %1%") % nrListConcats);
-    printMsg(v, format("  values allocated: %1% (%2% bytes)")
-        % nrValues % (nrValues * sizeof(Value)));
-    printMsg(v, format("  sets allocated: %1% (%2% bytes)")
-        % nrAttrsets % (nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Attr)));
+    printMsg(v, format("  values allocated: %1% (%2% bytes)") % nrValues % bValues);
+    printMsg(v, format("  sets allocated: %1% (%2% bytes)") % nrAttrsets % bAttrsets);
     printMsg(v, format("  right-biased unions: %1%") % nrOpUpdates);
     printMsg(v, format("  values copied in right-biased unions: %1%") % nrOpUpdateValuesCopied);
     printMsg(v, format("  symbols in symbol table: %1%") % symbols.size());
@@ -1470,6 +1471,7 @@ void EvalState::printStats()
     printMsg(v, format("  number of attr lookups: %1%") % nrLookups);
     printMsg(v, format("  number of primop calls: %1%") % nrPrimOpCalls);
     printMsg(v, format("  number of function calls: %1%") % nrFunctionCalls);
+    printMsg(v, format("  total allocations: %1% bytes") % (bEnvs + bLists + bValues + bAttrsets));
 
     if (countCalls) {
         v = lvlInfo;
