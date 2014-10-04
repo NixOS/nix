@@ -974,7 +974,28 @@ static void prim_attrNames(EvalState & state, const Pos & pos, Value * * args, V
     for (auto & i : *args[0]->attrs)
         mkString(*(v.list.elems[n++] = state.allocValue()), i.name);
 
-    std::sort(v.list.elems, v.list.elems + n, [](Value * v1, Value * v2) { return strcmp(v1->string.s, v2->string.s) < 0; });
+    std::sort(v.list.elems, v.list.elems + n,
+        [](Value * v1, Value * v2) { return strcmp(v1->string.s, v2->string.s) < 0; });
+}
+
+
+/* Return the values of the attributes in a set as a list, in the same
+   order as attrNames. */
+static void prim_attrValues(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceAttrs(*args[0], pos);
+
+    state.mkList(v, args[0]->attrs->size());
+
+    unsigned int n = 0;
+    for (auto & i : *args[0]->attrs)
+        v.list.elems[n++] = (Value *) &i;
+
+    std::sort(v.list.elems, v.list.elems + n,
+        [](Value * v1, Value * v2) { return (string) ((Attr *) v1)->name < (string) ((Attr *) v2)->name; });
+
+    for (unsigned int i = 0; i < n; ++i)
+        v.list.elems[i] = ((Attr *) v.list.elems[i])->value;
 }
 
 
@@ -1501,6 +1522,7 @@ void EvalState::createBaseEnv()
 
     // Sets
     addPrimOp("__attrNames", 1, prim_attrNames);
+    addPrimOp("__attrValues", 1, prim_attrValues);
     addPrimOp("__getAttr", 2, prim_getAttr);
     addPrimOp("__unsafeGetAttrPos", 2, prim_unsafeGetAttrPos);
     addPrimOp("__hasAttr", 2, prim_hasAttr);
