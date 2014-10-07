@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#!/bin/sh
 
 set -e
 
@@ -49,7 +49,10 @@ for i in $(cd $self/store >/dev/null && echo *); do
     fi
     if ! [ -e "$dest/store/$i" ]; then
         cp -Rp "$self/store/$i" "$i_tmp"
+        chmod -R a-w "$i_tmp"
+        chmod +w "$i_tmp"
         mv "$i_tmp" "$dest/store/$i"
+        chmod -w "$dest/store/$i"
     fi
 done
 echo "" >&2
@@ -62,6 +65,11 @@ fi
 
 if ! $nix/bin/nix-store --load-db < $self/.reginfo; then
     echo "$0: unable to register valid paths" >&2
+    exit 1
+fi
+
+if ! $nix/bin/nix-store --verify; then
+    echo "$0: store verification failed! Consider deleting /nix and starting over" >&2
     exit 1
 fi
 
@@ -123,3 +131,12 @@ variables are set, either log in again, or type
 in your shell.
 EOF
 fi
+cat >&2 <<EOF
+
+Then, consider running
+
+  nix-store --optimise
+
+which will reduce store disk usage by hardlinking identical
+files together.
+EOF
