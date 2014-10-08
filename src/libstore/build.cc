@@ -2845,8 +2845,12 @@ void SubstitutionGoal::finished()
         return;
     }
 
-    // :TODO: Transfer the user name down to here.
-    SecretMode smode(publicUserName());
+    /* The substituter is expected to keep the ownership of the file which is
+       downloaded.  This implies that if the substituter is responsible of the
+       security of the content which is transfered.  If the substituter use NAR
+       files then the ownership should be respected and the destination file
+       would have the correct ownership. */
+    SecretMode smode(getOwnerOfSecretFile(destPath));
 
     if (repair) replaceValidPath(storePath, destPath);
 
