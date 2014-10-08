@@ -10,6 +10,11 @@ if [ -n "$HOME" ]; then
 
     export PATH=$NIX_LINK/bin:$NIX_LINK/sbin:$PATH
 
+    if [ -n "$LD_LIBRARY_PATH$DYLD_LIBRARY_PATH" ]; then
+        echo "Warning: \$LD_LIBRARY_PATH or \$DYLD_LIBRARY_PATH are set!" >&2
+        echo "         This can cause unexpected behavior, please unset." >&2
+    fi
+
     # Subscribe the root user to the Nixpkgs channel by default.
     if [ ! -e $HOME/.nix-channels ]; then
         echo "http://nixos.org/channels/nixpkgs-unstable nixpkgs" > $HOME/.nix-channels
