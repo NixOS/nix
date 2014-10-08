@@ -1218,7 +1218,7 @@ string getOwnerOfSecretFile(const Path & path)
     /* Extract the uid of the file */
     struct stat st;
     if (stat(path.c_str(), &st) == -1)
-        throw SysError("statting file");
+        throw SysError(format("statting file '%1%'") % path);
 
     /* If the file is readable by the group, then this means this is a
        public file. */
