@@ -94,7 +94,7 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
 
 
 void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path,
-    InodeHash & inodeHash, const SecretMode & smode)
+    InodeHash & inodeHash)
 {
     checkInterrupt();
 
@@ -105,7 +105,7 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path,
     if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectoryIgnoringInodes(path, inodeHash);
         foreach (Strings::iterator, i, names)
-            optimisePath_(stats, path + "/" + *i, inodeHash, smode);
+            optimisePath_(stats, path + "/" + *i, inodeHash);
         return;
     }
 
@@ -177,6 +177,19 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path,
     bool mustToggle = !isStorePath(path);
     if (mustToggle) makeWritable(dirOf(path));
 
+    /* Hash are computed based on the NAR file.  These implies that 2 files with
+       identical content but different ownership *won't* be linked.  This is good
+       because otherwise a secret file could be revealed. */
+    SecretMode smode(getOwnerOfSecretFile(path));
+
+    /* Still, verify that the ownership is identical for both files */
+    if (st.st_mode != stLink.st_mode || st.st_uid != stLink.st_uid ||
+        st.st_gid != stLink.st_gid)
+    {
+        printMsg(lvlDebug, format("‘%1%’ does not have the same ownership as ‘%2%’") % path % linkPath);
+        return;
+    }
+
     /* When we're done, make the directory read-only again and reset
        its timestamp back to 0. */
     MakeReadOnly makeReadOnly(mustToggle ? dirOf(path) : "", smode);
@@ -227,9 +240,7 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
         addTempRoot(*i);
         if (!isValidPath(*i)) continue; /* path was GC'ed, probably */
         startNest(nest, lvlChatty, format("hashing files in ‘%1%’") % *i);
-        // :TODO: Infer the security of the path based on the ACL.
-        SecretMode smode(publicUserName());
-        optimisePath_(stats, *i, inodeHash, smode);
+        optimisePath_(stats, *i, inodeHash);
     }
 }
 
@@ -239,9 +250,7 @@ void LocalStore::optimisePath(const Path & path)
     OptimiseStats stats;
     InodeHash inodeHash;
 
-    // :TODO: Infer the security of the path based on the ACL.
-    SecretMode smode(publicUserName());
-    if (settings.autoOptimiseStore) optimisePath_(stats, path, inodeHash, smode);
+    if (settings.autoOptimiseStore) optimisePath_(stats, path, inodeHash);
 }
 
 

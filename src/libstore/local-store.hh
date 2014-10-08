@@ -308,7 +308,7 @@ private:
 
     InodeHash loadInodeHash();
     Strings readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash);
-    void optimisePath_(OptimiseStats & stats, const Path & path, InodeHash & inodeHash, const SecretMode & smode);
+    void optimisePath_(OptimiseStats & stats, const Path & path, InodeHash & inodeHash);
 
     // Internal versions that are not wrapped in retry_sqlite.
     bool isValidPath_(const Path & path);
