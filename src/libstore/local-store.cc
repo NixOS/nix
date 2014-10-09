@@ -1348,9 +1348,6 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
     addTempRoot(dstPath);
 
     if (repair || !isValidPath(dstPath)) {
-        // :TODO: Transfer the user name down to here.
-        SecretMode smode(publicUserName());
-
         /* The first check above is an optimisation to prevent
            unnecessary lock acquisition. */
 
@@ -1365,6 +1362,14 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
                 restorePath(dstPath, source);
             } else
                 writeFile(dstPath, dump);
+
+            /* When we are adding the files from a NAR file (recursive = true),
+               the content should already have the right ownership. So, we only
+               have to preserve the ownership of the content when we canonicalise
+               the path. */
+            string userName = recursive ? getOwnerOfSecretFile(dstPath)
+                                        : publicUserName();
+            SecretMode smode(userName);
 
             canonicalisePathMetaData(dstPath, -1, smode);
 
