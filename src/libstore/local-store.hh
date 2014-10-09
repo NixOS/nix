@@ -325,7 +325,8 @@ typedef set<Inode> InodesSeen;
    - the last modification date on each file is set to 1 (i.e.,
      00:00:01 1/1/1970 UTC)
    - the permissions are set of 444 or 555 (i.e., read-only with or
-     without execute permission; setuid bits etc. are cleared)
+     without execute permission; setuid bits etc. are cleared) and filtered
+     to 400 or 500 for secret content.
    - the owner and group are set to the Nix user and group, if we're
      running as root. */
 void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen, const SecretMode & secret);

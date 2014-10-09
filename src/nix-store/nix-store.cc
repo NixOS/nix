@@ -540,7 +540,8 @@ static void opDumpDB(Strings opFlags, Strings opArgs)
 }
 
 
-static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
+static void registerValidity(bool reregister, bool hashGiven, bool canonicalise,
+                             bool keepSecret)
 {
     ValidPathInfos infos;
 
@@ -550,8 +551,11 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
         if (!store->isValidPath(info.path) || reregister) {
             /* !!! races */
             if (canonicalise) {
-                // :TODO: Infer the security of the path based on the ACL.
-                SecretMode smode(publicUserName());
+                /* Make the content secret (idealy it should already be secret)
+                   if the --keep-secret option is given on the command line. */
+                string userName = keepSecret ? getCurrentUserName()
+                                             : publicUserName();
+                SecretMode smode(userName);
                 canonicalisePathMetaData(info.path, -1, smode);
             }
             if (!hashGiven) {
@@ -572,7 +576,7 @@ static void opLoadDB(Strings opFlags, Strings opArgs)
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (!opArgs.empty())
         throw UsageError("no arguments expected");
-    registerValidity(true, true, false);
+    registerValidity(true, true, false, false);
 }
 
 
@@ -580,16 +584,18 @@ static void opRegisterValidity(Strings opFlags, Strings opArgs)
 {
     bool reregister = false; // !!! maybe this should be the default
     bool hashGiven = false;
+    bool keepSecret = false;
 
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
         if (*i == "--reregister") reregister = true;
         else if (*i == "--hash-given") hashGiven = true;
+        else if (*i == "--keep-secret") keepSecret = true;
         else throw UsageError(format("unknown flag ‘%1%’") % *i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
-    registerValidity(reregister, hashGiven, true);
+    registerValidity(reregister, hashGiven, true, keepSecret);
 }
 
 
