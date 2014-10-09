@@ -96,7 +96,7 @@ struct Value
    Value to ensure that the target isn't kept alive unnecessarily. */
 static inline void clearValue(Value & v)
 {
-    v.app.right = 0;
+    v.app.left = v.app.right = 0;
 }
 
 
@@ -118,8 +118,8 @@ static inline void mkBool(Value & v, bool b)
 
 static inline void mkNull(Value & v)
 {
+    clearValue(v);
     v.type = tNull;
-    v.app.left = v.app.right = 0; // scrub
 }
 
 

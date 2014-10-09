@@ -455,6 +455,7 @@ Bindings * EvalState::allocBindings(Bindings::size_t capacity)
 
 void EvalState::mkList(Value & v, unsigned int length)
 {
+    clearValue(v);
     v.type = tList;
     v.list.length = length;
     v.list.elems = length ? (Value * *) GC_MALLOC(length * sizeof(Value *)) : 0;
