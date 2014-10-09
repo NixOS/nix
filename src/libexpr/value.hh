@@ -119,7 +119,7 @@ static inline void mkBool(Value & v, bool b)
 static inline void mkNull(Value & v)
 {
     v.type = tNull;
-    v.app.left = v.app.right = 00; // scrub
+    v.app.left = v.app.right = 0; // scrub
 }
 
 
