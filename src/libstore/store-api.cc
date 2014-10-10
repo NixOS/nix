@@ -226,7 +226,7 @@ Path computeStorePathForText(const string & name, const string & s,
 
     /* If the content is secret, we use a different type such as this public
        file do not get then them hashes as secret files. */
-    if (userName != publicUserName())
+    if (SecretMode::isSecret(userName))
         type = "secret-text";
 
     foreach (PathSet::const_iterator, i, references) {

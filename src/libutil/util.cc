@@ -1235,7 +1235,7 @@ SecretMode::SecretMode(const string & userName)
     filterMask_(0),
     oldMask_(0)
 {
-    if (userName_ != publicUserName()) {
+    if (isSecret(userName_)) {
         /* If we need to make private files, just make them only readable by
            the store user, and later we will transfer the ownership with ACL
            is the filesystem of the store supports it. */
@@ -1252,6 +1252,18 @@ SecretMode::~SecretMode()
         if (filter != filterMask_)
             throw Error("umask got change, might leak secure content");
     }
+}
+
+
+bool SecretMode::isSecret(const string & userName)
+{
+    return userName != publicUserName();
+}
+
+
+bool SecretMode::isOwnerAccessibleBy(const string & owner, const string & userName)
+{
+    return !isSecret(owner) || owner == userName;
 }
 
 

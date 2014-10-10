@@ -1501,7 +1501,7 @@ void LocalStore::exportPath(const Path & path, bool sign,
         throw Error(format("path ‘%1%’ is not valid") % path);
 
     string owner = getOwnerOfSecretFile(path);
-    if (owner != publicUserName() && owner != userName)
+    if (!SecretMode::isOwnerAccessibleBy(owner, userName))
         throw Error(format("path ‘%1%’ is not accessible by %2%") % path % userName);
 
     HashAndWriteSink hashAndWriteSink(sink);

@@ -407,6 +407,10 @@ class SecretMode
     explicit SecretMode(const string & userName);
     ~SecretMode();
 
+    /* Common functions for checking if the content is secret / accessible. */
+    static bool isSecret(const string & userName);
+    static bool isOwnerAccessibleBy(const string & owner, const string & userName);
+
     mode_t filterMode(mode_t mode) const {
         return mode & ~filterMask_;
     }

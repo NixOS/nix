@@ -294,7 +294,7 @@ static void performOp(bool trusted, const string & user,
         string userName = publicUserName();
         if (GET_PROTOCOL_MINOR(clientVersion) >= 15) {
             userName = readString(from);
-            if (userName != publicUserName() && userName != user)
+            if (!SecretMode::isOwnerAccessibleBy(userName, user))
                 throw Error(format("missmatch between user names; connection: %1%, claimed: %2%") % user % userName);
         }
         string suffix = readString(from);
@@ -313,7 +313,7 @@ static void performOp(bool trusted, const string & user,
         string userName = publicUserName();
         if (GET_PROTOCOL_MINOR(clientVersion) >= 15) {
             userName = readString(from);
-            if (userName != publicUserName() && userName != user)
+            if (!SecretMode::isOwnerAccessibleBy(userName, user))
                 throw Error(format("missmatch between user names; connection: %1%, claimed: %2%") % user % userName);
         }
         startWork();
