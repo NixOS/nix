@@ -318,7 +318,7 @@ std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
    affected), but it has some backwards compatibility issues (the
    hashing scheme changes), so I'm not doing that for now. */
 Path computeStorePathForText(const string & name, const string & s,
-    const PathSet & references);
+    const PathSet & references, const string &userName);
 
 
 /* Remove the temporary roots file for this process.  Any temporary

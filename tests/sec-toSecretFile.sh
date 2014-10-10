@@ -22,6 +22,10 @@ publicFileStat=$(stat --format=%A $publicFile)
 secretFile=$(nix-instantiate ./sec-toSecretFile.nix -A secret --eval-only | tr -d '"')
 secretFileStat=$(stat --format=%A $secretFile)
 
+# Determine the output path of the secret file.
+fakeSecretFile=$(nix-instantiate ./sec-toSecretFile.nix -A fakeSecret --eval-only | tr -d '"')
+fakeSecretFileStat=$(stat --format=%A $fakeSecretFile)
+
 # Check file ownership, and verify that only the owner of the store is the
 # only one capable of reading the secret file.
 expected="-r--r--r--"
@@ -33,5 +37,16 @@ fi
 expected="-r--------"
 if ! test $secretFileStat = $expected; then
     echo "Secret file should only be readable by root."
+    exit 1
+fi
+
+expected="-r--r--r--"
+if ! test $fakeSecretFileStat = $expected; then
+    echo "fake secret file should be readable by everybody."
+    exit 1
+fi
+
+if ! test $fakeSecretFile != $secretFile; then
+    echo "fake secret file and secret file should have a different path."
     exit 1
 fi

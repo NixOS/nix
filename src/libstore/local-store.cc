@@ -1422,7 +1422,7 @@ Path LocalStore::addToStore(const Path & _srcPath,
 Path LocalStore::addTextToStore(const string & name, const string & s,
     const PathSet & references, const string &userName, bool repair)
 {
-    Path dstPath = computeStorePathForText(name, s, references);
+    Path dstPath = computeStorePathForText(name, s, references, userName);
 
     addTempRoot(dstPath);
 

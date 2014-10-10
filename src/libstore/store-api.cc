@@ -122,6 +122,10 @@ void checkStoreName(const string & name)
        for plain text files written to the store using
        addTextToStore(); <r1> ... <rN> are the references of the
        path.
+     "secret-text:<r1>:<r2>:...<rN>"
+       for secret plain text files written to the store using
+       addTextToStore(); <r1> ... <rN> are the references of the
+       path.
      "source"
        for paths copied to the store using addToStore() when recursive
        = true and hashAlgo = "sha256"
@@ -133,7 +137,7 @@ void checkStoreName(const string & name)
        name of the output (usually, "out").
 
    <h2> = base-16 representation of a SHA-256 hash of:
-     if <type> = "text:...":
+     if <type> = "text:..." or <type> = "secret-text:...":
        the string written to the resulting store path
      if <type> = "source":
        the serialisation of the path from which this store path is
@@ -212,13 +216,19 @@ std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
 
 
 Path computeStorePathForText(const string & name, const string & s,
-    const PathSet & references)
+    const PathSet & references, const string &userName)
 {
     Hash hash = hashString(htSHA256, s);
     /* Stuff the references (if any) into the type.  This is a bit
        hacky, but we can't put them in `s' since that would be
        ambiguous. */
     string type = "text";
+
+    /* If the content is secret, we use a different type such as this public
+       file do not get then them hashes as secret files. */
+    if (userName != publicUserName())
+        type = "secret-text";
+
     foreach (PathSet::const_iterator, i, references) {
         type += ":";
         type += *i;

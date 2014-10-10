@@ -39,7 +39,7 @@ Path writeDerivation(StoreAPI & store, const Derivation & drv,
     string suffix = name + drvExtension;
     string contents = unparseDerivation(drv);
     return settings.readOnlyMode
-        ? computeStorePathForText(suffix, contents, references)
+        ? computeStorePathForText(suffix, contents, references, userName)
         : store.addTextToStore(suffix, contents, references, userName, repair);
 }
 

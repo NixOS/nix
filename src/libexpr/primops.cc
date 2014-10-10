@@ -816,7 +816,7 @@ static void toFile_impl(EvalState & state, const string & userName, const Pos & 
     }
 
     Path storePath = settings.readOnlyMode
-        ? computeStorePathForText(name, contents, refs)
+        ? computeStorePathForText(name, contents, refs, userName)
         : store->addTextToStore(name, contents, refs, userName, state.repair);
 
     /* Note: we don't need to add `context' to the context of the
