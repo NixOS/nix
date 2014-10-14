@@ -199,6 +199,20 @@ while (scalar @ARGV) {
         last;
     }
 
+    elsif ($arg eq "--rollback") {
+        die "$0: ‘--rollback’ has at most one argument\n" if scalar @ARGV > 1;
+        my $generation = shift @ARGV;
+        my @args = ("$Nix::Config::binDir/nix-env", "--profile", $profile);
+        if (defined $generation) {
+            die "invalid channel generation number ‘$generation’" unless $generation =~ /^[0-9]+$/;
+            push @args, "--switch-generation", $generation;
+        } else {
+            push @args, "--rollback";
+        }
+        system(@args) == 0 or exit 1;
+        last;
+    }
+
     elsif ($arg eq "--help") {
         exec "man nix-channel" or die;
     }

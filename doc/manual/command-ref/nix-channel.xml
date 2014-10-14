@@ -24,6 +24,7 @@
       <arg choice='plain'><option>--remove</option> <replaceable>url</replaceable></arg>
       <arg choice='plain'><option>--list</option></arg>
       <arg choice='plain'><option>--update</option> <arg rep='repeat'><replaceable>names</replaceable></arg></arg>
+      <arg choice='plain'><option>--rollback</option> <arg choice='opt'><replaceable>generation</replaceable></arg></arg>
     </group>
   </cmdsynopsis>
 </refsynopsisdiv>
@@ -80,6 +81,14 @@ condition="manual">See also <xref linkend="sec-channels"
 
   </varlistentry>
 
+  <varlistentry><term><option>--rollback</option> [<replaceable>generation</replaceable>]</term>
+
+    <listitem><para>Reverts the previous call to <command>nix-channel
+    --update</command>. Optionally, you can specify a specific channel
+    generation number to restore.</para></listitem>
+
+  </varlistentry>
+
 </variablelist>
 
 </para>
@@ -104,9 +113,53 @@ respectively.</para>
 <para>To subscribe to the Nixpkgs channel and install the GNU Hello package:</para>
 
 <screen>
-$ nix-channel --add http://nixos.org/channels/nixpkgs-unstable
+$ nix-channel --add https://nixos.org/channels/nixpkgs-unstable
 $ nix-channel --update
 $ nix-env -iA nixpkgs.hello</screen>
+
+<para>You can revert channel updates using <option>--rollback</option>:</para>
+
+<screen>
+$ nix-instantiate --eval -E '(import &lt;nixpkgs> {}).lib.nixpkgsVersion'
+"14.04.527.0e935f1"
+
+$ nix-channel --rollback
+switching from generation 483 to 482
+
+$ nix-instantiate --eval -E '(import &lt;nixpkgs> {}).lib.nixpkgsVersion'
+"14.04.526.dbadfad"
+</screen>
+
+</refsection>
+
+<refsection><title>Files</title>
+
+<variablelist>
+
+  <varlistentry><term><filename>/nix/var/nix/profiles/<replaceable>username</replaceable>/channels</filename></term>
+
+    <listitem><para><command>nix-channel</command> uses a
+    <command>nix-env</command> profile to keep track of previous
+    versions of the subscribed channels. Every time you run
+    <command>nix-channel --update</command>, a new channel generation
+    (that is, a symlink to the channel Nix expressions in the Nix store)
+    is created. This enables <command>nix-channel --rollback</command>
+    to revert to previous versions.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><filename>~/.nix-defexpr/channels</filename></term>
+
+    <listitem><para>This is a symlink to
+    <filename>/nix/var/nix/profiles/<replaceable>username</replaceable>/channels</filename>. It
+    ensures that <command>nix-env</command> can find your channels. In
+    a multi-user installation, you may also have
+    <filename>~/.nix-defexpr/channels_root</filename>, which links to
+    the channels of the root user.</para></listitem>
+
+  </varlistentry>
+
+</variablelist>
 
 </refsection>
 
