@@ -267,7 +267,7 @@ int handleExceptions(const string & programName, std::function<void()> fun)
         return e.status;
     } catch (UsageError & e) {
         printMsg(lvlError,
-            format(error + " %1%\nTry ‘%2% --help’ for more information.")
+            format(error + "%1%\nTry ‘%2% --help’ for more information.")
             % e.what() % programName);
         return 1;
     } catch (BaseError & e) {
