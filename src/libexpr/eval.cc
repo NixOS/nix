@@ -212,9 +212,9 @@ EvalState::EvalState(const Strings & _searchPath)
            allocated.  This might be a problem on systems that don't
            overcommit. */
         if (!getenv("GC_INITIAL_HEAP_SIZE")) {
-            size_t maxSize = 384 * 1024 * 1024;
             size_t size = 32 * 1024 * 1024;
 #if HAVE_SYSCONF && defined(_SC_PAGESIZE) && defined(_SC_PHYS_PAGES)
+            size_t maxSize = 384 * 1024 * 1024;
             long pageSize = sysconf(_SC_PAGESIZE);
             long pages = sysconf(_SC_PHYS_PAGES);
             if (pageSize != -1)
@@ -312,11 +312,6 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const Symbol & sym, co
     throw EvalError(format(s) % sym % p1 % p2);
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const char * s))
-{
-    throw TypeError(s);
-}
-
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const Pos & pos))
 {
     throw TypeError(format(s) % pos);
@@ -325,11 +320,6 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const Pos & pos))
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1))
 {
     throw TypeError(format(s) % s1);
-}
-
-LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1, const string & s2))
-{
-    throw TypeError(format(s) % s1 % s2);
 }
 
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const ExprLambda & fun, const Symbol & s2, const Pos & pos))
