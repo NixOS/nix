@@ -10,9 +10,11 @@ if [ -n "$HOME" ]; then
 
     export PATH=$NIX_LINK/bin:$NIX_LINK/sbin:$PATH
 
-    if [ -n "$LD_LIBRARY_PATH$DYLD_LIBRARY_PATH" ]; then
+    if [ -n "$LD_LIBRARY_PATH$DYLD_LIBRARY_PATH" ] &&
+      [ "$LD_LIBRARY_PATH$DYLD_LIBRARY_PATH" != "$NIX_LD_ALLOWED" ]; then
         echo "Warning: \$LD_LIBRARY_PATH or \$DYLD_LIBRARY_PATH are set!" >&2
-        echo "         This can cause unexpected behavior, please unset." >&2
+        echo "         This can cause unexpected behavior, please unset" >&2
+        echo "         or whitelist with NIX_LD_ALLOWED." >&2
     fi
 
     # Subscribe the root user to the Nixpkgs channel by default.
