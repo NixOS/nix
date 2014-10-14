@@ -61,6 +61,8 @@ sub writeChannels {
 # Adds a channel.
 sub addChannel {
     my ($url, $name) = @_;
+    die "invalid channel URL ‘$url’" unless $url =~ /^(file|http|https):\/\//;
+    die "invalid channel identifier ‘$name’" unless $name =~ /^[a-zA-Z0-9_][a-zA-Z0-9_\-\.]*$/;
     readChannels;
     $channels{$name} = $url;
     writeChannels;
