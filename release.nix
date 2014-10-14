@@ -24,8 +24,8 @@ let
 
         buildInputs =
           [ curl bison flex perl libxml2 libxslt bzip2
-            tetex dblatex nukeReferences pkgconfig sqlite git
-          ];
+            /* tetex dblatex */ nukeReferences pkgconfig sqlite
+          ] ++ lib.optional (!lib.inNixShell) git;
 
         configureFlags = ''
           --with-docbook-rng=${docbook5}/xml/rng/docbook
