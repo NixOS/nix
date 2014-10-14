@@ -18,7 +18,7 @@ static void sigsegvHandler(int signo, siginfo_t * info, void * ctx)
        the stack pointer.  Unfortunately, getting the stack pointer is
        not portable. */
     bool haveSP = true;
-    char * sp;
+    char * sp = 0;
 #if defined(__x86_64__) && defined(REG_RSP)
     sp = (char *) ((ucontext *) ctx)->uc_mcontext.gregs[REG_RSP];
 #elif defined(REG_ESP)
