@@ -1,5 +1,6 @@
 #! @perl@ -w @perlFlags@
 
+use strict;
 use Nix::SSH;
 use Nix::Config;
 use Nix::Store;
