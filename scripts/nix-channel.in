@@ -1,10 +1,13 @@
 #! @perl@ -w @perlFlags@
 
+use utf8;
 use strict;
 use File::Basename;
 use File::Path qw(mkpath);
 use Nix::Config;
 use Nix::Manifest;
+
+binmode STDERR, ":encoding(utf8)";
 
 Nix::Config::readConfig;
 
@@ -58,6 +61,8 @@ sub writeChannels {
 # Adds a channel.
 sub addChannel {
     my ($url, $name) = @_;
+    die "invalid channel URL ‘$url’" unless $url =~ /^(file|http|https):\/\//;
+    die "invalid channel identifier ‘$name’" unless $name =~ /^[a-zA-Z0-9_][a-zA-Z0-9_\-\.]*$/;
     readChannels;
     $channels{$name} = $url;
     writeChannels;
@@ -191,6 +196,20 @@ while (scalar @ARGV) {
 
     elsif ($arg eq "--update") {
         update(@ARGV);
+        last;
+    }
+
+    elsif ($arg eq "--rollback") {
+        die "$0: ‘--rollback’ has at most one argument\n" if scalar @ARGV > 1;
+        my $generation = shift @ARGV;
+        my @args = ("$Nix::Config::binDir/nix-env", "--profile", $profile);
+        if (defined $generation) {
+            die "invalid channel generation number ‘$generation’" unless $generation =~ /^[0-9]+$/;
+            push @args, "--switch-generation", $generation;
+        } else {
+            push @args, "--rollback";
+        }
+        system(@args) == 0 or exit 1;
         last;
     }
 

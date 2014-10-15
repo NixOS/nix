@@ -1,8 +1,11 @@
 #! @perl@ -w @perlFlags@
 
+use utf8;
 use strict;
 use Nix::Config;
 use Nix::Manifest;
+
+binmode STDERR, ":encoding(utf8)";
 
 my $manifestDir = $Nix::Config::manifestDir;
 

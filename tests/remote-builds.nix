@@ -60,6 +60,7 @@ in
           virtualisation.pathsInNixDB = [ config.system.build.extraUtils ];
           nix.package = nix;
           nix.binaryCaches = [ ];
+          programs.ssh.extraConfig = "ConnectTimeout 30";
         };
     };
 
@@ -69,14 +70,14 @@ in
 
       # Create an SSH key on the client.
       my $key = `${pkgs.openssh}/bin/ssh-keygen -t dsa -f key -N ""`;
-      $client->succeed("mkdir -m 700 /root/.ssh");
+      $client->succeed("mkdir -p -m 700 /root/.ssh");
       $client->copyFileFromHost("key", "/root/.ssh/id_dsa");
       $client->succeed("chmod 600 /root/.ssh/id_dsa");
 
       # Install the SSH key on the slaves.
       $client->waitForUnit("network.target");
       foreach my $slave ($slave1, $slave2) {
-          $slave->succeed("mkdir -m 700 /root/.ssh");
+          $slave->succeed("mkdir -p -m 700 /root/.ssh");
           $slave->copyFileFromHost("key.pub", "/root/.ssh/authorized_keys");
           $slave->waitForUnit("sshd");
           $client->succeed("ssh -o StrictHostKeyChecking=no " . $slave->name() . " 'echo hello world'");

@@ -1,11 +1,15 @@
 #! @perl@ -w @perlFlags@
 
+use utf8;
 use strict;
 use File::Basename;
 use File::stat;
 use Nix::Store;
 use Nix::Config;
 use Nix::Utils;
+
+binmode STDERR, ":encoding(utf8)";
+
 
 my $hashType = $ENV{'NIX_HASH_ALGO'} || "sha256"; # obsolete
 my $cacheDir = $ENV{'NIX_DOWNLOAD_CACHE'};

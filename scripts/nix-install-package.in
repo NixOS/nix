@@ -1,8 +1,11 @@
 #! @perl@ -w @perlFlags@
 
+use utf8;
 use strict;
 use Nix::Config;
 use Nix::Utils;
+
+binmode STDERR, ":encoding(utf8)";
 
 
 # Parse the command line arguments.
@@ -12,6 +15,7 @@ my $source;
 my $fromURL = 0;
 my @extraNixEnvArgs = ();
 my $interactive = 1;
+my $op = "--install";
 
 while (scalar @args) {
     my $arg = shift @args;
@@ -25,6 +29,9 @@ while (scalar @args) {
         my $profile = shift @args;
         die "$0: ‘--profile’ requires an argument\n" if !defined $profile;
         push @extraNixEnvArgs, "-p", $profile;
+    }
+    elsif ($arg eq "--set") {
+        $op = "--set";
     }
     elsif ($arg eq "--non-interactive") {
         $interactive = 0;
@@ -126,7 +133,7 @@ if (defined $binaryCacheURL) {
 
 
 print "\nInstalling package...\n";
-system("$Nix::Config::binDir/nix-env", "--install", $outPath, "--force-name", $drvName, @extraNixEnvArgs) == 0
+system("$Nix::Config::binDir/nix-env", $op, $outPath, "--force-name", $drvName, @extraNixEnvArgs) == 0
     or barf "nix-env failed: $?";
 
 

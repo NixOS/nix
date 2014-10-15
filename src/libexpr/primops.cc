@@ -89,7 +89,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
     if (isStorePath(path) && store->isValidPath(path) && isDerivation(path)) {
         Derivation drv = readDerivation(path);
         Value & w = *state.allocValue();
-        state.mkAttrs(w, 1 + drv.outputs.size());
+        state.mkAttrs(w, 2 + drv.outputs.size());
         mkString(*state.allocAttr(w, state.sDrvPath), path, singleton<PathSet>("=" + path));
         state.mkList(*state.allocAttr(w, state.symbols.create("outputs")), drv.outputs.size());
         unsigned int outputs_index = 0;
@@ -333,15 +333,16 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
 static void prim_abort(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    throw Abort(format("evaluation aborted with the following error message: ‘%1%’") %
-        state.coerceToString(pos, *args[0], context));
+    string s = state.coerceToString(pos, *args[0], context);
+    throw Abort(format("evaluation aborted with the following error message: ‘%1%’") % s);
 }
 
 
 static void prim_throw(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    throw ThrownError(format("%1%") % state.coerceToString(pos, *args[0], context));
+    string s = state.coerceToString(pos, *args[0], context);
+    throw ThrownError(s);
 }
 
 
@@ -383,6 +384,25 @@ static void prim_getEnv(EvalState & state, const Pos & pos, Value * * args, Valu
 }
 
 
+/* Evaluate the first argument, then return the second argument. */
+static void prim_seq(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceValue(*args[0]);
+    state.forceValue(*args[1]);
+    v = *args[1];
+}
+
+
+/* Evaluate the first argument deeply (i.e. recursing into lists and
+   attrsets), then return the second argument. */
+static void prim_deepSeq(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceValueDeep(*args[0]);
+    state.forceValue(*args[1]);
+    v = *args[1];
+}
+
+
 /* Evaluate the first expression and print it on standard error.  Then
    return the second expression.  Useful for debugging. */
 static void prim_trace(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -394,6 +414,39 @@ static void prim_trace(EvalState & state, const Pos & pos, Value * * args, Value
         printMsg(lvlError, format("trace: %1%") % *args[0]);
     state.forceValue(*args[1]);
     v = *args[1];
+}
+
+
+#if HAVE_BOEHMGC
+void canaryFinalizer(GC_PTR obj, GC_PTR client_data)
+{
+    Value * v = (Value *) obj;
+    EvalState & state(* (EvalState *) client_data);
+    printMsg(lvlError, format("canary ‘%1%’ garbage-collected") % v->string.s);
+    auto i = state.gcCanaries.find(v);
+    assert(i != state.gcCanaries.end());
+    state.gcCanaries.erase(i);
+}
+#endif
+
+
+void prim_gcCanary(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    string s = state.forceStringNoCtx(*args[0], pos);
+    state.mkList(v, 1);
+    Value * canary = v.list.elems[0] = state.allocValue();
+#if HAVE_BOEHMGC
+    state.gcCanaries.insert(canary);
+    GC_register_finalizer(canary, canaryFinalizer, &state, 0, 0);
+#endif
+    mkString(*canary, s);
+}
+
+
+void prim_valueSize(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    /* We're not forcing the argument on purpose. */
+    mkInt(v, valueSize(*args[0]));
 }
 
 
@@ -757,6 +810,35 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
     mkPath(v, state.findFile(searchPath, path).c_str());
 }
 
+/* Read a directory (without . or ..) */
+static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    PathSet ctx;
+    Path path = state.coerceToPath(pos, *args[0], ctx);
+    try {
+        realiseContext(ctx);
+    } catch (InvalidPathError & e) {
+        throw EvalError(format("cannot read ‘%1%’, since path ‘%2%’ is not valid, at %3%")
+            % path % e.path % pos);
+    }
+
+    DirEntries entries = readDirectory(path);
+    state.mkAttrs(v, entries.size());
+
+    for (auto & ent : entries) {
+        Value * ent_val = state.allocAttr(v, state.symbols.create(ent.name));
+        if (ent.type == DT_UNKNOWN)
+            ent.type = getFileType(path);
+        mkStringNoCopy(*ent_val,
+            ent.type == DT_REG ? "regular" :
+            ent.type == DT_DIR ? "directory" :
+            ent.type == DT_LNK ? "symlink" :
+            "unknown");
+    }
+
+    v.attrs->sort();
+}
+
 
 /*************************************************************
  * Creating files
@@ -916,13 +998,32 @@ static void prim_attrNames(EvalState & state, const Pos & pos, Value * * args, V
 
     state.mkList(v, args[0]->attrs->size());
 
-    StringSet names;
-    foreach (Bindings::iterator, i, *args[0]->attrs)
-        names.insert(i->name);
+    unsigned int n = 0;
+    for (auto & i : *args[0]->attrs)
+        mkString(*(v.list.elems[n++] = state.allocValue()), i.name);
+
+    std::sort(v.list.elems, v.list.elems + n,
+        [](Value * v1, Value * v2) { return strcmp(v1->string.s, v2->string.s) < 0; });
+}
+
+
+/* Return the values of the attributes in a set as a list, in the same
+   order as attrNames. */
+static void prim_attrValues(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceAttrs(*args[0], pos);
+
+    state.mkList(v, args[0]->attrs->size());
 
     unsigned int n = 0;
-    foreach (StringSet::iterator, i, names)
-        mkString(*(v.list.elems[n++] = state.allocValue()), *i);
+    for (auto & i : *args[0]->attrs)
+        v.list.elems[n++] = (Value *) &i;
+
+    std::sort(v.list.elems, v.list.elems + n,
+        [](Value * v1, Value * v2) { return (string) ((Attr *) v1)->name < (string) ((Attr *) v2)->name; });
+
+    for (unsigned int i = 0; i < n; ++i)
+        v.list.elems[i] = ((Attr *) v.list.elems[i])->value;
 }
 
 
@@ -1047,6 +1148,35 @@ static void prim_intersectAttrs(EvalState & state, const Pos & pos, Value * * ar
         if (j != args[1]->attrs->end())
             v.attrs->push_back(*j);
     }
+}
+
+
+/* Collect each attribute named `attr' from a list of attribute sets.
+   Sets that don't contain the named attribute are ignored.
+
+   Example:
+     catAttrs "a" [{a = 1;} {b = 0;} {a = 2;}]
+     => [1 2]
+*/
+static void prim_catAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    Symbol attrName = state.symbols.create(state.forceStringNoCtx(*args[0], pos));
+    state.forceList(*args[1], pos);
+
+    Value * res[args[1]->list.length];
+    unsigned int found = 0;
+
+    for (unsigned int n = 0; n < args[1]->list.length; ++n) {
+        Value & v2(*args[1]->list.elems[n]);
+        state.forceAttrs(v2, pos);
+        Bindings::iterator i = v2.attrs->find(attrName);
+        if (i != v2.attrs->end())
+            res[found++] = i->value;
+    }
+
+    state.mkList(v, found);
+    for (unsigned int n = 0; n < found; ++n)
+        v.list.elems[n] = res[n];
 }
 
 
@@ -1420,7 +1550,15 @@ void EvalState::createBaseEnv()
     addPrimOp("__addErrorContext", 2, prim_addErrorContext);
     addPrimOp("__tryEval", 1, prim_tryEval);
     addPrimOp("__getEnv", 1, prim_getEnv);
+
+    // Strictness
+    addPrimOp("__seq", 2, prim_seq);
+    addPrimOp("__deepSeq", 2, prim_deepSeq);
+
+    // Debugging
     addPrimOp("__trace", 2, prim_trace);
+    addPrimOp("__gcCanary", 1, prim_gcCanary);
+    addPrimOp("__valueSize", 1, prim_valueSize);
 
     // Paths
     addPrimOp("__toPath", 1, prim_toPath);
@@ -1429,6 +1567,7 @@ void EvalState::createBaseEnv()
     addPrimOp("baseNameOf", 1, prim_baseNameOf);
     addPrimOp("dirOf", 1, prim_dirOf);
     addPrimOp("__readFile", 1, prim_readFile);
+    addPrimOp("__readDir", 1, prim_readDir);
     addPrimOp("__findFile", 2, prim_findFile);
 
     // Creating files
@@ -1441,6 +1580,7 @@ void EvalState::createBaseEnv()
 
     // Sets
     addPrimOp("__attrNames", 1, prim_attrNames);
+    addPrimOp("__attrValues", 1, prim_attrValues);
     addPrimOp("__getAttr", 2, prim_getAttr);
     addPrimOp("__unsafeGetAttrPos", 2, prim_unsafeGetAttrPos);
     addPrimOp("__hasAttr", 2, prim_hasAttr);
@@ -1448,6 +1588,7 @@ void EvalState::createBaseEnv()
     addPrimOp("removeAttrs", 2, prim_removeAttrs);
     addPrimOp("__listToAttrs", 1, prim_listToAttrs);
     addPrimOp("__intersectAttrs", 2, prim_intersectAttrs);
+    addPrimOp("__catAttrs", 2, prim_catAttrs);
     addPrimOp("__functionArgs", 1, prim_functionArgs);
 
     // Lists

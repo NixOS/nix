@@ -301,12 +301,8 @@ static void findRoots(StoreAPI & store, const Path & path, unsigned char type, R
 {
     try {
 
-        if (type == DT_UNKNOWN) {
-            struct stat st = lstat(path);
-            if (S_ISDIR(st.st_mode)) type = DT_DIR;
-            else if (S_ISLNK(st.st_mode)) type = DT_LNK;
-            else if (S_ISREG(st.st_mode)) type = DT_REG;
-        }
+        if (type == DT_UNKNOWN)
+            type = getFileType(path);
 
         if (type == DT_DIR) {
             for (auto & i : readDirectory(path))

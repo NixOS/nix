@@ -1,0 +1,21 @@
+<section xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="sec-single-user">
+
+<title>Single-User Mode</title>
+
+<para>In single-user mode, all Nix operations that access the database
+in <filename><replaceable>prefix</replaceable>/var/nix/db</filename>
+or modify the Nix store in
+<filename><replaceable>prefix</replaceable>/store</filename> must be
+performed under the user ID that owns those directories.  This is
+typically <systemitem class="username">root</systemitem>.  (If you
+install from RPM packages, that’s in fact the default ownership.)
+However, on single-user machines, it is often convenient to
+<command>chown</command> those directories to your normal user account
+so that you don’t have to <command>su</command> to <systemitem
+class="username">root</systemitem> all the time.</para>
+
+</section>

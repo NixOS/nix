@@ -341,11 +341,7 @@ expr_op
   | expr_op UPDATE expr_op { $$ = new ExprOpUpdate(CUR_POS, $1, $3); }
   | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, *$3); }
   | expr_op '+' expr_op
-    { vector<Expr *> * l = new vector<Expr *>;
-      l->push_back($1);
-      l->push_back($3);
-      $$ = new ExprConcatStrings(CUR_POS, false, l);
-    }
+    { $$ = new ExprConcatStrings(CUR_POS, false, new vector<Expr *>({$1, $3})); }
   | expr_op '-' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__sub")), $1), $3); }
   | expr_op '*' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__mul")), $1), $3); }
   | expr_op '/' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__div")), $1), $3); }
@@ -461,13 +457,13 @@ attrs
   : attrs attr { $$ = $1; $1->push_back(AttrName(data->symbols.create($2))); }
   | attrs string_attr
     { $$ = $1;
-      ExprString *str = dynamic_cast<ExprString *>($2);
+      ExprString * str = dynamic_cast<ExprString *>($2);
       if (str) {
           $$->push_back(AttrName(str->s));
           delete str;
       } else
-        throw ParseError(format("dynamic attributes not allowed in inherit at %1%")
-            % makeCurPos(@2, data));
+          throw ParseError(format("dynamic attributes not allowed in inherit at %1%")
+              % makeCurPos(@2, data));
     }
   | { $$ = new AttrPath; }
   ;
@@ -476,12 +472,12 @@ attrpath
   : attrpath '.' attr { $$ = $1; $1->push_back(AttrName(data->symbols.create($3))); }
   | attrpath '.' string_attr
     { $$ = $1;
-      ExprString *str = dynamic_cast<ExprString *>($3);
+      ExprString * str = dynamic_cast<ExprString *>($3);
       if (str) {
           $$->push_back(AttrName(str->s));
           delete str;
       } else
-          $$->push_back(AttrName(static_cast<ExprConcatStrings *>($3)));
+          $$->push_back(AttrName($3));
     }
   | attr { $$ = new vector<AttrName>; $$->push_back(AttrName(data->symbols.create($1))); }
   | string_attr
@@ -491,7 +487,7 @@ attrpath
           $$->push_back(AttrName(str->s));
           delete str;
       } else
-          $$->push_back(AttrName(static_cast<ExprConcatStrings *>($1)));
+          $$->push_back(AttrName($1));
     }
   ;
 
@@ -502,7 +498,7 @@ attr
 
 string_attr
   : '"' string_parts '"' { $$ = $2; }
-  | DOLLAR_CURLY expr '}' { $$ = new ExprConcatStrings(CUR_POS, true, new vector<Expr*>(1, $2)); }
+  | DOLLAR_CURLY expr '}' { $$ = $2; }
   ;
 
 expr_list

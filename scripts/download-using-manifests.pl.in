@@ -9,6 +9,7 @@ use Nix::Utils;
 use POSIX qw(strftime);
 
 STDOUT->autoflush(1);
+binmode STDERR, ":encoding(utf8)";
 
 my $logFile = "$Nix::Config::logDir/downloads";
 

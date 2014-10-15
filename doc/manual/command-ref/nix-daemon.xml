@@ -1,0 +1,35 @@
+<refentry xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="sec-nix-daemon">
+
+<refmeta>
+  <refentrytitle>nix-daemon</refentrytitle>
+  <manvolnum>8</manvolnum>
+  <refmiscinfo class="source">Nix</refmiscinfo>
+  <refmiscinfo class="version"><xi:include href="../version.txt" parse="text"/></refmiscinfo>
+</refmeta>
+
+<refnamediv>
+  <refname>nix-daemon</refname>
+  <refpurpose>Nix multi-user support daemon</refpurpose>
+</refnamediv>
+
+<refsynopsisdiv>
+  <cmdsynopsis>
+    <command>nix-daemon</command>
+  </cmdsynopsis>
+</refsynopsisdiv>
+
+
+<refsection><title>Description</title>
+
+<para>The Nix daemon is necessary in multi-user Nix installations.  It
+performs build actions and other operations on the Nix store on behalf
+of unprivileged users.</para>
+
+
+</refsection>
+
+</refentry>

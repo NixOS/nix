@@ -28,6 +28,11 @@ h2 /* chapters, appendices, subtitle */
     font-size: 180%;
 }
 
+div.part
+{
+    margin-top: 2em;
+}
+
 /* Extra space between chapters, appendices. */
 div.chapter > div.titlepage h2, div.appendix > div.titlepage h2 
 { 

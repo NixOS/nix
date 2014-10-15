@@ -32,23 +32,20 @@
 namespace nix {
 
 
-Bindings::iterator Bindings::find(const Symbol & name)
-{
-    Attr key(name, 0);
-    iterator i = lower_bound(begin(), end(), key);
-    if (i != end() && i->name == name) return i;
-    return end();
-}
-
-
 void Bindings::sort()
 {
     std::sort(begin(), end());
 }
 
 
-std::ostream & operator << (std::ostream & str, const Value & v)
+static void printValue(std::ostream & str, std::set<const Value *> & active, const Value & v)
 {
+    if (active.find(&v) != active.end()) {
+        str << "<CYCLE>";
+        return;
+    }
+    active.insert(&v);
+
     switch (v.type) {
     case tInt:
         str << v.integer;
@@ -78,15 +75,20 @@ std::ostream & operator << (std::ostream & str, const Value & v)
         Sorted sorted;
         foreach (Bindings::iterator, i, *v.attrs)
             sorted[i->name] = i->value;
-        foreach (Sorted::iterator, i, sorted)
-            str << i->first << " = " << *i->second << "; ";
+        for (auto & i : sorted) {
+            str << i.first << " = ";
+            printValue(str, active, *i.second);
+            str << "; ";
+        }
         str << "}";
         break;
     }
     case tList:
         str << "[ ";
-        for (unsigned int n = 0; n < v.list.length; ++n)
-            str << *v.list.elems[n] << " ";
+        for (unsigned int n = 0; n < v.list.length; ++n) {
+            printValue(str, active, *v.list.elems[n]);
+            str << " ";
+        }
         str << "]";
         break;
     case tThunk:
@@ -105,6 +107,15 @@ std::ostream & operator << (std::ostream & str, const Value & v)
     default:
         throw Error("invalid value");
     }
+
+    active.erase(&v);
+}
+
+
+std::ostream & operator << (std::ostream & str, const Value & v)
+{
+    std::set<const Value *> active;
+    printValue(str, active, v);
     return str;
 }
 
@@ -175,7 +186,7 @@ EvalState::EvalState(const Strings & _searchPath)
     , baseEnvDispl(0)
 {
     nrEnvs = nrValuesInEnvs = nrValues = nrListElems = 0;
-    nrAttrsets = nrOpUpdates = nrOpUpdateValuesCopied = 0;
+    nrAttrsets = nrAttrsInAttrsets = nrOpUpdates = nrOpUpdateValuesCopied = 0;
     nrListConcats = nrPrimOpCalls = nrFunctionCalls = 0;
     countCalls = getEnv("NIX_COUNT_CALLS", "0") != "0";
 
@@ -230,6 +241,8 @@ EvalState::EvalState(const Strings & _searchPath)
 
 EvalState::~EvalState()
 {
+    fileEvalCache.clear();
+    printCanaries();
 }
 
 
@@ -411,9 +424,12 @@ Value * EvalState::allocValue()
 
 Env & EvalState::allocEnv(unsigned int size)
 {
+    assert(size <= std::numeric_limits<decltype(Env::size)>::max());
+
     nrEnvs++;
     nrValuesInEnvs += size;
     Env * env = (Env *) GC_MALLOC(sizeof(Env) + size * sizeof(Value *));
+    env->size = size;
 
     /* Clear the values because maybeThunk() and lookupVar fromWith expects this. */
     for (unsigned i = 0; i < size; ++i)
@@ -431,8 +447,15 @@ Value * EvalState::allocAttr(Value & vAttrs, const Symbol & name)
 }
 
 
+Bindings * EvalState::allocBindings(Bindings::size_t capacity)
+{
+    return new (GC_MALLOC(sizeof(Bindings) + sizeof(Attr) * capacity)) Bindings(capacity);
+}
+
+
 void EvalState::mkList(Value & v, unsigned int length)
 {
+    clearValue(v);
     v.type = tList;
     v.list.length = length;
     v.list.elems = length ? (Value * *) GC_MALLOC(length * sizeof(Value *)) : 0;
@@ -444,9 +467,9 @@ void EvalState::mkAttrs(Value & v, unsigned int expected)
 {
     clearValue(v);
     v.type = tAttrs;
-    v.attrs = NEW Bindings;
-    v.attrs->reserve(expected);
+    v.attrs = allocBindings(expected);
     nrAttrsets++;
+    nrAttrsInAttrsets += expected;
 }
 
 
@@ -617,7 +640,7 @@ void ExprPath::eval(EvalState & state, Env & env, Value & v)
 
 void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 {
-    state.mkAttrs(v, attrs.size());
+    state.mkAttrs(v, attrs.size() + dynamicAttrs.size());
     Env *dynamicEnv = &env;
 
     if (recursive) {
@@ -656,15 +679,19 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         if (hasOverrides) {
             Value * vOverrides = (*v.attrs)[overrides->second.displ].value;
             state.forceAttrs(*vOverrides);
-            foreach (Bindings::iterator, i, *vOverrides->attrs) {
-                AttrDefs::iterator j = attrs.find(i->name);
+            Bindings * newBnds = state.allocBindings(v.attrs->size() + vOverrides->attrs->size());
+            for (auto & i : *v.attrs)
+                newBnds->push_back(i);
+            for (auto & i : *vOverrides->attrs) {
+                AttrDefs::iterator j = attrs.find(i.name);
                 if (j != attrs.end()) {
-                    (*v.attrs)[j->second.displ] = *i;
-                    env2.values[j->second.displ] = i->value;
+                    (*newBnds)[j->second.displ] = i;
+                    env2.values[j->second.displ] = i.value;
                 } else
-                    v.attrs->push_back(*i);
+                    newBnds->push_back(i);
             }
-            v.attrs->sort();
+            newBnds->sort();
+            v.attrs = newBnds;
         }
     }
 
@@ -675,13 +702,10 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
     /* Dynamic attrs apply *after* rec and __overrides. */
     foreach (DynamicAttrDefs::iterator, i, dynamicAttrs) {
         Value nameVal;
-        if (i->nameExpr->es->size() == 1) {
-            i->nameExpr->es->front()->eval(state, *dynamicEnv, nameVal);
-            state.forceValue(nameVal);
-            if (nameVal.type == tNull)
-                continue;
-        }
         i->nameExpr->eval(state, *dynamicEnv, nameVal);
+        state.forceValue(nameVal);
+        if (nameVal.type == tNull)
+            continue;
         state.forceStringNoCtx(nameVal);
         Symbol nameSym = state.symbols.create(nameVal.string.s);
         Bindings::iterator j = v.attrs->find(nameSym);
@@ -690,8 +714,8 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 
         i->valueExpr->setName(nameSym);
         /* Keep sorted order so find can catch duplicates */
-        v.attrs->insert(lower_bound(v.attrs->begin(), v.attrs->end(), Attr(nameSym, 0)),
-                Attr(nameSym, i->valueExpr->maybeThunk(state, *dynamicEnv), &i->pos));
+        v.attrs->push_back(Attr(nameSym, i->valueExpr->maybeThunk(state, *dynamicEnv), &i->pos));
+        v.attrs->sort(); // FIXME: inefficient
     }
 }
 
@@ -1157,19 +1181,30 @@ void ExprPos::eval(EvalState & state, Env & env, Value & v)
 }
 
 
-void EvalState::strictForceValue(Value & v)
+void EvalState::forceValueDeep(Value & v)
 {
-    forceValue(v);
+    std::set<const Value *> seen;
 
-    if (v.type == tAttrs) {
-        foreach (Bindings::iterator, i, *v.attrs)
-            strictForceValue(*i->value);
-    }
+    std::function<void(Value & v)> recurse;
 
-    else if (v.type == tList) {
-        for (unsigned int n = 0; n < v.list.length; ++n)
-            strictForceValue(*v.list.elems[n]);
-    }
+    recurse = [&](Value & v) {
+        if (seen.find(&v) != seen.end()) return;
+        seen.insert(&v);
+
+        forceValue(v);
+
+        if (v.type == tAttrs) {
+            foreach (Bindings::iterator, i, *v.attrs)
+                recurse(*i->value);
+        }
+
+        else if (v.type == tList) {
+            for (unsigned int n = 0; n < v.list.length; ++n)
+                recurse(*v.list.elems[n]);
+        }
+    };
+
+    recurse(v);
 }
 
 
@@ -1330,7 +1365,7 @@ Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
 {
     string path = coerceToString(pos, v, context, false, false);
     if (path == "" || path[0] != '/')
-        throwEvalError("string ‘%1%’ doesn't represent an absolute path, at %1%", path, pos);
+        throwEvalError("string ‘%1%’ doesn't represent an absolute path, at %2%", path, pos);
     return path;
 }
 
@@ -1413,16 +1448,18 @@ void EvalState::printStats()
     getrusage(RUSAGE_SELF, &buf);
     float cpuTime = buf.ru_utime.tv_sec + ((float) buf.ru_utime.tv_usec / 1000000);
 
+    uint64_t bEnvs = nrEnvs * sizeof(Env) + nrValuesInEnvs * sizeof(Value *);
+    uint64_t bLists = nrListElems * sizeof(Value *);
+    uint64_t bValues = nrValues * sizeof(Value);
+    uint64_t bAttrsets = nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Attr);
+
     printMsg(v, format("  time elapsed: %1%") % cpuTime);
     printMsg(v, format("  size of a value: %1%") % sizeof(Value));
-    printMsg(v, format("  environments allocated: %1% (%2% bytes)")
-        % nrEnvs % (nrEnvs * sizeof(Env) + nrValuesInEnvs * sizeof(Value *)));
-    printMsg(v, format("  list elements: %1% (%2% bytes)")
-        % nrListElems % (nrListElems * sizeof(Value *)));
+    printMsg(v, format("  environments allocated: %1% (%2% bytes)") % nrEnvs % bEnvs);
+    printMsg(v, format("  list elements: %1% (%2% bytes)") % nrListElems % bLists);
     printMsg(v, format("  list concatenations: %1%") % nrListConcats);
-    printMsg(v, format("  values allocated: %1% (%2% bytes)")
-        % nrValues % (nrValues * sizeof(Value)));
-    printMsg(v, format("  sets allocated: %1%") % nrAttrsets);
+    printMsg(v, format("  values allocated: %1% (%2% bytes)") % nrValues % bValues);
+    printMsg(v, format("  sets allocated: %1% (%2% bytes)") % nrAttrsets % bAttrsets);
     printMsg(v, format("  right-biased unions: %1%") % nrOpUpdates);
     printMsg(v, format("  values copied in right-biased unions: %1%") % nrOpUpdateValuesCopied);
     printMsg(v, format("  symbols in symbol table: %1%") % symbols.size());
@@ -1432,6 +1469,7 @@ void EvalState::printStats()
     printMsg(v, format("  number of attr lookups: %1%") % nrLookups);
     printMsg(v, format("  number of primop calls: %1%") % nrPrimOpCalls);
     printMsg(v, format("  number of function calls: %1%") % nrFunctionCalls);
+    printMsg(v, format("  total allocations: %1% bytes") % (bEnvs + bLists + bValues + bAttrsets));
 
     if (countCalls) {
         v = lvlInfo;
@@ -1461,6 +1499,103 @@ void EvalState::printStats()
             printMsg(v, format("%1$10d %2%") % i->first % i->second);
 
     }
+}
+
+
+void EvalState::printCanaries()
+{
+#if HAVE_BOEHMGC
+    if (!settings.get("debug-gc", false)) return;
+
+    GC_gcollect();
+
+    if (gcCanaries.empty()) {
+        printMsg(lvlError, "all canaries have been garbage-collected");
+        return;
+    }
+
+    printMsg(lvlError, "the following canaries have not been garbage-collected:");
+
+    for (auto i : gcCanaries)
+        printMsg(lvlError, format("  %1%") % i->string.s);
+#endif
+}
+
+
+size_t valueSize(Value & v)
+{
+    std::set<const void *> seen;
+
+    auto doString = [&](const char * s) -> size_t {
+        if (seen.find(s) != seen.end()) return 0;
+        seen.insert(s);
+        return strlen(s) + 1;
+    };
+
+    std::function<size_t(Value & v)> doValue;
+    std::function<size_t(Env & v)> doEnv;
+
+    doValue = [&](Value & v) -> size_t {
+        if (seen.find(&v) != seen.end()) return 0;
+        seen.insert(&v);
+
+        size_t sz = sizeof(Value);
+
+        switch (v.type) {
+        case tString:
+            sz += doString(v.string.s);
+            if (v.string.context)
+                for (const char * * p = v.string.context; *p; ++p)
+                    sz += doString(*p);
+            break;
+        case tPath:
+            sz += doString(v.path);
+            break;
+        case tAttrs:
+            for (auto & i : *v.attrs)
+                sz += doValue(*i.value);
+            break;
+        case tList:
+            for (unsigned int n = 0; n < v.list.length; ++n)
+                sz += doValue(*v.list.elems[n]);
+            break;
+        case tThunk:
+            sz += doEnv(*v.thunk.env);
+            break;
+        case tApp:
+            sz += doValue(*v.app.left);
+            sz += doValue(*v.app.right);
+            break;
+        case tLambda:
+            sz += doEnv(*v.lambda.env);
+            break;
+        case tPrimOpApp:
+            sz += doValue(*v.primOpApp.left);
+            sz += doValue(*v.primOpApp.right);
+            break;
+        default:
+            ;
+        }
+
+        return sz;
+    };
+
+    doEnv = [&](Env & env) -> size_t {
+        if (seen.find(&env) != seen.end()) return 0;
+        seen.insert(&env);
+
+        size_t sz = sizeof(Env);
+
+        for (unsigned int i = 0; i < env.size; ++i)
+            if (env.values[i])
+                sz += doValue(*env.values[i]);
+
+        if (env.up) sz += doEnv(*env.up);
+
+        return sz;
+    };
+
+    return doValue(v);
 }
 
 

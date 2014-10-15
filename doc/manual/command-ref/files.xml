@@ -1,0 +1,14 @@
+<chapter xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id='ch-files'>
+
+<title>Files</title>
+
+<para>This section lists configuration files that you can use when you
+work with Nix.</para>
+
+<xi:include href="conf-file.xml" />
+
+</chapter>

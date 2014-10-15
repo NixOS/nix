@@ -82,7 +82,9 @@ public:
     PathSet queryFailedPaths();
 
     void clearFailedPaths(const PathSet & paths);
-    
+
+    void optimiseStore();
+
 private:
     AutoCloseFD fdSocket;
     FdSink to;

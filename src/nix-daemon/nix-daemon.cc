@@ -527,6 +527,13 @@ static void performOp(bool trusted, const string & user,
         break;
     }
 
+    case wopOptimiseStore:
+	startWork();
+	store->optimiseStore();
+	stopWork();
+	writeInt(1, to);
+	break;
+
     default:
         throw Error(format("invalid operation %1%") % op);
     }
@@ -780,6 +787,8 @@ static void daemonLoop(char * * argv)
 
             /* Fork a child to handle the connection. */
             startProcess([&]() {
+                fdSocket.close();
+
                 /* Background the daemon. */
                 if (setsid() == -1)
                     throw SysError(format("creating a new session"));

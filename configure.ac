@@ -54,8 +54,8 @@ if test "$sys_name" = sunos; then
 fi
 
 
-CFLAGS=${CFLAGS:--g -O3 -Wall}
-CXXFLAGS=${CXXFLAGS:--g -O3 -Wall}
+CFLAGS=
+CXXFLAGS=
 AC_PROG_CC
 AC_PROG_CXX
 
@@ -121,11 +121,6 @@ AC_CHECK_HEADER([err.h], [], [bsddiff_compat_include="-Icompat-include"])
 AC_SUBST([bsddiff_compat_include])
 
 
-# Check whether we have the personality() syscall, which allows us to
-# do i686-linux builds on x86_64-linux machines.
-AC_CHECK_HEADERS([sys/personality.h])
-
-
 # Check for <linux/fs.h> (for immutable file support).
 AC_CHECK_HEADERS([linux/fs.h])
 
@@ -143,7 +138,6 @@ NEED_PROG(bash, bash)
 NEED_PROG(patch, patch)
 AC_PATH_PROG(xmllint, xmllint, false)
 AC_PATH_PROG(xsltproc, xsltproc, false)
-AC_PATH_PROG(w3m, w3m, false)
 AC_PATH_PROG(flex, flex, false)
 AC_PATH_PROG(bison, bison, false)
 NEED_PROG(perl, perl)
@@ -323,6 +317,8 @@ for name in $ac_subst_vars; do
     declare $name="$(eval echo "${!name}")"
     declare $name="$(eval echo "${!name}")"
 done
+
+rm -f Makefile.config
 
 AC_CONFIG_HEADER([config.h])
 AC_CONFIG_FILES([])

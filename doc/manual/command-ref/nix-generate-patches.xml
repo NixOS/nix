@@ -1,0 +1,44 @@
+<refentry xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="sec-nix-generate-patches">
+
+<refmeta>
+  <refentrytitle>nix-generate-patches</refentrytitle>
+  <manvolnum>1</manvolnum>
+  <refmiscinfo class="source">Nix</refmiscinfo>
+  <refmiscinfo class="version"><xi:include href="../version.txt" parse="text"/></refmiscinfo>
+</refmeta>
+
+<refnamediv>
+  <refname>nix-generate-patches</refname>
+  <refpurpose>generates binary patches between NAR files</refpurpose>
+</refnamediv>
+
+<refsynopsisdiv>
+  <cmdsynopsis>
+    <command>nix-generate-patches</command>
+    <arg choice='plain'><replaceable>NAR-DIR</replaceable></arg>
+	<arg choice='plain'><replaceable>PATCH-DIR</replaceable></arg>
+	<arg choice='plain'><replaceable>PATCH-URI</replaceable></arg>
+	<arg choice='plain'><replaceable>OLD-MANIFEST</replaceable></arg>
+	<arg choice='plain'><replaceable>NEW-MANIFEST</replaceable></arg>
+  </cmdsynopsis>
+</refsynopsisdiv>
+
+
+<refsection><title>Description</title>
+
+<para>The command <command>nix-generate-patches</command> generates
+binary patches between NAR files listed in OLD-MANIFEST and NEW-MANIFEST.
+The patches are written to the directory PATCH-DIR, and the prefix
+PATCH-URI is used to generate URIs for the patches.  The patches are
+added to NEW-MANIFEST.  All NARs are required to exist in NAR-DIR.
+Patches are generated between succeeding versions of packages with
+the same name.</para>
+
+</refsection>
+
+
+</refentry>

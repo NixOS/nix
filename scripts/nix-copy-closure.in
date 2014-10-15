@@ -1,11 +1,13 @@
 #! @perl@ -w @perlFlags@
 
+use strict;
 use Nix::SSH;
 use Nix::Config;
 use Nix::Store;
 use Nix::CopyClosure;
 use List::Util qw(sum);
 
+binmode STDERR, ":encoding(utf8)";
 
 if (scalar @ARGV < 1) {
     print STDERR <<EOF
@@ -72,13 +74,13 @@ die "$0: you did not specify a host name\n" unless defined $sshHost;
 
 if ($toMode) { # Copy TO the remote machine.
     Nix::CopyClosure::copyTo(
-        $sshHost, [ @sshOpts ], [ @storePaths ],
+        $sshHost, [ @storePaths ],
         $includeOutputs, $dryRun, $sign, $useSubstitutes);
 }
 
 else { # Copy FROM the remote machine.
 
-    my ($from, $to) = connectToRemoteNix($sshHost, [ @sshOpts ]);
+    my ($from, $to) = connectToRemoteNix($sshHost, []);
 
     # Query the closure of the given store paths on the remote
     # machine.  Paths are assumed to be store paths; there is no

@@ -131,7 +131,6 @@ Path canonPath(const Path & path, bool resolveSymlinks)
                 i = temp.begin(); /* restart */
                 end = temp.end();
                 s = "";
-                /* !!! potential for infinite loop */
             }
         }
     }
@@ -226,6 +225,16 @@ DirEntries readDirectory(const Path & path)
     if (errno) throw SysError(format("reading directory ‘%1%’") % path);
 
     return entries;
+}
+
+
+unsigned char getFileType(const Path & path)
+{
+    struct stat st = lstat(path);
+    if (S_ISDIR(st.st_mode)) return DT_DIR;
+    if (S_ISLNK(st.st_mode)) return DT_LNK;
+    if (S_ISREG(st.st_mode)) return DT_REG;
+    return DT_UNKNOWN;
 }
 
 
@@ -384,6 +393,9 @@ Paths createDirs(const Path & path)
         st = lstat(path);
         created.push_back(path);
     }
+
+    if (S_ISLNK(st.st_mode) && stat(path.c_str(), &st) == -1)
+        throw SysError(format("statting symlink ‘%1%’") % path);
 
     if (!S_ISDIR(st.st_mode)) throw Error(format("‘%1%’ is not a directory") % path);
 

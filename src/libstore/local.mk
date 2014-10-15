@@ -30,3 +30,5 @@ $(d)/local-store.cc: $(d)/schema.sql.hh
 	$(trace-gen) sed -e 's/"/\\"/g' -e 's/\(.*\)/"\1\\n"/' < $< > $@ || (rm $@ && exit 1)
 
 clean-files += $(d)/schema.sql.hh
+
+$(eval $(call install-file-in, $(d)/nix-store.pc, $(prefix)/lib/pkgconfig, 0644))

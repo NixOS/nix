@@ -14,8 +14,10 @@ static void skipWhitespace(const char * & s)
 
 #if HAVE_BOEHMGC
 typedef std::vector<Value *, gc_allocator<Value *> > ValueVector;
+typedef std::map<Symbol, Value *, std::less<Symbol>, gc_allocator<Value *> > ValueMap;
 #else
 typedef std::vector<Value *> ValueVector;
+typedef std::map<Symbol, Value *> ValueMap;
 #endif
 
 
@@ -76,22 +78,25 @@ static void parseJSON(EvalState & state, const char * & s, Value & v)
 
     else if (*s == '{') {
         s++;
-        state.mkAttrs(v, 1);
+        ValueMap attrs;
         while (1) {
             skipWhitespace(s);
-            if (v.attrs->empty() && *s == '}') break;
+            if (attrs.empty() && *s == '}') break;
             string name = parseJSONString(s);
             skipWhitespace(s);
             if (*s != ':') throw JSONParseError("expected ‘:’ in JSON object");
             s++;
             Value * v2 = state.allocValue();
             parseJSON(state, s, *v2);
-            v.attrs->push_back(Attr(state.symbols.create(name), v2));
+            attrs[state.symbols.create(name)] = v2;
             skipWhitespace(s);
             if (*s == '}') break;
             if (*s != ',') throw JSONParseError("expected ‘,’ or ‘}’ after JSON member");
             s++;
         }
+        state.mkAttrs(v, attrs.size());
+        for (auto & i : attrs)
+            v.attrs->push_back(Attr(i.first, i.second));
         v.attrs->sort();
         s++;
     }

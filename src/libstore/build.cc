@@ -57,9 +57,8 @@
 #include <netinet/ip.h>
 #endif
 
-#if HAVE_SYS_PERSONALITY_H
+#if __linux__
 #include <sys/personality.h>
-#define CAN_DO_LINUX32_BUILDS
 #endif
 
 #if HAVE_STATVFS
@@ -1182,7 +1181,7 @@ static string get(const StringPairs & map, const string & key)
 static bool canBuildLocally(const string & platform)
 {
     return platform == settings.thisSystem
-#ifdef CAN_DO_LINUX32_BUILDS
+#if __linux__
         || (platform == "i686-linux" && settings.thisSystem == "x86_64-linux")
 #endif
         ;
@@ -1792,8 +1791,8 @@ void DerivationGoal::startBuilder()
 
         /* Bind-mount a user-configurable set of directories from the
            host file system. */
-        PathSet dirs = tokenizeString<StringSet>(settings.get("build-chroot-dirs", DEFAULT_CHROOT_DIRS));
-        PathSet dirs2 = tokenizeString<StringSet>(settings.get("build-extra-chroot-dirs", ""));
+        PathSet dirs = tokenizeString<StringSet>(settings.get("build-chroot-dirs", string(DEFAULT_CHROOT_DIRS)));
+        PathSet dirs2 = tokenizeString<StringSet>(settings.get("build-extra-chroot-dirs", string("")));
         dirs.insert(dirs2.begin(), dirs2.end());
         for (auto & i : dirs) {
             size_t p = i.find('=');
@@ -2077,7 +2076,7 @@ void DerivationGoal::initChild()
         /* Close all other file descriptors. */
         closeMostFDs(set<int>());
 
-#ifdef CAN_DO_LINUX32_BUILDS
+#if __linux__
         /* Change the personality to 32-bit if we're doing an
            i686-linux build on an x86_64-linux machine. */
         struct utsname utsbuf;
@@ -2085,7 +2084,7 @@ void DerivationGoal::initChild()
         if (drv.platform == "i686-linux" &&
             (settings.thisSystem == "x86_64-linux" ||
              (!strcmp(utsbuf.sysname, "Linux") && !strcmp(utsbuf.machine, "x86_64")))) {
-            if (personality(0x0008 | 0x8000000 /* == PER_LINUX32_3GB */) == -1)
+            if (personality(PER_LINUX32_3GB) == -1)
                 throw SysError("cannot set i686-linux personality");
         }
 
@@ -2095,6 +2094,11 @@ void DerivationGoal::initChild()
             int cur = personality(0xffffffff);
             if (cur != -1) personality(cur | 0x0020000 /* == UNAME26 */);
         }
+
+        /* Disable address space randomization for improved
+           determinism. */
+        int cur = personality(0xffffffff);
+        if (cur != -1) personality(cur | ADDR_NO_RANDOMIZE);
 #endif
 
         /* Fill in the environment. */
@@ -2322,16 +2326,36 @@ void DerivationGoal::registerOutputs()
                 debug(format("referenced input: ‘%1%’") % *i);
         }
 
-        /* If the derivation specifies an `allowedReferences'
-           attribute (containing a list of paths that the output may
-           refer to), check that all references are in that list.  !!!
-           allowedReferences should really be per-output. */
-        if (drv.env.find("allowedReferences") != drv.env.end()) {
-            PathSet allowed = parseReferenceSpecifiers(drv, get(drv.env, "allowedReferences"));
-            foreach (PathSet::iterator, i, references)
-                if (allowed.find(*i) == allowed.end())
-                    throw BuildError(format("output is not allowed to refer to path ‘%1%’") % *i);
-        }
+        /* Enforce `allowedReferences' and friends. */
+        auto checkRefs = [&](const string & attrName, bool allowed, bool recursive) {
+            if (drv.env.find(attrName) == drv.env.end()) return;
+
+            PathSet spec = parseReferenceSpecifiers(drv, get(drv.env, attrName));
+
+            PathSet used;
+            if (recursive) {
+                /* Our requisites are the union of the closures of our references. */
+                for (auto & i : references)
+                    /* Don't call computeFSClosure on ourselves. */
+                    if (actualPath != i)
+                        computeFSClosure(worker.store, i, used);
+            } else
+                used = references;
+
+            for (auto & i : used)
+                if (allowed) {
+                    if (spec.find(i) == spec.end())
+                        throw BuildError(format("output (‘%1%’) is not allowed to refer to path ‘%2%’") % actualPath % i);
+                } else {
+                    if (spec.find(i) != spec.end())
+                        throw BuildError(format("output (‘%1%’) is not allowed to refer to path ‘%2%’") % actualPath % i);
+                }
+        };
+
+        checkRefs("allowedReferences", true, false);
+        checkRefs("allowedRequisites", true, true);
+        checkRefs("disallowedReferences", false, false);
+        checkRefs("disallowedRequisites", false, true);
 
         worker.store.optimisePath(path); // FIXME: combine with scanForReferences()
 

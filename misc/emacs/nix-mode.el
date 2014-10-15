@@ -45,7 +45,7 @@
 
 
 ;;;###autoload
-(define-derived-mode nix-mode fundamental-mode "Nix"
+(define-derived-mode nix-mode prog-mode "Nix"
   "Major mode for editing Nix expressions.
 
 The following commands may be useful:

@@ -25,17 +25,19 @@ bool parseAutoArgs(Strings::iterator & i,
 }
 
 
-void evalAutoArgs(EvalState & state, std::map<string, string> & in, Bindings & out)
+Bindings * evalAutoArgs(EvalState & state, std::map<string, string> & in)
 {
-    for (auto & i: in) {
+    Bindings * res = state.allocBindings(in.size());
+    for (auto & i : in) {
         Value * v = state.allocValue();
         if (i.second[0] == 'E')
             state.mkThunk_(*v, state.parseExprFromString(string(i.second, 1), absPath(".")));
         else
             mkString(*v, string(i.second, 1));
-        out.push_back(Attr(state.symbols.create(i.first), v));
+        res->push_back(Attr(state.symbols.create(i.first), v));
     }
-    out.sort();
+    res->sort();
+    return res;
 }
 
 

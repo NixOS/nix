@@ -23,7 +23,7 @@ let
         inherit officialRelease;
 
         buildInputs =
-          [ curl bison flex perl libxml2 libxslt w3m bzip2
+          [ curl bison flex perl libxml2 libxslt bzip2
             tetex dblatex nukeReferences pkgconfig sqlite git
           ];
 
@@ -69,7 +69,6 @@ let
 
           echo "doc manual $out/share/doc/nix/manual" >> $out/nix-support/hydra-build-products
           echo "doc-pdf manual $out/manual.pdf" >> $out/nix-support/hydra-build-products
-          echo "doc release-notes $out/share/doc/nix/manual release-notes.html" >> $out/nix-support/hydra-build-products
         '';
       };
 
@@ -214,11 +213,11 @@ let
     # System tests.
     tests.remote_builds = (import ./tests/remote-builds.nix rec {
       nix = build.x86_64-linux; system = "x86_64-linux";
-    }).test;
+    });
 
     tests.nix_copy_closure = (import ./tests/nix-copy-closure.nix rec {
       nix = build.x86_64-linux; system = "x86_64-linux";
-    }).test;
+    });
 
     tests.sec_exportPath = (import ./tests/sec-exportPath.nix rec {
       nix = build.x86_64-linux; system = "x86_64-linux";

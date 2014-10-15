@@ -1,0 +1,119 @@
+<section xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id='sec-build-script'>
+
+<title>Build Script</title>
+
+<example xml:id='ex-hello-builder'><title>Build script for GNU Hello
+(<filename>builder.sh</filename>)</title>
+<programlisting>
+source $stdenv/setup <co xml:id='ex-hello-builder-co-1' />
+
+PATH=$perl/bin:$PATH <co xml:id='ex-hello-builder-co-2' />
+
+tar xvfz $src <co xml:id='ex-hello-builder-co-3' />
+cd hello-*
+./configure --prefix=$out <co xml:id='ex-hello-builder-co-4' />
+make <co xml:id='ex-hello-builder-co-5' />
+make install</programlisting>
+</example>
+
+<para><xref linkend='ex-hello-builder' /> shows the builder referenced
+from Hello's Nix expression (stored in
+<filename>pkgs/applications/misc/hello/ex-1/builder.sh</filename>).
+The builder can actually be made a lot shorter by using the
+<emphasis>generic builder</emphasis> functions provided by
+<varname>stdenv</varname>, but here we write out the build steps to
+elucidate what a builder does.  It performs the following
+steps:</para>
+
+<calloutlist>
+
+  <callout arearefs='ex-hello-builder-co-1'>
+
+    <para>When Nix runs a builder, it initially completely clears the
+    environment (except for the attributes declared in the
+    derivation).  For instance, the <envar>PATH</envar> variable is
+    empty<footnote><para>Actually, it's initialised to
+    <filename>/path-not-set</filename> to prevent Bash from setting it
+    to a default value.</para></footnote>.  This is done to prevent
+    undeclared inputs from being used in the build process.  If for
+    example the <envar>PATH</envar> contained
+    <filename>/usr/bin</filename>, then you might accidentally use
+    <filename>/usr/bin/gcc</filename>.</para>
+
+    <para>So the first step is to set up the environment.  This is
+    done by calling the <filename>setup</filename> script of the
+    standard environment.  The environment variable
+    <envar>stdenv</envar> points to the location of the standard
+    environment being used.  (It wasn't specified explicitly as an
+    attribute in <xref linkend='ex-hello-nix' />, but
+    <varname>mkDerivation</varname> adds it automatically.)</para>
+
+  </callout>
+
+  <callout arearefs='ex-hello-builder-co-2'>
+
+    <para>Since Hello needs Perl, we have to make sure that Perl is in
+    the <envar>PATH</envar>.  The <envar>perl</envar> environment
+    variable points to the location of the Perl package (since it
+    was passed in as an attribute to the derivation), so
+    <filename><replaceable>$perl</replaceable>/bin</filename> is the
+    directory containing the Perl interpreter.</para>
+
+  </callout>
+
+  <callout arearefs='ex-hello-builder-co-3'>
+
+    <para>Now we have to unpack the sources.  The
+    <varname>src</varname> attribute was bound to the result of
+    fetching the Hello source tarball from the network, so the
+    <envar>src</envar> environment variable points to the location in
+    the Nix store to which the tarball was downloaded.  After
+    unpacking, we <command>cd</command> to the resulting source
+    directory.</para>
+
+    <para>The whole build is performed in a temporary directory
+    created in <varname>/tmp</varname>, by the way.  This directory is
+    removed after the builder finishes, so there is no need to clean
+    up the sources afterwards.  Also, the temporary directory is
+    always newly created, so you don't have to worry about files from
+    previous builds interfering with the current build.</para>
+
+  </callout>
+
+  <callout arearefs='ex-hello-builder-co-4'>
+
+    <para>GNU Hello is a typical Autoconf-based package, so we first
+    have to run its <filename>configure</filename> script.  In Nix
+    every package is stored in a separate location in the Nix store,
+    for instance
+    <filename>/nix/store/9a54ba97fb71b65fda531012d0443ce2-hello-2.1.1</filename>.
+    Nix computes this path by cryptographically hashing all attributes
+    of the derivation.  The path is passed to the builder through the
+    <envar>out</envar> environment variable.  So here we give
+    <filename>configure</filename> the parameter
+    <literal>--prefix=$out</literal> to cause Hello to be installed in
+    the expected location.</para>
+
+  </callout>
+
+  <callout arearefs='ex-hello-builder-co-5'>
+
+    <para>Finally we build Hello (<literal>make</literal>) and install
+    it into the location specified by <envar>out</envar>
+    (<literal>make install</literal>).</para>
+
+  </callout>
+
+</calloutlist>
+
+<para>If you are wondering about the absence of error checking on the
+result of various commands called in the builder: this is because the
+shell script is evaluated with Bash's <option>-e</option> option,
+which causes the script to be aborted if any command fails without an
+error check.</para>
+
+</section>

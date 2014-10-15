@@ -265,15 +265,18 @@ static void printTree(const Path & path,
 /* Perform various sorts of queries. */
 static void opQuery(Strings opFlags, Strings opArgs)
 {
-    enum { qOutputs, qRequisites, qReferences, qReferrers
-         , qReferrersClosure, qDeriver, qBinding, qHash, qSize
-         , qTree, qGraph, qXml, qResolve, qRoots } query = qOutputs;
+    enum QueryType
+        { qDefault, qOutputs, qRequisites, qReferences, qReferrers
+        , qReferrersClosure, qDeriver, qBinding, qHash, qSize
+        , qTree, qGraph, qXml, qResolve, qRoots };
+    QueryType query = qDefault;
     bool useOutput = false;
     bool includeOutputs = false;
     bool forceRealise = false;
     string bindingName;
 
-    foreach (Strings::iterator, i, opFlags)
+    foreach (Strings::iterator, i, opFlags) {
+        QueryType prev = query;
         if (*i == "--outputs") query = qOutputs;
         else if (*i == "--requisites" || *i == "-R") query = qRequisites;
         else if (*i == "--references") query = qReferences;
@@ -298,6 +301,11 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (*i == "--force-realise" || *i == "--force-realize" || *i == "-f") forceRealise = true;
         else if (*i == "--include-outputs") includeOutputs = true;
         else throw UsageError(format("unknown flag ‘%1%’") % *i);
+        if (prev != qDefault && prev != query)
+            throw UsageError(format("query type ‘%1%’ conflicts with earlier flag") % *i);
+    }
+
+    if (query == qDefault) query = qOutputs;
 
     RunPager pager;
 
@@ -832,16 +840,6 @@ static void opRepairPath(Strings opFlags, Strings opArgs)
     }
 }
 
-
-static void showOptimiseStats(OptimiseStats & stats)
-{
-    printMsg(lvlError,
-        format("%1% freed by hard-linking %2% files")
-        % showBytes(stats.bytesFreed)
-        % stats.filesLinked);
-}
-
-
 /* Optimise the disk space usage of the Nix store by hard-linking
    files with the same contents. */
 static void opOptimise(Strings opFlags, Strings opArgs)
@@ -849,16 +847,8 @@ static void opOptimise(Strings opFlags, Strings opArgs)
     if (!opArgs.empty() || !opFlags.empty())
         throw UsageError("no arguments expected");
 
-    OptimiseStats stats;
-    try {
-        ensureLocalStore().optimiseStore(stats);
-    } catch (...) {
-        showOptimiseStats(stats);
-        throw;
-    }
-    showOptimiseStats(stats);
+    store->optimiseStore();
 }
-
 
 static void opQueryFailedPaths(Strings opFlags, Strings opArgs)
 {

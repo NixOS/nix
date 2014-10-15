@@ -1,0 +1,31 @@
+<section xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="ssec-relnotes-1.8">
+
+<title>Release 1.8 (TBA)</title>
+
+<itemizedlist>
+
+  <listitem><para><command>nix-env</command> selectors are now regular
+  expressions. For instance, you can do
+
+<screen>
+$ nix-env -qa '.*zip.*'
+</screen>
+
+  to query all packages with a name containing
+  <literal>zip</literal>.</para></listitem>
+
+  <listitem><para>Derivations can specify the new special attribute
+  <varname>allowedRequisites</varname>, which has a similar meaning to
+  <varname>allowedReferences</varname>. But instead of only enforcing
+  to explicitly specify the immediate references, it requires the
+  derivation to specify all the dependencies recursively (hence the
+  name, requisites) that are used by the resulting
+  output.</para></listitem>
+
+</itemizedlist>
+
+</section>

@@ -1,0 +1,390 @@
+<chapter xmlns="http://docbook.org/ns/docbook" xml:id="sec-common-options">
+
+<title>Common Options</title>
+
+
+<para>Most Nix commands accept the following command-line options:</para>
+
+<variablelist xml:id="opt-common">
+
+<varlistentry><term><option>--help</option></term>
+
+  <listitem><para>Prints out a summary of the command syntax and
+  exits.</para></listitem>
+
+</varlistentry>
+
+
+<varlistentry><term><option>--version</option></term>
+
+  <listitem><para>Prints out the Nix version number on standard output
+  and exits.</para></listitem>
+</varlistentry>
+
+
+<varlistentry><term><option>--verbose</option></term>
+  <term><option>-v</option></term>
+
+  <listitem>
+
+  <para>Increases the level of verbosity of diagnostic messages
+  printed on standard error.  For each Nix operation, the information
+  printed on standard output is well-defined; any diagnostic
+  information is printed on standard error, never on standard
+  output.</para>
+
+  <para>This option may be specified repeatedly.  Currently, the
+  following verbosity levels exist:</para>
+
+  <variablelist>
+
+    <varlistentry><term>0</term>
+    <listitem><para>“Errors only”: only print messages
+    explaining why the Nix invocation failed.</para></listitem>
+    </varlistentry>
+
+    <varlistentry><term>1</term>
+    <listitem><para>“Informational”: print
+    <emphasis>useful</emphasis> messages about what Nix is doing.
+    This is the default.</para></listitem>
+    </varlistentry>
+
+    <varlistentry><term>2</term>
+    <listitem><para>“Talkative”: print more informational
+    messages.</para></listitem>
+    </varlistentry>
+
+    <varlistentry><term>3</term>
+    <listitem><para>“Chatty”: print even more
+    informational messages.</para></listitem>
+    </varlistentry>
+
+    <varlistentry><term>4</term>
+    <listitem><para>“Debug”: print debug
+    information.</para></listitem>
+    </varlistentry>
+
+    <varlistentry><term>5</term>
+    <listitem><para>“Vomit”: print vast amounts of debug
+    information.</para></listitem>
+    </varlistentry>
+
+  </variablelist>
+
+  </listitem>
+
+</varlistentry>
+
+
+<varlistentry><term><option>--no-build-output</option></term>
+  <term><option>-Q</option></term>
+
+  <listitem><para>By default, output written by builders to standard
+  output and standard error is echoed to the Nix command's standard
+  error.  This option suppresses this behaviour.  Note that the
+  builder's standard output and error are always written to a log file
+  in
+  <filename><replaceable>prefix</replaceable>/nix/var/log/nix</filename>.</para></listitem>
+
+</varlistentry>
+
+
+<varlistentry xml:id="opt-max-jobs"><term><option>--max-jobs</option></term>
+  <term><option>-j</option></term>
+
+  <listitem><para>Sets the maximum number of build jobs that Nix will
+  perform in parallel to the specified number.  The default is
+  specified by the <link
+  linkend='conf-build-max-jobs'><literal>build-max-jobs</literal></link>
+  configuration setting, which itself defaults to
+  <literal>1</literal>.  A higher value is useful on SMP systems or to
+  exploit I/O latency.</para></listitem>
+
+</varlistentry>
+
+
+<varlistentry xml:id="opt-cores"><term><option>--cores</option></term>
+
+  <listitem><para>Sets the value of the <envar>NIX_BUILD_CORES</envar>
+  environment variable in the invocation of builders.  Builders can
+  use this variable at their discretion to control the maximum amount
+  of parallelism.  For instance, in Nixpkgs, if the derivation
+  attribute <varname>enableParallelBuilding</varname> is set to
+  <literal>true</literal>, the builder passes the
+  <option>-j<replaceable>N</replaceable></option> flag to GNU Make.
+  It defaults to the value of the <link
+  linkend='conf-build-cores'><literal>build-cores</literal></link>
+  configuration setting, if set, or <literal>1</literal> otherwise.
+  The value <literal>0</literal> means that the builder should use all
+  available CPU cores in the system.</para></listitem>
+
+</varlistentry>
+
+
+<varlistentry xml:id="opt-max-silent-time"><term><option>--max-silent-time</option></term>
+
+  <listitem><para>Sets the maximum number of seconds that a builder
+  can go without producing any data on standard output or standard
+  error.  The default is specified by the <link
+  linkend='conf-build-max-silent-time'><literal>build-max-silent-time</literal></link>
+  configuration setting.  <literal>0</literal> means no
+  time-out.</para></listitem>
+
+</varlistentry>
+
+<varlistentry xml:id="opt-timeout"><term><option>--timeout</option></term>
+
+  <listitem><para>Sets the maximum number of seconds that a builder
+  can run.  The default is specified by the <link
+  linkend='conf-build-timeout'><literal>build-timeout</literal></link>
+  configuration setting.  <literal>0</literal> means no
+  timeout.</para></listitem>
+
+</varlistentry>
+
+<varlistentry><term><option>--keep-going</option></term>
+  <term><option>-k</option></term>
+
+  <listitem><para>Keep going in case of failed builds, to the
+  greatest extent possible.  That is, if building an input of some
+  derivation fails, Nix will still build the other inputs, but not the
+  derivation itself.  Without this option, Nix stops if any build
+  fails (except for builds of substitutes), possibly killing builds in
+  progress (in case of parallel or distributed builds).</para></listitem>
+
+</varlistentry>
+
+
+<varlistentry><term><option>--keep-failed</option></term>
+  <term><option>-K</option></term>
+
+  <listitem><para>Specifies that in case of a build failure, the
+  temporary directory (usually in <filename>/tmp</filename>) in which
+  the build takes place should not be deleted.  The path of the build
+  directory is printed as an informational message.
+    </para>
+  </listitem>
+</varlistentry>
+
+
+<varlistentry><term><option>--fallback</option></term>
+
+  <listitem>
+
+  <para>Whenever Nix attempts to build a derivation for which
+  substitutes are known for each output path, but realising the output
+  paths through the substitutes fails, fall back on building the
+  derivation.</para>
+
+  <para>The most common scenario in which this is useful is when we
+  have registered substitutes in order to perform binary distribution
+  from, say, a network repository.  If the repository is down, the
+  realisation of the derivation will fail.  When this option is
+  specified, Nix will build the derivation instead.  Thus,
+  installation from binaries falls back on installation from source.
+  This option is not the default since it is generally not desirable
+  for a transient failure in obtaining the substitutes to lead to a
+  full build from source (with the related consumption of
+  resources).</para>
+
+  </listitem>
+
+</varlistentry>
+
+
+<varlistentry><term><option>--readonly-mode</option></term>
+
+  <listitem><para>When this option is used, no attempt is made to open
+  the Nix database.  Most Nix operations do need database access, so
+  those operations will fail.</para></listitem>
+
+</varlistentry>
+
+
+<varlistentry xml:id="opt-log-type"><term><option>--log-type</option>
+<replaceable>type</replaceable></term>
+
+  <listitem>
+
+  <para>This option determines how the output written to standard
+  error is formatted.  Nix’s diagnostic messages are typically
+  <emphasis>nested</emphasis>.  For instance, when tracing Nix
+  expression evaluation (<command>nix-env -vvvvv</command>, messages
+  from subexpressions are nested inside their parent expressions.  Nix
+  builder output is also often nested.  For instance, the Nix Packages
+  generic builder nests the various build tasks (unpack, configure,
+  compile, etc.), and the GNU Make in <literal>stdenv-linux</literal>
+  has been patched to provide nesting for recursive Make
+  invocations.</para>
+
+  <para><replaceable>type</replaceable> can be one of the
+  following:
+
+  <variablelist>
+
+    <varlistentry><term><literal>pretty</literal></term>
+
+      <listitem><para>Pretty-print the output, indicating different
+      nesting levels using spaces.  This is the
+      default.</para></listitem>
+
+    </varlistentry>
+
+    <varlistentry><term><literal>escapes</literal></term>
+
+      <listitem><para>Indicate nesting using escape codes that can be
+      interpreted by the <command>nix-log2xml</command> tool in the
+      Nix source distribution.  The resulting XML file can be fed into
+      the <command>log2html.xsl</command> stylesheet to create an HTML
+      file that can be browsed interactively, using JavaScript to
+      expand and collapse parts of the output.</para></listitem>
+
+    </varlistentry>
+
+    <varlistentry><term><literal>flat</literal></term>
+
+      <listitem><para>Remove all nesting.</para></listitem>
+
+    </varlistentry>
+
+  </variablelist>
+
+  </para>
+
+  </listitem>
+
+</varlistentry>
+
+
+<varlistentry><term><option>--arg</option> <replaceable>name</replaceable> <replaceable>value</replaceable></term>
+
+  <listitem><para>This option is accepted by
+  <command>nix-env</command>, <command>nix-instantiate</command> and
+  <command>nix-build</command>.  When evaluating Nix expressions, the
+  expression evaluator will automatically try to call functions that
+  it encounters.  It can automatically call functions for which every
+  argument has a <link linkend='ss-functions'>default value</link>
+  (e.g., <literal>{ <replaceable>argName</replaceable> ?
+  <replaceable>defaultValue</replaceable> }:
+  <replaceable>...</replaceable></literal>).  With
+  <option>--arg</option>, you can also call functions that have
+  arguments without a default value (or override a default value).
+  That is, if the evaluator encounters a function with an argument
+  named <replaceable>name</replaceable>, it will call it with value
+  <replaceable>value</replaceable>.</para>
+
+  <para>For instance, the file
+  <literal>pkgs/top-level/all-packages.nix</literal> in Nixpkgs is
+  actually a function:
+
+<programlisting>
+{ # The system (e.g., `i686-linux') for which to build the packages.
+  system ? builtins.currentSystem
+  <replaceable>...</replaceable>
+}: <replaceable>...</replaceable></programlisting>
+
+  So if you call this Nix expression (e.g., when you do
+  <literal>nix-env -i <replaceable>pkgname</replaceable></literal>),
+  the function will be called automatically using the value <link
+  linkend='builtin-currentSystem'><literal>builtins.currentSystem</literal></link>
+  for the <literal>system</literal> argument.  You can override this
+  using <option>--arg</option>, e.g., <literal>nix-env -i
+  <replaceable>pkgname</replaceable> --arg system
+  \"i686-freebsd\"</literal>.  (Note that since the argument is a Nix
+  string literal, you have to escape the quotes.)</para></listitem>
+
+</varlistentry>
+
+
+<varlistentry><term><option>--argstr</option> <replaceable>name</replaceable> <replaceable>value</replaceable></term>
+
+  <listitem><para>This option is like <option>--arg</option>, only the
+  value is not a Nix expression but a string.  So instead of
+  <literal>--arg system \"i686-linux\"</literal> (the outer quotes are
+  to keep the shell happy) you can say <literal>--argstr system
+  i686-linux</literal>.</para></listitem>
+
+</varlistentry>
+
+
+<varlistentry xml:id="opt-attr"><term><option>--attr</option> / <option>-A</option>
+<replaceable>attrPath</replaceable></term>
+
+  <listitem><para>Select an attribute from the top-level Nix
+  expression being evaluated.  (<command>nix-env</command>,
+  <command>nix-instantiate</command>, <command>nix-build</command> and
+  <command>nix-shell</command> only.)  The <emphasis>attribute
+  path</emphasis> <replaceable>attrPath</replaceable> is a sequence of
+  attribute names separated by dots.  For instance, given a top-level
+  Nix expression <replaceable>e</replaceable>, the attribute path
+  <literal>xorg.xorgserver</literal> would cause the expression
+  <literal><replaceable>e</replaceable>.xorg.xorgserver</literal> to
+  be used.  See <link
+  linkend='refsec-nix-env-install-examples'><command>nix-env
+  --install</command></link> for some concrete examples.</para>
+
+  <para>In addition to attribute names, you can also specify array
+  indices.  For instance, the attribute path
+  <literal>foo.3.bar</literal> selects the <literal>bar</literal>
+  attribute of the fourth element of the array in the
+  <literal>foo</literal> attribute of the top-level
+  expression.</para></listitem>
+
+</varlistentry>
+
+
+<varlistentry><term><option>--expr</option> / <option>-E</option></term>
+
+  <listitem><para>Interpret the command line arguments as a list of
+  Nix expressions to be parsed and evaluated, rather than as a list
+  of file names of Nix expressions.
+  (<command>nix-instantiate</command>, <command>nix-build</command>
+  and <command>nix-shell</command> only.)</para></listitem>
+
+</varlistentry>
+
+<varlistentry><term><option>--show-trace</option></term>
+
+  <listitem><para>Causes Nix to print out a stack trace in case of Nix
+  expression evaluation errors.</para></listitem>
+
+</varlistentry>
+
+
+<varlistentry xml:id="opt-I"><term><option>-I</option> <replaceable>path</replaceable></term>
+
+  <listitem><para>Add a path to the Nix expression search path.  This
+  option may be given multiple times.  See the <envar
+  linkend="env-NIX_PATH">NIX_PATH</envar> environment variable for
+  information on the semantics of the Nix search path.  Paths added
+  through <option>-I</option> take precedence over
+  <envar>NIX_PATH</envar>.</para></listitem>
+
+</varlistentry>
+
+
+<varlistentry><term><option>--option</option> <replaceable>name</replaceable> <replaceable>value</replaceable></term>
+
+  <listitem><para>Set the Nix configuration option
+  <replaceable>name</replaceable> to <replaceable>value</replaceable>.
+  This overrides settings in the Nix configuration file (see
+  <citerefentry><refentrytitle>nix.conf</refentrytitle><manvolnum>5</manvolnum></citerefentry>).</para></listitem>
+
+</varlistentry>
+
+
+<varlistentry><term><option>--repair</option></term>
+
+  <listitem><para>Fix corrupted or missing store paths by
+  redownloading or rebuilding them.  Note that this is slow because it
+  requires computing a cryptographic hash of the contents of every
+  path in the closure of the build.  Also note the warning under
+  <command>nix-store --repair-path</command>.</para></listitem>
+
+</varlistentry>
+
+
+</variablelist>
+
+
+</chapter>

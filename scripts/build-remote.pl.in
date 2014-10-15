@@ -1,5 +1,6 @@
 #! @perl@ -w @perlFlags@
 
+use utf8;
 use Fcntl qw(:DEFAULT :flock);
 use English '-no_match_vars';
 use IO::Handle;
@@ -7,7 +8,13 @@ use Nix::Config;
 use Nix::SSH;
 use Nix::CopyClosure;
 use Nix::Store;
+use Encode;
 no warnings('once');
+
+STDERR->autoflush(1);
+binmode STDERR, ":encoding(utf8)";
+
+my $debug = defined $ENV{NIX_DEBUG_HOOK};
 
 
 # General operation:
@@ -148,7 +155,7 @@ REQ: while (1) {
             }
         }
 
-        if (defined $ENV{NIX_DEBUG_HOOK}) {
+        if ($debug) {
             print STDERR "load on " . $_->{machine}->{hostName} . " = " . $_->{load} . "\n"
                 foreach @available;
         }
@@ -258,7 +265,7 @@ writeInt($maxSilentTime, $to);
 writeInt($buildTimeout, $to);
 my $res = readInt($from);
 if ($res != 0) {
-    my $msg = readString($from);
+    my $msg = decode("utf-8", readString($from));
     print STDERR "error: $msg on ‘$hostName’\n";
     exit $res;
 }

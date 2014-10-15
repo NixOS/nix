@@ -1,0 +1,38 @@
+<section xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="sec-collisions-nixenv">
+
+<title>Collisions in <command>nix-env</command></title>
+
+<para>Symptom: when installing or upgrading, you get an error message such as
+
+<screen>
+$ nix-env -i docbook-xml
+...
+adding /nix/store/s5hyxgm62gk2...-docbook-xml-4.2
+collision between `/nix/store/s5hyxgm62gk2...-docbook-xml-4.2/xml/dtd/docbook/calstblx.dtd'
+  and `/nix/store/06h377hr4b33...-docbook-xml-4.3/xml/dtd/docbook/calstblx.dtd'
+  at /nix/store/...-builder.pl line 62.</screen>
+
+</para>
+
+<para>The cause is that two installed packages in the user environment
+have overlapping filenames (e.g.,
+<filename>xml/dtd/docbook/calstblx.dtd</filename>.  This usually
+happens when you accidentally try to install two versions of the same
+package.  For instance, in the example above, the Nix Packages
+collection contains two versions of <literal>docbook-xml</literal>, so
+<command>nix-env -i</command> will try to install both.  The default
+user environment builder has no way to way to resolve such conflicts,
+so it just gives up.</para>
+
+<para>Solution: remove one of the offending packages from the user
+environment (if already installed) using <command>nix-env
+-e</command>, or specify exactly which version should be installed
+(e.g., <literal>nix-env -i docbook-xml-4.2</literal>).</para>
+
+<!-- FIXME: describe priorities -->
+
+</section>

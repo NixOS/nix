@@ -1,0 +1,30 @@
+<section xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="sec-obtaining-source">
+
+<title>Obtaining a Source Distribution</title>
+
+<para>The source tarball of the most recent stable release can be
+downloaded from the <link
+xlink:href="http://nixos.org/nix/download.html">Nix homepage</link>.
+You can also grab the <link
+xlink:href="http://hydra.nixos.org/job/nix/master/release/latest-finished#tabs-constituents">most
+recent development release</link>.</para>
+
+<para>Alternatively, the most recent sources of Nix can be obtained
+from its <link
+xlink:href="https://github.com/NixOS/nix">Git
+repository</link>.  For example, the following command will check out
+the latest revision into a directory called
+<filename>nix</filename>:</para>
+
+<screen>
+$ git clone https://github.com/NixOS/nix</screen>
+
+<para>Likewise, specific releases can be obtained from the <link
+xlink:href="https://github.com/NixOS/nix/tags">tags</link> of the
+repository.</para>
+
+</section>

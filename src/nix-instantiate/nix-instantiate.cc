@@ -61,7 +61,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
             else if (output == okJSON)
                 printValueAsJSON(state, strict, vRes, std::cout, context);
             else {
-                if (strict) state.strictForceValue(vRes);
+                if (strict) state.forceValueDeep(vRes);
                 std::cout << vRes << std::endl;
             }
         } else {
@@ -86,6 +86,8 @@ void processExpr(EvalState & state, const Strings & attrPaths,
             }
         }
     }
+
+    state.printCanaries();
 }
 
 
@@ -157,8 +159,7 @@ int main(int argc, char * * argv)
         EvalState state(searchPath);
         state.repair = repair;
 
-        Bindings autoArgs;
-        evalAutoArgs(state, autoArgs_, autoArgs);
+        Bindings & autoArgs(*evalAutoArgs(state, autoArgs_));
 
         if (evalOnly && !wantsReadWrite)
             settings.readOnlyMode = true;

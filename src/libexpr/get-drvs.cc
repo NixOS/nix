@@ -161,12 +161,12 @@ void DrvInfo::setMeta(const string & name, Value * v)
 {
     getMeta();
     Bindings * old = meta;
-    meta = new Bindings();
+    meta = state->allocBindings(1 + (old ? old->size() : 0));
     Symbol sym = state->symbols.create(name);
     if (old)
-        foreach (Bindings::iterator, i, *old)
-            if (i->name != sym)
-                meta->push_back(*i);
+        for (auto i : *old)
+            if (i.name != sym)
+                meta->push_back(i);
     if (v) meta->push_back(Attr(sym, v));
     meta->sort();
 }

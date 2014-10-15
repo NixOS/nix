@@ -77,6 +77,8 @@ typedef vector<DirEntry> DirEntries;
 
 DirEntries readDirectory(const Path & path);
 
+unsigned char getFileType(const Path & path);
+
 /* Read the contents of a file into a string. */
 string readFile(int fd);
 string readFile(const Path & path, bool drain = false);

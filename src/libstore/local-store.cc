@@ -552,9 +552,9 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
     if (lstat(path.c_str(), &st))
         throw SysError(format("getting attributes of path ‘%1%’") % path);
 
-    /* Really make sure that the path is of a supported type.  This
-       has already been checked in dumpPath(). */
-    assert(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode));
+    /* Really make sure that the path is of a supported type. */
+    if (!(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode)))
+        throw Error(format("file ‘%1%’ has an unsupported type") % path);
 
     /* Fail if the file is not owned by the build user.  This prevents
        us from messing up the ownership/permissions of files
