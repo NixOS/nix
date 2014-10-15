@@ -80,7 +80,7 @@ if ($toMode) { # Copy TO the remote machine.
 
 else { # Copy FROM the remote machine.
 
-    my ($from, $to) = connectToRemoteNix($sshHost);
+    my ($from, $to) = connectToRemoteNix($sshHost, []);
 
     # Query the closure of the given store paths on the remote
     # machine.  Paths are assumed to be store paths; there is no
