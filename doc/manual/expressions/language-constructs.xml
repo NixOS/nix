@@ -196,6 +196,24 @@ in concat { x = "foo"; y = "bar"; }</programlisting>
 
 </para>
 
+<para>A set that has a <literal>__functor</literal> attribute whose value
+is callable (i.e. is itself a function or a set with a
+<literal>__functor</literal> attribute whose value is callable) can be
+applied as if it were a function, with the set itself passed in first
+, e.g.,
+
+<programlisting>
+let add = { __functor = self: x: x + self.x; };
+    inc = add // { x = 1; };
+in inc 1
+</programlisting>
+
+evaluates to <literal>2</literal>. This can be used to attach metadata to a
+function without the caller needing to treat it specially, or to implement
+a form of object-oriented programming, for example.
+
+</para>
+
 </simplesect>
 
 
