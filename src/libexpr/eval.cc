@@ -180,6 +180,7 @@ EvalState::EvalState(const Strings & _searchPath)
     , sFile(symbols.create("file"))
     , sLine(symbols.create("line"))
     , sColumn(symbols.create("column"))
+    , sFunctor(symbols.create("__functor"))
     , repair(false)
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
@@ -883,6 +884,17 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
     if (fun.type == tPrimOp || fun.type == tPrimOpApp) {
         callPrimOp(fun, arg, v, pos);
         return;
+    }
+
+    if (fun.type == tAttrs) {
+      auto found = fun.attrs->find(sFunctor);
+      if (found != fun.attrs->end()) {
+        forceValue(*found->value);
+        Value * v2 = allocValue();
+        callFunction(*found->value, fun, *v2, pos);
+        forceValue(*v2);
+        return callFunction(*v2, arg, v, pos);
+      }
     }
 
     if (fun.type != tLambda)

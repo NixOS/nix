@@ -126,7 +126,7 @@ public:
 
     const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue,
         sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
-        sFile, sLine, sColumn;
+        sFile, sLine, sColumn, sFunctor;
     Symbol sDerivationNix;
 
     /* If set, force copying files to the Nix store even if they
