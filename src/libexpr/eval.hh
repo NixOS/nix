@@ -336,5 +336,13 @@ string showType(const Value & v);
 /* If `path' refers to a directory, then append "/default.nix". */
 Path resolveExprPath(Path path);
 
+struct InvalidPathError : EvalError
+{
+    Path path;
+    InvalidPathError(const Path & path);
+};
+
+/* Realise all paths in `context' */
+void realiseContext(const PathSet & context);
 
 }

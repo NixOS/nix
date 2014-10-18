@@ -39,16 +39,10 @@ std::pair<string, string> decodeContext(const string & s)
 }
 
 
-struct InvalidPathError : EvalError
-{
-    Path path;
-    InvalidPathError(const Path & path) :
-        EvalError(format("path ‘%1%’ is not valid") % path), path(path) {};
-    ~InvalidPathError() throw () { };
-};
+InvalidPathError::InvalidPathError(const Path & path) :
+    EvalError(format("path ‘%1%’ is not valid") % path), path(path) {}
 
-
-static void realiseContext(const PathSet & context)
+void realiseContext(const PathSet & context)
 {
     PathSet drvs;
     for (auto & i : context) {
