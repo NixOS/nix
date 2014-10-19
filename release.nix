@@ -181,8 +181,6 @@ let
       };
 
 
-    rpm_fedora16i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora16i386) 50;
-    rpm_fedora16x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora16x86_64) 50;
     rpm_fedora18i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora18i386) 60;
     rpm_fedora18x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora18x86_64) 60;
     rpm_fedora19i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora19i386) 70;
@@ -196,10 +194,6 @@ let
     deb_debian7i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian7i386) 60;
     deb_debian7x86_64 = makeDeb_x86_64 (diskImageFunsFun: diskImageFunsFun.debian7x86_64) 60;
 
-    deb_ubuntu1110i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1110i386) 60;
-    deb_ubuntu1110x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1110x86_64) 60;
-    deb_ubuntu1204i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1204i386) 60;
-    deb_ubuntu1204x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1204x86_64) 60;
     deb_ubuntu1210i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1210i386) 70;
     deb_ubuntu1210x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1210x86_64) 70;
     deb_ubuntu1304i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1304i386) 80;
