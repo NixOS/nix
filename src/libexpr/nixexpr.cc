@@ -396,6 +396,101 @@ void ExprPos::bindVars(const StaticEnv & env)
 }
 
 
+/* Rewriting. */
+
+Expr * Expr::rewrite(Visitor & v)
+{
+    return v(*this);
+}
+
+Expr * ExprSelect::rewrite(Visitor & v)
+{
+    e = e->rewrite(v);
+    if (def) def = def->rewrite(v);
+    return v(*this);
+}
+
+Expr * ExprOpHasAttr::rewrite(Visitor & v)
+{
+    e = e->rewrite(v);
+    return v(*this);
+}
+
+Expr * ExprAttrs::rewrite(Visitor & v)
+{
+    for (auto & a : attrs)
+        a.second.e = a.second.e->rewrite(v);
+    for (auto & a : dynamicAttrs) {
+        a.nameExpr = a.nameExpr->rewrite(v);
+        a.valueExpr = a.valueExpr->rewrite(v);
+    }
+    return v(*this);
+}
+
+Expr * ExprList::rewrite(Visitor & v)
+{
+    for (auto & e : elems)
+        e = e->rewrite(v);
+    return v(*this);
+}
+
+Expr * ExprLambda::rewrite(Visitor & v)
+{
+    if (matchAttrs)
+        for (auto & f : formals->formals)
+            if (f.def) f.def = f.def->rewrite(v);
+    body = body->rewrite(v);
+    return v(*this);
+}
+
+Expr * ExprLet::rewrite(Visitor & v)
+{
+    for (auto & a : attrs->attrs)
+        a.second.e = a.second.e->rewrite(v);
+    for (auto & a : attrs->dynamicAttrs) {
+        a.nameExpr = a.nameExpr->rewrite(v);
+        a.valueExpr = a.valueExpr->rewrite(v);
+    }
+    body = body->rewrite(v);
+    return v(*this);
+}
+
+Expr * ExprWith::rewrite(Visitor & v)
+{
+    attrs = attrs->rewrite(v);
+    body = body->rewrite(v);
+    return v(*this);
+}
+
+Expr * ExprIf::rewrite(Visitor & v)
+{
+    cond = cond->rewrite(v);
+    then = then->rewrite(v);
+    else_ = else_->rewrite(v);
+    return v(*this);
+}
+
+Expr * ExprAssert::rewrite(Visitor & v)
+{
+    cond = cond->rewrite(v);
+    body = body->rewrite(v);
+    return v(*this);
+}
+
+Expr * ExprOpNot::rewrite(Visitor & v)
+{
+    e = e->rewrite(v);
+    return v(*this);
+}
+
+Expr * ExprConcatStrings::rewrite(Visitor & v)
+{
+    for (auto & e : *es)
+        e = e->rewrite(v);
+    return v(*this);
+}
+
+
 /* Storing function names. */
 
 void Expr::setName(Symbol & name)
