@@ -58,12 +58,6 @@ public:
     friend std::ostream & operator << (std::ostream & str, const Symbol & sym);
 };
 
-inline std::ostream & operator << (std::ostream & str, const Symbol & sym)
-{
-    str << *sym.s;
-    return str;
-}
-
 class SymbolTable
 {
 private:

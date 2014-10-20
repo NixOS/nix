@@ -280,7 +280,7 @@ struct ExprOpNot : Expr
         Expr##name(const Pos & pos, Expr * e1, Expr * e2) : pos(pos), e1(e1), e2(e2) { }; \
         void show(std::ostream & str) \
         { \
-            str << *e1 << " " s " " << *e2; \
+            str << "(" << *e1 << " " s " " << *e2 << ")";   \
         } \
         void bindVars(const StaticEnv & env) \
         { \
