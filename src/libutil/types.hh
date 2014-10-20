@@ -39,7 +39,8 @@ protected:
 public:
     unsigned int status; // exit status
     BaseError(const FormatOrString & fs, unsigned int status = 1);
-    const char * what() const noexcept { return err.c_str(); }
+    ~BaseError() throw () { };
+    const char * what() const throw () { return err.c_str(); }
     const string & msg() const { return err; }
     const string & prefix() const { return prefix_; }
     BaseError & addPrefix(const FormatOrString & fs);
