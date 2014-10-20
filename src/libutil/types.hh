@@ -8,6 +8,15 @@
 
 #include <boost/format.hpp>
 
+/* Before 4.7, gcc's std::exception uses empty throw() specifiers for
+ * its (virtual) destructor and what() in c++11 mode, in violation of spec
+ */
+#ifdef __GNUC__
+#if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 7)
+#define EXCEPTION_NEEDS_THROW_SPEC
+#endif
+#endif
+
 
 namespace nix {
 
@@ -39,8 +48,12 @@ protected:
 public:
     unsigned int status; // exit status
     BaseError(const FormatOrString & fs, unsigned int status = 1);
+#ifdef EXCEPTION_NEEDS_THROW_SPEC
     ~BaseError() throw () { };
     const char * what() const throw () { return err.c_str(); }
+#else
+    const char * what() const noexcept { return err.c_str(); }
+#endif
     const string & msg() const { return err; }
     const string & prefix() const { return prefix_; }
     BaseError & addPrefix(const FormatOrString & fs);
