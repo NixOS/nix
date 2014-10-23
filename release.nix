@@ -6,7 +6,7 @@ let
 
   pkgs = import <nixpkgs> {};
 
-  systems = [ "x86_64-linux" "i686-linux" "x86_64-darwin" /* "x86_64-freebsd" "i686-freebsd" */ ];
+  systems = [ "x86_64-linux" "i686-linux" /* "x86_64-darwin" "x86_64-freebsd" "i686-freebsd" */ ];
 
 
   jobs = rec {
@@ -228,12 +228,12 @@ let
         [ tarball
           #build.i686-freebsd
           build.i686-linux
-          build.x86_64-darwin
+          #build.x86_64-darwin
           #build.x86_64-freebsd
           build.x86_64-linux
           #binaryTarball.i686-freebsd
           binaryTarball.i686-linux
-          binaryTarball.x86_64-darwin
+          #binaryTarball.x86_64-darwin
           #binaryTarball.x86_64-freebsd
           binaryTarball.x86_64-linux
           deb_debian7i386
