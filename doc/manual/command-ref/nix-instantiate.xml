@@ -45,7 +45,7 @@
     <arg choice='plain' rep='repeat'><replaceable>files</replaceable></arg>
     <sbr/>
     <command>nix-instantiate</command>
-    <arg choice='plain'><option>--file-file</option></arg>
+    <arg choice='plain'><option>--find-file</option></arg>
     <arg choice='plain' rep='repeat'><replaceable>files</replaceable></arg>
   </cmdsynopsis>
 </refsynopsisdiv>
