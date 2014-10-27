@@ -219,6 +219,10 @@ let
       nix = build.x86_64-linux; system = "x86_64-linux";
     });
 
+    tests.sec_exportPath = (import ./tests/sec-exportPath.nix rec {
+      nix = build.x86_64-linux; system = "x86_64-linux";
+    }).test;
+
 
     # Aggregate job containing the release-critical jobs.
     release = pkgs.releaseTools.aggregate {
@@ -250,6 +254,7 @@ let
           rpm_fedora20x86_64
           tests.remote_builds
           tests.nix_copy_closure
+          tests.sec_exportPath
         ];
     };
 

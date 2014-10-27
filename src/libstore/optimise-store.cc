@@ -27,12 +27,17 @@ static void makeWritable(const Path & path)
 struct MakeReadOnly
 {
     Path path;
-    MakeReadOnly(const Path & path) : path(path) { }
+    const SecretMode & smode;
+
+    MakeReadOnly(const Path & path, const SecretMode & smode)
+        : path(path), smode(smode)
+    { }
+
     ~MakeReadOnly()
     {
         try {
             /* This will make the path read-only. */
-            if (path != "") canonicaliseTimestampAndPermissions(path);
+            if (path != "") canonicaliseTimestampAndPermissions(path, smode);
         } catch (...) {
             ignoreException();
         }
@@ -88,7 +93,8 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
 }
 
 
-void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHash & inodeHash)
+void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path,
+    InodeHash & inodeHash)
 {
     checkInterrupt();
 
@@ -171,9 +177,22 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
     bool mustToggle = !isStorePath(path);
     if (mustToggle) makeWritable(dirOf(path));
 
+    /* Hash are computed based on the NAR file.  These implies that 2 files with
+       identical content but different ownership *won't* be linked.  This is good
+       because otherwise a secret file could be revealed. */
+    SecretMode smode(getOwnerOfSecretFile(path));
+
+    /* Still, verify that the ownership is identical for both files */
+    if (st.st_mode != stLink.st_mode || st.st_uid != stLink.st_uid ||
+        st.st_gid != stLink.st_gid)
+    {
+        printMsg(lvlDebug, format("‘%1%’ does not have the same ownership as ‘%2%’") % path % linkPath);
+        return;
+    }
+
     /* When we're done, make the directory read-only again and reset
        its timestamp back to 0. */
-    MakeReadOnly makeReadOnly(mustToggle ? dirOf(path) : "");
+    MakeReadOnly makeReadOnly(mustToggle ? dirOf(path) : "", smode);
 
     Path tempLink = (format("%1%/.tmp-link-%2%-%3%")
         % settings.nixStore % getpid() % rand()).str();

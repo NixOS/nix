@@ -2197,6 +2197,10 @@ void DerivationGoal::registerOutputs()
 
     ValidPathInfos infos;
 
+    /* Inherit ownership of outputs from the permission of the derivation
+       file. */
+    SecretMode smode(getOwnerOfSecretFile(drvPath));
+
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all
        output paths read-only. */
@@ -2253,7 +2257,7 @@ void DerivationGoal::registerOutputs()
             /* Canonicalise first.  This ensures that the path we're
                rewriting doesn't contain a hard link to /etc/shadow or
                something like that. */
-            canonicalisePathMetaData(actualPath, buildUser.enabled() ? buildUser.getUID() : -1, inodesSeen);
+            canonicalisePathMetaData(actualPath, buildUser.enabled() ? buildUser.getUID() : -1, inodesSeen, smode);
 
             /* FIXME: this is in-memory. */
             StringSink sink;
@@ -2296,7 +2300,7 @@ void DerivationGoal::registerOutputs()
         /* Get rid of all weird permissions.  This also checks that
            all files are owned by the build user, if applicable. */
         canonicalisePathMetaData(actualPath,
-            buildUser.enabled() && !rewritten ? buildUser.getUID() : -1, inodesSeen);
+            buildUser.enabled() && !rewritten ? buildUser.getUID() : -1, inodesSeen, smode);
 
         /* For this output path, find the references to other paths
            contained in it.  Compute the SHA-256 NAR hash at the same
@@ -2865,9 +2869,16 @@ void SubstitutionGoal::finished()
         return;
     }
 
+    /* The substituter is expected to keep the ownership of the file which is
+       downloaded.  This implies that if the substituter is responsible of the
+       security of the content which is transfered.  If the substituter use NAR
+       files then the ownership should be respected and the destination file
+       would have the correct ownership. */
+    SecretMode smode(getOwnerOfSecretFile(destPath));
+
     if (repair) replaceValidPath(storePath, destPath);
 
-    canonicalisePathMetaData(storePath, -1);
+    canonicalisePathMetaData(storePath, -1, smode);
 
     worker.store.optimisePath(storePath); // FIXME: combine with hashPath()
 

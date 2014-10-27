@@ -12,6 +12,7 @@
 
 #include <sys/wait.h>
 #include <unistd.h>
+#include <pwd.h>
 #include <fcntl.h>
 #include <limits.h>
 
@@ -1159,6 +1160,122 @@ string filterANSIEscapes(const string & s, bool nixOnly)
     }
     t += r;
     return t;
+}
+
+
+//////////////////////////////////////////////////////////////////////
+
+
+const string & publicUserName()
+{
+    static string userName("");
+    return userName;
+}
+
+
+static string getLoginFromUid(uid_t uid)
+{
+    /* Map the uid of the private file to the user name */
+    struct passwd pwd;
+    struct passwd *ppwd;
+    char *buf;
+    size_t bufsize;
+    int err;
+
+    bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
+    if (bufsize == size_t(-1))
+        bufsize = 16 * 1024;
+
+    buf = new char[bufsize];
+    if (!buf)
+        throw SysError("allocating passwd entry");
+
+    err = getpwuid_r(uid, &pwd, buf, bufsize, &ppwd);
+    if (!ppwd) {
+        delete[] buf;
+        if (err)
+            throw SysError("User matching uid");
+
+        /* The uid does not match any user name, no need to keep any secret
+           for a non-existing user name. */
+        return publicUserName();
+    }
+
+    string login(pwd.pw_name);
+    delete[] buf;
+
+    return login;
+}
+
+
+const string & getCurrentUserName()
+{
+    static string userName("");
+    if (userName == "") {
+        /* Map the uid of the effective user to the user name.
+
+           Note, getlogin_r sounds better but the manual page advices
+           against it for security related purposes.  Also it uses either
+           stdin or /dev/tty to get the current user name, which makes the
+           function fallible. */
+        userName = getLoginFromUid(geteuid());
+    }
+
+    return userName;
+}
+
+
+string getOwnerOfSecretFile(const Path & path)
+{
+    /* Extract the uid of the file */
+    struct stat st;
+    if (stat(path.c_str(), &st) == -1)
+        throw SysError(format("statting file '%1%'") % path);
+
+    /* If the file is readable by the group, then this means this is a
+       public file. */
+    if (st.st_mode & S_IRGRP)
+        return publicUserName();
+
+    /* Map the uid of the private file to the user name */
+    return getLoginFromUid(st.st_uid);
+}
+
+
+SecretMode::SecretMode(const string & userName)
+  : userName_(userName),
+    filterMask_(0),
+    oldMask_(0)
+{
+    if (isSecret(userName_)) {
+        /* If we need to make private files, just make them only readable by
+           the store user, and later we will transfer the ownership with ACL
+           is the filesystem of the store supports it. */
+        filterMask_ = 0077;
+        oldMask_ = umask(filterMask_);
+    }
+}
+
+
+SecretMode::~SecretMode()
+{
+    if (isSecret()) {
+        mode_t filter = umask(filterMask_);
+        if (filter != filterMask_)
+            throw Error("umask got change, might leak secure content");
+    }
+}
+
+
+bool SecretMode::isSecret(const string & userName)
+{
+    return userName != publicUserName();
+}
+
+
+bool SecretMode::isOwnerAccessibleBy(const string & owner, const string & userName)
+{
+    return !isSecret(owner) || owner == userName;
 }
 
 

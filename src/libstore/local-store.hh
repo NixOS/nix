@@ -3,6 +3,8 @@
 #include <string>
 #include <unordered_set>
 
+#include <sys/types.h>
+
 #include "store-api.hh"
 #include "util.hh"
 #include "pathlocks.hh"
@@ -142,10 +144,10 @@ public:
         bool recursive = true, HashType hashAlgo = htSHA256, bool repair = false);
 
     Path addTextToStore(const string & name, const string & s,
-        const PathSet & references, bool repair = false);
+        const PathSet & references, const string &userName, bool repair = false);
 
     void exportPath(const Path & path, bool sign,
-        Sink & sink);
+        const string & userName, Sink & sink);
 
     Paths importPaths(bool requireSignature, Source & source);
 
@@ -326,13 +328,14 @@ typedef set<Inode> InodesSeen;
    - the last modification date on each file is set to 1 (i.e.,
      00:00:01 1/1/1970 UTC)
    - the permissions are set of 444 or 555 (i.e., read-only with or
-     without execute permission; setuid bits etc. are cleared)
+     without execute permission; setuid bits etc. are cleared) and filtered
+     to 400 or 500 for secret content.
    - the owner and group are set to the Nix user and group, if we're
      running as root. */
-void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen);
-void canonicalisePathMetaData(const Path & path, uid_t fromUid);
+void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen, const SecretMode & secret);
+void canonicalisePathMetaData(const Path & path, uid_t fromUid, const SecretMode & secret);
 
-void canonicaliseTimestampAndPermissions(const Path & path);
+void canonicaliseTimestampAndPermissions(const Path & path, const SecretMode & secret);
 
 MakeError(PathInUse, Error);
 

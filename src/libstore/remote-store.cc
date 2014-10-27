@@ -424,12 +424,14 @@ Path RemoteStore::addToStore(const Path & _srcPath,
 
 
 Path RemoteStore::addTextToStore(const string & name, const string & s,
-    const PathSet & references, bool repair)
+    const PathSet & references, const string &userName, bool repair)
 {
     if (repair) throw Error("repairing is not supported when building through the Nix daemon");
 
     openConnection();
     writeInt(wopAddTextToStore, to);
+    if (GET_PROTOCOL_MINOR(daemonVersion) >= 15)
+        writeString(userName, to);
     writeString(name, to);
     writeString(s, to);
     writeStrings(references, to);
@@ -440,12 +442,14 @@ Path RemoteStore::addTextToStore(const string & name, const string & s,
 
 
 void RemoteStore::exportPath(const Path & path, bool sign,
-    Sink & sink)
+    const string & userName, Sink & sink)
 {
     openConnection();
     writeInt(wopExportPath, to);
     writeString(path, to);
     writeInt(sign ? 1 : 0, to);
+    if (GET_PROTOCOL_MINOR(daemonVersion) >= 15)
+        writeString(userName, to);
     processStderr(&sink); /* sink receives the actual data */
     readInt(from);
 }

@@ -488,6 +488,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     string outputHash, outputHashAlgo;
     bool outputHashRecursive = false;
+    string visibility = publicUserName();
 
     StringSet outputs;
     outputs.insert("out");
@@ -502,6 +503,15 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             if (ignoreNulls) {
                 state.forceValue(*i->value);
                 if (i->value->type == tNull) continue;
+            }
+
+            /* The `secretDerivation' attribute is special: it supplies a
+               boolean which indicates if the derivation and its realisation
+               are restricted to the current user. */
+            if (key == "secret") {
+                if (state.forceBool(*i->value))
+                    visibility = getCurrentUserName();
+                continue;
             }
 
             /* The `args' attribute is special: it supplies the
@@ -655,7 +665,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     }
 
     /* Write the resulting term into the Nix store directory. */
-    Path drvPath = writeDerivation(*store, drv, drvName, state.repair);
+    Path drvPath = writeDerivation(*store, drv, drvName, visibility, state.repair);
 
     printMsg(lvlChatty, format("instantiated ‘%1%’ -> ‘%2%’")
         % drvName % drvPath);
@@ -861,9 +871,11 @@ static void prim_fromJSON(EvalState & state, const Pos & pos, Value * * args, Va
 }
 
 
-/* Store a string in the Nix store as a source file that can be used
-   as an input by derivations. */
-static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
+/* Store a string in the Nix store as a source file that can be used as an
+   input by derivations.  If the provided user name is not the
+   publicUserName(), then the file would be copied to the store but
+   restricted to this user name. */
+static void toFile_impl(EvalState & state, const string & userName, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
     string name = state.forceStringNoCtx(*args[0], pos);
@@ -880,14 +892,30 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
     }
 
     Path storePath = settings.readOnlyMode
-        ? computeStorePathForText(name, contents, refs)
-        : store->addTextToStore(name, contents, refs, state.repair);
+        ? computeStorePathForText(name, contents, refs, userName)
+        : store->addTextToStore(name, contents, refs, userName, state.repair);
 
     /* Note: we don't need to add `context' to the context of the
        result, since `storePath' itself has references to the paths
        used in args[1]. */
 
     mkString(v, storePath, singleton<PathSet>(storePath));
+}
+
+
+/* Store a string in the Nix store as a source file that can be used
+   as an input by derivations. */
+static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    toFile_impl(state, publicUserName(), pos, args, v);
+}
+
+
+/* Store a secret string in the Nix store as a source file that can be used
+   as an input by derivations. */
+static void prim_toSecretFile(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    toFile_impl(state, getCurrentUserName(), pos, args, v);
 }
 
 
@@ -1541,6 +1569,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__toJSON", 1, prim_toJSON);
     addPrimOp("__fromJSON", 1, prim_fromJSON);
     addPrimOp("__toFile", 2, prim_toFile);
+    addPrimOp("__toSecretFile", 2, prim_toSecretFile);
     addPrimOp("__filterSource", 2, prim_filterSource);
 
     // Sets

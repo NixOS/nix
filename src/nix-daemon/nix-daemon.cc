@@ -114,6 +114,12 @@ struct RetrieveRegularNARSink : ParseSink
 
     RetrieveRegularNARSink() : regular(true) { }
 
+    /* Any content which is private content should not be considered as regular. */
+    void setPrivateSink()
+    {
+        regular = false;
+    }
+
     void createDirectory(const Path & path)
     {
         regular = false;
@@ -146,8 +152,9 @@ struct SavingSourceAdapter : Source
 };
 
 
-static void performOp(bool trusted, unsigned int clientVersion,
-    Source & from, Sink & to, unsigned int op)
+static void performOp(bool trusted, const string & user,
+    unsigned int clientVersion, Source & from, Sink & to,
+    unsigned int op)
 {
     switch (op) {
 
@@ -284,11 +291,17 @@ static void performOp(bool trusted, unsigned int clientVersion,
     }
 
     case wopAddTextToStore: {
+        string userName = publicUserName();
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 15) {
+            userName = readString(from);
+            if (!SecretMode::isOwnerAccessibleBy(userName, user))
+                throw Error(format("missmatch between user names; connection: %1%, claimed: %2%") % user % userName);
+        }
         string suffix = readString(from);
         string s = readString(from);
         PathSet refs = readStorePaths<PathSet>(from);
         startWork();
-        Path path = store->addTextToStore(suffix, s, refs);
+        Path path = store->addTextToStore(suffix, s, refs, userName);
         stopWork();
         writeString(path, to);
         break;
@@ -297,9 +310,15 @@ static void performOp(bool trusted, unsigned int clientVersion,
     case wopExportPath: {
         Path path = readStorePath(from);
         bool sign = readInt(from) == 1;
+        string userName = publicUserName();
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 15) {
+            userName = readString(from);
+            if (!SecretMode::isOwnerAccessibleBy(userName, user))
+                throw Error(format("missmatch between user names; connection: %1%, claimed: %2%") % user % userName);
+        }
         startWork();
         TunnelSink sink(to);
-        store->exportPath(path, sign, sink);
+        store->exportPath(path, sign, userName, sink);
         stopWork();
         writeInt(1, to);
         break;
@@ -521,7 +540,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
 }
 
 
-static void processConnection(bool trusted)
+static void processConnection(bool trusted, const string & user)
 {
     MonitorFdHup monitor(from.fd);
 
@@ -586,7 +605,7 @@ static void processConnection(bool trusted)
         opCount++;
 
         try {
-            performOp(trusted, clientVersion, from, to, op);
+            performOp(trusted, user, clientVersion, from, to, op);
         } catch (Error & e) {
             /* If we're not in a state where we can send replies, then
                something went wrong processing the input of the
@@ -736,6 +755,7 @@ static void daemonLoop(char * * argv)
 
             bool trusted = false;
             pid_t clientPid = -1;
+            string user = publicUserName();
 
 #if defined(SO_PEERCRED)
             /* Get the identity of the caller, if possible. */
@@ -747,7 +767,7 @@ static void daemonLoop(char * * argv)
             clientPid = cred.pid;
 
             struct passwd * pw = getpwuid(cred.uid);
-            string user = pw ? pw->pw_name : int2String(cred.uid);
+            user = pw ? pw->pw_name : int2String(cred.uid);
 
             struct group * gr = getgrgid(cred.gid);
             string group = gr ? gr->gr_name : int2String(cred.gid);
@@ -785,7 +805,7 @@ static void daemonLoop(char * * argv)
                 /* Handle the connection. */
                 from.fd = remote;
                 to.fd = remote;
-                processConnection(trusted);
+                processConnection(trusted, user);
 
                 _exit(0);
             }, false, "unexpected Nix daemon error: ");

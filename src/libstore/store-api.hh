@@ -168,17 +168,20 @@ public:
         bool recursive = true, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, bool repair = false) = 0;
 
-    /* Like addToStore, but the contents written to the output path is
-       a regular file containing the given string. */
+    /* Like addToStore, but the contents written to the output path is a
+       regular file containing the given string. A secret content is
+       indicated by a valid uid.  If the uid is not -1, then the content is
+       kept secret.  The secret would be associated to the given User
+       Identifier. */
     virtual Path addTextToStore(const string & name, const string & s,
-        const PathSet & references, bool repair = false) = 0;
+        const PathSet & references, const string &userName, bool repair = false) = 0;
 
     /* Export a store path, that is, create a NAR dump of the store
        path and append its references and its deriver.  Optionally, a
        cryptographic signature (created by OpenSSL) of the preceding
        data is attached. */
     virtual void exportPath(const Path & path, bool sign,
-        Sink & sink) = 0;
+        const string & userName, Sink & sink) = 0;
 
     /* Import a sequence of NAR dumps created by exportPaths() into
        the Nix store. */
@@ -319,7 +322,7 @@ std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
    affected), but it has some backwards compatibility issues (the
    hashing scheme changes), so I'm not doing that for now. */
 Path computeStorePathForText(const string & name, const string & s,
-    const PathSet & references);
+    const PathSet & references, const string &userName);
 
 
 /* Remove the temporary roots file for this process.  Any temporary
