@@ -1926,12 +1926,6 @@ void DerivationGoal::initChild()
 
             /* Set up private namespaces for the build:
 
-               - The PID namespace causes the build to start as PID 1.
-                 Processes outside of the chroot are not visible to
-                 those on the inside, but processes inside the chroot
-                 are visible from the outside (though with different
-                 PIDs).
-
                - The private mount namespace ensures that all the bind
                  mounts we do will only show up in this process and
                  its children, and will disappear automatically when
@@ -2032,8 +2026,7 @@ void DerivationGoal::initChild()
                     throw SysError(format("bind mount from ‘%1%’ to ‘%2%’ failed") % source % target);
             }
 
-            /* Bind a new instance of procfs on /proc to reflect our
-               private PID namespace. */
+            /* Bind a new instance of procfs on /proc. */
             createDirs(chrootRootDir + "/proc");
             if (mount("none", (chrootRootDir + "/proc").c_str(), "proc", 0, 0) == -1)
                 throw SysError("mounting /proc");
