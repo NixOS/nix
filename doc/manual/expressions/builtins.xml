@@ -45,14 +45,17 @@ available as <function>builtins.derivation</function>.</para>
     <listitem><para>Return the names of the attributes in the set
     <replaceable>set</replaceable> in a sorted list.  For instance,
     <literal>builtins.attrNames { y = 1; x = "foo"; }</literal>
-    evaluates to <literal>[ "x" "y" ]</literal>.  There is no built-in
-    function <function>attrValues</function>, but you can easily
-    define it yourself:
+    evaluates to <literal>[ "x" "y" ]</literal>.</para></listitem>
 
-<programlisting>
-attrValues = set: map (name: builtins.getAttr name set) (builtins.attrNames set);</programlisting>
+  </varlistentry>
 
-    </para></listitem>
+
+  <varlistentry><term><function>builtins.attrValues</function>
+  <replaceable>set</replaceable></term>
+
+    <listitem><para>Return the values of the attributes in the set
+    <replaceable>set</replaceable> in the order corresponding to the
+    sorted attribute names.</para></listitem>
 
   </varlistentry>
 
@@ -142,6 +145,19 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
   </varlistentry>
   -->
+
+
+  <varlistentry><term><function>builtins.deepSeq</function>
+  <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+
+    <listitem><para>This is like <literal>seq
+    <replaceable>e1</replaceable>
+    <replaceable>e2</replaceable></literal>, except that
+    <replaceable>e1</replaceable> is evaluated
+    <emphasis>deeply</emphasis>: if it’s a list or set, its elements
+    or attributes are also evaluated recursively.</para></listitem>
+
+  </varlistentry>
 
 
   <varlistentry><term><function>derivation</function>
@@ -596,13 +612,26 @@ in config.someSetting</programlisting>
   </varlistentry>
 
 
-  <!--
-  <varlistentry><term><function>relativise</function></term>
+  <varlistentry><term><function>builtins.readDir</function>
+  <replaceable>path</replaceable></term>
 
-    <listitem><para>TODO</para></listitem>
+    <listitem><para>Return the contents of the directory
+    <replaceable>path</replaceable> as a set mapping directory entries
+    to the corresponding file type. For instance, if directory
+    <filename>A</filename> contains a regular file
+    <filename>B</filename> and another directory
+    <filename>C</filename>, then <literal>builtins.readDir
+    ./A</literal> will return the set
+
+<programlisting>
+{ A = "regular"; B = "directory"; }</programlisting>
+
+    The possible values for the file type are
+    <literal>"regular"</literal>, <literal>"directory"</literal>,
+    <literal>"symlink"</literal> and
+    <literal>"unknown"</literal>.</para></listitem>
 
   </varlistentry>
-  -->
 
 
   <varlistentry><term><function>builtins.readFile</function>
@@ -622,10 +651,21 @@ in config.someSetting</programlisting>
     <replaceable>set</replaceable>.  The attributes don’t have to
     exist in <replaceable>set</replaceable>. For instance,
 
-<screen>
-removeAttrs { x = 1; y = 2; z = 3; } [ "a" "x" "z" ]</screen>
+<programlisting>
+removeAttrs { x = 1; y = 2; z = 3; } [ "a" "x" "z" ]</programlisting>
 
     evaluates to <literal>{ y = 2; }</literal>.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry><term><function>builtins.seq</function>
+  <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+
+    <listitem><para>Evaluate <replaceable>e1</replaceable>, then
+    evaluate and return <replaceable>e2</replaceable>. This ensures
+    that a computation is strict in the value of
+    <replaceable>e1</replaceable>.</para></listitem>
 
   </varlistentry>
 
