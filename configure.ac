@@ -313,9 +313,9 @@ AC_SUBST(tarFlags)
 test "$prefix" = NONE && prefix=$ac_default_prefix
 test "$exec_prefix" = NONE && exec_prefix='${prefix}'
 for name in $ac_subst_vars; do
-    declare $name="$(eval echo "${!name}")"
-    declare $name="$(eval echo "${!name}")"
-    declare $name="$(eval echo "${!name}")"
+    declare $name="$(eval 'echo "${!name}"')"
+    declare $name="$(eval 'echo "${!name}"')"
+    declare $name="$(eval 'echo "${!name}"')"
 done
 
 rm -f Makefile.config
