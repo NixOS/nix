@@ -173,6 +173,12 @@ $ cat ./result
 bar
 </screen>
 
+I'm working on a new package, how can I build it without adding it to nixpkgs?
+
+<screen>
+$ nix-build -E 'with import &lt;nixpkgs> { }; callPackage ./mypackage.nix { }'
+</screen>
+
 </para>
 
 </refsection>
