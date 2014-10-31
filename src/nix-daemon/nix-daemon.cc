@@ -565,7 +565,7 @@ static void processConnection(bool trusted)
         to.flush();
 
     } catch (Error & e) {
-        stopWork(false, e.msg());
+        stopWork(false, e.msg(), GET_PROTOCOL_MINOR(clientVersion) >= 8 ? 1 : 0);
         to.flush();
         return;
     }

@@ -87,8 +87,7 @@ void RemoteStore::openConnection(bool reserveSpace)
         processStderr();
     }
     catch (Error & e) {
-        throw Error(format("cannot start worker (%1%)")
-            % e.msg());
+        throw Error(format("cannot start daemon worker: %1%") % e.msg());
     }
 
     setOptions();
