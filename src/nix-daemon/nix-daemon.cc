@@ -22,6 +22,10 @@
 #include <pwd.h>
 #include <grp.h>
 
+#if __APPLE__ || __FreeBSD__
+#include <sys/ucred.h>
+#endif
+
 using namespace nix;
 
 
@@ -649,6 +653,44 @@ bool matchUser(const string & user, const string & group, const Strings & users)
 }
 
 
+struct PeerInfo
+{
+    bool pidKnown;
+    pid_t pid;
+    bool uidKnown;
+    uid_t uid;
+    bool gidKnown;
+    gid_t gid;
+};
+
+
+/* Get the identity of the caller, if possible. */
+static PeerInfo getPeerInfo(int remote)
+{
+    PeerInfo peer = { false, 0, false, 0, false, 0 };
+
+#if defined(SO_PEERCRED)
+
+    ucred cred;
+    socklen_t credLen = sizeof(cred);
+    if (getsockopt(remote, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) == -1)
+        throw SysError("getting peer credentials");
+    peer = { true, cred.pid, true, cred.uid, true, cred.gid };
+
+#elif defined(LOCAL_PEERCRED)
+
+    xucred cred;
+    socklen_t credLen = sizeof(cred);
+    if (getsockopt(remote, SOL_LOCAL, LOCAL_PEERCRED, &cred, &credLen) == -1)
+        throw SysError("getting peer credentials");
+    peer = { false, 0, true, cred.cr_uid, false, 0 };
+
+#endif
+
+    return peer;
+}
+
+
 #define SD_LISTEN_FDS_START 3
 
 
@@ -735,22 +777,13 @@ static void daemonLoop(char * * argv)
             closeOnExec(remote);
 
             bool trusted = false;
-            pid_t clientPid = -1;
+            PeerInfo peer = getPeerInfo(remote);
 
-#if defined(SO_PEERCRED)
-            /* Get the identity of the caller, if possible. */
-            ucred cred;
-            socklen_t credLen = sizeof(cred);
-            if (getsockopt(remote, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) == -1)
-                throw SysError("getting peer credentials");
+            struct passwd * pw = peer.uidKnown ? getpwuid(peer.uid) : 0;
+            string user = pw ? pw->pw_name : int2String(peer.uid);
 
-            clientPid = cred.pid;
-
-            struct passwd * pw = getpwuid(cred.uid);
-            string user = pw ? pw->pw_name : int2String(cred.uid);
-
-            struct group * gr = getgrgid(cred.gid);
-            string group = gr ? gr->gr_name : int2String(cred.gid);
+            struct group * gr = peer.gidKnown ? getgrgid(peer.gid) : 0;
+            string group = gr ? gr->gr_name : int2String(peer.gid);
 
             Strings trustedUsers = settings.get("trusted-users", Strings({"root"}));
             Strings allowedUsers = settings.get("allowed-users", Strings({"*"}));
@@ -761,9 +794,9 @@ static void daemonLoop(char * * argv)
             if (!trusted && !matchUser(user, group, allowedUsers))
                 throw Error(format("user ‘%1%’ is not allowed to connect to the Nix daemon") % user);
 
-            printMsg(lvlInfo, format((string) "accepted connection from pid %1%, user %2%"
-                    + (trusted ? " (trusted)" : "")) % clientPid % user);
-#endif
+            printMsg(lvlInfo, format((string) "accepted connection from pid %1%, user %2%" + (trusted ? " (trusted)" : ""))
+                % (peer.pidKnown ? int2String(peer.pid) : "<unknown>")
+                % (peer.uidKnown ? user : "<unknown>"));
 
             /* Fork a child to handle the connection. */
             startProcess([&]() {
@@ -777,8 +810,8 @@ static void daemonLoop(char * * argv)
                 setSigChldAction(false);
 
                 /* For debugging, stuff the pid into argv[1]. */
-                if (clientPid != -1 && argv[1]) {
-                    string processName = int2String(clientPid);
+                if (peer.pidKnown && argv[1]) {
+                    string processName = int2String(peer.pid);
                     strncpy(argv[1], processName.c_str(), strlen(argv[1]));
                 }
 
