@@ -66,7 +66,7 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
     <para>Keeping derivation around is useful for querying and
     traceability (e.g., it allows you to ask with what dependencies or
     options a store path was built), so by default this option is on.
-    Turn it off to safe a bit of disk space (or a lot if
+    Turn it off to save a bit of disk space (or a lot if
     <literal>gc-keep-outputs</literal> is also turned on).</para></listitem>
 
   </varlistentry>
