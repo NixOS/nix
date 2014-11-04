@@ -17,6 +17,7 @@ makefiles = \
   scripts/local.mk \
   corepkgs/local.mk \
   misc/systemd/local.mk \
+  misc/launchd/local.mk \
   misc/upstart/local.mk \
   misc/emacs/local.mk \
   doc/manual/local.mk \
