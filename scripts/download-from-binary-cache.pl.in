@@ -13,6 +13,7 @@ use WWW::Curl::Easy;
 use WWW::Curl::Multi;
 use strict;
 
+STDERR->autoflush(1);
 binmode STDERR, ":encoding(utf8)";
 
 Nix::Config::readConfig;
