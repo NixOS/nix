@@ -9,7 +9,7 @@
     <key>Program</key>
     <string>@bindir@/nix-daemon</string>
     <key>StandardErrorPath</key>
-    <string>/var/log/nix-daemin.log</string>
+    <string>/var/log/nix-daemon.log</string>
     <key>StandardOutPath</key>
     <string>/dev/null</string>
   </dict>
