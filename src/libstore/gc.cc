@@ -355,7 +355,8 @@ Roots LocalStore::findRoots()
 
     /* Process direct roots in {gcroots,manifests,profiles}. */
     nix::findRoots(*this, settings.nixStateDir + "/" + gcRootsDir, DT_UNKNOWN, roots);
-    nix::findRoots(*this, settings.nixStateDir + "/manifests", DT_UNKNOWN, roots);
+    if (pathExists(settings.nixStateDir + "/manifests"))
+        nix::findRoots(*this, settings.nixStateDir + "/manifests", DT_UNKNOWN, roots);
     nix::findRoots(*this, settings.nixStateDir + "/profiles", DT_UNKNOWN, roots);
 
     return roots;
