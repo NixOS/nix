@@ -24,7 +24,7 @@ let
 
         buildInputs =
           [ curl bison flex perl libxml2 libxslt bzip2
-            /* tetex dblatex */ nukeReferences pkgconfig sqlite
+            tetex dblatex nukeReferences pkgconfig sqlite
           ] ++ lib.optional (!lib.inNixShell) git;
 
         configureFlags = ''
