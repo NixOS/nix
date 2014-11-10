@@ -57,6 +57,7 @@ sub copyTo {
     if ($@) {
         chomp $@;
         warn "$@; falling back to old closure copying method\n";
+        $@ = "";
         return oldCopyTo(@_);
     }
 

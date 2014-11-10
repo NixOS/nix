@@ -1,5 +1,6 @@
 package Nix::SSH;
 
+use utf8;
 use strict;
 use File::Temp qw(tempdir);
 use IPC::Open2;
@@ -89,10 +90,16 @@ sub connectToRemoteNix {
     my $pid = open2($from, $to, "exec ssh -x -a $sshHost @globalSshOpts @{$sshOpts} nix-store --serve --write $extraFlags");
 
     # Do the handshake.
-    my $SERVE_MAGIC_1 = 0x390c9deb; # FIXME
-    my $clientVersion = 0x200;
-    syswrite($to, pack("L<x4L<x4", $SERVE_MAGIC_1, $clientVersion)) or die;
-    die "did not get valid handshake from remote host\n" if readInt($from) != 0x5452eecb;
+    my $magic;
+    eval {
+        my $SERVE_MAGIC_1 = 0x390c9deb; # FIXME
+        my $clientVersion = 0x200;
+        syswrite($to, pack("L<x4L<x4", $SERVE_MAGIC_1, $clientVersion)) or die;
+        $magic = readInt($from);
+    };
+    die "unable to connect to ‘$sshHost’\n" if $@;
+    die "did not get valid handshake from remote host\n" if $magic  != 0x5452eecb;
+
     my $serverVersion = readInt($from);
     die "unsupported server version\n" if $serverVersion < 0x200 || $serverVersion >= 0x300;
 
