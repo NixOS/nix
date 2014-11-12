@@ -259,11 +259,13 @@ close UPLOADLOCK;
 
 # Perform the build.
 print STDERR "building ‘$drvPath’ on ‘$hostName’\n";
+print STDERR "@ build-remote-start $drvPath $hostName\n" if $printBuildTrace;
 writeInt(6, $to) or die; # == cmdBuildPaths
 writeStrings([$drvPath], $to);
 writeInt($maxSilentTime, $to);
 writeInt($buildTimeout, $to);
 my $res = readInt($from);
+print STDERR "@ build-remote-done $drvPath $hostName\n" if $printBuildTrace;
 if ($res != 0) {
     my $msg = decode("utf-8", readString($from));
     print STDERR "error: $msg on ‘$hostName’\n";
