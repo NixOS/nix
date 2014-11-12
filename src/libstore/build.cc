@@ -851,13 +851,9 @@ DerivationGoal::~DerivationGoal()
 {
     /* Careful: we should never ever throw an exception from a
        destructor. */
-    try {
-        killChild();
-        deleteTmpDir(false);
-        closeLogFile();
-    } catch (...) {
-        ignoreException();
-    }
+    try { killChild(); } catch (...) { ignoreException(); }
+    try { deleteTmpDir(false); } catch (...) { ignoreException(); }
+    try { closeLogFile(); } catch (...) { ignoreException(); }
 }
 
 
