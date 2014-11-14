@@ -2073,7 +2073,7 @@ void DerivationGoal::initChild()
         if (drv.platform == "i686-linux" &&
             (settings.thisSystem == "x86_64-linux" ||
              (!strcmp(utsbuf.sysname, "Linux") && !strcmp(utsbuf.machine, "x86_64")))) {
-            if (personality(PER_LINUX32_3GB) == -1)
+            if (personality(PER_LINUX32) == -1)
                 throw SysError("cannot set i686-linux personality");
         }
 
