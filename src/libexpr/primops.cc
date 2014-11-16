@@ -35,7 +35,7 @@ std::pair<string, string> decodeContext(const string & s)
         size_t index = s.find("!", 1);
         return std::pair<string, string>(string(s, index + 1), string(s, 1, index - 1));
     } else
-        return std::pair<string, string>(s, "");
+        return std::pair<string, string>(s.at(0) == '/' ? s: string(s, 1), "");
 }
 
 
@@ -51,7 +51,7 @@ void realiseContext(const PathSet & context)
         assert(isStorePath(ctx));
         if (!store->isValidPath(ctx))
             throw InvalidPathError(ctx);
-        if (isDerivation(ctx))
+        if (!decoded.second.empty() && isDerivation(ctx))
             drvs.insert(decoded.first + "!" + decoded.second);
     }
     if (!drvs.empty()) {
