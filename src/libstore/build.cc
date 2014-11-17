@@ -2297,7 +2297,7 @@ void DerivationGoal::registerOutputs()
         if (buildMode == bmCheck) {
             ValidPathInfo info = worker.store.queryPathInfo(path);
             if (hash.first != info.hash)
-                throw Error(format("derivation ‘%2%’ may not be deterministic: hash mismatch in output ‘%1%’") % drvPath % path);
+                throw Error(format("derivation ‘%1%’ may not be deterministic: hash mismatch in output ‘%2%’") % drvPath % path);
             continue;
         }
 
