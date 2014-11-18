@@ -17,7 +17,7 @@ if [ -z "$USER" ]; then
 fi
 
 if [ "$(id -u)" -eq 0 ]; then
-    echo "warning: installing Nix as root is not recommended" >&2
+    printf '\e[1;31mwarning: installing Nix as root is not supported by this script!\e[0m\n'
 fi
 
 echo "performing a single-user installation of Nix..." >&2
@@ -79,7 +79,9 @@ if ! $nix/bin/nix-channel --list | grep -q "^nixpkgs "; then
         $nix/bin/nix-channel --add http://nixos.org/channels/nixpkgs-unstable
     fi
 fi
-$nix/bin/nix-channel --update nixpkgs
+if [ -z "$_NIX_INSTALLER_TEST" ]; then
+    $nix/bin/nix-channel --update nixpkgs
+fi
 
 # Install an SSL certificate bundle.
 $nix/bin/nix-env -iA nixpkgs.cacert || true

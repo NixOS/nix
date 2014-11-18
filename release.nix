@@ -211,13 +211,28 @@ let
 
 
     # System tests.
-    tests.remote_builds = (import ./tests/remote-builds.nix rec {
+    tests.remoteBuilds = (import ./tests/remote-builds.nix rec {
       nix = build.x86_64-linux; system = "x86_64-linux";
     });
 
-    tests.nix_copy_closure = (import ./tests/nix-copy-closure.nix rec {
+    tests.nix-copy-closure = (import ./tests/nix-copy-closure.nix rec {
       nix = build.x86_64-linux; system = "x86_64-linux";
     });
+
+    tests.binaryTarball =
+      with import <nixpkgs> { system = "x86_64-linux"; };
+      vmTools.runInLinuxImage (runCommand "nix-binary-tarball-test"
+        { diskImage = vmTools.diskImages.ubuntu1204x86_64;
+        }
+        ''
+          useradd -m alice
+          su - alice -c 'tar xf ${binaryTarball.x86_64-linux}/*.tar.*'
+          mount -t tmpfs none /nix # Provide a writable /nix.
+          chown alice /nix
+          su - alice -c '_NIX_INSTALLER_TEST=1 ./nix-*/install'
+          su - alice -c 'nix-store --verify'
+          su - alice -c 'nix-store -qR ${build.x86_64-linux}'
+        ''); # */
 
 
     # Aggregate job containing the release-critical jobs.
@@ -248,8 +263,9 @@ let
           rpm_fedora19x86_64
           rpm_fedora20i386
           rpm_fedora20x86_64
-          tests.remote_builds
-          tests.nix_copy_closure
+          tests.remoteBuilds
+          tests.nix-copy-closure
+          tests.binaryTarball
         ];
     };
 
