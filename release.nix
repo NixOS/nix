@@ -232,6 +232,8 @@ let
           su - alice -c '_NIX_INSTALLER_TEST=1 ./nix-*/install'
           su - alice -c 'nix-store --verify'
           su - alice -c 'nix-store -qR ${build.x86_64-linux}'
+          mkdir -p $out/nix-support
+          touch $out/nix-support/hydra-build-products
         ''); # */
 
 
