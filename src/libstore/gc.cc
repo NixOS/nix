@@ -145,11 +145,6 @@ Path addPermRoot(StoreAPI & store, const Path & _storePath,
 }
 
 
-/* The file to which we write our temporary roots. */
-static Path fnTempRoots;
-static AutoCloseFD fdTempRoots;
-
-
 void LocalStore::addTempRoot(const Path & path)
 {
     /* Create the temporary roots file for this process. */
@@ -202,27 +197,6 @@ void LocalStore::addTempRoot(const Path & path)
     debug(format("downgrading to read lock on ‘%1%’") % fnTempRoots);
     lockFile(fdTempRoots, ltRead, true);
 }
-
-
-void removeTempRoots()
-{
-    if (fdTempRoots != -1) {
-        fdTempRoots.close();
-        unlink(fnTempRoots.c_str());
-    }
-}
-
-
-/* Automatically clean up the temporary roots file when we exit. */
-struct RemoveTempRoots
-{
-    ~RemoveTempRoots()
-    {
-        removeTempRoots();
-    }
-};
-
-static RemoveTempRoots autoRemoveTempRoots __attribute__((unused));
 
 
 typedef std::shared_ptr<AutoCloseFD> FDPtr;

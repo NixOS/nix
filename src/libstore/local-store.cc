@@ -363,6 +363,15 @@ LocalStore::~LocalStore()
     } catch (...) {
         ignoreException();
     }
+
+    try {
+        if (fdTempRoots != -1) {
+            fdTempRoots.close();
+            unlink(fnTempRoots.c_str());
+        }
+    } catch (...) {
+        ignoreException();
+    }
 }
 
 

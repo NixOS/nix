@@ -244,6 +244,10 @@ private:
 
     bool didSetSubstituterEnv;
 
+    /* The file to which we write our temporary roots. */
+    Path fnTempRoots;
+    AutoCloseFD fdTempRoots;
+
     int getSchema();
 
     void openDB(bool create);
