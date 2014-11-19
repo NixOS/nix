@@ -864,7 +864,7 @@ void killUser(uid_t uid)
 
 
 pid_t startProcess(std::function<void()> fun,
-    bool dieWithParent, const string & errorPrefix)
+    bool dieWithParent, const string & errorPrefix, bool runExitHandlers)
 {
     pid_t pid = fork();
     if (pid == -1) throw SysError("unable to fork");
@@ -883,7 +883,10 @@ pid_t startProcess(std::function<void()> fun,
                 std::cerr << errorPrefix << e.what() << "\n";
             } catch (...) { }
         } catch (...) { }
-        _exit(1);
+        if (runExitHandlers)
+            exit(1);
+        else
+            _exit(1);
     }
 
     return pid;

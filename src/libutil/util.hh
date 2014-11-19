@@ -270,7 +270,7 @@ void killUser(uid_t uid);
 /* Fork a process that runs the given function, and return the child
    pid to the caller. */
 pid_t startProcess(std::function<void()> fun, bool dieWithParent = true,
-    const string & errorPrefix = "error: ");
+    const string & errorPrefix = "error: ", bool runExitHandlers = false);
 
 
 /* Run a program and return its stdout in a string (i.e., like the
