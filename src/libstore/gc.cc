@@ -724,7 +724,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     }
 
     /* While we're at it, vacuum the database. */
-    if (options.action == GCOptions::gcDeleteDead) vacuumDB();
+    //if (options.action == GCOptions::gcDeleteDead) vacuumDB();
 }
 
 
