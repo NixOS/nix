@@ -196,8 +196,6 @@ let
     deb_debian7i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian7i386) 60;
     deb_debian7x86_64 = makeDeb_x86_64 (diskImageFunsFun: diskImageFunsFun.debian7x86_64) 60;
 
-    deb_ubuntu1110i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1110i386) 60;
-    deb_ubuntu1110x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1110x86_64) 60;
     deb_ubuntu1204i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1204i386) 60;
     deb_ubuntu1204x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1204x86_64) 60;
     deb_ubuntu1210i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1210i386) 70;
@@ -208,6 +206,8 @@ let
     deb_ubuntu1310x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1310x86_64) 90;
     deb_ubuntu1404i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1404i386) 90;
     deb_ubuntu1404x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1404x86_64) 90;
+    deb_ubuntu1410i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1410i386) 90;
+    deb_ubuntu1410x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1410x86_64) 90;
 
 
     # System tests.
@@ -255,14 +255,10 @@ let
           binaryTarball.x86_64-linux
           deb_debian7i386
           deb_debian7x86_64
-          deb_ubuntu1304i386
-          deb_ubuntu1304x86_64
-          deb_ubuntu1310i386
-          deb_ubuntu1310x86_64
           deb_ubuntu1404i386
           deb_ubuntu1404x86_64
-          rpm_fedora19i386
-          rpm_fedora19x86_64
+          deb_ubuntu1410i386
+          deb_ubuntu1410x86_64
           rpm_fedora20i386
           rpm_fedora20x86_64
           tests.remoteBuilds
