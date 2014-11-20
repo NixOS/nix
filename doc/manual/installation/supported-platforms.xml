@@ -10,12 +10,13 @@
 
 <itemizedlist>
 
-  <listitem><para>Linux (particularly on x86, x86_64, and
-  PowerPC).</para></listitem>
+  <listitem><para>Linux (i686, x86_64).</para></listitem>
 
-  <listitem><para>Mac OS X.</para></listitem>
+  <listitem><para>Mac OS X (x86_64).</para></listitem>
 
+  <!--
   <listitem><para>FreeBSD (only tested on Intel).</para></listitem>
+  -->
 
   <!--
   <listitem><para>Windows through <link
