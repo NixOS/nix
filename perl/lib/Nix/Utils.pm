@@ -43,5 +43,5 @@ sub readFile {
 sub mkTempDir {
     my ($name) = @_;
     return tempdir("$name.XXXXXX", CLEANUP => 1, DIR => $ENV{"TMPDIR"} // $ENV{"XDG_RUNTIME_DIR"} // "/tmp")
-        or die "cannot create a temporary directory";
+        || die "cannot create a temporary directory";
 }
