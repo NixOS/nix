@@ -84,16 +84,19 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
         Derivation drv = readDerivation(path);
         Value & w = *state.allocValue();
         state.mkAttrs(w, 2 + drv.outputs.size());
-        mkString(*state.allocAttr(w, state.sDrvPath), path, singleton<PathSet>("=" + path));
-        state.mkList(*state.allocAttr(w, state.symbols.create("outputs")), drv.outputs.size());
+        Value * v2 = state.allocAttr(w, state.sDrvPath);
+        mkString(*v2, path, singleton<PathSet>("=" + path));
+        Value * outputsVal =
+            state.allocAttr(w, state.symbols.create("outputs"));
+        state.mkList(*outputsVal, drv.outputs.size());
         unsigned int outputs_index = 0;
 
-        Value * outputsVal = w.attrs->find(state.symbols.create("outputs"))->value;
-        foreach (DerivationOutputs::iterator, i, drv.outputs) {
-            mkString(*state.allocAttr(w, state.symbols.create(i->first)),
-                i->second.path, singleton<PathSet>("!" + i->first + "!" + path));
-            mkString(*(outputsVal->list.elems[outputs_index++] = state.allocValue()),
-                i->first);
+        for (const auto & o : drv.outputs) {
+            v2 = state.allocAttr(w, state.symbols.create(o.first));
+            mkString(*v2, o.second.path,
+                singleton<PathSet>("!" + o.first + "!" + path));
+            outputsVal->list.elems[outputs_index] = state.allocValue();
+            mkString(*(outputsVal->list.elems[outputs_index++]), o.first);
         }
         w.attrs->sort();
         Value fun;
