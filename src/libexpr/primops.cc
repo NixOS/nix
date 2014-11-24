@@ -18,6 +18,7 @@
 #include <cstring>
 #include <dlfcn.h>
 
+#include <glob.h>
 
 namespace nix {
 
@@ -827,6 +828,58 @@ static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Val
 }
 
 
+int glob_throw (const char *epath, int eerrno)
+{
+    throw EvalError(format("glob: error reading ‘%1%’") % epath);
+    return errno;
+}
+
+/* Return a list of paths that match a Unix glob.
+
+   Standard behavior on Unix is to silently continue over
+   read errors, like insufficient directory permissions.
+   For the sake of portabilty across filesystems where that kind
+   of error can't happen, the former behavior is not retained. */
+static void prim_glob(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    PathSet context;
+    Path pattern = state.coerceToString(pos, *args[0], context);
+
+    if (pattern.size() < 2)
+        throw EvalError(format("invalid glob ‘%1%’") % pattern);
+
+    else if (pattern[0] == '.') {
+        string dir = dirOf((string) pos.file);
+
+        if (pattern[1] == '/')
+            pattern.erase(0,1);
+        else if (pattern[1] == '.')
+            dir.push_back('/');
+        else
+            throw EvalError(format("glob ‘%1%’ is not absolute") % pattern);
+
+        pattern = dir.append(pattern);
+    }
+    else if (pattern[0] != '/')
+        throw EvalError(format("glob ‘%1%’ is not absolute") % pattern);
+
+    glob_t globbuf;
+    try {
+        glob(pattern.c_str(), GLOB_ERR, glob_throw, &globbuf);
+
+        state.mkList(v, globbuf.gl_pathc);
+        for (unsigned int i = 0; i < globbuf.gl_pathc; ++i)
+            mkPath(*(v.list.elems[i] = state.allocValue()), globbuf.gl_pathv[i]);
+    }
+    catch (...) {
+        globfree(&globbuf);
+        throw;
+    }
+    globfree(&globbuf);
+}
+
+
+
 /*************************************************************
  * Creating files
  *************************************************************/
@@ -1538,6 +1591,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__readFile", 1, prim_readFile);
     addPrimOp("__readDir", 1, prim_readDir);
     addPrimOp("__findFile", 2, prim_findFile);
+    addPrimOp("glob", 1, prim_glob);
 
     // Creating files
     addPrimOp("__toXML", 1, prim_toXML);
