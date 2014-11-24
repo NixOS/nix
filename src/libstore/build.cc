@@ -924,6 +924,11 @@ void DerivationGoal::init()
     /* The first thing to do is to make sure that the derivation
        exists.  If it doesn't, it may be created through a
        substitute. */
+    if (buildMode == bmNormal && worker.store.isValidPath(drvPath)) {
+        haveDerivation();
+        return;
+    }
+
     addWaitee(worker.makeSubstitutionGoal(drvPath));
 
     state = &DerivationGoal::haveDerivation;
