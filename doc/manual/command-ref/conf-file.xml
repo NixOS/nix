@@ -297,7 +297,7 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry><term><literal>build-cache-failures</literal></term>
+  <varlistentry><term><literal>build-cache-failure</literal></term>
 
     <listitem><para>If set to <literal>true</literal>, Nix will
     “cache” build failures, meaning that it will remember (in its
