@@ -6,7 +6,8 @@
 
 <title>Installing a Binary Distribution</title>
 
-<para>The easiest way to install Nix is to run the following command:
+<para>If you are using Linux or Mac OS X, the easiest way to install
+Nix is to run the following command:
 
 <screen>
 $ bash &lt;(curl https://nixos.org/nix/install)
@@ -18,7 +19,7 @@ run this under your usual user account, <emphasis>not</emphasis> as
 root.  The script will invoke <command>sudo</command> to create
 <filename>/nix</filename> if it doesn’t already exist.  If you don’t
 have <command>sudo</command>, you should manually create
-<command>/nix</command> first as root:
+<command>/nix</command> first as root, e.g.:
 
 <screen>
 $ mkdir /nix
@@ -40,7 +41,7 @@ build system</link>.</para>
 or upgraded using <command>rpm -U</command>.  For example,
 
 <screen>
-$ rpm -U nix-1.7-1.i386.rpm</screen>
+$ rpm -U nix-1.8-1.i386.rpm</screen>
 
 </para>
 
@@ -48,21 +49,21 @@ $ rpm -U nix-1.7-1.i386.rpm</screen>
 install it like this:
 
 <screen>
-$ dpkg -i nix_1.7-1_amd64.deb</screen>
+$ dpkg -i nix_1.8-1_amd64.deb</screen>
 
 </para>
 
-<para>For other platforms, including Mac OS X (Darwin), FreeBSD and
-other Linux distributions, you can download a binary tarball that
-contains Nix and all its dependencies.  (This is what the install
-script at <uri>https://nixos.org/nix/install</uri> uses.)  You should
-unpack it somewhere (e.g. in <filename>/tmp</filename>), and then run
-the script named <command>install</command> inside the binary tarball:
+<para>For other platforms, including Mac OS X and other Linux
+distributions, you can download a binary tarball that contains Nix and
+all its dependencies.  (This is what the install script at
+<uri>https://nixos.org/nix/install</uri> uses.)  You should unpack it
+somewhere (e.g. in <filename>/tmp</filename>), and then run the script
+named <command>install</command> inside the binary tarball:
 
 <screen>
 alice$ cd /tmp
-alice$ tar xfj nix-1.7-x86_64-darwin.tar.bz2
-alice$ cd nix-1.7-x86_64-darwin
+alice$ tar xfj nix-1.8-x86_64-darwin.tar.bz2
+alice$ cd nix-1.8-x86_64-darwin
 alice$ ./install
 </screen>
 
