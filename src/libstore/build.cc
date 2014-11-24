@@ -84,8 +84,12 @@ class Goal;
 typedef std::shared_ptr<Goal> GoalPtr;
 typedef std::weak_ptr<Goal> WeakGoalPtr;
 
+struct CompareGoalPtrs {
+    bool operator() (const GoalPtr & a, const GoalPtr & b);
+};
+
 /* Set of goals. */
-typedef set<GoalPtr> Goals;
+typedef set<GoalPtr, CompareGoalPtrs> Goals;
 typedef list<WeakGoalPtr> WeakGoals;
 
 /* A map of paths to goals (and the other way around). */
@@ -172,9 +176,18 @@ public:
        (important!), etc. */
     virtual void cancel(bool timeout) = 0;
 
+    virtual string key() = 0;
+
 protected:
     void amDone(ExitCode result);
 };
+
+
+bool CompareGoalPtrs::operator() (const GoalPtr & a, const GoalPtr & b) {
+    string s1 = a->key();
+    string s2 = b->key();
+    return s1 < s2;
+}
 
 
 /* A mapping used to remember for each child process to what goal it
@@ -303,6 +316,7 @@ public:
 void addToWeakGoals(WeakGoals & goals, GoalPtr p)
 {
     // FIXME: necessary?
+    // FIXME: O(n)
     foreach (WeakGoals::iterator, i, goals)
         if (i->lock() == p) return;
     goals.push_back(p);
@@ -766,6 +780,15 @@ public:
     ~DerivationGoal();
 
     void cancel(bool timeout);
+
+    string key()
+    {
+        /* Ensure that derivations get built in order of their name,
+           i.e. a derivation named "aardvark" always comes before
+           "baboon". And substitution goals always happen before
+           derivation goals (due to "b$"). */
+        return "b$" + storePathToName(drvPath) + "$" + drvPath;
+    }
 
     void work();
 
@@ -2575,6 +2598,13 @@ public:
 
     void cancel(bool timeout);
 
+    string key()
+    {
+        /* "a$" ensures substitution goals happen before derivation
+           goals. */
+        return "a$" + storePathToName(storePath) + "$" + storePath;
+    }
+
     void work();
 
     /* The states. */
@@ -3085,15 +3115,19 @@ void Worker::run(const Goals & _topGoals)
 
         checkInterrupt();
 
-        /* Call every wake goal. */
+        /* Call every wake goal (in the ordering established by
+           CompareGoalPtrs). */
         while (!awake.empty() && !topGoals.empty()) {
-            WeakGoals awake2(awake);
+            Goals awake2;
+            for (auto & i : awake) {
+                GoalPtr goal = i.lock();
+                if (goal) awake2.insert(goal);
+            }
             awake.clear();
-            foreach (WeakGoals::iterator, i, awake2) {
+            for (auto & goal : awake2) {
                 checkInterrupt();
-                GoalPtr goal = i->lock();
-                if (goal) goal->work();
-                if (topGoals.empty()) break;
+                goal->work();
+                if (topGoals.empty()) break; // stuff may have been cancelled
             }
         }
 
