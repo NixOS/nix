@@ -1277,7 +1277,7 @@ export _args; _args='-e /nix/store/9krlzvny65gdc8s7kpb6lkx8cd02c25c-default-buil
 <refsection><title>Description</title>
 
 <para>If build failure caching is enabled through the
-<literal>build-cache-failures</literal> configuration option, the
+<literal>build-cache-failure</literal> configuration option, the
 operation <option>--query-failed-paths</option> will print out all
 store paths that have failed to build.</para>
 
@@ -1314,7 +1314,7 @@ $ nix-store --query-failed-paths
 <refsection><title>Description</title>
 
 <para>If build failure caching is enabled through the
-<literal>build-cache-failures</literal> configuration option, the
+<literal>build-cache-failure</literal> configuration option, the
 operation <option>--clear-failed-paths</option> clears the “failed”
 state of the given store paths, allowing them to be built again.  This
 is useful if the failure was actually transient (e.g. because the disk
