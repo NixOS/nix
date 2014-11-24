@@ -28,10 +28,11 @@ in the channel:
 
 <screen>
 $ nix-env -qa
-docbook-xml-4.2
-firefox-1.0pre-PR-0.10.1
-hello-2.1.1
-libxslt-1.1.0
+docbook-xml-4.3
+docbook-xml-4.5
+firefox-33.0.2
+hello-2.9
+libxslt-1.1.28
 <replaceable>...</replaceable></screen>
 
 </para></step>
@@ -62,6 +63,28 @@ $ nix-env -e hello</screen>
 
 </para></step>
 
+<step><para>You can also test a package without installing it:
+
+<screen>
+$ nix-shell -p hello
+</screen>
+
+This builds or downloads GNU Hello and its dependencies, then drops
+you into a Bash shell where the <command>hello</command> command is
+present, all without affecting your normal environment:
+
+<screen>
+[nix-shell:~]$ hello
+Hello, world!
+
+[nix-shell:~]$ exit
+
+$ hello
+hello: command not found
+</screen>
+
+</para></step>
+
 <step><para>To keep up-to-date with the channel, do:
 
 <screen>
@@ -72,6 +95,7 @@ The latter command will upgrade each installed package for which there
 is a “newer” version (as determined by comparing the version
 numbers).</para></step>
 
+<!--
 <step><para>You can also install specific packages directly from
 your web browser.  For instance, you can go to <link
 xlink:href="http://hydra.nixos.org/jobset/nixpkgs/trunk/channel/latest"
@@ -81,6 +105,7 @@ the program <command>nix-install-package</command>.  A window should
 appear asking you whether it’s okay to install the package.  Say
 <literal>Y</literal>.  The package and all its dependencies will be
 installed.</para></step>
+-->
 
 <step><para>If you're unhappy with the result of a
 <command>nix-env</command> action (e.g., an upgraded package turned

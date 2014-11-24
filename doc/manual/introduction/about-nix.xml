@@ -4,7 +4,7 @@
       version="5.0"
       xml:id="ch-about-nix">
 
-<title>Introduction</title>
+<title>About Nix</title>
 
 <para>Nix is a <emphasis>purely functional package manager</emphasis>.
 This means that it treats packages like values in purely functional
@@ -16,10 +16,10 @@ store</emphasis>, usually the directory
 subdirectory such as
 
 <programlisting>
-/nix/store/nlc4z5y1hm8w9s8vm6m1f5hy962xjmp5-firefox-12.0
+/nix/store/b6gvzjyb2pg0kjfwrjmg1vfhh54ad73z-firefox-33.1/
 </programlisting>
 
-where <literal>nlc4z5…</literal> is a unique identifier for the
+where <literal>b6gvzjyb2pg0…</literal> is a unique identifier for the
 package that captures all its dependencies (it’s a cryptographic hash
 of the package’s build dependency graph).  This enables many powerful
 features.</para>
@@ -165,12 +165,6 @@ skip building from source and download a pre-built binary instead if
 it knows about it.  <emphasis>Nix channels</emphasis> provide Nix
 expressions along with pre-built binaries.</para>
 
-<!--
-<para>source deployment model (like <a
-href="http://www.gentoo.org/">Gentoo</a>) and a binary model (like
-RPM)</para>
--->
-
 </simplesect>
 
 
@@ -193,10 +187,48 @@ collection</emphasis> (Nixpkgs).</para>
 </simplesect>
 
 
+<simplesect><title>Managing build environments</title>
+
+<para>Nix is extremely useful for developers as it makes it easy to
+automatically set up the the build environment for a package. Given a
+Nix expression that describes the dependencies of your package, the
+command <command>nix-shell</command> will build or download those
+dependencies if they’re not already in your Nix store, and then start
+a Bash shell in which all necessary environment variables (such as
+compiler search paths) are set.</para>
+
+<para>For example, the following command gets all dependencies of the
+Pan newsreader, as described by <link
+xlink:href="https://github.com/NixOS/nixpkgs/blob/master/pkgs/applications/networking/newsreaders/pan/default.nix">its
+Nix expression</link>:</para>
+
+<screen>
+$ nix-shell '&lt;nixpkgs>' -A pan
+</screen>
+
+<para>You’re then dropped into a shell where you can edit, build and test
+the package:</para>
+
+<screen>
+[nix-shell]$ tar xf $src
+[nix-shell]$ cd pan-*
+[nix-shell]$ ./configure
+[nix-shell]$ make
+[nix-shell]$ ./pan/gui/pan
+</screen>
+
+<!--
+<para>Since Nix packages are reproducible and have complete dependency
+specifications, Nix makes an excellent basis for <a
+href="[%root%]hydra">a continuous build system</a>.</para>
+-->
+
+</simplesect>
+
+
 <simplesect><title>Portability</title>
 
-<para>Nix should run on most Unix systems, including Linux and Mac OS
-X.</para>
+<para>Nix runs on Linux and Mac OS X.</para>
 
 </simplesect>
 
@@ -206,20 +238,22 @@ X.</para>
 <para>NixOS is a Linux distribution based on Nix.  It uses Nix not
 just for package management but also to manage the system
 configuration (e.g., to build configuration files in
-<filename>/etc</filename>).  This means, among other things, that it’s
-possible to easily roll back the entire configuration of the system to
-an earlier state.  Also, users can install software without root
+<filename>/etc</filename>).  This means, among other things, that it
+is easy to roll back the entire configuration of the system to an
+earlier state.  Also, users can install software without root
 privileges.  For more information and downloads, see the <link
 xlink:href="http://nixos.org/">NixOS homepage</link>.</para>
 
 </simplesect>
 
 
-<!-- other features:
+<simplesect><title>License</title>
 
-- build farms
-- reproducibility (Nix expressions allows whole configuration to be rebuilt)
+<para>Nix is released under the terms of the <link
+xlink:href="http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html">GNU
+LGPLv2.1 or (at your option) any later version</link>.</para>
 
--->
+</simplesect>
+
 
 </chapter>
