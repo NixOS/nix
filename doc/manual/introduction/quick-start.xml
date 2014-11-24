@@ -2,11 +2,14 @@
       xmlns:xlink="http://www.w3.org/1999/xlink"
       xmlns:xi="http://www.w3.org/2001/XInclude"
       version="5.0"
-      xml:id="ch-getting-started-nix"> 
+      xml:id="chap-quick-start">
 
-<title>Getting Started with Nix</title>
+<title>Quick Start</title>
 
-<para>This tutorial takes you through the basic tasks you might perform when you start using Nix.</para>
+<para>This chapter is for impatient people who don't like reading
+documentation.  For more in-depth information you are kindly referred
+to subsequent chapters.</para>
+
 <procedure>
 
 <step><para>Install single-user Nix by running the following:

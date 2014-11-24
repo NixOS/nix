@@ -7,5 +7,6 @@
 <title>Introduction</title>
 
 <xi:include href="about-nix.xml" />
+<xi:include href="quick-start.xml" />
 
 </part>
