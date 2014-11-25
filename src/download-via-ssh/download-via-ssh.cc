@@ -8,6 +8,10 @@
 #include "worker-protocol.hh"
 #include "store-api.hh"
 
+#if defined(__FreeBSD__)
+#include <stdlib.h>
+#endif
+
 #include <iostream>
 #include <unistd.h>
 

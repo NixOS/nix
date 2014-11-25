@@ -9,7 +9,9 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdio.h>
-
+#if defined(__FreeBSD__)
+#include <stdlib.h>
+#endif
 
 namespace nix {
 

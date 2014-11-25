@@ -11,6 +11,9 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <fcntl.h>
+#if defined(__FreeBSD__)
+#include <errno.h>
+#endif
 
 #include <iostream>
 #include <unistd.h>
