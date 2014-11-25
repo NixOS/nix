@@ -200,7 +200,7 @@ public:
     inline void forceList(Value & v, const Pos & pos);
     void forceFunction(Value & v, const Pos & pos); // either lambda or primop
     string forceString(Value & v, const Pos & pos = noPos);
-    string forceString(Value & v, PathSet & context);
+    string forceString(Value & v, PathSet & context, const Pos & pos = noPos);
     string forceStringNoCtx(Value & v, const Pos & pos = noPos);
 
     /* Return true iff the value `v' denotes a derivation (i.e. a

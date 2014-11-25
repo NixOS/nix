@@ -870,7 +870,7 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
 {
     PathSet context;
     string name = state.forceStringNoCtx(*args[0], pos);
-    string contents = state.forceString(*args[1], context);
+    string contents = state.forceString(*args[1], context, pos);
 
     PathSet refs;
 
@@ -1427,7 +1427,7 @@ static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, 
       throw Error(format("unknown hash type ‘%1%’, at %2%") % type % pos);
 
     PathSet context; // discarded
-    string s = state.forceString(*args[1], context);
+    string s = state.forceString(*args[1], context, pos);
 
     mkString(v, printHash(hashString(ht, s)), context);
 };

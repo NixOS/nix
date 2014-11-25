@@ -1257,9 +1257,9 @@ void copyContext(const Value & v, PathSet & context)
 }
 
 
-string EvalState::forceString(Value & v, PathSet & context)
+string EvalState::forceString(Value & v, PathSet & context, const Pos & pos)
 {
-    string s = forceString(v);
+    string s = forceString(v, pos);
     copyContext(v, context);
     return s;
 }
