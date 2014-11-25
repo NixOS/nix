@@ -1430,7 +1430,34 @@ static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, 
     string s = state.forceString(*args[1], context, pos);
 
     mkString(v, printHash(hashString(ht, s)), context);
-};
+}
+
+
+/* Match a regular expression against a string and return either
+   ‘null’ or a list containing substring matches. */
+static void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    Regex regex(state.forceStringNoCtx(*args[0], pos), true);
+
+    PathSet context;
+    string s = state.forceString(*args[1], context, pos);
+
+    Regex::Subs subs;
+    if (!regex.matches(s, subs)) {
+        mkNull(v);
+        return;
+    }
+
+    unsigned int len = subs.empty() ? 0 : subs.rbegin()->first + 1;
+    state.mkList(v, len);
+    for (unsigned int n = 0; n < len; ++n) {
+        auto i = subs.find(n);
+        if (i == subs.end())
+            mkNull(*(v.list.elems[n] = state.allocValue()));
+        else
+            mkString(*(v.list.elems[n] = state.allocValue()), i->second);
+    }
+}
 
 
 /*************************************************************
@@ -1584,6 +1611,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
     addPrimOp("__unsafeDiscardOutputDependency", 1, prim_unsafeDiscardOutputDependency);
     addPrimOp("__hashString", 2, prim_hashString);
+    addPrimOp("__match", 2, prim_match);
 
     // Versions
     addPrimOp("__parseDrvName", 1, prim_parseDrvName);
