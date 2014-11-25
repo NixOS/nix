@@ -25,11 +25,10 @@ let
         buildInputs =
           [ curl bison flex perl libxml2 libxslt bzip2
             tetex dblatex nukeReferences pkgconfig sqlite
+            docbook5 docbook5_xsl
           ] ++ lib.optional (!lib.inNixShell) git;
 
         configureFlags = ''
-          --with-docbook-rng=${docbook5}/xml/rng/docbook
-          --with-docbook-xsl=${docbook5_xsl}/xml/xsl/docbook
           --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
           --with-www-curl=${perlPackages.WWWCurl}/${perl.libPrefix}

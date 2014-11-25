@@ -46,12 +46,4 @@ packages will need to be built from source.</para></warning>
 <filename>/nix/var</filename> by default.  This can be changed using
 <option>--localstatedir=<replaceable>path</replaceable></option>.</para>
 
-<para>If you want to rebuild the documentation, pass the full path to
-the DocBook RELAX NG schemas and to the DocBook XSL stylesheets using
-the
-<option>--with-docbook-rng=<replaceable>path</replaceable></option>
-and
-<option>--with-docbook-xsl=<replaceable>path</replaceable></option>
-options.</para>
-
 </section>

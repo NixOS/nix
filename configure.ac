@@ -176,17 +176,6 @@ AC_ARG_WITH(coreutils-bin, AC_HELP_STRING([--with-coreutils-bin=PATH],
 AC_SUBST(coreutils)
 
 
-AC_ARG_WITH(docbook-rng, AC_HELP_STRING([--with-docbook-rng=PATH],
-  [path of the DocBook RelaxNG schema]),
-  docbookrng=$withval, docbookrng=/docbook-rng-missing)
-AC_SUBST(docbookrng)
-
-AC_ARG_WITH(docbook-xsl, AC_HELP_STRING([--with-docbook-xsl=PATH],
-  [path of the DocBook XSL stylesheets]),
-  docbookxsl=$withval, docbookxsl=/docbook-xsl-missing)
-AC_SUBST(docbookxsl)
-
-
 AC_ARG_WITH(store-dir, AC_HELP_STRING([--with-store-dir=PATH],
   [path of the Nix store (defaults to /nix/store)]),
   storedir=$withval, storedir='/nix/store')
