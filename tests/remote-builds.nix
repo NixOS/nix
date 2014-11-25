@@ -4,7 +4,7 @@
 
 with import <nixpkgs/nixos/lib/testing.nix> { inherit system; };
 
-makeTest ({ pkgs, ... }:
+makeTest (
 
 let
 
@@ -25,7 +25,8 @@ let
         system = "i686-linux";
         PATH = "''${utils}/bin";
         builder = "''${utils}/bin/sh";
-        args = [ "-c" "echo Hello; mkdir $out; cat /proc/sys/kernel/hostname > $out/host; sleep 3" ];
+        args = [ "-c" "if [ ${toString nr} = 5 ]; then echo FAIL; exit 1; fi; echo Hello; mkdir $out $foo; cat /proc/sys/kernel/hostname > $out/host; ln -s $out $foo/bar; sleep 5" ];
+        outputs = [ "out" "foo" ];
       }
     '';
 
@@ -57,7 +58,9 @@ in
             ];
           virtualisation.writableStore = true;
           virtualisation.pathsInNixDB = [ config.system.build.extraUtils ];
-          environment.nix = nix;
+          nix.package = nix;
+          nix.binaryCaches = [ ];
+          programs.ssh.extraConfig = "ConnectTimeout 30";
         };
     };
 
@@ -67,14 +70,14 @@ in
 
       # Create an SSH key on the client.
       my $key = `${pkgs.openssh}/bin/ssh-keygen -t dsa -f key -N ""`;
-      $client->succeed("mkdir -m 700 /root/.ssh");
+      $client->succeed("mkdir -p -m 700 /root/.ssh");
       $client->copyFileFromHost("key", "/root/.ssh/id_dsa");
       $client->succeed("chmod 600 /root/.ssh/id_dsa");
 
       # Install the SSH key on the slaves.
       $client->waitForUnit("network.target");
       foreach my $slave ($slave1, $slave2) {
-          $slave->succeed("mkdir -m 700 /root/.ssh");
+          $slave->succeed("mkdir -p -m 700 /root/.ssh");
           $slave->copyFileFromHost("key.pub", "/root/.ssh/authorized_keys");
           $slave->waitForUnit("sshd");
           $client->succeed("ssh -o StrictHostKeyChecking=no " . $slave->name() . " 'echo hello world'");
@@ -86,9 +89,12 @@ in
 
       # And a parallel build.
       my ($out1, $out2) = split /\s/,
-          $client->succeed("nix-store -r \$(nix-instantiate ${expr nodes.client.config 2} ${expr nodes.client.config 3})");
+          $client->succeed('nix-store -r $(nix-instantiate ${expr nodes.client.config 2})\!out $(nix-instantiate ${expr nodes.client.config 3})\!out');
       $slave1->succeed("test -e $out1 -o -e $out2");
       $slave2->succeed("test -e $out1 -o -e $out2");
+
+      # And a failing build.
+      $client->fail("nix-build ${expr nodes.client.config 5}");
 
       # Test whether the build hook automatically skips unavailable slaves.
       $slave1->block;

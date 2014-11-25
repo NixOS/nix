@@ -1,6 +1,7 @@
 use strict;
 use Cwd;
 use IO::Handle;
+use utf8;
 
 STDOUT->autoflush(1);
 
@@ -53,18 +54,18 @@ sub createLinks {
             elsif (-l _) {
                 my $target = readlink $dstFile or die;
                 if (!-d $target) {
-                    die "collision between directory `$srcFile' and non-directory `$target'";
+                    die "collision between directory ‘$srcFile’ and non-directory ‘$target’";
                 }
-                unlink $dstFile or die "error unlinking `$dstFile': $!";
+                unlink $dstFile or die "error unlinking ‘$dstFile’: $!";
                 mkdir $dstFile, 0755 ||
-                    die "error creating directory `$dstFile': $!";
+                    die "error creating directory ‘$dstFile’: $!";
                 createLinks($target, $dstFile, $priorities{$dstFile});
                 createLinks($srcFile, $dstFile, $priority);
             }
 
             else {
                 symlink($srcFile, $dstFile) ||
-                    die "error creating link `$dstFile': $!";
+                    die "error creating link ‘$dstFile’: $!";
                 $priorities{$dstFile} = $priority;
                 $symlinks++;
             }
@@ -75,17 +76,16 @@ sub createLinks {
             if (-l $dstFile) {
                 my $target = readlink $dstFile;
                 my $prevPriority = $priorities{$dstFile};
-                die ( "collision between `$srcFile' and `$target'; "
-                    . "use `nix-env --set-flag "
-                    . "priority NUMBER PKGNAME' to change the priority of "
-                    . "one of the conflicting packages\n" )
+                die("collision between ‘$srcFile’ and ‘$target’; " .
+                    "use ‘nix-env --set-flag priority NUMBER PKGNAME’ " .
+                    "to change the priority of one of the conflicting packages\n")
                     if $prevPriority == $priority;
                 next if $prevPriority < $priority;
                 unlink $dstFile or die;
             }
 
             symlink($srcFile, $dstFile) ||
-                die "error creating link `$dstFile': $!";
+                die "error creating link ‘$dstFile’: $!";
             $priorities{$dstFile} = $priority;
             $symlinks++;
         }

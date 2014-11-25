@@ -15,7 +15,6 @@ MakeError(AssertionError, EvalError)
 MakeError(ThrownError, AssertionError)
 MakeError(Abort, EvalError)
 MakeError(TypeError, EvalError)
-MakeError(ImportError, EvalError) // error building an imported derivation
 MakeError(UndefinedVarError, Error)
 
 
@@ -28,6 +27,10 @@ struct Pos
     Pos() : line(0), column(0) { };
     Pos(const Symbol & file, unsigned int line, unsigned int column)
         : file(file), line(line), column(column) { };
+    operator bool() const
+    {
+        return line != 0;
+    }
     bool operator < (const Pos & p2) const
     {
         if (!line) return p2.line;
@@ -48,12 +51,20 @@ std::ostream & operator << (std::ostream & str, const Pos & pos);
 
 struct Env;
 struct Value;
-struct EvalState;
+class EvalState;
 struct StaticEnv;
 
 
 /* An attribute path is a sequence of attribute names. */
-typedef vector<Symbol> AttrPath;
+struct AttrName
+{
+    Symbol symbol;
+    Expr * expr;
+    AttrName(const Symbol & s) : symbol(s) {};
+    AttrName(Expr * e) : expr(e) {};
+};
+
+typedef std::vector<AttrName> AttrPath;
 
 string showAttrPath(const AttrPath & attrPath);
 
@@ -62,6 +73,7 @@ string showAttrPath(const AttrPath & attrPath);
 
 struct Expr
 {
+    virtual ~Expr() { };
     virtual void show(std::ostream & str);
     virtual void bindVars(const StaticEnv & env);
     virtual void eval(EvalState & state, Env & env, Value & v);
@@ -128,6 +140,7 @@ struct ExprVar : Expr
     unsigned int level;
     unsigned int displ;
 
+    ExprVar(const Symbol & name) : name(name) { };
     ExprVar(const Pos & pos, const Symbol & name) : pos(pos), name(name) { };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
@@ -135,10 +148,11 @@ struct ExprVar : Expr
 
 struct ExprSelect : Expr
 {
+    Pos pos;
     Expr * e, * def;
     AttrPath attrPath;
-    ExprSelect(Expr * e, const AttrPath & attrPath, Expr * def) : e(e), def(def), attrPath(attrPath) { };
-    ExprSelect(Expr * e, const Symbol & name) : e(e), def(0) { attrPath.push_back(name); };
+    ExprSelect(const Pos & pos, Expr * e, const AttrPath & attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(attrPath) { };
+    ExprSelect(const Pos & pos, Expr * e, const Symbol & name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
     COMMON_METHODS
 };
 
@@ -158,11 +172,20 @@ struct ExprAttrs : Expr
         Expr * e;
         Pos pos;
         unsigned int displ; // displacement
-        AttrDef(Expr * e, const Pos & pos, bool inherited=false) : inherited(inherited), e(e), pos(pos) { };
+        AttrDef(Expr * e, const Pos & pos, bool inherited=false)
+            : inherited(inherited), e(e), pos(pos) { };
         AttrDef() { };
     };
     typedef std::map<Symbol, AttrDef> AttrDefs;
     AttrDefs attrs;
+    struct DynamicAttrDef {
+        Expr * nameExpr, * valueExpr;
+        Pos pos;
+        DynamicAttrDef(Expr * nameExpr, Expr * valueExpr, const Pos & pos)
+            : nameExpr(nameExpr), valueExpr(valueExpr), pos(pos) { };
+    };
+    typedef std::vector<DynamicAttrDef> DynamicAttrDefs;
+    DynamicAttrDefs dynamicAttrs;
     ExprAttrs() : recursive(false) { };
     COMMON_METHODS
 };
@@ -201,7 +224,7 @@ struct ExprLambda : Expr
         : pos(pos), arg(arg), matchAttrs(matchAttrs), formals(formals), body(body)
     {
         if (!arg.empty() && formals && formals->argNames.find(arg) != formals->argNames.end())
-            throw ParseError(format("duplicate formal function argument `%1%' at %2%")
+            throw ParseError(format("duplicate formal function argument ‘%1%’ at %2%")
                 % arg % pos);
     };
     void setName(Symbol & name);
@@ -251,11 +274,13 @@ struct ExprOpNot : Expr
 #define MakeBinOp(name, s) \
     struct Expr##name : Expr \
     { \
+        Pos pos; \
         Expr * e1, * e2; \
         Expr##name(Expr * e1, Expr * e2) : e1(e1), e2(e2) { }; \
+        Expr##name(const Pos & pos, Expr * e1, Expr * e2) : pos(pos), e1(e1), e2(e2) { }; \
         void show(std::ostream & str) \
         { \
-            str << *e1 << " " s " " << *e2; \
+            str << "(" << *e1 << " " s " " << *e2 << ")";   \
         } \
         void bindVars(const StaticEnv & env) \
         { \
@@ -275,10 +300,11 @@ MakeBinOp(OpConcatLists, "++")
 
 struct ExprConcatStrings : Expr
 {
+    Pos pos;
     bool forceString;
     vector<Expr *> * es;
-    ExprConcatStrings(bool forceString, vector<Expr *> * es)
-        : forceString(forceString), es(es) { };
+    ExprConcatStrings(const Pos & pos, bool forceString, vector<Expr *> * es)
+        : pos(pos), forceString(forceString), es(es) { };
     COMMON_METHODS
 };
 
@@ -301,7 +327,6 @@ struct StaticEnv
     Vars vars;
     StaticEnv(bool isWith, const StaticEnv * up) : isWith(isWith), up(up) { };
 };
-
 
 
 }

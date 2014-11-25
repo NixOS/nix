@@ -55,7 +55,7 @@ void RemoteStore::openConnection(bool reserveSpace)
            us. */
         connectToDaemon();
     else
-        throw Error(format("invalid setting for NIX_REMOTE, `%1%'") % remoteMode);
+        throw Error(format("invalid setting for NIX_REMOTE, ‘%1%’") % remoteMode);
 
     from.fd = fdSocket;
     to.fd = fdSocket;
@@ -87,8 +87,7 @@ void RemoteStore::openConnection(bool reserveSpace)
         processStderr();
     }
     catch (Error & e) {
-        throw Error(format("cannot start worker (%1%)")
-            % e.msg());
+        throw Error(format("cannot start daemon worker: %1%") % e.msg());
     }
 
     setOptions();
@@ -116,12 +115,12 @@ void RemoteStore::connectToDaemon()
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
     if (socketPathRel.size() >= sizeof(addr.sun_path))
-        throw Error(format("socket path `%1%' is too long") % socketPathRel);
+        throw Error(format("socket path ‘%1%’ is too long") % socketPathRel);
     using namespace std;
     strcpy(addr.sun_path, socketPathRel.c_str());
 
     if (connect(fdSocket, (struct sockaddr *) &addr, sizeof(addr)) == -1)
-        throw SysError(format("cannot connect to daemon at `%1%'") % socketPath);
+        throw SysError(format("cannot connect to daemon at ‘%1%’") % socketPath);
 
     if (fchdir(fdPrevDir) == -1)
         throw SysError("couldn't change back to previous directory");
@@ -133,8 +132,6 @@ RemoteStore::~RemoteStore()
     try {
         to.flush();
         fdSocket.close();
-        if (child != -1)
-            child.wait(true);
     } catch (...) {
         ignoreException();
     }
@@ -165,6 +162,8 @@ void RemoteStore::setOptions()
 
     if (GET_PROTOCOL_MINOR(daemonVersion) >= 12) {
         Settings::SettingsMap overrides = settings.getOverrides();
+        if (overrides["ssh-auth-sock"] == "")
+            overrides["ssh-auth-sock"] = getEnv("SSH_AUTH_SOCK");
         writeInt(overrides.size(), to);
         foreach (Settings::SettingsMap::iterator, i, overrides) {
             writeString(i->first, to);
@@ -402,8 +401,23 @@ Path RemoteStore::addToStore(const Path & _srcPath,
     writeInt((hashAlgo == htSHA256 && recursive) ? 0 : 1, to);
     writeInt(recursive ? 1 : 0, to);
     writeString(printHashType(hashAlgo), to);
-    dumpPath(srcPath, to, filter);
-    processStderr();
+
+    try {
+        to.written = 0;
+        to.warn = true;
+        dumpPath(srcPath, to, filter);
+        to.warn = false;
+        processStderr();
+    } catch (SysError & e) {
+        /* Daemon closed while we were sending the path. Probably OOM
+           or I/O error. */
+        if (e.errNo == EPIPE)
+            try {
+                processStderr();
+            } catch (EndOfFile & e) { }
+        throw;
+    }
+
     return readStorePath(from);
 }
 
@@ -447,9 +461,9 @@ Paths RemoteStore::importPaths(bool requireSignature, Source & source)
 }
 
 
-void RemoteStore::buildPaths(const PathSet & drvPaths, bool repair)
+void RemoteStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
 {
-    if (repair) throw Error("repairing is not supported when building through the Nix daemon");
+    if (buildMode != bmNormal) throw Error("repairing or checking is not supported when building through the Nix daemon");
     openConnection();
     writeInt(wopBuildPaths, to);
     if (GET_PROTOCOL_MINOR(daemonVersion) >= 13)
@@ -564,6 +578,13 @@ void RemoteStore::clearFailedPaths(const PathSet & paths)
     readInt(from);
 }
 
+void RemoteStore::optimiseStore()
+{
+    openConnection();
+    writeInt(wopOptimiseStore, to);
+    processStderr();
+    readInt(from);
+}
 
 void RemoteStore::processStderr(Sink * sink, Source * source)
 {

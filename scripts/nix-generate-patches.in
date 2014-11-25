@@ -1,9 +1,9 @@
 #! @perl@ -w @perlFlags@
 
 use strict;
-use File::Temp qw(tempdir);
 use Nix::Manifest;
 use Nix::GeneratePatches;
+use Nix::Utils;
 
 if (scalar @ARGV != 5) {
     print STDERR <<EOF;
@@ -31,8 +31,7 @@ readManifest $srcManifest, \%srcNarFiles, \%srcPatches;
 my (%dstNarFiles, %dstLocalPaths, %dstPatches);
 readManifest $dstManifest, \%dstNarFiles, \%dstPatches;
 
-my $tmpDir = tempdir("nix-generate-patches.XXXXXX", CLEANUP => 1, TMPDIR => 1)
-    or die "cannot create a temporary directory";
+my $tmpDir = mkTempDir("nix-generate-patches");
 
 generatePatches \%srcNarFiles, \%dstNarFiles, \%srcPatches, \%dstPatches,
     $narPath, $patchesPath, $patchesURL, $tmpDir;

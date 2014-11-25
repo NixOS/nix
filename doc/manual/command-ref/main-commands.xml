@@ -1,0 +1,17 @@
+<chapter xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id='ch-main-commands'>
+
+<title>Main Commands</title>
+
+<para>This section lists commands and options that you can use when you
+work with Nix.</para>
+
+<xi:include href="nix-env.xml" />
+<xi:include href="nix-build.xml" />
+<xi:include href="nix-shell.xml" />
+<xi:include href="nix-store.xml" />
+
+</chapter>

@@ -9,15 +9,12 @@
 #include <iostream>
 #include <cctype>
 #include <exception>
+#include <algorithm>
 
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <signal.h>
-
-#if HAVE_BOEHMGC
-#include <gc/gc.h>
-#endif
 
 
 namespace nix {
@@ -35,11 +32,14 @@ static void sigintHandler(int signo)
 }
 
 
+static bool gcWarning = true;
+
 void printGCWarning()
 {
+    if (!gcWarning) return;
     static bool haveWarned = false;
     warnOnce(haveWarned,
-        "you did not specify `--add-root'; "
+        "you did not specify ‘--add-root’; "
         "the result might be removed by the garbage collector");
 }
 
@@ -59,23 +59,25 @@ void printMissing(const PathSet & willBuild,
 {
     if (!willBuild.empty()) {
         printMsg(lvlInfo, format("these derivations will be built:"));
-        foreach (PathSet::iterator, i, willBuild)
-            printMsg(lvlInfo, format("  %1%") % *i);
+        Paths sorted = topoSortPaths(*store, willBuild);
+        reverse(sorted.begin(), sorted.end());
+        for (auto & i : sorted)
+            printMsg(lvlInfo, format("  %1%") % i);
     }
 
     if (!willSubstitute.empty()) {
         printMsg(lvlInfo, format("these paths will be fetched (%.2f MiB download, %.2f MiB unpacked):")
             % (downloadSize / (1024.0 * 1024.0))
             % (narSize / (1024.0 * 1024.0)));
-        foreach (PathSet::iterator, i, willSubstitute)
-            printMsg(lvlInfo, format("  %1%") % *i);
+        for (auto & i : willSubstitute)
+            printMsg(lvlInfo, format("  %1%") % i);
     }
 
     if (!unknown.empty()) {
         printMsg(lvlInfo, format("don't know how to build these paths%1%:")
             % (settings.readOnlyMode ? " (may be caused by read-only store access)" : ""));
-        foreach (PathSet::iterator, i, unknown)
-            printMsg(lvlInfo, format("  %1%") % *i);
+        for (auto & i : unknown)
+            printMsg(lvlInfo, format("  %1%") % i);
     }
 }
 
@@ -93,7 +95,7 @@ string getArg(const string & opt,
     Strings::iterator & i, const Strings::iterator & end)
 {
     ++i;
-    if (i == end) throw UsageError(format("`%1%' requires an argument") % opt);
+    if (i == end) throw UsageError(format("‘%1%’ requires an argument") % opt);
     return *i;
 }
 
@@ -101,17 +103,23 @@ string getArg(const string & opt,
 void detectStackOverflow();
 
 
-/* Initialize and reorder arguments, then call the actual argument
-   processor. */
-static void initAndRun(int argc, char * * argv)
+void initNix()
 {
+    /* Turn on buffering for cerr. */
+#if HAVE_PUBSETBUF
+    static char buf[1024];
+    std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
+#endif
+
+    std::ios::sync_with_stdio(false);
+
     settings.processEnvironment();
     settings.loadConfFile();
 
     /* Catch SIGINT. */
     struct sigaction act;
     act.sa_handler = sigintHandler;
-    sigfillset(&act.sa_mask);
+    sigemptyset(&act.sa_mask);
     act.sa_flags = 0;
     if (sigaction(SIGINT, &act, 0))
         throw SysError("installing handler for SIGINT");
@@ -145,35 +153,37 @@ static void initAndRun(int argc, char * * argv)
     gettimeofday(&tv, 0);
     srandom(tv.tv_usec);
 
-    /* Process the NIX_LOG_TYPE environment variable. */
-    string lt = getEnv("NIX_LOG_TYPE");
-    if (lt != "") setLogType(lt);
+    if (char *pack = getenv("_NIX_OPTIONS"))
+        settings.unpack(pack);
+}
 
+
+void parseCmdLine(int argc, char * * argv,
+    std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
+{
     /* Put the arguments in a vector. */
-    Strings args, remaining;
+    Strings args;
+    argc--; argv++;
     while (argc--) args.push_back(*argv++);
-    args.erase(args.begin());
-
-    /* Expand compound dash options (i.e., `-qlf' -> `-q -l -f'), and
-       ignore options for the ATerm library. */
-    for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
-        string arg = *i;
-        if (arg.length() > 2 && arg[0] == '-' && arg[1] != '-' && !isdigit(arg[1])) {
-            for (unsigned int j = 1; j < arg.length(); j++)
-                if (isalpha(arg[j]))
-                    remaining.push_back((string) "-" + arg[j]);
-                else     {
-                    remaining.push_back(string(arg, j));
-                    break;
-                }
-        } else remaining.push_back(arg);
-    }
-    args = remaining;
-    remaining.clear();
 
     /* Process default options. */
     for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
         string arg = *i;
+
+        /* Expand compound dash options (i.e., `-qlf' -> `-q -l -f'). */
+        if (arg.length() > 2 && arg[0] == '-' && arg[1] != '-' && isalpha(arg[1])) {
+            *i = (string) "-" + arg[1];
+            auto next = i; ++next;
+            for (unsigned int j = 2; j < arg.length(); j++)
+                if (isalpha(arg[j]))
+                    args.insert(next, (string) "-" + arg[j]);
+                else {
+                    args.insert(next, string(arg, j));
+                    break;
+                }
+            arg = *i;
+        }
+
         if (arg == "--verbose" || arg == "-v") verbosity = (Verbosity) (verbosity + 1);
         else if (arg == "--quiet") verbosity = verbosity > lvlError ? (Verbosity) (verbosity - 1) : lvlError;
         else if (arg == "--log-type") {
@@ -184,14 +194,6 @@ static void initAndRun(int argc, char * * argv)
             settings.buildVerbosity = lvlVomit;
         else if (arg == "--print-build-trace")
             settings.printBuildTrace = true;
-        else if (arg == "--help") {
-            printHelp();
-            return;
-        }
-        else if (arg == "--version") {
-            std::cout << format("%1% (Nix) %2%") % programId % nixVersion << std::endl;
-            return;
-        }
         else if (arg == "--keep-failed" || arg == "-K")
             settings.keepFailed = true;
         else if (arg == "--keep-going" || arg == "-k")
@@ -212,73 +214,46 @@ static void initAndRun(int argc, char * * argv)
             settings.useBuildHook = false;
         else if (arg == "--show-trace")
             settings.showTrace = true;
+        else if (arg == "--no-gc-warning")
+            gcWarning = false;
         else if (arg == "--option") {
-            ++i; if (i == args.end()) throw UsageError("`--option' requires two arguments");
+            ++i; if (i == args.end()) throw UsageError("‘--option’ requires two arguments");
             string name = *i;
-            ++i; if (i == args.end()) throw UsageError("`--option' requires two arguments");
+            ++i; if (i == args.end()) throw UsageError("‘--option’ requires two arguments");
             string value = *i;
             settings.set(name, value);
         }
-        else remaining.push_back(arg);
+        else {
+            if (!parseArg(i, args.end()))
+                throw UsageError(format("unrecognised option ‘%1%’") % *i);
+        }
     }
 
     settings.update();
-
-    run(remaining);
-
-    /* Close the Nix database. */
-    store.reset((StoreAPI *) 0);
 }
 
 
-/* Called when the Boehm GC runs out of memory. */
-static void * oomHandler(size_t requested)
+void printVersion(const string & programName)
 {
-    /* Convert this to a proper C++ exception. */
-    throw std::bad_alloc();
+    std::cout << format("%1% (Nix) %2%") % programName % nixVersion << std::endl;
+    throw Exit();
 }
 
 
 void showManPage(const string & name)
 {
-    string cmd = "man " + name;
-    if (system(cmd.c_str()) != 0)
-        throw Error(format("command `%1%' failed") % cmd);
+    restoreSIGPIPE();
+    execlp("man", "man", name.c_str(), NULL);
+    throw SysError(format("command ‘man %1%’ failed") % name.c_str());
 }
 
 
-int exitCode = 0;
-char * * argvSaved = 0;
-
-}
-
-
-static char buf[1024];
-
-int main(int argc, char * * argv)
+int handleExceptions(const string & programName, std::function<void()> fun)
 {
-    using namespace nix;
-
-    argvSaved = argv;
-
-    /* Turn on buffering for cerr. */
-#if HAVE_PUBSETBUF
-    std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
-#endif
-
-    std::ios::sync_with_stdio(false);
-
-#if HAVE_BOEHMGC
-    /* Initialise the Boehm garbage collector.  This isn't necessary
-       on most platforms, but for portability we do it anyway. */
-    GC_INIT();
-
-    GC_oom_fn = oomHandler;
-#endif
-
+    string error = ANSI_RED "error:" ANSI_NORMAL " ";
     try {
         try {
-            initAndRun(argc, argv);
+            fun();
         } catch (...) {
             /* Subtle: we have to make sure that any `interrupted'
                condition is discharged before we reach printMsg()
@@ -288,25 +263,70 @@ int main(int argc, char * * argv)
             _isInterrupted = 0;
             throw;
         }
+    } catch (Exit & e) {
+        return e.status;
     } catch (UsageError & e) {
         printMsg(lvlError,
-            format(
-                "error: %1%\n"
-                "Try `%2% --help' for more information.")
-            % e.what() % programId);
+            format(error + "%1%\nTry ‘%2% --help’ for more information.")
+            % e.what() % programName);
         return 1;
     } catch (BaseError & e) {
-        printMsg(lvlError, format("error: %1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
+        printMsg(lvlError, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
         if (e.prefix() != "" && !settings.showTrace)
-            printMsg(lvlError, "(use `--show-trace' to show detailed location information)");
+            printMsg(lvlError, "(use ‘--show-trace’ to show detailed location information)");
         return e.status;
     } catch (std::bad_alloc & e) {
-        printMsg(lvlError, "error: out of memory");
+        printMsg(lvlError, error + "out of memory");
         return 1;
     } catch (std::exception & e) {
-        printMsg(lvlError, format("error: %1%") % e.what());
+        printMsg(lvlError, error + e.what());
         return 1;
     }
 
-    return exitCode;
+    return 0;
+}
+
+
+RunPager::RunPager()
+{
+    string pager = getEnv("PAGER");
+    if (!isatty(STDOUT_FILENO) || pager.empty()) return;
+
+    /* Ignore SIGINT. The pager will handle it (and we'll get
+       SIGPIPE). */
+    struct sigaction act;
+    act.sa_handler = SIG_IGN;
+    act.sa_flags = 0;
+    sigemptyset(&act.sa_mask);
+    if (sigaction(SIGINT, &act, 0)) throw SysError("ignoring SIGINT");
+
+    restoreSIGPIPE();
+
+    Pipe toPager;
+    toPager.create();
+
+    pid = startProcess([&]() {
+        if (dup2(toPager.readSide, STDIN_FILENO) == -1)
+            throw SysError("dupping stdin");
+        if (!getenv("LESS"))
+            setenv("LESS", "FRSXMK", 1);
+        execl("/bin/sh", "sh", "-c", pager.c_str(), NULL);
+        throw SysError(format("executing ‘%1%’") % pager);
+    });
+
+    if (dup2(toPager.writeSide, STDOUT_FILENO) == -1)
+        throw SysError("dupping stdout");
+}
+
+
+RunPager::~RunPager()
+{
+    if (pid != -1) {
+        std::cout.flush();
+        close(STDOUT_FILENO);
+        pid.wait(true);
+    }
+}
+
+
 }

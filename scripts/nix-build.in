@@ -1,16 +1,19 @@
 #! @perl@ -w @perlFlags@
 
+use utf8;
 use strict;
 use Nix::Config;
 use Nix::Store;
 use Nix::Utils;
-use File::Temp qw(tempdir);
 
+binmode STDERR, ":encoding(utf8)";
 
 my $dryRun = 0;
 my $verbose = 0;
 my $runEnv = $0 =~ /nix-shell$/;
 my $pure = 0;
+my $fromArgs = 0;
+my $packages = 0;
 
 my @instArgs = ();
 my @buildArgs = ();
@@ -23,8 +26,7 @@ my @envExclude = ();
 my $myName = $runEnv ? "nix-shell" : "nix-build";
 
 
-my $tmpDir = tempdir("$myName.XXXXXX", CLEANUP => 1, TMPDIR => 1)
-    or die "cannot create a temporary directory";
+my $tmpDir = mkTempDir($myName);
 
 my $outLink = "./result";
 my $drvLink = "$tmpDir/derivation";
@@ -49,51 +51,51 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
         $drvLink = "./derivation";
     }
 
-    elsif ($arg eq "--no-out-link" or $arg eq "--no-link") {
+    elsif ($arg eq "--no-out-link" || $arg eq "--no-link") {
         $outLink = "$tmpDir/result";
     }
 
     elsif ($arg eq "--drv-link") {
         $n++;
-        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
         $drvLink = $ARGV[$n];
     }
 
-    elsif ($arg eq "--out-link" or $arg eq "-o") {
+    elsif ($arg eq "--out-link" || $arg eq "-o") {
         $n++;
-        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
         $outLink = $ARGV[$n];
     }
 
-    elsif ($arg eq "--attr" or $arg eq "-A" or $arg eq "-I") {
+    elsif ($arg eq "--attr" || $arg eq "-A" || $arg eq "-I") {
         $n++;
-        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
         push @instArgs, ($arg, $ARGV[$n]);
     }
 
     elsif ($arg eq "--arg" || $arg eq "--argstr") {
-        die "$0: `$arg' requires two arguments\n" unless $n + 2 < scalar @ARGV;
+        die "$0: ‘$arg’ requires two arguments\n" unless $n + 2 < scalar @ARGV;
         push @instArgs, ($arg, $ARGV[$n + 1], $ARGV[$n + 2]);
         $n += 2;
     }
 
     elsif ($arg eq "--log-type") {
         $n++;
-        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
         push @instArgs, ($arg, $ARGV[$n]);
         push @buildArgs, ($arg, $ARGV[$n]);
     }
 
     elsif ($arg eq "--option") {
-        die "$0: `$arg' requires two arguments\n" unless $n + 2 < scalar @ARGV;
+        die "$0: ‘$arg’ requires two arguments\n" unless $n + 2 < scalar @ARGV;
         push @instArgs, ($arg, $ARGV[$n + 1], $ARGV[$n + 2]);
         push @buildArgs, ($arg, $ARGV[$n + 1], $ARGV[$n + 2]);
         $n += 2;
     }
 
-    elsif ($arg eq "--max-jobs" or $arg eq "-j" or $arg eq "--max-silent-time" or $arg eq "--log-type" or $arg eq "--cores" or $arg eq "--timeout") {
+    elsif ($arg eq "--max-jobs" || $arg eq "-j" || $arg eq "--max-silent-time" || $arg eq "--log-type" || $arg eq "--cores" || $arg eq "--timeout" || $arg eq '--add-root') {
         $n++;
-        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
         push @buildArgs, ($arg, $ARGV[$n]);
     }
 
@@ -110,7 +112,7 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
         @exprs = ("-");
     }
 
-    elsif ($arg eq "--verbose" or substr($arg, 0, 2) eq "-v") {
+    elsif ($arg eq "--verbose" || substr($arg, 0, 2) eq "-v") {
         push @buildArgs, $arg;
         push @instArgs, $arg;
         $verbose = 1;
@@ -121,24 +123,36 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
         push @instArgs, $arg;
     }
 
+    elsif ($arg eq "--check") {
+        push @buildArgs, $arg;
+    }
+
     elsif ($arg eq "--run-env") { # obsolete
         $runEnv = 1;
     }
 
     elsif ($arg eq "--command") {
         $n++;
-        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
         $envCommand = "$ARGV[$n]\nexit $!";
     }
 
     elsif ($arg eq "--exclude") {
         $n++;
-        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
         push @envExclude, $ARGV[$n];
     }
 
-    elsif ($arg eq "--pure") {
-        $pure = 1;
+    elsif ($arg eq "--pure") { $pure = 1; }
+    elsif ($arg eq "--impure") { $pure = 0; }
+
+    elsif ($arg eq "--expr" || $arg eq "-E") {
+        $fromArgs = 1;
+        push @instArgs, "--expr";
+    }
+
+    elsif ($arg eq "--packages" || $arg eq "-p") {
+        $packages = 1;
     }
 
     elsif (substr($arg, 0, 1) eq "-") {
@@ -150,7 +164,17 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
     }
 }
 
-@exprs = ("./default.nix") if scalar @exprs == 0;
+if ($packages) {
+    push @instArgs, "--expr";
+    @exprs = (
+        'with import <nixpkgs> { }; runCommand "shell" { buildInputs = [ '
+        . (join " ", map { "($_)" } @exprs) . ']; } ""');
+} elsif (!$fromArgs) {
+    @exprs = ("shell.nix") if scalar @exprs == 0 && $runEnv && -e "shell.nix";
+    @exprs = ("default.nix") if scalar @exprs == 0;
+}
+
+$ENV{'IN_NIX_SHELL'} = 1 if $runEnv;
 
 
 foreach my $expr (@exprs) {
@@ -172,28 +196,28 @@ foreach my $expr (@exprs) {
     if ($runEnv) {
         die "$0: a single derivation is required\n" if scalar @drvPaths != 1;
         my $drvPath = $drvPaths[0];
-        $drvPath = readlink $drvPath or die "cannot read symlink `$drvPath'" if -l $drvPath;
+        $drvPath = (split '!',$drvPath)[0];
+        $drvPath = readlink $drvPath or die "cannot read symlink ‘$drvPath’" if -l $drvPath;
         my $drv = derivationFromPath($drvPath);
 
         # Build or fetch all dependencies of the derivation.
         my @inputDrvs = grep { my $x = $_; (grep { $x =~ $_ } @envExclude) == 0 } @{$drv->{inputDrvs}};
-        system("$Nix::Config::binDir/nix-store -r @buildArgs @inputDrvs @{$drv->{inputSrcs}} > /dev/null") == 0
+        system("$Nix::Config::binDir/nix-store", "-r", "--no-output", "--no-gc-warning", @buildArgs, @inputDrvs, @{$drv->{inputSrcs}}) == 0
             or die "$0: failed to build all dependencies\n";
 
         # Set the environment.
+        my $tmp = $ENV{"TMPDIR"} // $ENV{"XDG_RUNTIME_DIR"} // "/tmp";
         if ($pure) {
             foreach my $name (keys %ENV) {
-                next if $name eq "HOME" || $name eq "USER" || $name eq "LOGNAME" || $name eq "DISPLAY" || $name eq "PATH";
+                next if grep { $_ eq $name } ("HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL", "TZ", "PAGER");
                 delete $ENV{$name};
             }
             # NixOS hack: prevent /etc/bashrc from sourcing /etc/profile.
             $ENV{'__ETC_PROFILE_SOURCED'} = 1;
         }
-        $ENV{'NIX_BUILD_TOP'} = $ENV{'TMPDIR'} = $ENV{'TEMPDIR'} = $ENV{'TMP'} = $ENV{'TEMP'} = $ENV{'TMPDIR'} // "/tmp";
+        $ENV{'NIX_BUILD_TOP'} = $ENV{'TMPDIR'} = $ENV{'TEMPDIR'} = $ENV{'TMP'} = $ENV{'TEMP'} = $tmp;
         $ENV{'NIX_STORE'} = $Nix::Config::storeDir;
         $ENV{$_} = $drv->{env}->{$_} foreach keys %{$drv->{env}};
-
-        $ENV{'IN_NIX_SHELL'} = 1;
 
         # Run a shell using the derivation's environment.  For
         # convenience, source $stdenv/setup to setup additional
@@ -202,16 +226,20 @@ foreach my $expr (@exprs) {
         my $rcfile = "$tmpDir/rc";
         writeFile(
             $rcfile,
+            "rm -rf '$tmpDir'; " .
             'unset BASH_ENV; ' .
             '[ -n "$PS1" ] && [ -e ~/.bashrc ] && source ~/.bashrc; ' .
             ($pure ? '' : 'p=$PATH; ' ) .
             'dontAddDisableDepTrack=1; ' .
             '[ -e $stdenv/setup ] && source $stdenv/setup; ' .
-            ($pure ? '' : 'PATH=$PATH:$p; ') .
+            'if [ "$(type -t runHook)" = function ]; then runHook shellHook; fi; ' .
+            ($pure ? '' : 'PATH=$PATH:$p; unset p; ') .
             'set +e; ' .
             '[ -n "$PS1" ] && PS1="\n\[\033[1;32m\][nix-shell:\w]$\[\033[0m\] "; ' .
             'unset NIX_ENFORCE_PURITY; ' .
+            'unset NIX_INDENT_MAKE; ' .
             'shopt -u nullglob; ' .
+            'unset TZ; ' . (defined $ENV{'TZ'} ? "export TZ='${ENV{'TZ'}}'; " : '') .
             $envCommand);
         $ENV{BASH_ENV} = $rcfile;
         exec($ENV{NIX_BUILD_SHELL} // "bash", "--rcfile", $rcfile);
@@ -231,7 +259,7 @@ foreach my $expr (@exprs) {
         } else {
             $p = $drvPath;
         }
-        my $target = readlink $p or die "cannot read symlink `$p'";
+        my $target = readlink $p or die "cannot read symlink ‘$p’";
         print STDERR "derivation is $target\n" if $verbose;
         if ($target eq $prevDrvPath) {
             push @drvPaths2, (pop @drvPaths2) . "," . $output;
@@ -248,13 +276,13 @@ foreach my $expr (@exprs) {
     while (<OUTPATHS>) {chomp; push @outPaths, $_;}
     if (!close OUTPATHS) {
         die "nix-store killed by signal " . ($? & 127) . "\n" if ($? & 127);
-        exit 1;
+        exit $? >> 8 || 1;
     }
 
     next if $dryRun;
 
     foreach my $outPath (@outPaths) {
-        my $target = readlink $outPath or die "cannot read symlink `$outPath'";
+        my $target = readlink $outPath or die "cannot read symlink ‘$outPath’";
         print "$target\n";
     }
 }

@@ -1,12 +1,11 @@
 #! @perl@ -w @perlFlags@
 
+use utf8;
 use strict;
-use File::Temp qw(tempdir);
 use Nix::Config;
 use Nix::Manifest;
 
-my $tmpDir = tempdir("nix-pull.XXXXXX", CLEANUP => 1, TMPDIR => 1)
-    or die "cannot create a temporary directory";
+binmode STDERR, ":encoding(utf8)";
 
 my $manifestDir = $Nix::Config::manifestDir;
 
@@ -17,7 +16,7 @@ umask 0022;
 
 # Create the manifests directory if it doesn't exist.
 if (! -e $manifestDir) {
-    mkdir $manifestDir, 0755 or die "cannot create directory `$manifestDir'";
+    mkdir $manifestDir, 0755 or die "cannot create directory ‘$manifestDir’";
 }
 
 
@@ -25,7 +24,7 @@ if (! -e $manifestDir) {
 my $gcRootsDir = "$Nix::Config::stateDir/gcroots";
 my $manifestDirLink = "$gcRootsDir/manifests";
 if (! -l $manifestDirLink) {
-    symlink($manifestDir, $manifestDirLink) or die "cannot create symlink `$manifestDirLink'";
+    symlink($manifestDir, $manifestDirLink) or die "cannot create symlink ‘$manifestDirLink’";
 }
 
 
@@ -36,7 +35,7 @@ sub downloadFile {
     $ENV{"PRINT_PATH"} = 1;
     $ENV{"QUIET"} = 1;
     my ($dummy, $path) = `$Nix::Config::binDir/nix-prefetch-url '$url'`;
-    die "cannot fetch `$url'" if $? != 0;
+    die "cannot fetch ‘$url’" if $? != 0;
     die "nix-prefetch-url did not return a path" unless defined $path;
     chomp $path;
     return $path;
@@ -53,13 +52,13 @@ sub processURL {
 
     # First see if a bzipped manifest is available.
     if (system("$Nix::Config::curl --fail --silent --location --head '$url'.bz2 > /dev/null") == 0) {
-        print "fetching list of Nix archives at `$url.bz2'...\n";
+        print "fetching list of Nix archives at ‘$url.bz2’...\n";
         $manifest = downloadFile "$url.bz2";
     }
 
     # Otherwise, just get the uncompressed manifest.
     else {
-        print "fetching list of Nix archives at `$url'...\n";
+        print "fetching list of Nix archives at ‘$url’...\n";
         $manifest = downloadFile $url;
     }
 
@@ -69,11 +68,11 @@ sub processURL {
     }
 
     my $hash = `$Nix::Config::binDir/nix-hash --flat '$manifest'`
-        or die "cannot hash `$manifest'";
+        or die "cannot hash ‘$manifest’";
     chomp $hash;
 
     my $urlFile = "$manifestDir/$baseName-$hash.url";
-    open URL, ">$urlFile" or die "cannot create `$urlFile'";
+    open URL, ">$urlFile" or die "cannot create ‘$urlFile’";
     print URL $origUrl;
     close URL;
 
@@ -82,7 +81,7 @@ sub processURL {
     unlink $finalPath if -e $finalPath;
 
     symlink("$manifest", "$finalPath")
-        or die "cannot link `$finalPath to `$manifest'";
+        or die "cannot link ‘$finalPath’ to ‘$manifest’";
 
     deleteOldManifests($origUrl, $urlFile);
 }

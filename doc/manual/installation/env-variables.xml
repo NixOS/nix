@@ -1,0 +1,24 @@
+<chapter xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="ch-env-variables">
+
+<title>Environment Variables</title>
+
+<para>To use Nix, some environment variables should be set.  In
+particular, <envar>PATH</envar> should contain the directories
+<filename><replaceable>prefix</replaceable>/bin</filename> and
+<filename>~/.nix-profile/bin</filename>.  The first directory contains
+the Nix tools themselves, while <filename>~/.nix-profile</filename> is
+a symbolic link to the current <emphasis>user environment</emphasis>
+(an automatically generated package consisting of symlinks to
+installed packages).  The simplest way to set the required environment
+variables is to include the file
+<filename><replaceable>prefix</replaceable>/etc/profile.d/nix.sh</filename>
+in your <filename>~/.profile</filename> (or similar), like this:</para>
+
+<screen>
+source <replaceable>prefix</replaceable>/etc/profile.d/nix.sh</screen>
+
+</chapter>

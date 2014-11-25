@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <unordered_set>
 
 #include "store-api.hh"
 #include "util.hh"
@@ -29,14 +30,12 @@ struct Derivation;
 
 struct OptimiseStats
 {
-    unsigned long totalFiles;
-    unsigned long sameContents;
     unsigned long filesLinked;
     unsigned long long bytesFreed;
     unsigned long long blocksFreed;
     OptimiseStats()
     {
-        totalFiles = sameContents = filesLinked = 0;
+        filesLinked = 0;
         bytesFreed = blocksFreed = 0;
     }
 };
@@ -150,7 +149,7 @@ public:
 
     Paths importPaths(bool requireSignature, Source & source);
 
-    void buildPaths(const PathSet & paths, bool repair = false);
+    void buildPaths(const PathSet & paths, BuildMode buildMode);
 
     void ensurePath(const Path & path);
 
@@ -167,6 +166,9 @@ public:
     /* Optimise the disk space usage of the Nix store by hard-linking
        files with the same contents. */
     void optimiseStore(OptimiseStats & stats);
+
+    /* Generic variant of the above method.  */
+    void optimiseStore();
 
     /* Optimise a single store path. */
     void optimisePath(const Path & path);
@@ -242,6 +244,10 @@ private:
 
     bool didSetSubstituterEnv;
 
+    /* The file to which we write our temporary roots. */
+    Path fnTempRoots;
+    AutoCloseFD fdTempRoots;
+
     int getSchema();
 
     void openDB(bool create);
@@ -303,7 +309,11 @@ private:
 
     void checkDerivationOutputs(const Path & drvPath, const Derivation & drv);
 
-    void optimisePath_(OptimiseStats & stats, const Path & path);
+    typedef std::unordered_set<ino_t> InodeHash;
+
+    InodeHash loadInodeHash();
+    Strings readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash);
+    void optimisePath_(OptimiseStats & stats, const Path & path, InodeHash & inodeHash);
 
     // Internal versions that are not wrapped in retry_sqlite.
     bool isValidPath_(const Path & path);

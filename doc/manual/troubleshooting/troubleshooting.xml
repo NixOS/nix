@@ -1,0 +1,16 @@
+<appendix xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xmlns:xi="http://www.w3.org/2001/XInclude"
+          version="5.0"
+          xml:id="ch-troubleshooting">
+
+<title>Troubleshooting</title>
+
+<para>This section provides solutions for some common problems.  See
+the <link xlink:href="https://github.com/NixOS/nix/issues">Nix bug
+tracker</link> for a list of currently known issues.</para>
+
+<xi:include href="collisions-nixenv.xml" />
+<xi:include href="links-nix-store.xml" />
+
+</appendix>

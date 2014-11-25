@@ -6,7 +6,7 @@ let
 
   pkgs = import <nixpkgs> {};
 
-  systems = [ "x86_64-linux" "i686-linux" "x86_64-darwin" "x86_64-freebsd" "i686-freebsd" ];
+  systems = [ "x86_64-linux" "i686-linux" "x86_64-darwin" /* "x86_64-freebsd" "i686-freebsd" */ ];
 
 
   jobs = rec {
@@ -19,18 +19,17 @@ let
         name = "nix-tarball";
         version = builtins.readFile ./version;
         versionSuffix = if officialRelease then "" else "pre${toString nix.revCount}_${nix.shortRev}";
-        src = nix;
+        src = if lib.inNixShell then null else nix;
         inherit officialRelease;
 
         buildInputs =
-          [ curl bison flex2535 perl libxml2 libxslt w3m bzip2
-            tetex dblatex nukeReferences pkgconfig sqlite git
-          ];
+          [ curl bison flex perl libxml2 libxslt bzip2
+            tetex dblatex nukeReferences pkgconfig sqlite
+          ] ++ lib.optional (!lib.inNixShell) git;
 
         configureFlags = ''
           --with-docbook-rng=${docbook5}/xml/rng/docbook
           --with-docbook-xsl=${docbook5_xsl}/xml/xsl/docbook
-          --with-xml-flags=--nonet
           --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
           --with-www-curl=${perlPackages.WWWCurl}/${perl.libPrefix}
@@ -49,16 +48,15 @@ let
         distPhase =
           ''
             runHook preDist
-            make dist-gzip
-            make dist-xz
+            make dist
             mkdir -p $out/tarballs
             cp *.tar.* $out/tarballs
           '';
 
         preDist = ''
-          make -C doc/manual install prefix=$out
+          make install docdir=$out/share/doc/nix makefiles=doc/manual/local.mk
 
-          make -C doc/manual manual.pdf prefix=$out
+          make doc/manual/manual.pdf
           cp doc/manual/manual.pdf $out/manual.pdf
 
           # The PDF containes filenames of included graphics (see
@@ -71,7 +69,6 @@ let
 
           echo "doc manual $out/share/doc/nix/manual" >> $out/nix-support/hydra-build-products
           echo "doc-pdf manual $out/manual.pdf" >> $out/nix-support/hydra-build-products
-          echo "doc release-notes $out/share/doc/nix/release-notes" >> $out/nix-support/hydra-build-products
         '';
       };
 
@@ -95,13 +92,24 @@ let
           --sysconfdir=/etc
         '';
 
+        # Provide a default value for the ‘build-chroot-dirs’ setting
+        # that includes /bin/sh pointing to bash.
+        preHook = lib.optionalString stdenv.isLinux (
+          let sh = stdenv.shell; in
+          ''
+            export DEFAULT_CHROOT_DIRS="/bin/sh=${sh} $(tr '\n' ' ' < ${writeReferencesToFile sh})"
+          '');
+
         enableParallelBuilding = true;
 
         makeFlags = "profiledir=$(out)/etc/profile.d";
 
+        preBuild = "unset NIX_INDENT_MAKE";
+
         installFlags = "sysconfdir=$(out)/etc";
 
         doInstallCheck = true;
+        installCheckFlags = "sysconfdir=$(out)/etc";
       });
 
 
@@ -123,15 +131,19 @@ let
           storePaths=$(perl ${pathsFromGraph} ./closure)
           printRegistration=1 perl ${pathsFromGraph} ./closure > $TMPDIR/reginfo
           substitute ${./scripts/install-nix-from-closure.sh} $TMPDIR/install \
-            --subst-var-by nix ${toplevel} --subst-var-by regInfo /nix/store/reginfo
+            --subst-var-by nix ${toplevel}
           chmod +x $TMPDIR/install
-          fn=$out/nix-${version}-${system}.tar.bz2
+          dir=nix-${version}-${system}
+          fn=$out/$dir.tar.bz2
           mkdir -p $out/nix-support
           echo "file binary-dist $fn" >> $out/nix-support/hydra-build-products
           tar cvfj $fn \
-            --owner=0 --group=0 --absolute-names \
-            --transform "s,$TMPDIR/install,/usr/bin/nix-finish-install," \
-            --transform "s,$TMPDIR/reginfo,/nix/store/reginfo," \
+            --owner=0 --group=0 --mode=u+rw,uga+r \
+            --absolute-names \
+            --hard-dereference \
+            --transform "s,$TMPDIR/install,$dir/install," \
+            --transform "s,$TMPDIR/reginfo,$dir/.reginfo," \
+            --transform "s,$NIX_STORE,$dir/store,S" \
             $TMPDIR/install $TMPDIR/reginfo $storePaths
         '');
 
@@ -169,41 +181,58 @@ let
       };
 
 
-    rpm_fedora16i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora16i386) 50;
-    rpm_fedora16x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora16x86_64) 50;
-    rpm_fedora18i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora18i386) 60;
-    rpm_fedora18x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora18x86_64) 60;
-    rpm_fedora19i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora19i386) 70;
-    rpm_fedora19x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora19x86_64) 70;
+    rpm_fedora16i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora16i386);
+    rpm_fedora16x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora16x86_64);
+    rpm_fedora18i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora18i386);
+    rpm_fedora18x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora18x86_64);
+    rpm_fedora19i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora19i386);
+    rpm_fedora19x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora19x86_64);
+    rpm_fedora20i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora20i386);
+    rpm_fedora20x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora20x86_64);
 
 
-    deb_debian60i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian60i386) 50;
-    deb_debian60x86_64 = makeDeb_x86_64 (diskImageFunsFun: diskImageFunsFun.debian60x86_64) 50;
-    deb_debian7i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian7i386) 60;
-    deb_debian7x86_64 = makeDeb_x86_64 (diskImageFunsFun: diskImageFunsFun.debian7x86_64) 60;
+    deb_debian7i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian7i386);
+    deb_debian7x86_64 = makeDeb_x86_64 (diskImageFunsFun: diskImageFunsFun.debian7x86_64);
 
-    deb_ubuntu1010i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1010i386) 50;
-    deb_ubuntu1010x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1010x86_64) 50;
-    deb_ubuntu1110i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1110i386) 60;
-    deb_ubuntu1110x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1110x86_64) 60;
-    deb_ubuntu1204i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1204i386) 60;
-    deb_ubuntu1204x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1204x86_64) 60;
-    deb_ubuntu1210i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1210i386) 70;
-    deb_ubuntu1210x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1210x86_64) 70;
-    deb_ubuntu1304i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1304i386) 80;
-    deb_ubuntu1304x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1304x86_64) 80;
-    deb_ubuntu1310i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1310i386) 90;
-    deb_ubuntu1310x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1310x86_64) 90;
+    deb_ubuntu1204i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1204i386);
+    deb_ubuntu1204x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1204x86_64);
+    deb_ubuntu1210i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1210i386);
+    deb_ubuntu1210x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1210x86_64);
+    deb_ubuntu1304i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1304i386);
+    deb_ubuntu1304x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1304x86_64);
+    deb_ubuntu1310i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1310i386);
+    deb_ubuntu1310x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1310x86_64);
+    deb_ubuntu1404i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1404i386);
+    deb_ubuntu1404x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1404x86_64);
+    deb_ubuntu1410i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1410i386);
+    deb_ubuntu1410x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1410x86_64);
 
 
     # System tests.
-    tests.remote_builds = (import ./tests/remote-builds.nix rec {
+    tests.remoteBuilds = (import ./tests/remote-builds.nix rec {
       nix = build.x86_64-linux; system = "x86_64-linux";
-    }).test;
+    });
 
-    tests.nix_copy_closure = (import ./tests/nix-copy-closure.nix rec {
+    tests.nix-copy-closure = (import ./tests/nix-copy-closure.nix rec {
       nix = build.x86_64-linux; system = "x86_64-linux";
-    }).test;
+    });
+
+    tests.binaryTarball =
+      with import <nixpkgs> { system = "x86_64-linux"; };
+      vmTools.runInLinuxImage (runCommand "nix-binary-tarball-test"
+        { diskImage = vmTools.diskImages.ubuntu1204x86_64;
+        }
+        ''
+          useradd -m alice
+          su - alice -c 'tar xf ${binaryTarball.x86_64-linux}/*.tar.*'
+          mount -t tmpfs none /nix # Provide a writable /nix.
+          chown alice /nix
+          su - alice -c '_NIX_INSTALLER_TEST=1 ./nix-*/install'
+          su - alice -c 'nix-store --verify'
+          su - alice -c 'nix-store -qR ${build.x86_64-linux}'
+          mkdir -p $out/nix-support
+          touch $out/nix-support/hydra-build-products
+        ''); # */
 
 
     # Aggregate job containing the release-critical jobs.
@@ -212,26 +241,27 @@ let
       meta.description = "Release-critical builds";
       constituents =
         [ tarball
-          build.i686-freebsd
+          #build.i686-freebsd
           build.i686-linux
           build.x86_64-darwin
-          build.x86_64-freebsd
+          #build.x86_64-freebsd
           build.x86_64-linux
-          binaryTarball.i686-freebsd
+          #binaryTarball.i686-freebsd
           binaryTarball.i686-linux
           binaryTarball.x86_64-darwin
-          binaryTarball.x86_64-freebsd
+          #binaryTarball.x86_64-freebsd
           binaryTarball.x86_64-linux
           deb_debian7i386
           deb_debian7x86_64
-          deb_ubuntu1304i386
-          deb_ubuntu1304x86_64
-          deb_ubuntu1310i386
-          deb_ubuntu1310x86_64
-          rpm_fedora19i386
-          rpm_fedora19x86_64
-          tests.remote_builds
-          tests.nix_copy_closure
+          deb_ubuntu1404i386
+          deb_ubuntu1404x86_64
+          deb_ubuntu1410i386
+          deb_ubuntu1410x86_64
+          rpm_fedora20i386
+          rpm_fedora20x86_64
+          tests.remoteBuilds
+          tests.nix-copy-closure
+          tests.binaryTarball
         ];
     };
 
@@ -242,7 +272,7 @@ let
   makeRPM_x86_64 = makeRPM "x86_64-linux";
 
   makeRPM =
-    system: diskImageFun: prio:
+    system: diskImageFun:
 
     with import <nixpkgs> { inherit system; };
 
@@ -252,7 +282,7 @@ let
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages = [ "perl-DBD-SQLite" "perl-devel" "sqlite" "sqlite-devel" "bzip2-devel" "emacs" "perl-WWW-Curl" ]; };
       memSize = 1024;
-      meta.schedulingPriority = prio;
+      meta.schedulingPriority = 50;
       postRPMInstall = "cd /tmp/rpmout/BUILD/nix-* && make installcheck";
     };
 
@@ -261,7 +291,7 @@ let
   makeDeb_x86_64 = makeDeb "x86_64-linux";
 
   makeDeb =
-    system: diskImageFun: prio:
+    system: diskImageFun:
 
     with import <nixpkgs> { inherit system; };
 
@@ -271,9 +301,10 @@ let
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages = [ "libdbd-sqlite3-perl" "libsqlite3-dev" "libbz2-dev" "libwww-curl-perl" ]; };
       memSize = 1024;
-      meta.schedulingPriority = prio;
+      meta.schedulingPriority = 50;
       configureFlags = "--sysconfdir=/etc";
       debRequires = [ "curl" "libdbd-sqlite3-perl" "libsqlite3-0" "libbz2-1.0" "bzip2" "xz-utils" "libwww-curl-perl" ];
+      debMaintainer = "Eelco Dolstra <eelco.dolstra@logicblox.com>";
       doInstallCheck = true;
     };
 

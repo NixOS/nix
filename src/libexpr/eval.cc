@@ -6,6 +6,7 @@
 #include "globals.hh"
 #include "eval-inline.hh"
 
+#include <algorithm>
 #include <cstring>
 #include <unistd.h>
 #include <sys/time.h>
@@ -31,23 +32,20 @@
 namespace nix {
 
 
-Bindings::iterator Bindings::find(const Symbol & name)
-{
-    Attr key(name, 0);
-    iterator i = lower_bound(begin(), end(), key);
-    if (i != end() && i->name == name) return i;
-    return end();
-}
-
-
 void Bindings::sort()
 {
     std::sort(begin(), end());
 }
 
 
-std::ostream & operator << (std::ostream & str, const Value & v)
+static void printValue(std::ostream & str, std::set<const Value *> & active, const Value & v)
 {
+    if (active.find(&v) != active.end()) {
+        str << "<CYCLE>";
+        return;
+    }
+    active.insert(&v);
+
     switch (v.type) {
     case tInt:
         str << v.integer;
@@ -77,15 +75,20 @@ std::ostream & operator << (std::ostream & str, const Value & v)
         Sorted sorted;
         foreach (Bindings::iterator, i, *v.attrs)
             sorted[i->name] = i->value;
-        foreach (Sorted::iterator, i, sorted)
-            str << i->first << " = " << *i->second << "; ";
+        for (auto & i : sorted) {
+            str << i.first << " = ";
+            printValue(str, active, *i.second);
+            str << "; ";
+        }
         str << "}";
         break;
     }
     case tList:
         str << "[ ";
-        for (unsigned int n = 0; n < v.list.length; ++n)
-            str << *v.list.elems[n] << " ";
+        for (unsigned int n = 0; n < v.list.length; ++n) {
+            printValue(str, active, *v.list.elems[n]);
+            str << " ";
+        }
         str << "]";
         break;
     case tThunk:
@@ -104,6 +107,15 @@ std::ostream & operator << (std::ostream & str, const Value & v)
     default:
         throw Error("invalid value");
     }
+
+    active.erase(&v);
+}
+
+
+std::ostream & operator << (std::ostream & str, const Value & v)
+{
+    std::set<const Value *> active;
+    printValue(str, active, v);
     return str;
 }
 
@@ -129,7 +141,30 @@ string showType(const Value & v)
 }
 
 
-EvalState::EvalState()
+#if HAVE_BOEHMGC
+/* Called when the Boehm GC runs out of memory. */
+static void * oomHandler(size_t requested)
+{
+    /* Convert this to a proper C++ exception. */
+    throw std::bad_alloc();
+}
+#endif
+
+
+static Symbol getName(const AttrName & name, EvalState & state, Env & env)
+{
+    if (name.symbol.set()) {
+        return name.symbol;
+    } else {
+        Value nameValue;
+        name.expr->eval(state, env, nameValue);
+        state.forceStringNoCtx(nameValue);
+        return state.symbols.create(nameValue.string.s);
+    }
+}
+
+
+EvalState::EvalState(const Strings & _searchPath)
     : sWith(symbols.create("<with>"))
     , sOutPath(symbols.create("outPath"))
     , sDrvPath(symbols.create("drvPath"))
@@ -145,19 +180,28 @@ EvalState::EvalState()
     , sFile(symbols.create("file"))
     , sLine(symbols.create("line"))
     , sColumn(symbols.create("column"))
+    , sFunctor(symbols.create("__functor"))
     , repair(false)
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
     , baseEnvDispl(0)
 {
     nrEnvs = nrValuesInEnvs = nrValues = nrListElems = 0;
-    nrAttrsets = nrOpUpdates = nrOpUpdateValuesCopied = 0;
+    nrAttrsets = nrAttrsInAttrsets = nrOpUpdates = nrOpUpdateValuesCopied = 0;
     nrListConcats = nrPrimOpCalls = nrFunctionCalls = 0;
     countCalls = getEnv("NIX_COUNT_CALLS", "0") != "0";
 
 #if HAVE_BOEHMGC
-    static bool gcInitialised = true;
-    if (gcInitialised) {
+    static bool gcInitialised = false;
+    if (!gcInitialised) {
+
+        /* Initialise the Boehm garbage collector.  This isn't
+           necessary on most platforms, but for portability we do it
+           anyway. */
+        GC_INIT();
+
+        GC_oom_fn = oomHandler;
+
         /* Set the initial heap size to something fairly big (25% of
            physical RAM, up to a maximum of 384 MiB) so that in most
            cases we don't need to garbage collect at all.  (Collection
@@ -169,9 +213,9 @@ EvalState::EvalState()
            allocated.  This might be a problem on systems that don't
            overcommit. */
         if (!getenv("GC_INITIAL_HEAP_SIZE")) {
-            size_t maxSize = 384 * 1024 * 1024;
             size_t size = 32 * 1024 * 1024;
 #if HAVE_SYSCONF && defined(_SC_PAGESIZE) && defined(_SC_PHYS_PAGES)
+            size_t maxSize = 384 * 1024 * 1024;
             long pageSize = sysconf(_SC_PAGESIZE);
             long pages = sysconf(_SC_PHYS_PAGES);
             if (pageSize != -1)
@@ -181,16 +225,16 @@ EvalState::EvalState()
             debug(format("setting initial heap size to %1% bytes") % size);
             GC_expand_hp(size);
         }
+
         gcInitialised = true;
     }
 #endif
 
     /* Initialise the Nix expression search path. */
-    searchPathInsertionPoint = searchPath.end();
     Strings paths = tokenizeString<Strings>(getEnv("NIX_PATH", ""), ":");
-    foreach (Strings::iterator, i, paths) addToSearchPath(*i);
+    for (auto & i : _searchPath) addToSearchPath(i, true);
+    for (auto & i : paths) addToSearchPath(i);
     addToSearchPath("nix=" + settings.nixDataDir + "/nix/corepkgs");
-    searchPathInsertionPoint = searchPath.begin();
 
     createBaseEnv();
 }
@@ -198,6 +242,8 @@ EvalState::EvalState()
 
 EvalState::~EvalState()
 {
+    fileEvalCache.clear();
+    printCanaries();
 }
 
 
@@ -242,14 +288,34 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2))
     throw EvalError(format(s) % s2);
 }
 
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const Pos & pos))
+{
+    throw EvalError(format(s) % pos);
+}
+
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const Pos & pos))
+{
+    throw EvalError(format(s) % s2 % pos);
+}
+
 LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3))
 {
     throw EvalError(format(s) % s2 % s3);
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const char * s))
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3, const Pos & pos))
 {
-    throw TypeError(s);
+    throw EvalError(format(s) % s2 % s3 % pos);
+}
+
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const Symbol & sym, const Pos & p1, const Pos & p2))
+{
+    throw EvalError(format(s) % sym % p1 % p2);
+}
+
+LocalNoInlineNoReturn(void throwTypeError(const char * s, const Pos & pos))
+{
+    throw TypeError(format(s) % pos);
 }
 
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1))
@@ -257,14 +323,9 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1))
     throw TypeError(format(s) % s1);
 }
 
-LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1, const string & s2))
+LocalNoInlineNoReturn(void throwTypeError(const char * s, const ExprLambda & fun, const Symbol & s2, const Pos & pos))
 {
-    throw TypeError(format(s) % s1 % s2);
-}
-
-LocalNoInlineNoReturn(void throwTypeError(const char * s, const ExprLambda & fun, const Symbol & s2))
-{
-    throw TypeError(format(s) % fun.showNamePos() % s2);
+    throw TypeError(format(s) % fun.showNamePos() % s2 % pos);
 }
 
 LocalNoInlineNoReturn(void throwAssertionError(const char * s, const Pos & pos))
@@ -282,9 +343,9 @@ LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2))
     e.addPrefix(format(s) % s2);
 }
 
-LocalNoInline(void addErrorPrefix(Error & e, const char * s, const ExprLambda & fun))
+LocalNoInline(void addErrorPrefix(Error & e, const char * s, const ExprLambda & fun, const Pos & pos))
 {
-    e.addPrefix(format(s) % fun.showNamePos());
+    e.addPrefix(format(s) % fun.showNamePos() % pos);
 }
 
 LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, const Pos & pos))
@@ -339,7 +400,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             return j->value;
         }
         if (!env->prevWith)
-            throwUndefinedVarError("undefined variable `%1%' at %2%", var.name, var.pos);
+            throwUndefinedVarError("undefined variable ‘%1%’ at %2%", var.name, var.pos);
         for (unsigned int l = env->prevWith; l; --l, env = env->up) ;
     }
 }
@@ -354,9 +415,12 @@ Value * EvalState::allocValue()
 
 Env & EvalState::allocEnv(unsigned int size)
 {
+    assert(size <= std::numeric_limits<decltype(Env::size)>::max());
+
     nrEnvs++;
     nrValuesInEnvs += size;
     Env * env = (Env *) GC_MALLOC(sizeof(Env) + size * sizeof(Value *));
+    env->size = size;
 
     /* Clear the values because maybeThunk() and lookupVar fromWith expects this. */
     for (unsigned i = 0; i < size; ++i)
@@ -374,8 +438,15 @@ Value * EvalState::allocAttr(Value & vAttrs, const Symbol & name)
 }
 
 
+Bindings * EvalState::allocBindings(Bindings::size_t capacity)
+{
+    return new (GC_MALLOC(sizeof(Bindings) + sizeof(Attr) * capacity)) Bindings(capacity);
+}
+
+
 void EvalState::mkList(Value & v, unsigned int length)
 {
+    clearValue(v);
     v.type = tList;
     v.list.length = length;
     v.list.elems = length ? (Value * *) GC_MALLOC(length * sizeof(Value *)) : 0;
@@ -387,9 +458,9 @@ void EvalState::mkAttrs(Value & v, unsigned int expected)
 {
     clearValue(v);
     v.type = tAttrs;
-    v.attrs = NEW Bindings;
-    v.attrs->reserve(expected);
+    v.attrs = allocBindings(expected);
     nrAttrsets++;
+    nrAttrsInAttrsets += expected;
 }
 
 
@@ -480,12 +551,12 @@ void EvalState::evalFile(const Path & path, Value & v)
         return;
     }
 
-    startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path2);
+    startNest(nest, lvlTalkative, format("evaluating file ‘%1%’") % path2);
     Expr * e = parseExprFromFile(path2);
     try {
         eval(e, v);
     } catch (Error & e) {
-        addErrorPrefix(e, "while evaluating the file `%1%':\n", path2);
+        addErrorPrefix(e, "while evaluating the file ‘%1%’:\n", path2);
         throw;
     }
 
@@ -506,8 +577,9 @@ void EvalState::eval(Expr * e, Value & v)
 }
 
 
-inline bool EvalState::evalBool(Env & env, Expr * e, Value & v)
+inline bool EvalState::evalBool(Env & env, Expr * e)
 {
+    Value v;
     e->eval(*this, env, v);
     if (v.type != tBool)
         throwTypeError("value is %1% while a Boolean was expected", v);
@@ -515,10 +587,13 @@ inline bool EvalState::evalBool(Env & env, Expr * e, Value & v)
 }
 
 
-inline bool EvalState::evalBool(Env & env, Expr * e)
+inline bool EvalState::evalBool(Env & env, Expr * e, const Pos & pos)
 {
     Value v;
-    return evalBool(env, e, v);
+    e->eval(*this, env, v);
+    if (v.type != tBool)
+        throwTypeError("value is %1% while a Boolean was expected, at %2%", v, pos);
+    return v.boolean;
 }
 
 
@@ -556,13 +631,15 @@ void ExprPath::eval(EvalState & state, Env & env, Value & v)
 
 void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 {
-    state.mkAttrs(v, attrs.size());
+    state.mkAttrs(v, attrs.size() + dynamicAttrs.size());
+    Env *dynamicEnv = &env;
 
     if (recursive) {
         /* Create a new environment that contains the attributes in
            this `rec'. */
         Env & env2(state.allocEnv(attrs.size()));
         env2.up = &env;
+        dynamicEnv = &env2;
 
         AttrDefs::iterator overrides = attrs.find(state.sOverrides);
         bool hasOverrides = overrides != attrs.end();
@@ -593,21 +670,43 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         if (hasOverrides) {
             Value * vOverrides = (*v.attrs)[overrides->second.displ].value;
             state.forceAttrs(*vOverrides);
-            foreach (Bindings::iterator, i, *vOverrides->attrs) {
-                AttrDefs::iterator j = attrs.find(i->name);
+            Bindings * newBnds = state.allocBindings(v.attrs->size() + vOverrides->attrs->size());
+            for (auto & i : *v.attrs)
+                newBnds->push_back(i);
+            for (auto & i : *vOverrides->attrs) {
+                AttrDefs::iterator j = attrs.find(i.name);
                 if (j != attrs.end()) {
-                    (*v.attrs)[j->second.displ] = *i;
-                    env2.values[j->second.displ] = i->value;
+                    (*newBnds)[j->second.displ] = i;
+                    env2.values[j->second.displ] = i.value;
                 } else
-                    v.attrs->push_back(*i);
+                    newBnds->push_back(i);
             }
-            v.attrs->sort();
+            newBnds->sort();
+            v.attrs = newBnds;
         }
     }
 
-    else {
+    else
         foreach (AttrDefs::iterator, i, attrs)
             v.attrs->push_back(Attr(i->first, i->second.e->maybeThunk(state, env), &i->second.pos));
+
+    /* Dynamic attrs apply *after* rec and __overrides. */
+    foreach (DynamicAttrDefs::iterator, i, dynamicAttrs) {
+        Value nameVal;
+        i->nameExpr->eval(state, *dynamicEnv, nameVal);
+        state.forceValue(nameVal);
+        if (nameVal.type == tNull)
+            continue;
+        state.forceStringNoCtx(nameVal);
+        Symbol nameSym = state.symbols.create(nameVal.string.s);
+        Bindings::iterator j = v.attrs->find(nameSym);
+        if (j != v.attrs->end())
+            throwEvalError("dynamic attribute ‘%1%’ at %2% already defined at %3%", nameSym, i->pos, *j->pos);
+
+        i->valueExpr->setName(nameSym);
+        /* Keep sorted order so find can catch duplicates */
+        v.attrs->push_back(Attr(nameSym, i->valueExpr->maybeThunk(state, *dynamicEnv), &i->pos));
+        v.attrs->sort(); // FIXME: inefficient
     }
 }
 
@@ -651,7 +750,7 @@ unsigned long nrLookups = 0;
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 {
     Value vTmp;
-    Pos * pos = 0;
+    Pos * pos2 = 0;
     Value * vAttrs = &vTmp;
 
     e->eval(state, env, vTmp);
@@ -661,30 +760,39 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
         foreach (AttrPath::const_iterator, i, attrPath) {
             nrLookups++;
             Bindings::iterator j;
+            Symbol name = getName(*i, state, env);
             if (def) {
                 state.forceValue(*vAttrs);
                 if (vAttrs->type != tAttrs ||
-                    (j = vAttrs->attrs->find(*i)) == vAttrs->attrs->end())
+                    (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
                 {
                     def->eval(state, env, v);
                     return;
                 }
             } else {
-                state.forceAttrs(*vAttrs);
-                if ((j = vAttrs->attrs->find(*i)) == vAttrs->attrs->end())
-                    throwEvalError("attribute `%1%' missing", showAttrPath(attrPath));
+                state.forceAttrs(*vAttrs, pos);
+                if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end()) {
+                    AttrPath staticPath;
+                    AttrPath::const_iterator j;
+                    for (j = attrPath.begin(); j != i; ++j)
+                        staticPath.push_back(AttrName(getName(*j, state, env)));
+                    staticPath.push_back(AttrName(getName(*j, state, env)));
+                    for (j = j + 1; j != attrPath.end(); ++j)
+                        staticPath.push_back(*j);
+                    throwEvalError("attribute ‘%1%’ missing, at %2%", showAttrPath(staticPath), pos);
+                }
             }
             vAttrs = j->value;
-            pos = j->pos;
-            if (state.countCalls && pos) state.attrSelects[*pos]++;
+            pos2 = j->pos;
+            if (state.countCalls && pos2) state.attrSelects[*pos2]++;
         }
 
         state.forceValue(*vAttrs);
 
     } catch (Error & e) {
-        if (pos && pos->file != state.sDerivationNix)
-            addErrorPrefix(e, "while evaluating the attribute `%1%' at %2%:\n",
-                showAttrPath(attrPath), *pos);
+        if (pos2 && pos2->file != state.sDerivationNix)
+            addErrorPrefix(e, "while evaluating the attribute ‘%1%’ at %2%:\n",
+                showAttrPath(attrPath), *pos2);
         throw;
     }
 
@@ -702,8 +810,9 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
     foreach (AttrPath::const_iterator, i, attrPath) {
         state.forceValue(*vAttrs);
         Bindings::iterator j;
+        Symbol name = getName(*i, state, env);
         if (vAttrs->type != tAttrs ||
-            (j = vAttrs->attrs->find(*i)) == vAttrs->attrs->end())
+            (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
         {
             mkBool(v, false);
             return;
@@ -726,12 +835,14 @@ void ExprLambda::eval(EvalState & state, Env & env, Value & v)
 
 void ExprApp::eval(EvalState & state, Env & env, Value & v)
 {
-    e1->eval(state, env, v);
-    state.callFunction(v, *(e2->maybeThunk(state, env)), v);
+    /* FIXME: vFun prevents GCC from doing tail call optimisation. */
+    Value vFun;
+    e1->eval(state, env, vFun);
+    state.callFunction(vFun, *(e2->maybeThunk(state, env)), v, pos);
 }
 
 
-void EvalState::callPrimOp(Value & fun, Value & arg, Value & v)
+void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
 {
     /* Figure out the number of arguments still needed. */
     unsigned int argsDone = 0;
@@ -757,7 +868,7 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v)
         /* And call the primop. */
         nrPrimOpCalls++;
         if (countCalls) primOpCalls[primOp->primOp->name]++;
-        primOp->primOp->fun(*this, vArgs, v);
+        primOp->primOp->fun(*this, pos, vArgs, v);
     } else {
         Value * fun2 = allocValue();
         *fun2 = fun;
@@ -768,15 +879,26 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v)
 }
 
 
-void EvalState::callFunction(Value & fun, Value & arg, Value & v)
+void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & pos)
 {
     if (fun.type == tPrimOp || fun.type == tPrimOpApp) {
-        callPrimOp(fun, arg, v);
+        callPrimOp(fun, arg, v, pos);
         return;
     }
 
+    if (fun.type == tAttrs) {
+      auto found = fun.attrs->find(sFunctor);
+      if (found != fun.attrs->end()) {
+        forceValue(*found->value);
+        Value * v2 = allocValue();
+        callFunction(*found->value, fun, *v2, pos);
+        forceValue(*v2);
+        return callFunction(*v2, arg, v, pos);
+      }
+    }
+
     if (fun.type != tLambda)
-        throwTypeError("attempt to call something which is not a function but %1%", fun);
+        throwTypeError("attempt to call something which is not a function but %1%, at %2%", fun, pos);
 
     ExprLambda & lambda(*fun.lambda.fun);
 
@@ -792,7 +914,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
         env2.values[displ++] = &arg;
 
     else {
-        forceAttrs(arg);
+        forceAttrs(arg, pos);
 
         if (!lambda.arg.empty())
             env2.values[displ++] = &arg;
@@ -804,8 +926,8 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
         foreach (Formals::Formals_::iterator, i, lambda.formals->formals) {
             Bindings::iterator j = arg.attrs->find(i->name);
             if (j == arg.attrs->end()) {
-                if (!i->def) throwTypeError("%1% called without required argument `%2%'",
-                    lambda, i->name);
+                if (!i->def) throwTypeError("%1% called without required argument ‘%2%’, at %3%",
+                    lambda, i->name, pos);
                 env2.values[displ++] = i->def->maybeThunk(*this, env2);
             } else {
                 attrsUsed++;
@@ -820,7 +942,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
                user. */
             foreach (Bindings::iterator, i, *arg.attrs)
                 if (lambda.formals->argNames.find(i->name) == lambda.formals->argNames.end())
-                    throwTypeError("%1% called with unexpected argument `%2%'", lambda, i->name);
+                    throwTypeError("%1% called with unexpected argument ‘%2%’, at %3%", lambda, i->name, pos);
             abort(); // can't happen
         }
     }
@@ -834,7 +956,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
         try {
             lambda.body->eval(*this, env2, v);
         } catch (Error & e) {
-            addErrorPrefix(e, "while evaluating %1%:\n", lambda);
+            addErrorPrefix(e, "while evaluating %1%, called from %2%:\n", lambda, pos);
             throw;
         }
     else
@@ -867,12 +989,12 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
         if (j != args.end())
             actualArgs->attrs->push_back(*j);
         else if (!i->def)
-            throwTypeError("cannot auto-call a function that has an argument without a default value (`%1%')", i->name);
+            throwTypeError("cannot auto-call a function that has an argument without a default value (‘%1%’)", i->name);
     }
 
     actualArgs->attrs->sort();
 
-    callFunction(fun, *actualArgs, res);
+    callFunction(fun, *actualArgs, res, noPos);
 }
 
 
@@ -890,13 +1012,13 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
 
 void ExprIf::eval(EvalState & state, Env & env, Value & v)
 {
-    (state.evalBool(env, cond, v) ? then : else_)->eval(state, env, v);
+    (state.evalBool(env, cond) ? then : else_)->eval(state, env, v);
 }
 
 
 void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 {
-    if (!state.evalBool(env, cond, v))
+    if (!state.evalBool(env, cond, pos))
         throwAssertionError("assertion failed at %1%", pos);
     body->eval(state, env, v);
 }
@@ -926,19 +1048,19 @@ void ExprOpNEq::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpAnd::eval(EvalState & state, Env & env, Value & v)
 {
-    mkBool(v, state.evalBool(env, e1) && state.evalBool(env, e2));
+    mkBool(v, state.evalBool(env, e1, pos) && state.evalBool(env, e2, pos));
 }
 
 
 void ExprOpOr::eval(EvalState & state, Env & env, Value & v)
 {
-    mkBool(v, state.evalBool(env, e1) || state.evalBool(env, e2));
+    mkBool(v, state.evalBool(env, e1, pos) || state.evalBool(env, e2, pos));
 }
 
 
 void ExprOpImpl::eval(EvalState & state, Env & env, Value & v)
 {
-    mkBool(v, !state.evalBool(env, e1) || state.evalBool(env, e2));
+    mkBool(v, !state.evalBool(env, e1, pos) || state.evalBool(env, e2, pos));
 }
 
 
@@ -983,18 +1105,18 @@ void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
     Value v1; e1->eval(state, env, v1);
     Value v2; e2->eval(state, env, v2);
     Value * lists[2] = { &v1, &v2 };
-    state.concatLists(v, 2, lists);
+    state.concatLists(v, 2, lists, pos);
 }
 
 
-void EvalState::concatLists(Value & v, unsigned int nrLists, Value * * lists)
+void EvalState::concatLists(Value & v, unsigned int nrLists, Value * * lists, const Pos & pos)
 {
     nrListConcats++;
 
     Value * nonEmpty = 0;
     unsigned int len = 0;
     for (unsigned int n = 0; n < nrLists; ++n) {
-        forceList(*lists[n]);
+        forceList(*lists[n], pos);
         unsigned int l = lists[n]->list.length;
         len += l;
         if (l) nonEmpty = lists[n];
@@ -1038,17 +1160,17 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 
         if (firstType == tInt) {
             if (vTmp.type != tInt)
-                throwEvalError("cannot add %1% to an integer", showType(vTmp));
+                throwEvalError("cannot add %1% to an integer, at %2%", showType(vTmp), pos);
             n += vTmp.integer;
         } else
-            s << state.coerceToString(vTmp, context, false, firstType == tString);
+            s << state.coerceToString(pos, vTmp, context, false, firstType == tString);
     }
 
     if (firstType == tInt)
         mkInt(v, n);
     else if (firstType == tPath) {
         if (!context.empty())
-            throwEvalError("a string that refers to a store path cannot be appended to a path, in `%1%'", s.str());
+            throwEvalError("a string that refers to a store path cannot be appended to a path, at %1%", pos);
         mkPath(v, s.str().c_str());
     } else
         mkString(v, s.str(), context);
@@ -1061,27 +1183,38 @@ void ExprPos::eval(EvalState & state, Env & env, Value & v)
 }
 
 
-void EvalState::strictForceValue(Value & v)
+void EvalState::forceValueDeep(Value & v)
 {
-    forceValue(v);
+    std::set<const Value *> seen;
 
-    if (v.type == tAttrs) {
-        foreach (Bindings::iterator, i, *v.attrs)
-            strictForceValue(*i->value);
-    }
+    std::function<void(Value & v)> recurse;
 
-    else if (v.type == tList) {
-        for (unsigned int n = 0; n < v.list.length; ++n)
-            strictForceValue(*v.list.elems[n]);
-    }
+    recurse = [&](Value & v) {
+        if (seen.find(&v) != seen.end()) return;
+        seen.insert(&v);
+
+        forceValue(v);
+
+        if (v.type == tAttrs) {
+            foreach (Bindings::iterator, i, *v.attrs)
+                recurse(*i->value);
+        }
+
+        else if (v.type == tList) {
+            for (unsigned int n = 0; n < v.list.length; ++n)
+                recurse(*v.list.elems[n]);
+        }
+    };
+
+    recurse(v);
 }
 
 
-NixInt EvalState::forceInt(Value & v)
+NixInt EvalState::forceInt(Value & v, const Pos & pos)
 {
     forceValue(v);
     if (v.type != tInt)
-        throwTypeError("value is %1% while an integer was expected", v);
+        throwTypeError("value is %1% while an integer was expected, at %2%", v, pos);
     return v.integer;
 }
 
@@ -1095,19 +1228,23 @@ bool EvalState::forceBool(Value & v)
 }
 
 
-void EvalState::forceFunction(Value & v)
+void EvalState::forceFunction(Value & v, const Pos & pos)
 {
     forceValue(v);
     if (v.type != tLambda && v.type != tPrimOp && v.type != tPrimOpApp)
-        throwTypeError("value is %1% while a function was expected", v);
+        throwTypeError("value is %1% while a function was expected, at %2%", v, pos);
 }
 
 
-string EvalState::forceString(Value & v)
+string EvalState::forceString(Value & v, const Pos & pos)
 {
     forceValue(v);
-    if (v.type != tString)
-        throwTypeError("value is %1% while a string was expected", v);
+    if (v.type != tString) {
+        if (pos)
+            throwTypeError("value is %1% while a string was expected, at %2%", v, pos);
+        else
+            throwTypeError("value is %1% while a string was expected", v);
+    }
     return string(v.string.s);
 }
 
@@ -1128,12 +1265,17 @@ string EvalState::forceString(Value & v, PathSet & context)
 }
 
 
-string EvalState::forceStringNoCtx(Value & v)
+string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
 {
-    string s = forceString(v);
-    if (v.string.context)
-        throwEvalError("the string `%1%' is not allowed to refer to a store path (such as `%2%')",
-            v.string.s, v.string.context[0]);
+    string s = forceString(v, pos);
+    if (v.string.context) {
+        if (pos)
+            throwEvalError("the string ‘%1%’ is not allowed to refer to a store path (such as ‘%2%’), at %3%",
+                v.string.s, v.string.context[0], pos);
+        else
+            throwEvalError("the string ‘%1%’ is not allowed to refer to a store path (such as ‘%2%’)",
+                v.string.s, v.string.context[0]);
+    }
     return s;
 }
 
@@ -1149,7 +1291,7 @@ bool EvalState::isDerivation(Value & v)
 }
 
 
-string EvalState::coerceToString(Value & v, PathSet & context,
+string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     bool coerceMore, bool copyToStore)
 {
     forceValue(v);
@@ -1168,8 +1310,8 @@ string EvalState::coerceToString(Value & v, PathSet & context,
 
     if (v.type == tAttrs) {
         Bindings::iterator i = v.attrs->find(sOutPath);
-        if (i == v.attrs->end()) throwTypeError("cannot coerce a set to a string");
-        return coerceToString(*i->value, context, coerceMore, copyToStore);
+        if (i == v.attrs->end()) throwTypeError("cannot coerce a set to a string, at %1%", pos);
+        return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
     }
 
     if (coerceMore) {
@@ -1184,7 +1326,7 @@ string EvalState::coerceToString(Value & v, PathSet & context,
         if (v.type == tList) {
             string result;
             for (unsigned int n = 0; n < v.list.length; ++n) {
-                result += coerceToString(*v.list.elems[n],
+                result += coerceToString(pos, *v.list.elems[n],
                     context, coerceMore, copyToStore);
                 if (n < v.list.length - 1
                     /* !!! not quite correct */
@@ -1195,14 +1337,14 @@ string EvalState::coerceToString(Value & v, PathSet & context,
         }
     }
 
-    throwTypeError("cannot coerce %1% to a string", v);
+    throwTypeError("cannot coerce %1% to a string, at %2%", v, pos);
 }
 
 
 string EvalState::copyPathToStore(PathSet & context, const Path & path)
 {
     if (nix::isDerivation(path))
-        throwEvalError("file names are not allowed to end in `%1%'", drvExtension);
+        throwEvalError("file names are not allowed to end in ‘%1%’", drvExtension);
 
     Path dstPath;
     if (srcToStore[path] != "")
@@ -1212,7 +1354,7 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
             ? computeStorePathForPath(path).first
             : store->addToStore(path, true, htSHA256, defaultPathFilter, repair);
         srcToStore[path] = dstPath;
-        printMsg(lvlChatty, format("copied source `%1%' -> `%2%'")
+        printMsg(lvlChatty, format("copied source ‘%1%’ -> ‘%2%’")
             % path % dstPath);
     }
 
@@ -1221,11 +1363,11 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
 }
 
 
-Path EvalState::coerceToPath(Value & v, PathSet & context)
+Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
 {
-    string path = coerceToString(v, context, false, false);
+    string path = coerceToString(pos, v, context, false, false);
     if (path == "" || path[0] != '/')
-        throwEvalError("string `%1%' doesn't represent an absolute path", path);
+        throwEvalError("string ‘%1%’ doesn't represent an absolute path, at %2%", path, pos);
     return path;
 }
 
@@ -1250,17 +1392,8 @@ bool EvalState::eqValues(Value & v1, Value & v2)
         case tBool:
             return v1.boolean == v2.boolean;
 
-        case tString: {
-            /* Compare both the string and its context. */
-            if (strcmp(v1.string.s, v2.string.s) != 0) return false;
-            const char * * p = v1.string.context, * * q = v2.string.context;
-            if (!p && !q) return true;
-            if (!p || !q) return false;
-            for ( ; *p && *q; ++p, ++q)
-                if (strcmp(*p, *q) != 0) return false;
-            if (*p || *q) return false;
-            return true;
-        }
+        case tString:
+            return strcmp(v1.string.s, v2.string.s) == 0;
 
         case tPath:
             return strcmp(v1.path, v2.path) == 0;
@@ -1317,16 +1450,18 @@ void EvalState::printStats()
     getrusage(RUSAGE_SELF, &buf);
     float cpuTime = buf.ru_utime.tv_sec + ((float) buf.ru_utime.tv_usec / 1000000);
 
+    uint64_t bEnvs = nrEnvs * sizeof(Env) + nrValuesInEnvs * sizeof(Value *);
+    uint64_t bLists = nrListElems * sizeof(Value *);
+    uint64_t bValues = nrValues * sizeof(Value);
+    uint64_t bAttrsets = nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Attr);
+
     printMsg(v, format("  time elapsed: %1%") % cpuTime);
     printMsg(v, format("  size of a value: %1%") % sizeof(Value));
-    printMsg(v, format("  environments allocated: %1% (%2% bytes)")
-        % nrEnvs % (nrEnvs * sizeof(Env) + nrValuesInEnvs * sizeof(Value *)));
-    printMsg(v, format("  list elements: %1% (%2% bytes)")
-        % nrListElems % (nrListElems * sizeof(Value *)));
+    printMsg(v, format("  environments allocated: %1% (%2% bytes)") % nrEnvs % bEnvs);
+    printMsg(v, format("  list elements: %1% (%2% bytes)") % nrListElems % bLists);
     printMsg(v, format("  list concatenations: %1%") % nrListConcats);
-    printMsg(v, format("  values allocated: %1% (%2% bytes)")
-        % nrValues % (nrValues * sizeof(Value)));
-    printMsg(v, format("  sets allocated: %1%") % nrAttrsets);
+    printMsg(v, format("  values allocated: %1% (%2% bytes)") % nrValues % bValues);
+    printMsg(v, format("  sets allocated: %1% (%2% bytes)") % nrAttrsets % bAttrsets);
     printMsg(v, format("  right-biased unions: %1%") % nrOpUpdates);
     printMsg(v, format("  values copied in right-biased unions: %1%") % nrOpUpdateValuesCopied);
     printMsg(v, format("  symbols in symbol table: %1%") % symbols.size());
@@ -1336,6 +1471,7 @@ void EvalState::printStats()
     printMsg(v, format("  number of attr lookups: %1%") % nrLookups);
     printMsg(v, format("  number of primop calls: %1%") % nrPrimOpCalls);
     printMsg(v, format("  number of function calls: %1%") % nrFunctionCalls);
+    printMsg(v, format("  total allocations: %1% bytes") % (bEnvs + bLists + bValues + bAttrsets));
 
     if (countCalls) {
         v = lvlInfo;
@@ -1365,6 +1501,103 @@ void EvalState::printStats()
             printMsg(v, format("%1$10d %2%") % i->first % i->second);
 
     }
+}
+
+
+void EvalState::printCanaries()
+{
+#if HAVE_BOEHMGC
+    if (!settings.get("debug-gc", false)) return;
+
+    GC_gcollect();
+
+    if (gcCanaries.empty()) {
+        printMsg(lvlError, "all canaries have been garbage-collected");
+        return;
+    }
+
+    printMsg(lvlError, "the following canaries have not been garbage-collected:");
+
+    for (auto i : gcCanaries)
+        printMsg(lvlError, format("  %1%") % i->string.s);
+#endif
+}
+
+
+size_t valueSize(Value & v)
+{
+    std::set<const void *> seen;
+
+    auto doString = [&](const char * s) -> size_t {
+        if (seen.find(s) != seen.end()) return 0;
+        seen.insert(s);
+        return strlen(s) + 1;
+    };
+
+    std::function<size_t(Value & v)> doValue;
+    std::function<size_t(Env & v)> doEnv;
+
+    doValue = [&](Value & v) -> size_t {
+        if (seen.find(&v) != seen.end()) return 0;
+        seen.insert(&v);
+
+        size_t sz = sizeof(Value);
+
+        switch (v.type) {
+        case tString:
+            sz += doString(v.string.s);
+            if (v.string.context)
+                for (const char * * p = v.string.context; *p; ++p)
+                    sz += doString(*p);
+            break;
+        case tPath:
+            sz += doString(v.path);
+            break;
+        case tAttrs:
+            for (auto & i : *v.attrs)
+                sz += doValue(*i.value);
+            break;
+        case tList:
+            for (unsigned int n = 0; n < v.list.length; ++n)
+                sz += doValue(*v.list.elems[n]);
+            break;
+        case tThunk:
+            sz += doEnv(*v.thunk.env);
+            break;
+        case tApp:
+            sz += doValue(*v.app.left);
+            sz += doValue(*v.app.right);
+            break;
+        case tLambda:
+            sz += doEnv(*v.lambda.env);
+            break;
+        case tPrimOpApp:
+            sz += doValue(*v.primOpApp.left);
+            sz += doValue(*v.primOpApp.right);
+            break;
+        default:
+            ;
+        }
+
+        return sz;
+    };
+
+    doEnv = [&](Env & env) -> size_t {
+        if (seen.find(&env) != seen.end()) return 0;
+        seen.insert(&env);
+
+        size_t sz = sizeof(Env);
+
+        for (unsigned int i = 0; i < env.size; ++i)
+            if (env.values[i])
+                sz += doValue(*env.values[i]);
+
+        if (env.up) sz += doEnv(*env.up);
+
+        return sz;
+    };
+
+    return doValue(v);
 }
 
 

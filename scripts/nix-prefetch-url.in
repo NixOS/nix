@@ -1,12 +1,15 @@
 #! @perl@ -w @perlFlags@
 
+use utf8;
 use strict;
 use File::Basename;
-use File::Temp qw(tempdir);
 use File::stat;
 use Nix::Store;
 use Nix::Config;
 use Nix::Utils;
+
+binmode STDERR, ":encoding(utf8)";
+
 
 my $hashType = $ENV{'NIX_HASH_ALGO'} || "sha256"; # obsolete
 my $cacheDir = $ENV{'NIX_DOWNLOAD_CACHE'};
@@ -18,9 +21,9 @@ while ($arg = shift) {
         exec "man nix-prefetch-url" or die;
     } elsif ($arg eq "--type") {
         $hashType = shift;
-        die "$0: `$arg' requires an argument\n" unless defined $hashType;
+        die "$0: ‘$arg’ requires an argument\n" unless defined $hashType;
     } elsif (substr($arg, 0, 1) eq "-") {
-        die "$0: unknown flag `$arg'\n";
+        die "$0: unknown flag ‘$arg’\n";
     } else {
         push @args, $arg;
     }
@@ -38,8 +41,7 @@ EOF
     exit 1;
 }
 
-my $tmpDir = tempdir("nix-prefetch-url.XXXXXX", CLEANUP => 1, TMPDIR => 1)
-    or die "cannot create a temporary directory";
+my $tmpDir = mkTempDir("nix-prefetch-url");
 
 # Hack to support the mirror:// scheme from Nixpkgs.
 if ($url =~ /^mirror:\/\//) {

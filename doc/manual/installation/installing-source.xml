@@ -1,0 +1,16 @@
+<chapter xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="ch-installing-source">
+
+<title>Installing Nix from Source</title>
+
+<para>If no binary package is available, you can download and compile
+a source distribution.</para>
+
+<xi:include href="prerequisites-source.xml" />
+<xi:include href="obtaining-source.xml" />
+<xi:include href="building-source.xml" />
+
+</chapter>

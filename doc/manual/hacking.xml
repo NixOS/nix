@@ -8,7 +8,7 @@
 the latest version of Nix from GitHub:
 <screen>
 $ git clone git://github.com/NixOS/nix.git
-$ cd hydra
+$ cd nix
 </screen>
 </para>
 
@@ -26,7 +26,7 @@ $ ./dev-shell
 </screen>
 To build Nix itself in this shell:
 <screen>
-[nix-shell]$ ./bootstrap
+[nix-shell]$ ./bootstrap.sh
 [nix-shell]$ configurePhase
 [nix-shell]$ make
 </screen>

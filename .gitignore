@@ -1,5 +1,4 @@
-Makefile
-Makefile.in
+Makefile.config
 
 # /
 /aclocal.m4
@@ -9,17 +8,7 @@ Makefile.in
 /nix.spec
 /stamp-h1
 /svn-revision
-/NEWS
 /libtool
-
-# /config/
-/config/config.guess
-/config/config.sub
-/config/depcomp
-/config/install-sh
-/config/missing
-/config/mkinstalldirs
-/config/ltmain.sh
 
 /corepkgs/config.nix
 
@@ -41,10 +30,7 @@ Makefile.in
 /doc/manual/*.1
 /doc/manual/*.5
 /doc/manual/*.8
-/doc/manual/images
 /doc/manual/version.txt
-/doc/manual/NEWS.html
-/doc/manual/NEWS.txt
 
 # /scripts/
 /scripts/nix-profile.sh
@@ -95,10 +81,6 @@ Makefile.in
 
 # /src/nix-log2xml/
 /src/nix-log2xml/nix-log2xml
-/src/nix-log2xml/test*.*
-/src/nix-log2xml/*.log
-/src/nix-log2xml/*.xml
-/src/nix-log2xml/*.html
 
 # /src/nix-store/
 /src/nix-store/nix-store
@@ -106,9 +88,11 @@ Makefile.in
 # /src/nix-daemon/
 /src/nix-daemon/nix-daemon
 
+# /src/download-via-ssh/
+/src/download-via-ssh/download-via-ssh
+
 # /tests/
 /tests/test-tmp
-/tests/config.nix
 /tests/common.sh
 /tests/dummy
 /tests/result*
@@ -121,14 +105,16 @@ Makefile.in
 /perl/lib/Nix/Config.pm
 /perl/lib/Nix/Store.cc
 
-.deps
-.libs
+/misc/systemd/nix-daemon.service
+/misc/systemd/nix-daemon.socket
+/misc/upstart/nix-daemon.conf
+
 *.a
-*.lo
-*.la
 *.o
 *.so
+*.dep
 *~
+*.pc
 
 # GNU Global
 GPATH

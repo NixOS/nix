@@ -18,6 +18,23 @@ if [ "$nlink" != 3 ]; then
     exit 1
 fi
 
+outPath3=$(echo 'with import ./config.nix; mkDerivation { name = "foo3"; builder = builtins.toFile "builder" "mkdir $out; echo hello > $out/foo"; }' | nix-build - --no-out-link)
+
+inode3="$(perl -e "print ((lstat('$outPath3/foo'))[1])")"
+if [ "$inode1" = "$inode3" ]; then
+    echo "inodes match unexpectedly"
+    exit 1
+fi
+
+nix-store --optimise
+
+inode1="$(perl -e "print ((lstat('$outPath1/foo'))[1])")"
+inode3="$(perl -e "print ((lstat('$outPath3/foo'))[1])")"
+if [ "$inode1" != "$inode3" ]; then
+    echo "inodes do not match"
+    exit 1
+fi
+
 nix-store --gc
 
 if [ -n "$(ls $NIX_STORE_DIR/.links)" ]; then

@@ -1,9 +1,11 @@
 #! @perl@ -w @perlFlags@
 
+use utf8;
 use strict;
-use File::Temp qw(tempdir);
 use Nix::Config;
 use Nix::Utils;
+
+binmode STDERR, ":encoding(utf8)";
 
 
 # Parse the command line arguments.
@@ -13,6 +15,7 @@ my $source;
 my $fromURL = 0;
 my @extraNixEnvArgs = ();
 my $interactive = 1;
+my $op = "--install";
 
 while (scalar @args) {
     my $arg = shift @args;
@@ -24,8 +27,11 @@ while (scalar @args) {
     }
     elsif ($arg eq "--profile" || $arg eq "-p") {
         my $profile = shift @args;
-        die "$0: `--profile' requires an argument\n" if !defined $profile;
+        die "$0: ‘--profile’ requires an argument\n" if !defined $profile;
         push @extraNixEnvArgs, "-p", $profile;
+    }
+    elsif ($arg eq "--set") {
+        $op = "--set";
     }
     elsif ($arg eq "--non-interactive") {
         $interactive = 0;
@@ -46,12 +52,11 @@ if ($interactive && !defined $ENV{"NIX_HAVE_TERMINAL"}) {
     foreach my $term ("xterm", "konsole", "gnome-terminal", "xterm") {
         exec($term, "-e", "$Nix::Config::binDir/nix-install-package", @ARGV);
     }
-    die "cannot execute `xterm'";
+    die "cannot execute ‘xterm’";
 }
 
 
-my $tmpDir = tempdir("nix-install-package.XXXXXX", CLEANUP => 1, TMPDIR => 1)
-    or die "cannot create a temporary directory";
+my $tmpDir = mkTempDir("nix-install-package");
 
 
 sub barf {
@@ -72,7 +77,7 @@ if ($fromURL) {
 
 
 # Read and parse the package file.
-open PKGFILE, "<$pkgFile" or barf "cannot open `$pkgFile': $!";
+open PKGFILE, "<$pkgFile" or barf "cannot open ‘$pkgFile’: $!";
 my $contents = <PKGFILE>;
 close PKGFILE;
 
@@ -94,12 +99,12 @@ my $drvPath = $5;
 my $outPath = $6;
 my $binaryCacheURL = $8;
 
-barf "invalid package version `$version'" unless $version eq "NIXPKG1";
+barf "invalid package version ‘$version’" unless $version eq "NIXPKG1";
 
 
 if ($interactive) {
     # Ask confirmation.
-    print "Do you want to install `$drvName' (Y/N)? ";
+    print "Do you want to install ‘$drvName’ (Y/N)? ";
     my $reply = <STDIN>;
     chomp $reply;
     exit if $reply ne "y" && $reply ne "Y";
@@ -108,7 +113,7 @@ if ($interactive) {
 
 if (defined $binaryCacheURL) {
 
-    push @extraNixEnvArgs, "--option", "binary-caches", $binaryCacheURL;
+    push @extraNixEnvArgs, "--option", "extra-binary-caches", $binaryCacheURL;
 
 } else {
 
@@ -128,7 +133,7 @@ if (defined $binaryCacheURL) {
 
 
 print "\nInstalling package...\n";
-system("$Nix::Config::binDir/nix-env", "--install", $outPath, "--force-name", $drvName, @extraNixEnvArgs) == 0
+system("$Nix::Config::binDir/nix-env", $op, $outPath, "--force-name", $drvName, @extraNixEnvArgs) == 0
     or barf "nix-env failed: $?";
 
 

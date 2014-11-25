@@ -55,4 +55,16 @@ rec {
     inherit dep;
   };
 
+  test9 = makeTest 9 {
+    builder = builtins.toFile "builder.sh" "mkdir $out; ln -s $dep $out/link";
+    inherit dep;
+    disallowedReferences = [dep];
+  };
+
+  test10 = makeTest 10 {
+    builder = builtins.toFile "builder.sh" "mkdir $out; echo $test5; ln -s $dep $out/link";
+    inherit dep test5;
+    disallowedReferences = [test5];
+  };
+
 }

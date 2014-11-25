@@ -1,7 +1,10 @@
 package Nix::Utils;
 
+use utf8;
+use File::Temp qw(tempdir);
+
 our @ISA = qw(Exporter);
-our @EXPORT = qw(checkURL uniq writeFile readFile);
+our @EXPORT = qw(checkURL uniq writeFile readFile mkTempDir);
 
 $urlRE = "(?: [a-zA-Z][a-zA-Z0-9\+\-\.]*\:[a-zA-Z0-9\%\/\?\:\@\&\=\+\$\,\-\_\.\!\~\*]+ )";
 
@@ -23,7 +26,7 @@ sub uniq {
 
 sub writeFile {
     my ($fn, $s) = @_;
-    open TMP, ">$fn" or die "cannot create file `$fn': $!";
+    open TMP, ">$fn" or die "cannot create file ‘$fn’: $!";
     print TMP "$s" or die;
     close TMP or die;
 }
@@ -31,8 +34,14 @@ sub writeFile {
 sub readFile {
     local $/ = undef;
     my ($fn) = @_;
-    open TMP, "<$fn" or die "cannot open file `$fn': $!";
+    open TMP, "<$fn" or die "cannot open file ‘$fn’: $!";
     my $s = <TMP>;
     close TMP or die;
     return $s;
+}
+
+sub mkTempDir {
+    my ($name) = @_;
+    return tempdir("$name.XXXXXX", CLEANUP => 1, DIR => $ENV{"TMPDIR"} // $ENV{"XDG_RUNTIME_DIR"} // "/tmp")
+        || die "cannot create a temporary directory";
 }

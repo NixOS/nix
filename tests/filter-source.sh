@@ -12,7 +12,6 @@ ln -s xyzzy $TEST_ROOT/filterin/link
 
 nix-build ./filter-source.nix -o $TEST_ROOT/filterout
 
-set -x
 test ! -e $TEST_ROOT/filterout/foo/bar
 test -e $TEST_ROOT/filterout/xyzzy
 test -e $TEST_ROOT/filterout/bak

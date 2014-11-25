@@ -1,0 +1,29 @@
+<section xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="ssec-gc-roots">
+
+<title>Garbage Collector Roots</title>
+
+<para>The roots of the garbage collector are all store paths to which
+there are symlinks in the directory
+<filename><replaceable>prefix</replaceable>/nix/var/nix/gcroots</filename>.
+For instance, the following command makes the path
+<filename>/nix/store/d718ef...-foo</filename> a root of the collector:
+
+<screen>
+$ ln -s /nix/store/d718ef...-foo /nix/var/nix/gcroots/bar</screen>
+	
+That is, after this command, the garbage collector will not remove
+<filename>/nix/store/d718ef...-foo</filename> or any of its
+dependencies.</para>
+
+<para>Subdirectories of
+<filename><replaceable>prefix</replaceable>/nix/var/nix/gcroots</filename>
+are also searched for symlinks.  Symlinks to non-store paths are
+followed and searched for roots, but symlinks to non-store paths
+<emphasis>inside</emphasis> the paths reached in that way are not
+followed to prevent infinite recursion.</para>
+
+</section>

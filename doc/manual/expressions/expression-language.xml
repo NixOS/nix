@@ -1,0 +1,30 @@
+<chapter xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="ch-expression-language">
+
+<title>Nix Expression Language</title>
+
+<para>The Nix expression language is a pure, lazy, functional
+language.  Purity means that operations in the language don't have
+side-effects (for instance, there is no variable assignment).
+Laziness means that arguments to functions are evaluated only when
+they are needed.  Functional means that functions are
+<quote>normal</quote> values that can be passed around and manipulated
+in interesting ways.  The language is not a full-featured, general
+purpose language.  Its main job is to describe packages,
+compositions of packages, and the variability within
+packages.</para>
+
+<para>This section presents the various features of the
+language.</para>
+
+<xi:include href="language-values.xml" />
+<xi:include href="language-constructs.xml" />
+<xi:include href="language-operators.xml" />
+<xi:include href="derivations.xml" />
+<xi:include href="builtins.xml" />
+
+
+</chapter>

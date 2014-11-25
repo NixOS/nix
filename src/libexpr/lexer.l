@@ -113,9 +113,11 @@ or          { return OR_KW; }
 {INT}       { errno = 0;
               yylval->n = strtol(yytext, 0, 10);
               if (errno != 0)
-                  throw ParseError(format("invalid integer `%1%'") % yytext);
+                  throw ParseError(format("invalid integer ‘%1%’") % yytext);
               return INT;
             }
+
+\$\{        { return DOLLAR_CURLY; }
 
 \"          { BEGIN(STRING); return '"'; }
 <STRING>([^\$\"\\]|\$[^\{\"]|\\.)+ {

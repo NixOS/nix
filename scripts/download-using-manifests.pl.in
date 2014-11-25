@@ -1,14 +1,15 @@
 #! @perl@ -w @perlFlags@
 
+use utf8;
 use strict;
 use Nix::Config;
 use Nix::Manifest;
 use Nix::Store;
 use Nix::Utils;
 use POSIX qw(strftime);
-use File::Temp qw(tempdir);
 
 STDOUT->autoflush(1);
+binmode STDERR, ":encoding(utf8)";
 
 my $logFile = "$Nix::Config::logDir/downloads";
 
@@ -229,7 +230,7 @@ if ($ARGV[0] eq "--query") {
             print "\n";
         }
 
-        else { die "unknown command `$cmd'"; }
+        else { die "unknown command ‘$cmd’"; }
     }
 
     exit 0;
@@ -247,8 +248,7 @@ $fast = 0;
 
 
 # Create a temporary directory.
-my $tmpDir = tempdir("nix-download.XXXXXX", CLEANUP => 1, TMPDIR => 1)
-    or die "cannot create a temporary directory";
+my $tmpDir = mkTempDir("nix-download");
 
 my $tmpNar = "$tmpDir/nar";
 my $tmpNar2 = "$tmpDir/nar2";
@@ -259,7 +259,7 @@ open LOGFILE, ">>$logFile" or die "cannot open log file $logFile";
 my $date = strftime ("%F %H:%M:%S UTC", gmtime (time));
 print LOGFILE "$$ get $targetPath $date\n";
 
-print STDERR "\n*** Trying to download/patch `$targetPath'\n";
+print STDERR "\n*** Trying to download/patch ‘$targetPath’\n";
 
 
 # Compute the shortest path.
@@ -288,7 +288,7 @@ while (scalar @path > 0) {
     print STDERR "\n*** Step $curStep/$maxStep: ";
 
     if ($edge->{type} eq "present") {
-        print STDERR "using already present path `$v'\n";
+        print STDERR "using already present path ‘$v’\n";
         print LOGFILE "$$ present $v\n";
 
         if ($curStep < $maxStep) {
@@ -297,13 +297,13 @@ while (scalar @path > 0) {
             # into a NAR archive, to which we can apply the patch.
             print STDERR "  packing base path...\n";
             system("$Nix::Config::binDir/nix-store --dump $v > $tmpNar") == 0
-                or die "cannot dump `$v'";
+                or die "cannot dump ‘$v’";
         }
     }
 
     elsif ($edge->{type} eq "patch") {
         my $patch = $edge->{info};
-        print STDERR "applying patch `$patch->{url}' to `$u' to create `$v'\n";
+        print STDERR "applying patch ‘$patch->{url}’ to ‘$u’ to create ‘$v’\n";
 
         print LOGFILE "$$ patch $patch->{url} $patch->{size} $patch->{baseHash} $u $v\n";
 
@@ -312,13 +312,13 @@ while (scalar @path > 0) {
         my $patchPath = "$tmpDir/patch";
         checkURL $patch->{url};
         system("$curl '$patch->{url}' -o $patchPath") == 0
-            or die "cannot download patch `$patch->{url}'\n";
+            or die "cannot download patch ‘$patch->{url}’\n";
 
         # Apply the patch to the NAR archive produced in step 1 (for
         # the already present path) or a later step (for patch sequences).
         print STDERR "  applying patch...\n";
-        system("$Nix::Config::libexecDir/bspatch $tmpNar $tmpNar2 $patchPath") == 0
-            or die "cannot apply patch `$patchPath' to $tmpNar\n";
+        system("$Nix::Config::libexecDir/nix/bspatch $tmpNar $tmpNar2 $patchPath") == 0
+            or die "cannot apply patch ‘$patchPath’ to $tmpNar\n";
 
         if ($curStep < $maxStep) {
             # The archive will be used as the base of the next patch.
@@ -328,7 +328,7 @@ while (scalar @path > 0) {
             # into the target path.
             print STDERR "  unpacking patched archive...\n";
             system("$Nix::Config::binDir/nix-store --restore $destPath < $tmpNar2") == 0
-                or die "cannot unpack $tmpNar2 to `$v'\n";
+                or die "cannot unpack $tmpNar2 to ‘$v’\n";
         }
 
         $finalNarHash = $patch->{narHash};
@@ -336,7 +336,7 @@ while (scalar @path > 0) {
 
     elsif ($edge->{type} eq "narfile") {
         my $narFile = $edge->{info};
-        print STDERR "downloading `$narFile->{url}' to `$v'\n";
+        print STDERR "downloading ‘$narFile->{url}’ to ‘$v’\n";
 
         my $size = $narFile->{size} || -1;
         print LOGFILE "$$ narfile $narFile->{url} $size $v\n";
@@ -347,16 +347,16 @@ while (scalar @path > 0) {
             $narFile->{compressionType} eq "bzip2" ? "| $Nix::Config::bzip2 -d" :
             $narFile->{compressionType} eq "xz" ? "| $Nix::Config::xz -d" :
             $narFile->{compressionType} eq "none" ? "" :
-            die "unknown compression type `$narFile->{compressionType}'";
+            die "unknown compression type ‘$narFile->{compressionType}’";
 
         if ($curStep < $maxStep) {
             # The archive will be used a base to a patch.
             system("$curl '$narFile->{url}' $decompressor > $tmpNar") == 0
-                or die "cannot download and unpack `$narFile->{url}' to `$v'\n";
+                or die "cannot download and unpack ‘$narFile->{url}’ to ‘$v’\n";
         } else {
             # Unpack the archive to the target path.
             system("$curl '$narFile->{url}' $decompressor | $Nix::Config::binDir/nix-store --restore '$destPath'") == 0
-                or die "cannot download and unpack `$narFile->{url}' to `$v'\n";
+                or die "cannot download and unpack ‘$narFile->{url}’ to ‘$v’\n";
         }
 
         $finalNarHash = $narFile->{narHash};

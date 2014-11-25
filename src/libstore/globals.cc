@@ -2,9 +2,11 @@
 
 #include "globals.hh"
 #include "util.hh"
+#include "archive.hh"
 
 #include <map>
 #include <algorithm>
+#include <unistd.h>
 
 
 namespace nix {
@@ -29,6 +31,10 @@ Settings::Settings()
     buildVerbosity = lvlError;
     maxBuildJobs = 1;
     buildCores = 1;
+#ifdef _SC_NPROCESSORS_ONLN
+    long res = sysconf(_SC_NPROCESSORS_ONLN);
+    if (res > 0) buildCores = res;
+#endif
     readOnlyMode = false;
     thisSystem = SYSTEM;
     maxSilentTime = 0;
@@ -40,9 +46,9 @@ Settings::Settings()
     useSQLiteWAL = true;
     syncBeforeRegistering = false;
     useSubstitutes = true;
+    buildUsersGroup = getuid() == 0 ? "nixbld" : "";
     useChroot = false;
-    dirsInChroot.insert("/dev");
-    dirsInChroot.insert("/dev/pts");
+    useSshSubstituter = true;
     impersonateLinux26 = false;
     keepLog = true;
     compressLog = true;
@@ -56,6 +62,7 @@ Settings::Settings()
     envKeepDerivations = false;
     lockCPU = getEnv("NIX_AFFINITY_HACK", "1") == "1";
     showTrace = false;
+    enableImportNative = false;
 }
 
 
@@ -70,17 +77,6 @@ void Settings::processEnvironment()
     nixLibexecDir = canonPath(getEnv("NIX_LIBEXEC_DIR", NIX_LIBEXEC_DIR));
     nixBinDir = canonPath(getEnv("NIX_BIN_DIR", NIX_BIN_DIR));
     nixDaemonSocketFile = canonPath(nixStateDir + DEFAULT_SOCKET_PATH);
-
-    string subs = getEnv("NIX_SUBSTITUTERS", "default");
-    if (subs == "default") {
-#if 0
-        if (getEnv("NIX_OTHER_STORES") != "")
-            substituters.push_back(nixLibexecDir + "/nix/substituters/copy-from-other-stores.pl");
-#endif
-        substituters.push_back(nixLibexecDir + "/nix/substituters/download-using-manifests.pl");
-        substituters.push_back(nixLibexecDir + "/nix/substituters/download-from-binary-cache.pl");
-    } else
-        substituters = tokenizeString<Strings>(subs, ":");
 }
 
 
@@ -106,7 +102,7 @@ void Settings::loadConfFile()
         if (tokens.empty()) continue;
 
         if (tokens.size() < 2 || tokens[1] != "=")
-            throw Error(format("illegal configuration line `%1%' in `%2%'") % line % settingsFile);
+            throw Error(format("illegal configuration line ‘%1%’ in ‘%2%’") % line % settingsFile);
 
         string name = tokens[0];
 
@@ -124,37 +120,79 @@ void Settings::set(const string & name, const string & value)
 }
 
 
-void Settings::update()
+string Settings::get(const string & name, const string & def)
 {
-    get(tryFallback, "build-fallback");
-    get(maxBuildJobs, "build-max-jobs");
-    get(buildCores, "build-cores");
-    get(thisSystem, "system");
-    get(maxSilentTime, "build-max-silent-time");
-    get(buildTimeout, "build-timeout");
-    get(reservedSize, "gc-reserved-space");
-    get(fsyncMetadata, "fsync-metadata");
-    get(useSQLiteWAL, "use-sqlite-wal");
-    get(syncBeforeRegistering, "sync-before-registering");
-    get(useSubstitutes, "build-use-substitutes");
-    get(buildUsersGroup, "build-users-group");
-    get(useChroot, "build-use-chroot");
-    get(dirsInChroot, "build-chroot-dirs");
-    get(impersonateLinux26, "build-impersonate-linux-26");
-    get(keepLog, "build-keep-log");
-    get(compressLog, "build-compress-log");
-    get(maxLogSize, "build-max-log-size");
-    get(cacheFailure, "build-cache-failure");
-    get(pollInterval, "build-poll-interval");
-    get(checkRootReachability, "gc-check-reachability");
-    get(gcKeepOutputs, "gc-keep-outputs");
-    get(gcKeepDerivations, "gc-keep-derivations");
-    get(autoOptimiseStore, "auto-optimise-store");
-    get(envKeepDerivations, "env-keep-derivations");
+    auto i = settings.find(name);
+    if (i == settings.end()) return def;
+    return i->second;
 }
 
 
-void Settings::get(string & res, const string & name)
+Strings Settings::get(const string & name, const Strings & def)
+{
+    auto i = settings.find(name);
+    if (i == settings.end()) return def;
+    return tokenizeString<Strings>(i->second);
+}
+
+
+bool Settings::get(const string & name, bool def)
+{
+    bool res = def;
+    _get(res, name);
+    return res;
+}
+
+
+void Settings::update()
+{
+    _get(tryFallback, "build-fallback");
+    _get(maxBuildJobs, "build-max-jobs");
+    _get(buildCores, "build-cores");
+    _get(thisSystem, "system");
+    _get(maxSilentTime, "build-max-silent-time");
+    _get(buildTimeout, "build-timeout");
+    _get(reservedSize, "gc-reserved-space");
+    _get(fsyncMetadata, "fsync-metadata");
+    _get(useSQLiteWAL, "use-sqlite-wal");
+    _get(syncBeforeRegistering, "sync-before-registering");
+    _get(useSubstitutes, "build-use-substitutes");
+    _get(buildUsersGroup, "build-users-group");
+    _get(useChroot, "build-use-chroot");
+    _get(impersonateLinux26, "build-impersonate-linux-26");
+    _get(keepLog, "build-keep-log");
+    _get(compressLog, "build-compress-log");
+    _get(maxLogSize, "build-max-log-size");
+    _get(cacheFailure, "build-cache-failure");
+    _get(pollInterval, "build-poll-interval");
+    _get(checkRootReachability, "gc-check-reachability");
+    _get(gcKeepOutputs, "gc-keep-outputs");
+    _get(gcKeepDerivations, "gc-keep-derivations");
+    _get(autoOptimiseStore, "auto-optimise-store");
+    _get(envKeepDerivations, "env-keep-derivations");
+    _get(sshSubstituterHosts, "ssh-substituter-hosts");
+    _get(useSshSubstituter, "use-ssh-substituter");
+    _get(logServers, "log-servers");
+    _get(enableImportNative, "allow-unsafe-native-code-during-evaluation");
+    _get(useCaseHack, "use-case-hack");
+
+    string subs = getEnv("NIX_SUBSTITUTERS", "default");
+    if (subs == "default") {
+        substituters.clear();
+#if 0
+        if (getEnv("NIX_OTHER_STORES") != "")
+            substituters.push_back(nixLibexecDir + "/nix/substituters/copy-from-other-stores.pl");
+#endif
+        substituters.push_back(nixLibexecDir + "/nix/substituters/download-using-manifests.pl");
+        substituters.push_back(nixLibexecDir + "/nix/substituters/download-from-binary-cache.pl");
+        if (useSshSubstituter && !sshSubstituterHosts.empty())
+            substituters.push_back(nixLibexecDir + "/nix/substituters/download-via-ssh");
+    } else
+        substituters = tokenizeString<Strings>(subs, ":");
+}
+
+
+void Settings::_get(string & res, const string & name)
 {
     SettingsMap::iterator i = settings.find(name);
     if (i == settings.end()) return;
@@ -162,18 +200,18 @@ void Settings::get(string & res, const string & name)
 }
 
 
-void Settings::get(bool & res, const string & name)
+void Settings::_get(bool & res, const string & name)
 {
     SettingsMap::iterator i = settings.find(name);
     if (i == settings.end()) return;
     if (i->second == "true") res = true;
     else if (i->second == "false") res = false;
-    else throw Error(format("configuration option `%1%' should be either `true' or `false', not `%2%'")
+    else throw Error(format("configuration option ‘%1%’ should be either ‘true’ or ‘false’, not ‘%2%’")
         % name % i->second);
 }
 
 
-void Settings::get(StringSet & res, const string & name)
+void Settings::_get(StringSet & res, const string & name)
 {
     SettingsMap::iterator i = settings.find(name);
     if (i == settings.end()) return;
@@ -182,13 +220,20 @@ void Settings::get(StringSet & res, const string & name)
     res.insert(ss.begin(), ss.end());
 }
 
+void Settings::_get(Strings & res, const string & name)
+{
+    SettingsMap::iterator i = settings.find(name);
+    if (i == settings.end()) return;
+    res = tokenizeString<Strings>(i->second);
+}
 
-template<class N> void Settings::get(N & res, const string & name)
+
+template<class N> void Settings::_get(N & res, const string & name)
 {
     SettingsMap::iterator i = settings.find(name);
     if (i == settings.end()) return;
     if (!string2Int(i->second, res))
-        throw Error(format("configuration setting `%1%' should have an integer value") % name);
+        throw Error(format("configuration setting ‘%1%’ should have an integer value") % name);
 }
 
 
@@ -206,13 +251,24 @@ string Settings::pack()
 }
 
 
+void Settings::unpack(const string & pack) {
+    Strings lines = tokenizeString<Strings>(pack, "\n");
+    foreach (Strings::iterator, i, lines) {
+        string::size_type eq = i->find('=');
+        if (eq == string::npos)
+            throw Error("illegal option name/value");
+        set(i->substr(0, eq), i->substr(eq + 1));
+    }
+}
+
+
 Settings::SettingsMap Settings::getOverrides()
 {
     return overrides;
 }
 
 
-const string nixVersion = NIX_VERSION;
+const string nixVersion = PACKAGE_VERSION;
 
 
 }

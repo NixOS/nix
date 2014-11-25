@@ -44,7 +44,7 @@ struct InstallSourceInfo
     Path nixExprPath; /* for srcNixExprDrvs, srcNixExprs */
     Path profile; /* for srcProfile */
     string systemFilter; /* for srcNixExprDrvs */
-    Bindings autoArgs;
+    Bindings * autoArgs;
 };
 
 
@@ -52,7 +52,7 @@ struct Globals
 {
     InstallSourceInfo instSource;
     Path profile;
-    EvalState state;
+    std::shared_ptr<EvalState> state;
     bool dryRun;
     bool preserveInstalled;
     bool removeAll;
@@ -62,20 +62,14 @@ struct Globals
 
 
 typedef void (* Operation) (Globals & globals,
-    Strings args, Strings opFlags, Strings opArgs);
-
-
-void printHelp()
-{
-    showManPage("nix-env");
-}
+    Strings opFlags, Strings opArgs);
 
 
 static string needArg(Strings::iterator & i,
     Strings & args, const string & arg)
 {
     if (i == args.end()) throw UsageError(
-        format("`%1%' requires an argument") % arg);
+        format("‘%1%’ requires an argument") % arg);
     return *i++;
 }
 
@@ -105,16 +99,16 @@ static bool isNixExpr(const Path & path, struct stat & st)
 static void getAllExprs(EvalState & state,
     const Path & path, StringSet & attrs, Value & v)
 {
-    Strings names = readDirectory(path);
-    StringSet namesSorted(names.begin(), names.end());
+    StringSet namesSorted;
+    for (auto & i : readDirectory(path)) namesSorted.insert(i.name);
 
-    foreach (StringSet::iterator, i, namesSorted) {
+    for (auto & i : namesSorted) {
         /* Ignore the manifest.nix used by profiles.  This is
            necessary to prevent it from showing up in channels (which
            are implemented using profiles). */
-        if (*i == "manifest.nix") continue;
+        if (i == "manifest.nix") continue;
 
-        Path path2 = path + "/" + *i;
+        Path path2 = path + "/" + i;
 
         struct stat st;
         if (stat(path2.c_str(), &st) == -1)
@@ -125,11 +119,11 @@ static void getAllExprs(EvalState & state,
                otherwise the attribute cannot be selected with the
                `-A' option.  Useful if you want to stick a Nix
                expression directly in ~/.nix-defexpr. */
-            string attrName = *i;
+            string attrName = i;
             if (hasSuffix(attrName, ".nix"))
                 attrName = string(attrName, 0, attrName.size() - 4);
             if (attrs.find(attrName) != attrs.end()) {
-                printMsg(lvlError, format("warning: name collision in input Nix expressions, skipping `%1%'") % path2);
+                printMsg(lvlError, format("warning: name collision in input Nix expressions, skipping ‘%1%’") % path2);
                 continue;
             }
             attrs.insert(attrName);
@@ -152,7 +146,7 @@ static void loadSourceExpr(EvalState & state, const Path & path, Value & v)
 {
     struct stat st;
     if (stat(path.c_str(), &st) == -1)
-        throw SysError(format("getting information about `%1%'") % path);
+        throw SysError(format("getting information about ‘%1%’") % path);
 
     if (isNixExpr(path, st)) {
         state.evalFile(path, v);
@@ -233,6 +227,15 @@ static bool isPrebuilt(EvalState & state, DrvInfo & elem)
 }
 
 
+static void checkSelectorUse(DrvNames & selectors)
+{
+    /* Check that all selectors have been used. */
+    foreach (DrvNames::iterator, i, selectors)
+        if (i->hits == 0 && i->fullName != "*")
+            throw Error(format("selector ‘%1%’ matches no derivations") % i->fullName);
+}
+
+
 static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
     const Strings & args, bool newestOnly)
 {
@@ -300,7 +303,7 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
             for (Newest::iterator j = newest.begin(); j != newest.end(); ++j) {
                 if (multiple.find(j->second.first.name) != multiple.end())
                     printMsg(lvlInfo,
-                        format("warning: there are multiple derivations named `%1%'; using the first one")
+                        format("warning: there are multiple derivations named ‘%1%’; using the first one")
                         % j->second.first.name);
                 matches.push_back(j->second);
             }
@@ -315,11 +318,7 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
             }
     }
 
-    /* Check that all selectors have been used. */
-    foreach (DrvNames::iterator, i, selectors)
-        if (i->hits == 0 && i->fullName != "*")
-            throw Error(format("selector `%1%' matches no derivations")
-                % i->fullName);
+    checkSelectorUse(selectors);
 
     return elems;
 }
@@ -351,7 +350,7 @@ static void queryInstSources(EvalState & state,
                Nix expression. */
             DrvInfos allElems;
             loadDerivations(state, instSource.nixExprPath,
-                instSource.systemFilter, instSource.autoArgs, "", allElems);
+                instSource.systemFilter, *instSource.autoArgs, "", allElems);
 
             elems = filterBySelector(state, allElems, args, newestOnly);
 
@@ -374,7 +373,7 @@ static void queryInstSources(EvalState & state,
                 Value vFun, vTmp;
                 state.eval(eFun, vFun);
                 mkApp(vTmp, vFun, vArg);
-                getDerivations(state, vTmp, "", instSource.autoArgs, elems, true);
+                getDerivations(state, vTmp, "", *instSource.autoArgs, elems, true);
             }
 
             break;
@@ -424,8 +423,8 @@ static void queryInstSources(EvalState & state,
             Value vRoot;
             loadSourceExpr(state, instSource.nixExprPath, vRoot);
             foreach (Strings::const_iterator, i, args) {
-                Value & v(*findAlongAttrPath(state, *i, instSource.autoArgs, vRoot));
-                getDerivations(state, v, "", instSource.autoArgs, elems, true);
+                Value & v(*findAlongAttrPath(state, *i, *instSource.autoArgs, vRoot));
+                getDerivations(state, v, "", *instSource.autoArgs, elems, true);
             }
             break;
         }
@@ -461,11 +460,11 @@ static void installDerivations(Globals & globals,
 
     /* Get the set of user environment elements to be installed. */
     DrvInfos newElems, newElemsTmp;
-    queryInstSources(globals.state, globals.instSource, args, newElemsTmp, true);
+    queryInstSources(*globals.state, globals.instSource, args, newElemsTmp, true);
 
     /* If --prebuilt-only is given, filter out source-only packages. */
     foreach (DrvInfos::iterator, i, newElemsTmp)
-        if (!globals.prebuiltOnly || isPrebuilt(globals.state, *i))
+        if (!globals.prebuiltOnly || isPrebuilt(*globals.state, *i))
             newElems.push_back(*i);
 
     StringSet newNames;
@@ -488,34 +487,33 @@ static void installDerivations(Globals & globals,
         /* Add in the already installed derivations, unless they have
            the same name as a to-be-installed element. */
         if (!globals.removeAll) {
-            DrvInfos installedElems = queryInstalled(globals.state, profile);
+            DrvInfos installedElems = queryInstalled(*globals.state, profile);
 
             foreach (DrvInfos::iterator, i, installedElems) {
                 DrvName drvName(i->name);
                 if (!globals.preserveInstalled &&
                     newNames.find(drvName.name) != newNames.end() &&
                     !keep(*i))
-                    printMsg(lvlInfo, format("replacing old `%1%'") % i->name);
+                    printMsg(lvlInfo, format("replacing old ‘%1%’") % i->name);
                 else
                     allElems.push_back(*i);
             }
 
             foreach (DrvInfos::iterator, i, newElems)
-                printMsg(lvlInfo, format("installing `%1%'") % i->name);
+                printMsg(lvlInfo, format("installing ‘%1%’") % i->name);
         }
 
-        printMissing(globals.state, newElems);
+        printMissing(*globals.state, newElems);
 
         if (globals.dryRun) return;
 
-        if (createUserEnv(globals.state, allElems,
+        if (createUserEnv(*globals.state, allElems,
                 profile, settings.envKeepDerivations, lockToken)) break;
     }
 }
 
 
-static void opInstall(Globals & globals,
-    Strings args, Strings opFlags, Strings opArgs)
+static void opInstall(Globals & globals, Strings opFlags, Strings opArgs)
 {
     for (Strings::iterator i = opFlags.begin(); i != opFlags.end(); ) {
         string arg = *i++;
@@ -524,7 +522,7 @@ static void opInstall(Globals & globals,
             globals.preserveInstalled = true;
         else if (arg == "--remove-all" || arg == "-r")
             globals.removeAll = true;
-        else throw UsageError(format("unknown flag `%1%'") % arg);
+        else throw UsageError(format("unknown flag ‘%1%’") % arg);
     }
 
     installDerivations(globals, opArgs, globals.profile);
@@ -547,11 +545,11 @@ static void upgradeDerivations(Globals & globals,
     while (true) {
         string lockToken = optimisticLockProfile(globals.profile);
 
-        DrvInfos installedElems = queryInstalled(globals.state, globals.profile);
+        DrvInfos installedElems = queryInstalled(*globals.state, globals.profile);
 
         /* Fetch all derivations from the input file. */
         DrvInfos availElems;
-        queryInstSources(globals.state, globals.instSource, args, availElems, false);
+        queryInstSources(*globals.state, globals.instSource, args, availElems, false);
 
         /* Go through all installed derivations. */
         DrvInfos newElems;
@@ -576,7 +574,7 @@ static void upgradeDerivations(Globals & globals,
                 foreach (DrvInfos::iterator, j, availElems) {
                     DrvName newName(j->name);
                     if (newName.name == drvName.name) {
-                        int d = comparePriorities(globals.state, *i, *j);
+                        int d = comparePriorities(*globals.state, *i, *j);
                         if (d == 0) d = compareVersions(drvName.version, newName.version);
                         if ((upgradeType == utLt && d < 0) ||
                             (upgradeType == utLeq && d <= 0) ||
@@ -585,10 +583,10 @@ static void upgradeDerivations(Globals & globals,
                         {
                             int d2 = -1;
                             if (bestElem != availElems.end()) {
-                                d2 = comparePriorities(globals.state, *bestElem, *j);
+                                d2 = comparePriorities(*globals.state, *bestElem, *j);
                                 if (d2 == 0) d2 = compareVersions(bestName.version, newName.version);
                             }
-                            if (d2 < 0 && (!globals.prebuiltOnly || isPrebuilt(globals.state, *j))) {
+                            if (d2 < 0 && (!globals.prebuiltOnly || isPrebuilt(*globals.state, *j))) {
                                 bestElem = j;
                                 bestName = newName;
                             }
@@ -601,29 +599,28 @@ static void upgradeDerivations(Globals & globals,
                     bestElem->queryOutPath())
                 {
                     printMsg(lvlInfo,
-                        format("upgrading `%1%' to `%2%'")
+                        format("upgrading ‘%1%’ to ‘%2%’")
                         % i->name % bestElem->name);
                     newElems.push_back(*bestElem);
                 } else newElems.push_back(*i);
 
             } catch (Error & e) {
-                e.addPrefix(format("while trying to find an upgrade for `%1%':\n") % i->name);
+                e.addPrefix(format("while trying to find an upgrade for ‘%1%’:\n") % i->name);
                 throw;
             }
         }
 
-        printMissing(globals.state, newElems);
+        printMissing(*globals.state, newElems);
 
         if (globals.dryRun) return;
 
-        if (createUserEnv(globals.state, newElems,
+        if (createUserEnv(*globals.state, newElems,
                 globals.profile, settings.envKeepDerivations, lockToken)) break;
     }
 }
 
 
-static void opUpgrade(Globals & globals,
-    Strings args, Strings opFlags, Strings opArgs)
+static void opUpgrade(Globals & globals, Strings opFlags, Strings opArgs)
 {
     UpgradeType upgradeType = utLt;
     for (Strings::iterator i = opFlags.begin(); i != opFlags.end(); ) {
@@ -633,7 +630,7 @@ static void opUpgrade(Globals & globals,
         else if (arg == "--leq") upgradeType = utLeq;
         else if (arg == "--eq") upgradeType = utEq;
         else if (arg == "--always") upgradeType = utAlways;
-        else throw UsageError(format("unknown flag `%1%'") % arg);
+        else throw UsageError(format("unknown flag ‘%1%’") % arg);
     }
 
     upgradeDerivations(globals, opArgs, upgradeType);
@@ -649,13 +646,12 @@ static void setMetaFlag(EvalState & state, DrvInfo & drv,
 }
 
 
-static void opSetFlag(Globals & globals,
-    Strings args, Strings opFlags, Strings opArgs)
+static void opSetFlag(Globals & globals, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
-        throw UsageError(format("unknown flag `%1%'") % opFlags.front());
+        throw UsageError(format("unknown flag ‘%1%’") % opFlags.front());
     if (opArgs.size() < 2)
-        throw UsageError("not enough arguments to `--set-flag'");
+        throw UsageError("not enough arguments to ‘--set-flag’");
 
     Strings::iterator arg = opArgs.begin();
     string flagName = *arg++;
@@ -665,48 +661,53 @@ static void opSetFlag(Globals & globals,
     while (true) {
         string lockToken = optimisticLockProfile(globals.profile);
 
-        DrvInfos installedElems = queryInstalled(globals.state, globals.profile);
+        DrvInfos installedElems = queryInstalled(*globals.state, globals.profile);
 
         /* Update all matching derivations. */
         foreach (DrvInfos::iterator, i, installedElems) {
             DrvName drvName(i->name);
             foreach (DrvNames::iterator, j, selectors)
                 if (j->matches(drvName)) {
-                    printMsg(lvlInfo, format("setting flag on `%1%'") % i->name);
-                    setMetaFlag(globals.state, *i, flagName, flagValue);
+                    printMsg(lvlInfo, format("setting flag on ‘%1%’") % i->name);
+                    j->hits++;
+                    setMetaFlag(*globals.state, *i, flagName, flagValue);
                     break;
                 }
         }
 
+        checkSelectorUse(selectors);
+
         /* Write the new user environment. */
-        if (createUserEnv(globals.state, installedElems,
+        if (createUserEnv(*globals.state, installedElems,
                 globals.profile, settings.envKeepDerivations, lockToken)) break;
     }
 }
 
 
-static void opSet(Globals & globals,
-    Strings args, Strings opFlags, Strings opArgs)
+static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
 {
     for (Strings::iterator i = opFlags.begin(); i != opFlags.end(); ) {
         string arg = *i++;
         if (parseInstallSourceOptions(globals, i, opFlags, arg)) ;
-        else throw UsageError(format("unknown flag `%1%'") % arg);
+        else throw UsageError(format("unknown flag ‘%1%’") % arg);
     }
 
     DrvInfos elems;
-    queryInstSources(globals.state, globals.instSource, opArgs, elems, true);
+    queryInstSources(*globals.state, globals.instSource, opArgs, elems, true);
 
     if (elems.size() != 1)
         throw Error("--set requires exactly one derivation");
 
     DrvInfo & drv(elems.front());
 
+    if (globals.forceName != "")
+        drv.name = globals.forceName;
+
     if (drv.queryDrvPath() != "") {
         PathSet paths = singleton<PathSet>(drv.queryDrvPath());
         printMissing(*store, paths);
         if (globals.dryRun) return;
-        store->buildPaths(paths, globals.state.repair);
+        store->buildPaths(paths, globals.state->repair ? bmRepair : bmNormal);
     }
     else {
         printMissing(*store, singleton<PathSet>(drv.queryOutPath()));
@@ -726,7 +727,7 @@ static void uninstallDerivations(Globals & globals, Strings & selectors,
     while (true) {
         string lockToken = optimisticLockProfile(profile);
 
-        DrvInfos installedElems = queryInstalled(globals.state, profile);
+        DrvInfos installedElems = queryInstalled(*globals.state, profile);
         DrvInfos newElems;
 
         foreach (DrvInfos::iterator, i, installedElems) {
@@ -738,7 +739,7 @@ static void uninstallDerivations(Globals & globals, Strings & selectors,
                 if ((isPath(*j) && i->queryOutPath() == followLinksToStorePath(*j))
                     || DrvName(*j).matches(drvName))
                 {
-                    printMsg(lvlInfo, format("uninstalling `%1%'") % i->name);
+                    printMsg(lvlInfo, format("uninstalling ‘%1%’") % i->name);
                     found = true;
                     break;
                 }
@@ -747,17 +748,16 @@ static void uninstallDerivations(Globals & globals, Strings & selectors,
 
         if (globals.dryRun) return;
 
-        if (createUserEnv(globals.state, newElems,
+        if (createUserEnv(*globals.state, newElems,
                 profile, settings.envKeepDerivations, lockToken)) break;
     }
 }
 
 
-static void opUninstall(Globals & globals,
-    Strings args, Strings opFlags, Strings opArgs)
+static void opUninstall(Globals & globals, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
-        throw UsageError(format("unknown flag `%1%'") % opFlags.front());
+        throw UsageError(format("unknown flag ‘%1%’") % opFlags.front());
     uninstallDerivations(globals, opArgs, globals.profile);
 }
 
@@ -850,13 +850,6 @@ static VersionDiff compareVersionAgainstSet(
 }
 
 
-static string colorString(const string & s)
-{
-    if (!isatty(STDOUT_FILENO)) return s;
-    return "\e[1;31m" + s + "\e[0m";
-}
-
-
 static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
 {
     JSONObject topObj(cout);
@@ -873,21 +866,20 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
         foreach (StringSet::iterator, j, metaNames) {
             metaObj.attr(*j);
             Value * v = i->queryMeta(*j);
-            if (!v)
-                printMsg(lvlError, format("derivation `%1%' has invalid meta attribute `%2%'") % i->name % *j);
-            else {
+            if (!v) {
+                printMsg(lvlError, format("derivation ‘%1%’ has invalid meta attribute ‘%2%’") % i->name % *j);
+                cout << "null";
+            } else {
                 PathSet context;
-                printValueAsJSON(globals.state, true, *v, cout, context);
+                printValueAsJSON(*globals.state, true, *v, cout, context);
             }
         }
     }
 }
 
 
-static void opQuery(Globals & globals,
-    Strings args, Strings opFlags, Strings opArgs)
+static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 {
-    typedef vector< map<string, string> > ResultSet;
     Strings remaining;
     string attrPath;
 
@@ -907,7 +899,7 @@ static void opQuery(Globals & globals,
 
     settings.readOnlyMode = true; /* makes evaluation a bit faster */
 
-    for (Strings::iterator i = args.begin(); i != args.end(); ) {
+    for (Strings::iterator i = opFlags.begin(); i != opFlags.end(); ) {
         string arg = *i++;
         if (arg == "--status" || arg == "-s") printStatus = true;
         else if (arg == "--no-name") printName = false;
@@ -923,10 +915,9 @@ static void opQuery(Globals & globals,
         else if (arg == "--json") jsonOutput = true;
         else if (arg == "--attr-path" || arg == "-P") printAttrPath = true;
         else if (arg == "--attr" || arg == "-A")
-            attrPath = needArg(i, args, arg);
-        else if (arg[0] == '-')
-            throw UsageError(format("unknown flag `%1%'") % arg);
-        else remaining.push_back(arg);
+            attrPath = needArg(i, opFlags, arg);
+        else
+            throw UsageError(format("unknown flag ‘%1%’") % arg);
     }
 
 
@@ -934,16 +925,16 @@ static void opQuery(Globals & globals,
     DrvInfos availElems, installedElems;
 
     if (source == sInstalled || compareVersions || printStatus)
-        installedElems = queryInstalled(globals.state, globals.profile);
+        installedElems = queryInstalled(*globals.state, globals.profile);
 
     if (source == sAvailable || compareVersions)
-        loadDerivations(globals.state, globals.instSource.nixExprPath,
-            globals.instSource.systemFilter, globals.instSource.autoArgs,
+        loadDerivations(*globals.state, globals.instSource.nixExprPath,
+            globals.instSource.systemFilter, *globals.instSource.autoArgs,
             attrPath, availElems);
 
-    DrvInfos elems_ = filterBySelector(globals.state,
+    DrvInfos elems_ = filterBySelector(*globals.state,
         source == sInstalled ? installedElems : availElems,
-        remaining, false);
+        opArgs, false);
 
     DrvInfos & otherElems(source == sInstalled ? availElems : installedElems);
 
@@ -975,7 +966,7 @@ static void opQuery(Globals & globals,
             try {
                 paths.insert(i->queryOutPath());
             } catch (AssertionError & e) {
-                printMsg(lvlTalkative, format("skipping derivation named `%1%' which gives an assertion failure") % i->name);
+                printMsg(lvlTalkative, format("skipping derivation named ‘%1%’ which gives an assertion failure") % i->name);
                 i->setFailed();
             }
         validPaths = store->queryValidPaths(paths);
@@ -989,6 +980,9 @@ static void opQuery(Globals & globals,
         return;
     }
 
+    bool tty = isatty(STDOUT_FILENO);
+    RunPager pager;
+
     Table table;
     std::ostringstream dummy;
     XMLWriter xml(true, *(xmlOutput ? &cout : &dummy));
@@ -998,7 +992,7 @@ static void opQuery(Globals & globals,
         try {
             if (i->hasFailed()) continue;
 
-            startNest(nest, lvlDebug, format("outputting query result `%1%'") % i->attrPath);
+            startNest(nest, lvlDebug, format("outputting query result ‘%1%’") % i->attrPath);
 
             if (globals.prebuiltOnly &&
                 validPaths.find(i->queryOutPath()) == validPaths.end() &&
@@ -1061,7 +1055,8 @@ static void opQuery(Globals & globals,
                     }
                 } else {
                     string column = (string) "" + ch + " " + version;
-                    if (diff == cvGreater) column = colorString(column);
+                    if (diff == cvGreater && tty)
+                        column = ANSI_RED + column + ANSI_NORMAL;
                     columns.push_back(column);
                 }
             }
@@ -1118,7 +1113,7 @@ static void opQuery(Globals & globals,
                             attrs2["name"] = *j;
                             Value * v = i->queryMeta(*j);
                             if (!v)
-                                printMsg(lvlError, format("derivation `%1%' has invalid meta attribute `%2%'") % i->name % *j);
+                                printMsg(lvlError, format("derivation ‘%1%’ has invalid meta attribute ‘%2%’") % i->name % *j);
                             else {
                                 if (v->type == tString) {
                                     attrs2["type"] = "string";
@@ -1153,9 +1148,9 @@ static void opQuery(Globals & globals,
             cout.flush();
 
         } catch (AssertionError & e) {
-            printMsg(lvlTalkative, format("skipping derivation named `%1%' which gives an assertion failure") % i->name);
+            printMsg(lvlTalkative, format("skipping derivation named ‘%1%’ which gives an assertion failure") % i->name);
         } catch (Error & e) {
-            e.addPrefix(format("while querying the derivation named `%1%':\n") % i->name);
+            e.addPrefix(format("while querying the derivation named ‘%1%’:\n") % i->name);
             throw;
         }
     }
@@ -1164,11 +1159,10 @@ static void opQuery(Globals & globals,
 }
 
 
-static void opSwitchProfile(Globals & globals,
-    Strings args, Strings opFlags, Strings opArgs)
+static void opSwitchProfile(Globals & globals, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
-        throw UsageError(format("unknown flag `%1%'") % opFlags.front());
+        throw UsageError(format("unknown flag ‘%1%’") % opFlags.front());
     if (opArgs.size() != 1)
         throw UsageError(format("exactly one argument expected"));
 
@@ -1213,11 +1207,10 @@ static void switchGeneration(Globals & globals, int dstGen)
 }
 
 
-static void opSwitchGeneration(Globals & globals,
-    Strings args, Strings opFlags, Strings opArgs)
+static void opSwitchGeneration(Globals & globals, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
-        throw UsageError(format("unknown flag `%1%'") % opFlags.front());
+        throw UsageError(format("unknown flag ‘%1%’") % opFlags.front());
     if (opArgs.size() != 1)
         throw UsageError(format("exactly one argument expected"));
 
@@ -1229,11 +1222,10 @@ static void opSwitchGeneration(Globals & globals,
 }
 
 
-static void opRollback(Globals & globals,
-    Strings args, Strings opFlags, Strings opArgs)
+static void opRollback(Globals & globals, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
-        throw UsageError(format("unknown flag `%1%'") % opFlags.front());
+        throw UsageError(format("unknown flag ‘%1%’") % opFlags.front());
     if (opArgs.size() != 0)
         throw UsageError(format("no arguments expected"));
 
@@ -1241,11 +1233,10 @@ static void opRollback(Globals & globals,
 }
 
 
-static void opListGenerations(Globals & globals,
-    Strings args, Strings opFlags, Strings opArgs)
+static void opListGenerations(Globals & globals, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
-        throw UsageError(format("unknown flag `%1%'") % opFlags.front());
+        throw UsageError(format("unknown flag ‘%1%’") % opFlags.front());
     if (opArgs.size() != 0)
         throw UsageError(format("no arguments expected"));
 
@@ -1254,6 +1245,8 @@ static void opListGenerations(Globals & globals,
 
     int curGen;
     Generations gens = findGenerations(globals.profile, curGen);
+
+    RunPager pager;
 
     for (Generations::iterator i = gens.begin(); i != gens.end(); ++i) {
         tm t;
@@ -1279,11 +1272,10 @@ static void deleteGeneration2(Globals & globals, unsigned int gen)
 }
 
 
-static void opDeleteGenerations(Globals & globals,
-    Strings args, Strings opFlags, Strings opArgs)
+static void opDeleteGenerations(Globals & globals, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
-        throw UsageError(format("unknown flag `%1%'") % opFlags.front());
+        throw UsageError(format("unknown flag ‘%1%’") % opFlags.front());
 
     PathLocks lock;
     lockProfile(lock, globals.profile);
@@ -1297,12 +1289,33 @@ static void opDeleteGenerations(Globals & globals,
             for (Generations::iterator j = gens.begin(); j != gens.end(); ++j)
                 if (j->number != curGen)
                     deleteGeneration2(globals, j->number);
-        }
+        } else if (i->size() >= 2 && tolower(*i->rbegin()) == 'd') {
+            time_t curTime = time(NULL);
+            time_t oldTime;
+            string strDays = string(*i, 0, i->size() - 1);
+            int days;
 
-        else {
+            if (!string2Int(strDays, days) || days < 1)
+                throw UsageError(format("invalid number of days specifier ‘%1%’") % *i);
+
+            oldTime = curTime - days * 24 * 3600;
+
+            bool canDelete = false;
+            for (Generations::reverse_iterator j = gens.rbegin(); j != gens.rend(); ++j) {
+                if (canDelete) {
+                    assert(j->creationTime < oldTime);
+                    deleteGeneration2(globals, j->number);
+                } else if (j->creationTime < oldTime) {
+                    /* We may now start deleting generations, but we don't delete
+                       this generation yet, because this generation was still the
+                       one that was active at the requested point in time. */
+                    canDelete = true;
+                }
+            }
+        } else {
             int n;
             if (!string2Int(*i, n) || n < 0)
-                throw UsageError(format("invalid generation specifier `%1%'")  % *i);
+                throw UsageError(format("invalid generation specifier ‘%1%’")  % *i);
             bool found = false;
             for (Generations::iterator j = gens.begin(); j != gens.end(); ++j) {
                 if (j->number == n) {
@@ -1318,102 +1331,117 @@ static void opDeleteGenerations(Globals & globals,
 }
 
 
-void run(Strings args)
+int main(int argc, char * * argv)
 {
-    Strings opFlags, opArgs, remaining;
-    Operation op = 0;
+    return handleExceptions(argv[0], [&]() {
+        initNix();
 
-    Globals globals;
+        Strings opFlags, opArgs, searchPath;
+        std::map<string, string> autoArgs_;
+        Operation op = 0;
+        bool repair = false;
+        string file;
 
-    globals.instSource.type = srcUnknown;
-    globals.instSource.nixExprPath = getDefNixExprPath();
-    globals.instSource.systemFilter = "*";
+        Globals globals;
 
-    globals.dryRun = false;
-    globals.preserveInstalled = false;
-    globals.removeAll = false;
-    globals.prebuiltOnly = false;
+        globals.instSource.type = srcUnknown;
+        globals.instSource.nixExprPath = getDefNixExprPath();
+        globals.instSource.systemFilter = "*";
 
-    for (Strings::iterator i = args.begin(); i != args.end(); ) {
-        string arg = *i++;
+        globals.dryRun = false;
+        globals.preserveInstalled = false;
+        globals.removeAll = false;
+        globals.prebuiltOnly = false;
 
-        Operation oldOp = op;
+        parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
+            Operation oldOp = op;
 
-        if (arg == "--install" || arg == "-i")
-            op = opInstall;
-        else if (parseOptionArg(arg, i, args.end(),
-                     globals.state, globals.instSource.autoArgs))
-            ;
-        else if (parseSearchPathArg(arg, i, args.end(), globals.state))
-            ;
-        else if (arg == "--force-name") // undocumented flag for nix-install-package
-            globals.forceName = needArg(i, args, arg);
-        else if (arg == "--uninstall" || arg == "-e")
-            op = opUninstall;
-        else if (arg == "--upgrade" || arg == "-u")
-            op = opUpgrade;
-        else if (arg == "--set-flag")
-            op = opSetFlag;
-        else if (arg == "--set")
-            op = opSet;
-        else if (arg == "--query" || arg == "-q")
-            op = opQuery;
-        else if (arg == "--profile" || arg == "-p")
-            globals.profile = absPath(needArg(i, args, arg));
-        else if (arg == "--file" || arg == "-f")
-            globals.instSource.nixExprPath = lookupFileArg(globals.state, needArg(i, args, arg));
-        else if (arg == "--switch-profile" || arg == "-S")
-            op = opSwitchProfile;
-        else if (arg == "--switch-generation" || arg == "-G")
-            op = opSwitchGeneration;
-        else if (arg == "--rollback")
-            op = opRollback;
-        else if (arg == "--list-generations")
-            op = opListGenerations;
-        else if (arg == "--delete-generations")
-            op = opDeleteGenerations;
-        else if (arg == "--dry-run") {
-            printMsg(lvlInfo, "(dry run; not doing anything)");
-            globals.dryRun = true;
+            if (*arg == "--help")
+                showManPage("nix-env");
+            else if (*arg == "--version")
+                printVersion("nix-env");
+            else if (*arg == "--install" || *arg == "-i")
+                op = opInstall;
+            else if (parseAutoArgs(arg, end, autoArgs_))
+                ;
+            else if (parseSearchPathArg(arg, end, searchPath))
+                ;
+            else if (*arg == "--force-name") // undocumented flag for nix-install-package
+                globals.forceName = getArg(*arg, arg, end);
+            else if (*arg == "--uninstall" || *arg == "-e")
+                op = opUninstall;
+            else if (*arg == "--upgrade" || *arg == "-u")
+                op = opUpgrade;
+            else if (*arg == "--set-flag")
+                op = opSetFlag;
+            else if (*arg == "--set")
+                op = opSet;
+            else if (*arg == "--query" || *arg == "-q")
+                op = opQuery;
+            else if (*arg == "--profile" || *arg == "-p")
+                globals.profile = absPath(getArg(*arg, arg, end));
+            else if (*arg == "--file" || *arg == "-f")
+                file = getArg(*arg, arg, end);
+            else if (*arg == "--switch-profile" || *arg == "-S")
+                op = opSwitchProfile;
+            else if (*arg == "--switch-generation" || *arg == "-G")
+                op = opSwitchGeneration;
+            else if (*arg == "--rollback")
+                op = opRollback;
+            else if (*arg == "--list-generations")
+                op = opListGenerations;
+            else if (*arg == "--delete-generations")
+                op = opDeleteGenerations;
+            else if (*arg == "--dry-run") {
+                printMsg(lvlInfo, "(dry run; not doing anything)");
+                globals.dryRun = true;
+            }
+            else if (*arg == "--system-filter")
+                globals.instSource.systemFilter = getArg(*arg, arg, end);
+            else if (*arg == "--prebuilt-only" || *arg == "-b")
+                globals.prebuiltOnly = true;
+            else if (*arg == "--repair")
+                repair = true;
+            else if (*arg != "" && arg->at(0) == '-') {
+                opFlags.push_back(*arg);
+                /* FIXME: hacky */
+                if (*arg == "--from-profile" ||
+                    (op == opQuery && (*arg == "--attr" || *arg == "-A")))
+                    opFlags.push_back(getArg(*arg, arg, end));
+            }
+            else
+                opArgs.push_back(*arg);
+
+            if (oldOp && oldOp != op)
+                throw UsageError("only one operation may be specified");
+
+            return true;
+        });
+
+        if (!op) throw UsageError("no operation specified");
+
+        globals.state = std::shared_ptr<EvalState>(new EvalState(searchPath));
+        globals.state->repair = repair;
+
+        if (file != "")
+            globals.instSource.nixExprPath = lookupFileArg(*globals.state, file);
+
+        globals.instSource.autoArgs = evalAutoArgs(*globals.state, autoArgs_);
+
+        if (globals.profile == "")
+            globals.profile = getEnv("NIX_PROFILE", "");
+
+        if (globals.profile == "") {
+            Path profileLink = getHomeDir() + "/.nix-profile";
+            globals.profile = pathExists(profileLink)
+                ? absPath(readLink(profileLink), dirOf(profileLink))
+                : canonPath(settings.nixStateDir + "/profiles/default");
         }
-        else if (arg == "--system-filter")
-            globals.instSource.systemFilter = needArg(i, args, arg);
-        else if (arg == "--prebuilt-only" || arg == "-b")
-            globals.prebuiltOnly = true;
-        else if (arg == "--repair")
-            globals.state.repair = true;
-        else {
-            remaining.push_back(arg);
-            if (arg[0] == '-') {
-                opFlags.push_back(arg);
-                if (arg == "--from-profile") { /* !!! hack */
-                    if (i != args.end()) opFlags.push_back(*i++);
-                }
-            } else opArgs.push_back(arg);
-        }
 
-        if (oldOp && oldOp != op)
-            throw UsageError("only one operation may be specified");
-    }
+        store = openStore();
 
-    if (!op) throw UsageError("no operation specified");
+        op(globals, opFlags, opArgs);
 
-    if (globals.profile == "")
-        globals.profile = getEnv("NIX_PROFILE", "");
-
-    if (globals.profile == "") {
-        Path profileLink = getHomeDir() + "/.nix-profile";
-        globals.profile = pathExists(profileLink)
-            ? absPath(readLink(profileLink), dirOf(profileLink))
-            : canonPath(settings.nixStateDir + "/profiles/default");
-    }
-
-    store = openStore();
-
-    op(globals, remaining, opFlags, opArgs);
-
-    globals.state.printStats();
+        globals.state->printStats();
+    });
 }
-
-
-string programId = "nix-env";

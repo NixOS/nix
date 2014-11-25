@@ -65,7 +65,7 @@ public:
 
     Paths importPaths(bool requireSignature, Source & source);
     
-    void buildPaths(const PathSet & paths, bool repair = false);
+    void buildPaths(const PathSet & paths, BuildMode buildMode);
 
     void ensurePath(const Path & path);
 
@@ -82,12 +82,13 @@ public:
     PathSet queryFailedPaths();
 
     void clearFailedPaths(const PathSet & paths);
-    
+
+    void optimiseStore();
+
 private:
     AutoCloseFD fdSocket;
     FdSink to;
     FdSource from;
-    Pid child;
     unsigned int daemonVersion;
     bool initialised;
 

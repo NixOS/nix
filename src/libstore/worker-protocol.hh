@@ -12,7 +12,6 @@ namespace nix {
 
 
 typedef enum {
-    wopQuit = 0,
     wopIsValidPath = 1,
     wopHasSubstitutes = 3,
     wopQueryPathHash = 4,
@@ -43,6 +42,7 @@ typedef enum {
     wopQueryValidPaths = 31,
     wopQuerySubstitutablePaths = 32,
     wopQueryValidDerivers = 33,
+    wopOptimiseStore = 34
 } WorkerOp;
 
 

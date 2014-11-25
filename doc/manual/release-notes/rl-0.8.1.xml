@@ -1,0 +1,21 @@
+<section xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="ch-relnotes-0.8.1">
+
+<title>Release 0.8.1 (April 13, 2005)</title>
+
+<para>This is a bug fix release.</para>
+
+<itemizedlist>
+
+  <listitem><para>Patch downloading was broken.</para></listitem>
+
+  <listitem><para>The garbage collector would not delete paths that
+  had references from invalid (but substitutable)
+  paths.</para></listitem>
+
+</itemizedlist>
+
+</section>

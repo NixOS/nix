@@ -1,11 +1,13 @@
 #! @perl@ -w @perlFlags@
 
+use strict;
 use Nix::SSH;
 use Nix::Config;
 use Nix::Store;
 use Nix::CopyClosure;
 use List::Util qw(sum);
 
+binmode STDERR, ":encoding(utf8)";
 
 if (scalar @ARGV < 1) {
     print STDERR <<EOF
@@ -19,9 +21,6 @@ EOF
 # Get the target host.
 my $sshHost;
 my $sign = 0;
-my $compressor = "";
-my $decompressor = "";
-my $progressViewer = "";
 my $toMode = 1;
 my $includeOutputs = 0;
 my $dryRun = 0;
@@ -40,17 +39,9 @@ while (@ARGV) {
     elsif ($arg eq "--sign") {
         $sign = 1;
     }
-    elsif ($arg eq "--gzip") {
-        $compressor = "gzip";
-        $decompressor = "gunzip";
-    }
-    elsif ($arg eq "--bzip2") {
-        $compressor = "bzip2";
-        $decompressor = "bunzip2";
-    }
-    elsif ($arg eq "--xz") {
-        $compressor = "xz";
-        $decompressor = "xz -d";
+    elsif ($arg eq "--gzip" || $arg eq "--bzip2" || $arg eq "--xz") {
+        warn "$0: ‘$arg’ is not implemented\n" if $arg ne "--gzip";
+        push @globalSshOpts, "-C";
     }
     elsif ($arg eq "--from") {
         $toMode = 0;
@@ -62,7 +53,7 @@ while (@ARGV) {
         $includeOutputs = 1;
     }
     elsif ($arg eq "--show-progress") {
-        $progressViewer = "@pv@";
+        warn "$0: ‘$arg’ is not implemented\n";
     }
     elsif ($arg eq "--dry-run") {
         $dryRun = 1;
@@ -81,51 +72,30 @@ while (@ARGV) {
 die "$0: you did not specify a host name\n" unless defined $sshHost;
 
 
-openSSHConnection $sshHost or die "$0: unable to start SSH\n";
-
-
 if ($toMode) { # Copy TO the remote machine.
     Nix::CopyClosure::copyTo(
-        $sshHost, [ @sshOpts ], [ @storePaths ], $compressor, $decompressor,
-        $includeOutputs, $dryRun, $sign, $progressViewer, $useSubstitutes);
+        $sshHost, [ @storePaths ],
+        $includeOutputs, $dryRun, $sign, $useSubstitutes);
 }
 
 else { # Copy FROM the remote machine.
 
+    my ($from, $to) = connectToRemoteNix($sshHost, []);
+
     # Query the closure of the given store paths on the remote
     # machine.  Paths are assumed to be store paths; there is no
     # resolution (following of symlinks).
-    my $extraOpts = $includeOutputs ? "--include-outputs" : "";
-    my $pid = open(READ,
-        "set -f; ssh @sshOpts $sshHost nix-store --query --requisites $extraOpts @storePaths|") or die;
-
-    while (<READ>) {
-        chomp;
-        die "bad: $_" unless /^\//;
-        push @missing, $_ unless isValidPath($_);
-    }
-
-    close READ or die "nix-store on remote machine `$sshHost' failed: $?";
-
-    my $missingSize = 0;
-    if ($progressViewer ne "") {
-        $missingSize = sum (split ' ', `set -f; ssh @sshOpts $sshHost nix-store -q --size @missing`) or die;
-    }
+    syswrite($to, pack("L<x4L<x4", 7, $includeOutputs ? 1 : 0)) or die;
+    writeStrings(\@storePaths, $to);
+    my @missing = grep { !isValidPath($_) } readStrings($from);
 
     # Export the store paths on the remote machine and import them locally.
     if (scalar @missing > 0) {
         print STDERR "copying ", scalar @missing, " missing paths from ‘$sshHost’...\n";
-        unless ($dryRun) {
-            if ($useSubstitutes) {
-                system "$Nix::Config::binDir/nix-store -r --ignore-unknown @missing";
-            }
-            $compressor = "| $compressor" if $compressor ne "";
-            $decompressor = "$decompressor |" if $decompressor ne "";
-            $progressViewer = "$progressViewer -s $missingSize |" if $progressViewer ne "";
-            my $extraOpts = $sign ? "--sign" : "";
-            system("set -f; ssh $sshHost @sshOpts 'nix-store --export $extraOpts @missing $compressor' | $decompressor $progressViewer $Nix::Config::binDir/nix-store --import > /dev/null") == 0
-                or die "copying store paths from remote machine `$sshHost' failed: $?";
-        }
+        writeInt(5, $to); # == cmdExportPaths
+        writeInt($sign ? 1 : 0, $to);
+        writeStrings(\@missing, $to);
+        importPaths(fileno($from));
     }
 
 }

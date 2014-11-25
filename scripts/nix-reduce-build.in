@@ -1,4 +1,4 @@
-#! @shell@
+#! @bash@
 
 WORKING_DIRECTORY=$(mktemp -d "${TMPDIR:-/tmp}"/nix-reduce-build-XXXXXX);
 cd "$WORKING_DIRECTORY";

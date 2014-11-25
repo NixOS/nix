@@ -16,46 +16,6 @@ namespace nix {
 
 
 class EvalState;
-struct Attr;
-
-
-/* Sets are represented as a vector of attributes, sorted by symbol
-   (i.e. pointer to the attribute name in the symbol table). */
-#if HAVE_BOEHMGC
-typedef std::vector<Attr, gc_allocator<Attr> > BindingsBase;
-#else
-typedef std::vector<Attr> BindingsBase;
-#endif
-
-
-class Bindings : public BindingsBase
-{
-public:
-    iterator find(const Symbol & name);
-    void sort();
-};
-
-
-typedef void (* PrimOpFun) (EvalState & state, Value * * args, Value & v);
-
-
-struct PrimOp
-{
-    PrimOpFun fun;
-    unsigned int arity;
-    Symbol name;
-    PrimOp(PrimOpFun fun, unsigned int arity, Symbol name)
-        : fun(fun), arity(arity), name(name) { }
-};
-
-
-struct Env
-{
-    Env * up;
-    unsigned short prevWith; // nr of levels up to next `with' environment
-    bool haveWithAttrs;
-    Value * values[0];
-};
 
 
 struct Attr
@@ -73,6 +33,76 @@ struct Attr
 };
 
 
+class Bindings
+{
+public:
+    typedef uint32_t size_t;
+
+private:
+    size_t size_, capacity;
+    Attr attrs[0];
+
+    Bindings(uint32_t capacity) : size_(0), capacity(capacity) { }
+    Bindings(const Bindings & bindings) = delete;
+
+public:
+    size_t size() const { return size_; }
+
+    bool empty() const { return !size_; }
+
+    typedef Attr * iterator;
+
+    void push_back(const Attr & attr)
+    {
+        assert(size_ < capacity);
+        attrs[size_++] = attr;
+    }
+
+    iterator find(const Symbol & name)
+    {
+        Attr key(name, 0);
+        iterator i = std::lower_bound(begin(), end(), key);
+        if (i != end() && i->name == name) return i;
+        return end();
+    }
+
+    iterator begin() { return &attrs[0]; }
+    iterator end() { return &attrs[size_]; }
+
+    Attr & operator[](size_t pos)
+    {
+        return attrs[pos];
+    }
+
+    void sort();
+
+    friend class EvalState;
+};
+
+
+typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, Value & v);
+
+
+struct PrimOp
+{
+    PrimOpFun fun;
+    unsigned int arity;
+    Symbol name;
+    PrimOp(PrimOpFun fun, unsigned int arity, Symbol name)
+        : fun(fun), arity(arity), name(name) { }
+};
+
+
+struct Env
+{
+    Env * up;
+    unsigned short size; // used by ‘valueSize’
+    unsigned short prevWith:15; // nr of levels up to next `with' environment
+    unsigned short haveWithAttrs:1;
+    Value * values[0];
+};
+
+
 void mkString(Value & v, const string & s, const PathSet & context = PathSet());
 
 void copyContext(const Value & v, PathSet & context);
@@ -82,10 +112,11 @@ void copyContext(const Value & v, PathSet & context);
    paths. */
 typedef std::map<Path, Path> SrcToStore;
 
-struct EvalState;
-
 
 std::ostream & operator << (std::ostream & str, const Value & v);
+
+
+typedef list<std::pair<string, Path> > SearchPath;
 
 
 class EvalState
@@ -95,7 +126,7 @@ public:
 
     const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue,
         sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
-        sFile, sLine, sColumn;
+        sFile, sLine, sColumn, sFunctor;
     Symbol sDerivationNix;
 
     /* If set, force copying files to the Nix store even if they
@@ -107,25 +138,24 @@ private:
 
     /* A cache from path names to values. */
 #if HAVE_BOEHMGC
-    typedef std::map<Path, Value, std::less<Path>, gc_allocator<std::pair<const Path, Value> > > FileEvalCache;
+    typedef std::map<Path, Value, std::less<Path>, traceable_allocator<std::pair<const Path, Value> > > FileEvalCache;
 #else
     typedef std::map<Path, Value> FileEvalCache;
 #endif
     FileEvalCache fileEvalCache;
 
-    typedef list<std::pair<string, Path> > SearchPath;
     SearchPath searchPath;
-    SearchPath::iterator searchPathInsertionPoint;
 
 public:
 
-    EvalState();
+    EvalState(const Strings & _searchPath);
     ~EvalState();
 
-    void addToSearchPath(const string & s);
+    void addToSearchPath(const string & s, bool warn = false);
 
     /* Parse a Nix expression from the specified file. */
     Expr * parseExprFromFile(const Path & path);
+    Expr * parseExprFromFile(const Path & path, StaticEnv & staticEnv);
 
     /* Parse a Nix expression from the specified string. */
     Expr * parseExprFromString(const string & s, const Path & basePath, StaticEnv & staticEnv);
@@ -139,6 +169,7 @@ public:
 
     /* Look up a file in the search path. */
     Path findFile(const string & path);
+    Path findFile(SearchPath & searchPath, const string & path);
 
     /* Evaluate an expression to normal form, storing the result in
        value `v'. */
@@ -146,8 +177,8 @@ public:
 
     /* Evaluation the expression, then verify that it has the expected
        type. */
-    inline bool evalBool(Env & env, Expr * e, Value & v);
     inline bool evalBool(Env & env, Expr * e);
+    inline bool evalBool(Env & env, Expr * e, const Pos & pos);
     inline void evalAttrs(Env & env, Expr * e, Value & v);
 
     /* If `v' is a thunk, enter it and overwrite `v' with the result
@@ -158,17 +189,19 @@ public:
 
     /* Force a value, then recursively force list elements and
        attributes. */
-    void strictForceValue(Value & v);
+    void forceValueDeep(Value & v);
 
     /* Force `v', and then verify that it has the expected type. */
-    NixInt forceInt(Value & v);
+    NixInt forceInt(Value & v, const Pos & pos);
     bool forceBool(Value & v);
     inline void forceAttrs(Value & v);
+    inline void forceAttrs(Value & v, const Pos & pos);
     inline void forceList(Value & v);
-    void forceFunction(Value & v); // either lambda or primop
-    string forceString(Value & v);
+    inline void forceList(Value & v, const Pos & pos);
+    void forceFunction(Value & v, const Pos & pos); // either lambda or primop
+    string forceString(Value & v, const Pos & pos = noPos);
     string forceString(Value & v, PathSet & context);
-    string forceStringNoCtx(Value & v);
+    string forceStringNoCtx(Value & v, const Pos & pos = noPos);
 
     /* Return true iff the value `v' denotes a derivation (i.e. a
        set with attribute `type = "derivation"'). */
@@ -178,7 +211,7 @@ public:
        string.  If `coerceMore' is set, also converts nulls, integers,
        booleans and lists to a string.  If `copyToStore' is set,
        referenced paths are copied to the Nix store as a side effect. */
-    string coerceToString(Value & v, PathSet & context,
+    string coerceToString(const Pos & pos, Value & v, PathSet & context,
         bool coerceMore = false, bool copyToStore = true);
 
     string copyPathToStore(PathSet & context, const Path & path);
@@ -186,7 +219,7 @@ public:
     /* Path coercion.  Converts strings, paths and derivations to a
        path.  The result is guaranteed to be a canonicalised, absolute
        path.  Nothing is copied to the store. */
-    Path coerceToPath(Value & v, PathSet & context);
+    Path coerceToPath(const Pos & pos, Value & v, PathSet & context);
 
 public:
 
@@ -216,9 +249,9 @@ private:
 
     inline Value * lookupVar(Env * env, const ExprVar & var, bool noEval);
 
-    friend class ExprVar;
-    friend class ExprAttrs;
-    friend class ExprLet;
+    friend struct ExprVar;
+    friend struct ExprAttrs;
+    friend struct ExprLet;
 
     Expr * parse(const char * text, const Path & path,
         const Path & basePath, StaticEnv & staticEnv);
@@ -229,8 +262,8 @@ public:
        elements and attributes are compared recursively. */
     bool eqValues(Value & v1, Value & v2);
 
-    void callFunction(Value & fun, Value & arg, Value & v);
-    void callPrimOp(Value & fun, Value & arg, Value & v);
+    void callFunction(Value & fun, Value & arg, Value & v, const Pos & pos);
+    void callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos);
 
     /* Automatically call a function for which each argument has a
        default value or has a binding in the `args' map. */
@@ -242,15 +275,19 @@ public:
 
     Value * allocAttr(Value & vAttrs, const Symbol & name);
 
+    Bindings * allocBindings(Bindings::size_t capacity);
+
     void mkList(Value & v, unsigned int length);
     void mkAttrs(Value & v, unsigned int expected);
     void mkThunk_(Value & v, Expr * expr);
     void mkPos(Value & v, Pos * pos);
 
-    void concatLists(Value & v, unsigned int nrLists, Value * * lists);
+    void concatLists(Value & v, unsigned int nrLists, Value * * lists, const Pos & pos);
 
     /* Print statistics. */
     void printStats();
+
+    void printCanaries();
 
 private:
 
@@ -259,6 +296,7 @@ private:
     unsigned long nrValues;
     unsigned long nrListElems;
     unsigned long nrAttrsets;
+    unsigned long nrAttrsInAttrsets;
     unsigned long nrOpUpdates;
     unsigned long nrOpUpdateValuesCopied;
     unsigned long nrListConcats;
@@ -278,10 +316,16 @@ private:
     typedef std::map<Pos, unsigned int> AttrSelects;
     AttrSelects attrSelects;
 
-    friend class ExprOpUpdate;
-    friend class ExprOpConcatLists;
-    friend class ExprSelect;
-    friend void prim_getAttr(EvalState & state, Value * * args, Value & v);
+    friend struct ExprOpUpdate;
+    friend struct ExprOpConcatLists;
+    friend struct ExprSelect;
+    friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
+
+#if HAVE_BOEHMGC
+    std::set<Value *> gcCanaries;
+    friend void canaryFinalizer(GC_PTR obj, GC_PTR client_data);
+    friend void prim_gcCanary(EvalState & state, const Pos & pos, Value * * args, Value & v);
+#endif
 };
 
 
@@ -292,5 +336,16 @@ string showType(const Value & v);
 /* If `path' refers to a directory, then append "/default.nix". */
 Path resolveExprPath(Path path);
 
+struct InvalidPathError : EvalError
+{
+    Path path;
+    InvalidPathError(const Path & path);
+#ifdef EXCEPTION_NEEDS_THROW_SPEC
+    ~InvalidPathError() throw () { };
+#endif
+};
+
+/* Realise all paths in `context' */
+void realiseContext(const PathSet & context);
 
 }

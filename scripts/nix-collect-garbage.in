@@ -8,12 +8,19 @@ my $profilesDir = "@localstatedir@/nix/profiles";
 
 # Process the command line arguments.
 my @args = ();
+my $arg;
+
 my $removeOld = 0;
+my $gen;
 my $dryRun = 0;
 
-for my $arg (@ARGV) {
+while ($arg = shift) {
     if ($arg eq "--delete-old" || $arg eq "-d") {
         $removeOld = 1;
+        $gen = "old";
+    } elsif ($arg eq "--delete-older-than") {
+        $removeOld = 1;
+        $gen = shift;
     } elsif ($arg eq "--dry-run") {
         $dryRun = 1;
     } elsif ($arg eq "--help") {
@@ -40,7 +47,8 @@ sub removeOldGenerations {
         $name = $dir . "/" . $name;
         if (-l $name && (readlink($name) =~ /link/)) {
             print STDERR "removing old generations of profile $name\n";
-            system("$Nix::Config::binDir/nix-env", "-p", $name, "--delete-generations", "old", $dryRun ? "--dry-run" : ());
+
+            system("$Nix::Config::binDir/nix-env", "-p", $name, "--delete-generations", $gen, $dryRun ? "--dry-run" : ());
         }
         elsif (! -l $name && -d $name) {
             removeOldGenerations $name;

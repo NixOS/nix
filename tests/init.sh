@@ -17,6 +17,7 @@ mkdir "$NIX_DB_DIR"
 mkdir "$NIX_CONF_DIR"
 
 cat > "$NIX_CONF_DIR"/nix.conf <<EOF
+build-users-group =
 gc-keep-outputs = false
 gc-keep-derivations = false
 env-keep-derivations = false

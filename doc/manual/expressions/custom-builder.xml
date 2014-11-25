@@ -1,0 +1,26 @@
+<section xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="sec-custom-builder">
+
+<title>Customizing the Generic Builder</title>
+
+<para>The operation of the generic builder can be modified in many
+places by setting certain variables.  These <emphasis>hook
+variables</emphasis> are typically set to the name of some shell
+function defined by you.  For instance, to perform some additional
+steps after <command>make install</command> you would set the
+<varname>postInstall</varname> variable:
+
+<programlisting>
+postInstall=myPostInstall
+
+myPostInstall() {
+    mkdir $out/share/extra
+    cp extrafiles/* $out/share/extra
+}</programlisting>
+
+</para>
+
+</section>

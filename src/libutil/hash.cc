@@ -89,11 +89,11 @@ Hash parseHash(HashType ht, const string & s)
 {
     Hash hash(ht);
     if (s.length() != hash.hashSize * 2)
-        throw Error(format("invalid hash `%1%'") % s);
+        throw Error(format("invalid hash ‘%1%’") % s);
     for (unsigned int i = 0; i < hash.hashSize; i++) {
         string s2(s, i * 2, 2);
         if (!isxdigit(s2[0]) || !isxdigit(s2[1])) 
-            throw Error(format("invalid hash `%1%'") % s);
+            throw Error(format("invalid hash ‘%1%’") % s);
         std::istringstream str(s2);
         int n;
         str >> std::hex >> n;
@@ -200,10 +200,10 @@ Hash parseHash32(HashType ht, const string & s)
         for (digit = 0; digit < base32Chars.size(); ++digit) /* !!! slow */
             if (chars[digit] == c) break;
         if (digit >= 32)
-            throw Error(format("invalid base-32 hash `%1%'") % s);
+            throw Error(format("invalid base-32 hash ‘%1%’") % s);
         if (mul(hash.hash, 32, hash.hashSize) ||
             add(hash.hash, digit, hash.hashSize))
-            throw Error(format("base-32 hash `%1%' is too large") % s);
+            throw Error(format("base-32 hash ‘%1%’ is too large") % s);
     }
 
     return hash;
@@ -220,7 +220,7 @@ Hash parseHash16or32(HashType ht, const string & s)
         /* base-32 representation */
         hash = parseHash32(ht, s);
     else
-        throw Error(format("hash `%1%' has wrong length for hash type `%2%'")
+        throw Error(format("hash ‘%1%’ has wrong length for hash type ‘%2%’")
             % s % printHashType(ht));
     return hash;
 }
@@ -290,13 +290,13 @@ Hash hashFile(HashType ht, const Path & path)
     start(ht, ctx);
 
     AutoCloseFD fd = open(path.c_str(), O_RDONLY);
-    if (fd == -1) throw SysError(format("opening file `%1%'") % path);
+    if (fd == -1) throw SysError(format("opening file ‘%1%’") % path);
 
     unsigned char buf[8192];
     ssize_t n;
     while ((n = read(fd, buf, sizeof(buf)))) {
         checkInterrupt();
-        if (n == -1) throw SysError(format("reading file `%1%'") % path);
+        if (n == -1) throw SysError(format("reading file ‘%1%’") % path);
         update(ht, ctx, buf, n);
     }
     

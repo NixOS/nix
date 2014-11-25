@@ -22,13 +22,13 @@ typedef enum {
 } ValueType;
 
 
-struct Bindings;
+class Bindings;
 struct Env;
 struct Expr;
 struct ExprLambda;
 struct PrimOp;
 struct PrimOp;
-struct Symbol;
+class Symbol;
 
 
 typedef long NixInt;
@@ -96,7 +96,7 @@ struct Value
    Value to ensure that the target isn't kept alive unnecessarily. */
 static inline void clearValue(Value & v)
 {
-    v.app.right = 0;
+    v.app.left = v.app.right = 0;
 }
 
 
@@ -118,8 +118,8 @@ static inline void mkBool(Value & v, bool b)
 
 static inline void mkNull(Value & v)
 {
+    clearValue(v);
     v.type = tNull;
-    v.app.left = v.app.right = 00; // scrub
 }
 
 
@@ -157,6 +157,12 @@ static inline void mkPathNoCopy(Value & v, const char * s)
 
 
 void mkPath(Value & v, const char * s);
+
+
+/* Compute the size in bytes of the given value, including all values
+   and environments reachable from it. Static expressions (Exprs) are
+   not included. */
+size_t valueSize(Value & v);
 
 
 }

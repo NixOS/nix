@@ -13,7 +13,7 @@ BufferedSink::~BufferedSink()
     /* We can't call flush() here, because C++ for some insane reason
        doesn't allow you to call virtual methods from a destructor. */
     assert(!bufPos);
-    if (buffer) delete[] buffer;
+    delete[] buffer;
 }
 
     
@@ -54,8 +54,24 @@ FdSink::~FdSink()
 }
 
 
+size_t threshold = 256 * 1024 * 1024;
+
+static void warnLargeDump()
+{
+    printMsg(lvlError, "warning: dumping very large path (> 256 MiB); this may run out of memory");
+}
+
+
 void FdSink::write(const unsigned char * data, size_t len)
 {
+    static bool warned = false;
+    if (warn && !warned) {
+        written += len;
+        if (written > threshold) {
+            warnLargeDump();
+            warned = true;
+        }
+    }
     writeFull(fd, data, len);
 }
 
@@ -71,7 +87,7 @@ void Source::operator () (unsigned char * data, size_t len)
 
 BufferedSource::~BufferedSource()
 {
-    if (buffer) delete[] buffer;
+    delete[] buffer;
 }
 
 
@@ -254,6 +270,17 @@ template<class T> T readStrings(Source & source)
 
 template Paths readStrings(Source & source);
 template PathSet readStrings(Source & source);
+
+
+void StringSink::operator () (const unsigned char * data, size_t len)
+{
+    static bool warned = false;
+    if (!warned && s.size() > threshold) {
+        warnLargeDump();
+        warned = true;
+    }
+    s.append((const char *) data, len);
+}
 
 
 }

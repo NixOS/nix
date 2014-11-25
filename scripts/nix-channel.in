@@ -1,10 +1,13 @@
 #! @perl@ -w @perlFlags@
 
+use utf8;
 use strict;
 use File::Basename;
 use File::Path qw(mkpath);
 use Nix::Config;
 use Nix::Manifest;
+
+binmode STDERR, ":encoding(utf8)";
 
 Nix::Config::readConfig;
 
@@ -22,7 +25,7 @@ my $channelsList = "$home/.nix-channels";
 my $nixDefExpr = "$home/.nix-defexpr";
 
 # Figure out the name of the channels profile.
-my $userName = getpwuid($<) or die "cannot figure out user name";
+my $userName = getpwuid($<) || $ENV{"USER"} or die "cannot figure out user name";
 my $profile = "$Nix::Config::stateDir/profiles/per-user/$userName/channels";
 mkpath(dirname $profile, 0, 0755);
 
@@ -32,7 +35,7 @@ my %channels;
 # Reads the list of channels.
 sub readChannels {
     return if (!-f $channelsList);
-    open CHANNELS, "<$channelsList" or die "cannot open `$channelsList': $!";
+    open CHANNELS, "<$channelsList" or die "cannot open ‘$channelsList’: $!";
     while (<CHANNELS>) {
         chomp;
         next if /^\s*\#/;
@@ -47,7 +50,7 @@ sub readChannels {
 
 # Writes the list of channels.
 sub writeChannels {
-    open CHANNELS, ">$channelsList" or die "cannot open `$channelsList': $!";
+    open CHANNELS, ">$channelsList" or die "cannot open ‘$channelsList’: $!";
     foreach my $name (keys %channels) {
         print CHANNELS "$channels{$name} $name\n";
     }
@@ -58,6 +61,8 @@ sub writeChannels {
 # Adds a channel.
 sub addChannel {
     my ($url, $name) = @_;
+    die "invalid channel URL ‘$url’" unless $url =~ /^(file|http|https):\/\//;
+    die "invalid channel identifier ‘$name’" unless $name =~ /^[a-zA-Z0-9_][a-zA-Z0-9_\-\.]*$/;
     readChannels;
     $channels{$name} = $url;
     writeChannels;
@@ -74,7 +79,7 @@ sub removeChannel {
     writeChannels;
 
     system("$Nix::Config::binDir/nix-env --profile '$profile' -e '$name'") == 0
-        or die "cannot remove channel `$name'\n";
+        or die "cannot remove channel ‘$name’\n";
 }
 
 
@@ -97,7 +102,7 @@ sub update {
         # consistency if the redirection is changed between
         # downloading the manifest and the tarball.
         my $headers = `$Nix::Config::curl --silent --head '$url'`;
-        die "$0: unable to check `$url'\n" if $? != 0;
+        die "$0: unable to check ‘$url’\n" if $? != 0;
         $headers =~ s/\r//g;
         $url = $1 if $headers =~ /^Location:\s*(.*)\s*$/m;
 
@@ -115,19 +120,19 @@ sub update {
         if ($getManifest) {
             # No binary cache, so pull the channel manifest.
             mkdir $manifestDir, 0755 unless -e $manifestDir;
-            die "$0: you do not have write permission to `$manifestDir'!\n" unless -W $manifestDir;
+            die "$0: you do not have write permission to ‘$manifestDir’!\n" unless -W $manifestDir;
             $ENV{'NIX_ORIG_URL'} = $origUrl;
             system("$Nix::Config::binDir/nix-pull", "--skip-wrong-store", "$url/MANIFEST") == 0
-                or die "cannot pull manifest from `$url'\n";
+                or die "cannot pull manifest from ‘$url’\n";
         }
 
         # Download the channel tarball.
         my $fullURL = "$url/nixexprs.tar.xz";
         system("$Nix::Config::curl --fail --silent --head '$fullURL' > /dev/null") == 0 or
             $fullURL = "$url/nixexprs.tar.bz2";
-        print STDERR "downloading Nix expressions from `$fullURL'...\n";
+        print STDERR "downloading Nix expressions from ‘$fullURL’...\n";
         my ($hash, $path) = `PRINT_PATH=1 QUIET=1 $Nix::Config::binDir/nix-prefetch-url '$fullURL'`;
-        die "cannot fetch `$fullURL'\n" if $? != 0;
+        die "cannot fetch ‘$fullURL’\n" if $? != 0;
         chomp $path;
 
         # If the URL contains a version number, append it to the name
@@ -148,10 +153,10 @@ sub update {
 
     # Make the channels appear in nix-env.
     unlink $nixDefExpr if -l $nixDefExpr; # old-skool ~/.nix-defexpr
-    mkdir $nixDefExpr or die "cannot create directory `$nixDefExpr'" if !-e $nixDefExpr;
+    mkdir $nixDefExpr or die "cannot create directory ‘$nixDefExpr’" if !-e $nixDefExpr;
     my $channelLink = "$nixDefExpr/channels";
     unlink $channelLink; # !!! not atomic
-    symlink($profile, $channelLink) or die "cannot symlink `$channelLink' to `$profile'";
+    symlink($profile, $channelLink) or die "cannot symlink ‘$channelLink’ to ‘$profile’";
 }
 
 
@@ -162,7 +167,7 @@ while (scalar @ARGV) {
     my $arg = shift @ARGV;
 
     if ($arg eq "--add") {
-        die "$0: `--add' requires one or two arguments\n" if scalar @ARGV < 1 || scalar @ARGV > 2;
+        die "$0: ‘--add’ requires one or two arguments\n" if scalar @ARGV < 1 || scalar @ARGV > 2;
         my $url = shift @ARGV;
         my $name = shift @ARGV;
         unless (defined $name) {
@@ -175,13 +180,13 @@ while (scalar @ARGV) {
     }
 
     if ($arg eq "--remove") {
-        die "$0: `--remove' requires one argument\n" if scalar @ARGV != 1;
+        die "$0: ‘--remove’ requires one argument\n" if scalar @ARGV != 1;
         removeChannel(shift @ARGV);
         last;
     }
 
     if ($arg eq "--list") {
-        die "$0: `--list' requires one argument\n" if scalar @ARGV != 0;
+        die "$0: ‘--list’ requires one argument\n" if scalar @ARGV != 0;
         readChannels;
         foreach my $name (keys %channels) {
             print "$name $channels{$name}\n";
@@ -191,6 +196,20 @@ while (scalar @ARGV) {
 
     elsif ($arg eq "--update") {
         update(@ARGV);
+        last;
+    }
+
+    elsif ($arg eq "--rollback") {
+        die "$0: ‘--rollback’ has at most one argument\n" if scalar @ARGV > 1;
+        my $generation = shift @ARGV;
+        my @args = ("$Nix::Config::binDir/nix-env", "--profile", $profile);
+        if (defined $generation) {
+            die "invalid channel generation number ‘$generation’" unless $generation =~ /^[0-9]+$/;
+            push @args, "--switch-generation", $generation;
+        } else {
+            push @args, "--rollback";
+        }
+        system(@args) == 0 or exit 1;
         last;
     }
 
@@ -204,6 +223,6 @@ while (scalar @ARGV) {
     }
 
     else {
-        die "unknown argument `$arg'; try `--help'\n";
+        die "unknown argument ‘$arg’; try ‘--help’\n";
     }
 }

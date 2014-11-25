@@ -1,5 +1,6 @@
 #! @perl@ -w @perlFlags@
 
+use utf8;
 use DBI;
 use DBD::SQLite;
 use File::Basename;
@@ -12,6 +13,8 @@ use WWW::Curl::Easy;
 use WWW::Curl::Multi;
 use strict;
 
+STDERR->autoflush(1);
+binmode STDERR, ":encoding(utf8)";
 
 Nix::Config::readConfig;
 
@@ -38,9 +41,16 @@ my $activeRequests = 0;
 my $curlIdCount = 1;
 my %requests;
 my %scheduled;
-my $caBundle = $ENV{"CURL_CA_BUNDLE"} // $ENV{"OPENSSL_X509_CERT_FILE"};
+my $caBundle = $ENV{"SSL_CERT_FILE"} // $ENV{"CURL_CA_BUNDLE"} // $ENV{"OPENSSL_X509_CERT_FILE"};
 
-my $userName = getpwuid($<) or die "cannot figure out user name";
+my $userName = getpwuid($<) || $ENV{"USER"} or die "cannot figure out user name";
+
+my $requireSignedBinaryCaches = ($Nix::Config::config{"signed-binary-caches"} // "0") ne "0";
+
+my $curlConnectTimeout = int(
+    $Nix::Config::config{"untrusted-connect-timeout"} //
+    $Nix::Config::config{"connect-timeout"} //
+    $ENV{"NIX_CONNECT_TIMEOUT"} // 0);
 
 
 sub addRequest {
@@ -60,7 +70,8 @@ sub addRequest {
     $curl->setopt(CURLOPT_USERAGENT, "Nix/$Nix::Config::version");
     $curl->setopt(CURLOPT_NOBODY, 1) if $head;
     $curl->setopt(CURLOPT_FAILONERROR, 1);
-    $curl->setopt(CURLOPT_TIMEOUT, int($ENV{"NIX_CONNECT_TIMEOUT"} // 0));
+    $curl->setopt(CURLOPT_CONNECTTIMEOUT, $curlConnectTimeout);
+    $curl->setopt(CURLOPT_TIMEOUT, 20 * 60);
 
     if ($activeRequests >= $maxParallelRequests) {
         $scheduled{$curlId} = 1;
@@ -120,13 +131,14 @@ sub processRequests {
 
 
 sub initCache {
-    my $dbPath = "$Nix::Config::stateDir/binary-cache-v2.sqlite";
+    my $dbPath = "$Nix::Config::stateDir/binary-cache-v3.sqlite";
 
     unlink "$Nix::Config::stateDir/binary-cache-v1.sqlite";
+    unlink "$Nix::Config::stateDir/binary-cache-v2.sqlite";
 
     # Open/create the database.
     $dbh = DBI->connect("dbi:SQLite:dbname=$dbPath", "", "")
-        or die "cannot open database `$dbPath'";
+        or die "cannot open database ‘$dbPath’";
     $dbh->{RaiseError} = 1;
     $dbh->{PrintError} = 0;
 
@@ -159,7 +171,7 @@ EOF
             narSize          integer,
             refs             text,
             deriver          text,
-            system           text,
+            signedBy         text,
             timestamp        integer not null,
             primary key (cache, storePath),
             foreign key (cache) references BinaryCaches(id) on delete cascade
@@ -183,7 +195,7 @@ EOF
 
     $insertNAR = $dbh->prepare(
         "insert or replace into NARs(cache, storePath, url, compression, fileHash, fileSize, narHash, " .
-        "narSize, refs, deriver, system, timestamp) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)") or die;
+        "narSize, refs, deriver, signedBy, timestamp) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)") or die;
 
     $queryNAR = $dbh->prepare("select * from NARs where cache = ? and storePath = ?") or die;
 
@@ -229,7 +241,7 @@ sub getAvailableCaches {
         my @untrustedUrls = strToList $Nix::Config::config{"untrusted-binary-caches"};
         @urls = ();
         foreach my $url (@untrustedUrls) {
-            die "binary cache ‘$url’ is not trusted (please add it to ‘trusted-binary-caches’ [@trustedUrls] in $Nix::Config::confDir/nix.conf)\n"
+            die "binary cache ‘$url’ is not trusted (please add it to ‘trusted-binary-caches’ in $Nix::Config::confDir/nix.conf)\n"
                 unless scalar(grep { $url eq $_ } @trustedUrls) > 0;
             push @urls, $url;
         }
@@ -237,7 +249,10 @@ sub getAvailableCaches {
 
     my @untrustedUrls = strToList $Nix::Config::config{"untrusted-extra-binary-caches"} // "";
     foreach my $url (@untrustedUrls) {
-        next unless scalar(grep { $url eq $_ } @trustedUrls) > 0;
+        unless (scalar(grep { $url eq $_ } @trustedUrls) > 0) {
+            warn "binary cache ‘$url’ is not trusted (please add it to ‘trusted-binary-caches’ in $Nix::Config::confDir/nix.conf)\n";
+            next;
+        }
         push @urls, $url;
     }
 
@@ -309,14 +324,16 @@ sub processNARInfo {
         return undef;
     }
 
-    my $narInfo = parseNARInfo($storePath, $request->{content});
+    my $narInfo = parseNARInfo($storePath, $request->{content}, $requireSignedBinaryCaches, $request->{url});
     return undef unless defined $narInfo;
+
+    die if $requireSignedBinaryCaches && !defined $narInfo->{signedBy};
 
     # Cache the result.
     $insertNAR->execute(
         $cache->{id}, basename($storePath), $narInfo->{url}, $narInfo->{compression},
         $narInfo->{fileHash}, $narInfo->{fileSize}, $narInfo->{narHash}, $narInfo->{narSize},
-        join(" ", @{$narInfo->{refs}}), $narInfo->{deriver}, $narInfo->{system}, time())
+        join(" ", @{$narInfo->{refs}}), $narInfo->{deriver}, $narInfo->{signedBy}, time())
         if shouldCache $request->{url};
 
     return $narInfo;
@@ -330,6 +347,10 @@ sub getCachedInfoFrom {
     my $res = $queryNAR->fetchrow_hashref();
     return undef unless defined $res;
 
+    # We may previously have cached this info when signature checking
+    # was disabled.  In that case, ignore the cached info.
+    return undef if $requireSignedBinaryCaches && !defined $res->{signedBy};
+
     return
         { url => $res->{url}
         , compression => $res->{compression}
@@ -339,6 +360,7 @@ sub getCachedInfoFrom {
         , narSize => $res->{narSize}
         , refs => [ split " ", $res->{refs} ]
         , deriver => $res->{deriver}
+        , signedBy => $res->{signedBy}
         } if defined $res;
 }
 
@@ -522,14 +544,16 @@ sub downloadBinary {
             next;
         }
         my $url = "$cache->{url}/$info->{url}"; # FIXME: handle non-relative URLs
-        print STDERR "\n*** Downloading ‘$url’ to ‘$storePath’...\n";
+        die if $requireSignedBinaryCaches && !defined $info->{signedBy};
+        print STDERR "\n*** Downloading ‘$url’ ", ($requireSignedBinaryCaches ? "(signed by ‘$info->{signedBy}’) " : ""), "to ‘$storePath’...\n";
         checkURL $url;
-        if (system("$Nix::Config::curl --fail --location --insecure '$url' $decompressor | $Nix::Config::binDir/nix-store --restore $destPath") != 0) {
-            warn "download of `$url' failed" . ($! ? ": $!" : "") . "\n";
+        if (system("$Nix::Config::curl --fail --location --insecure --connect-timeout $curlConnectTimeout '$url' $decompressor | $Nix::Config::binDir/nix-store --restore $destPath") != 0) {
+            warn "download of ‘$url’ failed" . ($! ? ": $!" : "") . "\n";
             next;
         }
 
         # Tell Nix about the expected hash so it can verify it.
+        die unless defined $info->{narHash} && $info->{narHash} ne "";
         print "$info->{narHash}\n";
 
         print STDERR "\n";
@@ -570,7 +594,7 @@ if ($ARGV[0] eq "--query") {
             print "\n";
         }
 
-        else { die "unknown command `$cmd'"; }
+        else { die "unknown command ‘$cmd’"; }
 
         flush STDOUT;
     }

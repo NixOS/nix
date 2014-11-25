@@ -16,6 +16,47 @@ std::ostream & operator << (std::ostream & str, Expr & e)
     return str;
 }
 
+static void showString(std::ostream & str, const string & s)
+{
+    str << '"';
+    for (auto c : (string) s)
+        if (c == '"' || c == '\\' || c == '$') str << "\\" << c;
+        else if (c == '\n') str << "\\n";
+        else if (c == '\r') str << "\\r";
+        else if (c == '\t') str << "\\t";
+        else str << c;
+    str << '"';
+}
+
+static void showId(std::ostream & str, const string & s)
+{
+    assert(!s.empty());
+    if (s == "if")
+        str << '"' << s << '"';
+    else {
+        char c = s[0];
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_')) {
+            showString(str, s);
+            return;
+        }
+        for (auto c : s)
+            if (!((c >= 'a' && c <= 'z') ||
+                  (c >= 'A' && c <= 'Z') ||
+                  (c >= '0' && c <= '9') ||
+                  c == '_' || c == '\'' || c == '-')) {
+                showString(str, s);
+                return;
+            }
+        str << s;
+    }
+}
+
+std::ostream & operator << (std::ostream & str, const Symbol & sym)
+{
+    showId(str, *sym.s);
+    return str;
+}
+
 void Expr::show(std::ostream & str)
 {
     abort();
@@ -28,7 +69,7 @@ void ExprInt::show(std::ostream & str)
 
 void ExprString::show(std::ostream & str)
 {
-    str << "\"" << s << "\""; // !!! escaping
+    showString(str, s);
 }
 
 void ExprPath::show(std::ostream & str)
@@ -44,12 +85,12 @@ void ExprVar::show(std::ostream & str)
 void ExprSelect::show(std::ostream & str)
 {
     str << "(" << *e << ")." << showAttrPath(attrPath);
-    if (def) str << " or " << *def;
+    if (def) str << " or (" << *def << ")";
 }
 
 void ExprOpHasAttr::show(std::ostream & str)
 {
-    str << "(" << *e << ") ? " << showAttrPath(attrPath);
+    str << "((" << *e << ") ? " << showAttrPath(attrPath) << ")";
 }
 
 void ExprAttrs::show(std::ostream & str)
@@ -61,6 +102,8 @@ void ExprAttrs::show(std::ostream & str)
             str << "inherit " << i->first << " " << "; ";
         else
             str << i->first << " = " << *i->second.e << "; ";
+    foreach (DynamicAttrDefs::iterator, i, dynamicAttrs)
+        str << "\"${" << *i->nameExpr << "}\" = " << *i->valueExpr << "; ";
     str << "}";
 }
 
@@ -83,6 +126,10 @@ void ExprLambda::show(std::ostream & str)
             str << i->name;
             if (i->def) str << " ? " << *i->def;
         }
+        if (formals->ellipsis) {
+            if (!first) str << ", ";
+            str << "...";
+        }
         str << " }";
         if (!arg.empty()) str << " @ ";
     }
@@ -92,23 +139,24 @@ void ExprLambda::show(std::ostream & str)
 
 void ExprLet::show(std::ostream & str)
 {
-    str << "let ";
+    str << "(let ";
     foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs)
-        if (i->second.inherited)
+        if (i->second.inherited) {
             str << "inherit " << i->first << "; ";
+        }
         else
             str << i->first << " = " << *i->second.e << "; ";
-    str << "in " << *body;
+    str << "in " << *body << ")";
 }
 
 void ExprWith::show(std::ostream & str)
 {
-    str << "with " << *attrs << "; " << *body;
+    str << "(with " << *attrs << "; " << *body << ")";
 }
 
 void ExprIf::show(std::ostream & str)
 {
-    str << "if " << *cond << " then " << *then << " else " << *else_;
+    str << "(if " << *cond << " then " << *then << " else " << *else_ << ")";
 }
 
 void ExprAssert::show(std::ostream & str)
@@ -118,16 +166,18 @@ void ExprAssert::show(std::ostream & str)
 
 void ExprOpNot::show(std::ostream & str)
 {
-    str << "! " << *e;
+    str << "(! " << *e << ")";
 }
 
 void ExprConcatStrings::show(std::ostream & str)
 {
     bool first = true;
+    str << "(";
     foreach (vector<Expr *>::iterator, i, *es) {
         if (first) first = false; else str << " + ";
         str << **i;
     }
+    str << ")";
 }
 
 void ExprPos::show(std::ostream & str)
@@ -138,22 +188,29 @@ void ExprPos::show(std::ostream & str)
 
 std::ostream & operator << (std::ostream & str, const Pos & pos)
 {
-    if (!pos.line)
+    if (!pos)
         str << "undefined position";
     else
-        str << (format("`%1%:%2%:%3%'") % pos.file % pos.line % pos.column).str();
+        str << (format(ANSI_BOLD "%1%" ANSI_NORMAL ":%2%:%3%") % pos.file % pos.line % pos.column).str();
     return str;
 }
 
 
 string showAttrPath(const AttrPath & attrPath)
 {
-    string s;
+    std::ostringstream out;
+    bool first = true;
     foreach (AttrPath::const_iterator, i, attrPath) {
-        if (!s.empty()) s += '.';
-        s += *i;
+        if (!first)
+            out << '.';
+        else
+            first = false;
+        if (i->symbol.set())
+            out << i->symbol;
+        else
+            out << "\"${" << *i->expr << "}\"";
     }
-    return s;
+    return out.str();
 }
 
 
@@ -203,7 +260,7 @@ void ExprVar::bindVars(const StaticEnv & env)
     /* Otherwise, the variable must be obtained from the nearest
        enclosing `with'.  If there is no `with', then we can issue an
        "undefined variable" error now. */
-    if (withLevel == -1) throw UndefinedVarError(format("undefined variable `%1%' at %2%") % name % pos);
+    if (withLevel == -1) throw UndefinedVarError(format("undefined variable ‘%1%’ at %2%") % name % pos);
 
     fromWith = true;
     this->level = withLevel;
@@ -213,17 +270,26 @@ void ExprSelect::bindVars(const StaticEnv & env)
 {
     e->bindVars(env);
     if (def) def->bindVars(env);
+    foreach (AttrPath::iterator, i, attrPath)
+        if (!i->symbol.set())
+            i->expr->bindVars(env);
 }
 
 void ExprOpHasAttr::bindVars(const StaticEnv & env)
 {
     e->bindVars(env);
+    foreach (AttrPath::iterator, i, attrPath)
+        if (!i->symbol.set())
+            i->expr->bindVars(env);
 }
 
 void ExprAttrs::bindVars(const StaticEnv & env)
 {
+    const StaticEnv * dynamicEnv = &env;
+    StaticEnv newEnv(false, &env);
+
     if (recursive) {
-        StaticEnv newEnv(false, &env);
+        dynamicEnv = &newEnv;
 
         unsigned int displ = 0;
         foreach (AttrDefs::iterator, i, attrs)
@@ -236,6 +302,11 @@ void ExprAttrs::bindVars(const StaticEnv & env)
     else
         foreach (AttrDefs::iterator, i, attrs)
             i->second.e->bindVars(env);
+
+    foreach (DynamicAttrDefs::iterator, i, dynamicAttrs) {
+        i->nameExpr->bindVars(*dynamicEnv);
+        i->valueExpr->bindVars(*dynamicEnv);
+    }
 }
 
 void ExprList::bindVars(const StaticEnv & env)
@@ -341,7 +412,7 @@ void ExprLambda::setName(Symbol & name)
 
 string ExprLambda::showNamePos() const
 {
-    return (format("%1% at %2%") % (name.set() ? "`" + (string) name + "'" : "an anonymous function") % pos).str();
+    return (format("%1% at %2%") % (name.set() ? "‘" + (string) name + "’" : "anonymous function") % pos).str();
 }
 
 

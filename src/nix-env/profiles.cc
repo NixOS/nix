@@ -42,16 +42,15 @@ Generations findGenerations(Path profile, int & curGen)
     Path profileDir = dirOf(profile);
     string profileName = baseNameOf(profile);
 
-    Strings names = readDirectory(profileDir);
-    for (Strings::iterator i = names.begin(); i != names.end(); ++i) {
+    for (auto & i : readDirectory(profileDir)) {
         int n;
-        if ((n = parseName(profileName, *i)) != -1) {
+        if ((n = parseName(profileName, i.name)) != -1) {
             Generation gen;
-            gen.path = profileDir + "/" + *i;
+            gen.path = profileDir + "/" + i.name;
             gen.number = n;
             struct stat st;
             if (lstat(gen.path.c_str(), &st) != 0)
-                throw SysError(format("statting `%1%'") % gen.path);
+                throw SysError(format("statting ‘%1%’") % gen.path);
             gen.creationTime = st.st_mtime;
             gens.push_back(gen);
         }
@@ -100,7 +99,7 @@ Path createGeneration(Path profile, Path outPath)
 static void removeFile(const Path & path)
 {
     if (remove(path.c_str()) == -1)
-        throw SysError(format("cannot unlink `%1%'") % path);
+        throw SysError(format("cannot unlink ‘%1%’") % path);
 }
 
 
@@ -118,8 +117,7 @@ void switchLink(Path link, Path target)
     if (dirOf(target) == dirOf(link)) target = baseNameOf(target);
 
     Path tmp = canonPath(dirOf(link) + "/.new_" + baseNameOf(link));
-    if (symlink(target.c_str(), tmp.c_str()) != 0)
-        throw SysError(format("creating symlink `%1%'") % tmp);
+    createSymlink(target, tmp);
     /* The rename() system call is supposed to be essentially atomic
        on Unix.  That is, if we have links `current -> X' and
        `new_current -> Y', and we rename new_current to current, a
@@ -127,14 +125,14 @@ void switchLink(Path link, Path target)
        file-not-found or other error condition.  This is sufficient to
        atomically switch user environments. */
     if (rename(tmp.c_str(), link.c_str()) != 0)
-        throw SysError(format("renaming `%1%' to `%2%'") % tmp % link);
+        throw SysError(format("renaming ‘%1%’ to ‘%2%’") % tmp % link);
 }
 
 
 void lockProfile(PathLocks & lock, const Path & profile)
 {
     lock.lockPaths(singleton<PathSet>(profile),
-        (format("waiting for lock on profile `%1%'") % profile).str());
+        (format("waiting for lock on profile ‘%1%’") % profile).str());
     lock.setDeletion(true);
 }
 

@@ -20,6 +20,8 @@ void doInit()
     if (!store) {
         try {
             settings.processEnvironment();
+            settings.loadConfFile();
+            settings.update();
             settings.lockCPU = false;
             store = openStore();
         } catch (Error & e) {
@@ -31,6 +33,10 @@ void doInit()
 
 MODULE = Nix::Store PACKAGE = Nix::Store
 PROTOTYPES: ENABLE
+
+
+#undef dNOOP // Hack to work around "error: declaration of 'Perl___notused' has a different language linkage" error message on clang.
+#define dNOOP
 
 
 void init()
@@ -168,6 +174,17 @@ void exportPaths(int fd, int sign, ...)
             for (int n = 2; n < items; ++n) paths.push_back(SvPV_nolen(ST(n)));
             FdSink sink(fd);
             exportPaths(*store, paths, sign, sink);
+        } catch (Error & e) {
+            croak(e.what());
+        }
+
+
+void importPaths(int fd)
+    PPCODE:
+        try {
+            doInit();
+            FdSource source(fd);
+            store->importPaths(false, source);
         } catch (Error & e) {
             croak(e.what());
         }

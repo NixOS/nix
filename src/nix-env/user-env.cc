@@ -1,5 +1,5 @@
+#include "user-env.hh"
 #include "util.hh"
-#include "get-drvs.hh"
 #include "derivations.hh"
 #include "store-api.hh"
 #include "globals.hh"
@@ -19,7 +19,7 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
     if (pathExists(manifestFile)) {
         Value v;
         state.evalFile(manifestFile, v);
-        Bindings bindings;
+        Bindings & bindings(*state.allocBindings(0));
         getDerivations(state, v, "", bindings, elems, false);
     }
     return elems;
@@ -38,7 +38,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
             drvsToBuild.insert(i->queryDrvPath());
 
     debug(format("building user environment dependencies"));
-    store->buildPaths(drvsToBuild, state.repair);
+    store->buildPaths(drvsToBuild, state.repair ? bmRepair : bmNormal);
 
     /* Construct the whole top level derivation. */
     PathSet references;
@@ -91,6 +91,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
             if (!v) continue;
             vMeta.attrs->push_back(Attr(state.symbols.create(*j), v));
         }
+        vMeta.attrs->sort();
         v.attrs->sort();
 
         if (drvPath != "") references.insert(drvPath);
@@ -120,12 +121,14 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     debug("evaluating user environment builder");
     state.forceValue(topLevel);
     PathSet context;
-    Path topLevelDrv = state.coerceToPath(*topLevel.attrs->find(state.sDrvPath)->value, context);
-    Path topLevelOut = state.coerceToPath(*topLevel.attrs->find(state.sOutPath)->value, context);
+    Attr & aDrvPath(*topLevel.attrs->find(state.sDrvPath));
+    Path topLevelDrv = state.coerceToPath(aDrvPath.pos ? *(aDrvPath.pos) : noPos, *(aDrvPath.value), context);
+    Attr & aOutPath(*topLevel.attrs->find(state.sOutPath));
+    Path topLevelOut = state.coerceToPath(aOutPath.pos ? *(aOutPath.pos) : noPos, *(aOutPath.value), context);
 
     /* Realise the resulting store expression. */
     debug("building user environment");
-    store->buildPaths(singleton<PathSet>(topLevelDrv), state.repair);
+    store->buildPaths(singleton<PathSet>(topLevelDrv), state.repair ? bmRepair : bmNormal);
 
     /* Switch the current user environment to the output path. */
     PathLocks lock;
@@ -133,7 +136,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
     Path lockTokenCur = optimisticLockProfile(profile);
     if (lockToken != lockTokenCur) {
-        printMsg(lvlError, format("profile `%1%' changed while we were busy; restarting") % profile);
+        printMsg(lvlError, format("profile ‘%1%’ changed while we were busy; restarting") % profile);
         return false;
     }
 
