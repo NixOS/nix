@@ -80,9 +80,20 @@ void printValueAsJSON(EvalState & state, bool strict,
             break;
         }
 
+	case tExternal:
+            v.external->printValueAsJSON(state, strict, str, context);
+            break;
+
         default:
             throw TypeError(format("cannot convert %1% to JSON") % showType(v));
     }
+}
+
+
+void ExternalValueBase::printValueAsJSON(EvalState & state, bool strict,
+      std::ostream & str, PathSet & context)
+{
+    throw TypeError(format("cannot convert %1% to JSON") % showType());
 }
 
 

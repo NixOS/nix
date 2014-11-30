@@ -104,6 +104,9 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
     case tPrimOpApp:
         str << "<PRIMOP-APP>";
         break;
+    case tExternal:
+        str << *v.external;
+        break;
     default:
         throw Error("invalid value");
     }
@@ -136,6 +139,7 @@ string showType(const Value & v)
         case tBlackhole: return "a black hole";
         case tPrimOp: return "a built-in function";
         case tPrimOpApp: return "a partially applied built-in function";
+        case tExternal: return v.external->showType();
     }
     abort();
 }
@@ -1314,6 +1318,9 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
         return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
     }
 
+    if (v.type == tExternal)
+        return v.external->coerceToString(pos, context, coerceMore, copyToStore);
+
     if (coerceMore) {
 
         /* Note that `false' is represented as an empty string for
@@ -1433,6 +1440,9 @@ bool EvalState::eqValues(Value & v1, Value & v2)
         case tPrimOp:
         case tPrimOpApp:
             return false;
+
+        case tExternal:
+            return *v1.external == *v2.external;
 
         default:
             throwEvalError("cannot compare %1% with %2%", showType(v1), showType(v2));
@@ -1575,6 +1585,11 @@ size_t valueSize(Value & v)
             sz += doValue(*v.primOpApp.left);
             sz += doValue(*v.primOpApp.right);
             break;
+        case tExternal:
+            if (seen.find(v.external) != seen.end()) break;
+            seen.insert(v.external);
+            sz += v.external->valueSize(seen);
+            break;
         default:
             ;
         }
@@ -1598,6 +1613,24 @@ size_t valueSize(Value & v)
     };
 
     return doValue(v);
+}
+
+
+string ExternalValueBase::coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore)
+{
+    throw TypeError(format("cannot coerce %1% to a string, at %2%") %
+        showType() % pos);
+}
+
+
+bool ExternalValueBase::operator==(const ExternalValueBase & b)
+{
+    return false;
+}
+
+
+std::ostream & operator << (std::ostream & str, ExternalValueBase & v) {
+    return v.print(str);
 }
 
 

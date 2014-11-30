@@ -144,9 +144,20 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
             break;
         }
 
+        case tExternal:
+            v.external->printValueAsXML(state, strict, location, doc, context, drvsSeen);
+            break;
+
         default:
             doc.writeEmptyElement("unevaluated");
     }
+}
+
+
+void ExternalValueBase::printValueAsXML(EvalState & state, bool strict,
+    bool location, XMLWriter & doc, PathSet & context, PathSet & drvsSeen)
+{
+    doc.writeEmptyElement("unevaluated");
 }
 
 

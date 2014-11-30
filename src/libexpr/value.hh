@@ -19,6 +19,7 @@ typedef enum {
     tBlackhole,
     tPrimOp,
     tPrimOpApp,
+    tExternal,
 } ValueType;
 
 
@@ -29,9 +30,57 @@ struct ExprLambda;
 struct PrimOp;
 struct PrimOp;
 class Symbol;
+struct Pos;
+class EvalState;
+class XMLWriter;
 
 
 typedef long NixInt;
+
+/* External values must descend from ExternalValueBase, so that
+ * type-agnostic nix functions (e.g. showType) can be implemented
+ */
+class ExternalValueBase
+{
+    friend std::ostream & operator << (std::ostream & str, ExternalValueBase & v);
+    protected:
+    /* Print out the value */
+    virtual std::ostream & print(std::ostream & str) = 0;
+
+    public:
+    /* Return a simple string describing the type */
+    virtual string showType() = 0;
+
+    /* Return a string to be used in builtins.typeOf */
+    virtual string typeOf() = 0;
+
+    /* How much space does this value take up */
+    virtual size_t valueSize(std::set<const void *> & seen) = 0;
+
+    /* Coerce the value to a string. Defaults to uncoercable, i.e. throws an
+     * error
+     */
+    virtual string coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore);
+
+    /* Compare to another value of the same type. Defaults to uncomparable,
+     * i.e. always false.
+     */
+    virtual bool operator==(const ExternalValueBase & b);
+
+    /* Print the value as JSON. Defaults to unconvertable, i.e. throws an error */
+    virtual void printValueAsJSON(EvalState & state, bool strict,
+        std::ostream & str, PathSet & context);
+
+    /* Print the value as XML. Defaults to unevaluated */
+    virtual void printValueAsXML(EvalState & state, bool strict, bool location,
+        XMLWriter & doc, PathSet & context, PathSet & drvsSeen);
+
+    virtual ~ExternalValueBase()
+    {
+    };
+};
+
+std::ostream & operator << (std::ostream & str, ExternalValueBase & v);
 
 
 struct Value
@@ -88,6 +137,7 @@ struct Value
         struct {
             Value * left, * right;
         } primOpApp;
+        ExternalValueBase * external;
     };
 };
 
