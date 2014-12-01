@@ -378,7 +378,7 @@ void NixRepl::loadFile(const Path & path)
     loadedFiles.push_back(path);
     Value v, v2;
     state.evalFile(lookupFileArg(state, path), v);
-    Bindings bindings;
+    Bindings & bindings(*state.allocBindings(0));
     state.autoCallFunction(bindings, v, v2);
     addAttrsToScope(v2);
 }
