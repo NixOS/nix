@@ -187,6 +187,9 @@ static void prim_typeOf(EvalState & state, const Pos & pos, Value * * args, Valu
         case tPrimOpApp:
             t = "lambda";
             break;
+	case tExternal:
+            t = args[0]->external->typeOf();
+            break;
         default: abort();
     }
     mkString(v, state.symbols.create(t));
