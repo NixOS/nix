@@ -91,7 +91,7 @@ void printValueAsJSON(EvalState & state, bool strict,
 
 
 void ExternalValueBase::printValueAsJSON(EvalState & state, bool strict,
-      std::ostream & str, PathSet & context)
+      std::ostream & str, PathSet & context) const
 {
     throw TypeError(format("cannot convert %1% to JSON") % showType());
 }

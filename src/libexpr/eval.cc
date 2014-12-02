@@ -1616,20 +1616,20 @@ size_t valueSize(Value & v)
 }
 
 
-string ExternalValueBase::coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore)
+string ExternalValueBase::coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore) const
 {
     throw TypeError(format("cannot coerce %1% to a string, at %2%") %
         showType() % pos);
 }
 
 
-bool ExternalValueBase::operator==(const ExternalValueBase & b)
+bool ExternalValueBase::operator==(const ExternalValueBase & b) const
 {
     return false;
 }
 
 
-std::ostream & operator << (std::ostream & str, ExternalValueBase & v) {
+std::ostream & operator << (std::ostream & str, const ExternalValueBase & v) {
     return v.print(str);
 }
 

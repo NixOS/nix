@@ -155,7 +155,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
 
 
 void ExternalValueBase::printValueAsXML(EvalState & state, bool strict,
-    bool location, XMLWriter & doc, PathSet & context, PathSet & drvsSeen)
+    bool location, XMLWriter & doc, PathSet & context, PathSet & drvsSeen) const
 {
     doc.writeEmptyElement("unevaluated");
 }
