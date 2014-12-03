@@ -112,6 +112,8 @@ Makefile.config
 *.a
 *.o
 *.so
+*.dll
+*.exe
 *.dep
 *~
 *.pc
