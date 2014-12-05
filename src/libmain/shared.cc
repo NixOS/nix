@@ -17,6 +17,8 @@
 #include <signal.h>
 #include <spawn.h>
 
+extern char * * environ;
+
 
 namespace nix {
 
