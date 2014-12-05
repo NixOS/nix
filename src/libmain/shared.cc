@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <signal.h>
+#include <spawn.h>
 
 
 namespace nix {
@@ -305,14 +306,35 @@ RunPager::RunPager()
     Pipe toPager;
     toPager.create();
 
-    pid = startProcess([&]() {
-        if (dup2(toPager.readSide, STDIN_FILENO) == -1)
-            throw SysError("dupping stdin");
-        if (!getenv("LESS"))
-            setenv("LESS", "FRSXMK", 1);
-        execl("/bin/sh", "sh", "-c", pager.c_str(), NULL);
-        throw SysError(format("executing ‘%1%’") % pager);
-    });
+    // FIXME: should do this in the child environment.
+    if (!getenv("LESS"))
+        setenv("LESS", "FRSXMK", 1);
+
+    /* Start the pager using posix_spawn. */
+    pid_t pid_;
+    const char * argv[] = { "sh", "-c", pager.c_str(), 0 };
+
+    posix_spawn_file_actions_t fileActions;
+    int err = posix_spawn_file_actions_init(&fileActions);
+    if (err) throw SysError(err, "creating POSIX file actions");
+    err = posix_spawn_file_actions_adddup2(&fileActions, toPager.readSide, STDIN_FILENO);
+    if (err) throw SysError(err, "adding to POSIX file actions");
+
+    posix_spawnattr_t spawnAttrs;
+    err = posix_spawnattr_init(&spawnAttrs);
+    if (err) throw SysError(err, "creating POSIX spawn attrs");
+#ifdef POSIX_SPAWN_USEVFORK
+    err = posix_spawnattr_setflags(&spawnAttrs, POSIX_SPAWN_USEVFORK);
+    if (err) throw SysError(err, "setting POSIX spawn attr flag");
+#endif
+
+    err = posix_spawn(&pid_, "/bin/sh", &fileActions, &spawnAttrs, (char * const *) argv, environ);
+
+    posix_spawn_file_actions_destroy(&fileActions);
+    posix_spawnattr_destroy(&spawnAttrs);
+
+    if (err) throw SysError(err, format("running ‘%1%’") % pager);
+    pid = pid_;
 
     if (dup2(toPager.writeSide, STDOUT_FILENO) == -1)
         throw SysError("dupping stdout");
