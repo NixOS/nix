@@ -13,7 +13,7 @@ let
     { config, pkgs, ... }:
     { services.openssh.enable = true;
       virtualisation.writableStore = true;
-      environment.nix = nix;
+      nix.package = nix;
     };
 
   # Trivial Nix expression to build remotely.
