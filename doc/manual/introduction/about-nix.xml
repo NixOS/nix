@@ -166,8 +166,8 @@ cache</emphasis>, a web server that provides pre-built binaries. For
 instance, when asked to build
 <literal>/nix/store/b6gvzjyb2pg0…-firefox-33.1</literal> from source,
 Nix would first check if the file
-<uri>http://cache.nixos.org/b6gvzjyb2pg0….narinfo</uri> exists, and if
-so, fetch the pre-built binary referenced from there; otherwise, it
+<uri>https://cache.nixos.org/b6gvzjyb2pg0….narinfo</uri> exists, and
+if so, fetch the pre-built binary referenced from there; otherwise, it
 would fall back to building from source.</para>
 
 </simplesect>

@@ -218,7 +218,7 @@ sub getAvailableCaches {
     }
 
     my @urls = strToList($Nix::Config::config{"binary-caches"} //
-        ($Nix::Config::storeDir eq "/nix/store" ? "http://cache.nixos.org" : ""));
+        ($Nix::Config::storeDir eq "/nix/store" ? "https://cache.nixos.org" : ""));
 
     my $urlsFiles = $Nix::Config::config{"binary-cache-files"}
         // "$Nix::Config::stateDir/profiles/per-user/$userName/channels/binary-caches/*";

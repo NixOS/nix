@@ -4,7 +4,7 @@
       version="5.0"
       xml:id="ssec-relnotes-1.8">
 
-<title>Release 1.8 (TBA)</title>
+<title>Release 1.8 (December 9, 2014)</title>
 
 <itemizedlist>
 
@@ -12,6 +12,10 @@
   remote build hook mechanism now uses <command>nix-store
   --serve</command> on the remote machine. This requires build slaves
   to be updated to Nix 1.8.</para></listitem>
+
+  <listitem><para>Nix now uses HTTPS instead of HTTP to access the
+  default binary cache,
+  <literal>cache.nixos.org</literal>.</para></listitem>
 
   <listitem><para><command>nix-env</command> selectors are now regular
   expressions. For instance, you can do
