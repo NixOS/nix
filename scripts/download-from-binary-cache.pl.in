@@ -47,7 +47,12 @@ $caBundle = "/etc/ssl/certs/ca-certificates.crt" if !$caBundle && -f "/etc/ssl/c
 
 my $userName = getpwuid($<) || $ENV{"USER"} or die "cannot figure out user name";
 
-my $requireSignedBinaryCaches = ($Nix::Config::config{"signed-binary-caches"} // "0") ne "0";
+sub isTrue {
+    my ($x) = @_;
+    return $x eq "true" || $x eq "1";
+}
+
+my $requireSignedBinaryCaches = isTrue($Nix::Config::config{"signed-binary-caches"} // "0");
 
 my $curlConnectTimeout = int(
     $Nix::Config::config{"untrusted-connect-timeout"} //
@@ -69,6 +74,7 @@ sub addRequest {
     $curl->setopt(CURLOPT_WRITEDATA, $fh);
     $curl->setopt(CURLOPT_FOLLOWLOCATION, 1);
     $curl->setopt(CURLOPT_CAINFO, $caBundle) if defined $caBundle;
+    $curl->setopt(CURLOPT_SSL_VERIFYPEER, 0) unless isTrue($Nix::Config::config{"verify-https-binary-caches"} // "1");
     $curl->setopt(CURLOPT_USERAGENT, "Nix/$Nix::Config::version");
     $curl->setopt(CURLOPT_NOBODY, 1) if $head;
     $curl->setopt(CURLOPT_FAILONERROR, 1);

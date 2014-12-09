@@ -402,6 +402,15 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
   </varlistentry>
 
 
+  <varlistentry><term><literal>verify-https-binary-caches</literal></term>
+
+    <listitem><para>Whether HTTPS binary caches are required to have a
+    certificate that can be verified. Defaults to
+    <literal>true</literal>.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry><term><literal>force-manifest</literal></term>
 
     <listitem><para>If this option is set to <literal>false</literal>
