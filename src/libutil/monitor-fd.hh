@@ -3,6 +3,7 @@
 #include <thread>
 #include <atomic>
 
+#include <stdlib.h>
 #include <poll.h>
 #include <sys/types.h>
 #include <unistd.h>
