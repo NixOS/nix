@@ -756,8 +756,12 @@ static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Va
 {
     PathSet context;
     Path path = state.coerceToPath(pos, *args[0], context);
-    if (!context.empty())
-        throw EvalError(format("string ‘%1%’ cannot refer to other paths, at %2%") % path % pos);
+    try {
+        realiseContext(context);
+    } catch (InvalidPathError & e) {
+        throw EvalError(format("cannot read ‘%1%’, since path ‘%2%’ is not valid, at %3%")
+            % path % e.path % pos);
+    }
     mkString(v, readFile(path).c_str());
 }
 
