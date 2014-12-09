@@ -52,7 +52,7 @@ sub isTrue {
     return $x eq "true" || $x eq "1";
 }
 
-my $requireSignedBinaryCaches = isTrue($Nix::Config::config{"signed-binary-caches"} // "0");
+my $requireSignedBinaryCaches = ($Nix::Config::config{"signed-binary-caches"} // "0") ne "0";
 
 my $curlConnectTimeout = int(
     $Nix::Config::config{"untrusted-connect-timeout"} //
