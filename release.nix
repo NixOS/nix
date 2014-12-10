@@ -122,15 +122,16 @@ let
       in
 
       runCommand "nix-binary-tarball-${version}"
-        { exportReferencesGraph = [ "closure" toplevel ];
+        { exportReferencesGraph = [ "closure1" toplevel "closure2" cacert ];
           buildInputs = [ perl ];
           meta.description = "Distribution-independent Nix bootstrap binaries for ${system}";
         }
         ''
-          storePaths=$(perl ${pathsFromGraph} ./closure)
-          printRegistration=1 perl ${pathsFromGraph} ./closure > $TMPDIR/reginfo
+          storePaths=$(perl ${pathsFromGraph} ./closure1 ./closure2)
+          printRegistration=1 perl ${pathsFromGraph} ./closure1 ./closure2 > $TMPDIR/reginfo
           substitute ${./scripts/install-nix-from-closure.sh} $TMPDIR/install \
-            --subst-var-by nix ${toplevel}
+            --subst-var-by nix ${toplevel} \
+            --subst-var-by cacert ${cacert}
           chmod +x $TMPDIR/install
           dir=nix-${version}-${system}
           fn=$out/$dir.tar.bz2

@@ -5,6 +5,7 @@ set -e
 dest="/nix"
 self="$(dirname "$0")"
 nix="@nix@"
+cacert="@cacert@"
 
 if ! [ -e $self/.reginfo ]; then
     echo "$0: incomplete installer (.reginfo is missing)" >&2
@@ -66,7 +67,7 @@ fi
 
 . $nix/etc/profile.d/nix.sh
 
-if ! $nix/bin/nix-env -i $nix; then
+if ! $nix/bin/nix-env -i "$nix"; then
     echo "$0: unable to install Nix into your default profile" >&2
     exit 1
 fi
@@ -80,7 +81,9 @@ if [ -z "$_NIX_INSTALLER_TEST" ]; then
 fi
 
 # Install an SSL certificate bundle.
-$nix/bin/nix-env -iA nixpkgs.cacert || true
+if [ -z "$SSL_CERT_FILE" ]; then
+    $nix/bin/nix-env -i "$cacert"
+fi
 
 # Make the shell source nix.sh during login.
 p=$NIX_LINK/etc/profile.d/nix.sh
