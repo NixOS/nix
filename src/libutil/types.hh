@@ -73,7 +73,6 @@ class SysError : public Error
 public:
     int errNo;
     SysError(const FormatOrString & fs);
-    SysError(int errNo, const FormatOrString & fs);
 };
 
 

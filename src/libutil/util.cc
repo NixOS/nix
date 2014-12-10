@@ -45,14 +45,8 @@ BaseError & BaseError::addPrefix(const FormatOrString & fs)
 
 
 SysError::SysError(const FormatOrString & fs)
-    : SysError(errno, fs)
-{
-}
-
-
-SysError::SysError(int errNo, const FormatOrString & fs)
-    : Error(format("%1%: %2%") % fs.s % strerror(errNo))
-    , errNo(errNo)
+    : Error(format("%1%: %2%") % fs.s % strerror(errno))
+    , errNo(errno)
 {
 }
 
