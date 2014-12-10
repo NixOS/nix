@@ -76,9 +76,12 @@ define build-library
     $(1)_PATH := $$(_d)/$$($(1)_NAME).$(SO_EXT)
 
     $$($(1)_PATH): $$($(1)_OBJS) $$(_libs) | $$(_d)/
-	$$(trace-ld) $(CXX) -o $$@ -shared $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
+	$$(trace-ld) $(CXX) -o $$(abspath $$@) -shared $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE)) $$($(1)_LDFLAGS_UNINSTALLED)
 
-    $(1)_LDFLAGS_USE += -L$$(_d) -Wl,-rpath,$$(abspath $$(_d)) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
+    ifneq ($(OS), Darwin)
+      $(1)_LDFLAGS_USE += -Wl,-rpath,$$(abspath $$(_d))
+    endif
+    $(1)_LDFLAGS_USE += -L$$(_d) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
 
     $(1)_INSTALL_PATH := $(DESTDIR)$$($(1)_INSTALL_DIR)/$$($(1)_NAME).$(SO_EXT)
 
@@ -90,10 +93,12 @@ define build-library
 	$$(trace-ld) $(CXX) -o $$@ -shared $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
 
     $(1)_LDFLAGS_USE_INSTALLED += -L$$(DESTDIR)$$($(1)_INSTALL_DIR) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
-    ifeq ($(SET_RPATH_TO_LIBS), 1)
-      $(1)_LDFLAGS_USE_INSTALLED += -Wl,-rpath,$$($(1)_INSTALL_DIR)
-    else
-      $(1)_LDFLAGS_USE_INSTALLED += -Wl,-rpath-link,$$($(1)_INSTALL_DIR)
+    ifneq ($(OS), Darwin)
+      ifeq ($(SET_RPATH_TO_LIBS), 1)
+        $(1)_LDFLAGS_USE_INSTALLED += -Wl,-rpath,$$($(1)_INSTALL_DIR)
+      else
+        $(1)_LDFLAGS_USE_INSTALLED += -Wl,-rpath-link,$$($(1)_INSTALL_DIR)
+      endif
     endif
 
     ifdef $(1)_FORCE_INSTALL
