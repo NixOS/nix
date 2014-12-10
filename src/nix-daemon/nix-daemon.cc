@@ -799,6 +799,11 @@ static void daemonLoop(char * * argv)
                 % (peer.uidKnown ? user : "<unknown>"));
 
             /* Fork a child to handle the connection. */
+            ProcessOptions options;
+            options.errorPrefix = "unexpected Nix daemon error: ";
+            options.dieWithParent = false;
+            options.runExitHandlers = true;
+            options.allowVfork = false;
             startProcess([&]() {
                 fdSocket.close();
 
@@ -821,7 +826,7 @@ static void daemonLoop(char * * argv)
                 processConnection(trusted);
 
                 exit(0);
-            }, false, "unexpected Nix daemon error: ", true);
+            }, options);
 
         } catch (Interrupted & e) {
             throw;

@@ -863,31 +863,46 @@ void killUser(uid_t uid)
 //////////////////////////////////////////////////////////////////////
 
 
-pid_t startProcess(std::function<void()> fun,
-    bool dieWithParent, const string & errorPrefix, bool runExitHandlers)
+/* Wrapper around vfork to prevent the child process from clobbering
+   the caller's stack frame in the parent. */
+static pid_t doFork(bool allowVfork, std::function<void()> fun) __attribute__((noinline));
+static pid_t doFork(bool allowVfork, std::function<void()> fun)
 {
+#ifdef __linux__
+    pid_t pid = allowVfork ? vfork() : fork();
+#else
     pid_t pid = fork();
-    if (pid == -1) throw SysError("unable to fork");
+#endif
+    if (pid != 0) return pid;
+    fun();
+    abort();
+}
 
-    if (pid == 0) {
+
+pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
+{
+    auto wrapper = [&]() {
         _writeToStderr = 0;
         try {
 #if __linux__
-            if (dieWithParent && prctl(PR_SET_PDEATHSIG, SIGKILL) == -1)
+            if (options.dieWithParent && prctl(PR_SET_PDEATHSIG, SIGKILL) == -1)
                 throw SysError("setting death signal");
 #endif
             restoreAffinity();
             fun();
         } catch (std::exception & e) {
             try {
-                std::cerr << errorPrefix << e.what() << "\n";
+                std::cerr << options.errorPrefix << e.what() << "\n";
             } catch (...) { }
         } catch (...) { }
-        if (runExitHandlers)
+        if (options.runExitHandlers)
             exit(1);
         else
             _exit(1);
-    }
+    };
+
+    pid_t pid = doFork(options.allowVfork, wrapper);
+    if (pid == -1) throw SysError("unable to fork");
 
     return pid;
 }

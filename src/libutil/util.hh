@@ -269,8 +269,16 @@ void killUser(uid_t uid);
 
 /* Fork a process that runs the given function, and return the child
    pid to the caller. */
-pid_t startProcess(std::function<void()> fun, bool dieWithParent = true,
-    const string & errorPrefix = "error: ", bool runExitHandlers = false);
+struct ProcessOptions
+{
+    string errorPrefix;
+    bool dieWithParent;
+    bool runExitHandlers;
+    bool allowVfork;
+    ProcessOptions() : errorPrefix("error: "), dieWithParent(true), runExitHandlers(false), allowVfork(true) { };
+};
+
+pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = ProcessOptions());
 
 
 /* Run a program and return its stdout in a string (i.e., like the
