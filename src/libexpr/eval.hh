@@ -241,6 +241,8 @@ private:
     void addPrimOp(const string & name,
         unsigned int arity, PrimOpFun primOp);
 
+    string showTypeOrXml(Value &v);
+
 public:
 
     void getBuiltin(const string & name, Value & v);

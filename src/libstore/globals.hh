@@ -89,6 +89,11 @@ struct Settings {
        the database. */
     bool readOnlyMode;
 
+
+    /* If set to true nix will print the value it tried to coerce to a
+     particular type as xml. This can cause infinite recursions */
+    bool xmldebugCorecionFailure;
+
     /* The canonical system name, as returned by config.guess. */
     string thisSystem;
 
