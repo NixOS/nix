@@ -358,7 +358,8 @@ LocalStore::~LocalStore()
             i->second.to.close();
             i->second.from.close();
             i->second.error.close();
-            i->second.pid.wait(true);
+            if (i->second.pid != -1)
+                i->second.pid.wait(true);
         }
     } catch (...) {
         ignoreException();
