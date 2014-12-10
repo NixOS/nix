@@ -298,6 +298,34 @@ fi
 AC_SUBST(tarFlags)
 
 
+# Additional checks
+AC_CHECK_FUNCS([dup2 fchdir getcwd gettimeofday localtime_r memset mkdir regcomp select setenv sethostname socket strcasecmp strchr strdup strerror strtol uname])
+AC_CHECK_HEADERS([fcntl.h limits.h sys/ioctl.h sys/socket.h sys/statvfs.h sys/time.h utime.h])
+AC_CHECK_HEADER_STDBOOL
+AC_CHECK_TYPES([ptrdiff_t])
+AC_C_INLINE
+AC_FUNC_CHOWN
+AC_FUNC_ERROR_AT_LINE
+AC_FUNC_FORK
+AC_FUNC_FSEEKO
+AC_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK
+AC_FUNC_MALLOC
+AC_PREREQ
+AC_PROG_INSTALL
+AC_PROG_LN_S
+AC_STRUCT_ST_BLOCKS
+AC_TYPE_MODE_T
+AC_TYPE_OFF_T
+AC_TYPE_PID_T
+AC_TYPE_SIZE_T
+AC_TYPE_SSIZE_T
+AC_TYPE_UID_T
+AC_TYPE_UINT16_T
+AC_TYPE_UINT32_T
+AC_TYPE_UINT64_T
+AC_TYPE_UINT8_T
+
+
 # Expand all variables in config.status.
 test "$prefix" = NONE && prefix=$ac_default_prefix
 test "$exec_prefix" = NONE && exec_prefix='${prefix}'
