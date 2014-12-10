@@ -12,7 +12,7 @@ if [ -n "$HOME" ]; then
 
     # Subscribe the user to the Nixpkgs channel by default.
     if [ ! -e $HOME/.nix-channels ]; then
-        echo "http://nixos.org/channels/nixpkgs-unstable nixpkgs" > $HOME/.nix-channels
+        echo "https://nixos.org/channels/nixpkgs-unstable nixpkgs" > $HOME/.nix-channels
     fi
 
     # Append ~/.nix-defexpr/channels/nixpkgs to $NIX_PATH so that
