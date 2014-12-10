@@ -1914,6 +1914,8 @@ void DerivationGoal::startBuilder()
     builderOut.create();
 
     /* Fork a child to build the package. */
+    ProcessOptions options;
+    options.allowVfork = !buildUser.enabled();
     pid = startProcess([&]() {
         runChild();
     });

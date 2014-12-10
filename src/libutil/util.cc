@@ -825,6 +825,9 @@ void killUser(uid_t uid)
        users to which the current process can send signals.  So we
        fork a process, switch to uid, and send a mass kill. */
 
+    ProcessOptions options;
+    options.allowVfork = false;
+
     Pid pid = startProcess([&]() {
 
         if (setuid(uid) == -1)
