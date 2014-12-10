@@ -816,8 +816,8 @@ private:
     /* Start building a derivation. */
     void startBuilder();
 
-    /* Initialise the builder's process. */
-    void initChild();
+    /* Run the builder's process. */
+    void runChild();
 
     friend int childEntry(void *);
 
@@ -1915,7 +1915,7 @@ void DerivationGoal::startBuilder()
 
     /* Fork a child to build the package. */
     pid = startProcess([&]() {
-        initChild();
+        runChild();
     });
 
     /* parent */
@@ -1936,7 +1936,7 @@ void DerivationGoal::startBuilder()
 }
 
 
-void DerivationGoal::initChild()
+void DerivationGoal::runChild()
 {
     /* Warning: in the child we should absolutely not make any SQLite
        calls! */
