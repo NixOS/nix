@@ -36,6 +36,7 @@ Settings::Settings()
     if (res > 0) buildCores = res;
 #endif
     readOnlyMode = false;
+    xmldebugCorecionFailure = false;
     thisSystem = SYSTEM;
     maxSilentTime = 0;
     buildTimeout = 0;
@@ -149,6 +150,7 @@ void Settings::update()
     _get(tryFallback, "build-fallback");
     _get(maxBuildJobs, "build-max-jobs");
     _get(buildCores, "build-cores");
+    _get(xmldebugCorecionFailure, "xml-debug-corecion-failure");
     _get(thisSystem, "system");
     _get(maxSilentTime, "build-max-silent-time");
     _get(buildTimeout, "build-timeout");
