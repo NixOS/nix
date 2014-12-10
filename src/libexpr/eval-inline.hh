@@ -23,6 +23,18 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v, const
     throw TypeError(format(s) % showType(v) % pos);
 }
 
+// from  eval.cc
+LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1))
+{
+    throw TypeError(format(s) % s1);
+}
+
+// obsoleting (const char * s, const Value & v, const Pos & pos)
+LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & typeOrXml, const Pos & pos))
+{
+    throw TypeError(format(s) % typeOrXml % pos);
+}
+
 
 void EvalState::forceValue(Value & v)
 {
@@ -51,7 +63,7 @@ inline void EvalState::forceAttrs(Value & v)
 {
     forceValue(v);
     if (v.type != tAttrs)
-        throwTypeError("value is %1% while a set was expected", v);
+        throwTypeError("value is %1% while a set was expected", showTypeOrXml(v));
 }
 
 
@@ -59,7 +71,7 @@ inline void EvalState::forceAttrs(Value & v, const Pos & pos)
 {
     forceValue(v);
     if (v.type != tAttrs)
-        throwTypeError("value is %1% while a set was expected, at %2%", v, pos);
+        throwTypeError("value is %1% while a set was expected, at %2%", showTypeOrXml(v), pos);
 }
 
 
@@ -67,7 +79,7 @@ inline void EvalState::forceList(Value & v)
 {
     forceValue(v);
     if (v.type != tList)
-        throwTypeError("value is %1% while a list was expected", v);
+        throwTypeError("value is %1% while a list was expected", showTypeOrXml(v));
 }
 
 
@@ -75,7 +87,7 @@ inline void EvalState::forceList(Value & v, const Pos & pos)
 {
     forceValue(v);
     if (v.type != tList)
-        throwTypeError("value is %1% while a list was expected, at %2%", v, pos);
+        throwTypeError("value is %1% while a list was expected, at %2%", showTypeOrXml(v), pos);
 }
 
 

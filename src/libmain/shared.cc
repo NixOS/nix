@@ -216,6 +216,8 @@ void parseCmdLine(int argc, char * * argv,
             settings.useBuildHook = false;
         else if (arg == "--show-trace")
             settings.showTrace = true;
+        else if (arg == "--xml-debug-coercion-failure")
+            settings.set("xml-debug-corecion-failure", "true");
         else if (arg == "--no-gc-warning")
             gcWarning = false;
         else if (arg == "--option") {

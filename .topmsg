@@ -1,0 +1,4 @@
+From: Marc Weber <marco-oweber@gmx.de>
+Subject: [PATCH] experimental/debug-coercions-as-xml
+
+add --xml-debug-coercion-failure which prints the value which cannot be coerced as xml

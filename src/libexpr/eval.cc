@@ -5,6 +5,7 @@
 #include "derivations.hh"
 #include "globals.hh"
 #include "eval-inline.hh"
+#include "value-to-xml.hh"
 
 #include <algorithm>
 #include <cstring>
@@ -275,6 +276,17 @@ void EvalState::addPrimOp(const string & name,
     baseEnv.values[0]->attrs->push_back(Attr(sym, v));
 }
 
+string EvalState::showTypeOrXml(Value & v){
+    if (settings.xmldebugCorecionFailure){
+        // make running this code intsead optional
+        std::ostringstream out;
+        PathSet context;
+        printValueAsXML(*this, true, false, v, out, context);
+        return out.str(); // don't know whether this is safe !
+    } else {
+     return showType(v);
+    }
+}
 
 void EvalState::getBuiltin(const string & name, Value & v)
 {
@@ -320,11 +332,6 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const Symbol & sym, co
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const Pos & pos))
 {
     throw TypeError(format(s) % pos);
-}
-
-LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1))
-{
-    throw TypeError(format(s) % s1);
 }
 
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const ExprLambda & fun, const Symbol & s2, const Pos & pos))
@@ -586,7 +593,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e)
     Value v;
     e->eval(*this, env, v);
     if (v.type != tBool)
-        throwTypeError("value is %1% while a Boolean was expected", v);
+        throwTypeError("value is %1% while a Boolean was expected", showTypeOrXml(v));
     return v.boolean;
 }
 
@@ -596,7 +603,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e, const Pos & pos)
     Value v;
     e->eval(*this, env, v);
     if (v.type != tBool)
-        throwTypeError("value is %1% while a Boolean was expected, at %2%", v, pos);
+        throwTypeError("value is %1% while a Boolean was expected, at %2%", showTypeOrXml(v), pos);
     return v.boolean;
 }
 
@@ -605,7 +612,7 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v)
 {
     e->eval(*this, env, v);
     if (v.type != tAttrs)
-        throwTypeError("value is %1% while a set was expected", v);
+        throwTypeError("value is %1% while a set was expected", showTypeOrXml(v));
 }
 
 
@@ -902,7 +909,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
     }
 
     if (fun.type != tLambda)
-        throwTypeError("attempt to call something which is not a function but %1%, at %2%", fun, pos);
+        throwTypeError("attempt to call something which is not a function but %1%, at %2%", showTypeOrXml(fun), pos);
 
     ExprLambda & lambda(*fun.lambda.fun);
 
@@ -1218,7 +1225,7 @@ NixInt EvalState::forceInt(Value & v, const Pos & pos)
 {
     forceValue(v);
     if (v.type != tInt)
-        throwTypeError("value is %1% while an integer was expected, at %2%", v, pos);
+        throwTypeError("value is %1% while an integer was expected, at %2%", showTypeOrXml(v), pos);
     return v.integer;
 }
 
@@ -1227,7 +1234,7 @@ bool EvalState::forceBool(Value & v)
 {
     forceValue(v);
     if (v.type != tBool)
-        throwTypeError("value is %1% while a Boolean was expected", v);
+        throwTypeError("value is %1% while a Boolean was expected", showTypeOrXml(v));
     return v.boolean;
 }
 
@@ -1236,7 +1243,7 @@ void EvalState::forceFunction(Value & v, const Pos & pos)
 {
     forceValue(v);
     if (v.type != tLambda && v.type != tPrimOp && v.type != tPrimOpApp)
-        throwTypeError("value is %1% while a function was expected, at %2%", v, pos);
+        throwTypeError("value is %1% while a function was expected, at %2%", showTypeOrXml(v), pos);
 }
 
 
@@ -1245,9 +1252,9 @@ string EvalState::forceString(Value & v, const Pos & pos)
     forceValue(v);
     if (v.type != tString) {
         if (pos)
-            throwTypeError("value is %1% while a string was expected, at %2%", v, pos);
+            throwTypeError("value is %1% while a string was expected, at %2%", showTypeOrXml(v), pos);
         else
-            throwTypeError("value is %1% while a string was expected", v);
+            throwTypeError("value is %1% while a string was expected", showTypeOrXml(v));
     }
     return string(v.string.s);
 }
@@ -1314,7 +1321,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
 
     if (v.type == tAttrs) {
         Bindings::iterator i = v.attrs->find(sOutPath);
-        if (i == v.attrs->end()) throwTypeError("cannot coerce a set to a string, at %1%", pos);
+        if (i == v.attrs->end()) throwTypeError("cannot coerce %1% to a string, at %2%", showTypeOrXml(v), pos);
         return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
     }
 
@@ -1344,7 +1351,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
         }
     }
 
-    throwTypeError("cannot coerce %1% to a string, at %2%", v, pos);
+    throwTypeError("cannot coerce %1% to a string, at %2%", showTypeOrXml(v), pos);
 }
 
 
