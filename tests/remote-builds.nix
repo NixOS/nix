@@ -25,7 +25,7 @@ let
         system = "i686-linux";
         PATH = "''${utils}/bin";
         builder = "''${utils}/bin/sh";
-        args = [ "-c" "if [ ${toString nr} = 5 ]; then echo FAIL; exit 1; fi; echo Hello; mkdir $out $foo; cat /proc/sys/kernel/hostname > $out/host; ln -s $out $foo/bar; sleep 5" ];
+        args = [ "-c" "if [ ${toString nr} = 5 ]; then echo FAIL; exit 1; fi; echo Hello; mkdir $out $foo; cat /proc/sys/kernel/hostname > $out/host; ln -s $out $foo/bar; sleep 10" ];
         outputs = [ "out" "foo" ];
       }
     '';
