@@ -30,7 +30,7 @@ store.</para>
 <figure xml:id='fig-user-environments'><title>User environments</title>
   <mediaobject>
     <imageobject>
-      <imagedata fileref='figures/user-environments.png' format='PNG' />
+      <imagedata fileref='../figures/user-environments.png' format='PNG' />
     </imageobject>
   </mediaobject>
 </figure>
