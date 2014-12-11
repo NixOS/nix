@@ -9,8 +9,8 @@ XSLTPROC = $(xsltproc) --nonet $(xmlflags) \
   --param contrib.inline.enabled 0 \
   --stringparam generate.toc "book toc"
 
-docbookxsl ?= http://docbook.sourceforge.net/release/xsl-ns/1.78.1
-docbookrng ?= http://docbook.org/xml/5.0/rng/docbook.rng
+docbookxsl = http://docbook.sourceforge.net/release/xsl-ns/1.78.1
+docbookrng = http://docbook.org/xml/5.0/rng/docbook.rng
 
 MANUAL_SRCS := $(call rwildcard, $(d), *.xml)
 
