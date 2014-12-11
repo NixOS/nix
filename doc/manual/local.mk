@@ -9,7 +9,8 @@ XSLTPROC = $(xsltproc) --nonet $(xmlflags) \
   --param contrib.inline.enabled 0 \
   --stringparam generate.toc "book toc"
 
-docbookxsl = http://docbook.sourceforge.net/release/xsl-ns/1.78.1/
+docbookxsl ?= http://docbook.sourceforge.net/release/xsl-ns/1.78.1
+docbookrng ?= http://docbook.org/xml/5.0/rng/docbook.rng
 
 MANUAL_SRCS := $(call rwildcard, $(d), *.xml)
 
@@ -26,7 +27,7 @@ $(d)/version.txt:
 $(d)/manual.is-valid: $(d)/manual.xmli
 	$(trace-gen) $(XSLTPROC) --novalid --stringparam profile.condition manual \
 	  $(docbookxsl)/profiling/profile.xsl $< 2> /dev/null | \
-	  $(xmllint) --nonet --noout --relaxng http://www.oasis-open.org/docbook/xml/5.0/rng/docbook.rng -
+	  $(xmllint) --nonet --noout --relaxng $(docbookrng) -
 	@touch $@
 
 clean-files += $(d)/manual.xmli $(d)/version.txt $(d)/manual.is-valid
