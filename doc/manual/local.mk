@@ -51,6 +51,8 @@ $(firstword $(man-pages)): $(d)/manual.xmli $(d)/manual.is-valid
 
 $(wordlist 2, $(words $(man-pages)), $(man-pages)): $(firstword $(man-pages))
 
+$(eval $(call install-symlink, nix-daemon.8.gz, $(mandir)/man8/nix-worker.8.gz))
+
 clean-files += $(d)/*.1 $(d)/*.5 $(d)/*.8
 
 dist-files += $(man-pages)
