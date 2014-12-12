@@ -698,7 +698,8 @@ static PeerInfo getPeerInfo(int remote)
 
 static void daemonLoop(char * * argv)
 {
-    chdir("/");
+    if (chdir("/") == -1)
+        throw SysError("cannot change current directory");
 
     /* Get rid of children automatically; don't let them become
        zombies. */
@@ -728,7 +729,8 @@ static void daemonLoop(char * * argv)
         /* Urgh, sockaddr_un allows path names of only 108 characters.
            So chdir to the socket directory so that we can pass a
            relative path name. */
-        chdir(dirOf(socketPath).c_str());
+        if (chdir(dirOf(socketPath).c_str()) == -1)
+            throw SysError("cannot change current directory");
         Path socketPathRel = "./" + baseNameOf(socketPath);
 
         struct sockaddr_un addr;
@@ -748,7 +750,8 @@ static void daemonLoop(char * * argv)
         if (res == -1)
             throw SysError(format("cannot bind to socket ‘%1%’") % socketPath);
 
-        chdir("/"); /* back to the root */
+        if (chdir("/") == -1) /* back to the root */
+            throw SysError("cannot change current directory");
 
         if (listen(fdSocket, 5) == -1)
             throw SysError(format("cannot listen on socket ‘%1%’") % socketPath);

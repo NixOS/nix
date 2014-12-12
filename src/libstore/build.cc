@@ -1976,9 +1976,11 @@ void DerivationGoal::runChild()
 
             /* Set the hostname etc. to fixed values. */
             char hostname[] = "localhost";
-            sethostname(hostname, sizeof(hostname));
+            if (sethostname(hostname, sizeof(hostname)) == -1)
+                throw SysError("cannot set host name");
             char domainname[] = "(none)"; // kernel default
-            setdomainname(domainname, sizeof(domainname));
+            if (setdomainname(domainname, sizeof(domainname)) == -1)
+                throw SysError("cannot set domain name");
 
             /* Make all filesystems private.  This is necessary
                because subtrees may have been mounted as "shared"
