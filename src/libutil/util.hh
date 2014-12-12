@@ -171,6 +171,7 @@ extern void (*_writeToStderr) (const unsigned char * buf, size_t count);
    requested number of bytes. */
 void readFull(int fd, unsigned char * buf, size_t count);
 void writeFull(int fd, const unsigned char * buf, size_t count);
+void writeFull(int fd, const string & s);
 
 MakeError(EndOfFile, Error)
 

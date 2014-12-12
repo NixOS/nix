@@ -191,7 +191,7 @@ void LocalStore::addTempRoot(const Path & path)
     lockFile(fdTempRoots, ltWrite, true);
 
     string s = path + '\0';
-    writeFull(fdTempRoots, (const unsigned char *) s.data(), s.size());
+    writeFull(fdTempRoots, s);
 
     /* Downgrade to a read lock. */
     debug(format("downgrading to read lock on ‘%1%’") % fnTempRoots);
@@ -231,7 +231,7 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
         if (lockFile(*fd, ltWrite, false)) {
             printMsg(lvlError, format("removing stale temporary roots file ‘%1%’") % path);
             unlink(path.c_str());
-            writeFull(*fd, (const unsigned char *) "d", 1);
+            writeFull(*fd, "d");
             continue;
         }
 

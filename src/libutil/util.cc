@@ -265,7 +265,7 @@ void writeFile(const Path & path, const string & s)
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT, 0666);
     if (fd == -1)
         throw SysError(format("opening file ‘%1%’") % path);
-    writeFull(fd, (unsigned char *) s.data(), s.size());
+    writeFull(fd, s);
 }
 
 
@@ -292,7 +292,7 @@ string readLine(int fd)
 void writeLine(int fd, string s)
 {
     s += '\n';
-    writeFull(fd, (const unsigned char *) s.data(), s.size());
+    writeFull(fd, s);
 }
 
 
@@ -483,18 +483,13 @@ void warnOnce(bool & haveWarned, const FormatOrString & fs)
 }
 
 
-static void defaultWriteToStderr(const unsigned char * buf, size_t count)
-{
-    writeFull(STDERR_FILENO, buf, count);
-}
-
-
 void writeToStderr(const string & s)
 {
     try {
-        auto p = _writeToStderr;
-        if (!p) p = defaultWriteToStderr;
-        p((const unsigned char *) s.data(), s.size());
+        if (_writeToStderr)
+            _writeToStderr((const unsigned char *) s.data(), s.size());
+        else
+            writeFull(STDERR_FILENO, s);
     } catch (SysError & e) {
         /* Ignore failing writes to stderr if we're in an exception
            handler, otherwise throw an exception.  We need to ignore
@@ -506,7 +501,7 @@ void writeToStderr(const string & s)
 }
 
 
-void (*_writeToStderr) (const unsigned char * buf, size_t count) = defaultWriteToStderr;
+void (*_writeToStderr) (const unsigned char * buf, size_t count) = 0;
 
 
 void readFull(int fd, unsigned char * buf, size_t count)
@@ -537,6 +532,12 @@ void writeFull(int fd, const unsigned char * buf, size_t count)
         count -= res;
         buf += res;
     }
+}
+
+
+void writeFull(int fd, const string & s)
+{
+    writeFull(fd, (const unsigned char *) s.data(), s.size());
 }
 
 

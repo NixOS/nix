@@ -33,7 +33,7 @@ void deleteLockFile(const Path & path, int fd)
        other processes waiting on this lock that the lock is stale
        (deleted). */
     unlink(path.c_str());
-    writeFull(fd, (const unsigned char *) "d", 1);
+    writeFull(fd, "d");
     /* Note that the result of unlink() is ignored; removing the lock
        file is an optimisation, not a necessity. */
 }

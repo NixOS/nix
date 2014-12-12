@@ -2166,7 +2166,7 @@ void DerivationGoal::runChild()
         restoreSIGPIPE();
 
         /* Indicate that we managed to set up the build environment. */
-        writeToStderr("\n");
+        writeFull(STDERR_FILENO, "\n");
 
         /* Execute the program.  This should not return. */
         execve(program.c_str(), (char * *) &args[0], (char * *) envArr);
@@ -2174,7 +2174,7 @@ void DerivationGoal::runChild()
         throw SysError(format("executing ‘%1%’") % drv.builder);
 
     } catch (std::exception & e) {
-        writeToStderr("while setting up the build environment: " + string(e.what()) + "\n");
+        writeFull(STDERR_FILENO, "while setting up the build environment: " + string(e.what()) + "\n");
         _exit(1);
     }
 }
@@ -2487,7 +2487,7 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
             BZ2_bzWrite(&err, bzLogFile, (unsigned char *) data.data(), data.size());
             if (err != BZ_OK) throw Error(format("cannot write to compressed log file (BZip2 error = %1%)") % err);
         } else if (fdLogFile != -1)
-            writeFull(fdLogFile, (unsigned char *) data.data(), data.size());
+            writeFull(fdLogFile, data);
     }
 
     if (hook && fd == hook->fromHook.readSide)

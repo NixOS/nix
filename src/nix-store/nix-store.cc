@@ -488,7 +488,7 @@ static void opReadLog(Strings opFlags, Strings opArgs)
             if (pathExists(logPath)) {
                 /* !!! Make this run in O(1) memory. */
                 string log = readFile(logPath);
-                writeFull(STDOUT_FILENO, (const unsigned char *) log.data(), log.size());
+                writeFull(STDOUT_FILENO, log);
                 found = true;
                 break;
             }
