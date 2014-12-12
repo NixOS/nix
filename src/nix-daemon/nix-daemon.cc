@@ -513,11 +513,11 @@ static void performOp(bool trusted, unsigned int clientVersion,
     }
 
     case wopOptimiseStore:
-	startWork();
-	store->optimiseStore();
-	stopWork();
-	writeInt(1, to);
-	break;
+        startWork();
+        store->optimiseStore();
+        stopWork();
+        writeInt(1, to);
+        break;
 
     default:
         throw Error(format("invalid operation %1%") % op);
