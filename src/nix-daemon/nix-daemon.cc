@@ -837,15 +837,6 @@ static void daemonLoop(char * * argv)
 }
 
 
-void run(Strings args)
-{
-    for (Strings::iterator i = args.begin(); i != args.end(); ) {
-        string arg = *i++;
-    }
-
-}
-
-
 int main(int argc, char * * argv)
 {
     return handleExceptions(argv[0], [&]() {
