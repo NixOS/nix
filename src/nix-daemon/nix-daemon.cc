@@ -610,6 +610,8 @@ static void processConnection(bool trusted)
         assert(!canSendStderr);
     };
 
+    canSendStderr = false;
+    _isInterrupted = false;
     printMsg(lvlDebug, format("%1% operations") % opCount);
 }
 
