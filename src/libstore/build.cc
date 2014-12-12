@@ -1918,7 +1918,7 @@ void DerivationGoal::startBuilder()
     options.allowVfork = !buildUser.enabled();
     pid = startProcess([&]() {
         runChild();
-    });
+    }, options);
 
     /* parent */
     pid.setSeparatePG(true);

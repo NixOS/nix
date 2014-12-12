@@ -850,7 +850,7 @@ void killUser(uid_t uid)
         }
 
         _exit(0);
-    });
+    }, options);
 
     int status = pid.wait(true);
     if (status != 0)
@@ -885,7 +885,7 @@ static pid_t doFork(bool allowVfork, std::function<void()> fun)
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
 {
     auto wrapper = [&]() {
-        _writeToStderr = 0;
+        if (!options.allowVfork) _writeToStderr = 0;
         try {
 #if __linux__
             if (options.dieWithParent && prctl(PR_SET_PDEATHSIG, SIGKILL) == -1)
