@@ -417,32 +417,6 @@ static void prim_trace(EvalState & state, const Pos & pos, Value * * args, Value
 }
 
 
-#if HAVE_BOEHMGC
-void canaryFinalizer(GC_PTR obj, GC_PTR client_data)
-{
-    Value * v = (Value *) obj;
-    EvalState & state(* (EvalState *) client_data);
-    printMsg(lvlError, format("canary ‘%1%’ garbage-collected") % v->string.s);
-    auto i = state.gcCanaries.find(v);
-    assert(i != state.gcCanaries.end());
-    state.gcCanaries.erase(i);
-}
-#endif
-
-
-void prim_gcCanary(EvalState & state, const Pos & pos, Value * * args, Value & v)
-{
-    string s = state.forceStringNoCtx(*args[0], pos);
-    state.mkList(v, 1);
-    Value * canary = v.list.elems[0] = state.allocValue();
-#if HAVE_BOEHMGC
-    state.gcCanaries.insert(canary);
-    GC_register_finalizer(canary, canaryFinalizer, &state, 0, 0);
-#endif
-    mkString(*canary, s);
-}
-
-
 void prim_valueSize(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     /* We're not forcing the argument on purpose. */
@@ -1560,7 +1534,6 @@ void EvalState::createBaseEnv()
 
     // Debugging
     addPrimOp("__trace", 2, prim_trace);
-    addPrimOp("__gcCanary", 1, prim_gcCanary);
     addPrimOp("__valueSize", 1, prim_valueSize);
 
     // Paths
