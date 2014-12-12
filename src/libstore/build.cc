@@ -2137,8 +2137,6 @@ void DerivationGoal::runChild()
            setuid() when run as root sets the real, effective and
            saved UIDs. */
         if (buildUser.enabled()) {
-            printMsg(lvlChatty, format("switching to user ‘%1%’") % buildUser.getUser());
-
             if (setgroups(0, 0) == -1)
                 throw SysError("cannot clear the set of supplementary groups");
 
