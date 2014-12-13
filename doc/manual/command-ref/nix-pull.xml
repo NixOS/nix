@@ -13,7 +13,7 @@
 
 <refnamediv>
   <refname>nix-pull</refname>
-  <refpurpose>pull substitutes from a network cache</refpurpose>
+  <refpurpose>register availability of pre-built binaries (deprecated)</refpurpose>
 </refnamediv>
 
 <refsynopsisdiv>
@@ -25,6 +25,9 @@
 
 
 <refsection><title>Description</title>
+
+<note><para>This command and the use of manifests is deprecated. It is
+better to use binary caches.</para></note>
 
 <para>The command <command>nix-pull</command> obtains a list of
 pre-built store paths from the URL <replaceable>url</replaceable>, and
@@ -43,7 +46,7 @@ with the files created by <replaceable>nix-push</replaceable>.</para>
 <refsection><title>Examples</title>
 
 <screen>
-$ nix-pull http://nix.cs.uu.nl/dist/nix/nixpkgs-0.5pre753/MANIFEST</screen>
+$ nix-pull https://nixos.org/releases/nixpkgs/nixpkgs-15.05pre54468.69858d7/MANIFEST</screen>
 
 </refsection>
 

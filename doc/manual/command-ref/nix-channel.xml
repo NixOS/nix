@@ -33,8 +33,8 @@
 
 <para>A Nix channel is mechanism that allows you to automatically stay
 up-to-date with a set of pre-built Nix expressions.  A Nix channel is
-just a URL that points to a place containing a set of Nix expressions
-and a <command>nix-push</command> manifest.  <phrase
+just a URL that points to a place containing both a set of Nix
+expressions and a pointer to a binary cache.  <phrase
 condition="manual">See also <xref linkend="sec-channels"
 />.</phrase></para>
 
@@ -99,13 +99,6 @@ an update.</para>
 <para>The list of subscribed channels is stored in
 <filename>~/.nix-channels</filename>.</para>
 
-<para>A channel consists of two elements: a bzipped Tar archive
-containing the Nix expressions, and a manifest created by
-<command>nix-push</command>.  These must be stored under
-<literal><replaceable>url</replaceable>/nixexprs.tar.bz2</literal> and
-<literal><replaceable>url</replaceable>/MANIFEST</literal>,
-respectively.</para>
-
 </refsection>
 
 <refsection><title>Examples</title>
@@ -156,6 +149,51 @@ $ nix-instantiate --eval -E '(import &lt;nixpkgs> {}).lib.nixpkgsVersion'
     a multi-user installation, you may also have
     <filename>~/.nix-defexpr/channels_root</filename>, which links to
     the channels of the root user.</para></listitem>
+
+  </varlistentry>
+
+</variablelist>
+
+</refsection>
+
+<refsection><title>Channel format</title>
+
+<para>A channel URL should point to a directory containing the
+following files:</para>
+
+<variablelist>
+
+  <varlistentry><term><filename>nixexprs.tar.xz</filename></term>
+
+    <listitem><para>A tarball containing Nix expressions and files
+    referenced by them (such as build scripts and patches). At
+    top-level, the tarball should contain a single directory. That
+    directory must contain a file <filename>default.nix</filename>
+    that serves as the channel’s “entry point”.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><filename>binary-cache-url</filename></term>
+
+    <listitem><para>A file containing the URL to a binary cache (such
+    as <uri>https://cache.nixos.org</uri>. Nix will automatically
+    check this cache for pre-built binaries, if the user has
+    sufficient rights to add binary caches. For instance, in a
+    multi-user Nix setup, the binary caches provided by the channels
+    of the root user are used automatically, but caches corresponding
+    to the channels of non-root users are ignored. Binary caches can
+    be created and maintained using
+    <command>nix-push</command>.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><filename>MANIFEST.bz2</filename></term>
+
+    <listitem><para>(Deprecated in favour of binary caches.) A
+    manifest as created by <command>nix-push</command>. Only used if
+    <filename>binary-cache-url</filename> is not present or if the
+    <filename>nix.conf</filename> option
+    <option>force-manifest</option> is set.</para></listitem>
 
   </varlistentry>
 

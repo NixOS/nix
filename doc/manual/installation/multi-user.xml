@@ -23,11 +23,11 @@ daemon</emphasis> running under the owner of the Nix store/database
 that performs the operation.</para>
 
 <note><para>Multi-user mode has one important limitation: only
-<systemitem class="username">root</systemitem> can run <command
-linkend="sec-nix-pull">nix-pull</command> to register the availability
-of pre-built binaries.  However, those registrations are shared by all
-users, so they still get the benefit from <command>nix-pull</command>s
-done by <systemitem class="username">root</systemitem>.</para></note>
+<systemitem class="username">root</systemitem> and a set of trusted
+users specified in <filename>nix.conf</filename> can specify arbitrary
+binary caches. So while unprivileged users may install packages from
+arbitrary Nix expressions, they may not get pre-built
+binaries.</para></note>
 
 
 <simplesect>

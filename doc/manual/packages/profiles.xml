@@ -73,9 +73,9 @@ generated based on the current one.  For instance, generation 43 was
 created from generation 42 when we did
 
 <screen>
-$ nix-env -i subversion mozilla</screen>
+$ nix-env -i subversion firefox</screen>
 
-on a set of Nix expressions that contained Mozilla and a new version
+on a set of Nix expressions that contained Firefox and a new version
 of Subversion.</para>
 
 <para>Generations are grouped together into

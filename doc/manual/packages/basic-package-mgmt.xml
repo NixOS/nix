@@ -28,40 +28,71 @@ Nix expressions called the Nix Package collection that contains
 packages ranging from basic development stuff such as GCC and Glibc,
 to end-user applications like Mozilla Firefox.  (Nix is however not
 tied to the Nix Package collection; you could write your own Nix
-expressions based on it, or completely new ones.)  You can download
-the latest version from <link
-xlink:href='http://nixos.org/nixpkgs/download.html' />.</para>
+expressions based on it, or completely new ones.)</para>
 
-<para>Assuming that you have downloaded and unpacked a release of Nix
-Packages, you can view the set of available packages in the release:
+<para>You can manually download the latest version of Nixpkgs from
+<link xlink:href='http://nixos.org/nixpkgs/download.html'/>. However,
+it’s much more convenient to use the Nixpkgs
+<emphasis>channel</emphasis>, since it makes it easy to stay up to
+date with new versions of Nixpkgs. (Channels are described in more
+detail in <xref linkend="sec-channels"/>.) Nixpkgs is automatically
+added to your list of “subscribed” channels when when you install
+Nix. If this is not the case for some reason, you can add it as
+follows:
 
 <screen>
-$ nix-env -qaf nixpkgs-<replaceable>version</replaceable> '*'
-ant-blackdown-1.4.2
+$ nix-channel --add https://nixos.org/channels/nixpkgs-unstable
+$ nix-channel --update
+</screen>
+
+</para>
+
+<note><para>On NixOS, you’re automatically subscribed to a NixOS
+channel corresponding to your NixOS major release
+(e.g. <uri>http://nixos.org/channels/nixos-14.12</uri>). A NixOS
+channel is identical to the Nixpkgs channel, except that it contains
+only Linux binaries and is updated only if a set of regression tests
+succeed.</para></note>
+
+<para>You can view the set of available packages in Nixpkgs:
+
+<screen>
+$ nix-env -qa
 aterm-2.2
 bash-3.0
 binutils-2.15
 bison-1.875d
 blackdown-1.4.2
 bzip2-1.0.2
-...</screen>
+…</screen>
 
-where <literal>nixpkgs-<replaceable>version</replaceable></literal> is
-where you’ve unpacked the release.  The flag <option>-q</option>
-specifies a query operation; <option>-a</option> means that you want
-to show the “available” (i.e., installable) packages, as opposed to
-the installed packages; and <option>-f</option>
-<filename>nixpkgs-<replaceable>version</replaceable></filename>
-specifies the source of the packages.  The argument
-<literal>'*'</literal> shows all installable packages. (The quotes are
-necessary to prevent shell expansion.)  You can also select specific
-packages by name:
+The flag <option>-q</option> specifies a query operation, and
+<option>-a</option> means that you want to show the “available” (i.e.,
+installable) packages, as opposed to the installed packages. If you
+downloaded Nixpkgs yourself, or if you checked it out from GitHub,
+then you need to pass the path to your Nixpkgs tree using the
+<option>-f</option> flag:
 
 <screen>
-$ nix-env -qaf nixpkgs-<replaceable>version</replaceable> gcc
-gcc-3.4.6
-gcc-4.0.3
-gcc-4.1.1</screen>
+$ nix-env -qaf <replaceable>/path/to/nixpkgs</replaceable>
+</screen>
+
+where <replaceable>/path/to/nixpkgs</replaceable> is where you’ve
+unpacked or checked out Nixpkgs.</para>
+
+<para>You can select specific packages by name:
+
+<screen>
+$ nix-env -qa firefox
+firefox-34.0.5
+firefox-with-plugins-34.0.5
+</screen>
+
+and using regular expressions:
+
+<screen>
+$ nix-env -qa 'firefox.*'
+</screen>
 
 </para>
 
@@ -70,12 +101,12 @@ available packages, i.e., whether they are installed into the user
 environment and/or present in the system:
 
 <screen>
-$ nix-env -qasf nixpkgs-<replaceable>version</replaceable> '*'
-...
+$ nix-env -qas
+…
 -PS bash-3.0
 --S binutils-2.15
 IPS bison-1.875d
-...</screen>
+…</screen>
 
 The first character (<literal>I</literal>) indicates whether the
 package is installed in your current user environment.  The second
@@ -88,40 +119,33 @@ just means that Nix knows that it can fetch a pre-built package from
 somewhere (typically a network server) instead of building it
 locally.</para>
 
-<para>So now that we have a set of Nix expressions we can build the
-packages contained in them.  This is done using <literal>nix-env
--i</literal>.  For instance,
+<para>You can install a package using <literal>nix-env -i</literal>.
+For instance,
 
 <screen>
-$ nix-env -f nixpkgs-<replaceable>version</replaceable> -i subversion</screen>
+$ nix-env -i subversion</screen>
 
 will install the package called <literal>subversion</literal> (which
 is, of course, the <link
 xlink:href='http://subversion.tigris.org/'>Subversion version
 management system</link>).</para>
 
-<para>When you do this for the first time, Nix will start building
-Subversion and all its dependencies.  This will take quite a while —
-typically an hour or two on modern machines.  Fortunately, there is a
-faster way (so do a Ctrl-C on that install operation!): you just need
-to tell Nix that pre-built binaries of all those packages are
-available somewhere.  This is done using the
-<command>nix-pull</command> command, which must be supplied with a URL
-containing a <emphasis>manifest</emphasis> describing what binaries
-are available.  This URL should correspond to the Nix Packages release
-that you’re using.  For instance, if you obtained a release from <link
-xlink:href='http://nixos.org/releases/nixpkgs/nixpkgs-0.12pre11712-4lrp7j8x'
-/>, then you should do:
-
-<screen>
-$ nix-pull http://nixos.org/releases/nixpkgs/nixpkgs-0.12pre11712-4lrp7j8x/MANIFEST</screen>
-
-If you then issue the installation command, it should start
-downloading binaries from <systemitem
-class='fqdomainname'>nixos.org</systemitem>, instead of building
-them from source.  This might still take a while since all
-dependencies must be downloaded, but on a reasonably fast connection
-such as a DSL line it’s on the order of a few minutes.</para>
+<note><para>When you ask Nix to install a package, it will first try
+to get it in pre-compiled form from a <emphasis>binary
+cache</emphasis>. By default, Nix will use the binary cache
+<uri>https://cache.nixos.org</uri>; it contains binaries for most
+packages in Nixpkgs. Only if no binary is available in the binary
+cache, Nix will build the package from source. So if <literal>nix-env
+-i subversion</literal> results in Nix building stuff from source,
+then either the package is not built for your platform by the Nixpkgs
+build servers, or your version of Nixpkgs is too old or too new. For
+instance, if you have a very recent checkout of Nixpkgs, then the
+Nixpkgs build servers may not have had a chance to build everything
+and upload the resulting binaries to
+<uri>https://cache.nixos.org</uri>. The Nixpkgs channel is only
+updated after all binaries have been uploaded to the cache, so if you
+stick to the Nixpkgs channel (rather than using a Git checkout of the
+Nixpkgs tree), you will get binaries for most packages.</para></note>
 
 <para>Naturally, packages can also be uninstalled:
 
@@ -134,7 +158,7 @@ $ nix-env -e subversion</screen>
 release of Nix Packages, you can do:
 
 <screen>
-$ nix-env -f nixpkgs-<replaceable>version</replaceable> -u subversion</screen>
+$ nix-env -u subversion</screen>
 
 This will <emphasis>only</emphasis> upgrade Subversion if there is a
 “newer” version in the new set of Nix expressions, as
@@ -149,17 +173,17 @@ whatever version is already installed.</para>
 versions:
 
 <screen>
-$ nix-env -f nixpkgs-<replaceable>version</replaceable> -u '*'</screen>
+$ nix-env -u</screen>
 
 </para>
 
 <para>Sometimes it’s useful to be able to ask what
 <command>nix-env</command> would do, without actually doing it.  For
 instance, to find out what packages would be upgraded by
-<literal>nix-env -u '*'</literal>, you can do
+<literal>nix-env -u</literal>, you can do
 
 <screen>
-$ nix-env ... -u '*' --dry-run
+$ nix-env -u --dry-run
 (dry run; not doing anything)
 upgrading `libxslt-1.1.0' to `libxslt-1.1.10'
 upgrading `graphviz-1.10' to `graphviz-1.12'
