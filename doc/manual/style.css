@@ -23,6 +23,11 @@ h1 /* title */
     font-size: 200%;
 }
 
+div.part h1
+{
+    font-size: 240%;
+}
+
 h2 /* chapters, appendices, subtitle */
 {
     font-size: 180%;
@@ -30,7 +35,7 @@ h2 /* chapters, appendices, subtitle */
 
 div.part
 {
-    margin-top: 2em;
+    margin-top: 4em;
 }
 
 /* Extra space between chapters, appendices. */
