@@ -109,7 +109,7 @@ void RemoteStore::connectToDaemon()
        applications... */
     AutoCloseFD fdPrevDir = open(".", O_RDONLY);
     if (fdPrevDir == -1) throw SysError("couldn't open current directory");
-    if (chdir(dirOf(socketPath).c_str()) == -1) throw SysError("couldn't change current directory");
+    if (chdir(dirOf(socketPath).c_str()) == -1) throw SysError(format("couldn't change to directory of ‘%1%’") % socketPath);
     Path socketPathRel = "./" + baseNameOf(socketPath);
 
     struct sockaddr_un addr;
