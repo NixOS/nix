@@ -72,17 +72,18 @@ if ! $nix/bin/nix-env -i "$nix"; then
     exit 1
 fi
 
+# Install an SSL certificate bundle.
+if [ -z "$SSL_CERT_FILE" -o ! -f "$SSL_CERT_FILE" ]; then
+    $nix/bin/nix-env -i "$cacert"
+    export SSL_CERT_FILE="$HOME/.nix-profile/etc/ca-bundle.crt"
+fi
+
 # Subscribe the user to the Nixpkgs channel and fetch it.
 if ! $nix/bin/nix-channel --list | grep -q "^nixpkgs "; then
     $nix/bin/nix-channel --add https://nixos.org/channels/nixpkgs-unstable
 fi
 if [ -z "$_NIX_INSTALLER_TEST" ]; then
     $nix/bin/nix-channel --update nixpkgs
-fi
-
-# Install an SSL certificate bundle.
-if [ -z "$SSL_CERT_FILE" ]; then
-    $nix/bin/nix-env -i "$cacert"
 fi
 
 # Make the shell source nix.sh during login.
