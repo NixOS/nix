@@ -66,6 +66,12 @@ div.appendix h3
     margin-top: 1.5em;
 }
 
+div.refentry\.separator
+{
+    margin-top: 2.5em;
+    margin-bottom: 2em;
+}
+
 div.refnamediv h2, div.refsynopsisdiv h2, div.refsection h2 /* refentry parts */
 {
     margin-top: 1.4em;
