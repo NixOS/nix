@@ -71,7 +71,7 @@ genericBuild <co xml:id='ex-hello-builder2-co-3' /></programlisting>
     generic builder is smart enough to figure out whether to unpack
     the sources using <command>gzip</command>,
     <command>bzip2</command>, etc.  It can be customised in many ways;
-    see <xref linkend='sec-standard-environment' />.</para>
+    see the Nixpkgs manual for details.</para>
 
   </callout>
 

@@ -110,12 +110,12 @@ buildInputs = [ pkg pkg.headers ];
 
 </itemizedlist>
 
-<para>The function <function>mkDerivation</function> in the standard
-environment is a wrapper around <function>derivation</function> that
-adds a default value for <varname>system</varname> and always uses
-Bash as the builder, to which the supplied builder is passed as a
-command-line argument.  See <xref linkend='sec-standard-environment'
-/>.</para>
+<para>The function <function>mkDerivation</function> in the Nixpkgs
+standard environment is a wrapper around
+<function>derivation</function> that adds a default value for
+<varname>system</varname> and always uses Bash as the builder, to
+which the supplied builder is passed as a command-line argument.  See
+the Nixpkgs manual for details.</para>
 
 <para>The builder is executed as follows:
 

@@ -22,6 +22,5 @@ manual</link>.</para></note>
 
 <xi:include href="simple-expression.xml" />
 <xi:include href="expression-language.xml" />
-<xi:include href="standard-env.xml" />
 
 </part>

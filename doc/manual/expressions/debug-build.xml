@@ -6,13 +6,14 @@
 
 <title>Debugging Build Failures</title>
 
-<para>At the beginning of each phase, the set of all shell variables
-is written to the file <filename>env-vars</filename> at the top-level
-build directory.  This is useful for debugging: it allows you to
-recreate the environment in which a build was performed.  For
-instance, if a build fails, then assuming you used the
-<option>-K</option> flag, you can go to the output directory and
-<quote>switch</quote> to the environment of the builder:
+<para>At the beginning of each phase of the build (such as unpacking,
+building or installing), the set of all shell variables is written to
+the file <filename>env-vars</filename> at the top-level build
+directory.  This is useful for debugging: it allows you to recreate
+the environment in which a build was performed.  For instance, if a
+build fails, then assuming you used the <option>-K</option> flag, you
+can go to the output directory and <quote>switch</quote> to the
+environment of the builder:
 
 <screen>
 $ nix-build -K ./foo.nix
