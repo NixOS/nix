@@ -1,0 +1,70 @@
+<section xmlns="http://docbook.org/ns/docbook"
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         xmlns:xi="http://www.w3.org/2001/XInclude"
+         version="5.0"
+         xml:id="ssec-binary-cache-substituter">
+
+<title>Serving a Nix store via HTTP</title>
+
+<para>You can easily share the Nix store of a machine via HTTP. This
+allows other machines to fetch store paths from that machine to speed
+up installations. It uses the same <emphasis>binary cache</emphasis>
+mechanism that Nix usually uses to fetch pre-built binaries from
+<uri>https://cache.nixos.org</uri>.</para>
+
+<para>The daemon that handles binary cache requests via HTTP,
+<command>nix-serve</command>, is not part of the Nix distribution, but
+you can install it from Nixpkgs:
+
+<screen>
+$ nix-env -i nix-serve
+</screen>
+
+You can then start the server, listening for HTTP connections on
+whatever port you like:
+
+<screen>
+$ nix-serve -p 8080
+</screen>
+
+To check whether it works, try the following on the client:
+
+<screen>
+$ curl http://avalon:8080/nix-cache-info
+</screen>
+
+which should print something like:
+
+<screen>
+StoreDir: /nix/store
+WantMassQuery: 1
+Priority: 30
+</screen>
+
+</para>
+
+<para>On the client side, you can tell Nix to use your binary cache
+using <option>--option extra-binary-caches</option>, e.g.:
+
+<screen>
+$ nix-env -i firefox --option extra-binary-caches http://avalon:8080/
+</screen>
+
+The option <option>extra-binary-caches</option> tells Nix to use this
+binary cache in addition to your default caches, such as
+<uri>https://cache.nixos.org</uri>. Thus, for any path in the closure
+of Firefox, Nix will first check if the path is available on the
+server <literal>avalon</literal> or another binary caches. If not, it
+will fall back to building from source.</para>
+
+<para>You can also tell Nix to always use your binary cache by adding
+a line to the <filename linkend="sec-conf-file">nix.conf</filename>
+configuration file like this:
+
+<programlisting>
+binary-caches = http://avalon:8080/ https://cache.nixos.org/
+</programlisting>
+
+</para>
+
+</section>

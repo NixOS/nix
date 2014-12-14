@@ -4,7 +4,7 @@
          version="5.0"
          xml:id="ssec-copy-closure">
 
-<title>Copying Closures</title>
+<title>Copying Closures Via SSH</title>
 
 <para>The command <command
 linkend="sec-nix-copy-closure">nix-copy-closure</command> copies a Nix
