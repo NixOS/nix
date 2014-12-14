@@ -14,15 +14,38 @@ dist-files :=
 OS = $(shell uname -s)
 
 
+# Hack to define a literal space.
+space :=
+space +=
+
+
+# Hack to define a literal newline.
+define newline
+
+
+endef
+
+
 # Default installation paths.
 prefix ?= /usr/local
 libdir ?= $(prefix)/lib
 bindir ?= $(prefix)/bin
 libexecdir ?= $(prefix)/libexec
 datadir ?= $(prefix)/share
+jardir ?= $(datadir)/java
 localstatedir ?= $(prefix)/var
 sysconfdir ?= $(prefix)/etc
 mandir ?= $(prefix)/share/man
+
+
+# Initialise support for build directories.
+builddir ?=
+
+ifdef builddir
+  buildprefix = $(builddir)/
+else
+  buildprefix =
+endif
 
 
 # Pass -fPIC if we're building dynamic libraries.
@@ -38,7 +61,6 @@ ifeq ($(BUILD_SHARED_LIBS), 1)
   endif
   SET_RPATH_TO_LIBS ?= 1
 endif
-
 
 # Pass -g if we want debug info.
 BUILD_DEBUG ?= 1

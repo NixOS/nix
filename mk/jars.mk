@@ -1,4 +1,5 @@
 define build-jar
+
   $(1)_NAME ?= $(1)
 
   _d := $$(strip $$($(1)_DIR))
@@ -7,14 +8,20 @@ define build-jar
 
   $(1)_TMPDIR := $$(_d)/.$$($(1)_NAME).jar.tmp
 
-  $$($(1)_PATH): $$($(1)_SOURCES)
+  _jars := $$(foreach jar, $$($(1)_JARS), $$($$(jar)_PATH))
+
+  $$($(1)_PATH): $$($(1)_SOURCES) $$(_jars) $$($(1)_EXTRA_DEPS)| $$($(1)_ORDER_AFTER)
 	@rm -rf $$($(1)_TMPDIR)
 	@mkdir -p $$($(1)_TMPDIR)
-	$$(trace-javac) javac $(GLOBAL_JAVACFLAGS) $$($(1)_JAVACFLAGS) -d $$($(1)_TMPDIR) $$($(1)_SOURCES)
-	$$(trace-jar) jar cf $$($(1)_PATH) -C $$($(1)_TMPDIR) .
+	$$(trace-javac) javac $(GLOBAL_JAVACFLAGS) $$($(1)_JAVACFLAGS) -d $$($(1)_TMPDIR) \
+	  $$(foreach fn, $$($(1)_SOURCES), '$$(fn)') \
+	  -cp "$$(subst $$(space),,$$(foreach jar,$$($(1)_JARS),$$($$(jar)_PATH):))$$$$CLASSPATH"
+	@echo -e '$$(subst $$(newline),\n,$$($(1)_MANIFEST))' > $$($(1)_PATH).manifest
+	$$(trace-jar) jar cfm $$($(1)_PATH) $$($(1)_PATH).manifest -C $$($(1)_TMPDIR) .
+	@rm $$($(1)_PATH).manifest
 	@rm -rf $$($(1)_TMPDIR)
 
-  $(1)_INSTALL_DIR ?= $$(libdir)/java
+  $(1)_INSTALL_DIR ?= $$(jardir)
 
   $(1)_INSTALL_PATH := $$($(1)_INSTALL_DIR)/$$($(1)_NAME).jar
 
