@@ -9,7 +9,7 @@
 #include "store-api.hh"
 
 #include <iostream>
-#include <stdlib.h>
+#include <cstdlib>
 #include <unistd.h>
 
 using namespace nix;

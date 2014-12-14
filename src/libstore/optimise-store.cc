@@ -4,7 +4,7 @@
 #include "local-store.hh"
 #include "globals.hh"
 
-#include <stdlib.h>
+#include <cstdlib>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>

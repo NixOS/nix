@@ -53,10 +53,6 @@ namespace nix {
 #include "parser-tab.hh"
 #include "lexer-tab.hh"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 YY_DECL;
 
 using namespace nix;
