@@ -37,7 +37,14 @@ generations, e.g.,
 <screen>
 $ nix-env --delete-generations 10 11 14</screen>
 
-</para>
+To delete all generations older than a specified number of days
+(except the current generation), use the <literal>d</literal>
+suffix. For example,
+
+<screen>
+$ nix-env --delete-generations 14d</screen>
+
+deletes all generations older than two weeks.</para>
 
 <para>After removing appropriate old generations you can run the
 garbage collector as follows:
