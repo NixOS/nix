@@ -52,8 +52,13 @@ endif
 BUILD_SHARED_LIBS ?= 1
 
 ifeq ($(BUILD_SHARED_LIBS), 1)
-  GLOBAL_CFLAGS += -fPIC
-  GLOBAL_CXXFLAGS += -fPIC
+  ifeq (CYGWIN,$(findstring CYGWIN,$(OS)))
+    GLOBAL_CFLAGS += -U__STRICT_ANSI__
+    GLOBAL_CXXFLAGS += -U__STRICT_ANSI__
+  else
+    GLOBAL_CFLAGS += -fPIC
+    GLOBAL_CXXFLAGS += -fPIC
+  endif
   ifneq ($(OS), Darwin)
    ifneq ($(OS), SunOS)
     GLOBAL_LDFLAGS += -Wl,--no-copy-dt-needed-entries
