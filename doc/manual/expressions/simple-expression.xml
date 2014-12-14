@@ -4,7 +4,7 @@
       version="5.0"
       xml:id="ch-simple-expression">
 
-<title>Simple Nix Expression Use-Case</title>
+<title>A Simple Nix Expression</title>
 
 <para>This section shows how to add and test the <link
 xlink:href='http://www.gnu.org/software/hello/hello.html'>GNU Hello
