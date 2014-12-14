@@ -41,7 +41,7 @@
   <xi:include href="installation/installation.xml" />
   <xi:include href="packages/package-management.xml" />
   <xi:include href="expressions/writing-nix-expressions.xml" />
-  <xi:include href="builds/build-farm.xml" />
+  <xi:include href="advanced-topics/advanced-topics.xml" />
   <xi:include href="command-ref/command-ref.xml" />
   <xi:include href="troubleshooting/troubleshooting.xml" />
   <xi:include href="glossary/glossary.xml" />

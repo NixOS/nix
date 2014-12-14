@@ -2,9 +2,18 @@
       xmlns:xlink="http://www.w3.org/1999/xlink"
       xmlns:xi="http://www.w3.org/2001/XInclude"
       version="5.0"
-      xml:id="ch-enabling-builds">
+      xml:id='chap-distributed-builds'>
 
-<title>Enabling Distributed Builds</title>
+<title>Distributed Builds</title>
+
+<para>Nix supports distributed builds, where a local Nix installation can
+forward Nix builds to other machines over the network.  This allows
+multiple builds to be performed in parallel (thus improving
+performance) and allows Nix to perform multi-platform builds in a
+semi-transparent way.  For instance, if you perform a build for a
+<literal>powerpc-darwin</literal> on an <literal>i686-linux</literal>
+machine, Nix can automatically forward the build to a
+<literal>powerpc-darwin</literal> machine, if available.</para>
 
 <para>You can enable distributed builds by setting the environment
 variable <envar>NIX_BUILD_HOOK</envar> to point to a program that Nix
@@ -41,7 +50,7 @@ example configuration is shown in <xref linkend='ex-remote-systems'
 bits of information:
 
 <orderedlist>
-  
+
   <listitem><para>The name of the remote machine, with optionally the
   user under which the remote build should be performed.  This is
   actually passed as an argument to <command>ssh</command>, so it can
@@ -73,9 +82,9 @@ bits of information:
   <filename>build-remote.pl</filename> will only perform the
   derivation on a machine that has the specified features.  For
   instance, the attribute
-  
+
 <programlisting>
-requiredSystemFeatures = [ "kvm" ];  
+requiredSystemFeatures = [ "kvm" ];
 </programlisting>
 
   will cause the build to be performed on a machine that has the
