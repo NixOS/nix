@@ -113,4 +113,11 @@ $ nix-store -l $(which xterm)
 
 </itemizedlist>
 
+<para>This release has contributions from Adam Szkoda, Aristid
+Breitkreuz, Bob van der Linden, Charles Strahan, darealshinji, Eelco
+Dolstra, Gergely Risko, Joel Taylor, Ludovic Courtès, Marko Durkovic,
+Mikey Ariel, Paul Colomiets, Ricardo M.  Correia, Ricky Elrod, Robert
+Helgesson, Rob Vermaas, Russell O'Connor, Shea Levy, Shell Turner,
+Sönke Hahn, Steve Purcell, Vladimír Čunát and Wout Mertens.</para>
+
 </section>
