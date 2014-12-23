@@ -1586,6 +1586,13 @@ void chmod_(const Path & path, mode_t mode)
 }
 
 
+int childEntry(void * arg)
+{
+    ((DerivationGoal *) arg)->runChild();
+    return 1;
+}
+
+
 void DerivationGoal::startBuilder()
 {
     startNest(nest, lvlInfo, format(
@@ -1902,11 +1909,58 @@ void DerivationGoal::startBuilder()
     builderOut.create();
 
     /* Fork a child to build the package. */
-    ProcessOptions options;
-    options.allowVfork = !buildUser.enabled();
-    pid = startProcess([&]() {
-        runChild();
-    }, options);
+    if (useChroot) {
+        /* Set up private namespaces for the build:
+
+           - The PID namespace causes the build to start as PID 1.
+             Processes outside of the chroot are not visible to those
+             on the inside, but processes inside the chroot are
+             visible from the outside (though with different PIDs).
+
+           - The private mount namespace ensures that all the bind
+             mounts we do will only show up in this process and its
+             children, and will disappear automatically when we're
+             done.
+
+           - The private network namespace ensures that the builder
+             cannot talk to the outside world (or vice versa).  It
+             only has a private loopback interface.
+
+           - The IPC namespace prevents the builder from communicating
+             with outside processes using SysV IPC mechanisms (shared
+             memory, message queues, semaphores).  It also ensures
+             that all IPC objects are destroyed when the builder
+             exits.
+
+           - The UTS namespace ensures that builders see a hostname of
+             localhost rather than the actual hostname.
+
+           We use a helper process to do the clone() to work around
+           clone() being broken in multi-threaded programs due to
+           at-fork handlers not being run. Note that we use
+           CLONE_PARENT to ensure that the real builder is parented to
+           us.
+        */
+        Pid helper = startProcess([&]() {
+            char stack[32 * 1024];
+            pid_t child = clone(childEntry, stack + sizeof(stack) - 8,
+                CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWNET | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD, this);
+            if (child == -1) throw SysError("cloning builder process");
+            writeFull(builderOut.writeSide, int2String(child) + "\n");
+            _exit(0);
+        });
+        if (helper.wait(true) != 0)
+            throw Error("unable to start build process");
+        pid_t tmp;
+        if (!string2Int<pid_t>(readLine(builderOut.readSide), tmp)) abort();
+        pid = tmp;
+    } else {
+        ProcessOptions options;
+        options.allowVfork = !buildUser.enabled();
+        pid = startProcess([&]() {
+            runChild();
+        }, options);
+    }
 
     /* parent */
     pid.setSeparatePG(true);
@@ -1922,7 +1976,6 @@ void DerivationGoal::startBuilder()
         printMsg(lvlError, format("@ build-started %1% - %2% %3%")
             % drvPath % drv.platform % logFile);
     }
-
 }
 
 
@@ -1937,30 +1990,6 @@ void DerivationGoal::runChild()
 
 #if CHROOT_ENABLED
         if (useChroot) {
-
-            /* Set up private namespaces for the build:
-
-               - The private mount namespace ensures that all the bind
-                 mounts we do will only show up in this process and
-                 its children, and will disappear automatically when
-                 we're done.
-
-               - The private network namespace ensures that the
-                 builder cannot talk to the outside world (or vice
-                 versa).  It only has a private loopback interface.
-
-               - The IPC namespace prevents the builder from
-                 communicating with outside processes using SysV IPC
-                 mechanisms (shared memory, message queues,
-                 semaphores).  It also ensures that all IPC objects
-                 are destroyed when the builder exits.
-
-               - The UTS namespace ensures that builders see a
-                 hostname of localhost rather than the actual
-                 hostname.
-            */
-            if (unshare(CLONE_NEWNS | CLONE_NEWNET | CLONE_NEWIPC | CLONE_NEWUTS) == -1)
-                throw SysError("setting up private namespaces");
 
             /* Initialise the loopback interface. */
             AutoCloseFD fd(socket(PF_INET, SOCK_DGRAM, IPPROTO_IP));
