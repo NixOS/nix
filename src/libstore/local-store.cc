@@ -258,18 +258,19 @@ LocalStore::LocalStore(bool reserveSpace)
 
         struct group * gr = getgrnam(settings.buildUsersGroup.c_str());
         if (!gr)
-            throw Error(format("the group ‘%1%’ specified in ‘build-users-group’ does not exist")
+            printMsg(lvlError, format("warning: the group ‘%1%’ specified in ‘build-users-group’ does not exist")
                 % settings.buildUsersGroup);
+        else {
+            struct stat st;
+            if (stat(settings.nixStore.c_str(), &st))
+                throw SysError(format("getting attributes of path ‘%1%’") % settings.nixStore);
 
-        struct stat st;
-        if (stat(settings.nixStore.c_str(), &st))
-            throw SysError(format("getting attributes of path ‘%1%’") % settings.nixStore);
-
-        if (st.st_uid != 0 || st.st_gid != gr->gr_gid || (st.st_mode & ~S_IFMT) != 01775) {
-            if (chown(settings.nixStore.c_str(), 0, gr->gr_gid) == -1)
-                throw SysError(format("changing ownership of path ‘%1%’") % settings.nixStore);
-            if (chmod(settings.nixStore.c_str(), 01775) == -1)
-                throw SysError(format("changing permissions on path ‘%1%’") % settings.nixStore);
+            if (st.st_uid != 0 || st.st_gid != gr->gr_gid || (st.st_mode & ~S_IFMT) != 01775) {
+                if (chown(settings.nixStore.c_str(), 0, gr->gr_gid) == -1)
+                    throw SysError(format("changing ownership of path ‘%1%’") % settings.nixStore);
+                if (chmod(settings.nixStore.c_str(), 01775) == -1)
+                    throw SysError(format("changing permissions on path ‘%1%’") % settings.nixStore);
+            }
         }
     }
 
