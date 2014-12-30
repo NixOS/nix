@@ -4,10 +4,8 @@
       version="5.0">
 
   <info>
-
     <title>Nix Package Manager Guide</title>
-
-    <edition>Version <xi:include href="version.txt" parse="text" /></edition>
+    <subtitle>Version <xi:include href="version.txt" parse="text" /></subtitle>
 
     <author>
       <personname>
