@@ -193,8 +193,12 @@ Path readLink(const Path & path)
     if (!S_ISLNK(st.st_mode))
         throw Error(format("‘%1%’ is not a symlink") % path);
     char buf[st.st_size];
-    if (readlink(path.c_str(), buf, st.st_size) != st.st_size)
+    ssize_t rlsize = readlink(path.c_str(), buf, st.st_size);
+    if (rlsize == -1)
         throw SysError(format("reading symbolic link ‘%1%’") % path);
+    else if (rlsize != st.st_size)
+        throw Error(format("symbolic link ‘%1%’ size mismatch %2% != %3%")
+            % path % rlsize % st.st_size);
     return string(buf, st.st_size);
 }
 
