@@ -196,8 +196,8 @@ Path readLink(const Path & path)
     ssize_t rlsize = readlink(path.c_str(), buf, st.st_size);
     if (rlsize == -1)
         throw SysError(format("reading symbolic link ‘%1%’") % path);
-    else if (rlsize != st.st_size)
-        throw Error(format("symbolic link ‘%1%’ size mismatch %2% != %3%")
+    else if (rlsize > st.st_size)
+        throw Error(format("symbolic link ‘%1%’ size overflow %2% > %3%")
             % path % rlsize % st.st_size);
     return string(buf, st.st_size);
 }
