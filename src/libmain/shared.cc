@@ -293,8 +293,9 @@ int handleExceptions(const string & programName, std::function<void()> fun)
 RunPager::RunPager()
 {
     if (!isatty(STDOUT_FILENO)) return;
-    string pager = getEnv("PAGER", "default");
-    if (pager == "" || pager == "cat") return;
+    char * pager = getenv("NIX_PAGER");
+    if (!pager) pager = getenv("PAGER");
+    if (pager && ((string) pager == "" || (string) pager == "cat")) return;
 
     /* Ignore SIGINT. The pager will handle it (and we'll get
        SIGPIPE). */
@@ -314,8 +315,8 @@ RunPager::RunPager()
             throw SysError("dupping stdin");
         if (!getenv("LESS"))
             setenv("LESS", "FRSXMK", 1);
-        if (pager != "default")
-            execl("/bin/sh", "sh", "-c", pager.c_str(), NULL);
+        if (pager)
+            execl("/bin/sh", "sh", "-c", pager, NULL);
         execlp("pager", "pager", NULL);
         execlp("less", "less", NULL);
         execlp("more", "more", NULL);
