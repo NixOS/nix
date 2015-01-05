@@ -36,7 +36,7 @@ it’s much more convenient to use the Nixpkgs
 <emphasis>channel</emphasis>, since it makes it easy to stay up to
 date with new versions of Nixpkgs. (Channels are described in more
 detail in <xref linkend="sec-channels"/>.) Nixpkgs is automatically
-added to your list of “subscribed” channels when when you install
+added to your list of “subscribed” channels when you install
 Nix. If this is not the case for some reason, you can add it as
 follows:
 
