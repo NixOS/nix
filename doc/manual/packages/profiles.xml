@@ -120,8 +120,7 @@ can also see all available generations:
 <screen>
 $ nix-env --list-generations</screen></para>
 
-<para>Actually, there is another level of indirection not shown in the
-figure above.  You generally wouldn’t have
+<para>You generally wouldn’t have
 <filename>/nix/var/nix/profiles/<replaceable>some-profile</replaceable>/bin</filename>
 in your <envar>PATH</envar>.  Rather, there is a symlink
 <filename>~/.nix-profile</filename> that points to your current
