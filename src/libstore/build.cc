@@ -1909,6 +1909,7 @@ void DerivationGoal::startBuilder()
     builderOut.create();
 
     /* Fork a child to build the package. */
+#if CHROOT_ENABLED
     if (useChroot) {
         /* Set up private namespaces for the build:
 
@@ -1954,7 +1955,9 @@ void DerivationGoal::startBuilder()
         pid_t tmp;
         if (!string2Int<pid_t>(readLine(builderOut.readSide), tmp)) abort();
         pid = tmp;
-    } else {
+    } else
+#endif
+    {
         ProcessOptions options;
         options.allowVfork = !buildUser.enabled();
         pid = startProcess([&]() {
