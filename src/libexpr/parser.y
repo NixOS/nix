@@ -626,7 +626,7 @@ Path EvalState::findFile(const string & path)
 }
 
 
-Path EvalState::findFile(SearchPath & searchPath, const string & path)
+Path EvalState::findFile(SearchPath & searchPath, const string & path, const Pos & pos)
 {
     foreach (SearchPath::iterator, i, searchPath) {
         Path res;
@@ -641,7 +641,11 @@ Path EvalState::findFile(SearchPath & searchPath, const string & path)
         }
         if (pathExists(res)) return canonPath(res);
     }
-    throw ThrownError(format("file ‘%1%’ was not found in the Nix search path (add it using $NIX_PATH or -I)") % path);
+    format f = format(
+        "file ‘%1%’ was not found in the Nix search path (add it using $NIX_PATH or -I)"
+        + string(pos ? ", at %2%" : ""));
+    f.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
+    throw ThrownError(f % path % pos);
 }
 
 

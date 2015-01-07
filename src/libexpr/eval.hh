@@ -169,7 +169,7 @@ public:
 
     /* Look up a file in the search path. */
     Path findFile(const string & path);
-    Path findFile(SearchPath & searchPath, const string & path);
+    Path findFile(SearchPath & searchPath, const string & path, const Pos & pos = noPos);
 
     /* Evaluate an expression to normal form, storing the result in
        value `v'. */

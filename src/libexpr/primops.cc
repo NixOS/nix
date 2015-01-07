@@ -775,7 +775,7 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
             % path % e.path % pos);
     }
 
-    mkPath(v, state.findFile(searchPath, path).c_str());
+    mkPath(v, state.findFile(searchPath, path, pos).c_str());
 }
 
 /* Read a directory (without . or ..) */
