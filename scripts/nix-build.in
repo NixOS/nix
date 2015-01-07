@@ -134,7 +134,7 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
     elsif ($arg eq "--command") {
         $n++;
         die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
-        $envCommand = "$ARGV[$n]\nexit $!";
+        $envCommand = "$ARGV[$n]\nexit";
     }
 
     elsif ($arg eq "--exclude") {
