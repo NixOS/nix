@@ -29,6 +29,7 @@
       <replaceable>attrPath</replaceable>
     </arg>
     <arg><option>--command</option> <replaceable>cmd</replaceable></arg>
+    <arg><option>--run</option> <replaceable>cmd</replaceable></arg>
     <arg><option>--exclude</option> <replaceable>regexp</replaceable></arg>
     <arg><option>--pure</option></arg>
     <group choice='req'>
@@ -92,11 +93,24 @@ also <xref linkend="sec-common-options" />.</phrase></para>
   <varlistentry><term><option>--command</option> <replaceable>cmd</replaceable></term>
 
     <listitem><para>In the environment of the derivation, run the
-    shell command <replaceable>cmd</replaceable> instead of starting
-    an interactive shell.  However, if you end the shell command with
-    <literal>return</literal>, you still get an interactive shell.
-    This can be useful for doing any additional
-    initialisation.</para></listitem>
+    shell command <replaceable>cmd</replaceable>. This command is
+    executed in an interactive shell. (Use <option>--run</option> to
+    use a non-interactive shell instead.) However, a call to
+    <literal>exit</literal> is implicitly added to the command, so the
+    shell will exit after running the command. To prevent this, add
+    <literal>return</literal> at the end; e.g. <literal>--command
+    "echo Hello; return"</literal> will print <literal>Hello</literal>
+    and then drop you into the interactive shell. This can be useful
+    for doing any additional initialisation.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--run</option> <replaceable>cmd</replaceable></term>
+
+    <listitem><para>Like <option>--command</option>, but executes the
+    command in a non-interactive shell. This means (among other
+    things) that if you hit Ctrl-C while the command is running, the
+    shell exits.</para></listitem>
 
   </varlistentry>
 

@@ -16,6 +16,7 @@ my $runEnv = $0 =~ /nix-shell$/;
 my $pure = 0;
 my $fromArgs = 0;
 my $packages = 0;
+my $interactive = 1;
 
 my @instArgs = ();
 my @buildArgs = ();
@@ -158,10 +159,11 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
         $runEnv = 1;
     }
 
-    elsif ($arg eq "--command") {
+    elsif ($arg eq "--command" || $arg eq "--run") {
         $n++;
         die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
         $envCommand = "$ARGV[$n]\nexit";
+        $interactive = 0 if $arg eq "--run";
     }
 
     elsif ($arg eq "--exclude") {
@@ -286,7 +288,10 @@ foreach my $expr (@exprs) {
             'unset TZ; ' . (defined $ENV{'TZ'} ? "export TZ='${ENV{'TZ'}}'; " : '') .
             $envCommand);
         $ENV{BASH_ENV} = $rcfile;
-        exec($ENV{NIX_BUILD_SHELL} // "bash", "--rcfile", $rcfile);
+        my @args = ($ENV{NIX_BUILD_SHELL} // "bash");
+        push @args, "--rcfile" if $interactive;
+        push @args, $rcfile;
+        exec @args;
         die;
     }
 
