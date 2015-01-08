@@ -251,12 +251,12 @@ LocalStore::LocalStore(bool reserveSpace)
        multi-user install. */
     if (getuid() == 0 && settings.buildUsersGroup != "") {
 
-        mode_t perm = 01737;
-
         Path perUserDir = profilesDir + "/per-user";
         createDirs(perUserDir);
-        if (chmod(perUserDir.c_str(), perm) == -1)
+        if (chmod(perUserDir.c_str(), 01777) == -1)
             throw SysError(format("could not set permissions on ‘%1%’ to 1737") % perUserDir);
+
+        mode_t perm = 01735;
 
         struct group * gr = getgrnam(settings.buildUsersGroup.c_str());
         if (!gr)
