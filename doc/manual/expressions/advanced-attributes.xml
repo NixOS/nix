@@ -40,7 +40,7 @@ allowedReferences = [];
     recursively.  For example,
 
 <programlisting>
-allowedReferences = [ foobar ];
+allowedRequisites = [ foobar ];
 </programlisting>
 
     enforces that the output of a derivation cannot have any other
