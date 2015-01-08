@@ -254,7 +254,7 @@ LocalStore::LocalStore(bool reserveSpace)
         Path perUserDir = profilesDir + "/per-user";
         createDirs(perUserDir);
         if (chmod(perUserDir.c_str(), 01777) == -1)
-            throw SysError(format("could not set permissions on ‘%1%’ to 1737") % perUserDir);
+            throw SysError(format("could not set permissions on ‘%1%’ to 1777") % perUserDir);
 
         mode_t perm = 01735;
 
