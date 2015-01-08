@@ -251,10 +251,12 @@ LocalStore::LocalStore(bool reserveSpace)
        multi-user install. */
     if (getuid() == 0 && settings.buildUsersGroup != "") {
 
+        mode_t perm = 01737;
+
         Path perUserDir = profilesDir + "/per-user";
         createDirs(perUserDir);
-        if (chmod(perUserDir.c_str(), 01777) == -1)
-            throw SysError(format("could not set permissions on ‘%1%’ to 1777") % perUserDir);
+        if (chmod(perUserDir.c_str(), perm) == -1)
+            throw SysError(format("could not set permissions on ‘%1%’ to 1737") % perUserDir);
 
         struct group * gr = getgrnam(settings.buildUsersGroup.c_str());
         if (!gr)
@@ -265,10 +267,10 @@ LocalStore::LocalStore(bool reserveSpace)
             if (stat(settings.nixStore.c_str(), &st))
                 throw SysError(format("getting attributes of path ‘%1%’") % settings.nixStore);
 
-            if (st.st_uid != 0 || st.st_gid != gr->gr_gid || (st.st_mode & ~S_IFMT) != 01775) {
+            if (st.st_uid != 0 || st.st_gid != gr->gr_gid || (st.st_mode & ~S_IFMT) != perm) {
                 if (chown(settings.nixStore.c_str(), 0, gr->gr_gid) == -1)
                     throw SysError(format("changing ownership of path ‘%1%’") % settings.nixStore);
-                if (chmod(settings.nixStore.c_str(), 01775) == -1)
+                if (chmod(settings.nixStore.c_str(), perm) == -1)
                     throw SysError(format("changing permissions on path ‘%1%’") % settings.nixStore);
             }
         }

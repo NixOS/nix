@@ -1736,21 +1736,6 @@ void DerivationGoal::startBuilder()
         /* Change ownership of the temporary build directory. */
         if (chown(tmpDir.c_str(), buildUser.getUID(), buildUser.getGID()) == -1)
             throw SysError(format("cannot change ownership of ‘%1%’") % tmpDir);
-
-        /* Check that the Nix store has the appropriate permissions,
-           i.e., owned by root and mode 1775 (sticky bit on so that
-           the builder can create its output but not mess with the
-           outputs of other processes). */
-        struct stat st;
-        if (stat(settings.nixStore.c_str(), &st) == -1)
-            throw SysError(format("cannot stat ‘%1%’") % settings.nixStore);
-        if (!(st.st_mode & S_ISVTX) ||
-            ((st.st_mode & S_IRWXG) != S_IRWXG) ||
-            (st.st_gid != buildUser.getGID()))
-            throw Error(format(
-                "builder does not have write permission to ‘%2%’; "
-                "try ‘chgrp %1% %2%; chmod 1775 %2%’")
-                % buildUser.getGID() % settings.nixStore);
     }
 
 
