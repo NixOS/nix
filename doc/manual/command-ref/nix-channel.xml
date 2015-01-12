@@ -21,7 +21,7 @@
     <command>nix-channel</command>
     <group choice='req'>
       <arg choice='plain'><option>--add</option> <replaceable>url</replaceable> <arg choice='opt'><replaceable>name</replaceable></arg></arg>
-      <arg choice='plain'><option>--remove</option> <replaceable>url</replaceable></arg>
+      <arg choice='plain'><option>--remove</option> <replaceable>name</replaceable></arg>
       <arg choice='plain'><option>--list</option></arg>
       <arg choice='plain'><option>--update</option> <arg rep='repeat'><replaceable>names</replaceable></arg></arg>
       <arg choice='plain'><option>--rollback</option> <arg choice='opt'><replaceable>generation</replaceable></arg></arg>
