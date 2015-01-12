@@ -50,6 +50,15 @@
 
 #define CHROOT_ENABLED HAVE_CHROOT && HAVE_UNSHARE && HAVE_SYS_MOUNT_H && defined(MS_BIND) && defined(MS_PRIVATE) && defined(CLONE_NEWNS)
 
+/* chroot-like behavior from Apple's sandbox */
+#if __APPLE__
+    #define SANDBOX_ENABLED 1
+    #define DEFAULT_ALLOWED_IMPURE_PREFIXES "/System/Library/Frameworks /usr/lib /dev /bin/sh"
+#else
+    #define SANDBOX_ENABLED 0
+    #define DEFAULT_ALLOWED_IMPURE_PREFIXES ""
+#endif
+
 #if CHROOT_ENABLED
 #include <sys/socket.h>
 #include <sys/ioctl.h>
@@ -1752,6 +1761,44 @@ void DerivationGoal::startBuilder()
     if (get(drv.env, "__noChroot") == "1") useChroot = false;
 
     if (useChroot) {
+        /* Allow a user-configurable set of directories from the
+           host file system. */
+        PathSet dirs = tokenizeString<StringSet>(settings.get("build-chroot-dirs", string(DEFAULT_CHROOT_DIRS)));
+        PathSet dirs2 = tokenizeString<StringSet>(settings.get("build-extra-chroot-dirs", string("")));
+        dirs.insert(dirs2.begin(), dirs2.end());
+
+        for (auto & i : dirs) {
+            size_t p = i.find('=');
+            if (p == string::npos)
+                dirsInChroot[i] = i;
+            else
+                dirsInChroot[string(i, 0, p)] = string(i, p + 1);
+        }
+        dirsInChroot[tmpDir] = tmpDir;
+
+        string allowed = settings.get("allowed-impure-host-deps", string(DEFAULT_ALLOWED_IMPURE_PREFIXES));
+        PathSet allowedPaths = tokenizeString<StringSet>(allowed);
+
+        /* This works like the above, except on a per-derivation level */
+        Strings impurePaths = tokenizeString<Strings>(get(drv.env, "__impureHostDeps"));
+
+        for (auto & i : impurePaths) {
+            bool found = false;
+            Path canonI = canonPath(i, true);
+            /* If only we had a trie to do this more efficiently :) luckily, these are generally going to be pretty small */
+            for (auto & a : allowedPaths) {
+                Path canonA = canonPath(a, true);
+                if (canonI == canonA || isInDir(canonI, canonA)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+                throw SysError(format("derivation '%1%' requested impure path ‘%2%’, but it was not in allowed-impure-host-deps (‘%3%’)") % drvPath % i % allowed);
+
+            dirsInChroot[i] = i;
+        }
+
 #if CHROOT_ENABLED
         /* Create a temporary directory in which we set up the chroot
            environment using bind-mounts.  We put it in the Nix store
@@ -1792,20 +1839,6 @@ void DerivationGoal::startBuilder()
 
         /* Create /etc/hosts with localhost entry. */
         writeFile(chrootRootDir + "/etc/hosts", "127.0.0.1 localhost\n");
-
-        /* Bind-mount a user-configurable set of directories from the
-           host file system. */
-        PathSet dirs = tokenizeString<StringSet>(settings.get("build-chroot-dirs", string(DEFAULT_CHROOT_DIRS)));
-        PathSet dirs2 = tokenizeString<StringSet>(settings.get("build-extra-chroot-dirs", string("")));
-        dirs.insert(dirs2.begin(), dirs2.end());
-        for (auto & i : dirs) {
-            size_t p = i.find('=');
-            if (p == string::npos)
-                dirsInChroot[i] = i;
-            else
-                dirsInChroot[string(i, 0, p)] = string(i, p + 1);
-        }
-        dirsInChroot[tmpDir] = tmpDir;
 
         /* Make the closure of the inputs available in the chroot,
            rather than the whole Nix store.  This prevents any access
@@ -1850,6 +1883,9 @@ void DerivationGoal::startBuilder()
             foreach (DerivationOutputs::iterator, i, drv.outputs)
                 dirsInChroot.erase(i->second.path);
 
+#elif SANDBOX_ENABLED
+        /* We don't really have any parent prep work to do (yet?)
+           All work happens in the child, instead. */
 #else
         throw Error("chroot builds are not supported on this platform");
 #endif
@@ -2156,8 +2192,118 @@ void DerivationGoal::runChild()
 
         /* Fill in the arguments. */
         Strings args;
-        string builderBasename = baseNameOf(drv.builder);
-        args.push_back(builderBasename);
+
+        const char *builder = "invalid";
+
+        string sandboxProfile;
+        if (useChroot && SANDBOX_ENABLED) {
+            /* Lots and lots and lots of file functions freak out if they can't stat their full ancestry */
+            PathSet ancestry;
+
+            /* We build the ancestry before adding all inputPaths to the store because we know they'll
+               all have the same parents (the store), and there might be lots of inputs. This isn't
+               particularly efficient... I doubt it'll be a bottleneck in practice */
+            for (auto & i : dirsInChroot) {
+                Path cur = i.first;
+                while (cur.compare("/") != 0) {
+                    cur = dirOf(cur);
+                    ancestry.insert(cur);
+                }
+            }
+
+            /* And we want the store in there regardless of how empty dirsInChroot. We include the innermost
+               path component this time, since it's typically /nix/store and we care about that. */
+            Path cur = settings.nixStore;
+            while (cur.compare("/") != 0) {
+                ancestry.insert(cur);
+                cur = dirOf(cur);
+            }
+
+            /* Add all our input paths to the chroot */
+            for (auto & i : inputPaths)
+                dirsInChroot[i] = i;
+
+
+            /* TODO: we should factor out the policy cleanly, so we don't have to repeat the constants every time... */
+            sandboxProfile += "(version 1)\n";
+
+            /* Violations will go to the syslog if you set this. Unfortunately the destination does not appear to be configurable */
+            if (settings.get("darwin-log-sandbox-violations", false)) {
+                sandboxProfile += "(deny default)\n";
+            } else {
+                sandboxProfile += "(deny default (with no-log))\n";
+            }
+
+            sandboxProfile += "(allow file-read* file-write-data (literal \"/dev/null\"))\n";
+
+            sandboxProfile += "(allow file-read-metadata\n"
+                "\t(literal \"/var\")\n"
+                "\t(literal \"/tmp\")\n"
+                "\t(literal \"/etc\")\n"
+                "\t(literal \"/etc/nix\")\n"
+                "\t(literal \"/etc/nix/nix.conf\"))\n";
+
+            /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different mechanisms
+               to find temporary directories, so we want to open up a broader place for them to dump their files, if needed. */
+            Path globalTmpDir = canonPath(getEnv("TMPDIR", "/tmp"), true);
+
+            /* They don't like trailing slashes on subpath directives */
+            if (globalTmpDir.back() == '/') globalTmpDir.pop_back();
+
+            /* This is where our temp folders are and where most of the building will happen, so we want rwx on it. */
+            sandboxProfile += (format("(allow file-read* file-write* process-exec (subpath \"%1%\") (subpath \"/private/tmp\"))\n") % globalTmpDir).str();
+
+            sandboxProfile += "(allow process-fork)\n";
+            sandboxProfile += "(allow sysctl-read)\n";
+            sandboxProfile += "(allow signal (target same-sandbox))\n";
+
+            /* Enables getpwuid (used by git and others) */
+            sandboxProfile += "(allow mach-lookup (global-name \"com.apple.system.notification_center\") (global-name \"com.apple.system.opendirectoryd.libinfo\"))\n";
+
+
+            /* Our rwx outputs */
+            sandboxProfile += "(allow file-read* file-write* process-exec\n";
+            for (auto & i : missingPaths) {
+                sandboxProfile += (format("\t(subpath \"%1%\")\n") % i.c_str()).str();
+            }
+            sandboxProfile += ")\n";
+
+            /* Our inputs (transitive dependencies and any impurities computed above) */
+            sandboxProfile += "(allow file-read* process-exec\n";
+            for (auto & i : dirsInChroot) {
+                if (i.first != i.second)
+                    throw SysError(format("can't map '%1%' to '%2%': mismatched impure paths not supported on darwin"));
+
+                string path = i.first;
+                struct stat st;
+                if (lstat(path.c_str(), &st))
+                    throw SysError(format("getting attributes of path ‘%1%’") % path);
+                if (S_ISDIR(st.st_mode))
+                    sandboxProfile += (format("\t(subpath \"%1%\")\n") % path).str();
+                else
+                    sandboxProfile += (format("\t(literal \"%1%\")\n") % path).str();
+            }
+            sandboxProfile += ")\n";
+
+            /* Our ancestry. N.B: this uses literal on folders, instead of subpath. Without that,
+               you open up the entire filesystem because you end up with (subpath "/") */
+            sandboxProfile += "(allow file-read-metadata\n";
+            for (auto & i : ancestry) {
+                sandboxProfile += (format("\t(literal \"%1%\")\n") % i.c_str()).str();
+            }
+            sandboxProfile += ")\n";
+
+            builder = "/usr/bin/sandbox-exec";
+            args.push_back("sandbox-exec");
+            args.push_back("-p");
+            args.push_back(sandboxProfile);
+            args.push_back(drv.builder);
+        } else {
+            builder = drv.builder.c_str();
+            string builderBasename = baseNameOf(drv.builder);
+            args.push_back(builderBasename);
+        }
+
         foreach (Strings::iterator, i, drv.args)
             args.push_back(rewriteHashes(*i, rewritesToTmp));
         auto argArr = stringsToCharPtrs(args);
@@ -2167,8 +2313,14 @@ void DerivationGoal::runChild()
         /* Indicate that we managed to set up the build environment. */
         writeFull(STDERR_FILENO, "\n");
 
+        /* This needs to be after that fateful '\n', and I didn't want to duplicate code */
+        if (useChroot && SANDBOX_ENABLED) {
+            printMsg(lvlDebug, "Generated sandbox profile:");
+            printMsg(lvlDebug, sandboxProfile);
+        }
+
         /* Execute the program.  This should not return. */
-        execve(drv.builder.c_str(), (char * *) &argArr[0], (char * *) &envArr[0]);
+        execve(builder, (char * *) &argArr[0], (char * *) &envArr[0]);
 
         throw SysError(format("executing ‘%1%’") % drv.builder);
 
