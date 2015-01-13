@@ -56,7 +56,7 @@
     #define DEFAULT_ALLOWED_IMPURE_PREFIXES "/System/Library/Frameworks /usr/lib /dev /bin/sh"
 #else
     #define SANDBOX_ENABLED 0
-    #define DEFAULT_ALLOWED_IMPURE_PREFIXES ""
+    #define DEFAULT_ALLOWED_IMPURE_PREFIXES "/bin" "/usr/bin"
 #endif
 
 #if CHROOT_ENABLED
