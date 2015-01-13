@@ -1797,7 +1797,7 @@ void DerivationGoal::startBuilder()
                 }
             }
             if (!found)
-                throw SysError(format("derivation '%1%' requested impure path ‘%2%’, but it was not in allowed-impure-host-deps (‘%3%’)") % drvPath % i % allowed);
+                throw Error(format("derivation '%1%' requested impure path ‘%2%’, but it was not in allowed-impure-host-deps (‘%3%’)") % drvPath % i % allowed);
 
             dirsInChroot[i] = i;
         }
