@@ -1784,10 +1784,13 @@ void DerivationGoal::startBuilder()
 
         for (auto & i : impurePaths) {
             bool found = false;
-            Path canonI = canonPath(i, true);
+            /* Note: we're not resolving symlinks here to prevent
+               giving a non-root user info about inaccessible
+               files. */
+            Path canonI = canonPath(i);
             /* If only we had a trie to do this more efficiently :) luckily, these are generally going to be pretty small */
             for (auto & a : allowedPaths) {
-                Path canonA = canonPath(a, true);
+                Path canonA = canonPath(a);
                 if (canonI == canonA || isInDir(canonI, canonA)) {
                     found = true;
                     break;
