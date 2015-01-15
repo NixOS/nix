@@ -132,6 +132,8 @@ static void getAllExprs(EvalState & state,
             Value & vArg(*state.allocValue());
             state.getBuiltin("import", vFun);
             mkString(vArg, path2);
+            if (v.attrs->size() == v.attrs->capacity())
+                throw Error(format("too many Nix expressions in directory ‘%1%’") % path);
             mkApp(*state.allocAttr(v, state.symbols.create(attrName)), vFun, vArg);
         }
         else if (S_ISDIR(st.st_mode))
@@ -160,7 +162,7 @@ static void loadSourceExpr(EvalState & state, const Path & path, Value & v)
        ~/.nix-defexpr directory that includes some system-wide
        directory). */
     if (S_ISDIR(st.st_mode)) {
-        state.mkAttrs(v, 16);
+        state.mkAttrs(v, 1024);
         state.mkList(*state.allocAttr(v, state.symbols.create("_combineChannels")), 0);
         StringSet attrs;
         getAllExprs(state, path, attrs, v);

@@ -39,10 +39,10 @@ public:
     typedef uint32_t size_t;
 
 private:
-    size_t size_, capacity;
+    size_t size_, capacity_;
     Attr attrs[0];
 
-    Bindings(uint32_t capacity) : size_(0), capacity(capacity) { }
+    Bindings(size_t capacity) : size_(0), capacity_(capacity) { }
     Bindings(const Bindings & bindings) = delete;
 
 public:
@@ -54,7 +54,7 @@ public:
 
     void push_back(const Attr & attr)
     {
-        assert(size_ < capacity);
+        assert(size_ < capacity_);
         attrs[size_++] = attr;
     }
 
@@ -75,6 +75,8 @@ public:
     }
 
     void sort();
+
+    size_t capacity() { return capacity_; }
 
     friend class EvalState;
 };
