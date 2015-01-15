@@ -9,6 +9,7 @@ my $binDir = $ENV{"NIX_BIN_DIR"} || "@bindir@";
 
 
 STDOUT->autoflush(1);
+binmode STDERR, ":encoding(utf8)";
 
 my @remoteStoresAll = split ':', ($ENV{"NIX_OTHER_STORES"} or "");
 
