@@ -2271,8 +2271,13 @@ void DerivationGoal::runChild()
             }
             sandboxProfile += ")\n";
 
-            /* Our inputs (transitive dependencies and any impurities computed above) */
-            sandboxProfile += "(allow file-read* process-exec\n";
+            /* Our inputs (transitive dependencies and any impurities computed above) 
+               Note that the sandbox profile allows file-write* even though it isn't seemingly necessary. First of all, nix's standard user permissioning
+               mechanism still prevents builders from writing to input directories, so no security/purity is lost. The reason we allow file-write* is that
+               denying it means the `access` syscall will return EPERM instead of EACCESS, which confuses a few programs that assume (understandably, since
+               it appears to be a violation of the POSIX spec) that `access` won't do that, and don't deal with it nicely if it does. The most notable of
+               these is the entire GHC Haskell ecosystem. */
+            sandboxProfile += "(allow file-read* file-write* process-exec\n";
             for (auto & i : dirsInChroot) {
                 if (i.first != i.second)
                     throw SysError(format("can't map '%1%' to '%2%': mismatched impure paths not supported on darwin"));
