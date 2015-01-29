@@ -710,7 +710,7 @@ static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, 
 static void prim_baseNameOf(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    mkString(v, baseNameOf(state.coerceToString(pos, *args[0], context)), context);
+    mkString(v, baseNameOf(state.coerceToString(pos, *args[0], context, false, false)), context);
 }
 
 
