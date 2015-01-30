@@ -71,7 +71,7 @@ sub barf {
 my $pkgFile = $source;
 if ($fromURL) {
     $pkgFile = "$tmpDir/tmp.nixpkg";
-    system("@curl@", "--silent", $source, "-o", $pkgFile) == 0
+    system("@curl@", "-L", "--silent", $source, "-o", $pkgFile) == 0
         or barf "curl failed: $?";
 }
 
