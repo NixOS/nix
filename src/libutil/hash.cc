@@ -141,51 +141,24 @@ string printHash16or32(const Hash & hash)
 }
 
 
-static bool mul(unsigned char * bytes, unsigned char y, int maxSize)
-{
-    unsigned char carry = 0;
-
-    for (int pos = 0; pos < maxSize; ++pos) {
-        unsigned int m = bytes[pos] * y + carry;
-        bytes[pos] = m & 0xff;
-        carry = m >> 8;
-    }
-
-    return carry;
-}
-
-
-static bool add(unsigned char * bytes, unsigned char y, int maxSize)
-{
-    unsigned char carry = y;
-
-    for (int pos = 0; pos < maxSize; ++pos) {
-        unsigned int m = bytes[pos] + carry;
-        bytes[pos] = m & 0xff;
-        carry = m >> 8;
-        if (carry == 0) break;
-    }
-
-    return carry;
-}
-
-
 Hash parseHash32(HashType ht, const string & s)
 {
     Hash hash(ht);
+    unsigned int len = hashLength32(ht);
+    assert(s.size() == len);
 
-    const char * chars = base32Chars.data();
-
-    for (unsigned int i = 0; i < s.length(); ++i) {
-        char c = s[i];
+    for (unsigned int n = 0; n < len; ++n) {
+        char c = s[len - n - 1];
         unsigned char digit;
         for (digit = 0; digit < base32Chars.size(); ++digit) /* !!! slow */
-            if (chars[digit] == c) break;
+            if (base32Chars[digit] == c) break;
         if (digit >= 32)
             throw Error(format("invalid base-32 hash ‘%1%’") % s);
-        if (mul(hash.hash, 32, hash.hashSize) ||
-            add(hash.hash, digit, hash.hashSize))
-            throw Error(format("base-32 hash ‘%1%’ is too large") % s);
+        unsigned int b = n * 5;
+        unsigned int i = b / 8;
+        unsigned int j = b % 8;
+        hash.hash[i] |= digit << j;
+        if (i < hash.hashSize - 1) hash.hash[i + 1] |= digit >> (8 - j);
     }
 
     return hash;
