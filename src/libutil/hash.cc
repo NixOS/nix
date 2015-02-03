@@ -84,7 +84,7 @@ string printHash(const Hash & hash)
     return string(buf, hash.hashSize * 2);
 }
 
-    
+
 Hash parseHash(HashType ht, const string & s)
 {
     Hash hash(ht);
@@ -92,7 +92,7 @@ Hash parseHash(HashType ht, const string & s)
         throw Error(format("invalid hash ‘%1%’") % s);
     for (unsigned int i = 0; i < hash.hashSize; i++) {
         string s2(s, i * 2, 2);
-        if (!isxdigit(s2[0]) || !isxdigit(s2[1])) 
+        if (!isxdigit(s2[0]) || !isxdigit(s2[1]))
             throw Error(format("invalid hash ‘%1%’") % s);
         std::istringstream str(s2);
         int n;
@@ -100,24 +100,6 @@ Hash parseHash(HashType ht, const string & s)
         hash.hash[i] = n;
     }
     return hash;
-}
-
-
-static unsigned char divMod(unsigned char * bytes, unsigned char y)
-{
-    unsigned int borrow = 0;
-
-    int pos = Hash::maxHashSize - 1;
-    while (pos >= 0 && !bytes[pos]) --pos;
-
-    for ( ; pos >= 0; --pos) {
-        unsigned int s = bytes[pos] + (borrow << 8);
-        unsigned int d = s / y;
-        borrow = s % y;
-        bytes[pos] = d;
-    }
-
-    return borrow;
 }
 
 
@@ -136,18 +118,18 @@ string printHash32(const Hash & hash)
     Hash hash2(hash);
     unsigned int len = hashLength32(hash);
 
-    const char * chars = base32Chars.data();
-    
-    string s(len, '0');
+    string s;
+    s.reserve(len);
 
-    int pos = len - 1;
-    while (pos >= 0) {
-        unsigned char digit = divMod(hash2.hash, 32);
-        s[pos--] = chars[digit];
+    for (int n = len - 1; n >= 0; n--) {
+        unsigned int b = n * 5;
+        unsigned int i = b / 8;
+        unsigned int j = b % 8;
+        unsigned char c =
+            (hash.hash[i] >> j)
+            | (i >= hash.hashSize - 1 ? 0 : hash.hash[i + 1] << (8 - j));
+        s.push_back(base32Chars[c & 0x1f]);
     }
-
-    for (unsigned int i = 0; i < hash2.maxHashSize; ++i)
-        assert(hash2.hash[i] == 0);
 
     return s;
 }
@@ -299,7 +281,7 @@ Hash hashFile(HashType ht, const Path & path)
         if (n == -1) throw SysError(format("reading file ‘%1%’") % path);
         update(ht, ctx, buf, n);
     }
-    
+
     finish(ht, ctx, hash.hash);
     return hash;
 }
@@ -311,7 +293,7 @@ HashSink::HashSink(HashType ht) : ht(ht)
     bytes = 0;
     start(ht, *ctx);
 }
-    
+
 HashSink::~HashSink()
 {
     bufPos = 0;
@@ -369,7 +351,7 @@ HashType parseHashType(const string & s)
     else return htUnknown;
 }
 
- 
+
 string printHashType(HashType ht)
 {
     if (ht == htMD5) return "md5";
@@ -378,5 +360,5 @@ string printHashType(HashType ht)
     else throw Error("cannot print unknown hash type");
 }
 
- 
+
 }
