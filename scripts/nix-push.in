@@ -6,11 +6,11 @@ use File::Basename;
 use File::Path qw(mkpath);
 use File::stat;
 use File::Copy;
+use MIME::Base64;
 use Nix::Config;
 use Nix::Store;
 use Nix::Manifest;
 use Nix::Utils;
-use Nix::Crypto;
 
 binmode STDERR, ":encoding(utf8)";
 
@@ -27,8 +27,7 @@ my $writeManifest = 0;
 my $manifestPath;
 my $archivesURL;
 my $link = 0;
-my $privateKeyFile;
-my $keyName;
+my $secretKeyFile;
 my @roots;
 
 for (my $n = 0; $n < scalar @ARGV; $n++) {
@@ -61,14 +60,10 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
         $archivesURL = $ARGV[$n];
     } elsif ($arg eq "--link") {
         $link = 1;
-    } elsif ($arg eq "--key") {
+    } elsif ($arg eq "--key-file") {
         $n++;
         die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
-        $privateKeyFile = $ARGV[$n];
-    } elsif ($arg eq "--key-name") {
-        $n++;
-        die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
-        $keyName = $ARGV[$n];
+        $secretKeyFile = $ARGV[$n];
     } elsif (substr($arg, 0, 1) eq "-") {
         die "$0: unknown flag ‘$arg’\n";
     } else {
@@ -110,7 +105,7 @@ my %narFiles;
 foreach my $storePath (@storePaths) {
     my $pathHash = substr(basename($storePath), 0, 32);
     my $narInfoFile = "$destDir/$pathHash.narinfo";
-    if (-e $narInfoFile) {
+    if (!$force && -e $narInfoFile) {
         my $narInfo = parseNARInfo($storePath, readFile($narInfoFile), 0, $narInfoFile) or die "cannot read ‘$narInfoFile’\n";
         my $narFile = "$destDir/$narInfo->{url}";
         if (-e $narFile) {
@@ -257,9 +252,13 @@ for (my $n = 0; $n < scalar @storePaths2; $n++) {
         }
     }
 
-    if (defined $privateKeyFile && defined $keyName) {
-        my $sig = signString($privateKeyFile, $info);
-        $info .= "Signature: 1;$keyName;$sig\n";
+    if (defined $secretKeyFile) {
+        my $s = readFile $secretKeyFile;
+        chomp $s;
+        my ($keyName, $secretKey) = split ":", $s;
+        die "invalid secret key file ‘$secretKeyFile’\n" unless defined $keyName && defined $secretKey;
+        my $sig = encode_base64(signString(decode_base64($secretKey), $info), "");
+        $info .= "Signature: 2;$keyName;$sig\n";
     }
 
     my $pathHash = substr(basename($storePath), 0, 32);

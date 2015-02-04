@@ -925,18 +925,24 @@ std::vector<const char *> stringsToCharPtrs(const Strings & ss)
 }
 
 
-string runProgram(Path program, bool searchPath, const Strings & args)
+string runProgram(Path program, bool searchPath, const Strings & args,
+    const string & input)
 {
     checkInterrupt();
 
     /* Create a pipe. */
-    Pipe pipe;
-    pipe.create();
+    Pipe stdout, stdin;
+    stdout.create();
+    if (!input.empty()) stdin.create();
 
     /* Fork. */
     Pid pid = startProcess([&]() {
-        if (dup2(pipe.writeSide, STDOUT_FILENO) == -1)
+        if (dup2(stdout.writeSide, STDOUT_FILENO) == -1)
             throw SysError("dupping stdout");
+        if (!input.empty()) {
+            if (dup2(stdin.readSide, STDIN_FILENO) == -1)
+                throw SysError("dupping stdin");
+        }
 
         Strings args_(args);
         args_.push_front(program);
@@ -950,9 +956,16 @@ string runProgram(Path program, bool searchPath, const Strings & args)
         throw SysError(format("executing ‘%1%’") % program);
     });
 
-    pipe.writeSide.close();
+    stdout.writeSide.close();
 
-    string result = drainFD(pipe.readSide);
+    /* FIXME: This can deadlock if the input is too long. */
+    if (!input.empty()) {
+        stdin.readSide.close();
+        writeFull(stdin.writeSide, input);
+        stdin.writeSide.close();
+    }
+
+    string result = drainFD(stdout.readSide);
 
     /* Wait for the child to finish. */
     int status = pid.wait(true);

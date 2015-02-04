@@ -1,5 +1,7 @@
 package Nix::Config;
 
+use MIME::Base64;
+
 $version = "@PACKAGE_VERSION@";
 
 $binDir = $ENV{"NIX_BIN_DIR"} || "@bindir@";
@@ -19,24 +21,31 @@ $useBindings = "@perlbindings@" eq "yes";
 
 %config = ();
 
+%binaryCachePublicKeys = ();
+
 sub readConfig {
     if (defined $ENV{'_NIX_OPTIONS'}) {
         foreach my $s (split '\n', $ENV{'_NIX_OPTIONS'}) {
             my ($n, $v) = split '=', $s, 2;
             $config{$n} = $v;
         }
-        return;
+    } else {
+        my $config = "$confDir/nix.conf";
+        return unless -f $config;
+
+        open CONFIG, "<$config" or die "cannot open ‘$config’";
+        while (<CONFIG>) {
+            /^\s*([\w\-\.]+)\s*=\s*(.*)$/ or next;
+            $config{$1} = $2;
+        }
+        close CONFIG;
     }
 
-    my $config = "$confDir/nix.conf";
-    return unless -f $config;
-
-    open CONFIG, "<$config" or die "cannot open ‘$config’";
-    while (<CONFIG>) {
-        /^\s*([\w\-\.]+)\s*=\s*(.*)$/ or next;
-        $config{$1} = $2;
+    foreach my $s (split(/ /, $config{"binary-cache-public-keys"} // "")) {
+        my ($keyName, $publicKey) = split ":", $s;
+        next unless defined $keyName && defined $publicKey;
+        $binaryCachePublicKeys{$keyName} = decode_base64($publicKey);
     }
-    close CONFIG;
 }
 
 return 1;

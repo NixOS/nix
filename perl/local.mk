@@ -5,8 +5,7 @@ nix_perl_sources := \
   $(d)/lib/Nix/SSH.pm \
   $(d)/lib/Nix/CopyClosure.pm \
   $(d)/lib/Nix/Config.pm.in \
-  $(d)/lib/Nix/Utils.pm \
-  $(d)/lib/Nix/Crypto.pm
+  $(d)/lib/Nix/Utils.pm
 
 nix_perl_modules := $(nix_perl_sources:.in=)
 
@@ -23,16 +22,18 @@ ifeq ($(perlbindings), yes)
 
   Store_SOURCES := $(Store_DIR)/Store.cc
 
-  Store_LIBS = libstore libutil
-
   Store_CXXFLAGS = \
     -I$(shell $(perl) -e 'use Config; print $$Config{archlibexp};')/CORE \
     -D_FILE_OFFSET_BITS=64 -Wno-unused-variable -Wno-literal-suffix -Wno-reserved-user-defined-literal
 
+  Store_LIBS = libstore libutil
+
+  Store_LDFLAGS := $(SODIUM_LIBS)
+
   ifeq (CYGWIN,$(findstring CYGWIN,$(OS)))
     archlib = $(shell perl -E 'use Config; print $$Config{archlib};')
     libperl = $(shell perl -E 'use Config; print $$Config{libperl};')
-    Store_LDFLAGS = $(shell find ${archlib} -name ${libperl})
+    Store_LDFLAGS += $(shell find ${archlib} -name ${libperl})
   endif
 
   Store_ALLOW_UNDEFINED = 1

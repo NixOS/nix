@@ -7,6 +7,7 @@ HAVE_OPENSSL = @HAVE_OPENSSL@
 OPENSSL_LIBS = @OPENSSL_LIBS@
 PACKAGE_NAME = @PACKAGE_NAME@
 PACKAGE_VERSION = @PACKAGE_VERSION@
+SODIUM_LIBS = @SODIUM_LIBS@
 bash = @bash@
 bindir = @bindir@
 bsddiff_compat_include = @bsddiff_compat_include@

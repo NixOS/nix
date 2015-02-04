@@ -8,8 +8,9 @@ use Cwd;
 use File::stat;
 use File::Path;
 use Fcntl ':flock';
+use MIME::Base64;
 use Nix::Config;
-use Nix::Crypto;
+use Nix::Store;
 
 our @ISA = qw(Exporter);
 our @EXPORT = qw(readManifest writeManifest updateManifestDB addPatch deleteOldManifests parseNARInfo);
@@ -440,22 +441,20 @@ sub parseNARInfo {
         }
         my ($sigVersion, $keyName, $sig64) = split ";", $sig;
         $sigVersion //= 0;
-        if ($sigVersion != 1) {
+        if ($sigVersion != 2) {
             warn "NAR info file ‘$location’ has unsupported version $sigVersion; ignoring\n";
             return undef;
         }
         return undef unless defined $keyName && defined $sig64;
-        my $publicKeyFile = $Nix::Config::config{"binary-cache-public-key-$keyName"};
-        if (!defined $publicKeyFile) {
+
+        my $publicKey = $Nix::Config::binaryCachePublicKeys{$keyName};
+        if (!defined $publicKey) {
             warn "NAR info file ‘$location’ is signed by unknown key ‘$keyName’; ignoring\n";
             return undef;
         }
-        if (! -f $publicKeyFile) {
-            die "binary cache public key file ‘$publicKeyFile’ does not exist\n";
-            return undef;
-        }
-        if (!isValidSignature($publicKeyFile, $sig64, $signedData)) {
-            warn "NAR info file ‘$location’ has an invalid signature; ignoring\n";
+
+        if (!checkSignature($publicKey, decode_base64($sig64), $signedData)) {
+            warn "NAR info file ‘$location’ has an incorrect signature; ignoring\n";
             return undef;
         }
         $res->{signedBy} = $keyName;

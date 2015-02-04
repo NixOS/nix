@@ -285,7 +285,7 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = P
 /* Run a program and return its stdout in a string (i.e., like the
    shell backtick operator). */
 string runProgram(Path program, bool searchPath = false,
-    const Strings & args = Strings());
+    const Strings & args = Strings(), const string & input = "");
 
 MakeError(ExecError, Error)
 

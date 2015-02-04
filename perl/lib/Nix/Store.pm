@@ -17,6 +17,7 @@ our @EXPORT = qw(
     queryPathFromHashPart
     topoSortPaths computeFSClosure followLinksToStorePath exportPaths importPaths
     hashPath hashFile hashString
+    signString checkSignature
     addToStore makeFixedOutputPath
     derivationFromPath
 );

@@ -20,6 +20,8 @@
 
 #include <bzlib.h>
 
+#include <sodium.h>
+
 
 using namespace nix;
 using std::cin;
@@ -1006,6 +1008,32 @@ static void opServe(Strings opFlags, Strings opArgs)
 }
 
 
+static void opGenerateBinaryCacheKey(Strings opFlags, Strings opArgs)
+{
+    foreach (Strings::iterator, i, opFlags)
+        throw UsageError(format("unknown flag ‘%1%’") % *i);
+
+    if (opArgs.size() != 1) throw UsageError("one argument expected");
+    string keyName = opArgs.front();
+
+    sodium_init();
+
+    unsigned char pk[crypto_sign_PUBLICKEYBYTES];
+    unsigned char sk[crypto_sign_SECRETKEYBYTES];
+    if (crypto_sign_keypair(pk, sk) != 0)
+        throw Error("key generation failed");
+
+    // FIXME: super ugly way to do base64 encoding.
+    auto args = Strings({"-MMIME::Base64", "-0777", "-ne", "print encode_base64($_, '')"});
+
+    string pk64 = runProgram("perl", true, args, string((char *) pk, crypto_sign_PUBLICKEYBYTES));
+    std::cout << keyName << ":" << pk64 << std::endl;
+
+    string sk64 = runProgram("perl", true, args, string((char *) sk, crypto_sign_SECRETKEYBYTES));
+    std::cout << keyName << ":" << sk64 << std::endl;
+}
+
+
 /* Scan the arguments; find the operation, set global flags, put all
    other flags in a list, and put all other arguments in another
    list. */
@@ -1072,14 +1100,16 @@ int main(int argc, char * * argv)
                 op = opQueryFailedPaths;
             else if (*arg == "--clear-failed-paths")
                 op = opClearFailedPaths;
+            else if (*arg == "--serve")
+                op = opServe;
+            else if (*arg == "--generate-binary-cache-key")
+                op = opGenerateBinaryCacheKey;
             else if (*arg == "--add-root")
                 gcRoot = absPath(getArg(*arg, arg, end));
             else if (*arg == "--indirect")
                 indirectRoot = true;
             else if (*arg == "--no-output")
                 noOutput = true;
-            else if (*arg == "--serve")
-                op = opServe;
             else if (*arg != "" && arg->at(0) == '-') {
                 opFlags.push_back(*arg);
                 if (*arg == "--max-freed" || *arg == "--max-links" || *arg == "--max-atime") /* !!! hack */

@@ -24,7 +24,7 @@ let
 
         buildInputs =
           [ curl bison flex perl libxml2 libxslt bzip2
-            tetex dblatex nukeReferences pkgconfig sqlite
+            tetex dblatex nukeReferences pkgconfig sqlite libsodium
             docbook5 docbook5_xsl
           ] ++ lib.optional (!lib.inNixShell) git;
 
@@ -80,7 +80,7 @@ let
         name = "nix";
         src = tarball;
 
-        buildInputs = [ curl perl bzip2 openssl pkgconfig sqlite boehmgc ];
+        buildInputs = [ curl perl bzip2 openssl pkgconfig sqlite boehmgc libsodium ];
 
         configureFlags = ''
           --disable-init-state

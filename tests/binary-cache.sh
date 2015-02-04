@@ -87,3 +87,53 @@ rm $(grep -l "StorePath:.*dependencies-input-2" $cacheDir/*.narinfo)
 
 nix-build --option binary-caches "file://$cacheDir" dependencies.nix -o $TEST_ROOT/result 2>&1 | tee $TEST_ROOT/log
 grep -q "Downloading" $TEST_ROOT/log
+
+
+# Create a signed binary cache.
+clearCache
+
+declare -a res=($(nix-store --generate-binary-cache-key test.nixos.org-1))
+publicKey="${res[0]}"
+secretKey="${res[1]}"
+echo "$secretKey" > $TEST_ROOT/secret-key
+
+res=($(nix-store --generate-binary-cache-key test.nixos.org-1))
+badKey="${res[0]}"
+
+res=($(nix-store --generate-binary-cache-key foo.nixos.org-1))
+otherKey="${res[0]}"
+
+nix-push --dest $cacheDir --key-file $TEST_ROOT/secret-key $outPath
+
+
+# Downloading should fail if we don't provide a key.
+clearStore
+
+rm -f $NIX_STATE_DIR/binary-cache*
+
+(! nix-store -r $outPath --option binary-caches "file://$cacheDir" --option signed-binary-caches '*' )
+
+
+# And it should fail if we provide an incorrect key.
+clearStore
+
+rm -f $NIX_STATE_DIR/binary-cache*
+
+(! nix-store -r $outPath --option binary-caches "file://$cacheDir" --option signed-binary-caches '*' --option binary-cache-public-keys "$badKey")
+
+
+# It should succeed if we provide the correct key.
+nix-store -r $outPath --option binary-caches "file://$cacheDir" --option signed-binary-caches '*' --option binary-cache-public-keys "$otherKey $publicKey"
+
+
+# It should fail if we corrupt the .narinfo.
+clearStore
+
+for i in $cacheDir/*.narinfo; do
+    grep -v References $i > $i.tmp
+    mv $i.tmp $i
+done
+
+rm -f $NIX_STATE_DIR/binary-cache*
+
+(! nix-store -r $outPath --option binary-caches "file://$cacheDir" --option signed-binary-caches '*' --option binary-cache-public-keys "$publicKey")

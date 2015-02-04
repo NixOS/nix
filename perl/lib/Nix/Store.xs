@@ -11,6 +11,8 @@
 #include <misc.hh>
 #include <util.hh>
 
+#include <sodium.h>
+
 
 using namespace nix;
 
@@ -221,6 +223,44 @@ SV * hashString(char * algo, int base32, char * s)
         } catch (Error & e) {
             croak(e.what());
         }
+
+
+SV * signString(SV * secretKey_, char * msg)
+    PPCODE:
+        try {
+            STRLEN secretKeyLen;
+            unsigned char * secretKey = (unsigned char *) SvPV(secretKey_, secretKeyLen);
+            if (secretKeyLen != crypto_sign_SECRETKEYBYTES)
+                throw Error("secret key is not valid");
+
+            unsigned char sig[crypto_sign_BYTES];
+            unsigned long long sigLen;
+            crypto_sign_detached(sig, &sigLen, (unsigned char *) msg, strlen(msg), secretKey);
+            XPUSHs(sv_2mortal(newSVpv((char *) sig, sigLen)));
+        } catch (Error & e) {
+            croak(e.what());
+        }
+
+
+int checkSignature(SV * publicKey_, SV * sig_, char * msg)
+    CODE:
+        try {
+            STRLEN publicKeyLen;
+            unsigned char * publicKey = (unsigned char *) SvPV(publicKey_, publicKeyLen);
+            if (publicKeyLen != crypto_sign_PUBLICKEYBYTES)
+                throw Error("public key is not valid");
+
+            STRLEN sigLen;
+            unsigned char * sig = (unsigned char *) SvPV(sig_, sigLen);
+            if (sigLen != crypto_sign_BYTES)
+                throw Error("signature is not valid");
+
+            RETVAL = crypto_sign_verify_detached(sig, (unsigned char *) msg, strlen(msg), publicKey) == 0;
+        } catch (Error & e) {
+            croak(e.what());
+        }
+    OUTPUT:
+        RETVAL
 
 
 SV * addToStore(char * srcPath, int recursive, char * algo)
