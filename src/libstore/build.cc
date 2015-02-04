@@ -1970,7 +1970,12 @@ void DerivationGoal::startBuilder()
             char stack[32 * 1024];
             pid_t child = clone(childEntry, stack + sizeof(stack) - 8,
                 CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWNET | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD, this);
-            if (child == -1) throw SysError("cloning builder process");
+            if (child == -1) {
+                if (errno == EINVAL)
+                    throw SysError("cloning builder process (Linux chroot builds require 3.13 or later)");
+                else
+                    throw SysError("cloning builder process");
+            }
             writeFull(builderOut.writeSide, int2String(child) + "\n");
             _exit(0);
         });

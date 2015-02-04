@@ -243,7 +243,8 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
     users” feature</link> to perform the actual builds under different
     users than root).  Currently, chroot builds only work on Linux
     because Nix uses “bind mounts” to make the Nix store and other
-    directories available inside the chroot.</para>
+    directories available inside the chroot. Kernel version 3.13 or later
+    is needed due to a PID namespace fix nix depends on.</para>
 
     </listitem>
 
