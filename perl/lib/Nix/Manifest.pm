@@ -13,7 +13,7 @@ use Nix::Config;
 use Nix::Store;
 
 our @ISA = qw(Exporter);
-our @EXPORT = qw(readManifest writeManifest updateManifestDB addPatch deleteOldManifests parseNARInfo);
+our @EXPORT = qw(readManifest writeManifest updateManifestDB addPatch deleteOldManifests parseNARInfo fingerprintPath);
 
 
 sub addNAR {
@@ -395,12 +395,26 @@ sub deleteOldManifests {
 }
 
 
+# Return a fingerprint of a store path to be used in binary cache
+# signatures. It contains the store path, the SHA-256 hash of the
+# contents of the path, and the references.
+sub fingerprintPath {
+    my ($storePath, $narHash, $references) = @_;
+    die if substr($storePath, 0, length($Nix::Config::storeDir)) ne $Nix::Config::storeDir;
+    die if substr($narHash, 0, 7) ne "sha256:";
+    die if length($narHash) != 59;
+    foreach my $ref (@{$references}) {
+        die if substr($ref, 0, length($Nix::Config::storeDir)) ne $Nix::Config::storeDir;
+    }
+    return "1;" . $storePath . ";" . $narHash . ";" . join(",", @{$references});
+}
+
+
 # Parse a NAR info file.
 sub parseNARInfo {
     my ($storePath, $content, $requireValidSig, $location) = @_;
 
     my ($storePath2, $url, $fileHash, $fileSize, $narHash, $narSize, $deriver, $system, $sig);
-    my $signedData = "";
     my $compression = "bzip2";
     my @refs;
 
@@ -416,8 +430,7 @@ sub parseNARInfo {
         elsif ($1 eq "References") { @refs = split / /, $2; }
         elsif ($1 eq "Deriver") { $deriver = $2; }
         elsif ($1 eq "System") { $system = $2; }
-        elsif ($1 eq "Signature") { $sig = $2; last; }
-        $signedData .= "$line\n";
+        elsif ($1 eq "Sig") { $sig = $2; }
     }
 
     return undef if $storePath ne $storePath2 || !defined $url || !defined $narHash;
@@ -435,16 +448,13 @@ sub parseNARInfo {
         };
 
     if ($requireValidSig) {
+        # FIXME: might be useful to support multiple signatures per .narinfo.
+
         if (!defined $sig) {
             warn "NAR info file ‘$location’ lacks a signature; ignoring\n";
             return undef;
         }
-        my ($sigVersion, $keyName, $sig64) = split ";", $sig;
-        $sigVersion //= 0;
-        if ($sigVersion != 2) {
-            warn "NAR info file ‘$location’ has unsupported version $sigVersion; ignoring\n";
-            return undef;
-        }
+        my ($keyName, $sig64) = split ":", $sig;
         return undef unless defined $keyName && defined $sig64;
 
         my $publicKey = $Nix::Config::binaryCachePublicKeys{$keyName};
@@ -453,10 +463,15 @@ sub parseNARInfo {
             return undef;
         }
 
-        if (!checkSignature($publicKey, decode_base64($sig64), $signedData)) {
+        my $fingerprint = fingerprintPath(
+            $storePath, $narHash,
+            [ map { "$Nix::Config::storeDir/$_" } @refs ]);
+
+        if (!checkSignature($publicKey, decode_base64($sig64), $fingerprint)) {
             warn "NAR info file ‘$location’ has an incorrect signature; ignoring\n";
             return undef;
         }
+
         $res->{signedBy} = $keyName;
     }
 
