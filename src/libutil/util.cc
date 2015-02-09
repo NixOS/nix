@@ -1208,4 +1208,63 @@ string filterANSIEscapes(const string & s, bool nixOnly)
 }
 
 
+static char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+
+string base64Encode(const string & s)
+{
+    string res;
+    int data = 0, nbits = 0;
+
+    for (char c : s) {
+        data = data << 8 | (unsigned char) c;
+        nbits += 8;
+        while (nbits >= 6) {
+            nbits -= 6;
+            res.push_back(base64Chars[data >> nbits & 0x3f]);
+        }
+    }
+
+    if (nbits) res.push_back(base64Chars[data << (6 - nbits) & 0x3f]);
+    while (res.size() % 4) res.push_back('=');
+
+    return res;
+}
+
+
+string base64Decode(const string & s)
+{
+    bool init = false;
+    char decode[256];
+    if (!init) {
+        // FIXME: not thread-safe.
+        memset(decode, -1, sizeof(decode));
+        for (int i = 0; i < 64; i++)
+            decode[(int) base64Chars[i]] = i;
+        init = true;
+    }
+
+    string res;
+    unsigned int d = 0, bits = 0;
+
+    for (char c : s) {
+        if (c == '=') break;
+        if (c == '\n') continue;
+
+        char digit = decode[(unsigned char) c];
+        if (digit == -1)
+            throw Error("invalid character in Base64 string");
+
+        bits += 6;
+        d = d << 6 | digit;
+        if (bits >= 8) {
+            res.push_back(d >> (bits - 8) & 0xff);
+            bits -= 8;
+        }
+    }
+
+    return res;
+}
+
+
 }

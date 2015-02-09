@@ -1023,14 +1023,8 @@ static void opGenerateBinaryCacheKey(Strings opFlags, Strings opArgs)
     if (crypto_sign_keypair(pk, sk) != 0)
         throw Error("key generation failed");
 
-    // FIXME: super ugly way to do base64 encoding.
-    auto args = Strings({"-MMIME::Base64", "-0777", "-ne", "print encode_base64($_, '')"});
-
-    string pk64 = runProgram("perl", true, args, string((char *) pk, crypto_sign_PUBLICKEYBYTES));
-    std::cout << keyName << ":" << pk64 << std::endl;
-
-    string sk64 = runProgram("perl", true, args, string((char *) sk, crypto_sign_SECRETKEYBYTES));
-    std::cout << keyName << ":" << sk64 << std::endl;
+    std::cout << keyName << ":" << base64Encode(string((char *) pk, crypto_sign_PUBLICKEYBYTES)) << std::endl;
+    std::cout << keyName << ":" << base64Encode(string((char *) sk, crypto_sign_SECRETKEYBYTES)) << std::endl;
 }
 
 

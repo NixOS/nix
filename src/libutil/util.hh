@@ -398,4 +398,9 @@ void ignoreException();
 string filterANSIEscapes(const string & s, bool nixOnly = false);
 
 
+/* Base64 encoding/decoding. */
+string base64Encode(const string & s);
+string base64Decode(const string & s);
+
+
 }
