@@ -200,6 +200,11 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
         push @buildArgs, $arg;
     }
 
+    elsif ($arg eq "-Q" || $arg eq "--no-build-output") {
+        push @buildArgs, $arg;
+        push @instArgs, $arg;
+    }
+
     else {
         push @exprs, $arg;
     }
