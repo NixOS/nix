@@ -181,8 +181,10 @@ let
       };
 
 
-    rpm_fedora20i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora20i386);
-    rpm_fedora20x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora20x86_64);
+    rpm_fedora20i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora20i386) [];
+    rpm_fedora20x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora20x86_64) [];
+    rpm_fedora21i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora21i386) [ "libsodium-devel" ];
+    rpm_fedora21x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora21x86_64) [ "libsodium-devel" ];
 
 
     deb_debian7i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian7i386);
@@ -264,7 +266,7 @@ let
   makeRPM_x86_64 = makeRPM "x86_64-linux";
 
   makeRPM =
-    system: diskImageFun:
+    system: diskImageFun: extraPackages:
 
     with import <nixpkgs> { inherit system; };
 
@@ -272,7 +274,9 @@ let
       name = "nix-rpm";
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
-        { extraPackages = [ "perl-DBD-SQLite" "perl-devel" "sqlite" "sqlite-devel" "bzip2-devel" "emacs" "perl-WWW-Curl" ]; };
+        { extraPackages =
+            [ "perl-DBD-SQLite" "perl-devel" "sqlite" "sqlite-devel" "bzip2-devel" "emacs" "perl-WWW-Curl" ]
+            ++ extraPackages; };
       memSize = 1024;
       meta.schedulingPriority = 50;
       postRPMInstall = "cd /tmp/rpmout/BUILD/nix-* && make installcheck";
