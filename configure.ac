@@ -205,8 +205,12 @@ AC_CHECK_HEADERS([bzlib.h], [true],
 PKG_CHECK_MODULES([SQLITE3], [sqlite3 >= 3.6.19], [CXXFLAGS="$SQLITE3_CFLAGS $CXXFLAGS"])
 
 
-# Look for libsodium, a required dependency.
-PKG_CHECK_MODULES([SODIUM], [libsodium], [CXXFLAGS="$SODIUM_CFLAGS $CXXFLAGS"])
+# Look for libsodium, an optional dependency.
+PKG_CHECK_MODULES([SODIUM], [libsodium],
+  [AC_DEFINE([HAVE_SODIUM], [1], [Whether to use libsodium for cryptography.])
+   CXXFLAGS="$SODIUM_CFLAGS $CXXFLAGS"
+   have_sodium=1], [have_sodium=])
+AC_SUBST(HAVE_SODIUM, [$have_sodium])
 
 
 # Whether to use the Boehm garbage collector.

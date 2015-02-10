@@ -20,7 +20,9 @@
 
 #include <bzlib.h>
 
+#if HAVE_SODIUM
 #include <sodium.h>
+#endif
 
 
 using namespace nix;
@@ -1016,6 +1018,7 @@ static void opGenerateBinaryCacheKey(Strings opFlags, Strings opArgs)
     if (opArgs.size() != 1) throw UsageError("one argument expected");
     string keyName = opArgs.front();
 
+#if HAVE_SODIUM
     sodium_init();
 
     unsigned char pk[crypto_sign_PUBLICKEYBYTES];
@@ -1025,6 +1028,9 @@ static void opGenerateBinaryCacheKey(Strings opFlags, Strings opArgs)
 
     std::cout << keyName << ":" << base64Encode(string((char *) pk, crypto_sign_PUBLICKEYBYTES)) << std::endl;
     std::cout << keyName << ":" << base64Encode(string((char *) sk, crypto_sign_SECRETKEYBYTES)) << std::endl;
+#else
+    throw Error("Nix was not compiled with libsodium, required for signed binary cache support");
+#endif
 }
 
 

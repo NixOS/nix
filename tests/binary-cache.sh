@@ -89,6 +89,8 @@ nix-build --option binary-caches "file://$cacheDir" dependencies.nix -o $TEST_RO
 grep -q "Downloading" $TEST_ROOT/log
 
 
+if [ -n "$HAVE_SODIUM" ]; then
+
 # Create a signed binary cache.
 clearCache
 
@@ -137,3 +139,5 @@ done
 rm -f $NIX_STATE_DIR/binary-cache*
 
 (! nix-store -r $outPath --option binary-caches "file://$cacheDir" --option signed-binary-caches '*' --option binary-cache-public-keys "$publicKey")
+
+fi # HAVE_LIBSODIUM

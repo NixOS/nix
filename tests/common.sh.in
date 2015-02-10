@@ -25,6 +25,7 @@ export dot=@dot@
 export xmllint="@xmllint@"
 export SHELL="@bash@"
 export PAGER=cat
+export HAVE_SODIUM="@HAVE_SODIUM@"
 
 export version=@PACKAGE_VERSION@
 export system=@system@
