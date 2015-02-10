@@ -80,7 +80,9 @@ let
         name = "nix";
         src = tarball;
 
-        buildInputs = [ curl perl bzip2 openssl pkgconfig sqlite boehmgc libsodium ];
+        buildInputs =
+          [ curl perl bzip2 openssl pkgconfig sqlite boehmgc ]
+          ++ lib.optional stdenv.isLinux libsodium;
 
         configureFlags = ''
           --disable-init-state
