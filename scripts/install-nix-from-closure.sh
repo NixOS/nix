@@ -41,7 +41,7 @@ mkdir -p $dest/store
 
 echo -n "copying Nix to $dest/store..." >&2
 
-for i in $(cd $self/store && echo *); do
+for i in $(cd $self/store >/dev/null && echo *); do
     echo -n "." >&2
     i_tmp="$dest/store/$i.$$"
     if [ -e "$i_tmp" ]; then
