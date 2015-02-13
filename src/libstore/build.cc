@@ -38,6 +38,9 @@
 #if HAVE_SYS_MOUNT_H
 #include <sys/mount.h>
 #endif
+#if HAVE_SYS_SYSCALL_H
+#include <sys/syscall.h>
+#endif
 #if HAVE_SCHED_H
 #include <sched.h>
 #endif
@@ -48,7 +51,7 @@
 #include <linux/fs.h>
 #endif
 
-#define CHROOT_ENABLED HAVE_CHROOT && HAVE_UNSHARE && HAVE_SYS_MOUNT_H && defined(MS_BIND) && defined(MS_PRIVATE) && defined(CLONE_NEWNS)
+#define CHROOT_ENABLED HAVE_CHROOT && HAVE_UNSHARE && HAVE_SYS_MOUNT_H && defined(MS_BIND) && defined(MS_PRIVATE) && defined(CLONE_NEWNS) && defined(SYS_pivot_root)
 
 /* chroot-like behavior from Apple's sandbox */
 #if __APPLE__
@@ -2059,6 +2062,11 @@ void DerivationGoal::runChild()
                     throw SysError(format("unable to make filesystem ‘%1%’ private") % fs);
             }
 
+            /* Bind-mount chroot directory to itself, to treat it as a
+               different filesystem from /, as needed for pivot_root. */
+            if (mount(chrootRootDir.c_str(), chrootRootDir.c_str(), 0, MS_BIND, 0) == -1)
+                throw SysError(format("unable to bind mount ‘%1%’") % chrootRootDir);
+
             /* Set up a nearly empty /dev, unless the user asked to
                bind-mount the host /dev. */
             if (dirsInChroot.find("/dev") == dirsInChroot.end()) {
@@ -2130,13 +2138,26 @@ void DerivationGoal::runChild()
                 chmod_(chrootRootDir + "/dev/pts/ptmx", 0666);
             }
 
-            /* Do the chroot().  Below we do a chdir() to the
-               temporary build directory to make sure the current
-               directory is in the chroot.  (Actually the order
-               doesn't matter, since due to the bind mount tmpDir and
-               tmpRootDit/tmpDir are the same directories.) */
-            if (chroot(chrootRootDir.c_str()) == -1)
+            /* Do the chroot(). */
+            if (chdir(chrootRootDir.c_str()) == -1)
+                throw SysError(format("cannot change directory to ‘%1%’") % chrootRootDir);
+
+            if (mkdir("real-root", 0) == -1)
+                throw SysError("cannot create real-root directory");
+
+#define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
+            if (pivot_root(".", "real-root") == -1)
+                throw SysError(format("cannot pivot old root directory onto ‘%1%’") % (chrootRootDir + "/real-root"));
+#undef pivot_root
+
+            if (chroot(".") == -1)
                 throw SysError(format("cannot change root directory to ‘%1%’") % chrootRootDir);
+
+            if (umount2("real-root", MNT_DETACH) == -1)
+                throw SysError("cannot unmount real root filesystem");
+
+            if (rmdir("real-root") == -1)
+                throw SysError("cannot remove real-root directory");
         }
 #endif
 

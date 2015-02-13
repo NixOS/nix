@@ -87,6 +87,7 @@ AC_CHECK_HEADERS([sys/mount.h], [], [],
 # include <sys/param.h>
 # endif
 ])
+AC_CHECK_HEADERS([sys/syscall.h])
 
 
 # Check for lutimes, optionally used for changing the mtime of
