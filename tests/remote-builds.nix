@@ -14,6 +14,7 @@ let
     { services.openssh.enable = true;
       virtualisation.writableStore = true;
       nix.package = nix;
+      nix.useChroot = true;
     };
 
   # Trivial Nix expression to build remotely.
