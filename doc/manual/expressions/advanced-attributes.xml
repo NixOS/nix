@@ -254,11 +254,17 @@ big = "a very long string";
     </programlisting>
 
     then when the builder runs, the environment variable
-    <envar>big</envar> will contain the absolute path to a temporary
-    file containing <literal>a very long string</literal>. This is
-    useful when you need to pass large strings to a builder, since
-    most operating systems impose a limit on the size of the
-    environment (typically, a few hundred kilobyte).</para></listitem>
+    <envar>bigPath</envar> will contain the absolute path to a
+    temporary file containing <literal>a very long
+    string</literal>. That is, for any attribute
+    <replaceable>x</replaceable> listed in
+    <varname>passAsFile</varname>, Nix will pass an environment
+    variable <envar><replaceable>x</replaceable>Path</envar> holding
+    the path of the file containing the value of attribute
+    <replaceable>x</replaceable>. This is useful when you need to pass
+    large strings to a builder, since most operating systems impose a
+    limit on the size of the environment (typically, a few hundred
+    kilobyte).</para></listitem>
 
   </varlistentry>
 

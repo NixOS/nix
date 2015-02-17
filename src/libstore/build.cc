@@ -1662,7 +1662,7 @@ void DerivationGoal::startBuilder()
         } else {
             Path p = tmpDir + "/.attr-" + int2String(fileNr++);
             writeFile(p, i.second);
-            env[i.first] = p;
+            env[i.first + "Path"] = p;
         }
     }
 

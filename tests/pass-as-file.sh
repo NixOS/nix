@@ -10,7 +10,7 @@ mkDerivation {
   passAsFile = [ \"foo\" ];
   foo = [ \"xyzzy\" ];
   builder = builtins.toFile \"builder.sh\" ''
-    [ \"\$(cat \$foo)\" = xyzzy ]
+    [ \"\$(cat \$fooPath)\" = xyzzy ]
     touch \$out
   '';
 }
