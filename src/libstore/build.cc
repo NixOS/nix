@@ -1646,13 +1646,25 @@ void DerivationGoal::startBuilder()
     /* The maximum number of cores to utilize for parallel building. */
     env["NIX_BUILD_CORES"] = (format("%d") % settings.buildCores).str();
 
-    /* Add all bindings specified in the derivation. */
-    foreach (StringPairs::iterator, i, drv.env)
-        env[i->first] = i->second;
-
     /* Create a temporary directory where the build will take
        place. */
     tmpDir = createTempDir("", "nix-build-" + storePathToName(drvPath), false, false, 0700);
+
+    /* Add all bindings specified in the derivation via the
+       environments, except those listed in the passAsFile
+       attribute. Those are passed as file names pointing to
+       temporary files containing the contents. */
+    StringSet passAsFile = tokenizeString<StringSet>(get(drv.env, "passAsFile"));
+    int fileNr = 0;
+    for (auto & i : drv.env) {
+        if (passAsFile.find(i.first) == passAsFile.end()) {
+            env[i.first] = i.second;
+        } else {
+            Path p = tmpDir + "/.attr-" + int2String(fileNr++);
+            writeFile(p, i.second);
+            env[i.first] = p;
+        }
+    }
 
     /* For convenience, set an environment pointing to the top build
        directory. */

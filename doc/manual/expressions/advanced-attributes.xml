@@ -242,6 +242,27 @@ stdenv.mkDerivation {
   </varlistentry>
 
 
+  <varlistentry><term><varname>passAsFile</varname></term>
+
+    <listitem><para>A list of names of attributes that should be
+    passed via files rather than environment variables.  For example,
+    if you have
+
+    <programlisting>
+passAsFile = ["big"];
+big = "a very long string";
+    </programlisting>
+
+    then when the builder runs, the environment variable
+    <envar>big</envar> will contain the absolute path to a temporary
+    file containing <literal>a very long string</literal>. This is
+    useful when you need to pass large strings to a builder, since
+    most operating systems impose a limit on the size of the
+    environment (typically, a few hundred kilobyte).</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry><term><varname>preferLocalBuild</varname></term>
 
     <listitem><para>If this attribute is set to
