@@ -90,6 +90,33 @@ derivation {
   </varlistentry>
 
 
+  <varlistentry><term><varname>impureEnvVars</varname></term>
+
+    <listitem><para>This attribute allows you to specify a list of
+    environment variables that should be passed from the environment
+    of the calling user to the builder.  Usually, the environment is
+    cleared completely when the builder is executed, but with this
+    attribute you can allow specific environment variables to be
+    passed unmodified.  For example, <function>fetchurl</function> in
+    Nixpkgs has the line
+
+<programlisting>
+impureEnvVars = [ "http_proxy" "https_proxy" <replaceable>...</replaceable> ];
+</programlisting>
+
+    to make it use the proxy server configuration specified by the
+    user in the environment variables <envar>http_proxy</envar> and
+    friends.</para>
+
+    <para>This attribute is only allowed in <link
+    linkend="fixed-output-drvs">fixed-output derivations</link>, where
+    impurities such as these are okay since (the hash of) the output
+    is known in advance.  It is ignored for all other
+    derivations.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry xml:id="fixed-output-drvs">
     <term><varname>outputHash</varname></term>
     <term><varname>outputHashAlgo</varname></term>
@@ -211,33 +238,6 @@ stdenv.mkDerivation {
     linkend="sec-nix-hash"><command>nix-hash</command> command</link>
     for information about converting to and from base-32
     notation.)</para></listitem>
-
-  </varlistentry>
-
-
-  <varlistentry><term><varname>impureEnvVars</varname></term>
-
-    <listitem><para>This attribute allows you to specify a list of
-    environment variables that should be passed from the environment
-    of the calling user to the builder.  Usually, the environment is
-    cleared completely when the builder is executed, but with this
-    attribute you can allow specific environment variables to be
-    passed unmodified.  For example, <function>fetchurl</function> in
-    Nixpkgs has the line
-
-<programlisting>
-impureEnvVars = [ "http_proxy" "https_proxy" <replaceable>...</replaceable> ];
-</programlisting>
-
-    to make it use the proxy server configuration specified by the
-    user in the environment variables <envar>http_proxy</envar> and
-    friends.</para>
-
-    <para>This attribute is only allowed in <link
-    linkend="fixed-output-drvs">fixed-output derivations</link>, where
-    impurities such as these are okay since (the hash of) the output
-    is known in advance.  It is ignored for all other
-    derivations.</para></listitem>
 
   </varlistentry>
 
