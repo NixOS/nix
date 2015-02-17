@@ -377,7 +377,6 @@ EOF
 }
 
 
-
 # Delete all old manifests downloaded from a given URL.
 sub deleteOldManifests {
     my ($url, $curUrlFile) = @_;
@@ -399,14 +398,14 @@ sub deleteOldManifests {
 # signatures. It contains the store path, the SHA-256 hash of the
 # contents of the path, and the references.
 sub fingerprintPath {
-    my ($storePath, $narHash, $references) = @_;
+    my ($storePath, $narHash, $narSize, $references) = @_;
     die if substr($storePath, 0, length($Nix::Config::storeDir)) ne $Nix::Config::storeDir;
     die if substr($narHash, 0, 7) ne "sha256:";
     die if length($narHash) != 59;
     foreach my $ref (@{$references}) {
         die if substr($ref, 0, length($Nix::Config::storeDir)) ne $Nix::Config::storeDir;
     }
-    return "1;" . $storePath . ";" . $narHash . ";" . join(",", @{$references});
+    return "1;" . $storePath . ";" . $narHash . ";" . $narSize . ";" . join(",", @{$references});
 }
 
 
@@ -464,7 +463,7 @@ sub parseNARInfo {
         }
 
         my $fingerprint = fingerprintPath(
-            $storePath, $narHash,
+            $storePath, $narHash, $narSize,
             [ map { "$Nix::Config::storeDir/$_" } @refs ]);
 
         if (!checkSignature($publicKey, decode_base64($sig64), $fingerprint)) {

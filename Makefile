@@ -25,7 +25,7 @@ makefiles = \
 
 GLOBAL_CXXFLAGS += -std=c++0x -g -Wall
 
-include Makefile.config
+-include Makefile.config
 
 OPTIMIZE = 1
 
