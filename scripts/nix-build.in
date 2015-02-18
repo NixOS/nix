@@ -30,6 +30,7 @@ my $myName = $runEnv ? "nix-shell" : "nix-build";
 
 my $inShebang = 0;
 my $script;
+my @savedArgs;
 
 my $tmpDir = mkTempDir($myName);
 
@@ -43,13 +44,14 @@ $SIG{'INT'} = sub { exit 1 };
 # Heuristic to see if we're invoked as a shebang script, namely, if we
 # have a single argument, it's the name of an executable file, and it
 # starts with "#!".
-if ($runEnv && scalar @ARGV == 1) {
+if ($runEnv && $ARGV[0] !~ /nix-shell/) {
     $script = $ARGV[0];
     if (-f $script && -x $script) {
         open SCRIPT, "<$script" or die "$0: cannot open ‘$script’: $!\n";
         my $first = <SCRIPT>;
         if ($first =~ /^\#\!/) {
             $inShebang = 1;
+            @savedArgs = @ARGV; shift @savedArgs;
             @ARGV = ();
             while (<SCRIPT>) {
                 chomp;
@@ -193,7 +195,8 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
         # or (undocumented) argv[0] does not contain "perl". Exploit
         # the latter by doing "exec -a".
         my $execArgs = $interpreter =~ /perl/ ? "-a PERL" : "";
-        $envCommand = "exec $execArgs $interpreter $script";
+        # FIXME: escape arguments.
+        $envCommand = "exec $execArgs $interpreter $script @savedArgs";
     }
 
     elsif (substr($arg, 0, 1) eq "-") {
