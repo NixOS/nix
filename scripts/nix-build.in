@@ -231,7 +231,7 @@ foreach my $expr (@exprs) {
         # If we're in a #! script, interpret filenames relative to the
         # script.
         $expr = dirname(Cwd::abs_path($script)) . "/" . $expr
-            if $inShebang && $expr !~ /^\//;
+            if $inShebang && !$packages && $expr !~ /^\//;
 
         # !!! would prefer the perl 5.8.0 pipe open feature here.
         my $pid = open(DRVPATHS, "-|") || exec "$Nix::Config::binDir/nix-instantiate", "--add-root", $drvLink, "--indirect", @instArgs, $expr;
