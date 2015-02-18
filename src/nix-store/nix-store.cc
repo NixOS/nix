@@ -1015,8 +1015,11 @@ static void opGenerateBinaryCacheKey(Strings opFlags, Strings opArgs)
     foreach (Strings::iterator, i, opFlags)
         throw UsageError(format("unknown flag ‘%1%’") % *i);
 
-    if (opArgs.size() != 1) throw UsageError("one argument expected");
-    string keyName = opArgs.front();
+    if (opArgs.size() != 3) throw UsageError("three arguments expected");
+    auto i = opArgs.begin();
+    string keyName = *i++;
+    string secretKeyFile = *i++;
+    string publicKeyFile = *i++;
 
 #if HAVE_SODIUM
     sodium_init();
@@ -1026,8 +1029,9 @@ static void opGenerateBinaryCacheKey(Strings opFlags, Strings opArgs)
     if (crypto_sign_keypair(pk, sk) != 0)
         throw Error("key generation failed");
 
-    std::cout << keyName << ":" << base64Encode(string((char *) pk, crypto_sign_PUBLICKEYBYTES)) << std::endl;
-    std::cout << keyName << ":" << base64Encode(string((char *) sk, crypto_sign_SECRETKEYBYTES)) << std::endl;
+    writeFile(publicKeyFile, keyName + ":" + base64Encode(string((char *) pk, crypto_sign_PUBLICKEYBYTES)));
+    umask(0077);
+    writeFile(secretKeyFile, keyName + ":" + base64Encode(string((char *) sk, crypto_sign_SECRETKEYBYTES)));
 #else
     throw Error("Nix was not compiled with libsodium, required for signed binary cache support");
 #endif

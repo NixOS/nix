@@ -94,18 +94,16 @@ if [ -n "$HAVE_SODIUM" ]; then
 # Create a signed binary cache.
 clearCache
 
-declare -a res=($(nix-store --generate-binary-cache-key test.nixos.org-1))
-publicKey="${res[0]}"
-secretKey="${res[1]}"
-echo "$secretKey" > $TEST_ROOT/secret-key
+declare -a res=($(nix-store --generate-binary-cache-key test.nixos.org-1 $TEST_ROOT/sk1 $TEST_ROOT/pk1 ))
+publicKey="$(cat $TEST_ROOT/pk1)"
 
-res=($(nix-store --generate-binary-cache-key test.nixos.org-1))
-badKey="${res[0]}"
+res=($(nix-store --generate-binary-cache-key test.nixos.org-1 $TEST_ROOT/sk2 $TEST_ROOT/pk2))
+badKey="$(cat $TEST_ROOT/pk2)"
 
-res=($(nix-store --generate-binary-cache-key foo.nixos.org-1))
-otherKey="${res[0]}"
+res=($(nix-store --generate-binary-cache-key foo.nixos.org-1 $TEST_ROOT/sk3 $TEST_ROOT/pk3))
+otherKey="$(cat $TEST_ROOT/pk3)"
 
-nix-push --dest $cacheDir --key-file $TEST_ROOT/secret-key $outPath
+nix-push --dest $cacheDir --key-file $TEST_ROOT/sk1 $outPath
 
 
 # Downloading should fail if we don't provide a key.
