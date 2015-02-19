@@ -379,9 +379,7 @@ expr_simple
   | HPATH {
       auto path = string{$1 + 1};
       $$ = new ExprConcatStrings(CUR_POS, false, new vector<Expr *>{
-          new ExprPath("/"),
-          new ExprApp(new ExprVar(data->symbols.create("__getEnv")),
-              new ExprString(data->symbols.create("HOME"))),
+          new ExprPath(getEnv("HOME", "/")),
           new ExprString(data->symbols.create(path))});
   }
   | SPATH {
