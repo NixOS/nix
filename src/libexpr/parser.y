@@ -376,12 +376,7 @@ expr_simple
       $$ = stripIndentation(CUR_POS, data->symbols, *$2);
   }
   | PATH { $$ = new ExprPath(absPath($1, data->basePath)); }
-  | HPATH {
-      auto path = string{$1 + 1};
-      $$ = new ExprConcatStrings(CUR_POS, false, new vector<Expr *>{
-          new ExprPath(getEnv("HOME", "/")),
-          new ExprString(data->symbols.create(path))});
-  }
+  | HPATH { $$ = new ExprPath(getEnv("HOME", "/") + string{$1 + 1}); }
   | SPATH {
       string path($1 + 1, strlen($1) - 2);
       $$ = new ExprApp(CUR_POS,
