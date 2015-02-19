@@ -286,7 +286,6 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %left '*' '/'
 %right CONCAT
 %nonassoc '?'
-%nonassoc '~'
 %nonassoc NEGATE
 
 %%
