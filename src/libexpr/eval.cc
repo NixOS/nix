@@ -1174,7 +1174,8 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     else if (firstType == tPath) {
         if (!context.empty())
             throwEvalError("a string that refers to a store path cannot be appended to a path, at %1%", pos);
-        mkPath(v, s.str().c_str());
+        auto path = canonPath(s.str());
+        mkPath(v, path.c_str());
     } else
         mkString(v, s.str(), context);
 }

@@ -268,7 +268,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %token <id> ID ATTRPATH
 %token <e> STR IND_STR
 %token <n> INT
-%token <path> PATH SPATH
+%token <path> PATH HPATH SPATH
 %token <uri> URI
 %token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL OR_KW
 %token DOLLAR_CURLY /* == ${ */
@@ -375,6 +375,7 @@ expr_simple
       $$ = stripIndentation(CUR_POS, data->symbols, *$2);
   }
   | PATH { $$ = new ExprPath(absPath($1, data->basePath)); }
+  | HPATH { $$ = new ExprPath(getEnv("HOME", "") + string{$1 + 1}); }
   | SPATH {
       string path($1 + 1, strlen($1) - 2);
       $$ = new ExprApp(CUR_POS,

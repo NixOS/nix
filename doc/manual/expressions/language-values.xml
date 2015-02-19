@@ -155,7 +155,14 @@ stdenv.mkDerivation {
   expression that contained it.  For instance, if a Nix expression in
   <filename>/foo/bar/bla.nix</filename> refers to
   <filename>../xyzzy/fnord.nix</filename>, the absolute path is
-  <filename>/foo/xyzzy/fnord.nix</filename>.</para></listitem>
+  <filename>/foo/xyzzy/fnord.nix</filename>.</para>
+
+  <para>If the first component of a path is a <literal>~</literal>,
+  it is interpreted as if the rest of the path were relative to the
+  user's home directory. e.g. <filename>~/foo</filename> would be
+  equivalent to <filename>/home/edolstra/foo</filename> for a user
+  whose home directory is <filename>/home/edolstra</filename>.
+  </para></listitem>
 
   <listitem><para><emphasis>Booleans</emphasis> with values
   <literal>true</literal> and

@@ -80,6 +80,7 @@ static Expr * unescapeStr(SymbolTable & symbols, const char * s)
 ID          [a-zA-Z\_][a-zA-Z0-9\_\'\-]*
 INT         [0-9]+
 PATH        [a-zA-Z0-9\.\_\-\+]*(\/[a-zA-Z0-9\.\_\-\+]+)+
+HPATH       \~(\/[a-zA-Z0-9\.\_\-\+]+)+
 SPATH       \<[a-zA-Z0-9\.\_\-\+]+(\/[a-zA-Z0-9\.\_\-\+]+)*\>
 URI         [a-zA-Z][a-zA-Z0-9\+\-\.]*\:[a-zA-Z0-9\%\/\?\:\@\&\=\+\$\,\-\_\.\!\~\*\']+
 
@@ -159,6 +160,7 @@ or          { return OR_KW; }
 <IND_STRING>.    return yytext[0]; /* just in case: shouldn't be reached */
 
 {PATH}      { yylval->path = strdup(yytext); return PATH; }
+{HPATH}     { yylval->path = strdup(yytext); return HPATH; }
 {SPATH}     { yylval->path = strdup(yytext); return SPATH; }
 {URI}       { yylval->uri = strdup(yytext); return URI; }
 
