@@ -54,6 +54,10 @@ sub isTrue {
     return $x eq "true" || $x eq "1";
 }
 
+# FIXME: this should be cache URLs required to have valid signatures,
+# or "*" to require signatures on all binary caches.
+# FIXME: should binary caches using a key in
+# ‘binary-cache-public-keys’ be trusted by default?
 my $requireSignedBinaryCaches = ($Nix::Config::config{"signed-binary-caches"} // "0") ne "0";
 
 my $curlConnectTimeout = int(
