@@ -136,7 +136,7 @@ $ nix-instantiate --eval -E '(import &lt;nixpkgs> {}).lib.nixpkgsVersion'
 
 <variablelist>
 
-  <varlistentry><term><filename>/nix/var/nix/profiles/<replaceable>username</replaceable>/channels</filename></term>
+  <varlistentry><term><filename>/nix/var/nix/profiles/per-user/<replaceable>username</replaceable>/channels</filename></term>
 
     <listitem><para><command>nix-channel</command> uses a
     <command>nix-env</command> profile to keep track of previous
@@ -151,7 +151,7 @@ $ nix-instantiate --eval -E '(import &lt;nixpkgs> {}).lib.nixpkgsVersion'
   <varlistentry><term><filename>~/.nix-defexpr/channels</filename></term>
 
     <listitem><para>This is a symlink to
-    <filename>/nix/var/nix/profiles/<replaceable>username</replaceable>/channels</filename>. It
+    <filename>/nix/var/nix/profiles/per-user/<replaceable>username</replaceable>/channels</filename>. It
     ensures that <command>nix-env</command> can find your channels. In
     a multi-user installation, you may also have
     <filename>~/.nix-defexpr/channels_root</filename>, which links to
