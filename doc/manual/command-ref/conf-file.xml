@@ -236,7 +236,7 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
     <link linkend='conf-build-chroot-dirs'><literal>build-chroot-dirs</literal>
     option</link>. This is useful to prevent undeclared dependencies
     on files in directories such as <filename>/usr/bin</filename>. In
-    addition, on Linux, builds run in rivate PID, mount, network, IPC
+    addition, on Linux, builds run in private PID, mount, network, IPC
     and UTS namespaces to isolate them from other processes in the
     system (except that fixed-output derivations do not run in private
     network namespace to ensure they can access the network).</para>
