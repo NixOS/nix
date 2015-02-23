@@ -1997,12 +1997,11 @@ void DerivationGoal::startBuilder()
             int flags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
             if (!fixedOutput) flags |= CLONE_NEWNET;
             pid_t child = clone(childEntry, stack + sizeof(stack) - 8, flags, this);
-            if (child == -1) {
-                if (errno == EINVAL)
-                    throw SysError("cloning builder process (Linux chroot builds require 3.13 or later)");
-                else
-                    throw SysError("cloning builder process");
-            }
+            if (child == -1 && errno == EINVAL)
+                /* Fallback for Linux < 2.13 where CLONE_NEWPID and
+                   CLONE_PARENT are not allowed together. */
+                child = clone(childEntry, stack + sizeof(stack) - 8, flags & ~CLONE_NEWPID, this);
+            if (child == -1) throw SysError("cloning builder process");
             writeFull(builderOut.writeSide, int2String(child) + "\n");
             _exit(0);
         });
