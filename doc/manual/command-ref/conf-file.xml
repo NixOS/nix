@@ -227,24 +227,32 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
   <varlistentry><term><literal>build-use-chroot</literal></term>
 
     <listitem><para>If set to <literal>true</literal>, builds will be
-    performed in a <emphasis>chroot environment</emphasis>, i.e., the
-    build will be isolated from the normal file system hierarchy and
-    will only see its dependencies in the Nix store, the temporary
-    build directory, private versions of <filename>/proc</filename>,
+    performed in a <emphasis>chroot environment</emphasis>, i.e.,
+    they’re isolated from the normal file system hierarchy and will
+    only see their dependencies in the Nix store, the temporary build
+    directory, private versions of <filename>/proc</filename>,
     <filename>/dev</filename>, <filename>/dev/shm</filename> and
     <filename>/dev/pts</filename>, and the paths configured with the
     <link linkend='conf-build-chroot-dirs'><literal>build-chroot-dirs</literal>
     option</link>. This is useful to prevent undeclared dependencies
-    on files in directories such as
-    <filename>/usr/bin</filename>.</para>
+    on files in directories such as <filename>/usr/bin</filename>. In
+    addition, on Linux, builds run in rivate PID, mount, network, IPC
+    and UTS namespaces to isolate them from other processes in the
+    system (except that fixed-output derivations do not run in private
+    network namespace to ensure they can access the network).</para>
 
-    <para>The use of a chroot requires that Nix is run as root (so you
-    should use the <link linkend='conf-build-users-group'>“build
-    users” feature</link> to perform the actual builds under different
-    users than root).  Currently, chroot builds only work on Linux
-    because Nix uses “bind mounts” to make the Nix store and other
-    directories available inside the chroot. Kernel version 3.13 or later
-    is needed.</para>
+    <para>Currently, chroots only work on Linux and Mac OS X. The use
+    of a chroot requires that Nix is run as root (so you should use
+    the <link linkend='conf-build-users-group'>“build users”
+    feature</link> to perform the actual builds under different users
+    than root).</para>
+
+    <para>If this option is set to <literal>relaxed</literal>, then
+    fixed-output derivations and derivations that have the
+    <varname>__noChroot</varname> attribute set to
+    <literal>true</literal> do not run in chroots.</para>
+
+    <para>The default is <literal>false</literal>.</para>
 
     </listitem>
 

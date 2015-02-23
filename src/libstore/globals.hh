@@ -145,9 +145,6 @@ struct Settings {
     /* The Unix group that contains the build users. */
     string buildUsersGroup;
 
-    /* Whether to build in chroot. */
-    bool useChroot;
-
     /* Set of ssh connection strings for the ssh substituter */
     Strings sshSubstituterHosts;
 

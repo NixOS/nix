@@ -1768,12 +1768,20 @@ void DerivationGoal::startBuilder()
        functions like fetchurl (which needs a proper /etc/resolv.conf)
        work properly.  Purity checking for fixed-output derivations
        is somewhat pointless anyway. */
-    useChroot = settings.useChroot;
-
-    if (fixedOutput) useChroot = false;
-
-    /* Hack to allow derivations to disable chroot builds. */
-    if (get(drv.env, "__noChroot") == "1") useChroot = false;
+    {
+        string x = settings.get("build-use-chroot", string("false"));
+        if (x != "true" && x != "false" && x != "relaxed")
+            throw Error("option ‘build-use-chroot’ must be set to one of ‘true’, ‘false’ or ‘relaxed’");
+        if (x == "true") {
+            if (get(drv.env, "__noChroot") == "1")
+                throw Error(format("derivation ‘%1%’ has ‘__noChroot’ set, but that's not allowed when ‘build-use-chroot’ is ‘true’") % drvPath);
+            useChroot = true;
+        }
+        else if (x == "false")
+            useChroot = false;
+        else if (x == "relaxed")
+            useChroot = !fixedOutput && get(drv.env, "__noChroot") != "1";
+    }
 
     if (useChroot) {
         /* Allow a user-configurable set of directories from the
@@ -1856,7 +1864,8 @@ void DerivationGoal::startBuilder()
                 % (buildUser.enabled() ? buildUser.getGID() : getgid())).str());
 
         /* Create /etc/hosts with localhost entry. */
-        writeFile(chrootRootDir + "/etc/hosts", "127.0.0.1 localhost\n");
+        if (!fixedOutput)
+            writeFile(chrootRootDir + "/etc/hosts", "127.0.0.1 localhost\n");
 
         /* Make the closure of the inputs available in the chroot,
            rather than the whole Nix store.  This prevents any access
@@ -1964,7 +1973,9 @@ void DerivationGoal::startBuilder()
 
            - The private network namespace ensures that the builder
              cannot talk to the outside world (or vice versa).  It
-             only has a private loopback interface.
+             only has a private loopback interface. (Fixed-output
+             derivations are not run in a private network namespace
+             to allow functions like fetchurl to work.)
 
            - The IPC namespace prevents the builder from communicating
              with outside processes using SysV IPC mechanisms (shared
@@ -1983,8 +1994,9 @@ void DerivationGoal::startBuilder()
         */
         Pid helper = startProcess([&]() {
             char stack[32 * 1024];
-            pid_t child = clone(childEntry, stack + sizeof(stack) - 8,
-                CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWNET | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD, this);
+            int flags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
+            if (!fixedOutput) flags |= CLONE_NEWNET;
+            pid_t child = clone(childEntry, stack + sizeof(stack) - 8, flags, this);
             if (child == -1) {
                 if (errno == EINVAL)
                     throw SysError("cloning builder process (Linux chroot builds require 3.13 or later)");
@@ -2081,10 +2093,10 @@ void DerivationGoal::runChild()
 
             /* Set up a nearly empty /dev, unless the user asked to
                bind-mount the host /dev. */
+            Strings ss;
             if (dirsInChroot.find("/dev") == dirsInChroot.end()) {
                 createDirs(chrootRootDir + "/dev/shm");
                 createDirs(chrootRootDir + "/dev/pts");
-                Strings ss;
                 ss.push_back("/dev/full");
 #ifdef __linux__
                 if (pathExists("/dev/kvm"))
@@ -2095,12 +2107,23 @@ void DerivationGoal::runChild()
                 ss.push_back("/dev/tty");
                 ss.push_back("/dev/urandom");
                 ss.push_back("/dev/zero");
-                foreach (Strings::iterator, i, ss) dirsInChroot[*i] = *i;
                 createSymlink("/proc/self/fd", chrootRootDir + "/dev/fd");
                 createSymlink("/proc/self/fd/0", chrootRootDir + "/dev/stdin");
                 createSymlink("/proc/self/fd/1", chrootRootDir + "/dev/stdout");
                 createSymlink("/proc/self/fd/2", chrootRootDir + "/dev/stderr");
             }
+
+            /* Fixed-output derivations typically need to access the
+               network, so give them access to /etc/resolv.conf and so
+               on. */
+            if (fixedOutput) {
+                ss.push_back("/etc/resolv.conf");
+                ss.push_back("/etc/nsswitch.conf");
+                ss.push_back("/etc/services");
+                ss.push_back("/etc/hosts");
+            }
+
+            for (auto & i : ss) dirsInChroot[i] = i;
 
             /* Bind-mount all the directories from the "host"
                filesystem that we want in the chroot

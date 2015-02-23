@@ -47,7 +47,6 @@ Settings::Settings()
     syncBeforeRegistering = false;
     useSubstitutes = true;
     buildUsersGroup = getuid() == 0 ? "nixbld" : "";
-    useChroot = false;
     useSshSubstituter = true;
     impersonateLinux26 = false;
     keepLog = true;
@@ -158,7 +157,6 @@ void Settings::update()
     _get(syncBeforeRegistering, "sync-before-registering");
     _get(useSubstitutes, "build-use-substitutes");
     _get(buildUsersGroup, "build-users-group");
-    _get(useChroot, "build-use-chroot");
     _get(impersonateLinux26, "build-impersonate-linux-26");
     _get(keepLog, "build-keep-log");
     _get(compressLog, "build-compress-log");
