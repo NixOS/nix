@@ -80,6 +80,8 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
             % path % e.path % pos);
     }
 
+    path = state.checkSourcePath(path);
+
     if (isStorePath(path) && store->isValidPath(path) && isDerivation(path)) {
         Derivation drv = readDerivation(path);
         Value & w = *state.allocValue();
@@ -133,7 +135,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
 /* !!! Should we pass the Pos or the file name too? */
 extern "C" typedef void (*ValueInitializer)(EvalState & state, Value & v);
 
-/* Load a ValueInitializer from a dso and return whatever it initializes */
+/* Load a ValueInitializer from a DSO and return whatever it initializes */
 static void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
@@ -145,6 +147,8 @@ static void prim_importNative(EvalState & state, const Pos & pos, Value * * args
         throw EvalError(format("cannot import ‘%1%’, since path ‘%2%’ is not valid, at %3%")
             % path % e.path % pos);
     }
+
+    path = state.checkSourcePath(path);
 
     string sym = state.forceStringNoCtx(*args[1], pos);
 
@@ -380,7 +384,7 @@ static void prim_tryEval(EvalState & state, const Pos & pos, Value * * args, Val
 static void prim_getEnv(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string name = state.forceStringNoCtx(*args[0], pos);
-    mkString(v, getEnv(name));
+    mkString(v, state.restricted ? "" : getEnv(name));
 }
 
 
@@ -680,7 +684,7 @@ static void prim_toPath(EvalState & state, const Pos & pos, Value * * args, Valu
 static void prim_storePath(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    Path path = state.coerceToPath(pos, *args[0], context);
+    Path path = state.checkSourcePath(state.coerceToPath(pos, *args[0], context));
     /* Resolve symlinks in ‘path’, unless ‘path’ itself is a symlink
        directly in the store.  The latter condition is necessary so
        e.g. nix-push does the right thing. */
@@ -701,7 +705,15 @@ static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, 
     Path path = state.coerceToPath(pos, *args[0], context);
     if (!context.empty())
         throw EvalError(format("string ‘%1%’ cannot refer to other paths, at %2%") % path % pos);
-    mkBool(v, pathExists(path));
+    try {
+        mkBool(v, pathExists(state.checkSourcePath(path)));
+    } catch (SysError & e) {
+        /* Don't give away info from errors while canonicalising
+           ‘path’ in restricted mode. */
+        mkBool(v, false);
+    } catch (RestrictedPathError & e) {
+        mkBool(v, false);
+    }
 }
 
 
@@ -736,7 +748,7 @@ static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Va
         throw EvalError(format("cannot read ‘%1%’, since path ‘%2%’ is not valid, at %3%")
             % path % e.path % pos);
     }
-    mkString(v, readFile(path).c_str());
+    mkString(v, readFile(state.checkSourcePath(path)).c_str());
 }
 
 
@@ -763,7 +775,7 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
             throw EvalError(format("attribute ‘path’ missing, at %1%") % pos);
         string path = state.coerceToPath(pos, *i->value, context);
 
-        searchPath.push_back(std::pair<string, Path>(prefix, path));
+        searchPath.push_back(std::pair<string, Path>(prefix, state.checkSourcePath(path)));
     }
 
     string path = state.forceStringNoCtx(*args[1], pos);
@@ -790,7 +802,7 @@ static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Val
             % path % e.path % pos);
     }
 
-    DirEntries entries = readDirectory(path);
+    DirEntries entries = readDirectory(state.checkSourcePath(path));
     state.mkAttrs(v, entries.size());
 
     for (auto & ent : entries) {
@@ -926,6 +938,8 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
         throw TypeError(format("first argument in call to ‘filterSource’ is not a function but %1%, at %2%") % showType(*args[0]) % pos);
 
     FilterFromExpr filter(state, *args[0]);
+
+    path = state.checkSourcePath(path);
 
     Path dstPath = settings.readOnlyMode
         ? computeStorePathForPath(path, true, htSHA256, filter).first

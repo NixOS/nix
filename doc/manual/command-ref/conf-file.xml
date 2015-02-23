@@ -539,6 +539,21 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
   </varlistentry>
 
 
+  <varlistentry xml:id="conf-restrict-eval"><term><literal>restrict-eval</literal></term>
+
+    <listitem>
+
+      <para>If set to <literal>true</literal>, the Nix evaluator will
+      not allow access to any files outside of the Nix search path (as
+      set via the <envar>NIX_PATH</envar> environment variable or the
+      <option>-I</option> option). The default is
+      <literal>false</literal>.</para>
+
+    </listitem>
+
+  </varlistentry>
+
+
 </variablelist>
 
 </para>

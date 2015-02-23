@@ -614,7 +614,8 @@ void EvalState::addToSearchPath(const string & s, bool warn)
     path = absPath(path);
     if (pathExists(path)) {
         debug(format("adding path ‘%1%’ to the search path") % path);
-        searchPath.push_back(std::pair<string, Path>(prefix, path));
+        /* Resolve symlinks in the path to support restricted mode. */
+        searchPath.push_back(std::pair<string, Path>(prefix, canonPath(path, true)));
     } else if (warn)
         printMsg(lvlError, format("warning: Nix search path entry ‘%1%’ does not exist, ignoring") % path);
 }

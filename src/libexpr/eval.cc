@@ -195,6 +195,8 @@ EvalState::EvalState(const Strings & _searchPath)
     nrListConcats = nrPrimOpCalls = nrFunctionCalls = 0;
     countCalls = getEnv("NIX_COUNT_CALLS", "0") != "0";
 
+    restricted = settings.get("restrict-eval", false);
+
 #if HAVE_BOEHMGC
     static bool gcInitialised = false;
     if (!gcInitialised) {
@@ -247,6 +249,21 @@ EvalState::EvalState(const Strings & _searchPath)
 EvalState::~EvalState()
 {
     fileEvalCache.clear();
+}
+
+
+Path EvalState::checkSourcePath(const Path & path_)
+{
+    if (!restricted) return path_;
+
+    /* Resolve symlinks. */
+    Path path = canonPath(path_, true);
+
+    for (auto & i : searchPath)
+        if (path == i.second || isInDir(path, i.second))
+            return path;
+
+    throw RestrictedPathError(format("access to path ‘%1%’ is forbidden in restricted mode") % path_);
 }
 
 
@@ -555,7 +572,7 @@ void EvalState::evalFile(const Path & path, Value & v)
     }
 
     startNest(nest, lvlTalkative, format("evaluating file ‘%1%’") % path2);
-    Expr * e = parseExprFromFile(path2);
+    Expr * e = parseExprFromFile(checkSourcePath(path2));
     try {
         eval(e, v);
     } catch (Error & e) {
@@ -1358,8 +1375,8 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
         dstPath = srcToStore[path];
     else {
         dstPath = settings.readOnlyMode
-            ? computeStorePathForPath(path).first
-            : store->addToStore(path, true, htSHA256, defaultPathFilter, repair);
+            ? computeStorePathForPath(checkSourcePath(path)).first
+            : store->addToStore(checkSourcePath(path), true, htSHA256, defaultPathFilter, repair);
         srcToStore[path] = dstPath;
         printMsg(lvlChatty, format("copied source ‘%1%’ -> ‘%2%’")
             % path % dstPath);

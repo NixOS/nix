@@ -135,6 +135,10 @@ public:
        already exist there. */
     bool repair;
 
+    /* If set, don't allow access to files outside of the Nix search
+       path or to environment variables. */
+    bool restricted;
+
 private:
     SrcToStore srcToStore;
 
@@ -154,6 +158,8 @@ public:
     ~EvalState();
 
     void addToSearchPath(const string & s, bool warn = false);
+
+    Path checkSourcePath(const Path & path);
 
     /* Parse a Nix expression from the specified file. */
     Expr * parseExprFromFile(const Path & path);

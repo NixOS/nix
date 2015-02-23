@@ -16,6 +16,7 @@ MakeError(ThrownError, AssertionError)
 MakeError(Abort, EvalError)
 MakeError(TypeError, EvalError)
 MakeError(UndefinedVarError, Error)
+MakeError(RestrictedPathError, Error)
 
 
 /* Position objects. */
