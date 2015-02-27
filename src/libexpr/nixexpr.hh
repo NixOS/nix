@@ -4,6 +4,7 @@
 #include "symbol-table.hh"
 
 #include <map>
+#include <functional>
 
 
 namespace nix {
@@ -80,6 +81,10 @@ struct Expr
     virtual void eval(EvalState & state, Env & env, Value & v);
     virtual Value * maybeThunk(EvalState & state, Env & env);
     virtual void setName(Symbol & name);
+
+    /* Perform a bottom-up rewrite of the AST. */
+    typedef std::function<Expr *(Expr & e)> Visitor;
+    virtual Expr * rewrite(Visitor & v);
 };
 
 std::ostream & operator << (std::ostream & str, Expr & e);
@@ -155,6 +160,7 @@ struct ExprSelect : Expr
     ExprSelect(const Pos & pos, Expr * e, const AttrPath & attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(attrPath) { };
     ExprSelect(const Pos & pos, Expr * e, const Symbol & name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
     COMMON_METHODS
+    Expr * rewrite(Visitor & v);
 };
 
 struct ExprOpHasAttr : Expr
@@ -163,6 +169,7 @@ struct ExprOpHasAttr : Expr
     AttrPath attrPath;
     ExprOpHasAttr(Expr * e, const AttrPath & attrPath) : e(e), attrPath(attrPath) { };
     COMMON_METHODS
+    Expr * rewrite(Visitor & v);
 };
 
 struct ExprAttrs : Expr
@@ -189,6 +196,7 @@ struct ExprAttrs : Expr
     DynamicAttrDefs dynamicAttrs;
     ExprAttrs() : recursive(false) { };
     COMMON_METHODS
+    Expr * rewrite(Visitor & v);
 };
 
 struct ExprList : Expr
@@ -196,6 +204,7 @@ struct ExprList : Expr
     std::vector<Expr *> elems;
     ExprList() { };
     COMMON_METHODS
+    Expr * rewrite(Visitor & v);
 };
 
 struct Formal
@@ -231,6 +240,7 @@ struct ExprLambda : Expr
     void setName(Symbol & name);
     string showNamePos() const;
     COMMON_METHODS
+    Expr * rewrite(Visitor & v);
 };
 
 struct ExprLet : Expr
@@ -239,6 +249,7 @@ struct ExprLet : Expr
     Expr * body;
     ExprLet(ExprAttrs * attrs, Expr * body) : attrs(attrs), body(body) { };
     COMMON_METHODS
+    Expr * rewrite(Visitor & v);
 };
 
 struct ExprWith : Expr
@@ -248,6 +259,7 @@ struct ExprWith : Expr
     unsigned int prevWith;
     ExprWith(const Pos & pos, Expr * attrs, Expr * body) : pos(pos), attrs(attrs), body(body) { };
     COMMON_METHODS
+    Expr * rewrite(Visitor & v);
 };
 
 struct ExprIf : Expr
@@ -255,6 +267,7 @@ struct ExprIf : Expr
     Expr * cond, * then, * else_;
     ExprIf(Expr * cond, Expr * then, Expr * else_) : cond(cond), then(then), else_(else_) { };
     COMMON_METHODS
+    Expr * rewrite(Visitor & v);
 };
 
 struct ExprAssert : Expr
@@ -263,6 +276,7 @@ struct ExprAssert : Expr
     Expr * cond, * body;
     ExprAssert(const Pos & pos, Expr * cond, Expr * body) : pos(pos), cond(cond), body(body) { };
     COMMON_METHODS
+    Expr * rewrite(Visitor & v);
 };
 
 struct ExprOpNot : Expr
@@ -270,6 +284,7 @@ struct ExprOpNot : Expr
     Expr * e;
     ExprOpNot(Expr * e) : e(e) { };
     COMMON_METHODS
+    Expr * rewrite(Visitor & v);
 };
 
 #define MakeBinOp(name, s) \
@@ -288,6 +303,12 @@ struct ExprOpNot : Expr
             e1->bindVars(env); e2->bindVars(env); \
         } \
         void eval(EvalState & state, Env & env, Value & v); \
+        Expr * rewrite(Visitor & v) \
+        { \
+            e1 = e1->rewrite(v); \
+            e2 = e2->rewrite(v); \
+            return v(*this); \
+        } \
     };
 
 MakeBinOp(App, "")
@@ -307,6 +328,7 @@ struct ExprConcatStrings : Expr
     ExprConcatStrings(const Pos & pos, bool forceString, vector<Expr *> * es)
         : pos(pos), forceString(forceString), es(es) { };
     COMMON_METHODS
+    Expr * rewrite(Visitor & v);
 };
 
 struct ExprPos : Expr

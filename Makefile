@@ -12,6 +12,7 @@ makefiles = \
   src/nix-daemon/local.mk \
   src/download-via-ssh/local.mk \
   src/nix-log2xml/local.mk \
+  src/nix-pack/local.mk \
   src/bsdiff-4.3/local.mk \
   perl/local.mk \
   scripts/local.mk \
