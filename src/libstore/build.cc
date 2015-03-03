@@ -2323,6 +2323,9 @@ void DerivationGoal::runChild()
             /* Enables getpwuid (used by git and others) */
             sandboxProfile += "(allow mach-lookup (global-name \"com.apple.system.notification_center\") (global-name \"com.apple.system.opendirectoryd.libinfo\"))\n";
 
+            /* Allow local networking operations, mostly because lots of test suites use it and it seems mostly harmless */
+            sandboxProfile += "(allow network* (local ip) (remote unix-socket))";
+
 
             /* Our rwx outputs */
             sandboxProfile += "(allow file-read* file-write* process-exec\n";
