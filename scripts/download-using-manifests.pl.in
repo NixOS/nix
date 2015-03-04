@@ -17,8 +17,7 @@ my $logFile = "$Nix::Config::logDir/downloads";
 # estimating the expected download size.
 my $fast = 1;
 
-# ‘--insecure’ is fine because Nix verifies the hash of the result.
-my $curl = "$Nix::Config::curl --fail --location --insecure";
+my $curl = "$Nix::Config::curl --fail --location";
 
 
 # Open the manifest cache and update it if necessary.
