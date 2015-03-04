@@ -1992,6 +1992,8 @@ void DerivationGoal::startBuilder()
            CLONE_PARENT to ensure that the real builder is parented to
            us.
         */
+        ProcessOptions options;
+        options.allowVfork = false;
         Pid helper = startProcess([&]() {
             char stack[32 * 1024];
             int flags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
@@ -2004,7 +2006,7 @@ void DerivationGoal::startBuilder()
             if (child == -1) throw SysError("cloning builder process");
             writeFull(builderOut.writeSide, int2String(child) + "\n");
             _exit(0);
-        });
+        }, options);
         if (helper.wait(true) != 0)
             throw Error("unable to start build process");
         pid_t tmp;
