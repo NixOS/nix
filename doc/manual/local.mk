@@ -27,8 +27,11 @@ $(d)/version.txt:
 # Note: RelaxNG validation requires xmllint >= 2.7.4.
 $(d)/manual.is-valid: $(d)/manual.xmli
 	$(trace-gen) $(XSLTPROC) --novalid --stringparam profile.condition manual \
-	  $(docbookxsl)/profiling/profile.xsl $< 2> /dev/null | \
-	  $(xmllint) --nonet --noout --relaxng $(docbookrng) -
+	  $(docbookxsl)/profiling/profile.xsl $< | \
+	  $(xmllint) --nonet --noout --relaxng $(docbookrng) - \
+	  || { ret=$$?; echo "ERROR: Failed to build $<: \
+	       You might have to install the package docbook-xsl-ns package."; \
+	       exit $$ret; }
 	@touch $@
 
 clean-files += $(d)/manual.xmli $(d)/version.txt $(d)/manual.is-valid
