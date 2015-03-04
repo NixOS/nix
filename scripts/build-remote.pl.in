@@ -16,6 +16,8 @@ binmode STDERR, ":encoding(utf8)";
 
 my $debug = defined $ENV{NIX_DEBUG_HOOK};
 
+setVerbosity(0); # make exportPath() less verbose
+
 
 # General operation:
 #

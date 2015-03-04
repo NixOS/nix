@@ -48,6 +48,11 @@ void init()
         doInit();
 
 
+void setVerbosity(int level)
+    CODE:
+        verbosity = (Verbosity) level;
+
+
 int isValidPath(char * path)
     CODE:
         try {
