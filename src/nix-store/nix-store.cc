@@ -140,7 +140,8 @@ static void opRealise(Strings opFlags, Strings opArgs)
         unknown = PathSet();
     }
 
-    printMissing(willBuild, willSubstitute, unknown, downloadSize, narSize);
+    if (settings.get("print-missing", true))
+        printMissing(willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     if (dryRun) return;
 
