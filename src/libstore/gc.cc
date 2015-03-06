@@ -96,7 +96,7 @@ Path addPermRoot(StoreAPI & store, const Path & _storePath,
                 "(are you running nix-build inside the store?)") % gcRoot);
 
     if (indirect) {
-        /* Don't clobber the the link if it already exists and doesn't
+        /* Don't clobber the link if it already exists and doesn't
            point to the Nix store. */
         if (pathExists(gcRoot) && (!isLink(gcRoot) || !isInStore(readLink(gcRoot))))
             throw Error(format("cannot create symlink ‘%1%’; already exists") % gcRoot);

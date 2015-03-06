@@ -1213,7 +1213,7 @@ static void prim_head(EvalState & state, const Pos & pos, Value * * args, Value 
 }
 
 
-/* Return a list consisting of everything but the the first element of
+/* Return a list consisting of everything but the first element of
    a list.  Warning: this function takes O(n) time, so you probably
    don't want to use it!  */
 static void prim_tail(EvalState & state, const Pos & pos, Value * * args, Value & v)
