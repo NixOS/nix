@@ -1226,8 +1226,13 @@ void EvalState::forceValueDeep(Value & v)
         forceValue(v);
 
         if (v.type == tAttrs) {
-            foreach (Bindings::iterator, i, *v.attrs)
-                recurse(*i->value);
+            for (auto & i : *v.attrs)
+                try {
+                    recurse(*i.value);
+                } catch (Error & e) {
+                    addErrorPrefix(e, "while evaluating the attribute ‘%1%’ at %2%:\n", i.name, *i.pos);
+                    throw;
+                }
         }
 
         else if (v.type == tList) {
