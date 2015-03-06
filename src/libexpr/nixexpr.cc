@@ -200,15 +200,12 @@ string showAttrPath(const AttrPath & attrPath)
 {
     std::ostringstream out;
     bool first = true;
-    foreach (AttrPath::const_iterator, i, attrPath) {
-        if (!first)
-            out << '.';
+    for (auto & i : attrPath) {
+        if (!first) out << '.'; else first = false;
+        if (i.symbol.set())
+            out << i.symbol;
         else
-            first = false;
-        if (i->symbol.set())
-            out << i->symbol;
-        else
-            out << "\"${" << *i->expr << "}\"";
+            out << "\"${" << *i.expr << "}\"";
     }
     return out.str();
 }

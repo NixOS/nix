@@ -765,6 +765,23 @@ void ExprVar::eval(EvalState & state, Env & env, Value & v)
 }
 
 
+static string showAttrPath(EvalState & state, Env & env, const AttrPath & attrPath)
+{
+    std::ostringstream out;
+    bool first = true;
+    for (auto & i : attrPath) {
+        if (!first) out << '.'; else first = false;
+        try {
+            out << getName(i, state, env);
+        } catch (Error & e) {
+            assert(!i.symbol.set());
+            out << "\"${" << *i.expr << "}\"";
+        }
+    }
+    return out.str();
+}
+
+
 unsigned long nrLookups = 0;
 
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)
@@ -791,16 +808,8 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                 }
             } else {
                 state.forceAttrs(*vAttrs, pos);
-                if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end()) {
-                    AttrPath staticPath;
-                    AttrPath::const_iterator j;
-                    for (j = attrPath.begin(); j != i; ++j)
-                        staticPath.push_back(AttrName(getName(*j, state, env)));
-                    staticPath.push_back(AttrName(getName(*j, state, env)));
-                    for (j = j + 1; j != attrPath.end(); ++j)
-                        staticPath.push_back(*j);
-                    throwEvalError("attribute ‘%1%’ missing, at %2%", showAttrPath(staticPath), pos);
-                }
+                if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
+                    throwEvalError("attribute ‘%1%’ missing, at %2%", name, pos);
             }
             vAttrs = j->value;
             pos2 = j->pos;
@@ -812,7 +821,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     } catch (Error & e) {
         if (pos2 && pos2->file != state.sDerivationNix)
             addErrorPrefix(e, "while evaluating the attribute ‘%1%’ at %2%:\n",
-                showAttrPath(attrPath), *pos2);
+                showAttrPath(state, env, attrPath), *pos2);
         throw;
     }
 
