@@ -416,7 +416,7 @@ $ nix-env --install gcc-3.3.2
 installing `gcc-3.3.2'
 uninstalling `gcc-3.1'</screen>
 
-Note the the previously installed version is removed, since
+Note the previously installed version is removed, since
 <option>--preserve-installed</option> was not specified.</para>
 
 <para>To install an arbitrary version:

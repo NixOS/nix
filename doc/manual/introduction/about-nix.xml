@@ -197,7 +197,7 @@ collection</emphasis> (Nixpkgs).</para>
 <simplesect><title>Managing build environments</title>
 
 <para>Nix is extremely useful for developers as it makes it easy to
-automatically set up the the build environment for a package. Given a
+automatically set up the build environment for a package. Given a
 Nix expression that describes the dependencies of your package, the
 command <command>nix-shell</command> will build or download those
 dependencies if they’re not already in your Nix store, and then start
