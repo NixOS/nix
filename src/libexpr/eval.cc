@@ -1515,6 +1515,13 @@ void EvalState::printStats()
     printMsg(v, format("  number of function calls: %1%") % nrFunctionCalls);
     printMsg(v, format("  total allocations: %1% bytes") % (bEnvs + bLists + bValues + bAttrsets));
 
+#if HAVE_BOEHMGC
+    GC_word heapSize, totalBytes;
+    GC_get_heap_usage_safe(&heapSize, 0, 0, 0, &totalBytes);
+    printMsg(v, format("  current Boehm heap size: %1% bytes") % heapSize);
+    printMsg(v, format("  total Boehm heap allocations: %1% bytes") % totalBytes);
+#endif
+
     if (countCalls) {
         v = lvlInfo;
 
