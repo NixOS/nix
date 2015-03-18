@@ -442,7 +442,7 @@ Env & EvalState::allocEnv(unsigned int size)
     Env * env = (Env *) GC_MALLOC(sizeof(Env) + size * sizeof(Value *));
     env->size = size;
 
-    /* Clear the values because maybeThunk() and lookupVar fromWith expects this. */
+    /* Clear the values because maybeThunk() and lookupVar fromWith expect this. */
     for (unsigned i = 0; i < size; ++i)
         env->values[i] = 0;
 
@@ -1498,6 +1498,7 @@ void EvalState::printStats()
 
     printMsg(v, format("  time elapsed: %1%") % cpuTime);
     printMsg(v, format("  size of a value: %1%") % sizeof(Value));
+    printMsg(v, format("  size of an attr: %1%") % sizeof(Attr));
     printMsg(v, format("  environments allocated: %1% (%2% bytes)") % nrEnvs % bEnvs);
     printMsg(v, format("  list elements: %1% (%2% bytes)") % nrListElems % bLists);
     printMsg(v, format("  list concatenations: %1%") % nrListConcats);
@@ -1575,12 +1576,20 @@ size_t valueSize(Value & v)
             sz += doString(v.path);
             break;
         case tAttrs:
-            for (auto & i : *v.attrs)
-                sz += doValue(*i.value);
+            if (seen.find(v.attrs) == seen.end()) {
+                seen.insert(v.attrs);
+                sz += sizeof(Bindings) + sizeof(Attr) * v.attrs->capacity();
+                for (auto & i : *v.attrs)
+                    sz += doValue(*i.value);
+            }
             break;
         case tList:
-            for (unsigned int n = 0; n < v.list.length; ++n)
-                sz += doValue(*v.list.elems[n]);
+            if (seen.find(v.list.elems) == seen.end()) {
+                seen.insert(v.list.elems);
+                sz += v.list.length * sizeof(Value *);
+                for (unsigned int n = 0; n < v.list.length; ++n)
+                    sz += doValue(*v.list.elems[n]);
+            }
             break;
         case tThunk:
             sz += doEnv(*v.thunk.env);
@@ -1612,7 +1621,7 @@ size_t valueSize(Value & v)
         if (seen.find(&env) != seen.end()) return 0;
         seen.insert(&env);
 
-        size_t sz = sizeof(Env);
+        size_t sz = sizeof(Env) + sizeof(Value *) * env.size;
 
         for (unsigned int i = 0; i < env.size; ++i)
             if (env.values[i])
