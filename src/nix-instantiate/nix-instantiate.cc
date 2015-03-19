@@ -93,6 +93,7 @@ int main(int argc, char * * argv)
 {
     return handleExceptions(argv[0], [&]() {
         initNix();
+        initGC();
 
         Strings files, searchPath;
         bool readStdin = false;

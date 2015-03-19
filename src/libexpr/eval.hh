@@ -121,6 +121,10 @@ std::ostream & operator << (std::ostream & str, const Value & v);
 typedef list<std::pair<string, Path> > SearchPath;
 
 
+/* Initialise the Boehm GC, if applicable. */
+void initGC();
+
+
 class EvalState
 {
 public:

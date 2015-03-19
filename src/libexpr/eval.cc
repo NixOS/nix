@@ -191,6 +191,47 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
 }
 
 
+static bool gcInitialised = false;
+
+void initGC()
+{
+    if (gcInitialised) return;
+
+#if HAVE_BOEHMGC
+    /* Initialise the Boehm garbage collector. */
+    GC_INIT();
+
+    GC_oom_fn = oomHandler;
+
+    /* Set the initial heap size to something fairly big (25% of
+       physical RAM, up to a maximum of 384 MiB) so that in most cases
+       we don't need to garbage collect at all.  (Collection has a
+       fairly significant overhead.)  The heap size can be overridden
+       through libgc's GC_INITIAL_HEAP_SIZE environment variable.  We
+       should probably also provide a nix.conf setting for this.  Note
+       that GC_expand_hp() causes a lot of virtual, but not physical
+       (resident) memory to be allocated.  This might be a problem on
+       systems that don't overcommit. */
+    if (!getenv("GC_INITIAL_HEAP_SIZE")) {
+        size_t size = 32 * 1024 * 1024;
+#if HAVE_SYSCONF && defined(_SC_PAGESIZE) && defined(_SC_PHYS_PAGES)
+        size_t maxSize = 384 * 1024 * 1024;
+        long pageSize = sysconf(_SC_PAGESIZE);
+        long pages = sysconf(_SC_PHYS_PAGES);
+        if (pageSize != -1)
+            size = (pageSize * pages) / 4; // 25% of RAM
+        if (size > maxSize) size = maxSize;
+#endif
+        debug(format("setting initial heap size to %1% bytes") % size);
+        GC_expand_hp(size);
+    }
+
+#endif
+
+    gcInitialised = true;
+}
+
+
 EvalState::EvalState(const Strings & _searchPath)
     : sWith(symbols.create("<with>"))
     , sOutPath(symbols.create("outPath"))
@@ -220,44 +261,7 @@ EvalState::EvalState(const Strings & _searchPath)
 
     restricted = settings.get("restrict-eval", false);
 
-#if HAVE_BOEHMGC
-    static bool gcInitialised = false;
-    if (!gcInitialised) {
-
-        /* Initialise the Boehm garbage collector.  This isn't
-           necessary on most platforms, but for portability we do it
-           anyway. */
-        GC_INIT();
-
-        GC_oom_fn = oomHandler;
-
-        /* Set the initial heap size to something fairly big (25% of
-           physical RAM, up to a maximum of 384 MiB) so that in most
-           cases we don't need to garbage collect at all.  (Collection
-           has a fairly significant overhead.)  The heap size can be
-           overridden through libgc's GC_INITIAL_HEAP_SIZE environment
-           variable.  We should probably also provide a nix.conf
-           setting for this.  Note that GC_expand_hp() causes a lot of
-           virtual, but not physical (resident) memory to be
-           allocated.  This might be a problem on systems that don't
-           overcommit. */
-        if (!getenv("GC_INITIAL_HEAP_SIZE")) {
-            size_t size = 32 * 1024 * 1024;
-#if HAVE_SYSCONF && defined(_SC_PAGESIZE) && defined(_SC_PHYS_PAGES)
-            size_t maxSize = 384 * 1024 * 1024;
-            long pageSize = sysconf(_SC_PAGESIZE);
-            long pages = sysconf(_SC_PHYS_PAGES);
-            if (pageSize != -1)
-                size = (pageSize * pages) / 4; // 25% of RAM
-            if (size > maxSize) size = maxSize;
-#endif
-            debug(format("setting initial heap size to %1% bytes") % size);
-            GC_expand_hp(size);
-        }
-
-        gcInitialised = true;
-    }
-#endif
+    assert(gcInitialised);
 
     /* Initialise the Nix expression search path. */
     Strings paths = tokenizeString<Strings>(getEnv("NIX_PATH", ""), ":");

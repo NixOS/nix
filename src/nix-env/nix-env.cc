@@ -1337,6 +1337,7 @@ int main(int argc, char * * argv)
 {
     return handleExceptions(argv[0], [&]() {
         initNix();
+        initGC();
 
         Strings opFlags, opArgs, searchPath;
         std::map<string, string> autoArgs_;
