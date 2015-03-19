@@ -21,15 +21,38 @@
 
 #else
 
-#define GC_STRDUP strdup
-#define GC_MALLOC malloc
-
 #define NEW new
 
 #endif
 
 
 namespace nix {
+
+
+static char * dupString(const char * s)
+{
+    char * t;
+#if HAVE_BOEHMGC
+    t = GC_strdup(s);
+#else
+    t = strdup(s);
+#endif
+    if (!t) throw std::bad_alloc();
+    return t;
+}
+
+
+static void * allocBytes(size_t n)
+{
+    void * p;
+#if HAVE_BOEHMGC
+    p = GC_malloc(n);
+#else
+    p = malloc(n);
+#endif
+    if (!p) throw std::bad_alloc();
+    return p;
+}
 
 
 void Bindings::sort()
@@ -376,7 +399,7 @@ LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, 
 
 void mkString(Value & v, const char * s)
 {
-    mkStringNoCopy(v, GC_STRDUP(s));
+    mkStringNoCopy(v, dupString(s));
 }
 
 
@@ -386,9 +409,9 @@ void mkString(Value & v, const string & s, const PathSet & context)
     if (!context.empty()) {
         unsigned int n = 0;
         v.string.context = (const char * *)
-            GC_MALLOC((context.size() + 1) * sizeof(char *));
+            allocBytes((context.size() + 1) * sizeof(char *));
         foreach (PathSet::const_iterator, i, context)
-            v.string.context[n++] = GC_STRDUP(i->c_str());
+            v.string.context[n++] = dupString(i->c_str());
         v.string.context[n] = 0;
     }
 }
@@ -396,7 +419,7 @@ void mkString(Value & v, const string & s, const PathSet & context)
 
 void mkPath(Value & v, const char * s)
 {
-    mkPathNoCopy(v, GC_STRDUP(s));
+    mkPathNoCopy(v, dupString(s));
 }
 
 
@@ -429,7 +452,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 Value * EvalState::allocValue()
 {
     nrValues++;
-    return (Value *) GC_MALLOC(sizeof(Value));
+    return (Value *) allocBytes(sizeof(Value));
 }
 
 
@@ -439,7 +462,7 @@ Env & EvalState::allocEnv(unsigned int size)
 
     nrEnvs++;
     nrValuesInEnvs += size;
-    Env * env = (Env *) GC_MALLOC(sizeof(Env) + size * sizeof(Value *));
+    Env * env = (Env *) allocBytes(sizeof(Env) + size * sizeof(Value *));
     env->size = size;
 
     /* Clear the values because maybeThunk() and lookupVar fromWith expect this. */
@@ -460,7 +483,7 @@ Value * EvalState::allocAttr(Value & vAttrs, const Symbol & name)
 
 Bindings * EvalState::allocBindings(Bindings::size_t capacity)
 {
-    return new (GC_MALLOC(sizeof(Bindings) + sizeof(Attr) * capacity)) Bindings(capacity);
+    return new (allocBytes(sizeof(Bindings) + sizeof(Attr) * capacity)) Bindings(capacity);
 }
 
 
@@ -469,7 +492,7 @@ void EvalState::mkList(Value & v, unsigned int length)
     clearValue(v);
     v.type = tList;
     v.list.length = length;
-    v.list.elems = length ? (Value * *) GC_MALLOC(length * sizeof(Value *)) : 0;
+    v.list.elems = length ? (Value * *) allocBytes(length * sizeof(Value *)) : 0;
     nrListElems += length;
 }
 
