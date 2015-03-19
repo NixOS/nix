@@ -199,6 +199,8 @@ void initGC()
 
 #if HAVE_BOEHMGC
     /* Initialise the Boehm garbage collector. */
+    GC_set_all_interior_pointers(0);
+
     GC_INIT();
 
     GC_oom_fn = oomHandler;
