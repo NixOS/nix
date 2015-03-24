@@ -1799,6 +1799,14 @@ void DerivationGoal::startBuilder()
         }
         dirsInChroot[tmpDir] = tmpDir;
 
+        /* Add the closure of store paths to the chroot. */
+        PathSet closure;
+        for (auto & i : dirsInChroot)
+            if (isInStore(i.second))
+                computeFSClosure(worker.store, toStorePath(i.second), closure);
+        for (auto & i : closure)
+            dirsInChroot[i] = i;
+
         string allowed = settings.get("allowed-impure-host-deps", string(DEFAULT_ALLOWED_IMPURE_PREFIXES));
         PathSet allowedPaths = tokenizeString<StringSet>(allowed);
 

@@ -95,11 +95,10 @@ let
 
         # Provide a default value for the ‘build-chroot-dirs’ setting
         # that includes /bin/sh pointing to bash.
-        preHook = lib.optionalString stdenv.isLinux (
-          let sh = stdenv.shell; in
+        preHook = lib.optionalString stdenv.isLinux
           ''
-            export DEFAULT_CHROOT_DIRS="/bin/sh=${sh} $(tr '\n' ' ' < ${writeReferencesToFile sh})"
-          '');
+            export DEFAULT_CHROOT_DIRS="/bin/sh=${stdenv.shell}"
+          '';
 
         enableParallelBuilding = true;
 
