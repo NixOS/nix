@@ -1507,11 +1507,14 @@ void EvalState::createBaseEnv()
     mkInt(v, time(0));
     addConstant("__currentTime", v);
 
-    mkString(v, settings.thisSystem.c_str());
+    mkString(v, settings.thisSystem);
     addConstant("__currentSystem", v);
 
-    mkString(v, nixVersion.c_str());
+    mkString(v, nixVersion);
     addConstant("__nixVersion", v);
+
+    mkString(v, settings.nixStore);
+    addConstant("__storeDir", v);
 
     /* Language version.  This should be increased every time a new
        language feature gets added.  It's not necessary to increase it

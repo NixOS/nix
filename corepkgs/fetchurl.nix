@@ -14,7 +14,7 @@ let
     '' + (if executable then "${coreutils}/chmod +x $out" else ""));
 
 in
-    
+
 derivation {
   name = baseNameOf (toString url);
   builder = shell;
@@ -26,14 +26,11 @@ derivation {
   outputHash = if outputHash != "" then outputHash else
       if sha256 != "" then sha256 else if sha1 != "" then sha1 else md5;
   outputHashMode = if executable then "recursive" else "flat";
-  
+
   inherit system url;
 
   # No need to double the amount of network traffic
   preferLocalBuild = true;
-
-  # Don't build in a chroot because Nix's dependencies may not be there.
-  __noChroot = true;
 
   impureEnvVars = [
     # We borrow these environment variables from the caller to allow
@@ -42,4 +39,6 @@ derivation {
     # by definition pure.
     "http_proxy" "https_proxy" "ftp_proxy" "all_proxy" "no_proxy"
   ];
+
+  inherit chrootDeps;
 }
