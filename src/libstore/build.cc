@@ -1838,6 +1838,12 @@ void DerivationGoal::startBuilder()
 
         printMsg(lvlChatty, format("setting up chroot environment in ‘%1%’") % chrootRootDir);
 
+        if (mkdir(chrootRootDir.c_str(), 0750) == -1)
+            throw SysError(format("cannot create ‘%1%’") % chrootRootDir);
+
+        if (chown(chrootRootDir.c_str(), 0, buildUser.getGID()) == -1)
+            throw SysError(format("cannot change ownership of ‘%1%’") % chrootRootDir);
+
         /* Create a writable /tmp in the chroot.  Many builders need
            this.  (Of course they should really respect $TMPDIR
            instead.) */
@@ -1874,8 +1880,12 @@ void DerivationGoal::startBuilder()
            can be bind-mounted).  !!! As an extra security
            precaution, make the fake Nix store only writable by the
            build user. */
-        createDirs(chrootRootDir + settings.nixStore);
-        chmod_(chrootRootDir + settings.nixStore, 01777);
+        Path chrootStoreDir = chrootRootDir + settings.nixStore;
+        createDirs(chrootStoreDir);
+        chmod_(chrootStoreDir, 0730);
+
+        if (chown(chrootStoreDir.c_str(), 0, buildUser.getGID()) == -1)
+            throw SysError(format("cannot change ownership of ‘%1%’") % chrootStoreDir);
 
         foreach (PathSet::iterator, i, inputPaths) {
             struct stat st;
