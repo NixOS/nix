@@ -1784,9 +1784,14 @@ void DerivationGoal::startBuilder()
     }
 
     if (useChroot) {
+
+        string defaultChrootDirs;
+        if (isInStore(BASH_PATH))
+            defaultChrootDirs = "/bin/sh=" BASH_PATH;
+
         /* Allow a user-configurable set of directories from the
            host file system. */
-        PathSet dirs = tokenizeString<StringSet>(settings.get("build-chroot-dirs", string(DEFAULT_CHROOT_DIRS)));
+        PathSet dirs = tokenizeString<StringSet>(settings.get("build-chroot-dirs", defaultChrootDirs));
         PathSet dirs2 = tokenizeString<StringSet>(settings.get("build-extra-chroot-dirs", string("")));
         dirs.insert(dirs2.begin(), dirs2.end());
 
