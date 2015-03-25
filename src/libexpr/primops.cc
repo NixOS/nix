@@ -18,6 +18,8 @@
 #include <cstring>
 #include <dlfcn.h>
 
+#include <curl/curl.h>
+
 
 namespace nix {
 
@@ -1480,6 +1482,119 @@ static void prim_compareVersions(EvalState & state, const Pos & pos, Value * * a
 
 
 /*************************************************************
+ * Networking
+ *************************************************************/
+
+
+struct Curl
+{
+    CURL * curl;
+    string data;
+
+    static size_t writeCallback(void * contents, size_t size, size_t nmemb, void * userp)
+    {
+        Curl & c(* (Curl *) userp);
+        size_t realSize = size * nmemb;
+        c.data.append((char *) contents, realSize);
+        return realSize;
+    }
+
+    Curl()
+    {
+        curl = curl_easy_init();
+        if (!curl) throw Error("unable to initialize curl");
+
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl, CURLOPT_CAINFO, getEnv("SSL_CERT_FILE", "/etc/ssl/certs/ca-certificates.crt").c_str());
+        curl_easy_setopt(curl, CURLOPT_USERAGENT, ("Nix/" + nixVersion).c_str());
+
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *) &curl);
+    }
+
+    ~Curl()
+    {
+        if (curl) curl_easy_cleanup(curl);
+    }
+
+    string fetch(const string & url)
+    {
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+
+        data.clear();
+
+        CURLcode res = curl_easy_perform(curl);
+        if (res != CURLE_OK)
+            throw Error(format("unable to download ‘%1%’: %2%")
+                % url % curl_easy_strerror(res));
+
+        return data;
+    }
+};
+
+
+void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
+    const string & who, bool unpack)
+{
+    if (state.restricted) throw Error(format("‘%1%’ is not allowed in restricted mode") % who);
+
+    string url;
+
+    state.forceValue(*args[0]);
+
+    if (args[0]->type == tAttrs) {
+
+        state.forceAttrs(*args[0], pos);
+
+        for (auto & attr : *args[0]->attrs) {
+            string name(attr.name);
+            if (name == "url")
+                url = state.forceStringNoCtx(*attr.value, *attr.pos);
+            else
+                throw EvalError(format("unsupported argument ‘%1%’ to ‘%2%’, at %3%") % attr.name % who % attr.pos);
+        }
+
+        if (url.empty())
+            throw EvalError(format("‘url’ argument required, at %1%") % pos);
+
+    } else
+        url = state.forceStringNoCtx(*args[0], pos);
+
+    // TODO: cache downloads.
+
+    Curl curl;
+    string data = curl.fetch(url);
+
+    string name;
+    string::size_type p = url.rfind('/');
+    if (p != string::npos) name = string(url, p + 1);
+
+    Path storePath = store->addTextToStore(name, data, PathSet(), state.repair);
+
+    if (unpack) {
+        Path tmpDir = createTempDir();
+        AutoDelete autoDelete(tmpDir, true);
+        runProgram("tar", true, {"xf", storePath, "-C", tmpDir, "--strip-components", "1"}, "");
+        storePath = store->addToStore(name, tmpDir, true, htSHA256, defaultPathFilter, state.repair);
+    }
+
+    mkString(v, storePath, singleton<PathSet>(storePath));
+}
+
+
+static void prim_fetchurl(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    fetch(state, pos, args, v, "fetchurl", false);
+}
+
+
+static void prim_fetchTarball(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    fetch(state, pos, args, v, "fetchTarball", true);
+}
+
+
+/*************************************************************
  * Primop registration
  *************************************************************/
 
@@ -1616,6 +1731,10 @@ void EvalState::createBaseEnv()
 
     // Derivations
     addPrimOp("derivationStrict", 1, prim_derivationStrict);
+
+    // Networking
+    addPrimOp("__fetchurl", 1, prim_fetchurl);
+    addPrimOp("fetchTarball", 1, prim_fetchTarball);
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
