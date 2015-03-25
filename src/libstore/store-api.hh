@@ -54,7 +54,7 @@ struct GCOptions
 };
 
 
-struct GCResults 
+struct GCResults
 {
     /* Depending on the action, the GC roots, or the paths that would
        be or have been deleted. */
@@ -82,7 +82,7 @@ struct SubstitutablePathInfo
 typedef std::map<Path, SubstitutablePathInfo> SubstitutablePathInfos;
 
 
-struct ValidPathInfo 
+struct ValidPathInfo
 {
     Path path;
     Path deriver;
@@ -100,13 +100,13 @@ typedef list<ValidPathInfo> ValidPathInfos;
 enum BuildMode { bmNormal, bmRepair, bmCheck };
 
 
-class StoreAPI 
+class StoreAPI
 {
 public:
 
     virtual ~StoreAPI() { }
 
-    /* Check whether a path is valid. */ 
+    /* Check whether a path is valid. */
     virtual bool isValidPath(const Path & path) = 0;
 
     /* Query which of the given paths is valid. */
@@ -118,7 +118,7 @@ public:
     /* Query information about a valid path. */
     virtual ValidPathInfo queryPathInfo(const Path & path) = 0;
 
-    /* Query the hash of a valid path. */ 
+    /* Query the hash of a valid path. */
     virtual Hash queryPathHash(const Path & path) = 0;
 
     /* Query the set of outgoing FS references for a store path.  The
@@ -150,7 +150,7 @@ public:
     /* Query the full store path given the hash part of a valid store
        path, or "" if the path doesn't exist. */
     virtual Path queryPathFromHashPart(const string & hashPart) = 0;
-    
+
     /* Query which of the given paths have substitutes. */
     virtual PathSet querySubstitutablePaths(const PathSet & paths) = 0;
 
@@ -159,12 +159,12 @@ public:
        info, it's omitted from the resulting ‘infos’ map. */
     virtual void querySubstitutablePathInfos(const PathSet & paths,
         SubstitutablePathInfos & infos) = 0;
-    
+
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
        The function object `filter' can be used to exclude files (see
        libutil/archive.hh). */
-    virtual Path addToStore(const Path & srcPath,
+    virtual Path addToStore(const string & name, const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, bool repair = false) = 0;
 
@@ -267,7 +267,7 @@ bool isStorePath(const Path & path);
 
 /* Extract the name part of the given store path. */
 string storePathToName(const Path & path);
-    
+
 void checkStoreName(const string & name);
 
 
@@ -288,7 +288,7 @@ Path followLinksToStorePath(const Path & path);
 /* Constructs a unique store path name. */
 Path makeStorePath(const string & type,
     const Hash & hash, const string & name);
-    
+
 Path makeOutputPath(const string & id,
     const Hash & hash, const string & name);
 

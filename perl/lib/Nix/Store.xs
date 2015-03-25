@@ -282,7 +282,7 @@ SV * addToStore(char * srcPath, int recursive, char * algo)
     PPCODE:
         try {
             doInit();
-            Path path = store->addToStore(srcPath, recursive, parseHashType(algo));
+            Path path = store->addToStore(baseNameOf(srcPath), srcPath, recursive, parseHashType(algo));
             XPUSHs(sv_2mortal(newSVpv(path.c_str(), 0)));
         } catch (Error & e) {
             croak(e.what());

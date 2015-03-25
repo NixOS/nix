@@ -387,7 +387,7 @@ Path RemoteStore::queryPathFromHashPart(const string & hashPart)
 }
 
 
-Path RemoteStore::addToStore(const Path & _srcPath,
+Path RemoteStore::addToStore(const string & name, const Path & _srcPath,
     bool recursive, HashType hashAlgo, PathFilter & filter, bool repair)
 {
     if (repair) throw Error("repairing is not supported when building through the Nix daemon");
@@ -397,7 +397,7 @@ Path RemoteStore::addToStore(const Path & _srcPath,
     Path srcPath(absPath(_srcPath));
 
     writeInt(wopAddToStore, to);
-    writeString(baseNameOf(srcPath), to);
+    writeString(name, to);
     /* backwards compatibility hack */
     writeInt((hashAlgo == htSHA256 && recursive) ? 0 : 1, to);
     writeInt(recursive ? 1 : 0, to);

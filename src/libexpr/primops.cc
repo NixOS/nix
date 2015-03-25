@@ -943,7 +943,7 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
 
     Path dstPath = settings.readOnlyMode
         ? computeStorePathForPath(path, true, htSHA256, filter).first
-        : store->addToStore(path, true, htSHA256, filter, state.repair);
+        : store->addToStore(baseNameOf(path), path, true, htSHA256, filter, state.repair);
 
     mkString(v, dstPath, singleton<PathSet>(dstPath));
 }

@@ -1405,7 +1405,7 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
 }
 
 
-Path LocalStore::addToStore(const Path & _srcPath,
+Path LocalStore::addToStore(const string & name, const Path & _srcPath,
     bool recursive, HashType hashAlgo, PathFilter & filter, bool repair)
 {
     Path srcPath(absPath(_srcPath));
@@ -1420,7 +1420,7 @@ Path LocalStore::addToStore(const Path & _srcPath,
     else
         sink.s = readFile(srcPath);
 
-    return addToStoreFromDump(sink.s, baseNameOf(srcPath), recursive, hashAlgo, repair);
+    return addToStoreFromDump(sink.s, name, recursive, hashAlgo, repair);
 }
 
 
