@@ -273,7 +273,7 @@ let
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages =
-            [ "perl-DBD-SQLite" "perl-devel" "sqlite" "sqlite-devel" "bzip2-devel" "emacs" "perl-WWW-Curl" ]
+            [ "perl-DBD-SQLite" "perl-devel" "sqlite" "sqlite-devel" "bzip2-devel" "emacs" "perl-WWW-Curl" "libcurl-devel" ]
             ++ extraPackages; };
       memSize = 1024;
       meta.schedulingPriority = 50;
@@ -293,7 +293,7 @@ let
       name = "nix-deb";
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
-        { extraPackages = [ "libdbd-sqlite3-perl" "libsqlite3-dev" "libbz2-dev" "libwww-curl-perl" ]; };
+        { extraPackages = [ "libdbd-sqlite3-perl" "libsqlite3-dev" "libbz2-dev" "libwww-curl-perl" "libcurl-dev" ]; };
       memSize = 1024;
       meta.schedulingPriority = 50;
       configureFlags = "--sysconfdir=/etc";
