@@ -89,6 +89,7 @@ static string pathNullDevice = "/dev/null";
 /* Forward definition. */
 class Worker;
 struct HookInstance;
+struct PreBuildHookInstance;
 
 
 /* A pointer to a goal. */
@@ -268,6 +269,8 @@ public:
     LocalStore & store;
 
     std::shared_ptr<HookInstance> hook;
+
+    std::shared_ptr<PreBuildHookInstance> preBuildHook;
 
     Worker(LocalStore & store);
     ~Worker();
@@ -649,6 +652,72 @@ HookInstance::~HookInstance()
 //////////////////////////////////////////////////////////////////////
 
 
+struct PreBuildHookInstance
+{
+    /* Pipes for talking to the build hook. */
+    Pipe toHook;
+
+    /* Pipe for the hook's standard output/error. */
+    Pipe fromHook;
+
+    /* The process ID of the hook. */
+    Pid pid;
+
+    PreBuildHookInstance();
+
+    ~PreBuildHookInstance();
+};
+
+
+PreBuildHookInstance::PreBuildHookInstance()
+{
+    debug("starting pre-build hook");
+
+    /* Create a pipe to get the output of the child. */
+    fromHook.create();
+
+    /* Create the communication pipes. */
+    toHook.create();
+
+    /* Fork the hook. */
+    pid = startProcess([&]() {
+
+        commonChildInit(fromHook);
+
+        if (chdir("/") == -1) throw SysError("changing into /");
+
+        /* Dup the communication pipes. */
+        if (dup2(toHook.readSide, STDIN_FILENO) == -1)
+            throw SysError("dupping to-hook read side");
+
+        setenv("_NIX_OPTIONS", settings.pack().c_str(), 1);
+
+        execl(settings.preBuildHook.c_str(), settings.preBuildHook.c_str(),
+            NULL);
+
+        throw SysError(format("executing ‘%1%’") % settings.preBuildHook);
+    });
+
+    pid.setSeparatePG(true);
+    fromHook.writeSide.close();
+    toHook.readSide.close();
+}
+
+
+PreBuildHookInstance::~PreBuildHookInstance()
+{
+    try {
+        toHook.writeSide.close();
+        pid.kill(true);
+    } catch (...) {
+        ignoreException();
+    }
+}
+
+
+//////////////////////////////////////////////////////////////////////
+
+
 typedef map<string, string> HashRewrites;
 
 
@@ -812,6 +881,13 @@ private:
 
     /* Is the build hook willing to perform the build? */
     HookReply tryBuildHook();
+
+    /* Run the pre-build hook, which can set system-specific
+       per-derivation settings too complex/volatile to hard-code
+       in nix itself */
+    void runPreBuildHook();
+
+    PathSet extraChrootDirs;
 
     /* Start building a derivation. */
     void startBuilder();
@@ -1177,6 +1253,9 @@ void DerivationGoal::inputsRealised()
     fixedOutput = true;
     foreach (DerivationOutputs::iterator, i, drv.outputs)
         if (i->second.hash == "") fixedOutput = false;
+
+    /* Ask the pre-build hook for any required settings */
+    runPreBuildHook();
 
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
@@ -1794,6 +1873,7 @@ void DerivationGoal::startBuilder()
         PathSet dirs = tokenizeString<StringSet>(settings.get("build-chroot-dirs", defaultChrootDirs));
         PathSet dirs2 = tokenizeString<StringSet>(settings.get("build-extra-chroot-dirs", string("")));
         dirs.insert(dirs2.begin(), dirs2.end());
+        dirs.insert(extraChrootDirs.begin(), extraChrootDirs.end());
 
         for (auto & i : dirs) {
             size_t p = i.find('=');
@@ -2791,6 +2871,33 @@ Path DerivationGoal::addHashRewrite(const Path & path)
     rewritesFromTmp[h2] = h1;
     redirectedOutputs[path] = p;
     return p;
+}
+
+
+void DerivationGoal::runPreBuildHook()
+{
+    if (settings.preBuildHook == "")
+        return;
+
+    if (!worker.preBuildHook)
+        worker.preBuildHook = std::make_shared<PreBuildHookInstance>();
+
+    writeLine(worker.preBuildHook->toHook.writeSide, drvPath);
+    while (true) {
+        string s = readLine(worker.preBuildHook->fromHook.readSide);
+        if (s == "extra-chroot-dirs") {
+            while (true) {
+                string s = readLine(worker.preBuildHook->fromHook.readSide);
+                if (s == "")
+                    break;
+                extraChrootDirs.emplace(std::move(s));
+            }
+        } else if (s == "") {
+            break;
+        } else {
+            throw Error(format("unknown pre-build hook command ‘%1%’") % s);
+        }
+    }
 }
 
 

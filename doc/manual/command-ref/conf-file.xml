@@ -562,6 +562,39 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
   </varlistentry>
 
 
+  <varlistentry xml:id="conf-pre-build-hook"><term><literal>pre-build-hook</literal></term>
+
+    <listitem>
+
+      <para>If set, the path to a program that can set extra
+      derivation-specific settings for this system. This is used for settings
+      that can't be captured by the derivation model itself and are too
+      variable between different versions of the same system to be hard-coded
+      into nix.</para>
+
+      <para>The hook listens on <literal>stdin</literal> for a derivation path.
+      It can then send a series of commands to modify various settings, followed
+      by an empty line to indicate completion. The currently recognized commands
+      are:</para>
+
+      <variablelist>
+        <varlistentry xml:id="extra-chroot-dirs"><term><literal>extra-chroot-dirs</literal></term>
+
+          <listitem>
+
+            <para>Pass a list of files and directories to be included in the
+            chroot for this build. One entry per line, terminated by an empty
+            line.</para>
+
+          </listitem>
+
+        </varlistentry>
+      </variablelist>
+    </listitem>
+
+  </varlistentry>
+
+
 </variablelist>
 
 </para>

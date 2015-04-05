@@ -204,6 +204,10 @@ struct Settings {
     /* Whether the importNative primop should be enabled */
     bool enableImportNative;
 
+    /* The hook to run just before a build to set derivation-specific
+       build settings */
+    Path preBuildHook;
+
 private:
     SettingsMap settings, overrides;
 
