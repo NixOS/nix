@@ -1895,7 +1895,7 @@ void DerivationGoal::startBuilder()
            build user. */
         Path chrootStoreDir = chrootRootDir + settings.nixStore;
         createDirs(chrootStoreDir);
-        chmod_(chrootStoreDir, 0735);
+        chmod_(chrootStoreDir, 01775);
 
         if (chown(chrootStoreDir.c_str(), 0, buildUser.getGID()) == -1)
             throw SysError(format("cannot change ownership of ‘%1%’") % chrootStoreDir);

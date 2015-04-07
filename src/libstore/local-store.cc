@@ -256,7 +256,7 @@ LocalStore::LocalStore(bool reserveSpace)
         if (chmod(perUserDir.c_str(), 01777) == -1)
             throw SysError(format("could not set permissions on ‘%1%’ to 1777") % perUserDir);
 
-        mode_t perm = 01735;
+        mode_t perm = 01775;
 
         struct group * gr = getgrnam(settings.buildUsersGroup.c_str());
         if (!gr)
