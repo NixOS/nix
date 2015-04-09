@@ -1551,20 +1551,25 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
 
     if (!skip) {
 
-        if (expectedETag.empty())
+        if (storePath.empty())
             printMsg(lvlInfo, format("downloading ‘%1%’...") % url);
         else
             printMsg(lvlInfo, format("checking ‘%1%’...") % url);
 
-        auto res = downloadFile(url, expectedETag);
+        try {
+            auto res = downloadFile(url, expectedETag);
 
-        if (!res.cached)
-            storePath = store->addTextToStore(name, res.data, PathSet(), state.repair);
+            if (!res.cached)
+                storePath = store->addTextToStore(name, res.data, PathSet(), state.repair);
 
-        assert(!storePath.empty());
-        replaceSymlink(storePath, fileLink);
+            assert(!storePath.empty());
+            replaceSymlink(storePath, fileLink);
 
-        writeFile(dataFile, url + "\n" + res.etag + "\n" + int2String(time(0)) + "\n");
+            writeFile(dataFile, url + "\n" + res.etag + "\n" + int2String(time(0)) + "\n");
+        } catch (DownloadError & e) {
+            if (storePath.empty()) throw;
+            printMsg(lvlError, format("warning: %1%; using cached result") % e.msg());
+        }
     }
 
     if (unpack) {

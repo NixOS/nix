@@ -100,7 +100,7 @@ struct Curl
         CURLcode res = curl_easy_perform(curl);
         if (res == CURLE_WRITE_ERROR && etag == expectedETag) return false;
         if (res != CURLE_OK)
-            throw Error(format("unable to download ‘%1%’: %2% (%3%)")
+            throw DownloadError(format("unable to download ‘%1%’: %2% (%3%)")
                 % url % curl_easy_strerror(res) % res);
 
         long httpStatus = 0;

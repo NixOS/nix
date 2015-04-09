@@ -13,4 +13,6 @@ struct DownloadResult
 
 DownloadResult downloadFile(string url, string expectedETag = "");
 
+MakeError(DownloadError, Error)
+
 }
