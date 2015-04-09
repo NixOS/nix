@@ -116,16 +116,7 @@ void switchLink(Path link, Path target)
     /* Hacky. */
     if (dirOf(target) == dirOf(link)) target = baseNameOf(target);
 
-    Path tmp = canonPath(dirOf(link) + "/.new_" + baseNameOf(link));
-    createSymlink(target, tmp);
-    /* The rename() system call is supposed to be essentially atomic
-       on Unix.  That is, if we have links `current -> X' and
-       `new_current -> Y', and we rename new_current to current, a
-       process accessing current will see X or Y, but never a
-       file-not-found or other error condition.  This is sufficient to
-       atomically switch user environments. */
-    if (rename(tmp.c_str(), link.c_str()) != 0)
-        throw SysError(format("renaming ‘%1%’ to ‘%2%’") % tmp % link);
+    replaceSymlink(target, link);
 }
 
 

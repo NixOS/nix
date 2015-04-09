@@ -110,6 +110,9 @@ Paths createDirs(const Path & path);
 /* Create a symlink. */
 void createSymlink(const Path & target, const Path & link);
 
+/* Atomically create or replace a symlink. */
+void replaceSymlink(const Path & target, const Path & link);
+
 
 template<class T, class A>
 T singleton(const A & a)
@@ -332,6 +335,10 @@ string concatStringsSep(const string & sep, const StringSet & ss);
 
 /* Remove trailing whitespace from a string. */
 string chomp(const string & s);
+
+
+/* Remove whitespace from the start and end of a string. */
+string trim(const string & s, const string & whitespace = " \n\r\t");
 
 
 /* Convert the exit status of a child as returned by wait() into an

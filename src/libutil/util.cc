@@ -413,6 +413,17 @@ void createSymlink(const Path & target, const Path & link)
 }
 
 
+void replaceSymlink(const Path & target, const Path & link)
+{
+    Path tmp = canonPath(dirOf(link) + "/.new_" + baseNameOf(link));
+
+    createSymlink(target, tmp);
+
+    if (rename(tmp.c_str(), link.c_str()) != 0)
+        throw SysError(format("renaming ‘%1%’ to ‘%2%’") % tmp % link);
+}
+
+
 LogType logType = ltPretty;
 Verbosity verbosity = lvlInfo;
 
@@ -1073,6 +1084,15 @@ string chomp(const string & s)
 {
     size_t i = s.find_last_not_of(" \n\r\t");
     return i == string::npos ? "" : string(s, 0, i + 1);
+}
+
+
+string trim(const string & s, const string & whitespace)
+{
+    auto i = s.find_first_not_of(whitespace);
+    if (i == string::npos) return "";
+    auto j = s.find_last_not_of(whitespace);
+    return string(s, i, j == string::npos ? j : j - i + 1);
 }
 
 
