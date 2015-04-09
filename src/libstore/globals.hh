@@ -27,6 +27,8 @@ struct Settings {
 
     bool get(const string & name, bool def);
 
+    int get(const string & name, int def);
+
     void update();
 
     string pack();

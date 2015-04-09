@@ -1631,14 +1631,22 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
 
     string expectedETag;
 
+    int ttl = settings.get("tarball-ttl", 60 * 60);
+    bool skip = false;
+
     if (pathExists(fileLink) && pathExists(dataFile)) {
         storePath = readLink(fileLink);
         store->addTempRoot(storePath);
         if (store->isValidPath(storePath)) {
             auto ss = tokenizeString<vector<string>>(readFile(dataFile), "\n");
-            if (ss.size() >= 2 && ss[0] == url) {
-                printMsg(lvlDebug, format("verifying previous ETag ‘%1%’") % ss[1]);
-                expectedETag = ss[1];
+            if (ss.size() >= 3 && ss[0] == url) {
+                time_t lastChecked;
+                if (string2Int(ss[2], lastChecked) && lastChecked + ttl >= time(0))
+                    skip = true;
+                else if (!ss[1].empty()) {
+                    printMsg(lvlDebug, format("verifying previous ETag ‘%1%’") % ss[1]);
+                    expectedETag = ss[1];
+                }
             }
         } else
             storePath = "";
@@ -1648,19 +1656,22 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     auto p = url.rfind('/');
     if (p != string::npos) name = string(url, p + 1);
 
-    if (expectedETag.empty())
-        printMsg(lvlInfo, format("downloading ‘%1%’...") % url);
-    else
-        printMsg(lvlInfo, format("checking ‘%1%’...") % url);
-    Curl curl;
+    if (!skip) {
 
-    if (curl.fetch(url, expectedETag))
-        storePath = store->addTextToStore(name, curl.data, PathSet(), state.repair);
+        if (expectedETag.empty())
+            printMsg(lvlInfo, format("downloading ‘%1%’...") % url);
+        else
+            printMsg(lvlInfo, format("checking ‘%1%’...") % url);
+        Curl curl;
 
-    assert(!storePath.empty());
-    replaceSymlink(storePath, fileLink);
+        if (curl.fetch(url, expectedETag))
+            storePath = store->addTextToStore(name, curl.data, PathSet(), state.repair);
 
-    writeFile(dataFile, url + "\n" + curl.etag + "\n");
+        assert(!storePath.empty());
+        replaceSymlink(storePath, fileLink);
+
+        writeFile(dataFile, url + "\n" + curl.etag + "\n" + int2String(time(0)) + "\n");
+    }
 
     if (unpack) {
         Path unpackedLink = cacheDir + "/" + baseNameOf(storePath) + "-unpacked";
