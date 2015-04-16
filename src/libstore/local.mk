@@ -15,6 +15,7 @@ ifeq ($(OS), SunOS)
 endif
 
 libstore_CXXFLAGS = \
+ -DNIX_PREFIX=\"$(prefix)\" \
  -DNIX_STORE_DIR=\"$(storedir)\" \
  -DNIX_DATA_DIR=\"$(datadir)\" \
  -DNIX_STATE_DIR=\"$(localstatedir)/nix\" \

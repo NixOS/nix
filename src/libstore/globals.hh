@@ -42,6 +42,8 @@ struct Settings {
 
     Path nixDataDir; /* !!! fix */
 
+    Path nixPrefix;
+
     /* The directory where we log various operations. */
     Path nixLogDir;
 

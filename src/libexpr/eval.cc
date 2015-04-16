@@ -292,6 +292,11 @@ Path EvalState::checkSourcePath(const Path & path_)
         if (path == i.second || isInDir(path, i.second))
             return path;
 
+    /* Hack to support the chroot dependencies of corepkgs (see
+       corepkgs/config.nix.in). */
+    if (path == settings.nixPrefix && isStorePath(settings.nixPrefix))
+        return path;
+
     throw RestrictedPathError(format("access to path ‘%1%’ is forbidden in restricted mode") % path_);
 }
 
