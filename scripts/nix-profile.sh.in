@@ -9,6 +9,7 @@ if [ -n "$HOME" ]; then
     fi
 
     export PATH=$NIX_LINK/bin:$NIX_LINK/sbin:$PATH
+    export MANPATH=$NIX_LINK/share/man:$MANPATH
 
     # Subscribe the user to the Nixpkgs channel by default.
     if [ ! -e $HOME/.nix-channels ]; then
