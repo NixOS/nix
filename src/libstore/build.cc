@@ -1969,6 +1969,42 @@ void DerivationGoal::startBuilder()
                 }
     }
 
+    if (settings.preBuildHook != "") {
+        printMsg(lvlChatty, format("executing pre-build hook ‘%1%’")
+            % settings.preBuildHook);
+        auto args = useChroot ? Strings({drvPath, chrootRootDir}) :
+            Strings({ drvPath });
+        enum BuildHookState {
+            stBegin,
+            stExtraChrootDirs
+        };
+        auto state = stBegin;
+        auto lines = runProgram(settings.preBuildHook, false, args);
+        auto lastPos = std::string::size_type{0};
+        for (auto nlPos = lines.find('\n'); nlPos != string::npos;
+                nlPos = lines.find('\n', lastPos)) {
+            auto line = std::string{lines, lastPos, nlPos};
+            lastPos = nlPos + 1;
+            if (state == stBegin) {
+                if (line == "extra-chroot-dirs") {
+                    state = stExtraChrootDirs;
+                } else {
+                    throw Error(format("unknown pre-build hook command ‘%1%’")
+                        % line);
+                }
+            } else if (state == stExtraChrootDirs) {
+                if (line == "") {
+                    state = stBegin;
+                } else {
+                    auto p = line.find('=');
+                    if (p == string::npos)
+                        dirsInChroot[line] = line;
+                    else
+                        dirsInChroot[string(line, 0, p)] = string(line, p + 1);
+                }
+            }
+        }
+    }
 
     /* Run the builder. */
     printMsg(lvlChatty, format("executing builder ‘%1%’") % drv.builder);
