@@ -182,7 +182,6 @@ void Settings::update()
     _get(logServers, "log-servers");
     _get(enableImportNative, "allow-unsafe-native-code-during-evaluation");
     _get(useCaseHack, "use-case-hack");
-    _get(preBuildHook, "pre-build-hook");
 
     string subs = getEnv("NIX_SUBSTITUTERS", "default");
     if (subs == "default") {
