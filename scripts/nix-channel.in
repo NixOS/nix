@@ -6,6 +6,7 @@ use File::Basename;
 use File::Path qw(mkpath);
 use Nix::Config;
 use Nix::Manifest;
+use File::Temp qw(tempdir);
 
 binmode STDERR, ":encoding(utf8)";
 
@@ -98,42 +99,14 @@ sub update {
         my $url = $channels{$name};
         my $origUrl = "$url/MANIFEST";
 
-        # Check if $url is a redirect.  If so, follow it now to ensure
-        # consistency if the redirection is changed between
-        # downloading the manifest and the tarball.
-        my $headers = `$Nix::Config::curl --silent --head '$url'`;
+        # We want to download the url to a file to see if it's a tarball while also checking if we
+        # got redirected in the process, so that we can grab the various parts of a nix channel
+        # definition from a consistent location if the redirect changes mid-download.
+        my $tmpdir = tempdir( CLEANUP => 1 );
+        my $filename;
+        ($url, $filename) = `cd $tmpdir && $Nix::Config::curl --silent --write-out '%{url_effective}\n%{filename_effective}' -L '$url' -O`;
         die "$0: unable to check ‘$url’\n" if $? != 0;
-        $headers =~ s/\r//g;
-        $url = $1 if $headers =~ /^Location:\s*(.*)\s*$/m;
-
-        # Check if the channel advertises a binary cache.
-        my $binaryCacheURL = `$Nix::Config::curl --silent '$url'/binary-cache-url`;
-        my $extraAttrs = "";
-        my $getManifest = ($Nix::Config::config{"force-manifest"} // "false") eq "true";
-        if ($? == 0 && $binaryCacheURL ne "") {
-            $extraAttrs .= "binaryCacheURL = \"$binaryCacheURL\"; ";
-            deleteOldManifests($origUrl, undef);
-        } else {
-            $getManifest = 1;
-        }
-
-        if ($getManifest) {
-            # No binary cache, so pull the channel manifest.
-            mkdir $manifestDir, 0755 unless -e $manifestDir;
-            die "$0: you do not have write permission to ‘$manifestDir’!\n" unless -W $manifestDir;
-            $ENV{'NIX_ORIG_URL'} = $origUrl;
-            system("$Nix::Config::binDir/nix-pull", "--skip-wrong-store", "$url/MANIFEST") == 0
-                or die "cannot pull manifest from ‘$url’\n";
-        }
-
-        # Download the channel tarball.
-        my $fullURL = "$url/nixexprs.tar.xz";
-        system("$Nix::Config::curl --fail --silent --head '$fullURL' > /dev/null") == 0 or
-            $fullURL = "$url/nixexprs.tar.bz2";
-        print STDERR "downloading Nix expressions from ‘$fullURL’...\n";
-        my ($hash, $path) = `PRINT_PATH=1 QUIET=1 $Nix::Config::binDir/nix-prefetch-url '$fullURL'`;
-        die "cannot fetch ‘$fullURL’\n" if $? != 0;
-        chomp $path;
+        chomp $url;
 
         # If the URL contains a version number, append it to the name
         # attribute (so that "nix-env -q" on the channels profile
@@ -141,6 +114,52 @@ sub update {
         my $cname = $name;
         $cname .= $1 if basename($url) =~ /(-\d.*)$/;
 
+        my $path;
+        my $ret = -1;
+        if (-e "$tmpdir/$filename") {
+            # Get our temporary download into the store
+            (my $hash, $path) = `PRINT_PATH=1 QUIET=1 $Nix::Config::binDir/nix-prefetch-url 'file://$tmpdir/$filename'`;
+            chomp $path;
+
+            # Try unpacking the expressions to see if they'll be valid for us to process later.
+            # Like anything in nix, this will cache the result so we don't do it again outside of the loop below
+            $ret = system("$Nix::Config::binDir/nix-build --no-out-link -E 'import <nix/unpack-channel.nix> " .
+                          "{ name = \"$cname\"; channelName = \"$name\"; src = builtins.storePath \"$path\"; }'");
+        }
+
+        # The URL doesn't unpack directly, so let's try treating it like a full channel folder with files in it
+        my $extraAttrs = "";
+        if ($ret != 0) {
+            # Check if the channel advertises a binary cache.
+            my $binaryCacheURL = `$Nix::Config::curl --silent '$url'/binary-cache-url`;
+            my $getManifest = ($Nix::Config::config{"force-manifest"} // "false") eq "true";
+            if ($? == 0 && $binaryCacheURL ne "") {
+                $extraAttrs .= "binaryCacheURL = \"$binaryCacheURL\"; ";
+                deleteOldManifests($origUrl, undef);
+            } else {
+                $getManifest = 1;
+            }
+
+            if ($getManifest) {
+                # No binary cache, so pull the channel manifest.
+                mkdir $manifestDir, 0755 unless -e $manifestDir;
+                die "$0: you do not have write permission to ‘$manifestDir’!\n" unless -W $manifestDir;
+                $ENV{'NIX_ORIG_URL'} = $origUrl;
+                system("$Nix::Config::binDir/nix-pull", "--skip-wrong-store", "$url/MANIFEST") == 0
+                    or die "cannot pull manifest from ‘$url’\n";
+            }
+
+            # Download the channel tarball.
+            my $fullURL = "$url/nixexprs.tar.xz";
+            system("$Nix::Config::curl --fail --silent --head '$fullURL' > /dev/null") == 0 or
+                $fullURL = "$url/nixexprs.tar.bz2";
+            print STDERR "downloading Nix expressions from ‘$fullURL’...\n";
+            (my $hash, $path) = `PRINT_PATH=1 QUIET=1 $Nix::Config::binDir/nix-prefetch-url '$fullURL'`;
+            die "cannot fetch ‘$fullURL’\n" if $? != 0;
+            chomp $path;
+        }
+
+        # Regardless of where it came from, add the expression representing this channel to accumulated expression
         $exprs .= "'f: f { name = \"$cname\"; channelName = \"$name\"; src = builtins.storePath \"$path\"; $extraAttrs }' ";
     }
 

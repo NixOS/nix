@@ -41,3 +41,26 @@ grep -q 'item.*attrPath="foo".*name="dependencies"' $TEST_ROOT/meta.xml
 # Do an install.
 nix-env -i dependencies
 [ -e $TEST_ROOT/var/nix/profiles/default/foobar ]
+
+
+
+clearProfiles
+clearManifests
+rm -f $TEST_ROOT/.nix-channels
+
+# Test updating from a tarball
+nix-channel --add file://$TEST_ROOT/foo/nixexprs.tar.bz2
+nix-channel --update
+
+# Do a query.
+nix-env -qa \* --meta --xml --out-path > $TEST_ROOT/meta.xml
+if [ "$xmllint" != false ]; then
+    $xmllint --noout $TEST_ROOT/meta.xml || fail "malformed XML"
+fi
+grep -q 'meta.*description.*Random test package' $TEST_ROOT/meta.xml
+grep -q 'item.*attrPath="foo".*name="dependencies"' $TEST_ROOT/meta.xml
+
+# Do an install.
+nix-env -i dependencies
+[ -e $TEST_ROOT/var/nix/profiles/default/foobar ]
+
