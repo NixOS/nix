@@ -703,6 +703,44 @@ $ nix-env -e '.*' <lineannotation>(remove everything)</lineannotation></screen>
 
 <!--######################################################################-->
 
+<refsection xml:id="rsec-nix-env-set"><title>Operation <option>--set</option></title>
+
+<refsection><title>Synopsis</title>
+
+<cmdsynopsis>
+  <command>nix-env</command>
+  <arg choice='plain'><option>--set</option></arg>
+  <arg choice='plain'><replaceable>drvname</replaceable></arg>
+</cmdsynopsis>
+</refsection>
+
+<refsection><title>Description</title>
+
+<para>The <option>--set</option> operation modifies the current generation of a
+profile so that it contains exactly the specified derivation, and nothing else.
+</para>
+
+</refsection>
+
+<refsection><title>Examples</title>
+
+<para>
+The following updates a profile such that its current generation will contain
+just Firefox:
+
+<screen>
+$ nix-env -p /nix/var/nix/profiles/browser --set firefox</screen>
+
+</para>
+
+</refsection>
+
+</refsection>
+
+
+
+<!--######################################################################-->
+
 <refsection xml:id="rsec-nix-env-set-flag"><title>Operation <option>--set-flag</option></title>
 
 <refsection><title>Synopsis</title>
