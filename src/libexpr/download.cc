@@ -54,6 +54,11 @@ struct Curl
         return realSize;
     }
 
+    static int progressCallback(void * clientp, double dltotal, double dlnow, double ultotal, double ulnow)
+    {
+        return _isInterrupted;
+    }
+
     Curl()
     {
         requestHeaders = 0;
@@ -71,6 +76,9 @@ struct Curl
 
         curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, headerCallback);
         curl_easy_setopt(curl, CURLOPT_HEADERDATA, (void *) &curl);
+
+        curl_easy_setopt(curl, CURLOPT_PROGRESSFUNCTION, progressCallback);
+        curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0);
     }
 
     ~Curl()
@@ -98,6 +106,7 @@ struct Curl
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, requestHeaders);
 
         CURLcode res = curl_easy_perform(curl);
+        checkInterrupt();
         if (res == CURLE_WRITE_ERROR && etag == expectedETag) return false;
         if (res != CURLE_OK)
             throw DownloadError(format("unable to download ‘%1%’: %2% (%3%)")
