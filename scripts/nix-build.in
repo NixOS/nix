@@ -44,7 +44,7 @@ $SIG{'INT'} = sub { exit 1 };
 # Heuristic to see if we're invoked as a shebang script, namely, if we
 # have a single argument, it's the name of an executable file, and it
 # starts with "#!".
-if ($runEnv && $ARGV[0] !~ /nix-shell/) {
+if ($runEnv && defined $ARGV[0] && $ARGV[0] !~ /nix-shell/) {
     $script = $ARGV[0];
     if (-f $script && -x $script) {
         open SCRIPT, "<$script" or die "$0: cannot open ‘$script’: $!\n";
