@@ -6,7 +6,7 @@
 
 using namespace nix;
 
-std::string gen = "";
+std::string gen = "old";
 bool dryRun = false;
 
 void runProgramSimple(Path program, const Strings & args)
