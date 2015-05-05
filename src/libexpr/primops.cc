@@ -103,7 +103,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
         }
         w.attrs->sort();
         Value fun;
-        state.evalFile(state.findFile("nix/imported-drv-to-derivation.nix"), fun);
+        state.evalFile(settings.nixDataDir + "/nix/corepkgs/imported-drv-to-derivation.nix", fun);
         state.forceFunction(fun, pos);
         mkApp(v, fun, w);
         state.forceAttrs(v, pos);
@@ -1512,88 +1512,7 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     } else
         url = state.forceStringNoCtx(*args[0], pos);
 
-    Path cacheDir = getEnv("XDG_CACHE_HOME", getEnv("HOME", "") + "/.cache") + "/nix/tarballs";
-    createDirs(cacheDir);
-
-    string urlHash = printHash32(hashString(htSHA256, url));
-
-    Path dataFile = cacheDir + "/" + urlHash + ".info";
-    Path fileLink = cacheDir + "/" + urlHash + "-file";
-
-    Path storePath;
-
-    string expectedETag;
-
-    int ttl = settings.get("tarball-ttl", 60 * 60);
-    bool skip = false;
-
-    if (pathExists(fileLink) && pathExists(dataFile)) {
-        storePath = readLink(fileLink);
-        store->addTempRoot(storePath);
-        if (store->isValidPath(storePath)) {
-            auto ss = tokenizeString<vector<string>>(readFile(dataFile), "\n");
-            if (ss.size() >= 3 && ss[0] == url) {
-                time_t lastChecked;
-                if (string2Int(ss[2], lastChecked) && lastChecked + ttl >= time(0))
-                    skip = true;
-                else if (!ss[1].empty()) {
-                    printMsg(lvlDebug, format("verifying previous ETag ‘%1%’") % ss[1]);
-                    expectedETag = ss[1];
-                }
-            }
-        } else
-            storePath = "";
-    }
-
-    string name;
-    auto p = url.rfind('/');
-    if (p != string::npos) name = string(url, p + 1);
-
-    if (!skip) {
-
-        if (storePath.empty())
-            printMsg(lvlInfo, format("downloading ‘%1%’...") % url);
-        else
-            printMsg(lvlInfo, format("checking ‘%1%’...") % url);
-
-        try {
-            auto res = downloadFile(url, expectedETag);
-
-            if (!res.cached)
-                storePath = store->addTextToStore(name, res.data, PathSet(), state.repair);
-
-            assert(!storePath.empty());
-            replaceSymlink(storePath, fileLink);
-
-            writeFile(dataFile, url + "\n" + res.etag + "\n" + int2String(time(0)) + "\n");
-        } catch (DownloadError & e) {
-            if (storePath.empty()) throw;
-            printMsg(lvlError, format("warning: %1%; using cached result") % e.msg());
-        }
-    }
-
-    if (unpack) {
-        Path unpackedLink = cacheDir + "/" + baseNameOf(storePath) + "-unpacked";
-        Path unpackedStorePath;
-        if (pathExists(unpackedLink)) {
-            unpackedStorePath = readLink(unpackedLink);
-            store->addTempRoot(unpackedStorePath);
-            if (!store->isValidPath(unpackedStorePath))
-                unpackedStorePath = "";
-        }
-        if (unpackedStorePath.empty()) {
-            printMsg(lvlDebug, format("unpacking ‘%1%’...") % storePath);
-            Path tmpDir = createTempDir();
-            AutoDelete autoDelete(tmpDir, true);
-            runProgram("tar", true, {"xf", storePath, "-C", tmpDir, "--strip-components", "1"}, "");
-            unpackedStorePath = store->addToStore(name, tmpDir, true, htSHA256, defaultPathFilter, state.repair);
-        }
-        replaceSymlink(unpackedStorePath, unpackedLink);
-        mkString(v, unpackedStorePath, singleton<PathSet>(unpackedStorePath));
-    }
-
-    else
-        mkString(v, storePath, singleton<PathSet>(storePath));
+    mkString(v, downloadFileCached(url, unpack), PathSet({url}));
 }
 
 
@@ -1753,8 +1672,7 @@ void EvalState::createBaseEnv()
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
-    string path = findFile("nix/derivation.nix");
-    assert(!path.empty());
+    string path = settings.nixDataDir + "/nix/corepkgs/derivation.nix";
     sDerivationNix = symbols.create(path);
     evalFile(path, v);
     addConstant("derivation", v);

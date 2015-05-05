@@ -1423,6 +1423,8 @@ int main(int argc, char * * argv)
 
         if (!op) throw UsageError("no operation specified");
 
+        store = openStore();
+
         globals.state = std::shared_ptr<EvalState>(new EvalState(searchPath));
         globals.state->repair = repair;
 
@@ -1440,8 +1442,6 @@ int main(int argc, char * * argv)
                 ? absPath(readLink(profileLink), dirOf(profileLink))
                 : canonPath(settings.nixStateDir + "/profiles/default");
         }
-
-        store = openStore();
 
         op(globals, opFlags, opArgs);
 

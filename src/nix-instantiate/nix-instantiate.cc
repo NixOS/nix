@@ -155,13 +155,15 @@ int main(int argc, char * * argv)
             return true;
         });
 
+        if (evalOnly && !wantsReadWrite)
+            settings.readOnlyMode = true;
+
+        store = openStore();
+
         EvalState state(searchPath);
         state.repair = repair;
 
         Bindings & autoArgs(*evalAutoArgs(state, autoArgs_));
-
-        if (evalOnly && !wantsReadWrite)
-            settings.readOnlyMode = true;
 
         if (attrPaths.empty()) attrPaths.push_back("");
 
@@ -173,8 +175,6 @@ int main(int argc, char * * argv)
             }
             return;
         }
-
-        store = openStore();
 
         if (readStdin) {
             Expr * e = parseStdin(state);

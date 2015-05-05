@@ -13,6 +13,8 @@ struct DownloadResult
 
 DownloadResult downloadFile(string url, string expectedETag = "");
 
+Path downloadFileCached(const string & url, bool unpack);
+
 MakeError(DownloadError, Error)
 
 }

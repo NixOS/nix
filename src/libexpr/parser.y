@@ -527,6 +527,8 @@ formal
 #include <unistd.h>
 
 #include <eval.hh>
+#include <download.hh>
+#include <store-api.hh>
 
 
 namespace nix {
@@ -599,6 +601,15 @@ Expr * EvalState::parseExprFromString(const string & s, const Path & basePath)
 }
 
 
+bool isUri(const string & s)
+{
+    size_t pos = s.find("://");
+    if (pos == string::npos) return false;
+    string scheme(s, 0, pos);
+    return scheme == "http" || scheme == "https";
+}
+
+
 void EvalState::addToSearchPath(const string & s, bool warn)
 {
     size_t pos = s.find('=');
@@ -610,6 +621,9 @@ void EvalState::addToSearchPath(const string & s, bool warn)
         prefix = string(s, 0, pos);
         path = string(s, pos + 1);
     }
+
+    if (isUri(path))
+        path = downloadFileCached(path, true);
 
     path = absPath(path);
     if (pathExists(path)) {
@@ -629,16 +643,17 @@ Path EvalState::findFile(const string & path)
 
 Path EvalState::findFile(SearchPath & searchPath, const string & path, const Pos & pos)
 {
-    foreach (SearchPath::iterator, i, searchPath) {
+    for (auto & i : searchPath) {
+        assert(!isUri(i.second));
         Path res;
-        if (i->first.empty())
-            res = i->second + "/" + path;
+        if (i.first.empty())
+            res = i.second + "/" + path;
         else {
-            if (path.compare(0, i->first.size(), i->first) != 0 ||
-                (path.size() > i->first.size() && path[i->first.size()] != '/'))
+            if (path.compare(0, i.first.size(), i.first) != 0 ||
+                (path.size() > i.first.size() && path[i.first.size()] != '/'))
                 continue;
-            res = i->second +
-                (path.size() == i->first.size() ? "" : "/" + string(path, i->first.size()));
+            res = i.second +
+                (path.size() == i.first.size() ? "" : "/" + string(path, i.first.size()));
         }
         if (pathExists(res)) return canonPath(res);
     }
