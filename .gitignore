@@ -50,7 +50,6 @@ Makefile.config
 /scripts/download-using-manifests.pl
 /scripts/copy-from-other-stores.pl
 /scripts/download-from-binary-cache.pl
-/scripts/find-runtime-roots.pl
 /scripts/build-remote.pl
 /scripts/nix-reduce-build
 /scripts/nix-http-export.cgi

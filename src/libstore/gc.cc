@@ -1,6 +1,7 @@
 #include "globals.hh"
 #include "misc.hh"
 #include "local-store.hh"
+#include "regex.hh"
 
 #include <functional>
 #include <queue>
@@ -336,19 +337,115 @@ Roots LocalStore::findRoots()
     return roots;
 }
 
+static void tryRuntimeRootLink(Path path, bool ifAbsolute, StringSet & paths) {
+    try {
+        auto target = readLink(path);
+        if (!ifAbsolute || target.find("/") == 0) {
+            paths.insert(target);
+        }
+    } catch (...) { }
+}
+
+static void findRuntimeRootsInProc(StringSet & paths) {
+    if (getFileType("/proc") != DT_DIR) return;
+
+    auto procreg = Regex("[0-9]+", false);
+    auto mapreg = Regex("[ ]*[^ ]+[ ]+[^ ]+[ ]+[^ ]+[ ]+[^ ]+[ ]+[^ ]+[ ]+(/[^ ]+)[ ]*", true);
+    auto pathreg = Regex("/[0-9a-z]+[0-9a-zA-Z+._?=-]*", true);
+
+    for (auto & i : readDirectory("/proc")) {
+        if (!procreg.matches(i.name)) continue;
+
+        auto process = "/proc/"+i.name;
+        tryRuntimeRootLink(process+"/exe", false, paths);
+        tryRuntimeRootLink(process+"/cwd", false, paths);
+
+        try {
+            for (auto & i : readDirectory(process+"/fd")) {
+                tryRuntimeRootLink(process+"/fd/"+i.name, true, paths);
+            }
+        } catch (...) { }
+
+        try {
+            auto result = readFile(process+"/maps", true);
+            auto lines = tokenizeString<Strings>(result, "\n");
+
+            foreach (Strings::iterator, i, lines) {
+                Regex::Subs subs;
+                if (mapreg.matches(*i, subs)) {
+                    paths.insert(subs[0]);
+                }
+            }
+        } catch (...) { }
+
+        try {
+            auto environ = readFile(process+"/environ", true);
+            size_t pos = 0;
+            while ((pos = environ.find(settings.nixStore, pos)) != string::npos) {
+                pos += settings.nixStore.size();
+                Regex::Subs subs;
+                if (pathreg.matches(environ.c_str()+pos, subs)) {
+                    paths.insert(settings.nixStore+subs[0]);
+                    pos += subs[0].size();
+                }
+            }
+        } catch (...) { }
+    }
+}
+
+static void findRuntimeRootsInLsof(StringSet & paths)
+{
+    auto regex = Regex("n/.*", false);
+    auto result = runProgram("lsof", true, Strings{"-n", "-w", "-F", "n"});
+    auto lines = tokenizeString<Strings>(result, "\n");
+
+    foreach (Strings::iterator, i, lines) {
+        if (regex.matches(*i)) {
+            paths.insert((*i).substr(1));
+        }
+    }
+}
+
+static void tryRuntimeRootInFile(Path path, StringSet & paths)
+{
+    try {
+        if (pathExists(path)) {
+            // drain because stat() size on special /proc files is wrong
+            paths.insert(readFile(path, true));
+        }
+    } catch (...) { } 
+}
+
+static void findRuntimeRoots(StringSet & paths) {
+    try {
+        findRuntimeRootsInProc(paths);
+    } catch (...) { }
+
+    try {
+        findRuntimeRootsInLsof(paths);
+    } catch (...) { }
+
+    // This is rather NixOS-specific, so it probably shouldn't be here.
+    tryRuntimeRootInFile("/proc/sys/kernel/modprobe", paths);
+    tryRuntimeRootInFile("/proc/sys/kernel/fbsplash", paths);
+    tryRuntimeRootInFile("/proc/sys/kernel/poweroff_cmd", paths);
+}
 
 static void addAdditionalRoots(StoreAPI & store, PathSet & roots)
 {
-    Path rootFinder = getEnv("NIX_ROOT_FINDER",
-        settings.nixLibexecDir + "/nix/find-runtime-roots.pl");
+    Path rootFinder = getEnv("NIX_ROOT_FINDER", "built-in finder");
 
     if (rootFinder.empty()) return;
 
     debug(format("executing ‘%1%’ to find additional roots") % rootFinder);
 
-    string result = runProgram(rootFinder);
-
-    StringSet paths = tokenizeString<StringSet>(result, "\n");
+    StringSet paths;
+    if (rootFinder == "built-in finder") {
+        findRuntimeRoots(paths);
+    } else {
+        string result = runProgram(rootFinder);
+        paths = tokenizeString<StringSet>(result, "\n");
+    }
 
     foreach (StringSet::iterator, i, paths) {
         if (isInStore(*i)) {

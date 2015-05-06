@@ -192,14 +192,22 @@ Path readLink(const Path & path)
     struct stat st = lstat(path);
     if (!S_ISLNK(st.st_mode))
         throw Error(format("‘%1%’ is not a symlink") % path);
-    char buf[st.st_size];
-    ssize_t rlsize = readlink(path.c_str(), buf, st.st_size);
+
+    ssize_t size = st.st_size;
+    if (size == 0 || path.find("/proc") == 0) {
+        // /proc links either have no size or a broken size
+        // assume 4096 without using PATH_MAX due to Hurd
+        size = 4096;
+    }
+
+    char buf[size];
+    ssize_t rlsize = readlink(path.c_str(), buf, size);
     if (rlsize == -1)
         throw SysError(format("reading symbolic link ‘%1%’") % path);
-    else if (rlsize > st.st_size)
+    else if (rlsize > size)
         throw Error(format("symbolic link ‘%1%’ size overflow %2% > %3%")
-            % path % rlsize % st.st_size);
-    return string(buf, st.st_size);
+            % path % rlsize % size);
+    return string(buf, rlsize);
 }
 
 
