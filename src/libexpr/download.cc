@@ -223,4 +223,13 @@ Path downloadFileCached(const string & url, bool unpack)
 }
 
 
+bool isUri(const string & s)
+{
+    size_t pos = s.find("://");
+    if (pos == string::npos) return false;
+    string scheme(s, 0, pos);
+    return scheme == "http" || scheme == "https";
+}
+
+
 }

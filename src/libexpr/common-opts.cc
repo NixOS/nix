@@ -1,5 +1,6 @@
 #include "common-opts.hh"
-#include "../libmain/shared.hh"
+#include "shared.hh"
+#include "download.hh"
 #include "util.hh"
 
 
@@ -53,7 +54,9 @@ bool parseSearchPathArg(Strings::iterator & i,
 
 Path lookupFileArg(EvalState & state, string s)
 {
-    if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
+    if (isUri(s))
+        return downloadFileCached(s, true);
+    else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
         Path p = s.substr(1, s.size() - 2);
         return state.findFile(p);
     } else

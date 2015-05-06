@@ -601,15 +601,6 @@ Expr * EvalState::parseExprFromString(const string & s, const Path & basePath)
 }
 
 
-bool isUri(const string & s)
-{
-    size_t pos = s.find("://");
-    if (pos == string::npos) return false;
-    string scheme(s, 0, pos);
-    return scheme == "http" || scheme == "https";
-}
-
-
 void EvalState::addToSearchPath(const string & s, bool warn)
 {
     size_t pos = s.find('=');

@@ -183,10 +183,10 @@ int main(int argc, char * * argv)
         } else if (files.empty() && !fromArgs)
             files.push_back("./default.nix");
 
-        foreach (Strings::iterator, i, files) {
+        for (auto & i : files) {
             Expr * e = fromArgs
-                ? state.parseExprFromString(*i, absPath("."))
-                : state.parseExprFromFile(resolveExprPath(lookupFileArg(state, *i)));
+                ? state.parseExprFromString(i, absPath("."))
+                : state.parseExprFromFile(resolveExprPath(lookupFileArg(state, i)));
             processExpr(state, attrPaths, parseOnly, strict, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         }

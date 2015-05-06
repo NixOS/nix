@@ -17,4 +17,6 @@ Path downloadFileCached(const string & url, bool unpack);
 
 MakeError(DownloadError, Error)
 
+bool isUri(const string & s);
+
 }
