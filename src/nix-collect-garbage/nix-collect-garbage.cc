@@ -45,7 +45,11 @@ void removeOldGenerations(std::string dir)
             if (link.find("link") != string::npos) {
                 printMsg(lvlInfo, format("removing old generations of profile %1%") % path);
 
-                runProgramSimple(settings.nixBinDir + "/nix-env", Strings{"-p", path, "--delete-generations", gen, dryRun ? "--dry-run" : ""});
+                auto args = Strings{"-p", path, "--delete-generations", gen};
+                if (dryRun) {
+                    args.push_back("--dry-run");
+                }
+                runProgramSimple(settings.nixBinDir + "/nix-env", args);
             }
         } else if (type == DT_DIR) {
             removeOldGenerations(path);
