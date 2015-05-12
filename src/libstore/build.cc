@@ -1786,8 +1786,10 @@ void DerivationGoal::startBuilder()
     if (useChroot) {
 
         string defaultChrootDirs;
+#if CHROOT_ENABLED
         if (isInStore(BASH_PATH))
             defaultChrootDirs = "/bin/sh=" BASH_PATH;
+#endif
 
         /* Allow a user-configurable set of directories from the
            host file system. */
