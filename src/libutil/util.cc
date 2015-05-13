@@ -942,16 +942,16 @@ string runProgram(Path program, bool searchPath, const Strings & args,
     checkInterrupt();
 
     /* Create a pipe. */
-    Pipe stdout, stdin;
-    stdout.create();
-    if (!input.empty()) stdin.create();
+    Pipe out, in;
+    out.create();
+    if (!input.empty()) in.create();
 
     /* Fork. */
     Pid pid = startProcess([&]() {
-        if (dup2(stdout.writeSide, STDOUT_FILENO) == -1)
+        if (dup2(out.writeSide, STDOUT_FILENO) == -1)
             throw SysError("dupping stdout");
         if (!input.empty()) {
-            if (dup2(stdin.readSide, STDIN_FILENO) == -1)
+            if (dup2(in.readSide, STDIN_FILENO) == -1)
                 throw SysError("dupping stdin");
         }
 
@@ -967,16 +967,16 @@ string runProgram(Path program, bool searchPath, const Strings & args,
         throw SysError(format("executing ‘%1%’") % program);
     });
 
-    stdout.writeSide.close();
+    out.writeSide.close();
 
     /* FIXME: This can deadlock if the input is too long. */
     if (!input.empty()) {
-        stdin.readSide.close();
-        writeFull(stdin.writeSide, input);
-        stdin.writeSide.close();
+        in.readSide.close();
+        writeFull(in.writeSide, input);
+        in.writeSide.close();
     }
 
-    string result = drainFD(stdout.readSide);
+    string result = drainFD(out.readSide);
 
     /* Wait for the child to finish. */
     int status = pid.wait(true);
