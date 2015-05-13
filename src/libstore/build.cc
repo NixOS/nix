@@ -20,6 +20,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
+#include <sys/select.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
