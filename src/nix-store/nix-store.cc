@@ -49,12 +49,11 @@ LocalStore & ensureLocalStore()
 
 static Path useDeriver(Path path)
 {
-    if (!isDerivation(path)) {
-        path = store->queryDeriver(path);
-        if (path == "")
-            throw Error(format("deriver of path ‘%1%’ is not known") % path);
-    }
-    return path;
+    if (isDerivation(path)) return path;
+    Path drvPath = store->queryDeriver(path);
+    if (drvPath == "")
+        throw Error(format("deriver of path ‘%1%’ is not known") % path);
+    return drvPath;
 }
 
 
