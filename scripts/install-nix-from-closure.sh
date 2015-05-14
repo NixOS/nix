@@ -131,12 +131,3 @@ variables are set, either log in again, or type
 in your shell.
 EOF
 fi
-cat >&2 <<EOF
-
-Then, consider running
-
-  nix-store --optimise
-
-which will reduce store disk usage by hardlinking identical
-files together.
-EOF
