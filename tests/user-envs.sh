@@ -99,6 +99,15 @@ if nix-env -q '*' | grep -q bar; then false; fi
 nix-env --list-generations
 test "$(nix-env --list-generations | wc -l)" -eq 7
 
+# Doing the same operation twice should result in the same generation, not an
+# additional one. At this point we just brought back foo. Installing it again
+# should not create a new generation.
+nix-env -i foo
+
+# Count generations.
+nix-env --list-generations
+test "$(nix-env --list-generations | wc -l)" -eq 7
+
 # Switch to a specified generation.
 nix-env --switch-generation 7
 [ "$(nix-store -q --resolve $profiles/test)" = "$oldGen" ]

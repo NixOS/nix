@@ -80,7 +80,22 @@ Path createGeneration(Path profile, Path outPath)
        previous ones. */
     int dummy;
     Generations gens = findGenerations(profile, dummy);
-    unsigned int num = gens.size() > 0 ? gens.back().number : 0;
+
+    unsigned int num;
+    if (gens.size() > 0) {
+        /* Check existing generations whether they represent an
+           environment we already materialized before.  In that case:
+           avoid cluttering the system with additional symlinks. */
+        for (auto & gen : gens) {
+            if (readLink(gen.path) == outPath) {
+                return gen.path;
+            }
+        }
+
+        num = gens.back().number;
+    } else {
+        num = 0;
+    }
 
     /* Create the new generation.  Note that addPermRoot() blocks if
        the garbage collector is running to prevent the stuff we've
