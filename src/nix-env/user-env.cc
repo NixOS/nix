@@ -28,7 +28,7 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
 
 bool createUserEnv(EvalState & state, DrvInfos & elems,
     const Path & profile, bool keepDerivations,
-    const string & lockToken)
+    const string & lockToken, bool lazyGeneration)
 {
     /* Build the components in the user environment, if they don't
        exist already. */
@@ -141,7 +141,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     }
 
     debug(format("switching to new user environment"));
-    Path generation = createGeneration(profile, topLevelOut);
+    Path generation = createGeneration(profile, topLevelOut, lazyGeneration);
     switchLink(profile, generation);
 
     return true;

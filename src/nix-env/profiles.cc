@@ -74,7 +74,7 @@ static void makeName(const Path & profile, unsigned int num,
 }
 
 
-Path createGeneration(Path profile, Path outPath)
+Path createGeneration(Path profile, Path outPath, bool lazy)
 {
     /* The new generation number should be higher than old the
        previous ones. */
@@ -83,13 +83,16 @@ Path createGeneration(Path profile, Path outPath)
 
     unsigned int num;
     if (gens.size() > 0) {
-        /* Check existing generations whether they represent an
-           environment we already materialized before.  In that case:
-           avoid cluttering the system with additional symlinks. */
-        for (auto & gen : gens) {
-            if (readLink(gen.path) == outPath) {
-                return gen.path;
-            }
+        Generation last = gens.back();
+
+        if (lazy && readLink(last.path) == outPath) {
+            /* If lazy generations are enabled then we only create a 
+               new generation symlink if it differs from the last one.
+
+               This helps keeping gratuitous installs/rebuilds from piling
+               up uncontrolled numbers of generations, cluttering up the
+               UI like grub. */
+            return last.path;
         }
 
         num = gens.back().number;
