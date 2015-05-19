@@ -11,5 +11,3 @@ nix-daemon_LDFLAGS = -pthread
 ifeq ($(OS), SunOS)
         nix-daemon_LDFLAGS += -lsocket
 endif
-
-$(eval $(call install-symlink, nix-daemon, $(bindir)/nix-worker))
