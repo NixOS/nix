@@ -58,7 +58,6 @@ struct Globals
     bool removeAll;
     string forceName;
     bool prebuiltOnly;
-    bool lazyGeneration;
 };
 
 
@@ -511,7 +510,7 @@ static void installDerivations(Globals & globals,
         if (globals.dryRun) return;
 
         if (createUserEnv(*globals.state, allElems,
-                profile, settings.envKeepDerivations, lockToken, globals.lazyGeneration)) break;
+                profile, settings.envKeepDerivations, lockToken)) break;
     }
 }
 
@@ -525,8 +524,6 @@ static void opInstall(Globals & globals, Strings opFlags, Strings opArgs)
             globals.preserveInstalled = true;
         else if (arg == "--remove-all" || arg == "-r")
             globals.removeAll = true;
-        else if (arg == "--lazy-generation")
-            globals.lazyGeneration = true;
         else throw UsageError(format("unknown flag ‘%1%’") % arg);
     }
 
@@ -620,7 +617,7 @@ static void upgradeDerivations(Globals & globals,
         if (globals.dryRun) return;
 
         if (createUserEnv(*globals.state, newElems,
-                globals.profile, settings.envKeepDerivations, lockToken, globals.lazyGeneration)) break;
+                globals.profile, settings.envKeepDerivations, lockToken)) break;
     }
 }
 
@@ -684,7 +681,7 @@ static void opSetFlag(Globals & globals, Strings opFlags, Strings opArgs)
 
         /* Write the new user environment. */
         if (createUserEnv(*globals.state, installedElems,
-                globals.profile, settings.envKeepDerivations, lockToken, globals.lazyGeneration)) break;
+                globals.profile, settings.envKeepDerivations, lockToken)) break;
     }
 }
 
@@ -721,8 +718,7 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
     }
 
     debug(format("switching to new user environment"));
-    Path generation = createGeneration(globals.profile, drv.queryOutPath(),
-                                       globals.lazyGeneration);
+    Path generation = createGeneration(globals.profile, drv.queryOutPath());
     switchLink(globals.profile, generation);
 }
 
@@ -755,7 +751,7 @@ static void uninstallDerivations(Globals & globals, Strings & selectors,
         if (globals.dryRun) return;
 
         if (createUserEnv(*globals.state, newElems,
-                profile, settings.envKeepDerivations, lockToken, globals.lazyGeneration)) break;
+                profile, settings.envKeepDerivations, lockToken)) break;
     }
 }
 
@@ -1359,7 +1355,6 @@ int main(int argc, char * * argv)
         globals.preserveInstalled = false;
         globals.removeAll = false;
         globals.prebuiltOnly = false;
-        globals.lazyGeneration = false;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             Operation oldOp = op;

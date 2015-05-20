@@ -31,7 +31,7 @@ typedef list<Generation> Generations;
    profile, sorted by generation number. */
 Generations findGenerations(Path profile, int & curGen);
     
-Path createGeneration(Path profile, Path outPath, bool lazy);
+Path createGeneration(Path profile, Path outPath);
 
 void deleteGeneration(const Path & profile, unsigned int gen);
 

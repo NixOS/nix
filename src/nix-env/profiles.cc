@@ -74,7 +74,7 @@ static void makeName(const Path & profile, unsigned int num,
 }
 
 
-Path createGeneration(Path profile, Path outPath, bool lazy)
+Path createGeneration(Path profile, Path outPath)
 {
     /* The new generation number should be higher than old the
        previous ones. */
@@ -85,9 +85,9 @@ Path createGeneration(Path profile, Path outPath, bool lazy)
     if (gens.size() > 0) {
         Generation last = gens.back();
 
-        if (lazy && readLink(last.path) == outPath) {
-            /* If lazy generations are enabled then we only create a 
-               new generation symlink if it differs from the last one.
+        if (readLink(last.path) == outPath) {
+            /* We only create a new generation symlink if it differs
+               from the last one.
 
                This helps keeping gratuitous installs/rebuilds from piling
                up uncontrolled numbers of generations, cluttering up the
