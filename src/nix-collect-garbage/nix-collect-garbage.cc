@@ -34,21 +34,23 @@ void runProgramSimple(Path program, const Strings & args)
 
 void removeOldGenerations(std::string dir)
 {
+    if (access(dir.c_str(), R_OK) != 0) return;
+
+    bool canWrite = access(dir.c_str(), W_OK) == 0;
+
     for (auto & i : readDirectory(dir)) {
         checkInterrupt();
 
-        auto path = dir + "/" + i.name; 
+        auto path = dir + "/" + i.name;
         auto type = i.type == DT_UNKNOWN ? getFileType(path) : i.type;
 
-        if (type == DT_LNK) {
+        if (type == DT_LNK && canWrite) {
             auto link = readLink(path);
             if (link.find("link") != string::npos) {
                 printMsg(lvlInfo, format("removing old generations of profile %1%") % path);
 
                 auto args = Strings{"-p", path, "--delete-generations", gen};
-                if (dryRun) {
-                    args.push_back("--dry-run");
-                }
+                if (dryRun) args.push_back("--dry-run");
                 runProgramSimple(settings.nixBinDir + "/nix-env", args);
             }
         } else if (type == DT_DIR) {
