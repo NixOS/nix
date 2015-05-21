@@ -217,6 +217,8 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
     }
 }
 
+die "$0: ‘-p’ and ‘-E’ are mutually exclusive\n" if $packages && $fromArgs;
+
 if ($packages) {
     push @instArgs, "--expr";
     @exprs = (
