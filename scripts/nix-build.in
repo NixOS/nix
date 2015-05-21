@@ -217,7 +217,7 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
     }
 }
 
-if ($packages) {
+if ($packages || $fromArgs) {
     push @instArgs, "--expr";
     @exprs = (
         'with import <nixpkgs> { }; runCommand "shell" { buildInputs = [ '
