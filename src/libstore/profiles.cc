@@ -129,6 +129,88 @@ void deleteGeneration(const Path & profile, unsigned int gen)
 }
 
 
+static void deleteGeneration2(const Path & profile, unsigned int gen, bool dryRun)
+{
+    if (dryRun)
+        printMsg(lvlInfo, format("would remove generation %1%") % gen);
+    else {
+        printMsg(lvlInfo, format("removing generation %1%") % gen);
+        deleteGeneration(profile, gen);
+    }
+}
+
+
+void deleteGenerations(const Path & profile, const std::set<unsigned int> & gensToDelete, bool dryRun)
+{
+    PathLocks lock;
+    lockProfile(lock, profile);
+
+    int curGen;
+    Generations gens = findGenerations(profile, curGen);
+
+    if (gensToDelete.find(curGen) != gensToDelete.end())
+        throw Error(format("cannot delete current generation of profile %1%’") % profile);
+
+    for (auto & i : gens) {
+        if (gensToDelete.find(i.number) == gensToDelete.end()) continue;
+        deleteGeneration2(profile, i.number, dryRun);
+    }
+}
+
+
+void deleteOldGenerations(const Path & profile, bool dryRun)
+{
+    PathLocks lock;
+    lockProfile(lock, profile);
+
+    int curGen;
+    Generations gens = findGenerations(profile, curGen);
+
+    for (auto & i : gens)
+        if (i.number != curGen)
+            deleteGeneration2(profile, i.number, dryRun);
+}
+
+
+void deleteGenerationsOlderThan(const Path & profile, time_t t, bool dryRun)
+{
+    PathLocks lock;
+    lockProfile(lock, profile);
+
+    int curGen;
+    Generations gens = findGenerations(profile, curGen);
+
+    bool canDelete = false;
+    for (auto i = gens.rbegin(); i != gens.rend(); ++i)
+        if (canDelete) {
+            assert(i->creationTime < t);
+            if (i->number != curGen)
+                deleteGeneration2(profile, i->number, dryRun);
+        } else if (i->creationTime < t) {
+            /* We may now start deleting generations, but we don't
+               delete this generation yet, because this generation was
+               still the one that was active at the requested point in
+               time. */
+            canDelete = true;
+        }
+}
+
+
+void deleteGenerationsOlderThan(const Path & profile, const string & timeSpec, bool dryRun)
+{
+    time_t curTime = time(0);
+    string strDays = string(timeSpec, 0, timeSpec.size() - 1);
+    int days;
+
+    if (!string2Int(strDays, days) || days < 1)
+        throw Error(format("invalid number of days specifier ‘%1%’") % timeSpec);
+
+    time_t oldTime = curTime - days * 24 * 3600;
+
+    deleteGenerationsOlderThan(profile, oldTime, dryRun);
+}
+
+
 void switchLink(Path link, Path target)
 {
     /* Hacky. */

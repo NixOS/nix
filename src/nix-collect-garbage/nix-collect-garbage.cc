@@ -1,5 +1,5 @@
 #include "store-api.hh"
-#include "hash.hh"
+#include "profiles.hh"
 #include "shared.hh"
 #include "globals.hh"
 
@@ -7,7 +7,7 @@
 
 using namespace nix;
 
-std::string gen = "old";
+std::string deleteOlderThan;
 bool dryRun = false;
 
 void runProgramSimple(Path program, const Strings & args)
@@ -49,10 +49,10 @@ void removeOldGenerations(std::string dir)
             auto link = readLink(path);
             if (link.find("link") != string::npos) {
                 printMsg(lvlInfo, format("removing old generations of profile %1%") % path);
-
-                auto args = Strings{"-p", path, "--delete-generations", gen};
-                if (dryRun) args.push_back("--dry-run");
-                runProgramSimple(settings.nixBinDir + "/nix-env", args);
+                if (deleteOlderThan != "")
+                    deleteGenerationsOlderThan(path, deleteOlderThan, dryRun);
+                else
+                    deleteOldGenerations(path, dryRun);
             }
         } else if (type == DT_DIR) {
             removeOldGenerations(path);
@@ -76,7 +76,7 @@ int main(int argc, char * * argv)
             else if (*arg == "--delete-old" || *arg == "-d") removeOld = true;
             else if (*arg == "--delete-older-than") {
                 removeOld = true;
-                gen = getArg(*arg, arg, end);
+                deleteOlderThan = getArg(*arg, arg, end);
             }
             else if (*arg == "--dry-run") dryRun = true;
             else

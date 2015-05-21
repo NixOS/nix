@@ -1262,73 +1262,24 @@ static void opListGenerations(Globals & globals, Strings opFlags, Strings opArgs
 }
 
 
-static void deleteGeneration2(Globals & globals, unsigned int gen)
-{
-    if (globals.dryRun)
-        printMsg(lvlInfo, format("would remove generation %1%") % gen);
-    else {
-        printMsg(lvlInfo, format("removing generation %1%") % gen);
-        deleteGeneration(globals.profile, gen);
-    }
-
-}
-
-
 static void opDeleteGenerations(Globals & globals, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
         throw UsageError(format("unknown flag ‘%1%’") % opFlags.front());
 
-    PathLocks lock;
-    lockProfile(lock, globals.profile);
-
-    int curGen;
-    Generations gens = findGenerations(globals.profile, curGen);
-
-    for (Strings::iterator i = opArgs.begin(); i != opArgs.end(); ++i) {
-
-        if (*i == "old") {
-            for (Generations::iterator j = gens.begin(); j != gens.end(); ++j)
-                if (j->number != curGen)
-                    deleteGeneration2(globals, j->number);
-        } else if (i->size() >= 2 && tolower(*i->rbegin()) == 'd') {
-            time_t curTime = time(NULL);
-            time_t oldTime;
-            string strDays = string(*i, 0, i->size() - 1);
-            int days;
-
-            if (!string2Int(strDays, days) || days < 1)
-                throw UsageError(format("invalid number of days specifier ‘%1%’") % *i);
-
-            oldTime = curTime - days * 24 * 3600;
-
-            bool canDelete = false;
-            for (Generations::reverse_iterator j = gens.rbegin(); j != gens.rend(); ++j) {
-                if (canDelete) {
-                    assert(j->creationTime < oldTime);
-                    deleteGeneration2(globals, j->number);
-                } else if (j->creationTime < oldTime) {
-                    /* We may now start deleting generations, but we don't delete
-                       this generation yet, because this generation was still the
-                       one that was active at the requested point in time. */
-                    canDelete = true;
-                }
-            }
-        } else {
-            int n;
-            if (!string2Int(*i, n) || n < 0)
-                throw UsageError(format("invalid generation specifier ‘%1%’")  % *i);
-            bool found = false;
-            for (Generations::iterator j = gens.begin(); j != gens.end(); ++j) {
-                if (j->number == n) {
-                    deleteGeneration2(globals, j->number);
-                    found = true;
-                    break;
-                }
-            }
-            if (!found)
-                printMsg(lvlError, format("generation %1% does not exist") % n);
+    if (opArgs.size() == 1 && opArgs.front() == "old") {
+        deleteOldGenerations(globals.profile, globals.dryRun);
+    } else if (opArgs.size() == 1 && opArgs.front().find('d') != string::npos) {
+        deleteGenerationsOlderThan(globals.profile, opArgs.front(), globals.dryRun);
+    } else {
+        std::set<unsigned int> gens;
+        for (auto & i : opArgs) {
+            unsigned int n;
+            if (!string2Int(i, n) || n < 0)
+                throw UsageError(format("invalid generation number ‘%1%’") % i);
+            gens.insert(n);
         }
+        deleteGenerations(globals.profile, gens, globals.dryRun);
     }
 }
 

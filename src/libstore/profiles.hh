@@ -30,10 +30,18 @@ typedef list<Generation> Generations;
 /* Returns the list of currently present generations for the specified
    profile, sorted by generation number. */
 Generations findGenerations(Path profile, int & curGen);
-    
+
 Path createGeneration(Path profile, Path outPath);
 
 void deleteGeneration(const Path & profile, unsigned int gen);
+
+void deleteGenerations(const Path & profile, const std::set<unsigned int> & gensToDelete, bool dryRun);
+
+void deleteOldGenerations(const Path & profile, bool dryRun);
+
+void deleteGenerationsOlderThan(const Path & profile, time_t t, bool dryRun);
+
+void deleteGenerationsOlderThan(const Path & profile, const string & timeSpec, bool dryRun);
 
 void switchLink(Path link, Path target);
 
