@@ -38,7 +38,7 @@ void removeOldGenerations(std::string dir)
         checkInterrupt();
 
         auto path = dir + "/" + i.name; 
-        auto type = getFileType(path);
+        auto type = i.type == DT_UNKNOWN ? getFileType(path) : i.type;
 
         if (type == DT_LNK) {
             auto link = readLink(path);
