@@ -99,6 +99,16 @@ if nix-env -q '*' | grep -q bar; then false; fi
 nix-env --list-generations
 test "$(nix-env --list-generations | wc -l)" -eq 7
 
+# Doing the same operation twice results in the same generation, which triggers
+# "lazy" behaviour and does not create a new symlink.
+
+nix-env -i foo
+nix-env -i foo
+
+# Count generations.
+nix-env --list-generations
+test "$(nix-env --list-generations | wc -l)" -eq 8
+
 # Switch to a specified generation.
 nix-env --switch-generation 7
 [ "$(nix-store -q --resolve $profiles/test)" = "$oldGen" ]

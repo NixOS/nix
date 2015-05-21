@@ -80,7 +80,25 @@ Path createGeneration(Path profile, Path outPath)
        previous ones. */
     int dummy;
     Generations gens = findGenerations(profile, dummy);
-    unsigned int num = gens.size() > 0 ? gens.back().number : 0;
+
+    unsigned int num;
+    if (gens.size() > 0) {
+        Generation last = gens.back();
+
+        if (readLink(last.path) == outPath) {
+            /* We only create a new generation symlink if it differs
+               from the last one.
+
+               This helps keeping gratuitous installs/rebuilds from piling
+               up uncontrolled numbers of generations, cluttering up the
+               UI like grub. */
+            return last.path;
+        }
+
+        num = gens.back().number;
+    } else {
+        num = 0;
+    }
 
     /* Create the new generation.  Note that addPermRoot() blocks if
        the garbage collector is running to prevent the stuff we've
