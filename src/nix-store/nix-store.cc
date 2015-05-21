@@ -625,28 +625,6 @@ static void opCheckValidity(Strings opFlags, Strings opArgs)
 }
 
 
-static string showBytes(unsigned long long bytes)
-{
-    return (format("%.2f MiB") % (bytes / (1024.0 * 1024.0))).str();
-}
-
-
-struct PrintFreed
-{
-    bool show;
-    const GCResults & results;
-    PrintFreed(bool show, const GCResults & results)
-        : show(show), results(results) { }
-    ~PrintFreed()
-    {
-        if (show)
-            cout << format("%1% store paths deleted, %2% freed\n")
-                % results.paths.size()
-                % showBytes(results.bytesFreed);
-    }
-};
-
-
 static void opGC(Strings opFlags, Strings opArgs)
 {
     bool printRoots = false;

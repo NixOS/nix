@@ -342,4 +342,19 @@ RunPager::~RunPager()
 }
 
 
+string showBytes(unsigned long long bytes)
+{
+    return (format("%.2f MiB") % (bytes / (1024.0 * 1024.0))).str();
+}
+
+
+PrintFreed::~PrintFreed()
+{
+    if (show)
+        std::cout << format("%1% store paths deleted, %2% freed\n")
+            % results.paths.size()
+            % showBytes(results.bytesFreed);
+}
+
+
 }

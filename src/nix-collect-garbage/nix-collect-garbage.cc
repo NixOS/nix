@@ -1,3 +1,4 @@
+#include "store-api.hh"
 #include "hash.hh"
 #include "shared.hh"
 #include "globals.hh"
@@ -87,7 +88,13 @@ int main(int argc, char * * argv)
         if (removeOld) removeOldGenerations(profilesDir);
 
         // Run the actual garbage collector.
-        if (!dryRun) runProgramSimple(settings.nixBinDir + "/nix-store", Strings{"--gc"});
+        if (!dryRun) {
+            store = openStore(false);
+            GCOptions options;
+            options.action = GCOptions::gcDeleteDead;
+            GCResults results;
+            PrintFreed freed(true, results);
+            store->collectGarbage(options, results);
+        }
     });
 }
-

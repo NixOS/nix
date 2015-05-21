@@ -83,4 +83,21 @@ private:
 
 extern volatile ::sig_atomic_t blockInt;
 
+
+/* GC helpers. */
+
+string showBytes(unsigned long long bytes);
+
+class GCResults;
+
+struct PrintFreed
+{
+    bool show;
+    const GCResults & results;
+    PrintFreed(bool show, const GCResults & results)
+        : show(show), results(results) { }
+    ~PrintFreed();
+};
+
+
 }
