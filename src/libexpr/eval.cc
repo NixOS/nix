@@ -292,10 +292,17 @@ Path EvalState::checkSourcePath(const Path & path_)
         if (path == i.second || isInDir(path, i.second))
             return path;
 
+    /* To support import-from-derivation, allow access to anything in
+       the store. FIXME: only allow access to paths that have been
+       constructed by this evaluation. */
+    if (isInStore(path)) return path;
+
+#if 0
     /* Hack to support the chroot dependencies of corepkgs (see
        corepkgs/config.nix.in). */
     if (path == settings.nixPrefix && isStorePath(settings.nixPrefix))
         return path;
+#endif
 
     throw RestrictedPathError(format("access to path ‘%1%’ is forbidden in restricted mode") % path_);
 }
