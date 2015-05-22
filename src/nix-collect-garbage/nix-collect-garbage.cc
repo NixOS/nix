@@ -10,24 +10,6 @@ using namespace nix;
 std::string deleteOlderThan;
 bool dryRun = false;
 
-void runProgramSimple(Path program, const Strings & args)
-{
-    checkInterrupt();
-
-    /* Fork. */
-    Pid pid = startProcess([&]() {
-        Strings args_(args);
-        args_.push_front(program);
-        auto cargs = stringsToCharPtrs(args_);
-
-        execv(program.c_str(), (char * *) &cargs[0]);
-
-        throw SysError(format("executing ‘%1%’") % program);
-    });
-
-    pid.wait(true);
-}
-
 
 /* If `-d' was specified, remove all old generations of all profiles.
  * Of course, this makes rollbacks to before this point in time
