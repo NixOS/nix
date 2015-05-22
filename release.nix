@@ -198,6 +198,8 @@ let
     deb_ubuntu1404x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1404x86_64);
     deb_ubuntu1410i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1410i386);
     deb_ubuntu1410x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1410x86_64);
+    deb_ubuntu1504i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1504i386);
+    deb_ubuntu1504x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1504x86_64);
 
 
     # System tests.
@@ -245,12 +247,14 @@ let
           binaryTarball.x86_64-linux
           deb_debian7i386
           deb_debian7x86_64
-          deb_ubuntu1404i386
-          deb_ubuntu1404x86_64
-          deb_ubuntu1410i386
-          deb_ubuntu1410x86_64
+          deb_ubuntu1404i386 # LTS
+          deb_ubuntu1404x86_64 # LTS
+          deb_ubuntu1504i386
+          deb_ubuntu1504x86_64
           rpm_fedora20i386
           rpm_fedora20x86_64
+          rpm_fedora21i386
+          rpm_fedora21x86_64
           tests.remoteBuilds
           tests.nix-copy-closure
           tests.binaryTarball
