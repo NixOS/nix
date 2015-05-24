@@ -23,7 +23,7 @@ my @buildArgs = ();
 my @exprs = ();
 
 my $shell = $ENV{SHELL} || "/bin/sh";
-my $envCommand = ""; # interactive shell
+my $envCommand = $shell =~ m,/(bash|sh)$, ? "" : "exec $shell"; # interactive shell
 my @envExclude = ();
 
 my $myName = $runEnv ? "nix-shell" : "nix-build";
@@ -274,6 +274,7 @@ foreach my $expr (@exprs) {
             }
             # NixOS hack: prevent /etc/bashrc from sourcing /etc/profile.
             $ENV{'__ETC_PROFILE_SOURCED'} = 1;
+            $ENV{'__ETC_ZSHENV_SOURCED'} = 1; # same for zsh
         }
         $ENV{'NIX_BUILD_TOP'} = $ENV{'TMPDIR'} = $ENV{'TEMPDIR'} = $ENV{'TMP'} = $ENV{'TEMP'} = $tmp;
         $ENV{'NIX_STORE'} = $Nix::Config::storeDir;
@@ -303,7 +304,7 @@ foreach my $expr (@exprs) {
             $envCommand);
         $ENV{BASH_ENV} = $rcfile;
         my @args = ($ENV{NIX_BUILD_SHELL} // "bash");
-        push @args, "--rcfile" if $interactive;
+        push @args, "--rcfile" if $interactive and $envCommand eq '';
         push @args, $rcfile;
         exec @args;
         die;
