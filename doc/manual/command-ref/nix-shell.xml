@@ -133,7 +133,9 @@ also <xref linkend="sec-common-options" />.</phrase></para>
     <filename>~/.bashrc</filename> and (depending on your Bash
     installation) <filename>/etc/bashrc</filename> are still sourced,
     so any variables set there will affect the interactive
-    shell.</para></listitem>
+    shell. <envar>IN_NIX_SHELL</envar> can be used to disable certain parts of 
+    <filename>~/.bashrc</filename>.
+    </para></listitem>
 
   </varlistentry>
 
