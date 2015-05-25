@@ -92,7 +92,7 @@ p=$NIX_LINK/etc/profile.d/nix.sh
 added=
 for i in .bash_profile .bash_login .profile; do
     fn="$HOME/$i"
-    if [ -e "$fn" ]; then
+    if [ -w "$fn" ]; then
         if ! grep -q "$p" "$fn"; then
             echo "modifying $fn..." >&2
             echo "if [ -e $p ]; then . $p; fi # added by Nix installer" >> $fn
