@@ -303,9 +303,10 @@ struct ExprConcatStrings : Expr
 {
     Pos pos;
     bool forceString;
+    bool indented;
     vector<Expr *> * es;
-    ExprConcatStrings(const Pos & pos, bool forceString, vector<Expr *> * es)
-        : pos(pos), forceString(forceString), es(es) { };
+    ExprConcatStrings(const Pos & pos, bool forceString, bool indented, vector<Expr *> * es)
+        : pos(pos), forceString(forceString), indented(indented), es(es) { };
     COMMON_METHODS
 };
 

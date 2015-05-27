@@ -1198,12 +1198,57 @@ void EvalState::concatLists(Value & v, unsigned int nrLists, Value * * lists, co
     }
 }
 
+static void updateIndentLevel(const string & s, bool & atStartOfLine, size_t & indent) {
+    for (unsigned int j = 0; j < s.size(); ++j) {
+        if (s[j] == '\n') {
+            atStartOfLine = true;
+            indent = 0;
+        } else if (atStartOfLine) {
+            if (s[j] == ' ') {
+                indent++;
+            } else {
+                atStartOfLine = false;
+                indent = 0;
+            }
+        }
+    }
+}
+
+static void stripLastLine(string & s) {
+    size_t pos = s.rfind('\n');
+    bool trim = pos != string::npos;
+    for (size_t i = pos+1; trim && i < s.size(); ++i) {
+        trim = (s[i] == ' ');
+    }
+    if (trim) {
+        s = s.substr(0, pos);
+    }
+}
+
+static void reindent(string & s, size_t indent) {
+    if (indent == 0) return;
+
+    string pad(indent, ' ');
+    string acc;
+    size_t pos=0, match_pos=0;
+
+    while ( (match_pos=s.find('\n', pos)) != string::npos ) {
+        acc += s.substr(pos, match_pos - pos + 1);
+        acc += pad;
+        pos = match_pos + 1;
+    }
+    acc += s.substr(pos, string::npos);
+    s = acc;
+}
 
 void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 {
     PathSet context;
     std::ostringstream s;
     NixInt n = 0;
+
+    bool atStartOfLine = true; /* = seen only whitespace in the current line */
+    size_t indent = 0;
 
     bool first = !forceString;
     ValueType firstType = tString;
@@ -1225,8 +1270,27 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
             if (vTmp.type != tInt)
                 throwEvalError("cannot add %1% to an integer, at %2%", showType(vTmp), pos);
             n += vTmp.integer;
-        } else
-            s << state.coerceToString(pos, vTmp, context, false, firstType == tString);
+        } else {
+            string sTmp = state.coerceToString(pos, vTmp, context, false, firstType == tString);
+            if (this->indented) {
+                // This is an indented string:
+                // Antiquotations must receive special treatment.
+                ExprString * e = dynamic_cast<ExprString *>(*i);
+
+                if (e) {
+                    updateIndentLevel(sTmp, atStartOfLine, indent);
+                } else {
+                    // This chunck is an antiquotation;
+                    // Check for and remove an empty last line.
+                    stripLastLine(sTmp);
+
+                    if (atStartOfLine) reindent(sTmp, indent);
+                    atStartOfLine = false;
+                    indent = 0;
+                }
+            }
+            s << sTmp;
+        }
     }
 
     if (firstType == tInt)

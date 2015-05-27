@@ -94,7 +94,34 @@ configureFlags = "
 
     <para>Antiquotation
     (<literal>${<replaceable>expr</replaceable>}</literal>) is
-    supported in indented strings.</para>
+    supported in indented strings.
+
+    Indentation of antiquotations is preserved across all the
+    lines of the antiquotation. This is better explained based on the
+    following string value :
+
+<programlisting>
+''
+  Begin
+    ${"A\nB\nC\n"}
+  End
+''</programlisting>
+
+    In this case, the antiquotation is indented by two spaces within the
+    indented string. This means that each line of the antiquotation will be
+    indented by two spaces, like so:
+
+<programlisting>
+''
+  Begin
+    A
+    B
+    C
+  End
+''</programlisting>
+
+    Also note that the trailing empty line is removed when there is one.
+    </para>
 
     <para>Since <literal>${</literal> and <literal>''</literal> have
     special meaning in indented strings, you need a way to quote them.

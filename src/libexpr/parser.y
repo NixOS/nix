@@ -211,8 +211,8 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Ex
         es2->push_back(new ExprString(symbols.create(s2)));
     }
 
-    /* If this is a single string, then don't do a concatenation. */
-    return es2->size() == 1 && dynamic_cast<ExprString *>((*es2)[0]) ? (*es2)[0] : new ExprConcatStrings(pos, true, es2);
+    /* NOP; If this is a single string, then don't do a concatenation. */
+    return es2->size() == 1 && dynamic_cast<ExprString *>((*es2)[0]) ? (*es2)[0] : new ExprConcatStrings(pos, true, true, es2);
 }
 
 
@@ -336,7 +336,7 @@ expr_op
   | expr_op UPDATE expr_op { $$ = new ExprOpUpdate(CUR_POS, $1, $3); }
   | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, *$3); }
   | expr_op '+' expr_op
-    { $$ = new ExprConcatStrings(CUR_POS, false, new vector<Expr *>({$1, $3})); }
+    { $$ = new ExprConcatStrings(CUR_POS, false, false, new vector<Expr *>({$1, $3})); }
   | expr_op '-' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__sub")), $1), $3); }
   | expr_op '*' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__mul")), $1), $3); }
   | expr_op '/' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__div")), $1), $3); }
@@ -398,7 +398,7 @@ expr_simple
 
 string_parts
   : STR
-  | string_parts_interpolated { $$ = new ExprConcatStrings(CUR_POS, true, $1); }
+  | string_parts_interpolated { $$ = new ExprConcatStrings(CUR_POS, true, false, $1); }
   | { $$ = new ExprString(data->symbols.create("")); }
   ;
 

@@ -117,4 +117,11 @@ let
     bar
   '';
 
-in s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9 + s10 + s11 + s12 + s13 + s14 + s15
+  # Indented antiquotatations should preserve indentation
+  s16 = let body = "A\nB\nC\n"; in ''
+    Begin
+      ${body}${body}
+    End
+  '';
+
+in s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9 + s10 + s11 + s12 + s13 + s14 + s15 + s16
