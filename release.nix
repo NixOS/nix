@@ -187,6 +187,8 @@ let
 
     deb_debian7i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian7i386);
     deb_debian7x86_64 = makeDeb_x86_64 (diskImageFunsFun: diskImageFunsFun.debian7x86_64);
+    deb_debian8i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian8i386);
+    deb_debian8x86_64 = makeDeb_x86_64 (diskImageFunsFun: diskImageFunsFun.debian8x86_64);
 
     deb_ubuntu1210i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1210i386);
     deb_ubuntu1210x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1210x86_64);
