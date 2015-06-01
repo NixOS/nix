@@ -149,6 +149,15 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 
   </varlistentry>
 
+  <varlistentry><term><option>-i</option> <replaceable>interpreter</replaceable></term>
+
+    <listitem><para>The chained script interpreter to be invoked by
+    <command>nix-shell</command>. Only applicable in
+    <literal>#!</literal>-scripts (described <link
+    linkend="ssec-nix-shell-shebang">below</link>).</para>
+
+    </listitem></varlistentry>
+
 </variablelist>
 
 <para>The following common options are supported:</para>
@@ -197,6 +206,121 @@ $ nix-shell -p sqlite xorg.libX11
 [nix-shell]$ echo $NIX_LDFLAGS
 … -L/nix/store/j1zg5v…-sqlite-3.8.0.2/lib -L/nix/store/0gmcz9…-libX11-1.6.1/lib …
 </screen>
+
+</para>
+
+</refsection>
+
+
+<refsection xml:id="ssec-nix-shell-shebang"><title>Use as a <literal>#!</literal>-interpreter</title>
+
+<para>You can use <command>nix-shell</command> as a script interpreter
+to allow scripts written in arbitrary languages to obtain their own
+dependencies via Nix. This is done by starting the script with the
+following lines:
+
+<programlisting>
+#! /usr/bin/env nix-shell
+#! nix-shell -i <replaceable>real-interpreter</replaceable> -p <replaceable>packages</replaceable>
+</programlisting>
+
+where <replaceable>real-interpreter</replaceable> is the “real” script
+interpreter that will be invoked by <command>nix-shell</command> after
+it has obtained the dependencies and initialised the environment, and
+<replaceable>packages</replaceable> are the attribute names of the
+dependencies in Nixpkgs.</para>
+
+<para>The lines starting with <literal>#! nix-shell</literal> specify
+<command>nix-shell</command> options (see above). Note that you cannot
+write <literal>#1 /usr/bin/env nix-shell -i ...</literal> because
+<command>/usr/bin/env</command> does not support passing options to
+the interpreter.</para>
+
+<para>For example, here is a Python script that depends on Python and
+the <literal>prettytable</literal> package:
+
+<programlisting>
+#! /usr/bin/env nix-shell
+#! nix-shell -i python -p python pythonPackages.prettytable
+
+import prettytable
+
+# Print a simple table.
+t = prettytable.PrettyTable(["N", "N^2"])
+for n in range(1, 10): t.add_row([n, n * n])
+print t
+</programlisting>
+
+</para>
+
+<para>Similarly, the following is a Perl script that specifies that it
+requires Perl and the <literal>HTML::TokeParser::Simple</literal> and
+<literal>LWP</literal> packages:
+
+<programlisting>
+#! /usr/bin/env nix-shell
+#! nix-shell -i perl -p perl perlPackages.HTMLTokeParserSimple perlPackages.LWP
+
+use HTML::TokeParser::Simple;
+
+# Fetch nixos.org and print all hrefs.
+my $p = HTML::TokeParser::Simple->new(url => 'http://nixos.org/');
+
+while (my $token = $p->get_tag("a")) {
+    my $href = $token->get_attr("href");
+    print "$href\n" if $href;
+}
+</programlisting>
+
+</para>
+
+<para>Finally, the following Haskell script uses a specific branch of
+Nixpkgs/NixOS (the 14.12 stable branch):
+
+<programlisting><![CDATA[
+#! /usr/bin/env nix-shell
+#! nix-shell -i runghc -p haskellPackages.ghc haskellPackages.HTTP haskellPackages.tagsoup
+#! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/nixos-14.12.tar.gz
+
+import Network.HTTP
+import Text.HTML.TagSoup
+
+-- Fetch nixos.org and print all hrefs.
+main = do
+  resp <- Network.HTTP.simpleHTTP (getRequest "http://nixos.org/")
+  body <- getResponseBody resp
+  let tags = filter (isTagOpenName "a") $ parseTags body
+  let tags' = map (fromAttrib "href") tags
+  mapM_ putStrLn $ filter (/= "") tags'
+]]></programlisting>
+
+If you want to be even more precise, you can specify a specific
+revision of Nixpkgs:
+
+<programlisting>
+#! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/0672315759b3e15e2121365f067c1c8c56bb4722.tar.gz
+</programlisting>
+
+</para>
+
+<para>The examples above all used <option>-p</option> to get
+dependencies from Nixpkgs. You can also use a Nix expression to build
+your own dependencies. For example, the Python example could have been
+written as:
+
+<programlisting>
+#! /usr/bin/env nix-shell
+#! nix-shell deps.nix -i python
+</programlisting>
+
+where the file <filename>deps.nix</filename> in the same directory
+as the <literal>#!</literal>-script contains:
+
+<programlisting>
+with import &lt;nixpkgs> {};
+
+runCommand "dummy" { buildInputs = [ python pythonPackages.prettytable ]; } ""
+</programlisting>
 
 </para>
 
