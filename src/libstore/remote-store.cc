@@ -587,6 +587,16 @@ void RemoteStore::optimiseStore()
     readInt(from);
 }
 
+bool RemoteStore::verifyStore(bool checkContents, bool repair)
+{
+    openConnection();
+    writeInt(wopVerifyStore, to);
+    writeInt(checkContents, to);
+    writeInt(repair, to);
+    processStderr();
+    return readInt(from) != 0;
+}
+
 void RemoteStore::processStderr(Sink * sink, Source * source)
 {
     to.flush();

@@ -85,6 +85,7 @@ public:
 
     void optimiseStore();
 
+    bool verifyStore(bool checkContents, bool repair);
 private:
     AutoCloseFD fdSocket;
     FdSink to;

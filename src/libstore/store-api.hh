@@ -254,6 +254,10 @@ public:
     /* Optimise the disk space usage of the Nix store by hard-linking files
        with the same contents. */
     virtual void optimiseStore() = 0;
+
+    /* Check the integrity of the Nix store.  Returns true if errors
+       remain. */
+    virtual bool verifyStore(bool checkContents, bool repair) = 0;
 };
 
 

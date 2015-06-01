@@ -519,6 +519,16 @@ static void performOp(bool trusted, unsigned int clientVersion,
         writeInt(1, to);
         break;
 
+    case wopVerifyStore: {
+	bool checkContents = readInt(from) != 0;
+	bool repair = readInt(from) != 0;
+	startWork();
+	bool errors = store->verifyStore(checkContents, repair);
+	stopWork();
+	writeInt(errors, to);
+	break;
+    }
+
     default:
         throw Error(format("invalid operation %1%") % op);
     }
