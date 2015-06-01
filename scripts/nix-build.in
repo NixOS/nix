@@ -56,7 +56,7 @@ if ($runEnv && defined $ARGV[0] && $ARGV[0] !~ /nix-shell/) {
             while (<SCRIPT>) {
                 chomp;
                 if (/^\#\!\s*nix-shell (.*)$/) {
-                    @ARGV = split / /, $1;
+                    push @ARGV, split(/ /, $1);
                 }
             }
         }
