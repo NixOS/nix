@@ -1515,7 +1515,8 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     } else
         url = state.forceStringNoCtx(*args[0], pos);
 
-    mkString(v, downloadFileCached(url, unpack), PathSet({url}));
+    Path res = downloadFileCached(url, unpack);
+    mkString(v, res, PathSet({res}));
 }
 
 
