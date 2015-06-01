@@ -12,6 +12,7 @@
 </partintro>
 -->
 
+<xi:include href="rl-1.9.xml" />
 <xi:include href="rl-1.8.xml" />
 <xi:include href="rl-1.7.xml" />
 <xi:include href="rl-1.6.1.xml" />
