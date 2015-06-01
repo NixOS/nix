@@ -61,6 +61,13 @@ derivation for development.</para>
 <filename>shell.nix</filename> if it exists, and
 <filename>default.nix</filename> otherwise.</para>
 
+<para>If <replaceable>path</replaceable> starts with
+<literal>http://</literal> or <literal>https://</literal>, it is
+interpreted as the URL of a tarball that will be downloaded and
+unpacked to a temporary location. The tarball must include a single
+top-level directory containing at least a file named
+<filename>default.nix</filename>.</para>
+
 <para>If the derivation defines the variable
 <varname>shellHook</varname>, it will be evaluated after
 <literal>$stdenv/setup</literal> has been sourced.  Since this hook is
@@ -205,6 +212,18 @@ A shorter way to do the same is:
 $ nix-shell -p sqlite xorg.libX11
 [nix-shell]$ echo $NIX_LDFLAGS
 … -L/nix/store/j1zg5v…-sqlite-3.8.0.2/lib -L/nix/store/0gmcz9…-libX11-1.6.1/lib …
+</screen>
+
+The <command>-p</command> flag looks up Nixpkgs in the Nix search
+path. You can override it by passing <option>-I</option> or setting
+<envar>NIX_PATH</envar>. For example, the following gives you a shell
+containing the Pan package from a specific revision of Nixpkgs:
+
+<screen>
+$ nix-shell -p pan -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/8a3eea054838b55aca962c3fbde9c83c102b8bf2.tar.gz
+
+[nix-shell:~]$ pan --version
+Pan 0.139
 </screen>
 
 </para>

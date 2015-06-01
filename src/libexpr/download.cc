@@ -212,6 +212,7 @@ Path downloadFileCached(const string & url, bool unpack)
             printMsg(lvlInfo, format("unpacking ‘%1%’...") % url);
             Path tmpDir = createTempDir();
             AutoDelete autoDelete(tmpDir, true);
+            // FIXME: this requires GNU tar for decompression.
             runProgram("tar", true, {"xf", storePath, "-C", tmpDir, "--strip-components", "1"}, "");
             unpackedStorePath = store->addToStore(name, tmpDir, true, htSHA256, defaultPathFilter, false);
         }

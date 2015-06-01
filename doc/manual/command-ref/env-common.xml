@@ -36,8 +36,20 @@ nixpkgs=/home/eelco/Dev/nixpkgs-branch:/etc/nixos</screen>
     <literal>&lt;nixpkgs/<replaceable>path</replaceable>></literal> in
     <filename>/home/eelco/Dev/nixpkgs-branch/<replaceable>path</replaceable></filename>
     and
-    <filename>/etc/nixos/nixpkgs/<replaceable>path</replaceable></filename>.
-    </para>
+    <filename>/etc/nixos/nixpkgs/<replaceable>path</replaceable></filename>.</para>
+
+    <para>If a path in the Nix search path starts with
+    <literal>http://</literal> or <literal>https://</literal>, it is
+    interpreted as the URL of a tarball that will be downloaded and
+    unpacked to a temporary location. The tarball must consist of a
+    single top-level directory. For example, setting
+    <envar>NIX_PATH</envar> to
+
+    <screen>
+nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/nixos-14.12.tar.gz</screen>
+
+    tells Nix to download the latest revision in the Nixpkgs/NixOS
+    14.12 channel.</para>
 
     <para>The search path can be extended using the <option
     linkend="opt-I">-I</option> option, which takes precedence over

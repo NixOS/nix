@@ -58,6 +58,13 @@ and so on).</para>
 <command>nix-build</command> will use <filename>default.nix</filename>
 in the current directory, if it exists.</para>
 
+<para>If an element of <replaceable>paths</replaceable> starts with
+<literal>http://</literal> or <literal>https://</literal>, it is
+interpreted as the URL of a tarball that will be downloaded and
+unpacked to a temporary location. The tarball must include a single
+top-level directory containing at least a file named
+<filename>default.nix</filename>.</para>
+
 <para><command>nix-build</command> is essentially a wrapper around
 <link
 linkend="sec-nix-instantiate"><command>nix-instantiate</command></link>
@@ -171,6 +178,15 @@ This will create a symlink <literal>result-man</literal>.</para>
 $ nix-build -E 'with import &lt;nixpkgs> { }; runCommand "foo" { } "echo bar > $out"'
 $ cat ./result
 bar
+</screen>
+
+</para>
+
+<para>Build the GNU Hello package from the latest revision of the
+master branch of Nixpkgs:
+
+<screen>
+$ nix-build https://github.com/NixOS/nixpkgs/archive/master.tar.gz -A hello
 </screen>
 
 </para>

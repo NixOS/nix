@@ -154,7 +154,15 @@ also <xref linkend="sec-common-options" />.</phrase></para>
     <option>--install</option>, <option>--upgrade</option>, and
     <option>--query --available</option> operations to obtain
     derivations.  The default is
-    <filename>~/.nix-defexpr</filename>.</para></listitem>
+    <filename>~/.nix-defexpr</filename>.</para>
+
+    <para>If the argument starts with <literal>http://</literal> or
+    <literal>https://</literal>, it is interpreted as the URL of a
+    tarball that will be downloaded and unpacked to a temporary
+    location. The tarball must include a single top-level directory
+    containing at least a file named <filename>default.nix</filename>.</para>
+
+    </listitem>
 
   </varlistentry>
 
@@ -495,6 +503,18 @@ the following paths will be substituted:
   <replaceable>...</replaceable></screen>
 
 </para>
+
+<para>To install Firefox from the latest revision in the Nixpkgs/NixOS
+14.12 channel:
+
+<screen>
+$ nix-env -f https://github.com/NixOS/nixpkgs-channels/archive/nixos-14.12.tar.gz -iA firefox
+</screen>
+
+(The GitHub repository <literal>nixpkgs-channels</literal> is updated
+automatically from the main <literal>nixpkgs</literal> repository
+after certain tests have succeeded and binaries have been built and
+uploaded to the binary cache at <uri>cache.nixos.org</uri>.)</para>
 
 </refsection>
 
@@ -1129,53 +1149,102 @@ user environment elements, etc. -->
 
 <refsection><title>Examples</title>
 
+<para>To show installed packages:
+
 <screen>
-$ nix-env -q <lineannotation>(show installed derivations)</lineannotation>
+$ nix-env -q
 bison-1.875c
 docbook-xml-4.2
 firefox-1.0.4
 MPlayer-1.0pre7
 ORBit2-2.8.3
-...
+<replaceable>…</replaceable>
+</screen>
 
-$ nix-env -qa <lineannotation>(show available derivations)</lineannotation>
+</para>
+
+<para>To show available packages:
+
+<screen>
+$ nix-env -qa
 firefox-1.0.7
 GConf-2.4.0.1
 MPlayer-1.0pre7
 ORBit2-2.8.3
-...
+<replaceable>…</replaceable>
+</screen>
 
-$ nix-env -qas      <lineannotation>(show status of available derivations)</lineannotation>
+</para>
+
+<para>To show the status of available packages:
+
+<screen>
+$ nix-env -qas
 -P- firefox-1.0.7   <lineannotation>(not installed but present)</lineannotation>
 --S GConf-2.4.0.1   <lineannotation>(not present, but there is a substitute for fast installation)</lineannotation>
 --S MPlayer-1.0pre3 <lineannotation>(i.e., this is not the installed MPlayer, even though the version is the same!)</lineannotation>
 IP- ORBit2-2.8.3    <lineannotation>(installed and by definition present)</lineannotation>
-...
+<replaceable>…</replaceable>
+</screen>
 
-<lineannotation>(show available derivations in the Nix expression <!-- !!! <filename>-->foo.nix<!-- </filename> -->)</lineannotation>
+</para>
+
+<para>To show available packages in the Nix expression <filename>foo.nix</filename>:
+
+<screen>
 $ nix-env -f ./foo.nix -qa
 foo-1.2.3
+</screen>
 
-$ nix-env -qc <lineannotation>(compare installed versions to what’s available)</lineannotation>
+</para>
+
+<para>To compare installed versions to what’s available:
+
+<screen>
+$ nix-env -qc
 <replaceable>...</replaceable>
 acrobat-reader-7.0 - ?      <lineannotation>(package is not available at all)</lineannotation>
 autoconf-2.59      = 2.59   <lineannotation>(same version)</lineannotation>
 firefox-1.0.4      &lt; 1.0.7  <lineannotation>(a more recent version is available)</lineannotation>
 <replaceable>...</replaceable>
+</screen>
 
-$ nix-env -qa '.*zip.*' <lineannotation>(show all packages with “zip” in the name)</lineannotation>
+</para>
+
+<para>To show all packages with “<literal>zip</literal>” in the name:
+
+<screen>
+$ nix-env -qa '.*zip.*'
 bzip2-1.0.6
 gzip-1.6
 zip-3.0
-<replaceable>...</replaceable>
+<replaceable>…</replaceable>
+</screen>
 
-$ nix-env -qa '.*(firefox|chromium).*' <lineannotation>(show all packages with “firefox” or “chromium” in the name)</lineannotation>
+</para>
+
+<para>To show all packages with “<literal>firefox</literal>” or
+“<literal>chromium</literal>” in the name:
+
+<screen>
+$ nix-env -qa '.*(firefox|chromium).*'
 chromium-37.0.2062.94
 chromium-beta-38.0.2125.24
 firefox-32.0.3
 firefox-with-plugins-13.0.1
-<replaceable>...</replaceable>
+<replaceable>…</replaceable>
 </screen>
+
+</para>
+
+<para>To show all packages in the latest revision of the Nixpkgs
+repository:
+
+<screen>
+$ nix-env -f https://github.com/NixOS/nixpkgs/archive/master.tar.gz -qa
+</screen>
+
+</para>
 
 </refsection>
 

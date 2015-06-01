@@ -211,6 +211,45 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
   </varlistentry>
 
 
+  <varlistentry><term><function>builtins.fetchurl</function>
+  <replaceable>url</replaceable></term>
+
+    <listitem><para>Download the specified URL and return the path of
+    the downloaded file. This function is not available if <link
+    linkend="conf-restrict-eval">restricted evaluation mode</link> is
+    enabled.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry><term><function>fetchTarball</function>
+  <replaceable>url</replaceable></term>
+
+    <listitem><para>Download the specified URL, unpack it and return
+    the path of the unpacked tree. The file must be a tape archive
+    (<filename>.tar</filename>) compressed with
+    <literal>gzip</literal>, <literal>bzip2</literal> or
+    <literal>xz</literal>. The top-level path component of the files
+    in the tarball is removed, so it is best if the tarball contains a
+    single directory at top level. The typical use of the function is
+    to obtain external Nix expression dependencies, such as a
+    particular version of Nixpkgs, e.g.
+
+<programlisting>
+with import (fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixos-14.12.tar.gz) {};
+
+stdenv.mkDerivation { … }
+</programlisting>
+
+    </para>
+
+    <para>This function is not available if <link
+    linkend="conf-restrict-eval">restricted evaluation mode</link> is
+    enabled.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry><term><function>builtins.filter</function>
   <replaceable>f</replaceable> <replaceable>xs</replaceable></term>
 
