@@ -186,7 +186,7 @@ main = do
   for Hydra to ensure that a Hydra jobset only refers to its declared
   inputs (and is therefore reproducible).</para></listitem>
 
-  <listitem><para><command>nix-env</command> now only created a new
+  <listitem><para><command>nix-env</command> now only creates a new
   “generation” symlink in <filename>/nix/var/nix/profiles</filename>
   if something actually changed.</para></listitem>
 
