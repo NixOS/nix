@@ -1340,6 +1340,56 @@ $ nix-store --clear-failed-paths *
 
 <!--######################################################################-->
 
+<refsection xml:id='rsec-nix-store-generate-binary-cache-key'><title>Operation <option>--generate-binary-cache-key</option></title>
+
+<refsection>
+  <title>Synopsis</title>
+  <cmdsynopsis>
+    <command>nix-store</command>
+    <arg choice='plain'>
+      <option>--generate-binary-cache-key</option>
+      <option>key-name</option>
+      <option>secret-key-file</option>
+      <option>public-key-file</option>
+    </arg>
+  </cmdsynopsis>
+</refsection>
+
+<refsection><title>Description</title>
+
+<para>This command generates an <link
+xlink:href="http://ed25519.cr.yp.to/">Ed25519 key pair</link> that can
+be used to create a signed binary cache. It takes three mandatory
+parameters:
+
+<orderedlist>
+
+  <listitem><para>A key name, such as
+  <literal>cache.example.org-1</literal>, that is used to look up keys
+  on the client when it verifies signatures. It can be anything, but
+  it’s suggested to use the host name of your cache
+  (e.g. <literal>cache.example.org</literal>) with a suffix denoting
+  the number of the key (to be incremented every time you need to
+  revoke a key).</para></listitem>
+
+  <listitem><para>The file name where the secret key is to be
+  stored.</para></listitem>
+
+  <listitem><para>The file name where the public key is to be
+  stored.</para></listitem>
+
+</orderedlist>
+
+For an example, see the manual page for <command
+linkend="sec-nix-push">nix-push</command>.</para>
+
+</refsection>
+
+</refsection>
+
+
+<!--######################################################################-->
+
 <refsection condition="manpage"><title>Environment variables</title>
 
 <variablelist>

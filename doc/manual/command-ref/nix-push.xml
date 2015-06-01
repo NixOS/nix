@@ -27,6 +27,7 @@
     <arg><option>--manifest</option></arg>
     <arg><option>--manifest-path</option> <replaceable>filename</replaceable></arg>
     <arg><option>--url-prefix</option> <replaceable>url</replaceable></arg>
+    <arg><option>--key-file</option> <replaceable>path</replaceable></arg>
     <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
   </cmdsynopsis>
 </refsynopsisdiv>
@@ -43,7 +44,7 @@ source and instead download binaries from the cache
 automatically.</para>
 
 <para><command>nix-push</command> performs the following actions.
-      
+
 <orderedlist>
 
   <listitem><para>Each path in <replaceable>paths</replaceable> is
@@ -155,6 +156,19 @@ automatically.</para>
 
   </varlistentry>
 
+  <varlistentry><term><option>--key-file</option> <replaceable>path</replaceable></term>
+
+    <listitem><para>Sign the binary cache using the secret key stored
+    in <replaceable>path</replaceable>. This secret key must have been
+    created using <command
+    linkend="rsec-nix-store-generate-binary-cache-key">nix-store
+    --generate-binary-cache-key</command>. Users of this binary cache
+    should add the corresponding public key to the option
+    <option>binary-cache-public-keys</option> in
+    <filename>nix.conf</filename>.</para></listitem>
+
+  </varlistentry>
+
 </variablelist>
 
 </refsection>
@@ -203,6 +217,40 @@ $ nix-pull http://example.org/cache
 
 to cause the binaries to be used by subsequent Nix operations.</para>
 
+<para>To generate a signed binary cache, you must first generate a key
+pair, in this example called <literal>cache.example.org-1</literal>,
+storing the secret key in <filename>./sk</filename> and the public key
+in <filename>./pk</filename>:
+
+<screen>
+$ nix-store --generate-binary-cache-key cache.example.org-1 sk pk
+
+$ cat sk
+cache.example.org-1:jcMRQYFo8pQKzTtimpQLIPeHkMYZjfhB24hGfwF+u9PuX8H8FO7q564+X3G/JDlqqIqGar3OXRRwS9N3Wh3vbw==
+
+$ cat pk
+cache.example.org-1:7l/B/BTu6ueuPl9xvyQ5aqiKhmq9zl0UcEvTd1od728=
+</screen>
+
+You can then generate a binary cache signed with the secret key:
+
+<screen>
+$ nix-push --dest /tmp/cache --key-file ./sk $(type -p firefox)
+</screen>
+
+Users who wish to verify the integrity of binaries downloaded from
+your cache would add the following to their
+<filename>nix.conf</filename>:
+
+<programlisting>
+binary-caches = http://cache.example.org
+signed-binary-caches = *
+binary-cache-public-keys = cache.example.org-1:7l/B/BTu6ueuPl9xvyQ5aqiKhmq9zl0UcEvTd1od728=
+</programlisting>
+
+Nix will then ignore any binary that has a missing, incorrect or
+unrecognised signature.</para>
+
 </refsection>
 
 
@@ -224,7 +272,7 @@ Priority: 10
 The properties that are currently supported are:
 
 <variablelist>
-  
+
   <varlistentry><term><literal>StoreDir</literal></term>
 
     <listitem><para>The path of the Nix store to which this binary
@@ -303,12 +351,13 @@ NarHash: sha256:0s491y1h9hxj5ghiizlxk7ax6jwbha00zwn7lpyd5xg5bhf60vzg
 NarSize: 109521136
 References: 2ma2k0ys8knh4an48n28vigcmc2z8773-linux-headers-2.6.23.16 ...
 Deriver: 7akyyc87ka32xwmqza9dvyg5pwx3j212-glibc-2.7.drv
+Sig: cache.example.org-1:WepnSp2UT0odDpR3NRjPVhJBHmdBgSBSTbHpdh4SCz92nGXwFY82bkPEmISoC0hGqBXDXEmB6y3Ohgna3mMgDg==
 </screen>
 
 The fields are as follows:
 
 <variablelist>
-  
+
   <varlistentry><term><literal>StorePath</literal></term>
 
     <listitem><para>The full store path, including the name part
@@ -378,6 +427,22 @@ The fields are as follows:
 
     <listitem><para>The Nix platform type of this binary, if known.
     This field is optional.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><literal>Sig</literal></term>
+
+    <listitem><para>A signature of the the form
+    <literal><replaceable>key-name</replaceable>:<replaceable>sig</replaceable></literal>,
+    where <replaceable>key-name</replaceable> is the symbolic name of
+    the key pair used to sign and verify the cache
+    (e.g. <literal>cache.example.org-1</literal>), and
+    <replaceable>sig</replaceable> is the actual signature, computed
+    over the <varname>StorePath</varname>, <varname>NarHash</varname>,
+    <varname>NarSize</varname> and <varname>References</varname>
+    fields using the <link
+    xlink:href="http://ed25519.cr.yp.to/">Ed25519 public-key signature
+    system</link>.</para></listitem>
 
   </varlistentry>
 

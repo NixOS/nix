@@ -401,6 +401,26 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
   </varlistentry>
 
 
+  <varlistentry><term><literal>signed-binary-caches</literal></term>
+
+    <listitem><para>If set to <literal>*</literal>, Nix will only
+    download binaries if they are signed using one of the keys listed
+    in <option>binary-cache-public-keys</option>.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry><term><literal>binary-cache-public-keys</literal></term>
+
+    <listitem><para>A whitespace-separated list of public keys
+    corresponding to the secret keys trusted to sign binary
+    caches. For example:
+    <literal>cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+    hydra.nixos.org-1:CNHJZBh9K4tP3EKF6FkkgeVYsS3ohTl+oS0Qa8bezVs=</literal>.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry><term><literal>binary-caches-parallel-connections</literal></term>
 
     <listitem><para>The maximum number of parallel HTTP connections
