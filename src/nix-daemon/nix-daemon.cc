@@ -520,13 +520,15 @@ static void performOp(bool trusted, unsigned int clientVersion,
         break;
 
     case wopVerifyStore: {
-	bool checkContents = readInt(from) != 0;
-	bool repair = readInt(from) != 0;
-	startWork();
-	bool errors = store->verifyStore(checkContents, repair);
-	stopWork();
-	writeInt(errors, to);
-	break;
+        bool checkContents = readInt(from) != 0;
+        bool repair = readInt(from) != 0;
+        startWork();
+        if (repair && !trusted)
+            throw Error("you are not privileged to repair paths");
+        bool errors = store->verifyStore(checkContents, repair);
+        stopWork();
+        writeInt(errors, to);
+        break;
     }
 
     default:
