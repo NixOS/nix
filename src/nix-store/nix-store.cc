@@ -768,7 +768,7 @@ static void opVerify(Strings opFlags, Strings opArgs)
         else if (*i == "--repair") repair = true;
         else throw UsageError(format("unknown flag ‘%1%’") % *i);
 
-    if (ensureLocalStore().verifyStore(checkContents, repair)) {
+    if (store->verifyStore(checkContents, repair)) {
         printMsg(lvlError, "warning: not all errors were fixed");
         throw Exit(1);
     }
