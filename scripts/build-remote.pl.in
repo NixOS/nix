@@ -84,7 +84,7 @@ if (defined $conf && -e $conf) {
         push @machines,
             { hostName => $tokens[0]
             , systemTypes => [ split(/,/, $tokens[1]) ]
-            , sshKeys => $tokens[2]
+            , sshKey => $tokens[2]
             , maxJobs => int($tokens[3])
             , speedFactor => 1.0 * (defined $tokens[4] ? int($tokens[4]) : 1)
             , supportedFeatures => [ @supportedFeatures, @mandatoryFeatures ]
@@ -203,7 +203,7 @@ REQ: while (1) {
 
 
         # Connect to the selected machine.
-        my @sshOpts = ("-i", $machine->{sshKeys});
+        my @sshOpts = ("-i", $machine->{sshKey});
         $hostName = $machine->{hostName};
         eval {
             ($from, $to) = connectToRemoteNix($hostName, \@sshOpts, "2>&4");
