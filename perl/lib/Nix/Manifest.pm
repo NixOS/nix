@@ -462,9 +462,16 @@ sub parseNARInfo {
             return undef;
         }
 
-        my $fingerprint = fingerprintPath(
-            $storePath, $narHash, $narSize,
-            [ map { "$Nix::Config::storeDir/$_" } @refs ]);
+        my $fingerprint;
+        eval {
+            $fingerprint = fingerprintPath(
+                $storePath, $narHash, $narSize,
+                [ map { "$Nix::Config::storeDir/$_" } @refs ]);
+        };
+        if ($@) {
+            warn "cannot compute fingerprint of ‘$location’; ignoring\n";
+            return undef;
+        }
 
         if (!checkSignature($publicKey, decode_base64($sig64), $fingerprint)) {
             warn "NAR info file ‘$location’ has an incorrect signature; ignoring\n";
