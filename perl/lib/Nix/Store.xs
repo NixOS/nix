@@ -232,6 +232,17 @@ SV * hashString(char * algo, int base32, char * s)
         }
 
 
+SV * convertHash(char * algo, char * s, int toBase32)
+    PPCODE:
+        try {
+            Hash h = parseHash16or32(parseHashType(algo), s);
+            string s = toBase32 ? printHash32(h) : printHash(h);
+            XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
+        } catch (Error & e) {
+            croak(e.what());
+        }
+
+
 SV * signString(SV * secretKey_, char * msg)
     PPCODE:
         try {
