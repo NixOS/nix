@@ -1655,6 +1655,7 @@ void DerivationGoal::startBuilder()
        environments, except those listed in the passAsFile
        attribute. Those are passed as file names pointing to
        temporary files containing the contents. */
+    PathSet filesToChown;
     StringSet passAsFile = tokenizeString<StringSet>(get(drv.env, "passAsFile"));
     int fileNr = 0;
     for (auto & i : drv.env) {
@@ -1663,6 +1664,7 @@ void DerivationGoal::startBuilder()
         } else {
             Path p = tmpDir + "/.attr-" + int2String(fileNr++);
             writeFile(p, i.second);
+            filesToChown.insert(p);
             env[i.first + "Path"] = p;
         }
     }
@@ -1759,8 +1761,11 @@ void DerivationGoal::startBuilder()
         buildUser.kill();
 
         /* Change ownership of the temporary build directory. */
-        if (chown(tmpDir.c_str(), buildUser.getUID(), buildUser.getGID()) == -1)
-            throw SysError(format("cannot change ownership of ‘%1%’") % tmpDir);
+        filesToChown.insert(tmpDir);
+
+        for (auto & p : filesToChown)
+            if (chown(p.c_str(), buildUser.getUID(), buildUser.getGID()) == -1)
+                throw SysError(format("cannot change ownership of ‘%1%’") % p);
     }
 
 
