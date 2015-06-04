@@ -94,7 +94,7 @@ elsif ($ARGV[0] eq "--substitute") {
     my ($store, $sourcePath) = findStorePath $storePath;
     die unless $store;
     print STDERR "\n*** Copying ‘$storePath’ from ‘$sourcePath’\n\n";
-    system("$binDir/nix-store --dump $sourcePath | $binDir/nix-store --restore $destPath") == 0
+    system("@coreutils@/cp", "-rpd", $sourcePath, $destPath) == 0
         or die "cannot copy ‘$sourcePath’ to ‘$storePath’";
     print "\n"; # no hash to verify
 }
