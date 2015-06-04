@@ -999,7 +999,7 @@ void DerivationGoal::haveDerivation()
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
-    if (settings.useSubstitutes && !willBuildLocally(drv))
+    if (settings.useSubstitutes && substitutesAllowed(drv))
         foreach (PathSet::iterator, i, invalidOutputs)
             addWaitee(worker.makeSubstitutionGoal(*i, buildMode == bmRepair));
 
@@ -1196,13 +1196,6 @@ PathSet outputPaths(const DerivationOutputs & outputs)
 }
 
 
-static string get(const StringPairs & map, const string & key)
-{
-    StringPairs::const_iterator i = map.find(key);
-    return i == map.end() ? (string) "" : i->second;
-}
-
-
 static bool canBuildLocally(const string & platform)
 {
     return platform == settings.thisSystem
@@ -1213,9 +1206,22 @@ static bool canBuildLocally(const string & platform)
 }
 
 
+static string get(const StringPairs & map, const string & key, const string & def = "")
+{
+    StringPairs::const_iterator i = map.find(key);
+    return i == map.end() ? def : i->second;
+}
+
+
 bool willBuildLocally(const Derivation & drv)
 {
     return get(drv.env, "preferLocalBuild") == "1" && canBuildLocally(drv.platform);
+}
+
+
+bool substitutesAllowed(const Derivation & drv)
+{
+    return get(drv.env, "allowSubstitutes", "1") == "1";
 }
 
 

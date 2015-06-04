@@ -120,7 +120,7 @@ void queryMissing(StoreAPI & store, const PathSet & targets,
                 if (invalid.empty()) continue;
 
                 todoDrv.insert(*i);
-                if (settings.useSubstitutes && !willBuildLocally(drv))
+                if (settings.useSubstitutes && substitutesAllowed(drv))
                     query.insert(invalid.begin(), invalid.end());
             }
 
@@ -144,7 +144,7 @@ void queryMissing(StoreAPI & store, const PathSet & targets,
 
             PathSet outputs;
             bool mustBuild = false;
-            if (settings.useSubstitutes && !willBuildLocally(drv)) {
+            if (settings.useSubstitutes && substitutesAllowed(drv)) {
                 foreach (DerivationOutputs::iterator, j, drv.outputs) {
                     if (!wantOutput(j->first, i2.second)) continue;
                     if (!store.isValidPath(j->second.path)) {

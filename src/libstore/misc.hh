@@ -34,5 +34,7 @@ void queryMissing(StoreAPI & store, const PathSet & targets,
 
 bool willBuildLocally(const Derivation & drv);
 
+bool substitutesAllowed(const Derivation & drv);
+
 
 }
