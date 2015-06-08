@@ -102,9 +102,9 @@ automatically.</para>
   <varlistentry><term><option>--bzip2</option></term>
 
     <listitem><para>Compress NARs using <command>bzip2</command>
-    instead of <command>xz -9</command>.  The latter compresses about
-    30% better on typical archives, decompresses about twice as fast,
-    but compresses a lot slower and is not supported by Nix prior to
+    instead of <command>xz</command>.  The latter compresses about 30%
+    better on typical archives, decompresses about twice as fast, but
+    compresses a lot slower and is not supported by Nix prior to
     version 1.2.</para></listitem>
 
   </varlistentry>
