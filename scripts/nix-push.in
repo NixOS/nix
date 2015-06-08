@@ -29,6 +29,7 @@ my $archivesURL;
 my $link = 0;
 my $secretKeyFile;
 my @roots;
+my @buildArgs;
 
 for (my $n = 0; $n < scalar @ARGV; $n++) {
     my $arg = $ARGV[$n];
@@ -64,6 +65,10 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
         $n++;
         die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
         $secretKeyFile = $ARGV[$n];
+    } elsif ($arg eq "--max-jobs" || $arg eq "-j") {
+        $n++;
+        die "$0: ‘$arg’ requires an argument\n" unless $n < scalar @ARGV;
+        push @buildArgs, ($arg, $ARGV[$n]);
     } elsif (substr($arg, 0, 1) eq "-") {
         die "$0: unknown flag ‘$arg’\n";
     } else {
@@ -153,7 +158,7 @@ close NIX;
 # Build the Nix expression.
 print STDERR "building compressed archives...\n";
 my @narPaths;
-my $pid = open(READ, "$Nix::Config::binDir/nix-build $nixExpr -o $tmpDir/result |")
+my $pid = open(READ, "-|", "$Nix::Config::binDir/nix-build", $nixExpr, "-o", "$tmpDir/result", @buildArgs)
     or die "cannot run nix-build";
 while (<READ>) {
     chomp;
