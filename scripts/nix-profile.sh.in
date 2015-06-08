@@ -22,11 +22,15 @@ if [ -n "$HOME" ]; then
     export NIX_PATH=${NIX_PATH:+$NIX_PATH:}nixpkgs=$HOME/.nix-defexpr/channels/nixpkgs
 
     # Set $SSL_CERT_FILE so that Nixpkgs applications like curl work.
-    if [ -e /etc/ssl/certs/ca-bundle.crt ]; then # Fedora, NixOS
-        export SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
-    elif [ -e /etc/ssl/certs/ca-certificates.crt ]; then # Ubuntu, Debian
+    if [ -e /etc/ssl/certs/ca-certificates.crt ]; then # NixOS, Ubuntu, Debian, Gentoo, Arch
         export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
-    elif [ -e "$NIX_LINK/etc/ca-bundle.crt" ]; then # fall back to Nix profile
+    elif [ -e /etc/ssl/certs/ca-bundle.crt ]; then # Old NixOS
+        export SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
+    elif [ -e /etc/pki/tls/certs/ca-bundle.crt ]; then # Fedora, CentOS
+        export SSL_CERT_FILE=/etc/pki/tls/certs/ca-bundle.crt
+    elif [ -e "$NIX_LINK/etc/ssl/certs/ca-bundle.crt" ]; then # fall back to cacert in Nix profile
+        export SSL_CERT_FILE="$NIX_LINK/etc/ssl/certs/ca-bundle.crt"
+    elif [ -e "$NIX_LINK/etc/ca-bundle.crt" ]; then # old cacert in Nix profile
         export SSL_CERT_FILE="$NIX_LINK/etc/ca-bundle.crt"
     fi
 fi
