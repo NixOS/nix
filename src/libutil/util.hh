@@ -295,7 +295,7 @@ MakeError(ExecError, Error)
 /* Convert a list of strings to a null-terminated vector of char
    *'s. The result must not be accessed beyond the lifetime of the
    list of strings. */
-std::vector<const char *> stringsToCharPtrs(const Strings & ss);
+std::vector<char *> stringsToCharPtrs(const Strings & ss);
 
 /* Close all file descriptors except stdin, stdout, stderr, and those
    listed in the given set.  Good practice in child processes. */

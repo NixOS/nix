@@ -927,10 +927,10 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
 }
 
 
-std::vector<const char *> stringsToCharPtrs(const Strings & ss)
+std::vector<char *> stringsToCharPtrs(const Strings & ss)
 {
-    std::vector<const char *> res;
-    for (auto & s : ss) res.push_back(s.c_str());
+    std::vector<char *> res;
+    for (auto & s : ss) res.push_back((char *) s.c_str());
     res.push_back(0);
     return res;
 }
@@ -957,12 +957,11 @@ string runProgram(Path program, bool searchPath, const Strings & args,
 
         Strings args_(args);
         args_.push_front(program);
-        auto cargs = stringsToCharPtrs(args_);
 
         if (searchPath)
-            execvp(program.c_str(), (char * *) &cargs[0]);
+            execvp(program.c_str(), stringsToCharPtrs(args_).data());
         else
-            execv(program.c_str(), (char * *) &cargs[0]);
+            execv(program.c_str(), stringsToCharPtrs(args_).data());
 
         throw SysError(format("executing ‘%1%’") % program);
     });
