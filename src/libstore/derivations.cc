@@ -285,4 +285,13 @@ bool wantOutput(const string & output, const std::set<string> & wanted)
 }
 
 
+PathSet outputPaths(const Derivation & drv)
+{
+    PathSet paths;
+    for (auto & i : drv.outputs)
+        paths.insert(i.second.path);
+    return paths;
+}
+
+
 }

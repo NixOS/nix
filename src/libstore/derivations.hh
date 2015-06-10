@@ -89,5 +89,6 @@ Path makeDrvPathWithOutputs(const Path & drvPath, const std::set<string> & outpu
 
 bool wantOutput(const string & output, const std::set<string> & wanted);
 
+PathSet outputPaths(const Derivation & drv);
 
 }
