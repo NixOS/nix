@@ -116,13 +116,13 @@ sub update {
 
         my $path;
         my $ret = -1;
-        if (-e "$tmpdir/$filename") {
-            # Get our temporary download into the store
+        if (-e "$tmpdir/$filename" && $filename =~ /\.tar\.(gz|bz2|xz)$/) {
+            # Get our temporary download into the store.
             (my $hash, $path) = `PRINT_PATH=1 QUIET=1 $Nix::Config::binDir/nix-prefetch-url 'file://$tmpdir/$filename'`;
             chomp $path;
 
             # Try unpacking the expressions to see if they'll be valid for us to process later.
-            # Like anything in nix, this will cache the result so we don't do it again outside of the loop below
+            # Like anything in nix, this will cache the result so we don't do it again outside of the loop below.
             $ret = system("$Nix::Config::binDir/nix-build --no-out-link -E 'import <nix/unpack-channel.nix> " .
                           "{ name = \"$cname\"; channelName = \"$name\"; src = builtins.storePath \"$path\"; }'");
         }
