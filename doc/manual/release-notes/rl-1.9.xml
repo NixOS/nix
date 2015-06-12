@@ -24,12 +24,12 @@ binary-cache-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFG
     that is not signed by one of the keys listed in
     <option>binary-cache-public-keys</option>.</para>
 
-    <para>Signature checking is only supported if you build Nix with
+    <para>Signature checking is only supported if you built Nix with
     the <literal>libsodium</literal> package.</para>
 
-    <para>Nix has had experimental support for signed binary caches
-    since version 1.7, but this release changes the signature format
-    in a backwards-incompatible way.</para>
+    <para>Note that while Nix has had experimental support for signed
+    binary caches since version 1.7, this release changes the
+    signature format in a backwards-incompatible way.</para>
 
   </listitem>
 
@@ -101,7 +101,7 @@ with import (fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixo
       <listitem><para><command>nix-shell</command> now has a flag
       <option>--run</option> to execute a command in the
       <command>nix-shell</command> environment,
-      e.g. <literal>nix-shell --command make</literal>. This is like
+      e.g. <literal>nix-shell --run make</literal>. This is like
       the existing <option>--command</option> flag, except that it
       uses a non-interactive shell (ensuring that hitting Ctrl-C won’t
       drop you into the child shell).</para></listitem>
@@ -143,10 +143,10 @@ main = do
 
       <listitem><para>If chroots are enabled, they are now used for
       all derivations, including fixed-output derivations (such as
-      <function>fetchurl</function>); however the latter do have
-      network access. Thus the latter can no longer access the host
-      filesystem. If you need the old behaviour, you can set the
-      option <option>build-use-chroot</option> to
+      <function>fetchurl</function>). The latter do have network
+      access, but can no longer access the host filesystem. If you
+      need the old behaviour, you can set the option
+      <option>build-use-chroot</option> to
       <literal>relaxed</literal>.</para></listitem>
 
       <listitem><para>On Linux, if chroots are enabled, builds are
@@ -156,7 +156,7 @@ main = do
       <listitem><para>Store paths listed in
       <option>build-chroot-dirs</option> are now automatically
       expanded to their closure. For instance, if you want
-      <filename>/nix/store/…-bash/bin/sh</filename>> mounted in your
+      <filename>/nix/store/…-bash/bin/sh</filename> mounted in your
       chroot as <filename>/bin/sh</filename>, you only need to say
       <literal>build-chroot-dirs =
       /bin/sh=/nix/store/…-bash/bin/sh</literal>; it is no longer
@@ -199,8 +199,8 @@ main = do
   lookups now show position information.</para></listitem>
 
   <listitem><para>Improved Boehm GC use: we disabled scanning for
-  interior pointers, which should reduce the <literal>Repeated
-  allocation of very large block</literal> warnings and associated
+  interior pointers, which should reduce the “<literal>Repeated
+  allocation of very large block</literal>” warnings and associated
   retention of memory.</para></listitem>
 
 </itemizedlist>
