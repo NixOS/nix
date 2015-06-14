@@ -1250,6 +1250,7 @@ static bool canBuildLocally(const string & platform)
     return platform == settings.thisSystem
 #if __linux__
         || (platform == "i686-linux" && settings.thisSystem == "x86_64-linux")
+        || (platform == "armv6l-linux" && settings.thisSystem == "armv7l-linux")
 #endif
         ;
 }
