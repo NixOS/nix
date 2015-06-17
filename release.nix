@@ -305,7 +305,9 @@ let
       memSize = 1024;
       meta.schedulingPriority = 50;
       configureFlags = "--sysconfdir=/etc";
-      debRequires = [ "curl" "libdbd-sqlite3-perl" "libsqlite3-0" "libbz2-1.0" "bzip2" "xz-utils" "libwww-curl-perl" ];
+      debRequires =
+        [ "curl" "libdbd-sqlite3-perl" "libsqlite3-0" "libbz2-1.0" "bzip2" "xz-utils" "libwww-curl-perl" ]
+        ++ lib.optionals (lib.elem "libsodium-dev" extraPackages) [ "libsodium13" ] ;
       debMaintainer = "Eelco Dolstra <eelco.dolstra@logicblox.com>";
       doInstallCheck = true;
     };
