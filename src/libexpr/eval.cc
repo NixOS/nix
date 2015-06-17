@@ -234,6 +234,18 @@ void initGC()
 }
 
 
+/* Very hacky way to parse $NIX_PATH, which is colon-separated, but
+   can contain URLs (e.g. "nixpkgs=https://bla...:foo=https://"). */
+static Strings parseNixPath(const string & in)
+{
+    string marker = "\001//";
+    auto res = tokenizeString<Strings>(replaceStrings(in, "://", marker), ":");
+    for (auto & s : res)
+        s = replaceStrings(s, marker, "://");
+    return res;
+}
+
+
 EvalState::EvalState(const Strings & _searchPath)
     : sWith(symbols.create("<with>"))
     , sOutPath(symbols.create("outPath"))
@@ -266,7 +278,7 @@ EvalState::EvalState(const Strings & _searchPath)
     assert(gcInitialised);
 
     /* Initialise the Nix expression search path. */
-    Strings paths = tokenizeString<Strings>(getEnv("NIX_PATH", ""), ":");
+    Strings paths = parseNixPath(getEnv("NIX_PATH", ""));
     for (auto & i : _searchPath) addToSearchPath(i, true);
     for (auto & i : paths) addToSearchPath(i);
     addToSearchPath("nix=" + settings.nixDataDir + "/nix/corepkgs");

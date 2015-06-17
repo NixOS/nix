@@ -341,6 +341,11 @@ string chomp(const string & s);
 string trim(const string & s, const string & whitespace = " \n\r\t");
 
 
+/* Replace all occurrences of a string inside another string. */
+string replaceStrings(const std::string & s,
+    const std::string & from, const std::string & to);
+
+
 /* Convert the exit status of a child as returned by wait() into an
    error string. */
 string statusToString(int status);

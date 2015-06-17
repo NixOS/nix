@@ -1095,6 +1095,20 @@ string trim(const string & s, const string & whitespace)
 }
 
 
+string replaceStrings(const std::string & s,
+    const std::string & from, const std::string & to)
+{
+    if (from.empty()) return s;
+    string res = s;
+    size_t pos = 0;
+    while ((pos = res.find(from, pos)) != std::string::npos) {
+        res.replace(pos, from.size(), to);
+        pos += to.size();
+    }
+    return res;
+}
+
+
 string statusToString(int status)
 {
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
