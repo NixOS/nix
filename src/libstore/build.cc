@@ -2423,7 +2423,7 @@ void DerivationGoal::runChild()
 
             /* Our ancestry. N.B: this uses literal on folders, instead of subpath. Without that,
                you open up the entire filesystem because you end up with (subpath "/") */
-            sandboxProfile += "(allow file-read-metadata\n";
+            sandboxProfile += "(allow file-read*\n";
             for (auto & i : ancestry) {
                 sandboxProfile += (format("\t(literal \"%1%\")\n") % i.c_str()).str();
             }
