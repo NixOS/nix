@@ -41,7 +41,7 @@ Settings::Settings()
     buildTimeout = 0;
     useBuildHook = true;
     printBuildTrace = false;
-    reservedSize = 1024 * 1024;
+    reservedSize = 8 * 1024 * 1024;
     fsyncMetadata = true;
     useSQLiteWAL = true;
     syncBeforeRegistering = false;
