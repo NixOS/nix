@@ -289,7 +289,17 @@ LocalStore::LocalStore(bool reserveSpace)
             struct stat st;
             if (stat(reservedPath.c_str(), &st) == -1 ||
                 st.st_size != settings.reservedSize)
-                writeFile(reservedPath, string(settings.reservedSize, 'X'));
+            {
+                AutoCloseFD fd = open(reservedPath.c_str(), O_WRONLY | O_CREAT, 0600);
+                int res = -1;
+#if HAVE_POSIX_FALLOCATE
+                res = posix_fallocate(fd, 0, settings.reservedSize);
+#endif
+                if (res == -1) {
+                    writeFull(fd, string(settings.reservedSize, 'X'));
+                    ftruncate(fd, settings.reservedSize);
+                }
+            }
         }
         else
             deletePath(reservedPath);
