@@ -376,6 +376,7 @@ struct LocalStore::GCState
     bool gcKeepOutputs;
     bool gcKeepDerivations;
     unsigned long long bytesInvalidated;
+    bool moveToTrash = true;
     Path trashDir;
     bool shouldDelete;
     GCState(GCResults & results_) : results(results_), bytesInvalidated(0) { }
@@ -428,16 +429,23 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
        not holding the global GC lock) we can delete the path without
        being afraid that the path has become alive again.  Otherwise
        delete it right away. */
-    if (S_ISDIR(st.st_mode)) {
+    if (state.moveToTrash && S_ISDIR(st.st_mode)) {
         // Estimate the amount freed using the narSize field.  FIXME:
         // if the path was not valid, need to determine the actual
         // size.
-        state.bytesInvalidated += size;
-        if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
-            throw SysError(format("making ‘%1%’ writable") % path);
-        Path tmp = state.trashDir + "/" + baseNameOf(path);
-        if (rename(path.c_str(), tmp.c_str()))
-            throw SysError(format("unable to rename ‘%1%’ to ‘%2%’") % path % tmp);
+        try {
+            if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
+                throw SysError(format("making ‘%1%’ writable") % path);
+            Path tmp = state.trashDir + "/" + baseNameOf(path);
+            if (rename(path.c_str(), tmp.c_str()))
+                throw SysError(format("unable to rename ‘%1%’ to ‘%2%’") % path % tmp);
+            state.bytesInvalidated += size;
+        } catch (SysError & e) {
+            if (e.errNo == ENOSPC) {
+                printMsg(lvlInfo, format("note: can't create move ‘%1%’: %2%") % path % e.msg());
+                deleteGarbage(state, path);
+            }
+        }
     } else
         deleteGarbage(state, path);
 
@@ -636,7 +644,14 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     if (state.shouldDelete) {
         if (pathExists(state.trashDir)) deleteGarbage(state, state.trashDir);
-        createDirs(state.trashDir);
+        try {
+            createDirs(state.trashDir);
+        } catch (SysError & e) {
+            if (e.errNo == ENOSPC) {
+                printMsg(lvlInfo, format("note: can't create trash directory: %1%") % e.msg());
+                state.moveToTrash = false;
+            }
+        }
     }
 
     /* Now either delete all garbage paths, or just the specified
