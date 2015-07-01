@@ -446,6 +446,7 @@ private:
     string user;
     uid_t uid;
     gid_t gid;
+    std::vector<gid_t> supplementaryGIDs;
 
 public:
     UserLock();
@@ -459,6 +460,7 @@ public:
     string getUser() { return user; }
     uid_t getUID() { return uid; }
     uid_t getGID() { return gid; }
+    std::vector<gid_t> getSupplementaryGIDs() { return supplementaryGIDs; }
 
     bool enabled() { return uid != 0; }
 
@@ -537,6 +539,17 @@ void UserLock::acquire()
             if (uid == getuid() || uid == geteuid())
                 throw Error(format("the Nix user should not be a member of ‘%1%’")
                     % settings.buildUsersGroup);
+
+            /* Get the list of supplementary groups of this build user.  This
+               is usually either empty or contains a group such as "kvm".  */
+            supplementaryGIDs.resize(10);
+            int ngroups = supplementaryGIDs.size();
+            int err = getgrouplist(pw->pw_name, pw->pw_gid,
+                supplementaryGIDs.data(), &ngroups);
+            if (err == -1)
+                throw Error(format("failed to get list of supplementary groups for ‘%1’") % pw->pw_name);
+
+            supplementaryGIDs.resize(ngroups);
 
             return;
         }
@@ -2304,8 +2317,11 @@ void DerivationGoal::runChild()
            setuid() when run as root sets the real, effective and
            saved UIDs. */
         if (buildUser.enabled()) {
-            if (setgroups(0, 0) == -1)
-                throw SysError("cannot clear the set of supplementary groups");
+            /* Preserve supplementary groups of the build user, to allow
+               admins to specify groups such as "kvm".  */
+            if (setgroups(buildUser.getSupplementaryGIDs().size(),
+                          buildUser.getSupplementaryGIDs().data()) == -1)
+                throw SysError("cannot set supplementary groups of build user");
 
             if (setgid(buildUser.getGID()) == -1 ||
                 getgid() != buildUser.getGID() ||
