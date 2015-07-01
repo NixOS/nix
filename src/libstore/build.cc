@@ -547,7 +547,7 @@ void UserLock::acquire()
             int err = getgrouplist(pw->pw_name, pw->pw_gid,
                 supplementaryGIDs.data(), &ngroups);
             if (err == -1)
-                throw Error(format("failed to get list of supplementary groups for ‘%1’") % pw->pw_name);
+                throw Error(format("failed to get list of supplementary groups for ‘%1%’") % pw->pw_name);
 
             supplementaryGIDs.resize(ngroups);
 
