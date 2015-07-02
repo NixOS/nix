@@ -216,10 +216,6 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Ex
 }
 
 
-void backToString(yyscan_t scanner);
-void backToIndString(yyscan_t scanner);
-
-
 static inline Pos makeCurPos(const YYLTYPE & loc, ParseData * data)
 {
     return Pos(data->path, loc.first_line, loc.first_column);
@@ -404,25 +400,18 @@ string_parts
 
 string_parts_interpolated
   : string_parts_interpolated STR { $$ = $1; $1->push_back($2); }
-  | string_parts_interpolated DOLLAR_CURLY expr '}' { backToString(scanner); $$ = $1; $1->push_back($3); }
-  | STR DOLLAR_CURLY expr '}'
-    {
-      backToString(scanner);
+  | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = $1; $1->push_back($3); }
+  | DOLLAR_CURLY expr '}' { $$ = new vector<Expr *>; $$->push_back($2); }
+  | STR DOLLAR_CURLY expr '}' {
       $$ = new vector<Expr *>;
       $$->push_back($1);
       $$->push_back($3);
-    }
-  | DOLLAR_CURLY expr '}'
-    {
-      backToString(scanner);
-      $$ = new vector<Expr *>;
-      $$->push_back($2);
     }
   ;
 
 ind_string_parts
   : ind_string_parts IND_STR { $$ = $1; $1->push_back($2); }
-  | ind_string_parts DOLLAR_CURLY expr '}' { backToIndString(scanner); $$ = $1; $1->push_back($3); }
+  | ind_string_parts DOLLAR_CURLY expr '}' { $$ = $1; $1->push_back($3); }
   | { $$ = new vector<Expr *>; }
   ;
 
