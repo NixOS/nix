@@ -129,12 +129,11 @@ or          { return OR_KW; }
 \}          { POP_STATE(); return '}'; }
 
 \"          { PUSH_STATE(STRING); return '"'; }
-<STRING>([^\$\"\\]|\$[^\{\"]|\\.)+ {
-              /* !!! Not quite right: we want a follow restriction on
-                 "$", it shouldn't be followed by a "{".  Right now
-                 "$\"" will be consumed as part of a string, rather
-                 than a "$" followed by the string terminator.
-                 Disallow "$\"" for now. */
+<STRING>([^\$\"\\]|\$[^\{\"\\]|\\.|\$\\.)*\$/\" |
+<STRING>([^\$\"\\]|\$[^\{\"\\]|\\.|\$\\.)+ {
+              /* It is impossible to match strings ending with '$' with one
+                 regex because trailing contexts are only valid at the end
+                 of a rule. (A sane but undocumented limitation.) */
               yylval->e = unescapeStr(data->symbols, yytext);
               return STR;
             }

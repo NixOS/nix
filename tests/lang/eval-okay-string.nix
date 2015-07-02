@@ -8,3 +8,5 @@ of
 line"
   + "foo${if true then "b${"a" + "r"}" else "xyzzy"}blaat"
   + "foo$bar"
+  + "$\"$\""
+  + "$"
