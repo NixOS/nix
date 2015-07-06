@@ -59,7 +59,8 @@ struct NixRepl
 
 void printHelp()
 {
-    std::cout << "Usage: nix-repl\n";
+    std::cout << "Usage: nix-repl [--help|--version]";
+    std::cout << std::endl;
 }
 
 
@@ -601,6 +602,11 @@ int main(int argc, char * * argv)
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--version")
                 printVersion("nix-repl");
+            else if (*arg == "--help") {
+                printHelp();
+                // exit with 0 since user asked for help
+                _exit(0);
+            }
             else if (parseSearchPathArg(arg, end, searchPath))
                 ;
             else if (*arg != "" && arg->at(0) == '-')
