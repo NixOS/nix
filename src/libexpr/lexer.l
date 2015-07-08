@@ -9,6 +9,7 @@
 %s DEFAULT
 %x STRING
 %x IND_STRING
+%x IND_STRING_INDENT
 
 
 %{
@@ -169,8 +170,22 @@ or          { return OR_KW; }
                 return STR;
               }
 
-\'\'(\ *\n)?     { PUSH_STATE(IND_STRING); return IND_STRING_OPEN; }
-<IND_STRING>([^\$\']|\$[^\{\']|\'[^\'\$])+ {
+\'\'(\ *\n)?     {
+                   PUSH_STATE(IND_STRING);
+                   PUSH_STATE(IND_STRING_INDENT);
+                   return IND_STRING_OPEN;
+                 }
+<IND_STRING_INDENT>" "*/[^ ] {
+                   POP_STATE();
+                   yylval->e = new ExprIndStr(yytext);
+                   return IND_STR_INDENT;
+                 }
+<IND_STRING_INDENT>. { /* this can never happen ! */
+                  throw ParseError("Congratulations! You found a bug in our reasonning. "
+                          "Please be so kind as to report that.");
+                }
+<IND_STRING>([^\$\'\n]|\$[^\{\'\n]|\'[^\'\$\n])*\$/[\'\n] |
+<IND_STRING>([^\$\'\n]|\$[^\{\'\n]|\'[^\'\$\n])+ {
                    yylval->e = new ExprIndStr(yytext);
                    return IND_STR;
                  }
@@ -183,7 +198,8 @@ or          { return OR_KW; }
                    yylval->e = new ExprIndStr("''");
                    return IND_STR;
                  }
-<IND_STRING>\'\'\\{ANY} {
+<IND_STRING>\'\'\\/\n /* Ignore that escape sequence as it is useless. */
+<IND_STRING>\'\'\\. {
                    yylval->e = unescapeStr(data->symbols, yytext + 2, yyleng - 2);
                    return IND_STR;
                  }
@@ -193,6 +209,7 @@ or          { return OR_KW; }
                    yylval->e = new ExprIndStr("'");
                    return IND_STR;
                  }
+<IND_STRING>\n   { PUSH_STATE(IND_STRING_INDENT); return '\n'; }
 
 
 {PATH}      { if (yytext[yyleng-1] == '/')
