@@ -14,6 +14,10 @@ let
     determination of the indentation level (the
     previous empty line has indentation 0, but
     it doesn't matter).
+      
+    Still, empty lines are not completely ignored,
+    as the previous line has two spaces over the
+    smallest indent, and these are preserved.
   '';
 
   s2 = ''  If the string starts with whitespace
@@ -40,7 +44,7 @@ let
     If you want them, use anti-quotations: ${"''"}, ${"\${"}.
   '';
 
-  s6 = ''  
+  s6 = ''
     Tabs are not interpreted as whitespace (since we can't guess
     what tab settings are intended), so don't use them.
  	This line starts with a space and a tab, so only one
@@ -52,10 +56,10 @@ let
     consists only of whitespace, it's ignored.  But here there is
     some non-whitespace stuff, so the line isn't removed. '';
 
-  s8 = ''    ${""}
+  s8 = ''    ${""}${""}
     This shows a hacky way to preserve an empty line after the start.
     But there's no reason to do so: you could just repeat the empty
-    line.
+    line. The anti-quote must be doubled, lest it is ignored.
   '';
 
   s9 = ''
@@ -75,7 +79,7 @@ let
     start on network-interfaces
 
     start script
-    
+
       rm -f /var/run/opengl-driver
       ${if true
         then "ln -sf 123 /var/run/opengl-driver"
@@ -99,7 +103,7 @@ let
     else if true
       then "env XORG_DRI_DRIVER_PATH=${"mesa"}/lib/modules/dri"
       else ""
-    } 
+    }
 
     exec ${"slim"}/bin/slim
   '';
@@ -122,7 +126,63 @@ let
     cut -d $'\t' -f 1
   '';
 
-  # Accept dollars at end of strings 
+  # Accept dollars at end of strings
   s17 = ''ending dollar $'' + ''$'' + "\n";
 
-in s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9 + s10 + s11 + s12 + s13 + s14 + s15 + s16 + s17
+  # Test single antiquotation on its own line
+  s18 = ''
+    Some antiquotations evaluate to multi-line content.
+    In that case, all the lines are indented to respect at least the
+    indentation of the antiquotation itself.
+
+      ${''
+          This is why this line will be indented,
+          and this one too !
+        ''}
+
+  '';
+
+  s19 = ''
+    Antiquotations on their own lines are very special, as they collapse when
+    their content evaluates to an empty string.
+    ${""}
+    Therefore, these two paragraphs look like one.
+
+  '';
+
+  s20 = ''
+    Also, antiquotation on their own line do not introduce empty lines when
+    it is not strictly necessary.
+
+    We have already shown that embedding an empty string does not introduce
+    ${""}
+    any empty line, but embedding an indented string also skips the extraneous
+    ${''
+        newline
+      ''}
+    in such a way that these lines look contiguous.
+
+  '';
+
+  s21 = ''
+    ${ "Such antiquotations" }
+      ${ "are\nintuitive\n" }
+    ${''
+        and very nice !
+
+      ''}
+  '';
+
+  s22 = let test = ''test''; in ''
+    This mechanism only works when the antiquotations are left alone on their own line.
+    As soon as the antiquotation is surrounded by text or other antiquotations,
+    it gets back to the behaviour described above.
+      ${test} ${test}
+      test ${test}
+      ${test} test
+
+  '';
+
+in s1  + s2  + s3  + s4  + s5  + s6  + s7  + s8  + s9  + s10
+ + s11 + s12 + s13 + s14 + s15 + s16 + s17 + s18 + s19 + s20
+ + s21 + s22
