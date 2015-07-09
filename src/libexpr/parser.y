@@ -128,6 +128,26 @@ static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
 }
 
 
+static bool isIndAntiquotLine(vector<Expr *> * line)
+{
+    size_t len = line->size();
+
+    if (len < 2 || len > 3) return false;
+    if (!dynamic_cast<ExprAntiquot *>(line->at(1))) return false;
+
+    if (len == 3) {
+        if (!dynamic_cast<ExprIndStr *>(line->at(2))) return false;
+        string & trailStr = dynamic_cast<ExprIndStr *>(line->at(2))->s;
+        if (trailStr.find_first_not_of(" ") != string::npos) return false;
+
+        // The last empty string is useless for an indented antiquotation.
+        delete line->back();
+        line->pop_back();
+    }
+
+    return true;
+}
+
 static void pushStringThenExpr(SymbolTable & symbols, vector<Expr *> * es, string & s, Expr * e)
 {
     if (!s.empty()) {
@@ -169,6 +189,14 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<ve
         size_t realIndent = static_cast<ExprIndStr *>(line->front())->s.size();
         size_t indent = realIndent > minIndent ? realIndent - minIndent : 0;
         delete line->front();
+
+        /* Single antiquotations on their own lines are ExprIndAntiquot
+           and manage their own indentation. */
+        if (isIndAntiquotLine(line)) {
+            pushStringThenExpr(symbols, es2, s2, new ExprIndAntiquot(pos, line->at(1), indent));
+            delete line;
+            continue;
+        }
 
         /* Add the required indent level */
         s2.append(indent, ' ');
@@ -407,7 +435,7 @@ ind_string_lines
 
 ind_string_line
   : ind_string_line IND_STR { $$ = $1; $1->push_back($2); }
-  | ind_string_line DOLLAR_CURLY expr '}' { $$ = $1; $1->push_back($3); }
+  | ind_string_line DOLLAR_CURLY expr '}' { $$ = $1; $1->push_back(new ExprAntiquot($3)); }
   | IND_STR_INDENT { $$ = new vector<Expr *>; $$->push_back($1); }
   ;
 

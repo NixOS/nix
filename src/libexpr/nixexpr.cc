@@ -186,6 +186,16 @@ void ExprConcatStrings::show(std::ostream & str)
     str << ")";
 }
 
+void ExprAntiquot::show(std::ostream & str)
+{
+    str << "${ " << *e << " }";
+}
+
+void ExprIndAntiquot::show(std::ostream & str)
+{
+    str << '"' << string(indentLevel, ' ') << *e << "\\n\"";
+}
+
 void ExprPos::show(std::ostream & str)
 {
     str << "__curPos";
@@ -396,6 +406,16 @@ void ExprConcatStrings::bindVars(const StaticEnv & env)
 {
     for (auto & i : *es)
         i->bindVars(env);
+}
+
+void ExprAntiquot::bindVars(const StaticEnv & env)
+{
+    e->bindVars(env);
+}
+
+void ExprIndAntiquot::bindVars(const StaticEnv & env)
+{
+    e->bindVars(env);
 }
 
 void ExprPos::bindVars(const StaticEnv & env)

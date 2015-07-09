@@ -319,6 +319,23 @@ struct ExprConcatStrings : Expr
     COMMON_METHODS
 };
 
+struct ExprAntiquot : Expr
+{
+    Expr * e;
+    ExprAntiquot(Expr * e) : e(e) { };
+    COMMON_METHODS
+};
+
+struct ExprIndAntiquot : Expr
+{
+    Pos pos;
+    Expr * e;
+    size_t indentLevel;
+    ExprIndAntiquot(const Pos & pos, Expr * e, size_t indentLevel)
+        : pos(pos), e(e), indentLevel(indentLevel) { };
+    COMMON_METHODS
+};
+
 struct ExprPos : Expr
 {
     Pos pos;
