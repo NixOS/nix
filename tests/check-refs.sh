@@ -38,3 +38,39 @@ nix-build -o $RESULT check-refs.nix -A test7
 
 # test10 should succeed (no disallowed references).
 nix-build -o $RESULT check-refs.nix -A test10
+
+# test11 should succeed (no allowed references).
+nix-build -o $RESULT check-refs.nix -A test11
+
+# test12 should fail (no allowed references).
+(! nix-build -o $RESULT check-refs.nix -A test12)
+
+# test13 should succeed (one allowed reference).
+nix-build -o $RESULT check-refs.nix -A test13
+
+# test14 should succeed (one allowed reference in out).
+nix-build -o $RESULT check-refs.nix -A test14
+
+# test15 should fail (one allowed reference in out).
+(! nix-build -o $RESULT check-refs.nix -A test15)
+
+# test16 should succeed (one allowed reference in out and two).
+nix-build -o $RESULT check-refs.nix -A test16
+
+# test17 should succeed (no disallowed references in out and two).
+nix-build -o $RESULT check-refs.nix -A test17
+
+# test18 should fail (one disallowed references in out).
+(! nix-build -o $RESULT check-refs.nix -A test18)
+
+# test19 should succeed (one disallowed references in out).
+nix-build -o $RESULT check-refs.nix -A test19
+
+# test20 should succeed (one disallowed references in out and two).
+nix-build -o $RESULT check-refs.nix -A test20
+
+# test21 should succeed (two disallows reference to one).
+nix-build -o $RESULT check-refs.nix -A test20
+
+# test22 should fail (two disallows reference to one).
+(! nix-build -o $RESULT check-refs.nix -A test21)
