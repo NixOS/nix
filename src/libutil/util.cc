@@ -149,10 +149,19 @@ Path dirOf(const Path & path)
 
 string baseNameOf(const Path & path)
 {
-    Path::size_type pos = path.rfind('/');
+    if (path.empty())
+        return string("");
+
+    Path::size_type last = path.length() - 1;
+    if (path[last] == '/' && last > 0)
+        last -= 1;
+
+    Path::size_type pos = path.rfind('/', last);
     if (pos == string::npos)
-        throw Error(format("invalid file name ‘%1%’") % path);
-    return string(path, pos + 1);
+        pos = 0;
+    else
+        pos += 1;
+    return string(path, pos, last - pos + 1);
 }
 
 
