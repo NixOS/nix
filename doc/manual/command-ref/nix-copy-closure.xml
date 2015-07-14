@@ -43,7 +43,7 @@
 
 <para><command>nix-copy-closure</command> gives you an easy and
 efficient way to exchange software between machines.  Given one or
-more Nix store paths <replaceable>paths</replaceable> on the local
+more Nix store <replaceable>paths</replaceable> on the local
 machine, <command>nix-copy-closure</command> computes the closure of
 those paths (i.e. all their dependencies in the Nix store), and copies
 all paths in the closure to the remote machine via the
