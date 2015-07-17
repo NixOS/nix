@@ -63,6 +63,8 @@ void Bindings::sort()
 
 static void printValue(std::ostream & str, std::set<const Value *> & active, const Value & v)
 {
+    checkInterrupt();
+
     if (active.find(&v) != active.end()) {
         str << "<CYCLE>";
         return;
