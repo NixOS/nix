@@ -40,15 +40,21 @@ typedef std::map<Path, StringSet> DerivationInputs;
 
 typedef std::map<string, string> StringPairs;
 
-struct Derivation
+struct BasicDerivation
 {
     DerivationOutputs outputs; /* keyed on symbolic IDs */
-    DerivationInputs inputDrvs; /* inputs that are sub-derivations */
     PathSet inputSrcs; /* inputs that are sources */
     string platform;
     Path builder;
     Strings args;
     StringPairs env;
+
+    virtual ~BasicDerivation() { };
+};
+
+struct Derivation : BasicDerivation
+{
+    DerivationInputs inputDrvs; /* inputs that are sub-derivations */
 };
 
 
@@ -89,6 +95,12 @@ Path makeDrvPathWithOutputs(const Path & drvPath, const std::set<string> & outpu
 
 bool wantOutput(const string & output, const std::set<string> & wanted);
 
-PathSet outputPaths(const Derivation & drv);
+PathSet outputPaths(const BasicDerivation & drv);
+
+struct Source;
+struct Sink;
+
+Source & operator >> (Source & in, BasicDerivation & drv);
+Sink & operator << (Sink & out, const BasicDerivation & drv);
 
 }

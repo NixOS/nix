@@ -275,6 +275,7 @@ public:
 
     /* Make a goal (with caching). */
     GoalPtr makeDerivationGoal(const Path & drvPath, const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
+    GoalPtr makeBasicDerivationGoal(const Path & drvPath, const BasicDerivation & drv, BuildMode buildMode = bmNormal);
     GoalPtr makeSubstitutionGoal(const Path & storePath, bool repair = false);
 
     /* Remove a dead goal. */
@@ -690,6 +691,9 @@ class SubstitutionGoal;
 class DerivationGoal : public Goal
 {
 private:
+    /* Whether to use an on-disk .drv file. */
+    bool useDerivation;
+
     /* The path of the derivation. */
     Path drvPath;
 
@@ -698,14 +702,14 @@ private:
     StringSet wantedOutputs;
 
     /* Whether additional wanted outputs have been added. */
-    bool needRestart;
+    bool needRestart = false;
 
     /* Whether to retry substituting the outputs after building the
        inputs. */
-    bool retrySubstitution;
+    bool retrySubstitution = false;
 
     /* The derivation stored at drvPath. */
-    Derivation drv;
+    std::unique_ptr<BasicDerivation> drv;
 
     /* The remainder is state held during the build. */
 
@@ -736,8 +740,8 @@ private:
     Path tmpDir;
 
     /* File descriptor for the log file. */
-    FILE * fLogFile;
-    BZFILE * bzLogFile;
+    FILE * fLogFile = 0;
+    BZFILE * bzLogFile = 0;
     AutoCloseFD fdLogFile;
 
     /* Number of bytes received from the builder's stdout/stderr. */
@@ -750,7 +754,7 @@ private:
     std::shared_ptr<HookInstance> hook;
 
     /* Whether we're currently doing a chroot build. */
-    bool useChroot;
+    bool useChroot = false;
 
     Path chrootRootDir;
 
@@ -790,7 +794,10 @@ private:
     InodesSeen inodesSeen;
 
 public:
-    DerivationGoal(const Path & drvPath, const StringSet & wantedOutputs, Worker & worker, BuildMode buildMode = bmNormal);
+    DerivationGoal(const Path & drvPath, const StringSet & wantedOutputs,
+        Worker & worker, BuildMode buildMode = bmNormal);
+    DerivationGoal(const Path & drvPath, const BasicDerivation & drv,
+        Worker & worker, BuildMode buildMode = bmNormal);
     ~DerivationGoal();
 
     void cancel(bool timeout);
@@ -816,7 +823,8 @@ public:
 
 private:
     /* The states. */
-    void init();
+    void getDerivation();
+    void loadDerivation();
     void haveDerivation();
     void outputsSubstituted();
     void closureRepaired();
@@ -867,19 +875,30 @@ private:
 };
 
 
-DerivationGoal::DerivationGoal(const Path & drvPath, const StringSet & wantedOutputs, Worker & worker, BuildMode buildMode)
+DerivationGoal::DerivationGoal(const Path & drvPath, const StringSet & wantedOutputs,
+    Worker & worker, BuildMode buildMode)
     : Goal(worker)
+    , useDerivation(true)
+    , drvPath(drvPath)
     , wantedOutputs(wantedOutputs)
-    , needRestart(false)
-    , retrySubstitution(false)
-    , fLogFile(0)
-    , bzLogFile(0)
-    , useChroot(false)
     , buildMode(buildMode)
 {
-    this->drvPath = drvPath;
-    state = &DerivationGoal::init;
+    state = &DerivationGoal::getDerivation;
     name = (format("building of ‘%1%’") % drvPath).str();
+    trace("created");
+}
+
+
+DerivationGoal::DerivationGoal(const Path & drvPath, const BasicDerivation & drv,
+    Worker & worker, BuildMode buildMode)
+    : Goal(worker)
+    , useDerivation(false)
+    , drvPath(drvPath)
+    , buildMode(buildMode)
+{
+    this->drv = std::unique_ptr<BasicDerivation>(new BasicDerivation(drv));
+    state = &DerivationGoal::haveDerivation;
+    name = (format("building of %1%") % showPaths(outputPaths(drv))).str();
     trace("created");
 }
 
@@ -951,28 +970,25 @@ void DerivationGoal::addWantedOutputs(const StringSet & outputs)
 }
 
 
-void DerivationGoal::init()
+void DerivationGoal::getDerivation()
 {
     trace("init");
-
-    if (settings.readOnlyMode)
-        throw Error(format("cannot build derivation ‘%1%’ - no write access to the Nix store") % drvPath);
 
     /* The first thing to do is to make sure that the derivation
        exists.  If it doesn't, it may be created through a
        substitute. */
     if (buildMode == bmNormal && worker.store.isValidPath(drvPath)) {
-        haveDerivation();
+        loadDerivation();
         return;
     }
 
     addWaitee(worker.makeSubstitutionGoal(drvPath));
 
-    state = &DerivationGoal::haveDerivation;
+    state = &DerivationGoal::loadDerivation;
 }
 
 
-void DerivationGoal::haveDerivation()
+void DerivationGoal::loadDerivation()
 {
     trace("loading derivation");
 
@@ -990,10 +1006,18 @@ void DerivationGoal::haveDerivation()
     assert(worker.store.isValidPath(drvPath));
 
     /* Get the derivation. */
-    drv = derivationFromPath(worker.store, drvPath);
+    drv = std::unique_ptr<BasicDerivation>(new Derivation(derivationFromPath(worker.store, drvPath)));
 
-    foreach (DerivationOutputs::iterator, i, drv.outputs)
-        worker.store.addTempRoot(i->second.path);
+    haveDerivation();
+}
+
+
+void DerivationGoal::haveDerivation()
+{
+    trace("have derivation");
+
+    for (auto & i : drv->outputs)
+        worker.store.addTempRoot(i.second.path);
 
     /* Check what outputs paths are not already valid. */
     PathSet invalidOutputs = checkPathValidity(false, buildMode == bmRepair);
@@ -1006,15 +1030,15 @@ void DerivationGoal::haveDerivation()
 
     /* Check whether any output previously failed to build.  If so,
        don't bother. */
-    foreach (PathSet::iterator, i, invalidOutputs)
-        if (pathFailed(*i)) return;
+    for (auto & i : invalidOutputs)
+        if (pathFailed(i)) return;
 
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
-    if (settings.useSubstitutes && substitutesAllowed(drv))
-        foreach (PathSet::iterator, i, invalidOutputs)
-            addWaitee(worker.makeSubstitutionGoal(*i, buildMode == bmRepair));
+    if (settings.useSubstitutes && substitutesAllowed(*drv))
+        for (auto & i : invalidOutputs)
+            addWaitee(worker.makeSubstitutionGoal(i, buildMode == bmRepair));
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
         outputsSubstituted();
@@ -1063,11 +1087,17 @@ void DerivationGoal::outputsSubstituted()
     wantedOutputs = PathSet();
 
     /* The inputs must be built before we can build this goal. */
-    foreach (DerivationInputs::iterator, i, drv.inputDrvs)
-        addWaitee(worker.makeDerivationGoal(i->first, i->second, buildMode == bmRepair ? bmRepair : bmNormal));
+    if (useDerivation)
+        for (auto & i : dynamic_cast<Derivation *>(drv.get())->inputDrvs)
+            addWaitee(worker.makeDerivationGoal(i.first, i.second, buildMode == bmRepair ? bmRepair : bmNormal));
 
-    foreach (PathSet::iterator, i, drv.inputSrcs)
-        addWaitee(worker.makeSubstitutionGoal(*i));
+    for (auto & i : drv->inputSrcs) {
+        if (worker.store.isValidPath(i)) continue;
+        if (!settings.useSubstitutes)
+            throw Error(format("dependency of ‘%1%’ of ‘%2%’ does not exist, and substitution is disabled")
+                % i % drvPath);
+        addWaitee(worker.makeSubstitutionGoal(i));
+    }
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
         inputsRealised();
@@ -1085,34 +1115,34 @@ void DerivationGoal::repairClosure()
 
     /* Get the output closure. */
     PathSet outputClosure;
-    foreach (DerivationOutputs::iterator, i, drv.outputs)
-        computeFSClosure(worker.store, i->second.path, outputClosure);
+    for (auto & i : drv->outputs)
+        computeFSClosure(worker.store, i.second.path, outputClosure);
 
     /* Filter out our own outputs (which we have already checked). */
-    foreach (DerivationOutputs::iterator, i, drv.outputs)
-        outputClosure.erase(i->second.path);
+    for (auto & i : drv->outputs)
+        outputClosure.erase(i.second.path);
 
     /* Get all dependencies of this derivation so that we know which
        derivation is responsible for which path in the output
        closure. */
     PathSet inputClosure;
-    computeFSClosure(worker.store, drvPath, inputClosure);
+    if (useDerivation) computeFSClosure(worker.store, drvPath, inputClosure);
     std::map<Path, Path> outputsToDrv;
-    foreach (PathSet::iterator, i, inputClosure)
-        if (isDerivation(*i)) {
-            Derivation drv = derivationFromPath(worker.store, *i);
-            foreach (DerivationOutputs::iterator, j, drv.outputs)
-                outputsToDrv[j->second.path] = *i;
+    for (auto & i : inputClosure)
+        if (isDerivation(i)) {
+            Derivation drv = derivationFromPath(worker.store, i);
+            for (auto & j : drv.outputs)
+                outputsToDrv[j.second.path] = i;
         }
 
     /* Check each path (slow!). */
     PathSet broken;
-    foreach (PathSet::iterator, i, outputClosure) {
-        if (worker.store.pathContentsGood(*i)) continue;
-        printMsg(lvlError, format("found corrupted or missing path ‘%1%’ in the output closure of ‘%2%’") % *i % drvPath);
-        Path drvPath2 = outputsToDrv[*i];
+    for (auto & i : outputClosure) {
+        if (worker.store.pathContentsGood(i)) continue;
+        printMsg(lvlError, format("found corrupted or missing path ‘%1%’ in the output closure of ‘%2%’") % i % drvPath);
+        Path drvPath2 = outputsToDrv[i];
         if (drvPath2 == "")
-            addWaitee(worker.makeSubstitutionGoal(*i, true));
+            addWaitee(worker.makeSubstitutionGoal(i, true));
         else
             addWaitee(worker.makeDerivationGoal(drvPath2, PathSet(), bmRepair));
     }
@@ -1140,6 +1170,8 @@ void DerivationGoal::inputsRealised()
     trace("all inputs realised");
 
     if (nrFailed != 0) {
+        if (!useDerivation)
+            throw Error(format("some dependencies of ‘%1%’ are missing") % drvPath);
         printMsg(lvlError,
             format("cannot build derivation ‘%1%’: %2% dependencies couldn't be built")
             % drvPath % nrFailed);
@@ -1156,32 +1188,33 @@ void DerivationGoal::inputsRealised()
        running the build hook. */
 
     /* The outputs are referenceable paths. */
-    foreach (DerivationOutputs::iterator, i, drv.outputs) {
-        debug(format("building path ‘%1%’") % i->second.path);
-        allPaths.insert(i->second.path);
+    for (auto & i : drv->outputs) {
+        debug(format("building path ‘%1%’") % i.second.path);
+        allPaths.insert(i.second.path);
     }
 
     /* Determine the full set of input paths. */
 
     /* First, the input derivations. */
-    foreach (DerivationInputs::iterator, i, drv.inputDrvs) {
-        /* Add the relevant output closures of the input derivation
-           `*i' as input paths.  Only add the closures of output paths
-           that are specified as inputs. */
-        assert(worker.store.isValidPath(i->first));
-        Derivation inDrv = derivationFromPath(worker.store, i->first);
-        foreach (StringSet::iterator, j, i->second)
-            if (inDrv.outputs.find(*j) != inDrv.outputs.end())
-                computeFSClosure(worker.store, inDrv.outputs[*j].path, inputPaths);
-            else
-                throw Error(
-                    format("derivation ‘%1%’ requires non-existent output ‘%2%’ from input derivation ‘%3%’")
-                    % drvPath % *j % i->first);
-    }
+    if (useDerivation)
+        for (auto & i : dynamic_cast<Derivation *>(drv.get())->inputDrvs) {
+            /* Add the relevant output closures of the input derivation
+               `i' as input paths.  Only add the closures of output paths
+               that are specified as inputs. */
+            assert(worker.store.isValidPath(i.first));
+            Derivation inDrv = derivationFromPath(worker.store, i.first);
+            for (auto & j : i.second)
+                if (inDrv.outputs.find(j) != inDrv.outputs.end())
+                    computeFSClosure(worker.store, inDrv.outputs[j].path, inputPaths);
+                else
+                    throw Error(
+                        format("derivation ‘%1%’ requires non-existent output ‘%2%’ from input derivation ‘%3%’")
+                        % drvPath % j % i.first);
+        }
 
     /* Second, the input sources. */
-    foreach (PathSet::iterator, i, drv.inputSrcs)
-        computeFSClosure(worker.store, *i, inputPaths);
+    for (auto & i : drv->inputSrcs)
+        computeFSClosure(worker.store, i, inputPaths);
 
     debug(format("added input paths %1%") % showPaths(inputPaths));
 
@@ -1189,8 +1222,8 @@ void DerivationGoal::inputsRealised()
 
     /* Is this a fixed-output derivation? */
     fixedOutput = true;
-    foreach (DerivationOutputs::iterator, i, drv.outputs)
-        if (i->second.hash == "") fixedOutput = false;
+    for (auto & i : drv->outputs)
+        if (i.second.hash == "") fixedOutput = false;
 
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
@@ -1217,13 +1250,13 @@ static string get(const StringPairs & map, const string & key, const string & de
 }
 
 
-bool willBuildLocally(const Derivation & drv)
+bool willBuildLocally(const BasicDerivation & drv)
 {
     return get(drv.env, "preferLocalBuild") == "1" && canBuildLocally(drv.platform);
 }
 
 
-bool substitutesAllowed(const Derivation & drv)
+bool substitutesAllowed(const BasicDerivation & drv)
 {
     return get(drv.env, "allowSubstitutes", "1") == "1";
 }
@@ -1238,10 +1271,10 @@ void DerivationGoal::tryToBuild()
        (It can't happen between here and the lockPaths() call below
        because we're not allowing multi-threading.)  If so, put this
        goal to sleep until another goal finishes, then try again. */
-    foreach (DerivationOutputs::iterator, i, drv.outputs)
-        if (pathIsLockedByMe(i->second.path)) {
+    for (auto & i : drv->outputs)
+        if (pathIsLockedByMe(i.second.path)) {
             debug(format("putting derivation ‘%1%’ to sleep because ‘%2%’ is locked by another goal")
-                % drvPath % i->second.path);
+                % drvPath % i.second.path);
             worker.waitForAnyGoal(shared_from_this());
             return;
         }
@@ -1251,7 +1284,7 @@ void DerivationGoal::tryToBuild()
        can't acquire the lock, then continue; hopefully some other
        goal can start a build, and if not, the main loop will sleep a
        few seconds and then retry this goal. */
-    if (!outputLocks.lockPaths(outputPaths(drv), "", false)) {
+    if (!outputLocks.lockPaths(outputPaths(*drv), "", false)) {
         worker.waitForAWhile(shared_from_this());
         return;
     }
@@ -1264,22 +1297,22 @@ void DerivationGoal::tryToBuild()
        now hold the locks on the output paths, no other process can
        build this derivation, so no further checks are necessary. */
     validPaths = checkPathValidity(true, buildMode == bmRepair);
-    assert(buildMode != bmCheck || validPaths.size() == drv.outputs.size());
-    if (buildMode != bmCheck && validPaths.size() == drv.outputs.size()) {
+    assert(buildMode != bmCheck || validPaths.size() == drv->outputs.size());
+    if (buildMode != bmCheck && validPaths.size() == drv->outputs.size()) {
         debug(format("skipping build of derivation ‘%1%’, someone beat us to it") % drvPath);
         outputLocks.setDeletion(true);
         amDone(ecSuccess);
         return;
     }
 
-    missingPaths = outputPaths(drv);
+    missingPaths = outputPaths(*drv);
     if (buildMode != bmCheck)
         foreach (PathSet::iterator, i, validPaths) missingPaths.erase(*i);
 
     /* If any of the outputs already exist but are not valid, delete
        them. */
-    foreach (DerivationOutputs::iterator, i, drv.outputs) {
-        Path path = i->second.path;
+    for (auto & i : drv->outputs) {
+        Path path = i.second.path;
         if (worker.store.isValidPath(path)) continue;
         if (!pathExists(path)) continue;
         debug(format("removing invalid path ‘%1%’") % path);
@@ -1289,13 +1322,13 @@ void DerivationGoal::tryToBuild()
     /* Check again whether any output previously failed to build,
        because some other process may have tried and failed before we
        acquired the lock. */
-    foreach (DerivationOutputs::iterator, i, drv.outputs)
-        if (pathFailed(i->second.path)) return;
+    for (auto & i : drv->outputs)
+        if (pathFailed(i.second.path)) return;
 
     /* Don't do a remote build if the derivation has the attribute
        `preferLocalBuild' set.  Also, check and repair modes are only
        supported for local builds. */
-    bool buildLocally = buildMode != bmNormal || willBuildLocally(drv);
+    bool buildLocally = buildMode != bmNormal || willBuildLocally(*drv);
 
     /* Is the build hook willing to accept this job? */
     if (!buildLocally) {
@@ -1504,8 +1537,8 @@ void DerivationGoal::buildDone()
                Hook errors (like communication problems with the
                remote machine) shouldn't be cached either. */
             if (settings.cacheFailure && !fixedOutput && !diskFull)
-                foreach (DerivationOutputs::iterator, i, drv.outputs)
-                    worker.store.registerFailedPath(i->second.path);
+                for (auto & i : drv->outputs)
+                    worker.store.registerFailedPath(i.second.path);
         }
 
         amDone(ecFailed);
@@ -1524,21 +1557,21 @@ void DerivationGoal::buildDone()
 
 HookReply DerivationGoal::tryBuildHook()
 {
-    if (!settings.useBuildHook || getEnv("NIX_BUILD_HOOK") == "") return rpDecline;
+    if (!settings.useBuildHook || getEnv("NIX_BUILD_HOOK") == "" || !useDerivation) return rpDecline;
 
     if (!worker.hook)
-        worker.hook = std::shared_ptr<HookInstance>(new HookInstance);
+        worker.hook = std::make_shared<HookInstance>();
 
     /* Tell the hook about system features (beyond the system type)
        required from the build machine.  (The hook could parse the
        drv file itself, but this is easier.) */
-    Strings features = tokenizeString<Strings>(get(drv.env, "requiredSystemFeatures"));
+    Strings features = tokenizeString<Strings>(get(drv->env, "requiredSystemFeatures"));
     foreach (Strings::iterator, i, features) checkStoreName(*i); /* !!! abuse */
 
     /* Send the request to the hook. */
     writeLine(worker.hook->toHook.writeSide, (format("%1% %2% %3% %4%")
         % (worker.getNrLocalBuilds() < settings.maxBuildJobs ? "1" : "0")
-        % drv.platform % drvPath % concatStringsSep(",", features)).str());
+        % drv->platform % drvPath % concatStringsSep(",", features)).str());
 
     /* Read the first line of input, which should be a word indicating
        whether the hook wishes to perform the build. */
@@ -1596,7 +1629,7 @@ HookReply DerivationGoal::tryBuildHook()
 
     if (settings.printBuildTrace)
         printMsg(lvlError, format("@ build-started %1% - %2% %3%")
-            % drvPath % drv.platform % logFile);
+            % drvPath % drv->platform % logFile);
 
     return rpAccept;
 }
@@ -1624,12 +1657,12 @@ void DerivationGoal::startBuilder()
             "building path(s) %1%") % showPaths(missingPaths));
 
     /* Right platform? */
-    if (!canBuildLocally(drv.platform)) {
+    if (!canBuildLocally(drv->platform)) {
         if (settings.printBuildTrace)
-            printMsg(lvlError, format("@ unsupported-platform %1% %2%") % drvPath % drv.platform);
+            printMsg(lvlError, format("@ unsupported-platform %1% %2%") % drvPath % drv->platform);
         throw Error(
             format("a ‘%1%’ is required to build ‘%3%’, but I am a ‘%2%’")
-            % drv.platform % settings.thisSystem % drvPath);
+            % drv->platform % settings.thisSystem % drvPath);
     }
 
     /* Construct the environment passed to the builder. */
@@ -1666,9 +1699,9 @@ void DerivationGoal::startBuilder()
        attribute. Those are passed as file names pointing to
        temporary files containing the contents. */
     PathSet filesToChown;
-    StringSet passAsFile = tokenizeString<StringSet>(get(drv.env, "passAsFile"));
+    StringSet passAsFile = tokenizeString<StringSet>(get(drv->env, "passAsFile"));
     int fileNr = 0;
-    for (auto & i : drv.env) {
+    for (auto & i : drv->env) {
         if (passAsFile.find(i.first) == passAsFile.end()) {
             env[i.first] = i.second;
         } else {
@@ -1708,7 +1741,7 @@ void DerivationGoal::startBuilder()
        fixed-output derivations is by definition pure (since we
        already know the cryptographic hash of the output). */
     if (fixedOutput) {
-        Strings varNames = tokenizeString<Strings>(get(drv.env, "impureEnvVars"));
+        Strings varNames = tokenizeString<Strings>(get(drv->env, "impureEnvVars"));
         foreach (Strings::iterator, i, varNames) env[*i] = getEnv(*i);
     }
 
@@ -1719,7 +1752,7 @@ void DerivationGoal::startBuilder()
        temporary build directory.  The text files have the format used
        by `nix-store --register-validity'.  However, the deriver
        fields are left empty. */
-    string s = get(drv.env, "exportReferencesGraph");
+    string s = get(drv->env, "exportReferencesGraph");
     Strings ss = tokenizeString<Strings>(s);
     if (ss.size() % 2 != 0)
         throw BuildError(format("odd number of tokens in ‘exportReferencesGraph’: ‘%1%’") % s);
@@ -1748,8 +1781,8 @@ void DerivationGoal::startBuilder()
         foreach (PathSet::iterator, j, paths2) {
             if (isDerivation(*j)) {
                 Derivation drv = derivationFromPath(worker.store, *j);
-                foreach (DerivationOutputs::iterator, k, drv.outputs)
-                    computeFSClosure(worker.store, k->second.path, paths);
+                for (auto & k : drv.outputs)
+                    computeFSClosure(worker.store, k.second.path, paths);
             }
         }
 
@@ -1789,14 +1822,14 @@ void DerivationGoal::startBuilder()
         if (x != "true" && x != "false" && x != "relaxed")
             throw Error("option ‘build-use-chroot’ must be set to one of ‘true’, ‘false’ or ‘relaxed’");
         if (x == "true") {
-            if (get(drv.env, "__noChroot") == "1")
+            if (get(drv->env, "__noChroot") == "1")
                 throw Error(format("derivation ‘%1%’ has ‘__noChroot’ set, but that's not allowed when ‘build-use-chroot’ is ‘true’") % drvPath);
             useChroot = true;
         }
         else if (x == "false")
             useChroot = false;
         else if (x == "relaxed")
-            useChroot = !fixedOutput && get(drv.env, "__noChroot") != "1";
+            useChroot = !fixedOutput && get(drv->env, "__noChroot") != "1";
     }
 
     if (useChroot) {
@@ -1834,7 +1867,7 @@ void DerivationGoal::startBuilder()
         PathSet allowedPaths = tokenizeString<StringSet>(allowed);
 
         /* This works like the above, except on a per-derivation level */
-        Strings impurePaths = tokenizeString<Strings>(get(drv.env, "__impureHostDeps"));
+        Strings impurePaths = tokenizeString<Strings>(get(drv->env, "__impureHostDeps"));
 
         for (auto & i : impurePaths) {
             bool found = false;
@@ -1865,7 +1898,7 @@ void DerivationGoal::startBuilder()
         if (pathExists(chrootRootDir)) deletePath(chrootRootDir);
 
         /* Clean up the chroot directory automatically. */
-        autoDelChroot = std::shared_ptr<AutoDelete>(new AutoDelete(chrootRootDir));
+        autoDelChroot = std::make_shared<AutoDelete>(chrootRootDir);
 
         printMsg(lvlChatty, format("setting up chroot environment in ‘%1%’") % chrootRootDir);
 
@@ -1948,8 +1981,8 @@ void DerivationGoal::startBuilder()
            (typically the dependencies of /bin/sh).  Throw them
            out. */
         if (buildMode != bmNormal)
-            foreach (DerivationOutputs::iterator, i, drv.outputs)
-                dirsInChroot.erase(i->second.path);
+            for (auto & i : drv->outputs)
+                dirsInChroot.erase(i.second.path);
 
 #elif SANDBOX_ENABLED
         /* We don't really have any parent prep work to do (yet?)
@@ -2025,7 +2058,7 @@ void DerivationGoal::startBuilder()
     }
 
     /* Run the builder. */
-    printMsg(lvlChatty, format("executing builder ‘%1%’") % drv.builder);
+    printMsg(lvlChatty, format("executing builder ‘%1%’") % drv->builder);
 
     /* Create the log file. */
     Path logFile = openLogFile();
@@ -2111,7 +2144,7 @@ void DerivationGoal::startBuilder()
 
     if (settings.printBuildTrace) {
         printMsg(lvlError, format("@ build-started %1% - %2% %3%")
-            % drvPath % drv.platform % logFile);
+            % drvPath % drv->platform % logFile);
     }
 }
 
@@ -2285,7 +2318,7 @@ void DerivationGoal::runChild()
            i686-linux build on an x86_64-linux machine. */
         struct utsname utsbuf;
         uname(&utsbuf);
-        if (drv.platform == "i686-linux" &&
+        if (drv->platform == "i686-linux" &&
             (settings.thisSystem == "x86_64-linux" ||
              (!strcmp(utsbuf.sysname, "Linux") && !strcmp(utsbuf.machine, "x86_64")))) {
             if (personality(PER_LINUX32) == -1)
@@ -2294,7 +2327,7 @@ void DerivationGoal::runChild()
 
         /* Impersonate a Linux 2.6 machine to get some determinism in
            builds that depend on the kernel version. */
-        if ((drv.platform == "i686-linux" || drv.platform == "x86_64-linux") && settings.impersonateLinux26) {
+        if ((drv->platform == "i686-linux" || drv->platform == "x86_64-linux") && settings.impersonateLinux26) {
             int cur = personality(0xffffffff);
             if (cur != -1) personality(cur | 0x0020000 /* == UNAME26 */);
         }
@@ -2449,15 +2482,15 @@ void DerivationGoal::runChild()
             args.push_back("sandbox-exec");
             args.push_back("-p");
             args.push_back(sandboxProfile);
-            args.push_back(drv.builder);
+            args.push_back(drv->builder);
         } else {
-            builder = drv.builder.c_str();
-            string builderBasename = baseNameOf(drv.builder);
+            builder = drv->builder.c_str();
+            string builderBasename = baseNameOf(drv->builder);
             args.push_back(builderBasename);
         }
 
-        foreach (Strings::iterator, i, drv.args)
-            args.push_back(rewriteHashes(*i, rewritesToTmp));
+        for (auto & i : drv->args)
+            args.push_back(rewriteHashes(i, rewritesToTmp));
 
         restoreSIGPIPE();
 
@@ -2473,7 +2506,7 @@ void DerivationGoal::runChild()
         /* Execute the program.  This should not return. */
         execve(builder, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
 
-        throw SysError(format("executing ‘%1%’") % drv.builder);
+        throw SysError(format("executing ‘%1%’") % drv->builder);
 
     } catch (std::exception & e) {
         writeFull(STDERR_FILENO, "while setting up the build environment: " + string(e.what()) + "\n");
@@ -2485,7 +2518,7 @@ void DerivationGoal::runChild()
 /* Parse a list of reference specifiers.  Each element must either be
    a store path, or the symbolic name of the output of the derivation
    (such as `out'). */
-PathSet parseReferenceSpecifiers(const Derivation & drv, string attr)
+PathSet parseReferenceSpecifiers(const BasicDerivation & drv, string attr)
 {
     PathSet result;
     Paths paths = tokenizeString<Paths>(attr);
@@ -2509,8 +2542,8 @@ void DerivationGoal::registerOutputs()
        to do anything here. */
     if (hook) {
         bool allValid = true;
-        foreach (DerivationOutputs::iterator, i, drv.outputs)
-            if (!worker.store.isValidPath(i->second.path)) allValid = false;
+        for (auto & i : drv->outputs)
+            if (!worker.store.isValidPath(i.second.path)) allValid = false;
         if (allValid) return;
     }
 
@@ -2519,8 +2552,8 @@ void DerivationGoal::registerOutputs()
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all
        output paths read-only. */
-    foreach (DerivationOutputs::iterator, i, drv.outputs) {
-        Path path = i->second.path;
+    for (auto & i : drv->outputs) {
+        Path path = i.second.path;
         if (missingPaths.find(path) == missingPaths.end()) continue;
 
         Path actualPath = path;
@@ -2591,10 +2624,10 @@ void DerivationGoal::registerOutputs()
         /* Check that fixed-output derivations produced the right
            outputs (i.e., the content hash should match the specified
            hash). */
-        if (i->second.hash != "") {
+        if (i.second.hash != "") {
 
             bool recursive; HashType ht; Hash h;
-            i->second.parseHashInfo(recursive, ht, h);
+            i.second.parseHashInfo(recursive, ht, h);
 
             if (!recursive) {
                 /* The output path should be a regular file without
@@ -2609,7 +2642,7 @@ void DerivationGoal::registerOutputs()
             if (h != h2)
                 throw BuildError(
                     format("output path ‘%1%’ should have %2% hash ‘%3%’, instead has ‘%4%’")
-                    % path % i->second.hashAlgo % printHash16or32(h) % printHash16or32(h2));
+                    % path % i.second.hashAlgo % printHash16or32(h) % printHash16or32(h2));
         }
 
         /* Get rid of all weird permissions.  This also checks that
@@ -2643,9 +2676,9 @@ void DerivationGoal::registerOutputs()
 
         /* Enforce `allowedReferences' and friends. */
         auto checkRefs = [&](const string & attrName, bool allowed, bool recursive) {
-            if (drv.env.find(attrName) == drv.env.end()) return;
+            if (drv->env.find(attrName) == drv->env.end()) return;
 
-            PathSet spec = parseReferenceSpecifiers(drv, get(drv.env, attrName));
+            PathSet spec = parseReferenceSpecifiers(*drv, get(drv->env, attrName));
 
             PathSet used;
             if (recursive) {
@@ -2806,12 +2839,12 @@ void DerivationGoal::handleEOF(int fd)
 PathSet DerivationGoal::checkPathValidity(bool returnValid, bool checkHash)
 {
     PathSet result;
-    foreach (DerivationOutputs::iterator, i, drv.outputs) {
-        if (!wantOutput(i->first, wantedOutputs)) continue;
+    for (auto & i : drv->outputs) {
+        if (!wantOutput(i.first, wantedOutputs)) continue;
         bool good =
-            worker.store.isValidPath(i->second.path) &&
-            (!checkHash || worker.store.pathContentsGood(i->second.path));
-        if (good == returnValid) result.insert(i->second.path);
+            worker.store.isValidPath(i.second.path) &&
+            (!checkHash || worker.store.pathContentsGood(i.second.path));
+        if (good == returnValid) result.insert(i.second.path);
     }
     return result;
 }
@@ -3066,7 +3099,7 @@ void SubstitutionGoal::tryToRun()
     }
 
     /* Acquire a lock on the output path. */
-    outputLock = std::shared_ptr<PathLocks>(new PathLocks);
+    outputLock = std::make_shared<PathLocks>();
     if (!outputLock->lockPaths(singleton<PathSet>(storePath), "", false)) {
         worker.waitForAWhile(shared_from_this());
         return;
@@ -3270,7 +3303,7 @@ GoalPtr Worker::makeDerivationGoal(const Path & path, const StringSet & wantedOu
 {
     GoalPtr goal = derivationGoals[path].lock();
     if (!goal) {
-        goal = GoalPtr(new DerivationGoal(path, wantedOutputs, *this, buildMode));
+        goal = std::make_shared<DerivationGoal>(path, wantedOutputs, *this, buildMode);
         derivationGoals[path] = goal;
         wakeUp(goal);
     } else
@@ -3279,11 +3312,19 @@ GoalPtr Worker::makeDerivationGoal(const Path & path, const StringSet & wantedOu
 }
 
 
+GoalPtr Worker::makeBasicDerivationGoal(const Path & drvPath, const BasicDerivation & drv, BuildMode buildMode)
+{
+    auto goal = std::make_shared<DerivationGoal>(drvPath, drv, *this, buildMode);
+    wakeUp(goal);
+    return goal;
+}
+
+
 GoalPtr Worker::makeSubstitutionGoal(const Path & path, bool repair)
 {
     GoalPtr goal = substitutionGoals[path].lock();
     if (!goal) {
-        goal = GoalPtr(new SubstitutionGoal(path, *this, repair));
+        goal = std::make_shared<SubstitutionGoal>(path, *this, repair);
         substitutionGoals[path] = goal;
         wakeUp(goal);
     }
@@ -3604,8 +3645,7 @@ unsigned int Worker::exitStatus()
 
 void LocalStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
 {
-    startNest(nest, lvlDebug,
-        format("building %1%") % showPaths(drvPaths));
+    startNest(nest, lvlDebug, format("building %1%") % showPaths(drvPaths));
 
     Worker worker(*this);
 
@@ -3630,6 +3670,35 @@ void LocalStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
 
     if (!failed.empty())
         throw Error(format("build of %1% failed") % showPaths(failed), worker.exitStatus());
+}
+
+
+BuildResult LocalStore::buildDerivation(const Path & drvPath, const BasicDerivation & drv,
+    BuildMode buildMode)
+{
+    startNest(nest, lvlDebug, format("building %1%") % showPaths({drvPath}));
+
+    Worker worker(*this);
+    auto goal = worker.makeBasicDerivationGoal(drvPath, drv, buildMode);
+
+    BuildResult result;
+
+    try {
+        worker.run(Goals{goal});
+        if (goal->getExitCode() == Goal::ecSuccess)
+            result.status = BuildResult::Success;
+        else if (worker.permanentFailure)
+            result.status = BuildResult::PermanentFailure;
+        else if (worker.timedOut)
+            result.status = BuildResult::TimedOut;
+        else
+            result.status = BuildResult::MiscFailure;
+    } catch (Error & e) {
+        result.status = BuildResult::MiscFailure;
+        result.errorMsg = e.msg();
+    }
+
+    return result;
 }
 
 

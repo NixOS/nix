@@ -862,6 +862,16 @@ static void opServe(Strings opFlags, Strings opArgs)
     out.flush();
     readInt(in); // Client version, unused for now
 
+    auto getBuildSettings = [&]() {
+        // FIXME: changing options here doesn't work if we're
+        // building through the daemon.
+        verbosity = lvlError;
+        settings.keepLog = false;
+        settings.useSubstitutes = false;
+        settings.maxSilentTime = readInt(in);
+        settings.buildTimeout = readInt(in);
+    };
+
     while (true) {
         ServeCommand cmd;
         try {
@@ -943,19 +953,12 @@ static void opServe(Strings opFlags, Strings opArgs)
                 break;
             }
 
-            case cmdBuildPaths: {
+            case cmdBuildPaths: { /* Used by build-remote.pl. */
 
-                /* Used by build-remote.pl. */
                 if (!writeAllowed) throw Error("building paths is not allowed");
                 PathSet paths = readStorePaths<PathSet>(in);
 
-                // FIXME: changing options here doesn't work if we're
-                // building through the daemon.
-                verbosity = lvlError;
-                settings.keepLog = false;
-                settings.useSubstitutes = false;
-                settings.maxSilentTime = readInt(in);
-                settings.buildTimeout = readInt(in);
+                getBuildSettings();
 
                 try {
                     MonitorFdHup monitor(in.fd);
@@ -966,6 +969,25 @@ static void opServe(Strings opFlags, Strings opArgs)
                     writeInt(e.status, out);
                     writeString(e.msg(), out);
                 }
+                break;
+            }
+
+            case cmdBuildDerivation: { /* Used by hydra-queue-runner. */
+
+                if (!writeAllowed) throw Error("building paths is not allowed");
+
+                Path drvPath = readStorePath(in); // informational only
+                BasicDerivation drv;
+                in >> drv;
+
+                getBuildSettings();
+
+                MonitorFdHup monitor(in.fd);
+                auto status = store->buildDerivation(drvPath, drv);
+
+                writeInt(status.status, out);
+                writeString(status.errorMsg, out);
+
                 break;
             }
 

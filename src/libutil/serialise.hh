@@ -118,12 +118,20 @@ void writeString(const unsigned char * buf, size_t len, Sink & sink);
 void writeString(const string & s, Sink & sink);
 template<class T> void writeStrings(const T & ss, Sink & sink);
 
+Sink & operator << (Sink & out, unsigned int n);
+Sink & operator << (Sink & out, const string & s);
+Sink & operator << (Sink & out, const Strings & s);
+Sink & operator << (Sink & out, const StringSet & s);
+
+
 void readPadding(size_t len, Source & source);
 unsigned int readInt(Source & source);
 unsigned long long readLongLong(Source & source);
 size_t readString(unsigned char * buf, size_t max, Source & source);
 string readString(Source & source);
 template<class T> T readStrings(Source & source);
+
+Source & operator >> (Source & in, string & s);
 
 
 MakeError(SerialisationError, Error)

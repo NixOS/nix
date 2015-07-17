@@ -151,6 +151,9 @@ public:
 
     void buildPaths(const PathSet & paths, BuildMode buildMode);
 
+    BuildResult buildDerivation(const Path & drvPath, const BasicDerivation & drv,
+        BuildMode buildMode) override;
+
     void ensurePath(const Path & path);
 
     void addTempRoot(const Path & path);

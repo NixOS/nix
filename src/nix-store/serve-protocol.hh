@@ -5,7 +5,7 @@ namespace nix {
 #define SERVE_MAGIC_1 0x390c9deb
 #define SERVE_MAGIC_2 0x5452eecb
 
-#define SERVE_PROTOCOL_VERSION 0x200
+#define SERVE_PROTOCOL_VERSION 0x201
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
@@ -17,6 +17,7 @@ typedef enum {
     cmdExportPaths = 5,
     cmdBuildPaths = 6,
     cmdQueryClosure = 7,
+    cmdBuildDerivation = 8,
 } ServeCommand;
 
 }

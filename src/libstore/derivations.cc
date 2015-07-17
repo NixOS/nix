@@ -3,6 +3,7 @@
 #include "globals.hh"
 #include "util.hh"
 #include "misc.hh"
+#include "worker-protocol.hh"
 
 
 namespace nix {
@@ -285,12 +286,52 @@ bool wantOutput(const string & output, const std::set<string> & wanted)
 }
 
 
-PathSet outputPaths(const Derivation & drv)
+PathSet outputPaths(const BasicDerivation & drv)
 {
     PathSet paths;
     for (auto & i : drv.outputs)
         paths.insert(i.second.path);
     return paths;
+}
+
+
+Source & operator >> (Source & in, BasicDerivation & drv)
+{
+    drv.outputs.clear();
+    auto nr = readInt(in);
+    for (unsigned int n = 0; n < nr; n++) {
+        auto name = readString(in);
+        DerivationOutput o;
+        in >> o.path >> o.hashAlgo >> o.hash;
+        assertStorePath(o.path);
+        drv.outputs[name] = o;
+    }
+
+    drv.inputSrcs = readStorePaths<PathSet>(in);
+    in >> drv.platform >> drv.builder;
+    drv.args = readStrings<Strings>(in);
+
+    nr = readInt(in);
+    for (unsigned int n = 0; n < nr; n++) {
+        auto key = readString(in);
+        auto value = readString(in);
+        drv.env[key] = value;
+    }
+
+    return in;
+}
+
+
+Sink & operator << (Sink & out, const BasicDerivation & drv)
+{
+    out << drv.outputs.size();
+    for (auto & i : drv.outputs)
+        out << i.first << i.second.path << i.second.hashAlgo << i.second.hash;
+    out << drv.inputSrcs << drv.platform << drv.builder << drv.args;
+    out << drv.env.size();
+    for (auto & i : drv.env)
+        out << i.first << i.second;
+    return out;
 }
 
 

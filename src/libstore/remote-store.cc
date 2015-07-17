@@ -482,6 +482,13 @@ void RemoteStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
 }
 
 
+BuildResult RemoteStore::buildDerivation(const Path & drvPath, const BasicDerivation & drv,
+    BuildMode buildMode)
+{
+    throw Error("not implemented");
+}
+
+
 void RemoteStore::ensurePath(const Path & path)
 {
     openConnection();

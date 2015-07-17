@@ -155,6 +155,12 @@ void writeInt(unsigned int n, Sink & sink)
     sink(buf, sizeof(buf));
 }
 
+Sink & operator << (Sink & out, unsigned int n)
+{
+    writeInt(n, out);
+    return out;
+}
+
 
 void writeLongLong(unsigned long long n, Sink & sink)
 {
@@ -184,6 +190,12 @@ void writeString(const string & s, Sink & sink)
     writeString((const unsigned char *) s.data(), s.size(), sink);
 }
 
+Sink & operator << (Sink & out, const string & s)
+{
+    writeString(s, out);
+    return out;
+}
+
 
 template<class T> void writeStrings(const T & ss, Sink & sink)
 {
@@ -194,6 +206,18 @@ template<class T> void writeStrings(const T & ss, Sink & sink)
 
 template void writeStrings(const Paths & ss, Sink & sink);
 template void writeStrings(const PathSet & ss, Sink & sink);
+
+Sink & operator << (Sink & out, const Strings & s)
+{
+    writeStrings(s, out);
+    return out;
+}
+
+Sink & operator << (Sink & out, const StringSet & s)
+{
+    writeStrings(s, out);
+    return out;
+}
 
 
 void readPadding(size_t len, Source & source)
@@ -258,7 +282,13 @@ string readString(Source & source)
     return string((char *) buf, len);
 }
 
- 
+Source & operator >> (Source & in, string & s)
+{
+    s = readString(in);
+    return in;
+}
+
+
 template<class T> T readStrings(Source & source)
 {
     unsigned int count = readInt(source);

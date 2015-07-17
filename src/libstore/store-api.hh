@@ -100,6 +100,22 @@ typedef list<ValidPathInfo> ValidPathInfos;
 enum BuildMode { bmNormal, bmRepair, bmCheck };
 
 
+struct BuildResult
+{
+    enum Status {
+        Success = 0,
+        PermanentFailure = 1,
+        TimedOut = 2,
+        MiscFailure = 3
+    } status = MiscFailure;
+    std::string errorMsg;
+    //time_t startTime = 0, stopTime = 0;
+};
+
+
+struct BasicDerivation;
+
+
 class StoreAPI
 {
 public:
@@ -193,6 +209,12 @@ public:
        recursively building any sub-derivations. For inputs that are
        not derivations, substitute them. */
     virtual void buildPaths(const PathSet & paths, BuildMode buildMode = bmNormal) = 0;
+
+    /* Build a single non-materialized derivation (i.e. not from an
+       on-disk .drv file). Note that ‘drvPath’ is only used for
+       informational purposes. */
+    virtual BuildResult buildDerivation(const Path & drvPath, const BasicDerivation & drv,
+        BuildMode buildMode = bmNormal) = 0;
 
     /* Ensure that a path is valid.  If it is not currently valid, it
        may be made valid by running a substitute (if defined for the
