@@ -69,13 +69,13 @@ static PathSet realisePath(Path path, bool build = true)
         rootNr++;
 
         if (p.second.empty())
-            foreach (DerivationOutputs::iterator, i, drv.outputs) p.second.insert(i->first);
+            for (auto & i : drv.outputs) p.second.insert(i.first);
 
         PathSet outputs;
-        foreach (StringSet::iterator, j, p.second) {
-            DerivationOutputs::iterator i = drv.outputs.find(*j);
+        for (auto & j : p.second) {
+            DerivationOutputs::iterator i = drv.outputs.find(j);
             if (i == drv.outputs.end())
-                throw Error(format("derivation ‘%1%’ does not have an output named ‘%2%’") % p.first % *j);
+                throw Error(format("derivation ‘%1%’ does not have an output named ‘%2%’") % p.first % j);
             Path outPath = i->second.path;
             if (gcRoot == "")
                 printGCWarning();
@@ -113,16 +113,16 @@ static void opRealise(Strings opFlags, Strings opArgs)
     BuildMode buildMode = bmNormal;
     bool ignoreUnknown = false;
 
-    foreach (Strings::iterator, i, opFlags)
-        if (*i == "--dry-run") dryRun = true;
-        else if (*i == "--repair") buildMode = bmRepair;
-        else if (*i == "--check") buildMode = bmCheck;
-        else if (*i == "--ignore-unknown") ignoreUnknown = true;
-        else throw UsageError(format("unknown flag ‘%1%’") % *i);
+    for (auto & i : opFlags)
+        if (i == "--dry-run") dryRun = true;
+        else if (i == "--repair") buildMode = bmRepair;
+        else if (i == "--check") buildMode = bmCheck;
+        else if (i == "--ignore-unknown") ignoreUnknown = true;
+        else throw UsageError(format("unknown flag ‘%1%’") % i);
 
     Paths paths;
-    foreach (Strings::iterator, i, opArgs) {
-        DrvPathWithOutputs p = parseDrvPathWithOutputs(*i);
+    for (auto & i : opArgs) {
+        DrvPathWithOutputs p = parseDrvPathWithOutputs(i);
         paths.push_back(makeDrvPathWithOutputs(followLinksToStorePath(p.first), p.second));
     }
 
@@ -133,8 +133,8 @@ static void opRealise(Strings opFlags, Strings opArgs)
 
     if (ignoreUnknown) {
         Paths paths2;
-        foreach (Paths::iterator, i, paths)
-            if (unknown.find(*i) == unknown.end()) paths2.push_back(*i);
+        for (auto & i : paths)
+            if (unknown.find(i) == unknown.end()) paths2.push_back(i);
         paths = paths2;
         unknown = PathSet();
     }
@@ -148,11 +148,11 @@ static void opRealise(Strings opFlags, Strings opArgs)
     store->buildPaths(PathSet(paths.begin(), paths.end()), buildMode);
 
     if (!ignoreUnknown)
-        foreach (Paths::iterator, i, paths) {
-            PathSet paths = realisePath(*i, false);
+        for (auto & i : paths) {
+            PathSet paths = realisePath(i, false);
             if (!noOutput)
-                foreach (PathSet::iterator, j, paths)
-                    cout << format("%1%\n") % *j;
+                for (auto & j : paths)
+                    cout << format("%1%\n") % j;
         }
 }
 
@@ -173,10 +173,9 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
 {
     bool recursive = false;
 
-    for (Strings::iterator i = opFlags.begin();
-         i != opFlags.end(); ++i)
-        if (*i == "--recursive") recursive = true;
-        else throw UsageError(format("unknown flag ‘%1%’") % *i);
+    for (auto & i : opFlags)
+        if (i == "--recursive") recursive = true;
+        else throw UsageError(format("unknown flag ‘%1%’") % i);
 
     if (opArgs.empty())
         throw UsageError("first argument must be hash algorithm");
@@ -194,10 +193,9 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
 {
     bool recursive = false;
 
-    for (Strings::iterator i = opFlags.begin();
-         i != opFlags.end(); ++i)
-        if (*i == "--recursive") recursive = true;
-        else throw UsageError(format("unknown flag ‘%1%’") % *i);
+    for (auto i : opFlags)
+        if (i == "--recursive") recursive = true;
+        else throw UsageError(format("unknown flag ‘%1%’") % i);
 
     if (opArgs.size() != 3)
         throw UsageError(format("‘--print-fixed-path’ requires three arguments"));
@@ -219,8 +217,8 @@ static PathSet maybeUseOutputs(const Path & storePath, bool useOutput, bool forc
     if (useOutput && isDerivation(storePath)) {
         Derivation drv = derivationFromPath(*store, storePath);
         PathSet outputs;
-        foreach (DerivationOutputs::iterator, i, drv.outputs)
-            outputs.insert(i->second.path);
+        for (auto & i : drv.outputs)
+            outputs.insert(i.second.path);
         return outputs;
     }
     else return singleton<PathSet>(storePath);
@@ -257,8 +255,8 @@ static void printTree(const Path & path,
     Paths sorted = topoSortPaths(*store, references);
     reverse(sorted.begin(), sorted.end());
 
-    foreach (Paths::iterator, i, sorted) {
-        Paths::iterator j = i; ++j;
+    for (auto i = sorted.begin(); i != sorted.end(); ++i) {
+        auto j = i; ++j;
         printTree(*i, tailPad + treeConn,
             j == sorted.end() ? tailPad + treeNull : tailPad + treeLine,
             done);
@@ -279,34 +277,34 @@ static void opQuery(Strings opFlags, Strings opArgs)
     bool forceRealise = false;
     string bindingName;
 
-    foreach (Strings::iterator, i, opFlags) {
+    for (auto & i : opFlags) {
         QueryType prev = query;
-        if (*i == "--outputs") query = qOutputs;
-        else if (*i == "--requisites" || *i == "-R") query = qRequisites;
-        else if (*i == "--references") query = qReferences;
-        else if (*i == "--referrers" || *i == "--referers") query = qReferrers;
-        else if (*i == "--referrers-closure" || *i == "--referers-closure") query = qReferrersClosure;
-        else if (*i == "--deriver" || *i == "-d") query = qDeriver;
-        else if (*i == "--binding" || *i == "-b") {
+        if (i == "--outputs") query = qOutputs;
+        else if (i == "--requisites" || i == "-R") query = qRequisites;
+        else if (i == "--references") query = qReferences;
+        else if (i == "--referrers" || i == "--referers") query = qReferrers;
+        else if (i == "--referrers-closure" || i == "--referers-closure") query = qReferrersClosure;
+        else if (i == "--deriver" || i == "-d") query = qDeriver;
+        else if (i == "--binding" || i == "-b") {
             if (opArgs.size() == 0)
                 throw UsageError("expected binding name");
             bindingName = opArgs.front();
             opArgs.pop_front();
             query = qBinding;
         }
-        else if (*i == "--hash") query = qHash;
-        else if (*i == "--size") query = qSize;
-        else if (*i == "--tree") query = qTree;
-        else if (*i == "--graph") query = qGraph;
-        else if (*i == "--xml") query = qXml;
-        else if (*i == "--resolve") query = qResolve;
-        else if (*i == "--roots") query = qRoots;
-        else if (*i == "--use-output" || *i == "-u") useOutput = true;
-        else if (*i == "--force-realise" || *i == "--force-realize" || *i == "-f") forceRealise = true;
-        else if (*i == "--include-outputs") includeOutputs = true;
-        else throw UsageError(format("unknown flag ‘%1%’") % *i);
+        else if (i == "--hash") query = qHash;
+        else if (i == "--size") query = qSize;
+        else if (i == "--tree") query = qTree;
+        else if (i == "--graph") query = qGraph;
+        else if (i == "--xml") query = qXml;
+        else if (i == "--resolve") query = qResolve;
+        else if (i == "--roots") query = qRoots;
+        else if (i == "--use-output" || i == "-u") useOutput = true;
+        else if (i == "--force-realise" || i == "--force-realize" || i == "-f") forceRealise = true;
+        else if (i == "--include-outputs") includeOutputs = true;
+        else throw UsageError(format("unknown flag ‘%1%’") % i);
         if (prev != qDefault && prev != query)
-            throw UsageError(format("query type ‘%1%’ conflicts with earlier flag") % *i);
+            throw UsageError(format("query type ‘%1%’ conflicts with earlier flag") % i);
     }
 
     if (query == qDefault) query = qOutputs;
@@ -316,12 +314,12 @@ static void opQuery(Strings opFlags, Strings opArgs)
     switch (query) {
 
         case qOutputs: {
-            foreach (Strings::iterator, i, opArgs) {
-                *i = followLinksToStorePath(*i);
-                if (forceRealise) realisePath(*i);
-                Derivation drv = derivationFromPath(*store, *i);
-                foreach (DerivationOutputs::iterator, j, drv.outputs)
-                    cout << format("%1%\n") % j->second.path;
+            for (auto & i : opArgs) {
+                i = followLinksToStorePath(i);
+                if (forceRealise) realisePath(i);
+                Derivation drv = derivationFromPath(*store, i);
+                for (auto & j : drv.outputs)
+                    cout << format("%1%\n") % j.second.path;
             }
             break;
         }
@@ -331,13 +329,13 @@ static void opQuery(Strings opFlags, Strings opArgs)
         case qReferrers:
         case qReferrersClosure: {
             PathSet paths;
-            foreach (Strings::iterator, i, opArgs) {
-                PathSet ps = maybeUseOutputs(followLinksToStorePath(*i), useOutput, forceRealise);
-                foreach (PathSet::iterator, j, ps) {
-                    if (query == qRequisites) computeFSClosure(*store, *j, paths, false, includeOutputs);
-                    else if (query == qReferences) store->queryReferences(*j, paths);
-                    else if (query == qReferrers) store->queryReferrers(*j, paths);
-                    else if (query == qReferrersClosure) computeFSClosure(*store, *j, paths, true);
+            for (auto & i : opArgs) {
+                PathSet ps = maybeUseOutputs(followLinksToStorePath(i), useOutput, forceRealise);
+                for (auto & j : ps) {
+                    if (query == qRequisites) computeFSClosure(*store, j, paths, false, includeOutputs);
+                    else if (query == qReferences) store->queryReferences(j, paths);
+                    else if (query == qReferrers) store->queryReferrers(j, paths);
+                    else if (query == qReferrersClosure) computeFSClosure(*store, j, paths, true);
                 }
             }
             Paths sorted = topoSortPaths(*store, paths);
@@ -348,16 +346,16 @@ static void opQuery(Strings opFlags, Strings opArgs)
         }
 
         case qDeriver:
-            foreach (Strings::iterator, i, opArgs) {
-                Path deriver = store->queryDeriver(followLinksToStorePath(*i));
+            for (auto & i : opArgs) {
+                Path deriver = store->queryDeriver(followLinksToStorePath(i));
                 cout << format("%1%\n") %
                     (deriver == "" ? "unknown-deriver" : deriver);
             }
             break;
 
         case qBinding:
-            foreach (Strings::iterator, i, opArgs) {
-                Path path = useDeriver(followLinksToStorePath(*i));
+            for (auto & i : opArgs) {
+                Path path = useDeriver(followLinksToStorePath(i));
                 Derivation drv = derivationFromPath(*store, path);
                 StringPairs::iterator j = drv.env.find(bindingName);
                 if (j == drv.env.end())
@@ -369,10 +367,10 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qHash:
         case qSize:
-            foreach (Strings::iterator, i, opArgs) {
-                PathSet paths = maybeUseOutputs(followLinksToStorePath(*i), useOutput, forceRealise);
-                foreach (PathSet::iterator, j, paths) {
-                    ValidPathInfo info = store->queryPathInfo(*j);
+            for (auto & i : opArgs) {
+                PathSet paths = maybeUseOutputs(followLinksToStorePath(i), useOutput, forceRealise);
+                for (auto & j : paths) {
+                    ValidPathInfo info = store->queryPathInfo(j);
                     if (query == qHash) {
                         assert(info.hash.type == htSHA256);
                         cout << format("sha256:%1%\n") % printHash32(info.hash);
@@ -384,15 +382,15 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qTree: {
             PathSet done;
-            foreach (Strings::iterator, i, opArgs)
-                printTree(followLinksToStorePath(*i), "", "", done);
+            for (auto & i : opArgs)
+                printTree(followLinksToStorePath(i), "", "", done);
             break;
         }
 
         case qGraph: {
             PathSet roots;
-            foreach (Strings::iterator, i, opArgs) {
-                PathSet paths = maybeUseOutputs(followLinksToStorePath(*i), useOutput, forceRealise);
+            for (auto & i : opArgs) {
+                PathSet paths = maybeUseOutputs(followLinksToStorePath(i), useOutput, forceRealise);
                 roots.insert(paths.begin(), paths.end());
             }
             printDotGraph(roots);
@@ -401,8 +399,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qXml: {
             PathSet roots;
-            foreach (Strings::iterator, i, opArgs) {
-                PathSet paths = maybeUseOutputs(followLinksToStorePath(*i), useOutput, forceRealise);
+            for (auto & i : opArgs) {
+                PathSet paths = maybeUseOutputs(followLinksToStorePath(i), useOutput, forceRealise);
                 roots.insert(paths.begin(), paths.end());
             }
             printXmlGraph(roots);
@@ -410,23 +408,23 @@ static void opQuery(Strings opFlags, Strings opArgs)
         }
 
         case qResolve: {
-            foreach (Strings::iterator, i, opArgs)
-                cout << format("%1%\n") % followLinksToStorePath(*i);
+            for (auto & i : opArgs)
+                cout << format("%1%\n") % followLinksToStorePath(i);
             break;
         }
 
         case qRoots: {
             PathSet referrers;
-            foreach (Strings::iterator, i, opArgs) {
-                PathSet paths = maybeUseOutputs(followLinksToStorePath(*i), useOutput, forceRealise);
-                foreach (PathSet::iterator, j, paths)
-                    computeFSClosure(*store, *j, referrers, true,
+            for (auto & i : opArgs) {
+                PathSet paths = maybeUseOutputs(followLinksToStorePath(i), useOutput, forceRealise);
+                for (auto & j : paths)
+                    computeFSClosure(*store, j, referrers, true,
                         settings.gcKeepOutputs, settings.gcKeepDerivations);
             }
             Roots roots = store->findRoots();
-            foreach (Roots::iterator, i, roots)
-                if (referrers.find(i->second) != referrers.end())
-                    cout << format("%1%\n") % i->first;
+            for (auto & i : roots)
+                if (referrers.find(i.second) != referrers.end())
+                    cout << format("%1%\n") % i.first;
             break;
         }
 
@@ -439,8 +437,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
 static string shellEscape(const string & s)
 {
     string r;
-    foreach (string::const_iterator, i, s)
-        if (*i == '\'') r += "'\\''"; else r += *i;
+    for (auto & i : s)
+        if (i == '\'') r += "'\\''"; else r += i;
     return r;
 }
 
@@ -455,15 +453,17 @@ static void opPrintEnv(Strings opFlags, Strings opArgs)
 
     /* Print each environment variable in the derivation in a format
        that can be sourced by the shell. */
-    foreach (StringPairs::iterator, i, drv.env)
-        cout << format("export %1%; %1%='%2%'\n") % i->first % shellEscape(i->second);
+    for (auto & i : drv.env)
+        cout << format("export %1%; %1%='%2%'\n") % i.first % shellEscape(i.second);
 
     /* Also output the arguments.  This doesn't preserve whitespace in
        arguments. */
     cout << "export _args; _args='";
-    foreach (Strings::iterator, i, drv.args) {
-        if (i != drv.args.begin()) cout << ' ';
-        cout << shellEscape(*i);
+    bool first = true;
+    for (auto & i : drv.args) {
+        if (!first) cout << ' ';
+        first = false;
+        cout << shellEscape(i);
     }
     cout << "'\n";
 }
@@ -475,8 +475,8 @@ static void opReadLog(Strings opFlags, Strings opArgs)
 
     RunPager pager;
 
-    foreach (Strings::iterator, i, opArgs) {
-        Path path = useDeriver(followLinksToStorePath(*i));
+    for (auto & i : opArgs) {
+        Path path = useDeriver(followLinksToStorePath(i));
 
         string baseName = baseNameOf(path);
         bool found = false;
@@ -547,8 +547,8 @@ static void opDumpDB(Strings opFlags, Strings opArgs)
     if (!opArgs.empty())
         throw UsageError("no arguments expected");
     PathSet validPaths = store->queryAllValidPaths();
-    foreach (PathSet::iterator, i, validPaths)
-        cout << store->makeValidityRegistration(singleton<PathSet>(*i), true, true);
+    for (auto & i : validPaths)
+        cout << store->makeValidityRegistration(singleton<PathSet>(i), true, true);
 }
 
 
@@ -590,11 +590,10 @@ static void opRegisterValidity(Strings opFlags, Strings opArgs)
     bool reregister = false; // !!! maybe this should be the default
     bool hashGiven = false;
 
-    for (Strings::iterator i = opFlags.begin();
-         i != opFlags.end(); ++i)
-        if (*i == "--reregister") reregister = true;
-        else if (*i == "--hash-given") hashGiven = true;
-        else throw UsageError(format("unknown flag ‘%1%’") % *i);
+    for (auto & i : opFlags)
+        if (i == "--reregister") reregister = true;
+        else if (i == "--hash-given") hashGiven = true;
+        else throw UsageError(format("unknown flag ‘%1%’") % i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
@@ -606,15 +605,12 @@ static void opCheckValidity(Strings opFlags, Strings opArgs)
 {
     bool printInvalid = false;
 
-    for (Strings::iterator i = opFlags.begin();
-         i != opFlags.end(); ++i)
-        if (*i == "--print-invalid") printInvalid = true;
-        else throw UsageError(format("unknown flag ‘%1%’") % *i);
+    for (auto & i : opFlags)
+        if (i == "--print-invalid") printInvalid = true;
+        else throw UsageError(format("unknown flag ‘%1%’") % i);
 
-    for (Strings::iterator i = opArgs.begin();
-         i != opArgs.end(); ++i)
-    {
-        Path path = followLinksToStorePath(*i);
+    for (auto & i : opArgs) {
+        Path path = followLinksToStorePath(i);
         if (!store->isValidPath(path)) {
             if (printInvalid)
                 cout << format("%1%\n") % path;
@@ -634,7 +630,7 @@ static void opGC(Strings opFlags, Strings opArgs)
     GCResults results;
 
     /* Do what? */
-    foreach (Strings::iterator, i, opFlags)
+    for (auto i = opFlags.begin(); i != opFlags.end(); ++i)
         if (*i == "--print-roots") printRoots = true;
         else if (*i == "--print-live") options.action = GCOptions::gcReturnLive;
         else if (*i == "--print-dead") options.action = GCOptions::gcReturnDead;
@@ -649,8 +645,8 @@ static void opGC(Strings opFlags, Strings opArgs)
 
     if (printRoots) {
         Roots roots = store->findRoots();
-        foreach (Roots::iterator, i, roots)
-            cout << i->first << " -> " << i->second << std::endl;
+        for (auto & i : roots)
+            cout << i.first << " -> " << i.second << std::endl;
     }
 
     else {
@@ -658,8 +654,8 @@ static void opGC(Strings opFlags, Strings opArgs)
         store->collectGarbage(options, results);
 
         if (options.action != GCOptions::gcDeleteDead)
-            foreach (PathSet::iterator, i, results.paths)
-                cout << *i << std::endl;
+            for (auto & i : results.paths)
+                cout << i << std::endl;
     }
 }
 
@@ -672,12 +668,12 @@ static void opDelete(Strings opFlags, Strings opArgs)
     GCOptions options;
     options.action = GCOptions::gcDeleteSpecific;
 
-    foreach (Strings::iterator, i, opFlags)
-        if (*i == "--ignore-liveness") options.ignoreLiveness = true;
-        else throw UsageError(format("unknown flag ‘%1%’") % *i);
+    for (auto & i : opFlags)
+        if (i == "--ignore-liveness") options.ignoreLiveness = true;
+        else throw UsageError(format("unknown flag ‘%1%’") % i);
 
-    foreach (Strings::iterator, i, opArgs)
-        options.pathsToDelete.insert(followLinksToStorePath(*i));
+    for (auto & i : opArgs)
+        options.pathsToDelete.insert(followLinksToStorePath(i));
 
     GCResults results;
     PrintFreed freed(true, results);
@@ -713,10 +709,9 @@ static void opRestore(Strings opFlags, Strings opArgs)
 static void opExport(Strings opFlags, Strings opArgs)
 {
     bool sign = false;
-    for (Strings::iterator i = opFlags.begin();
-         i != opFlags.end(); ++i)
-        if (*i == "--sign") sign = true;
-        else throw UsageError(format("unknown flag ‘%1%’") % *i);
+    for (auto & i : opFlags)
+        if (i == "--sign") sign = true;
+        else throw UsageError(format("unknown flag ‘%1%’") % i);
 
     FdSink sink(STDOUT_FILENO);
     Paths sorted = topoSortPaths(*store, PathSet(opArgs.begin(), opArgs.end()));
@@ -728,17 +723,17 @@ static void opExport(Strings opFlags, Strings opArgs)
 static void opImport(Strings opFlags, Strings opArgs)
 {
     bool requireSignature = false;
-    foreach (Strings::iterator, i, opFlags)
-        if (*i == "--require-signature") requireSignature = true;
-        else throw UsageError(format("unknown flag ‘%1%’") % *i);
+    for (auto & i : opFlags)
+        if (i == "--require-signature") requireSignature = true;
+        else throw UsageError(format("unknown flag ‘%1%’") % i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
     FdSource source(STDIN_FILENO);
     Paths paths = store->importPaths(requireSignature, source);
 
-    foreach (Paths::iterator, i, paths)
-        cout << format("%1%\n") % *i << std::flush;
+    for (auto & i : paths)
+        cout << format("%1%\n") % i << std::flush;
 }
 
 
@@ -762,11 +757,10 @@ static void opVerify(Strings opFlags, Strings opArgs)
     bool checkContents = false;
     bool repair = false;
 
-    for (Strings::iterator i = opFlags.begin();
-         i != opFlags.end(); ++i)
-        if (*i == "--check-contents") checkContents = true;
-        else if (*i == "--repair") repair = true;
-        else throw UsageError(format("unknown flag ‘%1%’") % *i);
+    for (auto & i : opFlags)
+        if (i == "--check-contents") checkContents = true;
+        else if (i == "--repair") repair = true;
+        else throw UsageError(format("unknown flag ‘%1%’") % i);
 
     if (store->verifyStore(checkContents, repair)) {
         printMsg(lvlError, "warning: not all errors were fixed");
@@ -783,8 +777,8 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
 
     int status = 0;
 
-    foreach (Strings::iterator, i, opArgs) {
-        Path path = followLinksToStorePath(*i);
+    for (auto & i : opArgs) {
+        Path path = followLinksToStorePath(i);
         printMsg(lvlTalkative, format("checking path ‘%1%’...") % path);
         ValidPathInfo info = store->queryPathInfo(path);
         HashResult current = hashPath(info.hash.type, path);
@@ -807,8 +801,8 @@ static void opRepairPath(Strings opFlags, Strings opArgs)
     if (!opFlags.empty())
         throw UsageError("no flags expected");
 
-    foreach (Strings::iterator, i, opArgs) {
-        Path path = followLinksToStorePath(*i);
+    for (auto & i : opArgs) {
+        Path path = followLinksToStorePath(i);
         ensureLocalStore().repairPath(path);
     }
 }
@@ -828,8 +822,8 @@ static void opQueryFailedPaths(Strings opFlags, Strings opArgs)
     if (!opArgs.empty() || !opFlags.empty())
         throw UsageError("no arguments expected");
     PathSet failed = store->queryFailedPaths();
-    foreach (PathSet::iterator, i, failed)
-        cout << format("%1%\n") % *i;
+    for (auto & i : failed)
+        cout << format("%1%\n") % i;
 }
 
 
@@ -845,9 +839,9 @@ static void opClearFailedPaths(Strings opFlags, Strings opArgs)
 static void opServe(Strings opFlags, Strings opArgs)
 {
     bool writeAllowed = false;
-    foreach (Strings::iterator, i, opFlags)
-        if (*i == "--write") writeAllowed = true;
-        else throw UsageError(format("unknown flag ‘%1%’") % *i);
+    for (auto & i : opFlags)
+        if (i == "--write") writeAllowed = true;
+        else throw UsageError(format("unknown flag ‘%1%’") % i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
@@ -919,10 +913,10 @@ static void opServe(Strings opFlags, Strings opArgs)
             case cmdQueryPathInfos: {
                 PathSet paths = readStorePaths<PathSet>(in);
                 // !!! Maybe we want a queryPathInfos?
-                foreach (PathSet::iterator, i, paths) {
-                    if (!store->isValidPath(*i))
+                for (auto & i : paths) {
+                    if (!store->isValidPath(i))
                         continue;
-                    ValidPathInfo info = store->queryPathInfo(*i);
+                    ValidPathInfo info = store->queryPathInfo(i);
                     writeString(info.path, out);
                     writeString(info.deriver, out);
                     writeStrings(info.references, out);
@@ -1012,8 +1006,8 @@ static void opServe(Strings opFlags, Strings opArgs)
 
 static void opGenerateBinaryCacheKey(Strings opFlags, Strings opArgs)
 {
-    foreach (Strings::iterator, i, opFlags)
-        throw UsageError(format("unknown flag ‘%1%’") % *i);
+    for (auto & i : opFlags)
+        throw UsageError(format("unknown flag ‘%1%’") % i);
 
     if (opArgs.size() != 3) throw UsageError("three arguments expected");
     auto i = opArgs.begin();

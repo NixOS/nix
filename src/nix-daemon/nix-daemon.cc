@@ -367,9 +367,9 @@ static void performOp(bool trusted, unsigned int clientVersion,
         Roots roots = store->findRoots();
         stopWork();
         writeInt(roots.size(), to);
-        for (Roots::iterator i = roots.begin(); i != roots.end(); ++i) {
-            writeString(i->first, to);
-            writeString(i->second, to);
+        for (auto & i : roots) {
+            writeString(i.first, to);
+            writeString(i.second, to);
         }
         break;
     }
@@ -464,12 +464,12 @@ static void performOp(bool trusted, unsigned int clientVersion,
         store->querySubstitutablePathInfos(paths, infos);
         stopWork();
         writeInt(infos.size(), to);
-        foreach (SubstitutablePathInfos::iterator, i, infos) {
-            writeString(i->first, to);
-            writeString(i->second.deriver, to);
-            writeStrings(i->second.references, to);
-            writeLongLong(i->second.downloadSize, to);
-            writeLongLong(i->second.narSize, to);
+        for (auto & i : infos) {
+            writeString(i.first, to);
+            writeString(i.second.deriver, to);
+            writeStrings(i.second.references, to);
+            writeLongLong(i.second.downloadSize, to);
+            writeLongLong(i.second.narSize, to);
         }
         break;
     }

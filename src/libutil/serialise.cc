@@ -200,8 +200,8 @@ Sink & operator << (Sink & out, const string & s)
 template<class T> void writeStrings(const T & ss, Sink & sink)
 {
     writeInt(ss.size(), sink);
-    foreach (typename T::const_iterator, i, ss)
-        writeString(*i, sink);
+    for (auto & i : ss)
+        writeString(i, sink);
 }
 
 template void writeStrings(const Paths & ss, Sink & sink);

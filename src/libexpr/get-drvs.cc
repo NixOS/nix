@@ -85,8 +85,8 @@ StringSet DrvInfo::queryMetaNames()
 {
     StringSet res;
     if (!getMeta()) return res;
-    foreach (Bindings::iterator, i, *meta)
-        res.insert(i->name);
+    for (auto & i : *meta)
+        res.insert(i.name);
     return res;
 }
 
@@ -102,8 +102,8 @@ bool DrvInfo::checkMeta(Value & v)
     else if (v.type == tAttrs) {
         Bindings::iterator i = v.attrs->find(state->sOutPath);
         if (i != v.attrs->end()) return false;
-        foreach (Bindings::iterator, i, *v.attrs)
-            if (!checkMeta(*i->value)) return false;
+        for (auto & i : *v.attrs)
+            if (!checkMeta(*i.value)) return false;
         return true;
     }
     else return v.type == tInt || v.type == tBool || v.type == tString;
@@ -255,13 +255,13 @@ static void getDerivations(EvalState & state, Value & vIn,
            precedence). */
         typedef std::map<string, Symbol> SortedSymbols;
         SortedSymbols attrs;
-        foreach (Bindings::iterator, i, *v.attrs)
-            attrs.insert(std::pair<string, Symbol>(i->name, i->name));
+        for (auto & i : *v.attrs)
+            attrs.insert(std::pair<string, Symbol>(i.name, i.name));
 
-        foreach (SortedSymbols::iterator, i, attrs) {
-            startNest(nest, lvlDebug, format("evaluating attribute ‘%1%’") % i->first);
-            string pathPrefix2 = addToPath(pathPrefix, i->first);
-            Value & v2(*v.attrs->find(i->second)->value);
+        for (auto & i : attrs) {
+            startNest(nest, lvlDebug, format("evaluating attribute ‘%1%’") % i.first);
+            string pathPrefix2 = addToPath(pathPrefix, i.first);
+            Value & v2(*v.attrs->find(i.second)->value);
             if (combineChannels)
                 getDerivations(state, v2, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
             else if (getDerivation(state, v2, pathPrefix2, drvs, done, ignoreAssertionFailures)) {

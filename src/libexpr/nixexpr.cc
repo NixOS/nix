@@ -97,21 +97,21 @@ void ExprAttrs::show(std::ostream & str)
 {
     if (recursive) str << "rec ";
     str << "{ ";
-    foreach (AttrDefs::iterator, i, attrs)
-        if (i->second.inherited)
-            str << "inherit " << i->first << " " << "; ";
+    for (auto & i : attrs)
+        if (i.second.inherited)
+            str << "inherit " << i.first << " " << "; ";
         else
-            str << i->first << " = " << *i->second.e << "; ";
-    foreach (DynamicAttrDefs::iterator, i, dynamicAttrs)
-        str << "\"${" << *i->nameExpr << "}\" = " << *i->valueExpr << "; ";
+            str << i.first << " = " << *i.second.e << "; ";
+    for (auto & i : dynamicAttrs)
+        str << "\"${" << *i.nameExpr << "}\" = " << *i.valueExpr << "; ";
     str << "}";
 }
 
 void ExprList::show(std::ostream & str)
 {
     str << "[ ";
-    foreach (vector<Expr *>::iterator, i, elems)
-        str << "(" << **i << ") ";
+    for (auto & i : elems)
+        str << "(" << *i << ") ";
     str << "]";
 }
 
@@ -121,10 +121,10 @@ void ExprLambda::show(std::ostream & str)
     if (matchAttrs) {
         str << "{ ";
         bool first = true;
-        foreach (Formals::Formals_::iterator, i, formals->formals) {
+        for (auto & i : formals->formals) {
             if (first) first = false; else str << ", ";
-            str << i->name;
-            if (i->def) str << " ? " << *i->def;
+            str << i.name;
+            if (i.def) str << " ? " << *i.def;
         }
         if (formals->ellipsis) {
             if (!first) str << ", ";
@@ -140,12 +140,12 @@ void ExprLambda::show(std::ostream & str)
 void ExprLet::show(std::ostream & str)
 {
     str << "(let ";
-    foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs)
-        if (i->second.inherited) {
-            str << "inherit " << i->first << "; ";
+    for (auto & i : attrs->attrs)
+        if (i.second.inherited) {
+            str << "inherit " << i.first << "; ";
         }
         else
-            str << i->first << " = " << *i->second.e << "; ";
+            str << i.first << " = " << *i.second.e << "; ";
     str << "in " << *body << ")";
 }
 
@@ -173,9 +173,9 @@ void ExprConcatStrings::show(std::ostream & str)
 {
     bool first = true;
     str << "(";
-    foreach (vector<Expr *>::iterator, i, *es) {
+    for (auto & i : *es) {
         if (first) first = false; else str << " + ";
-        str << **i;
+        str << *i;
     }
     str << ")";
 }
@@ -267,17 +267,17 @@ void ExprSelect::bindVars(const StaticEnv & env)
 {
     e->bindVars(env);
     if (def) def->bindVars(env);
-    foreach (AttrPath::iterator, i, attrPath)
-        if (!i->symbol.set())
-            i->expr->bindVars(env);
+    for (auto & i : attrPath)
+        if (!i.symbol.set())
+            i.expr->bindVars(env);
 }
 
 void ExprOpHasAttr::bindVars(const StaticEnv & env)
 {
     e->bindVars(env);
-    foreach (AttrPath::iterator, i, attrPath)
-        if (!i->symbol.set())
-            i->expr->bindVars(env);
+    for (auto & i : attrPath)
+        if (!i.symbol.set())
+            i.expr->bindVars(env);
 }
 
 void ExprAttrs::bindVars(const StaticEnv & env)
@@ -289,27 +289,27 @@ void ExprAttrs::bindVars(const StaticEnv & env)
         dynamicEnv = &newEnv;
 
         unsigned int displ = 0;
-        foreach (AttrDefs::iterator, i, attrs)
-            newEnv.vars[i->first] = i->second.displ = displ++;
+        for (auto & i : attrs)
+            newEnv.vars[i.first] = i.second.displ = displ++;
 
-        foreach (AttrDefs::iterator, i, attrs)
-            i->second.e->bindVars(i->second.inherited ? env : newEnv);
+        for (auto & i : attrs)
+            i.second.e->bindVars(i.second.inherited ? env : newEnv);
     }
 
     else
-        foreach (AttrDefs::iterator, i, attrs)
-            i->second.e->bindVars(env);
+        for (auto & i : attrs)
+            i.second.e->bindVars(env);
 
-    foreach (DynamicAttrDefs::iterator, i, dynamicAttrs) {
-        i->nameExpr->bindVars(*dynamicEnv);
-        i->valueExpr->bindVars(*dynamicEnv);
+    for (auto & i : dynamicAttrs) {
+        i.nameExpr->bindVars(*dynamicEnv);
+        i.valueExpr->bindVars(*dynamicEnv);
     }
 }
 
 void ExprList::bindVars(const StaticEnv & env)
 {
-    foreach (vector<Expr *>::iterator, i, elems)
-        (*i)->bindVars(env);
+    for (auto & i : elems)
+        i->bindVars(env);
 }
 
 void ExprLambda::bindVars(const StaticEnv & env)
@@ -321,11 +321,11 @@ void ExprLambda::bindVars(const StaticEnv & env)
     if (!arg.empty()) newEnv.vars[arg] = displ++;
 
     if (matchAttrs) {
-        foreach (Formals::Formals_::iterator, i, formals->formals)
-            newEnv.vars[i->name] = displ++;
+        for (auto & i : formals->formals)
+            newEnv.vars[i.name] = displ++;
 
-        foreach (Formals::Formals_::iterator, i, formals->formals)
-            if (i->def) i->def->bindVars(newEnv);
+        for (auto & i : formals->formals)
+            if (i.def) i.def->bindVars(newEnv);
     }
 
     body->bindVars(newEnv);
@@ -336,11 +336,11 @@ void ExprLet::bindVars(const StaticEnv & env)
     StaticEnv newEnv(false, &env);
 
     unsigned int displ = 0;
-    foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs)
-        newEnv.vars[i->first] = i->second.displ = displ++;
+    for (auto & i : attrs->attrs)
+        newEnv.vars[i.first] = i.second.displ = displ++;
 
-    foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs)
-        i->second.e->bindVars(i->second.inherited ? env : newEnv);
+    for (auto & i : attrs->attrs)
+        i.second.e->bindVars(i.second.inherited ? env : newEnv);
 
     body->bindVars(newEnv);
 }
@@ -384,8 +384,8 @@ void ExprOpNot::bindVars(const StaticEnv & env)
 
 void ExprConcatStrings::bindVars(const StaticEnv & env)
 {
-    foreach (vector<Expr *>::iterator, i, *es)
-        (*i)->bindVars(env);
+    for (auto & i : *es)
+        i->bindVars(env);
 }
 
 void ExprPos::bindVars(const StaticEnv & env)
@@ -419,8 +419,8 @@ string ExprLambda::showNamePos() const
 size_t SymbolTable::totalSize() const
 {
     size_t n = 0;
-    foreach (Symbols::const_iterator, i, symbols)
-        n += i->size();
+    for (auto & i : symbols)
+        n += i.size();
     return n;
 }
 

@@ -45,8 +45,8 @@ void processExpr(EvalState & state, const Strings & attrPaths,
     Value vRoot;
     state.eval(e, vRoot);
 
-    foreach (Strings::const_iterator, i, attrPaths) {
-        Value & v(*findAlongAttrPath(state, *i, autoArgs, vRoot));
+    for (auto & i : attrPaths) {
+        Value & v(*findAlongAttrPath(state, i, autoArgs, vRoot));
         state.forceValue(v);
 
         PathSet context;
@@ -67,11 +67,11 @@ void processExpr(EvalState & state, const Strings & attrPaths,
         } else {
             DrvInfos drvs;
             getDerivations(state, v, "", autoArgs, drvs, false);
-            foreach (DrvInfos::iterator, i, drvs) {
-                Path drvPath = i->queryDrvPath();
+            for (auto & i : drvs) {
+                Path drvPath = i.queryDrvPath();
 
                 /* What output do we want? */
-                string outputName = i->queryOutputName();
+                string outputName = i.queryOutputName();
                 if (outputName == "")
                     throw Error(format("derivation ‘%1%’ lacks an ‘outputName’ attribute ") % drvPath);
 
@@ -168,9 +168,9 @@ int main(int argc, char * * argv)
         if (attrPaths.empty()) attrPaths.push_back("");
 
         if (findFile) {
-            foreach (Strings::iterator, i, files) {
-                Path p = state.findFile(*i);
-                if (p == "") throw Error(format("unable to find ‘%1%’") % *i);
+            for (auto & i : files) {
+                Path p = state.findFile(i);
+                if (p == "") throw Error(format("unable to find ‘%1%’") % i);
                 std::cout << p << std::endl;
             }
             return;

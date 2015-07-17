@@ -32,8 +32,8 @@ Path writeDerivation(StoreAPI & store,
 {
     PathSet references;
     references.insert(drv.inputSrcs.begin(), drv.inputSrcs.end());
-    foreach (DerivationInputs::const_iterator, i, drv.inputDrvs)
-        references.insert(i->first);
+    for (auto & i : drv.inputDrvs)
+        references.insert(i.first);
     /* Note that the outputs of a derivation are *not* references
        (that can be missing (of course) and should not necessarily be
        held during a garbage collection). */
@@ -156,21 +156,21 @@ string unparseDerivation(const Derivation & drv)
     s += "Derive([";
 
     bool first = true;
-    foreach (DerivationOutputs::const_iterator, i, drv.outputs) {
+    for (auto & i : drv.outputs) {
         if (first) first = false; else s += ',';
-        s += '('; printString(s, i->first);
-        s += ','; printString(s, i->second.path);
-        s += ','; printString(s, i->second.hashAlgo);
-        s += ','; printString(s, i->second.hash);
+        s += '('; printString(s, i.first);
+        s += ','; printString(s, i.second.path);
+        s += ','; printString(s, i.second.hashAlgo);
+        s += ','; printString(s, i.second.hash);
         s += ')';
     }
 
     s += "],[";
     first = true;
-    foreach (DerivationInputs::const_iterator, i, drv.inputDrvs) {
+    for (auto & i : drv.inputDrvs) {
         if (first) first = false; else s += ',';
-        s += '('; printString(s, i->first);
-        s += ','; printStrings(s, i->second.begin(), i->second.end());
+        s += '('; printString(s, i.first);
+        s += ','; printStrings(s, i.second.begin(), i.second.end());
         s += ')';
     }
 
@@ -183,10 +183,10 @@ string unparseDerivation(const Derivation & drv)
 
     s += ",[";
     first = true;
-    foreach (StringPairs::const_iterator, i, drv.env) {
+    for (auto & i : drv.env) {
         if (first) first = false; else s += ',';
-        s += '('; printString(s, i->first);
-        s += ','; printString(s, i->second);
+        s += '('; printString(s, i.first);
+        s += ','; printString(s, i.second);
         s += ')';
     }
 
@@ -247,15 +247,15 @@ Hash hashDerivationModulo(StoreAPI & store, Derivation drv)
     /* For other derivations, replace the inputs paths with recursive
        calls to this function.*/
     DerivationInputs inputs2;
-    foreach (DerivationInputs::const_iterator, i, drv.inputDrvs) {
-        Hash h = drvHashes[i->first];
+    for (auto & i : drv.inputDrvs) {
+        Hash h = drvHashes[i.first];
         if (h.type == htUnknown) {
-            assert(store.isValidPath(i->first));
-            Derivation drv2 = readDerivation(i->first);
+            assert(store.isValidPath(i.first));
+            Derivation drv2 = readDerivation(i.first);
             h = hashDerivationModulo(store, drv2);
-            drvHashes[i->first] = h;
+            drvHashes[i.first] = h;
         }
-        inputs2[printHash(h)] = i->second;
+        inputs2[printHash(h)] = i.second;
     }
     drv.inputDrvs = inputs2;
 

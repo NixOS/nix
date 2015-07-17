@@ -31,7 +31,7 @@ Path readStorePath(Source & from)
 template<class T> T readStorePaths(Source & from)
 {
     T paths = readStrings<T>(from);
-    foreach (typename T::iterator, i, paths) assertStorePath(*i);
+    for (auto & i : paths) assertStorePath(i);
     return paths;
 }
 
@@ -166,9 +166,9 @@ void RemoteStore::setOptions()
         if (overrides["ssh-auth-sock"] == "")
             overrides["ssh-auth-sock"] = getEnv("SSH_AUTH_SOCK");
         writeInt(overrides.size(), to);
-        foreach (Settings::SettingsMap::iterator, i, overrides) {
-            writeString(i->first, to);
-            writeString(i->second, to);
+        for (auto & i : overrides) {
+            writeString(i.first, to);
+            writeString(i.second, to);
         }
     }
 
@@ -192,8 +192,8 @@ PathSet RemoteStore::queryValidPaths(const PathSet & paths)
     openConnection();
     if (GET_PROTOCOL_MINOR(daemonVersion) < 12) {
         PathSet res;
-        foreach (PathSet::const_iterator, i, paths)
-            if (isValidPath(*i)) res.insert(*i);
+        for (auto & i : paths)
+            if (isValidPath(i)) res.insert(i);
         return res;
     } else {
         writeInt(wopQueryValidPaths, to);
@@ -218,11 +218,11 @@ PathSet RemoteStore::querySubstitutablePaths(const PathSet & paths)
     openConnection();
     if (GET_PROTOCOL_MINOR(daemonVersion) < 12) {
         PathSet res;
-        foreach (PathSet::const_iterator, i, paths) {
+        for (auto & i : paths) {
             writeInt(wopHasSubstitutes, to);
-            writeString(*i, to);
+            writeString(i, to);
             processStderr();
-            if (readInt(from)) res.insert(*i);
+            if (readInt(from)) res.insert(i);
         }
         return res;
     } else {
@@ -245,10 +245,10 @@ void RemoteStore::querySubstitutablePathInfos(const PathSet & paths,
 
     if (GET_PROTOCOL_MINOR(daemonVersion) < 12) {
 
-        foreach (PathSet::const_iterator, i, paths) {
+        for (auto & i : paths) {
             SubstitutablePathInfo info;
             writeInt(wopQuerySubstitutablePathInfo, to);
-            writeString(*i, to);
+            writeString(i, to);
             processStderr();
             unsigned int reply = readInt(from);
             if (reply == 0) continue;
@@ -257,7 +257,7 @@ void RemoteStore::querySubstitutablePathInfos(const PathSet & paths,
             info.references = readStorePaths<PathSet>(from);
             info.downloadSize = readLongLong(from);
             info.narSize = GET_PROTOCOL_MINOR(daemonVersion) >= 7 ? readLongLong(from) : 0;
-            infos[*i] = info;
+            infos[i] = info;
         }
 
     } else {
@@ -473,8 +473,8 @@ void RemoteStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
         /* For backwards compatibility with old daemons, strip output
            identifiers. */
         PathSet drvPaths2;
-        foreach (PathSet::const_iterator, i, drvPaths)
-            drvPaths2.insert(string(*i, 0, i->find('!')));
+        for (auto & i : drvPaths)
+            drvPaths2.insert(string(i, 0, i.find('!')));
         writeStrings(drvPaths2, to);
     }
     processStderr();

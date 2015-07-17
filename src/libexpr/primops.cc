@@ -330,8 +330,8 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
     /* Create the result list. */
     state.mkList(v, res.size());
     unsigned int n = 0;
-    foreach (ValueList::iterator, i, res)
-        v.list.elems[n++] = *i;
+    for (auto & i : res)
+        v.list.elems[n++] = i;
 }
 
 
@@ -477,24 +477,24 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     StringSet outputs;
     outputs.insert("out");
 
-    foreach (Bindings::iterator, i, *args[0]->attrs) {
-        if (i->name == state.sIgnoreNulls) continue;
-        string key = i->name;
+    for (auto & i : *args[0]->attrs) {
+        if (i.name == state.sIgnoreNulls) continue;
+        string key = i.name;
         startNest(nest, lvlVomit, format("processing attribute ‘%1%’") % key);
 
         try {
 
             if (ignoreNulls) {
-                state.forceValue(*i->value);
-                if (i->value->type == tNull) continue;
+                state.forceValue(*i.value);
+                if (i.value->type == tNull) continue;
             }
 
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
             if (key == "args") {
-                state.forceList(*i->value, pos);
-                for (unsigned int n = 0; n < i->value->list.length; ++n) {
-                    string s = state.coerceToString(posDrvName, *i->value->list.elems[n], context, true);
+                state.forceList(*i.value, pos);
+                for (unsigned int n = 0; n < i.value->list.length; ++n) {
+                    string s = state.coerceToString(posDrvName, *i.value->list.elems[n], context, true);
                     drv.args.push_back(s);
                 }
             }
@@ -502,11 +502,11 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             /* All other attributes are passed to the builder through
                the environment. */
             else {
-                string s = state.coerceToString(posDrvName, *i->value, context, true);
+                string s = state.coerceToString(posDrvName, *i.value, context, true);
                 drv.env[key] = s;
                 if (key == "builder") drv.builder = s;
-                else if (i->name == state.sSystem) drv.platform = s;
-                else if (i->name == state.sName) {
+                else if (i.name == state.sSystem) drv.platform = s;
+                else if (i.name == state.sName) {
                     drvName = s;
                     printMsg(lvlVomit, format("derivation name is ‘%1%’") % drvName);
                 }
@@ -520,17 +520,17 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 else if (key == "outputs") {
                     Strings tmp = tokenizeString<Strings>(s);
                     outputs.clear();
-                    foreach (Strings::iterator, j, tmp) {
-                        if (outputs.find(*j) != outputs.end())
-                            throw EvalError(format("duplicate derivation output ‘%1%’, at %2%") % *j % posDrvName);
-                        /* !!! Check whether *j is a valid attribute
+                    for (auto & j : tmp) {
+                        if (outputs.find(j) != outputs.end())
+                            throw EvalError(format("duplicate derivation output ‘%1%’, at %2%") % j % posDrvName);
+                        /* !!! Check whether j is a valid attribute
                            name. */
                         /* Derivations cannot be named ‘drv’, because
                            then we'd have an attribute ‘drvPath’ in
                            the resulting set. */
-                        if (*j == "drv")
+                        if (j == "drv")
                             throw EvalError(format("invalid derivation output name ‘drv’, at %1%") % posDrvName);
-                        outputs.insert(*j);
+                        outputs.insert(j);
                     }
                     if (outputs.empty())
                         throw EvalError(format("derivation cannot have an empty set of outputs, at %1%") % posDrvName);
@@ -547,8 +547,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     /* Everything in the context of the strings in the derivation
        attributes should be added as dependencies of the resulting
        derivation. */
-    foreach (PathSet::iterator, i, context) {
-        Path path = *i;
+    for (auto & path : context) {
 
         /* Paths marked with `=' denote that the path of a derivation
            is explicitly passed to the builder.  Since that allows the
@@ -560,10 +559,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         if (path.at(0) == '=') {
             /* !!! This doesn't work if readOnlyMode is set. */
             PathSet refs; computeFSClosure(*store, string(path, 1), refs);
-            foreach (PathSet::iterator, j, refs) {
-                drv.inputSrcs.insert(*j);
-                if (isDerivation(*j))
-                    drv.inputDrvs[*j] = store->queryDerivationOutputNames(*j);
+            for (auto & j : refs) {
+                drv.inputSrcs.insert(j);
+                if (isDerivation(j))
+                    drv.inputDrvs[j] = store->queryDerivationOutputNames(j);
             }
         }
 
@@ -622,20 +621,20 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
            are empty, and the corresponding environment variables have
            an empty value.  This ensures that changes in the set of
            output names do get reflected in the hash. */
-        foreach (StringSet::iterator, i, outputs) {
-            drv.env[*i] = "";
-            drv.outputs[*i] = DerivationOutput("", "", "");
+        for (auto & i : outputs) {
+            drv.env[i] = "";
+            drv.outputs[i] = DerivationOutput("", "", "");
         }
 
         /* Use the masked derivation expression to compute the output
            path. */
         Hash h = hashDerivationModulo(*store, drv);
 
-        foreach (DerivationOutputs::iterator, i, drv.outputs)
-            if (i->second.path == "") {
-                Path outPath = makeOutputPath(i->first, h, drvName);
-                drv.env[i->first] = outPath;
-                i->second.path = outPath;
+        for (auto & i : drv.outputs)
+            if (i.second.path == "") {
+                Path outPath = makeOutputPath(i.first, h, drvName);
+                drv.env[i.first] = outPath;
+                i.second.path = outPath;
             }
     }
 
@@ -652,9 +651,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     state.mkAttrs(v, 1 + drv.outputs.size());
     mkString(*state.allocAttr(v, state.sDrvPath), drvPath, singleton<PathSet>("=" + drvPath));
-    foreach (DerivationOutputs::iterator, i, drv.outputs) {
-        mkString(*state.allocAttr(v, state.symbols.create(i->first)),
-            i->second.path, singleton<PathSet>("!" + i->first + "!" + drvPath));
+    for (auto & i : drv.outputs) {
+        mkString(*state.allocAttr(v, state.symbols.create(i.first)),
+            i.second.path, singleton<PathSet>("!" + i.first + "!" + drvPath));
     }
     v.attrs->sort();
 }
@@ -871,8 +870,7 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
 
     PathSet refs;
 
-    foreach (PathSet::iterator, i, context) {
-        Path path = *i;
+    for (auto path : context) {
         if (path.at(0) == '=') path = string(path, 1);
         if (isDerivation(path))
             throw EvalError(format("in ‘toFile’: the file ‘%1%’ cannot refer to derivation outputs, at %2%") % name % pos);
@@ -1057,9 +1055,9 @@ static void prim_removeAttrs(EvalState & state, const Pos & pos, Value * * args,
        to sort v.attrs because it's a subset of an already sorted
        vector. */
     state.mkAttrs(v, args[0]->attrs->size());
-    foreach (Bindings::iterator, i, *args[0]->attrs) {
-        if (names.find(i->name) == names.end())
-            v.attrs->push_back(*i);
+    for (auto & i : *args[0]->attrs) {
+        if (names.find(i.name) == names.end())
+            v.attrs->push_back(i);
     }
 }
 
@@ -1111,8 +1109,8 @@ static void prim_intersectAttrs(EvalState & state, const Pos & pos, Value * * ar
 
     state.mkAttrs(v, std::min(args[0]->attrs->size(), args[1]->attrs->size()));
 
-    foreach (Bindings::iterator, i, *args[0]->attrs) {
-        Bindings::iterator j = args[1]->attrs->find(i->name);
+    for (auto & i : *args[0]->attrs) {
+        Bindings::iterator j = args[1]->attrs->find(i.name);
         if (j != args[1]->attrs->end())
             v.attrs->push_back(*j);
     }
@@ -1173,9 +1171,9 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
     }
 
     state.mkAttrs(v, args[0]->lambda.fun->formals->formals.size());
-    foreach (Formals::Formals_::iterator, i, args[0]->lambda.fun->formals->formals)
+    for (auto & i : args[0]->lambda.fun->formals->formals)
         // !!! should optimise booleans (allocate only once)
-        mkBool(*state.allocAttr(v, i->name), i->def);
+        mkBool(*state.allocAttr(v, i.name), i.def);
     v.attrs->sort();
 }
 
@@ -1407,11 +1405,8 @@ static void prim_unsafeDiscardOutputDependency(EvalState & state, const Pos & po
     string s = state.coerceToString(pos, *args[0], context);
 
     PathSet context2;
-    foreach (PathSet::iterator, i, context) {
-        Path p = *i;
-        if (p.at(0) == '=') p = "~" + string(p, 1);
-        context2.insert(p);
-    }
+    for (auto & p : context)
+        context2.insert(p.at(0) == '=' ? "~" + string(p, 1) : p);
 
     mkString(v, s, context2);
 }

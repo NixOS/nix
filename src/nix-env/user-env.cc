@@ -33,9 +33,9 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     /* Build the components in the user environment, if they don't
        exist already. */
     PathSet drvsToBuild;
-    foreach (DrvInfos::iterator, i, elems)
-        if (i->queryDrvPath() != "")
-            drvsToBuild.insert(i->queryDrvPath());
+    for (auto & i : elems)
+        if (i.queryDrvPath() != "")
+            drvsToBuild.insert(i.queryDrvPath());
 
     debug(format("building user environment dependencies"));
     store->buildPaths(drvsToBuild, state.repair ? bmRepair : bmNormal);
@@ -45,51 +45,51 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     Value manifest;
     state.mkList(manifest, elems.size());
     unsigned int n = 0;
-    foreach (DrvInfos::iterator, i, elems) {
+    for (auto & i : elems) {
         /* Create a pseudo-derivation containing the name, system,
            output paths, and optionally the derivation path, as well
            as the meta attributes. */
-        Path drvPath = keepDerivations ? i->queryDrvPath() : "";
+        Path drvPath = keepDerivations ? i.queryDrvPath() : "";
 
         Value & v(*state.allocValue());
         manifest.list.elems[n++] = &v;
         state.mkAttrs(v, 16);
 
         mkString(*state.allocAttr(v, state.sType), "derivation");
-        mkString(*state.allocAttr(v, state.sName), i->name);
-        if (!i->system.empty())
-            mkString(*state.allocAttr(v, state.sSystem), i->system);
-        mkString(*state.allocAttr(v, state.sOutPath), i->queryOutPath());
+        mkString(*state.allocAttr(v, state.sName), i.name);
+        if (!i.system.empty())
+            mkString(*state.allocAttr(v, state.sSystem), i.system);
+        mkString(*state.allocAttr(v, state.sOutPath), i.queryOutPath());
         if (drvPath != "")
-            mkString(*state.allocAttr(v, state.sDrvPath), i->queryDrvPath());
+            mkString(*state.allocAttr(v, state.sDrvPath), i.queryDrvPath());
 
         // Copy each output.
-        DrvInfo::Outputs outputs = i->queryOutputs();
+        DrvInfo::Outputs outputs = i.queryOutputs();
         Value & vOutputs = *state.allocAttr(v, state.sOutputs);
         state.mkList(vOutputs, outputs.size());
         unsigned int m = 0;
-        foreach (DrvInfo::Outputs::iterator, j, outputs) {
-            mkString(*(vOutputs.list.elems[m++] = state.allocValue()), j->first);
-            Value & vOutputs = *state.allocAttr(v, state.symbols.create(j->first));
+        for (auto & j : outputs) {
+            mkString(*(vOutputs.list.elems[m++] = state.allocValue()), j.first);
+            Value & vOutputs = *state.allocAttr(v, state.symbols.create(j.first));
             state.mkAttrs(vOutputs, 2);
-            mkString(*state.allocAttr(vOutputs, state.sOutPath), j->second);
+            mkString(*state.allocAttr(vOutputs, state.sOutPath), j.second);
 
             /* This is only necessary when installing store paths, e.g.,
                `nix-env -i /nix/store/abcd...-foo'. */
-            store->addTempRoot(j->second);
-            store->ensurePath(j->second);
+            store->addTempRoot(j.second);
+            store->ensurePath(j.second);
 
-            references.insert(j->second);
+            references.insert(j.second);
         }
 
         // Copy the meta attributes.
         Value & vMeta = *state.allocAttr(v, state.sMeta);
         state.mkAttrs(vMeta, 16);
-        StringSet metaNames = i->queryMetaNames();
-        foreach (StringSet::iterator, j, metaNames) {
-            Value * v = i->queryMeta(*j);
+        StringSet metaNames = i.queryMetaNames();
+        for (auto & j : metaNames) {
+            Value * v = i.queryMeta(j);
             if (!v) continue;
-            vMeta.attrs->push_back(Attr(state.symbols.create(*j), v));
+            vMeta.attrs->push_back(Attr(state.symbols.create(j), v));
         }
         vMeta.attrs->sort();
         v.attrs->sort();

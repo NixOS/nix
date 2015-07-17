@@ -136,8 +136,8 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Ex
     bool atStartOfLine = true; /* = seen only whitespace in the current line */
     unsigned int minIndent = 1000000;
     unsigned int curIndent = 0;
-    foreach (vector<Expr *>::iterator, i, es) {
-        ExprIndStr * e = dynamic_cast<ExprIndStr *>(*i);
+    for (auto & i : es) {
+        ExprIndStr * e = dynamic_cast<ExprIndStr *>(i);
         if (!e) {
             /* Anti-quotations end the current start-of-line whitespace. */
             if (atStartOfLine) {
@@ -419,20 +419,20 @@ binds
   : binds attrpath '=' expr ';' { $$ = $1; addAttr($$, *$2, $4, makeCurPos(@2, data)); }
   | binds INHERIT attrs ';'
     { $$ = $1;
-      foreach (AttrPath::iterator, i, *$3) {
-          if ($$->attrs.find(i->symbol) != $$->attrs.end())
-              dupAttr(i->symbol, makeCurPos(@3, data), $$->attrs[i->symbol].pos);
+      for (auto & i : *$3) {
+          if ($$->attrs.find(i.symbol) != $$->attrs.end())
+              dupAttr(i.symbol, makeCurPos(@3, data), $$->attrs[i.symbol].pos);
           Pos pos = makeCurPos(@3, data);
-          $$->attrs[i->symbol] = ExprAttrs::AttrDef(new ExprVar(CUR_POS, i->symbol), pos, true);
+          $$->attrs[i.symbol] = ExprAttrs::AttrDef(new ExprVar(CUR_POS, i.symbol), pos, true);
       }
     }
   | binds INHERIT '(' expr ')' attrs ';'
     { $$ = $1;
       /* !!! Should ensure sharing of the expression in $4. */
-      foreach (AttrPath::iterator, i, *$6) {
-          if ($$->attrs.find(i->symbol) != $$->attrs.end())
-              dupAttr(i->symbol, makeCurPos(@6, data), $$->attrs[i->symbol].pos);
-          $$->attrs[i->symbol] = ExprAttrs::AttrDef(new ExprSelect(CUR_POS, $4, i->symbol), makeCurPos(@6, data));
+      for (auto & i : *$6) {
+          if ($$->attrs.find(i.symbol) != $$->attrs.end())
+              dupAttr(i.symbol, makeCurPos(@6, data), $$->attrs[i.symbol].pos);
+          $$->attrs[i.symbol] = ExprAttrs::AttrDef(new ExprSelect(CUR_POS, $4, i.symbol), makeCurPos(@6, data));
       }
     }
   | { $$ = new ExprAttrs; }

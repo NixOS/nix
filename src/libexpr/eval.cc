@@ -98,8 +98,8 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
         str << "{ ";
         typedef std::map<string, Value *> Sorted;
         Sorted sorted;
-        foreach (Bindings::iterator, i, *v.attrs)
-            sorted[i->name] = i->value;
+        for (auto & i : *v.attrs)
+            sorted[i.name] = i.value;
         for (auto & i : sorted) {
             str << i.first << " = ";
             printValue(str, active, *i.second);
@@ -442,8 +442,8 @@ void mkString(Value & v, const string & s, const PathSet & context)
         unsigned int n = 0;
         v.string.context = (const char * *)
             allocBytes((context.size() + 1) * sizeof(char *));
-        foreach (PathSet::const_iterator, i, context)
-            v.string.context[n++] = dupString(i->c_str());
+        for (auto & i : context)
+            v.string.context[n++] = dupString(i.c_str());
         v.string.context[n] = 0;
     }
 }
@@ -723,15 +723,15 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
            environment, while the inherited attributes are evaluated
            in the original environment. */
         unsigned int displ = 0;
-        foreach (AttrDefs::iterator, i, attrs) {
+        for (auto & i : attrs) {
             Value * vAttr;
-            if (hasOverrides && !i->second.inherited) {
+            if (hasOverrides && !i.second.inherited) {
                 vAttr = state.allocValue();
-                mkThunk(*vAttr, env2, i->second.e);
+                mkThunk(*vAttr, env2, i.second.e);
             } else
-                vAttr = i->second.e->maybeThunk(state, i->second.inherited ? env : env2);
+                vAttr = i.second.e->maybeThunk(state, i.second.inherited ? env : env2);
             env2.values[displ++] = vAttr;
-            v.attrs->push_back(Attr(i->first, vAttr, &i->second.pos));
+            v.attrs->push_back(Attr(i.first, vAttr, &i.second.pos));
         }
 
         /* If the rec contains an attribute called `__overrides', then
@@ -762,13 +762,13 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
     }
 
     else
-        foreach (AttrDefs::iterator, i, attrs)
-            v.attrs->push_back(Attr(i->first, i->second.e->maybeThunk(state, env), &i->second.pos));
+        for (auto & i : attrs)
+            v.attrs->push_back(Attr(i.first, i.second.e->maybeThunk(state, env), &i.second.pos));
 
     /* Dynamic attrs apply *after* rec and __overrides. */
-    foreach (DynamicAttrDefs::iterator, i, dynamicAttrs) {
+    for (auto & i : dynamicAttrs) {
         Value nameVal;
-        i->nameExpr->eval(state, *dynamicEnv, nameVal);
+        i.nameExpr->eval(state, *dynamicEnv, nameVal);
         state.forceValue(nameVal);
         if (nameVal.type == tNull)
             continue;
@@ -776,11 +776,11 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         Symbol nameSym = state.symbols.create(nameVal.string.s);
         Bindings::iterator j = v.attrs->find(nameSym);
         if (j != v.attrs->end())
-            throwEvalError("dynamic attribute ‘%1%’ at %2% already defined at %3%", nameSym, i->pos, *j->pos);
+            throwEvalError("dynamic attribute ‘%1%’ at %2% already defined at %3%", nameSym, i.pos, *j->pos);
 
-        i->valueExpr->setName(nameSym);
+        i.valueExpr->setName(nameSym);
         /* Keep sorted order so find can catch duplicates */
-        v.attrs->push_back(Attr(nameSym, i->valueExpr->maybeThunk(state, *dynamicEnv), &i->pos));
+        v.attrs->push_back(Attr(nameSym, i.valueExpr->maybeThunk(state, *dynamicEnv), &i.pos));
         v.attrs->sort(); // FIXME: inefficient
     }
 }
@@ -797,8 +797,8 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
        while the inherited attributes are evaluated in the original
        environment. */
     unsigned int displ = 0;
-    foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs)
-        env2.values[displ++] = i->second.e->maybeThunk(state, i->second.inherited ? env : env2);
+    for (auto & i : attrs->attrs)
+        env2.values[displ++] = i.second.e->maybeThunk(state, i.second.inherited ? env : env2);
 
     body->eval(state, env2, v);
 }
@@ -849,10 +849,10 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 
     try {
 
-        foreach (AttrPath::const_iterator, i, attrPath) {
+        for (auto & i : attrPath) {
             nrLookups++;
             Bindings::iterator j;
-            Symbol name = getName(*i, state, env);
+            Symbol name = getName(i, state, env);
             if (def) {
                 state.forceValue(*vAttrs);
                 if (vAttrs->type != tAttrs ||
@@ -891,10 +891,10 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
 
     e->eval(state, env, vTmp);
 
-    foreach (AttrPath::const_iterator, i, attrPath) {
+    for (auto & i : attrPath) {
         state.forceValue(*vAttrs);
         Bindings::iterator j;
-        Symbol name = getName(*i, state, env);
+        Symbol name = getName(i, state, env);
         if (vAttrs->type != tAttrs ||
             (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
         {
@@ -1007,12 +1007,12 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
            there is no matching actual argument but the formal
            argument has a default, use the default. */
         unsigned int attrsUsed = 0;
-        foreach (Formals::Formals_::iterator, i, lambda.formals->formals) {
-            Bindings::iterator j = arg.attrs->find(i->name);
+        for (auto & i : lambda.formals->formals) {
+            Bindings::iterator j = arg.attrs->find(i.name);
             if (j == arg.attrs->end()) {
-                if (!i->def) throwTypeError("%1% called without required argument ‘%2%’, at %3%",
-                    lambda, i->name, pos);
-                env2.values[displ++] = i->def->maybeThunk(*this, env2);
+                if (!i.def) throwTypeError("%1% called without required argument ‘%2%’, at %3%",
+                    lambda, i.name, pos);
+                env2.values[displ++] = i.def->maybeThunk(*this, env2);
             } else {
                 attrsUsed++;
                 env2.values[displ++] = j->value;
@@ -1024,9 +1024,9 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         if (!lambda.formals->ellipsis && attrsUsed != arg.attrs->size()) {
             /* Nope, so show the first unexpected argument to the
                user. */
-            foreach (Bindings::iterator, i, *arg.attrs)
-                if (lambda.formals->argNames.find(i->name) == lambda.formals->argNames.end())
-                    throwTypeError("%1% called with unexpected argument ‘%2%’, at %3%", lambda, i->name, pos);
+            for (auto & i : *arg.attrs)
+                if (lambda.formals->argNames.find(i.name) == lambda.formals->argNames.end())
+                    throwTypeError("%1% called with unexpected argument ‘%2%’, at %3%", lambda, i.name, pos);
             abort(); // can't happen
         }
     }
@@ -1068,12 +1068,12 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
     Value * actualArgs = allocValue();
     mkAttrs(*actualArgs, fun.lambda.fun->formals->formals.size());
 
-    foreach (Formals::Formals_::iterator, i, fun.lambda.fun->formals->formals) {
-        Bindings::iterator j = args.find(i->name);
+    for (auto & i : fun.lambda.fun->formals->formals) {
+        Bindings::iterator j = args.find(i.name);
         if (j != args.end())
             actualArgs->attrs->push_back(*j);
-        else if (!i->def)
-            throwTypeError("cannot auto-call a function that has an argument without a default value (‘%1%’)", i->name);
+        else if (!i.def)
+            throwTypeError("cannot auto-call a function that has an argument without a default value (‘%1%’)", i.name);
     }
 
     actualArgs->attrs->sort();
@@ -1229,9 +1229,9 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     bool first = !forceString;
     ValueType firstType = tString;
 
-    foreach (vector<Expr *>::iterator, i, *es) {
+    for (auto & i : *es) {
         Value vTmp;
-        (*i)->eval(state, env, vTmp);
+        i->eval(state, env, vTmp);
 
         /* If the first element is a path, then the result will also
            be a path, we don't copy anything (yet - that's done later,
@@ -1583,25 +1583,25 @@ void EvalState::printStats()
         printMsg(v, format("calls to %1% primops:") % primOpCalls.size());
         typedef std::multimap<unsigned int, Symbol> PrimOpCalls_;
         PrimOpCalls_ primOpCalls_;
-        foreach (PrimOpCalls::iterator, i, primOpCalls)
-            primOpCalls_.insert(std::pair<unsigned int, Symbol>(i->second, i->first));
-        foreach_reverse (PrimOpCalls_::reverse_iterator, i, primOpCalls_)
+        for (auto & i : primOpCalls)
+            primOpCalls_.insert(std::pair<unsigned int, Symbol>(i.second, i.first));
+        for (auto i = primOpCalls_.rbegin(); i != primOpCalls_.rend(); ++i)
             printMsg(v, format("%1$10d %2%") % i->first % i->second);
 
         printMsg(v, format("calls to %1% functions:") % functionCalls.size());
         typedef std::multimap<unsigned int, ExprLambda *> FunctionCalls_;
         FunctionCalls_ functionCalls_;
-        foreach (FunctionCalls::iterator, i, functionCalls)
-            functionCalls_.insert(std::pair<unsigned int, ExprLambda *>(i->second, i->first));
-        foreach_reverse (FunctionCalls_::reverse_iterator, i, functionCalls_)
+        for (auto & i : functionCalls)
+            functionCalls_.insert(std::pair<unsigned int, ExprLambda *>(i.second, i.first));
+        for (auto i = functionCalls_.rbegin(); i != functionCalls_.rend(); ++i)
             printMsg(v, format("%1$10d %2%") % i->first % i->second->showNamePos());
 
         printMsg(v, format("evaluations of %1% attributes:") % attrSelects.size());
         typedef std::multimap<unsigned int, Pos> AttrSelects_;
         AttrSelects_ attrSelects_;
-        foreach (AttrSelects::iterator, i, attrSelects)
-            attrSelects_.insert(std::pair<unsigned int, Pos>(i->second, i->first));
-        foreach_reverse (AttrSelects_::reverse_iterator, i, attrSelects_)
+        for (auto & i : attrSelects)
+            attrSelects_.insert(std::pair<unsigned int, Pos>(i.second, i.first));
+        for (auto i = attrSelects_.rbegin(); i != attrSelects_.rend(); ++i)
             printMsg(v, format("%1$10d %2%") % i->first % i->second);
 
     }

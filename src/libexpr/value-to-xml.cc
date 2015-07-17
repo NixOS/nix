@@ -8,7 +8,7 @@
 
 namespace nix {
 
-    
+
 static XMLAttrs singletonAttrs(const string & name, const string & value)
 {
     XMLAttrs attrs;
@@ -33,17 +33,17 @@ static void showAttrs(EvalState & state, bool strict, bool location,
     Bindings & attrs, XMLWriter & doc, PathSet & context, PathSet & drvsSeen)
 {
     StringSet names;
-    
-    foreach (Bindings::iterator, i, attrs)
-        names.insert(i->name);
-    
-    foreach (StringSet::iterator, i, names) {
-        Attr & a(*attrs.find(state.symbols.create(*i)));
-        
+
+    for (auto & i : attrs)
+        names.insert(i.name);
+
+    for (auto & i : names) {
+        Attr & a(*attrs.find(state.symbols.create(i)));
+
         XMLAttrs xmlAttrs;
-        xmlAttrs["name"] = *i;
+        xmlAttrs["name"] = i;
         if (location && a.pos != &noPos) posToXML(xmlAttrs, *a.pos);
-        
+
         XMLOpenElement _(doc, "attr", xmlAttrs);
         printValueAsXML(state, strict, location,
             *a.value, doc, context, drvsSeen);
@@ -57,7 +57,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
     checkInterrupt();
 
     if (strict) state.forceValue(v);
-        
+
     switch (v.type) {
 
         case tInt:
@@ -85,7 +85,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
         case tAttrs:
             if (state.isDerivation(v)) {
                 XMLAttrs xmlAttrs;
-            
+
                 Bindings::iterator a = v.attrs->find(state.symbols.create("derivation"));
 
                 Path drvPath;
@@ -95,7 +95,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
                     if (a->value->type == tString)
                         xmlAttrs["drvPath"] = drvPath = a->value->string.s;
                 }
-        
+
                 a = v.attrs->find(state.sOutPath);
                 if (a != v.attrs->end()) {
                     if (strict) state.forceValue(*a->value);
@@ -116,7 +116,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
                 XMLOpenElement _(doc, "attrs");
                 showAttrs(state, strict, location, *v.attrs, doc, context, drvsSeen);
             }
-            
+
             break;
 
         case tList: {
@@ -130,17 +130,17 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
             XMLAttrs xmlAttrs;
             if (location) posToXML(xmlAttrs, v.lambda.fun->pos);
             XMLOpenElement _(doc, "function", xmlAttrs);
-            
+
             if (v.lambda.fun->matchAttrs) {
                 XMLAttrs attrs;
                 if (!v.lambda.fun->arg.empty()) attrs["name"] = v.lambda.fun->arg;
                 if (v.lambda.fun->formals->ellipsis) attrs["ellipsis"] = "1";
                 XMLOpenElement _(doc, "attrspat", attrs);
-                foreach (Formals::Formals_::iterator, i, v.lambda.fun->formals->formals)
-                    doc.writeEmptyElement("attr", singletonAttrs("name", i->name));
+                for (auto & i : v.lambda.fun->formals->formals)
+                    doc.writeEmptyElement("attr", singletonAttrs("name", i.name));
             } else
                 doc.writeEmptyElement("varpat", singletonAttrs("name", v.lambda.fun->arg));
-            
+
             break;
         }
 
@@ -166,9 +166,9 @@ void printValueAsXML(EvalState & state, bool strict, bool location,
 {
     XMLWriter doc(true, out);
     XMLOpenElement root(doc, "expr");
-    PathSet drvsSeen;    
+    PathSet drvsSeen;
     printValueAsXML(state, strict, location, v, doc, context, drvsSeen);
 }
 
- 
+
 }

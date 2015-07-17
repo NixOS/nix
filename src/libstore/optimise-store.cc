@@ -99,8 +99,8 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
 
     if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectoryIgnoringInodes(path, inodeHash);
-        foreach (Strings::iterator, i, names)
-            optimisePath_(stats, path + "/" + *i, inodeHash);
+        for (auto & i : names)
+            optimisePath_(stats, path + "/" + i, inodeHash);
         return;
     }
 
@@ -218,11 +218,11 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
     PathSet paths = queryAllValidPaths();
     InodeHash inodeHash = loadInodeHash();
 
-    foreach (PathSet::iterator, i, paths) {
-        addTempRoot(*i);
-        if (!isValidPath(*i)) continue; /* path was GC'ed, probably */
-        startNest(nest, lvlChatty, format("hashing files in ‘%1%’") % *i);
-        optimisePath_(stats, *i, inodeHash);
+    for (auto & i : paths) {
+        addTempRoot(i);
+        if (!isValidPath(i)) continue; /* path was GC'ed, probably */
+        startNest(nest, lvlChatty, format("hashing files in ‘%1%’") % i);
+        optimisePath_(stats, i, inodeHash);
     }
 }
 

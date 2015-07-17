@@ -331,8 +331,8 @@ void addToWeakGoals(WeakGoals & goals, GoalPtr p)
 {
     // FIXME: necessary?
     // FIXME: O(n)
-    foreach (WeakGoals::iterator, i, goals)
-        if (i->lock() == p) return;
+    for (auto & i : goals)
+        if (i.lock() == p) return;
     goals.push_back(p);
 }
 
@@ -362,11 +362,10 @@ void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
 
         /* If we failed and keepGoing is not set, we remove all
            remaining waitees. */
-        foreach (Goals::iterator, i, waitees) {
-            GoalPtr goal = *i;
+        for (auto & goal : waitees) {
             WeakGoals waiters2;
-            foreach (WeakGoals::iterator, j, goal->waiters)
-                if (j->lock() != shared_from_this()) waiters2.push_back(*j);
+            for (auto & j : goal->waiters)
+                if (j.lock() != shared_from_this()) waiters2.push_back(j);
             goal->waiters = waiters2;
         }
         waitees.clear();
@@ -382,8 +381,8 @@ void Goal::amDone(ExitCode result)
     assert(exitCode == ecBusy);
     assert(result == ecSuccess || result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure);
     exitCode = result;
-    foreach (WeakGoals::iterator, i, waiters) {
-        GoalPtr goal = i->lock();
+    for (auto & i : waiters) {
+        GoalPtr goal = i.lock();
         if (goal) goal->waiteeDone(shared_from_this(), result);
     }
     waiters.clear();
@@ -509,13 +508,13 @@ void UserLock::acquire()
 
     /* Find a user account that isn't currently in use for another
        build. */
-    foreach (Strings::iterator, i, users) {
-        debug(format("trying user ‘%1%’") % *i);
+    for (auto & i : users) {
+        debug(format("trying user ‘%1%’") % i);
 
-        struct passwd * pw = getpwnam(i->c_str());
+        struct passwd * pw = getpwnam(i.c_str());
         if (!pw)
             throw Error(format("the user ‘%1%’ in the group ‘%2%’ does not exist")
-                % *i % settings.buildUsersGroup);
+                % i % settings.buildUsersGroup);
 
         createDirs(settings.nixStateDir + "/userpool");
 
@@ -533,7 +532,7 @@ void UserLock::acquire()
         if (lockFile(fd, ltWrite, false)) {
             fdUserLock = fd.borrow();
             lockedPaths.insert(fnUserLock);
-            user = *i;
+            user = i;
             uid = pw->pw_uid;
 
             /* Sanity check... */
@@ -669,12 +668,12 @@ typedef map<string, string> HashRewrites;
 
 string rewriteHashes(string s, const HashRewrites & rewrites)
 {
-    foreach (HashRewrites::const_iterator, i, rewrites) {
-        assert(i->first.size() == i->second.size());
+    for (auto & i : rewrites) {
+        assert(i.first.size() == i.second.size());
         size_t j = 0;
-        while ((j = s.find(i->first, j)) != string::npos) {
+        while ((j = s.find(i.first, j)) != string::npos) {
             debug(format("rewriting @ %1%") % j);
-            s.replace(j, i->second.size(), i->second);
+            s.replace(j, i.second.size(), i.second);
         }
     }
     return s;
@@ -962,9 +961,9 @@ void DerivationGoal::addWantedOutputs(const StringSet & outputs)
         wantedOutputs.clear();
         needRestart = true;
     } else
-        foreach (StringSet::const_iterator, i, outputs)
-            if (wantedOutputs.find(*i) == wantedOutputs.end()) {
-                wantedOutputs.insert(*i);
+        for (auto & i : outputs)
+            if (wantedOutputs.find(i) == wantedOutputs.end()) {
+                wantedOutputs.insert(i);
                 needRestart = true;
             }
 }
@@ -1307,7 +1306,7 @@ void DerivationGoal::tryToBuild()
 
     missingPaths = outputPaths(*drv);
     if (buildMode != bmCheck)
-        foreach (PathSet::iterator, i, validPaths) missingPaths.erase(*i);
+        for (auto & i : validPaths) missingPaths.erase(i);
 
     /* If any of the outputs already exist but are not valid, delete
        them. */
@@ -1469,9 +1468,9 @@ void DerivationGoal::buildDone()
             /* Move paths out of the chroot for easier debugging of
                build failures. */
             if (useChroot && buildMode == bmNormal)
-                foreach (PathSet::iterator, i, missingPaths)
-                    if (pathExists(chrootRootDir + *i))
-                        rename((chrootRootDir + *i).c_str(), i->c_str());
+                for (auto & i : missingPaths)
+                    if (pathExists(chrootRootDir + i))
+                        rename((chrootRootDir + i).c_str(), i.c_str());
 
             if (diskFull)
                 printMsg(lvlError, "note: build failure may have been caused by lack of free disk space");
@@ -1490,8 +1489,8 @@ void DerivationGoal::buildDone()
         }
 
         /* Delete unused redirected outputs (when doing hash rewriting). */
-        foreach (RedirectedOutputs::iterator, i, redirectedOutputs)
-            if (pathExists(i->second)) deletePath(i->second);
+        for (auto & i : redirectedOutputs)
+            if (pathExists(i.second)) deletePath(i.second);
 
         /* Delete the chroot (if we were using one). */
         autoDelChroot.reset(); /* this runs the destructor */
@@ -1566,7 +1565,7 @@ HookReply DerivationGoal::tryBuildHook()
        required from the build machine.  (The hook could parse the
        drv file itself, but this is easier.) */
     Strings features = tokenizeString<Strings>(get(drv->env, "requiredSystemFeatures"));
-    foreach (Strings::iterator, i, features) checkStoreName(*i); /* !!! abuse */
+    for (auto & i : features) checkStoreName(i); /* !!! abuse */
 
     /* Send the request to the hook. */
     writeLine(worker.hook->toHook.writeSide, (format("%1% %2% %3% %4%")
@@ -1608,13 +1607,13 @@ HookReply DerivationGoal::tryBuildHook()
     computeFSClosure(worker.store, drvPath, allInputs);
 
     string s;
-    foreach (PathSet::iterator, i, allInputs) { s += *i; s += ' '; }
+    for (auto & i : allInputs) { s += i; s += ' '; }
     writeLine(hook->toHook.writeSide, s);
 
     /* Tell the hooks the missing outputs that have to be copied back
        from the remote system. */
     s = "";
-    foreach (PathSet::iterator, i, missingPaths) { s += *i; s += ' '; }
+    for (auto & i : missingPaths) { s += i; s += ' '; }
     writeLine(hook->toHook.writeSide, s);
 
     hook->toHook.writeSide.close();
@@ -1742,7 +1741,7 @@ void DerivationGoal::startBuilder()
        already know the cryptographic hash of the output). */
     if (fixedOutput) {
         Strings varNames = tokenizeString<Strings>(get(drv->env, "impureEnvVars"));
-        foreach (Strings::iterator, i, varNames) env[*i] = getEnv(*i);
+        for (auto & i : varNames) env[i] = getEnv(i);
     }
 
     /* The `exportReferencesGraph' feature allows the references graph
@@ -1778,9 +1777,9 @@ void DerivationGoal::startBuilder()
         computeFSClosure(worker.store, storePath, paths);
         paths2 = paths;
 
-        foreach (PathSet::iterator, j, paths2) {
-            if (isDerivation(*j)) {
-                Derivation drv = derivationFromPath(worker.store, *j);
+        for (auto & j : paths2) {
+            if (isDerivation(j)) {
+                Derivation drv = derivationFromPath(worker.store, j);
                 for (auto & k : drv.outputs)
                     computeFSClosure(worker.store, k.second.path, paths);
             }
@@ -1951,28 +1950,28 @@ void DerivationGoal::startBuilder()
         if (chown(chrootStoreDir.c_str(), 0, buildUser.getGID()) == -1)
             throw SysError(format("cannot change ownership of ‘%1%’") % chrootStoreDir);
 
-        foreach (PathSet::iterator, i, inputPaths) {
+        for (auto & i : inputPaths) {
             struct stat st;
-            if (lstat(i->c_str(), &st))
-                throw SysError(format("getting attributes of path ‘%1%’") % *i);
+            if (lstat(i.c_str(), &st))
+                throw SysError(format("getting attributes of path ‘%1%’") % i);
             if (S_ISDIR(st.st_mode))
-                dirsInChroot[*i] = *i;
+                dirsInChroot[i] = i;
             else {
-                Path p = chrootRootDir + *i;
-                if (link(i->c_str(), p.c_str()) == -1) {
+                Path p = chrootRootDir + i;
+                if (link(i.c_str(), p.c_str()) == -1) {
                     /* Hard-linking fails if we exceed the maximum
                        link count on a file (e.g. 32000 of ext3),
                        which is quite possible after a `nix-store
                        --optimise'. */
                     if (errno != EMLINK)
-                        throw SysError(format("linking ‘%1%’ to ‘%2%’") % p % *i);
+                        throw SysError(format("linking ‘%1%’ to ‘%2%’") % p % i);
                     StringSink sink;
-                    dumpPath(*i, sink);
+                    dumpPath(i, sink);
                     StringSource source(sink.s);
                     restorePath(p, source);
                 }
 
-                regularInputPaths.insert(*i);
+                regularInputPaths.insert(i);
             }
         }
 
@@ -2007,16 +2006,16 @@ void DerivationGoal::startBuilder()
            contents of the new outputs to replace the dummy strings
            with the actual hashes. */
         if (validPaths.size() > 0)
-            foreach (PathSet::iterator, i, validPaths)
-                addHashRewrite(*i);
+            for (auto & i : validPaths)
+                addHashRewrite(i);
 
         /* If we're repairing, then we don't want to delete the
            corrupt outputs in advance.  So rewrite them as well. */
         if (buildMode == bmRepair)
-            foreach (PathSet::iterator, i, missingPaths)
-                if (worker.store.isValidPath(*i) && pathExists(*i)) {
-                    addHashRewrite(*i);
-                    redirectedBadOutputs.insert(*i);
+            for (auto & i : missingPaths)
+                if (worker.store.isValidPath(i) && pathExists(i)) {
+                    addHashRewrite(i);
+                    redirectedBadOutputs.insert(i);
                 }
     }
 
@@ -2190,8 +2189,8 @@ void DerivationGoal::runChild()
                local to the namespace, though, so setting MS_PRIVATE
                does not affect the outside world. */
             Strings mounts = tokenizeString<Strings>(readFile("/proc/self/mountinfo", true), "\n");
-            foreach (Strings::iterator, i, mounts) {
-                vector<string> fields = tokenizeString<vector<string> >(*i, " ");
+            for (auto & i : mounts) {
+                vector<string> fields = tokenizeString<vector<string> >(i, " ");
                 string fs = decodeOctalEscaped(fields.at(4));
                 if (mount(0, fs.c_str(), 0, MS_PRIVATE, 0) == -1)
                     throw SysError(format("unable to make filesystem ‘%1%’ private") % fs);
@@ -2239,10 +2238,10 @@ void DerivationGoal::runChild()
             /* Bind-mount all the directories from the "host"
                filesystem that we want in the chroot
                environment. */
-            foreach (DirsInChroot::iterator, i, dirsInChroot) {
+            for (auto & i : dirsInChroot) {
                 struct stat st;
-                Path source = i->second;
-                Path target = chrootRootDir + i->first;
+                Path source = i.second;
+                Path target = chrootRootDir + i.first;
                 if (source == "/proc") continue; // backwards compatibility
                 debug(format("bind mounting ‘%1%’ to ‘%2%’") % source % target);
                 if (stat(source.c_str(), &st) == -1)
@@ -2340,8 +2339,8 @@ void DerivationGoal::runChild()
 
         /* Fill in the environment. */
         Strings envStrs;
-        foreach (Environment::const_iterator, i, env)
-            envStrs.push_back(rewriteHashes(i->first + "=" + i->second, rewritesToTmp));
+        for (auto & i : env)
+            envStrs.push_back(rewriteHashes(i.first + "=" + i.second, rewritesToTmp));
 
         /* If we are running in `build-users' mode, then switch to the
            user we allocated above.  Make sure that we drop all root
@@ -2522,14 +2521,13 @@ PathSet parseReferenceSpecifiers(const BasicDerivation & drv, string attr)
 {
     PathSet result;
     Paths paths = tokenizeString<Paths>(attr);
-    foreach (Strings::iterator, i, paths) {
-        if (isStorePath(*i))
-            result.insert(*i);
-        else if (drv.outputs.find(*i) != drv.outputs.end())
-            result.insert(drv.outputs.find(*i)->second.path);
+    for (auto & i : paths) {
+        if (isStorePath(i))
+            result.insert(i);
+        else if (drv.outputs.find(i) != drv.outputs.end())
+            result.insert(drv.outputs.find(i)->second.path);
         else throw BuildError(
-            format("derivation contains an illegal reference specifier ‘%1%’")
-            % *i);
+            format("derivation contains an illegal reference specifier ‘%1%’") % i);
     }
     return result;
 }
@@ -2666,12 +2664,12 @@ void DerivationGoal::registerOutputs()
 
         /* For debugging, print out the referenced and unreferenced
            paths. */
-        foreach (PathSet::iterator, i, inputPaths) {
-            PathSet::iterator j = references.find(*i);
+        for (auto & i : inputPaths) {
+            PathSet::iterator j = references.find(i);
             if (j == references.end())
-                debug(format("unreferenced input: ‘%1%’") % *i);
+                debug(format("unreferenced input: ‘%1%’") % i);
             else
-                debug(format("referenced input: ‘%1%’") % *i);
+                debug(format("referenced input: ‘%1%’") % i);
         }
 
         /* Enforce `allowedReferences' and friends. */
@@ -3044,9 +3042,9 @@ void SubstitutionGoal::tryNext()
 
     /* To maintain the closure invariant, we first have to realise the
        paths referenced by this one. */
-    foreach (PathSet::iterator, i, info.references)
-        if (*i != storePath) /* ignore self-references */
-            addWaitee(worker.makeSubstitutionGoal(*i));
+    for (auto & i : info.references)
+        if (i != storePath) /* ignore self-references */
+            addWaitee(worker.makeSubstitutionGoal(i));
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
         referencesValid();
@@ -3065,9 +3063,9 @@ void SubstitutionGoal::referencesValid()
         return;
     }
 
-    foreach (PathSet::iterator, i, info.references)
-        if (*i != storePath) /* ignore self-references */
-            assert(worker.store.isValidPath(*i));
+    for (auto & i : info.references)
+        if (i != storePath) /* ignore self-references */
+            assert(worker.store.isValidPath(i));
 
     state = &SubstitutionGoal::tryToRun;
     worker.wakeUp(shared_from_this());
@@ -3359,8 +3357,8 @@ void Worker::removeGoal(GoalPtr goal)
     }
 
     /* Wake up goals waiting for any goal to finish. */
-    foreach (WeakGoals::iterator, i, waitingForAnyGoal) {
-        GoalPtr goal = i->lock();
+    for (auto & i : waitingForAnyGoal) {
+        GoalPtr goal = i.lock();
         if (goal) wakeUp(goal);
     }
 
@@ -3413,8 +3411,8 @@ void Worker::childTerminated(pid_t pid, bool wakeSleepers)
     if (wakeSleepers) {
 
         /* Wake up goals waiting for a build slot. */
-        foreach (WeakGoals::iterator, i, wantingToBuild) {
-            GoalPtr goal = i->lock();
+        for (auto & i : wantingToBuild) {
+            GoalPtr goal = i.lock();
             if (goal) wakeUp(goal);
         }
 
@@ -3449,7 +3447,7 @@ void Worker::waitForAWhile(GoalPtr goal)
 
 void Worker::run(const Goals & _topGoals)
 {
-    foreach (Goals::iterator, i,  _topGoals) topGoals.insert(*i);
+    for (auto & i : _topGoals) topGoals.insert(i);
 
     startNest(nest, lvlDebug, format("entered goal loop"));
 
@@ -3515,12 +3513,12 @@ void Worker::waitForInput()
        deadline for any child. */
     assert(sizeof(time_t) >= sizeof(long));
     time_t nearest = LONG_MAX; // nearest deadline
-    foreach (Children::iterator, i, children) {
-        if (!i->second.respectTimeouts) continue;
+    for (auto & i : children) {
+        if (!i.second.respectTimeouts) continue;
         if (settings.maxSilentTime != 0)
-            nearest = std::min(nearest, i->second.lastOutput + settings.maxSilentTime);
+            nearest = std::min(nearest, i.second.lastOutput + settings.maxSilentTime);
         if (settings.buildTimeout != 0)
-            nearest = std::min(nearest, i->second.timeStarted + settings.buildTimeout);
+            nearest = std::min(nearest, i.second.timeStarted + settings.buildTimeout);
     }
     if (nearest != LONG_MAX) {
         timeout.tv_sec = std::max((time_t) 1, nearest - before);
@@ -3545,10 +3543,10 @@ void Worker::waitForInput()
     fd_set fds;
     FD_ZERO(&fds);
     int fdMax = 0;
-    foreach (Children::iterator, i, children) {
-        foreach (set<int>::iterator, j, i->second.fds) {
-            FD_SET(*j, &fds);
-            if (*j >= fdMax) fdMax = *j + 1;
+    for (auto & i : children) {
+        for (auto & j : i.second.fds) {
+            FD_SET(j, &fds);
+            if (j >= fdMax) fdMax = j + 1;
         }
     }
 
@@ -3566,34 +3564,34 @@ void Worker::waitForInput()
        careful that we don't keep iterators alive across calls to
        cancel(). */
     set<pid_t> pids;
-    foreach (Children::iterator, i, children) pids.insert(i->first);
+    for (auto & i : children) pids.insert(i.first);
 
-    foreach (set<pid_t>::iterator, i, pids) {
+    for (auto & i : pids) {
         checkInterrupt();
-        Children::iterator j = children.find(*i);
+        Children::iterator j = children.find(i);
         if (j == children.end()) continue; // child destroyed
         GoalPtr goal = j->second.goal.lock();
         assert(goal);
 
         set<int> fds2(j->second.fds);
-        foreach (set<int>::iterator, k, fds2) {
-            if (FD_ISSET(*k, &fds)) {
+        for (auto & k : fds2) {
+            if (FD_ISSET(k, &fds)) {
                 unsigned char buffer[4096];
-                ssize_t rd = read(*k, buffer, sizeof(buffer));
+                ssize_t rd = read(k, buffer, sizeof(buffer));
                 if (rd == -1) {
                     if (errno != EINTR)
                         throw SysError(format("reading from %1%")
                             % goal->getName());
                 } else if (rd == 0) {
                     debug(format("%1%: got EOF") % goal->getName());
-                    goal->handleEOF(*k);
-                    j->second.fds.erase(*k);
+                    goal->handleEOF(k);
+                    j->second.fds.erase(k);
                 } else {
                     printMsg(lvlVomit, format("%1%: read %2% bytes")
                         % goal->getName() % rd);
                     string data((char *) buffer, rd);
                     j->second.lastOutput = after;
-                    goal->handleChildOutput(*k, data);
+                    goal->handleChildOutput(k, data);
                 }
             }
         }
@@ -3625,8 +3623,8 @@ void Worker::waitForInput()
 
     if (!waitingForAWhile.empty() && lastWokenUp + settings.pollInterval <= after) {
         lastWokenUp = after;
-        foreach (WeakGoals::iterator, i, waitingForAWhile) {
-            GoalPtr goal = i->lock();
+        for (auto & i : waitingForAWhile) {
+            GoalPtr goal = i.lock();
             if (goal) wakeUp(goal);
         }
         waitingForAWhile.clear();
@@ -3650,22 +3648,22 @@ void LocalStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
     Worker worker(*this);
 
     Goals goals;
-    foreach (PathSet::const_iterator, i, drvPaths) {
-        DrvPathWithOutputs i2 = parseDrvPathWithOutputs(*i);
+    for (auto & i : drvPaths) {
+        DrvPathWithOutputs i2 = parseDrvPathWithOutputs(i);
         if (isDerivation(i2.first))
             goals.insert(worker.makeDerivationGoal(i2.first, i2.second, buildMode));
         else
-            goals.insert(worker.makeSubstitutionGoal(*i, buildMode));
+            goals.insert(worker.makeSubstitutionGoal(i, buildMode));
     }
 
     worker.run(goals);
 
     PathSet failed;
-    foreach (Goals::iterator, i, goals)
-        if ((*i)->getExitCode() == Goal::ecFailed) {
-            DerivationGoal * i2 = dynamic_cast<DerivationGoal *>(i->get());
+    for (auto & i : goals)
+        if (i->getExitCode() == Goal::ecFailed) {
+            DerivationGoal * i2 = dynamic_cast<DerivationGoal *>(i.get());
             if (i2) failed.insert(i2->getDrvPath());
-            else failed.insert(dynamic_cast<SubstitutionGoal *>(i->get())->getStorePath());
+            else failed.insert(dynamic_cast<SubstitutionGoal *>(i.get())->getStorePath());
         }
 
     if (!failed.empty())

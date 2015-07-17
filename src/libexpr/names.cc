@@ -98,8 +98,8 @@ int compareVersions(const string & v1, const string & v2)
 DrvNames drvNamesFromArgs(const Strings & opArgs)
 {
     DrvNames result;
-    foreach (Strings::const_iterator, i, opArgs)
-        result.push_back(DrvName(*i));
+    for (auto & i : opArgs)
+        result.push_back(DrvName(i));
     return result;
 }
 

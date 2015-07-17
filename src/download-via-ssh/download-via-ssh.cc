@@ -64,8 +64,8 @@ static void query(std::pair<FdSink, FdSource> & pipes)
             writeStrings(tokenized, pipes.first);
             pipes.first.flush();
             PathSet paths = readStrings<PathSet>(pipes.second);
-            foreach (PathSet::iterator, i, paths)
-                std::cout << *i << std::endl;
+            for (auto & i : paths)
+                std::cout << i << std::endl;
         } else if (cmd == "info") {
             writeInt(cmdQueryPathInfos, pipes.first);
             writeStrings(tokenized, pipes.first);
@@ -80,8 +80,8 @@ static void query(std::pair<FdSink, FdSource> & pipes)
                 std::cout << deriver << std::endl;
                 PathSet references = readStorePaths<PathSet>(pipes.second);
                 std::cout << references.size() << std::endl;
-                foreach (PathSet::iterator, i, references)
-                    std::cout << *i << std::endl;
+                for (auto & i : references)
+                    std::cout << i << std::endl;
                 std::cout << readLongLong(pipes.second) << std::endl;
                 std::cout << readLongLong(pipes.second) << std::endl;
             }

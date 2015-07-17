@@ -42,11 +42,10 @@ Value * findAlongAttrPath(EvalState & state, const string & attrPath,
 
     Value * v = &vIn;
 
-    foreach (Strings::iterator, i, tokens) {
+    for (auto & attr : tokens) {
 
-        /* Is *i an index (integer) or a normal attribute name? */
+        /* Is i an index (integer) or a normal attribute name? */
         enum { apAttr, apIndex } apType = apAttr;
-        string attr = *i;
         unsigned int attrIndex;
         if (string2Int(attr, attrIndex)) apType = apIndex;
 

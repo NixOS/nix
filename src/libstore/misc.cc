@@ -28,15 +28,15 @@ void computeFSClosure(StoreAPI & store, const Path & path,
 
         if (includeOutputs) {
             PathSet derivers = store.queryValidDerivers(path);
-            foreach (PathSet::iterator, i, derivers)
-                edges.insert(*i);
+            for (auto & i : derivers)
+                edges.insert(i);
         }
 
         if (includeDerivers && isDerivation(path)) {
             PathSet outputs = store.queryDerivationOutputs(path);
-            foreach (PathSet::iterator, i, outputs)
-                if (store.isValidPath(*i) && store.queryDeriver(*i) == path)
-                    edges.insert(*i);
+            for (auto & i : outputs)
+                if (store.isValidPath(i) && store.queryDeriver(i) == path)
+                    edges.insert(i);
         }
 
     } else {
@@ -44,8 +44,8 @@ void computeFSClosure(StoreAPI & store, const Path & path,
 
         if (includeOutputs && isDerivation(path)) {
             PathSet outputs = store.queryDerivationOutputs(path);
-            foreach (PathSet::iterator, i, outputs)
-                if (store.isValidPath(*i)) edges.insert(*i);
+            for (auto & i : outputs)
+                if (store.isValidPath(i)) edges.insert(i);
         }
 
         if (includeDerivers) {
@@ -54,15 +54,15 @@ void computeFSClosure(StoreAPI & store, const Path & path,
         }
     }
 
-    foreach (PathSet::iterator, i, edges)
-        computeFSClosure(store, *i, paths, flipDirection, includeOutputs, includeDerivers);
+    for (auto & i : edges)
+        computeFSClosure(store, i, paths, flipDirection, includeOutputs, includeDerivers);
 }
 
 
 Path findOutput(const Derivation & drv, string id)
 {
-    foreach (DerivationOutputs::const_iterator, i, drv.outputs)
-        if (i->first == id) return i->second.path;
+    for (auto & i : drv.outputs)
+        if (i.first == id) return i.second.path;
     throw Error(format("derivation has no output ‘%1%’") % id);
 }
 
@@ -98,36 +98,36 @@ void queryMissing(StoreAPI & store, const PathSet & targets,
 
         PathSet query, todoDrv, todoNonDrv;
 
-        foreach (PathSet::iterator, i, todo) {
-            if (done.find(*i) != done.end()) continue;
-            done.insert(*i);
+        for (auto & i : todo) {
+            if (done.find(i) != done.end()) continue;
+            done.insert(i);
 
-            DrvPathWithOutputs i2 = parseDrvPathWithOutputs(*i);
+            DrvPathWithOutputs i2 = parseDrvPathWithOutputs(i);
 
             if (isDerivation(i2.first)) {
                 if (!store.isValidPath(i2.first)) {
                     // FIXME: we could try to substitute p.
-                    unknown.insert(*i);
+                    unknown.insert(i);
                     continue;
                 }
                 Derivation drv = derivationFromPath(store, i2.first);
 
                 PathSet invalid;
-                foreach (DerivationOutputs::iterator, j, drv.outputs)
-                    if (wantOutput(j->first, i2.second)
-                        && !store.isValidPath(j->second.path))
-                        invalid.insert(j->second.path);
+                for (auto & j : drv.outputs)
+                    if (wantOutput(j.first, i2.second)
+                        && !store.isValidPath(j.second.path))
+                        invalid.insert(j.second.path);
                 if (invalid.empty()) continue;
 
-                todoDrv.insert(*i);
+                todoDrv.insert(i);
                 if (settings.useSubstitutes && substitutesAllowed(drv))
                     query.insert(invalid.begin(), invalid.end());
             }
 
             else {
-                if (store.isValidPath(*i)) continue;
-                query.insert(*i);
-                todoNonDrv.insert(*i);
+                if (store.isValidPath(i)) continue;
+                query.insert(i);
+                todoNonDrv.insert(i);
             }
         }
 
@@ -136,8 +136,8 @@ void queryMissing(StoreAPI & store, const PathSet & targets,
         SubstitutablePathInfos infos;
         store.querySubstitutablePathInfos(query, infos);
 
-        foreach (PathSet::iterator, i, todoDrv) {
-            DrvPathWithOutputs i2 = parseDrvPathWithOutputs(*i);
+        for (auto & i : todoDrv) {
+            DrvPathWithOutputs i2 = parseDrvPathWithOutputs(i);
 
             // FIXME: cache this
             Derivation drv = derivationFromPath(store, i2.first);
@@ -145,13 +145,13 @@ void queryMissing(StoreAPI & store, const PathSet & targets,
             PathSet outputs;
             bool mustBuild = false;
             if (settings.useSubstitutes && substitutesAllowed(drv)) {
-                foreach (DerivationOutputs::iterator, j, drv.outputs) {
-                    if (!wantOutput(j->first, i2.second)) continue;
-                    if (!store.isValidPath(j->second.path)) {
-                        if (infos.find(j->second.path) == infos.end())
+                for (auto & j : drv.outputs) {
+                    if (!wantOutput(j.first, i2.second)) continue;
+                    if (!store.isValidPath(j.second.path)) {
+                        if (infos.find(j.second.path) == infos.end())
                             mustBuild = true;
                         else
-                            outputs.insert(j->second.path);
+                            outputs.insert(j.second.path);
                     }
                 }
             } else
@@ -160,22 +160,22 @@ void queryMissing(StoreAPI & store, const PathSet & targets,
             if (mustBuild) {
                 willBuild.insert(i2.first);
                 todo.insert(drv.inputSrcs.begin(), drv.inputSrcs.end());
-                foreach (DerivationInputs::iterator, j, drv.inputDrvs)
-                    todo.insert(makeDrvPathWithOutputs(j->first, j->second));
+                for (auto & j : drv.inputDrvs)
+                    todo.insert(makeDrvPathWithOutputs(j.first, j.second));
             } else
                 todoNonDrv.insert(outputs.begin(), outputs.end());
         }
 
-        foreach (PathSet::iterator, i, todoNonDrv) {
-            done.insert(*i);
-            SubstitutablePathInfos::iterator info = infos.find(*i);
+        for (auto & i : todoNonDrv) {
+            done.insert(i);
+            SubstitutablePathInfos::iterator info = infos.find(i);
             if (info != infos.end()) {
-                willSubstitute.insert(*i);
+                willSubstitute.insert(i);
                 downloadSize += info->second.downloadSize;
                 narSize += info->second.narSize;
                 todo.insert(info->second.references.begin(), info->second.references.end());
             } else
-                unknown.insert(*i);
+                unknown.insert(i);
         }
     }
 }
@@ -196,11 +196,11 @@ static void dfsVisit(StoreAPI & store, const PathSet & paths,
     if (store.isValidPath(path))
         store.queryReferences(path, references);
 
-    foreach (PathSet::iterator, i, references)
+    for (auto & i : references)
         /* Don't traverse into paths that don't exist.  That can
            happen due to substitutes for non-existent paths. */
-        if (*i != path && paths.find(*i) != paths.end())
-            dfsVisit(store, paths, *i, visited, sorted, parents);
+        if (i != path && paths.find(i) != paths.end())
+            dfsVisit(store, paths, i, visited, sorted, parents);
 
     sorted.push_front(path);
     parents.erase(path);
@@ -211,8 +211,8 @@ Paths topoSortPaths(StoreAPI & store, const PathSet & paths)
 {
     Paths sorted;
     PathSet visited, parents;
-    foreach (PathSet::const_iterator, i, paths)
-        dfsVisit(store, paths, *i, visited, sorted, parents);
+    for (auto & i : paths)
+        dfsVisit(store, paths, i, visited, sorted, parents);
     return sorted;
 }
 

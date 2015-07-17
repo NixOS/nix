@@ -13,7 +13,7 @@ namespace nix {
 static unsigned int refLength = 32; /* characters */
 
 
-static void search(const unsigned char * s, unsigned int len, 
+static void search(const unsigned char * s, unsigned int len,
     StringSet & hashes, StringSet & seen)
 {
     static bool initialised = false;
@@ -24,7 +24,7 @@ static void search(const unsigned char * s, unsigned int len,
             isBase32[(unsigned char) base32Chars[i]] = true;
         initialised = true;
     }
-    
+
     for (unsigned int i = 0; i + refLength <= len; ) {
         int j;
         bool match = true;
@@ -56,7 +56,7 @@ struct RefScanSink : Sink
     string tail;
 
     RefScanSink() : hashSink(htSHA256) { }
-    
+
     void operator () (const unsigned char * data, size_t len);
 };
 
@@ -89,17 +89,17 @@ PathSet scanForReferences(const string & path,
     /* For efficiency (and a higher hit rate), just search for the
        hash part of the file name.  (This assumes that all references
        have the form `HASH-bla'). */
-    foreach (PathSet::const_iterator, i, refs) {
-        string baseName = baseNameOf(*i);
+    for (auto & i : refs) {
+        string baseName = baseNameOf(i);
         string::size_type pos = baseName.find('-');
         if (pos == string::npos)
-            throw Error(format("bad reference ‘%1%’") % *i);
+            throw Error(format("bad reference ‘%1%’") % i);
         string s = string(baseName, 0, pos);
         assert(s.size() == refLength);
         assert(backMap.find(s) == backMap.end());
         // parseHash(htSHA256, s);
         sink.hashes.insert(s);
-        backMap[s] = *i;
+        backMap[s] = i;
     }
 
     /* Look for the hashes in the NAR dump of the path. */
@@ -107,14 +107,14 @@ PathSet scanForReferences(const string & path,
 
     /* Map the hashes found back to their store paths. */
     PathSet found;
-    foreach (StringSet::iterator, i, sink.seen) {
+    for (auto & i : sink.seen) {
         std::map<string, Path>::iterator j;
-        if ((j = backMap.find(*i)) == backMap.end()) abort();
+        if ((j = backMap.find(i)) == backMap.end()) abort();
         found.insert(j->second);
     }
 
     hash = sink.hashSink.finish();
-        
+
     return found;
 }
 

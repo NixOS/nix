@@ -73,10 +73,10 @@ void XMLWriter::writeEmptyElement(const string & name,
 
 void XMLWriter::writeAttrs(const XMLAttrs & attrs)
 {
-    for (XMLAttrs::const_iterator i = attrs.begin(); i != attrs.end(); ++i) {
-        output << " " << i->first << "=\"";
-        for (unsigned int j = 0; j < i->second.size(); ++j) {
-            char c = i->second[j];
+    for (auto & i : attrs) {
+        output << " " << i.first << "=\"";
+        for (unsigned int j = 0; j < i.second.size(); ++j) {
+            char c = i.second[j];
             if (c == '"') output << "&quot;";
             else if (c == '<') output << "&lt;";
             else if (c == '>') output << "&gt;";
