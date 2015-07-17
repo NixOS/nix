@@ -28,7 +28,12 @@ void removeOldGenerations(std::string dir)
         auto type = i.type == DT_UNKNOWN ? getFileType(path) : i.type;
 
         if (type == DT_LNK && canWrite) {
-            auto link = readLink(path);
+            std::string link;
+            try {
+                link = readLink(path);
+            } catch (SysError & e) {
+                if (e.errNo == ENOENT) continue;
+            }
             if (link.find("link") != string::npos) {
                 printMsg(lvlInfo, format("removing old generations of profile %1%") % path);
                 if (deleteOlderThan != "")
