@@ -851,8 +851,7 @@ static void opServe(Strings opFlags, Strings opArgs)
     /* Exchange the greeting. */
     unsigned int magic = readInt(in);
     if (magic != SERVE_MAGIC_1) throw Error("protocol mismatch");
-    writeInt(SERVE_MAGIC_2, out);
-    writeInt(SERVE_PROTOCOL_VERSION, out);
+    out << SERVE_MAGIC_2 << SERVE_PROTOCOL_VERSION;
     out.flush();
     readInt(in); // Client version, unused for now
 
@@ -906,7 +905,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                         }
                 }
 
-                writeStrings(store->queryValidPaths(paths), out);
+                out << store->queryValidPaths(paths);
                 break;
             }
 
@@ -917,14 +916,12 @@ static void opServe(Strings opFlags, Strings opArgs)
                     if (!store->isValidPath(i))
                         continue;
                     ValidPathInfo info = store->queryPathInfo(i);
-                    writeString(info.path, out);
-                    writeString(info.deriver, out);
-                    writeStrings(info.references, out);
+                    out << info.path << info.deriver << info.references;
                     // !!! Maybe we want compression?
-                    writeLongLong(info.narSize, out); // downloadSize
-                    writeLongLong(info.narSize, out);
+                    out << info.narSize // downloadSize
+                        << info.narSize;
                 }
-                writeString("", out);
+                out << "";
                 break;
             }
 
@@ -935,7 +932,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             case cmdImportPaths: {
                 if (!writeAllowed) throw Error("importing paths is not allowed");
                 store->importPaths(false, in);
-                writeInt(1, out); // indicate success
+                out << 1; // indicate success
                 break;
             }
 
@@ -957,11 +954,10 @@ static void opServe(Strings opFlags, Strings opArgs)
                 try {
                     MonitorFdHup monitor(in.fd);
                     store->buildPaths(paths);
-                    writeInt(0, out);
+                    out << 0;
                 } catch (Error & e) {
                     assert(e.status);
-                    writeInt(e.status, out);
-                    writeString(e.msg(), out);
+                    out << e.status << e.msg();
                 }
                 break;
             }
@@ -979,8 +975,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 MonitorFdHup monitor(in.fd);
                 auto status = store->buildDerivation(drvPath, drv);
 
-                writeInt(status.status, out);
-                writeString(status.errorMsg, out);
+                out << status.status << status.errorMsg;
 
                 break;
             }
@@ -991,7 +986,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 PathSet closure;
                 for (auto & i : paths)
                     computeFSClosure(*store, i, closure, false, includeOutputs);
-                writeStrings(closure, out);
+                out << closure;
                 break;
             }
 

@@ -43,8 +43,7 @@ static std::pair<FdSink, FdSource> connect(const string & conn)
 
 static void substitute(std::pair<FdSink, FdSource> & pipes, Path storePath, Path destPath)
 {
-    writeInt(cmdDumpStorePath, pipes.first);
-    writeString(storePath, pipes.first);
+    pipes.first << cmdDumpStorePath << storePath;
     pipes.first.flush();
     restorePath(destPath, pipes.second);
     std::cout << std::endl;
@@ -58,17 +57,17 @@ static void query(std::pair<FdSink, FdSource> & pipes)
         string cmd = tokenized.front();
         tokenized.pop_front();
         if (cmd == "have") {
-            writeInt(cmdQueryValidPaths, pipes.first);
-            writeInt(0, pipes.first); // don't lock
-            writeInt(0, pipes.first); // don't substitute
-            writeStrings(tokenized, pipes.first);
+            pipes.first
+                << cmdQueryValidPaths
+                << 0 // don't lock
+                << 0 // don't substitute
+                << tokenized;
             pipes.first.flush();
             PathSet paths = readStrings<PathSet>(pipes.second);
             for (auto & i : paths)
                 std::cout << i << std::endl;
         } else if (cmd == "info") {
-            writeInt(cmdQueryPathInfos, pipes.first);
-            writeStrings(tokenized, pipes.first);
+            pipes.first << cmdQueryPathInfos << tokenized;
             pipes.first.flush();
             while (1) {
                 Path path = readString(pipes.second);
@@ -116,13 +115,13 @@ int main(int argc, char * * argv)
         std::pair<FdSink, FdSource> pipes = connect(host);
 
         /* Exchange the greeting */
-        writeInt(SERVE_MAGIC_1, pipes.first);
+        pipes.first << SERVE_MAGIC_1;
         pipes.first.flush();
         unsigned int magic = readInt(pipes.second);
         if (magic != SERVE_MAGIC_2)
             throw Error("protocol mismatch");
         readInt(pipes.second); // Server version, unused for now
-        writeInt(SERVE_PROTOCOL_VERSION, pipes.first);
+        pipes.first << SERVE_PROTOCOL_VERSION;
         pipes.first.flush();
 
         string arg = argv[1];

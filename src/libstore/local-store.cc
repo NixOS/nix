@@ -1528,21 +1528,13 @@ void LocalStore::exportPath(const Path & path, bool sign,
         throw Error(format("hash of path ‘%1%’ has changed from ‘%2%’ to ‘%3%’!") % path
             % printHash(storedHash) % printHash(hash));
 
-    writeInt(EXPORT_MAGIC, hashAndWriteSink);
-
-    writeString(path, hashAndWriteSink);
-
     PathSet references;
     queryReferences(path, references);
-    writeStrings(references, hashAndWriteSink);
 
-    Path deriver = queryDeriver(path);
-    writeString(deriver, hashAndWriteSink);
+    hashAndWriteSink << EXPORT_MAGIC << path << references << queryDeriver(path);
 
     if (sign) {
         Hash hash = hashAndWriteSink.currentHash();
-
-        writeInt(1, hashAndWriteSink);
 
         Path tmpDir = createTempDir();
         AutoDelete delTmp(tmpDir);
@@ -1561,10 +1553,10 @@ void LocalStore::exportPath(const Path & path, bool sign,
         args.push_back(hashFile);
         string signature = runProgram(OPENSSL_PATH, true, args);
 
-        writeString(signature, hashAndWriteSink);
+        hashAndWriteSink << 1 << signature;
 
     } else
-        writeInt(0, hashAndWriteSink);
+        hashAndWriteSink << 0;
 }
 
 

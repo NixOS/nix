@@ -298,10 +298,10 @@ void exportPaths(StoreAPI & store, const Paths & paths,
     bool sign, Sink & sink)
 {
     for (auto & i : paths) {
-        writeInt(1, sink);
+        sink << 1;
         store.exportPath(i, sign, sink);
     }
-    writeInt(0, sink);
+    sink << 0;
 }
 
 

@@ -39,8 +39,7 @@ PathFilter defaultPathFilter;
 static void dumpContents(const Path & path, size_t size,
     Sink & sink)
 {
-    writeString("contents", sink);
-    writeLongLong(size, sink);
+    sink << "contents" << size;
 
     AutoCloseFD fd = open(path.c_str(), O_RDONLY);
     if (fd == -1) throw SysError(format("opening file ‘%1%’") % path);
@@ -65,21 +64,17 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
     if (lstat(path.c_str(), &st))
         throw SysError(format("getting attributes of path ‘%1%’") % path);
 
-    writeString("(", sink);
+    sink << "(";
 
     if (S_ISREG(st.st_mode)) {
-        writeString("type", sink);
-        writeString("regular", sink);
-        if (st.st_mode & S_IXUSR) {
-            writeString("executable", sink);
-            writeString("", sink);
-        }
+        sink << "type" << "regular";
+        if (st.st_mode & S_IXUSR)
+            sink << "executable" << "";
         dumpContents(path, (size_t) st.st_size, sink);
     }
 
     else if (S_ISDIR(st.st_mode)) {
-        writeString("type", sink);
-        writeString("directory", sink);
+        sink << "type" << "directory";
 
         /* If we're on a case-insensitive system like Mac OS X, undo
            the case hack applied by restorePath(). */
@@ -101,32 +96,24 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
 
         for (auto & i : unhacked)
             if (filter(path + "/" + i.first)) {
-                writeString("entry", sink);
-                writeString("(", sink);
-                writeString("name", sink);
-                writeString(i.first, sink);
-                writeString("node", sink);
+                sink << "entry" << "(" << "name" << i.first << "node";
                 dump(path + "/" + i.second, sink, filter);
-                writeString(")", sink);
+                sink << ")";
             }
     }
 
-    else if (S_ISLNK(st.st_mode)) {
-        writeString("type", sink);
-        writeString("symlink", sink);
-        writeString("target", sink);
-        writeString(readLink(path), sink);
-    }
+    else if (S_ISLNK(st.st_mode))
+        sink << "type" << "symlink" << "target" << readLink(path);
 
     else throw Error(format("file ‘%1%’ has an unsupported type") % path);
 
-    writeString(")", sink);
+    sink << ")";
 }
 
 
 void dumpPath(const Path & path, Sink & sink, PathFilter & filter)
 {
-    writeString(archiveVersion1, sink);
+    sink << archiveVersion1;
     dump(path, sink, filter);
 }
 

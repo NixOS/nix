@@ -43,7 +43,7 @@ static void tunnelStderr(const unsigned char * buf, size_t count)
 {
     if (canSendStderr) {
         try {
-            writeInt(STDERR_NEXT, to);
+            to << STDERR_NEXT;
             writeString(buf, count, to);
             to.flush();
         } catch (...) {
@@ -72,11 +72,10 @@ static void stopWork(bool success = true, const string & msg = "", unsigned int 
     canSendStderr = false;
 
     if (success)
-        writeInt(STDERR_LAST, to);
+        to << STDERR_LAST;
     else {
-        writeInt(STDERR_ERROR, to);
-        writeString(msg, to);
-        if (status != 0) writeInt(status, to);
+        to << STDERR_ERROR << msg;
+        if (status != 0) to << status;
     }
 }
 
@@ -87,7 +86,7 @@ struct TunnelSink : Sink
     TunnelSink(Sink & to) : to(to) { }
     virtual void operator () (const unsigned char * data, size_t len)
     {
-        writeInt(STDERR_WRITE, to);
+        to << STDERR_WRITE;
         writeString(data, len, to);
     }
 };
@@ -99,8 +98,7 @@ struct TunnelSource : BufferedSource
     TunnelSource(Source & from) : from(from) { }
     size_t readUnbuffered(unsigned char * data, size_t len)
     {
-        writeInt(STDERR_READ, to);
-        writeInt(len, to);
+        to << STDERR_READ << len;
         to.flush();
         size_t n = readString(data, len, from);
         if (n == 0) throw EndOfFile("unexpected end-of-file");
@@ -166,7 +164,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
         assertStorePath(path);
         bool result = store->isValidPath(path);
         stopWork();
-        writeInt(result, to);
+        to << result;
         break;
     }
 
@@ -175,7 +173,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
         startWork();
         PathSet res = store->queryValidPaths(paths);
         stopWork();
-        writeStrings(res, to);
+        to << res;
         break;
     }
 
@@ -184,7 +182,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
         startWork();
         PathSet res = store->querySubstitutablePaths(singleton<PathSet>(path));
         stopWork();
-        writeInt(res.find(path) != res.end(), to);
+        to << (res.find(path) != res.end());
         break;
     }
 
@@ -193,7 +191,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
         startWork();
         PathSet res = store->querySubstitutablePaths(paths);
         stopWork();
-        writeStrings(res, to);
+        to << res;
         break;
     }
 
@@ -202,7 +200,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
         startWork();
         Hash hash = store->queryPathHash(path);
         stopWork();
-        writeString(printHash(hash), to);
+        to << printHash(hash);
         break;
     }
 
@@ -221,7 +219,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
             paths = store->queryValidDerivers(path);
         else paths = store->queryDerivationOutputs(path);
         stopWork();
-        writeStrings(paths, to);
+        to << paths;
         break;
     }
 
@@ -231,7 +229,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
         StringSet names;
         names = store->queryDerivationOutputNames(path);
         stopWork();
-        writeStrings(names, to);
+        to << names;
         break;
     }
 
@@ -240,7 +238,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
         startWork();
         Path deriver = store->queryDeriver(path);
         stopWork();
-        writeString(deriver, to);
+        to << deriver;
         break;
     }
 
@@ -249,7 +247,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
         startWork();
         Path path = store->queryPathFromHashPart(hashPart);
         stopWork();
-        writeString(path, to);
+        to << path;
         break;
     }
 
@@ -283,7 +281,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
             ->addToStoreFromDump(recursive ? savedNAR.s : savedRegular.s, baseName, recursive, hashAlgo);
         stopWork();
 
-        writeString(path, to);
+        to << path;
         break;
     }
 
@@ -294,7 +292,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
         startWork();
         Path path = store->addTextToStore(suffix, s, refs);
         stopWork();
-        writeString(path, to);
+        to << path;
         break;
     }
 
@@ -305,7 +303,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
         TunnelSink sink(to);
         store->exportPath(path, sign, sink);
         stopWork();
-        writeInt(1, to);
+        to << 1;
         break;
     }
 
@@ -314,7 +312,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
         TunnelSource source(from);
         Paths paths = store->importPaths(!trusted, source);
         stopWork();
-        writeStrings(paths, to);
+        to << paths;
         break;
     }
 
@@ -323,7 +321,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
         startWork();
         store->buildPaths(drvs);
         stopWork();
-        writeInt(1, to);
+        to << 1;
         break;
     }
 
@@ -332,7 +330,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
         startWork();
         store->ensurePath(path);
         stopWork();
-        writeInt(1, to);
+        to << 1;
         break;
     }
 
@@ -341,7 +339,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
         startWork();
         store->addTempRoot(path);
         stopWork();
-        writeInt(1, to);
+        to << 1;
         break;
     }
 
@@ -350,7 +348,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
         startWork();
         store->addIndirectRoot(path);
         stopWork();
-        writeInt(1, to);
+        to << 1;
         break;
     }
 
@@ -358,7 +356,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
         startWork();
         store->syncWithGC();
         stopWork();
-        writeInt(1, to);
+        to << 1;
         break;
     }
 
@@ -366,11 +364,9 @@ static void performOp(bool trusted, unsigned int clientVersion,
         startWork();
         Roots roots = store->findRoots();
         stopWork();
-        writeInt(roots.size(), to);
-        for (auto & i : roots) {
-            writeString(i.first, to);
-            writeString(i.second, to);
-        }
+        to << roots.size();
+        for (auto & i : roots)
+            to << i.first << i.second;
         break;
     }
 
@@ -395,9 +391,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
         store->collectGarbage(options, results);
         stopWork();
 
-        writeStrings(results.paths, to);
-        writeLongLong(results.bytesFreed, to);
-        writeLongLong(0, to); // obsolete
+        to << results.paths << results.bytesFreed << 0 /* obsolete */;
 
         break;
     }
@@ -445,14 +439,11 @@ static void performOp(bool trusted, unsigned int clientVersion,
         stopWork();
         SubstitutablePathInfos::iterator i = infos.find(path);
         if (i == infos.end())
-            writeInt(0, to);
+            to << 0;
         else {
-            writeInt(1, to);
-            writeString(i->second.deriver, to);
-            writeStrings(i->second.references, to);
-            writeLongLong(i->second.downloadSize, to);
+            to << 1 << i->second.deriver << i->second.references << i->second.downloadSize;
             if (GET_PROTOCOL_MINOR(clientVersion) >= 7)
-                writeLongLong(i->second.narSize, to);
+                to << i->second.narSize;
         }
         break;
     }
@@ -463,13 +454,10 @@ static void performOp(bool trusted, unsigned int clientVersion,
         SubstitutablePathInfos infos;
         store->querySubstitutablePathInfos(paths, infos);
         stopWork();
-        writeInt(infos.size(), to);
+        to << infos.size();
         for (auto & i : infos) {
-            writeString(i.first, to);
-            writeString(i.second.deriver, to);
-            writeStrings(i.second.references, to);
-            writeLongLong(i.second.downloadSize, to);
-            writeLongLong(i.second.narSize, to);
+            to << i.first << i.second.deriver << i.second.references
+               << i.second.downloadSize << i.second.narSize;
         }
         break;
     }
@@ -478,7 +466,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
         startWork();
         PathSet paths = store->queryAllValidPaths();
         stopWork();
-        writeStrings(paths, to);
+        to << paths;
         break;
     }
 
@@ -486,7 +474,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
         startWork();
         PathSet paths = store->queryFailedPaths();
         stopWork();
-        writeStrings(paths, to);
+        to << paths;
         break;
     }
 
@@ -495,7 +483,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
         startWork();
         store->clearFailedPaths(paths);
         stopWork();
-        writeInt(1, to);
+        to << 1;
         break;
     }
 
@@ -504,11 +492,8 @@ static void performOp(bool trusted, unsigned int clientVersion,
         startWork();
         ValidPathInfo info = store->queryPathInfo(path);
         stopWork();
-        writeString(info.deriver, to);
-        writeString(printHash(info.hash), to);
-        writeStrings(info.references, to);
-        writeInt(info.registrationTime, to);
-        writeLongLong(info.narSize, to);
+        to << info.deriver << printHash(info.hash) << info.references
+           << info.registrationTime << info.narSize;
         break;
     }
 
@@ -516,7 +501,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
         startWork();
         store->optimiseStore();
         stopWork();
-        writeInt(1, to);
+        to << 1;
         break;
 
     case wopVerifyStore: {
@@ -527,7 +512,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
             throw Error("you are not privileged to repair paths");
         bool errors = store->verifyStore(checkContents, repair);
         stopWork();
-        writeInt(errors, to);
+        to << errors;
         break;
     }
 
@@ -547,8 +532,7 @@ static void processConnection(bool trusted)
     /* Exchange the greeting. */
     unsigned int magic = readInt(from);
     if (magic != WORKER_MAGIC_1) throw Error("protocol mismatch");
-    writeInt(WORKER_MAGIC_2, to);
-    writeInt(PROTOCOL_VERSION, to);
+    to << WORKER_MAGIC_2 << PROTOCOL_VERSION;
     to.flush();
     unsigned int clientVersion = readInt(from);
 

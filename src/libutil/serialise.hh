@@ -1,13 +1,14 @@
 #pragma once
 
 #include "types.hh"
+#include "util.hh"
 
 
 namespace nix {
 
 
 /* Abstract destination of binary data. */
-struct Sink 
+struct Sink
 {
     virtual ~Sink() { }
     virtual void operator () (const unsigned char * data, size_t len) = 0;
@@ -25,9 +26,9 @@ struct BufferedSink : Sink
     ~BufferedSink();
 
     void operator () (const unsigned char * data, size_t len);
-    
+
     void flush();
-    
+
     virtual void write(const unsigned char * data, size_t len) = 0;
 };
 
@@ -36,7 +37,7 @@ struct BufferedSink : Sink
 struct Source
 {
     virtual ~Source() { }
-    
+
     /* Store exactly ‘len’ bytes in the buffer pointed to by ‘data’.
        It blocks until all the requested data is available, or throws
        an error if it is not going to be available.   */
@@ -58,9 +59,9 @@ struct BufferedSource : Source
     BufferedSource(size_t bufSize = 32 * 1024)
         : bufSize(bufSize), bufPosIn(0), bufPosOut(0), buffer(0) { }
     ~BufferedSource();
-    
+
     size_t read(unsigned char * data, size_t len);
-    
+
     /* Underlying read call, to be overridden. */
     virtual size_t readUnbuffered(unsigned char * data, size_t len) = 0;
 
@@ -78,7 +79,7 @@ struct FdSink : BufferedSink
     FdSink() : fd(-1), warn(false), written(0) { }
     FdSink(int fd) : fd(fd), warn(false), written(0) { }
     ~FdSink();
-    
+
     void write(const unsigned char * data, size_t len);
 };
 
@@ -107,21 +108,31 @@ struct StringSource : Source
     const string & s;
     size_t pos;
     StringSource(const string & _s) : s(_s), pos(0) { }
-    size_t read(unsigned char * data, size_t len);    
+    size_t read(unsigned char * data, size_t len);
 };
 
 
 void writePadding(size_t len, Sink & sink);
-void writeInt(unsigned int n, Sink & sink);
-void writeLongLong(unsigned long long n, Sink & sink);
 void writeString(const unsigned char * buf, size_t len, Sink & sink);
-void writeString(const string & s, Sink & sink);
-template<class T> void writeStrings(const T & ss, Sink & sink);
 
-Sink & operator << (Sink & out, unsigned int n);
-Sink & operator << (Sink & out, const string & s);
-Sink & operator << (Sink & out, const Strings & s);
-Sink & operator << (Sink & out, const StringSet & s);
+inline Sink & operator << (Sink & sink, uint64_t n)
+{
+    unsigned char buf[8];
+    buf[0] = n & 0xff;
+    buf[1] = (n >> 8) & 0xff;
+    buf[2] = (n >> 16) & 0xff;
+    buf[3] = (n >> 24) & 0xff;
+    buf[4] = (n >> 32) & 0xff;
+    buf[5] = (n >> 40) & 0xff;
+    buf[6] = (n >> 48) & 0xff;
+    buf[7] = (n >> 56) & 0xff;
+    sink(buf, sizeof(buf));
+    return sink;
+}
+
+Sink & operator << (Sink & sink, const string & s);
+Sink & operator << (Sink & sink, const Strings & s);
+Sink & operator << (Sink & sink, const StringSet & s);
 
 
 void readPadding(size_t len, Source & source);
