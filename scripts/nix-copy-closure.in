@@ -25,6 +25,7 @@ my $toMode = 1;
 my $includeOutputs = 0;
 my $dryRun = 0;
 my $useSubstitutes = 0;
+my $verbosity = 1;
 
 
 # !!! Copied from nix-pack-closure, should put this in a module.
@@ -60,6 +61,10 @@ while (@ARGV) {
     }
     elsif ($arg eq "--use-substitutes" || $arg eq "-s") {
         $useSubstitutes = 1;
+    }
+    elsif ($arg eq "-v") {
+        $verbosity++;
+        setVerbosity($verbosity);
     }
     elsif (!defined $sshHost) {
         $sshHost = $arg;

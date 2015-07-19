@@ -1510,7 +1510,7 @@ void LocalStore::exportPath(const Path & path, bool sign,
 {
     assertStorePath(path);
 
-    printMsg(lvlInfo, format("exporting path ‘%1%’") % path);
+    printMsg(lvlTalkative, format("exporting path ‘%1%’") % path);
 
     if (!isValidPath(path))
         throw Error(format("path ‘%1%’ is not valid") % path);
@@ -1612,6 +1612,8 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
         throw Error("Nix archive cannot be imported; wrong format");
 
     Path dstPath = readStorePath(hashAndReadSource);
+
+    printMsg(lvlTalkative, format("importing path ‘%1%’") % dstPath);
 
     PathSet references = readStorePaths<PathSet>(hashAndReadSource);
 
