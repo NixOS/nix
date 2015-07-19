@@ -477,12 +477,24 @@ void printMsg_(Verbosity level, const FormatOrString & fs)
 {
     checkInterrupt();
     if (level > verbosity) return;
+
     string prefix;
     if (logType == ltPretty)
         for (int i = 0; i < nestingLevel; i++)
             prefix += "|   ";
     else if (logType == ltEscapes && level != lvlInfo)
         prefix = "\033[" + escVerbosity(level) + "s";
+    else if (logType == ltSystemd) {
+        char c;
+        switch (level) {
+            case lvlError: c = '3'; break;
+            case lvlInfo: c = '5'; break;
+            case lvlTalkative: case lvlChatty: c = '6'; break;
+            default: c = '7';
+        }
+        prefix = string("<") + c + ">";
+    }
+
     string s = (format("%1%%2%\n") % prefix % fs.s).str();
     if (!isatty(STDERR_FILENO)) s = filterANSIEscapes(s);
     writeToStderr(s);

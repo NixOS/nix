@@ -90,6 +90,7 @@ static void setLogType(string lt)
     if (lt == "pretty") logType = ltPretty;
     else if (lt == "escapes") logType = ltEscapes;
     else if (lt == "flat") logType = ltFlat;
+    else if (lt == "systemd") logType = ltSystemd;
     else throw UsageError("unknown log type");
 }
 
@@ -115,6 +116,9 @@ void initNix()
 #endif
 
     std::ios::sync_with_stdio(false);
+
+    if (getEnv("IN_SYSTEMD") == "1")
+        logType = ltSystemd;
 
     settings.processEnvironment();
     settings.loadConfFile();

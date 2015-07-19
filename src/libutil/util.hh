@@ -122,7 +122,8 @@ T singleton(const A & a)
 typedef enum {
     ltPretty,   /* nice, nested output */
     ltEscapes,  /* nesting indicated using escape codes (for log2xml) */
-    ltFlat      /* no nesting */
+    ltFlat,     /* no nesting */
+    ltSystemd,  /* use systemd severity prefixes */
 } LogType;
 
 extern LogType logType;
