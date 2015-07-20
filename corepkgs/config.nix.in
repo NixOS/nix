@@ -12,7 +12,6 @@ in rec {
   tar = "@tar@";
   tarFlags = "@tarFlags@";
   tr = "@tr@";
-  curl = "@curl@";
   nixBinDir = fromEnv "NIX_BIN_DIR" "@bindir@";
   nixPrefix = "@prefix@";
 

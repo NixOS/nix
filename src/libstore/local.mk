@@ -8,7 +8,7 @@ libstore_SOURCES := $(wildcard $(d)/*.cc)
 
 libstore_LIBS = libutil libformat
 
-libstore_LDFLAGS = -lsqlite3 -lbz2
+libstore_LDFLAGS = -lsqlite3 -lbz2 -lcurl
 
 ifeq ($(OS), SunOS)
 	libstore_LDFLAGS += -lsocket

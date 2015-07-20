@@ -8,6 +8,7 @@
 #include "util.hh"
 #include "archive.hh"
 #include "affinity.hh"
+#include "builtins.hh"
 
 #include <map>
 #include <sstream>
@@ -1269,6 +1270,12 @@ bool substitutesAllowed(const BasicDerivation & drv)
 }
 
 
+static bool isBuiltin(const BasicDerivation & drv)
+{
+    return string(drv.builder, 0, 8) == "builtin:";
+}
+
+
 void DerivationGoal::tryToBuild()
 {
     trace("trying to build");
@@ -2139,7 +2146,7 @@ void DerivationGoal::startBuilder()
 #endif
     {
         ProcessOptions options;
-        options.allowVfork = !buildUser.enabled();
+        options.allowVfork = !buildUser.enabled() && !isBuiltin(*drv);
         pid = startProcess([&]() {
             runChild();
         }, options);
@@ -2386,7 +2393,9 @@ void DerivationGoal::runChild()
         const char *builder = "invalid";
 
         string sandboxProfile;
-        if (useChroot && SANDBOX_ENABLED) {
+        if (isBuiltin(*drv))
+            ;
+        else if (useChroot && SANDBOX_ENABLED) {
             /* Lots and lots and lots of file functions freak out if they can't stat their full ancestry */
             PathSet ancestry;
 
@@ -2412,7 +2421,6 @@ void DerivationGoal::runChild()
             /* Add all our input paths to the chroot */
             for (auto & i : inputPaths)
                 dirsInChroot[i] = i;
-
 
             /* TODO: we should factor out the policy cleanly, so we don't have to repeat the constants every time... */
             sandboxProfile += "(version 1)\n";
@@ -2517,6 +2525,20 @@ void DerivationGoal::runChild()
         }
 
         /* Execute the program.  This should not return. */
+        if (isBuiltin(*drv)) {
+            try {
+                logType = ltFlat;
+                if (drv->builder == "builtin:fetchurl")
+                    builtinFetchurl(*drv);
+                else
+                    throw Error(format("unsupported builtin function ‘%1%’") % string(drv->builder, 8));
+                _exit(0);
+            } catch (std::exception & e) {
+                writeFull(STDERR_FILENO, "error: " + string(e.what()) + "\n");
+                _exit(1);
+            }
+        }
+
         execve(builder, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
 
         throw SysError(format("executing ‘%1%’") % drv->builder);
