@@ -103,13 +103,23 @@ enum BuildMode { bmNormal, bmRepair, bmCheck };
 struct BuildResult
 {
     enum Status {
-        Success = 0,
-        PermanentFailure = 1,
-        TimedOut = 2,
-        MiscFailure = 3
+        Built = 0,
+        Substituted,
+        AlreadyValid,
+        PermanentFailure,
+        InputRejected,
+        OutputRejected,
+        TransientFailure, // possibly transient
+        CachedFailure,
+        TimedOut,
+        MiscFailure,
+        DependencyFailed
     } status = MiscFailure;
     std::string errorMsg;
     //time_t startTime = 0, stopTime = 0;
+    bool success() {
+        return status == Built || status == Substituted || status == AlreadyValid;
+    }
 };
 
 
