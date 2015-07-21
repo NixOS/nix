@@ -543,6 +543,7 @@ void UserLock::acquire()
                 throw Error(format("the Nix user should not be a member of ‘%1%’")
                     % settings.buildUsersGroup);
 
+#if __linux__
             /* Get the list of supplementary groups of this build user.  This
                is usually either empty or contains a group such as "kvm".  */
             supplementaryGIDs.resize(10);
@@ -553,6 +554,7 @@ void UserLock::acquire()
                 throw Error(format("failed to get list of supplementary groups for ‘%1%’") % pw->pw_name);
 
             supplementaryGIDs.resize(ngroups);
+#endif
 
             return;
         }
@@ -2372,7 +2374,8 @@ void DerivationGoal::runChild()
         if (buildUser.enabled()) {
             /* Preserve supplementary groups of the build user, to allow
                admins to specify groups such as "kvm".  */
-            if (setgroups(buildUser.getSupplementaryGIDs().size(),
+            if (!buildUser.getSupplementaryGIDs().empty() &&
+                setgroups(buildUser.getSupplementaryGIDs().size(),
                           buildUser.getSupplementaryGIDs().data()) == -1)
                 throw SysError("cannot set supplementary groups of build user");
 
