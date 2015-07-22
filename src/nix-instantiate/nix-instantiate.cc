@@ -120,6 +120,8 @@ int main(int argc, char * * argv)
                 fromArgs = true;
             else if (*arg == "--eval" || *arg == "--eval-only")
                 evalOnly = true;
+            else if (*arg == "--xml-debug-coercion-failure")
+                settings.xmldebugCorecionFailure = true;
             else if (*arg == "--read-write-mode")
                 wantsReadWrite = true;
             else if (*arg == "--parse" || *arg == "--parse-only")
