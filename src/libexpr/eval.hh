@@ -74,7 +74,7 @@ public:
 
     /* If set, force copying files to the Nix store even if they
        already exist there. */
-    bool repair;
+    bool repair = false;
 
     /* If set, don't allow access to files outside of the Nix search
        path or to environment variables. */
@@ -183,7 +183,7 @@ public:
 
 private:
 
-    unsigned int baseEnvDispl;
+    unsigned int baseEnvDispl = 0;
 
     void createBaseEnv();
 
@@ -240,17 +240,17 @@ public:
 
 private:
 
-    unsigned long nrEnvs;
-    unsigned long nrValuesInEnvs;
-    unsigned long nrValues;
-    unsigned long nrListElems;
-    unsigned long nrAttrsets;
-    unsigned long nrAttrsInAttrsets;
-    unsigned long nrOpUpdates;
-    unsigned long nrOpUpdateValuesCopied;
-    unsigned long nrListConcats;
-    unsigned long nrPrimOpCalls;
-    unsigned long nrFunctionCalls;
+    unsigned long nrEnvs = 0;
+    unsigned long nrValuesInEnvs = 0;
+    unsigned long nrValues = 0;
+    unsigned long nrListElems = 0;
+    unsigned long nrAttrsets = 0;
+    unsigned long nrAttrsInAttrsets = 0;
+    unsigned long nrOpUpdates = 0;
+    unsigned long nrOpUpdateValuesCopied = 0;
+    unsigned long nrListConcats = 0;
+    unsigned long nrPrimOpCalls = 0;
+    unsigned long nrFunctionCalls = 0;
 
     bool countCalls;
 

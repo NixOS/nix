@@ -261,14 +261,9 @@ EvalState::EvalState(const Strings & _searchPath)
     , sLine(symbols.create("line"))
     , sColumn(symbols.create("column"))
     , sFunctor(symbols.create("__functor"))
-    , repair(false)
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
-    , baseEnvDispl(0)
 {
-    nrEnvs = nrValuesInEnvs = nrValues = nrListElems = 0;
-    nrAttrsets = nrAttrsInAttrsets = nrOpUpdates = nrOpUpdateValuesCopied = 0;
-    nrListConcats = nrPrimOpCalls = nrFunctionCalls = 0;
     countCalls = getEnv("NIX_COUNT_CALLS", "0") != "0";
 
     restricted = settings.get("restrict-eval", false);
