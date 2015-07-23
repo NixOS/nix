@@ -281,6 +281,10 @@ EvalState::EvalState(const Strings & _searchPath)
     for (auto & i : paths) addToSearchPath(i);
     addToSearchPath("nix=" + settings.nixDataDir + "/nix/corepkgs");
 
+    clearValue(vEmptySet);
+    vEmptySet.type = tAttrs;
+    vEmptySet.attrs = allocBindings(0);
+
     createBaseEnv();
 }
 

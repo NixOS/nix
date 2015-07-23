@@ -80,6 +80,8 @@ public:
        path or to environment variables. */
     bool restricted;
 
+    Value vEmptySet;
+
 private:
     SrcToStore srcToStore;
 
@@ -227,7 +229,7 @@ public:
     Bindings * allocBindings(Bindings::size_t capacity);
 
     void mkList(Value & v, unsigned int length);
-    void mkAttrs(Value & v, unsigned int expected);
+    void mkAttrs(Value & v, unsigned int capacity);
     void mkThunk_(Value & v, Expr * expr);
     void mkPos(Value & v, Pos * pos);
 

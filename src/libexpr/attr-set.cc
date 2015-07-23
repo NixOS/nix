@@ -29,13 +29,17 @@ Bindings * EvalState::allocBindings(Bindings::size_t capacity)
 }
 
 
-void EvalState::mkAttrs(Value & v, unsigned int expected)
+void EvalState::mkAttrs(Value & v, unsigned int capacity)
 {
+    if (capacity == 0) {
+        v = vEmptySet;
+        return;
+    }
     clearValue(v);
     v.type = tAttrs;
-    v.attrs = allocBindings(expected);
+    v.attrs = allocBindings(capacity);
     nrAttrsets++;
-    nrAttrsInAttrsets += expected;
+    nrAttrsInAttrsets += capacity;
 }
 
 
