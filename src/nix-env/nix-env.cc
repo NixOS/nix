@@ -1282,6 +1282,12 @@ static void opDeleteGenerations(Globals & globals, Strings opFlags, Strings opAr
 }
 
 
+static void opVersion(Globals & globals, Strings opFlags, Strings opArgs)
+{
+    printVersion("nix-env");
+}
+
+
 int main(int argc, char * * argv)
 {
     return handleExceptions(argv[0], [&]() {
@@ -1311,7 +1317,7 @@ int main(int argc, char * * argv)
             if (*arg == "--help")
                 showManPage("nix-env");
             else if (*arg == "--version")
-                printVersion("nix-env");
+                op = opVersion;
             else if (*arg == "--install" || *arg == "-i")
                 op = opInstall;
             else if (parseAutoArgs(arg, end, autoArgs_))

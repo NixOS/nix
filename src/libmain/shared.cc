@@ -243,6 +243,20 @@ void parseCmdLine(int argc, char * * argv,
 void printVersion(const string & programName)
 {
     std::cout << format("%1% (Nix) %2%") % programName % nixVersion << std::endl;
+    if (verbosity > lvlInfo) {
+        Strings cfg;
+#if HAVE_BOEHMGC
+        cfg.push_back("gc");
+#endif
+#if HAVE_SODIUM
+        cfg.push_back("signed-caches");
+#endif
+        std::cout << "Features: " << concatStringsSep(", ", cfg) << "\n";
+        std::cout << "Configuration file: " << settings.nixConfDir + "/nix.conf" << "\n";
+        std::cout << "Store directory: " << settings.nixStore << "\n";
+        std::cout << "State directory: " << settings.nixStateDir << "\n";
+        std::cout << "Database directory: " << settings.nixDBPath << "\n";
+    }
     throw Exit();
 }
 

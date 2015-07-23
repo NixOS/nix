@@ -1027,6 +1027,12 @@ static void opGenerateBinaryCacheKey(Strings opFlags, Strings opArgs)
 }
 
 
+static void opVersion(Strings opFlags, Strings opArgs)
+{
+    printVersion("nix-store");
+}
+
+
 /* Scan the arguments; find the operation, set global flags, put all
    other flags in a list, and put all other arguments in another
    list. */
@@ -1044,7 +1050,7 @@ int main(int argc, char * * argv)
             if (*arg == "--help")
                 showManPage("nix-store");
             else if (*arg == "--version")
-                printVersion("nix-store");
+                op = opVersion;
             else if (*arg == "--realise" || *arg == "--realize" || *arg == "-r")
                 op = opRealise;
             else if (*arg == "--add" || *arg == "-A")
