@@ -39,6 +39,28 @@ available as <function>builtins.derivation</function>.</para>
   </varlistentry>
 
 
+  <varlistentry><term><function>builtins.all</function>
+  <replaceable>pred</replaceable> <replaceable>list</replaceable></term>
+
+    <listitem><para>Return <literal>true</literal> if the function
+    <replaceable>pred</replaceable> returns <literal>true</literal>
+    for all elements of <replaceable>list</replaceable>,
+    and <literal>false</literal> otherwise.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry><term><function>builtins.any</function>
+  <replaceable>pred</replaceable> <replaceable>list</replaceable></term>
+
+    <listitem><para>Return <literal>true</literal> if the function
+    <replaceable>pred</replaceable> returns <literal>true</literal>
+    for at least one element of <replaceable>list</replaceable>,
+    and <literal>false</literal> otherwise.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry><term><function>builtins.attrNames</function>
   <replaceable>set</replaceable></term>
 

@@ -1333,6 +1333,37 @@ static void prim_foldlStrict(EvalState & state, const Pos & pos, Value * * args,
 }
 
 
+static void anyOrAll(bool any, EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceFunction(*args[0], pos);
+    state.forceList(*args[1], pos);
+
+    Value vTmp;
+    for (unsigned int n = 0; n < args[1]->list.length; ++n) {
+        state.callFunction(*args[0], *args[1]->list.elems[n], vTmp, pos);
+        bool res = state.forceBool(vTmp);
+        if (res == any) {
+            mkBool(v, any);
+            return;
+        }
+    }
+
+    mkBool(v, !any);
+}
+
+
+static void prim_any(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    anyOrAll(true, state, pos, args, v);
+}
+
+
+static void prim_all(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    anyOrAll(false, state, pos, args, v);
+}
+
+
 /*************************************************************
  * Integer arithmetic
  *************************************************************/
@@ -1671,6 +1702,8 @@ void EvalState::createBaseEnv()
     addPrimOp("__concatLists", 1, prim_concatLists);
     addPrimOp("__length", 1, prim_length);
     addPrimOp("__foldl'", 3, prim_foldlStrict);
+    addPrimOp("__any", 2, prim_any);
+    addPrimOp("__all", 2, prim_all);
 
     // Integer arithmetic
     addPrimOp("__add", 2, prim_add);
