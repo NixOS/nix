@@ -16,7 +16,7 @@ derivation {
       if sha256 != "" then sha256 else if sha1 != "" then sha1 else md5;
   outputHashMode = if executable then "recursive" else "flat";
 
-  inherit system url;
+  inherit system url executable;
 
   # No need to double the amount of network traffic
   preferLocalBuild = true;
