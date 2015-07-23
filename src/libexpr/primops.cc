@@ -872,8 +872,12 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
 
     for (auto path : context) {
         if (path.at(0) == '=') path = string(path, 1);
-        if (isDerivation(path))
-            throw EvalError(format("in ‘toFile’: the file ‘%1%’ cannot refer to derivation outputs, at %2%") % name % pos);
+        if (isDerivation(path)) {
+            /* See prim_unsafeDiscardOutputDependency. */
+            if (path.at(0) != '~')
+                throw EvalError(format("in ‘toFile’: the file ‘%1%’ cannot refer to derivation outputs, at %2%") % name % pos);
+            path = string(path, 1);
+	}
         refs.insert(path);
     }
 
