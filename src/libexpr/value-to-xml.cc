@@ -119,10 +119,10 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
 
             break;
 
-        case tList: {
+        case tList1: case tList2: case tListN: {
             XMLOpenElement _(doc, "list");
-            for (unsigned int n = 0; n < v.list.length; ++n)
-                printValueAsXML(state, strict, location, *v.list.elems[n], doc, context, drvsSeen);
+            for (unsigned int n = 0; n < v.listSize(); ++n)
+                printValueAsXML(state, strict, location, *v.listElems()[n], doc, context, drvsSeen);
             break;
         }
 

@@ -39,9 +39,9 @@ DrvInfo::Outputs DrvInfo::queryOutputs()
             state->forceList(*i->value, *i->pos);
 
             /* For each output... */
-            for (unsigned int j = 0; j < i->value->list.length; ++j) {
+            for (unsigned int j = 0; j < i->value->listSize(); ++j) {
                 /* Evaluate the corresponding set. */
-                string name = state->forceStringNoCtx(*i->value->list.elems[j], *i->pos);
+                string name = state->forceStringNoCtx(*i->value->listElems()[j], *i->pos);
                 Bindings::iterator out = attrs->find(state->symbols.create(name));
                 if (out == attrs->end()) continue; // FIXME: throw error?
                 state->forceAttrs(*out->value);
@@ -94,9 +94,9 @@ StringSet DrvInfo::queryMetaNames()
 bool DrvInfo::checkMeta(Value & v)
 {
     state->forceValue(v);
-    if (v.type == tList) {
-        for (unsigned int n = 0; n < v.list.length; ++n)
-            if (!checkMeta(*v.list.elems[n])) return false;
+    if (v.isList()) {
+        for (unsigned int n = 0; n < v.listSize(); ++n)
+            if (!checkMeta(*v.listElems()[n])) return false;
         return true;
     }
     else if (v.type == tAttrs) {
@@ -277,13 +277,13 @@ static void getDerivations(EvalState & state, Value & vIn,
         }
     }
 
-    else if (v.type == tList) {
-        for (unsigned int n = 0; n < v.list.length; ++n) {
+    else if (v.isList()) {
+        for (unsigned int n = 0; n < v.listSize(); ++n) {
             startNest(nest, lvlDebug,
                 format("evaluating list element"));
             string pathPrefix2 = addToPath(pathPrefix, (format("%1%") % n).str());
-            if (getDerivation(state, *v.list.elems[n], pathPrefix2, drvs, done, ignoreAssertionFailures))
-                getDerivations(state, *v.list.elems[n], pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
+            if (getDerivation(state, *v.listElems()[n], pathPrefix2, drvs, done, ignoreAssertionFailures))
+                getDerivations(state, *v.listElems()[n], pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
         }
     }
 

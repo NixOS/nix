@@ -108,10 +108,12 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
         str << "}";
         break;
     }
-    case tList:
+    case tList1:
+    case tList2:
+    case tListN:
         str << "[ ";
-        for (unsigned int n = 0; n < v.list.length; ++n) {
-            printValue(str, active, *v.list.elems[n]);
+        for (unsigned int n = 0; n < v.listSize(); ++n) {
+            printValue(str, active, *v.listElems()[n]);
             str << " ";
         }
         str << "]";
@@ -157,7 +159,7 @@ string showType(const Value & v)
         case tPath: return "a path";
         case tNull: return "null";
         case tAttrs: return "a set";
-        case tList: return "a list";
+        case tList1: case tList2: case tListN: return "a list";
         case tThunk: return "a thunk";
         case tApp: return "a function application";
         case tLambda: return "a function";
@@ -519,13 +521,19 @@ Bindings * EvalState::allocBindings(Bindings::size_t capacity)
 }
 
 
-void EvalState::mkList(Value & v, unsigned int length)
+void EvalState::mkList(Value & v, unsigned int size)
 {
     clearValue(v);
-    v.type = tList;
-    v.list.length = length;
-    v.list.elems = length ? (Value * *) allocBytes(length * sizeof(Value *)) : 0;
-    nrListElems += length;
+    if (size == 1)
+        v.type = tList1;
+    else if (size == 2)
+        v.type = tList2;
+    else {
+        v.type = tListN;
+        v.bigList.size = size;
+        v.bigList.elems = size ? (Value * *) allocBytes(size * sizeof(Value *)) : 0;
+    }
+    nrListElems += size;
 }
 
 
@@ -807,8 +815,8 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 void ExprList::eval(EvalState & state, Env & env, Value & v)
 {
     state.mkList(v, elems.size());
-    for (unsigned int n = 0; n < v.list.length; ++n)
-        v.list.elems[n] = elems[n]->maybeThunk(state, env);
+    for (unsigned int n = 0; n < elems.size(); ++n)
+        v.listElems()[n] = elems[n]->maybeThunk(state, env);
 }
 
 
@@ -1201,20 +1209,21 @@ void EvalState::concatLists(Value & v, unsigned int nrLists, Value * * lists, co
     unsigned int len = 0;
     for (unsigned int n = 0; n < nrLists; ++n) {
         forceList(*lists[n], pos);
-        unsigned int l = lists[n]->list.length;
+        unsigned int l = lists[n]->listSize();
         len += l;
         if (l) nonEmpty = lists[n];
     }
 
-    if (nonEmpty && len == nonEmpty->list.length) {
+    if (nonEmpty && len == nonEmpty->listSize()) {
         v = *nonEmpty;
         return;
     }
 
     mkList(v, len);
+    auto out = v.listElems();
     for (unsigned int n = 0, pos = 0; n < nrLists; ++n) {
-        unsigned int l = lists[n]->list.length;
-        memcpy(v.list.elems + pos, lists[n]->list.elems, l * sizeof(Value *));
+        unsigned int l = lists[n]->listSize();
+        memcpy(out + pos, lists[n]->listElems(), l * sizeof(Value *));
         pos += l;
     }
 }
@@ -1290,9 +1299,9 @@ void EvalState::forceValueDeep(Value & v)
                 }
         }
 
-        else if (v.type == tList) {
-            for (unsigned int n = 0; n < v.list.length; ++n)
-                recurse(*v.list.elems[n]);
+        else if (v.isList()) {
+            for (unsigned int n = 0; n < v.listSize(); ++n)
+                recurse(*v.listElems()[n]);
         }
     };
 
@@ -1416,14 +1425,14 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
         if (v.type == tInt) return int2String(v.integer);
         if (v.type == tNull) return "";
 
-        if (v.type == tList) {
+        if (v.isList()) {
             string result;
-            for (unsigned int n = 0; n < v.list.length; ++n) {
-                result += coerceToString(pos, *v.list.elems[n],
+            for (unsigned int n = 0; n < v.listSize(); ++n) {
+                result += coerceToString(pos, *v.listElems()[n],
                     context, coerceMore, copyToStore);
-                if (n < v.list.length - 1
+                if (n < v.listSize() - 1
                     /* !!! not quite correct */
-                    && (v.list.elems[n]->type != tList || v.list.elems[n]->list.length != 0))
+                    && (!v.listElems()[n]->isList() || v.listElems()[n]->listSize() != 0))
                     result += " ";
             }
             return result;
@@ -1494,10 +1503,12 @@ bool EvalState::eqValues(Value & v1, Value & v2)
         case tNull:
             return true;
 
-        case tList:
-            if (v1.list.length != v2.list.length) return false;
-            for (unsigned int n = 0; n < v1.list.length; ++n)
-                if (!eqValues(*v1.list.elems[n], *v2.list.elems[n])) return false;
+        case tList1:
+        case tList2:
+        case tListN:
+            if (v1.listSize() != v2.listSize()) return false;
+            for (unsigned int n = 0; n < v1.listSize(); ++n)
+                if (!eqValues(*v1.listElems()[n], *v2.listElems()[n])) return false;
             return true;
 
         case tAttrs: {
@@ -1645,12 +1656,14 @@ size_t valueSize(Value & v)
                     sz += doValue(*i.value);
             }
             break;
-        case tList:
-            if (seen.find(v.list.elems) == seen.end()) {
-                seen.insert(v.list.elems);
-                sz += v.list.length * sizeof(Value *);
-                for (unsigned int n = 0; n < v.list.length; ++n)
-                    sz += doValue(*v.list.elems[n]);
+        case tList1:
+        case tList2:
+        case tListN:
+            if (seen.find(v.listElems()) == seen.end()) {
+                seen.insert(v.listElems());
+                sz += v.listSize() * sizeof(Value *);
+                for (unsigned int n = 0; n < v.listSize(); ++n)
+                    sz += doValue(*v.listElems()[n]);
             }
             break;
         case tThunk:

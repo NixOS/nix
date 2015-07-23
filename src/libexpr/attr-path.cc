@@ -76,15 +76,15 @@ Value * findAlongAttrPath(EvalState & state, const string & attrPath,
 
         else if (apType == apIndex) {
 
-            if (v->type != tList)
+            if (!v->isList())
                 throw TypeError(
                     format("the expression selected by the selection path ‘%1%’ should be a list but is %2%")
                     % attrPath % showType(*v));
 
-            if (attrIndex >= v->list.length)
+            if (attrIndex >= v->listSize())
                 throw Error(format("list index %1% in selection path ‘%2%’ is out of range") % attrIndex % attrPath);
 
-            v = v->list.elems[attrIndex];
+            v = v->listElems()[attrIndex];
         }
 
     }

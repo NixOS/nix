@@ -73,7 +73,7 @@ static void parseJSON(EvalState & state, const char * & s, Value & v)
         s++;
         state.mkList(v, values.size());
         for (size_t n = 0; n < values.size(); ++n)
-            v.list.elems[n] = values[n];
+            v.listElems()[n] = values[n];
     }
 
     else if (*s == '{') {

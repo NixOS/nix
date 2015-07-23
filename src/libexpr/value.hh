@@ -12,7 +12,9 @@ typedef enum {
     tPath,
     tNull,
     tAttrs,
-    tList,
+    tList1,
+    tList2,
+    tListN,
     tThunk,
     tApp,
     tLambda,
@@ -119,9 +121,10 @@ struct Value
         const char * path;
         Bindings * attrs;
         struct {
-            unsigned int length;
+            unsigned int size;
             Value * * elems;
-        } list;
+        } bigList;
+        Value * smallList[2];
         struct {
             Env * env;
             Expr * expr;
@@ -139,6 +142,26 @@ struct Value
         } primOpApp;
         ExternalValueBase * external;
     };
+
+    bool isList() const
+    {
+        return type == tList1 || type == tList2 || type == tListN;
+    }
+
+    Value * * listElems()
+    {
+        return type == tList1 || type == tList2 ? smallList : bigList.elems;
+    }
+
+    const Value * const * listElems() const
+    {
+        return type == tList1 || type == tList2 ? smallList : bigList.elems;
+    }
+
+    unsigned int listSize() const
+    {
+        return type == tList1 ? 1 : type == tList2 ? 2 : bigList.size;
+    }
 };
 
 

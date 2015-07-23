@@ -1127,13 +1127,13 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                                     attrs2["type"] = "bool";
                                     attrs2["value"] = v->boolean ? "true" : "false";
                                     xml.writeEmptyElement("meta", attrs2);
-                                } else if (v->type == tList) {
+                                } else if (v->isList()) {
                                     attrs2["type"] = "strings";
                                     XMLOpenElement m(xml, "meta", attrs2);
-                                    for (unsigned int j = 0; j < v->list.length; ++j) {
-                                        if (v->list.elems[j]->type != tString) continue;
+                                    for (unsigned int j = 0; j < v->listSize(); ++j) {
+                                        if (v->listElems()[j]->type != tString) continue;
                                         XMLAttrs attrs3;
-                                        attrs3["value"] = v->list.elems[j]->string.s;
+                                        attrs3["value"] = v->listElems()[j]->string.s;
                                         xml.writeEmptyElement("string", attrs3);
                                     }
                                 }

@@ -71,11 +71,11 @@ void printValueAsJSON(EvalState & state, bool strict,
             break;
         }
 
-        case tList: {
+        case tList1: case tList2: case tListN: {
             JSONList json(str);
-            for (unsigned int n = 0; n < v.list.length; ++n) {
+            for (unsigned int n = 0; n < v.listSize(); ++n) {
                 json.elem();
-                printValueAsJSON(state, strict, *v.list.elems[n], str, context);
+                printValueAsJSON(state, strict, *v.listElems()[n], str, context);
             }
             break;
         }

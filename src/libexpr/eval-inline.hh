@@ -66,7 +66,7 @@ inline void EvalState::forceAttrs(Value & v, const Pos & pos)
 inline void EvalState::forceList(Value & v)
 {
     forceValue(v);
-    if (v.type != tList)
+    if (!v.isList())
         throwTypeError("value is %1% while a list was expected", v);
 }
 
@@ -74,7 +74,7 @@ inline void EvalState::forceList(Value & v)
 inline void EvalState::forceList(Value & v, const Pos & pos)
 {
     forceValue(v);
-    if (v.type != tList)
+    if (!v.isList())
         throwTypeError("value is %1% while a list was expected, at %2%", v, pos);
 }
 

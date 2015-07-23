@@ -52,7 +52,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         Path drvPath = keepDerivations ? i.queryDrvPath() : "";
 
         Value & v(*state.allocValue());
-        manifest.list.elems[n++] = &v;
+        manifest.listElems()[n++] = &v;
         state.mkAttrs(v, 16);
 
         mkString(*state.allocAttr(v, state.sType), "derivation");
@@ -69,7 +69,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         state.mkList(vOutputs, outputs.size());
         unsigned int m = 0;
         for (auto & j : outputs) {
-            mkString(*(vOutputs.list.elems[m++] = state.allocValue()), j.first);
+            mkString(*(vOutputs.listElems()[m++] = state.allocValue()), j.first);
             Value & vOutputs = *state.allocAttr(v, state.symbols.create(j.first));
             state.mkAttrs(vOutputs, 2);
             mkString(*state.allocAttr(vOutputs, state.sOutPath), j.second);
