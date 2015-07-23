@@ -1304,6 +1304,29 @@ static void prim_length(EvalState & state, const Pos & pos, Value * * args, Valu
 }
 
 
+/* Reduce a list by applying a binary operator, from left to
+   right. The operator is applied strictly. */
+static void prim_foldlStrict(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceFunction(*args[0], pos);
+    state.forceList(*args[2], pos);
+
+    Value * vCur = args[1];
+
+    if (args[2]->list.length)
+        for (unsigned int n = 0; n < args[2]->list.length; ++n) {
+            Value vTmp;
+            state.callFunction(*args[0], *vCur, vTmp, pos);
+            vCur = n == args[2]->list.length - 1 ? &v : state.allocValue();
+            state.callFunction(vTmp, *args[2]->list.elems[n], *vCur, pos);
+        }
+    else
+        v = *vCur;
+
+    state.forceValue(v);
+}
+
+
 /*************************************************************
  * Integer arithmetic
  *************************************************************/
@@ -1641,6 +1664,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__elem", 2, prim_elem);
     addPrimOp("__concatLists", 1, prim_concatLists);
     addPrimOp("__length", 1, prim_length);
+    addPrimOp("__foldl'", 3, prim_foldlStrict);
 
     // Integer arithmetic
     addPrimOp("__add", 2, prim_add);

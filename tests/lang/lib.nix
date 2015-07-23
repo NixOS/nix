@@ -17,7 +17,7 @@ rec {
     then fold (x: y: (flatten x) ++ y) [] x
     else [x];
 
-  sum = fold (x: y: add x y) 0;
+  sum = foldl' (x: y: add x y) 0;
 
   hasSuffix = ext: fileName:
     let lenFileName = stringLength fileName;
