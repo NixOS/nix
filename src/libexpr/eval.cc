@@ -55,12 +55,6 @@ static void * allocBytes(size_t n)
 }
 
 
-void Bindings::sort()
-{
-    std::sort(begin(), end());
-}
-
-
 static void printValue(std::ostream & str, std::set<const Value *> & active, const Value & v)
 {
     checkInterrupt();
@@ -507,20 +501,6 @@ Env & EvalState::allocEnv(unsigned int size)
 }
 
 
-Value * EvalState::allocAttr(Value & vAttrs, const Symbol & name)
-{
-    Value * v = allocValue();
-    vAttrs.attrs->push_back(Attr(name, v));
-    return v;
-}
-
-
-Bindings * EvalState::allocBindings(Bindings::size_t capacity)
-{
-    return new (allocBytes(sizeof(Bindings) + sizeof(Attr) * capacity)) Bindings(capacity);
-}
-
-
 void EvalState::mkList(Value & v, unsigned int size)
 {
     clearValue(v);
@@ -534,16 +514,6 @@ void EvalState::mkList(Value & v, unsigned int size)
         v.bigList.elems = size ? (Value * *) allocBytes(size * sizeof(Value *)) : 0;
     }
     nrListElems += size;
-}
-
-
-void EvalState::mkAttrs(Value & v, unsigned int expected)
-{
-    clearValue(v);
-    v.type = tAttrs;
-    v.attrs = allocBindings(expected);
-    nrAttrsets++;
-    nrAttrsInAttrsets += expected;
 }
 
 
