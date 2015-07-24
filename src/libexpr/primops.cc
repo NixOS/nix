@@ -1514,6 +1514,26 @@ static void prim_match(EvalState & state, const Pos & pos, Value * * args, Value
 }
 
 
+static void prim_concatStringSep(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    PathSet context;
+
+    auto sep = state.forceString(*args[0], context, pos);
+    state.forceList(*args[1]);
+
+    string res;
+    res.reserve((args[1]->listSize() + 32) * sep.size());
+    bool first = true;
+
+    for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
+        if (first) first = false; else res += sep;
+        res += state.coerceToString(pos, *args[1]->listElems()[n], context);
+    }
+
+    mkString(v, res, context);
+}
+
+
 /*************************************************************
  * Versions
  *************************************************************/
@@ -1720,6 +1740,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__unsafeDiscardOutputDependency", 1, prim_unsafeDiscardOutputDependency);
     addPrimOp("__hashString", 2, prim_hashString);
     addPrimOp("__match", 2, prim_match);
+    addPrimOp("__concatStringsSep", 2, prim_concatStringSep);
 
     // Versions
     addPrimOp("__parseDrvName", 1, prim_parseDrvName);
