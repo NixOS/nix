@@ -1519,7 +1519,7 @@ static void prim_concatStringSep(EvalState & state, const Pos & pos, Value * * a
     PathSet context;
 
     auto sep = state.forceString(*args[0], context, pos);
-    state.forceList(*args[1]);
+    state.forceList(*args[1], pos);
 
     string res;
     res.reserve((args[1]->listSize() + 32) * sep.size());
@@ -1528,6 +1528,41 @@ static void prim_concatStringSep(EvalState & state, const Pos & pos, Value * * a
     for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
         if (first) first = false; else res += sep;
         res += state.coerceToString(pos, *args[1]->listElems()[n], context);
+    }
+
+    mkString(v, res, context);
+}
+
+
+static void prim_replaceStrings(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceList(*args[0], pos);
+    state.forceList(*args[1], pos);
+    if (args[0]->listSize() != args[1]->listSize())
+        throw EvalError(format("‘from’ and ‘to’ arguments to ‘replaceStrings’ have different lengths, at %1%") % pos);
+
+    Strings from;
+    for (unsigned int n = 0; n < args[0]->listSize(); ++n)
+        from.push_back(state.forceStringNoCtx(*args[0]->listElems()[n], pos));
+
+    Strings to;
+    for (unsigned int n = 0; n < args[1]->listSize(); ++n)
+        to.push_back(state.forceStringNoCtx(*args[1]->listElems()[n], pos));
+
+    PathSet context;
+    auto s = state.forceString(*args[2], context, pos);
+
+    string res;
+    for (size_t p = 0; p < s.size(); ) {
+        bool found = false;
+        for (auto i = from.begin(), j = to.begin(); i != from.end(); ++i, ++j)
+            if (s.compare(p, i->size(), *i) == 0) {
+                found = true;
+                p += i->size();
+                res += *j;
+                break;
+            }
+        if (!found) res += s[p++];
     }
 
     mkString(v, res, context);
@@ -1741,6 +1776,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__hashString", 2, prim_hashString);
     addPrimOp("__match", 2, prim_match);
     addPrimOp("__concatStringsSep", 2, prim_concatStringSep);
+    addPrimOp("__replaceStrings", 3, prim_replaceStrings);
 
     // Versions
     addPrimOp("__parseDrvName", 1, prim_parseDrvName);

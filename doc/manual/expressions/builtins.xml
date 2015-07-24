@@ -733,6 +733,23 @@ removeAttrs { x = 1; y = 2; z = 3; } [ "a" "x" "z" ]</programlisting>
   </varlistentry>
 
 
+  <varlistentry><term><function>builtins.replaceStrings</function>
+  <replaceable>from</replaceable> <replaceable>to</replaceable> <replaceable>s</replaceable></term>
+
+    <listitem><para>Given string <replaceable>s</replaceable>, replace
+    every occurrence of the strings in <replaceable>from</replaceable>
+    with the corresponding string in
+    <replaceable>to</replaceable>. For example,
+
+<programlisting>
+builtins.replaceStrings ["oo" "a"] ["a" "i"] "foobar"
+</programlisting>
+
+    evaluates to <literal>"fabir"</literal>.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry><term><function>builtins.seq</function>
   <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
 
