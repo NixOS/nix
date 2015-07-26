@@ -2730,10 +2730,10 @@ void DerivationGoal::registerOutputs()
             for (auto & i : used)
                 if (allowed) {
                     if (spec.find(i) == spec.end())
-                        throw BuildError(format("output (‘%1%’) is not allowed to refer to path ‘%2%’") % actualPath % i);
+                        throw BuildError(format("output ‘%1%’ is not allowed to refer to path ‘%2%’") % actualPath % i);
                 } else {
                     if (spec.find(i) != spec.end())
-                        throw BuildError(format("output (‘%1%’) is not allowed to refer to path ‘%2%’") % actualPath % i);
+                        throw BuildError(format("output ‘%1%’ is not allowed to refer to path ‘%2%’") % actualPath % i);
                 }
         };
 
