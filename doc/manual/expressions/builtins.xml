@@ -779,6 +779,29 @@ builtins.replaceStrings ["oo" "a"] ["a" "i"] "foobar"
   </varlistentry>
 
 
+  <varlistentry><term><function>builtins.sort</function>
+  <replaceable>comparator</replaceable> <replaceable>list</replaceable></term>
+
+    <listitem><para>Return <replaceable>list</replaceable> in sorted
+    order. It repeatedly calls the function
+    <replaceable>comparator</replaceable> with two elements. The
+    comparator should return <literal>true</literal> if the first
+    element is less than the second, and <literal>false</literal>
+    otherwise. For example,
+
+<programlisting>
+builtins.sort builtins.lessThan [ 483 249 526 147 42 77 ]
+</programlisting>
+
+    produces the list <literal>[ 42 77 147 249 483 526
+    ]</literal>.</para>
+
+    <para>This is a stable sort: it preserves the relative order of
+    elements deemed equal by the comparator.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry><term><function>builtins.stringLength</function>
   <replaceable>e</replaceable></term>
 

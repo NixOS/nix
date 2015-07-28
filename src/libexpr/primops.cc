@@ -1364,7 +1364,6 @@ static void prim_all(EvalState & state, const Pos & pos, Value * * args, Value &
 }
 
 
-/* Apply a function to every element of a list. */
 static void prim_genList(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceFunction(*args[0], pos);
@@ -1380,6 +1379,41 @@ static void prim_genList(EvalState & state, const Pos & pos, Value * * args, Val
         mkInt(*arg, n);
         mkApp(*(v.listElems()[n] = state.allocValue()), *args[0], *arg);
     }
+}
+
+
+static void prim_lessThan(EvalState & state, const Pos & pos, Value * * args, Value & v);
+
+
+static void prim_sort(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceFunction(*args[0], pos);
+    state.forceList(*args[1], pos);
+
+    auto len = args[1]->listSize();
+    state.mkList(v, len);
+    for (unsigned int n = 0; n < len; ++n) {
+        state.forceValue(*args[1]->listElems()[n]);
+        v.listElems()[n] = args[1]->listElems()[n];
+    }
+
+
+    auto comparator = [&](Value * a, Value * b) {
+        /* Optimization: if the comparator is lessThan, bypass
+           callFunction. */
+        if (args[0]->type == tPrimOp && args[0]->primOp->fun == prim_lessThan)
+            return CompareValues()(a, b);
+
+        Value vTmp1, vTmp2;
+        state.callFunction(*args[0], *a, vTmp1, pos);
+        state.callFunction(vTmp1, *b, vTmp2, pos);
+        return state.forceBool(vTmp2);
+    };
+
+    /* FIXME: std::sort can segfault if the comparator is not a strict
+       weak ordering. What to do? std::stable_sort() seems more
+       resilient, but no guarantees... */
+    std::stable_sort(v.listElems(), v.listElems() + len, comparator);
 }
 
 
@@ -1779,6 +1813,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__any", 2, prim_any);
     addPrimOp("__all", 2, prim_all);
     addPrimOp("__genList", 2, prim_genList);
+    addPrimOp("__sort", 2, prim_sort);
 
     // Integer arithmetic
     addPrimOp("__add", 2, prim_add);

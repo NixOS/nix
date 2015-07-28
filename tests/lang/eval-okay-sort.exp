@@ -1,0 +1,1 @@
+[ [ 42 77 147 249 483 526 ] [ 526 483 249 147 77 42 ] [ "bar" "fnord" "foo" "xyzzy" ] [ { key = 1; value = "foo"; } { key = 1; value = "fnord"; } { key = 2; value = "bar"; } ] ]
