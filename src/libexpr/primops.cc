@@ -1364,6 +1364,25 @@ static void prim_all(EvalState & state, const Pos & pos, Value * * args, Value &
 }
 
 
+/* Apply a function to every element of a list. */
+static void prim_genList(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceFunction(*args[0], pos);
+    auto len = state.forceInt(*args[1], pos);
+
+    if (len < 0)
+        throw EvalError(format("cannot create list of size %1%, at %2%") % len % pos);
+
+    state.mkList(v, len);
+
+    for (unsigned int n = 0; n < len; ++n) {
+        Value * arg = state.allocValue();
+        mkInt(*arg, n);
+        mkApp(*(v.listElems()[n] = state.allocValue()), *args[0], *arg);
+    }
+}
+
+
 /*************************************************************
  * Integer arithmetic
  *************************************************************/
@@ -1759,6 +1778,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__foldl'", 3, prim_foldlStrict);
     addPrimOp("__any", 2, prim_any);
     addPrimOp("__all", 2, prim_all);
+    addPrimOp("__genList", 2, prim_genList);
 
     // Integer arithmetic
     addPrimOp("__add", 2, prim_add);

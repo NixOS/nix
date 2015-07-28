@@ -364,6 +364,24 @@ builtins.fromJSON ''{"x": [1, 2, 3], "y": null}''
   </varlistentry>
 
 
+  <varlistentry><term><function>builtins.genList</function>
+  <replaceable>generator</replaceable> <replaceable>length</replaceable></term>
+
+    <listitem><para>Generate list of size
+    <replaceable>length</replaceable>, with each element
+    <replaceable>i></replaceable> equal to the value returned by
+    <replaceable>generator</replaceable> <literal>i</literal>. For
+    example,
+
+<programlisting>
+builtins.genList (x: x * x) 5
+</programlisting>
+
+    returns the list <literal>[ 0 1 4 9 16 ]</literal>.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry><term><function>builtins.getAttr</function>
   <replaceable>s</replaceable> <replaceable>set</replaceable></term>
 
