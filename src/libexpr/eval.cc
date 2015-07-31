@@ -746,7 +746,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
     for (auto & i : dynamicAttrs) {
         Value nameVal;
         i.nameExpr->eval(state, *dynamicEnv, nameVal);
-        state.forceValue(nameVal);
+        state.forceValue(nameVal, i.pos);
         if (nameVal.type == tNull)
             continue;
         state.forceStringNoCtx(nameVal);
@@ -792,7 +792,7 @@ void ExprList::eval(EvalState & state, Env & env, Value & v)
 void ExprVar::eval(EvalState & state, Env & env, Value & v)
 {
     Value * v2 = state.lookupVar(&env, *this, false);
-    state.forceValue(*v2);
+    state.forceValue(*v2, pos);
     v = *v2;
 }
 
@@ -831,7 +831,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             Bindings::iterator j;
             Symbol name = getName(i, state, env);
             if (def) {
-                state.forceValue(*vAttrs);
+                state.forceValue(*vAttrs, pos);
                 if (vAttrs->type != tAttrs ||
                     (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
                 {
@@ -848,7 +848,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             if (state.countCalls && pos2) state.attrSelects[*pos2]++;
         }
 
-        state.forceValue(*vAttrs);
+        state.forceValue(*vAttrs, ( pos2 != NULL ? *pos2 : this->pos ) );
 
     } catch (Error & e) {
         if (pos2 && pos2->file != state.sDerivationNix)
@@ -950,10 +950,10 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
     if (fun.type == tAttrs) {
       auto found = fun.attrs->find(sFunctor);
       if (found != fun.attrs->end()) {
-        forceValue(*found->value);
+        forceValue(*found->value, pos);
         Value * v2 = allocValue();
         callFunction(*found->value, fun, *v2, pos);
-        forceValue(*v2);
+        forceValue(*v2, pos);
         return callFunction(*v2, arg, v, pos);
       }
     }
@@ -1280,7 +1280,7 @@ void EvalState::forceValueDeep(Value & v)
 
 NixInt EvalState::forceInt(Value & v, const Pos & pos)
 {
-    forceValue(v);
+    forceValue(v, pos);
     if (v.type != tInt)
         throwTypeError("value is %1% while an integer was expected, at %2%", v, pos);
     return v.integer;
@@ -1306,7 +1306,7 @@ void EvalState::forceFunction(Value & v, const Pos & pos)
 
 string EvalState::forceString(Value & v, const Pos & pos)
 {
-    forceValue(v);
+    forceValue(v, pos);
     if (v.type != tString) {
         if (pos)
             throwTypeError("value is %1% while a string was expected, at %2%", v, pos);
