@@ -1,15 +1,16 @@
 #pragma once
 
 #include "eval.hh"
+#include "shared.hh"
 
 #define LocalNoInline(f) static f __attribute__((noinline)); f
 #define LocalNoInlineNoReturn(f) static f __attribute__((noinline, noreturn)); f
 
 namespace nix {
 
-LocalNoInlineNoReturn(void throwEvalError(const char * s))
+LocalNoInlineNoReturn(void throwEvalError(const FormatOrString & fs))
 {
-    throw EvalError(s);
+    throw EvalError(fs);
 }
 
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v))
@@ -24,7 +25,7 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v, const
 }
 
 
-void EvalState::forceValue(Value & v)
+void EvalState::forceValue(Value & v, const Pos & pos)
 {
     if (v.type == tThunk) {
         Env * env = v.thunk.env;
@@ -43,7 +44,7 @@ void EvalState::forceValue(Value & v)
     else if (v.type == tApp)
         callFunction(*v.app.left, *v.app.right, v, noPos);
     else if (v.type == tBlackhole)
-        throwEvalError("infinite recursion encountered");
+        throwEvalError(format("infinite recursion encountered, at %1%") % pos);
 }
 
 
