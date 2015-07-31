@@ -358,11 +358,6 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2))
     throw EvalError(format(s) % s2);
 }
 
-LocalNoInlineNoReturn(void throwEvalError(const char * s, const Pos & pos))
-{
-    throw EvalError(format(s) % pos);
-}
-
 LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const Pos & pos))
 {
     throw EvalError(format(s) % s2 % pos);

@@ -8,9 +8,9 @@
 
 namespace nix {
 
-LocalNoInlineNoReturn(void throwEvalError(const FormatOrString & fs))
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const Pos & pos))
 {
-    throw EvalError(fs);
+    throw EvalError(format(s) % pos);
 }
 
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v))
@@ -44,7 +44,7 @@ void EvalState::forceValue(Value & v, const Pos & pos)
     else if (v.type == tApp)
         callFunction(*v.app.left, *v.app.right, v, noPos);
     else if (v.type == tBlackhole)
-        throwEvalError(format("infinite recursion encountered, at %1%") % pos);
+        throwEvalError("infinite recursion encountered, at %1%", pos);
 }
 
 
