@@ -1,7 +1,6 @@
 #pragma once
 
 #include "eval.hh"
-#include "shared.hh"
 
 #define LocalNoInline(f) static f __attribute__((noinline)); f
 #define LocalNoInlineNoReturn(f) static f __attribute__((noinline, noreturn)); f
