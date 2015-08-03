@@ -1,3 +1,4 @@
+#include <iostream>
 #include "config.h"
 
 #include "references.hh"
@@ -2161,8 +2162,14 @@ void DerivationGoal::startBuilder()
         singleton<set<int> >(builderOut.readSide), true, true);
 
     /* Check if setting up the build environment failed. */
-    string msg = readLine(builderOut.readSide);
-    if (!msg.empty()) throw Error(msg);
+    while (true) {
+        string msg = readLine(builderOut.readSide);
+        if (string(msg, 0, 1) == "\1") {
+            if (msg.size() == 1) break;
+            throw Error(string(msg, 1));
+        }
+        printMsg(lvlDebug, msg);
+    }
 
     if (settings.printBuildTrace) {
         printMsg(lvlError, format("@ build-started %1% - %2% %3%")
@@ -2177,6 +2184,8 @@ void DerivationGoal::runChild()
        calls! */
 
     try { /* child */
+
+        logType = ltFlat;
 
         commonChildInit(builderOut);
 
@@ -2502,6 +2511,9 @@ void DerivationGoal::runChild()
             }
             sandboxProfile += ")\n";
 
+            debug("Generated sandbox profile:");
+            debug(sandboxProfile);
+
             builder = "/usr/bin/sandbox-exec";
             args.push_back("sandbox-exec");
             args.push_back("-p");
@@ -2519,13 +2531,7 @@ void DerivationGoal::runChild()
         restoreSIGPIPE();
 
         /* Indicate that we managed to set up the build environment. */
-        writeFull(STDERR_FILENO, "\n");
-
-        /* This needs to be after that fateful '\n', and I didn't want to duplicate code */
-        if (useChroot && SANDBOX_ENABLED) {
-            printMsg(lvlDebug, "Generated sandbox profile:");
-            printMsg(lvlDebug, sandboxProfile);
-        }
+        writeFull(STDERR_FILENO, string("\1\n"));
 
         /* Execute the program.  This should not return. */
         if (isBuiltin(*drv)) {
@@ -2547,7 +2553,7 @@ void DerivationGoal::runChild()
         throw SysError(format("executing ‘%1%’") % drv->builder);
 
     } catch (std::exception & e) {
-        writeFull(STDERR_FILENO, "while setting up the build environment: " + string(e.what()) + "\n");
+        writeFull(STDERR_FILENO, "\1while setting up the build environment: " + string(e.what()) + "\n");
         _exit(1);
     }
 }
