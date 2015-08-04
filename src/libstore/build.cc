@@ -1,4 +1,3 @@
-#include <iostream>
 #include "config.h"
 
 #include "references.hh"
@@ -11,9 +10,10 @@
 #include "affinity.hh"
 #include "builtins.hh"
 
+#include <algorithm>
+#include <iostream>
 #include <map>
 #include <sstream>
-#include <algorithm>
 
 #include <limits.h>
 #include <time.h>
