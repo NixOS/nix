@@ -75,7 +75,7 @@ $ nix-shell -p pan -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/
       <listitem><para>In <command>nixos-rebuild</command> (on NixOS):
 
 <screen>
-$ nixos-rebuild test -I nixpkgs=nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/nixos-unstable.tar.gz
+$ nixos-rebuild test -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/nixos-unstable.tar.gz
 </screen>
 
       </para></listitem>
