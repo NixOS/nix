@@ -105,8 +105,8 @@ sub update {
         my $tmpdir = tempdir( CLEANUP => 1 );
         my $filename;
         ($url, $filename) = `cd $tmpdir && $Nix::Config::curl --silent --write-out '%{url_effective}\n%{filename_effective}' -L '$url' -O`;
-        die "$0: unable to check ‘$url’\n" if $? != 0;
         chomp $url;
+        die "$0: unable to check ‘$url’\n" if $? != 0;
 
         # If the URL contains a version number, append it to the name
         # attribute (so that "nix-env -q" on the channels profile
