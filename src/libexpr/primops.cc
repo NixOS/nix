@@ -88,39 +88,39 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
         Value & w = *state.allocValue();
         state.mkAttrs(w, 3 + drv.outputs.size());
         Value * v2 = state.allocAttr(w, state.sDrvPath);
-        mkString(*v2, path, singleton<PathSet>("=" + path));
+        v2->setString(path, singleton<PathSet>("=" + path));
         v2 = state.allocAttr(w, state.sName);
-        mkString(*v2, drv.env["name"]);
+        v2->setString(drv.env["name"]);
         Value * outputsVal =
             state.allocAttr(w, state.symbols.create("outputs"));
         state.mkList(*outputsVal, drv.outputs.size());
+        Value::asMutableList outList(outputsVal);
         unsigned int outputs_index = 0;
 
         for (const auto & o : drv.outputs) {
             v2 = state.allocAttr(w, state.symbols.create(o.first));
-            mkString(*v2, o.second.path,
+            v2->setString(o.second.path,
                 singleton<PathSet>("!" + o.first + "!" + path));
-            outputsVal->listElems()[outputs_index] = state.allocValue();
-            mkString(*(outputsVal->listElems()[outputs_index++]), o.first);
+            (outList[outputs_index++] = state.allocValue())->setString(o.first);
         }
-        w.attrs->sort();
+        w.asAttrs()->sort();
         Value fun;
         state.evalFile(settings.nixDataDir + "/nix/corepkgs/imported-drv-to-derivation.nix", fun);
         state.forceFunction(fun, pos);
-        mkApp(v, fun, w);
+        v.setApp(fun, w);
         state.forceAttrs(v, pos);
     } else {
         state.forceAttrs(*args[0]);
-        if (args[0]->attrs->empty())
+        if (args[0]->asAttrs()->empty())
             state.evalFile(path, v);
         else {
-            Env * env = &state.allocEnv(args[0]->attrs->size());
+            Env * env = &state.allocEnv(args[0]->asAttrs()->size());
             env->up = &state.baseEnv;
 
             StaticEnv staticEnv(false, &state.staticBaseEnv);
 
             unsigned int displ = 0;
-            for (auto & attr : *args[0]->attrs) {
+            for (auto & attr : *args[0]->asAttrs()) {
                 staticEnv.vars[attr.name] = displ;
                 env->values[displ++] = attr.value;
             }
@@ -181,25 +181,28 @@ static void prim_typeOf(EvalState & state, const Pos & pos, Value * * args, Valu
 {
     state.forceValue(*args[0]);
     string t;
-    switch (args[0]->type) {
-        case tInt: t = "int"; break;
-        case tBool: t = "bool"; break;
-        case tString: t = "string"; break;
-        case tPath: t = "path"; break;
-        case tNull: t = "null"; break;
-        case tAttrs: t = "set"; break;
-        case tList1: case tList2: case tListN: t = "list"; break;
-        case tLambda:
-        case tPrimOp:
-        case tPrimOpApp:
+    switch (args[0]->type()) {
+        case Value::tInt: t = "int"; break;
+        case Value::tBool: t = "bool"; break;
+        case Value::tString: t = "string"; break;
+        case Value::tPath: t = "path"; break;
+        case Value::tNull: t = "null"; break;
+        case Value::tAttrs: t = "set"; break;
+        case Value::tList0:
+        case Value::tList1:
+        case Value::tList2:
+        case Value::tListN: t = "list"; break;
+        case Value::tLambda:
+        case Value::tPrimOp:
+        case Value::tPrimOpApp:
             t = "lambda";
             break;
-        case tExternal:
-            t = args[0]->external->typeOf();
+        case Value::tExternal:
+            t = args[0]->asExternal()->typeOf();
             break;
         default: abort();
     }
-    mkString(v, state.symbols.create(t));
+    v.setString(state.symbols.create(t));
 }
 
 
@@ -207,7 +210,7 @@ static void prim_typeOf(EvalState & state, const Pos & pos, Value * * args, Valu
 static void prim_isNull(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0]);
-    mkBool(v, args[0]->type == tNull);
+    v.setBool(args[0]->type() == Value::tNull);
 }
 
 
@@ -215,7 +218,7 @@ static void prim_isNull(EvalState & state, const Pos & pos, Value * * args, Valu
 static void prim_isFunction(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0]);
-    mkBool(v, args[0]->type == tLambda);
+    v.setBool(args[0]->type() == Value::tLambda);
 }
 
 
@@ -223,7 +226,7 @@ static void prim_isFunction(EvalState & state, const Pos & pos, Value * * args, 
 static void prim_isInt(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0]);
-    mkBool(v, args[0]->type == tInt);
+    v.setBool(args[0]->type() == Value::tInt);
 }
 
 
@@ -231,7 +234,7 @@ static void prim_isInt(EvalState & state, const Pos & pos, Value * * args, Value
 static void prim_isString(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0]);
-    mkBool(v, args[0]->type == tString);
+    v.setBool(args[0]->type() == Value::tString);
 }
 
 
@@ -239,7 +242,7 @@ static void prim_isString(EvalState & state, const Pos & pos, Value * * args, Va
 static void prim_isBool(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0]);
-    mkBool(v, args[0]->type == tBool);
+    v.setBool(args[0]->type() == Value::tBool);
 }
 
 
@@ -247,15 +250,15 @@ struct CompareValues
 {
     bool operator () (const Value * v1, const Value * v2) const
     {
-        if (v1->type != v2->type)
+        if (v1->type() != v2->type())
             throw EvalError("cannot compare values of different types");
-        switch (v1->type) {
-            case tInt:
-                return v1->integer < v2->integer;
-            case tString:
-                return strcmp(v1->string.s, v2->string.s) < 0;
-            case tPath:
-                return strcmp(v1->path, v2->path) < 0;
+        switch (v1->type()) {
+            case Value::tInt:
+                return v1->asInt() < v2->asInt();
+            case Value::tString:
+                return strcmp(v1->asString(), v2->asString()) < 0;
+            case Value::tPath:
+                return strcmp(v1->asPath(), v2->asPath()) < 0;
             default:
                 throw EvalError(format("cannot compare %1% with %2%") % showType(*v1) % showType(*v2));
         }
@@ -278,19 +281,20 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
 
     /* Get the start set. */
     Bindings::iterator startSet =
-        args[0]->attrs->find(state.symbols.create("startSet"));
-    if (startSet == args[0]->attrs->end())
+        args[0]->asAttrs()->find(state.symbols.create("startSet"));
+    if (startSet == args[0]->asAttrs()->end())
         throw EvalError(format("attribute ‘startSet’ required, at %1%") % pos);
     state.forceList(*startSet->value, pos);
 
     ValueList workSet;
-    for (unsigned int n = 0; n < startSet->value->listSize(); ++n)
-        workSet.push_back(startSet->value->listElems()[n]);
+    Value::asList list(startSet->value);
+    for (unsigned int n = 0; n < list.length(); ++n)
+        workSet.push_back(list[n]);
 
     /* Get the operator. */
     Bindings::iterator op =
-        args[0]->attrs->find(state.symbols.create("operator"));
-    if (op == args[0]->attrs->end())
+        args[0]->asAttrs()->find(state.symbols.create("operator"));
+    if (op == args[0]->asAttrs()->end())
         throw EvalError(format("attribute ‘operator’ required, at %1%") % pos);
     state.forceValue(*op->value);
 
@@ -308,8 +312,8 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
         state.forceAttrs(*e, pos);
 
         Bindings::iterator key =
-            e->attrs->find(state.symbols.create("key"));
-        if (key == e->attrs->end())
+            e->asAttrs()->find(state.symbols.create("key"));
+        if (key == e->asAttrs()->end())
             throw EvalError(format("attribute ‘key’ required, at %1%") % pos);
         state.forceValue(*key->value);
 
@@ -319,21 +323,23 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
 
         /* Call the `operator' function with `e' as argument. */
         Value call;
-        mkApp(call, *op->value, *e);
+        call.setApp(*op->value, *e);
         state.forceList(call, pos);
 
         /* Add the values returned by the operator to the work set. */
-        for (unsigned int n = 0; n < call.listSize(); ++n) {
-            state.forceValue(*call.listElems()[n]);
-            workSet.push_back(call.listElems()[n]);
+        Value::asList list(call);
+        for (unsigned int n = 0; n < list.length(); ++n) {
+            state.forceValue(*list[n]);
+            workSet.push_back(list[n]);
         }
     }
 
     /* Create the result list. */
     state.mkList(v, res.size());
+    Value::asMutableList resList(v);
     unsigned int n = 0;
     for (auto & i : res)
-        v.listElems()[n++] = i;
+        resList[n++] = i;
 }
 
 
@@ -373,13 +379,13 @@ static void prim_tryEval(EvalState & state, const Pos & pos, Value * * args, Val
     state.mkAttrs(v, 2);
     try {
         state.forceValue(*args[0]);
-        v.attrs->push_back(Attr(state.sValue, args[0]));
-        mkBool(*state.allocAttr(v, state.symbols.create("success")), true);
+        v.asAttrs()->push_back(Attr(state.sValue, args[0]));
+        state.allocAttr(v, state.symbols.create("success"))->setBool(true);
     } catch (AssertionError & e) {
-        mkBool(*state.allocAttr(v, state.sValue), false);
-        mkBool(*state.allocAttr(v, state.symbols.create("success")), false);
+        state.allocAttr(v, state.sValue)->setBool(false);
+        state.allocAttr(v, state.symbols.create("success"))->setBool(false);
     }
-    v.attrs->sort();
+    v.asAttrs()->sort();
 }
 
 
@@ -387,7 +393,7 @@ static void prim_tryEval(EvalState & state, const Pos & pos, Value * * args, Val
 static void prim_getEnv(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string name = state.forceStringNoCtx(*args[0], pos);
-    mkString(v, state.restricted ? "" : getEnv(name));
+    v.setString(state.restricted ? "" : getEnv(name));
 }
 
 
@@ -415,8 +421,8 @@ static void prim_deepSeq(EvalState & state, const Pos & pos, Value * * args, Val
 static void prim_trace(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0]);
-    if (args[0]->type == tString)
-        printMsg(lvlError, format("trace: %1%") % args[0]->string.s);
+    if (args[0]->type() == Value::tString)
+        printMsg(lvlError, format("trace: %1%") % args[0]->asString());
     else
         printMsg(lvlError, format("trace: %1%") % *args[0]);
     state.forceValue(*args[1]);
@@ -427,7 +433,7 @@ static void prim_trace(EvalState & state, const Pos & pos, Value * * args, Value
 void prim_valueSize(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     /* We're not forcing the argument on purpose. */
-    mkInt(v, valueSize(*args[0]));
+    v.setInt(valueSize(*args[0]));
 }
 
 
@@ -450,8 +456,8 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     state.forceAttrs(*args[0], pos);
 
     /* Figure out the name first (for stack backtraces). */
-    Bindings::iterator attr = args[0]->attrs->find(state.sName);
-    if (attr == args[0]->attrs->end())
+    Bindings::iterator attr = args[0]->asAttrs()->find(state.sName);
+    if (attr == args[0]->asAttrs()->end())
         throw EvalError(format("required attribute ‘name’ missing, at %1%") % pos);
     string drvName;
     Pos & posDrvName(*attr->pos);
@@ -464,8 +470,8 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     /* Check whether null attributes should be ignored. */
     bool ignoreNulls = false;
-    attr = args[0]->attrs->find(state.sIgnoreNulls);
-    if (attr != args[0]->attrs->end())
+    attr = args[0]->asAttrs()->find(state.sIgnoreNulls);
+    if (attr != args[0]->asAttrs()->end())
         ignoreNulls = state.forceBool(*attr->value);
 
     /* Build the derivation expression by processing the attributes. */
@@ -479,7 +485,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     StringSet outputs;
     outputs.insert("out");
 
-    for (auto & i : *args[0]->attrs) {
+    for (auto & i : *args[0]->asAttrs()) {
         if (i.name == state.sIgnoreNulls) continue;
         string key = i.name;
         startNest(nest, lvlVomit, format("processing attribute ‘%1%’") % key);
@@ -488,15 +494,16 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
             if (ignoreNulls) {
                 state.forceValue(*i.value);
-                if (i.value->type == tNull) continue;
+                if (i.value->type() == Value::tNull) continue;
             }
 
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
             if (key == "args") {
                 state.forceList(*i.value, pos);
-                for (unsigned int n = 0; n < i.value->listSize(); ++n) {
-                    string s = state.coerceToString(posDrvName, *i.value->listElems()[n], context, true);
+                Value::asList list(i.value);
+                for (unsigned int n = 0; n < list.length(); ++n) {
+                    string s = state.coerceToString(posDrvName, *list[n], context, true);
                     drv.args.push_back(s);
                 }
             }
@@ -652,12 +659,12 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     drvHashes[drvPath] = hashDerivationModulo(*store, drv);
 
     state.mkAttrs(v, 1 + drv.outputs.size());
-    mkString(*state.allocAttr(v, state.sDrvPath), drvPath, singleton<PathSet>("=" + drvPath));
+    state.allocAttr(v, state.sDrvPath)->setString(drvPath, singleton<PathSet>("=" + drvPath));
     for (auto & i : drv.outputs) {
-        mkString(*state.allocAttr(v, state.symbols.create(i.first)),
+        state.allocAttr(v, state.symbols.create(i.first))->setString(
             i.second.path, singleton<PathSet>("!" + i.first + "!" + drvPath));
     }
-    v.attrs->sort();
+    v.asAttrs()->sort();
 }
 
 
@@ -671,7 +678,7 @@ static void prim_toPath(EvalState & state, const Pos & pos, Value * * args, Valu
 {
     PathSet context;
     Path path = state.coerceToPath(pos, *args[0], context);
-    mkString(v, canonPath(path), context);
+    v.setString(canonPath(path), context);
 }
 
 
@@ -697,7 +704,7 @@ static void prim_storePath(EvalState & state, const Pos & pos, Value * * args, V
     if (!settings.readOnlyMode)
         store->ensurePath(path2);
     context.insert(path2);
-    mkString(v, path, context);
+    v.setString(path, context);
 }
 
 
@@ -708,13 +715,13 @@ static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, 
     if (!context.empty())
         throw EvalError(format("string ‘%1%’ cannot refer to other paths, at %2%") % path % pos);
     try {
-        mkBool(v, pathExists(state.checkSourcePath(path)));
+        v.setBool(pathExists(state.checkSourcePath(path)));
     } catch (SysError & e) {
         /* Don't give away info from errors while canonicalising
            ‘path’ in restricted mode. */
-        mkBool(v, false);
+        v.setBool(false);
     } catch (RestrictedPathError & e) {
-        mkBool(v, false);
+        v.setBool(false);
     }
 }
 
@@ -724,7 +731,7 @@ static void prim_pathExists(EvalState & state, const Pos & pos, Value * * args, 
 static void prim_baseNameOf(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    mkString(v, baseNameOf(state.coerceToString(pos, *args[0], context, false, false)), context);
+    v.setString(baseNameOf(state.coerceToString(pos, *args[0], context, false, false)), context);
 }
 
 
@@ -735,7 +742,10 @@ static void prim_dirOf(EvalState & state, const Pos & pos, Value * * args, Value
 {
     PathSet context;
     Path dir = dirOf(state.coerceToPath(pos, *args[0], context));
-    if (args[0]->type == tPath) mkPath(v, dir.c_str()); else mkString(v, dir, context);
+    if (args[0]->type() == Value::tPath)
+        v.setPath(dir.c_str());
+    else
+        v.setString(dir, context);
 }
 
 
@@ -753,7 +763,7 @@ static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Va
     string s = readFile(state.checkSourcePath(path));
     if (s.find((char) 0) != string::npos)
         throw Error(format("the contents of the file ‘%1%’ cannot be represented as a Nix string") % path);
-    mkString(v, s.c_str());
+    v.setString(s.c_str());
 }
 
 
@@ -766,17 +776,18 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
     SearchPath searchPath;
 
     PathSet context;
-    for (unsigned int n = 0; n < args[0]->listSize(); ++n) {
-        Value & v2(*args[0]->listElems()[n]);
+    Value::asList list(args[0]);
+    for (unsigned int n = 0; n < list.length(); ++n) {
+        Value & v2(*list[n]);
         state.forceAttrs(v2, pos);
 
         string prefix;
-        Bindings::iterator i = v2.attrs->find(state.symbols.create("prefix"));
-        if (i != v2.attrs->end())
+        Bindings::iterator i = v2.asAttrs()->find(state.symbols.create("prefix"));
+        if (i != v2.asAttrs()->end())
             prefix = state.forceStringNoCtx(*i->value, pos);
 
-        i = v2.attrs->find(state.symbols.create("path"));
-        if (i == v2.attrs->end())
+        i = v2.asAttrs()->find(state.symbols.create("path"));
+        if (i == v2.asAttrs()->end())
             throw EvalError(format("attribute ‘path’ missing, at %1%") % pos);
         string path = state.coerceToPath(pos, *i->value, context);
 
@@ -792,12 +803,18 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
             % path % e.path % pos);
     }
 
-    mkPath(v, state.findFile(searchPath, path, pos).c_str());
+    v.setPath(state.findFile(searchPath, path, pos).c_str());
 }
+
+alignas(16) static const char sRegular[] = "regular";
+alignas(16) static const char sDirectory[] = "directory";
+alignas(16) static const char sSymlink[] = "symlink";
+alignas(16) static const char sUnknown[] = "unknown";
 
 /* Read a directory (without . or ..) */
 static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
+
     PathSet ctx;
     Path path = state.coerceToPath(pos, *args[0], ctx);
     try {
@@ -814,14 +831,15 @@ static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Val
         Value * ent_val = state.allocAttr(v, state.symbols.create(ent.name));
         if (ent.type == DT_UNKNOWN)
             ent.type = getFileType(path + "/" + ent.name);
-        mkStringNoCopy(*ent_val,
-            ent.type == DT_REG ? "regular" :
-            ent.type == DT_DIR ? "directory" :
-            ent.type == DT_LNK ? "symlink" :
-            "unknown");
+        ent_val->setStringNoCopy(
+            ent.type == DT_REG ? sRegular :
+            ent.type == DT_DIR ? sDirectory :
+            ent.type == DT_LNK ? sSymlink :
+            sUnknown,
+            nullptr);
     }
 
-    v.attrs->sort();
+    v.asAttrs()->sort();
 }
 
 
@@ -838,7 +856,7 @@ static void prim_toXML(EvalState & state, const Pos & pos, Value * * args, Value
     std::ostringstream out;
     PathSet context;
     printValueAsXML(state, true, false, *args[0], out, context);
-    mkString(v, out.str(), context);
+    v.setString(out.str(), context);
 }
 
 
@@ -850,7 +868,7 @@ static void prim_toJSON(EvalState & state, const Pos & pos, Value * * args, Valu
     std::ostringstream out;
     PathSet context;
     printValueAsJSON(state, true, *args[0], out, context);
-    mkString(v, out.str(), context);
+    v.setString(out.str(), context);
 }
 
 
@@ -891,7 +909,7 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
        result, since `storePath' itself has references to the paths
        used in args[1]. */
 
-    mkString(v, storePath, singleton<PathSet>(storePath));
+    v.setString(storePath, singleton<PathSet>(storePath));
 }
 
 
@@ -914,13 +932,13 @@ struct FilterFromExpr : PathFilter
         /* Call the filter function.  The first argument is the path,
            the second is a string indicating the type of the file. */
         Value arg1;
-        mkString(arg1, path);
+        arg1.setString(path);
 
         Value fun2;
         state.callFunction(filter, arg1, fun2, noPos);
 
         Value arg2;
-        mkString(arg2,
+        arg2.setString(
             S_ISREG(st.st_mode) ? "regular" :
             S_ISDIR(st.st_mode) ? "directory" :
             S_ISLNK(st.st_mode) ? "symlink" :
@@ -942,7 +960,7 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
         throw EvalError(format("string ‘%1%’ cannot refer to other paths, at %2%") % path % pos);
 
     state.forceValue(*args[0]);
-    if (args[0]->type != tLambda)
+    if (args[0]->type() != Value::tLambda)
         throw TypeError(format("first argument in call to ‘filterSource’ is not a function but %1%, at %2%") % showType(*args[0]) % pos);
 
     FilterFromExpr filter(state, *args[0]);
@@ -953,7 +971,7 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
         ? computeStorePathForPath(path, true, htSHA256, filter).first
         : store->addToStore(baseNameOf(path), path, true, htSHA256, filter, state.repair);
 
-    mkString(v, dstPath, singleton<PathSet>(dstPath));
+    v.setString(dstPath, singleton<PathSet>(dstPath));
 }
 
 
@@ -968,14 +986,15 @@ static void prim_attrNames(EvalState & state, const Pos & pos, Value * * args, V
 {
     state.forceAttrs(*args[0], pos);
 
-    state.mkList(v, args[0]->attrs->size());
+    state.mkList(v, args[0]->asAttrs()->size());
+    Value::asMutableList list(v);
 
     unsigned int n = 0;
-    for (auto & i : *args[0]->attrs)
-        mkString(*(v.listElems()[n++] = state.allocValue()), i.name);
+    for (auto & i : *args[0]->asAttrs())
+        (list[n++] = state.allocValue())->setString(i.name);
 
-    std::sort(v.listElems(), v.listElems() + n,
-        [](Value * v1, Value * v2) { return strcmp(v1->string.s, v2->string.s) < 0; });
+    std::sort(list.begin(), list.end(),
+        [](Value * v1, Value * v2) { return strcmp(v1->asString(), v2->asString()) < 0; });
 }
 
 
@@ -985,17 +1004,18 @@ static void prim_attrValues(EvalState & state, const Pos & pos, Value * * args, 
 {
     state.forceAttrs(*args[0], pos);
 
-    state.mkList(v, args[0]->attrs->size());
+    state.mkList(v, args[0]->asAttrs()->size());
+    Value::asMutableList list(v);
 
     unsigned int n = 0;
-    for (auto & i : *args[0]->attrs)
-        v.listElems()[n++] = (Value *) &i;
+    for (auto & i : *args[0]->asAttrs())
+        list[n++] = (Value *) &i;
 
-    std::sort(v.listElems(), v.listElems() + n,
+    std::sort(list.begin(), list.end(),
         [](Value * v1, Value * v2) { return (string) ((Attr *) v1)->name < (string) ((Attr *) v2)->name; });
 
     for (unsigned int i = 0; i < n; ++i)
-        v.listElems()[i] = ((Attr *) v.listElems()[i])->value;
+        list[i] = ((Attr *) list[i])->value;
 }
 
 
@@ -1005,8 +1025,8 @@ void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
     string attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
     // !!! Should we create a symbol here or just do a lookup?
-    Bindings::iterator i = args[1]->attrs->find(state.symbols.create(attr));
-    if (i == args[1]->attrs->end())
+    Bindings::iterator i = args[1]->asAttrs()->find(state.symbols.create(attr));
+    if (i == args[1]->asAttrs()->end())
         throw EvalError(format("attribute ‘%1%’ missing, at %2%") % attr % pos);
     // !!! add to stack trace?
     if (state.countCalls && i->pos) state.attrSelects[*i->pos]++;
@@ -1020,9 +1040,9 @@ void prim_unsafeGetAttrPos(EvalState & state, const Pos & pos, Value * * args, V
 {
     string attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
-    Bindings::iterator i = args[1]->attrs->find(state.symbols.create(attr));
-    if (i == args[1]->attrs->end())
-        mkNull(v);
+    Bindings::iterator i = args[1]->asAttrs()->find(state.symbols.create(attr));
+    if (i == args[1]->asAttrs()->end())
+        v.setNull();
     else
         state.mkPos(v, i->pos);
 }
@@ -1033,7 +1053,7 @@ static void prim_hasAttr(EvalState & state, const Pos & pos, Value * * args, Val
 {
     string attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
-    mkBool(v, args[1]->attrs->find(state.symbols.create(attr)) != args[1]->attrs->end());
+    v.setBool(args[1]->asAttrs()->find(state.symbols.create(attr)) != args[1]->asAttrs()->end());
 }
 
 
@@ -1041,7 +1061,7 @@ static void prim_hasAttr(EvalState & state, const Pos & pos, Value * * args, Val
 static void prim_isAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0]);
-    mkBool(v, args[0]->type == tAttrs);
+    v.setBool(args[0]->type() == Value::tAttrs);
 }
 
 
@@ -1052,18 +1072,19 @@ static void prim_removeAttrs(EvalState & state, const Pos & pos, Value * * args,
 
     /* Get the attribute names to be removed. */
     std::set<Symbol> names;
-    for (unsigned int i = 0; i < args[1]->listSize(); ++i) {
-        state.forceStringNoCtx(*args[1]->listElems()[i], pos);
-        names.insert(state.symbols.create(args[1]->listElems()[i]->string.s));
+    Value::asList list(args[1]);
+    for (unsigned int i = 0; i < list.length(); ++i) {
+        state.forceStringNoCtx(*list[i], pos);
+        names.insert(state.symbols.create(list[i]->asString()));
     }
 
     /* Copy all attributes not in that set.  Note that we don't need
        to sort v.attrs because it's a subset of an already sorted
        vector. */
-    state.mkAttrs(v, args[0]->attrs->size());
-    for (auto & i : *args[0]->attrs) {
+    state.mkAttrs(v, args[0]->asAttrs()->size());
+    for (auto & i : *args[0]->asAttrs()) {
         if (names.find(i.name) == names.end())
-            v.attrs->push_back(i);
+            v.asAttrs()->push_back(i);
     }
 }
 
@@ -1076,32 +1097,33 @@ static void prim_removeAttrs(EvalState & state, const Pos & pos, Value * * args,
 static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceList(*args[0], pos);
+    Value::asList list(args[0]);
 
-    state.mkAttrs(v, args[0]->listSize());
+    state.mkAttrs(v, list.length());
 
     std::set<Symbol> seen;
 
-    for (unsigned int i = 0; i < args[0]->listSize(); ++i) {
-        Value & v2(*args[0]->listElems()[i]);
+    for (unsigned int i = 0; i < list.length(); ++i) {
+        Value & v2(*list[i]);
         state.forceAttrs(v2, pos);
 
-        Bindings::iterator j = v2.attrs->find(state.sName);
-        if (j == v2.attrs->end())
+        Bindings::iterator j = v2.asAttrs()->find(state.sName);
+        if (j == v2.asAttrs()->end())
             throw TypeError(format("‘name’ attribute missing in a call to ‘listToAttrs’, at %1%") % pos);
         string name = state.forceStringNoCtx(*j->value, pos);
 
         Symbol sym = state.symbols.create(name);
         if (seen.find(sym) == seen.end()) {
-            Bindings::iterator j2 = v2.attrs->find(state.symbols.create(state.sValue));
-            if (j2 == v2.attrs->end())
+            Bindings::iterator j2 = v2.asAttrs()->find(state.symbols.create(state.sValue));
+            if (j2 == v2.asAttrs()->end())
                 throw TypeError(format("‘value’ attribute missing in a call to ‘listToAttrs’, at %1%") % pos);
 
-            v.attrs->push_back(Attr(sym, j2->value, j2->pos));
+            v.asAttrs()->push_back(Attr(sym, j2->value, j2->pos));
             seen.insert(sym);
         }
     }
 
-    v.attrs->sort();
+    v.asAttrs()->sort();
 }
 
 
@@ -1113,12 +1135,12 @@ static void prim_intersectAttrs(EvalState & state, const Pos & pos, Value * * ar
     state.forceAttrs(*args[0], pos);
     state.forceAttrs(*args[1], pos);
 
-    state.mkAttrs(v, std::min(args[0]->attrs->size(), args[1]->attrs->size()));
+    state.mkAttrs(v, std::min(args[0]->asAttrs()->size(), args[1]->asAttrs()->size()));
 
-    for (auto & i : *args[0]->attrs) {
-        Bindings::iterator j = args[1]->attrs->find(i.name);
-        if (j != args[1]->attrs->end())
-            v.attrs->push_back(*j);
+    for (auto & i : *args[0]->asAttrs()) {
+        Bindings::iterator j = args[1]->asAttrs()->find(i.name);
+        if (j != args[1]->asAttrs()->end())
+            v.asAttrs()->push_back(*j);
     }
 }
 
@@ -1134,21 +1156,23 @@ static void prim_catAttrs(EvalState & state, const Pos & pos, Value * * args, Va
 {
     Symbol attrName = state.symbols.create(state.forceStringNoCtx(*args[0], pos));
     state.forceList(*args[1], pos);
+    Value::asList list(args[1]);
 
-    Value * res[args[1]->listSize()];
+    Value * res[list.length()];
     unsigned int found = 0;
 
-    for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
-        Value & v2(*args[1]->listElems()[n]);
+    for (unsigned int n = 0; n < list.length(); ++n) {
+        Value & v2(*list[n]);
         state.forceAttrs(v2, pos);
-        Bindings::iterator i = v2.attrs->find(attrName);
-        if (i != v2.attrs->end())
+        Bindings::iterator i = v2.asAttrs()->find(attrName);
+        if (i != v2.asAttrs()->end())
             res[found++] = i->value;
     }
 
     state.mkList(v, found);
+    Value::asMutableList resList(v);
     for (unsigned int n = 0; n < found; ++n)
-        v.listElems()[n] = res[n];
+        resList[n] = res[n];
 }
 
 
@@ -1168,19 +1192,19 @@ static void prim_catAttrs(EvalState & state, const Pos & pos, Value * * args, Va
 static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0]);
-    if (args[0]->type != tLambda)
+    if (args[0]->type() != Value::tLambda)
         throw TypeError(format("‘functionArgs’ requires a function, at %1%") % pos);
 
-    if (!args[0]->lambda.fun->matchAttrs) {
+    if (!args[0]->asLambda()->matchAttrs) {
         state.mkAttrs(v, 0);
         return;
     }
 
-    state.mkAttrs(v, args[0]->lambda.fun->formals->formals.size());
-    for (auto & i : args[0]->lambda.fun->formals->formals)
+    state.mkAttrs(v, args[0]->asLambda()->formals->formals.size());
+    for (auto & i : args[0]->asLambda()->formals->formals)
         // !!! should optimise booleans (allocate only once)
-        mkBool(*state.allocAttr(v, i.name), i.def);
-    v.attrs->sort();
+        state.allocAttr(v, i.name)->setBool(i.def);
+    v.asAttrs()->sort();
 }
 
 
@@ -1193,17 +1217,18 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
 static void prim_isList(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0]);
-    mkBool(v, args[0]->isList());
+    v.setBool(args[0]->isList());
 }
 
 
 static void elemAt(EvalState & state, const Pos & pos, Value & list, int n, Value & v)
 {
     state.forceList(list, pos);
-    if (n < 0 || (unsigned int) n >= list.listSize())
+    Value::asList l(list);
+    if (n < 0 || (unsigned int) n >= l.length())
         throw Error(format("list index %1% is out of bounds, at %2%") % n % pos);
-    state.forceValue(*list.listElems()[n]);
-    v = *list.listElems()[n];
+    state.forceValue(*l[n]);
+    v = *l[n];
 }
 
 
@@ -1227,11 +1252,14 @@ static void prim_head(EvalState & state, const Pos & pos, Value * * args, Value 
 static void prim_tail(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceList(*args[0], pos);
-    if (args[0]->listSize() == 0)
+    Value::asList list(args[0]);
+    if (list.length() == 0)
         throw Error(format("‘tail’ called on an empty list, at %1%") % pos);
-    state.mkList(v, args[0]->listSize() - 1);
-    for (unsigned int n = 0; n < v.listSize(); ++n)
-        v.listElems()[n] = args[0]->listElems()[n + 1];
+
+    state.mkList(v, list.length() - 1);
+    Value::asMutableList resList(v);
+    for (unsigned int n = 0; n < resList.length(); ++n)
+        resList[n] = list[n + 1];
 }
 
 
@@ -1240,12 +1268,13 @@ static void prim_map(EvalState & state, const Pos & pos, Value * * args, Value &
 {
     state.forceFunction(*args[0], pos);
     state.forceList(*args[1], pos);
+    Value::asList list(args[1]);
 
-    state.mkList(v, args[1]->listSize());
+    state.mkList(v, list.length());
+    Value::asMutableList resList(v);
 
-    for (unsigned int n = 0; n < v.listSize(); ++n)
-        mkApp(*(v.listElems()[n] = state.allocValue()),
-            *args[0], *args[1]->listElems()[n]);
+    for (unsigned int n = 0; n < resList.length(); ++n)
+        (resList[n] = state.allocValue())->setApp(*args[0], *list[n]);
 }
 
 
@@ -1256,17 +1285,18 @@ static void prim_filter(EvalState & state, const Pos & pos, Value * * args, Valu
 {
     state.forceFunction(*args[0], pos);
     state.forceList(*args[1], pos);
+    Value::asList list(args[1]);
 
     // FIXME: putting this on the stack is risky.
-    Value * vs[args[1]->listSize()];
+    Value * vs[list.length()];
     unsigned int k = 0;
 
     bool same = true;
-    for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
+    for (unsigned int n = 0; n < list.length(); ++n) {
         Value res;
-        state.callFunction(*args[0], *args[1]->listElems()[n], res, noPos);
+        state.callFunction(*args[0], *list[n], res, noPos);
         if (state.forceBool(res))
-            vs[k++] = args[1]->listElems()[n];
+            vs[k++] = list[n];
         else
             same = false;
     }
@@ -1275,7 +1305,9 @@ static void prim_filter(EvalState & state, const Pos & pos, Value * * args, Valu
         v = *args[1];
     else {
         state.mkList(v, k);
-        for (unsigned int n = 0; n < k; ++n) v.listElems()[n] = vs[n];
+        Value::asMutableList resList(v);
+        for (unsigned int n = 0; n < k; ++n)
+            resList[n] = vs[n];
     }
 }
 
@@ -1285,12 +1317,13 @@ static void prim_elem(EvalState & state, const Pos & pos, Value * * args, Value 
 {
     bool res = false;
     state.forceList(*args[1], pos);
-    for (unsigned int n = 0; n < args[1]->listSize(); ++n)
-        if (state.eqValues(*args[0], *args[1]->listElems()[n])) {
+    Value::asList list(args[1]);
+    for (unsigned int n = 0; n < list.length(); ++n)
+        if (state.eqValues(*args[0], *list[n])) {
             res = true;
             break;
         }
-    mkBool(v, res);
+    v.setBool(res);
 }
 
 
@@ -1298,7 +1331,8 @@ static void prim_elem(EvalState & state, const Pos & pos, Value * * args, Value 
 static void prim_concatLists(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceList(*args[0], pos);
-    state.concatLists(v, args[0]->listSize(), args[0]->listElems(), pos);
+    Value::asList list(args[0]);
+    state.concatLists(v, list.length(), list.begin(), pos);
 }
 
 
@@ -1306,7 +1340,8 @@ static void prim_concatLists(EvalState & state, const Pos & pos, Value * * args,
 static void prim_length(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceList(*args[0], pos);
-    mkInt(v, args[0]->listSize());
+    Value::asList list(args[0]);
+    v.setInt(list.length());
 }
 
 
@@ -1316,15 +1351,16 @@ static void prim_foldlStrict(EvalState & state, const Pos & pos, Value * * args,
 {
     state.forceFunction(*args[0], pos);
     state.forceList(*args[2], pos);
+    Value::asList list(args[2]);
 
     Value * vCur = args[1];
 
-    if (args[2]->listSize())
-        for (unsigned int n = 0; n < args[2]->listSize(); ++n) {
+    if (list.length())
+        for (unsigned int n = 0; n < list.length(); ++n) {
             Value vTmp;
             state.callFunction(*args[0], *vCur, vTmp, pos);
-            vCur = n == args[2]->listSize() - 1 ? &v : state.allocValue();
-            state.callFunction(vTmp, *args[2]->listElems()[n], *vCur, pos);
+            vCur = n == list.length() - 1 ? &v : state.allocValue();
+            state.callFunction(vTmp, *list[n], *vCur, pos);
         }
     else
         v = *vCur;
@@ -1337,18 +1373,19 @@ static void anyOrAll(bool any, EvalState & state, const Pos & pos, Value * * arg
 {
     state.forceFunction(*args[0], pos);
     state.forceList(*args[1], pos);
+    Value::asList list(args[1]);
 
     Value vTmp;
-    for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
-        state.callFunction(*args[0], *args[1]->listElems()[n], vTmp, pos);
+    for (unsigned int n = 0; n < list.length(); ++n) {
+        state.callFunction(*args[0], *list[n], vTmp, pos);
         bool res = state.forceBool(vTmp);
         if (res == any) {
-            mkBool(v, any);
+            v.setBool(any);
             return;
         }
     }
 
-    mkBool(v, !any);
+    v.setBool(!any);
 }
 
 
@@ -1373,11 +1410,12 @@ static void prim_genList(EvalState & state, const Pos & pos, Value * * args, Val
         throw EvalError(format("cannot create list of size %1%, at %2%") % len % pos);
 
     state.mkList(v, len);
+    Value::asMutableList resList(v);
 
     for (unsigned int n = 0; n < len; ++n) {
         Value * arg = state.allocValue();
-        mkInt(*arg, n);
-        mkApp(*(v.listElems()[n] = state.allocValue()), *args[0], *arg);
+        arg->setInt(n);
+        (resList[n] = state.allocValue())->setApp(*args[0], *arg);
     }
 }
 
@@ -1389,19 +1427,22 @@ static void prim_sort(EvalState & state, const Pos & pos, Value * * args, Value 
 {
     state.forceFunction(*args[0], pos);
     state.forceList(*args[1], pos);
+    Value::asList list(args[1]);
 
-    auto len = args[1]->listSize();
+    auto len = list.length();
     state.mkList(v, len);
+    Value::asMutableList resList(v);
+
     for (unsigned int n = 0; n < len; ++n) {
-        state.forceValue(*args[1]->listElems()[n]);
-        v.listElems()[n] = args[1]->listElems()[n];
+        state.forceValue(*list[n]);
+        resList[n] = list[n];
     }
 
 
     auto comparator = [&](Value * a, Value * b) {
         /* Optimization: if the comparator is lessThan, bypass
            callFunction. */
-        if (args[0]->type == tPrimOp && args[0]->primOp->fun == prim_lessThan)
+        if (args[0]->type() == Value::tPrimOp && args[0]->asPrimOp()->fun == prim_lessThan)
             return CompareValues()(a, b);
 
         Value vTmp1, vTmp2;
@@ -1413,7 +1454,7 @@ static void prim_sort(EvalState & state, const Pos & pos, Value * * args, Value 
     /* FIXME: std::sort can segfault if the comparator is not a strict
        weak ordering. What to do? std::stable_sort() seems more
        resilient, but no guarantees... */
-    std::stable_sort(v.listElems(), v.listElems() + len, comparator);
+    std::stable_sort(resList.begin(), resList.end(), comparator);
 }
 
 
@@ -1424,19 +1465,19 @@ static void prim_sort(EvalState & state, const Pos & pos, Value * * args, Value 
 
 static void prim_add(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    mkInt(v, state.forceInt(*args[0], pos) + state.forceInt(*args[1], pos));
+    v.setInt(state.forceInt(*args[0], pos) + state.forceInt(*args[1], pos));
 }
 
 
 static void prim_sub(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    mkInt(v, state.forceInt(*args[0], pos) - state.forceInt(*args[1], pos));
+    v.setInt(state.forceInt(*args[0], pos) - state.forceInt(*args[1], pos));
 }
 
 
 static void prim_mul(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    mkInt(v, state.forceInt(*args[0], pos) * state.forceInt(*args[1], pos));
+    v.setInt(state.forceInt(*args[0], pos) * state.forceInt(*args[1], pos));
 }
 
 
@@ -1444,7 +1485,7 @@ static void prim_div(EvalState & state, const Pos & pos, Value * * args, Value &
 {
     NixInt i2 = state.forceInt(*args[1], pos);
     if (i2 == 0) throw EvalError(format("division by zero, at %1%") % pos);
-    mkInt(v, state.forceInt(*args[0], pos) / i2);
+    v.setInt(state.forceInt(*args[0], pos) / i2);
 }
 
 
@@ -1453,7 +1494,7 @@ static void prim_lessThan(EvalState & state, const Pos & pos, Value * * args, Va
     state.forceValue(*args[0]);
     state.forceValue(*args[1]);
     CompareValues comp;
-    mkBool(v, comp(args[0], args[1]));
+    v.setBool(comp(args[0], args[1]));
 }
 
 
@@ -1469,7 +1510,7 @@ static void prim_toString(EvalState & state, const Pos & pos, Value * * args, Va
 {
     PathSet context;
     string s = state.coerceToString(pos, *args[0], context, true, false);
-    mkString(v, s, context);
+    v.setString(s, context);
 }
 
 
@@ -1486,7 +1527,7 @@ static void prim_substring(EvalState & state, const Pos & pos, Value * * args, V
 
     if (start < 0) throw EvalError(format("negative start position in ‘substring’, at %1%") % pos);
 
-    mkString(v, (unsigned int) start >= s.size() ? "" : string(s, start, len), context);
+    v.setString((unsigned int) start >= s.size() ? "" : string(s, start, len), context);
 }
 
 
@@ -1494,7 +1535,7 @@ static void prim_stringLength(EvalState & state, const Pos & pos, Value * * args
 {
     PathSet context;
     string s = state.coerceToString(pos, *args[0], context);
-    mkInt(v, s.size());
+    v.setInt(s.size());
 }
 
 
@@ -1502,7 +1543,7 @@ static void prim_unsafeDiscardStringContext(EvalState & state, const Pos & pos, 
 {
     PathSet context;
     string s = state.coerceToString(pos, *args[0], context);
-    mkString(v, s, PathSet());
+    v.setString(s, PathSet());
 }
 
 
@@ -1521,7 +1562,7 @@ static void prim_unsafeDiscardOutputDependency(EvalState & state, const Pos & po
     for (auto & p : context)
         context2.insert(p.at(0) == '=' ? "~" + string(p, 1) : p);
 
-    mkString(v, s, context2);
+    v.setString(s, context2);
 }
 
 
@@ -1536,7 +1577,7 @@ static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, 
     PathSet context; // discarded
     string s = state.forceString(*args[1], context, pos);
 
-    mkString(v, printHash(hashString(ht, s)), context);
+    v.setString(printHash(hashString(ht, s)), context);
 }
 
 
@@ -1551,18 +1592,19 @@ static void prim_match(EvalState & state, const Pos & pos, Value * * args, Value
 
     Regex::Subs subs;
     if (!regex.matches(s, subs)) {
-        mkNull(v);
+        v.setNull();
         return;
     }
 
     unsigned int len = subs.empty() ? 0 : subs.rbegin()->first + 1;
     state.mkList(v, len);
+    Value::asMutableList resList(v);
     for (unsigned int n = 0; n < len; ++n) {
         auto i = subs.find(n);
         if (i == subs.end())
-            mkNull(*(v.listElems()[n] = state.allocValue()));
+            (resList[n] = state.allocValue())->setNull();
         else
-            mkString(*(v.listElems()[n] = state.allocValue()), i->second);
+            (resList[n] = state.allocValue())->setString(i->second);
     }
 }
 
@@ -1573,34 +1615,38 @@ static void prim_concatStringSep(EvalState & state, const Pos & pos, Value * * a
 
     auto sep = state.forceString(*args[0], context, pos);
     state.forceList(*args[1], pos);
+    Value::asList list(args[1]);
 
     string res;
-    res.reserve((args[1]->listSize() + 32) * sep.size());
+    res.reserve((list.length() + 32) * sep.size());
     bool first = true;
 
-    for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
+    for (unsigned int n = 0; n < list.length(); ++n) {
         if (first) first = false; else res += sep;
-        res += state.coerceToString(pos, *args[1]->listElems()[n], context);
+        res += state.coerceToString(pos, *list[n], context);
     }
 
-    mkString(v, res, context);
+    v.setString(res, context);
 }
 
 
 static void prim_replaceStrings(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceList(*args[0], pos);
+    Value::asList l0(args[0]);
     state.forceList(*args[1], pos);
-    if (args[0]->listSize() != args[1]->listSize())
+    Value::asList l1(args[1]);
+
+    if (l0.length() != l1.length())
         throw EvalError(format("‘from’ and ‘to’ arguments to ‘replaceStrings’ have different lengths, at %1%") % pos);
 
     Strings from;
-    for (unsigned int n = 0; n < args[0]->listSize(); ++n)
-        from.push_back(state.forceStringNoCtx(*args[0]->listElems()[n], pos));
+    for (unsigned int n = 0; n < l0.length(); ++n)
+        from.push_back(state.forceStringNoCtx(*l0[n], pos));
 
     Strings to;
-    for (unsigned int n = 0; n < args[1]->listSize(); ++n)
-        to.push_back(state.forceStringNoCtx(*args[1]->listElems()[n], pos));
+    for (unsigned int n = 0; n < l1.length(); ++n)
+        to.push_back(state.forceStringNoCtx(*l1[n], pos));
 
     PathSet context;
     auto s = state.forceString(*args[2], context, pos);
@@ -1618,7 +1664,7 @@ static void prim_replaceStrings(EvalState & state, const Pos & pos, Value * * ar
         if (!found) res += s[p++];
     }
 
-    mkString(v, res, context);
+    v.setString(res, context);
 }
 
 
@@ -1632,9 +1678,9 @@ static void prim_parseDrvName(EvalState & state, const Pos & pos, Value * * args
     string name = state.forceStringNoCtx(*args[0], pos);
     DrvName parsed(name);
     state.mkAttrs(v, 2);
-    mkString(*state.allocAttr(v, state.sName), parsed.name);
-    mkString(*state.allocAttr(v, state.symbols.create("version")), parsed.version);
-    v.attrs->sort();
+    state.allocAttr(v, state.sName)->setString(parsed.name);
+    state.allocAttr(v, state.symbols.create("version"))->setString(parsed.version);
+    v.asAttrs()->sort();
 }
 
 
@@ -1642,7 +1688,7 @@ static void prim_compareVersions(EvalState & state, const Pos & pos, Value * * a
 {
     string version1 = state.forceStringNoCtx(*args[0], pos);
     string version2 = state.forceStringNoCtx(*args[1], pos);
-    mkInt(v, compareVersions(version1, version2));
+    v.setInt(compareVersions(version1, version2));
 }
 
 
@@ -1660,11 +1706,11 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
 
     state.forceValue(*args[0]);
 
-    if (args[0]->type == tAttrs) {
+    if (args[0]->type() == Value::tAttrs) {
 
         state.forceAttrs(*args[0], pos);
 
-        for (auto & attr : *args[0]->attrs) {
+        for (auto & attr : *args[0]->asAttrs()) {
             string name(attr.name);
             if (name == "url")
                 url = state.forceStringNoCtx(*attr.value, *attr.pos);
@@ -1679,7 +1725,7 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
         url = state.forceStringNoCtx(*args[0], pos);
 
     Path res = downloadFileCached(url, unpack);
-    mkString(v, res, PathSet({res}));
+    v.setString(res, PathSet({res}));
 }
 
 
@@ -1711,39 +1757,39 @@ void EvalState::createBaseEnv()
     mkAttrs(v, 128);
     addConstant("builtins", v);
 
-    mkBool(v, true);
+    v.setBool(true);
     addConstant("true", v);
 
-    mkBool(v, false);
+    v.setBool(false);
     addConstant("false", v);
 
-    mkNull(v);
+    v.setNull();
     addConstant("null", v);
 
-    mkInt(v, time(0));
+    v.setInt(time(0));
     addConstant("__currentTime", v);
 
-    mkString(v, settings.thisSystem);
+    v.setString(settings.thisSystem);
     addConstant("__currentSystem", v);
 
-    mkString(v, nixVersion);
+    v.setString(nixVersion);
     addConstant("__nixVersion", v);
 
-    mkString(v, settings.nixStore);
+    v.setString(settings.nixStore);
     addConstant("__storeDir", v);
 
     /* Language version.  This should be increased every time a new
        language feature gets added.  It's not necessary to increase it
        when primops get added, because you can just use `builtins ?
        primOp' to check. */
-    mkInt(v, 3);
+    v.setInt(3);
     addConstant("__langVersion", v);
 
     // Miscellaneous
     addPrimOp("scopedImport", 2, prim_scopedImport);
     Value * v2 = allocValue();
     mkAttrs(*v2, 0);
-    mkApp(v, *baseEnv.values[baseEnvDispl - 1], *v2);
+    v.setApp(*baseEnv.values[baseEnvDispl - 1], *v2);
     forceValue(v);
     addConstant("import", v);
     if (settings.enableImportNative)
@@ -1853,19 +1899,21 @@ void EvalState::createBaseEnv()
 
     /* Add a value containing the current Nix expression search path. */
     mkList(v, searchPath.size());
+    Value::asMutableList vl(v);
     int n = 0;
     for (auto & i : searchPath) {
-        v2 = v.listElems()[n++] = allocValue();
+        v2 = vl[n++] = allocValue();
         mkAttrs(*v2, 2);
-        mkString(*allocAttr(*v2, symbols.create("path")), i.second);
-        mkString(*allocAttr(*v2, symbols.create("prefix")), i.first);
-        v2->attrs->sort();
+        allocAttr(*v2, symbols.create("path"))->setString(i.second);
+        allocAttr(*v2, symbols.create("prefix"))->setString(i.first);
+        v2->asAttrs()->sort();
     }
+    vl.synchronizeValueContent();
     addConstant("__nixPath", v);
 
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */
-    baseEnv.values[0]->attrs->sort();
+    baseEnv.values[0]->asAttrs()->sort();
 }
 
 

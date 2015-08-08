@@ -131,10 +131,10 @@ static void getAllExprs(EvalState & state,
             Value & vFun(*state.allocValue());
             Value & vArg(*state.allocValue());
             state.getBuiltin("import", vFun);
-            mkString(vArg, path2);
-            if (v.attrs->size() == v.attrs->capacity())
+            vArg.setString(path2);
+            if (v.asAttrs()->size() == v.asAttrs()->capacity())
                 throw Error(format("too many Nix expressions in directory ‘%1%’") % path);
-            mkApp(*state.allocAttr(v, state.symbols.create(attrName)), vFun, vArg);
+            state.allocAttr(v, state.symbols.create(attrName))->setApp(vFun, vArg);
         }
         else if (S_ISDIR(st.st_mode))
             /* `path2' is a directory (with no default.nix in it);
@@ -166,7 +166,7 @@ static void loadSourceExpr(EvalState & state, const Path & path, Value & v)
         state.mkList(*state.allocAttr(v, state.symbols.create("_combineChannels")), 0);
         StringSet attrs;
         getAllExprs(state, path, attrs, v);
-        v.attrs->sort();
+        v.asAttrs()->sort();
     }
 }
 
@@ -374,7 +374,7 @@ static void queryInstSources(EvalState & state,
                 Expr * eFun = state.parseExprFromString(i, absPath("."));
                 Value vFun, vTmp;
                 state.eval(eFun, vFun);
-                mkApp(vTmp, vFun, vArg);
+                vTmp.setApp(vFun, vArg);
                 getDerivations(state, vTmp, "", *instSource.autoArgs, elems, true);
             }
 
@@ -643,7 +643,7 @@ static void setMetaFlag(EvalState & state, DrvInfo & drv,
     const string & name, const string & value)
 {
     Value * v = state.allocValue();
-    mkString(*v, value.c_str());
+    v->setString(value.c_str());
     drv.setMeta(name, v);
 }
 
@@ -1115,25 +1115,26 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                             if (!v)
                                 printMsg(lvlError, format("derivation ‘%1%’ has invalid meta attribute ‘%2%’") % i.name % j);
                             else {
-                                if (v->type == tString) {
+                                if (v->type() == Value::tString) {
                                     attrs2["type"] = "string";
-                                    attrs2["value"] = v->string.s;
+                                    attrs2["value"] = v->asString();
                                     xml.writeEmptyElement("meta", attrs2);
-                                } else if (v->type == tInt) {
+                                } else if (v->type() == Value::tInt) {
                                     attrs2["type"] = "int";
-                                    attrs2["value"] = (format("%1%") % v->integer).str();
+                                    attrs2["value"] = (format("%1%") % v->asInt()).str();
                                     xml.writeEmptyElement("meta", attrs2);
-                                } else if (v->type == tBool) {
+                                } else if (v->type() == Value::tBool) {
                                     attrs2["type"] = "bool";
-                                    attrs2["value"] = v->boolean ? "true" : "false";
+                                    attrs2["value"] = v->asBool() ? "true" : "false";
                                     xml.writeEmptyElement("meta", attrs2);
                                 } else if (v->isList()) {
                                     attrs2["type"] = "strings";
                                     XMLOpenElement m(xml, "meta", attrs2);
-                                    for (unsigned int j = 0; j < v->listSize(); ++j) {
-                                        if (v->listElems()[j]->type != tString) continue;
+                                    Value::asList list(v);
+                                    for (unsigned int j = 0; j < list.length(); ++j) {
+                                        if (list[j]->type() != Value::tString) continue;
                                         XMLAttrs attrs3;
-                                        attrs3["value"] = v->listElems()[j]->string.s;
+                                        attrs3["value"] = list[j]->asString();
                                         xml.writeEmptyElement("string", attrs3);
                                     }
                                 }

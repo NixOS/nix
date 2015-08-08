@@ -58,94 +58,98 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
 
     if (strict) state.forceValue(v);
 
-    switch (v.type) {
+    switch (v.type()) {
 
-        case tInt:
-            doc.writeEmptyElement("int", singletonAttrs("value", (format("%1%") % v.integer).str()));
+        case Value::tInt:
+            doc.writeEmptyElement("int", singletonAttrs("value", (format("%1%") % v.asInt()).str()));
             break;
 
-        case tBool:
-            doc.writeEmptyElement("bool", singletonAttrs("value", v.boolean ? "true" : "false"));
+        case Value::tBool:
+            doc.writeEmptyElement("bool", singletonAttrs("value", v.asBool() ? "true" : "false"));
             break;
 
-        case tString:
+        case Value::tString:
             /* !!! show the context? */
             copyContext(v, context);
-            doc.writeEmptyElement("string", singletonAttrs("value", v.string.s));
+            doc.writeEmptyElement("string", singletonAttrs("value", v.asString()));
             break;
 
-        case tPath:
-            doc.writeEmptyElement("path", singletonAttrs("value", v.path));
+        case Value::tPath:
+            doc.writeEmptyElement("path", singletonAttrs("value", v.asPath()));
             break;
 
-        case tNull:
+        case Value::tNull:
             doc.writeEmptyElement("null");
             break;
 
-        case tAttrs:
+        case Value::tAttrs:
             if (state.isDerivation(v)) {
                 XMLAttrs xmlAttrs;
 
-                Bindings::iterator a = v.attrs->find(state.symbols.create("derivation"));
+                Bindings::iterator a = v.asAttrs()->find(state.symbols.create("derivation"));
 
                 Path drvPath;
-                a = v.attrs->find(state.sDrvPath);
-                if (a != v.attrs->end()) {
+                a = v.asAttrs()->find(state.sDrvPath);
+                if (a != v.asAttrs()->end()) {
                     if (strict) state.forceValue(*a->value);
-                    if (a->value->type == tString)
-                        xmlAttrs["drvPath"] = drvPath = a->value->string.s;
+                    if (a->value->type() == Value::tString)
+                        xmlAttrs["drvPath"] = drvPath = a->value->asString();
                 }
 
-                a = v.attrs->find(state.sOutPath);
-                if (a != v.attrs->end()) {
+                a = v.asAttrs()->find(state.sOutPath);
+                if (a != v.asAttrs()->end()) {
                     if (strict) state.forceValue(*a->value);
-                    if (a->value->type == tString)
-                        xmlAttrs["outPath"] = a->value->string.s;
+                    if (a->value->type() == Value::tString)
+                        xmlAttrs["outPath"] = a->value->asString();
                 }
 
                 XMLOpenElement _(doc, "derivation", xmlAttrs);
 
                 if (drvPath != "" && drvsSeen.find(drvPath) == drvsSeen.end()) {
                     drvsSeen.insert(drvPath);
-                    showAttrs(state, strict, location, *v.attrs, doc, context, drvsSeen);
+                    showAttrs(state, strict, location, *v.asAttrs(), doc, context, drvsSeen);
                 } else
                     doc.writeEmptyElement("repeated");
             }
 
             else {
                 XMLOpenElement _(doc, "attrs");
-                showAttrs(state, strict, location, *v.attrs, doc, context, drvsSeen);
+                showAttrs(state, strict, location, *v.asAttrs(), doc, context, drvsSeen);
             }
 
             break;
 
-        case tList1: case tList2: case tListN: {
+        case Value::tList0:
+        case Value::tList1:
+        case Value::tList2:
+        case Value::tListN: {
             XMLOpenElement _(doc, "list");
-            for (unsigned int n = 0; n < v.listSize(); ++n)
-                printValueAsXML(state, strict, location, *v.listElems()[n], doc, context, drvsSeen);
+            Value::asList list(v);
+            for (unsigned int n = 0; n < list.length(); ++n)
+                printValueAsXML(state, strict, location, *list[n], doc, context, drvsSeen);
             break;
         }
 
-        case tLambda: {
+        case Value::tLambda: {
             XMLAttrs xmlAttrs;
-            if (location) posToXML(xmlAttrs, v.lambda.fun->pos);
+            if (location) posToXML(xmlAttrs, v.asLambda()->pos);
             XMLOpenElement _(doc, "function", xmlAttrs);
 
-            if (v.lambda.fun->matchAttrs) {
+            if (v.asLambda()->matchAttrs) {
                 XMLAttrs attrs;
-                if (!v.lambda.fun->arg.empty()) attrs["name"] = v.lambda.fun->arg;
-                if (v.lambda.fun->formals->ellipsis) attrs["ellipsis"] = "1";
+                if (!v.asLambda()->arg.empty()) attrs["name"] = v.asLambda()->arg;
+                if (v.asLambda()->formals->ellipsis) attrs["ellipsis"] = "1";
                 XMLOpenElement _(doc, "attrspat", attrs);
-                for (auto & i : v.lambda.fun->formals->formals)
+                for (auto & i : v.asLambda()->formals->formals)
                     doc.writeEmptyElement("attr", singletonAttrs("name", i.name));
             } else
-                doc.writeEmptyElement("varpat", singletonAttrs("name", v.lambda.fun->arg));
+                doc.writeEmptyElement("varpat", singletonAttrs("name", v.asLambda()->arg));
 
             break;
         }
 
-        case tExternal:
-            v.external->printValueAsXML(state, strict, location, doc, context, drvsSeen);
+        case Value::tExternal:
+            v.asExternal()->printValueAsXML(state, strict, location, doc, context, drvsSeen);
             break;
 
         default:

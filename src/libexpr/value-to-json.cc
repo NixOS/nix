@@ -31,38 +31,38 @@ void printValueAsJSON(EvalState & state, bool strict,
 
     if (strict) state.forceValue(v);
 
-    switch (v.type) {
+    switch (v.type()) {
 
-        case tInt:
-            str << v.integer;
+        case Value::tInt:
+            str << v.asInt();
             break;
 
-        case tBool:
-            str << (v.boolean ? "true" : "false");
+        case Value::tBool:
+            str << (v.asBool() ? "true" : "false");
             break;
 
-        case tString:
+        case Value::tString:
             copyContext(v, context);
-            escapeJSON(str, v.string.s);
+            escapeJSON(str, v.asString());
             break;
 
-        case tPath:
-            escapeJSON(str, state.copyPathToStore(context, v.path));
+        case Value::tPath:
+            escapeJSON(str, state.copyPathToStore(context, v.asPath()));
             break;
 
-        case tNull:
+        case Value::tNull:
             str << "null";
             break;
 
-        case tAttrs: {
-            Bindings::iterator i = v.attrs->find(state.sOutPath);
-            if (i == v.attrs->end()) {
+        case Value::tAttrs: {
+            Bindings::iterator i = v.asAttrs()->find(state.sOutPath);
+            if (i == v.asAttrs()->end()) {
                 JSONObject json(str);
                 StringSet names;
-                for (auto & j : *v.attrs)
+                for (auto & j : *v.asAttrs())
                     names.insert(j.name);
                 for (auto & j : names) {
-                    Attr & a(*v.attrs->find(state.symbols.create(j)));
+                    Attr & a(*v.asAttrs()->find(state.symbols.create(j)));
                     json.attr(j);
                     printValueAsJSON(state, strict, *a.value, str, context);
                 }
@@ -71,17 +71,21 @@ void printValueAsJSON(EvalState & state, bool strict,
             break;
         }
 
-        case tList1: case tList2: case tListN: {
+        case Value::tList0:
+        case Value::tList1:
+        case Value::tList2:
+        case Value::tListN: {
             JSONList json(str);
-            for (unsigned int n = 0; n < v.listSize(); ++n) {
+            Value::asList list(v);
+            for (unsigned int n = 0; n < list.length(); ++n) {
                 json.elem();
-                printValueAsJSON(state, strict, *v.listElems()[n], str, context);
+                printValueAsJSON(state, strict, *list[n], str, context);
             }
             break;
         }
 
-        case tExternal:
-            v.external->printValueAsJSON(state, strict, str, context);
+        case Value::tExternal:
+            v.asExternal()->printValueAsJSON(state, strict, str, context);
             break;
 
         default:

@@ -93,7 +93,7 @@ struct ExprInt : Expr
 {
     NixInt n;
     Value v;
-    ExprInt(NixInt n) : n(n) { mkInt(v, n); };
+    ExprInt(NixInt n) : n(n) { v.setInt(n); };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };
@@ -102,7 +102,7 @@ struct ExprString : Expr
 {
     Symbol s;
     Value v;
-    ExprString(const Symbol & s) : s(s) { mkString(v, s); };
+    ExprString(const Symbol & s) : s(s) { v.setString(s); };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };
@@ -118,7 +118,7 @@ struct ExprPath : Expr
 {
     string s;
     Value v;
-    ExprPath(const string & s) : s(s) { mkPathNoCopy(v, this->s.c_str()); };
+    ExprPath(const string & s) : s(s) { v.setPathNoCopy(this->s.c_str()); };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };

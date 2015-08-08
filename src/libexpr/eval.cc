@@ -29,19 +29,6 @@
 namespace nix {
 
 
-static char * dupString(const char * s)
-{
-    char * t;
-#if HAVE_BOEHMGC
-    t = GC_strdup(s);
-#else
-    t = strdup(s);
-#endif
-    if (!t) throw std::bad_alloc();
-    return t;
-}
-
-
 static void * allocBytes(size_t n)
 {
     void * p;
@@ -65,16 +52,16 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
     }
     active.insert(&v);
 
-    switch (v.type) {
-    case tInt:
-        str << v.integer;
+    switch (v.type()) {
+    case Value::tInt:
+        str << v.asInt();
         break;
-    case tBool:
-        str << (v.boolean ? "true" : "false");
+    case Value::tBool:
+        str << (v.asBool() ? "true" : "false");
         break;
-    case tString:
+    case Value::tString:
         str << "\"";
-        for (const char * i = v.string.s; *i; i++)
+        for (const char * i = v.asString(); *i; i++)
             if (*i == '\"' || *i == '\\') str << "\\" << *i;
             else if (*i == '\n') str << "\\n";
             else if (*i == '\r') str << "\\r";
@@ -82,17 +69,17 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
             else str << *i;
         str << "\"";
         break;
-    case tPath:
-        str << v.path; // !!! escaping?
+    case Value::tPath:
+        str << v.asPath(); // !!! escaping?
         break;
-    case tNull:
+    case Value::tNull:
         str << "null";
         break;
-    case tAttrs: {
+    case Value::tAttrs: {
         str << "{ ";
         typedef std::map<string, Value *> Sorted;
         Sorted sorted;
-        for (auto & i : *v.attrs)
+        for (auto & i : *v.asAttrs())
             sorted[i.name] = i.value;
         for (auto & i : sorted) {
             str << i.first << " = ";
@@ -102,31 +89,34 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
         str << "}";
         break;
     }
-    case tList1:
-    case tList2:
-    case tListN:
+    case Value::tList0:
+    case Value::tList1:
+    case Value::tList2:
+    case Value::tListN: {
+        Value::asList list(v);
         str << "[ ";
-        for (unsigned int n = 0; n < v.listSize(); ++n) {
-            printValue(str, active, *v.listElems()[n]);
+        for (unsigned int n = 0; n < list.length(); ++n) {
+            printValue(str, active, *list[n]);
             str << " ";
         }
         str << "]";
         break;
-    case tThunk:
-    case tApp:
+    }
+    case Value::tThunk:
+    case Value::tApp:
         str << "<CODE>";
         break;
-    case tLambda:
+    case Value::tLambda:
         str << "<LAMBDA>";
         break;
-    case tPrimOp:
+    case Value::tPrimOp:
         str << "<PRIMOP>";
         break;
-    case tPrimOpApp:
+    case Value::tPrimOpApp:
         str << "<PRIMOP-APP>";
         break;
-    case tExternal:
-        str << *v.external;
+    case Value::tExternal:
+        str << *v.asExternal();
         break;
     default:
         throw Error("invalid value");
@@ -146,21 +136,24 @@ std::ostream & operator << (std::ostream & str, const Value & v)
 
 string showType(const Value & v)
 {
-    switch (v.type) {
-        case tInt: return "an integer";
-        case tBool: return "a boolean";
-        case tString: return "a string";
-        case tPath: return "a path";
-        case tNull: return "null";
-        case tAttrs: return "a set";
-        case tList1: case tList2: case tListN: return "a list";
-        case tThunk: return "a thunk";
-        case tApp: return "a function application";
-        case tLambda: return "a function";
-        case tBlackhole: return "a black hole";
-        case tPrimOp: return "a built-in function";
-        case tPrimOpApp: return "a partially applied built-in function";
-        case tExternal: return v.external->showType();
+    switch (v.type()) {
+        case Value::tInt: return "an integer";
+        case Value::tBool: return "a boolean";
+        case Value::tString: return "a string";
+        case Value::tPath: return "a path";
+        case Value::tNull: return "null";
+        case Value::tAttrs: return "a set";
+        case Value::tList0:
+        case Value::tList1:
+        case Value::tList2:
+        case Value::tListN: return "a list";
+        case Value::tThunk: return "a thunk";
+        case Value::tApp: return "a function application";
+        case Value::tLambda: return "a function";
+        case Value::tBlackhole: return "a black hole";
+        case Value::tPrimOp: return "a built-in function";
+        case Value::tPrimOpApp: return "a partially applied built-in function";
+        case Value::tExternal: return v.asExternal()->showType();
     }
     abort();
 }
@@ -178,14 +171,13 @@ static void * oomHandler(size_t requested)
 
 static Symbol getName(const AttrName & name, EvalState & state, Env & env)
 {
-    if (name.symbol.set()) {
+    if (name.symbol.set())
         return name.symbol;
-    } else {
-        Value nameValue;
-        name.expr->eval(state, env, nameValue);
-        state.forceStringNoCtx(nameValue);
-        return state.symbols.create(nameValue.string.s);
-    }
+
+    Value nameValue;
+    name.expr->eval(state, env, nameValue);
+    state.forceStringNoCtx(nameValue);
+    return state.symbols.create(nameValue.asString());
 }
 
 
@@ -198,6 +190,10 @@ void initGC()
 #if HAVE_BOEHMGC
     /* Initialise the Boehm garbage collector. */
     GC_set_all_interior_pointers(0);
+
+    /* Values are using interrior pointers to pack the value type. */
+    GC_register_displacement(1);
+    GC_register_displacement(2);
 
     GC_INIT();
 
@@ -276,9 +272,7 @@ EvalState::EvalState(const Strings & _searchPath)
     for (auto & i : paths) addToSearchPath(i);
     addToSearchPath("nix=" + settings.nixDataDir + "/nix/corepkgs");
 
-    clearValue(vEmptySet);
-    vEmptySet.type = tAttrs;
-    vEmptySet.attrs = allocBindings(0);
+    vEmptySet.setAttrs(allocBindings(0));
 
     createBaseEnv();
 }
@@ -324,7 +318,7 @@ void EvalState::addConstant(const string & name, Value & v)
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v2;
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v2));
+    baseEnv.values[0]->asAttrs()->push_back(Attr(symbols.create(name2), v2));
 }
 
 
@@ -334,17 +328,16 @@ void EvalState::addPrimOp(const string & name,
     Value * v = allocValue();
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
     Symbol sym = symbols.create(name2);
-    v->type = tPrimOp;
-    v->primOp = NEW PrimOp(primOp, arity, sym);
+    v->setPrimOp(NEW PrimOp(primOp, arity, sym));
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
-    baseEnv.values[0]->attrs->push_back(Attr(sym, v));
+    baseEnv.values[0]->asAttrs()->push_back(Attr(sym, v));
 }
 
 
 void EvalState::getBuiltin(const string & name, Value & v)
 {
-    v = *baseEnv.values[0]->attrs->find(symbols.create(name))->value;
+    v = *baseEnv.values[0]->asAttrs()->find(symbols.create(name))->value;
 }
 
 
@@ -419,32 +412,6 @@ LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, 
 }
 
 
-void mkString(Value & v, const char * s)
-{
-    mkStringNoCopy(v, dupString(s));
-}
-
-
-void mkString(Value & v, const string & s, const PathSet & context)
-{
-    mkString(v, s.c_str());
-    if (!context.empty()) {
-        unsigned int n = 0;
-        v.string.context = (const char * *)
-            allocBytes((context.size() + 1) * sizeof(char *));
-        for (auto & i : context)
-            v.string.context[n++] = dupString(i.c_str());
-        v.string.context[n] = 0;
-    }
-}
-
-
-void mkPath(Value & v, const char * s)
-{
-    mkPathNoCopy(v, dupString(s));
-}
-
-
 inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 {
     for (unsigned int l = var.level; l; --l, env = env->up) ;
@@ -459,8 +426,8 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             env->values[0] = v;
             env->haveWithAttrs = true;
         }
-        Bindings::iterator j = env->values[0]->attrs->find(var.name);
-        if (j != env->values[0]->attrs->end()) {
+        Bindings::iterator j = env->values[0]->asAttrs()->find(var.name);
+        if (j != env->values[0]->asAttrs()->end()) {
             if (countCalls && j->pos) attrSelects[*j->pos]++;
             return j->value;
         }
@@ -497,16 +464,14 @@ Env & EvalState::allocEnv(unsigned int size)
 
 void EvalState::mkList(Value & v, unsigned int size)
 {
-    clearValue(v);
+    if (size == 0)
+        v.setList();
     if (size == 1)
-        v.type = tList1;
+        v.setList(nullptr);
     else if (size == 2)
-        v.type = tList2;
-    else {
-        v.type = tListN;
-        v.bigList.size = size;
-        v.bigList.elems = size ? (Value * *) allocBytes(size * sizeof(Value *)) : 0;
-    }
+        v.setList(nullptr, nullptr);
+    else
+        v.setList((Value * *) allocBytes(size * sizeof(Value *)), size);
     nrListElems += size;
 }
 
@@ -515,9 +480,7 @@ unsigned long nrThunks = 0;
 
 static inline void mkThunk(Value & v, Env & env, Expr * expr)
 {
-    v.type = tThunk;
-    v.thunk.env = &env;
-    v.thunk.expr = expr;
+    v.setThunk(&env, expr);
     nrThunks++;
 }
 
@@ -532,12 +495,12 @@ void EvalState::mkPos(Value & v, Pos * pos)
 {
     if (pos) {
         mkAttrs(v, 3);
-        mkString(*allocAttr(v, sFile), pos->file);
-        mkInt(*allocAttr(v, sLine), pos->line);
-        mkInt(*allocAttr(v, sColumn), pos->column);
-        v.attrs->sort();
+        allocAttr(v, sFile)->setString(pos->file);
+        allocAttr(v, sLine)->setInt(pos->line);
+        allocAttr(v, sColumn)->setInt(pos->column);
+        v.asAttrs()->sort();
     } else
-        mkNull(v);
+        v.setNull();
 }
 
 
@@ -628,9 +591,9 @@ inline bool EvalState::evalBool(Env & env, Expr * e)
 {
     Value v;
     e->eval(*this, env, v);
-    if (v.type != tBool)
+    if (v.type() != Value::tBool)
         throwTypeError("value is %1% while a Boolean was expected", v);
-    return v.boolean;
+    return v.asBool();
 }
 
 
@@ -638,16 +601,16 @@ inline bool EvalState::evalBool(Env & env, Expr * e, const Pos & pos)
 {
     Value v;
     e->eval(*this, env, v);
-    if (v.type != tBool)
+    if (v.type() != Value::tBool)
         throwTypeError("value is %1% while a Boolean was expected, at %2%", v, pos);
-    return v.boolean;
+    return v.asBool();
 }
 
 
 inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v)
 {
     e->eval(*this, env, v);
-    if (v.type != tAttrs)
+    if (v.type() != Value::tAttrs)
         throwTypeError("value is %1% while a set was expected", v);
 }
 
@@ -703,7 +666,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             } else
                 vAttr = i.second.e->maybeThunk(state, i.second.inherited ? env : env2);
             env2.values[displ++] = vAttr;
-            v.attrs->push_back(Attr(i.first, vAttr, &i.second.pos));
+            v.asAttrs()->push_back(Attr(i.first, vAttr, &i.second.pos));
         }
 
         /* If the rec contains an attribute called `__overrides', then
@@ -715,12 +678,12 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
            been substituted into the bodies of the other attributes.
            Hence we need __overrides.) */
         if (hasOverrides) {
-            Value * vOverrides = (*v.attrs)[overrides->second.displ].value;
+            Value * vOverrides = (*v.asAttrs())[overrides->second.displ].value;
             state.forceAttrs(*vOverrides);
-            Bindings * newBnds = state.allocBindings(v.attrs->size() + vOverrides->attrs->size());
-            for (auto & i : *v.attrs)
+            Bindings * newBnds = state.allocBindings(v.asAttrs()->size() + vOverrides->asAttrs()->size());
+            for (auto & i : *v.asAttrs())
                 newBnds->push_back(i);
-            for (auto & i : *vOverrides->attrs) {
+            for (auto & i : *vOverrides->asAttrs()) {
                 AttrDefs::iterator j = attrs.find(i.name);
                 if (j != attrs.end()) {
                     (*newBnds)[j->second.displ] = i;
@@ -729,31 +692,31 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
                     newBnds->push_back(i);
             }
             newBnds->sort();
-            v.attrs = newBnds;
+            v.setAttrs(newBnds);
         }
     }
 
     else
         for (auto & i : attrs)
-            v.attrs->push_back(Attr(i.first, i.second.e->maybeThunk(state, env), &i.second.pos));
+            v.asAttrs()->push_back(Attr(i.first, i.second.e->maybeThunk(state, env), &i.second.pos));
 
     /* Dynamic attrs apply *after* rec and __overrides. */
     for (auto & i : dynamicAttrs) {
         Value nameVal;
         i.nameExpr->eval(state, *dynamicEnv, nameVal);
         state.forceValue(nameVal, i.pos);
-        if (nameVal.type == tNull)
+        if (nameVal.type() == Value::tNull)
             continue;
         state.forceStringNoCtx(nameVal);
-        Symbol nameSym = state.symbols.create(nameVal.string.s);
-        Bindings::iterator j = v.attrs->find(nameSym);
-        if (j != v.attrs->end())
+        Symbol nameSym = state.symbols.create(nameVal.asString());
+        Bindings::iterator j = v.asAttrs()->find(nameSym);
+        if (j != v.asAttrs()->end())
             throwEvalError("dynamic attribute ‘%1%’ at %2% already defined at %3%", nameSym, i.pos, *j->pos);
 
         i.valueExpr->setName(nameSym);
         /* Keep sorted order so find can catch duplicates */
-        v.attrs->push_back(Attr(nameSym, i.valueExpr->maybeThunk(state, *dynamicEnv), &i.pos));
-        v.attrs->sort(); // FIXME: inefficient
+        v.asAttrs()->push_back(Attr(nameSym, i.valueExpr->maybeThunk(state, *dynamicEnv), &i.pos));
+        v.asAttrs()->sort(); // FIXME: inefficient
     }
 }
 
@@ -779,8 +742,9 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 void ExprList::eval(EvalState & state, Env & env, Value & v)
 {
     state.mkList(v, elems.size());
+    Value::asMutableList list(v);
     for (unsigned int n = 0; n < elems.size(); ++n)
-        v.listElems()[n] = elems[n]->maybeThunk(state, env);
+        list[n] = elems[n]->maybeThunk(state, env);
 }
 
 
@@ -827,15 +791,15 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             Symbol name = getName(i, state, env);
             if (def) {
                 state.forceValue(*vAttrs, pos);
-                if (vAttrs->type != tAttrs ||
-                    (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
+                if (vAttrs->type() != Value::tAttrs ||
+                    (j = vAttrs->asAttrs()->find(name)) == vAttrs->asAttrs()->end())
                 {
                     def->eval(state, env, v);
                     return;
                 }
             } else {
                 state.forceAttrs(*vAttrs, pos);
-                if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
+                if ((j = vAttrs->asAttrs()->find(name)) == vAttrs->asAttrs()->end())
                     throwEvalError("attribute ‘%1%’ missing, at %2%", name, pos);
             }
             vAttrs = j->value;
@@ -867,25 +831,23 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
         state.forceValue(*vAttrs);
         Bindings::iterator j;
         Symbol name = getName(i, state, env);
-        if (vAttrs->type != tAttrs ||
-            (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
+        if (vAttrs->type() != Value::tAttrs ||
+            (j = vAttrs->asAttrs()->find(name)) == vAttrs->asAttrs()->end())
         {
-            mkBool(v, false);
+            v.setBool(false);
             return;
         } else {
             vAttrs = j->value;
         }
     }
 
-    mkBool(v, true);
+    v.setBool(true);
 }
 
 
 void ExprLambda::eval(EvalState & state, Env & env, Value & v)
 {
-    v.type = tLambda;
-    v.lambda.env = &env;
-    v.lambda.fun = this;
+    v.setLambda(&env, this);
 }
 
 
@@ -903,12 +865,12 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
     /* Figure out the number of arguments still needed. */
     unsigned int argsDone = 0;
     Value * primOp = &fun;
-    while (primOp->type == tPrimOpApp) {
+    while (primOp->type() == Value::tPrimOpApp) {
         argsDone++;
-        primOp = primOp->primOpApp.left;
+        primOp = primOp->asAppLeft();
     }
-    assert(primOp->type == tPrimOp);
-    unsigned int arity = primOp->primOp->arity;
+    assert(primOp->type() == Value::tPrimOp);
+    unsigned int arity = primOp->asPrimOp()->arity;
     unsigned int argsLeft = arity - argsDone;
 
     if (argsLeft == 1) {
@@ -918,33 +880,31 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
         Value * vArgs[arity];
         unsigned int n = arity - 1;
         vArgs[n--] = &arg;
-        for (Value * arg = &fun; arg->type == tPrimOpApp; arg = arg->primOpApp.left)
-            vArgs[n--] = arg->primOpApp.right;
+        for (Value * arg = &fun; arg->type() == Value::tPrimOpApp; arg = arg->asAppLeft())
+            vArgs[n--] = arg->asAppRight();
 
         /* And call the primop. */
         nrPrimOpCalls++;
-        if (countCalls) primOpCalls[primOp->primOp->name]++;
-        primOp->primOp->fun(*this, pos, vArgs, v);
+        if (countCalls) primOpCalls[primOp->asPrimOp()->name]++;
+        primOp->asPrimOp()->fun(*this, pos, vArgs, v);
     } else {
         Value * fun2 = allocValue();
         *fun2 = fun;
-        v.type = tPrimOpApp;
-        v.primOpApp.left = fun2;
-        v.primOpApp.right = &arg;
+        v.setPrimOpApp(fun2, &arg);
     }
 }
 
 
 void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & pos)
 {
-    if (fun.type == tPrimOp || fun.type == tPrimOpApp) {
+    if (fun.type() == Value::tPrimOp || fun.type() == Value::tPrimOpApp) {
         callPrimOp(fun, arg, v, pos);
         return;
     }
 
-    if (fun.type == tAttrs) {
-      auto found = fun.attrs->find(sFunctor);
-      if (found != fun.attrs->end()) {
+    if (fun.type() == Value::tAttrs) {
+      auto found = fun.asAttrs()->find(sFunctor);
+      if (found != fun.asAttrs()->end()) {
         forceValue(*found->value, pos);
         Value * v2 = allocValue();
         callFunction(*found->value, fun, *v2, pos);
@@ -953,16 +913,16 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
       }
     }
 
-    if (fun.type != tLambda)
+    if (fun.type() != Value::tLambda)
         throwTypeError("attempt to call something which is not a function but %1%, at %2%", fun, pos);
 
-    ExprLambda & lambda(*fun.lambda.fun);
+    ExprLambda & lambda(*fun.asLambda());
 
     unsigned int size =
         (lambda.arg.empty() ? 0 : 1) +
         (lambda.matchAttrs ? lambda.formals->formals.size() : 0);
     Env & env2(allocEnv(size));
-    env2.up = fun.lambda.env;
+    env2.up = fun.asExprEnv();
 
     unsigned int displ = 0;
 
@@ -980,8 +940,8 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
            argument has a default, use the default. */
         unsigned int attrsUsed = 0;
         for (auto & i : lambda.formals->formals) {
-            Bindings::iterator j = arg.attrs->find(i.name);
-            if (j == arg.attrs->end()) {
+            Bindings::iterator j = arg.asAttrs()->find(i.name);
+            if (j == arg.asAttrs()->end()) {
                 if (!i.def) throwTypeError("%1% called without required argument ‘%2%’, at %3%",
                     lambda, i.name, pos);
                 env2.values[displ++] = i.def->maybeThunk(*this, env2);
@@ -993,10 +953,10 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
 
         /* Check that each actual argument is listed as a formal
            argument (unless the attribute match specifies a `...'). */
-        if (!lambda.formals->ellipsis && attrsUsed != arg.attrs->size()) {
+        if (!lambda.formals->ellipsis && attrsUsed != arg.asAttrs()->size()) {
             /* Nope, so show the first unexpected argument to the
                user. */
-            for (auto & i : *arg.attrs)
+            for (auto & i : *arg.asAttrs())
                 if (lambda.formals->argNames.find(i.name) == lambda.formals->argNames.end())
                     throwTypeError("%1% called with unexpected argument ‘%2%’, at %3%", lambda, i.name, pos);
             abort(); // can't happen
@@ -1016,7 +976,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
             throw;
         }
     else
-        fun.lambda.fun->body->eval(*this, env2, v);
+        fun.asLambda()->body->eval(*this, env2, v);
 }
 
 
@@ -1032,23 +992,23 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
 {
     forceValue(fun);
 
-    if (fun.type != tLambda || !fun.lambda.fun->matchAttrs) {
+    if (fun.type() != Value::tLambda || !fun.asLambda()->matchAttrs) {
         res = fun;
         return;
     }
 
     Value * actualArgs = allocValue();
-    mkAttrs(*actualArgs, fun.lambda.fun->formals->formals.size());
+    mkAttrs(*actualArgs, fun.asLambda()->formals->formals.size());
 
-    for (auto & i : fun.lambda.fun->formals->formals) {
+    for (auto & i : fun.asLambda()->formals->formals) {
         Bindings::iterator j = args.find(i.name);
         if (j != args.end())
-            actualArgs->attrs->push_back(*j);
+            actualArgs->asAttrs()->push_back(*j);
         else if (!i.def)
             throwTypeError("cannot auto-call a function that has an argument without a default value (‘%1%’)", i.name);
     }
 
-    actualArgs->attrs->sort();
+    actualArgs->asAttrs()->sort();
 
     callFunction(fun, *actualArgs, res, noPos);
 }
@@ -1082,7 +1042,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpNot::eval(EvalState & state, Env & env, Value & v)
 {
-    mkBool(v, !state.evalBool(env, e));
+    v.setBool(!state.evalBool(env, e));
 }
 
 
@@ -1090,7 +1050,7 @@ void ExprOpEq::eval(EvalState & state, Env & env, Value & v)
 {
     Value v1; e1->eval(state, env, v1);
     Value v2; e2->eval(state, env, v2);
-    mkBool(v, state.eqValues(v1, v2));
+    v.setBool(state.eqValues(v1, v2));
 }
 
 
@@ -1098,25 +1058,25 @@ void ExprOpNEq::eval(EvalState & state, Env & env, Value & v)
 {
     Value v1; e1->eval(state, env, v1);
     Value v2; e2->eval(state, env, v2);
-    mkBool(v, !state.eqValues(v1, v2));
+    v.setBool(!state.eqValues(v1, v2));
 }
 
 
 void ExprOpAnd::eval(EvalState & state, Env & env, Value & v)
 {
-    mkBool(v, state.evalBool(env, e1, pos) && state.evalBool(env, e2, pos));
+    v.setBool(state.evalBool(env, e1, pos) && state.evalBool(env, e2, pos));
 }
 
 
 void ExprOpOr::eval(EvalState & state, Env & env, Value & v)
 {
-    mkBool(v, state.evalBool(env, e1, pos) || state.evalBool(env, e2, pos));
+    v.setBool(state.evalBool(env, e1, pos) || state.evalBool(env, e2, pos));
 }
 
 
 void ExprOpImpl::eval(EvalState & state, Env & env, Value & v)
 {
-    mkBool(v, !state.evalBool(env, e1, pos) || state.evalBool(env, e2, pos));
+    v.setBool(!state.evalBool(env, e1, pos) || state.evalBool(env, e2, pos));
 }
 
 
@@ -1128,31 +1088,31 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
 
     state.nrOpUpdates++;
 
-    if (v1.attrs->size() == 0) { v = v2; return; }
-    if (v2.attrs->size() == 0) { v = v1; return; }
+    if (v1.asAttrs()->size() == 0) { v = v2; return; }
+    if (v2.asAttrs()->size() == 0) { v = v1; return; }
 
-    state.mkAttrs(v, v1.attrs->size() + v2.attrs->size());
+    state.mkAttrs(v, v1.asAttrs()->size() + v2.asAttrs()->size());
 
     /* Merge the sets, preferring values from the second set.  Make
        sure to keep the resulting vector in sorted order. */
-    Bindings::iterator i = v1.attrs->begin();
-    Bindings::iterator j = v2.attrs->begin();
+    Bindings::iterator i = v1.asAttrs()->begin();
+    Bindings::iterator j = v2.asAttrs()->begin();
 
-    while (i != v1.attrs->end() && j != v2.attrs->end()) {
+    while (i != v1.asAttrs()->end() && j != v2.asAttrs()->end()) {
         if (i->name == j->name) {
-            v.attrs->push_back(*j);
+            v.asAttrs()->push_back(*j);
             ++i; ++j;
         }
         else if (i->name < j->name)
-            v.attrs->push_back(*i++);
+            v.asAttrs()->push_back(*i++);
         else
-            v.attrs->push_back(*j++);
+            v.asAttrs()->push_back(*j++);
     }
 
-    while (i != v1.attrs->end()) v.attrs->push_back(*i++);
-    while (j != v2.attrs->end()) v.attrs->push_back(*j++);
+    while (i != v1.asAttrs()->end()) v.asAttrs()->push_back(*i++);
+    while (j != v2.asAttrs()->end()) v.asAttrs()->push_back(*j++);
 
-    state.nrOpUpdateValuesCopied += v.attrs->size();
+    state.nrOpUpdateValuesCopied += v.asAttrs()->size();
 }
 
 
@@ -1173,21 +1133,27 @@ void EvalState::concatLists(Value & v, unsigned int nrLists, Value * * lists, co
     unsigned int len = 0;
     for (unsigned int n = 0; n < nrLists; ++n) {
         forceList(*lists[n], pos);
-        unsigned int l = lists[n]->listSize();
+        Value::asList ln(lists[n]);
+        unsigned int l = ln.length();
         len += l;
         if (l) nonEmpty = lists[n];
     }
 
-    if (nonEmpty && len == nonEmpty->listSize()) {
-        v = *nonEmpty;
-        return;
+    if (nonEmpty) {
+        Value::asList nonEmptyList(nonEmpty);
+        if (len == nonEmptyList.length()) {
+            v = *nonEmpty;
+            return;
+        }
     }
 
     mkList(v, len);
-    auto out = v.listElems();
+    Value::asMutableList outList(v);
+    auto out = outList.begin();
     for (unsigned int n = 0, pos = 0; n < nrLists; ++n) {
-        unsigned int l = lists[n]->listSize();
-        memcpy(out + pos, lists[n]->listElems(), l * sizeof(Value *));
+        Value::asList ln(lists[n]);
+        unsigned int l = ln.length();
+        memcpy(out + pos, ln.begin(), l * sizeof(Value *));
         pos += l;
     }
 }
@@ -1200,7 +1166,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     NixInt n = 0;
 
     bool first = !forceString;
-    ValueType firstType = tString;
+    Value::Type firstType = Value::tString;
 
     for (auto & i : *es) {
         Value vTmp;
@@ -1211,27 +1177,27 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
            since paths are copied when they are used in a derivation),
            and none of the strings are allowed to have contexts. */
         if (first) {
-            firstType = vTmp.type;
+            firstType = vTmp.type();
             first = false;
         }
 
-        if (firstType == tInt) {
-            if (vTmp.type != tInt)
+        if (firstType == Value::tInt) {
+            if (vTmp.type() != Value::tInt)
                 throwEvalError("cannot add %1% to an integer, at %2%", showType(vTmp), pos);
-            n += vTmp.integer;
+            n += vTmp.asInt();
         } else
-            s << state.coerceToString(pos, vTmp, context, false, firstType == tString);
+            s << state.coerceToString(pos, vTmp, context, false, firstType == Value::tString);
     }
 
-    if (firstType == tInt)
-        mkInt(v, n);
-    else if (firstType == tPath) {
+    if (firstType == Value::tInt)
+        v.setInt(n);
+    else if (firstType == Value::tPath) {
         if (!context.empty())
             throwEvalError("a string that refers to a store path cannot be appended to a path, at %1%", pos);
         auto path = canonPath(s.str());
-        mkPath(v, path.c_str());
+        v.setPath(path.c_str());
     } else
-        mkString(v, s.str(), context);
+        v.setString(s.str(), context);
 }
 
 
@@ -1253,8 +1219,8 @@ void EvalState::forceValueDeep(Value & v)
 
         forceValue(v);
 
-        if (v.type == tAttrs) {
-            for (auto & i : *v.attrs)
+        if (v.type() == Value::tAttrs) {
+            for (auto & i : *v.asAttrs())
                 try {
                     recurse(*i.value);
                 } catch (Error & e) {
@@ -1264,8 +1230,9 @@ void EvalState::forceValueDeep(Value & v)
         }
 
         else if (v.isList()) {
-            for (unsigned int n = 0; n < v.listSize(); ++n)
-                recurse(*v.listElems()[n]);
+            Value::asList list(v);
+            for (unsigned int n = 0; n < list.length(); ++n)
+                recurse(*list[n]);
         }
     };
 
@@ -1276,25 +1243,25 @@ void EvalState::forceValueDeep(Value & v)
 NixInt EvalState::forceInt(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
-    if (v.type != tInt)
+    if (v.type() != Value::tInt)
         throwTypeError("value is %1% while an integer was expected, at %2%", v, pos);
-    return v.integer;
+    return v.asInt();
 }
 
 
 bool EvalState::forceBool(Value & v)
 {
     forceValue(v);
-    if (v.type != tBool)
+    if (v.type() != Value::tBool)
         throwTypeError("value is %1% while a Boolean was expected", v);
-    return v.boolean;
+    return v.asBool();
 }
 
 
 void EvalState::forceFunction(Value & v, const Pos & pos)
 {
     forceValue(v);
-    if (v.type != tLambda && v.type != tPrimOp && v.type != tPrimOpApp)
+    if (v.type() != Value::tLambda && v.type() != Value::tPrimOp && v.type() != Value::tPrimOpApp)
         throwTypeError("value is %1% while a function was expected, at %2%", v, pos);
 }
 
@@ -1302,20 +1269,20 @@ void EvalState::forceFunction(Value & v, const Pos & pos)
 string EvalState::forceString(Value & v, const Pos & pos)
 {
     forceValue(v, pos);
-    if (v.type != tString) {
+    if (v.type() != Value::tString) {
         if (pos)
             throwTypeError("value is %1% while a string was expected, at %2%", v, pos);
         else
             throwTypeError("value is %1% while a string was expected", v);
     }
-    return string(v.string.s);
+    return string(v.asString());
 }
 
 
 void copyContext(const Value & v, PathSet & context)
 {
-    if (v.string.context)
-        for (const char * * p = v.string.context; *p; ++p)
+    if (v.asStringContext())
+        for (const char * * p = v.asStringContext(); *p; ++p)
             context.insert(*p);
 }
 
@@ -1331,13 +1298,13 @@ string EvalState::forceString(Value & v, PathSet & context, const Pos & pos)
 string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
 {
     string s = forceString(v, pos);
-    if (v.string.context) {
+    if (v.asStringContext()) {
         if (pos)
             throwEvalError("the string ‘%1%’ is not allowed to refer to a store path (such as ‘%2%’), at %3%",
-                v.string.s, v.string.context[0], pos);
+                v.asString(), v.asStringContext()[0], pos);
         else
             throwEvalError("the string ‘%1%’ is not allowed to refer to a store path (such as ‘%2%’)",
-                v.string.s, v.string.context[0]);
+                v.asString(), v.asStringContext()[0]);
     }
     return s;
 }
@@ -1345,12 +1312,12 @@ string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
 
 bool EvalState::isDerivation(Value & v)
 {
-    if (v.type != tAttrs) return false;
-    Bindings::iterator i = v.attrs->find(sType);
-    if (i == v.attrs->end()) return false;
+    if (v.type() != Value::tAttrs) return false;
+    Bindings::iterator i = v.asAttrs()->find(sType);
+    if (i == v.asAttrs()->end()) return false;
     forceValue(*i->value);
-    if (i->value->type != tString) return false;
-    return strcmp(i->value->string.s, "derivation") == 0;
+    if (i->value->type() != Value::tString) return false;
+    return strcmp(i->value->asString(), "derivation") == 0;
 }
 
 
@@ -1361,42 +1328,43 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
 
     string s;
 
-    if (v.type == tString) {
+    if (v.type() == Value::tString) {
         copyContext(v, context);
-        return v.string.s;
+        return v.asString();
     }
 
-    if (v.type == tPath) {
-        Path path(canonPath(v.path));
+    if (v.type() == Value::tPath) {
+        Path path(canonPath(v.asPath()));
         return copyToStore ? copyPathToStore(context, path) : path;
     }
 
-    if (v.type == tAttrs) {
-        Bindings::iterator i = v.attrs->find(sOutPath);
-        if (i == v.attrs->end()) throwTypeError("cannot coerce a set to a string, at %1%", pos);
+    if (v.type() == Value::tAttrs) {
+        Bindings::iterator i = v.asAttrs()->find(sOutPath);
+        if (i == v.asAttrs()->end()) throwTypeError("cannot coerce a set to a string, at %1%", pos);
         return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
     }
 
-    if (v.type == tExternal)
-        return v.external->coerceToString(pos, context, coerceMore, copyToStore);
+    if (v.type() == Value::tExternal)
+        return v.asExternal()->coerceToString(pos, context, coerceMore, copyToStore);
 
     if (coerceMore) {
 
         /* Note that `false' is represented as an empty string for
            shell scripting convenience, just like `null'. */
-        if (v.type == tBool && v.boolean) return "1";
-        if (v.type == tBool && !v.boolean) return "";
-        if (v.type == tInt) return int2String(v.integer);
-        if (v.type == tNull) return "";
+        if (v.type() == Value::tBool && v.asBool()) return "1";
+        if (v.type() == Value::tBool && !v.asBool()) return "";
+        if (v.type() == Value::tInt) return int2String(v.asInt());
+        if (v.type() == Value::tNull) return "";
 
         if (v.isList()) {
             string result;
-            for (unsigned int n = 0; n < v.listSize(); ++n) {
-                result += coerceToString(pos, *v.listElems()[n],
+            Value::asList vList(v);
+            for (unsigned int n = 0; n < vList.length(); ++n) {
+                result += coerceToString(pos, *vList[n],
                     context, coerceMore, copyToStore);
-                if (n < v.listSize() - 1
+                if (n < vList.length() - 1
                     /* !!! not quite correct */
-                    && (!v.listElems()[n]->isList() || v.listElems()[n]->listSize() != 0))
+                    && (!vList[n]->isList() || vList[n]->type() != Value::tList0))
                     result += " ";
             }
             return result;
@@ -1448,48 +1416,54 @@ bool EvalState::eqValues(Value & v1, Value & v2)
        uniqList on a list of sets.)  Will remove this eventually. */
     if (&v1 == &v2) return true;
 
-    if (v1.type != v2.type) return false;
+    if (v1.type() != v2.type()) return false;
 
-    switch (v1.type) {
+    switch (v1.type()) {
 
-        case tInt:
-            return v1.integer == v2.integer;
+        case Value::tInt:
+            return v1.asInt() == v2.asInt();
 
-        case tBool:
-            return v1.boolean == v2.boolean;
+        case Value::tBool:
+            return v1.asBool() == v2.asBool();
 
-        case tString:
-            return strcmp(v1.string.s, v2.string.s) == 0;
+        case Value::tString:
+            return strcmp(v1.asString(), v2.asString()) == 0;
 
-        case tPath:
-            return strcmp(v1.path, v2.path) == 0;
+        case Value::tPath:
+            return strcmp(v1.asPath(), v2.asPath()) == 0;
 
-        case tNull:
+        case Value::tNull:
             return true;
 
-        case tList1:
-        case tList2:
-        case tListN:
-            if (v1.listSize() != v2.listSize()) return false;
-            for (unsigned int n = 0; n < v1.listSize(); ++n)
-                if (!eqValues(*v1.listElems()[n], *v2.listElems()[n])) return false;
+        case Value::tList0:
+        case Value::tList1:
+        case Value::tList2:
+        case Value::tListN: {
+            Value::asList l1(v1);
+            Value::asList l2(v2);
+            if (l1.length() != l2.length())
+                return false;
+            for (unsigned int n = 0; n < l1.length(); ++n)
+                if (!eqValues(*l1[n], *l2[n]))
+                    return false;
             return true;
+        }
 
-        case tAttrs: {
+        case Value::tAttrs: {
             /* If both sets denote a derivation (type = "derivation"),
                then compare their outPaths. */
             if (isDerivation(v1) && isDerivation(v2)) {
-                Bindings::iterator i = v1.attrs->find(sOutPath);
-                Bindings::iterator j = v2.attrs->find(sOutPath);
-                if (i != v1.attrs->end() && j != v2.attrs->end())
+                Bindings::iterator i = v1.asAttrs()->find(sOutPath);
+                Bindings::iterator j = v2.asAttrs()->find(sOutPath);
+                if (i != v1.asAttrs()->end() && j != v2.asAttrs()->end())
                     return eqValues(*i->value, *j->value);
             }
 
-            if (v1.attrs->size() != v2.attrs->size()) return false;
+            if (v1.asAttrs()->size() != v2.asAttrs()->size()) return false;
 
             /* Otherwise, compare the attributes one by one. */
             Bindings::iterator i, j;
-            for (i = v1.attrs->begin(), j = v2.attrs->begin(); i != v1.attrs->end(); ++i, ++j)
+            for (i = v1.asAttrs()->begin(), j = v2.asAttrs()->begin(); i != v1.asAttrs()->end(); ++i, ++j)
                 if (i->name != j->name || !eqValues(*i->value, *j->value))
                     return false;
 
@@ -1497,13 +1471,13 @@ bool EvalState::eqValues(Value & v1, Value & v2)
         }
 
         /* Functions are incomparable. */
-        case tLambda:
-        case tPrimOp:
-        case tPrimOpApp:
+        case Value::tLambda:
+        case Value::tPrimOp:
+        case Value::tPrimOpApp:
             return false;
 
-        case tExternal:
-            return *v1.external == *v2.external;
+        case Value::tExternal:
+            return *v1.asExternal() == *v2.asExternal();
 
         default:
             throwEvalError("cannot compare %1% with %2%", showType(v1), showType(v2));
@@ -1602,52 +1576,52 @@ size_t valueSize(Value & v)
 
         size_t sz = sizeof(Value);
 
-        switch (v.type) {
-        case tString:
-            sz += doString(v.string.s);
-            if (v.string.context)
-                for (const char * * p = v.string.context; *p; ++p)
+        switch (v.type()) {
+        case Value::tString:
+            sz += doString(v.asString());
+            if (v.asStringContext())
+                for (const char * * p = v.asStringContext(); *p; ++p)
                     sz += doString(*p);
             break;
-        case tPath:
-            sz += doString(v.path);
+        case Value::tPath:
+            sz += doString(v.asPath());
             break;
-        case tAttrs:
-            if (seen.find(v.attrs) == seen.end()) {
-                seen.insert(v.attrs);
-                sz += sizeof(Bindings) + sizeof(Attr) * v.attrs->capacity();
-                for (auto & i : *v.attrs)
+        case Value::tAttrs:
+            if (seen.find(v.asAttrs()) == seen.end()) {
+                seen.insert(v.asAttrs());
+                sz += sizeof(Bindings) + sizeof(Attr) * v.asAttrs()->capacity();
+                for (auto & i : *v.asAttrs())
                     sz += doValue(*i.value);
             }
             break;
-        case tList1:
-        case tList2:
-        case tListN:
-            if (seen.find(v.listElems()) == seen.end()) {
-                seen.insert(v.listElems());
-                sz += v.listSize() * sizeof(Value *);
-                for (unsigned int n = 0; n < v.listSize(); ++n)
-                    sz += doValue(*v.listElems()[n]);
+        case Value::tList0:
+        case Value::tList1:
+        case Value::tList2:
+        case Value::tListN: {
+            Value::asList list(v);
+            if (seen.find(list.begin()) == seen.end()) {
+                seen.insert(list.begin());
+                sz += list.length() * sizeof(Value *);
+                for (unsigned int n = 0; n < list.length(); ++n)
+                    sz += doValue(*list[n]);
             }
             break;
-        case tThunk:
-            sz += doEnv(*v.thunk.env);
+        }
+        case Value::tThunk:
+            sz += doEnv(*v.asExprEnv());
             break;
-        case tApp:
-            sz += doValue(*v.app.left);
-            sz += doValue(*v.app.right);
+        case Value::tApp:
+        case Value::tPrimOpApp:
+            sz += doValue(*v.asAppLeft());
+            sz += doValue(*v.asAppRight());
             break;
-        case tLambda:
-            sz += doEnv(*v.lambda.env);
+        case Value::tLambda:
+            sz += doEnv(*v.asExprEnv());
             break;
-        case tPrimOpApp:
-            sz += doValue(*v.primOpApp.left);
-            sz += doValue(*v.primOpApp.right);
-            break;
-        case tExternal:
-            if (seen.find(v.external) != seen.end()) break;
-            seen.insert(v.external);
-            sz += v.external->valueSize(seen);
+        case Value::tExternal:
+            if (seen.find(v.asExternal()) != seen.end()) break;
+            seen.insert(v.asExternal());
+            sz += v.asExternal()->valueSize(seen);
             break;
         default:
             ;
