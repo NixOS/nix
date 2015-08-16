@@ -286,7 +286,7 @@ foreach my $expr (@exprs) {
             $rcfile,
             "rm -rf '$tmpDir'; " .
             'unset BASH_ENV; ' .
-            '[ -n "$PS1" ] && [ -e ~/.bashrc ] && source ~/.bashrc; ' .
+            ($pure ? '' : '[ -n "$PS1" ] && [ -e ~/.bashrc ] && source ~/.bashrc; ' ) .
             ($pure ? '' : 'p=$PATH; ' ) .
             'dontAddDisableDepTrack=1; ' .
             '[ -e $stdenv/setup ] && source $stdenv/setup; ' .
