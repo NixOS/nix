@@ -272,8 +272,6 @@ foreach my $expr (@exprs) {
                 next if grep { $_ eq $name } ("HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL", "TZ", "PAGER");
                 delete $ENV{$name};
             }
-            # NixOS hack: prevent /etc/bashrc from sourcing /etc/profile.
-            $ENV{'__ETC_PROFILE_SOURCED'} = 1;
         }
         $ENV{'NIX_BUILD_TOP'} = $ENV{'TMPDIR'} = $ENV{'TEMPDIR'} = $ENV{'TMP'} = $ENV{'TEMP'} = $tmp;
         $ENV{'NIX_STORE'} = $Nix::Config::storeDir;
@@ -303,6 +301,7 @@ foreach my $expr (@exprs) {
             $envCommand);
         $ENV{BASH_ENV} = $rcfile;
         my @args = ($ENV{NIX_BUILD_SHELL} // "bash");
+        push @args, "--noprofile"
         push @args, "--rcfile" if $interactive;
         push @args, $rcfile;
         exec @args;
