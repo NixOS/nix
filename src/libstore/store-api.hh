@@ -4,6 +4,7 @@
 #include "serialise.hh"
 
 #include <string>
+#include <limits>
 #include <map>
 #include <memory>
 
@@ -36,21 +37,19 @@ struct GCOptions
         gcDeleteSpecific,
     } GCAction;
 
-    GCAction action;
+    GCAction action{gcDeleteDead};
 
     /* If `ignoreLiveness' is set, then reachability from the roots is
        ignored (dangerous!).  However, the paths must still be
        unreferenced *within* the store (i.e., there can be no other
        store paths that depend on them). */
-    bool ignoreLiveness;
+    bool ignoreLiveness{false};
 
     /* For `gcDeleteSpecific', the paths to delete. */
     PathSet pathsToDelete;
 
     /* Stop after at least `maxFreed' bytes have been freed. */
-    unsigned long long maxFreed;
-
-    GCOptions();
+    unsigned long long maxFreed{std::numeric_limits<unsigned long long>::max()};
 };
 
 

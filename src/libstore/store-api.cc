@@ -2,18 +2,8 @@
 #include "globals.hh"
 #include "util.hh"
 
-#include <climits>
-
 
 namespace nix {
-
-
-GCOptions::GCOptions()
-{
-    action = gcDeleteDead;
-    ignoreLiveness = false;
-    maxFreed = ULLONG_MAX;
-}
 
 
 bool isInStore(const Path & path)

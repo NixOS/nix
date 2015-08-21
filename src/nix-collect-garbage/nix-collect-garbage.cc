@@ -50,10 +50,11 @@ void removeOldGenerations(std::string dir)
 int main(int argc, char * * argv)
 {
     bool removeOld = false;
-    Strings extraArgs;
 
     return handleExceptions(argv[0], [&]() {
         initNix();
+
+        GCOptions options;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--help")
@@ -66,8 +67,12 @@ int main(int argc, char * * argv)
                 deleteOlderThan = getArg(*arg, arg, end);
             }
             else if (*arg == "--dry-run") dryRun = true;
+            else if (*arg == "--max-freed") {
+                long long maxFreed = getIntArg<long long>(*arg, arg, end, true);
+                options.maxFreed = maxFreed >= 0 ? maxFreed : 0;
+            }
             else
-                extraArgs.push_back(*arg);
+                return false;
             return true;
         });
 
@@ -77,7 +82,6 @@ int main(int argc, char * * argv)
         // Run the actual garbage collector.
         if (!dryRun) {
             store = openStore(false);
-            GCOptions options;
             options.action = GCOptions::gcDeleteDead;
             GCResults results;
             PrintFreed freed(true, results);
