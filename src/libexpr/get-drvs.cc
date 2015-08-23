@@ -1,6 +1,7 @@
 #include "get-drvs.hh"
 #include "util.hh"
 #include "eval-inline.hh"
+#include "globals.hh"
 
 #include <cstring>
 
@@ -185,30 +186,38 @@ static bool getDerivation(EvalState & state, Value & v,
     bool ignoreAssertionFailures)
 {
     try {
-        state.forceValue(v);
-        if (!state.isDerivation(v)) return true;
+        try {
+            state.forceValue(v);
+            if (!state.isDerivation(v)) return true;
 
-        /* Remove spurious duplicates (e.g., a set like `rec { x =
-           derivation {...}; y = x;}'. */
-        if (done.find(v.attrs) != done.end()) return false;
-        done.insert(v.attrs);
+            /* Remove spurious duplicates (e.g., a set like `rec { x =
+            derivation {...}; y = x;}'. */
+            if (done.find(v.attrs) != done.end()) return false;
+            done.insert(v.attrs);
 
-        Bindings::iterator i = v.attrs->find(state.sName);
-        /* !!! We really would like to have a decent back trace here. */
-        if (i == v.attrs->end()) throw TypeError("derivation name missing");
+            Bindings::iterator i = v.attrs->find(state.sName);
+            /* !!! We really would like to have a decent back trace here. */
+            if (i == v.attrs->end()) throw TypeError("derivation name missing");
 
-        Bindings::iterator i2 = v.attrs->find(state.sSystem);
+            Bindings::iterator i2 = v.attrs->find(state.sSystem);
 
-        DrvInfo drv(state, state.forceStringNoCtx(*i->value), attrPath,
-            i2 == v.attrs->end() ? "unknown" : state.forceStringNoCtx(*i2->value, *i2->pos),
-            v.attrs);
+            DrvInfo drv(state, state.forceStringNoCtx(*i->value), attrPath,
+                i2 == v.attrs->end() ? "unknown" : state.forceStringNoCtx(*i2->value, *i2->pos),
+                v.attrs);
 
-        drvs.push_back(drv);
+            drvs.push_back(drv);
+            return false;
+
+        } catch (AssertionError & e) {
+            if (ignoreAssertionFailures) return false;
+            throw;
+        }
+    } catch (Error & e) {
+        e.addPrefix(format("while evaluating the attribute path ‘%1%’:\n") % attrPath);
+        if(!settings.keepGoing)
+          throw;
+        printMsg(lvlError, format(ANSI_RED "error:" ANSI_NORMAL " " "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
         return false;
-
-    } catch (AssertionError & e) {
-        if (ignoreAssertionFailures) return false;
-        throw;
     }
 }
 

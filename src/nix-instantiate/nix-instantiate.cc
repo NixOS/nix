@@ -68,21 +68,28 @@ void processExpr(EvalState & state, const Strings & attrPaths,
             DrvInfos drvs;
             getDerivations(state, v, "", autoArgs, drvs, false);
             for (auto & i : drvs) {
-                Path drvPath = i.queryDrvPath();
+                try {
+                    Path drvPath = i.queryDrvPath();
 
-                /* What output do we want? */
-                string outputName = i.queryOutputName();
-                if (outputName == "")
-                    throw Error(format("derivation ‘%1%’ lacks an ‘outputName’ attribute ") % drvPath);
+                    /* What output do we want? */
+                    string outputName = i.queryOutputName();
+                    if (outputName == "")
+                        throw Error(format("derivation ‘%1%’ lacks an ‘outputName’ attribute ") % drvPath);
 
-                if (gcRoot == "")
-                    printGCWarning();
-                else {
-                    Path rootName = gcRoot;
-                    if (++rootNr > 1) rootName += "-" + int2String(rootNr);
-                    drvPath = addPermRoot(*store, drvPath, rootName, indirectRoot);
+                    if (gcRoot == "")
+                        printGCWarning();
+                    else {
+                        Path rootName = gcRoot;
+                        if (++rootNr > 1) rootName += "-" + int2String(rootNr);
+                        drvPath = addPermRoot(*store, drvPath, rootName, indirectRoot);
+                    }
+                    std::cout << format("%1%%2%\n") % drvPath % (outputName != "out" ? "!" + outputName : "");
+                } catch (Error & e) {
+                    e.addPrefix(format("while evaluating the derivation at attribute path ‘%1%’:\n") % i.attrPath);
+                    if(!settings.keepGoing)
+                      throw;
+                    printMsg(lvlError, format(ANSI_RED "error:" ANSI_NORMAL " " "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
                 }
-                std::cout << format("%1%%2%\n") % drvPath % (outputName != "out" ? "!" + outputName : "");
             }
         }
     }

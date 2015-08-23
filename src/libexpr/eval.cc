@@ -786,9 +786,15 @@ void ExprList::eval(EvalState & state, Env & env, Value & v)
 
 void ExprVar::eval(EvalState & state, Env & env, Value & v)
 {
-    Value * v2 = state.lookupVar(&env, *this, false);
-    state.forceValue(*v2, pos);
-    v = *v2;
+    try {
+        Value * v2 = state.lookupVar(&env, *this, false);
+        state.forceValue(*v2, pos);
+        v = *v2;
+    } catch (Error & e) {
+        addErrorPrefix(e, "while evaluating the value ‘%1%’ at %2%:\n",
+            this->name, this->pos);
+        throw;
+    }
 }
 
 
@@ -817,9 +823,9 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     Pos * pos2 = 0;
     Value * vAttrs = &vTmp;
 
-    e->eval(state, env, vTmp);
-
     try {
+
+        e->eval(state, env, vTmp);
 
         for (auto & i : attrPath) {
             nrLookups++;
@@ -924,7 +930,12 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
         /* And call the primop. */
         nrPrimOpCalls++;
         if (countCalls) primOpCalls[primOp->primOp->name]++;
-        primOp->primOp->fun(*this, pos, vArgs, v);
+        try {
+            primOp->primOp->fun(*this, pos, vArgs, v);
+        } catch (Error & e) {
+            addErrorPrefix(e, "while calling primop %1%, called from %2%:\n", primOp->primOp->name, pos);
+            throw;
+        }
     } else {
         Value * fun2 = allocValue();
         *fun2 = fun;

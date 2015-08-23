@@ -205,6 +205,8 @@ void parseCmdLine(int argc, char * * argv,
             settings.keepFailed = true;
         else if (arg == "--keep-going" || arg == "-k")
             settings.keepGoing = true;
+        else if (arg == "--color" || arg == "-C")
+            useColor = true;
         else if (arg == "--fallback")
             settings.set("build-fallback", "true");
         else if (arg == "--max-jobs" || arg == "-j")
