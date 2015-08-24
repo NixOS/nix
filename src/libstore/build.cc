@@ -911,6 +911,10 @@ DerivationGoal::DerivationGoal(const Path & drvPath, const BasicDerivation & drv
     state = &DerivationGoal::haveDerivation;
     name = (format("building of %1%") % showPaths(outputPaths(drv))).str();
     trace("created");
+
+    /* Prevent the .chroot directory from being
+       garbage-collected. (See isActiveTempFile() in gc.cc.) */
+    worker.store.addTempRoot(drvPath);
 }
 
 
