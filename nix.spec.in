@@ -26,6 +26,7 @@ Requires: gzip
 Requires: xz
 BuildRequires: bzip2-devel
 BuildRequires: sqlite-devel
+BuildRequires: libcurl-devel
 
 # Hack to make that shitty RPM scanning hack shut up.
 Provides: perl(Nix::SSH)
