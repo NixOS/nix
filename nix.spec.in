@@ -114,6 +114,7 @@ make %{?_smp_flags}
 rm -rf $RPM_BUILD_ROOT
 %endif
 make DESTDIR=$RPM_BUILD_ROOT install
+mkdir -p $RPM_BUILD_ROOT/nix/store
 
 find $RPM_BUILD_ROOT -name '*.la' -exec rm -f {} ';'
 
@@ -178,6 +179,7 @@ systemctl start  nix-daemon.socket
 %{_mandir}/man8/*.8*
 %config(noreplace) %{_sysconfdir}/profile.d/nix.sh
 /nix
+/nix/store
 
 %files devel
 %{_includedir}/nix
