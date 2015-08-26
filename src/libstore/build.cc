@@ -2451,12 +2451,54 @@ void DerivationGoal::runChild()
 
             sandboxProfile += "(allow file-read* file-write-data (literal \"/dev/null\"))\n";
 
+            sandboxProfile += "(allow ipc-posix-shm*)\n";
+
+            sandboxProfile += "(allow mach-lookup\n"
+                "\t(global-name \"com.apple.SecurityServer\")\n"
+                ")\n";
+
+            sandboxProfile += "(allow file-read*\n"
+                "\t(literal \"/dev/dtracehelper\")\n"
+                "\t(literal \"/dev/tty\")\n"
+                "\t(literal \"/System/Library/CoreServices/SystemVersion.plist\")\n"
+                "\t(literal \"/dev/autofs_nowait\")\n"
+                "\t(literal \"/private/var/run/systemkeychaincheck.done\")\n"
+                "\t(literal \"/private/etc/protocols\")\n"
+                "\t(literal \"/private/var/tmp\")\n"
+                "\t(subpath \"/usr/share/locale\")\n"
+                "\t(subpath \"/usr/share/zoneinfo\")\n"
+                "\t(literal \"/private/var/db\")\n"
+                "\t(subpath \"/private/var/db/mds\")\n"
+                ")\n";
+
+            sandboxProfile += "(allow file-write*\n"
+                "\t(literal \"/dev/tty\")\n"
+                "\t(literal \"/dev/dtracehelper\")\n"
+                "\t(literal \"/mds\")\n"
+                ")\n";
+
+            sandboxProfile += "(allow file-ioctl\n"
+                "\t(literal \"/dev/dtracehelper\")\n"
+                ")\n";
+
             sandboxProfile += "(allow file-read-metadata\n"
                 "\t(literal \"/var\")\n"
                 "\t(literal \"/tmp\")\n"
                 "\t(literal \"/etc\")\n"
                 "\t(literal \"/etc/nix\")\n"
-                "\t(literal \"/etc/nix/nix.conf\"))\n";
+                "\t(literal \"/etc/nix/nix.conf\")\n"
+                "\t(literal \"/etc/resolv.conf\")\n"
+                "\t(literal \"/private/etc/resolv.conf\")\n"
+                ")\n";
+
+            sandboxProfile += "(allow file-read*\n"
+                "\t(literal \"/private/etc/nix/nix.conf\")\n"
+                "\t(literal \"/private/var/run/resolv.conf\")\n"
+                ")\n";
+
+            sandboxProfile += "(allow file-read* file-write*\n"
+                "\t(subpath \"/dev/fd\")\n"
+                ")\n";
 
             /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different mechanisms
                to find temporary directories, so we want to open up a broader place for them to dump their files, if needed. */
@@ -2492,7 +2534,7 @@ void DerivationGoal::runChild()
                denying it means the `access` syscall will return EPERM instead of EACCESS, which confuses a few programs that assume (understandably, since
                it appears to be a violation of the POSIX spec) that `access` won't do that, and don't deal with it nicely if it does. The most notable of
                these is the entire GHC Haskell ecosystem. */
-            sandboxProfile += "(allow file-read* file-write* process-exec\n";
+            sandboxProfile += "(allow file-read* file-write* process-exec mach-priv-task-port\n";
             for (auto & i : dirsInChroot) {
                 if (i.first != i.second)
                     throw SysError(format("can't map '%1%' to '%2%': mismatched impure paths not supported on darwin"));
@@ -2510,7 +2552,7 @@ void DerivationGoal::runChild()
 
             /* Our ancestry. N.B: this uses literal on folders, instead of subpath. Without that,
                you open up the entire filesystem because you end up with (subpath "/") */
-            sandboxProfile += "(allow file-read-metadata\n";
+            sandboxProfile += "(allow file-read*\n";
             for (auto & i : ancestry) {
                 sandboxProfile += (format("\t(literal \"%1%\")\n") % i.c_str()).str();
             }
