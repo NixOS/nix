@@ -72,8 +72,10 @@ struct TeeSink : ParseSink
 
 void parseDump(ParseSink & sink, Source & source);
 
-void restorePath(const Path & path, Source & source);
+void restorePath(const Path & path, Source & source, bool recursive = true);
 
+void copyPath(const Path & srcPath, const Path & dstPath,
+    PathFilter & filter = defaultPathFilter, bool recursive = true);
 
 // FIXME: global variables are bad m'kay.
 extern bool useCaseHack;

@@ -412,9 +412,16 @@ Path RemoteStore::addToStore(const string & name, const Path & _srcPath,
 
     auto conn(connections->get());
 
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 0x15) {
+        throw Error("adding to the store is not supported with an old Nix daemon");
+    }
+
     Path srcPath(absPath(_srcPath));
 
-    conn->to << wopAddToStore << name
+    Hash h = recursive ? hashPath(hashAlgo, srcPath, filter).first : hashFile(hashAlgo, srcPath);
+    Path dstPath = makeFixedOutputPath(recursive, h, name);
+
+    conn->to << wopAddToStore << dstPath
        << ((hashAlgo == htSHA256 && recursive) ? 0 : 1) /* backwards compatibility hack */
        << (recursive ? 1 : 0)
        << printHashType(hashAlgo);

@@ -152,8 +152,8 @@ public:
        in `dump', which is either a NAR serialisation (if recursive ==
        true) or simply the contents of a regular file (if recursive ==
        false). */
-    Path addToStoreFromDump(const string & dump, const string & name,
-        bool recursive = true, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair);
+    Path addToStoreFromDump(Source& dump, const Path& dstPath,
+        bool recursive = true, bool repair = false);
 
     Path addTextToStore(const string & name, const string & s,
         const PathSet & references, RepairFlag repair) override;
