@@ -1361,13 +1361,32 @@ void LocalStore::invalidatePath(const Path & path)
 }
 
 
-Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
-    bool recursive, HashType hashAlgo, bool repair)
+struct HashAndReadSource : Source
 {
-    Hash h = hashString(hashAlgo, dump);
+    Source & readSource;
+    HashSink hashSink;
+    bool hashing;
+    HashAndReadSource(Source & readSource) : readSource(readSource), hashSink(htSHA256)
+    {
+        hashing = true;
+    }
+    size_t read(unsigned char * data, size_t len)
+    {
+        size_t n = readSource.read(data, len);
+        if (hashing) hashSink(data, n);
+        return n;
+    }
+    HashResult finish()
+    {
+        hashing = false;
+        return hashSink.finish();
+    }
+};
 
-    Path dstPath = makeFixedOutputPath(recursive, hashAlgo, h, name);
 
+Path LocalStore::addToStoreFromDump(Source & source, const Path & dstPath,
+    bool recursive, bool repair)
+{
     addTempRoot(dstPath);
 
     if (repair || !isValidPath(dstPath)) {
@@ -1381,25 +1400,10 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
 
             if (pathExists(dstPath)) deletePath(dstPath);
 
-            if (recursive) {
-                StringSource source(dump);
-                restorePath(dstPath, source);
-            } else
-                writeFile(dstPath, dump);
-
+            HashAndReadSource hashSource(source);
+            restorePath(dstPath, hashSource, recursive);
+            HashResult hash = hashSource.finish();
             canonicalisePathMetaData(dstPath, -1);
-
-            /* Register the SHA-256 hash of the NAR serialisation of
-               the path in the database.  We may just have computed it
-               above (if called with recursive == true and hashAlgo ==
-               sha256); otherwise, compute it here. */
-            HashResult hash;
-            if (recursive) {
-                hash.first = hashAlgo == htSHA256 ? h : hashString(htSHA256, dump);
-                hash.second = dump.size();
-            } else
-                hash = hashPath(htSHA256, dstPath);
-
             optimisePath(dstPath); // FIXME: combine with hashPath()
 
             ValidPathInfo info;
@@ -1422,16 +1426,34 @@ Path LocalStore::addToStore(const string & name, const Path & _srcPath,
     Path srcPath(absPath(_srcPath));
     debug(format("adding ‘%1%’ to the store") % srcPath);
 
-    /* Read the whole path into memory. This is not a very scalable
-       method for very large paths, but `copyPath' is mainly used for
-       small files. */
-    StringSink sink;
-    if (recursive)
-        dumpPath(srcPath, sink, filter);
-    else
-        sink.s = readFile(srcPath);
+    Hash h = recursive ? hashPath(hashAlgo, srcPath, filter).first : hashFile(hashAlgo, srcPath);
+    Path dstPath = makeFixedOutputPath(recursive, hashAlgo, h, name);
+    addTempRoot(dstPath);
+    if (repair || !isValidPath(dstPath)) {
 
-    return addToStoreFromDump(sink.s, name, recursive, hashAlgo, repair);
+        PathLocks outputLock(singleton<PathSet, Path>(dstPath));
+
+        if (repair || !isValidPath(dstPath)) {
+
+            if (pathExists(dstPath)) deletePath(dstPath);
+
+            copyPath(srcPath, dstPath, filter, recursive);
+
+            canonicalisePathMetaData(dstPath, -1);
+            HashResult hash = hashPath(htSHA256, dstPath);
+            optimisePath(dstPath); // FIXME: combine with hashPath()
+
+            ValidPathInfo info;
+            info.path = dstPath;
+            info.hash = hash.first;
+            info.narSize = hash.second;
+            registerValidPath(info);
+        }
+
+        outputLock.setDeletion(true);
+    }
+
+    return dstPath;
 }
 
 
@@ -1560,24 +1582,6 @@ void LocalStore::exportPath(const Path & path, bool sign,
 }
 
 
-struct HashAndReadSource : Source
-{
-    Source & readSource;
-    HashSink hashSink;
-    bool hashing;
-    HashAndReadSource(Source & readSource) : readSource(readSource), hashSink(htSHA256)
-    {
-        hashing = true;
-    }
-    size_t read(unsigned char * data, size_t len)
-    {
-        size_t n = readSource.read(data, len);
-        if (hashing) hashSink(data, n);
-        return n;
-    }
-};
-
-
 /* Create a temporary directory in the store that won't be
    garbage-collected. */
 Path LocalStore::createTempDirInStore()
@@ -1620,8 +1624,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
     Path deriver = readString(hashAndReadSource);
     if (deriver != "") assertStorePath(deriver);
 
-    Hash hash = hashAndReadSource.hashSink.finish().first;
-    hashAndReadSource.hashing = false;
+    Hash hash = hashAndReadSource.finish().first;
 
     bool haveSignature = readInt(hashAndReadSource) == 1;
 

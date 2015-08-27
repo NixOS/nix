@@ -248,7 +248,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
                             names[name] = 0;
                     }
                 } else if (s == "node") {
-                    if (s.empty()) throw badArchive("entry name missing");
+                    if (name.empty()) throw badArchive("entry name missing");
                     parse(sink, source, path + "/" + name);
                 } else
                     throw badArchive("unknown field " + s);
@@ -284,10 +284,17 @@ void parseDump(ParseSink & sink, Source & source)
 struct RestoreSink : ParseSink
 {
     Path dstPath;
+    bool recursive;
     AutoCloseFD fd;
+
+    RestoreSink(const Path& dstPath, bool recursive)
+     : dstPath(dstPath), recursive(recursive)
+    {
+    }
 
     void createDirectory(const Path & path)
     {
+        if(!recursive) throw Error("regular file expected");
         Path p = dstPath + path;
         if (mkdir(p.c_str(), 0777) == -1)
             throw SysError(format("creating directory ‘%1%’") % p);
@@ -332,18 +339,121 @@ struct RestoreSink : ParseSink
 
     void createSymlink(const Path & path, const string & target)
     {
+        if(!recursive) throw Error("regular file expected");
         Path p = dstPath + path;
         nix::createSymlink(target, p);
     }
 };
 
 
-void restorePath(const Path & path, Source & source)
+void restorePath(const Path & path, Source & source, bool recursive)
 {
-    RestoreSink sink;
-    sink.dstPath = path;
+    RestoreSink sink(path, recursive);
     parseDump(sink, source);
 }
 
+static void copyContents(const Path & srcPath, const AutoCloseFD& ofd, size_t size)
+{
+#if HAVE_POSIX_FALLOCATE
+    if (size) {
+        errno = posix_fallocate(ofd, 0, size);
+        /* Note that EINVAL may indicate that the underlying
+            filesystem doesn't support preallocation (e.g. on
+            OpenSolaris).  Since preallocation is just an
+            optimisation, ignore it. */
+        if (errno && errno != EINVAL)
+            throw SysError(format("preallocating file of %1% bytes") % size);
+    }
+#endif
+
+    AutoCloseFD fd = open(srcPath.c_str(), O_RDONLY);
+    if (fd == -1) throw SysError(format("opening file ‘%1%’") % srcPath);
+
+    // TODO: use sendfile(2) / sendfile64(2) on Linux
+
+    unsigned char buf[65536];
+    size_t left = size;
+
+    while (left > 0) {
+        checkInterrupt();
+        size_t n = left > sizeof(buf) ? sizeof(buf) : left;
+        readFull(fd, buf, n);
+        writeFull(ofd, buf, n);
+        left -= n;
+    }
+}
+
+void copyPath(const Path & srcPath, const Path & dstPath, PathFilter & filter, bool recursive)
+{
+    struct stat st;
+    if (lstat(srcPath.c_str(), &st))
+        throw SysError(format("getting attributes of path ‘%1%’") % srcPath);
+
+    if (S_ISREG(st.st_mode)) {
+        AutoCloseFD ofd = open(dstPath.c_str(), O_CREAT | O_EXCL | O_WRONLY, 0666);
+        if (ofd == -1) throw SysError(format("creating file ‘%1%’") % dstPath);
+        if (st.st_mode & S_IXUSR) {
+            struct stat ost;
+            if (fstat(ofd, &ost) == -1)
+                throw SysError("fstat");
+            if (fchmod(ofd, ost.st_mode | (S_IXUSR | S_IXGRP | S_IXOTH)) == -1)
+                throw SysError("fchmod");
+        }
+        copyContents(srcPath, ofd, (size_t) st.st_size);
+    }
+    else if (S_ISDIR(st.st_mode)) {
+        if(!recursive) throw Error("regular file expected");
+        if (mkdir(dstPath.c_str(), 0777) == -1)
+            throw SysError(format("creating directory ‘%1%’") % dstPath);
+        /* If we're on a case-insensitive system like Mac OS X, undo
+           the case hack applied by restorePath(). */
+        if (useCaseHack) {
+            std::map<string, string> unhacked;
+            for (auto & i : readDirectory(srcPath)) {
+                string name(i.name);
+                size_t pos = i.name.find(caseHackSuffix);
+                if (pos != string::npos) {
+                    printMsg(lvlDebug, format("removing case hack suffix from ‘%1%’") % (srcPath + "/" + i.name));
+                    name.erase(pos);
+                }
+                if (unhacked.find(name) != unhacked.end())
+                    throw Error(format("file name collision in between ‘%1%’ and ‘%2%’")
+                        % (srcPath + "/" + unhacked[name]) % (srcPath + "/" + i.name));
+                unhacked[name] = i.name;
+            }
+
+            std::map<Path, int, CaseInsensitiveCompare> names;
+            for (auto & i : unhacked)
+                if (filter(srcPath + "/" + i.first)) {
+                    string name = i.first;
+                    if (name.empty() || name.find('/') != string::npos || name.find((char) 0) != string::npos)
+                        throw Error(format("Directory contains invalid file name ‘%1%’") % name);
+                    auto i = names.find(name);
+                    if (i != names.end()) {
+                        printMsg(lvlDebug, format("case collision between ‘%1%’ and ‘%2%’") % i->first % name);
+                        name += caseHackSuffix;
+                        name += int2String(++i->second);
+                    } else
+                        names[name] = 0;
+                    copyPath(srcPath + "/" + name, dstPath + "/" + name, filter, recursive);
+                }
+        } else {
+            for (auto & i : readDirectory(srcPath)) {
+                if (filter(srcPath + "/" + i.name)) {
+                    string name = i.name;
+                    if (name.empty() || name.find('/') != string::npos || name.find((char) 0) != string::npos)
+                        throw Error(format("Directory contains invalid file name ‘%1%’") % name);
+                    copyPath(srcPath + "/" + name, dstPath + "/" + name, filter, recursive);
+                }
+            }
+        }
+    }
+    else if (S_ISLNK(st.st_mode)) {
+        if(!recursive) throw Error("regular file expected");
+        Path target = readLink(srcPath);
+        nix::createSymlink(target, dstPath);
+    }
+    else throw Error(format("file ‘%1%’ has an unsupported type") % srcPath);
+}
 
 }

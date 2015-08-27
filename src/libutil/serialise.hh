@@ -130,6 +130,12 @@ inline Sink & operator << (Sink & sink, uint64_t n)
     return sink;
 }
 
+
+template< unsigned N >
+Sink & operator << (Sink & sink, const char (&s)[N]) {
+    writeString((const unsigned char*)s, N-1, sink);
+    return sink;
+}
 Sink & operator << (Sink & sink, const string & s);
 Sink & operator << (Sink & sink, const Strings & s);
 Sink & operator << (Sink & sink, const StringSet & s);

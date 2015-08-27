@@ -107,47 +107,6 @@ struct TunnelSource : BufferedSource
 };
 
 
-/* If the NAR archive contains a single file at top-level, then save
-   the contents of the file to `s'.  Otherwise barf. */
-struct RetrieveRegularNARSink : ParseSink
-{
-    bool regular;
-    string s;
-
-    RetrieveRegularNARSink() : regular(true) { }
-
-    void createDirectory(const Path & path)
-    {
-        regular = false;
-    }
-
-    void receiveContents(unsigned char * data, unsigned int len)
-    {
-        s.append((const char *) data, len);
-    }
-
-    void createSymlink(const Path & path, const string & target)
-    {
-        regular = false;
-    }
-};
-
-
-/* Adapter class of a Source that saves all data read to `s'. */
-struct SavingSourceAdapter : Source
-{
-    Source & orig;
-    string s;
-    SavingSourceAdapter(Source & orig) : orig(orig) { }
-    size_t read(unsigned char * data, size_t len)
-    {
-        size_t n = orig.read(data, len);
-        s.append((const char *) data, n);
-        return n;
-    }
-};
-
-
 static void performOp(bool trusted, unsigned int clientVersion,
     Source & from, Sink & to, unsigned int op)
 {
@@ -252,33 +211,16 @@ static void performOp(bool trusted, unsigned int clientVersion,
     }
 
     case wopAddToStore: {
-        string baseName = readString(from);
-        bool fixed = readInt(from) == 1; /* obsolete */
-        bool recursive = readInt(from) == 1;
-        string s = readString(from);
-        /* Compatibility hack. */
-        if (!fixed) {
-            s = "sha256";
-            recursive = true;
+        if (GET_PROTOCOL_MINOR(clientVersion) < 15) {
+            throw Error("adding to the store is not supported with an old Nix client");
         }
-        HashType hashAlgo = parseHashType(s);
 
-        SavingSourceAdapter savedNAR(from);
-        RetrieveRegularNARSink savedRegular;
-
-        if (recursive) {
-            /* Get the entire NAR dump from the client and save it to
-               a string so that we can pass it to
-               addToStoreFromDump(). */
-            ParseSink sink; /* null sink; just parse the NAR */
-            parseDump(sink, savedNAR);
-        } else
-            parseDump(savedRegular, from);
+        Path dstPath = readStorePath(from);
+        bool recursive = readInt(from) == 1;
 
         startWork();
-        if (!savedRegular.regular) throw Error("regular file expected");
         Path path = dynamic_cast<LocalStore *>(store.get())
-            ->addToStoreFromDump(recursive ? savedNAR.s : savedRegular.s, baseName, recursive, hashAlgo);
+            ->addToStoreFromDump(from, dstPath, recursive);
         stopWork();
 
         to << path;

@@ -374,12 +374,17 @@ Path RemoteStore::addToStore(const string & name, const Path & _srcPath,
 
     openConnection();
 
+    if (GET_PROTOCOL_MINOR(daemonVersion) < 15) {
+        throw Error("adding to the store is not supported with an old Nix daemon");
+    }
+
     Path srcPath(absPath(_srcPath));
 
-    to << wopAddToStore << name
-       << ((hashAlgo == htSHA256 && recursive) ? 0 : 1) /* backwards compatibility hack */
-       << (recursive ? 1 : 0)
-       << printHashType(hashAlgo);
+    Hash h = recursive ? hashPath(hashAlgo, srcPath, filter).first : hashFile(hashAlgo, srcPath);
+    Path dstPath = makeFixedOutputPath(recursive, hashAlgo, h, name);
+
+    to << wopAddToStore << dstPath
+       << (recursive ? 1 : 0);
 
     try {
         to.written = 0;
