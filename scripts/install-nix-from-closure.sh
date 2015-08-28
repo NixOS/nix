@@ -96,6 +96,8 @@ if [ -z "$_NIX_INSTALLER_TEST" ]; then
     $nix/bin/nix-channel --update nixpkgs
 fi
 
+pfish=$HOME/.nix-profile/etc/profile.d/nix.fish
+
 added=
 if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
 
@@ -125,6 +127,13 @@ variables are set, please add the line
   . $p
 
 to your shell profile (e.g. ~/.profile).
+
+For the fish shell, please add the line
+
+  source $pfish
+
+to your fish config file (~/.config/fish/config.fish).
+
 EOF
 else
     cat >&2 <<EOF
@@ -133,6 +142,12 @@ Installation finished!  To ensure that the necessary environment
 variables are set, either log in again, or type
 
   . $p
+
+in your shell.
+
+For the fish shell, please type
+
+  source $pfish
 
 in your shell.
 EOF
