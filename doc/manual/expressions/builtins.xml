@@ -716,7 +716,7 @@ in config.someSetting</programlisting>
     ./A</literal> will return the set
 
 <programlisting>
-{ A = "regular"; B = "directory"; }</programlisting>
+{ B = "regular"; C = "directory"; }</programlisting>
 
     The possible values for the file type are
     <literal>"regular"</literal>, <literal>"directory"</literal>,
