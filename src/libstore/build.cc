@@ -766,9 +766,6 @@ private:
     /* RAII object to delete the chroot directory. */
     std::shared_ptr<AutoDelete> autoDelChroot;
 
-    /* All inputs that are regular files. */
-    PathSet regularInputPaths;
-
     /* Whether this is a fixed-output derivation. */
     bool fixedOutput;
 
@@ -1998,8 +1995,6 @@ void DerivationGoal::startBuilder()
                     StringSource source(sink.s);
                     restorePath(p, source);
                 }
-
-                regularInputPaths.insert(i);
             }
         }
 
