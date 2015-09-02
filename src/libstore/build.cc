@@ -1998,13 +1998,13 @@ void DerivationGoal::startBuilder()
             }
         }
 
-        /* If we're repairing or checking, it's possible that we're
+        /* If we're repairing, checking or rebuilding part of a
+           multiple-outputs derivation, it's possible that we're
            rebuilding a path that is in settings.dirsInChroot
            (typically the dependencies of /bin/sh).  Throw them
            out. */
-        if (buildMode != bmNormal)
-            for (auto & i : drv->outputs)
-                dirsInChroot.erase(i.second.path);
+        for (auto & i : drv->outputs)
+            dirsInChroot.erase(i.second.path);
 
 #elif SANDBOX_ENABLED
         /* We don't really have any parent prep work to do (yet?)
