@@ -7,6 +7,7 @@
 #include "affinity.hh"
 #include "globals.hh"
 #include "monitor-fd.hh"
+#include "derivations.hh"
 
 #include <algorithm>
 
@@ -322,6 +323,20 @@ static void performOp(bool trusted, unsigned int clientVersion,
         store->buildPaths(drvs);
         stopWork();
         to << 1;
+        break;
+    }
+
+    case wopBuildDerivation: {
+        Path drvPath = readStorePath(from);
+        BasicDerivation drv;
+        from >> drv;
+        BuildMode buildMode = (BuildMode) readInt(from);
+        startWork();
+        if (!trusted)
+            throw Error("you are not privileged to build derivations");
+        auto res = store->buildDerivation(drvPath, drv, buildMode);
+        stopWork();
+        to << res.status << res.errorMsg;
         break;
     }
 

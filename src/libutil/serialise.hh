@@ -143,6 +143,7 @@ string readString(Source & source);
 template<class T> T readStrings(Source & source);
 
 Source & operator >> (Source & in, string & s);
+Source & operator >> (Source & in, unsigned int & n);
 
 
 MakeError(SerialisationError, Error)

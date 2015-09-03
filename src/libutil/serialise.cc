@@ -248,6 +248,13 @@ Source & operator >> (Source & in, string & s)
 }
 
 
+Source & operator >> (Source & in, unsigned int & n)
+{
+    n = readInt(in);
+    return in;
+}
+
+
 template<class T> T readStrings(Source & source)
 {
     unsigned int count = readInt(source);

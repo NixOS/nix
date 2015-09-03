@@ -5,6 +5,7 @@
 #include "archive.hh"
 #include "affinity.hh"
 #include "globals.hh"
+#include "derivations.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -458,7 +459,14 @@ void RemoteStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
 BuildResult RemoteStore::buildDerivation(const Path & drvPath, const BasicDerivation & drv,
     BuildMode buildMode)
 {
-    throw Error("not implemented");
+    openConnection();
+    to << wopBuildDerivation << drvPath << drv << buildMode;
+    processStderr();
+    BuildResult res;
+    unsigned int status;
+    from >> status >> res.errorMsg;
+    res.status = (BuildResult::Status) status;
+    return res;
 }
 
 
