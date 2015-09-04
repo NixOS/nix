@@ -1,0 +1,2 @@
+error: while evaluating the attribute ‘body’ at PWD/lang/eval-fail-remove.nix:4:3:
+attribute ‘x’ missing, at PWD/lang/eval-fail-remove.nix:4:10

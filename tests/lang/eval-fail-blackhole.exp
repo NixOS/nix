@@ -1,0 +1,2 @@
+error: while evaluating the attribute ‘body’ at PWD/lang/eval-fail-blackhole.nix:2:3:
+infinite recursion encountered, at PWD/lang/eval-fail-blackhole.nix:4:7

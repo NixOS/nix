@@ -15,6 +15,9 @@ if test -n "$dot"; then
     $dot < $TEST_ROOT/graph
 fi
 
+# Test XML graph generation
+nix-store -q --xml "$drvPath" > $TEST_ROOT/xmlgraph
+
 outPath=$(nix-store -rvv "$drvPath") || fail "build failed"
 
 # Test Graphviz graph generation.

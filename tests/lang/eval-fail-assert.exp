@@ -1,0 +1,3 @@
+error: while evaluating the attribute ‘body’ at PWD/lang/eval-fail-assert.nix:4:3:
+while evaluating ‘x’ at PWD/lang/eval-fail-assert.nix:2:7, called from PWD/lang/eval-fail-assert.nix:4:10:
+assertion failed at PWD/lang/eval-fail-assert.nix:2:12

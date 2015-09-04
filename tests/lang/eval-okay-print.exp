@@ -1,0 +1,2 @@
+trace: [ <CODE> ]
+[ null <PRIMOP> <PRIMOP-APP> <LAMBDA> [ [ <CYCLE> ] ] ]
