@@ -11,9 +11,12 @@ builtins.fromJSON
               "Width":  200,
               "Height": 250
           },
+          "Animated" : false,
+          "IDs": [116, 943, 234, 38793, true  ,false,null, -100],
+          "Escapes": "\"\\\/\t\n\r\t",
           "Subtitle" : false,
-          "Latitude":  46.2051,
-          "Longitude": 6.0723
+          "Latitude":  37.7668,
+          "Longitude": -122.3959
         }
     }
   ''
@@ -28,8 +31,11 @@ builtins.fromJSON
           Width = 200;
           Height = 250;
         };
+      Animated = false;
+      IDs = [ 116 943 234 38793 true false null (0-100) ];
+      Escapes = "\"\\\/\t\n\r\t";  # supported in JSON but not Nix: \b\f
       Subtitle = false;
-      Latitude = 46.2051;
-      Longitude = 6.0723;
+      Latitude = 37.7668;
+      Longitude = -122.3959;
     };
   }

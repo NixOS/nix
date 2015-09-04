@@ -24,3 +24,9 @@ eval_stdin_res=$(echo 'let a = {} // a; in a.foo' | nix-instantiate --eval -E - 
 echo $eval_stdin_res | grep "at «stdin»:1:15:"
 echo $eval_stdin_res | grep "infinite recursion encountered"
 
+# Attribute path errors
+expectStderr 1 nix-instantiate --eval -E '{}' -A '"x' | grepQuiet "missing closing quote in selection path"
+expectStderr 1 nix-instantiate --eval -E '[]' -A 'x' | grepQuiet "should be a set"
+expectStderr 1 nix-instantiate --eval -E '{}' -A '1' | grepQuiet "should be a list"
+expectStderr 1 nix-instantiate --eval -E '{}' -A '.' | grepQuiet "empty attribute name"
+expectStderr 1 nix-instantiate --eval -E '[]' -A '1' | grepQuiet "out of range"

@@ -1,0 +1,7 @@
+error: syntax error, unexpected end of file, expecting '"'
+
+       at «stdin»:3:5:
+
+            2| # Note that this file must not end with a newline.
+            3| a 1"$
+             |     ^
