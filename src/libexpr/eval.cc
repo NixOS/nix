@@ -1294,7 +1294,7 @@ bool EvalState::forceBool(Value & v)
 void EvalState::forceFunction(Value & v, const Pos & pos)
 {
     forceValue(v);
-    if (v.type != tLambda && v.type != tPrimOp && v.type != tPrimOpApp)
+    if (v.type != tLambda && v.type != tPrimOp && v.type != tPrimOpApp && !isFunctor(v))
         throwTypeError("value is %1% while a function was expected, at %2%", v, pos);
 }
 
