@@ -213,6 +213,8 @@ public:
        elements and attributes are compared recursively. */
     bool eqValues(Value & v1, Value & v2);
 
+    bool isFunctor(Value & fun);
+
     void callFunction(Value & fun, Value & arg, Value & v, const Pos & pos);
     void callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos);
 
