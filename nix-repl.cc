@@ -87,8 +87,8 @@ void NixRepl::mainLoop(const Strings & files)
 {
     std::cout << "Welcome to Nix version " << NIX_VERSION << ". Type :? for help." << std::endl << std::endl;
 
-    foreach (Strings::const_iterator, i, files)
-        loadedFiles.push_back(*i);
+    for (auto & i : files)
+        loadedFiles.push_back(i);
 
     reloadFiles();
     if (!loadedFiles.empty()) std::cout << std::endl;
@@ -210,8 +210,8 @@ void NixRepl::completePrefix(string prefix)
             e->eval(state, *env, v);
             state.forceAttrs(v);
 
-            foreach (Bindings::iterator, i, *v.attrs) {
-                string name = i->name;
+            for (auto & i : *v.attrs) {
+                string name = i.name;
                 if (string(name, 0, prefix2.size()) != prefix2) continue;
                 completions.insert(expr + "." + name);
             }
@@ -251,11 +251,11 @@ static int runProgram(const string & program, const Strings & args)
 bool isVarName(const string & s)
 {
     // FIXME: not quite correct.
-    foreach (string::const_iterator, i, s)
-        if (!((*i >= 'a' && *i <= 'z') ||
-              (*i >= 'A' && *i <= 'Z') ||
-              (*i >= '0' && *i <= '9') ||
-              *i == '_' || *i == '\''))
+    for (auto & i : s)
+        if (!((i >= 'a' && i <= 'z') ||
+              (i >= 'A' && i <= 'Z') ||
+              (i >= '0' && i <= '9') ||
+              i == '_' || i == '\''))
             return false;
     return true;
 }
@@ -329,8 +329,8 @@ bool NixRepl::processLine(string line)
             if (runProgram("nix-store", Strings{"-r", drvPath}) == 0) {
                 Derivation drv = readDerivation(drvPath);
                 std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
-                foreach (DerivationOutputs::iterator, i, drv.outputs)
-                    std::cout << format("  %1% -> %2%") % i->first % i->second.path << std::endl;
+                for (auto & i : drv.outputs)
+                    std::cout << format("  %1% -> %2%") % i.first % i.second.path << std::endl;
             }
         } else
             runProgram("nix-shell", Strings{drvPath});
@@ -393,8 +393,8 @@ void NixRepl::initEnv()
     staticEnv.vars.clear();
 
     varNames.clear();
-    foreach (StaticEnv::Vars::iterator, i, state.staticBaseEnv.vars)
-        varNames.insert(i->first);
+    for (auto & i : state.staticBaseEnv.vars)
+        varNames.insert(i.first);
 }
 
 
@@ -405,10 +405,12 @@ void NixRepl::reloadFiles()
     Strings old = loadedFiles;
     loadedFiles.clear();
 
-    foreach (Strings::iterator, i, old) {
-        if (i != old.begin()) std::cout << std::endl;
-        std::cout << format("Loading ‘%1%’...") % *i << std::endl;
-        loadFile(*i);
+    bool first = true;
+    for (auto & i : old) {
+        if (!first) std::cout << std::endl;
+        first = false;
+        std::cout << format("Loading ‘%1%’...") % i << std::endl;
+        loadFile(i);
     }
 }
 
@@ -416,8 +418,8 @@ void NixRepl::reloadFiles()
 void NixRepl::addAttrsToScope(Value & attrs)
 {
     state.forceAttrs(attrs);
-    foreach (Bindings::iterator, i, *attrs.attrs)
-        addVarToScope(i->name, *i->value);
+    for (auto & i : *attrs.attrs)
+        addVarToScope(i.name, *i.value);
     std::cout << format("Added %1% variables.") % attrs.attrs->size() << std::endl;
 }
 
@@ -509,8 +511,8 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 
             typedef std::map<string, Value *> Sorted;
             Sorted sorted;
-            foreach (Bindings::iterator, i, *v.attrs)
-                sorted[i->name] = i->value;
+            for (auto & i : *v.attrs)
+                sorted[i.name] = i.value;
 
             /* If this is a derivation, then don't show the
                self-references ("all", "out", etc.). */
@@ -522,20 +524,20 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
                     hidden.insert("out");
                 else {
                     state.forceList(*i->value);
-                    for (unsigned int j = 0; j < i->value->list.length; ++j)
-                        hidden.insert(state.forceStringNoCtx(*i->value->list.elems[j]));
+                    for (unsigned int j = 0; j < i->value->listSize(); ++j)
+                        hidden.insert(state.forceStringNoCtx(*i->value->listElems()[j]));
                 }
             }
 
-            foreach (Sorted::iterator, i, sorted) {
-                str << i->first << " = ";
-                if (hidden.find(i->first) != hidden.end())
+            for (auto & i : sorted) {
+                str << i.first << " = ";
+                if (hidden.find(i.first) != hidden.end())
                     str << "«...»";
-                else if (seen.find(i->second) != seen.end())
+                else if (seen.find(i.second) != seen.end())
                     str << "«repeated»";
                 else
                     try {
-                        printValue(str, *i->second, maxDepth - 1, seen);
+                        printValue(str, *i.second, maxDepth - 1, seen);
                     } catch (AssertionError & e) {
                         str << "«error: " << e.msg() << "»";
                     }
@@ -549,17 +551,19 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
     }
 
-    case tList:
+    case tList1:
+    case tList2:
+    case tListN:
         seen.insert(&v);
 
         str << "[ ";
         if (maxDepth > 0)
-            for (unsigned int n = 0; n < v.list.length; ++n) {
-                if (seen.find(v.list.elems[n]) != seen.end())
+            for (unsigned int n = 0; n < v.listSize(); ++n) {
+                if (seen.find(v.listElems()[n]) != seen.end())
                     str << "«repeated»";
                 else
                     try {
-                        printValue(str, *v.list.elems[n], maxDepth - 1, seen);
+                        printValue(str, *v.listElems()[n], maxDepth - 1, seen);
                     } catch (AssertionError & e) {
                         str << "«error: " << e.msg() << "»";
                     }
