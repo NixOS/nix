@@ -8,7 +8,11 @@ libexpr_SOURCES := $(wildcard $(d)/*.cc) $(d)/lexer-tab.cc $(d)/parser-tab.cc
 
 libexpr_LIBS = libutil libstore libformat
 
-libexpr_LDFLAGS = -ldl
+ifeq ($(shell uname),FreeBSD)
+	libexpr_LDFLAGS =
+else
+	libexpr_LDFLAGS = -ldl
+endif
 
 # The dependency on libgc must be propagated (i.e. meaning that
 # programs/libraries that use libexpr must explicitly pass -lgc),

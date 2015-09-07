@@ -9,6 +9,10 @@
 #include <unistd.h>
 #include <signal.h>
 
+#if defined(__FreeBSD__)
+#include <stdlib.h>
+#endif
+
 namespace nix {
 
 

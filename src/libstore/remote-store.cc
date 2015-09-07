@@ -13,6 +13,9 @@
 #include <sys/un.h>
 #include <errno.h>
 #include <fcntl.h>
+#if defined(__FreeBSD__)
+#include <errno.h>
+#endif
 
 #include <iostream>
 #include <unistd.h>
