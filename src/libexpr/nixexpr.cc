@@ -185,13 +185,16 @@ void ExprPos::show(std::ostream & str)
     str << "__curPos";
 }
 
+string showPos(const Pos & pos, const string& locType) {
+    if (!pos)
+      return "";
+    else
+      return (format("%6%" ANSI_BOLD "%1%" ANSI_NORMAL ":%2%:%3%-%4%:%5%") % (string) pos.file % pos.firstline % pos.firstcolumn % pos.lastline % pos.lastcolumn % locType).str();
+}
 
 std::ostream & operator << (std::ostream & str, const Pos & pos)
 {
-    if (!pos)
-        str << "undefined position";
-    else
-        str << (format(ANSI_BOLD "%1%" ANSI_NORMAL ":%2%:%3%") % (string) pos.file % pos.line % pos.column).str();
+    str << showPos(pos, " at ");
     return str;
 }
 
@@ -257,7 +260,7 @@ void ExprVar::bindVars(const StaticEnv & env)
     /* Otherwise, the variable must be obtained from the nearest
        enclosing `with'.  If there is no `with', then we can issue an
        "undefined variable" error now. */
-    if (withLevel == -1) throw UndefinedVarError(format("undefined variable ‘%1%’ at %2%") % name % pos);
+    if (withLevel == -1) throw UndefinedVarError(format("undefined variable ‘%1%’%2%") % name % pos);
 
     fromWith = true;
     this->level = withLevel;
@@ -409,7 +412,7 @@ void ExprLambda::setName(Symbol & name)
 
 string ExprLambda::showNamePos() const
 {
-    return (format("%1% at %2%") % (name.set() ? "‘" + (string) name + "’" : "anonymous function") % pos).str();
+    return (format("%1%%2%") % (name.set() ? "‘" + (string) name + "’" : "anonymous function") % pos).str();
 }
 
 

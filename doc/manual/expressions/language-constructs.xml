@@ -56,6 +56,28 @@ evaluates to <literal>"foobar"</literal>.
 
 </para>
 
+<para>The syntax
+
+<programlisting>
+let {
+  x = "foo";
+  y = "bar";
+  body = x + y;
+}
+</programlisting>
+
+is also allowed; it is syntactic sugar for
+
+<programlisting>
+(rec {
+  x = "foo";
+  y = "bar";
+  body = x + y;
+}).body
+</programlisting>
+
+</para>
+
 </simplesect>
 
 

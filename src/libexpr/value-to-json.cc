@@ -25,11 +25,11 @@ void escapeJSON(std::ostream & str, const string & s)
 
 
 void printValueAsJSON(EvalState & state, bool strict,
-    Value & v, std::ostream & str, PathSet & context)
+    Value & v, std::ostream & str, PathSet & context, const Pos & pos)
 {
     checkInterrupt();
 
-    if (strict) state.forceValue(v);
+    if (strict) state.forceValue(v, pos);
 
     switch (v.type) {
 
@@ -64,10 +64,15 @@ void printValueAsJSON(EvalState & state, bool strict,
                 for (auto & j : names) {
                     Attr & a(*v.attrs->find(state.symbols.create(j)));
                     json.attr(j);
-                    printValueAsJSON(state, strict, *a.value, str, context);
+                    try {
+                        printValueAsJSON(state, strict, *a.value, str, context, *a.pos);
+                    } catch (Error & e) {
+                        addErrorPrefix(e, "while evaluating the attribute ‘%1%’%2%:\n", a.name, *a.pos);
+                        throw;
+                    }
                 }
             } else
-                printValueAsJSON(state, strict, *i->value, str, context);
+                printValueAsJSON(state, strict, *i->value, str, context, *i->pos);
             break;
         }
 
@@ -75,7 +80,12 @@ void printValueAsJSON(EvalState & state, bool strict,
             JSONList json(str);
             for (unsigned int n = 0; n < v.listSize(); ++n) {
                 json.elem();
-                printValueAsJSON(state, strict, *v.listElems()[n], str, context);
+                try {
+                    printValueAsJSON(state, strict, *v.listElems()[n], str, context, pos);
+                } catch (Error & e) {
+                    addErrorPrefix(e, "while evaluating list position ‘%1%’%2%:\n", n, pos);
+                    throw;
+                }
             }
             break;
         }

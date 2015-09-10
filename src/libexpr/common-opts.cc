@@ -35,7 +35,7 @@ Bindings * evalAutoArgs(EvalState & state, std::map<string, string> & in)
             state.mkThunk_(*v, state.parseExprFromString(string(i.second, 1), absPath(".")));
         else
             mkString(*v, string(i.second, 1));
-        res->push_back(Attr(state.symbols.create(i.first), v));
+        res->push_back(Attr(state.symbols.create(i.first), v, &noPos));
     }
     res->sort();
     return res;
@@ -58,7 +58,7 @@ Path lookupFileArg(EvalState & state, string s)
         return downloadFileCached(s, true);
     else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
         Path p = s.substr(1, s.size() - 2);
-        return state.findFile(p);
+        return state.findFile(p, noPos);
     } else
         return absPath(s);
 }

@@ -55,24 +55,24 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         manifest.listElems()[n++] = &v;
         state.mkAttrs(v, 16);
 
-        mkString(*state.allocAttr(v, state.sType), "derivation");
-        mkString(*state.allocAttr(v, state.sName), i.name);
+        mkString(*state.allocAttr(v, state.sType, &noPos), "derivation");
+        mkString(*state.allocAttr(v, state.sName, &noPos), i.name);
         if (!i.system.empty())
-            mkString(*state.allocAttr(v, state.sSystem), i.system);
-        mkString(*state.allocAttr(v, state.sOutPath), i.queryOutPath());
+            mkString(*state.allocAttr(v, state.sSystem, &noPos), i.system);
+        mkString(*state.allocAttr(v, state.sOutPath, &noPos), i.queryOutPath());
         if (drvPath != "")
-            mkString(*state.allocAttr(v, state.sDrvPath), i.queryDrvPath());
+            mkString(*state.allocAttr(v, state.sDrvPath, &noPos), i.queryDrvPath());
 
         // Copy each output.
         DrvInfo::Outputs outputs = i.queryOutputs();
-        Value & vOutputs = *state.allocAttr(v, state.sOutputs);
+        Value & vOutputs = *state.allocAttr(v, state.sOutputs, &noPos);
         state.mkList(vOutputs, outputs.size());
         unsigned int m = 0;
         for (auto & j : outputs) {
             mkString(*(vOutputs.listElems()[m++] = state.allocValue()), j.first);
-            Value & vOutputs = *state.allocAttr(v, state.symbols.create(j.first));
+            Value & vOutputs = *state.allocAttr(v, state.symbols.create(j.first), &noPos);
             state.mkAttrs(vOutputs, 2);
-            mkString(*state.allocAttr(vOutputs, state.sOutPath), j.second);
+            mkString(*state.allocAttr(vOutputs, state.sOutPath, &noPos), j.second);
 
             /* This is only necessary when installing store paths, e.g.,
                `nix-env -i /nix/store/abcd...-foo'. */
@@ -83,13 +83,13 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         }
 
         // Copy the meta attributes.
-        Value & vMeta = *state.allocAttr(v, state.sMeta);
+        Value & vMeta = *state.allocAttr(v, state.sMeta, &noPos);
         state.mkAttrs(vMeta, 16);
         StringSet metaNames = i.queryMetaNames();
         for (auto & j : metaNames) {
             Value * v = i.queryMeta(j);
             if (!v) continue;
-            vMeta.attrs->push_back(Attr(state.symbols.create(j), v));
+            vMeta.attrs->push_back(Attr(state.symbols.create(j), v, &noPos));
         }
         vMeta.attrs->sort();
         v.attrs->sort();
@@ -105,21 +105,21 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
     /* Get the environment builder expression. */
     Value envBuilder;
-    state.evalFile(state.findFile("nix/buildenv.nix"), envBuilder);
+    state.evalFile(state.findFile("nix/buildenv.nix", noPos), envBuilder);
 
     /* Construct a Nix expression that calls the user environment
        builder with the manifest as argument. */
     Value args, topLevel;
     state.mkAttrs(args, 3);
-    mkString(*state.allocAttr(args, state.symbols.create("manifest")),
+    mkString(*state.allocAttr(args, state.symbols.create("manifest"), &noPos),
         manifestFile, singleton<PathSet>(manifestFile));
-    args.attrs->push_back(Attr(state.symbols.create("derivations"), &manifest));
+    args.attrs->push_back(Attr(state.symbols.create("derivations"), &manifest, &noPos));
     args.attrs->sort();
     mkApp(topLevel, envBuilder, args);
 
     /* Evaluate it. */
     debug("evaluating user environment builder");
-    state.forceValue(topLevel);
+    state.forceValue(topLevel, noPos);
     PathSet context;
     Attr & aDrvPath(*topLevel.attrs->find(state.sDrvPath));
     Path topLevelDrv = state.coerceToPath(aDrvPath.pos ? *(aDrvPath.pos) : noPos, *(aDrvPath.value), context);

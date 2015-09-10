@@ -16,10 +16,10 @@ struct Attr
 {
     Symbol name;
     Value * value;
-    Pos * pos;
-    Attr(Symbol name, Value * value, Pos * pos = &noPos)
+    const Pos * pos;
+    Attr(Symbol name, Value * value, const Pos * pos)
         : name(name), value(value), pos(pos) { };
-    Attr() : pos(&noPos) { };
+    Attr(const Pos * pos) : pos(pos) { };
     bool operator < (const Attr & a) const
     {
         return name < a.name;
@@ -57,7 +57,7 @@ public:
 
     iterator find(const Symbol & name)
     {
-        Attr key(name, 0);
+        Attr key(name, 0, 0);
         iterator i = std::lower_bound(begin(), end(), key);
         if (i != end() && i->name == name) return i;
         return end();

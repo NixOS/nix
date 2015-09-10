@@ -47,7 +47,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
 
     for (auto & i : attrPaths) {
         Value & v(*findAlongAttrPath(state, i, autoArgs, vRoot));
-        state.forceValue(v);
+        state.forceValue(v, noPos);
 
         PathSet context;
         if (evalOnly) {
@@ -57,11 +57,11 @@ void processExpr(EvalState & state, const Strings & attrPaths,
             else
                 state.autoCallFunction(autoArgs, v, vRes);
             if (output == okXML)
-                printValueAsXML(state, strict, location, vRes, std::cout, context);
+                printValueAsXML(state, strict, location, vRes, std::cout, context, noPos);
             else if (output == okJSON)
-                printValueAsJSON(state, strict, vRes, std::cout, context);
+                printValueAsJSON(state, strict, vRes, std::cout, context, noPos);
             else {
-                if (strict) state.forceValueDeep(vRes);
+                if (strict) state.forceValueDeep(vRes, noPos);
                 std::cout << vRes << std::endl;
             }
         } else {
@@ -176,7 +176,7 @@ int main(int argc, char * * argv)
 
         if (findFile) {
             for (auto & i : files) {
-                Path p = state.findFile(i);
+                Path p = state.findFile(i, noPos);
                 if (p == "") throw Error(format("unable to find ‘%1%’") % i);
                 std::cout << p << std::endl;
             }

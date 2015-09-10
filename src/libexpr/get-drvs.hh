@@ -28,7 +28,7 @@ private:
 
     Bindings * getMeta();
 
-    bool checkMeta(Value & v);
+    bool checkMeta(Value & v, const Pos& pos);
 
 public:
     string name;
