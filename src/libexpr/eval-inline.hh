@@ -6,6 +6,8 @@ namespace nix {
 
 void EvalState::forceValue(Value & v, const Pos & pos)
 {
+    if(!(v.pos))
+        v.pos = pos;
     if (v.type == tThunk) {
         Env * env = v.thunk.env;
         Expr * expr = v.thunk.expr;
@@ -14,10 +16,10 @@ void EvalState::forceValue(Value & v, const Pos & pos)
             //checkInterrupt();
             expr->eval(*this, *env, v);
         } catch (Error & e) {
+            addErrorPrefix(e, "while evaluating %1%%2%:\n", v, (v.pos == pos) ? noPos : pos);
             v.type = tThunk;
             v.thunk.env = env;
             v.thunk.expr = expr;
-            addErrorPrefix(e, "while evaluating value%1%:\n", pos);
             throw;
         }
     }

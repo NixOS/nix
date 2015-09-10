@@ -293,6 +293,7 @@ void realiseContext(const PathSet & context);
 
 LocalNoInline(void addErrorPrefix(Error & e, const char * s, const ExprLambda & fun, const Pos & pos));
 LocalNoInline(void addErrorPrefix(Error & e, const char * s, const Pos & pos));
+LocalNoInline(void addErrorPrefix(Error & e, const char * s, const Value & v, const Pos & pos));
 LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2));
 LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, const Pos & pos));
 LocalNoInline(void addErrorPrefix(Error & e, const char * s, unsigned int s2, const Pos & pos));
@@ -303,6 +304,9 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2));
 LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const Pos & pos));
 LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3));
 LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3, const Pos & pos));
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const Value & v, const Pos & pos));
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const Value & v, const Value & v2, const Pos & pos));
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const Value & v, const string & s2, const Pos & pos));
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const ExprLambda & fun, const Symbol & s2, const Pos & pos));
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const Pos & pos));
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v));
