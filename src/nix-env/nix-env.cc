@@ -570,14 +570,16 @@ static void upgradeDerivations(Globals & globals,
                    constraints specified by upgradeType.  If there are
                    multiple matches, take the one with the highest
                    priority.  If there are still multiple matches,
-                   take the one with the highest version. */
+                   take the one with the highest version.
+                   Do not upgrade if it would decrease the priority. */
                 DrvInfos::iterator bestElem = availElems.end();
-                DrvName bestName;
+                string bestVersion;
                 for (auto j = availElems.begin(); j != availElems.end(); ++j) {
+                    if (comparePriorities(*globals.state, i, *j) > 0)
+                        continue;
                     DrvName newName(j->name);
                     if (newName.name == drvName.name) {
-                        int d = comparePriorities(*globals.state, i, *j);
-                        if (d == 0) d = compareVersions(drvName.version, newName.version);
+                        int d = compareVersions(drvName.version, newName.version);
                         if ((upgradeType == utLt && d < 0) ||
                             (upgradeType == utLeq && d <= 0) ||
                             (upgradeType == utEq && d == 0) ||
@@ -586,11 +588,11 @@ static void upgradeDerivations(Globals & globals,
                             int d2 = -1;
                             if (bestElem != availElems.end()) {
                                 d2 = comparePriorities(*globals.state, *bestElem, *j);
-                                if (d2 == 0) d2 = compareVersions(bestName.version, newName.version);
+                                if (d2 == 0) d2 = compareVersions(bestVersion, newName.version);
                             }
                             if (d2 < 0 && (!globals.prebuiltOnly || isPrebuilt(*globals.state, *j))) {
                                 bestElem = j;
-                                bestName = newName;
+                                bestVersion = newName.version;
                             }
                         }
                     }
