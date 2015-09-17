@@ -1277,7 +1277,7 @@ static void opDeleteGenerations(Globals & globals, Strings opFlags, Strings opAr
         std::set<unsigned int> gens;
         for (auto & i : opArgs) {
             unsigned int n;
-            if (!string2Int(i, n) || n < 0)
+            if (!string2Int(i, n))
                 throw UsageError(format("invalid generation number ‘%1%’") % i);
             gens.insert(n);
         }

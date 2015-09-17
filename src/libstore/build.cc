@@ -806,7 +806,7 @@ public:
 
     void timedOut() override;
 
-    string key()
+    string key() override
     {
         /* Ensure that derivations get built in order of their name,
            i.e. a derivation named "aardvark" always comes before
@@ -815,7 +815,7 @@ public:
         return "b$" + storePathToName(drvPath) + "$" + drvPath;
     }
 
-    void work();
+    void work() override;
 
     Path getDrvPath()
     {
@@ -863,8 +863,8 @@ private:
     void deleteTmpDir(bool force);
 
     /* Callback used by the worker to write to the log. */
-    void handleChildOutput(int fd, const string & data);
-    void handleEOF(int fd);
+    void handleChildOutput(int fd, const string & data) override;
+    void handleEOF(int fd) override;
 
     /* Return the set of (in)valid paths. */
     PathSet checkPathValidity(bool returnValid, bool checkHash);

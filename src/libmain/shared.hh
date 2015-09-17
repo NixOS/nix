@@ -88,7 +88,7 @@ extern volatile ::sig_atomic_t blockInt;
 
 string showBytes(unsigned long long bytes);
 
-class GCResults;
+struct GCResults;
 
 struct PrintFreed
 {

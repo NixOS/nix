@@ -24,7 +24,9 @@ ifeq ($(perlbindings), yes)
 
   Store_CXXFLAGS = \
     -I$(shell $(perl) -e 'use Config; print $$Config{archlibexp};')/CORE \
-    -D_FILE_OFFSET_BITS=64 -Wno-unused-variable -Wno-literal-suffix -Wno-reserved-user-defined-literal
+    -D_FILE_OFFSET_BITS=64 \
+    -Wno-unknown-warning-option -Wno-unused-variable -Wno-literal-suffix \
+    -Wno-reserved-user-defined-literal -Wno-duplicate-decl-specifier -Wno-pointer-bool-conversion
 
   Store_LIBS = libstore libutil
 

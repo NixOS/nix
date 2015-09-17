@@ -98,41 +98,41 @@ public:
 
     /* Implementations of abstract store API methods. */
 
-    bool isValidPath(const Path & path);
+    bool isValidPath(const Path & path) override;
 
-    PathSet queryValidPaths(const PathSet & paths);
+    PathSet queryValidPaths(const PathSet & paths) override;
 
-    PathSet queryAllValidPaths();
+    PathSet queryAllValidPaths() override;
 
-    ValidPathInfo queryPathInfo(const Path & path);
+    ValidPathInfo queryPathInfo(const Path & path) override;
 
-    Hash queryPathHash(const Path & path);
+    Hash queryPathHash(const Path & path) override;
 
-    void queryReferences(const Path & path, PathSet & references);
+    void queryReferences(const Path & path, PathSet & references) override;
 
-    void queryReferrers(const Path & path, PathSet & referrers);
+    void queryReferrers(const Path & path, PathSet & referrers) override;
 
-    Path queryDeriver(const Path & path);
+    Path queryDeriver(const Path & path) override;
 
-    PathSet queryValidDerivers(const Path & path);
+    PathSet queryValidDerivers(const Path & path) override;
 
-    PathSet queryDerivationOutputs(const Path & path);
+    PathSet queryDerivationOutputs(const Path & path) override;
 
-    StringSet queryDerivationOutputNames(const Path & path);
+    StringSet queryDerivationOutputNames(const Path & path) override;
 
-    Path queryPathFromHashPart(const string & hashPart);
+    Path queryPathFromHashPart(const string & hashPart) override;
 
-    PathSet querySubstitutablePaths(const PathSet & paths);
+    PathSet querySubstitutablePaths(const PathSet & paths) override;
 
     void querySubstitutablePathInfos(const Path & substituter,
         PathSet & paths, SubstitutablePathInfos & infos);
 
     void querySubstitutablePathInfos(const PathSet & paths,
-        SubstitutablePathInfos & infos);
+        SubstitutablePathInfos & infos) override;
 
     Path addToStore(const string & name, const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter, bool repair = false);
+        PathFilter & filter = defaultPathFilter, bool repair = false) override;
 
     /* Like addToStore(), but the contents of the path are contained
        in `dump', which is either a NAR serialisation (if recursive ==
@@ -142,43 +142,43 @@ public:
         bool recursive = true, HashType hashAlgo = htSHA256, bool repair = false);
 
     Path addTextToStore(const string & name, const string & s,
-        const PathSet & references, bool repair = false);
+        const PathSet & references, bool repair = false) override;
 
     void exportPath(const Path & path, bool sign,
-        Sink & sink);
+        Sink & sink) override;
 
-    Paths importPaths(bool requireSignature, Source & source);
+    Paths importPaths(bool requireSignature, Source & source) override;
 
-    void buildPaths(const PathSet & paths, BuildMode buildMode);
+    void buildPaths(const PathSet & paths, BuildMode buildMode) override;
 
     BuildResult buildDerivation(const Path & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override;
 
-    void ensurePath(const Path & path);
+    void ensurePath(const Path & path) override;
 
-    void addTempRoot(const Path & path);
+    void addTempRoot(const Path & path) override;
 
-    void addIndirectRoot(const Path & path);
+    void addIndirectRoot(const Path & path) override;
 
-    void syncWithGC();
+    void syncWithGC() override;
 
-    Roots findRoots();
+    Roots findRoots() override;
 
-    void collectGarbage(const GCOptions & options, GCResults & results);
+    void collectGarbage(const GCOptions & options, GCResults & results) override;
 
     /* Optimise the disk space usage of the Nix store by hard-linking
        files with the same contents. */
     void optimiseStore(OptimiseStats & stats);
 
     /* Generic variant of the above method.  */
-    void optimiseStore();
+    void optimiseStore() override;
 
     /* Optimise a single store path. */
     void optimisePath(const Path & path);
 
     /* Check the integrity of the Nix store.  Returns true if errors
        remain. */
-    bool verifyStore(bool checkContents, bool repair);
+    bool verifyStore(bool checkContents, bool repair) override;
 
     /* Register the validity of a path, i.e., that `path' exists, that
        the paths referenced by it exists, and in the case of an output
@@ -197,9 +197,9 @@ public:
     /* Query whether `path' previously failed to build. */
     bool hasPathFailed(const Path & path);
 
-    PathSet queryFailedPaths();
+    PathSet queryFailedPaths() override;
 
-    void clearFailedPaths(const PathSet & paths);
+    void clearFailedPaths(const PathSet & paths) override;
 
     void vacuumDB();
 
