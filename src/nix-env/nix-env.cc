@@ -602,9 +602,11 @@ static void upgradeDerivations(Globals & globals,
                     i.queryOutPath() !=
                     bestElem->queryOutPath())
                 {
+                    const char * action = compareVersions(drvName.version, bestVersion) <= 0
+                        ? "upgrading" : "downgrading";
                     printMsg(lvlInfo,
-                        format("upgrading ‘%1%’ to ‘%2%’")
-                        % i.name % bestElem->name);
+                        format("%1% ‘%2%’ to ‘%3%’")
+                        % action % i.name % bestElem->name);
                     newElems.push_back(*bestElem);
                 } else newElems.push_back(i);
 
