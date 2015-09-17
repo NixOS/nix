@@ -378,7 +378,7 @@ number of possible ways:
 
 <variablelist>
 
-  <varlistentry><term><option>--prebuild-only</option> / <option>-b</option></term>
+  <varlistentry><term><option>--prebuilt-only</option> / <option>-b</option></term>
 
     <listitem><para>Use only derivations for which a substitute is
     registered, i.e., there is a pre-built binary available that can
@@ -1012,7 +1012,7 @@ user environment elements, etc. -->
 
   </varlistentry>
 
-  <varlistentry><term><option>--prebuild-only</option> / <option>-b</option></term>
+  <varlistentry><term><option>--prebuilt-only</option> / <option>-b</option></term>
 
     <listitem><para>Show only derivations for which a substitute is
     registered, i.e., there is a pre-built binary available that can
