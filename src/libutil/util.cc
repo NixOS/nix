@@ -167,10 +167,11 @@ string baseNameOf(const Path & path)
 
 bool isInDir(const Path & path, const Path & dir)
 {
-    return path[0] == '/'
-        && string(path, 0, dir.size()) == dir
-        && path.size() >= dir.size() + 2
-        && path[dir.size()] == '/';
+    return dir == "/"
+        || (path[0] == '/'
+            && string(path, 0, dir.size()) == dir
+            && path.size() >= dir.size() + 2
+            && path[dir.size()] == '/');
 }
 
 

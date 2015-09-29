@@ -59,7 +59,7 @@
 /* chroot-like behavior from Apple's sandbox */
 #if __APPLE__
     #define SANDBOX_ENABLED 1
-    #define DEFAULT_ALLOWED_IMPURE_PREFIXES "/System/Library /usr/lib /dev /bin/sh"
+    #define DEFAULT_ALLOWED_IMPURE_PREFIXES "/"
 #else
     #define SANDBOX_ENABLED 0
     #define DEFAULT_ALLOWED_IMPURE_PREFIXES "/bin" "/usr/bin"
@@ -2451,7 +2451,7 @@ void DerivationGoal::runChild()
 
             sandboxProfile += "(allow file-read* file-write-data (literal \"/dev/null\"))\n";
 
-            sandboxProfile += "(allow ipc-posix-shm*)\n";
+            sandboxProfile += "(allow ipc-posix-shm* ipc-posix-sem)\n";
 
             sandboxProfile += "(allow mach-lookup\n"
                 "\t(global-name \"com.apple.SecurityServer\")\n"
