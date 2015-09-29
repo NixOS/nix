@@ -2439,8 +2439,10 @@ void DerivationGoal::runChild()
             for (auto & i : inputPaths)
                 dirsInChroot[i] = i;
 
-            /* TODO: we should factor out the policy cleanly, so we don't have to repeat the constants every time... */
+            /* This has to appear before import statements */
             sandboxProfile += "(version 1)\n";
+
+            sandboxProfile += (format("(import \"%1%/share/nix/sandbox-defaults.sb\")\n") % NIX_PREFIX).str();
 
             /* Violations will go to the syslog if you set this. Unfortunately the destination does not appear to be configurable */
             if (settings.get("darwin-log-sandbox-violations", false)) {
@@ -2449,76 +2451,12 @@ void DerivationGoal::runChild()
                 sandboxProfile += "(deny default (with no-log))\n";
             }
 
-            sandboxProfile += "(allow file-read* file-write-data (literal \"/dev/null\"))\n";
-
-            sandboxProfile += "(allow ipc-posix-shm* ipc-posix-sem)\n";
-
-            sandboxProfile += "(allow mach-lookup\n"
-                "\t(global-name \"com.apple.SecurityServer\")\n"
-                ")\n";
-
-            sandboxProfile += "(allow file-read*\n"
-                "\t(literal \"/dev/dtracehelper\")\n"
-                "\t(literal \"/dev/tty\")\n"
-                "\t(literal \"/dev/autofs_nowait\")\n"
-                "\t(literal \"/private/var/run/systemkeychaincheck.done\")\n"
-                "\t(literal \"/private/etc/protocols\")\n"
-                "\t(literal \"/private/var/tmp\")\n"
-                "\t(subpath \"/usr/share/locale\")\n"
-                "\t(subpath \"/usr/share/zoneinfo\")\n"
-                "\t(literal \"/private/var/db\")\n"
-                "\t(subpath \"/private/var/db/mds\")\n"
-                ")\n";
-
-            sandboxProfile += "(allow file-write*\n"
-                "\t(literal \"/dev/tty\")\n"
-                "\t(literal \"/dev/dtracehelper\")\n"
-                "\t(literal \"/mds\")\n"
-                ")\n";
-
-            sandboxProfile += "(allow file-ioctl\n"
-                "\t(literal \"/dev/dtracehelper\")\n"
-                ")\n";
-
-            sandboxProfile += "(allow file-read-metadata\n"
-                "\t(literal \"/var\")\n"
-                "\t(literal \"/tmp\")\n"
-                "\t(literal \"/etc\")\n"
-                "\t(literal \"/etc/nix\")\n"
-                "\t(literal \"/etc/nix/nix.conf\")\n"
-                "\t(literal \"/etc/resolv.conf\")\n"
-                "\t(literal \"/private/etc/resolv.conf\")\n"
-                ")\n";
-
-            sandboxProfile += "(allow file-read*\n"
-                "\t(literal \"/private/etc/nix/nix.conf\")\n"
-                "\t(literal \"/private/var/run/resolv.conf\")\n"
-                ")\n";
-
-            sandboxProfile += "(allow file-read* file-write*\n"
-                "\t(subpath \"/dev/fd\")\n"
-                ")\n";
-
             /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different mechanisms
                to find temporary directories, so we want to open up a broader place for them to dump their files, if needed. */
             Path globalTmpDir = canonPath(getEnv("TMPDIR", "/tmp"), true);
 
             /* They don't like trailing slashes on subpath directives */
             if (globalTmpDir.back() == '/') globalTmpDir.pop_back();
-
-            /* This is where our temp folders are and where most of the building will happen, so we want rwx on it. */
-            sandboxProfile += (format("(allow file-read* file-write* process-exec (subpath \"%1%\") (subpath \"/private/tmp\"))\n") % globalTmpDir).str();
-
-            sandboxProfile += "(allow process-fork)\n";
-            sandboxProfile += "(allow sysctl-read)\n";
-            sandboxProfile += "(allow signal (target same-sandbox))\n";
-
-            /* Enables getpwuid (used by git and others) */
-            sandboxProfile += "(allow mach-lookup (global-name \"com.apple.system.notification_center\") (global-name \"com.apple.system.opendirectoryd.libinfo\"))\n";
-
-            /* Allow local networking operations, mostly because lots of test suites use it and it seems mostly harmless */
-            sandboxProfile += "(allow network* (local ip) (remote unix-socket))";
-
 
             /* Our rwx outputs */
             sandboxProfile += "(allow file-read* file-write* process-exec\n";
@@ -2564,6 +2502,8 @@ void DerivationGoal::runChild()
             args.push_back("sandbox-exec");
             args.push_back("-p");
             args.push_back(sandboxProfile);
+            args.push_back("-D");
+            args.push_back((format("_GLOBAL_TMP_DIR=%1%") % globalTmpDir).str());
             args.push_back(drv->builder);
         } else {
             builder = drv->builder.c_str();
