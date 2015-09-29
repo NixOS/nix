@@ -2460,7 +2460,6 @@ void DerivationGoal::runChild()
             sandboxProfile += "(allow file-read*\n"
                 "\t(literal \"/dev/dtracehelper\")\n"
                 "\t(literal \"/dev/tty\")\n"
-                "\t(literal \"/System/Library/CoreServices/SystemVersion.plist\")\n"
                 "\t(literal \"/dev/autofs_nowait\")\n"
                 "\t(literal \"/private/var/run/systemkeychaincheck.done\")\n"
                 "\t(literal \"/private/etc/protocols\")\n"
