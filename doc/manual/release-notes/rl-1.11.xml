@@ -1,0 +1,23 @@
+<section xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="ssec-relnotes-1.11">
+
+<title>Release 1.11 (TODO: date, 2015)</title>
+
+<para>TODO: This is primarily a bug fix release. It also has a number of new
+features:</para>
+
+<itemizedlist>
+  <listitem>
+    <para>All "chroot"-containing strings got renamed to "sandbox".
+      In particular, some nix options got renamed, but the old names
+      are still accepted as lower-priority aliases.
+    </para>
+  </listitem>
+</itemizedlist>
+
+<para>This release has contributions from TODO.</para>
+
+</section>
