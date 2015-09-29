@@ -59,7 +59,7 @@
 /* chroot-like behavior from Apple's sandbox */
 #if __APPLE__
     #define SANDBOX_ENABLED 1
-    #define DEFAULT_ALLOWED_IMPURE_PREFIXES "/"
+    #define DEFAULT_ALLOWED_IMPURE_PREFIXES "/System/Library /usr /dev /bin/sh"
 #else
     #define SANDBOX_ENABLED 0
     #define DEFAULT_ALLOWED_IMPURE_PREFIXES "/bin" "/usr/bin"
