@@ -48,6 +48,7 @@ int main(int argc, char * * argv)
         HashType ht = htSHA256;
         std::vector<string> args;
         Strings searchPath;
+        bool printPath = getEnv("PRINT_PATH") != "";
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--help")
@@ -60,6 +61,8 @@ int main(int argc, char * * argv)
                 if (ht == htUnknown)
                     throw UsageError(format("unknown hash type ‘%1%’") % s);
             }
+            else if (*arg == "--print-path")
+                printPath = true;
             else if (parseSearchPathArg(arg, end, searchPath))
                 ;
             else if (*arg != "" && arg->at(0) == '-')
@@ -123,10 +126,11 @@ int main(int argc, char * * argv)
             storePath = store->addToStore(name, tmpFile, false, ht);
         }
 
-        printMsg(lvlInfo, format("path is ‘%1%’") % storePath);
+        if (!printPath)
+            printMsg(lvlInfo, format("path is ‘%1%’") % storePath);
 
         std::cout << printHash16or32(hash) << std::endl;
-        if (getEnv("PRINT_PATH") != "")
+        if (printPath)
             std::cout << storePath << std::endl;
     });
 }

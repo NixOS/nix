@@ -3,7 +3,7 @@
       xmlns:xi="http://www.w3.org/2001/XInclude"
       version="5.0"
       xml:id="sec-nix-prefetch-url">
-  
+
 <refmeta>
   <refentrytitle>nix-prefetch-url</refentrytitle>
   <manvolnum>1</manvolnum>
@@ -54,8 +54,8 @@ error if signaled if the actual hash of the file does not match the
 specified hash.</para>
 
 <para>This command prints the hash on standard output.  Additionally,
-if the environment variable <envar>PRINT_PATH</envar> is set, the path
-of the downloaded file in the Nix store is also printed.</para>
+if the option <option>--print-path</option> is used, the path of the
+downloaded file in the Nix store is also printed.</para>
 
 </refsection>
 
@@ -63,13 +63,20 @@ of the downloaded file in the Nix store is also printed.</para>
 <refsection><title>Options</title>
 
 <variablelist>
-  
+
   <varlistentry><term><option>--type</option> <replaceable>hashAlgo</replaceable></term>
 
     <listitem><para>Use the specified cryptographic hash algorithm,
     which can be one of <literal>md5</literal>,
     <literal>sha1</literal>, and
     <literal>sha256</literal>.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--print-path</option></term>
+
+    <listitem><para>Print the store path of the downloaded file on
+    standard output.</para></listitem>
 
   </varlistentry>
 
@@ -81,14 +88,14 @@ of the downloaded file in the Nix store is also printed.</para>
 <refsection><title>Examples</title>
 
 <screen>
-$ nix-prefetch-url ftp://ftp.nluug.nl/pub/gnu/make/make-3.80.tar.bz2
-0bbd1df101bc0294d440471e50feca71
+$ nix-prefetch-url ftp://ftp.gnu.org/pub/gnu/hello/hello-2.10.tar.gz
+0ssi1wpaf7plaswqqjwigppsg5fyh99vdlb9kzl7c9lng89ndq1i
 
-$ PRINT_PATH=1 nix-prefetch-url ftp://ftp.nluug.nl/pub/gnu/make/make-3.80.tar.bz2
-0bbd1df101bc0294d440471e50feca71
-/nix/store/wvyz8ifdn7wyz1p3pqyn0ra45ka2l492-make-3.80.tar.bz2</screen>
+$ nix-prefetch-url --print-path mirror://gnu/hello/hello-2.10.tar.gz
+0ssi1wpaf7plaswqqjwigppsg5fyh99vdlb9kzl7c9lng89ndq1i
+/nix/store/3x7dwzq014bblazs7kq20p9hyzz0qh8g-hello-2.10.tar.gz</screen>
 
 </refsection>
 
-    
+
 </refentry>
