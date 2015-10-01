@@ -4,7 +4,6 @@ nix_bin_scripts := \
   $(d)/nix-copy-closure \
   $(d)/nix-generate-patches \
   $(d)/nix-install-package \
-  $(d)/nix-prefetch-url \
   $(d)/nix-pull \
   $(d)/nix-push
 

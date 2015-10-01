@@ -202,6 +202,7 @@ public:
     AutoDelete(const Path & p, bool recursive = true);
     ~AutoDelete();
     void cancel();
+    operator Path() const { return path; }
 };
 
 
