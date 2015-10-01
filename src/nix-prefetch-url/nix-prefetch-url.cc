@@ -5,6 +5,7 @@
 #include "eval.hh"
 #include "eval-inline.hh"
 #include "common-opts.hh"
+#include "attr-path.hh"
 
 #include <iostream>
 
@@ -49,6 +50,9 @@ int main(int argc, char * * argv)
         std::vector<string> args;
         Strings searchPath;
         bool printPath = getEnv("PRINT_PATH") != "";
+        bool fromExpr = false;
+        string attrPath;
+        std::map<string, string> autoArgs_;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--help")
@@ -63,6 +67,12 @@ int main(int argc, char * * argv)
             }
             else if (*arg == "--print-path")
                 printPath = true;
+            else if (*arg == "--attr" || *arg == "-A") {
+                fromExpr = true;
+                attrPath = getArg(*arg, arg, end);
+            }
+            else if (parseAutoArgs(arg, end, autoArgs_))
+                ;
             else if (parseSearchPathArg(arg, end, searchPath))
                 ;
             else if (*arg != "" && arg->at(0) == '-')
@@ -72,15 +82,37 @@ int main(int argc, char * * argv)
             return true;
         });
 
-        if (args.size() < 1 || args.size() > 2)
-            throw UsageError("nix-prefetch-url expects one argument");
+        if (args.size() > 2)
+            throw UsageError("too many arguments");
 
         store = openStore();
-
         EvalState state(searchPath);
 
+        Bindings & autoArgs(*evalAutoArgs(state, autoArgs_));
+
+        /* If -A is given, get the URI from the specified Nix
+           expression. */
+        string uri;
+        if (!fromExpr) {
+            if (args.empty())
+                throw UsageError("you must specify a URI");
+            uri = args[0];
+        } else {
+            Path path = resolveExprPath(lookupFileArg(state, args.empty() ? "." : args[0]));
+            Value vRoot;
+            state.evalFile(path, vRoot);
+            Value & v(*findAlongAttrPath(state, attrPath, autoArgs, vRoot));
+            state.forceAttrs(v);
+            auto urls = v.attrs->find(state.symbols.create("urls"));
+            if (urls == v.attrs->end())
+                throw Error("attribute set does not contain a ‘urls’ attribute");
+            state.forceList(*urls->value);
+            if (urls->value->listSize() < 1)
+                throw Error("‘urls’ list is empty");
+            uri = state.forceString(*urls->value->listElems()[0]);
+        }
+
         /* Figure out a name in the Nix store. */
-        auto uri = args[0];
         auto name = baseNameOf(uri);
         if (name.empty())
             throw Error(format("cannot figure out file name for ‘%1%’") % uri);
