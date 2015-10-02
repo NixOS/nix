@@ -61,7 +61,9 @@ ifeq ($(BUILD_SHARED_LIBS), 1)
   endif
   ifneq ($(OS), Darwin)
    ifneq ($(OS), SunOS)
-    GLOBAL_LDFLAGS += -Wl,--no-copy-dt-needed-entries
+    ifneq ($(OS), FreeBSD)
+     GLOBAL_LDFLAGS += -Wl,--no-copy-dt-needed-entries
+    endif
    endif
   endif
   SET_RPATH_TO_LIBS ?= 1
