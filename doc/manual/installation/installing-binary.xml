@@ -28,6 +28,7 @@ $ chown alice /nix
 
 </para>
 
+<!--
 <para>You can also manually download and install a binary package.
 Binary packages of the latest stable release are available for Fedora,
 Debian, Ubuntu, Mac OS X and various other systems from the <link
@@ -53,12 +54,12 @@ $ dpkg -i nix_1.8-1_amd64.deb</screen>
 
 </para>
 
-<para>For other platforms, including Mac OS X and other Linux
-distributions, you can download a binary tarball that contains Nix and
-all its dependencies.  (This is what the install script at
-<uri>https://nixos.org/nix/install</uri> uses.)  You should unpack it
-somewhere (e.g. in <filename>/tmp</filename>), and then run the script
-named <command>install</command> inside the binary tarball:
+<para>You can also download a binary tarball that contains Nix and all
+its dependencies.  (This is what the install script at
+<uri>https://nixos.org/nix/install</uri> does automatically.)  You
+should unpack it somewhere (e.g. in <filename>/tmp</filename>), and
+then run the script named <command>install</command> inside the binary
+tarball:
 
 <screen>
 alice$ cd /tmp
@@ -76,6 +77,15 @@ other auxiliary data, if desired:
 
 <screen>
 $ rm -rf /nix</screen>
+
+</para>
+-->
+
+<para>You can uninstall Nix simply by running:
+
+<screen>
+$ rm -rf /nix
+</screen>
 
 </para>
 
