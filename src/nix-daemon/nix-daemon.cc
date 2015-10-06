@@ -694,8 +694,14 @@ static PeerInfo getPeerInfo(int remote)
 
     xucred cred;
     socklen_t credLen = sizeof(cred);
+#if defined(SOL_LOCAL)
     if (getsockopt(remote, SOL_LOCAL, LOCAL_PEERCRED, &cred, &credLen) == -1)
         throw SysError("getting peer credentials");
+#else
+    // e.g. FreeBSD
+    if (getsockopt(remote, SOL_SOCKET, LOCAL_PEERCRED, &cred, &credLen) == -1)
+        throw SysError("getting peer credentials");
+#endif
     peer = { false, 0, true, cred.cr_uid, false, 0 };
 
 #endif
