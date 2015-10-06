@@ -853,7 +853,7 @@ static void opServe(Strings opFlags, Strings opArgs)
     if (magic != SERVE_MAGIC_1) throw Error("protocol mismatch");
     out << SERVE_MAGIC_2 << SERVE_PROTOCOL_VERSION;
     out.flush();
-    readInt(in); // Client version, unused for now
+    unsigned int clientVersion = readInt(in);
 
     auto getBuildSettings = [&]() {
         // FIXME: changing options here doesn't work if we're
@@ -863,6 +863,8 @@ static void opServe(Strings opFlags, Strings opArgs)
         settings.useSubstitutes = false;
         settings.maxSilentTime = readInt(in);
         settings.buildTimeout = readInt(in);
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 2)
+            settings.maxLogSize = readInt(in);
     };
 
     while (true) {

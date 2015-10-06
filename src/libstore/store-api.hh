@@ -112,7 +112,8 @@ struct BuildResult
         CachedFailure,
         TimedOut,
         MiscFailure,
-        DependencyFailed
+        DependencyFailed,
+        LogLimitExceeded,
     } status = MiscFailure;
     std::string errorMsg;
     //time_t startTime = 0, stopTime = 0;

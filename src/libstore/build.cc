@@ -2854,7 +2854,8 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
             printMsg(lvlError,
                 format("%1% killed after writing more than %2% bytes of log output")
                 % getName() % settings.maxLogSize);
-            timedOut(); // not really a timeout, but close enough
+            killChild();
+            done(BuildResult::LogLimitExceeded);
             return;
         }
         if (verbosity >= settings.buildVerbosity)
