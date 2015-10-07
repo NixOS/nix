@@ -54,6 +54,7 @@ int main(int argc, char * * argv)
         string attrPath;
         std::map<string, string> autoArgs_;
         bool unpack = false;
+        string name;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--help")
@@ -122,10 +123,16 @@ int main(int argc, char * * argv)
                 printMsg(lvlInfo, "warning: this does not look like a fetchurl call");
             else
                 unpack = state.forceString(*attr->value) == "recursive";
+
+            /* Extract the name. */
+            attr = v.attrs->find(state.symbols.create("name"));
+            if (attr != v.attrs->end())
+                name = state.forceString(*attr->value);
         }
 
         /* Figure out a name in the Nix store. */
-        auto name = baseNameOf(uri);
+        if (name.empty())
+            name = baseNameOf(uri);
         if (name.empty())
             throw Error(format("cannot figure out file name for ‘%1%’") % uri);
 
