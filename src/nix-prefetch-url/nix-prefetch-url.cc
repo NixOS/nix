@@ -53,6 +53,7 @@ int main(int argc, char * * argv)
         bool fromExpr = false;
         string attrPath;
         std::map<string, string> autoArgs_;
+        bool unpack = false;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--help")
@@ -71,6 +72,8 @@ int main(int argc, char * * argv)
                 fromExpr = true;
                 attrPath = getArg(*arg, arg, end);
             }
+            else if (*arg == "--unpack")
+                unpack = true;
             else if (parseAutoArgs(arg, end, autoArgs_))
                 ;
             else if (parseSearchPathArg(arg, end, searchPath))
@@ -103,13 +106,22 @@ int main(int argc, char * * argv)
             state.evalFile(path, vRoot);
             Value & v(*findAlongAttrPath(state, attrPath, autoArgs, vRoot));
             state.forceAttrs(v);
-            auto urls = v.attrs->find(state.symbols.create("urls"));
-            if (urls == v.attrs->end())
+
+            /* Extract the URI. */
+            auto attr = v.attrs->find(state.symbols.create("urls"));
+            if (attr == v.attrs->end())
                 throw Error("attribute set does not contain a ‘urls’ attribute");
-            state.forceList(*urls->value);
-            if (urls->value->listSize() < 1)
+            state.forceList(*attr->value);
+            if (attr->value->listSize() < 1)
                 throw Error("‘urls’ list is empty");
-            uri = state.forceString(*urls->value->listElems()[0]);
+            uri = state.forceString(*attr->value->listElems()[0]);
+
+            /* Extract the hash mode. */
+            attr = v.attrs->find(state.symbols.create("outputHashMode"));
+            if (attr == v.attrs->end())
+                printMsg(lvlInfo, "warning: this does not look like a fetchurl call");
+            else
+                unpack = state.forceString(*attr->value) == "recursive";
         }
 
         /* Figure out a name in the Nix store. */
@@ -123,7 +135,7 @@ int main(int argc, char * * argv)
         Path storePath;
         if (args.size() == 2) {
             expectedHash = parseHash16or32(ht, args[1]);
-            storePath = makeFixedOutputPath(false, ht, expectedHash, name);
+            storePath = makeFixedOutputPath(unpack, ht, expectedHash, name);
             if (store->isValidPath(storePath))
                 hash = expectedHash;
             else
@@ -134,28 +146,48 @@ int main(int argc, char * * argv)
 
             auto actualUri = resolveMirrorUri(state, uri);
 
-            if (uri != actualUri)
-                printMsg(lvlInfo, format("‘%1%’ expands to ‘%2%’") % uri % actualUri);
-
             /* Download the file. */
+            printMsg(lvlInfo, format("downloading ‘%1%’...") % actualUri);
             auto result = downloadFile(actualUri);
+
+            AutoDelete tmpDir(createTempDir(), true);
+            Path tmpFile = (Path) tmpDir + "/tmp";
+            writeFile(tmpFile, result.data);
+
+            /* Optionally unpack the file. */
+            if (unpack) {
+                printMsg(lvlInfo, "unpacking...");
+                Path unpacked = (Path) tmpDir + "/unpacked";
+                createDirs(unpacked);
+                if (hasSuffix(baseNameOf(uri), ".zip"))
+                    runProgram("unzip", true, {"-qq", tmpFile, "-d", unpacked}, "");
+                else
+                    // FIXME: this requires GNU tar for decompression.
+                    runProgram("tar", true, {"xf", tmpFile, "-C", unpacked}, "");
+
+                /* If the archive unpacks to a single file/directory, then use
+                   that as the top-level. */
+                auto entries = readDirectory(unpacked);
+                if (entries.size() == 1)
+                    tmpFile = unpacked + "/" + entries[0].name;
+                else
+                    tmpFile = unpacked;
+            }
+
+            /* FIXME: inefficient; addToStore() will also hash
+               this. */
+            hash = unpack ? hashPath(ht, tmpFile).first : hashString(ht, result.data);
+
+            if (expectedHash != Hash(ht) && expectedHash != hash)
+                throw Error(format("hash mismatch for ‘%1%’") % uri);
 
             /* Copy the file to the Nix store. FIXME: if RemoteStore
                implemented addToStoreFromDump() and downloadFile()
                supported a sink, we could stream the download directly
                into the Nix store. */
-            AutoDelete tmpDir(createTempDir(), true);
-            Path tmpFile = (Path) tmpDir + "/tmp";
-            writeFile(tmpFile, result.data);
+            storePath = store->addToStore(name, tmpFile, unpack, ht);
 
-            /* FIXME: inefficient; addToStore() will also hash
-               this. */
-            hash = hashString(ht, result.data);
-
-            if (expectedHash != Hash(ht) && expectedHash != hash)
-                throw Error(format("hash mismatch for ‘%1%’") % uri);
-
-            storePath = store->addToStore(name, tmpFile, false, ht);
+            assert(storePath == makeFixedOutputPath(unpack, ht, hash, name));
         }
 
         if (!printPath)
