@@ -6,7 +6,17 @@
 
 #include <curl/curl.h>
 
+#include <iostream>
+
+
 namespace nix {
+
+double getTime()
+{
+    struct timeval tv;
+    gettimeofday(&tv, 0);
+    return tv.tv_sec + (tv.tv_usec / 1000000.0);
+}
 
 struct Curl
 {
@@ -15,6 +25,10 @@ struct Curl
     string etag, status, expectedETag;
 
     struct curl_slist * requestHeaders;
+
+    bool showProgress;
+    double prevProgressTime{0}, startTime{0};
+    unsigned int moveBack{1};
 
     static size_t writeCallback(void * contents, size_t size, size_t nmemb, void * userp)
     {
@@ -56,9 +70,28 @@ struct Curl
         return realSize;
     }
 
-    static int progressCallback(void * clientp, double dltotal, double dlnow, double ultotal, double ulnow)
+    int xferInfoCallback(curl_off_t dltotal, curl_off_t dlnow)
     {
+        if (showProgress) {
+            double now = getTime();
+            if (prevProgressTime <= now - 1) {
+                string s = (format(" [%1$.0f/%2$.0f KiB, %3$.1f KiB/s]")
+                    % (dlnow / 1024.0)
+                    % (dltotal / 1024.0)
+                    % (now == startTime ? 0 : dlnow / 1024.0 / (now - startTime))).str();
+                std::cerr << "\e[" << moveBack << "D" << s;
+                moveBack = s.size();
+                std::cerr.flush();
+                prevProgressTime = now;
+            }
+        }
         return _isInterrupted;
+    }
+
+    static int xferInfoCallback_(void * userp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow)
+    {
+        Curl & c(* (Curl *) userp);
+        return c.xferInfoCallback(dltotal, dlnow);
     }
 
     Curl()
@@ -79,8 +112,11 @@ struct Curl
         curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, headerCallback);
         curl_easy_setopt(curl, CURLOPT_HEADERDATA, (void *) &curl);
 
-        curl_easy_setopt(curl, CURLOPT_PROGRESSFUNCTION, progressCallback);
+        curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, xferInfoCallback_);
+        curl_easy_setopt(curl, CURLOPT_XFERINFODATA, (void *) &curl);
         curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0);
+
+        showProgress = isatty(STDERR_FILENO);
     }
 
     ~Curl()
@@ -107,7 +143,16 @@ struct Curl
 
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, requestHeaders);
 
+        if (showProgress) {
+            std::cerr << (format("downloading ‘%1%’... ") % url);
+            std::cerr.flush();
+            startTime = getTime();
+        }
+
         CURLcode res = curl_easy_perform(curl);
+        if (showProgress)
+            //std::cerr << "\e[" << moveBack << "D\e[K\n";
+            std::cerr << "\n";
         checkInterrupt();
         if (res == CURLE_WRITE_ERROR && etag == expectedETag) return false;
         if (res != CURLE_OK)
@@ -177,11 +222,6 @@ Path downloadFileCached(const string & url, bool unpack)
     if (p != string::npos) name = string(url, p + 1);
 
     if (!skip) {
-
-        if (storePath.empty())
-            printMsg(lvlInfo, format("downloading ‘%1%’...") % url);
-        else
-            printMsg(lvlInfo, format("checking ‘%1%’...") % url);
 
         try {
             auto res = downloadFile(url, expectedETag);

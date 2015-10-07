@@ -158,7 +158,6 @@ int main(int argc, char * * argv)
             auto actualUri = resolveMirrorUri(state, uri);
 
             /* Download the file. */
-            printMsg(lvlInfo, format("downloading ‘%1%’...") % actualUri);
             auto result = downloadFile(actualUri);
 
             AutoDelete tmpDir(createTempDir(), true);
