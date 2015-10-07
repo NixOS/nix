@@ -91,6 +91,18 @@ downloaded file in the Nix store is also printed.</para>
 
   </varlistentry>
 
+  <varlistentry><term><option>--name</option></term>
+
+    <listitem><para>Override the name of the file in the Nix store. By
+    default, this is
+    <literal><replaceable>hash</replaceable>-<replaceable>basename</replaceable></literal>,
+    where <replaceable>basename</replaceable> is the last component of
+    <replaceable>url</replaceable>. Overriding the name is necessary
+    when <replaceable>basename</replaceable> contains characters that
+    are not allowed in Nix store paths.</para></listitem>
+
+  </varlistentry>
+
 </variablelist>
 
 </refsection>

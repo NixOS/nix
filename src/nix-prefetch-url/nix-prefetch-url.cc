@@ -75,6 +75,8 @@ int main(int argc, char * * argv)
             }
             else if (*arg == "--unpack")
                 unpack = true;
+            else if (*arg == "--name")
+                name = getArg(*arg, arg, end);
             else if (parseAutoArgs(arg, end, autoArgs_))
                 ;
             else if (parseSearchPathArg(arg, end, searchPath))
@@ -125,9 +127,11 @@ int main(int argc, char * * argv)
                 unpack = state.forceString(*attr->value) == "recursive";
 
             /* Extract the name. */
-            attr = v.attrs->find(state.symbols.create("name"));
-            if (attr != v.attrs->end())
-                name = state.forceString(*attr->value);
+            if (name.empty()) {
+                attr = v.attrs->find(state.symbols.create("name"));
+                if (attr != v.attrs->end())
+                    name = state.forceString(*attr->value);
+            }
         }
 
         /* Figure out a name in the Nix store. */
