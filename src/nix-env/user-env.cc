@@ -26,6 +26,8 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
 }
 
 
+alignas(16) static const char sDerivation[] = "derivation";
+
 bool createUserEnv(EvalState & state, DrvInfos & elems,
     const Path & profile, bool keepDerivations,
     const string & lockToken)
@@ -44,6 +46,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     PathSet references;
     Value manifest;
     state.mkList(manifest, elems.size());
+    Value::asMutableList manifestList(manifest);
     unsigned int n = 0;
     for (auto & i : elems) {
         /* Create a pseudo-derivation containing the name, system,
@@ -52,27 +55,28 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         Path drvPath = keepDerivations ? i.queryDrvPath() : "";
 
         Value & v(*state.allocValue());
-        manifest.listElems()[n++] = &v;
+        manifestList[n++] = &v;
         state.mkAttrs(v, 16);
 
-        mkString(*state.allocAttr(v, state.sType), "derivation");
-        mkString(*state.allocAttr(v, state.sName), i.name);
+        state.allocAttr(v, state.sType)->setStringNoCopy(sDerivation, nullptr);
+        state.allocAttr(v, state.sName)->setString(i.name);
         if (!i.system.empty())
-            mkString(*state.allocAttr(v, state.sSystem), i.system);
-        mkString(*state.allocAttr(v, state.sOutPath), i.queryOutPath());
+            state.allocAttr(v, state.sSystem)->setString(i.system);
+        state.allocAttr(v, state.sOutPath)->setString(i.queryOutPath());
         if (drvPath != "")
-            mkString(*state.allocAttr(v, state.sDrvPath), i.queryDrvPath());
+            state.allocAttr(v, state.sDrvPath)->setString(i.queryDrvPath());
 
         // Copy each output.
         DrvInfo::Outputs outputs = i.queryOutputs();
         Value & vOutputs = *state.allocAttr(v, state.sOutputs);
         state.mkList(vOutputs, outputs.size());
+        Value::asMutableList vOutputsList(vOutputs);
         unsigned int m = 0;
         for (auto & j : outputs) {
-            mkString(*(vOutputs.listElems()[m++] = state.allocValue()), j.first);
+            (vOutputsList[m++] = state.allocValue())->setString(j.first);
             Value & vOutputs = *state.allocAttr(v, state.symbols.create(j.first));
             state.mkAttrs(vOutputs, 2);
-            mkString(*state.allocAttr(vOutputs, state.sOutPath), j.second);
+            state.allocAttr(vOutputs, state.sOutPath)->setString(j.second);
 
             /* This is only necessary when installing store paths, e.g.,
                `nix-env -i /nix/store/abcd...-foo'. */
@@ -89,13 +93,14 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         for (auto & j : metaNames) {
             Value * v = i.queryMeta(j);
             if (!v) continue;
-            vMeta.attrs->push_back(Attr(state.symbols.create(j), v));
+            vMeta.asAttrs()->push_back(Attr(state.symbols.create(j), v));
         }
-        vMeta.attrs->sort();
-        v.attrs->sort();
+        vMeta.asAttrs()->sort();
+        v.asAttrs()->sort();
 
         if (drvPath != "") references.insert(drvPath);
     }
+    manifestList.synchronizeValueContent();
 
     /* Also write a copy of the list of user environment elements to
        the store; we need it for future modifications of the
@@ -111,19 +116,19 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
        builder with the manifest as argument. */
     Value args, topLevel;
     state.mkAttrs(args, 3);
-    mkString(*state.allocAttr(args, state.symbols.create("manifest")),
+    state.allocAttr(args, state.symbols.create("manifest"))->setString(
         manifestFile, singleton<PathSet>(manifestFile));
-    args.attrs->push_back(Attr(state.symbols.create("derivations"), &manifest));
-    args.attrs->sort();
-    mkApp(topLevel, envBuilder, args);
+    args.asAttrs()->push_back(Attr(state.symbols.create("derivations"), &manifest));
+    args.asAttrs()->sort();
+    topLevel.setApp(envBuilder, args);
 
     /* Evaluate it. */
     debug("evaluating user environment builder");
     state.forceValue(topLevel);
     PathSet context;
-    Attr & aDrvPath(*topLevel.attrs->find(state.sDrvPath));
+    Attr & aDrvPath(*topLevel.asAttrs()->find(state.sDrvPath));
     Path topLevelDrv = state.coerceToPath(aDrvPath.pos ? *(aDrvPath.pos) : noPos, *(aDrvPath.value), context);
-    Attr & aOutPath(*topLevel.attrs->find(state.sOutPath));
+    Attr & aOutPath(*topLevel.asAttrs()->find(state.sOutPath));
     Path topLevelOut = state.coerceToPath(aOutPath.pos ? *(aOutPath.pos) : noPos, *(aOutPath.value), context);
 
     /* Realise the resulting store expression. */

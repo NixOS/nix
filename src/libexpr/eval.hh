@@ -42,8 +42,6 @@ struct Env
 };
 
 
-void mkString(Value & v, const string & s, const PathSet & context = PathSet());
-
 void copyContext(const Value & v, PathSet & context);
 
 

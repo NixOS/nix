@@ -60,7 +60,7 @@ Value * findAlongAttrPath(EvalState & state, const string & attrPath,
 
         if (apType == apAttr) {
 
-            if (v->type != tAttrs)
+            if (v->type() != Value::tAttrs)
                 throw TypeError(
                     format("the expression selected by the selection path ‘%1%’ should be a set but is %2%")
                     % attrPath % showType(*v));
@@ -68,8 +68,8 @@ Value * findAlongAttrPath(EvalState & state, const string & attrPath,
             if (attr.empty())
                 throw Error(format("empty attribute name in selection path ‘%1%’") % attrPath);
 
-            Bindings::iterator a = v->attrs->find(state.symbols.create(attr));
-            if (a == v->attrs->end())
+            Bindings::iterator a = v->asAttrs()->find(state.symbols.create(attr));
+            if (a == v->asAttrs()->end())
                 throw Error(format("attribute ‘%1%’ in selection path ‘%2%’ not found") % attr % attrPath);
             v = &*a->value;
         }
@@ -81,10 +81,11 @@ Value * findAlongAttrPath(EvalState & state, const string & attrPath,
                     format("the expression selected by the selection path ‘%1%’ should be a list but is %2%")
                     % attrPath % showType(*v));
 
-            if (attrIndex >= v->listSize())
+            Value::asList list(v);
+            if (attrIndex >= list.length())
                 throw Error(format("list index %1% in selection path ‘%2%’ is out of range") % attrIndex % attrPath);
 
-            v = v->listElems()[attrIndex];
+            v = list[attrIndex];
         }
 
     }

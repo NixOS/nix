@@ -26,23 +26,21 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v, const
 
 void EvalState::forceValue(Value & v, const Pos & pos)
 {
-    if (v.type == tThunk) {
-        Env * env = v.thunk.env;
-        Expr * expr = v.thunk.expr;
+    if (v.type() == Value::tThunk) {
+        Env * env = v.asExprEnv();
+        Expr * expr = v.asThunk();
         try {
-            v.type = tBlackhole;
+            v.setBlackhole();
             //checkInterrupt();
             expr->eval(*this, *env, v);
         } catch (Error & e) {
-            v.type = tThunk;
-            v.thunk.env = env;
-            v.thunk.expr = expr;
+            v.setThunk(env, expr);
             throw;
         }
     }
-    else if (v.type == tApp)
-        callFunction(*v.app.left, *v.app.right, v, noPos);
-    else if (v.type == tBlackhole)
+    else if (v.type() == Value::tApp)
+        callFunction(*v.asAppLeft(), *v.asAppRight(), v, noPos);
+    else if (v.type() == Value::tBlackhole)
         throwEvalError("infinite recursion encountered, at %1%", pos);
 }
 
@@ -50,7 +48,7 @@ void EvalState::forceValue(Value & v, const Pos & pos)
 inline void EvalState::forceAttrs(Value & v)
 {
     forceValue(v);
-    if (v.type != tAttrs)
+    if (v.type() != Value::tAttrs)
         throwTypeError("value is %1% while a set was expected", v);
 }
 
@@ -58,7 +56,7 @@ inline void EvalState::forceAttrs(Value & v)
 inline void EvalState::forceAttrs(Value & v, const Pos & pos)
 {
     forceValue(v);
-    if (v.type != tAttrs)
+    if (v.type() != Value::tAttrs)
         throwTypeError("value is %1% while a set was expected, at %2%", v, pos);
 }
 

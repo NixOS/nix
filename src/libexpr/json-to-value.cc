@@ -72,8 +72,9 @@ static void parseJSON(EvalState & state, const char * & s, Value & v)
         }
         s++;
         state.mkList(v, values.size());
+        Value::asMutableList list(v);
         for (size_t n = 0; n < values.size(); ++n)
-            v.listElems()[n] = values[n];
+            list[n] = values[n];
     }
 
     else if (*s == '{') {
@@ -96,13 +97,13 @@ static void parseJSON(EvalState & state, const char * & s, Value & v)
         }
         state.mkAttrs(v, attrs.size());
         for (auto & i : attrs)
-            v.attrs->push_back(Attr(i.first, i.second));
-        v.attrs->sort();
+            v.asAttrs()->push_back(Attr(i.first, i.second));
+        v.asAttrs()->sort();
         s++;
     }
 
     else if (*s == '"') {
-        mkString(v, parseJSONString(s));
+        v.setString(parseJSONString(s));
     }
 
     else if (isdigit(*s) || *s == '-') {
@@ -115,22 +116,22 @@ static void parseJSON(EvalState & state, const char * & s, Value & v)
         // FIXME: detect overflow
         while (isdigit(*s)) n = n * 10 + (*s++ - '0');
         if (*s == '.' || *s == 'e') throw JSONParseError("floating point JSON numbers are not supported");
-        mkInt(v, neg ? -n : n);
+        v.setInt(neg ? -n : n);
     }
 
     else if (strncmp(s, "true", 4) == 0) {
         s += 4;
-        mkBool(v, true);
+        v.setBool(true);
     }
 
     else if (strncmp(s, "false", 5) == 0) {
         s += 5;
-        mkBool(v, false);
+        v.setBool(false);
     }
 
     else if (strncmp(s, "null", 4) == 0) {
         s += 4;
-        mkNull(v);
+        v.setNull();
     }
 
     else throw JSONParseError("unrecognised JSON value");
