@@ -1291,6 +1291,12 @@ bool EvalState::forceBool(Value & v)
 }
 
 
+bool EvalState::isFunctor(Value & fun)
+{
+    return fun.type == tAttrs && fun.attrs->find(sFunctor) != fun.attrs->end();
+}
+
+
 void EvalState::forceFunction(Value & v, const Pos & pos)
 {
     forceValue(v);
