@@ -70,7 +70,7 @@ struct Curl
         return realSize;
     }
 
-    int xferInfoCallback(curl_off_t dltotal, curl_off_t dlnow)
+    int progressCallback(double dltotal, double dlnow)
     {
         if (showProgress) {
             double now = getTime();
@@ -88,10 +88,10 @@ struct Curl
         return _isInterrupted;
     }
 
-    static int xferInfoCallback_(void * userp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow)
+    static int progressCallback_(void * userp, double dltotal, double dlnow, double ultotal, double ulnow)
     {
         Curl & c(* (Curl *) userp);
-        return c.xferInfoCallback(dltotal, dlnow);
+        return c.progressCallback(dltotal, dlnow);
     }
 
     Curl()
@@ -112,8 +112,8 @@ struct Curl
         curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, headerCallback);
         curl_easy_setopt(curl, CURLOPT_HEADERDATA, (void *) &curl);
 
-        curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, xferInfoCallback_);
-        curl_easy_setopt(curl, CURLOPT_XFERINFODATA, (void *) &curl);
+        curl_easy_setopt(curl, CURLOPT_PROGRESSFUNCTION, progressCallback_);
+        curl_easy_setopt(curl, CURLOPT_PROGRESSDATA, (void *) &curl);
         curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0);
 
         showProgress = isatty(STDERR_FILENO);
