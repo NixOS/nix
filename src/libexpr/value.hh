@@ -87,6 +87,7 @@ std::ostream & operator << (std::ostream & str, const ExternalValueBase & v);
 
 struct Value
 {
+    Pos pos = noPos;
     ValueType type;
     union
     {

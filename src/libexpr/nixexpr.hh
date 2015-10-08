@@ -19,34 +19,7 @@ MakeError(UndefinedVarError, Error)
 MakeError(RestrictedPathError, Error)
 
 
-/* Position objects. */
-
-struct Pos
-{
-    Symbol file;
-    unsigned int line, column;
-    Pos() : line(0), column(0) { };
-    Pos(const Symbol & file, unsigned int line, unsigned int column)
-        : file(file), line(line), column(column) { };
-    operator bool() const
-    {
-        return line != 0;
-    }
-    bool operator < (const Pos & p2) const
-    {
-        if (!line) return p2.line;
-        if (!p2.line) return false;
-        int d = ((string) file).compare((string) p2.file);
-        if (d < 0) return true;
-        if (d > 0) return false;
-        if (line < p2.line) return true;
-        if (line > p2.line) return false;
-        return column < p2.column;
-    }
-};
-
-extern Pos noPos;
-
+string showPos(const Pos& pos, const string& locType);
 std::ostream & operator << (std::ostream & str, const Pos & pos);
 
 
@@ -59,10 +32,11 @@ struct StaticEnv;
 /* An attribute path is a sequence of attribute names. */
 struct AttrName
 {
+    Pos pos;
     Symbol symbol;
     Expr * expr;
-    AttrName(const Symbol & s) : symbol(s) {};
-    AttrName(Expr * e) : expr(e) {};
+    AttrName(const Pos& pos, const Symbol & s) : pos(pos), symbol(s) {};
+    AttrName(const Pos& pos, Expr * e) : pos(pos), expr(e) {};
 };
 
 typedef std::vector<AttrName> AttrPath;
@@ -153,15 +127,16 @@ struct ExprSelect : Expr
     Expr * e, * def;
     AttrPath attrPath;
     ExprSelect(const Pos & pos, Expr * e, const AttrPath & attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(attrPath) { };
-    ExprSelect(const Pos & pos, Expr * e, const Symbol & name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
+    ExprSelect(const Pos & pos, Expr * e, const Symbol & name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(pos, name)); };
     COMMON_METHODS
 };
 
 struct ExprOpHasAttr : Expr
 {
+    Pos pos;
     Expr * e;
     AttrPath attrPath;
-    ExprOpHasAttr(Expr * e, const AttrPath & attrPath) : e(e), attrPath(attrPath) { };
+    ExprOpHasAttr(const Pos & pos, Expr * e, const AttrPath & attrPath) : pos(pos), e(e), attrPath(attrPath) { };
     COMMON_METHODS
 };
 
@@ -225,7 +200,7 @@ struct ExprLambda : Expr
         : pos(pos), arg(arg), matchAttrs(matchAttrs), formals(formals), body(body)
     {
         if (!arg.empty() && formals && formals->argNames.find(arg) != formals->argNames.end())
-            throw ParseError(format("duplicate formal function argument ‘%1%’ at %2%")
+            throw ParseError(format("duplicate formal function argument ‘%1%’%2%")
                 % arg % pos);
     };
     void setName(Symbol & name);
@@ -252,8 +227,9 @@ struct ExprWith : Expr
 
 struct ExprIf : Expr
 {
+    Pos pos;
     Expr * cond, * then, * else_;
-    ExprIf(Expr * cond, Expr * then, Expr * else_) : cond(cond), then(then), else_(else_) { };
+    ExprIf(const Pos & pos, Expr * cond, Expr * then, Expr * else_) : pos(pos), cond(cond), then(then), else_(else_) { };
     COMMON_METHODS
 };
 
@@ -267,8 +243,9 @@ struct ExprAssert : Expr
 
 struct ExprOpNot : Expr
 {
+    Pos pos;
     Expr * e;
-    ExprOpNot(Expr * e) : e(e) { };
+    ExprOpNot(const Pos & pos, Expr * e) : pos(pos), e(e) { };
     COMMON_METHODS
 };
 
@@ -277,7 +254,6 @@ struct ExprOpNot : Expr
     { \
         Pos pos; \
         Expr * e1, * e2; \
-        Expr##name(Expr * e1, Expr * e2) : e1(e1), e2(e2) { }; \
         Expr##name(const Pos & pos, Expr * e1, Expr * e2) : pos(pos), e1(e1), e2(e2) { }; \
         void show(std::ostream & str) \
         { \

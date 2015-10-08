@@ -128,6 +128,7 @@ typedef enum {
 
 extern LogType logType;
 extern Verbosity verbosity; /* suppress msgs > this */
+extern bool useColor;
 
 class Nest
 {

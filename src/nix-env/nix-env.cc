@@ -134,7 +134,7 @@ static void getAllExprs(EvalState & state,
             mkString(vArg, path2);
             if (v.attrs->size() == v.attrs->capacity())
                 throw Error(format("too many Nix expressions in directory ‘%1%’") % path);
-            mkApp(*state.allocAttr(v, state.symbols.create(attrName)), vFun, vArg);
+            mkApp(*state.allocAttr(v, state.symbols.create(attrName), &noPos), vFun, vArg);
         }
         else if (S_ISDIR(st.st_mode))
             /* `path2' is a directory (with no default.nix in it);
@@ -163,7 +163,7 @@ static void loadSourceExpr(EvalState & state, const Path & path, Value & v)
        directory). */
     if (S_ISDIR(st.st_mode)) {
         state.mkAttrs(v, 1024);
-        state.mkList(*state.allocAttr(v, state.symbols.create("_combineChannels")), 0);
+        state.mkList(*state.allocAttr(v, state.symbols.create("_combineChannels"), &noPos), 0);
         StringSet attrs;
         getAllExprs(state, path, attrs, v);
         v.attrs->sort();
@@ -877,7 +877,7 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
                 cout << "null";
             } else {
                 PathSet context;
-                printValueAsJSON(*globals.state, true, *v, cout, context);
+                printValueAsJSON(*globals.state, true, *v, cout, context, noPos);
             }
         }
     }

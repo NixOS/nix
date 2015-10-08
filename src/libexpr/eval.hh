@@ -119,8 +119,8 @@ public:
     void resetFileCache();
 
     /* Look up a file in the search path. */
-    Path findFile(const string & path);
-    Path findFile(SearchPath & searchPath, const string & path, const Pos & pos = noPos);
+    Path findFile(const string & path, const Pos & pos);
+    Path findFile(SearchPath & searchPath, const string & path, const Pos & pos);
 
     /* Evaluate an expression to normal form, storing the result in
        value `v'. */
@@ -128,31 +128,28 @@ public:
 
     /* Evaluation the expression, then verify that it has the expected
        type. */
-    inline bool evalBool(Env & env, Expr * e);
     inline bool evalBool(Env & env, Expr * e, const Pos & pos);
-    inline void evalAttrs(Env & env, Expr * e, Value & v);
+    inline void evalAttrs(Env & env, Expr * e, Value & v, const Pos & pos);
 
     /* If `v' is a thunk, enter it and overwrite `v' with the result
        of the evaluation of the thunk.  If `v' is a delayed function
        application, call the function and overwrite `v' with the
        result.  Otherwise, this is a no-op. */
-    inline void forceValue(Value & v, const Pos & pos = noPos);
+    inline void forceValue(Value & v, const Pos & pos);
 
     /* Force a value, then recursively force list elements and
        attributes. */
-    void forceValueDeep(Value & v);
+    void forceValueDeep(Value & v, const Pos & pos);
 
     /* Force `v', and then verify that it has the expected type. */
     NixInt forceInt(Value & v, const Pos & pos);
-    bool forceBool(Value & v);
-    inline void forceAttrs(Value & v);
+    bool forceBool(Value & v, const Pos & pos);
     inline void forceAttrs(Value & v, const Pos & pos);
-    inline void forceList(Value & v);
     inline void forceList(Value & v, const Pos & pos);
     void forceFunction(Value & v, const Pos & pos); // either lambda or primop
-    string forceString(Value & v, const Pos & pos = noPos);
-    string forceString(Value & v, PathSet & context, const Pos & pos = noPos);
-    string forceStringNoCtx(Value & v, const Pos & pos = noPos);
+    string forceString(Value & v, const Pos & pos);
+    string forceString(Value & v, PathSet & context, const Pos & pos);
+    string forceStringNoCtx(Value & v, const Pos & pos);
 
     /* Return true iff the value `v' denotes a derivation (i.e. a
        set with attribute `type = "derivation"'). */
@@ -211,7 +208,7 @@ public:
 
     /* Do a deep equality test between two values.  That is, list
        elements and attributes are compared recursively. */
-    bool eqValues(Value & v1, Value & v2);
+    bool eqValues(Value & v1, Value & v2, const Pos & pos);
 
     void callFunction(Value & fun, Value & arg, Value & v, const Pos & pos);
     void callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos);
@@ -224,14 +221,14 @@ public:
     Value * allocValue();
     Env & allocEnv(unsigned int size);
 
-    Value * allocAttr(Value & vAttrs, const Symbol & name);
+    Value * allocAttr(Value & vAttrs, const Symbol & name, const Pos* pos);
 
     Bindings * allocBindings(Bindings::size_t capacity);
 
     void mkList(Value & v, unsigned int length);
     void mkAttrs(Value & v, unsigned int capacity);
     void mkThunk_(Value & v, Expr * expr);
-    void mkPos(Value & v, Pos * pos);
+    void mkPos(Value & v, const Pos * pos);
 
     void concatLists(Value & v, unsigned int nrLists, Value * * lists, const Pos & pos);
 
@@ -290,5 +287,31 @@ struct InvalidPathError : EvalError
 
 /* Realise all paths in `context' */
 void realiseContext(const PathSet & context);
+
+#define LocalNoInline(f) f __attribute__((noinline)); f
+#define LocalNoInlineNoReturn(f) f __attribute__((noinline, noreturn)); f
+
+LocalNoInline(void addErrorPrefix(Error & e, const char * s, const ExprLambda & fun, const Pos & pos));
+LocalNoInline(void addErrorPrefix(Error & e, const char * s, const Pos & pos));
+LocalNoInline(void addErrorPrefix(Error & e, const char * s, const Value & v, const Pos & pos));
+LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2));
+LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, const Pos & pos));
+LocalNoInline(void addErrorPrefix(Error & e, const char * s, unsigned int s2, const Pos & pos));
+LocalNoInlineNoReturn(void throwAssertionError(const char * s, const Pos & pos));
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const Pos & pos));
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const Symbol & sym, const Pos & p1, const Pos & p2));
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2));
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const Pos & pos));
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3));
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3, const Pos & pos));
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const Value & v, const Pos & pos));
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const Value & v, const Value & v2, const Pos & pos));
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const Value & v, const string & s2, const Pos & pos));
+LocalNoInlineNoReturn(void throwTypeError(const char * s, const ExprLambda & fun, const Symbol & s2, const Pos & pos));
+LocalNoInlineNoReturn(void throwTypeError(const char * s, const Pos & pos));
+LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v));
+LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v, const Pos & pos));
+LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s1));
+LocalNoInlineNoReturn(void throwUndefinedVarError(const char * s, const string & s1, const Pos & pos));
 
 }

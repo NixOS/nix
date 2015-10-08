@@ -435,6 +435,7 @@ void replaceSymlink(const Path & target, const Path & link)
 
 LogType logType = ltPretty;
 Verbosity verbosity = lvlInfo;
+bool useColor = false;
 
 static int nestingLevel = 0;
 
@@ -505,7 +506,7 @@ void printMsg_(Verbosity level, const FormatOrString & fs)
     }
 
     string s = (format("%1%%2%\n") % prefix % fs.s).str();
-    if (!isatty(STDERR_FILENO)) s = filterANSIEscapes(s);
+    if (!isatty(STDERR_FILENO) && !useColor) s = filterANSIEscapes(s);
     writeToStderr(s);
 }
 

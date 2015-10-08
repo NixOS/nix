@@ -96,7 +96,7 @@ static void parseJSON(EvalState & state, const char * & s, Value & v)
         }
         state.mkAttrs(v, attrs.size());
         for (auto & i : attrs)
-            v.attrs->push_back(Attr(i.first, i.second));
+            v.attrs->push_back(Attr(i.first, i.second, &noPos));
         v.attrs->sort();
         s++;
     }
