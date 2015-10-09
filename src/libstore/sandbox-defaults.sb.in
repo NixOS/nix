@@ -6,6 +6,7 @@
        (literal "/dev/dtracehelper")
        (literal "/dev/tty")
        (literal "/dev/autofs_nowait")
+       (literal "/System/Library/CoreServices/SystemVersion.plist")
        (literal "/private/var/run/systemkeychaincheck.done")
        (literal "/private/etc/protocols")
        (literal "/private/var/tmp")
