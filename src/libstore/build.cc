@@ -2059,7 +2059,7 @@ void DerivationGoal::startBuilder()
         auto lastPos = std::string::size_type{0};
         for (auto nlPos = lines.find('\n'); nlPos != string::npos;
                 nlPos = lines.find('\n', lastPos)) {
-            auto line = std::string{lines, lastPos, nlPos};
+            auto line = std::string{lines, lastPos, nlPos - lastPos};
             lastPos = nlPos + 1;
             if (state == stBegin) {
                 if (line == "extra-chroot-dirs") {
