@@ -21,6 +21,7 @@ our @EXPORT = qw(
     signString checkSignature
     addToStore makeFixedOutputPath
     derivationFromPath
+    addTempRoot
 );
 
 our $VERSION = '0.15';

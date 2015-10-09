@@ -356,3 +356,13 @@ SV * derivationFromPath(char * drvPath)
         }
     OUTPUT:
         RETVAL
+
+
+void addTempRoot(char * storePath)
+    PPCODE:
+        try {
+            doInit();
+            store->addTempRoot(storePath);
+        } catch (Error & e) {
+            croak(e.what());
+        }
