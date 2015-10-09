@@ -10,8 +10,6 @@
        (literal "/private/var/run/systemkeychaincheck.done")
        (literal "/private/etc/protocols")
        (literal "/private/var/tmp")
-       (subpath "/usr/share/locale")
-       (subpath "/usr/share/zoneinfo")
        (literal "/private/var/db")
        (subpath "/private/var/db/mds"))
 
