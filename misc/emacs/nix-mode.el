@@ -9,16 +9,16 @@
 ;;; Code:
 
 (defconst nix-font-lock-keywords
-  '("\\<if\\>" "\\<then\\>" "\\<else\\>" "\\<assert\\>" "\\<with\\>"
-    "\\<let\\>" "\\<in\\>" "\\<rec\\>" "\\<inherit\\>" "\\<or\\>"
-    ("\\<true\\>" . font-lock-builtin-face)
-    ("\\<false\\>" . font-lock-builtin-face)
-    ("\\<null\\>" . font-lock-builtin-face)
-    ("\\<import\\>" . font-lock-builtin-face)
-    ("\\<derivation\\>" . font-lock-builtin-face)
-    ("\\<baseNameOf\\>" . font-lock-builtin-face)
-    ("\\<toString\\>" . font-lock-builtin-face)
-    ("\\<isNull\\>" . font-lock-builtin-face)
+  '("\\_<if\\_>" "\\_<then\\_>" "\\_<else\\_>" "\\_<assert\\_>" "\\_<with\\_>"
+    "\\_<let\\_>" "\\_<in\\_>" "\\_<rec\\_>" "\\_<inherit\\_>" "\\_<or\\_>"
+    ("\\_<true\\_>" . font-lock-builtin-face)
+    ("\\_<false\\_>" . font-lock-builtin-face)
+    ("\\_<null\\_>" . font-lock-builtin-face)
+    ("\\_<import\\_>" . font-lock-builtin-face)
+    ("\\_<derivation\\_>" . font-lock-builtin-face)
+    ("\\_<baseNameOf\\_>" . font-lock-builtin-face)
+    ("\\_<toString\\_>" . font-lock-builtin-face)
+    ("\\_<isNull\\_>" . font-lock-builtin-face)
     ("[a-zA-Z][a-zA-Z0-9\\+-\\.]*:[a-zA-Z0-9%/\\?:@&=\\+\\$,_\\.!~\\*'-]+"
      . font-lock-constant-face)
     ("\\<\\([a-zA-Z_][a-zA-Z0-9_'\-\.]*\\)[ \t]*="
