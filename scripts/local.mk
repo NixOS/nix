@@ -16,7 +16,6 @@ nix_substituters := \
 
 nix_noinst_scripts := \
   $(d)/build-remote.pl \
-  $(d)/find-runtime-roots.pl \
   $(d)/nix-http-export.cgi \
   $(d)/nix-profile.sh \
   $(d)/nix-reduce-build \
@@ -27,7 +26,6 @@ noinst-scripts += $(nix_noinst_scripts)
 profiledir = $(sysconfdir)/profile.d
 
 $(eval $(call install-file-as, $(d)/nix-profile.sh, $(profiledir)/nix.sh, 0644))
-$(eval $(call install-program-in, $(d)/find-runtime-roots.pl, $(libexecdir)/nix))
 $(eval $(call install-program-in, $(d)/build-remote.pl, $(libexecdir)/nix))
 $(foreach prog, $(nix_substituters), $(eval $(call install-program-in, $(prog), $(libexecdir)/nix/substituters)))
 $(eval $(call install-symlink, nix-build, $(bindir)/nix-shell))
