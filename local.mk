@@ -1,5 +1,5 @@
 ifeq ($(MAKECMDGOALS), dist)
-  dist-files += $(shell git ls-files)
+  dist-files += $(shell cat dist-files)
 endif
 
 dist-files += configure config.h.in nix.spec
