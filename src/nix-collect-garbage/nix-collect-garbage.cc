@@ -4,6 +4,7 @@
 #include "globals.hh"
 
 #include <iostream>
+#include <cerrno>
 
 using namespace nix;
 
