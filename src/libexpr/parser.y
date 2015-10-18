@@ -20,6 +20,7 @@
 
 #include "nixexpr.hh"
 #include "eval.hh"
+#include "globals.hh"
 
 namespace nix {
 
@@ -192,7 +193,7 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<ve
 
         /* Single antiquotations on their own lines are ExprIndAntiquot
            and manage their own indentation. */
-        if (isIndAntiquotLine(line)) {
+        if (settings.enableSmartAntiquotations && isIndAntiquotLine(line)) {
             pushStringThenExpr(symbols, es2, s2, new ExprIndAntiquot(pos, line->at(1), indent));
             delete line;
             continue;

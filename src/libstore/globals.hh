@@ -188,6 +188,10 @@ struct Settings {
        build settings */
     Path preBuildHook;
 
+    /* Whether lone antiquotations in indented string should be
+       interpreted line-wise */
+    bool enableSmartAntiquotations;
+
 private:
     SettingsMap settings, overrides;
 

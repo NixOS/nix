@@ -59,6 +59,7 @@ Settings::Settings()
     lockCPU = getEnv("NIX_AFFINITY_HACK", "1") == "1";
     showTrace = false;
     enableImportNative = false;
+    enableSmartAntiquotations = false;
 }
 
 
@@ -185,6 +186,7 @@ void Settings::update()
     _get(preBuildHook, "pre-build-hook");
     _get(keepGoing, "keep-going");
     _get(keepFailed, "keep-failed");
+    _get(enableSmartAntiquotations,"smart-antiquotations");
 }
 
 
