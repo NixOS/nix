@@ -25,13 +25,6 @@ derivation {
 
   __impureHostDeps = [
     "/usr/lib/libSystem.dylib"
-    "/usr/lib/libSystem.B.dylib"
-    "/usr/lib/libobjc.A.dylib"
-    "/usr/lib/libobjc.dylib"
-    "/usr/lib/libauto.dylib"
-    "/usr/lib/libc++abi.dylib"
-    "/usr/lib/libc++.1.dylib"
-    "/usr/lib/libDiagnosticMessagesClient.dylib"
     "/usr/lib/system"
   ];
 
