@@ -102,7 +102,6 @@ struct Curl
         if (!curl) throw Error("unable to initialize curl");
 
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-        curl_easy_setopt(curl, CURLOPT_CAINFO, getEnv("SSL_CERT_FILE", "/etc/ssl/certs/ca-certificates.crt").c_str());
         curl_easy_setopt(curl, CURLOPT_USERAGENT, ("Nix/" + nixVersion).c_str());
         curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1);
 
@@ -125,9 +124,16 @@ struct Curl
         if (requestHeaders) curl_slist_free_all(requestHeaders);
     }
 
-    bool fetch(const string & url, const string & expectedETag = "")
+    bool fetch(const string & url, const DownloadOptions & options)
     {
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+
+        if (options.verifyTLS)
+            curl_easy_setopt(curl, CURLOPT_CAINFO, getEnv("SSL_CERT_FILE", "/etc/ssl/certs/ca-certificates.crt").c_str());
+        else {
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0);
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0);
+        }
 
         data.clear();
 
@@ -136,9 +142,9 @@ struct Curl
             requestHeaders = 0;
         }
 
-        if (!expectedETag.empty()) {
-            this->expectedETag = expectedETag;
-            requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + expectedETag).c_str());
+        if (!options.expectedETag.empty()) {
+            this->expectedETag = options.expectedETag;
+            requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + options.expectedETag).c_str());
         }
 
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, requestHeaders);
@@ -154,7 +160,7 @@ struct Curl
             //std::cerr << "\e[" << moveBack << "D\e[K\n";
             std::cerr << "\n";
         checkInterrupt();
-        if (res == CURLE_WRITE_ERROR && etag == expectedETag) return false;
+        if (res == CURLE_WRITE_ERROR && etag == options.expectedETag) return false;
         if (res != CURLE_OK)
             throw DownloadError(format("unable to download ‘%1%’: %2% (%3%)")
                 % url % curl_easy_strerror(res) % res);
@@ -168,11 +174,11 @@ struct Curl
 };
 
 
-DownloadResult downloadFile(string url, string expectedETag)
+DownloadResult downloadFile(string url, const DownloadOptions & options)
 {
     DownloadResult res;
     Curl curl;
-    if (curl.fetch(url, expectedETag)) {
+    if (curl.fetch(url, options)) {
         res.cached = false;
         res.data = curl.data;
     } else
@@ -224,7 +230,9 @@ Path downloadFileCached(const string & url, bool unpack)
     if (!skip) {
 
         try {
-            auto res = downloadFile(url, expectedETag);
+            DownloadOptions options;
+            options.expectedETag = expectedETag;
+            auto res = downloadFile(url, options);
 
             if (!res.cached)
                 storePath = store->addTextToStore(name, res.data, PathSet(), false);

@@ -8,7 +8,13 @@ void builtinFetchurl(const BasicDerivation & drv)
     auto url = drv.env.find("url");
     if (url == drv.env.end()) throw Error("attribute ‘url’ missing");
     printMsg(lvlInfo, format("downloading ‘%1%’...") % url->second);
-    auto data = downloadFile(url->second); // FIXME: show progress
+
+    /* No need to do TLS verification, because we check the hash of
+       the result anyway. */
+    DownloadOptions options;
+    options.verifyTLS = false;
+
+    auto data = downloadFile(url->second, options); // FIXME: show progress
 
     auto out = drv.env.find("out");
     if (out == drv.env.end()) throw Error("attribute ‘url’ missing");
