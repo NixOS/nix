@@ -4,6 +4,7 @@ use utf8;
 use strict;
 use warnings;
 use Cwd qw(realpath);
+use Errno;
 use File::Basename qw(dirname);
 use File::Path qw(make_path);
 use File::Spec::Functions qw(catfile);
@@ -24,10 +25,14 @@ make_path dirname($cache);
 our $DEPS;
 eval {
   $DEPS = lock_retrieve($cache);
-} or do {
+};
+
+if($!{ENOENT}) {
   lock_store {}, $cache;
   $DEPS = {};
-};
+} elsif($@) {
+  die "Unable to obtain a lock on dependency-map file $cache: $@";
+}
 
 sub mkset(@) {
   my %set;
