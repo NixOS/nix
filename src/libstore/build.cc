@@ -2488,7 +2488,11 @@ void DerivationGoal::runChild()
             sandboxProfile += ")\n";
 
             /* Our ancestry. N.B: this uses literal on folders, instead of subpath. Without that,
-               you open up the entire filesystem because you end up with (subpath "/") */
+               you open up the entire filesystem because you end up with (subpath "/")
+               Note: file-read-metadata* is not sufficiently permissive for GHC. file-read* is but may
+               be a security hazard.
+               TODO: figure out a more appropriate directive.
+             */
             sandboxProfile += "(allow file-read*\n";
             for (auto & i : ancestry) {
                 sandboxProfile += (format("\t(literal \"%1%\")\n") % i.c_str()).str();
