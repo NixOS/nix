@@ -59,12 +59,10 @@
 /* chroot-like behavior from Apple's sandbox */
 #if __APPLE__
     #define SANDBOX_ENABLED 1
-    #define DARWIN_PREBUILD 1
     #define DEFAULT_ALLOWED_IMPURE_PREFIXES "/System/Library /usr/lib /dev /bin/sh"
 #else
     #define SANDBOX_ENABLED 0
     #define DEFAULT_ALLOWED_IMPURE_PREFIXES "/bin" "/usr/bin"
-    #define DARWIN_PREBUILD 0
 #endif
 
 #if CHROOT_ENABLED
@@ -2046,11 +2044,6 @@ void DerivationGoal::startBuilder()
                     redirectedBadOutputs.insert(i);
                 }
     }
-
-#if DARWIN_PREBUILD
-    if (settings.preBuildHook == "")
-      settings.preBuildHook = settings.nixLibexecDir + "/nix/resolve-system-dependencies.pl";
-#endif
 
     if (settings.preBuildHook != "") {
         printMsg(lvlChatty, format("executing pre-build hook ‘%1%’")
