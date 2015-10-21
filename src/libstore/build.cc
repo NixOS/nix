@@ -1246,12 +1246,19 @@ void DerivationGoal::inputsRealised()
 }
 
 
-static bool canBuildLocally(const string & platform)
+static bool isBuiltin(const BasicDerivation & drv)
 {
-    return platform == settings.thisSystem
+    return string(drv.builder, 0, 8) == "builtin:";
+}
+
+
+static bool canBuildLocally(const BasicDerivation & drv)
+{
+    return drv.platform == settings.thisSystem
+        || isBuiltin(drv)
 #if __linux__
-        || (platform == "i686-linux" && settings.thisSystem == "x86_64-linux")
-        || (platform == "armv6l-linux" && settings.thisSystem == "armv7l-linux")
+        || (drv.platform == "i686-linux" && settings.thisSystem == "x86_64-linux")
+        || (drv.platform == "armv6l-linux" && settings.thisSystem == "armv7l-linux")
 #endif
         ;
 }
@@ -1266,19 +1273,13 @@ static string get(const StringPairs & map, const string & key, const string & de
 
 bool willBuildLocally(const BasicDerivation & drv)
 {
-    return get(drv.env, "preferLocalBuild") == "1" && canBuildLocally(drv.platform);
+    return get(drv.env, "preferLocalBuild") == "1" && canBuildLocally(drv);
 }
 
 
 bool substitutesAllowed(const BasicDerivation & drv)
 {
     return get(drv.env, "allowSubstitutes", "1") == "1";
-}
-
-
-static bool isBuiltin(const BasicDerivation & drv)
-{
-    return string(drv.builder, 0, 8) == "builtin:";
 }
 
 
@@ -1683,7 +1684,7 @@ void DerivationGoal::startBuilder()
             "building path(s) %1%") % showPaths(missingPaths));
 
     /* Right platform? */
-    if (!canBuildLocally(drv->platform)) {
+    if (!canBuildLocally(*drv)) {
         if (settings.printBuildTrace)
             printMsg(lvlError, format("@ unsupported-platform %1% %2%") % drvPath % drv->platform);
         throw Error(
