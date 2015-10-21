@@ -2442,7 +2442,7 @@ void DerivationGoal::runChild()
             /* This has to appear before import statements */
             sandboxProfile += "(version 1)\n";
 
-            sandboxProfile += (format("(import \"%1%/share/nix/sandbox-defaults.sb\")\n") % NIX_PREFIX).str();
+            sandboxProfile += (format("(import \"%1%/nix/sandbox-defaults.sb\")\n") % settings.nixDataDir).str();
 
             /* Violations will go to the syslog if you set this. Unfortunately the destination does not appear to be configurable */
             if (settings.get("darwin-log-sandbox-violations", false)) {
