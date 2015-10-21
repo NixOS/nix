@@ -114,8 +114,6 @@ struct Curl
         curl_easy_setopt(curl, CURLOPT_PROGRESSFUNCTION, progressCallback_);
         curl_easy_setopt(curl, CURLOPT_PROGRESSDATA, (void *) &curl);
         curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0);
-
-        showProgress = isatty(STDERR_FILENO);
     }
 
     ~Curl()
@@ -126,6 +124,8 @@ struct Curl
 
     bool fetch(const string & url, const DownloadOptions & options)
     {
+        showProgress = options.forceProgress || isatty(STDERR_FILENO);
+
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 
         if (options.verifyTLS)

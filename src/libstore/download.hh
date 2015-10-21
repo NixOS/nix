@@ -9,6 +9,7 @@ struct DownloadOptions
 {
     string expectedETag;
     bool verifyTLS{true};
+    bool forceProgress{false};
 };
 
 struct DownloadResult
