@@ -42,14 +42,8 @@ sub mkset(@) {
 
 sub union($$) {
   my ($set1, $set2) = @_;
-  my $new = {};
-  foreach my $key (keys %$set1) {
-    $new->{$key} = $set1->{$key};
-  }
-  foreach my $key (keys %$set2) {
-    $new->{$key} = $set2->{$key};
-  }
-  $new
+  my %new = (%$set1, %$set2);
+  \%new
 }
 
 sub cache_filepath($) {
