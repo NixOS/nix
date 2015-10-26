@@ -36,7 +36,9 @@ let
 
         postUnpack = ''
           # Clean up when building from a working tree.
-          (cd $sourceRoot && (git ls-files -o | xargs -r rm -v))
+          if [[ -d $sourceRoot/.git ]]; then
+            git -C $sourceRoot clean -fd
+          fi
         '';
 
         preConfigure = ''

@@ -1,5 +1,6 @@
 ifeq ($(MAKECMDGOALS), dist)
-  dist-files += $(shell git ls-files)
+  # Make sure we are in repo root with `--git-dir`
+  dist-files += $(shell git --git-dir=.git ls-files || find * -type f)
 endif
 
 dist-files += configure config.h.in nix.spec
