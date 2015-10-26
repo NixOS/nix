@@ -36,7 +36,12 @@ let
 
         postUnpack = ''
           # Clean up when building from a working tree.
-          (cd $sourceRoot && (git ls-files -o | xargs -r rm -v))
+          if [[ -d $sourceRoot/.git ]]; then
+            (cd $sourceRoot && (git ls-files -o | xargs -r rm -v))
+          fi
+
+          # Store initial files in ./dist-files
+          (cd $sourceRoot && find * -type f > dist-files)
         '';
 
         preConfigure = ''
