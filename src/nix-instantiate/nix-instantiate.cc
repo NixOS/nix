@@ -79,7 +79,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                     printGCWarning();
                 else {
                     Path rootName = gcRoot;
-                    if (++rootNr > 1) rootName += "-" + int2String(rootNr);
+                    if (++rootNr > 1) rootName += "-" + std::to_string(rootNr);
                     drvPath = addPermRoot(*store, drvPath, rootName, indirectRoot);
                 }
                 std::cout << format("%1%%2%\n") % drvPath % (outputName != "out" ? "!" + outputName : "");

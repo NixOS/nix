@@ -356,13 +356,6 @@ template<class N> bool string2Int(const string & s, N & n)
     return str && str.get() == EOF;
 }
 
-template<class N> string int2String(N n)
-{
-    std::ostringstream str;
-    str << n;
-    return str.str();
-}
-
 
 /* Return true iff `s' ends in `suffix'. */
 bool hasSuffix(const string & s, const string & suffix);

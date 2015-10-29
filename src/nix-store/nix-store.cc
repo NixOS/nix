@@ -81,7 +81,7 @@ static PathSet realisePath(Path path, bool build = true)
                 printGCWarning();
             else {
                 Path rootName = gcRoot;
-                if (rootNr > 1) rootName += "-" + int2String(rootNr);
+                if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
                 if (i->first != "out") rootName += "-" + i->first;
                 outPath = addPermRoot(*store, outPath, rootName, indirectRoot);
             }
@@ -98,7 +98,7 @@ static PathSet realisePath(Path path, bool build = true)
         else {
             Path rootName = gcRoot;
             rootNr++;
-            if (rootNr > 1) rootName += "-" + int2String(rootNr);
+            if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
             path = addPermRoot(*store, path, rootName, indirectRoot);
         }
         return singleton<PathSet>(path);

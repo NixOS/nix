@@ -243,7 +243,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
                         if (i != names.end()) {
                             printMsg(lvlDebug, format("case collision between ‘%1%’ and ‘%2%’") % i->first % name);
                             name += caseHackSuffix;
-                            name += int2String(++i->second);
+                            name += std::to_string(++i->second);
                         } else
                             names[name] = 0;
                     }

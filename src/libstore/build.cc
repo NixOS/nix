@@ -1732,7 +1732,7 @@ void DerivationGoal::startBuilder()
         if (passAsFile.find(i.first) == passAsFile.end()) {
             env[i.first] = i.second;
         } else {
-            Path p = tmpDir + "/.attr-" + int2String(fileNr++);
+            Path p = tmpDir + "/.attr-" + std::to_string(fileNr++);
             writeFile(p, i.second);
             filesToChown.insert(p);
             env[i.first + "Path"] = p;
@@ -2142,7 +2142,7 @@ void DerivationGoal::startBuilder()
                    CLONE_PARENT are not allowed together. */
                 child = clone(childEntry, stack + stackSize, flags & ~CLONE_NEWPID, this);
             if (child == -1) throw SysError("cloning builder process");
-            writeFull(builderOut.writeSide, int2String(child) + "\n");
+            writeFull(builderOut.writeSide, std::to_string(child) + "\n");
             _exit(0);
         }, options);
         if (helper.wait(true) != 0)

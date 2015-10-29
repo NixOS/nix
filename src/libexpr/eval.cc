@@ -1392,7 +1392,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
            shell scripting convenience, just like `null'. */
         if (v.type == tBool && v.boolean) return "1";
         if (v.type == tBool && !v.boolean) return "";
-        if (v.type == tInt) return int2String(v.integer);
+        if (v.type == tInt) return std::to_string(v.integer);
         if (v.type == tNull) return "";
 
         if (v.isList()) {

@@ -240,7 +240,7 @@ Path downloadFileCached(const string & url, bool unpack)
             assert(!storePath.empty());
             replaceSymlink(storePath, fileLink);
 
-            writeFile(dataFile, url + "\n" + res.etag + "\n" + int2String(time(0)) + "\n");
+            writeFile(dataFile, url + "\n" + res.etag + "\n" + std::to_string(time(0)) + "\n");
         } catch (DownloadError & e) {
             if (storePath.empty()) throw;
             printMsg(lvlError, format("warning: %1%; using cached result") % e.msg());
