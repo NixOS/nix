@@ -1,12 +1,19 @@
 with import <nix/config.nix>;
 
-{system ? builtins.currentSystem, url, outputHash ? "", outputHashAlgo ? "", md5 ? "", sha1 ? "", sha256 ? "", executable ? false}:
+{ system ? builtins.currentSystem
+, url
+, outputHash ? ""
+, outputHashAlgo ? ""
+, md5 ? "", sha1 ? "", sha256 ? ""
+, executable ? false
+, unpack ? false
+, name ? baseNameOf (toString url)
+}:
 
 assert (outputHash != "" && outputHashAlgo != "")
     || md5 != "" || sha1 != "" || sha256 != "";
 
 derivation {
-  name = baseNameOf (toString url);
   builder = "builtin:fetchurl";
 
   # New-style output content requirements.
@@ -14,9 +21,9 @@ derivation {
       if sha256 != "" then "sha256" else if sha1 != "" then "sha1" else "md5";
   outputHash = if outputHash != "" then outputHash else
       if sha256 != "" then sha256 else if sha1 != "" then sha1 else md5;
-  outputHashMode = if executable then "recursive" else "flat";
+  outputHashMode = if unpack || executable then "recursive" else "flat";
 
-  inherit system url executable;
+  inherit name system url executable unpack;
 
   # No need to double the amount of network traffic
   preferLocalBuild = true;

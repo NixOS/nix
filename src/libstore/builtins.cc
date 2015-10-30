@@ -1,5 +1,7 @@
 #include "builtins.hh"
 #include "download.hh"
+#include "store-api.hh"
+#include "archive.hh"
 
 namespace nix {
 
@@ -20,12 +22,21 @@ void builtinFetchurl(const BasicDerivation & drv)
 
     auto out = drv.env.find("out");
     if (out == drv.env.end()) throw Error("attribute ‘url’ missing");
-    writeFile(out->second, data.data);
+
+    Path storePath = out->second;
+    assertStorePath(storePath);
+
+    auto unpack = drv.env.find("unpack");
+    if (unpack != drv.env.end() && unpack->second == "1") {
+        StringSource source(data.data);
+        restorePath(storePath, source);
+    } else
+        writeFile(storePath, data.data);
 
     auto executable = drv.env.find("executable");
     if (executable != drv.env.end() && executable->second == "1") {
-        if (chmod(out->second.c_str(), 0755) == -1)
-            throw SysError(format("making ‘%1%’ executable") % out->second);
+        if (chmod(storePath.c_str(), 0755) == -1)
+            throw SysError(format("making ‘%1%’ executable") % storePath);
     }
 }
 
