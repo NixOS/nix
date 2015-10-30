@@ -6,8 +6,10 @@ libutil_DIR := $(d)
 
 libutil_SOURCES := $(wildcard $(d)/*.cc)
 
+libutil_LDFLAGS = -llzma
+
 ifeq ($(HAVE_OPENSSL), 1)
-  libutil_LDFLAGS = $(OPENSSL_LIBS)
+  libutil_LDFLAGS += $(OPENSSL_LIBS)
 else
   libutil_SOURCES += $(d)/md5.c $(d)/sha1.c $(d)/sha256.c
 endif

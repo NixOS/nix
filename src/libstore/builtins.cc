@@ -2,6 +2,7 @@
 #include "download.hh"
 #include "store-api.hh"
 #include "archive.hh"
+#include "compression.hh"
 
 namespace nix {
 
@@ -28,6 +29,8 @@ void builtinFetchurl(const BasicDerivation & drv)
 
     auto unpack = drv.env.find("unpack");
     if (unpack != drv.env.end() && unpack->second == "1") {
+        if (string(data.data, 0, 6) == string("\xfd" "7zXZ\0", 6))
+            data.data = decompressXZ(data.data);
         StringSource source(data.data);
         restorePath(storePath, source);
     } else

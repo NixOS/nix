@@ -83,7 +83,7 @@ let
         src = tarball;
 
         buildInputs =
-          [ curl perl bzip2 openssl pkgconfig sqlite boehmgc ]
+          [ curl perl bzip2 xz openssl pkgconfig sqlite boehmgc ]
           ++ lib.optional stdenv.isLinux libsodium;
 
         configureFlags = ''

@@ -218,6 +218,10 @@ PKG_CHECK_MODULES([SODIUM], [libsodium],
 AC_SUBST(HAVE_SODIUM, [$have_sodium])
 
 
+# Look for liblzma, a required dependency.
+PKG_CHECK_MODULES([LIBLZMA], [liblzma], [CXXFLAGS="$LIBLZMA_CFLAGS $CXXFLAGS"])
+
+
 # Whether to use the Boehm garbage collector.
 AC_ARG_ENABLE(gc, AC_HELP_STRING([--enable-gc],
   [enable garbage collection in the Nix expression evaluator (requires Boehm GC) [default=no]]),
