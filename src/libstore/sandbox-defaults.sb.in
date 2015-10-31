@@ -35,7 +35,10 @@
        (literal "/private/var/run/resolv.conf"))
 
 ; some builders use filehandles other than stdin/stdout
-(allow file* (subpath "/dev/fd"))
+(allow file*
+        (subpath "/dev/fd")
+        (literal "/dev/ptmx")
+        (regex #"^/dev/[pt]ty.*$"))
 
 ; allow everything inside TMP
 (allow file* process-exec
