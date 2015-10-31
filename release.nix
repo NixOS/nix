@@ -23,7 +23,7 @@ let
         inherit officialRelease;
 
         buildInputs =
-          [ curl bison flex perl libxml2 libxslt bzip2
+          [ curl bison flex perl libxml2 libxslt bzip2 xz
             dblatex (dblatex.tex or tetex) nukeReferences pkgconfig sqlite libsodium
             docbook5 docbook5_xsl
           ] ++ lib.optional (!lib.inNixShell) git;
