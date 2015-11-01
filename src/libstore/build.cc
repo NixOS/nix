@@ -548,7 +548,7 @@ void UserLock::acquire()
 #if __linux__
             /* Get the list of supplementary groups of this build user.  This
                is usually either empty or contains a group such as "kvm".  */
-            supplementaryGIDs.resize(10);
+            supplementaryGIDs.resize(256);
             int ngroups = supplementaryGIDs.size();
             int err = getgrouplist(pw->pw_name, pw->pw_gid,
                 supplementaryGIDs.data(), &ngroups);
