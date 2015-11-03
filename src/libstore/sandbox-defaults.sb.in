@@ -15,7 +15,7 @@
 
 (allow file-read*
        (subpath "/usr/share/icu")
-       (subpath "/usr/share/locale"))
+       (subpath "/usr/share/locale")
        (subpath "/usr/share/zoneinfo"))
 
 (allow file-write*
