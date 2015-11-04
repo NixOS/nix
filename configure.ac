@@ -183,16 +183,12 @@ AC_ARG_WITH(store-dir, AC_HELP_STRING([--with-store-dir=PATH],
 AC_SUBST(storedir)
 
 
-# Look for OpenSSL, an optional dependency.
+# Look for OpenSSL, a required dependency.
 AC_PATH_PROG(openssl, openssl, openssl) # if not found, call openssl in $PATH
 AC_SUBST(openssl)
 AC_DEFINE_UNQUOTED(OPENSSL_PATH, ["$openssl"], [Path of the OpenSSL binary])
 
-PKG_CHECK_MODULES([OPENSSL], [libcrypto],
-  [AC_DEFINE([HAVE_OPENSSL], [1], [Whether to use OpenSSL.])
-   CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"
-   have_openssl=1], [have_openssl=])
-AC_SUBST(HAVE_OPENSSL, [$have_openssl])
+PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
 
 
 # Look for libbz2, a required dependency.

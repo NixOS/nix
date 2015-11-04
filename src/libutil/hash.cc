@@ -3,16 +3,8 @@
 #include <iostream>
 #include <cstring>
 
-#ifdef HAVE_OPENSSL
 #include <openssl/md5.h>
 #include <openssl/sha.h>
-#else
-extern "C" {
-#include "md5.h"
-#include "sha1.h"
-#include "sha256.h"
-}
-#endif
 
 #include "hash.hh"
 #include "archive.hh"
