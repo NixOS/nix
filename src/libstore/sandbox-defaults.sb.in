@@ -11,8 +11,12 @@
        (literal "/private/etc/protocols")
        (literal "/private/var/tmp")
        (literal "/private/var/db")
-       (subpath "/private/var/db/mds")
-       (subpath "/usr/share/icu"))
+       (subpath "/private/var/db/mds"))
+
+(allow file-read*
+       (subpath "/usr/share/icu")
+       (subpath "/usr/share/locale")
+       (subpath "/usr/share/zoneinfo"))
 
 (allow file-write*
        (literal "/dev/tty")
