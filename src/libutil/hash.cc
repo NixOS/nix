@@ -32,6 +32,7 @@ Hash::Hash(HashType type)
     if (type == htMD5) hashSize = md5HashSize;
     else if (type == htSHA1) hashSize = sha1HashSize;
     else if (type == htSHA256) hashSize = sha256HashSize;
+    else if (type == htSHA512) hashSize = sha512HashSize;
     else throw Error("unknown hash type");
     assert(hashSize <= maxHashSize);
     memset(hash, 0, maxHashSize);
@@ -190,6 +191,7 @@ union Ctx
     MD5_CTX md5;
     SHA_CTX sha1;
     SHA256_CTX sha256;
+    SHA512_CTX sha512;
 };
 
 
@@ -198,6 +200,7 @@ static void start(HashType ht, Ctx & ctx)
     if (ht == htMD5) MD5_Init(&ctx.md5);
     else if (ht == htSHA1) SHA1_Init(&ctx.sha1);
     else if (ht == htSHA256) SHA256_Init(&ctx.sha256);
+    else if (ht == htSHA512) SHA512_Init(&ctx.sha512);
 }
 
 
@@ -207,6 +210,7 @@ static void update(HashType ht, Ctx & ctx,
     if (ht == htMD5) MD5_Update(&ctx.md5, bytes, len);
     else if (ht == htSHA1) SHA1_Update(&ctx.sha1, bytes, len);
     else if (ht == htSHA256) SHA256_Update(&ctx.sha256, bytes, len);
+    else if (ht == htSHA512) SHA512_Update(&ctx.sha512, bytes, len);
 }
 
 
@@ -215,6 +219,7 @@ static void finish(HashType ht, Ctx & ctx, unsigned char * hash)
     if (ht == htMD5) MD5_Final(hash, &ctx.md5);
     else if (ht == htSHA1) SHA1_Final(hash, &ctx.sha1);
     else if (ht == htSHA256) SHA256_Final(hash, &ctx.sha256);
+    else if (ht == htSHA512) SHA512_Final(hash, &ctx.sha512);
 }
 
 
@@ -312,6 +317,7 @@ HashType parseHashType(const string & s)
     if (s == "md5") return htMD5;
     else if (s == "sha1") return htSHA1;
     else if (s == "sha256") return htSHA256;
+    else if (s == "sha512") return htSHA512;
     else return htUnknown;
 }
 
@@ -321,6 +327,7 @@ string printHashType(HashType ht)
     if (ht == htMD5) return "md5";
     else if (ht == htSHA1) return "sha1";
     else if (ht == htSHA256) return "sha256";
+    else if (ht == htSHA512) return "sha512";
     else throw Error("cannot print unknown hash type");
 }
 

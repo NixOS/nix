@@ -40,13 +40,10 @@ echo "Hello World!" > $TEST_ROOT/fixed/foo
 ln -s foo $TEST_ROOT/fixed/bar
 
 out2=$(nix-store --add $TEST_ROOT/fixed)
-echo $out2
-test "$out" = "$out2" || exit 1
+[ "$out" = "$out2" ]
 
 out3=$(nix-store --add-fixed --recursive sha256 $TEST_ROOT/fixed)
-echo $out3
-test "$out" = "$out3" || exit 1
+[ "$out" = "$out3" ]
 
 out4=$(nix-store --print-fixed-path --recursive sha256 "1ixr6yd3297ciyp9im522dfxpqbkhcw0pylkb2aab915278fqaik" fixed)
-echo $out4
-test "$out" = "$out4" || exit 1
+[ "$out" = "$out4" ]

@@ -7,19 +7,20 @@
 namespace nix {
 
 
-typedef enum { htUnknown, htMD5, htSHA1, htSHA256 } HashType;
+typedef enum { htUnknown, htMD5, htSHA1, htSHA256, htSHA512 } HashType;
 
 
 const int md5HashSize = 16;
 const int sha1HashSize = 20;
 const int sha256HashSize = 32;
+const int sha512HashSize = 64;
 
 extern const string base32Chars;
 
 
 struct Hash
 {
-    static const unsigned int maxHashSize = 32;
+    static const unsigned int maxHashSize = 64;
     unsigned int hashSize;
     unsigned char hash[maxHashSize];
 
