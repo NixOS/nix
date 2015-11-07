@@ -232,7 +232,11 @@ DirEntries readDirectory(const Path & path)
         checkInterrupt();
         string name = dirent->d_name;
         if (name == "." || name == "..") continue;
+#ifdef HAVE_STRUCT_DIRENT_D_TYPE
         entries.emplace_back(name, dirent->d_ino, dirent->d_type);
+#else
+        entries.emplace_back(name, dirent->d_ino, getFileType(absPath(name, path)));
+#endif
     }
     if (errno) throw SysError(format("reading directory ‘%1%’") % path);
 

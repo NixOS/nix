@@ -48,6 +48,7 @@ test "$localstatedir" = '${prefix}/var' && localstatedir=/nix/var
 
 
 # Solaris-specific stuff.
+AC_STRUCT_DIRENT_D_TYPE
 if test "$sys_name" = sunos; then
     # Solaris requires -lsocket -lnsl for network functions
     LIBS="-lsocket -lnsl $LIBS"
