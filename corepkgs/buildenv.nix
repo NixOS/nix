@@ -23,10 +23,10 @@ derivation {
   # network traffic, so don't do that.
   preferLocalBuild = true;
 
-  __impureHostDeps = [
+  __impureHostDeps = if builtins.currentSystem == "x86_64-darwin" then [
     "/usr/lib/libSystem.dylib"
     "/usr/lib/system"
-  ];
+  ] else null;
 
   inherit chrootDeps;
 }
