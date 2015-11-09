@@ -120,9 +120,9 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
         return;
     }
 
-    /* This can still happen on top-level files */
+    /* This can still happen on top-level files. */
     if (st.st_nlink > 1 && inodeHash.count(st.st_ino)) {
-        printMsg(lvlDebug, format("‘%1%’ is already linked, with %2% other file(s).") % path % (st.st_nlink - 2));
+        printMsg(lvlDebug, format("‘%1%’ is already linked, with %2% other file(s)") % path % (st.st_nlink - 2));
         return;
     }
 
@@ -141,6 +141,7 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
     /* Check if this is a known hash. */
     Path linkPath = linksDir + "/" + printHash32(hash);
 
+ retry:
     if (!pathExists(linkPath)) {
         /* Nope, create a hard link in the links directory. */
         if (link(path.c_str(), linkPath.c_str()) == 0) {
@@ -162,6 +163,12 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
     if (st.st_ino == stLink.st_ino) {
         printMsg(lvlDebug, format("‘%1%’ is already linked to ‘%2%’") % path % linkPath);
         return;
+    }
+
+    if (st.st_size != stLink.st_size) {
+        printMsg(lvlError, format("removing corrupted link ‘%1%’") % linkPath);
+        unlink(linkPath.c_str());
+        goto retry;
     }
 
     printMsg(lvlTalkative, format("linking ‘%1%’ to ‘%2%’") % path % linkPath);
