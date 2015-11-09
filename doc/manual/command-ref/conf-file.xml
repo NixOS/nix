@@ -616,6 +616,18 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
   </varlistentry>
 
 
+  <varlistentry xml:id="conf-build-repeat"><term><literal>build-repeat</literal></term>
+
+    <listitem><para>How many times to repeat builds to check whether
+    they are deterministic. The default value is 0. If the value is
+    non-zero, every build is repeated the specified number of
+    times. If the contents of any of the runs differs from the
+    previous ones, the build is rejected and the resulting store paths
+    are not registered as “valid” in Nix’s database.</para></listitem>
+
+  </varlistentry>
+
+
 </variablelist>
 
 </para>

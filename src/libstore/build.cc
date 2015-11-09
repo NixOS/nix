@@ -791,12 +791,18 @@ private:
        temporary paths. */
     PathSet redirectedBadOutputs;
 
-    /* Set of inodes seen during calls to canonicalisePathMetaData()
-       for this build's outputs.  This needs to be shared between
-       outputs to allow hard links between outputs. */
-    InodesSeen inodesSeen;
-
     BuildResult result;
+
+    /* The current round, if we're building multiple times. */
+    unsigned int curRound = 1;
+
+    unsigned int nrRounds;
+
+    /* Path registration info from the previous round, if we're
+       building multiple times. Since this contains the hash, it
+       allows us to compare whether two rounds produced the same
+       result. */
+    ValidPathInfos prevInfos;
 
 public:
     DerivationGoal(const Path & drvPath, const StringSet & wantedOutputs,
@@ -1238,6 +1244,10 @@ void DerivationGoal::inputsRealised()
     for (auto & i : drv->outputs)
         if (i.second.hash == "") fixedOutput = false;
 
+    /* Don't repeat fixed-output derivations since they're already
+       verified by their output hash.*/
+    nrRounds = fixedOutput ? 1 : settings.get("build-repeat", 0) + 1;
+
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
        build hook. */
@@ -1420,6 +1430,9 @@ void replaceValidPath(const Path & storePath, const Path tmpPath)
 }
 
 
+MakeError(NotDeterministic, BuildError)
+
+
 void DerivationGoal::buildDone()
 {
     trace("build done");
@@ -1519,6 +1532,15 @@ void DerivationGoal::buildDone()
 
         deleteTmpDir(true);
 
+        /* Repeat the build if necessary. */
+        if (curRound++ < nrRounds) {
+            outputLocks.unlock();
+            buildUser.release();
+            state = &DerivationGoal::tryToBuild;
+            worker.wakeUp(shared_from_this());
+            return;
+        }
+
         /* It is now safe to delete the lock files, since all future
            lockers will see that the output paths are valid; they will
            not create new lock files with the same names as the old
@@ -1552,6 +1574,7 @@ void DerivationGoal::buildDone()
                     % drvPath % 1 % e.msg());
 
             st =
+                dynamic_cast<NotDeterministic*>(&e) ? BuildResult::NotDeterministic :
                 statusOk(status) ? BuildResult::OutputRejected :
                 fixedOutput || diskFull ? BuildResult::TransientFailure :
                 BuildResult::PermanentFailure;
@@ -1678,10 +1701,13 @@ int childEntry(void * arg)
 
 void DerivationGoal::startBuilder()
 {
-    startNest(nest, lvlInfo, format(
-            buildMode == bmRepair ? "repairing path(s) %1%" :
-            buildMode == bmCheck ? "checking path(s) %1%" :
-            "building path(s) %1%") % showPaths(missingPaths));
+    auto f = format(
+        buildMode == bmRepair ? "repairing path(s) %1%" :
+        buildMode == bmCheck ? "checking path(s) %1%" :
+        nrRounds > 1 ? "building path(s) %1% (round %2%/%3%)" :
+        "building path(s) %1%");
+    f.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
+    startNest(nest, lvlInfo, f % showPaths(missingPaths) % curRound % nrRounds);
 
     /* Right platform? */
     if (!canBuildLocally(*drv)) {
@@ -1693,6 +1719,7 @@ void DerivationGoal::startBuilder()
     }
 
     /* Construct the environment passed to the builder. */
+    env.clear();
 
     /* Most shells initialise PATH to some default (/bin:/usr/bin:...) when
        PATH is not set.  We don't want this, so we fill it in with some dummy
@@ -1872,6 +1899,8 @@ void DerivationGoal::startBuilder()
         PathSet dirs = tokenizeString<StringSet>(settings.get("build-chroot-dirs", defaultChrootDirs));
         PathSet dirs2 = tokenizeString<StringSet>(settings.get("build-extra-chroot-dirs", string("")));
         dirs.insert(dirs2.begin(), dirs2.end());
+
+        dirsInChroot.clear();
 
         for (auto & i : dirs) {
             size_t p = i.find('=');
@@ -2582,6 +2611,11 @@ void DerivationGoal::registerOutputs()
 
     ValidPathInfos infos;
 
+    /* Set of inodes seen during calls to canonicalisePathMetaData()
+       for this build's outputs.  This needs to be shared between
+       outputs to allow hard links between outputs. */
+    InodesSeen inodesSeen;
+
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all
        output paths read-only. */
@@ -2752,6 +2786,16 @@ void DerivationGoal::registerOutputs()
     }
 
     if (buildMode == bmCheck) return;
+
+    if (curRound > 1 && prevInfos != infos)
+        throw NotDeterministic(
+            format("result of ‘%1%’ differs from previous round; rejecting as non-deterministic")
+            % drvPath);
+
+    if (curRound < nrRounds) {
+        prevInfos = infos;
+        return;
+    }
 
     /* Register each output path as valid, and register the sets of
        paths referenced by each of them.  If there are cycles in the

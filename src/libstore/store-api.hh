@@ -87,10 +87,17 @@ struct ValidPathInfo
     Path deriver;
     Hash hash;
     PathSet references;
-    time_t registrationTime;
-    unsigned long long narSize; // 0 = unknown
+    time_t registrationTime = 0;
+    unsigned long long narSize = 0; // 0 = unknown
     unsigned long long id; // internal use only
-    ValidPathInfo() : registrationTime(0), narSize(0) { }
+
+    bool operator == (const ValidPathInfo & i) const
+    {
+        return
+            path == i.path
+            && hash == i.hash
+            && references == i.references;
+    }
 };
 
 typedef list<ValidPathInfo> ValidPathInfos;
@@ -114,6 +121,7 @@ struct BuildResult
         MiscFailure,
         DependencyFailed,
         LogLimitExceeded,
+        NotDeterministic,
     } status = MiscFailure;
     std::string errorMsg;
     //time_t startTime = 0, stopTime = 0;
