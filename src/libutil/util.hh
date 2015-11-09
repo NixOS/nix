@@ -150,8 +150,8 @@ void printMsg_(Verbosity level, const FormatOrString & fs);
 
 #define printMsg(level, f) \
     do { \
-        if (level <= verbosity) { \
-            printMsg_(level, (f)); \
+        if (level <= nix::verbosity) { \
+            nix::printMsg_(level, (f)); \
         } \
     } while (0)
 
