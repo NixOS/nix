@@ -1,5 +1,6 @@
 #! @perl@ -w @perlFlags@
 
+use utf8;
 use strict;
 use Nix::SSH;
 use Nix::Config;
