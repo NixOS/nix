@@ -778,6 +778,8 @@ private:
     DirsInChroot dirsInChroot;
     typedef map<string, string> Environment;
     Environment env;
+    typedef string SandboxProfile;
+    SandboxProfile additionalSandboxProfile;
 
     /* Hash rewriting. */
     HashRewrites rewritesToTmp, rewritesFromTmp;
@@ -1919,30 +1921,34 @@ void DerivationGoal::startBuilder()
         for (auto & i : closure)
             dirsInChroot[i] = i;
 
-        string allowed = settings.get("allowed-impure-host-deps", string(DEFAULT_ALLOWED_IMPURE_PREFIXES));
-        PathSet allowedPaths = tokenizeString<StringSet>(allowed);
+        if(!SANDBOX_ENABLED) {
+          string allowed = settings.get("allowed-impure-host-deps", string(DEFAULT_ALLOWED_IMPURE_PREFIXES));
+          PathSet allowedPaths = tokenizeString<StringSet>(allowed);
 
-        /* This works like the above, except on a per-derivation level */
-        Strings impurePaths = tokenizeString<Strings>(get(drv->env, "__impureHostDeps"));
+          /* This works like the above, except on a per-derivation level */
+          Strings impurePaths = tokenizeString<Strings>(get(drv->env, "__impureHostDeps"));
 
-        for (auto & i : impurePaths) {
-            bool found = false;
-            /* Note: we're not resolving symlinks here to prevent
-               giving a non-root user info about inaccessible
-               files. */
-            Path canonI = canonPath(i);
-            /* If only we had a trie to do this more efficiently :) luckily, these are generally going to be pretty small */
-            for (auto & a : allowedPaths) {
-                Path canonA = canonPath(a);
-                if (canonI == canonA || isInDir(canonI, canonA)) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found)
-                throw Error(format("derivation '%1%' requested impure path ‘%2%’, but it was not in allowed-impure-host-deps (‘%3%’)") % drvPath % i % allowed);
+          for (auto & i : impurePaths) {
+              bool found = false;
+              /* Note: we're not resolving symlinks here to prevent
+                 giving a non-root user info about inaccessible
+                 files. */
+              Path canonI = canonPath(i);
+              /* If only we had a trie to do this more efficiently :) luckily, these are generally going to be pretty small */
+              for (auto & a : allowedPaths) {
+                  Path canonA = canonPath(a);
+                  if (canonI == canonA || isInDir(canonI, canonA)) {
+                      found = true;
+                      break;
+                  }
+              }
+              if (!found)
+                  throw Error(format("derivation '%1%' requested impure path ‘%2%’, but it was not in allowed-impure-host-deps (‘%3%’)") % drvPath % i % allowed);
 
-            dirsInChroot[i] = i;
+              dirsInChroot[i] = i;
+          }
+        } else {
+          additionalSandboxProfile = get(drv->env, "__sandboxProfile");
         }
 
 #if CHROOT_ENABLED
@@ -2471,8 +2477,6 @@ void DerivationGoal::runChild()
             /* This has to appear before import statements */
             sandboxProfile += "(version 1)\n";
 
-            sandboxProfile += (format("(import \"%1%/nix/sandbox-defaults.sb\")\n") % settings.nixDataDir).str();
-
             /* Violations will go to the syslog if you set this. Unfortunately the destination does not appear to be configurable */
             if (settings.get("darwin-log-sandbox-violations", false)) {
                 sandboxProfile += "(deny default)\n";
@@ -2528,13 +2532,20 @@ void DerivationGoal::runChild()
             }
             sandboxProfile += ")\n";
 
+            sandboxProfile += additionalSandboxProfile;
+
             debug("Generated sandbox profile:");
             debug(sandboxProfile);
 
+            char *tmpProfile = strdup((format("%1%/nix-sandboxXXXXXX.sb") % globalTmpDir).str().c_str());
+            int profileFd = mkstemps(tmpProfile, 3);
+            closeOnExec(profileFd);
+            writeFull(profileFd, sandboxProfile);
+
             builder = "/usr/bin/sandbox-exec";
             args.push_back("sandbox-exec");
-            args.push_back("-p");
-            args.push_back(sandboxProfile);
+            args.push_back("-f");
+            args.push_back(tmpProfile);
             args.push_back("-D");
             args.push_back((format("_GLOBAL_TMP_DIR=%1%") % globalTmpDir).str());
             args.push_back(drv->builder);
