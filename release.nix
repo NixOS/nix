@@ -97,10 +97,9 @@ let
 
         enableParallelBuilding = true;
 
-        __sandboxProfile = lib.sandbox.allowNetwork
-          + lib.sandbox.allowFileRead {
-            literal = [ "/etc" "/etc/nix/nix.conf" "/private/etc/nix/nix.conf" ];
-          };
+        __sandboxProfile = lib.sandbox.allowFileRead [
+          "/etc" "/etc/nix/nix.conf" "/private/etc/nix/nix.conf"
+        ];
 
         makeFlags = "profiledir=$(out)/etc/profile.d";
 
