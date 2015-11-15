@@ -778,8 +778,12 @@ private:
     DirsInChroot dirsInChroot;
     typedef map<string, string> Environment;
     Environment env;
+#if SANDBOX_ENABLED
     typedef string SandboxProfile;
     SandboxProfile additionalSandboxProfile;
+
+    AutoDelete autoDelSandbox;
+#endif
 
     /* Hash rewriting. */
     HashRewrites rewritesToTmp, rewritesFromTmp;
@@ -2445,9 +2449,10 @@ void DerivationGoal::runChild()
         const char *builder = "invalid";
 
         string sandboxProfile;
-        if (isBuiltin(*drv))
+        if (isBuiltin(*drv)) {
             ;
-        else if (useChroot && SANDBOX_ENABLED) {
+#if SANDBOX_ENABLED
+        } else if (useChroot) {
             /* Lots and lots and lots of file functions freak out if they can't stat their full ancestry */
             PathSet ancestry;
 
@@ -2527,16 +2532,20 @@ void DerivationGoal::runChild()
             debug("Generated sandbox profile:");
             debug(sandboxProfile);
 
-            Path tmpProfile = createTempDir() + "/profile.sb";
-            writeFile(tmpProfile, sandboxProfile);
+            Path sandboxFile = drvPath + ".sb";
+            if (pathExists(sandboxFile)) deletePath(sandboxFile);
+            autoDelSandbox = AutoDelete(sandboxFile);
+
+            writeFile(sandboxFile, sandboxProfile);
 
             builder = "/usr/bin/sandbox-exec";
             args.push_back("sandbox-exec");
             args.push_back("-f");
-            args.push_back(tmpProfile);
+            args.push_back(sandboxFile);
             args.push_back("-D");
             args.push_back("_GLOBAL_TMP_DIR=" + globalTmpDir);
             args.push_back(drv->builder);
+#endif
         } else {
             builder = drv->builder.c_str();
             string builderBasename = baseNameOf(drv->builder);
