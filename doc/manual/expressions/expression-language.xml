@@ -25,6 +25,6 @@ language.</para>
 <xi:include href="language-operators.xml" />
 <xi:include href="derivations.xml" />
 <xi:include href="builtins.xml" />
-
+<xi:include href="debug-attributes.xml" />
 
 </chapter>

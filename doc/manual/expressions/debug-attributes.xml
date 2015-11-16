@@ -1,0 +1,47 @@
+<section xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="ssec-debug-attrsets">
+
+<title>Debugging Attribute Sets</title>
+
+<para>Attribute sets are the core of nix, and sometimes can get quite complex.
+During development it may be useful to use
+<function>builtins.toJSON</function>, <function>builtins.toJSON</function> and
+<function>builtins.trace</function> to inspect attribute sets.
+
+<screen>
+$ cat dbg-ex.nix 
+rec {
+  set = { 
+    a = 1;
+    y = "foo";
+    x.z = "0";
+  }; 
+
+  # inspect set
+  json = builtins.toJSON set; 
+  xml = builtins.toXML set; 
+
+  # trace when set is being assigned
+  superSet = { 
+    set = builtins.trace "assigning set!" set;
+    poit = "narf";
+  };
+}
+
+$ nix-instantiate --eval -A json dbg-ex.nix 
+"{\"a\":1,\"x\":{\"z\":\"0\"},\"y\":\"foo\"}"
+
+$ nix-instantiate --eval -A xml dbg-ex.nix 
+"<![CDATA[<?xml version='1.0' encoding='utf-8'?>\n<expr>\n  <attrs>\n    <attr name=\"a\">\n      <int value=\"1\" />\n    </attr>\n    <attr name=\"x\">\n      <attrs>\n        <attr name=\"z\">\n          <string value=\"0\" />\n        </attr>\n      </attrs>\n    </attr>\n    <attr name=\"y\">\n      <string value=\"foo\" />\n    </attr>\n  </attrs>\n</expr>\n]]>"
+
+$ nix-instantiate -A superSet dbg-ex.nix 
+trace: assigning set!
+
+</screen> 
+
+</para>
+
+</section>
