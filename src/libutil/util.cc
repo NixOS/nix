@@ -628,7 +628,7 @@ void AutoDelete::cancel()
     del = false;
 }
 
-void AutoDelete::reset(const Path & p, bool recursive = true) {
+void AutoDelete::reset(const Path & p, bool recursive) {
     path = p;
     this->recursive = recursive;
     del = true;
