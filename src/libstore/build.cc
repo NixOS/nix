@@ -2503,8 +2503,11 @@ void DerivationGoal::runChild()
             }
             sandboxProfile += ")\n";
 
-            /* Our inputs (transitive dependencies and any impurities computed above) */
-            sandboxProfile += "(allow file-read* process-exec\n";
+            /* Our inputs (transitive dependencies and any impurities computed above)
+
+               without file-write* allowed, access() incorrectly returns EPERM
+             */
+            sandboxProfile += "(allow file-read* file-write* process-exec\n";
             for (auto & i : dirsInChroot) {
                 if (i.first != i.second)
                     throw SysError(format("can't map '%1%' to '%2%': mismatched impure paths not supported on darwin"));
