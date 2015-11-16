@@ -6,6 +6,8 @@
 #include "globals.hh"
 #include "eval-inline.hh"
 #include "value-to-json.hh"
+#include "json-to-value.hh"
+#include <src/boost/format.hpp>
 
 #include <iostream>
 #include <fstream>
@@ -266,7 +268,7 @@ EvalState::EvalState(const Strings & _searchPath)
     , sColumn(symbols.create("column"))
     , sFunctor(symbols.create("__functor"))
     , sToString(symbols.create("__toString"))
-    , evalMode(Record)
+    , evalMode(Normal)
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
 {
@@ -285,8 +287,24 @@ EvalState::EvalState(const Strings & _searchPath)
     clearValue(vEmptySet);
     vEmptySet.type = tAttrs;
     vEmptySet.attrs = allocBindings(0);
+    
+    const char * recordMode = getenv("NIX_RECORDING");
+    const char * playbackMode = getenv("NIX_PLAYBACK");
+    if (recordMode && !playbackMode) {
+      evalMode = Record;
+      recordFileName = recordMode;
+    } else if (playbackMode && !recordMode) {
+      evalMode = Playback;
+      recordFileName = playbackMode;
+    } else if (!playbackMode && !recordMode) {
+      evalMode = Normal;
+    }
+    else
+      throw EvalError("can't use both NIX_RECORDING and NIX_PLAYBACK");
+    std::cout << "EvalMode: " << evalMode << std::endl;
 
     createBaseEnv();
+
 }
 
 
@@ -371,26 +389,41 @@ std::string EvalState::valueToJSON(Value & value) {
 void EvalState::addImpurePrimOp(const string & name,
     unsigned int arity, PrimOpFun primOp)
 {
+  std::cout << "IMPURE " << name << std::endl;
+  
     if (evalMode == Record) {
         PrimOpLambdaFun foo = [this, name, primOp, arity] (EvalState & state, const Pos & pos, Value * * args, Value & v) {
-            std::cout << "WE'RE GETTING CALLED INSIDE " << name << std::endl;
             std::list<string> argList;
             for (int i = 0; i < arity; i++) {
                 argList.push_back(valueToJSON(*args[i]));
             }
+            std::cout << "Record " << name << std::endl;
             primOp(state, pos, args, v);
             recording[std::make_pair(name, argList)] = v;
         };
-        std::cout << "ZOMG " << name << std::endl;
         addPrimOpLambda(name, arity, foo);
     } else if (evalMode == Playback) {
-        std::cout << "ZOMG PLAYBACK " << name << std::endl;
+	PrimOpLambdaFun foo = [this, name, primOp, arity] (EvalState & state, const Pos & pos, Value * * args, Value & v) {
+            std::list<string> argList;
+            for (int i = 0; i < arity; i++) {
+                argList.push_back(valueToJSON(*args[i]));
+            }
+            std::cout << "Playback " << name << std::endl;
+            auto result = recording.find(std::make_pair(name, argList));
+	    if (result == recording.end()) {
+	      std::string errorMsg("wanted to call ");
+	      errorMsg +=name;
+	      throw EvalError(errorMsg.c_str());
+	    }
+	    else {
+	      v = result->second;
+	    }
+	};
+        addPrimOpLambda(name, arity, foo);
     } else {
         addPrimOp(name, arity, primOp);
     }
 }
-
-
 
 void EvalState::getBuiltin(const string & name, Value & v)
 {
@@ -668,19 +701,83 @@ void EvalState::resetFileCache()
 }
 
 
-void EvalState::eval(Expr * e, Value & v)
-{
-    e->eval(*this, baseEnv, v);
+void EvalState::getAttr(Value & attrSet, const char *attr, Value & v) {
+    forceAttrs(attrSet);
+    // !!! Should we create a symbol here or just do a lookup?
+    Bindings::iterator i = attrSet.attrs->find(symbols.create(attr));
+    if (i == attrSet.attrs->end())
+        throwEvalError("attribute ‘%1%’ missing", attr);
+    // !!! add to stack trace?
+    forceValue(*i->value);
+    v = *i->value;
+}
 
-    std::fstream out(getEnv("NIX_RECORDING"), std::fstream::out);
-    for (auto kv : recording) {
-        out << kv.first.first << "(";
-        for (auto arg : kv.first.second) {
-            out << ", " << arg;
-        }
-        out << ") = " << kv.second << std::endl;
+void EvalState::eval(Expr * e, Value & v)
+{  
+   if (evalMode == Playback) {
+     Value top;
+     std::fstream in(recordFileName, std::fstream::in);
+     std::stringstream buffer;
+     buffer << in.rdbuf();
+     parseJSON(*this, buffer.str(), top);
+     Value functions;
+     getAttr(top, "functions", functions);
+     forceList(functions);
+     for (unsigned int i = 0; i < functions.listSize(); ++i) {
+	  Value &current = *functions.listElems()[i];
+	  Value name, parameters, result;
+	  getAttr(current, "name", name);
+	  getAttr(current, "parameters", parameters);
+	  getAttr(current, "result", result);
+	  std::string nameString = forceStringNoCtx(name);
+	  std::list<std::string> parameterList;
+	  forceList(parameters);
+	  for (unsigned int j = 0; j < parameters.listSize(); ++j) {
+	      parameterList.push_back(valueToJSON(*parameters.listElems()[j]));
+	  }
+	  recording[std::make_pair(nameString, parameterList)] = result;
+     }
+     Value sources;
+     getAttr(top, "sources", sources);
+     forceAttrs(sources);
+     for (auto it = sources.attrs->begin(); it != sources.attrs->end(); ++it) {
+       srcToStore[it->name] = forceStringNoCtx(*it->value);
+     }
+   }
+  
+    e->eval(*this, baseEnv, v);
+    if (evalMode == Record) { 
+	std::fstream out(recordFileName, std::fstream::out);
+	out << "{\"functions\": [\n";
+	bool isThisTheFirstTime = true;
+	
+	for (auto kv : recording) {
+	  std::cout << "?";	
+	  if (!isThisTheFirstTime) out << ",";
+	  isThisTheFirstTime = false;
+	  
+	  out << "{ \"name\": \"" << kv.first.first << "\", \"parameters\": [";
+	  
+	  bool isThisTheFirstTime2 = true;
+	  for (auto parameter: kv.first.second) {
+	    if (!isThisTheFirstTime2) out << ", ";
+	    isThisTheFirstTime2 = false;
+	    out << parameter;	
+	  }
+	  out << "], \"result\": " << valueToJSON(kv.second) << "}\n";
+	}
+	    
+	out << "], \"sources\": {";
+	
+	bool isThisTheFirstTime3 = true;
+	for (auto path : srcToStore) {
+	  if (!isThisTheFirstTime3) out << ", ";
+	  out << "\"" << path.first << "\": \"" << path.second << "\"";
+	}
+	std::cout << "\\";
+	out << "}}";
+	out.close();
     }
-    out.close();
 }
 
 
@@ -1507,7 +1604,6 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
 }
 
 
-// TODO: record & playback
 string EvalState::copyPathToStore(PathSet & context, const Path & path)
 {
     if (nix::isDerivation(path))
@@ -1517,6 +1613,9 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
     if (srcToStore[path] != "")
         dstPath = srcToStore[path];
     else {
+      if (evalMode == Playback) {
+	  throwEvalError("Unknown path encountered in playback mode: '%1%'", path);
+      }
         dstPath = settings.readOnlyMode
             ? computeStorePathForPath(checkSourcePath(path)).first
             : store->addToStore(baseNameOf(path), checkSourcePath(path), true, htSHA256, defaultPathFilter, repair);

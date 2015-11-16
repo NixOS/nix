@@ -1747,7 +1747,7 @@ void EvalState::createBaseEnv()
     forceValue(v);
     addConstant("import", v);
     if (settings.enableImportNative)
-        addPrimOp("__importNative", 2, prim_importNative);
+        addImpurePrimOp("__importNative", 2, prim_importNative);
     addPrimOp("__typeOf", 1, prim_typeOf);
     addPrimOp("isNull", 1, prim_isNull);
     addPrimOp("__isFunction", 1, prim_isFunction);
@@ -1759,7 +1759,7 @@ void EvalState::createBaseEnv()
     addPrimOp("throw", 1, prim_throw);
     addPrimOp("__addErrorContext", 2, prim_addErrorContext);
     addPrimOp("__tryEval", 1, prim_tryEval);
-    addPrimOp("__getEnv", 1, prim_getEnv);
+    addImpurePrimOp("__getEnv", 1, prim_getEnv);
 
     // Strictness
     addPrimOp("__seq", 2, prim_seq);
@@ -1770,7 +1770,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__valueSize", 1, prim_valueSize);
 
     // Paths
-    addImpurePrimOp("__toPath", 1, prim_toPath);
+    addPrimOp("__toPath", 1, prim_toPath);
     addImpurePrimOp("__storePath", 1, prim_storePath);
     addImpurePrimOp("__pathExists", 1, prim_pathExists);
     addPrimOp("baseNameOf", 1, prim_baseNameOf);

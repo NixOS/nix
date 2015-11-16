@@ -109,6 +109,7 @@ private:
     SearchPath searchPath;
 
     EvalMode evalMode;
+    const char * recordFileName;
 
     std::map<std::pair<string, std::list<string>>, Value> recording;
 
@@ -298,6 +299,7 @@ private:
     friend struct ExprOpConcatLists;
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
+    void getAttr(Value & top, const char* arg2, Value & v);
 };
 
 
