@@ -2534,7 +2534,7 @@ void DerivationGoal::runChild()
 
             Path sandboxFile = drvPath + ".sb";
             if (pathExists(sandboxFile)) deletePath(sandboxFile);
-            autoDelSandbox = AutoDelete(sandboxFile);
+            autoDelSandbox.reset(sandboxFile, false);
 
             writeFile(sandboxFile, sandboxProfile);
 

@@ -599,6 +599,8 @@ string drainFD(int fd)
 //////////////////////////////////////////////////////////////////////
 
 
+AutoDelete::AutoDelete() : del{false} {}
+
 AutoDelete::AutoDelete(const string & p, bool recursive) : path(p)
 {
     del = true;
@@ -624,6 +626,12 @@ AutoDelete::~AutoDelete()
 void AutoDelete::cancel()
 {
     del = false;
+}
+
+void AutoDelete::reset(const Path & p, bool recursive = true) {
+    this-> p = p;
+    this->recursive = recursive;
+    del = true;
 }
 
 
