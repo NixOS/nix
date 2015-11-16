@@ -5,7 +5,10 @@
 #include "derivations.hh"
 #include "globals.hh"
 #include "eval-inline.hh"
+#include "value-to-json.hh"
 
+#include <iostream>
+#include <fstream>
 #include <algorithm>
 #include <cstring>
 #include <unistd.h>
@@ -158,7 +161,8 @@ string showType(const Value & v)
         case tApp: return "a function application";
         case tLambda: return "a function";
         case tBlackhole: return "a black hole";
-        case tPrimOp: return "a built-in function";
+        case tPrimOp:
+        case tPrimOpLambda: return "a built-in function";
         case tPrimOpApp: return "a partially applied built-in function";
         case tExternal: return v.external->showType();
     }
@@ -262,6 +266,7 @@ EvalState::EvalState(const Strings & _searchPath)
     , sColumn(symbols.create("column"))
     , sFunctor(symbols.create("__functor"))
     , sToString(symbols.create("__toString"))
+    , evalMode(Record)
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
 {
@@ -341,6 +346,50 @@ void EvalState::addPrimOp(const string & name,
     baseEnv.values[baseEnvDispl++] = v;
     baseEnv.values[0]->attrs->push_back(Attr(sym, v));
 }
+
+void EvalState::addPrimOpLambda(const string & name,
+    unsigned int arity, PrimOpLambdaFun primOp)
+{
+    Value * v = allocValue();
+    string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
+    Symbol sym = symbols.create(name2);
+    v->type = tPrimOpLambda;
+    v->primOpLambda = NEW PrimOpLambda(primOp, arity, sym);
+    staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
+    baseEnv.values[baseEnvDispl++] = v;
+    baseEnv.values[0]->attrs->push_back(Attr(sym, v));
+}
+
+
+std::string EvalState::valueToJSON(Value & value) {
+    std::ostringstream out;
+    PathSet context;
+    printValueAsJSON(*this, true, value, out, context);
+    return out.str();
+}
+
+void EvalState::addImpurePrimOp(const string & name,
+    unsigned int arity, PrimOpFun primOp)
+{
+    if (evalMode == Record) {
+        PrimOpLambdaFun foo = [this, name, primOp, arity] (EvalState & state, const Pos & pos, Value * * args, Value & v) {
+            std::cout << "WE'RE GETTING CALLED INSIDE " << name << std::endl;
+            std::list<string> argList;
+            for (int i = 0; i < arity; i++) {
+                argList.push_back(valueToJSON(*args[i]));
+            }
+            primOp(state, pos, args, v);
+            recording[std::make_pair(name, argList)] = v;
+        };
+        std::cout << "ZOMG " << name << std::endl;
+        addPrimOpLambda(name, arity, foo);
+    } else if (evalMode == Playback) {
+        std::cout << "ZOMG PLAYBACK " << name << std::endl;
+    } else {
+        addPrimOp(name, arity, primOp);
+    }
+}
+
 
 
 void EvalState::getBuiltin(const string & name, Value & v)
@@ -622,6 +671,16 @@ void EvalState::resetFileCache()
 void EvalState::eval(Expr * e, Value & v)
 {
     e->eval(*this, baseEnv, v);
+
+    std::fstream out(getEnv("NIX_RECORDING"), std::fstream::out);
+    for (auto kv : recording) {
+        out << kv.first.first << "(";
+        for (auto arg : kv.first.second) {
+            out << ", " << arg;
+        }
+        out << ") = " << kv.second << std::endl;
+    }
+    out.close();
 }
 
 
@@ -908,8 +967,19 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
         argsDone++;
         primOp = primOp->primOpApp.left;
     }
-    assert(primOp->type == tPrimOp);
-    unsigned int arity = primOp->primOp->arity;
+
+    unsigned int arity;
+    Symbol name;
+
+    if (primOp->type == tPrimOp) {
+        arity = primOp->primOp->arity;
+        name = primOp->primOp->name;
+    } else if (primOp->type == tPrimOpLambda) {
+        arity = primOp->primOpLambda->arity;
+        name = primOp->primOpLambda->name;
+    } else {
+        abort();
+    } 
     unsigned int argsLeft = arity - argsDone;
 
     if (argsLeft == 1) {
@@ -924,8 +994,13 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
 
         /* And call the primop. */
         nrPrimOpCalls++;
-        if (countCalls) primOpCalls[primOp->primOp->name]++;
-        primOp->primOp->fun(*this, pos, vArgs, v);
+        if (countCalls) primOpCalls[name]++;
+
+        if (primOp->type == tPrimOp) {
+            primOp->primOp->fun(*this, pos, vArgs, v);
+        } else if (primOp->type == tPrimOpLambda) {
+            primOp->primOpLambda->fun(*this, pos, vArgs, v);
+        }
     } else {
         Value * fun2 = allocValue();
         *fun2 = fun;
@@ -938,7 +1013,7 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
 
 void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & pos)
 {
-    if (fun.type == tPrimOp || fun.type == tPrimOpApp) {
+    if (fun.type == tPrimOp || fun.type == tPrimOpLambda || fun.type == tPrimOpApp) {
         callPrimOp(fun, arg, v, pos);
         return;
     }
@@ -1432,6 +1507,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
 }
 
 
+// TODO: record & playback
 string EvalState::copyPathToStore(PathSet & context, const Path & path)
 {
     if (nix::isDerivation(path))

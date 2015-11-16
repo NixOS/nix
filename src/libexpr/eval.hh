@@ -18,9 +18,14 @@ namespace nix {
 
 class EvalState;
 
+typedef enum {
+    Normal,
+    Record,
+    Playback
+} EvalMode;
 
 typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, Value & v);
-
+typedef std::function<void(EvalState & state, const Pos & pos, Value * * args, Value & v)> PrimOpLambdaFun;
 
 struct PrimOp
 {
@@ -31,6 +36,14 @@ struct PrimOp
         : fun(fun), arity(arity), name(name) { }
 };
 
+struct PrimOpLambda
+{
+    PrimOpLambdaFun fun;
+    unsigned int arity;
+    Symbol name;
+    PrimOpLambda(PrimOpLambdaFun fun, unsigned int arity, Symbol name)
+        : fun(fun), arity(arity), name(name) { }
+};
 
 struct Env
 {
@@ -94,6 +107,10 @@ private:
     FileEvalCache fileEvalCache;
 
     SearchPath searchPath;
+
+    EvalMode evalMode;
+
+    std::map<std::pair<string, std::list<string>>, Value> recording;
 
 public:
 
@@ -190,6 +207,16 @@ private:
     void addConstant(const string & name, Value & v);
 
     void addPrimOp(const string & name,
+        unsigned int arity, PrimOpFun primOp);
+
+    void addPrimOpLambda(const string & name,
+        unsigned int arity, PrimOpLambdaFun primOp);
+
+
+
+    std::string valueToJSON(Value & value);
+
+    void addImpurePrimOp(const string & name,
         unsigned int arity, PrimOpFun primOp);
 
 public:

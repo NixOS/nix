@@ -1770,14 +1770,14 @@ void EvalState::createBaseEnv()
     addPrimOp("__valueSize", 1, prim_valueSize);
 
     // Paths
-    addPrimOp("__toPath", 1, prim_toPath);
-    addPrimOp("__storePath", 1, prim_storePath);
-    addPrimOp("__pathExists", 1, prim_pathExists);
+    addImpurePrimOp("__toPath", 1, prim_toPath);
+    addImpurePrimOp("__storePath", 1, prim_storePath);
+    addImpurePrimOp("__pathExists", 1, prim_pathExists);
     addPrimOp("baseNameOf", 1, prim_baseNameOf);
     addPrimOp("dirOf", 1, prim_dirOf);
-    addPrimOp("__readFile", 1, prim_readFile);
-    addPrimOp("__readDir", 1, prim_readDir);
-    addPrimOp("__findFile", 2, prim_findFile);
+    addImpurePrimOp("__readFile", 1, prim_readFile);
+    addImpurePrimOp("__readDir", 1, prim_readDir);
+    addImpurePrimOp("__findFile", 2, prim_findFile);
 
     // Creating files
     addPrimOp("__toXML", 1, prim_toXML);

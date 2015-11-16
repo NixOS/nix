@@ -20,6 +20,7 @@ typedef enum {
     tLambda,
     tBlackhole,
     tPrimOp,
+    tPrimOpLambda,
     tPrimOpApp,
     tExternal,
 } ValueType;
@@ -30,7 +31,7 @@ struct Env;
 struct Expr;
 struct ExprLambda;
 struct PrimOp;
-struct PrimOp;
+struct PrimOpLambda;
 class Symbol;
 struct Pos;
 class EvalState;
@@ -137,6 +138,7 @@ struct Value
             ExprLambda * fun;
         } lambda;
         PrimOp * primOp;
+        PrimOpLambda * primOpLambda;
         struct {
             Value * left, * right;
         } primOpApp;
