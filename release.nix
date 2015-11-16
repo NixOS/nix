@@ -232,6 +232,7 @@ let
           touch $out/nix-support/hydra-build-products
         ''); # */
 
+    installer = pkgs.lib.genAttrs systems (system: makeInstaller system []);
 
     # Aggregate job containing the release-critical jobs.
     release = pkgs.releaseTools.aggregate {
@@ -314,5 +315,25 @@ let
       doInstallCheck = true;
     };
 
+  makeInstaller =
+    system: extraPackages:
+
+    with import <nixpkgs> { inherit system; };
+
+    runCommand "nix-installer-${system}"
+      { buildInputs = [ zip ] ++ extraPackages; }
+      ''
+        mkdir -p $out tmp
+
+        # collect content of zip archive
+        cp ${./scripts/installer.py} tmp/__main__.py
+        cp ${jobs.binaryTarball."${system}"}/*.tar.bz2 tmp/archive.tar.bz2
+
+        # zip tmp/ folder and make it executable
+        cd tmp/ && zip -qr ../tmp.zip * && cd ..
+        echo "#!/usr/bin/env python" | cat - tmp.zip > $out/$name
+        chmod +x $out/$name
+        rm tmp.zip
+      '';
 
 in jobs
