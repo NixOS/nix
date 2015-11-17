@@ -199,9 +199,11 @@ class AutoDelete
     bool del;
     bool recursive;
 public:
+    AutoDelete();
     AutoDelete(const Path & p, bool recursive = true);
     ~AutoDelete();
     void cancel();
+    void reset(const Path & p, bool recursive = true);
     operator Path() const { return path; }
 };
 
