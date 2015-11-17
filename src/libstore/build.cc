@@ -1251,6 +1251,8 @@ static bool canBuildLocally(const string & platform)
 #if __linux__
         || (platform == "i686-linux" && settings.thisSystem == "x86_64-linux")
 #endif
+        || (platform == "i686-linux" && settings.thisSystem == "x86_64-freebsd")
+        || (platform == "i686-linux" && settings.thisSystem == "i686-freebsd")
         ;
 }
 
