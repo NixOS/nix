@@ -5,6 +5,7 @@
 #include "nixexpr.hh"
 #include "symbol-table.hh"
 #include "hash.hh"
+#include <iostream>
 
 #include <map>
 
@@ -217,9 +218,61 @@ private:
 
     std::string valueToJSON(Value & value);
 
-    void addImpurePrimOp(const string & name,
-        unsigned int arity, PrimOpFun primOp);
+    
+    template< PrimOpFun primOp, const char *name, unsigned int arity>
+    class WrapPrimOp
+    {
+    public:
+      static void recordPrimOp(EvalState & state, const Pos & pos, Value * * args, Value & v)
+      {
+	  std::list<string> argList;
+	  for (int i = 0; i < arity; i++) {
+	      argList.push_back(state.valueToJSON(*args[i]));
+	  }
+	  std::cout << "Record " << name << std::endl;
+	  primOp(state, pos, args, v);
+	  state.recording[std::make_pair(name, argList)] = v;
+      }
+	
+    static void playbackPrimOp(EvalState & state, const Pos & pos, Value * * args, Value & v)
+    {	
+	  std::list<string> argList;
+	  for (int i = 0; i < arity; i++) {
+	      argList.push_back(state.valueToJSON(*args[i]));
+	  }
+	  std::cout << "Playback " << name << std::endl;
+	  auto result = state.recording.find(std::make_pair(name, argList));
+	  if (result == state.recording.end()) {
+	    std::string errorMsg("wanted to call ");
+	    errorMsg +=name;
+	    throw EvalError(errorMsg.c_str());
+	  }
+	  else {
+	    v = result->second;
+	  }     	
+    }
+    
+    };
+    
+    template< const char *name, unsigned int arity, PrimOpFun primOp>
+    void addImpurePrimOp() 
+    {      
+      if (evalMode == Record) {
+	  PrimOpFun wrapped = WrapPrimOp<primOp, name, arity>::recordPrimOp;
+	  addPrimOp(name, arity, wrapped);
+      } else if (evalMode == Playback) {
+	    PrimOpFun wrapped = WrapPrimOp<primOp, name, arity>::playbackPrimOp;
+	    addPrimOp(name, arity, wrapped	);
+      } else {
+	  addPrimOp(name, arity, primOp);
+      }      
+    }
 
+      
+      
+
+    
+    
 public:
 
     void getBuiltin(const string & name, Value & v);

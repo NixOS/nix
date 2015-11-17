@@ -421,44 +421,6 @@ std::string EvalState::valueToJSON(Value & value) {
     return out.str();
 }
 
-void EvalState::addImpurePrimOp(const string & name,
-    unsigned int arity, PrimOpFun primOp)
-{
-  std::cout << "IMPURE " << name << std::endl;
-  
-    if (evalMode == Record) {
-        PrimOpLambdaFun foo = [this, name, primOp, arity] (EvalState & state, const Pos & pos, Value * * args, Value & v) {
-            std::list<string> argList;
-            for (int i = 0; i < arity; i++) {
-                argList.push_back(valueToJSON(*args[i]));
-            }
-            std::cout << "Record " << name << std::endl;
-            primOp(state, pos, args, v);
-            recording[std::make_pair(name, argList)] = v;
-        };
-        addPrimOpLambda(name, arity, foo);
-    } else if (evalMode == Playback) {
-	PrimOpLambdaFun foo = [this, name, primOp, arity] (EvalState & state, const Pos & pos, Value * * args, Value & v) {
-            std::list<string> argList;
-            for (int i = 0; i < arity; i++) {
-                argList.push_back(valueToJSON(*args[i]));
-            }
-            std::cout << "Playback " << name << std::endl;
-            auto result = recording.find(std::make_pair(name, argList));
-	    if (result == recording.end()) {
-	      std::string errorMsg("wanted to call ");
-	      errorMsg +=name;
-	      throw EvalError(errorMsg.c_str());
-	    }
-	    else {
-	      v = result->second;
-	    }
-	};
-        addPrimOpLambda(name, arity, foo);
-    } else {
-        addPrimOp(name, arity, primOp);
-    }
-}
 
 void EvalState::getBuiltin(const string & name, Value & v)
 {
