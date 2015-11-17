@@ -220,9 +220,6 @@ private:
 
     
     template< PrimOpFun primOp, const char *name, unsigned int arity>
-    class WrapPrimOp
-    {
-    public:
       static void recordPrimOp(EvalState & state, const Pos & pos, Value * * args, Value & v)
       {
 	  std::list<string> argList;
@@ -234,6 +231,7 @@ private:
 	  state.recording[std::make_pair(name, argList)] = v;
       }
 	
+    template< PrimOpFun primOp, const char *name, unsigned int arity>
     static void playbackPrimOp(EvalState & state, const Pos & pos, Value * * args, Value & v)
     {	
 	  std::list<string> argList;
@@ -252,17 +250,15 @@ private:
 	  }     	
     }
     
-    };
-    
     template< const char *name, unsigned int arity, PrimOpFun primOp>
     void addImpurePrimOp() 
     {      
       if (evalMode == Record) {
-	  PrimOpFun wrapped = WrapPrimOp<primOp, name, arity>::recordPrimOp;
+	  PrimOpFun wrapped = recordPrimOp<primOp, name, arity>;
 	  addPrimOp(name, arity, wrapped);
       } else if (evalMode == Playback) {
-	    PrimOpFun wrapped = WrapPrimOp<primOp, name, arity>::playbackPrimOp;
-	    addPrimOp(name, arity, wrapped	);
+	    PrimOpFun wrapped = playbackPrimOp<primOp, name, arity>;
+	    addPrimOp(name, arity, wrapped);
       } else {
 	  addPrimOp(name, arity, primOp);
       }      

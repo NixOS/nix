@@ -346,6 +346,40 @@ EvalState::EvalState(const Strings & _searchPath)
 EvalState::~EvalState()
 {
     fileEvalCache.clear();
+
+    if (evalMode == Record) { 
+	std::fstream out(recordFileName, std::fstream::out);
+	out << "{\"functions\": [\n";
+	bool isThisTheFirstTime = true;
+	
+	for (auto kv : recording) {
+	  std::cout << "?";	
+	  if (!isThisTheFirstTime) out << ",";
+	  isThisTheFirstTime = false;
+	  
+	  out << "{ \"name\": \"" << kv.first.first << "\", \"parameters\": [";
+	  
+	  bool isThisTheFirstTime2 = true;
+	  for (auto parameter: kv.first.second) {
+	    if (!isThisTheFirstTime2) out << ", ";
+	    isThisTheFirstTime2 = false;
+	    out << parameter;	
+	  }
+	  out << "], \"result\": " << valueToJSON(kv.second) << "}\n";
+	}
+	    
+	out << "], \"sources\": {";
+	
+	bool isThisTheFirstTime3 = true;
+	for (auto path : srcToStore) {
+	  if (!isThisTheFirstTime3) out << ", ";
+      isThisTheFirstTime3 = false;
+	  out << "\"" << path.first << "\": \"" << path.second << "\"";
+	}
+	std::cout << "\\";
+	out << "}}";
+	out.close();
+    }
 }
 
 
@@ -709,43 +743,9 @@ void EvalState::getAttr(Value & attrSet, const char *attr, Value & v) {
     v = *i->value;
 }
 
-void EvalState::eval(Expr * e, Value & v)
-{  
+void EvalState::eval(Expr* e, Value& v)
+{
     e->eval(*this, baseEnv, v);
-
-    if (evalMode == Record) { 
-	std::fstream out(recordFileName, std::fstream::out);
-	out << "{\"functions\": [\n";
-	bool isThisTheFirstTime = true;
-	
-	for (auto kv : recording) {
-	  std::cout << "?";	
-	  if (!isThisTheFirstTime) out << ",";
-	  isThisTheFirstTime = false;
-	  
-	  out << "{ \"name\": \"" << kv.first.first << "\", \"parameters\": [";
-	  
-	  bool isThisTheFirstTime2 = true;
-	  for (auto parameter: kv.first.second) {
-	    if (!isThisTheFirstTime2) out << ", ";
-	    isThisTheFirstTime2 = false;
-	    out << parameter;	
-	  }
-	  out << "], \"result\": " << valueToJSON(kv.second) << "}\n";
-	}
-	    
-	out << "], \"sources\": {";
-	
-	bool isThisTheFirstTime3 = true;
-	for (auto path : srcToStore) {
-	  if (!isThisTheFirstTime3) out << ", ";
-      isThisTheFirstTime3 = false;
-	  out << "\"" << path.first << "\": \"" << path.second << "\"";
-	}
-	std::cout << "\\";
-	out << "}}";
-	out.close();
-    }
 }
 
 
