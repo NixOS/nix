@@ -296,6 +296,41 @@ EvalState::EvalState(const Strings & _searchPath)
     } else if (playbackMode && !recordMode) {
       evalMode = Playback;
       recordFileName = playbackMode;
+
+    std::cout << "ZOMG PLAYBACK !!!!" << std::endl;;
+     Value top;
+     std::fstream in(recordFileName, std::fstream::in);
+     std::stringstream buffer;
+     buffer << in.rdbuf();
+     parseJSON(*this, buffer.str(), top);
+     Value functions;
+     getAttr(top, "functions", functions);
+     forceList(functions);
+     for (unsigned int i = 0; i < functions.listSize(); ++i) {
+      Value &current = *functions.listElems()[i];
+      Value name, parameters, result;
+      getAttr(current, "name", name);
+      getAttr(current, "parameters", parameters);
+      getAttr(current, "result", result);
+      std::string nameString = forceStringNoCtx(name);
+      std::list<std::string> parameterList;
+      forceList(parameters);
+      for (unsigned int j = 0; j < parameters.listSize(); ++j) {
+          parameterList.push_back(valueToJSON(*parameters.listElems()[j]));
+      }
+      recording[std::make_pair(nameString, parameterList)] = result;
+     }
+     Value sources;
+     getAttr(top, "sources", sources);
+     forceAttrs(sources);
+     std::cout << sources.attrs->size() << std::endl;
+     for (auto it = sources.attrs->begin(); it != sources.attrs->end(); ++it) {
+        std::cout << it->name << " -> " << forceStringNoCtx(*it->value) << std::endl;
+       srcToStore[it->name] = forceStringNoCtx(*it->value);
+     }
+
+
+      
     } else if (!playbackMode && !recordMode) {
       evalMode = Normal;
     }
@@ -714,38 +749,8 @@ void EvalState::getAttr(Value & attrSet, const char *attr, Value & v) {
 
 void EvalState::eval(Expr * e, Value & v)
 {  
-   if (evalMode == Playback) {
-     Value top;
-     std::fstream in(recordFileName, std::fstream::in);
-     std::stringstream buffer;
-     buffer << in.rdbuf();
-     parseJSON(*this, buffer.str(), top);
-     Value functions;
-     getAttr(top, "functions", functions);
-     forceList(functions);
-     for (unsigned int i = 0; i < functions.listSize(); ++i) {
-	  Value &current = *functions.listElems()[i];
-	  Value name, parameters, result;
-	  getAttr(current, "name", name);
-	  getAttr(current, "parameters", parameters);
-	  getAttr(current, "result", result);
-	  std::string nameString = forceStringNoCtx(name);
-	  std::list<std::string> parameterList;
-	  forceList(parameters);
-	  for (unsigned int j = 0; j < parameters.listSize(); ++j) {
-	      parameterList.push_back(valueToJSON(*parameters.listElems()[j]));
-	  }
-	  recording[std::make_pair(nameString, parameterList)] = result;
-     }
-     Value sources;
-     getAttr(top, "sources", sources);
-     forceAttrs(sources);
-     for (auto it = sources.attrs->begin(); it != sources.attrs->end(); ++it) {
-       srcToStore[it->name] = forceStringNoCtx(*it->value);
-     }
-   }
-  
     e->eval(*this, baseEnv, v);
+
     if (evalMode == Record) { 
 	std::fstream out(recordFileName, std::fstream::out);
 	out << "{\"functions\": [\n";
@@ -772,6 +777,7 @@ void EvalState::eval(Expr * e, Value & v)
 	bool isThisTheFirstTime3 = true;
 	for (auto path : srcToStore) {
 	  if (!isThisTheFirstTime3) out << ", ";
+      isThisTheFirstTime3 = false;
 	  out << "\"" << path.first << "\": \"" << path.second << "\"";
 	}
 	std::cout << "\\";
@@ -1604,7 +1610,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
 }
 
 
-string EvalState::copyPathToStore(PathSet & context, const Path & path)
+string EvalState::copyPathToStore(PathSet & context, const Path & path, bool ignoreReadOnly)
 {
     if (nix::isDerivation(path))
         throwEvalError("file names are not allowed to end in ‘%1%’", drvExtension);
@@ -1616,7 +1622,7 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
       if (evalMode == Playback) {
 	  throwEvalError("Unknown path encountered in playback mode: '%1%'", path);
       }
-        dstPath = settings.readOnlyMode
+        dstPath = (settings.readOnlyMode && !ignoreReadOnly)
             ? computeStorePathForPath(checkSourcePath(path)).first
             : store->addToStore(baseNameOf(path), checkSourcePath(path), true, htSHA256, defaultPathFilter, repair);
         srcToStore[path] = dstPath;
