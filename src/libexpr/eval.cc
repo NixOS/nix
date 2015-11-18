@@ -163,8 +163,7 @@ string showType(const Value & v)
         case tApp: return "a function application";
         case tLambda: return "a function";
         case tBlackhole: return "a black hole";
-        case tPrimOp:
-        case tPrimOpLambda: return "a built-in function";
+        case tPrimOp: return "a built-in function";
         case tPrimOpApp: return "a partially applied built-in function";
         case tExternal: return v.external->showType();
     }
@@ -297,7 +296,6 @@ EvalState::EvalState(const Strings & _searchPath)
       evalMode = Playback;
       recordFileName = playbackMode;
 
-    std::cout << "ZOMG PLAYBACK !!!!" << std::endl;;
      Value top;
      std::fstream in(recordFileName, std::fstream::in);
      std::stringstream buffer;
@@ -376,7 +374,6 @@ EvalState::~EvalState()
       isThisTheFirstTime3 = false;
 	  out << "\"" << path.first << "\": \"" << path.second << "\"";
 	}
-	std::cout << "\\";
 	out << "}}";
 	out.close();
     }
@@ -429,19 +426,6 @@ void EvalState::addPrimOp(const string & name,
     Symbol sym = symbols.create(name2);
     v->type = tPrimOp;
     v->primOp = NEW PrimOp(primOp, arity, sym);
-    staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
-    baseEnv.values[baseEnvDispl++] = v;
-    baseEnv.values[0]->attrs->push_back(Attr(sym, v));
-}
-
-void EvalState::addPrimOpLambda(const string & name,
-    unsigned int arity, PrimOpLambdaFun primOp)
-{
-    Value * v = allocValue();
-    string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    Symbol sym = symbols.create(name2);
-    v->type = tPrimOpLambda;
-    v->primOpLambda = NEW PrimOpLambda(primOp, arity, sym);
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
     baseEnv.values[0]->attrs->push_back(Attr(sym, v));
@@ -732,7 +716,7 @@ void EvalState::resetFileCache()
 }
 
 
-void EvalState::getAttr(Value & attrSet, const char *attr, Value & v) {
+void EvalState::getAttr(Value & attrSet, const char * attr, Value & v) {
     forceAttrs(attrSet);
     // !!! Should we create a symbol here or just do a lookup?
     Bindings::iterator i = attrSet.attrs->find(symbols.create(attr));
@@ -1032,19 +1016,8 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
         argsDone++;
         primOp = primOp->primOpApp.left;
     }
-
-    unsigned int arity;
-    Symbol name;
-
-    if (primOp->type == tPrimOp) {
-        arity = primOp->primOp->arity;
-        name = primOp->primOp->name;
-    } else if (primOp->type == tPrimOpLambda) {
-        arity = primOp->primOpLambda->arity;
-        name = primOp->primOpLambda->name;
-    } else {
-        abort();
-    } 
+    assert(primOp->type == tPrimOp);
+    unsigned int arity = primOp->primOp->arity;
     unsigned int argsLeft = arity - argsDone;
 
     if (argsLeft == 1) {
@@ -1059,13 +1032,8 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
 
         /* And call the primop. */
         nrPrimOpCalls++;
-        if (countCalls) primOpCalls[name]++;
-
-        if (primOp->type == tPrimOp) {
-            primOp->primOp->fun(*this, pos, vArgs, v);
-        } else if (primOp->type == tPrimOpLambda) {
-            primOp->primOpLambda->fun(*this, pos, vArgs, v);
-        }
+        if (countCalls) primOpCalls[primOp->primOp->name]++;
+        primOp->primOp->fun(*this, pos, vArgs, v);
     } else {
         Value * fun2 = allocValue();
         *fun2 = fun;
@@ -1078,7 +1046,7 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
 
 void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & pos)
 {
-    if (fun.type == tPrimOp || fun.type == tPrimOpLambda || fun.type == tPrimOpApp) {
+    if (fun.type == tPrimOp || fun.type == tPrimOpApp) {
         callPrimOp(fun, arg, v, pos);
         return;
     }

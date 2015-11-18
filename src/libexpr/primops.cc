@@ -1708,8 +1708,6 @@ extern const char __pathExists[] = "__pathExists";
 extern const char __readFile[] = "__readFile";
 
 
-
-
 void EvalState::createBaseEnv()
 {
     baseEnv.up = 0;
@@ -1794,6 +1792,8 @@ void EvalState::createBaseEnv()
     addPrimOp("__toJSON", 1, prim_toJSON);
     addPrimOp("__fromJSON", 1, prim_fromJSON);
     addPrimOp("__toFile", 2, prim_toFile);
+
+    //TODO: filter source is an impure primop too
     addPrimOp("__filterSource", 2, prim_filterSource);
 
     // Sets

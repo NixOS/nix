@@ -1,7 +1,6 @@
 #pragma once
 
 #include "symbol-table.hh"
-#include <functional>
 
 namespace nix {
 
@@ -21,7 +20,6 @@ typedef enum {
     tLambda,
     tBlackhole,
     tPrimOp,
-    tPrimOpLambda,
     tPrimOpApp,
     tExternal,
 } ValueType;
@@ -32,12 +30,10 @@ struct Env;
 struct Expr;
 struct ExprLambda;
 struct PrimOp;
-struct PrimOpLambda;
 class Symbol;
 struct Pos;
 class EvalState;
 class XMLWriter;
-struct ConstantWithSideEffect;
 
 
 typedef long NixInt;
@@ -140,9 +136,7 @@ struct Value
             ExprLambda * fun;
         } lambda;
         PrimOp * primOp;
-        PrimOpLambda * primOpLambda;
-        ConstantWithSideEffect * constantWithSideEffect;
-	struct {
+        struct {
             Value * left, * right;
         } primOpApp;
         ExternalValueBase * external;

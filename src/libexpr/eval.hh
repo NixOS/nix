@@ -26,7 +26,7 @@ typedef enum {
 } EvalMode;
 
 typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, Value & v);
-typedef std::function<void(EvalState & state, const Pos & pos, Value * * args, Value & v)> PrimOpLambdaFun;
+
 
 struct PrimOp
 {
@@ -37,14 +37,6 @@ struct PrimOp
         : fun(fun), arity(arity), name(name) { }
 };
 
-struct PrimOpLambda
-{
-    PrimOpLambdaFun fun;
-    unsigned int arity;
-    Symbol name;
-    PrimOpLambda(PrimOpLambdaFun fun, unsigned int arity, Symbol name)
-        : fun(fun), arity(arity), name(name) { }
-};
 
 struct Env
 {
@@ -112,6 +104,7 @@ private:
     EvalMode evalMode;
     const char * recordFileName;
 
+    //TODO: use some other structure, maybe a hashmap
     std::map<std::pair<string, std::list<string>>, Value> recording;
 
 public:
@@ -211,14 +204,8 @@ private:
     void addPrimOp(const string & name,
         unsigned int arity, PrimOpFun primOp);
 
-    void addPrimOpLambda(const string & name,
-        unsigned int arity, PrimOpLambdaFun primOp);
-
-
-
     std::string valueToJSON(Value & value);
-
-    
+  
     template< PrimOpFun primOp, const char *name, unsigned int arity>
       static void recordPrimOp(EvalState & state, const Pos & pos, Value * * args, Value & v)
       {
@@ -263,11 +250,6 @@ private:
 	  addPrimOp(name, arity, primOp);
       }      
     }
-
-      
-      
-
-    
     
 public:
 

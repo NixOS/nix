@@ -21,8 +21,6 @@
 #include "nixexpr.hh"
 #include "eval.hh"
 
-#include <iostream>
-
 namespace nix {
 
     struct ParseData
@@ -580,7 +578,6 @@ Expr * EvalState::parseExprFromFile(const Path & path, StaticEnv & staticEnv)
     if (evalMode == Record || evalMode == Playback) {
       PathSet context;
       actualPath = copyPathToStore(context, path, true);
-      std::cout << "parseExprFromFile(" << path << ") = " << actualPath << "\n";
     } else {
       actualPath = path;
     }
