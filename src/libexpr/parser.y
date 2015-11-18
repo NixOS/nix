@@ -576,10 +576,10 @@ Expr * EvalState::parseExprFromFile(const Path & path, StaticEnv & staticEnv)
 {
     Path actualPath;
     if (evalMode == Record || evalMode == Playback) {
-      PathSet context;
-      actualPath = copyPathToStore(context, path, true);
+        PathSet context;
+        actualPath = copyPathToStore(context, path, true);
     } else {
-      actualPath = path;
+        actualPath = path;
     }
     return parse(readFile(actualPath).c_str(), path, dirOf(path), staticEnv);
 }

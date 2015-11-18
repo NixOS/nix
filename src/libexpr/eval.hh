@@ -5,7 +5,6 @@
 #include "nixexpr.hh"
 #include "symbol-table.hh"
 #include "hash.hh"
-#include <iostream>
 
 #include <map>
 
@@ -23,7 +22,7 @@ typedef enum {
     Normal,
     Record,
     Playback
-} EvalMode;
+} DeterministicEvaluationMode;
 
 typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, Value & v);
 
@@ -101,10 +100,11 @@ private:
 
     SearchPath searchPath;
 
-    EvalMode evalMode;
+    DeterministicEvaluationMode evalMode;
     const char * recordFileName;
 
     //TODO: use some other structure, maybe a hashmap
+    //since comparing strings with long same prefixes is slow
     std::map<std::pair<string, std::list<string>>, Value> recording;
 
 public:
@@ -205,52 +205,69 @@ private:
         unsigned int arity, PrimOpFun primOp);
 
     std::string valueToJSON(Value & value);
-  
-    template< PrimOpFun primOp, const char *name, unsigned int arity>
-      static void recordPrimOp(EvalState & state, const Pos & pos, Value * * args, Value & v)
-      {
-	  std::list<string> argList;
-	  for (int i = 0; i < arity; i++) {
-	      argList.push_back(state.valueToJSON(*args[i]));
-	  }
-	  std::cout << "Record " << name << std::endl;
-	  primOp(state, pos, args, v);
-	  state.recording[std::make_pair(name, argList)] = v;
-      }
-	
-    template< PrimOpFun primOp, const char *name, unsigned int arity>
+    void getAttr(Value & top, const Symbol & arg2, Value & v);
+    void initializeDeterministicEvaluationMode();
+    void initializePlayback();
+    void finalizeRecord();
+ 
+    template< const char * name, unsigned int arity, PrimOpFun primOp>
+    static void recordPrimOp(EvalState & state, const Pos & pos, Value * * args, Value & v)
+    {
+        std::list<string> argList;
+        for (int i = 0; i < arity; i++) {
+            argList.push_back(state.valueToJSON(*args[i]));
+        }
+        primOp(state, pos, args, v);
+        state.recording[std::make_pair(name, argList)] = v;
+    }
+
+    template< const char * name, unsigned int arity, PrimOpFun primOp>
     static void playbackPrimOp(EvalState & state, const Pos & pos, Value * * args, Value & v)
-    {	
-	  std::list<string> argList;
-	  for (int i = 0; i < arity; i++) {
-	      argList.push_back(state.valueToJSON(*args[i]));
-	  }
-	  std::cout << "Playback " << name << std::endl;
-	  auto result = state.recording.find(std::make_pair(name, argList));
-	  if (result == state.recording.end()) {
-	    std::string errorMsg("wanted to call ");
-	    errorMsg +=name;
-	    throw EvalError(errorMsg.c_str());
-	  }
-	  else {
-	    v = result->second;
-	  }     	
+    {
+        std::list<string> argList;
+        for (int i = 0; i < arity; i++) {
+            argList.push_back(state.valueToJSON(*args[i]));
+        }
+        auto result = state.recording.find(std::make_pair(name, argList));
+        if (result == state.recording.end()) {
+            std::string errorMsg("wanted to call ");
+            errorMsg +=name;
+            throw EvalError(errorMsg.c_str());
+        }
+        else {
+            v = result->second;
+        }
     }
-    
-    template< const char *name, unsigned int arity, PrimOpFun primOp>
+
+    template< const char * name, unsigned int arity, PrimOpFun primOp>
     void addImpurePrimOp() 
-    {      
-      if (evalMode == Record) {
-	  PrimOpFun wrapped = recordPrimOp<primOp, name, arity>;
-	  addPrimOp(name, arity, wrapped);
-      } else if (evalMode == Playback) {
-	    PrimOpFun wrapped = playbackPrimOp<primOp, name, arity>;
-	    addPrimOp(name, arity, wrapped);
-      } else {
-	  addPrimOp(name, arity, primOp);
-      }      
+    {
+        if (evalMode == Record) {
+            addPrimOp(name, arity, recordPrimOp<name, arity, primOp>);
+        } else if (evalMode == Playback) {
+	    addPrimOp(name, arity, playbackPrimOp<name, arity, primOp>);
+        } else {
+            addPrimOp(name, arity, primOp);
+        }      
     }
     
+    template< const char * name >
+    static void unsupportedPrimOp(EvalState & state, const Pos & pos, Value * * args, Value & v)
+    {
+        throw EvalError(format("primop '%s' is not (yet) supported in Record/Playback mode (used at '%s')") % name % pos);
+    }
+    
+    template< const char * name >
+    void addUnsupportedImpurePrimOp(unsigned int arity, PrimOpFun primOp)
+    {
+        if (evalMode == Record || evalMode == Playback) {
+            addPrimOp(name, arity, unsupportedPrimOp<name>);
+        }
+        else {
+            addPrimOp(name, arity, primOp);
+        }
+    }
+
 public:
 
     void getBuiltin(const string & name, Value & v);
@@ -330,7 +347,6 @@ private:
     friend struct ExprOpConcatLists;
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
-    void getAttr(Value & top, const char* arg2, Value & v);
 };
 
 

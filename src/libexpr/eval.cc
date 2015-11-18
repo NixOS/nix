@@ -7,9 +7,9 @@
 #include "eval-inline.hh"
 #include "value-to-json.hh"
 #include "json-to-value.hh"
-#include <src/boost/format.hpp>
 
 #include <iostream>
+#include <src/boost/format.hpp>
 #include <fstream>
 #include <algorithm>
 #include <cstring>
@@ -287,98 +287,111 @@ EvalState::EvalState(const Strings & _searchPath)
     vEmptySet.type = tAttrs;
     vEmptySet.attrs = allocBindings(0);
     
+    initializeDeterministicEvaluationMode();
+    createBaseEnv();
+}
+
+void EvalState::initializeDeterministicEvaluationMode()
+{
     const char * recordMode = getenv("NIX_RECORDING");
     const char * playbackMode = getenv("NIX_PLAYBACK");
     if (recordMode && !playbackMode) {
-      evalMode = Record;
-      recordFileName = recordMode;
+        evalMode = Record;
+        recordFileName = recordMode;
     } else if (playbackMode && !recordMode) {
-      evalMode = Playback;
-      recordFileName = playbackMode;
-
-     Value top;
-     std::fstream in(recordFileName, std::fstream::in);
-     std::stringstream buffer;
-     buffer << in.rdbuf();
-     parseJSON(*this, buffer.str(), top);
-     Value functions;
-     getAttr(top, "functions", functions);
-     forceList(functions);
-     for (unsigned int i = 0; i < functions.listSize(); ++i) {
-      Value &current = *functions.listElems()[i];
-      Value name, parameters, result;
-      getAttr(current, "name", name);
-      getAttr(current, "parameters", parameters);
-      getAttr(current, "result", result);
-      std::string nameString = forceStringNoCtx(name);
-      std::list<std::string> parameterList;
-      forceList(parameters);
-      for (unsigned int j = 0; j < parameters.listSize(); ++j) {
-          parameterList.push_back(valueToJSON(*parameters.listElems()[j]));
-      }
-      recording[std::make_pair(nameString, parameterList)] = result;
-     }
-     Value sources;
-     getAttr(top, "sources", sources);
-     forceAttrs(sources);
-     std::cout << sources.attrs->size() << std::endl;
-     for (auto it = sources.attrs->begin(); it != sources.attrs->end(); ++it) {
-        std::cout << it->name << " -> " << forceStringNoCtx(*it->value) << std::endl;
-       srcToStore[it->name] = forceStringNoCtx(*it->value);
-     }
-
-
-      
+        evalMode = Playback;
+        recordFileName = playbackMode;
+        initializePlayback();
     } else if (!playbackMode && !recordMode) {
-      evalMode = Normal;
+        evalMode = Normal;
     }
     else
-      throw EvalError("can't use both NIX_RECORDING and NIX_PLAYBACK");
-    std::cout << "EvalMode: " << evalMode << std::endl;
-
-    createBaseEnv();
-
+        throw EvalError("can't use both NIX_RECORDING and NIX_PLAYBACK");
+    
+    if (evalMode == Record || evalMode == Playback) {
+        std::cerr << "Running in deterministic evaluation mode: " << evalMode << std::endl;
+    }
 }
 
+void EvalState::initializePlayback()
+{
+    Symbol functionsSymbol(symbols.create("functions")), 
+           nameSymbol(symbols.create("name")),
+           parametersSymbol(symbols.create("parameters")),
+           resultSymbol(symbols.create("result")),
+           sourcesSymbol(symbols.create("sources"));
+    Value top;
+    
+    parseJSON(*this, readFile(recordFileName), top);
+    Value functions;
+    getAttr(top, functionsSymbol, functions);
+    forceList(functions);
+    for (unsigned int i = 0; i < functions.listSize(); ++i) {
+        Value &current = *functions.listElems()[i];
+        Value name, parameters, result;
+        getAttr(current, nameSymbol, name);
+        getAttr(current, parametersSymbol, parameters);
+        getAttr(current, resultSymbol, result);
+        std::string nameString = forceStringNoCtx(name);
+        std::list<std::string> parameterList;
+        forceList(parameters);
+        for (unsigned int j = 0; j < parameters.listSize(); ++j) {
+            parameterList.push_back(valueToJSON(*parameters.listElems()[j]));
+        }
+        recording[std::make_pair(nameString, parameterList)] = result;
+    }
+    Value sources;
+    getAttr(top, sourcesSymbol, sources);
+    forceAttrs(sources);
+    std::cout << sources.attrs->size() << std::endl;
+    for (auto it = sources.attrs->begin(); it != sources.attrs->end(); ++it) {
+        std::cout << it->name << " -> " << forceStringNoCtx(*it->value) << std::endl;
+        srcToStore[it->name] = forceStringNoCtx(*it->value);
+    }
+}
 
 EvalState::~EvalState()
 {
     fileEvalCache.clear();
 
     if (evalMode == Record) { 
-	std::fstream out(recordFileName, std::fstream::out);
-	out << "{\"functions\": [\n";
-	bool isThisTheFirstTime = true;
-	
-	for (auto kv : recording) {
-	  std::cout << "?";	
-	  if (!isThisTheFirstTime) out << ",";
-	  isThisTheFirstTime = false;
-	  
-	  out << "{ \"name\": \"" << kv.first.first << "\", \"parameters\": [";
-	  
-	  bool isThisTheFirstTime2 = true;
-	  for (auto parameter: kv.first.second) {
-	    if (!isThisTheFirstTime2) out << ", ";
-	    isThisTheFirstTime2 = false;
-	    out << parameter;	
-	  }
-	  out << "], \"result\": " << valueToJSON(kv.second) << "}\n";
-	}
-	    
-	out << "], \"sources\": {";
-	
-	bool isThisTheFirstTime3 = true;
-	for (auto path : srcToStore) {
-	  if (!isThisTheFirstTime3) out << ", ";
-      isThisTheFirstTime3 = false;
-	  out << "\"" << path.first << "\": \"" << path.second << "\"";
-	}
-	out << "}}";
-	out.close();
-    }
+        finalizeRecord();
+    }    
 }
 
+void EvalState::finalizeRecord()
+{
+    std::ofstream out(recordFileName, std::fstream::out);
+    out << "{\"functions\": [\n";
+   
+    //TODO: write this in a more functional style
+    bool isThisTheFirstTime = true;
+    for (auto kv : recording) {
+        if (!isThisTheFirstTime) out << ",";
+        isThisTheFirstTime = false;
+        
+        out << "{ \"name\": \"" << kv.first.first << "\", \"parameters\": [";
+        
+        bool isThisTheFirstTime2 = true;
+        for (auto parameter: kv.first.second) {
+            if (!isThisTheFirstTime2) out << ", ";
+            isThisTheFirstTime2 = false;
+            out << parameter;   
+        }
+        out << "], \"result\": " << valueToJSON(kv.second) << "}\n";
+    }
+        
+    out << "], \"sources\": {";
+    
+    bool isThisTheFirstTime3 = true;
+    for (auto path : srcToStore) {
+        if (!isThisTheFirstTime3) out << ", ";
+        isThisTheFirstTime3 = false;
+        out << "\"" << path.first << "\": \"" << path.second << "\"";
+    }
+    out << "}}";
+    out.close();
+}
 
 Path EvalState::checkSourcePath(const Path & path_)
 {
@@ -438,7 +451,6 @@ std::string EvalState::valueToJSON(Value & value) {
     printValueAsJSON(*this, true, value, out, context);
     return out.str();
 }
-
 
 void EvalState::getBuiltin(const string & name, Value & v)
 {
@@ -716,13 +728,11 @@ void EvalState::resetFileCache()
 }
 
 
-void EvalState::getAttr(Value & attrSet, const char * attr, Value & v) {
+void EvalState::getAttr(Value & attrSet, const Symbol & attr, Value & v) {
     forceAttrs(attrSet);
-    // !!! Should we create a symbol here or just do a lookup?
-    Bindings::iterator i = attrSet.attrs->find(symbols.create(attr));
+    Bindings::iterator i = attrSet.attrs->find(attr);
     if (i == attrSet.attrs->end())
         throwEvalError("attribute ‘%1%’ missing", attr);
-    // !!! add to stack trace?
     forceValue(*i->value);
     v = *i->value;
 }
@@ -1549,9 +1559,9 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path, bool ign
     if (srcToStore[path] != "")
         dstPath = srcToStore[path];
     else {
-      if (evalMode == Playback) {
-	  throwEvalError("Unknown path encountered in playback mode: '%1%'", path);
-      }
+        if (evalMode == Playback) {
+            throwEvalError("Unknown path encountered in playback mode: '%1%'", path);
+        }
         dstPath = (settings.readOnlyMode && !ignoreReadOnly)
             ? computeStorePathForPath(checkSourcePath(path)).first
             : store->addToStore(baseNameOf(path), checkSourcePath(path), true, htSHA256, defaultPathFilter, repair);

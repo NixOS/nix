@@ -1706,6 +1706,7 @@ extern const char __getEnv[] = "__getEnv";
 extern const char __storePath[] = "__storePath";
 extern const char __pathExists[] = "__pathExists";
 extern const char __readFile[] = "__readFile";
+extern const char __filterSource[] = "__filterSource";
 
 
 void EvalState::createBaseEnv()
@@ -1792,9 +1793,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__toJSON", 1, prim_toJSON);
     addPrimOp("__fromJSON", 1, prim_fromJSON);
     addPrimOp("__toFile", 2, prim_toFile);
-
-    //TODO: filter source is an impure primop too
-    addPrimOp("__filterSource", 2, prim_filterSource);
+    addUnsupportedImpurePrimOp<__filterSource>(2, prim_filterSource);
 
     // Sets
     addPrimOp("__attrNames", 1, prim_attrNames);
@@ -1851,8 +1850,8 @@ void EvalState::createBaseEnv()
     addPrimOp("derivationStrict", 1, prim_derivationStrict);
 
     // Networking
-    addPrimOp("__fetchurl", 1, prim_fetchurl);
-    addPrimOp("fetchTarball", 1, prim_fetchTarball);
+    addImpurePrimOp("__fetchurl", 1, prim_fetchurl);
+    addImpurePrimOp("fetchTarball", 1, prim_fetchTarball);
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
