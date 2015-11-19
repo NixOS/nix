@@ -1699,6 +1699,7 @@ static void prim_fetchTarball(EvalState & state, const Pos & pos, Value * * args
  * Primop registration
  *************************************************************/
 
+
 extern const char __importNative[] = "__importNative";
 extern const char __findFile[] = "__findFile";
 extern const char __readDir[] = "__readDir";
@@ -1707,7 +1708,8 @@ extern const char __storePath[] = "__storePath";
 extern const char __pathExists[] = "__pathExists";
 extern const char __readFile[] = "__readFile";
 extern const char __filterSource[] = "__filterSource";
-
+extern const char __fetchurl[] = "__fetchurl";
+extern const char fetchTarball[] = "fetchTarball";
 
 void EvalState::createBaseEnv()
 {
@@ -1728,18 +1730,20 @@ void EvalState::createBaseEnv()
 
     mkNull(v);
     addConstant("null", v);
+    
+    Value * impureConstantPrimop = getImpureConstantPrimop();
 
     mkInt(v, time(0));
-    addConstant("__currentTime", v);
+    addImpureConstant("__currentTime", v, impureConstantPrimop);
 
     mkString(v, settings.thisSystem);
-    addConstant("__currentSystem", v);
+    addImpureConstant("__currentSystem", v, impureConstantPrimop);
 
     mkString(v, nixVersion);
-    addConstant("__nixVersion", v);
+    addImpureConstant("__nixVersion", v, impureConstantPrimop);
 
     mkString(v, settings.nixStore);
-    addConstant("__storeDir", v);
+    addImpureConstant("__storeDir", v, impureConstantPrimop);
 
     /* Language version.  This should be increased every time a new
        language feature gets added.  It's not necessary to increase it
@@ -1850,8 +1854,8 @@ void EvalState::createBaseEnv()
     addPrimOp("derivationStrict", 1, prim_derivationStrict);
 
     // Networking
-    addImpurePrimOp("__fetchurl", 1, prim_fetchurl);
-    addImpurePrimOp("fetchTarball", 1, prim_fetchTarball);
+    addImpurePrimOp<__fetchurl, 1, prim_fetchurl>();
+    addImpurePrimOp<fetchTarball, 1, prim_fetchTarball>();
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */

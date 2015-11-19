@@ -200,7 +200,8 @@ private:
     void createBaseEnv();
 
     void addConstant(const string & name, Value & v);
-
+    void addImpureConstant(const string & name, Value & v, Value * impureConstant);
+    
     void addPrimOp(const string & name,
         unsigned int arity, PrimOpFun primOp);
 
@@ -214,7 +215,7 @@ private:
     static void recordPrimOp(EvalState & state, const Pos & pos, Value * * args, Value & v)
     {
         std::list<string> argList;
-        for (int i = 0; i < arity; i++) {
+        for (unsigned int i = 0; i < arity; i++) {
             argList.push_back(state.valueToJSON(*args[i]));
         }
         primOp(state, pos, args, v);
@@ -225,7 +226,7 @@ private:
     static void playbackPrimOp(EvalState & state, const Pos & pos, Value * * args, Value & v)
     {
         std::list<string> argList;
-        for (int i = 0; i < arity; i++) {
+        for (unsigned int i = 0; i < arity; i++) {
             argList.push_back(state.valueToJSON(*args[i]));
         }
         auto result = state.recording.find(std::make_pair(name, argList));
@@ -238,17 +239,22 @@ private:
             v = result->second;
         }
     }
-
+    
+    template< const char * name, unsigned int arity, PrimOpFun primOp>
+    PrimOpFun transformPrimOp()
+    {
+        switch (evalMode) {
+            case Record: return recordPrimOp<name, arity, primOp>;
+            case Playback: return playbackPrimOp<name, arity, primOp>;
+            case Normal: return primOp;
+            default: abort();
+        }
+    }
+    
     template< const char * name, unsigned int arity, PrimOpFun primOp>
     void addImpurePrimOp() 
     {
-        if (evalMode == Record) {
-            addPrimOp(name, arity, recordPrimOp<name, arity, primOp>);
-        } else if (evalMode == Playback) {
-	    addPrimOp(name, arity, playbackPrimOp<name, arity, primOp>);
-        } else {
-            addPrimOp(name, arity, primOp);
-        }      
+        addPrimOp(name, arity, transformPrimOp<name, arity, primOp>());
     }
     
     template< const char * name >
@@ -347,6 +353,9 @@ private:
     friend struct ExprOpConcatLists;
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
+    void addToBaseEnv(const string & name, Value * v, Symbol sym);
+    void addToBaseEnv(const string & name, Value * v);
+    Value * getImpureConstantPrimop();
 };
 
 

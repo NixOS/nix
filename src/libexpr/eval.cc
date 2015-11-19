@@ -419,17 +419,60 @@ Path EvalState::checkSourcePath(const Path & path_)
     throw RestrictedPathError(format("access to path ‘%1%’ is forbidden in restricted mode") % path_);
 }
 
+void EvalState::addToBaseEnv(const string & name, Value * v, Symbol sym) 
+{
+    staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
+    baseEnv.values[baseEnvDispl++] = v;
+    baseEnv.values[0]->attrs->push_back(Attr(sym, v));
+}
+
+void EvalState::addToBaseEnv(const string & name, Value * v) 
+{
+    string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
+    addToBaseEnv(name, v, symbols.create(name2));    
+}
 
 void EvalState::addConstant(const string & name, Value & v)
 {
     Value * v2 = allocValue();
     *v2 = v;
-    staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
-    baseEnv.values[baseEnvDispl++] = v2;
-    string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v2));
+    addToBaseEnv(name, v2);
 }
 
+void EvalState::addImpureConstant(const string & name, Value & v, Value * constantPrimOp) 
+{
+    if (evalMode == Normal) {
+        addConstant(name, v);
+        return;
+    }
+    Value * v2 = allocValue();
+    *v2 = v;
+    Value * wrappedConstant = allocValue();
+    wrappedConstant->type = tApp;
+    Value * left = wrappedConstant->app.left = allocValue();
+    left->type = tPrimOpApp;
+    left->primOpApp.left = constantPrimOp;
+    left->primOpApp.right = allocValue();
+    mkString(*left->primOpApp.right, name);
+    wrappedConstant->primOpApp.right = v2;
+    forceValue(*wrappedConstant);
+    addToBaseEnv(name, wrappedConstant);
+}
+
+static void prim_impureConstant(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    v = *args[1];
+}
+
+extern const char __impureConstant[] = "__impureConstant";
+Value * EvalState::getImpureConstantPrimop()
+{   
+    if (evalMode == Normal) return 0;
+    Value * result = allocValue();
+    result->type = tPrimOp;
+    result->primOp = NEW PrimOp(transformPrimOp<__impureConstant, 2, prim_impureConstant>(), 2, symbols.create("impureConstant"));
+    return result;
+}
 
 void EvalState::addPrimOp(const string & name,
     unsigned int arity, PrimOpFun primOp)
@@ -439,11 +482,8 @@ void EvalState::addPrimOp(const string & name,
     Symbol sym = symbols.create(name2);
     v->type = tPrimOp;
     v->primOp = NEW PrimOp(primOp, arity, sym);
-    staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
-    baseEnv.values[baseEnvDispl++] = v;
-    baseEnv.values[0]->attrs->push_back(Attr(sym, v));
+    addToBaseEnv(name, v, sym);
 }
-
 
 std::string EvalState::valueToJSON(Value & value) {
     std::ostringstream out;
