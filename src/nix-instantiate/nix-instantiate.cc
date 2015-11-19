@@ -101,6 +101,7 @@ int main(int argc, char * * argv)
         bool findFile = false;
         bool evalOnly = false;
         bool parseOnly = false;
+        Path replay;
         OutputKind outputKind = okPlain;
         bool xmlOutputSourceLocation = true;
         bool strict = false;
@@ -148,6 +149,8 @@ int main(int argc, char * * argv)
                 repair = true;
             else if (*arg == "--dry-run")
                 settings.readOnlyMode = true;
+            else if (*arg == "--replay")
+                replay = getArg(*arg, arg, end);
             else if (*arg != "" && arg->at(0) == '-')
                 return false;
             else
@@ -160,32 +163,38 @@ int main(int argc, char * * argv)
 
         store = openStore();
 
-        EvalState state(searchPath);
+        EvalState state(searchPath, replay.empty() ? Normal : Playback, replay.c_str());
         state.repair = repair;
-
-        Bindings & autoArgs(*evalAutoArgs(state, autoArgs_));
-
-        if (attrPaths.empty()) attrPaths.push_back("");
-
-        if (findFile) {
-            for (auto & i : files) {
-                Path p = state.findFile(i);
-                if (p == "") throw Error(format("unable to find ‘%1%’") % i);
-                std::cout << p << std::endl;
+        string currentPath = absPath(".");
+        
+        if (replay.empty()) {
+            if (attrPaths.empty()) attrPaths.push_back("");
+            
+            if (findFile) {
+                for (auto & i : files) {
+                    Path p = state.findFile(i);
+                    if (p == "") throw Error(format("unable to find ‘%1%’") % i);
+                    std::cout << p << std::endl;
+                }
+                return;
             }
-            return;
+            
+            state.setRecordingInfo(fromArgs, autoArgs_, attrPaths, files, currentPath);
+        }
+        else {
+            state.getRecordingInfo(fromArgs, autoArgs_, attrPaths, files, currentPath);
         }
 
+        Bindings & autoArgs(*evalAutoArgs(state, autoArgs_));
         if (readStdin) {
             Expr * e = parseStdin(state);
             processExpr(state, attrPaths, parseOnly, strict, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         } else if (files.empty() && !fromArgs)
             files.push_back("./default.nix");
-
         for (auto & i : files) {
             Expr * e = fromArgs
-                ? state.parseExprFromString(i, absPath("."))
+                ? state.parseExprFromString(i, currentPath)
                 : state.parseExprFromFile(resolveExprPath(lookupFileArg(state, i)));
             processExpr(state, attrPaths, parseOnly, strict, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);

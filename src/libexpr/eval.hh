@@ -26,7 +26,6 @@ typedef enum {
 
 typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, Value & v);
 
-
 struct PrimOp
 {
     PrimOpFun fun;
@@ -102,14 +101,23 @@ private:
 
     DeterministicEvaluationMode evalMode;
     const char * recordFileName;
+    Value * playbackJson;
 
     //TODO: use some other structure, maybe a hashmap
     //since comparing strings with long same prefixes is slow
     std::map<std::pair<string, std::list<string>>, Value> recording;
-
+    struct RecordingExpression {
+        bool fromArgs;
+        std::map<string,string> autoArgs;
+        Strings attrPaths;
+        Strings files;
+        string currentDir;
+        RecordingExpression() : fromArgs(false) {}
+    } recordingExpression;
+    
 public:
 
-    EvalState(const Strings & _searchPath);
+    EvalState(const Strings & _searchPath, DeterministicEvaluationMode evalMode = Normal, const char * evalModeFile = nullptr);
     ~EvalState();
 
     void addToSearchPath(const string & s, bool warn = false);
@@ -275,6 +283,8 @@ private:
     }
 
 public:
+    void getRecordingInfo(bool & fromArgs, std::map<string, string> & autoArgs_, Strings & attrPaths, Strings & files, string & currentDir);
+    void setRecordingInfo(bool fromArgs, std::map<string, string> autoArgs_, Strings attrPaths, Strings files, string currentDir);
 
     void getBuiltin(const string & name, Value & v);
 

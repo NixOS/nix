@@ -7,6 +7,7 @@
 #include "eval-inline.hh"
 #include "value-to-json.hh"
 #include "json-to-value.hh"
+#include "common-opts.hh"
 
 #include <iostream>
 #include <src/boost/format.hpp>
@@ -249,7 +250,7 @@ static Strings parseNixPath(const string & in)
 }
 
 
-EvalState::EvalState(const Strings & _searchPath)
+EvalState::EvalState(const Strings & _searchPath, DeterministicEvaluationMode evalMode, const char * evalModeFile)
     : sWith(symbols.create("<with>"))
     , sOutPath(symbols.create("outPath"))
     , sDrvPath(symbols.create("drvPath"))
@@ -267,7 +268,8 @@ EvalState::EvalState(const Strings & _searchPath)
     , sColumn(symbols.create("column"))
     , sFunctor(symbols.create("__functor"))
     , sToString(symbols.create("__toString"))
-    , evalMode(Normal)
+    , evalMode(evalMode)
+    , recordFileName(evalModeFile)
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
 {
@@ -293,24 +295,84 @@ EvalState::EvalState(const Strings & _searchPath)
 
 void EvalState::initializeDeterministicEvaluationMode()
 {
-    const char * recordMode = getenv("NIX_RECORDING");
-    const char * playbackMode = getenv("NIX_PLAYBACK");
-    if (recordMode && !playbackMode) {
-        evalMode = Record;
-        recordFileName = recordMode;
-    } else if (playbackMode && !recordMode) {
-        evalMode = Playback;
-        recordFileName = playbackMode;
-        initializePlayback();
-    } else if (!playbackMode && !recordMode) {
-        evalMode = Normal;
+    if (evalMode == Normal) {
+        const char * recordMode = getenv("NIX_RECORDING");
+        const char * playbackMode = getenv("NIX_PLAYBACK");
+        if (recordMode && !playbackMode) {
+            evalMode = Record;
+            recordFileName = recordMode;
+        } else if (playbackMode && !recordMode) {
+            evalMode = Playback;
+            recordFileName = playbackMode;
+        } else if (!playbackMode && !recordMode) {
+            evalMode = Normal;
+        }
+        else
+            throw EvalError("can't use both NIX_RECORDING and NIX_PLAYBACK");
     }
-    else
-        throw EvalError("can't use both NIX_RECORDING and NIX_PLAYBACK");
+    if (evalMode == Playback || evalMode == Record)
+        assert(recordFileName != 0);
+    
+    if (evalMode == Playback) {
+        initializePlayback();
+    }
     
     if (evalMode == Record || evalMode == Playback) {
         std::cerr << "Running in deterministic evaluation mode: " << evalMode << std::endl;
     }
+}
+
+void EvalState::setRecordingInfo(bool fromArgs, std::map<string, string> autoArgs_, Strings attrPaths, Strings files, string currentDir)
+{
+    recordingExpression.fromArgs = fromArgs;
+    recordingExpression.autoArgs = autoArgs_;
+    recordingExpression.attrPaths = attrPaths;
+    recordingExpression.files = files;
+    recordingExpression.currentDir = currentDir;
+}
+
+void EvalState::getRecordingInfo(bool & fromArgs, std::map<string, string> & autoArgs_, Strings & attrPaths, Strings & files, string & currentDir)
+{
+    if (!autoArgs_.empty()) {
+        throw Error("you can't supply auto arguments in playback mode");
+    }
+    if (!attrPaths.empty()) {
+        throw Error("you can't supply attribute paths in playback mode");
+    }
+    if (!files.empty()) {
+        throw Error("you can't supply files or expressions in playback mode");
+    }
+    if (fromArgs) {
+        throw Error("--expr is invalid in playback mode");
+    }
+    Symbol expressionS(symbols.create("expression")),
+           fromArgsS(symbols.create("fromArgs")),
+           autoArgsS(symbols.create("autoArgs")),
+           attributesS(symbols.create("attributes")),
+           filesS(symbols.create("files")),
+           currentDirS(symbols.create("currentDir"));
+    Value expression, fromArgsV, autoArgsV, attributesV, filesV, currentDirV;
+    getAttr(*playbackJson, expressionS, expression);
+    getAttr(expression, fromArgsS, fromArgsV);
+    getAttr(expression, autoArgsS, autoArgsV);
+    getAttr(expression, attributesS, attributesV);
+    getAttr(expression, filesS, filesV);
+    getAttr(expression, currentDirS, currentDirV);
+    fromArgs = forceBool(fromArgsV);
+    forceAttrs(autoArgsV);
+    for (auto it = autoArgsV.attrs->begin(); it != autoArgsV.attrs->end(); ++it) {
+       forceString(*it->value);
+       autoArgs_[it->name] = forceStringNoCtx(*it->value);
+    }
+    forceList(attributesV);
+    for (unsigned int i = 0; i < attributesV.listSize(); ++i) {
+        attrPaths.push_back(forceStringNoCtx(*attributesV.listElems()[i]));
+    }
+    forceList(filesV);
+    for (unsigned int i = 0; i < filesV.listSize(); ++i) {
+        files.push_back(forceStringNoCtx(*filesV.listElems()[i]));
+    }
+    currentDir = forceStringNoCtx(currentDirV);
 }
 
 void EvalState::initializePlayback()
@@ -320,7 +382,8 @@ void EvalState::initializePlayback()
            parametersSymbol(symbols.create("parameters")),
            resultSymbol(symbols.create("result")),
            sourcesSymbol(symbols.create("sources"));
-    Value top;
+    Value & top (*allocValue());
+    playbackJson = &top;
     
     parseJSON(*this, readFile(recordFileName), top);
     Value functions;
@@ -359,10 +422,33 @@ EvalState::~EvalState()
 
 void EvalState::finalizeRecord()
 {
-    std::ofstream out(recordFileName, std::fstream::out);
-    out << "{\"functions\": [\n";
-   
     //TODO: write this in a more functional style
+    std::ofstream out(recordFileName, std::fstream::out);
+    out << "{\"expression\":{\"fromArgs\":";
+    out << (recordingExpression.fromArgs ? "true" : "false");
+    out << ",\"autoArgs\":{";
+    bool isThisTheFirstTime0 = true;
+    for (auto autoArg: recordingExpression.autoArgs) {
+        if (!isThisTheFirstTime0) out << ",";
+        isThisTheFirstTime0 = false;
+        out << "\"" << autoArg.first << "\":\"" << autoArg.second << "\""; 
+    }
+    out << "},\"attributes\":[";
+    isThisTheFirstTime0 = true;
+    for (auto attr: recordingExpression.attrPaths) {
+        if (!isThisTheFirstTime0) out << ",";
+        isThisTheFirstTime0 = false;
+        out << "\"" << attr << "\""; 
+    }
+    out << "],\"files\":[";
+    isThisTheFirstTime0 = true;
+    for (auto file: recordingExpression.files) {
+        if (!isThisTheFirstTime0) out << ",";
+        isThisTheFirstTime0 = false;
+        out << "\"" << resolveExprPath(lookupFileArg(*this, file)) << "\"";
+    }
+    out << "],\"currentDir\":\"" << recordingExpression.currentDir << "\"},\"functions\": [\n";
+   
     bool isThisTheFirstTime = true;
     for (auto kv : recording) {
         if (!isThisTheFirstTime) out << ",";
