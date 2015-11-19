@@ -455,7 +455,6 @@ void EvalState::addImpureConstant(const string & name, Value & v, Value * consta
     left->primOpApp.right = allocValue();
     mkString(*left->primOpApp.right, name);
     wrappedConstant->primOpApp.right = v2;
-    forceValue(*wrappedConstant);
     addToBaseEnv(name, wrappedConstant);
 }
 
