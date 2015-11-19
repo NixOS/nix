@@ -97,6 +97,10 @@ let
 
         enableParallelBuilding = true;
 
+        __sandboxProfile = lib.sandbox.allowFileRead [
+          "/etc" "/etc/nix/nix.conf" "/private/etc/nix/nix.conf"
+        ];
+
         makeFlags = "profiledir=$(out)/etc/profile.d";
 
         preBuild = "unset NIX_INDENT_MAKE";

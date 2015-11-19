@@ -778,6 +778,12 @@ private:
     DirsInChroot dirsInChroot;
     typedef map<string, string> Environment;
     Environment env;
+#if SANDBOX_ENABLED
+    typedef string SandboxProfile;
+    SandboxProfile additionalSandboxProfile;
+
+    AutoDelete autoDelSandbox;
+#endif
 
     /* Hash rewriting. */
     HashRewrites rewritesToTmp, rewritesFromTmp;
@@ -1919,6 +1925,9 @@ void DerivationGoal::startBuilder()
         for (auto & i : closure)
             dirsInChroot[i] = i;
 
+#if SANDBOX_ENABLED
+        additionalSandboxProfile = get(drv->env, "__sandboxProfile");
+#else
         string allowed = settings.get("allowed-impure-host-deps", string(DEFAULT_ALLOWED_IMPURE_PREFIXES));
         PathSet allowedPaths = tokenizeString<StringSet>(allowed);
 
@@ -1944,6 +1953,7 @@ void DerivationGoal::startBuilder()
 
             dirsInChroot[i] = i;
         }
+#endif
 
 #if CHROOT_ENABLED
         /* Create a temporary directory in which we set up the chroot
@@ -2439,9 +2449,10 @@ void DerivationGoal::runChild()
         const char *builder = "invalid";
 
         string sandboxProfile;
-        if (isBuiltin(*drv))
+        if (isBuiltin(*drv)) {
             ;
-        else if (useChroot && SANDBOX_ENABLED) {
+#if SANDBOX_ENABLED
+        } else if (useChroot) {
             /* Lots and lots and lots of file functions freak out if they can't stat their full ancestry */
             PathSet ancestry;
 
@@ -2471,8 +2482,6 @@ void DerivationGoal::runChild()
             /* This has to appear before import statements */
             sandboxProfile += "(version 1)\n";
 
-            sandboxProfile += (format("(import \"%1%/nix/sandbox-defaults.sb\")\n") % settings.nixDataDir).str();
-
             /* Violations will go to the syslog if you set this. Unfortunately the destination does not appear to be configurable */
             if (settings.get("darwin-log-sandbox-violations", false)) {
                 sandboxProfile += "(deny default)\n";
@@ -2494,13 +2503,8 @@ void DerivationGoal::runChild()
             }
             sandboxProfile += ")\n";
 
-            /* Our inputs (transitive dependencies and any impurities computed above)
-               Note that the sandbox profile allows file-write* even though it isn't seemingly necessary. First of all, nix's standard user permissioning
-               mechanism still prevents builders from writing to input directories, so no security/purity is lost. The reason we allow file-write* is that
-               denying it means the `access` syscall will return EPERM instead of EACCESS, which confuses a few programs that assume (understandably, since
-               it appears to be a violation of the POSIX spec) that `access` won't do that, and don't deal with it nicely if it does. The most notable of
-               these is the entire GHC Haskell ecosystem. */
-            sandboxProfile += "(allow file-read* file-write* process-exec mach-priv-task-port\n";
+            /* Our inputs (transitive dependencies and any impurities computed above) */
+            sandboxProfile += "(allow file-read* process-exec\n";
             for (auto & i : dirsInChroot) {
                 if (i.first != i.second)
                     throw SysError(format("can't map '%1%' to '%2%': mismatched impure paths not supported on darwin"));
@@ -2516,28 +2520,32 @@ void DerivationGoal::runChild()
             }
             sandboxProfile += ")\n";
 
-            /* Our ancestry. N.B: this uses literal on folders, instead of subpath. Without that,
-               you open up the entire filesystem because you end up with (subpath "/")
-               Note: file-read-metadata* is not sufficiently permissive for GHC. file-read* is but may
-               be a security hazard.
-               TODO: figure out a more appropriate directive.
-             */
+            /* Allow file-read* on full directory hierarchy to self. Allows realpath() */
             sandboxProfile += "(allow file-read*\n";
             for (auto & i : ancestry) {
                 sandboxProfile += (format("\t(literal \"%1%\")\n") % i.c_str()).str();
             }
             sandboxProfile += ")\n";
 
+            sandboxProfile += additionalSandboxProfile;
+
             debug("Generated sandbox profile:");
             debug(sandboxProfile);
 
+            Path sandboxFile = drvPath + ".sb";
+            if (pathExists(sandboxFile)) deletePath(sandboxFile);
+            autoDelSandbox.reset(sandboxFile, false);
+
+            writeFile(sandboxFile, sandboxProfile);
+
             builder = "/usr/bin/sandbox-exec";
             args.push_back("sandbox-exec");
-            args.push_back("-p");
-            args.push_back(sandboxProfile);
+            args.push_back("-f");
+            args.push_back(sandboxFile);
             args.push_back("-D");
-            args.push_back((format("_GLOBAL_TMP_DIR=%1%") % globalTmpDir).str());
+            args.push_back("_GLOBAL_TMP_DIR=" + globalTmpDir);
             args.push_back(drv->builder);
+#endif
         } else {
             builder = drv->builder.c_str();
             string builderBasename = baseNameOf(drv->builder);
