@@ -336,16 +336,14 @@ void EvalState::initializePlayback()
         std::list<std::string> parameterList;
         forceList(parameters);
         for (unsigned int j = 0; j < parameters.listSize(); ++j) {
-            parameterList.push_back(valueToJSON(*parameters.listElems()[j]));
+            parameterList.push_back(valueToJSON(*parameters.listElems()[j], false));
         }
         recording[std::make_pair(nameString, parameterList)] = result;
     }
     Value sources;
     getAttr(top, sourcesSymbol, sources);
     forceAttrs(sources);
-    std::cout << sources.attrs->size() << std::endl;
     for (auto it = sources.attrs->begin(); it != sources.attrs->end(); ++it) {
-        std::cout << it->name << " -> " << forceStringNoCtx(*it->value) << std::endl;
         srcToStore[it->name] = forceStringNoCtx(*it->value);
     }
 }
@@ -378,7 +376,7 @@ void EvalState::finalizeRecord()
             isThisTheFirstTime2 = false;
             out << parameter;   
         }
-        out << "], \"result\": " << valueToJSON(kv.second) << "}\n";
+        out << "], \"result\": " << valueToJSON(kv.second, false) << "}\n";
     }
         
     out << "], \"sources\": {";
@@ -484,10 +482,10 @@ void EvalState::addPrimOp(const string & name,
     addToBaseEnv(name, v, sym);
 }
 
-std::string EvalState::valueToJSON(Value & value) {
+std::string EvalState::valueToJSON(Value & value, bool copyToStore) {
     std::ostringstream out;
     PathSet context;
-    printValueAsJSON(*this, true, value, out, context);
+    printValueAsJSON(*this, true, value, out, context, copyToStore);
     return out.str();
 }
 

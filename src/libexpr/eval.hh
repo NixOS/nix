@@ -205,7 +205,7 @@ private:
     void addPrimOp(const string & name,
         unsigned int arity, PrimOpFun primOp);
 
-    std::string valueToJSON(Value & value);
+    std::string valueToJSON(Value & value, bool copyToStore);
     void getAttr(Value & top, const Symbol & arg2, Value & v);
     void initializeDeterministicEvaluationMode();
     void initializePlayback();
@@ -216,7 +216,7 @@ private:
     {
         std::list<string> argList;
         for (unsigned int i = 0; i < arity; i++) {
-            argList.push_back(state.valueToJSON(*args[i]));
+            argList.push_back(state.valueToJSON(*args[i], false));
         }
         primOp(state, pos, args, v);
         state.recording[std::make_pair(name, argList)] = v;
@@ -227,7 +227,7 @@ private:
     {
         std::list<string> argList;
         for (unsigned int i = 0; i < arity; i++) {
-            argList.push_back(state.valueToJSON(*args[i]));
+            argList.push_back(state.valueToJSON(*args[i], false));
         }
         auto result = state.recording.find(std::make_pair(name, argList));
         if (result == state.recording.end()) {

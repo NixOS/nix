@@ -25,7 +25,7 @@ void escapeJSON(std::ostream & str, const string & s)
 
 
 void printValueAsJSON(EvalState & state, bool strict,
-    Value & v, std::ostream & str, PathSet & context)
+    Value & v, std::ostream & str, PathSet & context, bool copyPathToStore)
 {
     checkInterrupt();
 
@@ -47,9 +47,13 @@ void printValueAsJSON(EvalState & state, bool strict,
             break;
 
         case tPath:
-            escapeJSON(str, state.copyPathToStore(context, v.path));
+            if(copyPathToStore) {
+                escapeJSON(str, state.copyPathToStore(context, v.path));
+            }
+            else {
+                escapeJSON(str, v.path);
+            }
             break;
-
         case tNull:
             str << "null";
             break;
