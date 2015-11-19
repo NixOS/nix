@@ -217,7 +217,8 @@ private:
     void getAttr(Value & top, const Symbol & arg2, Value & v);
     void initializeDeterministicEvaluationMode();
     void initializePlayback();
-    void finalizeRecord();
+    void finalizeRecording (Value & result);
+    void writeRecordingIntoStore (Value & result);
  
     template< const char * name, unsigned int arity, PrimOpFun primOp>
     static void recordPrimOp(EvalState & state, const Pos & pos, Value * * args, Value & v)

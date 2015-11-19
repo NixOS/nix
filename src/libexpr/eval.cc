@@ -8,6 +8,7 @@
 #include "value-to-json.hh"
 #include "json-to-value.hh"
 #include "common-opts.hh"
+#include "get-drvs.hh"
 
 #include <iostream>
 #include <src/boost/format.hpp>
@@ -415,15 +416,38 @@ EvalState::~EvalState()
 {
     fileEvalCache.clear();
 
-    if (evalMode == Record) { 
-        finalizeRecord();
+    if (evalMode == Record) {
+        Value result;
+        finalizeRecording(result);
+        writeRecordingIntoStore(result);
     }    
 }
 
-void EvalState::finalizeRecord()
+void EvalState::writeRecordingIntoStore(Value & result)
+{
+    Value v;
+    string path = settings.nixDataDir + "/nix/corepkgs/reproducable-derivation.nix";
+    evalFile(path, v);
+    Value app;
+    app.type = tApp;
+    app.app.left = &v;
+    app.app.right = &result;
+    DrvInfos drvs;
+    Bindings * autoArgs = allocBindings(4);
+    getDerivations(*this, app, "", *autoArgs, drvs, false);
+    Path drvPath = drvs.front().queryDrvPath();
+    PathSet paths;
+    paths.insert(drvPath);
+    store->buildPaths(paths);
+    std::cerr << "succesfully build source closure: " << drvs.front().queryOutPath() << std::endl;
+}
+
+
+void EvalState::finalizeRecording(Value & result)
 {
     //TODO: write this in a more functional style
-    std::ofstream out(recordFileName, std::fstream::out);
+    std::stringstream out;
+    PathSet context;
     out << "{\"expression\":{\"fromArgs\":";
     out << (recordingExpression.fromArgs ? "true" : "false");
     out << ",\"autoArgs\":{";
@@ -471,10 +495,11 @@ void EvalState::finalizeRecord()
     for (auto path : srcToStore) {
         if (!isThisTheFirstTime3) out << ", ";
         isThisTheFirstTime3 = false;
+        context.insert(path.second);
         out << "\"" << path.first << "\": \"" << path.second << "\"";
     }
     out << "}}";
-    out.close();
+    mkString(result, out.str(), context);
 }
 
 Path EvalState::checkSourcePath(const Path & path_)
