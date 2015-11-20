@@ -408,7 +408,7 @@ void EvalState::initializePlayback()
     getAttr(top, sourcesSymbol, sources);
     forceAttrs(sources);
     for (auto it = sources.attrs->begin(); it != sources.attrs->end(); ++it) {
-        srcToStore[it->name] = forceStringNoCtx(*it->value);
+        srcToStoreForPlayback[it->name] = forceStringNoCtx(*it->value);
     }
 }
 
@@ -479,7 +479,7 @@ void EvalState::finalizeRecording(Value & result)
     for (auto kv : recording) {
         if (!isThisTheFirstTime) out << ",";
         isThisTheFirstTime = false;
-        
+    
         out << "{ \"name\":";
         escapeJSON(out, kv.first.first);
         out << ", \"parameters\": [";
@@ -496,7 +496,7 @@ void EvalState::finalizeRecording(Value & result)
     out << "], \"sources\": {";
     
     bool isThisTheFirstTime3 = true;
-    for (auto path : srcToStore) {
+    for (auto path : srcToStoreForPlayback) {
         if (!isThisTheFirstTime3) out << ", ";
         isThisTheFirstTime3 = false;
         context.insert(path.second);
@@ -1713,12 +1713,13 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path, bool ign
     if (srcToStore[path] != "")
         dstPath = srcToStore[path];
     else {
+        Path path2 = path;
         if (evalMode == Playback) {
-            throwEvalError("Unknown path encountered in playback mode: '%1%'", path);
+            path2 = copyPathToStoreIfItsNotAlreadyThere(context, path);
         }
         dstPath = (settings.readOnlyMode && !ignoreReadOnly)
-            ? computeStorePathForPath(checkSourcePath(path)).first
-            : store->addToStore(baseNameOf(path), checkSourcePath(path), true, htSHA256, defaultPathFilter, repair);
+            ? computeStorePathForPath(checkSourcePath(path2)).first
+            : store->addToStore(baseNameOf(path), checkSourcePath(path2), true, htSHA256, defaultPathFilter, repair);
         srcToStore[path] = dstPath;
         printMsg(lvlChatty, format("copied source ‘%1%’ -> ‘%2%’")
             % path % dstPath);
@@ -1727,6 +1728,37 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path, bool ign
     context.insert(dstPath);
     return dstPath;
 }
+
+Path EvalState::copyPathToStoreIfItsNotAlreadyThere(PathSet context, Path path)
+{
+    if (evalMode == Playback) {
+        Path rest;
+        while (srcToStoreForPlayback[path] == "") {
+            string::size_type lastSeperator = path.find_last_of("/");
+            if (lastSeperator == string::npos) {
+                throwEvalError("path '%s' not found in playback mode", path + rest);
+            }
+            rest = path.substr(lastSeperator) + rest;
+            path = path.substr(0, lastSeperator);
+        }
+        return srcToStoreForPlayback[path] + rest;        
+    }
+    if (isInStore(path)) {
+        string storePath = toStorePath(path);
+        srcToStoreForPlayback[storePath] = storePath;
+        return path;
+    }
+    else {
+        if (srcToStoreForPlayback[path] != "")
+            return srcToStoreForPlayback[path];
+        else {
+            string result = copyPathToStore(context, path, true);
+            srcToStoreForPlayback[path] = result;
+            return result;
+        }
+    }
+}
+
 
 
 Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)

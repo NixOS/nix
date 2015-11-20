@@ -577,7 +577,7 @@ Expr * EvalState::parseExprFromFile(const Path & path, StaticEnv & staticEnv)
     Path actualPath;
     if (evalMode == Record || evalMode == Playback) {
         PathSet context;
-        actualPath = copyPathToStore(context, path, true);
+        actualPath = copyPathToStoreIfItsNotAlreadyThere(context, path);
     } else {
         actualPath = path;
     }

@@ -88,7 +88,8 @@ public:
 
 private:
     SrcToStore srcToStore;
-
+    SrcToStore srcToStoreForPlayback;
+    
     /* A cache from path names to values. */
 #if HAVE_BOEHMGC
     typedef std::map<Path, Value, std::less<Path>, traceable_allocator<std::pair<const Path, Value> > > FileEvalCache;
@@ -367,6 +368,7 @@ private:
     void addToBaseEnv(const string & name, Value * v, Symbol sym);
     void addToBaseEnv(const string & name, Value * v);
     Value * getImpureConstantPrimop();
+    Path copyPathToStoreIfItsNotAlreadyThere(PathSet context, Path path);
 };
 
 
