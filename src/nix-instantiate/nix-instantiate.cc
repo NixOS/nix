@@ -101,7 +101,8 @@ int main(int argc, char * * argv)
         bool findFile = false;
         bool evalOnly = false;
         bool parseOnly = false;
-        Path replay;
+        Path playback;
+        bool record = false;
         OutputKind outputKind = okPlain;
         bool xmlOutputSourceLocation = true;
         bool strict = false;
@@ -149,8 +150,10 @@ int main(int argc, char * * argv)
                 repair = true;
             else if (*arg == "--dry-run")
                 settings.readOnlyMode = true;
-            else if (*arg == "--replay")
-                replay = getArg(*arg, arg, end);
+            else if (*arg == "--playback")
+                playback = getArg(*arg, arg, end);
+            else if (*arg == "--record")
+                record = true;
             else if (*arg != "" && arg->at(0) == '-')
                 return false;
             else
@@ -163,13 +166,21 @@ int main(int argc, char * * argv)
 
         store = openStore();
 
-        EvalState state(searchPath, replay.empty() ? Normal : Playback, replay.c_str());
+        DeterministicEvaluationMode mode = record ? Record : Normal;
+        if (!playback.empty()) {
+            if (mode == Normal) {
+                mode = Playback;
+            }
+            else
+                throw Error("can't specify both --playback and --record");
+        }
+        
+        EvalState state(searchPath, mode, playback.c_str());
         state.repair = repair;
         string currentPath = absPath(".");
         
-        if (replay.empty()) {
+        if (mode != Playback) {
             if (attrPaths.empty()) attrPaths.push_back("");
-            
             if (findFile) {
                 for (auto & i : files) {
                     Path p = state.findFile(i);
@@ -178,7 +189,6 @@ int main(int argc, char * * argv)
                 }
                 return;
             }
-            
             state.setRecordingInfo(fromArgs, autoArgs_, attrPaths, files, currentPath);
         }
         else {
