@@ -455,21 +455,23 @@ void EvalState::finalizeRecording(Value & result)
     for (auto autoArg: recordingExpression.autoArgs) {
         if (!isThisTheFirstTime0) out << ",";
         isThisTheFirstTime0 = false;
-        out << "\"" << autoArg.first << "\":\"" << autoArg.second << "\""; 
+        escapeJSON (out, autoArg.first);
+        out << ":";
+        escapeJSON(out, autoArg.second); 
     }
     out << "},\"attributes\":[";
     isThisTheFirstTime0 = true;
     for (auto attr: recordingExpression.attrPaths) {
         if (!isThisTheFirstTime0) out << ",";
         isThisTheFirstTime0 = false;
-        out << "\"" << attr << "\""; 
+        escapeJSON(out, attr);
     }
     out << "],\"files\":[";
     isThisTheFirstTime0 = true;
     for (auto file: recordingExpression.files) {
         if (!isThisTheFirstTime0) out << ",";
         isThisTheFirstTime0 = false;
-        out << "\"" << resolveExprPath(lookupFileArg(*this, file)) << "\"";
+        escapeJSON(out, recordingExpression.fromArgs ? file : resolveExprPath(lookupFileArg(*this, file)));
     }
     out << "],\"currentDir\":\"" << recordingExpression.currentDir << "\"},\"functions\": [\n";
    
@@ -478,13 +480,15 @@ void EvalState::finalizeRecording(Value & result)
         if (!isThisTheFirstTime) out << ",";
         isThisTheFirstTime = false;
         
-        out << "{ \"name\": \"" << kv.first.first << "\", \"parameters\": [";
+        out << "{ \"name\":";
+        escapeJSON(out, kv.first.first);
+        out << ", \"parameters\": [";
         
         bool isThisTheFirstTime2 = true;
         for (auto parameter: kv.first.second) {
             if (!isThisTheFirstTime2) out << ", ";
             isThisTheFirstTime2 = false;
-            out << parameter;   
+            out << parameter;
         }
         out << "], \"result\": " << valueToJSON(kv.second, false) << "}\n";
     }
@@ -496,7 +500,9 @@ void EvalState::finalizeRecording(Value & result)
         if (!isThisTheFirstTime3) out << ", ";
         isThisTheFirstTime3 = false;
         context.insert(path.second);
-        out << "\"" << path.first << "\": \"" << path.second << "\"";
+        escapeJSON(out, path.first);
+        out << ":";
+        escapeJSON(out, path.second);
     }
     out << "}}";
     mkString(result, out.str(), context);
