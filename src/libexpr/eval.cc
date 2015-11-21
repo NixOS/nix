@@ -584,7 +584,7 @@ Value * EvalState::getImpureConstantPrimop()
     if (evalMode == Normal) return 0;
     Value * result = allocValue();
     result->type = tPrimOp;
-    result->primOp = NEW PrimOp(transformPrimOp<__impureConstant, 2, prim_impureConstant>(), 2, symbols.create("impureConstant"));
+    result->primOp = NEW PrimOp(transformPrimOp<__impureConstant, 2, prim_impureConstant, onlyPos<0> >(), 2, symbols.create("impureConstant"));
     return result;
 }
 

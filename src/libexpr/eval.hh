@@ -221,23 +221,32 @@ private:
     void finalizeRecording (Value & result);
     void writeRecordingIntoStore (Value & result);
  
-    template< const char * name, unsigned int arity, PrimOpFun primOp>
+    static bool constTrue(unsigned int arg) { return true; }
+    template< int argumentPos >
+    static bool onlyPos(unsigned int arg) { return arg == argumentPos; }
+    typedef bool (*UsedArguments) (unsigned int argumentIndex);
+    
+    template< const char * name, unsigned int arity, PrimOpFun primOp, UsedArguments useArgument >
     static void recordPrimOp(EvalState & state, const Pos & pos, Value * * args, Value & v)
     {
         std::list<string> argList;
         for (unsigned int i = 0; i < arity; i++) {
-            argList.push_back(state.valueToJSON(*args[i], false));
+            if (useArgument(i)) {
+                argList.push_back(state.valueToJSON(*args[i], false));
+            }
         }
         primOp(state, pos, args, v);
         state.recording[std::make_pair(name, argList)] = v;
     }
 
-    template< const char * name, unsigned int arity, PrimOpFun primOp>
+    template< const char * name, unsigned int arity, PrimOpFun primOp, UsedArguments useArgument >
     static void playbackPrimOp(EvalState & state, const Pos & pos, Value * * args, Value & v)
     {
         std::list<string> argList;
         for (unsigned int i = 0; i < arity; i++) {
-            argList.push_back(state.valueToJSON(*args[i], false));
+            if(useArgument(i)) {
+                argList.push_back(state.valueToJSON(*args[i], false));
+            }
         }
         auto result = state.recording.find(std::make_pair(name, argList));
         if (result == state.recording.end()) {
@@ -250,21 +259,21 @@ private:
         }
     }
     
-    template< const char * name, unsigned int arity, PrimOpFun primOp>
+    template< const char * name, unsigned int arity, PrimOpFun primOp, UsedArguments useArguments >
     PrimOpFun transformPrimOp()
     {
         switch (evalMode) {
-            case Record: return recordPrimOp<name, arity, primOp>;
-            case Playback: return playbackPrimOp<name, arity, primOp>;
+            case Record: return recordPrimOp<name, arity, primOp, useArguments>;
+            case Playback: return playbackPrimOp<name, arity, primOp, useArguments>;
             case Normal: return primOp;
             default: abort();
         }
     }
     
-    template< const char * name, unsigned int arity, PrimOpFun primOp>
+    template< const char * name, unsigned int arity, PrimOpFun primOp, UsedArguments useArguments = constTrue>
     void addImpurePrimOp() 
     {
-        addPrimOp(name, arity, transformPrimOp<name, arity, primOp>());
+        addPrimOp(name, arity, transformPrimOp<name, arity, primOp, useArguments>());
     }
     
     template< const char * name >

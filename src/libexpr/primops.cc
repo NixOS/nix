@@ -1790,7 +1790,7 @@ void EvalState::createBaseEnv()
     addPrimOp("dirOf", 1, prim_dirOf);
     addImpurePrimOp<__readFile, 1, prim_readFile>();
     addImpurePrimOp<__readDir, 1, prim_readDir>();
-    addImpurePrimOp<__findFile, 2, prim_findFile>();
+    addImpurePrimOp<__findFile, 2, prim_findFile, onlyPos<1>>();
 
     // Creating files
     addPrimOp("__toXML", 1, prim_toXML);
