@@ -1,0 +1,63 @@
+(allow file-read* file-write-data (literal "/dev/null"))
+(allow ipc-posix*)
+(allow mach-lookup (global-name "com.apple.SecurityServer"))
+
+(allow file-read*
+       (literal "/dev/dtracehelper")
+       (literal "/dev/tty")
+       (literal "/dev/autofs_nowait")
+       (literal "/System/Library/CoreServices/SystemVersion.plist")
+       (literal "/private/var/run/systemkeychaincheck.done")
+       (literal "/private/etc/protocols")
+       (literal "/private/var/tmp")
+       (literal "/private/var/db")
+       (subpath "/private/var/db/mds"))
+
+(allow file-read*
+       (subpath "/usr/share/icu")
+       (subpath "/usr/share/locale")
+       (subpath "/usr/share/zoneinfo"))
+
+(allow file-write*
+       (literal "/dev/tty")
+       (literal "/dev/dtracehelper")
+       (literal "/mds"))
+
+(allow file-ioctl (literal "/dev/dtracehelper"))
+
+(allow file-read-metadata
+       (literal "/var")
+       (literal "/tmp")
+       ; symlinks
+       (literal "@sysconfdir@")
+       (literal "@sysconfdir@/nix")
+       (literal "@sysconfdir@/nix/nix.conf")
+       (literal "/etc/resolv.conf")
+       (literal "/private/etc/resolv.conf"))
+
+(allow file-read*
+       (literal "/private@sysconfdir@/nix/nix.conf")
+       (literal "/private/var/run/resolv.conf"))
+
+; some builders use filehandles other than stdin/stdout
+(allow file*
+        (subpath "/dev/fd")
+        (literal "/dev/ptmx")
+        (regex #"^/dev/[pt]ty.*$"))
+
+; allow everything inside TMP
+(allow file* process-exec
+       (subpath (param "_GLOBAL_TMP_DIR"))
+       (subpath "/private/tmp"))
+
+(allow process-fork)
+(allow sysctl-read)
+(allow signal (target same-sandbox))
+
+; allow getpwuid (for git and other packages)
+(allow mach-lookup
+       (global-name "com.apple.system.notification_center")
+       (global-name "com.apple.system.opendirectoryd.libinfo"))
+
+; allow local networking
+(allow network* (local ip) (remote unix-socket))
