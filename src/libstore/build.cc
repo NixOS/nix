@@ -1926,7 +1926,7 @@ void DerivationGoal::startBuilder()
             dirsInChroot[i] = i;
 
 #if SANDBOX_ENABLED
-        additionalSandboxProfile = get(drv->env, "__sandboxProfile");
+        additionalSandboxProfile = get(drv->env, "_sandboxProfile");
 #else
         string allowed = settings.get("allowed-impure-host-deps", string(DEFAULT_ALLOWED_IMPURE_PREFIXES));
         PathSet allowedPaths = tokenizeString<StringSet>(allowed);
