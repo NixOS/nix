@@ -1140,7 +1140,19 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                                         attrs3["value"] = v->listElems()[j]->string.s;
                                         xml.writeEmptyElement("string", attrs3);
                                     }
+                              } else if (v->type == tAttrs) {
+                                  attrs2["type"] = "strings";
+                                  XMLOpenElement m(xml, "meta", attrs2);
+                                  Bindings & attrs = *v->attrs;
+                                  for (auto &i : attrs) {
+                                      Attr & a(*attrs.find(i.name));
+                                      if(a.value->type != tString) continue;
+                                      XMLAttrs attrs3;
+                                      attrs3["type"] = i.name;
+                                      attrs3["value"] = a.value->string.s;
+                                      xml.writeEmptyElement("string", attrs3);
                                 }
+                              }
                             }
                         }
                     }
