@@ -1927,7 +1927,7 @@ void DerivationGoal::startBuilder()
 
 #if SANDBOX_ENABLED
         additionalSandboxProfile = get(drv->env, "__sandboxProfile");
-#else
+#endif
         string allowed = settings.get("allowed-impure-host-deps", string(DEFAULT_ALLOWED_IMPURE_PREFIXES));
         PathSet allowedPaths = tokenizeString<StringSet>(allowed);
 
@@ -1953,7 +1953,6 @@ void DerivationGoal::startBuilder()
 
             dirsInChroot[i] = i;
         }
-#endif
 
 #if CHROOT_ENABLED
         /* Create a temporary directory in which we set up the chroot

@@ -97,7 +97,7 @@ let
 
         enableParallelBuilding = true;
 
-        __sandboxProfile = lib.sandbox.allowFileRead [
+        sandboxProfile = lib.sandbox.allowFileRead [
           "/etc" "/etc/nix/nix.conf" "/private/etc/nix/nix.conf"
         ];
 
