@@ -60,7 +60,7 @@ $ nix-store -l $(which xterm)
   <listitem><para><command>nix-copy-closure</command> now uses
   <command>nix-store --serve</command> on the remote side to send or
   receive closures. This fixes a race condition between
-  <command>nix-copy-closureE</command> and the garbage
+  <command>nix-copy-closure</command> and the garbage
   collector.</para></listitem>
 
   <listitem><para>Derivations can specify the new special attribute
