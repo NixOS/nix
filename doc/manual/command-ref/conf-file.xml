@@ -426,7 +426,7 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
     <listitem><para>The maximum number of parallel HTTP connections
     used by the binary cache substituter to get NAR info files.  This
     number should be high to minimise latency.  It defaults to
-    150.</para></listitem>
+    25.</para></listitem>
 
   </varlistentry>
 
