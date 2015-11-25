@@ -1032,6 +1032,17 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
 {
     forceValue(fun);
 
+    if (fun.type == tAttrs) {
+        auto found = fun.attrs->find(sFunctor);
+        if (found != fun.attrs->end()) {
+            forceValue(*found->value);
+            Value * v = allocValue();
+            callFunction(*found->value, fun, *v, noPos);
+            forceValue(*v);
+            return autoCallFunction(args, *v, res);
+        }
+    }
+
     if (fun.type != tLambda || !fun.lambda.fun->matchAttrs) {
         res = fun;
         return;
