@@ -281,7 +281,7 @@ let
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages =
-            [ "perl-DBD-SQLite" "perl-devel" "sqlite" "sqlite-devel" "bzip2-devel" "emacs" "perl-WWW-Curl" "libcurl-devel" ]
+            [ "perl-DBD-SQLite" "perl-devel" "sqlite" "sqlite-devel" "bzip2-devel" "emacs" "perl-WWW-Curl" "libcurl-devel" "openssl-devel" "xz-devel" ]
             ++ extraPackages; };
       memSize = 1024;
       meta.schedulingPriority = 50;
@@ -302,13 +302,13 @@ let
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages =
-            [ "libdbd-sqlite3-perl" "libsqlite3-dev" "libbz2-dev" "libwww-curl-perl" "libcurl-dev" ]
+            [ "libdbd-sqlite3-perl" "libsqlite3-dev" "libbz2-dev" "libwww-curl-perl" "libcurl-dev" "libssl-dev" "liblzma-dev" ]
             ++ extraPackages; };
       memSize = 1024;
       meta.schedulingPriority = 50;
       configureFlags = "--sysconfdir=/etc";
       debRequires =
-        [ "curl" "libdbd-sqlite3-perl" "libsqlite3-0" "libbz2-1.0" "bzip2" "xz-utils" "libwww-curl-perl" ]
+        [ "curl" "libdbd-sqlite3-perl" "libsqlite3-0" "libbz2-1.0" "bzip2" "xz-utils" "libwww-curl-perl" "libssl1.0.0" "liblzma5" ]
         ++ lib.optionals (lib.elem "libsodium-dev" extraPackages) [ "libsodium13" ] ;
       debMaintainer = "Eelco Dolstra <eelco.dolstra@logicblox.com>";
       doInstallCheck = true;
