@@ -1881,12 +1881,14 @@ void DerivationGoal::startBuilder()
        work properly.  Purity checking for fixed-output derivations
        is somewhat pointless anyway. */
     {
-        string x = settings.get("build-use-chroot", string("false"));
+        string x = settings.get("build-use-sandbox",
+            /* deprecated alias */
+            settings.get("build-use-chroot", string("false")));
         if (x != "true" && x != "false" && x != "relaxed")
-            throw Error("option ‘build-use-chroot’ must be set to one of ‘true’, ‘false’ or ‘relaxed’");
+            throw Error("option ‘build-use-sandbox’ must be set to one of ‘true’, ‘false’ or ‘relaxed’");
         if (x == "true") {
             if (get(drv->env, "__noChroot") == "1")
-                throw Error(format("derivation ‘%1%’ has ‘__noChroot’ set, but that's not allowed when ‘build-use-chroot’ is ‘true’") % drvPath);
+                throw Error(format("derivation ‘%1%’ has ‘__noChroot’ set, but that's not allowed when ‘build-use-sandbox’ is ‘true’") % drvPath);
             useChroot = true;
         }
         else if (x == "false")
@@ -1905,8 +1907,13 @@ void DerivationGoal::startBuilder()
 
         /* Allow a user-configurable set of directories from the
            host file system. */
-        PathSet dirs = tokenizeString<StringSet>(settings.get("build-chroot-dirs", defaultChrootDirs));
-        PathSet dirs2 = tokenizeString<StringSet>(settings.get("build-extra-chroot-dirs", string("")));
+        PathSet dirs = tokenizeString<StringSet>(
+            settings.get("build-sandbox-paths",
+                /* deprecated alias with lower priority */
+                settings.get("build-chroot-dirs", defaultChrootDirs)));
+        PathSet dirs2 = tokenizeString<StringSet>(
+            settings.get("build-extra-chroot-dirs",
+                settings.get("build-extra-sandbox-paths", string(""))));
         dirs.insert(dirs2.begin(), dirs2.end());
 
         dirsInChroot.clear();
@@ -2054,7 +2061,7 @@ void DerivationGoal::startBuilder()
         /* We don't really have any parent prep work to do (yet?)
            All work happens in the child, instead. */
 #else
-        throw Error("chroot builds are not supported on this platform");
+        throw Error("sandboxing builds is not supported on this platform");
 #endif
     }
 
@@ -2103,7 +2110,7 @@ void DerivationGoal::startBuilder()
             auto line = std::string{lines, lastPos, nlPos - lastPos};
             lastPos = nlPos + 1;
             if (state == stBegin) {
-                if (line == "extra-chroot-dirs") {
+                if (line == "extra-sandbox-paths" || line == "extra-chroot-dirs") {
                     state = stExtraChrootDirs;
                 } else {
                     throw Error(format("unknown pre-build hook command ‘%1%’")
@@ -2645,7 +2652,7 @@ void DerivationGoal::registerOutputs()
                     replaceValidPath(path, actualPath);
                 else
                     if (buildMode != bmCheck && rename(actualPath.c_str(), path.c_str()) == -1)
-                        throw SysError(format("moving build output ‘%1%’ from the chroot to the Nix store") % path);
+                        throw SysError(format("moving build output ‘%1%’ from the sandbox to the Nix store") % path);
             }
             if (buildMode != bmCheck) actualPath = path;
         } else {
