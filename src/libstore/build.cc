@@ -1275,9 +1275,10 @@ static bool canBuildLocally(const BasicDerivation & drv)
 #if __linux__
         || (drv.platform == "i686-linux" && settings.thisSystem == "x86_64-linux")
         || (drv.platform == "armv6l-linux" && settings.thisSystem == "armv7l-linux")
+#elif __FreeBSD__
+        || (drv.platform == "i686-linux" && settings.thisSystem == "x86_64-freebsd")
+        || (drv.platform == "i686-linux" && settings.thisSystem == "i686-freebsd")
 #endif
-        || (platform == "i686-linux" && settings.thisSystem == "x86_64-freebsd")
-        || (platform == "i686-linux" && settings.thisSystem == "i686-freebsd")
         ;
 }
 
