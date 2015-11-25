@@ -21,7 +21,7 @@ Nix::Config::readConfig;
 my @caches;
 my $gotCaches = 0;
 
-my $maxParallelRequests = int($Nix::Config::config{"binary-caches-parallel-connections"} // 150);
+my $maxParallelRequests = int($Nix::Config::config{"binary-caches-parallel-connections"} // 50);
 $maxParallelRequests = 1 if $maxParallelRequests < 1;
 
 my $ttlNegative = 24 * 3600; # when to purge negative lookups from the database
