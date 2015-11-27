@@ -261,6 +261,7 @@ EvalState::EvalState(const Strings & _searchPath)
     , sLine(symbols.create("line"))
     , sColumn(symbols.create("column"))
     , sFunctor(symbols.create("__functor"))
+    , sToString(symbols.create("__toString"))
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
 {
@@ -1389,7 +1390,14 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     }
 
     if (v.type == tAttrs) {
-        Bindings::iterator i = v.attrs->find(sOutPath);
+        auto i = v.attrs->find(sToString);
+        if (i != v.attrs->end()) {
+            forceValue(*i->value, pos);
+            Value v1;
+            callFunction(*i->value, v, v1, pos);
+            return coerceToString(pos, v1, context, coerceMore, copyToStore);
+        }
+        i = v.attrs->find(sOutPath);
         if (i == v.attrs->end()) throwTypeError("cannot coerce a set to a string, at %1%", pos);
         return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
     }
