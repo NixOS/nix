@@ -248,7 +248,7 @@ struct CompareValues
     bool operator () (const Value * v1, const Value * v2) const
     {
         if (v1->type != v2->type)
-            throw EvalError("cannot compare values of different types");
+            throw EvalError(format("cannot compare %1% with %2%") % showType(*v1) % showType(*v2));
         switch (v1->type) {
             case tInt:
                 return v1->integer < v2->integer;
