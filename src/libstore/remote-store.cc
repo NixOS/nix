@@ -438,12 +438,18 @@ Paths RemoteStore::importPaths(bool requireSignature, Source & source)
 
 void RemoteStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
 {
-    if (buildMode != bmNormal) throw Error("repairing or checking is not supported when building through the Nix daemon");
     openConnection();
     to << wopBuildPaths;
-    if (GET_PROTOCOL_MINOR(daemonVersion) >= 13)
+    if (GET_PROTOCOL_MINOR(daemonVersion) >= 13) {
         to << drvPaths;
-    else {
+        if (GET_PROTOCOL_MINOR(daemonVersion) >= 15)
+            to << buildMode;
+        else
+            /* Old daemons did not take a 'buildMode' parameter, so we
+               need to validate it here on the client side.  */
+            if (buildMode != bmNormal)
+                throw Error("repairing or checking is not supported when building through the Nix daemon");
+    } else {
         /* For backwards compatibility with old daemons, strip output
            identifiers. */
         PathSet drvPaths2;
