@@ -745,6 +745,9 @@ private:
     /* The temporary directory. */
     Path tmpDir;
 
+    /* The path of the temporary directory in the sandbox. */
+    Path tmpDirInSandbox;
+
     /* File descriptor for the log file. */
     FILE * fLogFile = 0;
     BZFILE * bzLogFile = 0;
@@ -1727,6 +1730,28 @@ void DerivationGoal::startBuilder()
             % drv->platform % settings.thisSystem % drvPath);
     }
 
+    /* Are we doing a chroot build?  Note that fixed-output
+       derivations are never done in a chroot, mainly so that
+       functions like fetchurl (which needs a proper /etc/resolv.conf)
+       work properly.  Purity checking for fixed-output derivations
+       is somewhat pointless anyway. */
+    {
+        string x = settings.get("build-use-sandbox",
+            /* deprecated alias */
+            settings.get("build-use-chroot", string("false")));
+        if (x != "true" && x != "false" && x != "relaxed")
+            throw Error("option ‘build-use-sandbox’ must be set to one of ‘true’, ‘false’ or ‘relaxed’");
+        if (x == "true") {
+            if (get(drv->env, "__noChroot") == "1")
+                throw Error(format("derivation ‘%1%’ has ‘__noChroot’ set, but that's not allowed when ‘build-use-sandbox’ is ‘true’") % drvPath);
+            useChroot = true;
+        }
+        else if (x == "false")
+            useChroot = false;
+        else if (x == "relaxed")
+            useChroot = !fixedOutput && get(drv->env, "__noChroot") != "1";
+    }
+
     /* Construct the environment passed to the builder. */
     env.clear();
 
@@ -1755,7 +1780,12 @@ void DerivationGoal::startBuilder()
 
     /* Create a temporary directory where the build will take
        place. */
-    tmpDir = createTempDir("", "nix-build-" + storePathToName(drvPath), false, false, 0700);
+    auto drvName = storePathToName(drvPath);
+    tmpDir = createTempDir("", "nix-build-" + drvName, false, false, 0700);
+
+    /* In a sandbox, for determinism, always use the same temporary
+       directory. */
+    tmpDirInSandbox = useChroot ? "/tmp/nix-build-" + drvName + "-0" : tmpDir;
 
     /* Add all bindings specified in the derivation via the
        environments, except those listed in the passAsFile
@@ -1777,16 +1807,16 @@ void DerivationGoal::startBuilder()
 
     /* For convenience, set an environment pointing to the top build
        directory. */
-    env["NIX_BUILD_TOP"] = tmpDir;
+    env["NIX_BUILD_TOP"] = tmpDirInSandbox;
 
     /* Also set TMPDIR and variants to point to this directory. */
-    env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmpDir;
+    env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmpDirInSandbox;
 
     /* Explicitly set PWD to prevent problems with chroot builds.  In
        particular, dietlibc cannot figure out the cwd because the
        inode of the current directory doesn't appear in .. (because
        getdents returns the inode of the mount point). */
-    env["PWD"] = tmpDir;
+    env["PWD"] = tmpDirInSandbox;
 
     /* Compatibility hack with Nix <= 0.7: if this is a fixed-output
        derivation, tell the builder, so that for instance `fetchurl'
@@ -1875,28 +1905,6 @@ void DerivationGoal::startBuilder()
     }
 
 
-    /* Are we doing a chroot build?  Note that fixed-output
-       derivations are never done in a chroot, mainly so that
-       functions like fetchurl (which needs a proper /etc/resolv.conf)
-       work properly.  Purity checking for fixed-output derivations
-       is somewhat pointless anyway. */
-    {
-        string x = settings.get("build-use-sandbox",
-            /* deprecated alias */
-            settings.get("build-use-chroot", string("false")));
-        if (x != "true" && x != "false" && x != "relaxed")
-            throw Error("option ‘build-use-sandbox’ must be set to one of ‘true’, ‘false’ or ‘relaxed’");
-        if (x == "true") {
-            if (get(drv->env, "__noChroot") == "1")
-                throw Error(format("derivation ‘%1%’ has ‘__noChroot’ set, but that's not allowed when ‘build-use-sandbox’ is ‘true’") % drvPath);
-            useChroot = true;
-        }
-        else if (x == "false")
-            useChroot = false;
-        else if (x == "relaxed")
-            useChroot = !fixedOutput && get(drv->env, "__noChroot") != "1";
-    }
-
     if (useChroot) {
 
         string defaultChrootDirs;
@@ -1925,7 +1933,7 @@ void DerivationGoal::startBuilder()
             else
                 dirsInChroot[string(i, 0, p)] = string(i, p + 1);
         }
-        dirsInChroot[tmpDir] = tmpDir;
+        dirsInChroot[tmpDirInSandbox] = tmpDir;
 
         /* Add the closure of store paths to the chroot. */
         PathSet closure;
@@ -2391,7 +2399,7 @@ void DerivationGoal::runChild()
         }
 #endif
 
-        if (chdir(tmpDir.c_str()) == -1)
+        if (chdir(tmpDirInSandbox.c_str()) == -1)
             throw SysError(format("changing into ‘%1%’") % tmpDir);
 
         /* Close all other file descriptors. */
