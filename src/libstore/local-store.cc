@@ -23,16 +23,11 @@
 #include <time.h>
 #include <grp.h>
 
-#if HAVE_UNSHARE && HAVE_STATVFS && HAVE_SYS_MOUNT_H
+#if __linux__
 #include <sched.h>
 #include <sys/statvfs.h>
 #include <sys/mount.h>
-#endif
-
-#if HAVE_LINUX_FS_H
-#include <linux/fs.h>
 #include <sys/ioctl.h>
-#include <errno.h>
 #endif
 
 #include <sqlite3.h>
@@ -502,7 +497,7 @@ void LocalStore::openDB(bool create)
    bind mount.  So make the Nix store writable for this process. */
 void LocalStore::makeStoreWritable()
 {
-#if HAVE_UNSHARE && HAVE_STATVFS && HAVE_SYS_MOUNT_H && defined(MS_BIND) && defined(MS_REMOUNT)
+#if __linux__
     if (getuid() != 0) return;
     /* Check if /nix/store is on a read-only mount. */
     struct statvfs stat;

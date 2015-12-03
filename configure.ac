@@ -76,27 +76,12 @@ static char buf[1024];]],
 AC_LANG_POP(C++)
 
 
-# Check for chroot support (requires chroot() and bind mounts).
-AC_CHECK_FUNCS([chroot])
-AC_CHECK_FUNCS([unshare])
 AC_CHECK_FUNCS([statvfs])
-AC_CHECK_HEADERS([sched.h])
-AC_CHECK_HEADERS([sys/param.h])
-AC_CHECK_HEADERS([sys/mount.h], [], [],
-[#ifdef HAVE_SYS_PARAM_H
-# include <sys/param.h>
-# endif
-])
-AC_CHECK_HEADERS([sys/syscall.h])
 
 
 # Check for lutimes, optionally used for changing the mtime of
 # symlinks.
 AC_CHECK_FUNCS([lutimes])
-
-
-# Check for sched_setaffinity.
-AC_CHECK_FUNCS([sched_setaffinity])
 
 
 # Check whether the store optimiser can optimise symlinks.
@@ -120,10 +105,6 @@ AC_LANG_POP(C++)
 # Check for <err.h>.
 AC_CHECK_HEADER([err.h], [], [bsddiff_compat_include="-Icompat-include"])
 AC_SUBST([bsddiff_compat_include])
-
-
-# Check for <linux/fs.h> (for immutable file support).
-AC_CHECK_HEADERS([linux/fs.h])
 
 
 AC_DEFUN([NEED_PROG],

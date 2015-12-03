@@ -34,47 +34,27 @@
 
 #include <bzlib.h>
 
-/* Includes required for chroot support. */
-#if HAVE_SYS_PARAM_H
-#include <sys/param.h>
-#endif
-#if HAVE_SYS_MOUNT_H
-#include <sys/mount.h>
-#endif
-#if HAVE_SYS_SYSCALL_H
-#include <sys/syscall.h>
-#endif
-#if HAVE_SCHED_H
-#include <sched.h>
-#endif
-
-/* In GNU libc 2.11, <sys/mount.h> does not define `MS_PRIVATE', but
-   <linux/fs.h> does.  */
-#if !defined MS_PRIVATE && defined HAVE_LINUX_FS_H
-#include <linux/fs.h>
-#endif
-
-#define CHROOT_ENABLED HAVE_CHROOT && HAVE_SYS_MOUNT_H && defined(MS_BIND) && defined(MS_PRIVATE) && defined(CLONE_NEWNS) && defined(SYS_pivot_root)
-
 /* chroot-like behavior from Apple's sandbox */
 #if __APPLE__
-    #define SANDBOX_ENABLED 1
     #define DEFAULT_ALLOWED_IMPURE_PREFIXES "/System/Library /usr/lib /dev /bin/sh"
 #else
-    #define SANDBOX_ENABLED 0
     #define DEFAULT_ALLOWED_IMPURE_PREFIXES ""
 #endif
 
-#if CHROOT_ENABLED
+/* Includes required for chroot support. */
+#if __linux__
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <netinet/ip.h>
-#endif
-
-#if __linux__
 #include <sys/personality.h>
 #include <sys/mman.h>
+#include <sched.h>
+#include <sys/param.h>
+#include <sys/mount.h>
+#include <sys/syscall.h>
+#include <linux/fs.h>
+#define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
 #endif
 
 #if HAVE_STATVFS
@@ -781,10 +761,10 @@ private:
     DirsInChroot dirsInChroot;
     typedef map<string, string> Environment;
     Environment env;
-#if SANDBOX_ENABLED
+
+#if __APPLE__
     typedef string SandboxProfile;
     SandboxProfile additionalSandboxProfile;
-
     AutoDelete autoDelSandbox;
 #endif
 
@@ -1908,7 +1888,7 @@ void DerivationGoal::startBuilder()
     if (useChroot) {
 
         string defaultChrootDirs;
-#if CHROOT_ENABLED
+#if __linux__
         if (isInStore(BASH_PATH))
             defaultChrootDirs = "/bin/sh=" BASH_PATH;
 #endif
@@ -1943,7 +1923,7 @@ void DerivationGoal::startBuilder()
         for (auto & i : closure)
             dirsInChroot[i] = i;
 
-#if SANDBOX_ENABLED
+#if __APPLE__
         additionalSandboxProfile = get(drv->env, "__sandboxProfile");
 #endif
         string allowed = settings.get("allowed-impure-host-deps", string(DEFAULT_ALLOWED_IMPURE_PREFIXES));
@@ -1972,7 +1952,7 @@ void DerivationGoal::startBuilder()
             dirsInChroot[i] = i;
         }
 
-#if CHROOT_ENABLED
+#if __linux__
         /* Create a temporary directory in which we set up the chroot
            environment using bind-mounts.  We put it in the Nix store
            to ensure that we can create hard-links to non-directory
@@ -2065,7 +2045,7 @@ void DerivationGoal::startBuilder()
         for (auto & i : drv->outputs)
             dirsInChroot.erase(i.second.path);
 
-#elif SANDBOX_ENABLED
+#elif __APPLE__
         /* We don't really have any parent prep work to do (yet?)
            All work happens in the child, instead. */
 #else
@@ -2148,7 +2128,7 @@ void DerivationGoal::startBuilder()
     builderOut.create();
 
     /* Fork a child to build the package. */
-#if CHROOT_ENABLED
+#if __linux__
     if (useChroot) {
         /* Set up private namespaces for the build:
 
@@ -2250,7 +2230,7 @@ void DerivationGoal::runChild()
 
         commonChildInit(builderOut);
 
-#if CHROOT_ENABLED
+#if __linux__
         if (useChroot) {
 
             /* Initialise the loopback interface. */
@@ -2383,10 +2363,8 @@ void DerivationGoal::runChild()
             if (mkdir("real-root", 0) == -1)
                 throw SysError("cannot create real-root directory");
 
-#define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
             if (pivot_root(".", "real-root") == -1)
                 throw SysError(format("cannot pivot old root directory onto ‘%1%’") % (chrootRootDir + "/real-root"));
-#undef pivot_root
 
             if (chroot(".") == -1)
                 throw SysError(format("cannot change root directory to ‘%1%’") % chrootRootDir);
@@ -2468,7 +2446,7 @@ void DerivationGoal::runChild()
         string sandboxProfile;
         if (isBuiltin(*drv)) {
             ;
-#if SANDBOX_ENABLED
+#if __APPLE__
         } else if (useChroot) {
             /* Lots and lots and lots of file functions freak out if they can't stat their full ancestry */
             PathSet ancestry;
