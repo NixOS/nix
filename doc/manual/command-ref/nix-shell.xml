@@ -252,8 +252,8 @@ dependencies in Nixpkgs.</para>
 <para>The lines starting with <literal>#! nix-shell</literal> specify
 <command>nix-shell</command> options (see above). Note that you cannot
 write <literal>#1 /usr/bin/env nix-shell -i ...</literal> because
-<command>/usr/bin/env</command> does not support passing options to
-the interpreter.</para>
+many operating systems only allow one argument in
+<literal>#!</literal> lines.</para>
 
 <para>For example, here is a Python script that depends on Python and
 the <literal>prettytable</literal> package:
