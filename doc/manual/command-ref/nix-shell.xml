@@ -176,6 +176,22 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 </refsection>
 
 
+<refsection><title>Environment variables</title>
+
+<variablelist>
+
+  <varlistentry><term><envar>NIX_BUILD_SHELL</envar></term>
+    
+    <listitem><para>Shell used to start the interactive environment. 
+    Defaults to the <command>bash</command> found in <envar>PATH</envar>.</para></listitem>
+
+  </varlistentry>
+
+</variablelist>
+
+</refsection>
+
+
 <refsection><title>Examples</title>
 
 <para>To build the dependencies of the package Pan, and start an
