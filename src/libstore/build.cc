@@ -2736,8 +2736,8 @@ void DerivationGoal::registerOutputs()
             Hash h2 = recursive ? hashPath(ht, actualPath).first : hashFile(ht, actualPath);
             if (h != h2)
                 throw BuildError(
-                    format("Nix expects output path ‘%1%’ to have %2% hash ‘%3%’, instead it has ‘%4%’")
-                    % path % i.second.hashAlgo % printHash16or32(h) % printHash16or32(h2));
+                    format("output path ‘%1%’ has %2% hash ‘%3%’ when ‘%4%’ was expected")
+                    % path % i.second.hashAlgo % printHash16or32(h2) % printHash16or32(h));
         }
 
         /* Get rid of all weird permissions.  This also checks that
