@@ -91,7 +91,7 @@ done
 started as follows (as <literal>root</literal>):
 
 <screen>
-$ nix-daemon</screen>
+$ /root/.nix-profile/bin/nix-daemon</screen>
 
 You’ll want to put that line somewhere in your system’s boot
 scripts.</para>
