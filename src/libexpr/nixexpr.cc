@@ -30,8 +30,9 @@ static void showString(std::ostream & str, const string & s)
 
 static void showId(std::ostream & str, const string & s)
 {
-    assert(!s.empty());
-    if (s == "if")
+    if (s.empty())
+        str << "\"\"";
+    else if (s == "if") // FIXME: handle other keywords
         str << '"' << s << '"';
     else {
         char c = s[0];
