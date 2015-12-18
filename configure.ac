@@ -54,8 +54,6 @@ if test "$sys_name" = sunos; then
 fi
 
 
-CFLAGS=
-CXXFLAGS=
 AC_PROG_CC
 AC_PROG_CXX
 
