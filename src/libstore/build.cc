@@ -2505,7 +2505,9 @@ void DerivationGoal::runChild()
             sandboxProfile += "(allow file-read* file-write* process-exec\n";
             for (auto & i : dirsInChroot) {
                 if (i.first != i.second)
-                    throw SysError(format("can't map '%1%' to '%2%': mismatched impure paths not supported on darwin"));
+                    throw Error(format(
+                        "can't map '%1%' to '%2%': mismatched impure paths not supported on Darwin")
+                        % i.first % i.second);
 
                 string path = i.first;
                 struct stat st;
