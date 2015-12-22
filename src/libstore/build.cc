@@ -1765,7 +1765,7 @@ void DerivationGoal::startBuilder()
 
     /* In a sandbox, for determinism, always use the same temporary
        directory. */
-    tmpDirInSandbox = useChroot ? "/tmp/nix-build-" + drvName + "-0" : tmpDir;
+    tmpDirInSandbox = useChroot ? canonPath("/tmp", true) + "/nix-build-" + drvName + "-0" : tmpDir;
 
     /* Add all bindings specified in the derivation via the
        environments, except those listed in the passAsFile
