@@ -1013,7 +1013,8 @@ static void opGenerateBinaryCacheKey(Strings opFlags, Strings opArgs)
     string publicKeyFile = *i++;
 
 #if HAVE_SODIUM
-    sodium_init();
+    if (sodium_init() == -1)
+        throw Error("could not initialise libsodium");
 
     unsigned char pk[crypto_sign_PUBLICKEYBYTES];
     unsigned char sk[crypto_sign_SECRETKEYBYTES];
