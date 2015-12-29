@@ -1778,10 +1778,11 @@ void DerivationGoal::startBuilder()
         if (passAsFile.find(i.first) == passAsFile.end()) {
             env[i.first] = i.second;
         } else {
-            Path p = tmpDir + "/.attr-" + std::to_string(fileNr++);
+            string fn = ".attr-" + std::to_string(fileNr++);
+            Path p = tmpDir + "/" + fn;
             writeFile(p, i.second);
             filesToChown.insert(p);
-            env[i.first + "Path"] = p;
+            env[i.first + "Path"] = tmpDirInSandbox + "/" + fn;
         }
     }
 
