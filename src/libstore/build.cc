@@ -2170,7 +2170,7 @@ void DerivationGoal::startBuilder()
             size_t stackSize = 1 * 1024 * 1024;
             char * stack = (char *) mmap(0, stackSize,
                 PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
-            if (!stack) throw SysError("allocating stack");
+            if (stack == MAP_FAILED) throw SysError("allocating stack");
             int flags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
             if (!fixedOutput) flags |= CLONE_NEWNET;
             pid_t child = clone(childEntry, stack + stackSize, flags, this);
