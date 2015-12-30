@@ -335,7 +335,7 @@ stdenv.mkDerivation {
   </varlistentry>
 
 
-  <varlistentry><term><function>builtins.foldl’</function> 
+  <varlistentry><term><function>builtins.foldl’</function>
     <replaceable>op</replaceable> <replaceable>nul</replaceable> <replaceable>list</replaceable></term>
 
     <listitem><para>Reduce a list by applying a binary operator, from
@@ -345,6 +345,24 @@ stdenv.mkDerivation {
     <literal>foldl’ (x: y: x + y) 0 [1 2 3]</literal> evaluates to
     6.</para></listitem>
 
+  </varlistentry>
+
+
+  <varlistentry><term><function>builtins.functionArgs</function>
+    <replaceable>f</replaceable></term>
+
+    <listitem><para>
+    Return a set containing the names of the formal arguments expected
+    by the function <replaceable>f</replaceable>.
+    The value of each attribute is a Boolean denoting whether the corresponding
+    argument has a default value.  For instance,
+    <literal>functionArgs ({ x, y ? 123}: ...)  =  { x = false; y = true; }</literal>.
+    </para>
+
+    <para>"Formal argument" here refers to the attributes pattern-matched by
+    the function.  Plain lambdas are not included, e.g.
+    <literal>functionArgs (x: ...)  =  { }</literal>.
+    </para></listitem>
   </varlistentry>
 
 

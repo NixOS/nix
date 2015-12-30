@@ -1154,7 +1154,7 @@ static void prim_catAttrs(EvalState & state, const Pos & pos, Value * * args, Va
 
 /* Return a set containing the names of the formal arguments expected
    by the function `f'.  The value of each attribute is a Boolean
-   denoting whether has a default value.  For instance,
+   denoting whether the corresponding argument has a default value.  For instance,
 
       functionArgs ({ x, y ? 123}: ...)
    => { x = false; y = true; }
