@@ -2,6 +2,7 @@
 #include "types.hh"
 
 #include <lzma.h>
+#include <cstdio>
 
 namespace nix {
 
