@@ -36,7 +36,7 @@
   distribution does not provide them.</para></listitem>
 
   <listitem><para>The <link
-  xlink:href="http://www.hpl.hp.com/personal/Hans_Boehm/gc/">Boehm
+  xlink:href="http://www.hboehm.info/gc/">Boehm
   garbage collector</link> to reduce the evaluator’s memory
   consumption (optional).  To enable it, install
   <literal>pkgconfig</literal> and the Boehm garbage collector, and
