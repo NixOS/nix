@@ -183,12 +183,17 @@ interactive shell in which to build it:
 
 <screen>
 $ nix-shell '&lt;nixpkgs>' -A pan
-[nix-shell]$ unpackPhase
+[nix-shell]$ eval "${unpackPhase-unpackPhase}"
 [nix-shell]$ cd pan-*
-[nix-shell]$ configurePhase
-[nix-shell]$ buildPhase
+[nix-shell]$ eval "${configurePhase-configurePhase}"
+[nix-shell]$ eval "${buildPhase-buildPhase}"
 [nix-shell]$ ./pan/gui/pan
 </screen>
+
+<warning><para>
+  It is important to run the eval commands instead of just calling for example <command>configurePhase</command>
+  because the latter will not respect custom phases and use the default implementation of the phase instead.
+</para></warning>
 
 To clear the environment first, and do some additional automatic
 initialisation of the interactive shell:
