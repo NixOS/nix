@@ -4,7 +4,7 @@
       version="5.0"
       xml:id="ssec-relnotes-0.11">
 
-<title>Release 0.11 (December 31, 2007)</title>
+<title>Release 0.11 (2007-12-31)</title>
 
 <para>Nix 0.11 has many improvements over the previous stable release.
 The most important improvement is secure multi-user support.  It also

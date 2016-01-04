@@ -4,7 +4,7 @@
       version="5.0"
       xml:id="ch-relnotes-0.10">
 
-<title>Release 0.10 (October 6, 2006)</title>
+<title>Release 0.10 (2006-10-06)</title>
 
 <note><para>This version of Nix uses Berkeley DB 4.4 instead of 4.3.
 The database is upgraded automatically, but you should be careful not

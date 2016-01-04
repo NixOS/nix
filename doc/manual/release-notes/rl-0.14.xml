@@ -2,7 +2,9 @@
       xmlns:xlink="http://www.w3.org/1999/xlink"
       xmlns:xi="http://www.w3.org/2001/XInclude"
       version="5.0"
-      xml:id="ssec-relnotes-0.14"><title>Release 0.14 (February 4, 2010)</title>
+      xml:id="ssec-relnotes-0.14">
+
+<title>Release 0.14 (2010-02-04)</title>
 
 <para>This release has the following improvements:</para>
 

@@ -4,7 +4,7 @@
       version="5.0"
       xml:id="ssec-relnotes-1.4">
 
-<title>Release 1.4 (February 26, 2013)</title>
+<title>Release 1.4 (2013-02-26)</title>
 
 <para>This release fixes a security bug in multi-user operation.  It
 was possible for derivations to cause the mode of files outside of the

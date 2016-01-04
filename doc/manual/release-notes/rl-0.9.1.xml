@@ -4,7 +4,7 @@
       version="5.0"
       xml:id="ch-relnotes-0.9.1">
 
-<title>Release 0.9.1 (September 20, 2005)</title>
+<title>Release 0.9.1 (2005-09-20)</title>
 
 <para>This bug fix release addresses a problem with the ATerm library
 when the <option>--with-aterm</option> flag in
