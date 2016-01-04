@@ -161,7 +161,11 @@ bool PathLocks::lockPaths(const PathSet & _paths,
 
 PathLocks::~PathLocks()
 {
-    unlock();
+    try {
+        unlock();
+    } catch (...) {
+        ignoreException();
+    }
 }
 
 
