@@ -66,6 +66,30 @@ template<class N> N getIntArg(const string & opt,
     return n * multiplier;
 }
 
+template<class N> N getFloatArg(const string & opt,
+    Strings::iterator & i, const Strings::iterator & end, bool allowUnit)
+{
+    ++i;
+    if (i == end) throw UsageError(format("‘%1%’ requires an argument") % opt);
+    string s = *i;
+    N multiplier = 1;
+    if (allowUnit && !s.empty()) {
+        char u = std::toupper(*s.rbegin());
+        if (std::isalpha(u)) {
+            if (u == 'K') multiplier = 1ULL << 10;
+            else if (u == 'M') multiplier = 1ULL << 20;
+            else if (u == 'G') multiplier = 1ULL << 30;
+            else if (u == 'T') multiplier = 1ULL << 40;
+            else throw UsageError(format("invalid unit specifier ‘%1%’") % u);
+            s.resize(s.size() - 1);
+        }
+    }
+    N n;
+    if (!string2Float(s, n))
+        throw UsageError(format("‘%1%’ requires a float argument") % opt);
+    return n * multiplier;
+}
+
 /* Show the manual page for the specified program. */
 void showManPage(const string & name);
 

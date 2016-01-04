@@ -85,6 +85,7 @@ static Expr * unescapeStr(SymbolTable & symbols, const char * s)
 
 ID          [a-zA-Z\_][a-zA-Z0-9\_\'\-]*
 INT         [0-9]+
+FLOAT       {INT}[0-9]+\.[0-9]+[eE]-?{INT}
 PATH        [a-zA-Z0-9\.\_\-\+]*(\/[a-zA-Z0-9\.\_\-\+]+)+
 HPATH       \~(\/[a-zA-Z0-9\.\_\-\+]+)+
 SPATH       \<[a-zA-Z0-9\.\_\-\+]+(\/[a-zA-Z0-9\.\_\-\+]+)*\>
@@ -122,6 +123,12 @@ or          { return OR_KW; }
               if (errno != 0)
                   throw ParseError(format("invalid integer ‘%1%’") % yytext);
               return INT;
+            }
+{FLOAT}     { errno = 0;
+              yylval->n = strtod(yytext, 0);
+              if (errno != 0)
+                  throw ParseError(format("invalid float ‘%1%’") % yytext);
+              return FLOAT;
             }
 
 \$\{        { PUSH_STATE(INITIAL); return DOLLAR_CURLY; }

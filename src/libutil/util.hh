@@ -358,6 +358,14 @@ template<class N> bool string2Int(const string & s, N & n)
     return str && str.get() == EOF;
 }
 
+/* Parse a string into a float. */
+template<class N> bool string2Float(const string & s, N & n)
+{
+    std::istringstream str(s);
+    str >> n;
+    return str && str.get() == EOF;
+}
+
 
 /* Return true iff `s' ends in `suffix'. */
 bool hasSuffix(const string & s, const string & suffix);

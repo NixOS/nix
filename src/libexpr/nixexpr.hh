@@ -98,6 +98,15 @@ struct ExprInt : Expr
     Value * maybeThunk(EvalState & state, Env & env);
 };
 
+struct ExprFloat : Expr
+{
+    NixFloat nf;
+    Value v;
+    ExprFloat(NixFloat nf) : nf(nf) { mkFloat(v, nf); };
+    COMMON_METHODS
+    Value * maybeThunk(EvalState & state, Env & env);
+};
+
 struct ExprString : Expr
 {
     Symbol s;
