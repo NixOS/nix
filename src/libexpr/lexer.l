@@ -85,7 +85,7 @@ static Expr * unescapeStr(SymbolTable & symbols, const char * s)
 
 ID          [a-zA-Z\_][a-zA-Z0-9\_\'\-]*
 INT         [0-9]+
-FLOAT       {INT}[0-9]+\.[0-9]+[eE]-?{INT}
+FLOAT       {INT}\.{INT}
 PATH        [a-zA-Z0-9\.\_\-\+]*(\/[a-zA-Z0-9\.\_\-\+]+)+
 HPATH       \~(\/[a-zA-Z0-9\.\_\-\+]+)+
 SPATH       \<[a-zA-Z0-9\.\_\-\+]+(\/[a-zA-Z0-9\.\_\-\+]+)*\>
