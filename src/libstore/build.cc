@@ -1710,6 +1710,10 @@ void DerivationGoal::startBuilder()
             % drv->platform % settings.thisSystem % drvPath);
     }
 
+#if __APPLE__
+    additionalSandboxProfile = get(drv->env, "__sandboxProfile");
+#endif
+
     /* Are we doing a chroot build?  Note that fixed-output
        derivations are never done in a chroot, mainly so that
        functions like fetchurl (which needs a proper /etc/resolv.conf)
@@ -1723,7 +1727,11 @@ void DerivationGoal::startBuilder()
             throw Error("option ‘build-use-sandbox’ must be set to one of ‘true’, ‘false’ or ‘relaxed’");
         if (x == "true") {
             if (get(drv->env, "__noChroot") == "1")
-                throw Error(format("derivation ‘%1%’ has ‘__noChroot’ set, but that's not allowed when ‘build-use-sandbox’ is ‘true’") % drvPath);
+                throw Error(format("derivation ‘%1%’ has ‘__noChroot’ set, "
+                    "but that's not allowed when ‘build-use-sandbox’ is ‘true’") % drvPath);
+            if (additionalSandboxProfile != "")
+                throw Error(format("derivation ‘%1%’ specifies a sandbox profile, "
+                    "but this is only allowed when ‘build-use-sandbox’ is ‘relaxed’") % drvPath);
             useChroot = true;
         }
         else if (x == "false")
@@ -1924,9 +1932,6 @@ void DerivationGoal::startBuilder()
         for (auto & i : closure)
             dirsInChroot[i] = i;
 
-#if __APPLE__
-        additionalSandboxProfile = get(drv->env, "__sandboxProfile");
-#endif
         string allowed = settings.get("allowed-impure-host-deps", string(DEFAULT_ALLOWED_IMPURE_PREFIXES));
         PathSet allowedPaths = tokenizeString<StringSet>(allowed);
 
@@ -1948,7 +1953,7 @@ void DerivationGoal::startBuilder()
                 }
             }
             if (!found)
-                throw Error(format("derivation '%1%' requested impure path ‘%2%’, but it was not in allowed-impure-host-deps (‘%3%’)") % drvPath % i % allowed);
+                throw Error(format("derivation ‘%1%’ requested impure path ‘%2%’, but it was not in allowed-impure-host-deps (‘%3%’)") % drvPath % i % allowed);
 
             dirsInChroot[i] = i;
         }
