@@ -4,18 +4,100 @@
       version="5.0"
       xml:id="ssec-relnotes-1.11">
 
-<title>Release 1.11 (TODO: date, 2015)</title>
+<title>Release 1.11 (2015-01-05)</title>
 
-<para>TODO: This is primarily a bug fix release. It also has a number of new
+<para>This is primarily a bug fix release. It also has a number of new
 features:</para>
 
 <itemizedlist>
+
+  <listitem>
+    <para><command>nix-prefetch-url</command> can now download URLs
+    specified in a Nix expression. For example,
+
+<screen>
+$ nix-prefetch-url -A hello.src
+</screen>
+
+    will prefetch the file specified by the
+    <function>fetchurl</function> call in the attribute
+    <literal>hello.src</literal> from the Nix expression in the
+    current directory, and print the cryptographic hash of the
+    resulting file on stdout. This differs from <literal>nix-build -A
+    hello.src</literal> in that it doesn't verify the hash, and is
+    thus useful when you’re updating a Nix expression.</para>
+
+    <para>You can also prefetch the result of functions that unpack a
+    tarball, such as <function>fetchFromGitHub</function>. For example:
+
+<screen>
+$ nix-prefetch-url --unpack https://github.com/NixOS/patchelf/archive/0.8.tar.gz
+</screen>
+
+    or from a Nix expression:
+
+<screen>
+$ nix-prefetch-url -A nix-repl.src
+</screen>
+
+    </para>
+
+  </listitem>
+
+  <listitem>
+    <para>The builtin function
+    <function>&lt;nix/fetchurl.nix></function> now supports
+    downloading and unpacking NARs. This removes the need to have
+    multiple downloads in the Nixpkgs stdenv bootstrap process (like a
+    separate busybox binary for Linux, or curl/mkdir/sh/bzip2 for
+    Darwin). Now all those files can be combined into a single NAR,
+    optionally compressed using <command>xz</command>.</para>
+  </listitem>
+
+  <listitem>
+    <para>Nix now supports SHA-512 hashes for verifying fixed-output
+    derivations, and in <function>builtins.hashString</function>.</para>
+  </listitem>
+
+  <listitem>
+    <para>
+      The new flag <option>--option build-repeat
+      <replaceable>N</replaceable></option> will cause every build to
+      be executed <replaceable>N</replaceable>+1 times. If the build
+      output differs between any round, the build is rejected, and the
+      output paths are not registered as valid. This is primarily
+      useful to verify build determinism. (We already had a
+      <option>--check</option> option to repeat a previously succeeded
+      build. However, with <option>--check</option>, non-deterministic
+      builds are registered in the DB. Preventing that is useful for
+      Hydra to ensure that non-deterministic builds don't end up
+      getting published to the binary cache.)
+    </para>
+  </listitem>
+
+  <listitem>
+    <para>Improved FreeBSD support.</para>
+  </listitem>
+
+  <listitem>
+    <para><command>nix-env -qa --xml --meta</command> now prints
+    license information.</para>
+  </listitem>
+
+  <listitem>
+    <para>The maximum number of parallel TCP connections that the
+    binary cache substituter will use has been decreased from 150 to
+    25. This should prevent upsetting some broken NAT routers, and
+    also improves performance.</para>
+  </listitem>
+
   <listitem>
     <para>All "chroot"-containing strings got renamed to "sandbox".
-      In particular, some nix options got renamed, but the old names
+      In particular, some Nix options got renamed, but the old names
       are still accepted as lower-priority aliases.
     </para>
   </listitem>
+
 </itemizedlist>
 
 <para>This release has contributions from TODO.</para>
