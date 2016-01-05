@@ -112,6 +112,7 @@ Makefile.config
 *.a
 *.o
 *.so
+*.dylib
 *.dll
 *.exe
 *.dep
