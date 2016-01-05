@@ -26,6 +26,7 @@ let
           [ curl bison flex perl libxml2 libxslt bzip2 xz
             dblatex (dblatex.tex or tetex) nukeReferences pkgconfig sqlite libsodium
             docbook5 docbook5_xsl
+            python27Packages.pytest python27Packages.pytestcache
           ] ++ lib.optional (!lib.inNixShell) git;
 
         configureFlags = ''

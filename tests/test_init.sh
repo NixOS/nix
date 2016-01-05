@@ -1,5 +1,6 @@
 source common.sh
 
+
 echo "NIX_STORE_DIR=$NIX_STORE_DIR NIX_DB_DIR=$NIX_DB_DIR"
 
 test -n "$TEST_ROOT"

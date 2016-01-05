@@ -3,17 +3,18 @@ source common.sh
 clearStore
 
 # Test fetching a flat file.
-hash=$(nix-hash --flat --type sha256 ./fetchurl.sh)
+TEST_FILE=test_fetchurl.sh
+hash=$(nix-hash --flat --type sha256 "./${TEST_FILE}")
 
-outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr sha256 $hash --no-out-link)
+outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(pwd)/${TEST_FILE} --argstr sha256 $hash --no-out-link)
 
-cmp $outPath fetchurl.sh
+cmp $outPath ${TEST_FILE}
 
 # Test unpacking a NAR.
 rm -rf $TEST_ROOT/archive
 mkdir -p $TEST_ROOT/archive
-cp ./fetchurl.sh $TEST_ROOT/archive
-chmod +x $TEST_ROOT/archive/fetchurl.sh
+cp "./${TEST_FILE}" $TEST_ROOT/archive
+chmod +x $TEST_ROOT/archive/${TEST_FILE}
 ln -s foo $TEST_ROOT/archive/symlink
 nar=$TEST_ROOT/archive.nar
 nix-store --dump $TEST_ROOT/archive > $nar
@@ -25,7 +26,8 @@ outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$nar --argstr sha25
 
 echo $outPath | grep -q 'xyzzy'
 
-test -x $outPath/fetchurl.sh
+ls $outPath
+test -x $outPath/${TEST_FILE}
 test -L $outPath/symlink
 
 nix-store --delete $outPath
@@ -37,5 +39,5 @@ xz --keep $nar
 outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$narxz --argstr sha256 $hash \
           --arg unpack true --argstr name xyzzy --no-out-link)
 
-test -x $outPath/fetchurl.sh
+test -x $outPath/${TEST_FILE}
 test -L $outPath/symlink

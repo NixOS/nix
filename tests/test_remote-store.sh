@@ -5,7 +5,7 @@ clearManifests
 
 startDaemon
 
-$SHELL ./user-envs.sh
+$SHELL ./test_user-envs.sh
 
 nix-store --dump-db > $TEST_ROOT/d1
 NIX_REMOTE= nix-store --dump-db > $TEST_ROOT/d2

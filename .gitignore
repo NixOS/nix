@@ -54,6 +54,8 @@ Makefile.config
 /scripts/build-remote.pl
 /scripts/nix-reduce-build
 /scripts/nix-http-export.cgi
+/scripts/resolve-system-dependencies.pl
+
 
 # /src/bsdiff-4.3/
 /src/bsdiff-4.3/bsdiff
@@ -84,6 +86,7 @@ Makefile.config
 
 # /src/nix-store/
 /src/nix-store/nix-store
+/src/libstore/sandbox-defaults.sb
 
 # /src/nix-daemon/
 /src/nix-daemon/nix-daemon
@@ -105,9 +108,12 @@ Makefile.config
 /perl/lib/Nix/Config.pm
 /perl/lib/Nix/Store.cc
 
+/misc/launchd/org.nixos.nix-daemon.plist
 /misc/systemd/nix-daemon.service
 /misc/systemd/nix-daemon.socket
 /misc/upstart/nix-daemon.conf
+
+/inst
 
 *.a
 *.o
@@ -118,6 +124,11 @@ Makefile.config
 *.dep
 *~
 *.pc
+
+# pytest
+.cache
+__pycache__
+*.pyc
 
 # GNU Global
 GPATH
