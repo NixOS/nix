@@ -232,7 +232,13 @@ DirEntries readDirectory(const Path & path)
         checkInterrupt();
         string name = dirent->d_name;
         if (name == "." || name == "..") continue;
-        entries.emplace_back(name, dirent->d_ino, #ifdef HAVE_STRUCT_DIRENT_D_TYPE dirent->d_type #else DT_UNKNOWN #endif);
+        entries.emplace_back(name, dirent->d_ino,
+#ifdef HAVE_STRUCT_DIRENT_D_TYPE
+            dirent->d_type
+#else
+            DT_UNKNOWN
+#endif
+        );
     }
     if (errno) throw SysError(format("reading directory ‘%1%’") % path);
 
