@@ -270,7 +270,7 @@ foreach my $expr (@exprs) {
         my $tmp = $ENV{"TMPDIR"} // $ENV{"XDG_RUNTIME_DIR"} // "/tmp";
         if ($pure) {
             foreach my $name (keys %ENV) {
-                next if grep { $_ eq $name } ("HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL", "TZ", "PAGER");
+                next if grep { $_ eq $name } ("HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL", "TZ", "PAGER", "NIX_BUILD_SHELL");
                 delete $ENV{$name};
             }
             # NixOS hack: prevent /etc/bashrc from sourcing /etc/profile.
