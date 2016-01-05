@@ -130,6 +130,7 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
         break;
     case tFloat:
         str << v.fpoint;
+        break;
     default:
         throw Error("invalid value");
     }
