@@ -11,6 +11,12 @@
 
 #include <cstdio>
 
+#ifndef HAVE_STRUCT_DIRENT_D_TYPE
+#define DT_UNKNOWN 0
+#define DT_REG 1
+#define DT_LNK 2
+#define DT_DIR 3
+#endif
 
 namespace nix {
 
