@@ -3131,6 +3131,7 @@ void SubstitutionGoal::tryNext()
         /* None left.  Terminate this goal and let someone else deal
            with it. */
         debug(format("path ‘%1%’ is required, but there is no substituter that can build it") % storePath);
+
         /* Hack: don't indicate failure if there were no substituters.
            In that case the calling derivation should just do a
            build. */
@@ -3826,8 +3827,17 @@ void LocalStore::repairPath(const Path & path)
 
     worker.run(goals);
 
-    if (goal->getExitCode() != Goal::ecSuccess)
-        throw Error(format("cannot repair path ‘%1%’") % path, worker.exitStatus());
+    if (goal->getExitCode() != Goal::ecSuccess) {
+        /* Since substituting the path didn't work, if we have a valid
+           deriver, then rebuild the deriver. */
+        Path deriver = queryDeriver(path);
+        if (deriver != "" && isValidPath(deriver)) {
+            goals.clear();
+            goals.insert(worker.makeDerivationGoal(deriver, StringSet(), bmRepair));
+            worker.run(goals);
+        } else
+            throw Error(format("cannot repair path ‘%1%’") % path, worker.exitStatus());
+    }
 }
 
 
