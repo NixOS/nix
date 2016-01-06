@@ -8,4 +8,5 @@ builtins.toJSON
     g = [ 1 2 3 ];
     h = [ "a" [ "b" { "foo\nbar" = {}; } ] ];
     i = 1 + 2;
+    j = 1.44;
   }

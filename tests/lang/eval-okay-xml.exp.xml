@@ -45,5 +45,8 @@
     <attr name="x">
       <int value="123" />
     </attr>
+    <attr name="y">
+      <float value="567.89" />
+    </attr>
   </attrs>
 </expr>
