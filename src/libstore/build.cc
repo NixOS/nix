@@ -1123,8 +1123,10 @@ void DerivationGoal::repairClosure()
 
     /* Get the output closure. */
     PathSet outputClosure;
-    for (auto & i : drv->outputs)
+    for (auto & i : drv->outputs) {
+        if (!wantOutput(i.first, wantedOutputs)) continue;
         computeFSClosure(worker.store, i.second.path, outputClosure);
+    }
 
     /* Filter out our own outputs (which we have already checked). */
     for (auto & i : drv->outputs)
