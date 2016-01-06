@@ -149,7 +149,7 @@ foreach my $pkg (@pkgs) {
 
 
 # Symlink to the packages that have been "propagated" by packages
-# installed by the user (i.e., package X declares that it want Y
+# installed by the user (i.e., package X declares that it wants Y
 # installed as well).  We do these later because they have a lower
 # priority in case of collisions.
 my $priorityCounter = 1000; # don't care about collisions
