@@ -32,7 +32,7 @@ available as <function>builtins.derivation</function>.</para>
   <varlistentry><term><function>builtins.add</function>
   <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
 
-    <listitem><para>Return the sum of the integers
+    <listitem><para>Return the sum of the numbers
     <replaceable>e1</replaceable> and
     <replaceable>e2</replaceable>.</para></listitem>
 
@@ -204,7 +204,7 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
   <varlistentry><term><function>builtins.div</function>
   <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
 
-    <listitem><para>Return the quotient of the integers
+    <listitem><para>Return the quotient of the numbers
     <replaceable>e1</replaceable> and
     <replaceable>e2</replaceable>.</para></listitem>
 
@@ -335,7 +335,7 @@ stdenv.mkDerivation {
   </varlistentry>
 
 
-  <varlistentry><term><function>builtins.foldl’</function> 
+  <varlistentry><term><function>builtins.foldl’</function>
     <replaceable>op</replaceable> <replaceable>nul</replaceable> <replaceable>list</replaceable></term>
 
     <listitem><para>Reduce a list by applying a binary operator, from
@@ -602,12 +602,12 @@ x: x + 456</programlisting>
   <varlistentry><term><function>builtins.lessThan</function>
   <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
 
-    <listitem><para>Return <literal>true</literal> if the integer
-    <replaceable>e1</replaceable> is less than the integer
+    <listitem><para>Return <literal>true</literal> if the number
+    <replaceable>e1</replaceable> is less than the number
     <replaceable>e2</replaceable>, and <literal>false</literal>
     otherwise.  Evaluation aborts if either
     <replaceable>e1</replaceable> or <replaceable>e2</replaceable>
-    does not evaluate to an integer.</para></listitem>
+    does not evaluate to a number.</para></listitem>
 
   </varlistentry>
 
@@ -658,7 +658,7 @@ map (x: "foo" + x) [ "bar" "bla" "abc" ]</programlisting>
   <varlistentry><term><function>builtins.mul</function>
   <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
 
-    <listitem><para>Return the product of the integers
+    <listitem><para>Return the product of the numbers
     <replaceable>e1</replaceable> and
     <replaceable>e2</replaceable>.</para></listitem>
 
@@ -815,7 +815,7 @@ builtins.sort builtins.lessThan [ 483 249 526 147 42 77 ]
   <varlistentry><term><function>builtins.sub</function>
   <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
 
-    <listitem><para>Return the difference between the integers
+    <listitem><para>Return the difference between the numbers
     <replaceable>e1</replaceable> and
     <replaceable>e2</replaceable>.</para></listitem>
 
@@ -942,7 +942,7 @@ in foo</programlisting>
   <varlistentry><term><function>builtins.toJSON</function> <replaceable>e</replaceable></term>
 
     <listitem><para>Return a string containing a JSON representation
-    of <replaceable>e</replaceable>.  Strings, integers, booleans,
+    of <replaceable>e</replaceable>.  Strings, integers, floats, booleans,
     nulls and lists are mapped to their JSON equivalents.  Sets
     (except derivations) are represented as objects.  Derivations are
     translated to a JSON string containing the derivation’s output
