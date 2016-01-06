@@ -39,7 +39,7 @@ class XMLWriter;
 
 
 typedef long NixInt;
-typedef double NixFloat;
+typedef float NixFloat;
 
 /* External values must descend from ExternalValueBase, so that
  * type-agnostic nix functions (e.g. showType) can be implemented
