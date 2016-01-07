@@ -18,6 +18,18 @@ if nix-store --verify --check-contents -v; then
     exit 1
 fi
 
+# The path can be repaired by rebuilding the derivation.
+nix-store --verify --check-contents --repair
+
+nix-store --verify-path $path2
+
+# Re-corrupt and delete the deriver. Now --verify --repair should
+# not work.
+chmod u+w $path2
+touch $path2/bad
+
+nix-store --delete $(nix-store -qd $path2)
+
 if nix-store --verify --check-contents --repair; then
     echo "nix-store --verify --repair succeeded unexpectedly" >&2
     exit 1
