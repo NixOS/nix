@@ -103,7 +103,7 @@ let
 
         installFlags = "sysconfdir=$(out)/etc";
 
-        doInstallCheck = false;
+        doInstallCheck = true;
         installCheckFlags = "sysconfdir=$(out)/etc";
       });
 
