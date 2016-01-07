@@ -3731,7 +3731,7 @@ void Worker::waitForInput()
         }
     }
 
-    if (!waitingForAWhile.empty() && lastWokenUp + settings.pollInterval <= after) {
+    if (!waitingForAWhile.empty() && lastWokenUp + (time_t) settings.pollInterval <= after) {
         lastWokenUp = after;
         for (auto & i : waitingForAWhile) {
             GoalPtr goal = i.lock();

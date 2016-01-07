@@ -1374,7 +1374,7 @@ static void prim_genList(EvalState & state, const Pos & pos, Value * * args, Val
 
     state.mkList(v, len);
 
-    for (unsigned int n = 0; n < len; ++n) {
+    for (unsigned int n = 0; n < (unsigned int) len; ++n) {
         Value * arg = state.allocValue();
         mkInt(*arg, n);
         mkApp(*(v.listElems()[n] = state.allocValue()), *args[0], *arg);
