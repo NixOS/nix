@@ -29,7 +29,7 @@ void doInit()
             settings.lockCPU = false;
             store = openStore();
         } catch (Error & e) {
-            croak(e.what());
+            croak("%s", e.what());
         }
     }
 }
@@ -59,7 +59,7 @@ int isValidPath(char * path)
             doInit();
             RETVAL = store->isValidPath(path);
         } catch (Error & e) {
-            croak(e.what());
+            croak("%s", e.what());
         }
     OUTPUT:
         RETVAL
@@ -74,7 +74,7 @@ SV * queryReferences(char * path)
             for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i)
                 XPUSHs(sv_2mortal(newSVpv(i->c_str(), 0)));
         } catch (Error & e) {
-            croak(e.what());
+            croak("%s", e.what());
         }
 
 
@@ -86,7 +86,7 @@ SV * queryPathHash(char * path)
             string s = "sha256:" + printHash32(hash);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
-            croak(e.what());
+            croak("%s", e.what());
         }
 
 
@@ -98,7 +98,7 @@ SV * queryDeriver(char * path)
             if (deriver == "") XSRETURN_UNDEF;
             XPUSHs(sv_2mortal(newSVpv(deriver.c_str(), 0)));
         } catch (Error & e) {
-            croak(e.what());
+            croak("%s", e.what());
         }
 
 
@@ -120,7 +120,7 @@ SV * queryPathInfo(char * path, int base32)
                 av_push(arr, newSVpv(i->c_str(), 0));
             XPUSHs(sv_2mortal(newRV((SV *) arr)));
         } catch (Error & e) {
-            croak(e.what());
+            croak("%s", e.what());
         }
 
 
@@ -131,7 +131,7 @@ SV * queryPathFromHashPart(char * hashPart)
             Path path = store->queryPathFromHashPart(hashPart);
             XPUSHs(sv_2mortal(newSVpv(path.c_str(), 0)));
         } catch (Error & e) {
-            croak(e.what());
+            croak("%s", e.what());
         }
 
 
@@ -145,7 +145,7 @@ SV * computeFSClosure(int flipDirection, int includeOutputs, ...)
             for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i)
                 XPUSHs(sv_2mortal(newSVpv(i->c_str(), 0)));
         } catch (Error & e) {
-            croak(e.what());
+            croak("%s", e.what());
         }
 
 
@@ -159,7 +159,7 @@ SV * topoSortPaths(...)
             for (Paths::iterator i = sorted.begin(); i != sorted.end(); ++i)
                 XPUSHs(sv_2mortal(newSVpv(i->c_str(), 0)));
         } catch (Error & e) {
-            croak(e.what());
+            croak("%s", e.what());
         }
 
 
@@ -169,7 +169,7 @@ SV * followLinksToStorePath(char * path)
             doInit();
             RETVAL = newSVpv(followLinksToStorePath(path).c_str(), 0);
         } catch (Error & e) {
-            croak(e.what());
+            croak("%s", e.what());
         }
     OUTPUT:
         RETVAL
@@ -184,7 +184,7 @@ void exportPaths(int fd, int sign, ...)
             FdSink sink(fd);
             exportPaths(*store, paths, sign, sink);
         } catch (Error & e) {
-            croak(e.what());
+            croak("%s", e.what());
         }
 
 
@@ -195,7 +195,7 @@ void importPaths(int fd)
             FdSource source(fd);
             store->importPaths(false, source);
         } catch (Error & e) {
-            croak(e.what());
+            croak("%s", e.what());
         }
 
 
@@ -206,7 +206,7 @@ SV * hashPath(char * algo, int base32, char * path)
             string s = base32 ? printHash32(h) : printHash(h);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
-            croak(e.what());
+            croak("%s", e.what());
         }
 
 
@@ -217,7 +217,7 @@ SV * hashFile(char * algo, int base32, char * path)
             string s = base32 ? printHash32(h) : printHash(h);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
-            croak(e.what());
+            croak("%s", e.what());
         }
 
 
@@ -228,7 +228,7 @@ SV * hashString(char * algo, int base32, char * s)
             string s = base32 ? printHash32(h) : printHash(h);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
-            croak(e.what());
+            croak("%s", e.what());
         }
 
 
@@ -239,7 +239,7 @@ SV * convertHash(char * algo, char * s, int toBase32)
             string s = toBase32 ? printHash32(h) : printHash(h);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
-            croak(e.what());
+            croak("%s", e.what());
         }
 
 
@@ -260,7 +260,7 @@ SV * signString(SV * secretKey_, char * msg)
             throw Error("Nix was not compiled with libsodium, required for signed binary cache support");
 #endif
         } catch (Error & e) {
-            croak(e.what());
+            croak("%s", e.what());
         }
 
 
@@ -283,7 +283,7 @@ int checkSignature(SV * publicKey_, SV * sig_, char * msg)
             throw Error("Nix was not compiled with libsodium, required for signed binary cache support");
 #endif
         } catch (Error & e) {
-            croak(e.what());
+            croak("%s", e.what());
         }
     OUTPUT:
         RETVAL
@@ -296,7 +296,7 @@ SV * addToStore(char * srcPath, int recursive, char * algo)
             Path path = store->addToStore(baseNameOf(srcPath), srcPath, recursive, parseHashType(algo));
             XPUSHs(sv_2mortal(newSVpv(path.c_str(), 0)));
         } catch (Error & e) {
-            croak(e.what());
+            croak("%s", e.what());
         }
 
 
@@ -309,7 +309,7 @@ SV * makeFixedOutputPath(int recursive, char * algo, char * hash, char * name)
                 parseHash16or32(ht, hash), name);
             XPUSHs(sv_2mortal(newSVpv(path.c_str(), 0)));
         } catch (Error & e) {
-            croak(e.what());
+            croak("%s", e.what());
         }
 
 
@@ -352,7 +352,7 @@ SV * derivationFromPath(char * drvPath)
 
             RETVAL = newRV_noinc((SV *)hash);
         } catch (Error & e) {
-            croak(e.what());
+            croak("%s", e.what());
         }
     OUTPUT:
         RETVAL
@@ -364,5 +364,5 @@ void addTempRoot(char * storePath)
             doInit();
             store->addTempRoot(storePath);
         } catch (Error & e) {
-            croak(e.what());
+            croak("%s", e.what());
         }
