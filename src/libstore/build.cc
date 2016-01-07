@@ -621,11 +621,15 @@ HookInstance::HookInstance()
         if (dup2(builderOut.writeSide, 4) == -1)
             throw SysError("dupping builder's stdout/stderr");
 
-        execl(buildHook.c_str(), buildHook.c_str(), settings.thisSystem.c_str(),
-            (format("%1%") % settings.maxSilentTime).str().c_str(),
-            (format("%1%") % settings.printBuildTrace).str().c_str(),
-            (format("%1%") % settings.buildTimeout).str().c_str(),
-            NULL);
+        Strings args = {
+            baseNameOf(buildHook),
+            settings.thisSystem,
+            (format("%1%") % settings.maxSilentTime).str(),
+            (format("%1%") % settings.printBuildTrace).str(),
+            (format("%1%") % settings.buildTimeout).str()
+        };
+
+        execv(buildHook.c_str(), stringsToCharPtrs(args).data());
 
         throw SysError(format("executing ‘%1%’") % buildHook);
     });
