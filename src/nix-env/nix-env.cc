@@ -1284,6 +1284,8 @@ static void opDeleteGenerations(Globals & globals, Strings opFlags, Strings opAr
         deleteOldGenerations(globals.profile, globals.dryRun);
     } else if (opArgs.size() == 1 && opArgs.front().find('d') != string::npos) {
         deleteGenerationsOlderThan(globals.profile, opArgs.front(), globals.dryRun);
+    } else if (opArgs.size() == 1 && opArgs.front().find('+') != string::npos) {
+        deleteGenerationsGreaterThan(globals.profile, opArgs.front(), globals.dryRun);
     } else {
         std::set<unsigned int> gens;
         for (auto & i : opArgs) {

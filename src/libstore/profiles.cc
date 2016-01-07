@@ -157,6 +157,29 @@ void deleteGenerations(const Path & profile, const std::set<unsigned int> & gens
     }
 }
 
+void deleteGenerationsGreaterThan(const Path & profile, const string & max, bool dryRun)
+{
+    int max_keep = 0;
+    PathLocks lock;
+    if(max.size() < 2)
+     throw Error(format("invalid number of generations ‘%1%’") % max);
+    string str_max = string(max, 1, max.size());
+    if (!string2Int(str_max, max_keep) || max_keep == 0)
+      throw Error(format("invalid number of generations to keep ‘%1%’") % max);
+
+    lockProfile(lock, profile);
+
+    int curGen;
+    Generations gens = findGenerations(profile, curGen);
+
+    for (auto i = gens.rbegin(); i != gens.rend(); ++i) {
+      if (max_keep) {
+	max_keep--;
+	continue;
+      }
+      deleteGeneration2(profile, i->number, dryRun);
+    }
+}
 
 void deleteOldGenerations(const Path & profile, bool dryRun)
 {
