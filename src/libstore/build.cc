@@ -1326,7 +1326,6 @@ void DerivationGoal::tryToBuild()
        now hold the locks on the output paths, no other process can
        build this derivation, so no further checks are necessary. */
     validPaths = checkPathValidity(true, buildMode == bmRepair);
-    assert(buildMode != bmCheck || validPaths.size() == drv->outputs.size());
     if (buildMode != bmCheck && validPaths.size() == drv->outputs.size()) {
         debug(format("skipping build of derivation ‘%1%’, someone beat us to it") % drvPath);
         outputLocks.setDeletion(true);
@@ -2747,6 +2746,7 @@ void DerivationGoal::registerOutputs()
         PathSet references = scanForReferences(actualPath, allPaths, hash);
 
         if (buildMode == bmCheck) {
+            if (!store->isValidPath(path)) continue;
             ValidPathInfo info = worker.store.queryPathInfo(path);
             if (hash.first != info.hash)
                 throw Error(format("derivation ‘%1%’ may not be deterministic: hash mismatch in output ‘%2%’") % drvPath % path);
