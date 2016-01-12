@@ -602,10 +602,10 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
        users group); we check for this case below. */
     if (st.st_uid != geteuid()) {
 #if HAVE_LCHOWN
-        if (lchown(path.c_str(), geteuid(), (gid_t) -1) == -1)
+        if (lchown(path.c_str(), geteuid(), getegid()) == -1)
 #else
         if (!S_ISLNK(st.st_mode) &&
-            chown(path.c_str(), geteuid(), (gid_t) -1) == -1)
+            chown(path.c_str(), geteuid(), getegid()) == -1)
 #endif
             throw SysError(format("changing owner of ‘%1%’ to %2%")
                 % path % geteuid());
