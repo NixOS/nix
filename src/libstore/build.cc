@@ -2637,6 +2637,8 @@ void DerivationGoal::registerOutputs()
        outputs to allow hard links between outputs. */
     InodesSeen inodesSeen;
 
+    Path checkSuffix = "-check";
+
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all
        output paths read-only. */
@@ -2750,7 +2752,7 @@ void DerivationGoal::registerOutputs()
             ValidPathInfo info = worker.store.queryPathInfo(path);
             if (hash.first != info.hash) {
                 if (settings.keepFailed) {
-                    Path dst = path + "-check";
+                    Path dst = path + checkSuffix;
                     if (pathExists(dst)) deletePath(dst);
                     if (rename(actualPath.c_str(), dst.c_str()))
                         throw SysError(format("renaming ‘%1%’ to ‘%2%’") % actualPath % dst);
@@ -2804,9 +2806,11 @@ void DerivationGoal::registerOutputs()
         checkRefs("disallowedReferences", false, false);
         checkRefs("disallowedRequisites", false, true);
 
-        worker.store.optimisePath(path); // FIXME: combine with scanForReferences()
+        if (curRound == nrRounds) {
+            worker.store.optimisePath(path); // FIXME: combine with scanForReferences()
 
-        worker.store.markContentsGood(path);
+            worker.store.markContentsGood(path);
+        }
 
         ValidPathInfo info;
         info.path = path;
@@ -2819,10 +2823,37 @@ void DerivationGoal::registerOutputs()
 
     if (buildMode == bmCheck) return;
 
-    if (curRound > 1 && prevInfos != infos)
-        throw NotDeterministic(
-            format("result of ‘%1%’ differs from previous round; rejecting as non-deterministic")
-            % drvPath);
+    /* Compare the result with the previous round, and report which
+       path is different, if any.*/
+    if (curRound > 1 && prevInfos != infos) {
+        assert(prevInfos.size() == infos.size());
+        for (auto i = prevInfos.begin(), j = infos.begin(); i != prevInfos.end(); ++i, ++j)
+            if (!(*i == *j)) {
+                Path prev = i->path + checkSuffix;
+                if (pathExists(prev))
+                    throw NotDeterministic(
+                        format("output ‘%1%’ of ‘%2%’ differs from ‘%3%’ from previous round")
+                        % i->path % drvPath % prev);
+                else
+                    throw NotDeterministic(
+                        format("output ‘%1%’ of ‘%2%’ differs from previous round")
+                        % i->path % drvPath);
+            }
+        assert(false); // shouldn't happen
+    }
+
+    if (settings.keepFailed) {
+        for (auto & i : drv->outputs) {
+            Path prev = i.second.path + checkSuffix;
+            if (pathExists(prev)) deletePath(prev);
+            if (curRound < nrRounds) {
+                Path dst = i.second.path + checkSuffix;
+                if (rename(i.second.path.c_str(), dst.c_str()))
+                    throw SysError(format("renaming ‘%1%’ to ‘%2%’") % i.second.path % dst);
+            }
+        }
+
+    }
 
     if (curRound < nrRounds) {
         prevInfos = infos;
