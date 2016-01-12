@@ -2662,7 +2662,7 @@ void DerivationGoal::registerOutputs()
                 && redirectedBadOutputs.find(path) != redirectedBadOutputs.end()
                 && pathExists(redirected))
                 replaceValidPath(path, redirected);
-            if (buildMode == bmCheck)
+            if (buildMode == bmCheck && redirected != "")
                 actualPath = redirected;
         }
 
