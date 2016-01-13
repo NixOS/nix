@@ -167,8 +167,10 @@ or          { return OR_KW; }
                  }
 <IND_STRING>\$\{ { PUSH_STATE(INSIDE_DOLLAR_CURLY); return DOLLAR_CURLY; }
 <IND_STRING>\'\' { POP_STATE(); return IND_STRING_CLOSE; }
-<IND_STRING>\'   {
-                   yylval->e = new ExprIndStr("'");
+<IND_STRING>(\'|\$) {
+                   char str[2] = "'";
+                   str[0] = yytext[0];
+                   yylval->e = new ExprIndStr(str);
                    return IND_STR;
                  }
 <IND_STRING>.    return yytext[0]; /* just in case: shouldn't be reached */
