@@ -1,6 +1,8 @@
 source common.sh
 
 # Note: this test expects to be run *after* nix-push.sh.
+# Need to figure out a better way for this in the test runner infrastructure.
+source test_nix-push.sh
 
 drvPath=$(nix-instantiate ./dependencies.nix)
 outPath=$(nix-store -q $drvPath)

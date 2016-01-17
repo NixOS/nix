@@ -10,32 +10,7 @@ set +x
 
 fail=0
 
-for i in lang/parse-fail-*.nix; do
-    echo "parsing $i (should fail)";
-    i=$(basename $i .nix)
-    if nix-instantiate --parse - < lang/$i.nix; then
-        echo "FAIL: $i shouldn't parse"
-        fail=1
-    fi
-done
 
-for i in lang/parse-okay-*.nix; do
-    echo "parsing $i (should succeed)";
-    i=$(basename $i .nix)
-    if ! nix-instantiate --parse - < lang/$i.nix > lang/$i.out; then
-        echo "FAIL: $i should parse"
-        fail=1
-    fi
-done
-
-for i in lang/eval-fail-*.nix; do
-    echo "evaluating $i (should fail)";
-    i=$(basename $i .nix)
-    if nix-instantiate --eval lang/$i.nix; then
-        echo "FAIL: $i shouldn't evaluate"
-        fail=1
-    fi
-done
 
 for i in lang/eval-okay-*.nix; do
     echo "evaluating $i (should succeed)";

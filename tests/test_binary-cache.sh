@@ -46,6 +46,7 @@ clearStore
 nar=$(ls $cacheDir/*.nar.xz | head -n1)
 mv $nar $nar.good
 mkdir -p $TEST_ROOT/empty
+
 nix-store --dump $TEST_ROOT/empty | xz > $nar
 
 nix-build --option binary-caches "file://$cacheDir" dependencies.nix -o $TEST_ROOT/result 2>&1 | tee $TEST_ROOT/log
