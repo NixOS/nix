@@ -4,7 +4,7 @@
       version="5.0"
       xml:id="ssec-relnotes-1.11">
 
-<title>Release 1.11 (2015-01-05)</title>
+<title>Release 1.11 (2015-01-18)</title>
 
 <para>This is primarily a bug fix release. It also has a number of new
 features:</para>
@@ -76,6 +76,36 @@ $ nix-prefetch-url -A nix-repl.src
   </listitem>
 
   <listitem>
+    <para>
+      The options <option>--check</option> and <option>--option
+      build-repeat <replaceable>N</replaceable></option>, if they
+      detect a difference between two runs of the same derivation and
+      <option>-K</option> is given, will make the output of the other
+      run available under
+      <filename><replaceable>store-path</replaceable>-check</filename>. This
+      makes it easier to investigate the non-determinism using tools
+      like <command>diffoscope</command>, e.g.,
+
+<screen>
+$ nix-build pkgs/stdenv/linux -A stage1.pkgs.zlib --check -K
+error: derivation ‘/nix/store/l54i8wlw2265…-zlib-1.2.8.drv’ may not
+be deterministic: output ‘/nix/store/11a27shh6n2i…-zlib-1.2.8’
+differs from ‘/nix/store/11a27shh6n2i…-zlib-1.2.8-check’
+
+$ diffoscope /nix/store/11a27shh6n2i…-zlib-1.2.8 /nix/store/11a27shh6n2i…-zlib-1.2.8-check
+…
+├── lib/libz.a
+│   ├── metadata
+│   │ @@ -1,15 +1,15 @@
+│   │ -rw-r--r-- 30001/30000   3096 Jan 12 15:20 2016 adler32.o
+…
+│   │ +rw-r--r-- 30001/30000   3096 Jan 12 15:28 2016 adler32.o
+…
+</screen>
+
+    </para></listitem>
+
+  <listitem>
     <para>Improved FreeBSD support.</para>
   </listitem>
 
@@ -100,6 +130,12 @@ $ nix-prefetch-url -A nix-repl.src
 
 </itemizedlist>
 
-<para>This release has contributions from TODO.</para>
+<para>This release has contributions from Anders Claesson, Anthony
+Cowley, Bjørn Forsman, Brian McKenna, Danny Wilson, davidak, Eelco Dolstra,
+Fabian Schmitthenner, FrankHB, Ilya Novoselov, janus, Jim Garrison, John
+Ericson, Jude Taylor, Ludovic Courtès, Manuel Jacob, Mathnerd314,
+Pascal Wittmann, Peter Simons, Philip Potter, Preston Bennes, Rommel
+M. Martinez, Sander van der Burg, Shea Levy, Tim Cuthbertson, Tuomas
+Tynkkynen, Utku Demir and Vladimír Čunát.</para>
 
 </section>
