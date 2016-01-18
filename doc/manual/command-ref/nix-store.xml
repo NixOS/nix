@@ -194,6 +194,25 @@ printed.)</para>
 
   </varlistentry>
 
+  <varlistentry><term><option>--check</option></term>
+
+    <listitem><para>This option allows you to check whether a
+    derivation is deterministic. It rebuilds the specified derivation
+    and checks whether the result is bitwise-identical with the
+    existing outputs, printing an error if that’s not the case. The
+    outputs of the specified derivation must already exist. When used
+    with <option>-K</option>, if an output path is not identical to
+    the corresponding output from the previous build, the new output
+    path is left in
+    <filename>/nix/store/<replaceable>name</replaceable>-check.</filename></para>
+
+    <para>See also the <option>build-repeat</option> configuration
+    option, which repeats a derivation a number of times and prevents
+    its outputs from being registered as “valid” in the Nix store
+    unless they are identical.</para></listitem>
+
+  </varlistentry>
+
 </variablelist>
 
 </refsection>
@@ -211,6 +230,14 @@ $ nix-store -r $(nix-instantiate ./test.nix)
 
 This is essentially what <link
 linkend="sec-nix-build"><command>nix-build</command></link> does.</para>
+
+<para>To test whether a previously-built derivation is deterministic:
+
+<screen>
+$ nix-build -r '&lt;nixpkgs>' -A hello --check -K
+</screen>
+
+</para>
 
 </refsection>
 
