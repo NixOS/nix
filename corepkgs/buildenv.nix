@@ -8,7 +8,7 @@ derivation {
   builder = perl;
   args = [ "-w" ./buildenv.pl ];
 
-  manifest = manifest;
+  inherit manifest;
 
   # !!! grmbl, need structured data for passing this in a clean way.
   derivations =
@@ -22,6 +22,9 @@ derivation {
   # Building user environments remotely just causes huge amounts of
   # network traffic, so don't do that.
   preferLocalBuild = true;
+
+  # Also don't bother substituting.
+  allowSubstitutes = false;
 
   __sandboxProfile = ''
     (allow sysctl-read)
