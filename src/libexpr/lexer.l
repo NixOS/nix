@@ -8,7 +8,6 @@
 
 %x STRING
 %x IND_STRING
-%x INSIDE_DOLLAR_CURLY
 
 
 %{
@@ -94,8 +93,6 @@ URI         [a-zA-Z][a-zA-Z0-9\+\-\.]*\:[a-zA-Z0-9\%\/\?\:\@\&\=\+\$\,\-\_\.\!\~
 
 %%
 
-<INITIAL,INSIDE_DOLLAR_CURLY>{
-
 
 if          { return IF; }
 then        { return THEN; }
@@ -127,15 +124,11 @@ or          { return OR_KW; }
               return INT;
             }
 
-\$\{        { PUSH_STATE(INSIDE_DOLLAR_CURLY); return DOLLAR_CURLY; }
-\{          { return '{'; }
-}
+\$\{        { PUSH_STATE(INITIAL); return DOLLAR_CURLY; }
+\{          { PUSH_STATE(INITIAL); return '{'; }
+\}          { POP_STATE(); return '}'; }
 
-\}                     { return '}'; }
-<INSIDE_DOLLAR_CURLY>\}      { POP_STATE(); return '}'; }
-
-<INITIAL,INSIDE_DOLLAR_CURLY>\"          { PUSH_STATE(STRING); return '"'; }
-
+\"          { PUSH_STATE(STRING); return '"'; }
 <STRING>([^\$\"\\]|\$[^\{\"\\]|\\.|\$\\.)*\$/\" |
 <STRING>([^\$\"\\]|\$[^\{\"\\]|\\.|\$\\.)+ {
               /* It is impossible to match strings ending with '$' with one
@@ -144,11 +137,11 @@ or          { return OR_KW; }
               yylval->e = unescapeStr(data->symbols, yytext);
               return STR;
             }
-<STRING>\$\{  { PUSH_STATE(INSIDE_DOLLAR_CURLY); return DOLLAR_CURLY; }
+<STRING>\$\{  { PUSH_STATE(INITIAL); return DOLLAR_CURLY; }
 <STRING>\"  { POP_STATE(); return '"'; }
 <STRING>.   return yytext[0]; /* just in case: shouldn't be reached */
 
-<INITIAL,INSIDE_DOLLAR_CURLY>\'\'(\ *\n)?     { PUSH_STATE(IND_STRING); return IND_STRING_OPEN; }
+\'\'(\ *\n)?     { PUSH_STATE(IND_STRING); return IND_STRING_OPEN; }
 <IND_STRING>([^\$\']|\$[^\{\']|\'[^\'\$])+ {
                    yylval->e = new ExprIndStr(yytext);
                    return IND_STR;
@@ -165,15 +158,13 @@ or          { return OR_KW; }
                    yylval->e = unescapeStr(data->symbols, yytext + 2);
                    return IND_STR;
                  }
-<IND_STRING>\$\{ { PUSH_STATE(INSIDE_DOLLAR_CURLY); return DOLLAR_CURLY; }
+<IND_STRING>\$\{ { PUSH_STATE(INITIAL); return DOLLAR_CURLY; }
 <IND_STRING>\'\' { POP_STATE(); return IND_STRING_CLOSE; }
 <IND_STRING>\'   {
                    yylval->e = new ExprIndStr("'");
                    return IND_STR;
                  }
 <IND_STRING>.    return yytext[0]; /* just in case: shouldn't be reached */
-
-<INITIAL,INSIDE_DOLLAR_CURLY>{
 
 {PATH}      { yylval->path = strdup(yytext); return PATH; }
 {HPATH}     { yylval->path = strdup(yytext); return HPATH; }
@@ -186,7 +177,6 @@ or          { return OR_KW; }
 
 .           return yytext[0];
 
-}
 
 %%
 
