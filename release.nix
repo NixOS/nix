@@ -1,4 +1,5 @@
 { nix ? { outPath = ./.; revCount = 1234; shortRev = "abcdef"; }
+, nixpkgs ? { outPath = <nixpkgs>; revCount = 1234; shortRev = "abcdef"; }
 , officialRelease ? false
 }:
 
@@ -235,7 +236,6 @@ let
         ''); # */
 
     tests.evalNixpkgs =
-      { nixpkgs ? { outPath = pkgs.lib.cleanSource <nixpkgs>; revCount = 1234; shortRev = "abcdef"; } }:
       import <nixpkgs/pkgs/top-level/make-tarball.nix> {
         inherit nixpkgs;
         inherit pkgs;
@@ -244,7 +244,6 @@ let
       };
 
     tests.evalNixOS =
-      { nixpkgs ? { outPath = pkgs.lib.cleanSource <nixpkgs>; revCount = 1234; shortRev = "abcdef"; } }:
       pkgs.runCommand "eval-nixos" { buildInputs = [ build.x86_64-linux ]; }
         ''
           export NIX_DB_DIR=$TMPDIR
