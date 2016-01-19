@@ -234,6 +234,28 @@ let
           touch $out/nix-support/hydra-build-products
         ''); # */
 
+    tests.evalNixpkgs =
+      { nixpkgs ? { outPath = pkgs.lib.cleanSource <nixpkgs>; revCount = 1234; shortRev = "abcdef"; } }:
+      import <nixpkgs/pkgs/top-level/make-tarball.nix> {
+        inherit nixpkgs;
+        inherit pkgs;
+        nix = build.x86_64-linux;
+        officialRelease = false;
+      };
+
+    tests.evalNixOS =
+      { nixpkgs ? { outPath = pkgs.lib.cleanSource <nixpkgs>; revCount = 1234; shortRev = "abcdef"; } }:
+      pkgs.runCommand "eval-nixos" { buildInputs = [ build.x86_64-linux ]; }
+        ''
+          export NIX_DB_DIR=$TMPDIR
+          export NIX_STATE_DIR=$TMPDIR
+          nix-store --init
+
+          nix-instantiate ${nixpkgs}/nixos/release-combined.nix -A tested --dry-run
+
+          touch $out
+        '';
+
 
     # Aggregate job containing the release-critical jobs.
     release = pkgs.releaseTools.aggregate {
@@ -264,6 +286,8 @@ let
           tests.remoteBuilds
           tests.nix-copy-closure
           tests.binaryTarball
+          tests.evalNixpkgs
+          tests.evalNixOS
         ];
     };
 
