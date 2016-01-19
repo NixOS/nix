@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <functional>
-
+#include <limits>
 #include <cstdio>
 
 #ifndef HAVE_STRUCT_DIRENT_D_TYPE
@@ -359,6 +359,8 @@ bool statusOk(int status);
 /* Parse a string into an integer. */
 template<class N> bool string2Int(const string & s, N & n)
 {
+    if (string(s, 0, 1) == "-" && !std::numeric_limits<N>::is_signed)
+        return false;
     std::istringstream str(s);
     str >> n;
     return str && str.get() == EOF;
