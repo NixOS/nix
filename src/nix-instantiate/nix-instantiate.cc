@@ -88,6 +88,17 @@ void processExpr(EvalState & state, const Strings & attrPaths,
     }
 }
 
+Expr * processExprExpression(EvalState & state, Expr * expr, const string & attrPath, Bindings & autoArgs) {
+    Expr * findAlongAttrPath = new ExprVar(state.symbols.create("__findAlongAttrPath"));
+    Expr * param1 = new ExprString(state.symbols.create(attrPath));
+    ExprAttrs * param2 = new ExprAttrs();
+    for (auto binding: autoArgs) {
+        //Remark: the value is either a string or a thunk without environment, in both cases valueToExpression does the right thing
+        param2->attrs[binding.name] = ExprAttrs::AttrDef(state.valueToExpression(*binding.value), noPos);
+    }
+    return new ExprApp(new ExprApp(new ExprApp(findAlongAttrPath, param1), param2), expr);
+}
+
 
 int main(int argc, char * * argv)
 {
@@ -101,7 +112,7 @@ int main(int argc, char * * argv)
         bool findFile = false;
         bool evalOnly = false;
         bool parseOnly = false;
-        Path playback;
+        bool playback = false;
         bool record = false;
         OutputKind outputKind = okPlain;
         bool xmlOutputSourceLocation = true;
@@ -151,7 +162,7 @@ int main(int argc, char * * argv)
             else if (*arg == "--dry-run")
                 settings.readOnlyMode = true;
             else if (*arg == "--playback")
-                playback = getArg(*arg, arg, end);
+                playback = true;
             else if (*arg == "--record")
                 record = true;
             else if (*arg != "" && arg->at(0) == '-')
@@ -167,7 +178,7 @@ int main(int argc, char * * argv)
         store = openStore();
 
         DeterministicEvaluationMode mode = record ? Record : Normal;
-        if (!playback.empty()) {
+        if (playback) {
             if (mode == Normal) {
                 mode = Playback;
             }
@@ -175,41 +186,57 @@ int main(int argc, char * * argv)
                 throw Error("can't specify both --playback and --record");
         }
         
-        EvalState state(searchPath, mode, playback.c_str());
+        EvalState state(searchPath, mode);
         state.repair = repair;
         string currentPath = absPath(".");
         
-        if (mode != Playback) {
-            if (attrPaths.empty()) attrPaths.push_back("");
-            if (findFile) {
-                for (auto & i : files) {
-                    Path p = state.findFile(i);
-                    if (p == "") throw Error(format("unable to find ‘%1%’") % i);
-                    std::cout << p << std::endl;
-                }
-                return;
+        if (attrPaths.empty()) attrPaths.push_back("");
+        if (findFile) {
+            for (auto & i : files) {
+                Path p = state.findFile(i);
+                if (p == "") throw Error(format("unable to find ‘%1%’") % i);
+                std::cout << p << std::endl;
             }
-            state.setRecordingInfo(fromArgs, autoArgs_, attrPaths, files, currentPath);
+            return;
         }
-        else {
-            state.getRecordingInfo(fromArgs, autoArgs_, attrPaths, files, currentPath);
-        }
-
+        
         Bindings & autoArgs(*evalAutoArgs(state, autoArgs_));
+        std::list< Expr * > expressions;
         if (readStdin) {
-            Expr * e = parseStdin(state);
-            processExpr(state, attrPaths, parseOnly, strict, autoArgs,
-                evalOnly, outputKind, xmlOutputSourceLocation, e);
+            expressions.push_back(parseStdin(state));
         } else if (files.empty() && !fromArgs)
             files.push_back("./default.nix");
         for (auto & i : files) {
-            Expr * e = fromArgs
-                ? state.parseExprFromString(i, currentPath)
-                : state.parseExprFromFile(resolveExprPath(lookupFileArg(state, i)));
-            processExpr(state, attrPaths, parseOnly, strict, autoArgs,
-                evalOnly, outputKind, xmlOutputSourceLocation, e);
+            Expr * e;
+            if (fromArgs) {
+                e = state.parseExprFromString(i, currentPath);
+            }
+            else {
+                Path p = resolveExprPath(lookupFileArg(state, i));
+                e = new ExprApp(new ExprVar(state.symbols.create("import")), new ExprPath(p));
+                if (playback) {
+                    state.addPlaybackSource(p, p);
+                }
+                e->bindVars(state.staticBaseEnv);
+            }
+            expressions.push_back(e);
         }
-
+        if (mode == Record) {
+            ExprList * recordExpr = new ExprList();
+            for (auto e: expressions) {
+                for (auto attrPath: attrPaths) {
+                    recordExpr->elems.push_back(processExprExpression(state, e, attrPath, autoArgs));
+                }
+            }
+            if (recordExpr->elems.size() == 1)
+                state.setRecordingInfo(recordExpr->elems.front());
+            else
+                state.setRecordingInfo(recordExpr);
+        }
+        for (auto e: expressions) {
+            processExpr(state, attrPaths, parseOnly, strict, autoArgs,
+            evalOnly, outputKind, xmlOutputSourceLocation, e);
+        }
         state.printStats();
     });
 }

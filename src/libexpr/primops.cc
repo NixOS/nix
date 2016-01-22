@@ -10,6 +10,7 @@
 #include "names.hh"
 #include "eval-inline.hh"
 #include "download.hh"
+#include "attr-path.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -390,6 +391,26 @@ static void prim_getEnv(EvalState & state, const Pos & pos, Value * * args, Valu
     mkString(v, state.restricted ? "" : getEnv(name));
 }
 
+/* wrapper around findAlongAttrPath to allow immitating nix-instantiate inside nix */
+static void prim_findAlongAttrPath(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    string attrPath = state.forceString(*args[0]);
+    state.forceAttrs(*args[1]);
+    Value & result = *findAlongAttrPath(state, attrPath, *args[1]->attrs, *args[2]);
+    state.forceValue(result);
+    v = result;
+}
+
+/* wrapper around findAlongAttrPath to allow immitating nix-instantiate inside nix */
+static void prim_playback(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    if (!state.isInPlaybackMode()) {
+        throwEvalError("playback primop is only allowed in playback mode (at '%s')", pos);
+    }
+    state.addPlaybackSubstitutions(*args[0]);
+    state.forceValue(*args[1]);
+    v = *args[1];
+}
 
 /* Evaluate the first argument, then return the second argument. */
 static void prim_seq(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -1773,6 +1794,8 @@ void EvalState::createBaseEnv()
     addPrimOp("__addErrorContext", 2, prim_addErrorContext);
     addPrimOp("__tryEval", 1, prim_tryEval);
     addImpurePrimOp<__getEnv, 1, prim_getEnv>();
+    addPrimOp("__findAlongAttrPath", 3, prim_findAlongAttrPath);
+    addPrimOp("__playback", 2, prim_playback);
 
     // Strictness
     addPrimOp("__seq", 2, prim_seq);
@@ -1790,6 +1813,7 @@ void EvalState::createBaseEnv()
     addPrimOp("dirOf", 1, prim_dirOf);
     addImpurePrimOp<__readFile, 1, prim_readFile>();
     addImpurePrimOp<__readDir, 1, prim_readDir>();
+    // this really isn't impure but we don't want to record __nixPath
     addImpurePrimOp<__findFile, 2, prim_findFile, onlyPos<1>>();
 
     // Creating files
@@ -1874,6 +1898,8 @@ void EvalState::createBaseEnv()
         mkString(*allocAttr(*v2, symbols.create("prefix")), i.first);
         v2->attrs->sort();
     }
+    // TODO this really is an impure constant but rely that the user
+    //      doesn't use this directly but ueses __findFile instead
     addConstant("__nixPath", v);
 
     /* Now that we've added all primops, sort the `builtins' set,

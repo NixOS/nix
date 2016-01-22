@@ -21,7 +21,8 @@ class EvalState;
 typedef enum {
     Normal,
     Record,
-    Playback
+    Playback,
+    RecordAndPlayback
 } DeterministicEvaluationMode;
 
 typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, Value & v);
@@ -101,28 +102,25 @@ private:
     SearchPath searchPath;
 
     DeterministicEvaluationMode evalMode;
-    const char * recordFileName;
-    Value * playbackJson;
 
     //TODO: use some other structure, maybe a hashmap
     //since comparing strings with long same prefixes is slow
     std::map<std::pair<string, std::list<string>>, Value> recording;
-    struct RecordingExpression {
-        bool fromArgs;
-        std::map<string,string> autoArgs;
-        Strings attrPaths;
-        Strings files;
-        string currentDir;
-        RecordingExpression() : fromArgs(false) {}
-    } recordingExpression;
+    Expr * recordingExpression;
     
 public:
+    bool isInPlaybackMode() {
+        return evalMode == Playback || evalMode == RecordAndPlayback;
+    }
+  
 
-    EvalState(const Strings & _searchPath, DeterministicEvaluationMode evalMode = Normal, const char * evalModeFile = nullptr);
+    EvalState(const Strings & _searchPath, DeterministicEvaluationMode evalMode = Normal);
     ~EvalState();
 
     void addToSearchPath(const string & s, bool warn = false);
-
+    void addPlaybackSubstitutions(nix::Value& top); 
+    void addPlaybackSource(const Path & from, const Path & to);
+    
     Path checkSourcePath(const Path & path);
 
     /* Parse a Nix expression from the specified file. */
@@ -146,6 +144,9 @@ public:
     /* Evaluate an expression to normal form, storing the result in
        value `v'. */
     void eval(Expr * e, Value & v);
+    
+    // convert a value back to an expression
+    Expr * valueToExpression(const Value & v);
 
     /* Evaluation the expression, then verify that it has the expected
        type. */
@@ -215,9 +216,9 @@ private:
         unsigned int arity, PrimOpFun primOp);
 
     std::string valueToJSON(Value & value, bool copyToStore);
+    string parameterValue(Value & value);
     void getAttr(Value & top, const Symbol & arg2, Value & v);
     void initializeDeterministicEvaluationMode();
-    void initializePlayback();
     void finalizeRecording (Value & result);
     void writeRecordingIntoStore (Value & result);
  
@@ -232,7 +233,7 @@ private:
         std::list<string> argList;
         for (unsigned int i = 0; i < arity; i++) {
             if (useArgument(i)) {
-                argList.push_back(state.valueToJSON(*args[i], false));
+                argList.push_back(state.parameterValue(*args[i]));
             }
         }
         primOp(state, pos, args, v);
@@ -245,13 +246,18 @@ private:
         std::list<string> argList;
         for (unsigned int i = 0; i < arity; i++) {
             if(useArgument(i)) {
-                argList.push_back(state.valueToJSON(*args[i], false));
+                argList.push_back(state.parameterValue(*args[i]));
             }
         }
         auto result = state.recording.find(std::make_pair(name, argList));
         if (result == state.recording.end()) {
             std::string errorMsg("wanted to call ");
-            errorMsg +=name;
+            errorMsg += name;
+            errorMsg += "(";
+            for (auto arg: argList) {
+                errorMsg += arg + ", ";
+            }
+            errorMsg += ")";
             throw EvalError(errorMsg.c_str());
         }
         else {
@@ -294,8 +300,7 @@ private:
     }
 
 public:
-    void getRecordingInfo(bool & fromArgs, std::map<string, string> & autoArgs_, Strings & attrPaths, Strings & files, string & currentDir);
-    void setRecordingInfo(bool fromArgs, std::map<string, string> autoArgs_, Strings attrPaths, Strings files, string currentDir);
+    void setRecordingInfo(Expr *);
 
     void getBuiltin(const string & name, Value & v);
 
@@ -377,7 +382,7 @@ private:
     void addToBaseEnv(const string & name, Value * v, Symbol sym);
     void addToBaseEnv(const string & name, Value * v);
     Value * getImpureConstantPrimop();
-    Path copyPathToStoreIfItsNotAlreadyThere(PathSet context, Path path);
+    Path copyPathToStoreIfItsNotAlreadyThere(PathSet & context, Path path);
 };
 
 

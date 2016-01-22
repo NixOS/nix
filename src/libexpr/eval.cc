@@ -142,6 +142,45 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
     active.erase(&v);
 }
 
+Expr * EvalState::valueToExpression(const Value & v)
+{
+    switch (v.type) {
+    case tInt:
+        return new ExprInt(v.integer);
+    case tBool:
+        return new ExprVar(symbols.create(v.boolean ? "true" : "false"));
+    case tString:
+        return new ExprString(symbols.create(v.string.s));
+    case tPath:
+        return new ExprPath(v.path);
+    case tNull:
+        return new ExprVar(symbols.create("null"));
+    case tAttrs:
+    {
+        ExprAttrs * result = new ExprAttrs();
+        for (auto a: *v.attrs) {
+            result->attrs.insert(std::make_pair(a.name, ExprAttrs::AttrDef(valueToExpression(*a.value), *a.pos)));
+        }
+        return result;
+    }
+    case tList1:
+    case tList2:
+    case tListN:
+    {
+        ExprList * result = new ExprList();
+        for (int i = 0; i < v.listSize(); ++i) {
+            result->elems.push_back(valueToExpression(*v.listElems()[i]));
+        }
+        return result;
+    }
+    case tThunk:
+        return v.thunk.expr;
+    default:
+        throw Error("value not supported while converting");
+    }
+}
+
+
 
 std::ostream & operator << (std::ostream & str, const Value & v)
 {
@@ -251,7 +290,7 @@ static Strings parseNixPath(const string & in)
 }
 
 
-EvalState::EvalState(const Strings & _searchPath, DeterministicEvaluationMode evalMode, const char * evalModeFile)
+EvalState::EvalState(const Strings & _searchPath, DeterministicEvaluationMode evalMode)
     : sWith(symbols.create("<with>"))
     , sOutPath(symbols.create("outPath"))
     , sDrvPath(symbols.create("drvPath"))
@@ -270,7 +309,6 @@ EvalState::EvalState(const Strings & _searchPath, DeterministicEvaluationMode ev
     , sFunctor(symbols.create("__functor"))
     , sToString(symbols.create("__toString"))
     , evalMode(evalMode)
-    , recordFileName(evalModeFile)
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
 {
@@ -301,21 +339,13 @@ void EvalState::initializeDeterministicEvaluationMode()
         const char * playbackMode = getenv("NIX_PLAYBACK");
         if (recordMode && !playbackMode) {
             evalMode = Record;
-            recordFileName = recordMode;
         } else if (playbackMode && !recordMode) {
             evalMode = Playback;
-            recordFileName = playbackMode;
         } else if (!playbackMode && !recordMode) {
             evalMode = Normal;
         }
         else
             throw EvalError("can't use both NIX_RECORDING and NIX_PLAYBACK");
-    }
-    if (evalMode == Playback || evalMode == Record)
-        assert(recordFileName != 0);
-    
-    if (evalMode == Playback) {
-        initializePlayback();
     }
     
     if (evalMode == Record || evalMode == Playback) {
@@ -323,70 +353,28 @@ void EvalState::initializeDeterministicEvaluationMode()
     }
 }
 
-void EvalState::setRecordingInfo(bool fromArgs, std::map<string, string> autoArgs_, Strings attrPaths, Strings files, string currentDir)
+void EvalState::setRecordingInfo(Expr * e)
 {
-    recordingExpression.fromArgs = fromArgs;
-    recordingExpression.autoArgs = autoArgs_;
-    recordingExpression.attrPaths = attrPaths;
-    recordingExpression.files = files;
-    recordingExpression.currentDir = currentDir;
+    recordingExpression = e;
 }
 
-void EvalState::getRecordingInfo(bool & fromArgs, std::map<string, string> & autoArgs_, Strings & attrPaths, Strings & files, string & currentDir)
+string EvalState::parameterValue(Value& value)
 {
-    if (!autoArgs_.empty()) {
-        throw Error("you can't supply auto arguments in playback mode");
-    }
-    if (!attrPaths.empty()) {
-        throw Error("you can't supply attribute paths in playback mode");
-    }
-    if (!files.empty()) {
-        throw Error("you can't supply files or expressions in playback mode");
-    }
-    if (fromArgs) {
-        throw Error("--expr is invalid in playback mode");
-    }
-    Symbol expressionS(symbols.create("expression")),
-           fromArgsS(symbols.create("fromArgs")),
-           autoArgsS(symbols.create("autoArgs")),
-           attributesS(symbols.create("attributes")),
-           filesS(symbols.create("files")),
-           currentDirS(symbols.create("currentDir"));
-    Value expression, fromArgsV, autoArgsV, attributesV, filesV, currentDirV;
-    getAttr(*playbackJson, expressionS, expression);
-    getAttr(expression, fromArgsS, fromArgsV);
-    getAttr(expression, autoArgsS, autoArgsV);
-    getAttr(expression, attributesS, attributesV);
-    getAttr(expression, filesS, filesV);
-    getAttr(expression, currentDirS, currentDirV);
-    fromArgs = forceBool(fromArgsV);
-    forceAttrs(autoArgsV);
-    for (auto it = autoArgsV.attrs->begin(); it != autoArgsV.attrs->end(); ++it) {
-       forceString(*it->value);
-       autoArgs_[it->name] = forceStringNoCtx(*it->value);
-    }
-    forceList(attributesV);
-    for (unsigned int i = 0; i < attributesV.listSize(); ++i) {
-        attrPaths.push_back(forceStringNoCtx(*attributesV.listElems()[i]));
-    }
-    forceList(filesV);
-    for (unsigned int i = 0; i < filesV.listSize(); ++i) {
-        files.push_back(forceStringNoCtx(*filesV.listElems()[i]));
-    }
-    currentDir = forceStringNoCtx(currentDirV);
+    std::stringstream result;
+    forceValueDeep(value);
+    result << *valueToExpression(value);
+    return result.str();
 }
 
-void EvalState::initializePlayback()
+
+void EvalState::addPlaybackSubstitutions(Value & top)
 {
     Symbol functionsSymbol(symbols.create("functions")), 
            nameSymbol(symbols.create("name")),
            parametersSymbol(symbols.create("parameters")),
            resultSymbol(symbols.create("result")),
            sourcesSymbol(symbols.create("sources"));
-    Value & top (*allocValue());
-    playbackJson = &top;
-    
-    parseJSON(*this, readFile(recordFileName), top);
+
     Value functions;
     getAttr(top, functionsSymbol, functions);
     forceList(functions);
@@ -400,16 +388,48 @@ void EvalState::initializePlayback()
         std::list<std::string> parameterList;
         forceList(parameters);
         for (unsigned int j = 0; j < parameters.listSize(); ++j) {
-            parameterList.push_back(valueToJSON(*parameters.listElems()[j], false));
+            parameterList.push_back(parameterValue(*parameters.listElems()[j]));
         }
-        recording[std::make_pair(nameString, parameterList)] = result;
+        
+        auto key = std::make_pair(nameString, parameterList);
+        auto currentPlaybackValue = recording.find(key);
+        if (currentPlaybackValue == recording.end()) {
+            recording[key] = result;
+        }
+        else {
+            if (!eqValues(recording[key], result)) {
+                std::stringstream primopApp;
+                primopApp << nameString << "(";
+                bool f = false;
+                for (auto param: parameterList) {
+                    if (f) primopApp << ", ";
+                    primopApp << param;
+                    f = true;
+                }
+                primopApp << ")";
+                std::stringstream result1, result2;
+                result1 << result;
+                result2 << recording[key];
+                throw EvalError(format("playback of '%s' has multiple possible values: '%s' and '%s'") %
+                    primopApp.str() % result1.str() % result2.str());
+            }
+        }
     }
+    
     Value sources;
     getAttr(top, sourcesSymbol, sources);
     forceAttrs(sources);
+    PathSet context;
     for (auto it = sources.attrs->begin(); it != sources.attrs->end(); ++it) {
-        srcToStoreForPlayback[it->name] = forceStringNoCtx(*it->value);
+        addPlaybackSource(it->name, coerceToPath(noPos, *it->value, context));
     }
+}
+
+void EvalState::addPlaybackSource(const Path& from, const Path& to)
+{
+    //TODO check for suffixes/prefixes in srcToStoreForPlayback
+    //      and srcToStore and look out for consistency
+    srcToStoreForPlayback[from] = to;
 }
 
 EvalState::~EvalState()
@@ -443,69 +463,72 @@ void EvalState::writeRecordingIntoStore(Value & result)
 }
 
 
+struct ExprUnparsed: public Expr {
+    std::string unparsed;
+    ExprUnparsed(const std::string & up) : unparsed(up) {}
+    
+    virtual void show(std::ostream& str) {
+        str << unparsed;
+    }
+};
+
 void EvalState::finalizeRecording(Value & result)
 {
-    //TODO: write this in a more functional style
-    std::stringstream out;
-    PathSet context;
-    out << "{\"expression\":{\"fromArgs\":";
-    out << (recordingExpression.fromArgs ? "true" : "false");
-    out << ",\"autoArgs\":{";
-    bool isThisTheFirstTime0 = true;
-    for (auto autoArg: recordingExpression.autoArgs) {
-        if (!isThisTheFirstTime0) out << ",";
-        isThisTheFirstTime0 = false;
-        escapeJSON (out, autoArg.first);
-        out << ":";
-        escapeJSON(out, autoArg.second); 
-    }
-    out << "},\"attributes\":[";
-    isThisTheFirstTime0 = true;
-    for (auto attr: recordingExpression.attrPaths) {
-        if (!isThisTheFirstTime0) out << ",";
-        isThisTheFirstTime0 = false;
-        escapeJSON(out, attr);
-    }
-    out << "],\"files\":[";
-    isThisTheFirstTime0 = true;
-    for (auto file: recordingExpression.files) {
-        if (!isThisTheFirstTime0) out << ",";
-        isThisTheFirstTime0 = false;
-        escapeJSON(out, recordingExpression.fromArgs ? file : resolveExprPath(lookupFileArg(*this, file)));
-    }
-    out << "],\"currentDir\":\"" << recordingExpression.currentDir << "\"},\"functions\": [\n";
-   
-    bool isThisTheFirstTime = true;
+    Value & top = *allocValue();
+    //Value & top = result;
+    mkAttrs(top, 2);
+    Value * sources = allocAttr(top, symbols.create("sources"));
+    Value * functions = allocAttr(top, symbols.create("functions"));
+    top.attrs->sort();
+    
+    mkList(*functions, recording.size());
+    int j = 0;
     for (auto kv : recording) {
-        if (!isThisTheFirstTime) out << ",";
-        isThisTheFirstTime = false;
-    
-        out << "{ \"name\":";
-        escapeJSON(out, kv.first.first);
-        out << ", \"parameters\": [";
-        
-        bool isThisTheFirstTime2 = true;
-        for (auto parameter: kv.first.second) {
-            if (!isThisTheFirstTime2) out << ", ";
-            isThisTheFirstTime2 = false;
-            out << parameter;
+        Value & attrs = *allocValue();
+        functions->listElems()[j] = &attrs;
+        mkAttrs(attrs, 3);
+        Value * name = allocAttr(attrs, symbols.create("name"));
+        mkString(*name, kv.first.first);
+        Value * parameters = allocAttr(attrs, symbols.create("parameters"));
+        mkList(*parameters, kv.first.second.size());
+        auto iter = kv.first.second.begin();
+        for (int s = 0; s < kv.first.second.size(); ++s) {
+            parameters->listElems()[s] = allocValue();
+            mkThunk_(*parameters->listElems()[s], new ExprUnparsed(*iter));
+            ++iter;
         }
-        out << "], \"result\": " << valueToJSON(kv.second, false) << "}\n";
+        Value * result = allocAttr(attrs, symbols.create("result"));
+        forceValueDeep(kv.second);
+        *result = kv.second;
+        //*result = kv.second;
+        attrs.attrs->sort();
+        ++j;
     }
-        
-    out << "], \"sources\": {";
     
-    bool isThisTheFirstTime3 = true;
+    PathSet context;
+    mkAttrs(*sources, srcToStoreForPlayback.size());
     for (auto path : srcToStoreForPlayback) {
-        if (!isThisTheFirstTime3) out << ", ";
-        isThisTheFirstTime3 = false;
+        Value * p = allocAttr(*sources, symbols.create(path.first));
+        mkPath(*p, path.second.c_str());
+        assert (isInStore(path.second));
         context.insert(path.second);
-        escapeJSON(out, path.first);
-        out << ":";
-        escapeJSON(out, path.second);
     }
-    out << "}}";
-    mkString(result, out.str(), context);
+
+    mkAttrs(result, 2);
+    
+    {
+        Expr * e = valueToExpression(top);
+        std::stringstream out;
+        out << *e;
+        mkString(*allocAttr(result, symbols.create("recording")), out.str(), context);
+    }
+    {
+        std::stringstream exp;
+        exp << *recordingExpression;    
+        mkString(*allocAttr(result, symbols.create("expressions")), exp.str());
+    }
+    
+    result.attrs->sort();
 }
 
 Path EvalState::checkSourcePath(const Path & path_)
@@ -1729,8 +1752,14 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path, bool ign
     return dstPath;
 }
 
-Path EvalState::copyPathToStoreIfItsNotAlreadyThere(PathSet context, Path path)
+Path EvalState::copyPathToStoreIfItsNotAlreadyThere(PathSet & context, Path path)
 {
+    // special-case derivation.nix
+    // this is used so early the paths aren't set up correctly yet
+    // also doesn't really make sense to use it
+    if (symbols.create(path) == sDerivationNix) {
+        return path;
+    }
     if (evalMode == Playback) {
         Path rest;
         while (srcToStoreForPlayback[path] == "") {
