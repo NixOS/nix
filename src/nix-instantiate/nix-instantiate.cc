@@ -163,8 +163,10 @@ int main(int argc, char * * argv)
                 settings.readOnlyMode = true;
             else if (*arg == "--playback")
                 playback = true;
-            else if (*arg == "--record")
+            else if (*arg == "--record") {
                 record = true;
+                wantsReadWrite = true;
+            }
             else if (*arg != "" && arg->at(0) == '-')
                 return false;
             else
