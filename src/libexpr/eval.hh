@@ -106,7 +106,6 @@ private:
     //TODO: use some other structure, maybe a hashmap
     //since comparing strings with long same prefixes is slow
     std::map<std::pair<string, std::list<string>>, Value> recording;
-    Expr * recordingExpression;
     
 public:
     bool isInPlaybackMode() {
@@ -126,7 +125,9 @@ public:
     /* Parse a Nix expression from the specified file. */
     Expr * parseExprFromFile(const Path & path);
     Expr * parseExprFromFile(const Path & path, StaticEnv & staticEnv);
-
+    Expr * parseExprFromFileWithoutRecording(const Path & path);
+    Expr * parseExprFromFileWithoutRecording(const Path & path, StaticEnv &);
+    
     /* Parse a Nix expression from the specified string. */
     Expr * parseExprFromString(const string & s, const Path & basePath, StaticEnv & staticEnv);
     Expr * parseExprFromString(const string & s, const Path & basePath);
@@ -219,8 +220,6 @@ private:
     string parameterValue(Value & value);
     void getAttr(Value & top, const Symbol & arg2, Value & v);
     void initializeDeterministicEvaluationMode();
-    void finalizeRecording (Value & result);
-    void writeRecordingIntoStore (Value & result);
  
     static bool constTrue(unsigned int arg) { return true; }
     template< int argumentPos >
@@ -300,7 +299,8 @@ private:
     }
 
 public:
-    void setRecordingInfo(Expr *);
+    void finalizeRecording (Value & result, Expr * recordingExpressions);
+    Path writeRecordingIntoStore (Value & result, bool buildStorePath);
 
     void getBuiltin(const string & name, Value & v);
 

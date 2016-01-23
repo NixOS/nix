@@ -9,6 +9,7 @@
 #include "json-to-value.hh"
 #include "common-opts.hh"
 #include "get-drvs.hh"
+#include "shared.hh"
 
 #include <iostream>
 #include <src/boost/format.hpp>
@@ -353,11 +354,6 @@ void EvalState::initializeDeterministicEvaluationMode()
     }
 }
 
-void EvalState::setRecordingInfo(Expr * e)
-{
-    recordingExpression = e;
-}
-
 string EvalState::parameterValue(Value& value)
 {
     std::stringstream result;
@@ -435,15 +431,9 @@ void EvalState::addPlaybackSource(const Path& from, const Path& to)
 EvalState::~EvalState()
 {
     fileEvalCache.clear();
-
-    if (evalMode == Record) {
-        Value result;
-        finalizeRecording(result);
-        writeRecordingIntoStore(result);
-    }    
 }
 
-void EvalState::writeRecordingIntoStore(Value & result)
+Path EvalState::writeRecordingIntoStore(Value & result, bool buildStorePath)
 {
     Value v;
     string path = settings.nixDataDir + "/nix/corepkgs/reproducable-derivation.nix";
@@ -456,10 +446,11 @@ void EvalState::writeRecordingIntoStore(Value & result)
     Bindings * autoArgs = allocBindings(4);
     getDerivations(*this, app, "", *autoArgs, drvs, false);
     Path drvPath = drvs.front().queryDrvPath();
+    if (!buildStorePath) return drvPath;
     PathSet paths;
     paths.insert(drvPath);
     store->buildPaths(paths);
-    std::cerr << "succesfully build source closure: " << drvs.front().queryOutPath() << std::endl;
+    return drvs.front().queryOutPath();
 }
 
 
@@ -472,7 +463,7 @@ struct ExprUnparsed: public Expr {
     }
 };
 
-void EvalState::finalizeRecording(Value & result)
+void EvalState::finalizeRecording(Value & result, Expr * recordingExpression)
 {
     Value & top = *allocValue();
     //Value & top = result;

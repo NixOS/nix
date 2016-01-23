@@ -113,7 +113,7 @@ int main(int argc, char * * argv)
         bool evalOnly = false;
         bool parseOnly = false;
         bool playback = false;
-        bool record = false;
+        string record;
         OutputKind outputKind = okPlain;
         bool xmlOutputSourceLocation = true;
         bool strict = false;
@@ -164,8 +164,8 @@ int main(int argc, char * * argv)
             else if (*arg == "--playback")
                 playback = true;
             else if (*arg == "--record") {
-                record = true;
                 wantsReadWrite = true;
+                record = getArg(*arg, arg, end);
             }
             else if (*arg != "" && arg->at(0) == '-')
                 return false;
@@ -179,20 +179,19 @@ int main(int argc, char * * argv)
 
         store = openStore();
 
-        DeterministicEvaluationMode mode = record ? Record : Normal;
+        DeterministicEvaluationMode mode = record.empty() ? Normal : Record;
         if (playback) {
-            if (mode == Normal) {
-                mode = Playback;
-            }
-            else
-                throw Error("can't specify both --playback and --record");
+          if (mode != Normal) throw Error ("--record and --playback exclude each other at the moment");
+          mode = Playback;
         }
         
         EvalState state(searchPath, mode);
         state.repair = repair;
-        string currentPath = absPath(".");
-        
+
+        Bindings & autoArgs(*evalAutoArgs(state, autoArgs_));
+
         if (attrPaths.empty()) attrPaths.push_back("");
+
         if (findFile) {
             for (auto & i : files) {
                 Path p = state.findFile(i);
@@ -201,43 +200,36 @@ int main(int argc, char * * argv)
             }
             return;
         }
+
+        ExprList * expressions = new ExprList();
         
-        Bindings & autoArgs(*evalAutoArgs(state, autoArgs_));
-        std::list< Expr * > expressions;
         if (readStdin) {
-            expressions.push_back(parseStdin(state));
+            Expr * e = parseStdin(state);
+            for (auto p: attrPaths)
+                expressions->elems.push_back(processExprExpression(state, e, p, autoArgs));
+            processExpr(state, attrPaths, parseOnly, strict, autoArgs,
+                evalOnly, outputKind, xmlOutputSourceLocation, e);
         } else if (files.empty() && !fromArgs)
             files.push_back("./default.nix");
+
         for (auto & i : files) {
-            Expr * e;
-            if (fromArgs) {
-                e = state.parseExprFromString(i, currentPath);
-            }
-            else {
-                Path p = resolveExprPath(lookupFileArg(state, i));
-                e = new ExprApp(new ExprVar(state.symbols.create("import")), new ExprPath(p));
-                if (playback) {
-                    state.addPlaybackSource(p, p);
-                }
-                e->bindVars(state.staticBaseEnv);
-            }
-            expressions.push_back(e);
-        }
-        if (mode == Record) {
-            ExprList * recordExpr = new ExprList();
-            for (auto e: expressions) {
-                for (auto attrPath: attrPaths) {
-                    recordExpr->elems.push_back(processExprExpression(state, e, attrPath, autoArgs));
-                }
-            }
-            if (recordExpr->elems.size() == 1)
-                state.setRecordingInfo(recordExpr->elems.front());
-            else
-                state.setRecordingInfo(recordExpr);
-        }
-        for (auto e: expressions) {
+            Expr * e = fromArgs
+                ? state.parseExprFromString(i, absPath("."))
+                : state.parseExprFromFileWithoutRecording(resolveExprPath(lookupFileArg(state, i)));
+            for (auto p: attrPaths)
+                expressions->elems.push_back(processExprExpression(state, e, p, autoArgs));
             processExpr(state, attrPaths, parseOnly, strict, autoArgs,
-            evalOnly, outputKind, xmlOutputSourceLocation, e);
+                evalOnly, outputKind, xmlOutputSourceLocation, e);
+        }
+        
+        Expr * playbackExpression = expressions->elems.size() == 1 ? expressions->elems.front() : expressions;
+        
+        if (mode == Record) {
+            Value result;
+            state.finalizeRecording(result, playbackExpression);
+            bool drv = record.compare(record.length()-4, 4, ".drv");
+            Path drvPath = state.writeRecordingIntoStore(result, drv);
+            createSymlink(drvPath, absPath(record));
         }
         state.printStats();
     });
