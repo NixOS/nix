@@ -7,7 +7,7 @@
 namespace nix {
 
 
-typedef enum { htUnknown, htMD5, htSHA1, htSHA256, htSHA512 } HashType;
+enum HashType : char { htUnknown, htMD5, htSHA1, htSHA256, htSHA512 };
 
 
 const int md5HashSize = 16;
