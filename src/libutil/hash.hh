@@ -40,6 +40,18 @@ struct Hash
 
     /* For sorting. */
     bool operator < (const Hash & h) const;
+
+    /* Returns the length of a base-16 representation of this hash. */
+    size_t base16Len() const
+    {
+        return hashSize * 2;
+    }
+
+    /* Returns the length of a base-32 representation of this hash. */
+    size_t base32Len() const
+    {
+        return (hashSize * 8 - 1) / 5 + 1;
+    }
 };
 
 
@@ -48,9 +60,6 @@ string printHash(const Hash & hash);
 
 /* Parse a hexadecimal representation of a hash code. */
 Hash parseHash(HashType ht, const string & s);
-
-/* Returns the length of a base-32 hash representation. */
-unsigned int hashLength32(const Hash & hash);
 
 /* Convert a hash to a base-32 representation. */
 string printHash32(const Hash & hash);

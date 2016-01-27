@@ -96,19 +96,13 @@ Hash parseHash(HashType ht, const string & s)
 }
 
 
-unsigned int hashLength32(const Hash & hash)
-{
-    return (hash.hashSize * 8 - 1) / 5 + 1;
-}
-
-
 // omitted: E O U T
 const string base32Chars = "0123456789abcdfghijklmnpqrsvwxyz";
 
 
 string printHash32(const Hash & hash)
 {
-    unsigned int len = hashLength32(hash);
+    size_t len = hash.base32Len();
 
     string s;
     s.reserve(len);
@@ -136,7 +130,7 @@ string printHash16or32(const Hash & hash)
 Hash parseHash32(HashType ht, const string & s)
 {
     Hash hash(ht);
-    unsigned int len = hashLength32(ht);
+    size_t len = hash.base32Len();
     assert(s.size() == len);
 
     for (unsigned int n = 0; n < len; ++n) {
@@ -163,7 +157,7 @@ Hash parseHash16or32(HashType ht, const string & s)
     if (s.size() == hash.hashSize * 2)
         /* hexadecimal representation */
         hash = parseHash(ht, s);
-    else if (s.size() == hashLength32(hash))
+    else if (s.size() == hash.base32Len())
         /* base-32 representation */
         hash = parseHash32(ht, s);
     else
