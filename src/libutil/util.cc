@@ -150,7 +150,7 @@ Path dirOf(const Path & path)
 string baseNameOf(const Path & path)
 {
     if (path.empty())
-        return string("");
+        return "";
 
     Path::size_type last = path.length() - 1;
     if (path[last] == '/' && last > 0)
@@ -161,6 +161,7 @@ string baseNameOf(const Path & path)
         pos = 0;
     else
         pos += 1;
+
     return string(path, pos, last - pos + 1);
 }
 
