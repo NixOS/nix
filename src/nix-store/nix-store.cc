@@ -140,7 +140,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
     }
 
     if (settings.get("print-missing", true))
-        printMissing(willBuild, willSubstitute, unknown, downloadSize, narSize);
+        printMissing(*store, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     if (dryRun) return;
 

@@ -52,17 +52,17 @@ void printMissing(StoreAPI & store, const PathSet & paths)
     unsigned long long downloadSize, narSize;
     PathSet willBuild, willSubstitute, unknown;
     queryMissing(store, paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
-    printMissing(willBuild, willSubstitute, unknown, downloadSize, narSize);
+    printMissing(store, willBuild, willSubstitute, unknown, downloadSize, narSize);
 }
 
 
-void printMissing(const PathSet & willBuild,
+void printMissing(StoreAPI & store, const PathSet & willBuild,
     const PathSet & willSubstitute, const PathSet & unknown,
     unsigned long long downloadSize, unsigned long long narSize)
 {
     if (!willBuild.empty()) {
         printMsg(lvlInfo, format("these derivations will be built:"));
-        Paths sorted = topoSortPaths(*store, willBuild);
+        Paths sorted = topoSortPaths(store, willBuild);
         reverse(sorted.begin(), sorted.end());
         for (auto & i : sorted)
             printMsg(lvlInfo, format("  %1%") % i);

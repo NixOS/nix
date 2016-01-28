@@ -35,7 +35,7 @@ void printGCWarning();
 
 void printMissing(StoreAPI & store, const PathSet & paths);
 
-void printMissing(const PathSet & willBuild,
+void printMissing(StoreAPI & store, const PathSet & willBuild,
     const PathSet & willSubstitute, const PathSet & unknown,
     unsigned long long downloadSize, unsigned long long narSize);
 
