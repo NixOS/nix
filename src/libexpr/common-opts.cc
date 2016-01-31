@@ -52,7 +52,7 @@ bool parseSearchPathArg(Strings::iterator & i,
 }
 
 
-Path lookupFileArg(EvalState & state, string s)
+Path lookupFileArg(EvalState & state, string s, string currentPath)
 {
     if (isUri(s))
         return downloadFileCached(s, true);
@@ -60,7 +60,7 @@ Path lookupFileArg(EvalState & state, string s)
         Path p = s.substr(1, s.size() - 2);
         return state.findFile(p);
     } else
-        return absPath(s);
+        return absPath(s, currentPath);
 }
 
 

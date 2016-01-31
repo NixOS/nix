@@ -88,6 +88,17 @@ void processExpr(EvalState & state, const Strings & attrPaths,
     }
 }
 
+Expr * processExprExpression(EvalState & state, Expr * expr, const string & attrPath, Bindings & autoArgs) {
+    Expr * findAlongAttrPath = new ExprVar(state.symbols.create("__findAlongAttrPath"));
+    Expr * param1 = new ExprString(state.symbols.create(attrPath));
+    ExprAttrs * param2 = new ExprAttrs();
+    for (auto binding: autoArgs) {
+        //Remark: the value is either a string or a thunk without environment, in both cases valueToExpression does the right thing
+        param2->attrs[binding.name] = ExprAttrs::AttrDef(state.valueToExpression(*binding.value), noPos);
+    }
+    return new ExprApp(new ExprApp(new ExprApp(findAlongAttrPath, param1), param2), expr);
+}
+
 
 int main(int argc, char * * argv)
 {
@@ -101,6 +112,8 @@ int main(int argc, char * * argv)
         bool findFile = false;
         bool evalOnly = false;
         bool parseOnly = false;
+        bool playback = false;
+        string record;
         OutputKind outputKind = okPlain;
         bool xmlOutputSourceLocation = true;
         bool strict = false;
@@ -148,6 +161,12 @@ int main(int argc, char * * argv)
                 repair = true;
             else if (*arg == "--dry-run")
                 settings.readOnlyMode = true;
+            else if (*arg == "--playback")
+                playback = true;
+            else if (*arg == "--record") {
+                wantsReadWrite = true;
+                record = getArg(*arg, arg, end);
+            }
             else if (*arg != "" && arg->at(0) == '-')
                 return false;
             else
@@ -160,7 +179,13 @@ int main(int argc, char * * argv)
 
         store = openStore();
 
-        EvalState state(searchPath);
+        DeterministicEvaluationMode mode = record.empty() ? Normal : Record;
+        if (playback) {
+          if (mode != Normal) throw Error ("--record and --playback exclude each other at the moment");
+          mode = Playback;
+        }
+        
+        EvalState state(searchPath, mode);
         state.repair = repair;
 
         Bindings & autoArgs(*evalAutoArgs(state, autoArgs_));
@@ -176,8 +201,12 @@ int main(int argc, char * * argv)
             return;
         }
 
+        ExprList * expressions = new ExprList();
+        
         if (readStdin) {
             Expr * e = parseStdin(state);
+            for (auto p: attrPaths)
+                expressions->elems.push_back(processExprExpression(state, e, p, autoArgs));
             processExpr(state, attrPaths, parseOnly, strict, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         } else if (files.empty() && !fromArgs)
@@ -186,11 +215,22 @@ int main(int argc, char * * argv)
         for (auto & i : files) {
             Expr * e = fromArgs
                 ? state.parseExprFromString(i, absPath("."))
-                : state.parseExprFromFile(resolveExprPath(lookupFileArg(state, i)));
+                : state.parseExprFromFileWithoutRecording(resolveExprPath(lookupFileArg(state, i)));
+            for (auto p: attrPaths)
+                expressions->elems.push_back(processExprExpression(state, e, p, autoArgs));
             processExpr(state, attrPaths, parseOnly, strict, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         }
-
+        
+        Expr * playbackExpression = expressions->elems.size() == 1 ? expressions->elems.front() : expressions;
+        
+        if (mode == Record) {
+            Value result;
+            state.finalizeRecording(result, playbackExpression);
+            bool drv = record.compare(record.length()-4, 4, ".drv");
+            Path drvPath = state.writeRecordingIntoStore(result, drv);
+            createSymlink(drvPath, absPath(record));
+        }
         state.printStats();
     });
 }

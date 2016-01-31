@@ -9,7 +9,7 @@
 namespace nix {
 
 void printValueAsJSON(EvalState & state, bool strict,
-    Value & v, std::ostream & out, PathSet & context);
+    Value & v, std::ostream & out, PathSet & context, bool copyPathToStore = true);
 
 void escapeJSON(std::ostream & str, const string & s);
 

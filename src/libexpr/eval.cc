@@ -5,7 +5,15 @@
 #include "derivations.hh"
 #include "globals.hh"
 #include "eval-inline.hh"
+#include "value-to-json.hh"
+#include "json-to-value.hh"
+#include "common-opts.hh"
+#include "get-drvs.hh"
+#include "shared.hh"
 
+#include <iostream>
+#include <src/boost/format.hpp>
+#include <fstream>
 #include <algorithm>
 #include <cstring>
 #include <unistd.h>
@@ -135,6 +143,45 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
     active.erase(&v);
 }
 
+Expr * EvalState::valueToExpression(const Value & v)
+{
+    switch (v.type) {
+    case tInt:
+        return new ExprInt(v.integer);
+    case tBool:
+        return new ExprVar(symbols.create(v.boolean ? "true" : "false"));
+    case tString:
+        return new ExprString(symbols.create(v.string.s));
+    case tPath:
+        return new ExprPath(v.path);
+    case tNull:
+        return new ExprVar(symbols.create("null"));
+    case tAttrs:
+    {
+        ExprAttrs * result = new ExprAttrs();
+        for (auto a: *v.attrs) {
+            result->attrs.insert(std::make_pair(a.name, ExprAttrs::AttrDef(valueToExpression(*a.value), *a.pos)));
+        }
+        return result;
+    }
+    case tList1:
+    case tList2:
+    case tListN:
+    {
+        ExprList * result = new ExprList();
+        for (int i = 0; i < v.listSize(); ++i) {
+            result->elems.push_back(valueToExpression(*v.listElems()[i]));
+        }
+        return result;
+    }
+    case tThunk:
+        return v.thunk.expr;
+    default:
+        throw Error("value not supported while converting");
+    }
+}
+
+
 
 std::ostream & operator << (std::ostream & str, const Value & v)
 {
@@ -244,7 +291,7 @@ static Strings parseNixPath(const string & in)
 }
 
 
-EvalState::EvalState(const Strings & _searchPath)
+EvalState::EvalState(const Strings & _searchPath, DeterministicEvaluationMode evalMode)
     : sWith(symbols.create("<with>"))
     , sOutPath(symbols.create("outPath"))
     , sDrvPath(symbols.create("drvPath"))
@@ -262,6 +309,7 @@ EvalState::EvalState(const Strings & _searchPath)
     , sColumn(symbols.create("column"))
     , sFunctor(symbols.create("__functor"))
     , sToString(symbols.create("__toString"))
+    , evalMode(evalMode)
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
 {
@@ -280,16 +328,199 @@ EvalState::EvalState(const Strings & _searchPath)
     clearValue(vEmptySet);
     vEmptySet.type = tAttrs;
     vEmptySet.attrs = allocBindings(0);
-
+    
+    initializeDeterministicEvaluationMode();
     createBaseEnv();
 }
 
+void EvalState::initializeDeterministicEvaluationMode()
+{
+    if (evalMode == Normal) {
+        const char * recordMode = getenv("NIX_RECORDING");
+        const char * playbackMode = getenv("NIX_PLAYBACK");
+        if (recordMode && !playbackMode) {
+            evalMode = Record;
+        } else if (playbackMode && !recordMode) {
+            evalMode = Playback;
+        } else if (!playbackMode && !recordMode) {
+            evalMode = Normal;
+        }
+        else
+            throw EvalError("can't use both NIX_RECORDING and NIX_PLAYBACK");
+    }
+    
+    if (evalMode == Record || evalMode == Playback) {
+        std::cerr << "Running in deterministic evaluation mode: " << evalMode << std::endl;
+    }
+}
+
+string EvalState::parameterValue(Value& value)
+{
+    std::stringstream result;
+    forceValueDeep(value);
+    result << *valueToExpression(value);
+    return result.str();
+}
+
+
+void EvalState::addPlaybackSubstitutions(Value & top)
+{
+    Symbol functionsSymbol(symbols.create("functions")), 
+           nameSymbol(symbols.create("name")),
+           parametersSymbol(symbols.create("parameters")),
+           resultSymbol(symbols.create("result")),
+           sourcesSymbol(symbols.create("sources"));
+
+    Value functions;
+    getAttr(top, functionsSymbol, functions);
+    forceList(functions);
+    for (unsigned int i = 0; i < functions.listSize(); ++i) {
+        Value &current = *functions.listElems()[i];
+        Value name, parameters, result;
+        getAttr(current, nameSymbol, name);
+        getAttr(current, parametersSymbol, parameters);
+        getAttr(current, resultSymbol, result);
+        std::string nameString = forceStringNoCtx(name);
+        std::list<std::string> parameterList;
+        forceList(parameters);
+        for (unsigned int j = 0; j < parameters.listSize(); ++j) {
+            parameterList.push_back(parameterValue(*parameters.listElems()[j]));
+        }
+        
+        auto key = std::make_pair(nameString, parameterList);
+        auto currentPlaybackValue = recording.find(key);
+        if (currentPlaybackValue == recording.end()) {
+            recording[key] = result;
+        }
+        else {
+            if (!eqValues(recording[key], result)) {
+                std::stringstream primopApp;
+                primopApp << nameString << "(";
+                bool f = false;
+                for (auto param: parameterList) {
+                    if (f) primopApp << ", ";
+                    primopApp << param;
+                    f = true;
+                }
+                primopApp << ")";
+                std::stringstream result1, result2;
+                result1 << result;
+                result2 << recording[key];
+                throw EvalError(format("playback of '%s' has multiple possible values: '%s' and '%s'") %
+                    primopApp.str() % result1.str() % result2.str());
+            }
+        }
+    }
+    
+    Value sources;
+    getAttr(top, sourcesSymbol, sources);
+    forceAttrs(sources);
+    PathSet context;
+    for (auto it = sources.attrs->begin(); it != sources.attrs->end(); ++it) {
+        addPlaybackSource(it->name, coerceToPath(noPos, *it->value, context));
+    }
+}
+
+void EvalState::addPlaybackSource(const Path& from, const Path& to)
+{
+    //TODO check for suffixes/prefixes in srcToStoreForPlayback
+    //      and srcToStore and look out for consistency
+    srcToStoreForPlayback[from] = to;
+}
 
 EvalState::~EvalState()
 {
     fileEvalCache.clear();
 }
 
+Path EvalState::writeRecordingIntoStore(Value & result, bool buildStorePath)
+{
+    Value v;
+    string path = settings.nixDataDir + "/nix/corepkgs/reproducable-derivation.nix";
+    evalFile(path, v);
+    Value app;
+    app.type = tApp;
+    app.app.left = &v;
+    app.app.right = &result;
+    DrvInfos drvs;
+    Bindings * autoArgs = allocBindings(4);
+    getDerivations(*this, app, "", *autoArgs, drvs, false);
+    Path drvPath = drvs.front().queryDrvPath();
+    if (!buildStorePath) return drvPath;
+    PathSet paths;
+    paths.insert(drvPath);
+    store->buildPaths(paths);
+    return drvs.front().queryOutPath();
+}
+
+
+struct ExprUnparsed: public Expr {
+    std::string unparsed;
+    ExprUnparsed(const std::string & up) : unparsed(up) {}
+    
+    virtual void show(std::ostream& str) {
+        str << unparsed;
+    }
+};
+
+void EvalState::finalizeRecording(Value & result, Expr * recordingExpression)
+{
+    Value & top = *allocValue();
+    //Value & top = result;
+    mkAttrs(top, 2);
+    Value * sources = allocAttr(top, symbols.create("sources"));
+    Value * functions = allocAttr(top, symbols.create("functions"));
+    top.attrs->sort();
+    
+    mkList(*functions, recording.size());
+    int j = 0;
+    for (auto kv : recording) {
+        Value & attrs = *allocValue();
+        functions->listElems()[j] = &attrs;
+        mkAttrs(attrs, 3);
+        Value * name = allocAttr(attrs, symbols.create("name"));
+        mkString(*name, kv.first.first);
+        Value * parameters = allocAttr(attrs, symbols.create("parameters"));
+        mkList(*parameters, kv.first.second.size());
+        auto iter = kv.first.second.begin();
+        for (int s = 0; s < kv.first.second.size(); ++s) {
+            parameters->listElems()[s] = allocValue();
+            mkThunk_(*parameters->listElems()[s], new ExprUnparsed(*iter));
+            ++iter;
+        }
+        Value * result = allocAttr(attrs, symbols.create("result"));
+        forceValueDeep(kv.second);
+        *result = kv.second;
+        //*result = kv.second;
+        attrs.attrs->sort();
+        ++j;
+    }
+    
+    PathSet context;
+    mkAttrs(*sources, srcToStoreForPlayback.size());
+    for (auto path : srcToStoreForPlayback) {
+        Value * p = allocAttr(*sources, symbols.create(path.first));
+        mkPath(*p, path.second.c_str());
+        assert (isInStore(path.second));
+        context.insert(path.second);
+    }
+
+    mkAttrs(result, 2);
+    
+    {
+        Expr * e = valueToExpression(top);
+        std::stringstream out;
+        out << *e;
+        mkString(*allocAttr(result, symbols.create("recording")), out.str(), context);
+    }
+    {
+        std::stringstream exp;
+        exp << *recordingExpression;    
+        mkString(*allocAttr(result, symbols.create("expressions")), exp.str());
+    }
+    
+    result.attrs->sort();
+}
 
 Path EvalState::checkSourcePath(const Path & path_)
 {
@@ -317,17 +548,59 @@ Path EvalState::checkSourcePath(const Path & path_)
     throw RestrictedPathError(format("access to path ‘%1%’ is forbidden in restricted mode") % path_);
 }
 
+void EvalState::addToBaseEnv(const string & name, Value * v, Symbol sym) 
+{
+    staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
+    baseEnv.values[baseEnvDispl++] = v;
+    baseEnv.values[0]->attrs->push_back(Attr(sym, v));
+}
+
+void EvalState::addToBaseEnv(const string & name, Value * v) 
+{
+    string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
+    addToBaseEnv(name, v, symbols.create(name2));    
+}
 
 void EvalState::addConstant(const string & name, Value & v)
 {
     Value * v2 = allocValue();
     *v2 = v;
-    staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
-    baseEnv.values[baseEnvDispl++] = v2;
-    string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v2));
+    addToBaseEnv(name, v2);
 }
 
+void EvalState::addImpureConstant(const string & name, Value & v, Value * constantPrimOp) 
+{
+    if (evalMode == Normal) {
+        addConstant(name, v);
+        return;
+    }
+    Value * v2 = allocValue();
+    *v2 = v;
+    Value * wrappedConstant = allocValue();
+    wrappedConstant->type = tApp;
+    Value * left = wrappedConstant->app.left = allocValue();
+    left->type = tPrimOpApp;
+    left->primOpApp.left = constantPrimOp;
+    left->primOpApp.right = allocValue();
+    mkString(*left->primOpApp.right, name);
+    wrappedConstant->primOpApp.right = v2;
+    addToBaseEnv(name, wrappedConstant);
+}
+
+static void prim_impureConstant(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    v = *args[1];
+}
+
+extern const char __impureConstant[] = "__impureConstant";
+Value * EvalState::getImpureConstantPrimop()
+{   
+    if (evalMode == Normal) return 0;
+    Value * result = allocValue();
+    result->type = tPrimOp;
+    result->primOp = NEW PrimOp(transformPrimOp<__impureConstant, 2, prim_impureConstant, onlyPos<0> >(), 2, symbols.create("impureConstant"));
+    return result;
+}
 
 void EvalState::addPrimOp(const string & name,
     unsigned int arity, PrimOpFun primOp)
@@ -337,11 +610,15 @@ void EvalState::addPrimOp(const string & name,
     Symbol sym = symbols.create(name2);
     v->type = tPrimOp;
     v->primOp = NEW PrimOp(primOp, arity, sym);
-    staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
-    baseEnv.values[baseEnvDispl++] = v;
-    baseEnv.values[0]->attrs->push_back(Attr(sym, v));
+    addToBaseEnv(name, v, sym);
 }
 
+std::string EvalState::valueToJSON(Value & value, bool copyToStore) {
+    std::ostringstream out;
+    PathSet context;
+    printValueAsJSON(*this, true, value, out, context, copyToStore);
+    return out.str();
+}
 
 void EvalState::getBuiltin(const string & name, Value & v)
 {
@@ -619,7 +896,16 @@ void EvalState::resetFileCache()
 }
 
 
-void EvalState::eval(Expr * e, Value & v)
+void EvalState::getAttr(Value & attrSet, const Symbol & attr, Value & v) {
+    forceAttrs(attrSet);
+    Bindings::iterator i = attrSet.attrs->find(attr);
+    if (i == attrSet.attrs->end())
+        throwEvalError("attribute ‘%1%’ missing", attr);
+    forceValue(*i->value);
+    v = *i->value;
+}
+
+void EvalState::eval(Expr* e, Value& v)
 {
     e->eval(*this, baseEnv, v);
 }
@@ -1432,7 +1718,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
 }
 
 
-string EvalState::copyPathToStore(PathSet & context, const Path & path)
+string EvalState::copyPathToStore(PathSet & context, const Path & path, bool ignoreReadOnly)
 {
     if (nix::isDerivation(path))
         throwEvalError("file names are not allowed to end in ‘%1%’", drvExtension);
@@ -1441,9 +1727,13 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
     if (srcToStore[path] != "")
         dstPath = srcToStore[path];
     else {
-        dstPath = settings.readOnlyMode
-            ? computeStorePathForPath(checkSourcePath(path)).first
-            : store->addToStore(baseNameOf(path), checkSourcePath(path), true, htSHA256, defaultPathFilter, repair);
+        Path path2 = path;
+        if (evalMode == Playback) {
+            path2 = copyPathToStoreIfItsNotAlreadyThere(context, path);
+        }
+        dstPath = (settings.readOnlyMode && !ignoreReadOnly)
+            ? computeStorePathForPath(checkSourcePath(path2)).first
+            : store->addToStore(baseNameOf(path), checkSourcePath(path2), true, htSHA256, defaultPathFilter, repair);
         srcToStore[path] = dstPath;
         printMsg(lvlChatty, format("copied source ‘%1%’ -> ‘%2%’")
             % path % dstPath);
@@ -1452,6 +1742,43 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
     context.insert(dstPath);
     return dstPath;
 }
+
+Path EvalState::copyPathToStoreIfItsNotAlreadyThere(PathSet & context, Path path)
+{
+    // special-case derivation.nix
+    // this is used so early the paths aren't set up correctly yet
+    // also doesn't really make sense to use it
+    if (symbols.create(path) == sDerivationNix) {
+        return path;
+    }
+    if (evalMode == Playback) {
+        Path rest;
+        while (srcToStoreForPlayback[path] == "") {
+            string::size_type lastSeperator = path.find_last_of("/");
+            if (lastSeperator == string::npos) {
+                throwEvalError("path '%s' not found in playback mode", path + rest);
+            }
+            rest = path.substr(lastSeperator) + rest;
+            path = path.substr(0, lastSeperator);
+        }
+        return srcToStoreForPlayback[path] + rest;        
+    }
+    if (isInStore(path)) {
+        string storePath = toStorePath(path);
+        srcToStoreForPlayback[storePath] = storePath;
+        return path;
+    }
+    else {
+        if (srcToStoreForPlayback[path] != "")
+            return srcToStoreForPlayback[path];
+        else {
+            string result = copyPathToStore(context, path, true);
+            srcToStoreForPlayback[path] = result;
+            return result;
+        }
+    }
+}
+
 
 
 Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)

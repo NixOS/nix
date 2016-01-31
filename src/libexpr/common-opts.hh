@@ -13,6 +13,6 @@ Bindings * evalAutoArgs(EvalState & state, std::map<string, string> & in);
 bool parseSearchPathArg(Strings::iterator & i,
     const Strings::iterator & argsEnd, Strings & searchPath);
 
-Path lookupFileArg(EvalState & state, string s);
+Path lookupFileArg(EvalState & state, string s, string currentPath = "");
 
 }

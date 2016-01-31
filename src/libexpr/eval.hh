@@ -18,9 +18,14 @@ namespace nix {
 
 class EvalState;
 
+typedef enum {
+    Normal,
+    Record,
+    Playback,
+    RecordAndPlayback
+} DeterministicEvaluationMode;
 
 typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, Value & v);
-
 
 struct PrimOp
 {
@@ -84,7 +89,8 @@ public:
 
 private:
     SrcToStore srcToStore;
-
+    SrcToStore srcToStoreForPlayback;
+    
     /* A cache from path names to values. */
 #if HAVE_BOEHMGC
     typedef std::map<Path, Value, std::less<Path>, traceable_allocator<std::pair<const Path, Value> > > FileEvalCache;
@@ -95,19 +101,33 @@ private:
 
     SearchPath searchPath;
 
-public:
+    DeterministicEvaluationMode evalMode;
 
-    EvalState(const Strings & _searchPath);
+    //TODO: use some other structure, maybe a hashmap
+    //since comparing strings with long same prefixes is slow
+    std::map<std::pair<string, std::list<string>>, Value> recording;
+    
+public:
+    bool isInPlaybackMode() {
+        return evalMode == Playback || evalMode == RecordAndPlayback;
+    }
+  
+
+    EvalState(const Strings & _searchPath, DeterministicEvaluationMode evalMode = Normal);
     ~EvalState();
 
     void addToSearchPath(const string & s, bool warn = false);
-
+    void addPlaybackSubstitutions(nix::Value& top); 
+    void addPlaybackSource(const Path & from, const Path & to);
+    
     Path checkSourcePath(const Path & path);
 
     /* Parse a Nix expression from the specified file. */
     Expr * parseExprFromFile(const Path & path);
     Expr * parseExprFromFile(const Path & path, StaticEnv & staticEnv);
-
+    Expr * parseExprFromFileWithoutRecording(const Path & path);
+    Expr * parseExprFromFileWithoutRecording(const Path & path, StaticEnv &);
+    
     /* Parse a Nix expression from the specified string. */
     Expr * parseExprFromString(const string & s, const Path & basePath, StaticEnv & staticEnv);
     Expr * parseExprFromString(const string & s, const Path & basePath);
@@ -125,6 +145,9 @@ public:
     /* Evaluate an expression to normal form, storing the result in
        value `v'. */
     void eval(Expr * e, Value & v);
+    
+    // convert a value back to an expression
+    Expr * valueToExpression(const Value & v);
 
     /* Evaluation the expression, then verify that it has the expected
        type. */
@@ -165,7 +188,7 @@ public:
     string coerceToString(const Pos & pos, Value & v, PathSet & context,
         bool coerceMore = false, bool copyToStore = true);
 
-    string copyPathToStore(PathSet & context, const Path & path);
+    string copyPathToStore(PathSet & context, const Path & path, bool ignoreReadOnly = false);
 
     /* Path coercion.  Converts strings, paths and derivations to a
        path.  The result is guaranteed to be a canonicalised, absolute
@@ -188,11 +211,96 @@ private:
     void createBaseEnv();
 
     void addConstant(const string & name, Value & v);
-
+    void addImpureConstant(const string & name, Value & v, Value * impureConstant);
+    
     void addPrimOp(const string & name,
         unsigned int arity, PrimOpFun primOp);
 
+    std::string valueToJSON(Value & value, bool copyToStore);
+    string parameterValue(Value & value);
+    void getAttr(Value & top, const Symbol & arg2, Value & v);
+    void initializeDeterministicEvaluationMode();
+ 
+    static bool constTrue(unsigned int arg) { return true; }
+    template< int argumentPos >
+    static bool onlyPos(unsigned int arg) { return arg == argumentPos; }
+    typedef bool (*UsedArguments) (unsigned int argumentIndex);
+    
+    template< const char * name, unsigned int arity, PrimOpFun primOp, UsedArguments useArgument >
+    static void recordPrimOp(EvalState & state, const Pos & pos, Value * * args, Value & v)
+    {
+        std::list<string> argList;
+        for (unsigned int i = 0; i < arity; i++) {
+            if (useArgument(i)) {
+                argList.push_back(state.parameterValue(*args[i]));
+            }
+        }
+        primOp(state, pos, args, v);
+        state.recording[std::make_pair(name, argList)] = v;
+    }
+
+    template< const char * name, unsigned int arity, PrimOpFun primOp, UsedArguments useArgument >
+    static void playbackPrimOp(EvalState & state, const Pos & pos, Value * * args, Value & v)
+    {
+        std::list<string> argList;
+        for (unsigned int i = 0; i < arity; i++) {
+            if(useArgument(i)) {
+                argList.push_back(state.parameterValue(*args[i]));
+            }
+        }
+        auto result = state.recording.find(std::make_pair(name, argList));
+        if (result == state.recording.end()) {
+            std::string errorMsg("wanted to call ");
+            errorMsg += name;
+            errorMsg += "(";
+            for (auto arg: argList) {
+                errorMsg += arg + ", ";
+            }
+            errorMsg += ")";
+            throw EvalError(errorMsg.c_str());
+        }
+        else {
+            v = result->second;
+        }
+    }
+    
+    template< const char * name, unsigned int arity, PrimOpFun primOp, UsedArguments useArguments >
+    PrimOpFun transformPrimOp()
+    {
+        switch (evalMode) {
+            case Record: return recordPrimOp<name, arity, primOp, useArguments>;
+            case Playback: return playbackPrimOp<name, arity, primOp, useArguments>;
+            case Normal: return primOp;
+            default: abort();
+        }
+    }
+    
+    template< const char * name, unsigned int arity, PrimOpFun primOp, UsedArguments useArguments = constTrue>
+    void addImpurePrimOp() 
+    {
+        addPrimOp(name, arity, transformPrimOp<name, arity, primOp, useArguments>());
+    }
+    
+    template< const char * name >
+    static void unsupportedPrimOp(EvalState & state, const Pos & pos, Value * * args, Value & v)
+    {
+        throw EvalError(format("primop '%s' is not (yet) supported in Record/Playback mode (used at '%s')") % name % pos);
+    }
+    
+    template< const char * name >
+    void addUnsupportedImpurePrimOp(unsigned int arity, PrimOpFun primOp)
+    {
+        if (evalMode == Record || evalMode == Playback) {
+            addPrimOp(name, arity, unsupportedPrimOp<name>);
+        }
+        else {
+            addPrimOp(name, arity, primOp);
+        }
+    }
+
 public:
+    void finalizeRecording (Value & result, Expr * recordingExpressions);
+    Path writeRecordingIntoStore (Value & result, bool buildStorePath);
 
     void getBuiltin(const string & name, Value & v);
 
@@ -271,6 +379,10 @@ private:
     friend struct ExprOpConcatLists;
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
+    void addToBaseEnv(const string & name, Value * v, Symbol sym);
+    void addToBaseEnv(const string & name, Value * v);
+    Value * getImpureConstantPrimop();
+    Path copyPathToStoreIfItsNotAlreadyThere(PathSet & context, Path path);
 };
 
 
