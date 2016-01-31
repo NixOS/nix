@@ -397,9 +397,15 @@ int LocalStore::getSchema()
 }
 
 
+bool LocalStore::haveWriteAccess()
+{
+    return access(settings.nixDBPath.c_str(), R_OK | W_OK) == 0;
+}
+
+
 void LocalStore::openDB(bool create)
 {
-    if (access(settings.nixDBPath.c_str(), R_OK | W_OK))
+    if (!haveWriteAccess())
         throw SysError(format("Nix database directory ‘%1%’ is not writable") % settings.nixDBPath);
 
     /* Open the Nix database. */

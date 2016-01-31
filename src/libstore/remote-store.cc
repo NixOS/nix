@@ -50,14 +50,8 @@ void RemoteStore::openConnection(bool reserveSpace)
     if (initialised) return;
     initialised = true;
 
-    string remoteMode = getEnv("NIX_REMOTE");
-
-    if (remoteMode == "daemon")
-        /* Connect to a daemon that does the privileged work for
-           us. */
-        connectToDaemon();
-    else
-        throw Error(format("invalid setting for NIX_REMOTE, ‘%1%’") % remoteMode);
+    /* Connect to a daemon that does the privileged work for us. */
+    connectToDaemon();
 
     from.fd = fdSocket;
     to.fd = fdSocket;

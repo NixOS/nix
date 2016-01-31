@@ -311,10 +311,22 @@ std::shared_ptr<StoreAPI> store;
 
 std::shared_ptr<StoreAPI> openStore(bool reserveSpace)
 {
-    if (getEnv("NIX_REMOTE") == "")
-        return std::shared_ptr<StoreAPI>(new LocalStore(reserveSpace));
-    else
-        return std::shared_ptr<StoreAPI>(new RemoteStore());
+    enum { mDaemon, mLocal, mAuto } mode;
+
+    mode = getEnv("NIX_REMOTE") == "daemon" ? mDaemon : mAuto;
+
+    if (mode == mAuto) {
+        if (LocalStore::haveWriteAccess())
+            mode = mLocal;
+        else if (pathExists(settings.nixDaemonSocketFile))
+            mode = mDaemon;
+        else
+            mode = mLocal;
+    }
+
+    return mode == mDaemon
+        ? (std::shared_ptr<StoreAPI>) std::make_shared<RemoteStore>()
+        : std::make_shared<LocalStore>(reserveSpace);
 }
 
 

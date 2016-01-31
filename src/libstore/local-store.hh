@@ -253,6 +253,12 @@ private:
 
     int getSchema();
 
+public:
+
+    static bool haveWriteAccess();
+
+private:
+
     void openDB(bool create);
 
     void makeStoreWritable();
