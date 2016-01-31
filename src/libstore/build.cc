@@ -1045,6 +1045,15 @@ void DerivationGoal::haveDerivation()
     for (auto & i : invalidOutputs)
         if (pathFailed(i)) return;
 
+    /* Reject doing a hash build of anything other than a fixed-output
+       derivation. */
+    if (buildMode == bmHash) {
+        if (drv->outputs.size() != 1 ||
+            drv->outputs.find("out") == drv->outputs.end() ||
+            drv->outputs["out"].hashAlgo == "")
+            throw Error(format("cannot do a hash build of non-fixed-output derivation ‘%1%’") % drvPath);
+    }
+
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
@@ -2727,12 +2736,29 @@ void DerivationGoal::registerOutputs()
                         format("output path ‘%1%’ should be a non-executable regular file") % path);
             }
 
-            /* Check the hash. */
+            /* Check the hash. In hash mode, move the path produced by
+               the derivation to its content-addressed location. */
             Hash h2 = recursive ? hashPath(ht, actualPath).first : hashFile(ht, actualPath);
-            if (h != h2)
-                throw BuildError(
-                    format("output path ‘%1%’ has %2% hash ‘%3%’ when ‘%4%’ was expected")
-                    % path % i.second.hashAlgo % printHash16or32(h2) % printHash16or32(h));
+            if (buildMode == bmHash) {
+                Path dest = makeFixedOutputPath(recursive, ht, h2, drv->env["name"]);
+                printMsg(lvlError, format("build produced path ‘%1%’ with %2% hash ‘%3%’")
+                    % dest % printHashType(ht) % printHash16or32(h2));
+                if (worker.store.isValidPath(dest))
+                    return;
+                if (actualPath != dest) {
+                    PathLocks outputLocks({dest});
+                    if (pathExists(dest))
+                        deletePath(dest);
+                    if (rename(actualPath.c_str(), dest.c_str()) == -1)
+                        throw SysError(format("moving ‘%1%’ to ‘%2%’") % actualPath % dest);
+                }
+                path = actualPath = dest;
+            } else {
+                if (h != h2)
+                    throw BuildError(
+                        format("output path ‘%1%’ has %2% hash ‘%3%’ when ‘%4%’ was expected")
+                        % path % i.second.hashAlgo % printHash16or32(h2) % printHash16or32(h));
+            }
         }
 
         /* Get rid of all weird permissions.  This also checks that
@@ -2748,7 +2774,7 @@ void DerivationGoal::registerOutputs()
         PathSet references = scanForReferences(actualPath, allPaths, hash);
 
         if (buildMode == bmCheck) {
-            if (!store->isValidPath(path)) continue;
+            if (!worker.store.isValidPath(path)) continue;
             ValidPathInfo info = worker.store.queryPathInfo(path);
             if (hash.first != info.hash) {
                 if (settings.keepFailed) {

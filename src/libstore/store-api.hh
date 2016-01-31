@@ -103,7 +103,7 @@ struct ValidPathInfo
 typedef list<ValidPathInfo> ValidPathInfos;
 
 
-enum BuildMode { bmNormal, bmRepair, bmCheck };
+enum BuildMode { bmNormal, bmRepair, bmCheck, bmHash };
 
 
 struct BuildResult
