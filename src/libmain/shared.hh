@@ -31,11 +31,11 @@ void printVersion(const string & programName);
 /* Ugh.  No better place to put this. */
 void printGCWarning();
 
-class StoreAPI;
+class Store;
 
-void printMissing(ref<StoreAPI> store, const PathSet & paths);
+void printMissing(ref<Store> store, const PathSet & paths);
 
-void printMissing(ref<StoreAPI> store, const PathSet & willBuild,
+void printMissing(ref<Store> store, const PathSet & willBuild,
     const PathSet & willSubstitute, const PathSet & unknown,
     unsigned long long downloadSize, unsigned long long narSize);
 

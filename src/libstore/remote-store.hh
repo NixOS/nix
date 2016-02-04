@@ -14,7 +14,7 @@ struct FdSink;
 struct FdSource;
 
 
-class RemoteStore : public StoreAPI
+class RemoteStore : public Store
 {
 public:
 

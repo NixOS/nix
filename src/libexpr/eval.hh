@@ -16,7 +16,7 @@
 namespace nix {
 
 
-class StoreAPI;
+class Store;
 class EvalState;
 
 
@@ -83,7 +83,7 @@ public:
 
     Value vEmptySet;
 
-    const ref<StoreAPI> store;
+    const ref<Store> store;
 
 private:
     SrcToStore srcToStore;
@@ -100,7 +100,7 @@ private:
 
 public:
 
-    EvalState(const Strings & _searchPath, ref<StoreAPI> store);
+    EvalState(const Strings & _searchPath, ref<Store> store);
     ~EvalState();
 
     void addToSearchPath(const string & s, bool warn = false);

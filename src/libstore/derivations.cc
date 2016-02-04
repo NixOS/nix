@@ -68,7 +68,7 @@ bool BasicDerivation::canBuildLocally() const
 }
 
 
-Path writeDerivation(ref<StoreAPI> store,
+Path writeDerivation(ref<Store> store,
     const Derivation & drv, const string & name, bool repair)
 {
     PathSet references;
@@ -274,7 +274,7 @@ DrvHashes drvHashes;
    paths have been replaced by the result of a recursive call to this
    function, and that for fixed-output derivations we return a hash of
    its output path. */
-Hash hashDerivationModulo(StoreAPI & store, Derivation drv)
+Hash hashDerivationModulo(Store & store, Derivation drv)
 {
     /* Return a fixed hash for fixed-output derivations. */
     if (drv.isFixedOutput()) {

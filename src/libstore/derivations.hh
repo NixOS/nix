@@ -80,11 +80,11 @@ struct Derivation : BasicDerivation
 };
 
 
-class StoreAPI;
+class Store;
 
 
 /* Write a derivation to the Nix store, and return its path. */
-Path writeDerivation(ref<StoreAPI> store,
+Path writeDerivation(ref<Store> store,
     const Derivation & drv, const string & name, bool repair = false);
 
 /* Read a derivation from a file. */
@@ -94,7 +94,7 @@ Derivation readDerivation(const Path & drvPath);
    derivations. */
 bool isDerivation(const string & fileName);
 
-Hash hashDerivationModulo(StoreAPI & store, Derivation drv);
+Hash hashDerivationModulo(Store & store, Derivation drv);
 
 /* Memoisation of hashDerivationModulo(). */
 typedef std::map<Path, Hash> DrvHashes;

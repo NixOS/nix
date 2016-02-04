@@ -135,11 +135,11 @@ struct BasicDerivation;
 struct Derivation;
 
 
-class StoreAPI
+class Store
 {
 public:
 
-    virtual ~StoreAPI() { }
+    virtual ~Store() { }
 
     /* Check whether a path is valid. */
     virtual bool isValidPath(const Path & path) = 0;
@@ -407,13 +407,13 @@ void removeTempRoots();
 
 
 /* Register a permanent GC root. */
-Path addPermRoot(ref<StoreAPI> store, const Path & storePath,
+Path addPermRoot(ref<Store> store, const Path & storePath,
     const Path & gcRoot, bool indirect, bool allowOutsideRootsDir = false);
 
 
 /* Factory method: open the Nix database, either through the local or
    remote implementation. */
-ref<StoreAPI> openStore(bool reserveSpace = true);
+ref<Store> openStore(bool reserveSpace = true);
 
 
 /* Display a set of paths in human-readable form (i.e., between quotes

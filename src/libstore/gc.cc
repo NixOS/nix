@@ -83,7 +83,7 @@ void LocalStore::addIndirectRoot(const Path & path)
 }
 
 
-Path addPermRoot(ref<StoreAPI> store, const Path & _storePath,
+Path addPermRoot(ref<Store> store, const Path & _storePath,
     const Path & _gcRoot, bool indirect, bool allowOutsideRootsDir)
 {
     Path storePath(canonPath(_storePath));

@@ -19,11 +19,11 @@ struct DownloadResult
     string data, etag;
 };
 
-class StoreAPI;
+class Store;
 
 DownloadResult downloadFile(string url, const DownloadOptions & options);
 
-Path downloadFileCached(ref<StoreAPI> store, const string & url, bool unpack);
+Path downloadFileCached(ref<Store> store, const string & url, bool unpack);
 
 MakeError(DownloadError, Error)
 

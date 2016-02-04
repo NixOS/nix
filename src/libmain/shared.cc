@@ -46,7 +46,7 @@ void printGCWarning()
 }
 
 
-void printMissing(ref<StoreAPI> store, const PathSet & paths)
+void printMissing(ref<Store> store, const PathSet & paths)
 {
     unsigned long long downloadSize, narSize;
     PathSet willBuild, willSubstitute, unknown;
@@ -55,7 +55,7 @@ void printMissing(ref<StoreAPI> store, const PathSet & paths)
 }
 
 
-void printMissing(ref<StoreAPI> store, const PathSet & willBuild,
+void printMissing(ref<Store> store, const PathSet & willBuild,
     const PathSet & willSubstitute, const PathSet & unknown,
     unsigned long long downloadSize, unsigned long long narSize)
 {

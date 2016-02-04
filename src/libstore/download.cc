@@ -188,7 +188,7 @@ DownloadResult downloadFile(string url, const DownloadOptions & options)
 }
 
 
-Path downloadFileCached(ref<StoreAPI> store, const string & url, bool unpack)
+Path downloadFileCached(ref<Store> store, const string & url, bool unpack)
 {
     Path cacheDir = getEnv("XDG_CACHE_HOME", getEnv("HOME", "") + "/.cache") + "/nix/tarballs";
     createDirs(cacheDir);

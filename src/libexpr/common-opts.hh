@@ -4,7 +4,7 @@
 
 namespace nix {
 
-class StoreAPI;
+class Store;
 
 /* Some common option parsing between nix-env and nix-instantiate. */
 bool parseAutoArgs(Strings::iterator & i,

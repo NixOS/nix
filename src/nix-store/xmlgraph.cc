@@ -33,7 +33,7 @@ static string makeNode(const string & id)
 }
 
 
-void printXmlGraph(StoreAPI & store, const PathSet & roots)
+void printXmlGraph(Store & store, const PathSet & roots)
 {
     PathSet workList(roots);
     PathSet doneSet;

@@ -220,7 +220,7 @@ Path computeStorePathForText(const string & name, const string & s,
 /* Return a string accepted by decodeValidPathInfo() that
    registers the specified paths as valid.  Note: it's the
    responsibility of the caller to provide a closure. */
-string StoreAPI::makeValidityRegistration(const PathSet & paths,
+string Store::makeValidityRegistration(const PathSet & paths,
     bool showDerivers, bool showHash)
 {
     string s = "";
@@ -284,7 +284,7 @@ string showPaths(const PathSet & paths)
 }
 
 
-void StoreAPI::exportPaths(const Paths & paths,
+void Store::exportPaths(const Paths & paths,
     bool sign, Sink & sink)
 {
     for (auto & i : paths) {
@@ -306,7 +306,7 @@ void StoreAPI::exportPaths(const Paths & paths,
 namespace nix {
 
 
-ref<StoreAPI> openStore(bool reserveSpace)
+ref<Store> openStore(bool reserveSpace)
 {
     enum { mDaemon, mLocal, mAuto } mode;
 
@@ -322,8 +322,8 @@ ref<StoreAPI> openStore(bool reserveSpace)
     }
 
     return mode == mDaemon
-        ? make_ref<StoreAPI, RemoteStore>()
-        : make_ref<StoreAPI, LocalStore>(reserveSpace);
+        ? make_ref<Store, RemoteStore>()
+        : make_ref<Store, LocalStore>(reserveSpace);
 }
 
 

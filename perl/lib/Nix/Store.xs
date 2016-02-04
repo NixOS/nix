@@ -19,9 +19,9 @@
 using namespace nix;
 
 
-static ref<StoreAPI> store()
+static ref<Store> store()
 {
-    static std::shared_ptr<StoreAPI> _store;
+    static std::shared_ptr<Store> _store;
     if (!_store) {
         try {
             settings.processEnvironment();
@@ -33,7 +33,7 @@ static ref<StoreAPI> store()
             croak("%s", e.what());
         }
     }
-    return ref<StoreAPI>(_store);
+    return ref<Store>(_store);
 }
 
 

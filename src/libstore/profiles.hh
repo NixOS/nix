@@ -31,9 +31,9 @@ typedef list<Generation> Generations;
    profile, sorted by generation number. */
 Generations findGenerations(Path profile, int & curGen);
 
-class StoreAPI;
+class Store;
 
-Path createGeneration(ref<StoreAPI> store, Path profile, Path outPath);
+Path createGeneration(ref<Store> store, Path profile, Path outPath);
 
 void deleteGeneration(const Path & profile, unsigned int gen);
 

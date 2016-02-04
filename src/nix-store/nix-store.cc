@@ -37,7 +37,7 @@ static Path gcRoot;
 static int rootNr = 0;
 static bool indirectRoot = false;
 static bool noOutput = false;
-static std::shared_ptr<StoreAPI> store;
+static std::shared_ptr<Store> store;
 
 
 LocalStore & ensureLocalStore()
@@ -84,7 +84,7 @@ static PathSet realisePath(Path path, bool build = true)
                 Path rootName = gcRoot;
                 if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
                 if (i->first != "out") rootName += "-" + i->first;
-                outPath = addPermRoot(ref<StoreAPI>(store), outPath, rootName, indirectRoot);
+                outPath = addPermRoot(ref<Store>(store), outPath, rootName, indirectRoot);
             }
             outputs.insert(outPath);
         }
@@ -100,7 +100,7 @@ static PathSet realisePath(Path path, bool build = true)
             Path rootName = gcRoot;
             rootNr++;
             if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
-            path = addPermRoot(ref<StoreAPI>(store), path, rootName, indirectRoot);
+            path = addPermRoot(ref<Store>(store), path, rootName, indirectRoot);
         }
         return singleton<PathSet>(path);
     }
@@ -142,7 +142,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
     }
 
     if (settings.get("print-missing", true))
-        printMissing(ref<StoreAPI>(store), willBuild, willSubstitute, unknown, downloadSize, narSize);
+        printMissing(ref<Store>(store), willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     if (dryRun) return;
 

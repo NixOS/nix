@@ -4,8 +4,8 @@
 
 namespace nix {
 
-class StoreAPI;
+class Store;
 
-void printXmlGraph(StoreAPI & store, const PathSet & roots);
+void printXmlGraph(Store & store, const PathSet & roots);
 
 }

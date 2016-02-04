@@ -32,7 +32,7 @@ static bool indirectRoot = false;
 enum OutputKind { okPlain, okXML, okJSON };
 
 
-void processExpr(ref<StoreAPI> store, EvalState & state, const Strings & attrPaths,
+void processExpr(ref<Store> store, EvalState & state, const Strings & attrPaths,
     bool parseOnly, bool strict, Bindings & autoArgs,
     bool evalOnly, OutputKind output, bool location, Expr * e)
 {

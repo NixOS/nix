@@ -7,7 +7,7 @@
 namespace nix {
 
 
-Derivation StoreAPI::derivationFromPath(const Path & drvPath)
+Derivation Store::derivationFromPath(const Path & drvPath)
 {
     assertStorePath(drvPath);
     ensurePath(drvPath);
@@ -15,7 +15,7 @@ Derivation StoreAPI::derivationFromPath(const Path & drvPath)
 }
 
 
-void StoreAPI::computeFSClosure(const Path & path,
+void Store::computeFSClosure(const Path & path,
     PathSet & paths, bool flipDirection, bool includeOutputs, bool includeDerivers)
 {
     if (paths.find(path) != paths.end()) return;
@@ -59,7 +59,7 @@ void StoreAPI::computeFSClosure(const Path & path,
 }
 
 
-void StoreAPI::queryMissing(const PathSet & targets,
+void Store::queryMissing(const PathSet & targets,
     PathSet & willBuild, PathSet & willSubstitute, PathSet & unknown,
     unsigned long long & downloadSize, unsigned long long & narSize)
 {
@@ -173,7 +173,7 @@ void StoreAPI::queryMissing(const PathSet & targets,
 }
 
 
-Paths StoreAPI::topoSortPaths(const PathSet & paths)
+Paths Store::topoSortPaths(const PathSet & paths)
 {
     Paths sorted;
     PathSet visited, parents;
