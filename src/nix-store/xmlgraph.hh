@@ -6,6 +6,6 @@ namespace nix {
 
 class Store;
 
-void printXmlGraph(Store & store, const PathSet & roots);
+void printXmlGraph(ref<Store> store, const PathSet & roots);
 
 }

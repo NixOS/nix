@@ -40,11 +40,11 @@ static bool noOutput = false;
 static std::shared_ptr<Store> store;
 
 
-LocalStore & ensureLocalStore()
+ref<LocalStore> ensureLocalStore()
 {
-    LocalStore * store2(dynamic_cast<LocalStore *>(store.get()));
+    auto store2 = std::dynamic_pointer_cast<LocalStore>(store);
     if (!store2) throw Error("you don't have sufficient rights to use this command");
-    return *store2;
+    return ref<LocalStore>(store2);
 }
 
 
@@ -395,7 +395,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 PathSet paths = maybeUseOutputs(followLinksToStorePath(i), useOutput, forceRealise);
                 roots.insert(paths.begin(), paths.end());
             }
-            printDotGraph(*store, roots);
+            printDotGraph(ref<Store>(store), roots);
             break;
         }
 
@@ -405,7 +405,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 PathSet paths = maybeUseOutputs(followLinksToStorePath(i), useOutput, forceRealise);
                 roots.insert(paths.begin(), paths.end());
             }
-            printXmlGraph(*store, roots);
+            printXmlGraph(ref<Store>(store), roots);
             break;
         }
 
@@ -574,7 +574,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
         }
     }
 
-    ensureLocalStore().registerValidPaths(infos);
+    ensureLocalStore()->registerValidPaths(infos);
 }
 
 
@@ -805,7 +805,7 @@ static void opRepairPath(Strings opFlags, Strings opArgs)
 
     for (auto & i : opArgs) {
         Path path = followLinksToStorePath(i);
-        ensureLocalStore().repairPath(path);
+        ensureLocalStore()->repairPath(path);
     }
 }
 
