@@ -655,7 +655,7 @@ void LocalStore::checkDerivationOutputs(const Path & drvPath, const Derivation &
     assert(isDerivation(drvName));
     drvName = string(drvName, 0, drvName.size() - drvExtension.size());
 
-    if (isFixedOutputDrv(drv)) {
+    if (drv.isFixedOutput()) {
         DerivationOutputs::const_iterator out = drv.outputs.find("out");
         if (out == drv.outputs.end())
             throw Error(format("derivation ‘%1%’ does not have an output named ‘out’") % drvPath);
@@ -1335,7 +1335,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
            error if a cycle is detected and roll back the
            transaction.  Cycles can only occur when a derivation
            has multiple outputs. */
-        topoSortPaths(*this, paths);
+        topoSortPaths(paths);
 
         txn.commit();
     } end_retry_sqlite;

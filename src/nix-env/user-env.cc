@@ -38,7 +38,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
             drvsToBuild.insert(i.queryDrvPath());
 
     debug(format("building user environment dependencies"));
-    store->buildPaths(drvsToBuild, state.repair ? bmRepair : bmNormal);
+    state.store->buildPaths(drvsToBuild, state.repair ? bmRepair : bmNormal);
 
     /* Construct the whole top level derivation. */
     PathSet references;
@@ -76,8 +76,8 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
             /* This is only necessary when installing store paths, e.g.,
                `nix-env -i /nix/store/abcd...-foo'. */
-            store->addTempRoot(j.second);
-            store->ensurePath(j.second);
+            state.store->addTempRoot(j.second);
+            state.store->ensurePath(j.second);
 
             references.insert(j.second);
         }
@@ -100,7 +100,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     /* Also write a copy of the list of user environment elements to
        the store; we need it for future modifications of the
        environment. */
-    Path manifestFile = store->addTextToStore("env-manifest.nix",
+    Path manifestFile = state.store->addTextToStore("env-manifest.nix",
         (format("%1%") % manifest).str(), references);
 
     /* Get the environment builder expression. */
@@ -128,7 +128,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
     /* Realise the resulting store expression. */
     debug("building user environment");
-    store->buildPaths(singleton<PathSet>(topLevelDrv), state.repair ? bmRepair : bmNormal);
+    state.store->buildPaths(singleton<PathSet>(topLevelDrv), state.repair ? bmRepair : bmNormal);
 
     /* Switch the current user environment to the output path. */
     PathLocks lock;
@@ -141,7 +141,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     }
 
     debug(format("switching to new user environment"));
-    Path generation = createGeneration(profile, topLevelOut);
+    Path generation = createGeneration(state.store, profile, topLevelOut);
     switchLink(profile, generation);
 
     return true;

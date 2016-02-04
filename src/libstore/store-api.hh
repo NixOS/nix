@@ -132,6 +132,7 @@ struct BuildResult
 
 
 struct BasicDerivation;
+struct Derivation;
 
 
 class StoreAPI
@@ -213,6 +214,10 @@ public:
        data is attached. */
     virtual void exportPath(const Path & path, bool sign,
         Sink & sink) = 0;
+
+    /* Export multiple paths in the format expected by ‘nix-store
+       --import’. */
+    void exportPaths(const Paths & paths, bool sign, Sink & sink);
 
     /* Import a sequence of NAR dumps created by exportPaths() into
        the Nix store. */
@@ -298,6 +303,35 @@ public:
     /* Check the integrity of the Nix store.  Returns true if errors
        remain. */
     virtual bool verifyStore(bool checkContents, bool repair) = 0;
+
+    /* Utility functions. */
+
+    /* Read a derivation, after ensuring its existence through
+       ensurePath(). */
+    Derivation derivationFromPath(const Path & drvPath);
+
+    /* Place in `paths' the set of all store paths in the file system
+       closure of `storePath'; that is, all paths than can be directly
+       or indirectly reached from it.  `paths' is not cleared.  If
+       `flipDirection' is true, the set of paths that can reach
+       `storePath' is returned; that is, the closures under the
+       `referrers' relation instead of the `references' relation is
+       returned. */
+    void computeFSClosure(const Path & path,
+        PathSet & paths, bool flipDirection = false,
+        bool includeOutputs = false, bool includeDerivers = false);
+
+    /* Given a set of paths that are to be built, return the set of
+       derivations that will be built, and the set of output paths
+       that will be substituted. */
+    void queryMissing(const PathSet & targets,
+        PathSet & willBuild, PathSet & willSubstitute, PathSet & unknown,
+        unsigned long long & downloadSize, unsigned long long & narSize);
+
+    /* Sort a set of paths topologically under the references
+       relation.  If p refers to q, then p preceeds q in this list. */
+    Paths topoSortPaths(const PathSet & paths);
+
 };
 
 
@@ -373,23 +407,13 @@ void removeTempRoots();
 
 
 /* Register a permanent GC root. */
-Path addPermRoot(StoreAPI & store, const Path & storePath,
+Path addPermRoot(ref<StoreAPI> store, const Path & storePath,
     const Path & gcRoot, bool indirect, bool allowOutsideRootsDir = false);
-
-
-/* Sort a set of paths topologically under the references relation.
-   If p refers to q, then p preceeds q in this list. */
-Paths topoSortPaths(StoreAPI & store, const PathSet & paths);
-
-
-/* For now, there is a single global store API object, but we'll
-   purify that in the future. */
-extern std::shared_ptr<StoreAPI> store;
 
 
 /* Factory method: open the Nix database, either through the local or
    remote implementation. */
-std::shared_ptr<StoreAPI> openStore(bool reserveSpace = true);
+ref<StoreAPI> openStore(bool reserveSpace = true);
 
 
 /* Display a set of paths in human-readable form (i.e., between quotes
@@ -399,12 +423,6 @@ string showPaths(const PathSet & paths);
 
 ValidPathInfo decodeValidPathInfo(std::istream & str,
     bool hashGiven = false);
-
-
-/* Export multiple paths in the format expected by ‘nix-store
-   --import’. */
-void exportPaths(StoreAPI & store, const Paths & paths,
-    bool sign, Sink & sink);
 
 
 MakeError(SubstError, Error)

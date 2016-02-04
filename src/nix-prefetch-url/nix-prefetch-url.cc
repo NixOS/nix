@@ -91,8 +91,8 @@ int main(int argc, char * * argv)
         if (args.size() > 2)
             throw UsageError("too many arguments");
 
-        store = openStore();
-        EvalState state(searchPath);
+        auto store = openStore();
+        EvalState state(searchPath, store);
 
         Bindings & autoArgs(*evalAutoArgs(state, autoArgs_));
 

@@ -2,7 +2,6 @@
 #include "store-api.hh"
 #include "globals.hh"
 #include "util.hh"
-#include "misc.hh"
 #include "worker-protocol.hh"
 
 
@@ -27,7 +26,49 @@ void DerivationOutput::parseHashInfo(bool & recursive, HashType & hashType, Hash
 }
 
 
-Path writeDerivation(StoreAPI & store,
+Path BasicDerivation::findOutput(const string & id) const
+{
+    auto i = outputs.find(id);
+    if (i == outputs.end())
+        throw Error(format("derivation has no output ‘%1%’") % id);
+    return i->second.path;
+}
+
+
+bool BasicDerivation::willBuildLocally() const
+{
+    return get(env, "preferLocalBuild") == "1" && canBuildLocally();
+}
+
+
+bool BasicDerivation::substitutesAllowed() const
+{
+    return get(env, "allowSubstitutes", "1") == "1";
+}
+
+
+bool BasicDerivation::isBuiltin() const
+{
+    return string(builder, 0, 8) == "builtin:";
+}
+
+
+bool BasicDerivation::canBuildLocally() const
+{
+    return platform == settings.thisSystem
+        || isBuiltin()
+#if __linux__
+        || (platform == "i686-linux" && settings.thisSystem == "x86_64-linux")
+        || (platform == "armv6l-linux" && settings.thisSystem == "armv7l-linux")
+#elif __FreeBSD__
+        || (platform == "i686-linux" && settings.thisSystem == "x86_64-freebsd")
+        || (platform == "i686-linux" && settings.thisSystem == "i686-freebsd")
+#endif
+        ;
+}
+
+
+Path writeDerivation(ref<StoreAPI> store,
     const Derivation & drv, const string & name, bool repair)
 {
     PathSet references;
@@ -38,10 +79,10 @@ Path writeDerivation(StoreAPI & store,
        (that can be missing (of course) and should not necessarily be
        held during a garbage collection). */
     string suffix = name + drvExtension;
-    string contents = unparseDerivation(drv);
+    string contents = drv.unparse();
     return settings.readOnlyMode
         ? computeStorePathForText(suffix, contents, references)
-        : store.addTextToStore(suffix, contents, references, repair);
+        : store->addTextToStore(suffix, contents, references, repair);
 }
 
 
@@ -149,14 +190,14 @@ static void printStrings(string & res, ForwardIterator i, ForwardIterator j)
 }
 
 
-string unparseDerivation(const Derivation & drv)
+string Derivation::unparse() const
 {
     string s;
     s.reserve(65536);
     s += "Derive([";
 
     bool first = true;
-    for (auto & i : drv.outputs) {
+    for (auto & i : outputs) {
         if (first) first = false; else s += ',';
         s += '('; printString(s, i.first);
         s += ','; printString(s, i.second.path);
@@ -167,7 +208,7 @@ string unparseDerivation(const Derivation & drv)
 
     s += "],[";
     first = true;
-    for (auto & i : drv.inputDrvs) {
+    for (auto & i : inputDrvs) {
         if (first) first = false; else s += ',';
         s += '('; printString(s, i.first);
         s += ','; printStrings(s, i.second.begin(), i.second.end());
@@ -175,15 +216,15 @@ string unparseDerivation(const Derivation & drv)
     }
 
     s += "],";
-    printStrings(s, drv.inputSrcs.begin(), drv.inputSrcs.end());
+    printStrings(s, inputSrcs.begin(), inputSrcs.end());
 
-    s += ','; printString(s, drv.platform);
-    s += ','; printString(s, drv.builder);
-    s += ','; printStrings(s, drv.args.begin(), drv.args.end());
+    s += ','; printString(s, platform);
+    s += ','; printString(s, builder);
+    s += ','; printStrings(s, args.begin(), args.end());
 
     s += ",[";
     first = true;
-    for (auto & i : drv.env) {
+    for (auto & i : env) {
         if (first) first = false; else s += ',';
         s += '('; printString(s, i.first);
         s += ','; printString(s, i.second);
@@ -202,11 +243,11 @@ bool isDerivation(const string & fileName)
 }
 
 
-bool isFixedOutputDrv(const Derivation & drv)
+bool BasicDerivation::isFixedOutput() const
 {
-    return drv.outputs.size() == 1 &&
-        drv.outputs.begin()->first == "out" &&
-        drv.outputs.begin()->second.hash != "";
+    return outputs.size() == 1 &&
+        outputs.begin()->first == "out" &&
+        outputs.begin()->second.hash != "";
 }
 
 
@@ -236,7 +277,7 @@ DrvHashes drvHashes;
 Hash hashDerivationModulo(StoreAPI & store, Derivation drv)
 {
     /* Return a fixed hash for fixed-output derivations. */
-    if (isFixedOutputDrv(drv)) {
+    if (drv.isFixedOutput()) {
         DerivationOutputs::const_iterator i = drv.outputs.begin();
         return hashString(htSHA256, "fixed:out:"
             + i->second.hashAlgo + ":"
@@ -259,7 +300,7 @@ Hash hashDerivationModulo(StoreAPI & store, Derivation drv)
     }
     drv.inputDrvs = inputs2;
 
-    return hashString(htSHA256, unparseDerivation(drv));
+    return hashString(htSHA256, drv.unparse());
 }
 
 
@@ -286,10 +327,10 @@ bool wantOutput(const string & output, const std::set<string> & wanted)
 }
 
 
-PathSet outputPaths(const BasicDerivation & drv)
+PathSet BasicDerivation::outputPaths() const
 {
     PathSet paths;
-    for (auto & i : drv.outputs)
+    for (auto & i : outputs)
         paths.insert(i.second.path);
     return paths;
 }

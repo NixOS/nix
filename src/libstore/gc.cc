@@ -1,5 +1,5 @@
+#include "derivations.hh"
 #include "globals.hh"
-#include "misc.hh"
 #include "local-store.hh"
 
 #include <functional>
@@ -83,7 +83,7 @@ void LocalStore::addIndirectRoot(const Path & path)
 }
 
 
-Path addPermRoot(StoreAPI & store, const Path & _storePath,
+Path addPermRoot(ref<StoreAPI> store, const Path & _storePath,
     const Path & _gcRoot, bool indirect, bool allowOutsideRootsDir)
 {
     Path storePath(canonPath(_storePath));
@@ -101,7 +101,7 @@ Path addPermRoot(StoreAPI & store, const Path & _storePath,
         if (pathExists(gcRoot) && (!isLink(gcRoot) || !isInStore(readLink(gcRoot))))
             throw Error(format("cannot create symlink ‘%1%’; already exists") % gcRoot);
         makeSymlink(gcRoot, storePath);
-        store.addIndirectRoot(gcRoot);
+        store->addIndirectRoot(gcRoot);
     }
 
     else {
@@ -127,7 +127,7 @@ Path addPermRoot(StoreAPI & store, const Path & _storePath,
        check if the root is in a directory in or linked from the
        gcroots directory. */
     if (settings.checkRootReachability) {
-        Roots roots = store.findRoots();
+        Roots roots = store->findRoots();
         if (roots.find(gcRoot) == roots.end())
             printMsg(lvlError,
                 format(
@@ -139,7 +139,7 @@ Path addPermRoot(StoreAPI & store, const Path & _storePath,
     /* Grab the global GC root, causing us to block while a GC is in
        progress.  This prevents the set of permanent roots from
        increasing while a GC is in progress. */
-    store.syncWithGC();
+    store->syncWithGC();
 
     return gcRoot;
 }
@@ -260,19 +260,16 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
 }
 
 
-static void foundRoot(StoreAPI & store,
-    const Path & path, const Path & target, Roots & roots)
+void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
 {
-    Path storePath = toStorePath(target);
-    if (store.isValidPath(storePath))
-        roots[path] = storePath;
-    else
-        printMsg(lvlInfo, format("skipping invalid root from ‘%1%’ to ‘%2%’") % path % storePath);
-}
+    auto foundRoot = [&](const Path & path, const Path & target) {
+        Path storePath = toStorePath(target);
+        if (isValidPath(storePath))
+            roots[path] = storePath;
+        else
+            printMsg(lvlInfo, format("skipping invalid root from ‘%1%’ to ‘%2%’") % path % storePath);
+    };
 
-
-static void findRoots(StoreAPI & store, const Path & path, unsigned char type, Roots & roots)
-{
     try {
 
         if (type == DT_UNKNOWN)
@@ -280,13 +277,13 @@ static void findRoots(StoreAPI & store, const Path & path, unsigned char type, R
 
         if (type == DT_DIR) {
             for (auto & i : readDirectory(path))
-                findRoots(store, path + "/" + i.name, i.type, roots);
+                findRoots(path + "/" + i.name, i.type, roots);
         }
 
         else if (type == DT_LNK) {
             Path target = readLink(path);
             if (isInStore(target))
-                foundRoot(store, path, target, roots);
+                foundRoot(path, target);
 
             /* Handle indirect roots. */
             else {
@@ -300,14 +297,14 @@ static void findRoots(StoreAPI & store, const Path & path, unsigned char type, R
                     struct stat st2 = lstat(target);
                     if (!S_ISLNK(st2.st_mode)) return;
                     Path target2 = readLink(target);
-                    if (isInStore(target2)) foundRoot(store, target, target2, roots);
+                    if (isInStore(target2)) foundRoot(target, target2);
                 }
             }
         }
 
         else if (type == DT_REG) {
             Path storePath = settings.nixStore + "/" + baseNameOf(path);
-            if (store.isValidPath(storePath))
+            if (isValidPath(storePath))
                 roots[path] = storePath;
         }
 
@@ -328,16 +325,16 @@ Roots LocalStore::findRoots()
     Roots roots;
 
     /* Process direct roots in {gcroots,manifests,profiles}. */
-    nix::findRoots(*this, settings.nixStateDir + "/" + gcRootsDir, DT_UNKNOWN, roots);
+    findRoots(settings.nixStateDir + "/" + gcRootsDir, DT_UNKNOWN, roots);
     if (pathExists(settings.nixStateDir + "/manifests"))
-        nix::findRoots(*this, settings.nixStateDir + "/manifests", DT_UNKNOWN, roots);
-    nix::findRoots(*this, settings.nixStateDir + "/profiles", DT_UNKNOWN, roots);
+        findRoots(settings.nixStateDir + "/manifests", DT_UNKNOWN, roots);
+    findRoots(settings.nixStateDir + "/profiles", DT_UNKNOWN, roots);
 
     return roots;
 }
 
 
-static void addAdditionalRoots(StoreAPI & store, PathSet & roots)
+void LocalStore::findRuntimeRoots(PathSet & roots)
 {
     Path rootFinder = getEnv("NIX_ROOT_FINDER",
         settings.nixLibexecDir + "/nix/find-runtime-roots.pl");
@@ -353,7 +350,7 @@ static void addAdditionalRoots(StoreAPI & store, PathSet & roots)
     for (auto & i : paths)
         if (isInStore(i)) {
             Path path = toStorePath(i);
-            if (roots.find(path) == roots.end() && store.isValidPath(path)) {
+            if (roots.find(path) == roots.end() && isValidPath(path)) {
                 debug(format("got additional root ‘%1%’") % path);
                 roots.insert(path);
             }
@@ -628,7 +625,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        to add running programs to the set of roots (to prevent them
        from being garbage collected). */
     if (!options.ignoreLiveness)
-        addAdditionalRoots(*this, state.roots);
+        findRuntimeRoots(state.roots);
 
     /* Read the temporary roots.  This acquires read locks on all
        per-process temporary root files.  So after this point no paths

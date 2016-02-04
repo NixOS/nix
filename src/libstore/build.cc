@@ -2,7 +2,6 @@
 
 #include "references.hh"
 #include "pathlocks.hh"
-#include "misc.hh"
 #include "globals.hh"
 #include "local-store.hh"
 #include "util.hh"
@@ -906,7 +905,7 @@ DerivationGoal::DerivationGoal(const Path & drvPath, const BasicDerivation & drv
 {
     this->drv = std::unique_ptr<BasicDerivation>(new BasicDerivation(drv));
     state = &DerivationGoal::haveDerivation;
-    name = (format("building of %1%") % showPaths(outputPaths(drv))).str();
+    name = (format("building of %1%") % showPaths(drv.outputPaths())).str();
     trace("created");
 
     /* Prevent the .chroot directory from being
@@ -1018,7 +1017,7 @@ void DerivationGoal::loadDerivation()
     assert(worker.store.isValidPath(drvPath));
 
     /* Get the derivation. */
-    drv = std::unique_ptr<BasicDerivation>(new Derivation(derivationFromPath(worker.store, drvPath)));
+    drv = std::unique_ptr<BasicDerivation>(new Derivation(worker.store.derivationFromPath(drvPath)));
 
     haveDerivation();
 }
@@ -1057,7 +1056,7 @@ void DerivationGoal::haveDerivation()
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
-    if (settings.useSubstitutes && substitutesAllowed(*drv))
+    if (settings.useSubstitutes && drv->substitutesAllowed())
         for (auto & i : invalidOutputs)
             addWaitee(worker.makeSubstitutionGoal(i, buildMode == bmRepair));
 
@@ -1138,7 +1137,7 @@ void DerivationGoal::repairClosure()
     PathSet outputClosure;
     for (auto & i : drv->outputs) {
         if (!wantOutput(i.first, wantedOutputs)) continue;
-        computeFSClosure(worker.store, i.second.path, outputClosure);
+        worker.store.computeFSClosure(i.second.path, outputClosure);
     }
 
     /* Filter out our own outputs (which we have already checked). */
@@ -1149,11 +1148,11 @@ void DerivationGoal::repairClosure()
        derivation is responsible for which path in the output
        closure. */
     PathSet inputClosure;
-    if (useDerivation) computeFSClosure(worker.store, drvPath, inputClosure);
+    if (useDerivation) worker.store.computeFSClosure(drvPath, inputClosure);
     std::map<Path, Path> outputsToDrv;
     for (auto & i : inputClosure)
         if (isDerivation(i)) {
-            Derivation drv = derivationFromPath(worker.store, i);
+            Derivation drv = worker.store.derivationFromPath(i);
             for (auto & j : drv.outputs)
                 outputsToDrv[j.second.path] = i;
         }
@@ -1225,10 +1224,10 @@ void DerivationGoal::inputsRealised()
                `i' as input paths.  Only add the closures of output paths
                that are specified as inputs. */
             assert(worker.store.isValidPath(i.first));
-            Derivation inDrv = derivationFromPath(worker.store, i.first);
+            Derivation inDrv = worker.store.derivationFromPath(i.first);
             for (auto & j : i.second)
                 if (inDrv.outputs.find(j) != inDrv.outputs.end())
-                    computeFSClosure(worker.store, inDrv.outputs[j].path, inputPaths);
+                    worker.store.computeFSClosure(inDrv.outputs[j].path, inputPaths);
                 else
                     throw Error(
                         format("derivation ‘%1%’ requires non-existent output ‘%2%’ from input derivation ‘%3%’")
@@ -1237,7 +1236,7 @@ void DerivationGoal::inputsRealised()
 
     /* Second, the input sources. */
     for (auto & i : drv->inputSrcs)
-        computeFSClosure(worker.store, i, inputPaths);
+        worker.store.computeFSClosure(i, inputPaths);
 
     debug(format("added input paths %1%") % showPaths(inputPaths));
 
@@ -1257,46 +1256,6 @@ void DerivationGoal::inputsRealised()
        build hook. */
     state = &DerivationGoal::tryToBuild;
     worker.wakeUp(shared_from_this());
-}
-
-
-static bool isBuiltin(const BasicDerivation & drv)
-{
-    return string(drv.builder, 0, 8) == "builtin:";
-}
-
-
-static bool canBuildLocally(const BasicDerivation & drv)
-{
-    return drv.platform == settings.thisSystem
-        || isBuiltin(drv)
-#if __linux__
-        || (drv.platform == "i686-linux" && settings.thisSystem == "x86_64-linux")
-        || (drv.platform == "armv6l-linux" && settings.thisSystem == "armv7l-linux")
-#elif __FreeBSD__
-        || (drv.platform == "i686-linux" && settings.thisSystem == "x86_64-freebsd")
-        || (drv.platform == "i686-linux" && settings.thisSystem == "i686-freebsd")
-#endif
-        ;
-}
-
-
-static string get(const StringPairs & map, const string & key, const string & def = "")
-{
-    StringPairs::const_iterator i = map.find(key);
-    return i == map.end() ? def : i->second;
-}
-
-
-bool willBuildLocally(const BasicDerivation & drv)
-{
-    return get(drv.env, "preferLocalBuild") == "1" && canBuildLocally(drv);
-}
-
-
-bool substitutesAllowed(const BasicDerivation & drv)
-{
-    return get(drv.env, "allowSubstitutes", "1") == "1";
 }
 
 
@@ -1322,7 +1281,7 @@ void DerivationGoal::tryToBuild()
        can't acquire the lock, then continue; hopefully some other
        goal can start a build, and if not, the main loop will sleep a
        few seconds and then retry this goal. */
-    if (!outputLocks.lockPaths(outputPaths(*drv), "", false)) {
+    if (!outputLocks.lockPaths(drv->outputPaths(), "", false)) {
         worker.waitForAWhile(shared_from_this());
         return;
     }
@@ -1342,7 +1301,7 @@ void DerivationGoal::tryToBuild()
         return;
     }
 
-    missingPaths = outputPaths(*drv);
+    missingPaths = drv->outputPaths();
     if (buildMode != bmCheck)
         for (auto & i : validPaths) missingPaths.erase(i);
 
@@ -1365,7 +1324,7 @@ void DerivationGoal::tryToBuild()
     /* Don't do a remote build if the derivation has the attribute
        `preferLocalBuild' set.  Also, check and repair modes are only
        supported for local builds. */
-    bool buildLocally = buildMode != bmNormal || willBuildLocally(*drv);
+    bool buildLocally = buildMode != bmNormal || drv->willBuildLocally();
 
     /* Is the build hook willing to accept this job? */
     if (!buildLocally) {
@@ -1661,7 +1620,7 @@ HookReply DerivationGoal::tryBuildHook()
        list it since the remote system *probably* already has it.) */
     PathSet allInputs;
     allInputs.insert(inputPaths.begin(), inputPaths.end());
-    computeFSClosure(worker.store, drvPath, allInputs);
+    worker.store.computeFSClosure(drvPath, allInputs);
 
     string s;
     for (auto & i : allInputs) { s += i; s += ' '; }
@@ -1716,7 +1675,7 @@ void DerivationGoal::startBuilder()
     startNest(nest, lvlInfo, f % showPaths(missingPaths) % curRound % nrRounds);
 
     /* Right platform? */
-    if (!canBuildLocally(*drv)) {
+    if (!drv->canBuildLocally()) {
         if (settings.printBuildTrace)
             printMsg(lvlError, format("@ unsupported-platform %1% %2%") % drvPath % drv->platform);
         throw Error(
@@ -1873,14 +1832,14 @@ void DerivationGoal::startBuilder()
            like passing all build-time dependencies of some path to a
            derivation that builds a NixOS DVD image. */
         PathSet paths, paths2;
-        computeFSClosure(worker.store, storePath, paths);
+        worker.store.computeFSClosure(storePath, paths);
         paths2 = paths;
 
         for (auto & j : paths2) {
             if (isDerivation(j)) {
-                Derivation drv = derivationFromPath(worker.store, j);
+                Derivation drv = worker.store.derivationFromPath(j);
                 for (auto & k : drv.outputs)
-                    computeFSClosure(worker.store, k.second.path, paths);
+                    worker.store.computeFSClosure(k.second.path, paths);
             }
         }
 
@@ -1944,7 +1903,7 @@ void DerivationGoal::startBuilder()
         PathSet closure;
         for (auto & i : dirsInChroot)
             if (isInStore(i.second))
-                computeFSClosure(worker.store, toStorePath(i.second), closure);
+                worker.store.computeFSClosure(toStorePath(i.second), closure);
         for (auto & i : closure)
             dirsInChroot[i] = i;
 
@@ -2212,7 +2171,7 @@ void DerivationGoal::startBuilder()
 #endif
     {
         ProcessOptions options;
-        options.allowVfork = !buildUser.enabled() && !isBuiltin(*drv);
+        options.allowVfork = !buildUser.enabled() && !drv->isBuiltin();
         pid = startProcess([&]() {
             runChild();
         }, options);
@@ -2466,7 +2425,7 @@ void DerivationGoal::runChild()
         const char *builder = "invalid";
 
         string sandboxProfile;
-        if (isBuiltin(*drv)) {
+        if (drv->isBuiltin()) {
             ;
 #if __APPLE__
         } else if (useChroot) {
@@ -2583,7 +2542,7 @@ void DerivationGoal::runChild()
         writeFull(STDERR_FILENO, string("\1\n"));
 
         /* Execute the program.  This should not return. */
-        if (isBuiltin(*drv)) {
+        if (drv->isBuiltin()) {
             try {
                 logType = ltFlat;
                 if (drv->builder == "builtin:fetchurl")
@@ -2813,7 +2772,7 @@ void DerivationGoal::registerOutputs()
                 for (auto & i : references)
                     /* Don't call computeFSClosure on ourselves. */
                     if (actualPath != i)
-                        computeFSClosure(worker.store, i, used);
+                        worker.store.computeFSClosure(i, used);
             } else
                 used = references;
 

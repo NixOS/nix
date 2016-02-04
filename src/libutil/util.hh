@@ -413,4 +413,14 @@ string base64Encode(const string & s);
 string base64Decode(const string & s);
 
 
+/* Get a value for the specified key from an associate container, or a
+   default value if the key doesn't exist. */
+template <class T>
+string get(const T & map, const string & key, const string & def = "")
+{
+    auto i = map.find(key);
+    return i == map.end() ? def : i->second;
+}
+
+
 }

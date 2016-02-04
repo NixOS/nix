@@ -1,14 +1,14 @@
-#include "globals.hh"
-#include "misc.hh"
 #include "archive.hh"
-#include "shared.hh"
+#include "derivations.hh"
 #include "dotgraph.hh"
-#include "xmlgraph.hh"
+#include "globals.hh"
 #include "local-store.hh"
-#include "util.hh"
-#include "serve-protocol.hh"
-#include "worker-protocol.hh"
 #include "monitor-fd.hh"
+#include "serve-protocol.hh"
+#include "shared.hh"
+#include "util.hh"
+#include "worker-protocol.hh"
+#include "xmlgraph.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -37,6 +37,7 @@ static Path gcRoot;
 static int rootNr = 0;
 static bool indirectRoot = false;
 static bool noOutput = false;
+static std::shared_ptr<StoreAPI> store;
 
 
 LocalStore & ensureLocalStore()
@@ -65,7 +66,7 @@ static PathSet realisePath(Path path, bool build = true)
 
     if (isDerivation(p.first)) {
         if (build) store->buildPaths(singleton<PathSet>(path));
-        Derivation drv = derivationFromPath(*store, p.first);
+        Derivation drv = store->derivationFromPath(p.first);
         rootNr++;
 
         if (p.second.empty())
@@ -83,7 +84,7 @@ static PathSet realisePath(Path path, bool build = true)
                 Path rootName = gcRoot;
                 if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
                 if (i->first != "out") rootName += "-" + i->first;
-                outPath = addPermRoot(*store, outPath, rootName, indirectRoot);
+                outPath = addPermRoot(ref<StoreAPI>(store), outPath, rootName, indirectRoot);
             }
             outputs.insert(outPath);
         }
@@ -99,7 +100,7 @@ static PathSet realisePath(Path path, bool build = true)
             Path rootName = gcRoot;
             rootNr++;
             if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
-            path = addPermRoot(*store, path, rootName, indirectRoot);
+            path = addPermRoot(ref<StoreAPI>(store), path, rootName, indirectRoot);
         }
         return singleton<PathSet>(path);
     }
@@ -129,7 +130,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
 
     unsigned long long downloadSize, narSize;
     PathSet willBuild, willSubstitute, unknown;
-    queryMissing(*store, PathSet(paths.begin(), paths.end()),
+    store->queryMissing(PathSet(paths.begin(), paths.end()),
         willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     if (ignoreUnknown) {
@@ -141,7 +142,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
     }
 
     if (settings.get("print-missing", true))
-        printMissing(*store, willBuild, willSubstitute, unknown, downloadSize, narSize);
+        printMissing(ref<StoreAPI>(store), willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     if (dryRun) return;
 
@@ -216,7 +217,7 @@ static PathSet maybeUseOutputs(const Path & storePath, bool useOutput, bool forc
 {
     if (forceRealise) realisePath(storePath);
     if (useOutput && isDerivation(storePath)) {
-        Derivation drv = derivationFromPath(*store, storePath);
+        Derivation drv = store->derivationFromPath(storePath);
         PathSet outputs;
         for (auto & i : drv.outputs)
             outputs.insert(i.second.path);
@@ -253,7 +254,7 @@ static void printTree(const Path & path,
        closure(B).  That is, if derivation A is an (possibly indirect)
        input of B, then A is printed first.  This has the effect of
        flattening the tree, preventing deeply nested structures.  */
-    Paths sorted = topoSortPaths(*store, references);
+    Paths sorted = store->topoSortPaths(references);
     reverse(sorted.begin(), sorted.end());
 
     for (auto i = sorted.begin(); i != sorted.end(); ++i) {
@@ -318,7 +319,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (auto & i : opArgs) {
                 i = followLinksToStorePath(i);
                 if (forceRealise) realisePath(i);
-                Derivation drv = derivationFromPath(*store, i);
+                Derivation drv = store->derivationFromPath(i);
                 for (auto & j : drv.outputs)
                     cout << format("%1%\n") % j.second.path;
             }
@@ -333,13 +334,13 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (auto & i : opArgs) {
                 PathSet ps = maybeUseOutputs(followLinksToStorePath(i), useOutput, forceRealise);
                 for (auto & j : ps) {
-                    if (query == qRequisites) computeFSClosure(*store, j, paths, false, includeOutputs);
+                    if (query == qRequisites) store->computeFSClosure(j, paths, false, includeOutputs);
                     else if (query == qReferences) store->queryReferences(j, paths);
                     else if (query == qReferrers) store->queryReferrers(j, paths);
-                    else if (query == qReferrersClosure) computeFSClosure(*store, j, paths, true);
+                    else if (query == qReferrersClosure) store->computeFSClosure(j, paths, true);
                 }
             }
-            Paths sorted = topoSortPaths(*store, paths);
+            Paths sorted = store->topoSortPaths(paths);
             for (Paths::reverse_iterator i = sorted.rbegin();
                  i != sorted.rend(); ++i)
                 cout << format("%s\n") % *i;
@@ -357,7 +358,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         case qBinding:
             for (auto & i : opArgs) {
                 Path path = useDeriver(followLinksToStorePath(i));
-                Derivation drv = derivationFromPath(*store, path);
+                Derivation drv = store->derivationFromPath(path);
                 StringPairs::iterator j = drv.env.find(bindingName);
                 if (j == drv.env.end())
                     throw Error(format("derivation ‘%1%’ has no environment binding named ‘%2%’")
@@ -394,7 +395,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 PathSet paths = maybeUseOutputs(followLinksToStorePath(i), useOutput, forceRealise);
                 roots.insert(paths.begin(), paths.end());
             }
-            printDotGraph(roots);
+            printDotGraph(*store, roots);
             break;
         }
 
@@ -404,7 +405,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 PathSet paths = maybeUseOutputs(followLinksToStorePath(i), useOutput, forceRealise);
                 roots.insert(paths.begin(), paths.end());
             }
-            printXmlGraph(roots);
+            printXmlGraph(*store, roots);
             break;
         }
 
@@ -419,7 +420,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (auto & i : opArgs) {
                 PathSet paths = maybeUseOutputs(followLinksToStorePath(i), useOutput, forceRealise);
                 for (auto & j : paths)
-                    computeFSClosure(*store, j, referrers, true,
+                    store->computeFSClosure(j, referrers, true,
                         settings.gcKeepOutputs, settings.gcKeepDerivations);
             }
             Roots roots = store->findRoots();
@@ -450,7 +451,7 @@ static void opPrintEnv(Strings opFlags, Strings opArgs)
     if (opArgs.size() != 1) throw UsageError("‘--print-env’ requires one derivation store path");
 
     Path drvPath = opArgs.front();
-    Derivation drv = derivationFromPath(*store, drvPath);
+    Derivation drv = store->derivationFromPath(drvPath);
 
     /* Print each environment variable in the derivation in a format
        that can be sourced by the shell. */
@@ -715,9 +716,9 @@ static void opExport(Strings opFlags, Strings opArgs)
         else throw UsageError(format("unknown flag ‘%1%’") % i);
 
     FdSink sink(STDOUT_FILENO);
-    Paths sorted = topoSortPaths(*store, PathSet(opArgs.begin(), opArgs.end()));
+    Paths sorted = store->topoSortPaths(PathSet(opArgs.begin(), opArgs.end()));
     reverse(sorted.begin(), sorted.end());
-    exportPaths(*store, sorted, sign, sink);
+    store->exportPaths(sorted, sign, sink);
 }
 
 
@@ -896,7 +897,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                         if (!isDerivation(path)) paths2.insert(path);
                     unsigned long long downloadSize, narSize;
                     PathSet willBuild, willSubstitute, unknown;
-                    queryMissing(*store, PathSet(paths2.begin(), paths2.end()),
+                    store->queryMissing(PathSet(paths2.begin(), paths2.end()),
                         willBuild, willSubstitute, unknown, downloadSize, narSize);
                     /* FIXME: should use ensurePath(), but it only
                        does one path at a time. */
@@ -941,9 +942,9 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             case cmdExportPaths: {
                 bool sign = readInt(in);
-                Paths sorted = topoSortPaths(*store, readStorePaths<PathSet>(in));
+                Paths sorted = store->topoSortPaths(readStorePaths<PathSet>(in));
                 reverse(sorted.begin(), sorted.end());
-                exportPaths(*store, sorted, sign, out);
+                store->exportPaths(sorted, sign, out);
                 break;
             }
 
@@ -988,7 +989,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 PathSet paths = readStorePaths<PathSet>(in);
                 PathSet closure;
                 for (auto & i : paths)
-                    computeFSClosure(*store, i, closure, false, includeOutputs);
+                    store->computeFSClosure(i, closure, false, includeOutputs);
                 out << closure;
                 break;
             }

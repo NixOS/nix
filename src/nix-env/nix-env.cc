@@ -1,17 +1,17 @@
-#include "profiles.hh"
-#include "names.hh"
-#include "globals.hh"
-#include "misc.hh"
-#include "shared.hh"
-#include "eval.hh"
-#include "get-drvs.hh"
 #include "attr-path.hh"
 #include "common-opts.hh"
-#include "xml-writer.hh"
+#include "derivations.hh"
+#include "eval.hh"
+#include "get-drvs.hh"
+#include "globals.hh"
+#include "names.hh"
+#include "profiles.hh"
+#include "shared.hh"
 #include "store-api.hh"
 #include "user-env.hh"
 #include "util.hh"
 #include "value-to-json.hh"
+#include "xml-writer.hh"
 
 #include <cerrno>
 #include <ctime>
@@ -223,8 +223,8 @@ static int comparePriorities(EvalState & state, DrvInfo & drv1, DrvInfo & drv2)
 static bool isPrebuilt(EvalState & state, DrvInfo & elem)
 {
     Path path = elem.queryOutPath();
-    if (store->isValidPath(path)) return true;
-    PathSet ps = store->querySubstitutablePaths(singleton<PathSet>(path));
+    if (state.store->isValidPath(path)) return true;
+    PathSet ps = state.store->querySubstitutablePaths(singleton<PathSet>(path));
     return ps.find(path) != ps.end();
 }
 
@@ -398,7 +398,7 @@ static void queryInstSources(EvalState & state,
 
                 if (isDerivation(path)) {
                     elem.setDrvPath(path);
-                    elem.setOutPath(findOutput(derivationFromPath(*store, path), "out"));
+                    elem.setOutPath(state.store->derivationFromPath(path).findOutput("out"));
                     if (name.size() >= drvExtension.size() &&
                         string(name, name.size() - drvExtension.size()) == drvExtension)
                         name = string(name, 0, name.size() - drvExtension.size());
@@ -445,7 +445,7 @@ static void printMissing(EvalState & state, DrvInfos & elems)
             targets.insert(i.queryOutPath());
     }
 
-    printMissing(*store, targets);
+    printMissing(state.store, targets);
 }
 
 
@@ -711,18 +711,18 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
 
     if (drv.queryDrvPath() != "") {
         PathSet paths = singleton<PathSet>(drv.queryDrvPath());
-        printMissing(*store, paths);
+        printMissing(globals.state->store, paths);
         if (globals.dryRun) return;
-        store->buildPaths(paths, globals.state->repair ? bmRepair : bmNormal);
+        globals.state->store->buildPaths(paths, globals.state->repair ? bmRepair : bmNormal);
     }
     else {
-        printMissing(*store, singleton<PathSet>(drv.queryOutPath()));
+        printMissing(globals.state->store, singleton<PathSet>(drv.queryOutPath()));
         if (globals.dryRun) return;
-        store->ensurePath(drv.queryOutPath());
+        globals.state->store->ensurePath(drv.queryOutPath());
     }
 
     debug(format("switching to new user environment"));
-    Path generation = createGeneration(globals.profile, drv.queryOutPath());
+    Path generation = createGeneration(globals.state->store, globals.profile, drv.queryOutPath());
     switchLink(globals.profile, generation);
 }
 
@@ -973,8 +973,8 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                 printMsg(lvlTalkative, format("skipping derivation named ‘%1%’ which gives an assertion failure") % i.name);
                 i.setFailed();
             }
-        validPaths = store->queryValidPaths(paths);
-        substitutablePaths = store->querySubstitutablePaths(paths);
+        validPaths = globals.state->store->queryValidPaths(paths);
+        substitutablePaths = globals.state->store->querySubstitutablePaths(paths);
     }
 
 
@@ -1394,9 +1394,9 @@ int main(int argc, char * * argv)
 
         if (!op) throw UsageError("no operation specified");
 
-        store = openStore();
+        auto store = openStore();
 
-        globals.state = std::shared_ptr<EvalState>(new EvalState(searchPath));
+        globals.state = std::shared_ptr<EvalState>(new EvalState(searchPath, store));
         globals.state->repair = repair;
 
         if (file != "")

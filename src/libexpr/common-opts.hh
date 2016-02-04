@@ -4,6 +4,8 @@
 
 namespace nix {
 
+class StoreAPI;
+
 /* Some common option parsing between nix-env and nix-instantiate. */
 bool parseAutoArgs(Strings::iterator & i,
     const Strings::iterator & argsEnd, std::map<string, string> & res);

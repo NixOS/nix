@@ -94,7 +94,7 @@ void printClosure(const Path & nePath, const StoreExpr & fs)
 #endif
 
 
-void printDotGraph(const PathSet & roots)
+void printDotGraph(StoreAPI & store, const PathSet & roots)
 {
     PathSet workList(roots);
     PathSet doneSet;
@@ -111,7 +111,7 @@ void printDotGraph(const PathSet & roots)
         cout << makeNode(path, symbolicName(path), "#ff0000");
 
         PathSet references;
-        store->queryReferences(path, references);
+        store.queryReferences(path, references);
 
         for (PathSet::iterator i = references.begin();
              i != references.end(); ++i)

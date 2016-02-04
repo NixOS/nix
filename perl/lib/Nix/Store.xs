@@ -6,10 +6,10 @@
 #undef do_open
 #undef do_close
 
-#include <store-api.hh>
-#include <globals.hh>
-#include <misc.hh>
-#include <util.hh>
+#include "derivations.hh"
+#include "globals.hh"
+#include "store-api.hh"
+#include "util.hh"
 
 #if HAVE_SODIUM
 #include <sodium.h>
@@ -19,19 +19,21 @@
 using namespace nix;
 
 
-void doInit()
+static ref<StoreAPI> store()
 {
-    if (!store) {
+    static std::shared_ptr<StoreAPI> _store;
+    if (!_store) {
         try {
             settings.processEnvironment();
             settings.loadConfFile();
             settings.update();
             settings.lockCPU = false;
-            store = openStore();
+            _store = openStore();
         } catch (Error & e) {
             croak("%s", e.what());
         }
     }
+    return ref<StoreAPI>(_store);
 }
 
 
@@ -45,7 +47,7 @@ PROTOTYPES: ENABLE
 
 void init()
     CODE:
-        doInit();
+        store();
 
 
 void setVerbosity(int level)
@@ -56,8 +58,7 @@ void setVerbosity(int level)
 int isValidPath(char * path)
     CODE:
         try {
-            doInit();
-            RETVAL = store->isValidPath(path);
+            RETVAL = store()->isValidPath(path);
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -68,9 +69,8 @@ int isValidPath(char * path)
 SV * queryReferences(char * path)
     PPCODE:
         try {
-            doInit();
             PathSet paths;
-            store->queryReferences(path, paths);
+            store()->queryReferences(path, paths);
             for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i)
                 XPUSHs(sv_2mortal(newSVpv(i->c_str(), 0)));
         } catch (Error & e) {
@@ -81,8 +81,7 @@ SV * queryReferences(char * path)
 SV * queryPathHash(char * path)
     PPCODE:
         try {
-            doInit();
-            Hash hash = store->queryPathHash(path);
+            Hash hash = store()->queryPathHash(path);
             string s = "sha256:" + printHash32(hash);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
@@ -93,8 +92,7 @@ SV * queryPathHash(char * path)
 SV * queryDeriver(char * path)
     PPCODE:
         try {
-            doInit();
-            Path deriver = store->queryDeriver(path);
+            Path deriver = store()->queryDeriver(path);
             if (deriver == "") XSRETURN_UNDEF;
             XPUSHs(sv_2mortal(newSVpv(deriver.c_str(), 0)));
         } catch (Error & e) {
@@ -105,8 +103,7 @@ SV * queryDeriver(char * path)
 SV * queryPathInfo(char * path, int base32)
     PPCODE:
         try {
-            doInit();
-            ValidPathInfo info = store->queryPathInfo(path);
+            ValidPathInfo info = store()->queryPathInfo(path);
             if (info.deriver == "")
                 XPUSHs(&PL_sv_undef);
             else
@@ -127,8 +124,7 @@ SV * queryPathInfo(char * path, int base32)
 SV * queryPathFromHashPart(char * hashPart)
     PPCODE:
         try {
-            doInit();
-            Path path = store->queryPathFromHashPart(hashPart);
+            Path path = store()->queryPathFromHashPart(hashPart);
             XPUSHs(sv_2mortal(newSVpv(path.c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
@@ -138,10 +134,9 @@ SV * queryPathFromHashPart(char * hashPart)
 SV * computeFSClosure(int flipDirection, int includeOutputs, ...)
     PPCODE:
         try {
-            doInit();
             PathSet paths;
             for (int n = 2; n < items; ++n)
-                computeFSClosure(*store, SvPV_nolen(ST(n)), paths, flipDirection, includeOutputs);
+                store()->computeFSClosure(SvPV_nolen(ST(n)), paths, flipDirection, includeOutputs);
             for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i)
                 XPUSHs(sv_2mortal(newSVpv(i->c_str(), 0)));
         } catch (Error & e) {
@@ -152,10 +147,9 @@ SV * computeFSClosure(int flipDirection, int includeOutputs, ...)
 SV * topoSortPaths(...)
     PPCODE:
         try {
-            doInit();
             PathSet paths;
             for (int n = 0; n < items; ++n) paths.insert(SvPV_nolen(ST(n)));
-            Paths sorted = topoSortPaths(*store, paths);
+            Paths sorted = store()->topoSortPaths(paths);
             for (Paths::iterator i = sorted.begin(); i != sorted.end(); ++i)
                 XPUSHs(sv_2mortal(newSVpv(i->c_str(), 0)));
         } catch (Error & e) {
@@ -166,7 +160,6 @@ SV * topoSortPaths(...)
 SV * followLinksToStorePath(char * path)
     CODE:
         try {
-            doInit();
             RETVAL = newSVpv(followLinksToStorePath(path).c_str(), 0);
         } catch (Error & e) {
             croak("%s", e.what());
@@ -178,11 +171,10 @@ SV * followLinksToStorePath(char * path)
 void exportPaths(int fd, int sign, ...)
     PPCODE:
         try {
-            doInit();
             Paths paths;
             for (int n = 2; n < items; ++n) paths.push_back(SvPV_nolen(ST(n)));
             FdSink sink(fd);
-            exportPaths(*store, paths, sign, sink);
+            store()->exportPaths(paths, sign, sink);
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -191,9 +183,8 @@ void exportPaths(int fd, int sign, ...)
 void importPaths(int fd)
     PPCODE:
         try {
-            doInit();
             FdSource source(fd);
-            store->importPaths(false, source);
+            store()->importPaths(false, source);
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -292,8 +283,7 @@ int checkSignature(SV * publicKey_, SV * sig_, char * msg)
 SV * addToStore(char * srcPath, int recursive, char * algo)
     PPCODE:
         try {
-            doInit();
-            Path path = store->addToStore(baseNameOf(srcPath), srcPath, recursive, parseHashType(algo));
+            Path path = store()->addToStore(baseNameOf(srcPath), srcPath, recursive, parseHashType(algo));
             XPUSHs(sv_2mortal(newSVpv(path.c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
@@ -303,7 +293,6 @@ SV * addToStore(char * srcPath, int recursive, char * algo)
 SV * makeFixedOutputPath(int recursive, char * algo, char * hash, char * name)
     PPCODE:
         try {
-            doInit();
             HashType ht = parseHashType(algo);
             Path path = makeFixedOutputPath(recursive, ht,
                 parseHash16or32(ht, hash), name);
@@ -318,8 +307,7 @@ SV * derivationFromPath(char * drvPath)
         HV *hash;
     CODE:
         try {
-            doInit();
-            Derivation drv = derivationFromPath(*store, drvPath);
+            Derivation drv = store()->derivationFromPath(drvPath);
             hash = newHV();
 
             HV * outputs = newHV();
@@ -361,8 +349,7 @@ SV * derivationFromPath(char * drvPath)
 void addTempRoot(char * storePath)
     PPCODE:
         try {
-            doInit();
-            store->addTempRoot(storePath);
+            store()->addTempRoot(storePath);
         } catch (Error & e) {
             croak("%s", e.what());
         }

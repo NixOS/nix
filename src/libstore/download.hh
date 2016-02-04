@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.hh"
+
 #include <string>
 
 namespace nix {
@@ -18,9 +19,11 @@ struct DownloadResult
     string data, etag;
 };
 
+class StoreAPI;
+
 DownloadResult downloadFile(string url, const DownloadOptions & options);
 
-Path downloadFileCached(const string & url, bool unpack);
+Path downloadFileCached(ref<StoreAPI> store, const string & url, bool unpack);
 
 MakeError(DownloadError, Error)
 

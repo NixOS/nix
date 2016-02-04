@@ -74,7 +74,7 @@ static void makeName(const Path & profile, unsigned int num,
 }
 
 
-Path createGeneration(Path profile, Path outPath)
+Path createGeneration(ref<StoreAPI> store, Path profile, Path outPath)
 {
     /* The new generation number should be higher than old the
        previous ones. */
@@ -108,7 +108,7 @@ Path createGeneration(Path profile, Path outPath)
        user environment etc. we've just built. */
     Path generation;
     makeName(profile, num + 1, generation);
-    addPermRoot(*store, outPath, generation, false, true);
+    addPermRoot(store, outPath, generation, false, true);
 
     return generation;
 }

@@ -149,7 +149,7 @@ struct SavingSourceAdapter : Source
 };
 
 
-static void performOp(bool trusted, unsigned int clientVersion,
+static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVersion,
     Source & from, Sink & to, unsigned int op)
 {
     switch (op) {
@@ -278,8 +278,7 @@ static void performOp(bool trusted, unsigned int clientVersion,
 
         startWork();
         if (!savedRegular.regular) throw Error("regular file expected");
-        Path path = dynamic_cast<LocalStore *>(store.get())
-            ->addToStoreFromDump(recursive ? savedNAR.s : savedRegular.s, baseName, recursive, hashAlgo);
+        Path path = store->addToStoreFromDump(recursive ? savedNAR.s : savedRegular.s, baseName, recursive, hashAlgo);
         stopWork();
 
         to << path;
@@ -583,56 +582,56 @@ static void processConnection(bool trusted)
 #endif
 
         /* Open the store. */
-        store = std::shared_ptr<StoreAPI>(new LocalStore(reserveSpace));
+        auto store = make_ref<LocalStore>(reserveSpace);
 
         stopWork();
         to.flush();
+
+        /* Process client requests. */
+        unsigned int opCount = 0;
+
+        while (true) {
+            WorkerOp op;
+            try {
+                op = (WorkerOp) readInt(from);
+            } catch (Interrupted & e) {
+                break;
+            } catch (EndOfFile & e) {
+                break;
+            }
+
+            opCount++;
+
+            try {
+                performOp(store, trusted, clientVersion, from, to, op);
+            } catch (Error & e) {
+                /* If we're not in a state where we can send replies, then
+                   something went wrong processing the input of the
+                   client.  This can happen especially if I/O errors occur
+                   during addTextToStore() / importPath().  If that
+                   happens, just send the error message and exit. */
+                bool errorAllowed = canSendStderr;
+                stopWork(false, e.msg(), GET_PROTOCOL_MINOR(clientVersion) >= 8 ? e.status : 0);
+                if (!errorAllowed) throw;
+            } catch (std::bad_alloc & e) {
+                stopWork(false, "Nix daemon out of memory", GET_PROTOCOL_MINOR(clientVersion) >= 8 ? 1 : 0);
+                throw;
+            }
+
+            to.flush();
+
+            assert(!canSendStderr);
+        };
+
+        canSendStderr = false;
+        _isInterrupted = false;
+        printMsg(lvlDebug, format("%1% operations") % opCount);
 
     } catch (Error & e) {
         stopWork(false, e.msg(), GET_PROTOCOL_MINOR(clientVersion) >= 8 ? 1 : 0);
         to.flush();
         return;
     }
-
-    /* Process client requests. */
-    unsigned int opCount = 0;
-
-    while (true) {
-        WorkerOp op;
-        try {
-            op = (WorkerOp) readInt(from);
-        } catch (Interrupted & e) {
-            break;
-        } catch (EndOfFile & e) {
-            break;
-        }
-
-        opCount++;
-
-        try {
-            performOp(trusted, clientVersion, from, to, op);
-        } catch (Error & e) {
-            /* If we're not in a state where we can send replies, then
-               something went wrong processing the input of the
-               client.  This can happen especially if I/O errors occur
-               during addTextToStore() / importPath().  If that
-               happens, just send the error message and exit. */
-            bool errorAllowed = canSendStderr;
-            stopWork(false, e.msg(), GET_PROTOCOL_MINOR(clientVersion) >= 8 ? e.status : 0);
-            if (!errorAllowed) throw;
-        } catch (std::bad_alloc & e) {
-            stopWork(false, "Nix daemon out of memory", GET_PROTOCOL_MINOR(clientVersion) >= 8 ? 1 : 0);
-            throw;
-        }
-
-        to.flush();
-
-        assert(!canSendStderr);
-    };
-
-    canSendStderr = false;
-    _isInterrupted = false;
-    printMsg(lvlDebug, format("%1% operations") % opCount);
 }
 
 
@@ -787,10 +786,6 @@ static void daemonLoop(char * * argv)
     while (1) {
 
         try {
-            /* Important: the server process *cannot* open the SQLite
-               database, because it doesn't like forks very much. */
-            assert(!store);
-
             /* Accept a connection. */
             struct sockaddr_un remoteAddr;
             socklen_t remoteAddrLen = sizeof(remoteAddr);

@@ -33,7 +33,7 @@ static string makeNode(const string & id)
 }
 
 
-void printXmlGraph(const PathSet & roots)
+void printXmlGraph(StoreAPI & store, const PathSet & roots)
 {
     PathSet workList(roots);
     PathSet doneSet;
@@ -51,7 +51,7 @@ void printXmlGraph(const PathSet & roots)
         cout << makeNode(path);
 
         PathSet references;
-        store->queryReferences(path, references);
+        store.queryReferences(path, references);
 
         for (PathSet::iterator i = references.begin();
              i != references.end(); ++i)

@@ -244,7 +244,7 @@ static Strings parseNixPath(const string & in)
 }
 
 
-EvalState::EvalState(const Strings & _searchPath)
+EvalState::EvalState(const Strings & _searchPath, ref<StoreAPI> store)
     : sWith(symbols.create("<with>"))
     , sOutPath(symbols.create("outPath"))
     , sDrvPath(symbols.create("drvPath"))
@@ -262,6 +262,7 @@ EvalState::EvalState(const Strings & _searchPath)
     , sColumn(symbols.create("column"))
     , sFunctor(symbols.create("__functor"))
     , sToString(symbols.create("__toString"))
+    , store(store)
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
 {

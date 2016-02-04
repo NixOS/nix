@@ -16,6 +16,7 @@
 namespace nix {
 
 
+class StoreAPI;
 class EvalState;
 
 
@@ -82,6 +83,8 @@ public:
 
     Value vEmptySet;
 
+    const ref<StoreAPI> store;
+
 private:
     SrcToStore srcToStore;
 
@@ -97,7 +100,7 @@ private:
 
 public:
 
-    EvalState(const Strings & _searchPath);
+    EvalState(const Strings & _searchPath, ref<StoreAPI> store);
     ~EvalState();
 
     void addToSearchPath(const string & s, bool warn = false);
@@ -240,6 +243,8 @@ public:
     /* Print statistics. */
     void printStats();
 
+    void realiseContext(const PathSet & context);
+
 private:
 
     unsigned long nrEnvs = 0;
@@ -289,8 +294,5 @@ struct InvalidPathError : EvalError
     ~InvalidPathError() throw () { };
 #endif
 };
-
-/* Realise all paths in `context' */
-void realiseContext(const PathSet & context);
 
 }

@@ -284,12 +284,12 @@ string showPaths(const PathSet & paths)
 }
 
 
-void exportPaths(StoreAPI & store, const Paths & paths,
+void StoreAPI::exportPaths(const Paths & paths,
     bool sign, Sink & sink)
 {
     for (auto & i : paths) {
         sink << 1;
-        store.exportPath(i, sign, sink);
+        exportPath(i, sign, sink);
     }
     sink << 0;
 }
@@ -306,10 +306,7 @@ void exportPaths(StoreAPI & store, const Paths & paths,
 namespace nix {
 
 
-std::shared_ptr<StoreAPI> store;
-
-
-std::shared_ptr<StoreAPI> openStore(bool reserveSpace)
+ref<StoreAPI> openStore(bool reserveSpace)
 {
     enum { mDaemon, mLocal, mAuto } mode;
 
@@ -325,8 +322,8 @@ std::shared_ptr<StoreAPI> openStore(bool reserveSpace)
     }
 
     return mode == mDaemon
-        ? (std::shared_ptr<StoreAPI>) std::make_shared<RemoteStore>()
-        : std::make_shared<LocalStore>(reserveSpace);
+        ? make_ref<StoreAPI, RemoteStore>()
+        : make_ref<StoreAPI, LocalStore>(reserveSpace);
 }
 
 

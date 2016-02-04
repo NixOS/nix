@@ -303,6 +303,10 @@ private:
 
     int openGCLock(LockType lockType);
 
+    void findRoots(const Path & path, unsigned char type, Roots & roots);
+
+    void findRuntimeRoots(PathSet & roots);
+
     void removeUnusedLinks(const GCState & state);
 
     void startSubstituter(const Path & substituter,

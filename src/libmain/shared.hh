@@ -19,8 +19,6 @@ public:
     Exit(int status) : status(status) { }
 };
 
-class StoreAPI;
-
 int handleExceptions(const string & programName, std::function<void()> fun);
 
 void initNix();
@@ -33,9 +31,11 @@ void printVersion(const string & programName);
 /* Ugh.  No better place to put this. */
 void printGCWarning();
 
-void printMissing(StoreAPI & store, const PathSet & paths);
+class StoreAPI;
 
-void printMissing(StoreAPI & store, const PathSet & willBuild,
+void printMissing(ref<StoreAPI> store, const PathSet & paths);
+
+void printMissing(ref<StoreAPI> store, const PathSet & willBuild,
     const PathSet & willSubstitute, const PathSet & unknown,
     unsigned long long downloadSize, unsigned long long narSize);
 

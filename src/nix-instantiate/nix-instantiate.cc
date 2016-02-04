@@ -9,7 +9,6 @@
 #include "util.hh"
 #include "store-api.hh"
 #include "common-opts.hh"
-#include "misc.hh"
 
 #include <map>
 #include <iostream>
@@ -33,7 +32,7 @@ static bool indirectRoot = false;
 enum OutputKind { okPlain, okXML, okJSON };
 
 
-void processExpr(EvalState & state, const Strings & attrPaths,
+void processExpr(ref<StoreAPI> store, EvalState & state, const Strings & attrPaths,
     bool parseOnly, bool strict, Bindings & autoArgs,
     bool evalOnly, OutputKind output, bool location, Expr * e)
 {
@@ -80,7 +79,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 else {
                     Path rootName = gcRoot;
                     if (++rootNr > 1) rootName += "-" + std::to_string(rootNr);
-                    drvPath = addPermRoot(*store, drvPath, rootName, indirectRoot);
+                    drvPath = addPermRoot(store, drvPath, rootName, indirectRoot);
                 }
                 std::cout << format("%1%%2%\n") % drvPath % (outputName != "out" ? "!" + outputName : "");
             }
@@ -158,9 +157,9 @@ int main(int argc, char * * argv)
         if (evalOnly && !wantsReadWrite)
             settings.readOnlyMode = true;
 
-        store = openStore();
+        auto store = openStore();
 
-        EvalState state(searchPath);
+        EvalState state(searchPath, store);
         state.repair = repair;
 
         Bindings & autoArgs(*evalAutoArgs(state, autoArgs_));
@@ -178,7 +177,7 @@ int main(int argc, char * * argv)
 
         if (readStdin) {
             Expr * e = parseStdin(state);
-            processExpr(state, attrPaths, parseOnly, strict, autoArgs,
+            processExpr(store, state, attrPaths, parseOnly, strict, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         } else if (files.empty() && !fromArgs)
             files.push_back("./default.nix");
@@ -187,7 +186,7 @@ int main(int argc, char * * argv)
             Expr * e = fromArgs
                 ? state.parseExprFromString(i, absPath("."))
                 : state.parseExprFromFile(resolveExprPath(lookupFileArg(state, i)));
-            processExpr(state, attrPaths, parseOnly, strict, autoArgs,
+            processExpr(store, state, attrPaths, parseOnly, strict, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         }
 

@@ -1,15 +1,15 @@
-#include "eval.hh"
-#include "misc.hh"
-#include "globals.hh"
-#include "store-api.hh"
-#include "util.hh"
 #include "archive.hh"
-#include "value-to-xml.hh"
-#include "value-to-json.hh"
+#include "derivations.hh"
+#include "download.hh"
+#include "eval-inline.hh"
+#include "eval.hh"
+#include "globals.hh"
 #include "json-to-value.hh"
 #include "names.hh"
-#include "eval-inline.hh"
-#include "download.hh"
+#include "store-api.hh"
+#include "util.hh"
+#include "value-to-json.hh"
+#include "value-to-xml.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -43,7 +43,7 @@ std::pair<string, string> decodeContext(const string & s)
 InvalidPathError::InvalidPathError(const Path & path) :
     EvalError(format("path ‘%1%’ is not valid") % path), path(path) {}
 
-void realiseContext(const PathSet & context)
+void EvalState::realiseContext(const PathSet & context)
 {
     PathSet drvs;
     for (auto & i : context) {
@@ -52,16 +52,14 @@ void realiseContext(const PathSet & context)
         assert(isStorePath(ctx));
         if (!store->isValidPath(ctx))
             throw InvalidPathError(ctx);
-        if (!decoded.second.empty() && isDerivation(ctx))
+        if (!decoded.second.empty() && nix::isDerivation(ctx))
             drvs.insert(decoded.first + "!" + decoded.second);
     }
     if (!drvs.empty()) {
         /* For performance, prefetch all substitute info. */
         PathSet willBuild, willSubstitute, unknown;
         unsigned long long downloadSize, narSize;
-        queryMissing(*store, drvs,
-            willBuild, willSubstitute, unknown, downloadSize, narSize);
-
+        store->queryMissing(drvs, willBuild, willSubstitute, unknown, downloadSize, narSize);
         store->buildPaths(drvs);
     }
 }
@@ -75,7 +73,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
     Path path = state.coerceToPath(pos, *args[1], context);
 
     try {
-        realiseContext(context);
+        state.realiseContext(context);
     } catch (InvalidPathError & e) {
         throw EvalError(format("cannot import ‘%1%’, since path ‘%2%’ is not valid, at %3%")
             % path % e.path % pos);
@@ -83,7 +81,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
 
     path = state.checkSourcePath(path);
 
-    if (isStorePath(path) && store->isValidPath(path) && isDerivation(path)) {
+    if (isStorePath(path) && state.store->isValidPath(path) && isDerivation(path)) {
         Derivation drv = readDerivation(path);
         Value & w = *state.allocValue();
         state.mkAttrs(w, 3 + drv.outputs.size());
@@ -145,7 +143,7 @@ static void prim_importNative(EvalState & state, const Pos & pos, Value * * args
     Path path = state.coerceToPath(pos, *args[0], context);
 
     try {
-        realiseContext(context);
+        state.realiseContext(context);
     } catch (InvalidPathError & e) {
         throw EvalError(format("cannot import ‘%1%’, since path ‘%2%’ is not valid, at %3%")
             % path % e.path % pos);
@@ -560,11 +558,12 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
            runs. */
         if (path.at(0) == '=') {
             /* !!! This doesn't work if readOnlyMode is set. */
-            PathSet refs; computeFSClosure(*store, string(path, 1), refs);
+            PathSet refs;
+            state.store->computeFSClosure(string(path, 1), refs);
             for (auto & j : refs) {
                 drv.inputSrcs.insert(j);
                 if (isDerivation(j))
-                    drv.inputDrvs[j] = store->queryDerivationOutputNames(j);
+                    drv.inputDrvs[j] = state.store->queryDerivationOutputNames(j);
             }
         }
 
@@ -581,7 +580,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         /* Handle derivation contexts returned by
            ‘builtins.storePath’. */
         else if (isDerivation(path))
-            drv.inputDrvs[path] = store->queryDerivationOutputNames(path);
+            drv.inputDrvs[path] = state.store->queryDerivationOutputNames(path);
 
         /* Otherwise it's a source file. */
         else
@@ -630,7 +629,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
         /* Use the masked derivation expression to compute the output
            path. */
-        Hash h = hashDerivationModulo(*store, drv);
+        Hash h = hashDerivationModulo(*state.store, drv);
 
         for (auto & i : drv.outputs)
             if (i.second.path == "") {
@@ -641,7 +640,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     }
 
     /* Write the resulting term into the Nix store directory. */
-    Path drvPath = writeDerivation(*store, drv, drvName, state.repair);
+    Path drvPath = writeDerivation(state.store, drv, drvName, state.repair);
 
     printMsg(lvlChatty, format("instantiated ‘%1%’ -> ‘%2%’")
         % drvName % drvPath);
@@ -649,7 +648,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     /* Optimisation, but required in read-only mode! because in that
        case we don't actually write store derivations, so we can't
        read them later. */
-    drvHashes[drvPath] = hashDerivationModulo(*store, drv);
+    drvHashes[drvPath] = hashDerivationModulo(*state.store, drv);
 
     state.mkAttrs(v, 1 + drv.outputs.size());
     mkString(*state.allocAttr(v, state.sDrvPath), drvPath, singleton<PathSet>("=" + drvPath));
@@ -695,7 +694,7 @@ static void prim_storePath(EvalState & state, const Pos & pos, Value * * args, V
         throw EvalError(format("path ‘%1%’ is not in the Nix store, at %2%") % path % pos);
     Path path2 = toStorePath(path);
     if (!settings.readOnlyMode)
-        store->ensurePath(path2);
+        state.store->ensurePath(path2);
     context.insert(path2);
     mkString(v, path, context);
 }
@@ -745,7 +744,7 @@ static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Va
     PathSet context;
     Path path = state.coerceToPath(pos, *args[0], context);
     try {
-        realiseContext(context);
+        state.realiseContext(context);
     } catch (InvalidPathError & e) {
         throw EvalError(format("cannot read ‘%1%’, since path ‘%2%’ is not valid, at %3%")
             % path % e.path % pos);
@@ -786,7 +785,7 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
     string path = state.forceStringNoCtx(*args[1], pos);
 
     try {
-        realiseContext(context);
+        state.realiseContext(context);
     } catch (InvalidPathError & e) {
         throw EvalError(format("cannot find ‘%1%’, since path ‘%2%’ is not valid, at %3%")
             % path % e.path % pos);
@@ -801,7 +800,7 @@ static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Val
     PathSet ctx;
     Path path = state.coerceToPath(pos, *args[0], ctx);
     try {
-        realiseContext(ctx);
+        state.realiseContext(ctx);
     } catch (InvalidPathError & e) {
         throw EvalError(format("cannot read ‘%1%’, since path ‘%2%’ is not valid, at %3%")
             % path % e.path % pos);
@@ -879,13 +878,13 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
             if (path.at(0) != '~')
                 throw EvalError(format("in ‘toFile’: the file ‘%1%’ cannot refer to derivation outputs, at %2%") % name % pos);
             path = string(path, 1);
-	}
+        }
         refs.insert(path);
     }
 
     Path storePath = settings.readOnlyMode
         ? computeStorePathForText(name, contents, refs)
-        : store->addTextToStore(name, contents, refs, state.repair);
+        : state.store->addTextToStore(name, contents, refs, state.repair);
 
     /* Note: we don't need to add `context' to the context of the
        result, since `storePath' itself has references to the paths
@@ -951,7 +950,7 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
 
     Path dstPath = settings.readOnlyMode
         ? computeStorePathForPath(path, true, htSHA256, filter).first
-        : store->addToStore(baseNameOf(path), path, true, htSHA256, filter, state.repair);
+        : state.store->addToStore(baseNameOf(path), path, true, htSHA256, filter, state.repair);
 
     mkString(v, dstPath, singleton<PathSet>(dstPath));
 }
@@ -1678,7 +1677,7 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     } else
         url = state.forceStringNoCtx(*args[0], pos);
 
-    Path res = downloadFileCached(url, unpack);
+    Path res = downloadFileCached(state.store, url, unpack);
     mkString(v, res, PathSet({res}));
 }
 
