@@ -5,7 +5,7 @@ makefiles = \
   src/libstore/local.mk \
   src/libmain/local.mk \
   src/libexpr/local.mk \
-  src/nix-hash/local.mk \
+  src/nix/local.mk \
   src/nix-store/local.mk \
   src/nix-instantiate/local.mk \
   src/nix-env/local.mk \

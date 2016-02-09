@@ -6,6 +6,7 @@ namespace nix {
 
 struct MixCommonArgs : virtual Args
 {
+    string programName;
     MixCommonArgs(const string & programName);
 };
 

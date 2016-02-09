@@ -73,9 +73,6 @@ Makefile.config
 # /src/nix-env/
 /src/nix-env/nix-env
 
-# /src/nix-hash/
-/src/nix-hash/nix-hash
-
 # /src/nix-instantiate/
 /src/nix-instantiate/nix-instantiate
 

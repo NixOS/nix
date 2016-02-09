@@ -145,6 +145,8 @@ public:
             *dest = ss;
         }});
     }
+
+    friend class MultiCommand;
 };
 
 Strings argvToStrings(int argc, char * * argv);

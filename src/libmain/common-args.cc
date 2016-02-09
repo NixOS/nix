@@ -4,6 +4,7 @@
 namespace nix {
 
 MixCommonArgs::MixCommonArgs(const string & programName)
+    : programName(programName)
 {
     mkFlag('v', "verbose", "increase verbosity level", []() {
         verbosity = (Verbosity) (verbosity + 1);
