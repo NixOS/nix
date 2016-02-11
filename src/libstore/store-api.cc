@@ -322,8 +322,8 @@ ref<Store> openStore(bool reserveSpace)
     }
 
     return mode == mDaemon
-        ? make_ref<Store, RemoteStore>()
-        : make_ref<Store, LocalStore>(reserveSpace);
+        ? (ref<Store>) make_ref<RemoteStore>()
+        : (ref<Store>) make_ref<LocalStore>(reserveSpace);
 }
 
 

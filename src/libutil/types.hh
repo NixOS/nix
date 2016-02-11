@@ -134,13 +134,15 @@ public:
         return p;
     }
 
+    template<typename T2>
+    operator ref<T2> ()
+    {
+        return ref<T2>((std::shared_ptr<T2>) p);
+    }
+
 private:
 
     template<typename T2, typename... Args>
-    friend ref<T2>
-    make_ref(Args&&... args);
-
-    template<typename T2, typename T3, typename... Args>
     friend ref<T2>
     make_ref(Args&&... args);
 
@@ -153,14 +155,5 @@ make_ref(Args&&... args)
     auto p = std::make_shared<T>(std::forward<Args>(args)...);
     return ref<T>(p);
 }
-
-template<typename T, typename T2, typename... Args>
-inline ref<T>
-make_ref(Args&&... args)
-{
-    auto p = std::make_shared<T2>(std::forward<Args>(args)...);
-    return ref<T>(p);
-}
-
 
 }
