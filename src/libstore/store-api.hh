@@ -255,6 +255,10 @@ public:
        `path' has disappeared. */
     virtual void addIndirectRoot(const Path & path) = 0;
 
+    /* Register a permanent GC root. */
+    Path addPermRoot(const Path & storePath,
+        const Path & gcRoot, bool indirect, bool allowOutsideRootsDir = false);
+
     /* Acquire the global GC lock, then immediately release it.  This
        function must be called after registering a new permanent root,
        but before exiting.  Otherwise, it is possible that a running
@@ -404,11 +408,6 @@ Path computeStorePathForText(const string & name, const string & s,
    root becomes garbage after this point unless it has been registered
    as a (permanent) root. */
 void removeTempRoots();
-
-
-/* Register a permanent GC root. */
-Path addPermRoot(ref<Store> store, const Path & storePath,
-    const Path & gcRoot, bool indirect, bool allowOutsideRootsDir = false);
 
 
 /* Factory method: open the Nix database, either through the local or

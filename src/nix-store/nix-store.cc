@@ -84,7 +84,7 @@ static PathSet realisePath(Path path, bool build = true)
                 Path rootName = gcRoot;
                 if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
                 if (i->first != "out") rootName += "-" + i->first;
-                outPath = addPermRoot(ref<Store>(store), outPath, rootName, indirectRoot);
+                outPath = store->addPermRoot(outPath, rootName, indirectRoot);
             }
             outputs.insert(outPath);
         }
@@ -100,7 +100,7 @@ static PathSet realisePath(Path path, bool build = true)
             Path rootName = gcRoot;
             rootNr++;
             if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
-            path = addPermRoot(ref<Store>(store), path, rootName, indirectRoot);
+            path = store->addPermRoot(path, rootName, indirectRoot);
         }
         return singleton<PathSet>(path);
     }

@@ -83,7 +83,7 @@ void LocalStore::addIndirectRoot(const Path & path)
 }
 
 
-Path addPermRoot(ref<Store> store, const Path & _storePath,
+Path Store::addPermRoot(const Path & _storePath,
     const Path & _gcRoot, bool indirect, bool allowOutsideRootsDir)
 {
     Path storePath(canonPath(_storePath));
@@ -101,7 +101,7 @@ Path addPermRoot(ref<Store> store, const Path & _storePath,
         if (pathExists(gcRoot) && (!isLink(gcRoot) || !isInStore(readLink(gcRoot))))
             throw Error(format("cannot create symlink ‘%1%’; already exists") % gcRoot);
         makeSymlink(gcRoot, storePath);
-        store->addIndirectRoot(gcRoot);
+        addIndirectRoot(gcRoot);
     }
 
     else {
@@ -127,7 +127,7 @@ Path addPermRoot(ref<Store> store, const Path & _storePath,
        check if the root is in a directory in or linked from the
        gcroots directory. */
     if (settings.checkRootReachability) {
-        Roots roots = store->findRoots();
+        Roots roots = findRoots();
         if (roots.find(gcRoot) == roots.end())
             printMsg(lvlError,
                 format(
@@ -139,7 +139,7 @@ Path addPermRoot(ref<Store> store, const Path & _storePath,
     /* Grab the global GC root, causing us to block while a GC is in
        progress.  This prevents the set of permanent roots from
        increasing while a GC is in progress. */
-    store->syncWithGC();
+    syncWithGC();
 
     return gcRoot;
 }

@@ -108,7 +108,7 @@ Path createGeneration(ref<Store> store, Path profile, Path outPath)
        user environment etc. we've just built. */
     Path generation;
     makeName(profile, num + 1, generation);
-    addPermRoot(store, outPath, generation, false, true);
+    store->addPermRoot(outPath, generation, false, true);
 
     return generation;
 }
