@@ -47,7 +47,8 @@ public:
     StringSet queryMetaNames();
     Value * queryMeta(const string & name);
     string queryMetaString(const string & name);
-    int queryMetaInt(const string & name, int def);
+    NixInt queryMetaInt(const string & name, NixInt def);
+    NixFloat queryMetaFloat(const string & name, NixFloat def);
     bool queryMetaBool(const string & name, bool def);
     void setMeta(const string & name, Value * v);
 

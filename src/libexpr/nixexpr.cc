@@ -68,6 +68,11 @@ void ExprInt::show(std::ostream & str)
     str << n;
 }
 
+void ExprFloat::show(std::ostream & str)
+{
+    str << nf;
+}
+
 void ExprString::show(std::ostream & str)
 {
     showString(str, s);
@@ -223,6 +228,10 @@ void Expr::bindVars(const StaticEnv & env)
 }
 
 void ExprInt::bindVars(const StaticEnv & env)
+{
+}
+
+void ExprFloat::bindVars(const StaticEnv & env)
 {
 }
 

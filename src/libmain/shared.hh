@@ -66,6 +66,7 @@ template<class N> N getIntArg(const string & opt,
     return n * multiplier;
 }
 
+
 /* Show the manual page for the specified program. */
 void showManPage(const string & name);
 

@@ -106,7 +106,8 @@ bool DrvInfo::checkMeta(Value & v)
             if (!checkMeta(*i.value)) return false;
         return true;
     }
-    else return v.type == tInt || v.type == tBool || v.type == tString;
+    else return v.type == tInt || v.type == tBool || v.type == tString ||
+                v.type == tFloat;
 }
 
 
@@ -127,7 +128,7 @@ string DrvInfo::queryMetaString(const string & name)
 }
 
 
-int DrvInfo::queryMetaInt(const string & name, int def)
+NixInt DrvInfo::queryMetaInt(const string & name, NixInt def)
 {
     Value * v = queryMeta(name);
     if (!v) return def;
@@ -135,8 +136,22 @@ int DrvInfo::queryMetaInt(const string & name, int def)
     if (v->type == tString) {
         /* Backwards compatibility with before we had support for
            integer meta fields. */
-        int n;
+        NixInt n;
         if (string2Int(v->string.s, n)) return n;
+    }
+    return def;
+}
+
+NixFloat DrvInfo::queryMetaFloat(const string & name, NixFloat def)
+{
+    Value * v = queryMeta(name);
+    if (!v) return def;
+    if (v->type == tFloat) return v->fpoint;
+    if (v->type == tString) {
+        /* Backwards compatibility with before we had support for
+           float meta fields. */
+        NixFloat n;
+        if (string2Float(v->string.s, n)) return n;
     }
     return def;
 }

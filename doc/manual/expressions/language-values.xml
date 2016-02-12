@@ -140,8 +140,13 @@ stdenv.mkDerivation {
 
   </listitem>
 
-  <listitem><para><emphasis>Integers</emphasis>, e.g.,
-  <literal>123</literal>.</para></listitem>
+  <listitem><para>Numbers, which can be <emphasis>integers</emphasis> (like
+  <literal>123</literal>) or <emphasis>floating point</emphasis> (like
+  <literal>123.43</literal> or <literal>.27e13</literal>).</para>
+
+  <para>Numbers are type-compatible: pure integer operations will always
+  return integers, whereas any operation involving at least one floating point
+  number will have a floating point number as a result.</para></listitem>
 
   <listitem><para><emphasis>Paths</emphasis>, e.g.,
   <filename>/bin/sh</filename> or <filename>./builder.sh</filename>.

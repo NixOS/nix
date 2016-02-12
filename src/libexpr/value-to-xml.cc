@@ -148,6 +148,10 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
             v.external->printValueAsXML(state, strict, location, doc, context, drvsSeen);
             break;
 
+        case tFloat:
+            doc.writeEmptyElement("float", singletonAttrs("value", (format("%1%") % v.fpoint).str()));
+            break;
+
         default:
             doc.writeEmptyElement("unevaluated");
     }

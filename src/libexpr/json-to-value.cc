@@ -105,17 +105,22 @@ static void parseJSON(EvalState & state, const char * & s, Value & v)
         mkString(v, parseJSONString(s));
     }
 
-    else if (isdigit(*s) || *s == '-') {
-        bool neg = false;
-        if (*s == '-') {
-            neg = true;
-            if (!*++s) throw JSONParseError("unexpected end of JSON number");
+    else if (isdigit(*s) || *s == '-' || *s == '.' ) {
+        // Buffer into a string first, then use built-in C++ conversions
+        std::string tmp_number;
+        ValueType number_type = tInt;
+
+        while (isdigit(*s) || *s == '-' || *s == '.' || *s == 'e' || *s == 'E') {
+            if (*s == '.' || *s == 'e' || *s == 'E')
+                number_type = tFloat;
+            tmp_number.append(*s++, 1);
         }
-        NixInt n = 0;
-        // FIXME: detect overflow
-        while (isdigit(*s)) n = n * 10 + (*s++ - '0');
-        if (*s == '.' || *s == 'e') throw JSONParseError("floating point JSON numbers are not supported");
-        mkInt(v, neg ? -n : n);
+
+        if (number_type == tFloat) {
+            mkFloat(v, stod(tmp_number));
+        } else {
+            mkInt(v, stoi(tmp_number));
+        }
     }
 
     else if (strncmp(s, "true", 4) == 0) {
