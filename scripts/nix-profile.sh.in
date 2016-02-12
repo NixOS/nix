@@ -23,6 +23,8 @@ if [ -n "$HOME" ]; then
     # Set $SSL_CERT_FILE so that Nixpkgs applications like curl work.
     if [ -e /etc/ssl/certs/ca-certificates.crt ]; then # NixOS, Ubuntu, Debian, Gentoo, Arch
         export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+    elif [ -e /etc/ssl/ca-bundle.pem ]; then # openSUSE Tumbleweed
+        export SSL_CERT_FILE=/etc/ssl/ca-bundle.pem
     elif [ -e /etc/ssl/certs/ca-bundle.crt ]; then # Old NixOS
         export SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
     elif [ -e /etc/pki/tls/certs/ca-bundle.crt ]; then # Fedora, CentOS
