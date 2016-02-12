@@ -15,5 +15,9 @@ nix-env --version | grep "$version"
 nix-env --foo 2>&1 | grep "no operation"
 nix-env -q --foo 2>&1 | grep "unknown flag"
 
-# Eval Errors.
-nix-instantiate --eval -E 'let a = {} // a; in a.foo' 2>&1 | grep "infinite recursion encountered, at (string):1:15$"
+# Attribute path errors
+nix-instantiate --eval -E '{}' -A '"x' 2>&1 | grep "missing closing quote in selection path"
+nix-instantiate --eval -E '[]' -A 'x' 2>&1 | grep "should be a set"
+nix-instantiate --eval -E '{}' -A '1' 2>&1 | grep "should be a list"
+nix-instantiate --eval -E '{}' -A '.' 2>&1 | grep "empty attribute name"
+nix-instantiate --eval -E '[]' -A '1' 2>&1 | grep "out of range"

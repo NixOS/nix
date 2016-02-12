@@ -1,0 +1,1 @@
+error: value is an integer while a set was expected, at PWD/lang/eval-fail-set.nix:1:1

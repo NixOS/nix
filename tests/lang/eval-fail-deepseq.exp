@@ -1,0 +1,2 @@
+error: while evaluating the attribute ‘x’ at PWD/lang/eval-fail-deepseq.nix:1:20:
+evaluation aborted with the following error message: ‘foo’

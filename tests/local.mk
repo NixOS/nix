@@ -11,7 +11,7 @@ nix_tests = \
   binary-patching.sh timeout.sh secure-drv-outputs.sh nix-channel.sh \
   multiple-outputs.sh import-derivation.sh fetchurl.sh optimise-store.sh \
   binary-cache.sh nix-profile.sh repair.sh dump-db.sh case-hack.sh \
-  check-reqs.sh pass-as-file.sh tarball.sh
+  check-reqs.sh pass-as-file.sh tarball.sh restricted.sh
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))

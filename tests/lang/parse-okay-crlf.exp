@@ -1,0 +1,1 @@
+rec { y = 123; x = y; foo = "multi\nline\n  string\n  test\r"; z = 456; }
