@@ -255,7 +255,7 @@ bool isVarName(const string & s)
         if (!((i >= 'a' && i <= 'z') ||
               (i >= 'A' && i <= 'Z') ||
               (i >= '0' && i <= '9') ||
-              i == '_' || i == '\''))
+              i == '_' || i == '-' || i == '\''))
             return false;
     return true;
 }
