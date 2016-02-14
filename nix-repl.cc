@@ -250,7 +250,8 @@ static int runProgram(const string & program, const Strings & args)
 
 bool isVarName(const string & s)
 {
-    // FIXME: not quite correct.
+    if (s.size() > 0 && (s[0] == '-' || s[0] == '\''))
+        return false;
     for (auto & i : s)
         if (!((i >= 'a' && i <= 'z') ||
               (i >= 'A' && i <= 'Z') ||
