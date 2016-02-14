@@ -69,7 +69,7 @@ struct CmdToBase : Command
     {
         return toBase32
             ? "convert a hash to base-32 representation"
-            : "convert a hash to base-32 representation";
+            : "convert a hash to base-16 representation";
     }
 
     void run() override
