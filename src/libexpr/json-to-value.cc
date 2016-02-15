@@ -113,14 +113,13 @@ static void parseJSON(EvalState & state, const char * & s, Value & v)
         while (isdigit(*s) || *s == '-' || *s == '.' || *s == 'e' || *s == 'E') {
             if (*s == '.' || *s == 'e' || *s == 'E')
                 number_type = tFloat;
-            tmp_number.append(*s++, 1);
+            tmp_number += *s++;
         }
 
-        if (number_type == tFloat) {
+        if (number_type == tFloat)
             mkFloat(v, stod(tmp_number));
-        } else {
+        else
             mkInt(v, stoi(tmp_number));
-        }
     }
 
     else if (strncmp(s, "true", 4) == 0) {
