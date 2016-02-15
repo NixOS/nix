@@ -1064,7 +1064,7 @@ StringSet LocalStore::queryDerivationOutputNames(const Path & path)
 
 Path LocalStore::queryPathFromHashPart(const string & hashPart)
 {
-    if (hashPart.size() != 32) throw Error("invalid hash part");
+    if (hashPart.size() != storePathHashLen) throw Error("invalid hash part");
 
     Path prefix = settings.nixStore + "/" + hashPart;
 

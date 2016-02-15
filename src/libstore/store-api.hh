@@ -339,6 +339,9 @@ public:
 };
 
 
+const size_t storePathHashLen = 32; // base-32 characters, i.e. 160 bits
+
+
 /* !!! These should be part of the store API, I guess. */
 
 /* Throw an exception if `path' is not directly in the Nix store. */
@@ -349,6 +352,9 @@ bool isStorePath(const Path & path);
 
 /* Extract the name part of the given store path. */
 string storePathToName(const Path & path);
+
+/* Extract the hash part of the given store path. */
+string storePathToHash(const Path & path);
 
 void checkStoreName(const string & name);
 

@@ -61,7 +61,14 @@ Path followLinksToStorePath(const Path & path)
 string storePathToName(const Path & path)
 {
     assertStorePath(path);
-    return string(path, settings.nixStore.size() + 34);
+    return string(path, settings.nixStore.size() + storePathHashLen + 2);
+}
+
+
+string storePathToHash(const Path & path)
+{
+    assertStorePath(path);
+    return string(path, settings.nixStore.size() + 1, storePathHashLen);
 }
 
 
