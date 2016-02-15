@@ -224,6 +224,13 @@ Path computeStorePathForText(const string & name, const string & s,
 }
 
 
+void Store::queryReferences(const Path & path, PathSet & references)
+{
+    ValidPathInfo info = queryPathInfo(path);
+    references.insert(info.references.begin(), info.references.end());
+}
+
+
 /* Return a string accepted by decodeValidPathInfo() that
    registers the specified paths as valid.  Note: it's the
    responsibility of the caller to provide a closure. */

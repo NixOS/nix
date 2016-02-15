@@ -108,8 +108,6 @@ public:
 
     Hash queryPathHash(const Path & path) override;
 
-    void queryReferences(const Path & path, PathSet & references) override;
-
     void queryReferrers(const Path & path, PathSet & referrers) override;
 
     Path queryDeriver(const Path & path) override;

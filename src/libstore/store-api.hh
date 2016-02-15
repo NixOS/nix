@@ -12,6 +12,13 @@
 namespace nix {
 
 
+/* Size of the hash part of store paths, in base-32 characters. */
+const size_t storePathHashLen = 32; // i.e. 160 bits
+
+/* Magic header of exportPath() output. */
+const uint32_t exportMagic = 0x4558494e;
+
+
 typedef std::map<Path, Path> Roots;
 
 
@@ -156,10 +163,9 @@ public:
     /* Query the hash of a valid path. */
     virtual Hash queryPathHash(const Path & path) = 0;
 
-    /* Query the set of outgoing FS references for a store path.  The
+    /* Query the set of outgoing FS references for a store path. The
        result is not cleared. */
-    virtual void queryReferences(const Path & path,
-        PathSet & references) = 0;
+    virtual void queryReferences(const Path & path, PathSet & references);
 
     /* Queries the set of incoming FS references for a store path.
        The result is not cleared. */
@@ -337,9 +343,6 @@ public:
     Paths topoSortPaths(const PathSet & paths);
 
 };
-
-
-const size_t storePathHashLen = 32; // base-32 characters, i.e. 160 bits
 
 
 /* !!! These should be part of the store API, I guess. */

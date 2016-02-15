@@ -953,14 +953,6 @@ PathSet LocalStore::queryAllValidPaths()
 }
 
 
-void LocalStore::queryReferences(const Path & path,
-    PathSet & references)
-{
-    ValidPathInfo info = queryPathInfo(path);
-    references.insert(info.references.begin(), info.references.end());
-}
-
-
 void LocalStore::queryReferrers_(const Path & path, PathSet & referrers)
 {
     SQLiteStmtUse use(stmtQueryReferrers);
@@ -1493,9 +1485,6 @@ struct HashAndWriteSink : Sink
 };
 
 
-#define EXPORT_MAGIC 0x4558494e
-
-
 static void checkSecrecy(const Path & path)
 {
     struct stat st;
@@ -1532,7 +1521,7 @@ void LocalStore::exportPath(const Path & path, bool sign,
     PathSet references;
     queryReferences(path, references);
 
-    hashAndWriteSink << EXPORT_MAGIC << path << references << queryDeriver(path);
+    hashAndWriteSink << exportMagic << path << references << queryDeriver(path);
 
     if (sign) {
         Hash hash = hashAndWriteSink.currentHash();
@@ -1608,8 +1597,8 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 
     restorePath(unpacked, hashAndReadSource);
 
-    unsigned int magic = readInt(hashAndReadSource);
-    if (magic != EXPORT_MAGIC)
+    uint32_t magic = readInt(hashAndReadSource);
+    if (magic != exportMagic)
         throw Error("Nix archive cannot be imported; wrong format");
 
     Path dstPath = readStorePath(hashAndReadSource);
