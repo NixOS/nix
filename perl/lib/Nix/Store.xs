@@ -160,6 +160,7 @@ SV * topoSortPaths(...)
 SV * followLinksToStorePath(char * path)
     CODE:
         try {
+            store();
             RETVAL = newSVpv(followLinksToStorePath(path).c_str(), 0);
         } catch (Error & e) {
             croak("%s", e.what());
