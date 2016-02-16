@@ -374,8 +374,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 for (auto & j : paths) {
                     ValidPathInfo info = store->queryPathInfo(j);
                     if (query == qHash) {
-                        assert(info.hash.type == htSHA256);
-                        cout << format("sha256:%1%\n") % printHash32(info.hash);
+                        assert(info.narHash.type == htSHA256);
+                        cout << format("sha256:%1%\n") % printHash32(info.narHash);
                     } else if (query == qSize)
                         cout << format("%1%\n") % info.narSize;
                 }
@@ -567,7 +567,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
                 canonicalisePathMetaData(info.path, -1);
             if (!hashGiven) {
                 HashResult hash = hashPath(htSHA256, info.path);
-                info.hash = hash.first;
+                info.narHash = hash.first;
                 info.narSize = hash.second;
             }
             infos.push_back(info);
@@ -783,11 +783,11 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         Path path = followLinksToStorePath(i);
         printMsg(lvlTalkative, format("checking path ‘%1%’...") % path);
         ValidPathInfo info = store->queryPathInfo(path);
-        HashResult current = hashPath(info.hash.type, path);
-        if (current.first != info.hash) {
+        HashResult current = hashPath(info.narHash.type, path);
+        if (current.first != info.narHash) {
             printMsg(lvlError,
                 format("path ‘%1%’ was modified! expected hash ‘%2%’, got ‘%3%’")
-                % path % printHash(info.hash) % printHash(current.first));
+                % path % printHash(info.narHash) % printHash(current.first));
             status = 1;
         }
     }

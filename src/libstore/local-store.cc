@@ -694,7 +694,7 @@ unsigned long long LocalStore::addValidPath(const ValidPathInfo & info, bool che
 {
     SQLiteStmtUse use(stmtRegisterValidPath);
     stmtRegisterValidPath.bind(info.path);
-    stmtRegisterValidPath.bind("sha256:" + printHash(info.hash));
+    stmtRegisterValidPath.bind("sha256:" + printHash(info.narHash));
     stmtRegisterValidPath.bind(info.registrationTime == 0 ? time(0) : info.registrationTime);
     if (info.deriver != "")
         stmtRegisterValidPath.bind(info.deriver);
@@ -845,7 +845,7 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path)
 
         const char * s = (const char *) sqlite3_column_text(stmtQueryPathInfo, 1);
         assert(s);
-        info.hash = parseHashField(path, s);
+        info.narHash = parseHashField(path, s);
 
         info.registrationTime = sqlite3_column_int(stmtQueryPathInfo, 2);
 
@@ -883,7 +883,7 @@ void LocalStore::updatePathInfo(const ValidPathInfo & info)
         stmtUpdatePathInfo.bind64(info.narSize);
     else
         stmtUpdatePathInfo.bind(); // null
-    stmtUpdatePathInfo.bind("sha256:" + printHash(info.hash));
+    stmtUpdatePathInfo.bind("sha256:" + printHash(info.narHash));
     stmtUpdatePathInfo.bind(info.path);
     if (sqlite3_step(stmtUpdatePathInfo) != SQLITE_DONE)
         throwSQLiteError(db, format("updating info of path ‘%1%’ in database") % info.path);
@@ -1274,7 +1274,7 @@ void LocalStore::querySubstitutablePathInfos(const PathSet & paths,
 
 Hash LocalStore::queryPathHash(const Path & path)
 {
-    return queryPathInfo(path).hash;
+    return queryPathInfo(path).narHash;
 }
 
 
@@ -1298,7 +1298,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         PathSet paths;
 
         for (auto & i : infos) {
-            assert(i.hash.type == htSHA256);
+            assert(i.narHash.type == htSHA256);
             if (isValidPath_(i.path))
                 updatePathInfo(i);
             else
@@ -1397,7 +1397,7 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
 
             ValidPathInfo info;
             info.path = dstPath;
-            info.hash = hash.first;
+            info.narHash = hash.first;
             info.narSize = hash.second;
             registerValidPath(info);
         }
@@ -1453,7 +1453,7 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
 
             ValidPathInfo info;
             info.path = dstPath;
-            info.hash = hash.first;
+            info.narHash = hash.first;
             info.narSize = hash.second;
             info.references = references;
             registerValidPath(info);
@@ -1680,7 +1680,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 
             ValidPathInfo info;
             info.path = dstPath;
-            info.hash = hash.first;
+            info.narHash = hash.first;
             info.narSize = hash.second;
             info.references = references;
             info.deriver = deriver != "" && isValidPath(deriver) ? deriver : "";
@@ -1764,21 +1764,21 @@ bool LocalStore::verifyStore(bool checkContents, bool repair)
 
                 /* Check the content hash (optionally - slow). */
                 printMsg(lvlTalkative, format("checking contents of ‘%1%’") % i);
-                HashResult current = hashPath(info.hash.type, i);
+                HashResult current = hashPath(info.narHash.type, i);
 
-                if (info.hash != nullHash && info.hash != current.first) {
+                if (info.narHash != nullHash && info.narHash != current.first) {
                     printMsg(lvlError, format("path ‘%1%’ was modified! "
                             "expected hash ‘%2%’, got ‘%3%’")
-                        % i % printHash(info.hash) % printHash(current.first));
+                        % i % printHash(info.narHash) % printHash(current.first));
                     if (repair) repairPath(i); else errors = true;
                 } else {
 
                     bool update = false;
 
                     /* Fill in missing hashes. */
-                    if (info.hash == nullHash) {
+                    if (info.narHash == nullHash) {
                         printMsg(lvlError, format("fixing missing hash on ‘%1%’") % i);
-                        info.hash = current.first;
+                        info.narHash = current.first;
                         update = true;
                     }
 
@@ -1867,9 +1867,9 @@ bool LocalStore::pathContentsGood(const Path & path)
     if (!pathExists(path))
         res = false;
     else {
-        HashResult current = hashPath(info.hash.type, path);
+        HashResult current = hashPath(info.narHash.type, path);
         Hash nullHash(htSHA256);
-        res = info.hash == nullHash || info.hash == current.first;
+        res = info.narHash == nullHash || info.narHash == current.first;
     }
     pathContentsGoodCache[path] = res;
     if (!res) printMsg(lvlError, format("path ‘%1%’ is corrupted or missing!") % path);
@@ -1921,7 +1921,7 @@ ValidPathInfo LocalStore::queryPathInfoOld(const Path & path)
         } else if (name == "Deriver") {
             res.deriver = value;
         } else if (name == "Hash") {
-            res.hash = parseHashField(path, value);
+            res.narHash = parseHashField(path, value);
         } else if (name == "Registered-At") {
             int n = 0;
             string2Int(value, n);

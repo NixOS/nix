@@ -273,7 +273,7 @@ ValidPathInfo RemoteStore::queryPathInfo(const Path & path)
     info.path = path;
     info.deriver = readString(from);
     if (info.deriver != "") assertStorePath(info.deriver);
-    info.hash = parseHash(htSHA256, readString(from));
+    info.narHash = parseHash(htSHA256, readString(from));
     info.references = readStorePaths<PathSet>(from);
     info.registrationTime = readInt(from);
     info.narSize = readLongLong(from);

@@ -245,7 +245,7 @@ string Store::makeValidityRegistration(const PathSet & paths,
         ValidPathInfo info = queryPathInfo(i);
 
         if (showHash) {
-            s += printHash(info.hash) + "\n";
+            s += printHash(info.narHash) + "\n";
             s += (format("%1%\n") % info.narSize).str();
         }
 
@@ -270,7 +270,7 @@ ValidPathInfo decodeValidPathInfo(std::istream & str, bool hashGiven)
     if (hashGiven) {
         string s;
         getline(str, s);
-        info.hash = parseHash(htSHA256, s);
+        info.narHash = parseHash(htSHA256, s);
         getline(str, s);
         if (!string2Int(s, info.narSize)) throw Error("number expected");
     }

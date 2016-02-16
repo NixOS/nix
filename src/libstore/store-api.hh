@@ -92,7 +92,7 @@ struct ValidPathInfo
 {
     Path path;
     Path deriver;
-    Hash hash;
+    Hash narHash;
     PathSet references;
     time_t registrationTime = 0;
     unsigned long long narSize = 0; // 0 = unknown
@@ -102,7 +102,7 @@ struct ValidPathInfo
     {
         return
             path == i.path
-            && hash == i.hash
+            && narHash == i.narHash
             && references == i.references;
     }
 };

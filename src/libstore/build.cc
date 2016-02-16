@@ -2735,7 +2735,7 @@ void DerivationGoal::registerOutputs()
         if (buildMode == bmCheck) {
             if (!worker.store.isValidPath(path)) continue;
             ValidPathInfo info = worker.store.queryPathInfo(path);
-            if (hash.first != info.hash) {
+            if (hash.first != info.narHash) {
                 if (settings.keepFailed) {
                     Path dst = path + checkSuffix;
                     if (pathExists(dst)) deletePath(dst);
@@ -2799,7 +2799,7 @@ void DerivationGoal::registerOutputs()
 
         ValidPathInfo info;
         info.path = path;
-        info.hash = hash.first;
+        info.narHash = hash.first;
         info.narSize = hash.second;
         info.references = references;
         info.deriver = drvPath;
@@ -3369,7 +3369,7 @@ void SubstitutionGoal::finished()
 
     ValidPathInfo info2;
     info2.path = storePath;
-    info2.hash = hash.first;
+    info2.narHash = hash.first;
     info2.narSize = hash.second;
     info2.references = info.references;
     info2.deriver = info.deriver;

@@ -515,7 +515,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         startWork();
         ValidPathInfo info = store->queryPathInfo(path);
         stopWork();
-        to << info.deriver << printHash(info.hash) << info.references
+        to << info.deriver << printHash(info.narHash) << info.references
            << info.registrationTime << info.narSize;
         break;
     }
