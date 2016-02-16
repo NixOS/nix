@@ -10,6 +10,7 @@
 #include "globals.hh"
 #include "store-api.hh"
 #include "util.hh"
+#include "crypto.hh"
 
 #if HAVE_SODIUM
 #include <sodium.h>
@@ -235,19 +236,12 @@ SV * convertHash(char * algo, char * s, int toBase32)
         }
 
 
-SV * signString(SV * secretKey_, char * msg)
+SV * signString(char * secretKey_, char * msg)
     PPCODE:
         try {
 #if HAVE_SODIUM
-            STRLEN secretKeyLen;
-            unsigned char * secretKey = (unsigned char *) SvPV(secretKey_, secretKeyLen);
-            if (secretKeyLen != crypto_sign_SECRETKEYBYTES)
-                throw Error("secret key is not valid");
-
-            unsigned char sig[crypto_sign_BYTES];
-            unsigned long long sigLen;
-            crypto_sign_detached(sig, &sigLen, (unsigned char *) msg, strlen(msg), secretKey);
-            XPUSHs(sv_2mortal(newSVpv((char *) sig, sigLen)));
+            auto sig = SecretKey(secretKey_).signDetached(msg);
+            XPUSHs(sv_2mortal(newSVpv(sig.c_str(), sig.size())));
 #else
             throw Error("Nix was not compiled with libsodium, required for signed binary cache support");
 #endif
