@@ -19,9 +19,6 @@ using namespace std;
 using namespace nix;
 
 
-string programId = "nix-repl";
-
-
 struct NixRepl
 {
     string curDir;
