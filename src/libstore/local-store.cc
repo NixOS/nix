@@ -40,10 +40,7 @@ MakeError(SQLiteError, Error);
 MakeError(SQLiteBusy, SQLiteError);
 
 
-static void throwSQLiteError(sqlite3 * db, const format & f)
-    __attribute__ ((noreturn));
-
-static void throwSQLiteError(sqlite3 * db, const format & f)
+[[noreturn]] static void throwSQLiteError(sqlite3 * db, const format & f)
 {
     int err = sqlite3_errcode(db);
     if (err == SQLITE_BUSY || err == SQLITE_PROTOCOL) {

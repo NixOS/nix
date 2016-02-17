@@ -37,6 +37,11 @@ SecretKey::SecretKey(const string & s)
 #endif
 }
 
+[[noreturn]] static void noSodium()
+{
+    throw Error("Nix was not compiled with libsodium, required for signed binary cache support");
+}
+
 std::string SecretKey::signDetached(const std::string & data) const
 {
 #if HAVE_SODIUM
@@ -46,7 +51,7 @@ std::string SecretKey::signDetached(const std::string & data) const
         (unsigned char *) key.data());
     return name + ":" + base64Encode(std::string((char *) sig, sigLen));
 #else
-    throw Error("Nix was not compiled with libsodium, required for signed binary cache support");
+    noSodium();
 #endif
 }
 
@@ -62,6 +67,7 @@ PublicKey::PublicKey(const string & s)
 bool verifyDetached(const std::string & data, const std::string & sig,
     const PublicKeys & publicKeys)
 {
+#if HAVE_SODIUM
     auto ss = split(sig);
 
     auto key = publicKeys.find(ss.first);
@@ -74,6 +80,9 @@ bool verifyDetached(const std::string & data, const std::string & sig,
     return crypto_sign_verify_detached((unsigned char *) sig2.data(),
         (unsigned char *) data.data(), data.size(),
         (unsigned char *) key->second.key.data()) == 0;
+#else
+    noSodium();
+#endif
 }
 
 }
