@@ -99,7 +99,7 @@ void NixRepl::mainLoop(const Strings & files)
     string input;
 
     while (true) {
-        // When continuing input from a previous, don't print a prompt, just align to the same
+        // When continuing input from previous lines, don't print a prompt, just align to the same
         // number of chars as the prompt.
         const char * prompt = input.empty() ? "nix-repl> " : "          ";
         if (!getLine(input, prompt)) {
