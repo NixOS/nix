@@ -78,8 +78,6 @@ NixRepl::NixRepl(const Strings & searchPath)
     , staticEnv(false, &state.staticBaseEnv)
 {
     curDir = absPath(".");
-
-    store = openStore();
 }
 
 
@@ -638,6 +636,7 @@ int main(int argc, char * * argv)
             return true;
         });
 
+        store = openStore();
         NixRepl repl(searchPath);
         repl.mainLoop(files);
     });
