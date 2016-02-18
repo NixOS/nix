@@ -41,7 +41,7 @@ struct NixRepl
     NixRepl(const Strings & searchPath);
     void mainLoop(const Strings & files);
     void completePrefix(string prefix);
-    bool getLine(string & line, const char * prompt);
+    bool getLine(string & input, const char * prompt);
     bool processLine(string line);
     void loadFile(const Path & path);
     void initEnv();
@@ -102,14 +102,10 @@ void NixRepl::mainLoop(const Strings & files)
         // When continuing input from a previous, don't print a prompt, just align to the same
         // number of chars as the prompt.
         const char * prompt = input.empty() ? "nix-repl> " : "          ";
-        string line;
-        if (!getLine(line, prompt)) {
+        if (!getLine(input, prompt)) {
             std::cout << std::endl;
             break;
         }
-
-        input.append(removeWhitespace(line));
-        input.push_back('\n');
 
         try {
             if (!processLine(input)) return;
@@ -167,7 +163,7 @@ char * completerThunk(const char * s, int state)
 }
 
 
-bool NixRepl::getLine(string & line, const char * prompt)
+bool NixRepl::getLine(string & input, const char * prompt)
 {
     struct sigaction act, old;
     act.sa_handler = sigintHandler;
@@ -176,15 +172,17 @@ bool NixRepl::getLine(string & line, const char * prompt)
     if (sigaction(SIGINT, &act, &old))
         throw SysError("installing handler for SIGINT");
 
-    if (sigsetjmp(sigintJmpBuf, 1))
-        line = "";
-    else {
+    if (sigsetjmp(sigintJmpBuf, 1)) {
+        input.clear();
+    } else {
         curRepl = this;
         rl_completion_entry_function = completerThunk;
 
         char * s = readline(prompt);
         if (!s) return false;
-        line = chomp(string(s));
+        string line = chomp(string(s));
+        input.append(removeWhitespace(line));
+        input.push_back('\n');
         free(s);
         if (line != "") {
             add_history(line.c_str());
