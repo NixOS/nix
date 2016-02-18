@@ -41,7 +41,7 @@ struct NixRepl
     NixRepl(const Strings & searchPath);
     void mainLoop(const Strings & files);
     void completePrefix(string prefix);
-    bool getLine(string & line);
+    bool getLine(string & line, const char * prompt);
     bool processLine(string line);
     void loadFile(const Path & path);
     void initEnv();
@@ -96,21 +96,39 @@ void NixRepl::mainLoop(const Strings & files)
     using_history();
     read_history(0);
 
+    string input;
+
     while (true) {
+        // When continuing input from a previous, don't print a prompt, just align to the same
+        // number of chars as the prompt.
+        const char * prompt = input.empty() ? "nix-repl> " : "          ";
         string line;
-        if (!getLine(line)) {
+        if (!getLine(line, prompt)) {
             std::cout << std::endl;
             break;
         }
 
+        input.append(removeWhitespace(line));
+        input.push_back('\n');
+
         try {
-            if (!processLine(removeWhitespace(line))) return;
+            if (!processLine(input)) return;
+        } catch (ParseError & e) {
+            if (e.msg().find("unexpected $end") != std::string::npos) {
+                // For parse errors on incomplete input, we continue waiting for the next line of
+                // input without clearing the input so far.
+                continue;
+            } else {
+                printMsg(lvlError, "error: " + e.msg());
+            }
         } catch (Error & e) {
             printMsg(lvlError, "error: " + e.msg());
         } catch (Interrupted & e) {
             printMsg(lvlError, "error: " + e.msg());
         }
 
+        // We handled the current input fully, so we should clear it and read brand new input.
+        input.clear();
         std::cout << std::endl;
     }
 }
@@ -149,7 +167,7 @@ char * completerThunk(const char * s, int state)
 }
 
 
-bool NixRepl::getLine(string & line)
+bool NixRepl::getLine(string & line, const char * prompt)
 {
     struct sigaction act, old;
     act.sa_handler = sigintHandler;
@@ -164,7 +182,7 @@ bool NixRepl::getLine(string & line)
         curRepl = this;
         rl_completion_entry_function = completerThunk;
 
-        char * s = readline("nix-repl> ");
+        char * s = readline(prompt);
         if (!s) return false;
         line = chomp(string(s));
         free(s);
