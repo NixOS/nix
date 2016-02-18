@@ -286,7 +286,7 @@ bool NixRepl::processLine(string line)
     string command, arg;
 
     if (line[0] == ':') {
-        size_t p = line.find(' ');
+        size_t p = line.find_first_of(" \n\r\t");
         command = string(line, 0, p);
         if (p != string::npos) arg = removeWhitespace(string(line, p));
     } else {
