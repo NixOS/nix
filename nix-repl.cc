@@ -340,7 +340,7 @@ bool NixRepl::processLine(string line)
              << "  :r            Reload all files\n"
              << "  :s <expr>     Build dependencies of derivation, then start nix-shell\n"
              << "  :t <expr>     Describe result of evaluation\n"
-             << "  :x <expr>     Build derivation, then start nix-shell\n";
+             << "  :u <expr>     Build derivation, then start nix-shell\n";
     }
 
     else if (command == ":a" || command == ":add") {
@@ -364,7 +364,7 @@ bool NixRepl::processLine(string line)
         evalString(arg, v);
         std::cout << showType(v) << std::endl;
 
-    } else if (command == ":x") {
+    } else if (command == ":u") {
         Value v, f, result;
         evalString(arg, v);
         evalString("drv: (import <nixpkgs> {}).runCommand \"shell\" { buildInputs = [ drv ]; } \"\"", f);
