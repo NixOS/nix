@@ -101,4 +101,8 @@ struct PrintFreed
 };
 
 
+/* Install a SIGSEGV handler to detect stack overflows. */
+void detectStackOverflow();
+
+
 }
