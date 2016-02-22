@@ -6,7 +6,7 @@ libmain_DIR := $(d)
 
 libmain_SOURCES := $(wildcard $(d)/*.cc)
 
-libutil_LDFLAGS = $(OPENSSL_LIBS)
+libmain_LDFLAGS = $(OPENSSL_LIBS)
 
 libmain_LIBS = libstore libutil libformat
 
