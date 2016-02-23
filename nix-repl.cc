@@ -472,6 +472,19 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 }
 
 
+std::ostream & printStringValue(std::ostream & str, const char * string) {
+    str << "\"";
+    for (const char * i = string; *i; i++)
+        if (*i == '\"' || *i == '\\') str << "\\" << *i;
+        else if (*i == '\n') str << "\\n";
+        else if (*i == '\r') str << "\\r";
+        else if (*i == '\t') str << "\\t";
+        else str << *i;
+    str << "\"";
+    return str;
+}
+
+
 // FIXME: lot of cut&paste from Nix's eval.cc.
 std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int maxDepth, ValuesSeen & seen)
 {
@@ -491,14 +504,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
 
     case tString:
-        str << "\"";
-        for (const char * i = v.string.s; *i; i++)
-            if (*i == '\"' || *i == '\\') str << "\\" << *i;
-            else if (*i == '\n') str << "\\n";
-            else if (*i == '\r') str << "\\r";
-            else if (*i == '\t') str << "\\t";
-            else str << *i;
-        str << "\"";
+        printStringValue(str, v.string.s);
         break;
 
     case tPath:
@@ -546,7 +552,11 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
             }
 
             for (auto & i : sorted) {
-                str << i.first << " = ";
+                if (isVarName(i.first))
+                    str << i.first;
+                else
+                    printStringValue(str, i.first.c_str());
+                str << " = ";
                 if (hidden.find(i.first) != hidden.end())
                     str << "«...»";
                 else if (seen.find(i.second) != seen.end())
