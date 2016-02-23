@@ -126,6 +126,7 @@ void initNix()
     std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
 #endif
 
+    // FIXME: do we need this? It's not thread-safe.
     std::ios::sync_with_stdio(false);
 
     if (getEnv("IN_SYSTEMD") == "1")

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <limits>
 #include <string>
 
 #include "store-api.hh"
@@ -19,9 +20,7 @@ class RemoteStore : public Store
 {
 public:
 
-    RemoteStore();
-
-    ~RemoteStore();
+    RemoteStore(size_t maxConnections = std::numeric_limits<size_t>::max());
 
     /* Implementations of abstract store API methods. */
 
@@ -99,6 +98,8 @@ private:
         FdSink to;
         FdSource from;
         unsigned int daemonVersion;
+
+        ~Connection();
 
         void processStderr(Sink * sink = 0, Source * source = 0);
     };

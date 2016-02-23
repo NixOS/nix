@@ -14,8 +14,8 @@
 #include <sys/un.h>
 #include <errno.h>
 #include <fcntl.h>
-
 #include <unistd.h>
+
 #include <cstring>
 
 namespace nix {
@@ -39,8 +39,8 @@ template<class T> T readStorePaths(Source & from)
 template PathSet readStorePaths(Source & from);
 
 
-RemoteStore::RemoteStore()
-    : connections(make_ref<Pool<Connection>>([this]() { return openConnection(); }))
+RemoteStore::RemoteStore(size_t maxConnections)
+    : connections(make_ref<Pool<Connection>>(maxConnections, [this]() { return openConnection(); }))
 {
 }
 
@@ -113,18 +113,6 @@ ref<RemoteStore::Connection> RemoteStore::openConnection(bool reserveSpace)
     setOptions(conn);
 
     return conn;
-}
-
-
-RemoteStore::~RemoteStore()
-{
-    try {
-        //to.flush();
-        //fdSocket.close();
-        // FIXME: close pool
-    } catch (...) {
-        ignoreException();
-    }
 }
 
 
@@ -567,6 +555,18 @@ bool RemoteStore::verifyStore(bool checkContents, bool repair)
     conn->processStderr();
     return readInt(conn->from) != 0;
 }
+
+
+RemoteStore::Connection::~Connection()
+{
+    try {
+        to.flush();
+        fd.close();
+    } catch (...) {
+        ignoreException();
+    }
+}
+
 
 void RemoteStore::Connection::processStderr(Sink * sink, Source * source)
 {
