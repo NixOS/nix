@@ -12,6 +12,7 @@ class Pipe;
 class Pid;
 struct FdSink;
 struct FdSource;
+template<typename T> class Pool;
 
 
 class RemoteStore : public Store
@@ -91,19 +92,22 @@ public:
     bool verifyStore(bool checkContents, bool repair) override;
 
 private:
-    AutoCloseFD fdSocket;
-    FdSink to;
-    FdSource from;
-    unsigned int daemonVersion;
-    bool initialised;
 
-    void openConnection(bool reserveSpace = true);
+    struct Connection
+    {
+        AutoCloseFD fd;
+        FdSink to;
+        FdSource from;
+        unsigned int daemonVersion;
 
-    void processStderr(Sink * sink = 0, Source * source = 0);
+        void processStderr(Sink * sink = 0, Source * source = 0);
+    };
 
-    void connectToDaemon();
+    ref<Pool<Connection>> connections;
 
-    void setOptions();
+    ref<Connection> openConnection(bool reserveSpace = true);
+
+    void setOptions(ref<Connection> conn);
 };
 
 
