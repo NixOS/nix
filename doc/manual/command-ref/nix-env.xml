@@ -367,6 +367,10 @@ number of possible ways:
   linkend="rsec-nix-store-realise">realised</link> and
   installed.</para></listitem>
 
+  <listitem><para>By default all outputs are installed for each derivation.
+  That can be reduced by setting <literal>meta.outputsToInstall</literal>.
+  </para></listitem> <!-- TODO: link nixpkgs docs on the ability to override those. -->
+
 </itemizedlist>
 
 </para>

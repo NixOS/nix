@@ -63,8 +63,8 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         if (drvPath != "")
             mkString(*state.allocAttr(v, state.sDrvPath), i.queryDrvPath());
 
-        // Copy each output.
-        DrvInfo::Outputs outputs = i.queryOutputs();
+        // Copy each output meant for installation.
+        DrvInfo::Outputs outputs = i.queryOutputs(true);
         Value & vOutputs = *state.allocAttr(v, state.sOutputs);
         state.mkList(vOutputs, outputs.size());
         unsigned int m = 0;
