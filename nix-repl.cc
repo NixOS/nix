@@ -20,6 +20,7 @@ using namespace nix;
 
 
 string programId = "nix-repl";
+const string historyFile = string(getenv("HOME")) + "/.nix-repl-history";
 
 
 struct NixRepl
@@ -91,8 +92,10 @@ void NixRepl::mainLoop(const Strings & files)
     reloadFiles();
     if (!loadedFiles.empty()) std::cout << std::endl;
 
+    // Allow nix-repl specific settings in .inputrc
+    rl_readline_name = "nix-repl";
     using_history();
-    read_history(0);
+    read_history(historyFile.c_str());
 
     string input;
 
@@ -649,5 +652,7 @@ int main(int argc, char * * argv)
         store = openStore();
         NixRepl repl(searchPath);
         repl.mainLoop(files);
+
+        write_history(historyFile.c_str());
     });
 }

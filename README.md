@@ -102,3 +102,7 @@ example:
 
     nix-repl> config.networking.use<TAB>
     config.networking.useDHCP   config.networking.usePredictableInterfaceNames
+
+Input history is preserved by readline in ~/.nix-repl-history
+The readline "application name" is nix-repl. This allows for nix-repl specific
+settings in ~/.inputrc
