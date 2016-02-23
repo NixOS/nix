@@ -30,7 +30,7 @@ string DrvInfo::queryOutPath()
 }
 
 
-DrvInfo::Outputs DrvInfo::queryOutputs()
+DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
 {
     if (outputs.empty()) {
         /* Get the ‘outputs’ list. */
@@ -55,7 +55,23 @@ DrvInfo::Outputs DrvInfo::queryOutputs()
         } else
             outputs["out"] = queryOutPath();
     }
-    return outputs;
+    if (!onlyOutputsToInstall || !attrs)
+        return outputs;
+
+    /* Check for `meta.outputsToInstall` and return `outputs` reduced to that. */
+    const Value * outTI = queryMeta("outputsToInstall");
+    if (!outTI) return outputs;
+    const auto errMsg = Error("this derivation has bad ‘meta.outputsToInstall’");
+        /* ^ this shows during `nix-env -i` right under the bad derivation */
+    if (!outTI->isList()) throw errMsg;
+    Outputs result;
+    for (auto i = outTI->listElems(); i != outTI->listElems() + outTI->listSize(); ++i) {
+        if ((*i)->type != tString) throw errMsg;
+        auto out = outputs.find((*i)->string.s);
+        if (out == outputs.end()) throw errMsg;
+        result.insert(*out);
+    }
+    return result;
 }
 
 
@@ -177,8 +193,8 @@ typedef set<Bindings *> Done;
 
 
 /* Evaluate value `v'.  If it evaluates to a set of type `derivation',
-   then put information about it in `drvs' (unless it's already in
-   `doneExprs').  The result boolean indicates whether it makes sense
+   then put information about it in `drvs' (unless it's already in `done').
+   The result boolean indicates whether it makes sense
    for the caller to recursively search for derivations in `v'. */
 static bool getDerivation(EvalState & state, Value & v,
     const string & attrPath, DrvInfos & drvs, Done & done,
