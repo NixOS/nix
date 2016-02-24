@@ -313,18 +313,24 @@ void Store::exportPaths(const Paths & paths,
 
 
 #include "local-store.hh"
-#include "serialise.hh"
 #include "remote-store.hh"
+#include "local-binary-cache-store.hh"
 
 
 namespace nix {
 
 
-ref<Store> openStore(bool reserveSpace)
+ref<Store> openStoreAt(const std::string & uri, bool reserveSpace)
 {
+    if (std::string(uri, 0, 7) == "file://") {
+        return make_ref<LocalBinaryCacheStore>(std::shared_ptr<Store>(0),
+            "", "", // FIXME: allow the signing key to be set
+            std::string(uri, 7));
+    }
+
     enum { mDaemon, mLocal, mAuto } mode;
 
-    mode = getEnv("NIX_REMOTE") == "daemon" ? mDaemon : mAuto;
+    mode = uri == "daemon" ? mDaemon : mAuto;
 
     if (mode == mAuto) {
         if (LocalStore::haveWriteAccess())
@@ -338,6 +344,12 @@ ref<Store> openStore(bool reserveSpace)
     return mode == mDaemon
         ? (ref<Store>) make_ref<RemoteStore>()
         : (ref<Store>) make_ref<LocalStore>(reserveSpace);
+}
+
+
+ref<Store> openStore(bool reserveSpace)
+{
+    return openStoreAt(getEnv("NIX_REMOTE"), reserveSpace);
 }
 
 

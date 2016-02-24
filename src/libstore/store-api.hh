@@ -419,8 +419,28 @@ Path computeStorePathForText(const string & name, const string & s,
 void removeTempRoots();
 
 
-/* Factory method: open the Nix database, either through the local or
-   remote implementation. */
+/* Return a Store object to access the Nix store denoted by
+   ‘uri’ (slight misnomer...). Supported values are:
+
+   * ‘direct’: The Nix store in /nix/store and database in
+     /nix/var/nix/db, accessed directly.
+
+   * ‘daemon’: The Nix store accessed via a Unix domain socket
+     connection to nix-daemon.
+
+   * ‘file://<path>’: A binary cache stored in <path>.
+
+   If ‘uri’ is empty, it defaults to ‘direct’ or ‘daemon’ depending on
+   whether the user has write access to the local Nix store/database.
+
+   The Boolean ‘reserveSpace’ denotes whether some disk space should
+   be reserved to enable future garbage collector runs. It should be
+   set to true *unless* you're going to collect garbage.
+*/
+ref<Store> openStoreAt(const std::string & uri, bool reserveSpace = true);
+
+
+/* Open the store indicated by the ‘NIX_REMOTE’ environment variable. */
 ref<Store> openStore(bool reserveSpace = true);
 
 
