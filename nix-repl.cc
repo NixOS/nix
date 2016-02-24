@@ -106,7 +106,7 @@ void NixRepl::mainLoop(const Strings & files)
         }
 
         try {
-            if (!processLine(input)) return;
+            if (!removeWhitespace(input).empty() && !processLine(input)) return;
         } catch (ParseError & e) {
             if (e.msg().find("unexpected $end") != std::string::npos) {
                 // For parse errors on incomplete input, we continue waiting for the next line of
