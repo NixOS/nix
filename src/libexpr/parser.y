@@ -31,10 +31,12 @@ namespace nix {
         Path basePath;
         Symbol path;
         string error;
+        bool atEnd;
         Symbol sLetBody;
         ParseData(EvalState & state)
             : state(state)
             , symbols(state.symbols)
+            , atEnd(false)
             , sLetBody(symbols.create("<let-body>"))
             { };
     };
@@ -539,7 +541,12 @@ Expr * EvalState::parse(const char * text,
     int res = yyparse(scanner, &data);
     yylex_destroy(scanner);
 
-    if (res) throw ParseError(data.error);
+    if (res) {
+      if (data.atEnd)
+        throw IncompleteParseError(data.error);
+      else
+        throw ParseError(data.error);
+    }
 
     data.result->bindVars(staticEnv);
 
