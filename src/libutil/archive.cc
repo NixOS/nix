@@ -29,7 +29,7 @@ bool useCaseHack =
     false;
 #endif
 
-static string archiveVersion1 = "nix-archive-1";
+const std::string narVersionMagic1 = "nix-archive-1";
 
 static string caseHackSuffix = "~nix~case~hack~";
 
@@ -113,8 +113,14 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
 
 void dumpPath(const Path & path, Sink & sink, PathFilter & filter)
 {
-    sink << archiveVersion1;
+    sink << narVersionMagic1;
     dump(path, sink, filter);
+}
+
+
+void dumpString(const std::string & s, Sink & sink)
+{
+    sink << narVersionMagic1 << "(" << "type" << "regular" << "contents" << s << ")";
 }
 
 
@@ -214,7 +220,8 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
         }
 
         else if (s == "executable" && type == tpRegular) {
-            readString(source);
+            auto s = readString(source);
+            if (s != "") throw badArchive("executable marker has non-empty value");
             sink.isExecutable();
         }
 
@@ -275,7 +282,7 @@ void parseDump(ParseSink & sink, Source & source)
         /* This generally means the integer at the start couldn't be
            decoded.  Ignore and throw the exception below. */
     }
-    if (version != archiveVersion1)
+    if (version != narVersionMagic1)
         throw badArchive("input doesn't look like a Nix archive");
     parse(sink, source, "");
 }

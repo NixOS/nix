@@ -24,6 +24,10 @@ BinaryCacheStore::BinaryCacheStore(std::shared_ptr<Store> localStore,
         auto key = PublicKey(readFile(publicKeyFile));
         publicKeys->emplace(key.name, key);
     }
+
+    StringSink sink;
+    sink << narVersionMagic1;
+    narMagic = sink.s;
 }
 
 void BinaryCacheStore::init()
@@ -54,6 +58,8 @@ void BinaryCacheStore::addToCache(const ValidPathInfo & info,
 {
     auto narInfoFile = narInfoFileFor(info.path);
     if (fileExists(narInfoFile)) return;
+
+    assert(nar.compare(0, narMagic.size(), narMagic) == 0);
 
     auto narInfo = make_ref<NarInfo>(info);
 
@@ -259,6 +265,50 @@ void BinaryCacheStore::querySubstitutablePathInfos(const PathSet & paths,
 
     if (settings.useSubstitutes)
         localStore->querySubstitutablePathInfos(left, infos);
+}
+
+Path BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
+    bool recursive, HashType hashAlgo, PathFilter & filter, bool repair)
+{
+    // FIXME: some cut&paste from LocalStore::addToStore().
+
+    /* Read the whole path into memory. This is not a very scalable
+       method for very large paths, but `copyPath' is mainly used for
+       small files. */
+    StringSink sink;
+    Hash h;
+    if (recursive) {
+        dumpPath(srcPath, sink, filter);
+        h = hashString(hashAlgo, sink.s);
+    } else {
+        auto s = readFile(srcPath);
+        dumpString(s, sink);
+        h = hashString(hashAlgo, s);
+    }
+
+    ValidPathInfo info;
+    info.path = makeFixedOutputPath(recursive, hashAlgo, h, name);
+
+    if (repair || !isValidPath(info.path))
+        addToCache(info, sink.s);
+
+    return info.path;
+}
+
+Path BinaryCacheStore::addTextToStore(const string & name, const string & s,
+    const PathSet & references, bool repair)
+{
+    ValidPathInfo info;
+    info.path = computeStorePathForText(name, s, references);
+    info.references = references;
+
+    if (repair || !isValidPath(info.path)) {
+        StringSink sink;
+        dumpString(s, sink);
+        addToCache(info, sink.s);
+    }
+
+    return info.path;
 }
 
 void BinaryCacheStore::buildPaths(const PathSet & paths, BuildMode buildMode)

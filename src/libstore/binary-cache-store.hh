@@ -68,6 +68,8 @@ private:
 
     Stats stats;
 
+    std::string narMagic;
+
     std::string narInfoFileFor(const Path & storePath);
 
     void addToCache(const ValidPathInfo & info, const string & nar);
@@ -96,10 +98,10 @@ public:
     { notImpl(); }
 
     Path queryDeriver(const Path & path) override
-    { notImpl(); }
+    { return ""; }
 
     PathSet queryValidDerivers(const Path & path) override
-    { notImpl(); }
+    { return {}; }
 
     PathSet queryDerivationOutputs(const Path & path) override
     { notImpl(); }
@@ -111,19 +113,17 @@ public:
     { notImpl(); }
 
     PathSet querySubstitutablePaths(const PathSet & paths) override
-    { notImpl(); }
+    { return {}; }
 
     void querySubstitutablePathInfos(const PathSet & paths,
         SubstitutablePathInfos & infos) override;
 
     Path addToStore(const string & name, const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter, bool repair = false) override
-    { notImpl(); }
+        PathFilter & filter = defaultPathFilter, bool repair = false) override;
 
     Path addTextToStore(const string & name, const string & s,
-        const PathSet & references, bool repair = false) override
-    { notImpl(); }
+        const PathSet & references, bool repair = false) override;
 
     void exportPath(const Path & path, bool sign,
         Sink & sink) override;
@@ -156,7 +156,7 @@ public:
     { notImpl(); }
 
     PathSet queryFailedPaths() override
-    { return PathSet(); }
+    { return {}; }
 
     void clearFailedPaths(const PathSet & paths) override
     { }
