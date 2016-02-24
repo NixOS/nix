@@ -323,9 +323,11 @@ namespace nix {
 ref<Store> openStoreAt(const std::string & uri, bool reserveSpace)
 {
     if (std::string(uri, 0, 7) == "file://") {
-        return make_ref<LocalBinaryCacheStore>(std::shared_ptr<Store>(0),
+        auto store = make_ref<LocalBinaryCacheStore>(std::shared_ptr<Store>(0),
             "", "", // FIXME: allow the signing key to be set
             std::string(uri, 7));
+        store->init();
+        return store;
     }
 
     enum { mDaemon, mLocal, mAuto } mode;
