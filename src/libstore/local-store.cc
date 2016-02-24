@@ -1365,7 +1365,7 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
 
         if (repair || !isValidPath(dstPath)) {
 
-            if (pathExists(dstPath)) deletePath(dstPath);
+            deletePath(dstPath);
 
             if (recursive) {
                 StringSource source(dump);
@@ -1434,7 +1434,7 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
 
         if (repair || !isValidPath(dstPath)) {
 
-            if (pathExists(dstPath)) deletePath(dstPath);
+            deletePath(dstPath);
 
             writeFile(dstPath, s);
 
@@ -1659,7 +1659,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 
         if (!isValidPath(dstPath)) {
 
-            if (pathExists(dstPath)) deletePath(dstPath);
+            deletePath(dstPath);
 
             if (rename(unpacked.c_str(), dstPath.c_str()) == -1)
                 throw SysError(format("cannot move ‘%1%’ to ‘%2%’")

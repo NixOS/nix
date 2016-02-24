@@ -92,8 +92,8 @@ string readLine(int fd);
 void writeLine(int fd, string s);
 
 /* Delete a path; i.e., in the case of a directory, it is deleted
-   recursively.  Don't use this at home, kids.  The second variant
-   returns the number of bytes and blocks freed. */
+   recursively. It's not an error if the path does not exist. The
+   second variant returns the number of bytes and blocks freed. */
 void deletePath(const Path & path);
 
 void deletePath(const Path & path, unsigned long long & bytesFreed);
