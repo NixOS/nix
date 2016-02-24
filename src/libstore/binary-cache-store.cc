@@ -33,6 +33,11 @@ void BinaryCacheStore::init()
         upsertFile(cacheInfoFile, "StoreDir: " + settings.nixStore + "\n");
 }
 
+void BinaryCacheStore::notImpl()
+{
+    throw Error("operation not implemented for binary cache stores");
+}
+
 const BinaryCacheStore::Stats & BinaryCacheStore::getStats()
 {
     return stats;

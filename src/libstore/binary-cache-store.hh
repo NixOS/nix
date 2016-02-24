@@ -34,6 +34,8 @@ protected:
     BinaryCacheStore(std::shared_ptr<Store> localStore,
         const Path & secretKeyFile, const Path & publicKeyFile);
 
+    [[noreturn]] void notImpl();
+
     virtual bool fileExists(const std::string & path) = 0;
 
     virtual void upsertFile(const std::string & path, const std::string & data) = 0;
@@ -79,37 +81,37 @@ public:
     bool isValidPath(const Path & path) override;
 
     PathSet queryValidPaths(const PathSet & paths) override
-    { abort(); }
+    { notImpl(); }
 
     PathSet queryAllValidPaths() override
-    { abort(); }
+    { notImpl(); }
 
     ValidPathInfo queryPathInfo(const Path & path) override;
 
     Hash queryPathHash(const Path & path) override
-    { abort(); }
+    { notImpl(); }
 
     void queryReferrers(const Path & path,
         PathSet & referrers) override
-    { abort(); }
+    { notImpl(); }
 
     Path queryDeriver(const Path & path) override
-    { abort(); }
+    { notImpl(); }
 
     PathSet queryValidDerivers(const Path & path) override
-    { abort(); }
+    { notImpl(); }
 
     PathSet queryDerivationOutputs(const Path & path) override
-    { abort(); }
+    { notImpl(); }
 
     StringSet queryDerivationOutputNames(const Path & path) override
-    { abort(); }
+    { notImpl(); }
 
     Path queryPathFromHashPart(const string & hashPart) override
-    { abort(); }
+    { notImpl(); }
 
     PathSet querySubstitutablePaths(const PathSet & paths) override
-    { abort(); }
+    { notImpl(); }
 
     void querySubstitutablePathInfos(const PathSet & paths,
         SubstitutablePathInfos & infos) override;
@@ -117,11 +119,11 @@ public:
     Path addToStore(const string & name, const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, bool repair = false) override
-    { abort(); }
+    { notImpl(); }
 
     Path addTextToStore(const string & name, const string & s,
         const PathSet & references, bool repair = false) override
-    { abort(); }
+    { notImpl(); }
 
     void exportPath(const Path & path, bool sign,
         Sink & sink) override;
@@ -134,24 +136,24 @@ public:
 
     BuildResult buildDerivation(const Path & drvPath, const BasicDerivation & drv,
         BuildMode buildMode = bmNormal) override
-    { abort(); }
+    { notImpl(); }
 
     void ensurePath(const Path & path) override;
 
     void addTempRoot(const Path & path) override
-    { abort(); }
+    { notImpl(); }
 
     void addIndirectRoot(const Path & path) override
-    { abort(); }
+    { notImpl(); }
 
     void syncWithGC() override
     { }
 
     Roots findRoots() override
-    { abort(); }
+    { notImpl(); }
 
     void collectGarbage(const GCOptions & options, GCResults & results) override
-    { abort(); }
+    { notImpl(); }
 
     PathSet queryFailedPaths() override
     { return PathSet(); }
