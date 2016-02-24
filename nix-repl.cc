@@ -106,7 +106,7 @@ void NixRepl::mainLoop(const Strings & files)
         }
 
         try {
-            if (!processLine(input)) return;
+            if (!removeWhitespace(input).empty() && !processLine(input)) return;
         } catch (ParseError & e) {
             if (e.msg().find("unexpected $end") != std::string::npos) {
                 // For parse errors on incomplete input, we continue waiting for the next line of
@@ -178,14 +178,13 @@ bool NixRepl::getLine(string & input, const char * prompt)
 
         char * s = readline(prompt);
         if (!s) return false;
-        string line = chomp(string(s));
-        input.append(removeWhitespace(line));
+        input.append(s);
         input.push_back('\n');
-        free(s);
-        if (line != "") {
-            add_history(line.c_str());
+        if (!removeWhitespace(s).empty()) {
+            add_history(s);
             append_history(1, 0);
         }
+        free(s);
     }
 
     _isInterrupted = 0;
