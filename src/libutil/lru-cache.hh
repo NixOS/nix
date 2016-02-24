@@ -59,8 +59,8 @@ public:
         return true;
     }
 
-    /* Look up an item in the cache. If it's exists, it becomes the
-       most recently used item. */
+    /* Look up an item in the cache. If it exists, it becomes the most
+       recently used item. */
     // FIXME: use boost::optional?
     Value * get(const Key & key)
     {
