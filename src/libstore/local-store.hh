@@ -88,11 +88,13 @@ private:
 
     Path linksDir;
 
+    Path reservedPath;
+
 public:
 
     /* Initialise the local store, upgrading the schema if
        necessary. */
-    LocalStore(bool reserveSpace = true);
+    LocalStore();
 
     ~LocalStore();
 

@@ -216,8 +216,9 @@ void checkStoreNotSymlink()
 }
 
 
-LocalStore::LocalStore(bool reserveSpace)
-    : didSetSubstituterEnv(false)
+LocalStore::LocalStore()
+    : reservedPath(settings.nixDBPath + "/reserved")
+    , didSetSubstituterEnv(false)
 {
     schemaPath = settings.nixDBPath + "/schema";
 
@@ -276,25 +277,20 @@ LocalStore::LocalStore(bool reserveSpace)
        needed, we reserve some dummy space that we can free just
        before doing a garbage collection. */
     try {
-        Path reservedPath = settings.nixDBPath + "/reserved";
-        if (reserveSpace) {
-            struct stat st;
-            if (stat(reservedPath.c_str(), &st) == -1 ||
-                st.st_size != settings.reservedSize)
-            {
-                AutoCloseFD fd = open(reservedPath.c_str(), O_WRONLY | O_CREAT, 0600);
-                int res = -1;
+        struct stat st;
+        if (stat(reservedPath.c_str(), &st) == -1 ||
+            st.st_size != settings.reservedSize)
+        {
+            AutoCloseFD fd = open(reservedPath.c_str(), O_WRONLY | O_CREAT, 0600);
+            int res = -1;
 #if HAVE_POSIX_FALLOCATE
-                res = posix_fallocate(fd, 0, settings.reservedSize);
+            res = posix_fallocate(fd, 0, settings.reservedSize);
 #endif
-                if (res == -1) {
-                    writeFull(fd, string(settings.reservedSize, 'X'));
-                    ftruncate(fd, settings.reservedSize);
-                }
+            if (res == -1) {
+                writeFull(fd, string(settings.reservedSize, 'X'));
+                ftruncate(fd, settings.reservedSize);
             }
         }
-        else
-            deletePath(reservedPath);
     } catch (SysError & e) { /* don't care about errors */
     }
 

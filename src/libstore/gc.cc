@@ -608,6 +608,9 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     state.shouldDelete = options.action == GCOptions::gcDeleteDead || options.action == GCOptions::gcDeleteSpecific;
 
+    if (state.shouldDelete && pathExists(reservedPath))
+        deletePath(reservedPath);
+
     /* Acquire the global GC root.  This prevents
        a) New roots from being added.
        b) Processes from creating new temporary root files. */

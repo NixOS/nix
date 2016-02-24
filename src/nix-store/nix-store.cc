@@ -1131,7 +1131,7 @@ int main(int argc, char * * argv)
         if (!op) throw UsageError("no operation specified");
 
         if (op != opDump && op != opRestore) /* !!! hack */
-            store = openStore(op != opGC);
+            store = openStore();
 
         op(opFlags, opArgs);
     });

@@ -432,16 +432,12 @@ void removeTempRoots();
 
    If ‘uri’ is empty, it defaults to ‘direct’ or ‘daemon’ depending on
    whether the user has write access to the local Nix store/database.
-
-   The Boolean ‘reserveSpace’ denotes whether some disk space should
-   be reserved to enable future garbage collector runs. It should be
-   set to true *unless* you're going to collect garbage.
-*/
-ref<Store> openStoreAt(const std::string & uri, bool reserveSpace = true);
+   set to true *unless* you're going to collect garbage. */
+ref<Store> openStoreAt(const std::string & uri);
 
 
 /* Open the store indicated by the ‘NIX_REMOTE’ environment variable. */
-ref<Store> openStore(bool reserveSpace = true);
+ref<Store> openStore();
 
 
 /* Display a set of paths in human-readable form (i.e., between quotes

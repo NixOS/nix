@@ -106,7 +106,7 @@ private:
 
     ref<Pool<Connection>> connections;
 
-    ref<Connection> openConnection(bool reserveSpace = true);
+    ref<Connection> openConnection();
 
     void setOptions(ref<Connection> conn);
 };

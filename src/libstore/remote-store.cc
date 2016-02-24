@@ -49,7 +49,7 @@ RemoteStore::RemoteStore(size_t maxConnections)
 }
 
 
-ref<RemoteStore::Connection> RemoteStore::openConnection(bool reserveSpace)
+ref<RemoteStore::Connection> RemoteStore::openConnection()
 {
     auto conn = make_ref<Connection>();
 
@@ -106,7 +106,7 @@ ref<RemoteStore::Connection> RemoteStore::openConnection(bool reserveSpace)
         }
 
         if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 11)
-            conn->to << reserveSpace;
+            conn->to << false;
 
         conn->processStderr();
     }

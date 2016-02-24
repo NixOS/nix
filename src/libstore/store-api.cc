@@ -320,7 +320,7 @@ void Store::exportPaths(const Paths & paths,
 namespace nix {
 
 
-ref<Store> openStoreAt(const std::string & uri, bool reserveSpace)
+ref<Store> openStoreAt(const std::string & uri)
 {
     if (std::string(uri, 0, 7) == "file://") {
         auto store = make_ref<LocalBinaryCacheStore>(std::shared_ptr<Store>(0),
@@ -345,13 +345,13 @@ ref<Store> openStoreAt(const std::string & uri, bool reserveSpace)
 
     return mode == mDaemon
         ? (ref<Store>) make_ref<RemoteStore>()
-        : (ref<Store>) make_ref<LocalStore>(reserveSpace);
+        : (ref<Store>) make_ref<LocalStore>();
 }
 
 
-ref<Store> openStore(bool reserveSpace)
+ref<Store> openStore()
 {
-    return openStoreAt(getEnv("NIX_REMOTE"), reserveSpace);
+    return openStoreAt(getEnv("NIX_REMOTE"));
 }
 
 
