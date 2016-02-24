@@ -38,37 +38,37 @@ public:
     {
     private:
         Sync * s;
+        std::unique_lock<std::mutex> lk;
         friend Sync;
-        Lock(Sync * s) : s(s) { s->mutex.lock(); }
+        Lock(Sync * s) : s(s), lk(s->mutex) { }
     public:
-        Lock(Lock && l) : s(l.s) { l.s = 0; }
+        Lock(Lock && l) : s(l.s) { abort(); }
         Lock(const Lock & l) = delete;
-        ~Lock() { if (s) s->mutex.unlock(); }
+        ~Lock() { }
         T * operator -> () { return &s->data; }
         T & operator * () { return s->data; }
 
-        /* FIXME: performance impact of condition_variable_any? */
-        void wait(std::condition_variable_any & cv)
+        void wait(std::condition_variable & cv)
         {
             assert(s);
-            cv.wait(s->mutex);
+            cv.wait(lk);
         }
 
         template<class Rep, class Period, class Predicate>
-        bool wait_for(std::condition_variable_any & cv,
+        bool wait_for(std::condition_variable & cv,
             const std::chrono::duration<Rep, Period> & duration,
             Predicate pred)
         {
             assert(s);
-            return cv.wait_for(s->mutex, duration, pred);
+            return cv.wait_for(lk, duration, pred);
         }
 
         template<class Clock, class Duration>
-        std::cv_status wait_until(std::condition_variable_any & cv,
+        std::cv_status wait_until(std::condition_variable & cv,
             const std::chrono::time_point<Clock, Duration> & duration)
         {
             assert(s);
-            return cv.wait_until(s->mutex, duration);
+            return cv.wait_until(lk, duration);
         }
     };
 

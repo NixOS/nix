@@ -54,7 +54,7 @@ private:
 
     Sync<State> state;
 
-    std::condition_variable_any wakeup;
+    std::condition_variable wakeup;
 
 public:
 
