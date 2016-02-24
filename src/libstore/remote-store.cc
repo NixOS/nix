@@ -40,7 +40,11 @@ template PathSet readStorePaths(Source & from);
 
 
 RemoteStore::RemoteStore(size_t maxConnections)
-    : connections(make_ref<Pool<Connection>>(maxConnections, [this]() { return openConnection(); }))
+    : connections(make_ref<Pool<Connection>>(
+            maxConnections,
+            [this]() { return openConnection(); },
+            [](const ref<Connection> & r) { return r->to.good() && r->from.good(); }
+            ))
 {
 }
 

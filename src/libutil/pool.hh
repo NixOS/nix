@@ -33,11 +33,17 @@ class Pool
 {
 public:
 
+    /* A function that produces new instances of R on demand. */
     typedef std::function<ref<R>()> Factory;
+
+    /* A function that checks whether an instance of R is still
+       usable. Unusable instances are removed from the pool. */
+    typedef std::function<bool(const ref<R> &)> Validator;
 
 private:
 
     Factory factory;
+    Validator validator;
 
     struct State
     {
@@ -53,8 +59,10 @@ private:
 public:
 
     Pool(size_t max = std::numeric_limits<size_t>::max,
-        const Factory & factory = []() { return make_ref<R>(); })
+        const Factory & factory = []() { return make_ref<R>(); },
+        const Validator & validator = [](ref<R> r) { return true; })
         : factory(factory)
+        , validator(validator)
     {
         auto state_(state.lock());
         state_->max = max;
@@ -109,11 +117,13 @@ public:
             while (state_->idle.empty() && state_->inUse >= state_->max)
                 state_.wait(wakeup);
 
-            if (!state_->idle.empty()) {
+            while (!state_->idle.empty()) {
                 auto p = state_->idle.back();
                 state_->idle.pop_back();
-                state_->inUse++;
-                return Handle(*this, p);
+                if (validator(p)) {
+                    state_->inUse++;
+                    return Handle(*this, p);
+                }
             }
 
             state_->inUse++;

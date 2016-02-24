@@ -12,6 +12,7 @@ struct Sink
 {
     virtual ~Sink() { }
     virtual void operator () (const unsigned char * data, size_t len) = 0;
+    virtual bool good() { return true; }
 };
 
 
@@ -25,7 +26,7 @@ struct BufferedSink : Sink
         : bufSize(bufSize), bufPos(0), buffer(0) { }
     ~BufferedSink();
 
-    void operator () (const unsigned char * data, size_t len);
+    void operator () (const unsigned char * data, size_t len) override;
 
     void flush();
 
@@ -47,6 +48,8 @@ struct Source
        return the number of bytes stored.  If blocks until at least
        one byte is available. */
     virtual size_t read(unsigned char * data, size_t len) = 0;
+
+    virtual bool good() { return true; }
 };
 
 
@@ -60,7 +63,7 @@ struct BufferedSource : Source
         : bufSize(bufSize), bufPosIn(0), bufPosOut(0), buffer(0) { }
     ~BufferedSource();
 
-    size_t read(unsigned char * data, size_t len);
+    size_t read(unsigned char * data, size_t len) override;
 
     /* Underlying read call, to be overridden. */
     virtual size_t readUnbuffered(unsigned char * data, size_t len) = 0;
@@ -80,7 +83,12 @@ struct FdSink : BufferedSink
     FdSink(int fd) : fd(fd), warn(false), written(0) { }
     ~FdSink();
 
-    void write(const unsigned char * data, size_t len);
+    void write(const unsigned char * data, size_t len) override;
+
+    bool good() override;
+
+private:
+    bool _good = true;
 };
 
 
@@ -90,7 +98,10 @@ struct FdSource : BufferedSource
     int fd;
     FdSource() : fd(-1) { }
     FdSource(int fd) : fd(fd) { }
-    size_t readUnbuffered(unsigned char * data, size_t len);
+    size_t readUnbuffered(unsigned char * data, size_t len) override;
+    bool good() override;
+private:
+    bool _good = true;
 };
 
 
@@ -98,7 +109,7 @@ struct FdSource : BufferedSource
 struct StringSink : Sink
 {
     string s;
-    void operator () (const unsigned char * data, size_t len);
+    void operator () (const unsigned char * data, size_t len) override;
 };
 
 
@@ -108,7 +119,7 @@ struct StringSource : Source
     const string & s;
     size_t pos;
     StringSource(const string & _s) : s(_s), pos(0) { }
-    size_t read(unsigned char * data, size_t len);
+    size_t read(unsigned char * data, size_t len) override;
 };
 
 
