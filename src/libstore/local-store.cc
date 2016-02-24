@@ -1444,14 +1444,16 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
 
             canonicalisePathMetaData(dstPath, -1);
 
-            HashResult hash = hashPath(htSHA256, dstPath);
+            StringSink sink;
+            dumpString(s, sink);
+            auto hash = hashString(htSHA256, sink.s);
 
             optimisePath(dstPath);
 
             ValidPathInfo info;
             info.path = dstPath;
-            info.narHash = hash.first;
-            info.narSize = hash.second;
+            info.narHash = hash;
+            info.narSize = sink.s.size();
             info.references = references;
             registerValidPath(info);
         }
