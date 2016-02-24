@@ -58,7 +58,7 @@ private:
 
 public:
 
-    Pool(size_t max = std::numeric_limits<size_t>::max,
+    Pool(size_t max = std::numeric_limits<size_t>::max(),
         const Factory & factory = []() { return make_ref<R>(); },
         const Validator & validator = [](ref<R> r) { return true; })
         : factory(factory)
@@ -144,7 +144,7 @@ public:
     unsigned int count()
     {
         auto state_(state.lock());
-        return state_->count + state_->inUse;
+        return state_->idle.size() + state_->inUse;
     }
 };
 
