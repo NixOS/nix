@@ -36,7 +36,18 @@ struct JSONObject
         attr(s);
         escapeJSON(str, t);
     }
-    void attr(const string & s, int n)
+    void attr(const string & s, const char * t)
+    {
+        attr(s);
+        escapeJSON(str, t);
+    }
+    void attr(const string & s, bool b)
+    {
+        attr(s);
+        str << (b ? "true" : "false");
+    }
+    template<typename T>
+    void attr(const string & s, const T & n)
     {
         attr(s);
         str << n;

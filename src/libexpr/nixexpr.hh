@@ -11,6 +11,7 @@ namespace nix {
 
 MakeError(EvalError, Error)
 MakeError(ParseError, Error)
+MakeError(IncompleteParseError, ParseError)
 MakeError(AssertionError, EvalError)
 MakeError(ThrownError, AssertionError)
 MakeError(Abort, EvalError)
@@ -94,6 +95,15 @@ struct ExprInt : Expr
     NixInt n;
     Value v;
     ExprInt(NixInt n) : n(n) { mkInt(v, n); };
+    COMMON_METHODS
+    Value * maybeThunk(EvalState & state, Env & env);
+};
+
+struct ExprFloat : Expr
+{
+    NixFloat nf;
+    Value v;
+    ExprFloat(NixFloat nf) : nf(nf) { mkFloat(v, nf); };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };

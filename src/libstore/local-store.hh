@@ -88,11 +88,13 @@ private:
 
     Path linksDir;
 
+    Path reservedPath;
+
 public:
 
     /* Initialise the local store, upgrading the schema if
        necessary. */
-    LocalStore(bool reserveSpace = true);
+    LocalStore();
 
     ~LocalStore();
 
@@ -107,8 +109,6 @@ public:
     ValidPathInfo queryPathInfo(const Path & path) override;
 
     Hash queryPathHash(const Path & path) override;
-
-    void queryReferences(const Path & path, PathSet & references) override;
 
     void queryReferrers(const Path & path, PathSet & referrers) override;
 

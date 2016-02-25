@@ -12,6 +12,13 @@
 namespace nix {
 
 
+/* Size of the hash part of store paths, in base-32 characters. */
+const size_t storePathHashLen = 32; // i.e. 160 bits
+
+/* Magic header of exportPath() output. */
+const uint32_t exportMagic = 0x4558494e;
+
+
 typedef std::map<Path, Path> Roots;
 
 
@@ -85,7 +92,7 @@ struct ValidPathInfo
 {
     Path path;
     Path deriver;
-    Hash hash;
+    Hash narHash;
     PathSet references;
     time_t registrationTime = 0;
     unsigned long long narSize = 0; // 0 = unknown
@@ -95,7 +102,7 @@ struct ValidPathInfo
     {
         return
             path == i.path
-            && hash == i.hash
+            && narHash == i.narHash
             && references == i.references;
     }
 };
@@ -156,10 +163,9 @@ public:
     /* Query the hash of a valid path. */
     virtual Hash queryPathHash(const Path & path) = 0;
 
-    /* Query the set of outgoing FS references for a store path.  The
+    /* Query the set of outgoing FS references for a store path. The
        result is not cleared. */
-    virtual void queryReferences(const Path & path,
-        PathSet & references) = 0;
+    virtual void queryReferences(const Path & path, PathSet & references);
 
     /* Queries the set of incoming FS references for a store path.
        The result is not cleared. */
@@ -255,6 +261,10 @@ public:
        `path' has disappeared. */
     virtual void addIndirectRoot(const Path & path) = 0;
 
+    /* Register a permanent GC root. */
+    Path addPermRoot(const Path & storePath,
+        const Path & gcRoot, bool indirect, bool allowOutsideRootsDir = false);
+
     /* Acquire the global GC lock, then immediately release it.  This
        function must be called after registering a new permanent root,
        but before exiting.  Otherwise, it is possible that a running
@@ -346,6 +356,9 @@ bool isStorePath(const Path & path);
 /* Extract the name part of the given store path. */
 string storePathToName(const Path & path);
 
+/* Extract the hash part of the given store path. */
+string storePathToHash(const Path & path);
+
 void checkStoreName(const string & name);
 
 
@@ -406,14 +419,25 @@ Path computeStorePathForText(const string & name, const string & s,
 void removeTempRoots();
 
 
-/* Register a permanent GC root. */
-Path addPermRoot(ref<Store> store, const Path & storePath,
-    const Path & gcRoot, bool indirect, bool allowOutsideRootsDir = false);
+/* Return a Store object to access the Nix store denoted by
+   ‘uri’ (slight misnomer...). Supported values are:
+
+   * ‘direct’: The Nix store in /nix/store and database in
+     /nix/var/nix/db, accessed directly.
+
+   * ‘daemon’: The Nix store accessed via a Unix domain socket
+     connection to nix-daemon.
+
+   * ‘file://<path>’: A binary cache stored in <path>.
+
+   If ‘uri’ is empty, it defaults to ‘direct’ or ‘daemon’ depending on
+   whether the user has write access to the local Nix store/database.
+   set to true *unless* you're going to collect garbage. */
+ref<Store> openStoreAt(const std::string & uri);
 
 
-/* Factory method: open the Nix database, either through the local or
-   remote implementation. */
-ref<Store> openStore(bool reserveSpace = true);
+/* Open the store indicated by the ‘NIX_REMOTE’ environment variable. */
+ref<Store> openStore();
 
 
 /* Display a set of paths in human-readable form (i.e., between quotes

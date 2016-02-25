@@ -55,6 +55,8 @@ extern PathFilter defaultPathFilter;
 void dumpPath(const Path & path, Sink & sink,
     PathFilter & filter = defaultPathFilter);
 
+void dumpString(const std::string & s, Sink & sink);
+
 struct ParseSink
 {
     virtual void createDirectory(const Path & path) { };
@@ -74,6 +76,9 @@ void restorePath(const Path & path, Source & source);
 
 // FIXME: global variables are bad m'kay.
 extern bool useCaseHack;
+
+
+extern const std::string narVersionMagic1;
 
 
 }

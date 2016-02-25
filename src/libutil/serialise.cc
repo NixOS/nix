@@ -72,7 +72,17 @@ void FdSink::write(const unsigned char * data, size_t len)
             warned = true;
         }
     }
-    writeFull(fd, data, len);
+    try {
+        writeFull(fd, data, len);
+    } catch (SysError & e) {
+        _good = true;
+    }
+}
+
+
+bool FdSink::good()
+{
+    return _good;
 }
 
 
@@ -119,9 +129,15 @@ size_t FdSource::readUnbuffered(unsigned char * data, size_t len)
         checkInterrupt();
         n = ::read(fd, (char *) data, bufSize);
     } while (n == -1 && errno == EINTR);
-    if (n == -1) throw SysError("reading from file");
-    if (n == 0) throw EndOfFile("unexpected end-of-file");
+    if (n == -1) { _good = false; throw SysError("reading from file"); }
+    if (n == 0) { _good = false; throw EndOfFile("unexpected end-of-file"); }
     return n;
+}
+
+
+bool FdSource::good()
+{
+    return _good;
 }
 
 

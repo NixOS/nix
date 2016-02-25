@@ -84,6 +84,10 @@ void printValueAsJSON(EvalState & state, bool strict,
             v.external->printValueAsJSON(state, strict, str, context);
             break;
 
+        case tFloat:
+            str << v.fpoint;
+            break;
+
         default:
             throw TypeError(format("cannot convert %1% to JSON") % showType(v));
     }

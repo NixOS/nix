@@ -128,6 +128,9 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
     case tExternal:
         str << *v.external;
         break;
+    case tFloat:
+        str << v.fpoint;
+        break;
     default:
         throw Error("invalid value");
     }
@@ -161,6 +164,7 @@ string showType(const Value & v)
         case tPrimOp: return "a built-in function";
         case tPrimOpApp: return "a partially applied built-in function";
         case tExternal: return v.external->showType();
+        case tFloat: return "a float";
     }
     abort();
 }
@@ -579,6 +583,12 @@ Value * ExprInt::maybeThunk(EvalState & state, Env & env)
     return &v;
 }
 
+Value * ExprFloat::maybeThunk(EvalState & state, Env & env)
+{
+    nrAvoided++;
+    return &v;
+}
+
 Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 {
     nrAvoided++;
@@ -665,6 +675,11 @@ void ExprInt::eval(EvalState & state, Env & env, Value & v)
     v = this->v;
 }
 
+
+void ExprFloat::eval(EvalState & state, Env & env, Value & v)
+{
+    v = this->v;
+}
 
 void ExprString::eval(EvalState & state, Env & env, Value & v)
 {
@@ -1211,6 +1226,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     PathSet context;
     std::ostringstream s;
     NixInt n = 0;
+    NixFloat nf = 0;
 
     bool first = !forceString;
     ValueType firstType = tString;
@@ -1229,15 +1245,30 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
         }
 
         if (firstType == tInt) {
-            if (vTmp.type != tInt)
+            if (vTmp.type == tInt) {
+                n += vTmp.integer;
+            } else if (vTmp.type == tFloat) {
+                // Upgrade the type from int to float;
+                firstType = tFloat;
+                nf = n;
+                nf += vTmp.fpoint;
+            } else
                 throwEvalError("cannot add %1% to an integer, at %2%", showType(vTmp), pos);
-            n += vTmp.integer;
+        } else if (firstType == tFloat) {
+            if (vTmp.type == tInt) {
+                nf += vTmp.integer;
+            } else if (vTmp.type == tFloat) {
+                nf += vTmp.fpoint;
+            } else
+                throwEvalError("cannot add %1% to a float, at %2%", showType(vTmp), pos);
         } else
             s << state.coerceToString(pos, vTmp, context, false, firstType == tString);
     }
 
     if (firstType == tInt)
         mkInt(v, n);
+    else if (firstType == tFloat)
+        mkFloat(v, nf);
     else if (firstType == tPath) {
         if (!context.empty())
             throwEvalError("a string that refers to a store path cannot be appended to a path, at %1%", pos);
@@ -1292,6 +1323,17 @@ NixInt EvalState::forceInt(Value & v, const Pos & pos)
     if (v.type != tInt)
         throwTypeError("value is %1% while an integer was expected, at %2%", v, pos);
     return v.integer;
+}
+
+
+NixFloat EvalState::forceFloat(Value & v, const Pos & pos)
+{
+    forceValue(v, pos);
+    if (v.type == tInt)
+        return v.integer;
+    else if (v.type != tFloat)
+        throwTypeError("value is %1% while a float was expected, at %2%", v, pos);
+    return v.fpoint;
 }
 
 
@@ -1413,6 +1455,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
         if (v.type == tBool && v.boolean) return "1";
         if (v.type == tBool && !v.boolean) return "";
         if (v.type == tInt) return std::to_string(v.integer);
+        if (v.type == tFloat) return std::to_string(v.fpoint);
         if (v.type == tNull) return "";
 
         if (v.isList()) {
@@ -1474,6 +1517,13 @@ bool EvalState::eqValues(Value & v1, Value & v2)
        uniqList on a list of sets.)  Will remove this eventually. */
     if (&v1 == &v2) return true;
 
+    // Special case type-compatibility between float and int
+    if (v1.type == tInt && v2.type == tFloat)
+        return v1.integer == v2.fpoint;
+    if (v1.type == tFloat && v2.type == tInt)
+        return v1.fpoint == v2.integer;
+
+    // All other types are not compatible with each other.
     if (v1.type != v2.type) return false;
 
     switch (v1.type) {
@@ -1530,6 +1580,9 @@ bool EvalState::eqValues(Value & v1, Value & v2)
 
         case tExternal:
             return *v1.external == *v2.external;
+
+        case tFloat:
+            return v1.fpoint == v2.fpoint;
 
         default:
             throwEvalError("cannot compare %1% with %2%", showType(v1), showType(v2));

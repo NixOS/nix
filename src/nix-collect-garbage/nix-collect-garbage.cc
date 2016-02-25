@@ -82,7 +82,7 @@ int main(int argc, char * * argv)
 
         // Run the actual garbage collector.
         if (!dryRun) {
-            auto store = openStore(false);
+            auto store = openStore();
             options.action = GCOptions::gcDeleteDead;
             GCResults results;
             PrintFreed freed(true, results);

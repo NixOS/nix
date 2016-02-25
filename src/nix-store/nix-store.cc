@@ -84,7 +84,7 @@ static PathSet realisePath(Path path, bool build = true)
                 Path rootName = gcRoot;
                 if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
                 if (i->first != "out") rootName += "-" + i->first;
-                outPath = addPermRoot(ref<Store>(store), outPath, rootName, indirectRoot);
+                outPath = store->addPermRoot(outPath, rootName, indirectRoot);
             }
             outputs.insert(outPath);
         }
@@ -100,7 +100,7 @@ static PathSet realisePath(Path path, bool build = true)
             Path rootName = gcRoot;
             rootNr++;
             if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
-            path = addPermRoot(ref<Store>(store), path, rootName, indirectRoot);
+            path = store->addPermRoot(path, rootName, indirectRoot);
         }
         return singleton<PathSet>(path);
     }
@@ -374,8 +374,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 for (auto & j : paths) {
                     ValidPathInfo info = store->queryPathInfo(j);
                     if (query == qHash) {
-                        assert(info.hash.type == htSHA256);
-                        cout << format("sha256:%1%\n") % printHash32(info.hash);
+                        assert(info.narHash.type == htSHA256);
+                        cout << format("sha256:%1%\n") % printHash32(info.narHash);
                     } else if (query == qSize)
                         cout << format("%1%\n") % info.narSize;
                 }
@@ -567,7 +567,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
                 canonicalisePathMetaData(info.path, -1);
             if (!hashGiven) {
                 HashResult hash = hashPath(htSHA256, info.path);
-                info.hash = hash.first;
+                info.narHash = hash.first;
                 info.narSize = hash.second;
             }
             infos.push_back(info);
@@ -783,11 +783,11 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         Path path = followLinksToStorePath(i);
         printMsg(lvlTalkative, format("checking path ‘%1%’...") % path);
         ValidPathInfo info = store->queryPathInfo(path);
-        HashResult current = hashPath(info.hash.type, path);
-        if (current.first != info.hash) {
+        HashResult current = hashPath(info.narHash.type, path);
+        if (current.first != info.narHash) {
             printMsg(lvlError,
                 format("path ‘%1%’ was modified! expected hash ‘%2%’, got ‘%3%’")
-                % path % printHash(info.hash) % printHash(current.first));
+                % path % printHash(info.narHash) % printHash(current.first));
             status = 1;
         }
     }
@@ -1131,7 +1131,7 @@ int main(int argc, char * * argv)
         if (!op) throw UsageError("no operation specified");
 
         if (op != opDump && op != opRestore) /* !!! hack */
-            store = openStore(op != opGC);
+            store = openStore();
 
         op(opFlags, opArgs);
     });

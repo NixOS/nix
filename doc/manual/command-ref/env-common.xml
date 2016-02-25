@@ -11,6 +11,12 @@
 
 <variablelist xml:id="env-common">
 
+<varlistentry><term><envar>IN_NIX_SHELL</envar></term>
+
+  <listitem><para>Indicator that tells if the current environment was set up by
+  <command>nix-shell</command>.</para></listitem>
+
+</varlistentry>
 
 <varlistentry xml:id="env-NIX_PATH"><term><envar>NIX_PATH</envar></term>
 

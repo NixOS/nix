@@ -6,10 +6,11 @@
 #include "store-api.hh"
 #include "util.hh"
 
-#include <iostream>
+#include <algorithm>
 #include <cctype>
 #include <exception>
-#include <algorithm>
+#include <iostream>
+#include <mutex>
 
 #include <cstdlib>
 #include <sys/time.h>
@@ -17,7 +18,7 @@
 #include <unistd.h>
 #include <signal.h>
 
-extern char * * environ;
+#include <openssl/crypto.h>
 
 
 namespace nix {
@@ -94,7 +95,18 @@ string getArg(const string & opt,
 }
 
 
-void detectStackOverflow();
+/* OpenSSL is not thread-safe by default - it will randomly crash
+   unless the user supplies a mutex locking function. So let's do
+   that. */
+static std::vector<std::mutex> opensslLocks;
+
+static void opensslLockCallback(int mode, int type, const char * file, int line)
+{
+    if (mode & CRYPTO_LOCK)
+        opensslLocks[type].lock();
+    else
+        opensslLocks[type].unlock();
+}
 
 
 void initNix()
@@ -105,10 +117,15 @@ void initNix()
     std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
 #endif
 
+    // FIXME: do we need this? It's not thread-safe.
     std::ios::sync_with_stdio(false);
 
     if (getEnv("IN_SYSTEMD") == "1")
         logType = ltSystemd;
+
+    /* Initialise OpenSSL locking. */
+    opensslLocks = std::vector<std::mutex>(CRYPTO_num_locks());
+    CRYPTO_set_locking_callback(opensslLockCallback);
 
     settings.processEnvironment();
     settings.loadConfFile();

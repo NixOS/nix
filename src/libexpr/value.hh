@@ -22,6 +22,7 @@ typedef enum {
     tPrimOp,
     tPrimOpApp,
     tExternal,
+    tFloat
 } ValueType;
 
 
@@ -38,6 +39,7 @@ class XMLWriter;
 
 
 typedef long NixInt;
+typedef float NixFloat;
 
 /* External values must descend from ExternalValueBase, so that
  * type-agnostic nix functions (e.g. showType) can be implemented
@@ -141,6 +143,7 @@ struct Value
             Value * left, * right;
         } primOpApp;
         ExternalValueBase * external;
+        NixFloat fpoint;
     };
 
     bool isList() const
@@ -178,6 +181,14 @@ static inline void mkInt(Value & v, NixInt n)
     clearValue(v);
     v.type = tInt;
     v.integer = n;
+}
+
+
+static inline void mkFloat(Value & v, NixFloat n)
+{
+    clearValue(v);
+    v.type = tFloat;
+    v.fpoint = n;
 }
 
 

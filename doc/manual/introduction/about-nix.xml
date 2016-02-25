@@ -62,9 +62,10 @@ directories such as
 so if a package builds correctly on your system, this is because you
 specified the dependency explicitly.</para>
 
-<para>Runtime dependencies are found by scanning binaries for the hash
-parts of Nix store paths (such as <literal>r8vvq9kq…</literal>).  This
-sounds risky, but it works extremely well.</para>
+<para>Once a package is built, runtime dependencies are found by
+scanning binaries for the hash parts of Nix store paths (such as
+<literal>r8vvq9kq…</literal>).  This sounds risky, but it works
+extremely well.</para>
 
 </simplesect>
 

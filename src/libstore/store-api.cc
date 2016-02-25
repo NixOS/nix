@@ -61,7 +61,14 @@ Path followLinksToStorePath(const Path & path)
 string storePathToName(const Path & path)
 {
     assertStorePath(path);
-    return string(path, settings.nixStore.size() + 34);
+    return string(path, settings.nixStore.size() + storePathHashLen + 2);
+}
+
+
+string storePathToHash(const Path & path)
+{
+    assertStorePath(path);
+    return string(path, settings.nixStore.size() + 1, storePathHashLen);
 }
 
 
@@ -217,6 +224,13 @@ Path computeStorePathForText(const string & name, const string & s,
 }
 
 
+void Store::queryReferences(const Path & path, PathSet & references)
+{
+    ValidPathInfo info = queryPathInfo(path);
+    references.insert(info.references.begin(), info.references.end());
+}
+
+
 /* Return a string accepted by decodeValidPathInfo() that
    registers the specified paths as valid.  Note: it's the
    responsibility of the caller to provide a closure. */
@@ -231,7 +245,7 @@ string Store::makeValidityRegistration(const PathSet & paths,
         ValidPathInfo info = queryPathInfo(i);
 
         if (showHash) {
-            s += printHash(info.hash) + "\n";
+            s += printHash(info.narHash) + "\n";
             s += (format("%1%\n") % info.narSize).str();
         }
 
@@ -256,7 +270,7 @@ ValidPathInfo decodeValidPathInfo(std::istream & str, bool hashGiven)
     if (hashGiven) {
         string s;
         getline(str, s);
-        info.hash = parseHash(htSHA256, s);
+        info.narHash = parseHash(htSHA256, s);
         getline(str, s);
         if (!string2Int(s, info.narSize)) throw Error("number expected");
     }
@@ -299,18 +313,26 @@ void Store::exportPaths(const Paths & paths,
 
 
 #include "local-store.hh"
-#include "serialise.hh"
 #include "remote-store.hh"
+#include "local-binary-cache-store.hh"
 
 
 namespace nix {
 
 
-ref<Store> openStore(bool reserveSpace)
+ref<Store> openStoreAt(const std::string & uri)
 {
+    if (std::string(uri, 0, 7) == "file://") {
+        auto store = make_ref<LocalBinaryCacheStore>(std::shared_ptr<Store>(0),
+            "", "", // FIXME: allow the signing key to be set
+            std::string(uri, 7));
+        store->init();
+        return store;
+    }
+
     enum { mDaemon, mLocal, mAuto } mode;
 
-    mode = getEnv("NIX_REMOTE") == "daemon" ? mDaemon : mAuto;
+    mode = uri == "daemon" ? mDaemon : mAuto;
 
     if (mode == mAuto) {
         if (LocalStore::haveWriteAccess())
@@ -322,8 +344,14 @@ ref<Store> openStore(bool reserveSpace)
     }
 
     return mode == mDaemon
-        ? make_ref<Store, RemoteStore>()
-        : make_ref<Store, LocalStore>(reserveSpace);
+        ? (ref<Store>) make_ref<RemoteStore>()
+        : (ref<Store>) make_ref<LocalStore>();
+}
+
+
+ref<Store> openStore()
+{
+    return openStoreAt(getEnv("NIX_REMOTE"));
 }
 
 

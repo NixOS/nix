@@ -92,8 +92,8 @@ string readLine(int fd);
 void writeLine(int fd, string s);
 
 /* Delete a path; i.e., in the case of a directory, it is deleted
-   recursively.  Don't use this at home, kids.  The second variant
-   returns the number of bytes and blocks freed. */
+   recursively. It's not an error if the path does not exist. The
+   second variant returns the number of bytes and blocks freed. */
 void deletePath(const Path & path);
 
 void deletePath(const Path & path, unsigned long long & bytesFreed);
@@ -361,6 +361,14 @@ template<class N> bool string2Int(const string & s, N & n)
 {
     if (string(s, 0, 1) == "-" && !std::numeric_limits<N>::is_signed)
         return false;
+    std::istringstream str(s);
+    str >> n;
+    return str && str.get() == EOF;
+}
+
+/* Parse a string into a float. */
+template<class N> bool string2Float(const string & s, N & n)
+{
     std::istringstream str(s);
     str >> n;
     return str && str.get() == EOF;

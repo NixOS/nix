@@ -1310,7 +1310,6 @@ void DerivationGoal::tryToBuild()
     for (auto & i : drv->outputs) {
         Path path = i.second.path;
         if (worker.store.isValidPath(path)) continue;
-        if (!pathExists(path)) continue;
         debug(format("removing invalid path ‘%1%’") % path);
         deletePath(path);
     }
@@ -1390,8 +1389,7 @@ void replaceValidPath(const Path & storePath, const Path tmpPath)
         rename(storePath.c_str(), oldPath.c_str());
     if (rename(tmpPath.c_str(), storePath.c_str()) == -1)
         throw SysError(format("moving ‘%1%’ to ‘%2%’") % tmpPath % storePath);
-    if (pathExists(oldPath))
-        deletePath(oldPath);
+    deletePath(oldPath);
 }
 
 
@@ -1490,7 +1488,7 @@ void DerivationGoal::buildDone()
 
         /* Delete unused redirected outputs (when doing hash rewriting). */
         for (auto & i : redirectedOutputs)
-            if (pathExists(i.second)) deletePath(i.second);
+            deletePath(i.second);
 
         /* Delete the chroot (if we were using one). */
         autoDelChroot.reset(); /* this runs the destructor */
@@ -1939,7 +1937,7 @@ void DerivationGoal::startBuilder()
            to ensure that we can create hard-links to non-directory
            inputs in the fake Nix store in the chroot (see below). */
         chrootRootDir = drvPath + ".chroot";
-        if (pathExists(chrootRootDir)) deletePath(chrootRootDir);
+        deletePath(chrootRootDir);
 
         /* Clean up the chroot directory automatically. */
         autoDelChroot = std::make_shared<AutoDelete>(chrootRootDir);
@@ -2514,7 +2512,7 @@ void DerivationGoal::runChild()
             debug(sandboxProfile);
 
             Path sandboxFile = drvPath + ".sb";
-            if (pathExists(sandboxFile)) deletePath(sandboxFile);
+            deletePath(sandboxFile);
             autoDelSandbox.reset(sandboxFile, false);
 
             writeFile(sandboxFile, sandboxProfile);
@@ -2706,8 +2704,7 @@ void DerivationGoal::registerOutputs()
                     return;
                 if (actualPath != dest) {
                     PathLocks outputLocks({dest});
-                    if (pathExists(dest))
-                        deletePath(dest);
+                    deletePath(dest);
                     if (rename(actualPath.c_str(), dest.c_str()) == -1)
                         throw SysError(format("moving ‘%1%’ to ‘%2%’") % actualPath % dest);
                 }
@@ -2735,10 +2732,10 @@ void DerivationGoal::registerOutputs()
         if (buildMode == bmCheck) {
             if (!worker.store.isValidPath(path)) continue;
             ValidPathInfo info = worker.store.queryPathInfo(path);
-            if (hash.first != info.hash) {
+            if (hash.first != info.narHash) {
                 if (settings.keepFailed) {
                     Path dst = path + checkSuffix;
-                    if (pathExists(dst)) deletePath(dst);
+                    deletePath(dst);
                     if (rename(actualPath.c_str(), dst.c_str()))
                         throw SysError(format("renaming ‘%1%’ to ‘%2%’") % actualPath % dst);
                     throw Error(format("derivation ‘%1%’ may not be deterministic: output ‘%2%’ differs from ‘%3%’")
@@ -2799,7 +2796,7 @@ void DerivationGoal::registerOutputs()
 
         ValidPathInfo info;
         info.path = path;
-        info.hash = hash.first;
+        info.narHash = hash.first;
         info.narSize = hash.second;
         info.references = references;
         info.deriver = drvPath;
@@ -2830,7 +2827,7 @@ void DerivationGoal::registerOutputs()
     if (settings.keepFailed) {
         for (auto & i : drv->outputs) {
             Path prev = i.second.path + checkSuffix;
-            if (pathExists(prev)) deletePath(prev);
+            deletePath(prev);
             if (curRound < nrRounds) {
                 Path dst = i.second.path + checkSuffix;
                 if (rename(i.second.path.c_str(), dst.c_str()))
@@ -2998,7 +2995,7 @@ Path DerivationGoal::addHashRewrite(const Path & path)
     string h1 = string(path, settings.nixStore.size() + 1, 32);
     string h2 = string(printHash32(hashString(htSHA256, "rewrite:" + drvPath + ":" + path)), 0, 32);
     Path p = settings.nixStore + "/" + h2 + string(path, settings.nixStore.size() + 33);
-    if (pathExists(p)) deletePath(p);
+    deletePath(p);
     assert(path.size() == p.size());
     rewritesToTmp[h1] = h2;
     rewritesFromTmp[h2] = h1;
@@ -3259,8 +3256,7 @@ void SubstitutionGoal::tryToRun()
     destPath = repair ? storePath + ".tmp" : storePath;
 
     /* Remove the (stale) output path if it exists. */
-    if (pathExists(destPath))
-        deletePath(destPath);
+    deletePath(destPath);
 
     worker.store.setSubstituterEnv();
 
@@ -3369,7 +3365,7 @@ void SubstitutionGoal::finished()
 
     ValidPathInfo info2;
     info2.path = storePath;
-    info2.hash = hash.first;
+    info2.narHash = hash.first;
     info2.narSize = hash.second;
     info2.references = info.references;
     info2.deriver = info.deriver;

@@ -43,7 +43,7 @@ of which specify the inputs of the build.</para>
 
     <itemizedlist>
 
-      <listitem><para>Strings and integers are just passed
+      <listitem><para>Strings and numbers are just passed
       verbatim.</para></listitem>
 
       <listitem><para>A <emphasis>path</emphasis> (e.g.,

@@ -31,10 +31,12 @@ namespace nix {
         Path basePath;
         Symbol path;
         string error;
+        bool atEnd;
         Symbol sLetBody;
         ParseData(EvalState & state)
             : state(state)
             , symbols(state.symbols)
+            , atEnd(false)
             , sLetBody(symbols.create("<let-body>"))
             { };
     };
@@ -244,6 +246,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   nix::Formals * formals;
   nix::Formal * formal;
   nix::NixInt n;
+  nix::NixFloat nf;
   const char * id; // !!! -> Symbol
   char * path;
   char * uri;
@@ -264,6 +267,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %token <id> ID ATTRPATH
 %token <e> STR IND_STR
 %token <n> INT
+%token <nf> FLOAT
 %token <path> PATH HPATH SPATH
 %token <uri> URI
 %token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL OR_KW
@@ -366,6 +370,7 @@ expr_simple
           $$ = new ExprVar(CUR_POS, data->symbols.create($1));
   }
   | INT { $$ = new ExprInt($1); }
+  | FLOAT { $$ = new ExprFloat($1); }
   | '"' string_parts '"' { $$ = $2; }
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
       $$ = stripIndentation(CUR_POS, data->symbols, *$2);
@@ -536,7 +541,12 @@ Expr * EvalState::parse(const char * text,
     int res = yyparse(scanner, &data);
     yylex_destroy(scanner);
 
-    if (res) throw ParseError(data.error);
+    if (res) {
+      if (data.atEnd)
+        throw IncompleteParseError(data.error);
+      else
+        throw ParseError(data.error);
+    }
 
     data.result->bindVars(staticEnv);
 

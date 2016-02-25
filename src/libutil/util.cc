@@ -320,9 +320,11 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
 {
     checkInterrupt();
 
-    printMsg(lvlVomit, format("%1%") % path);
-
-    struct stat st = lstat(path);
+    struct stat st;
+    if (lstat(path.c_str(), &st) == -1) {
+        if (errno == ENOENT) return;
+        throw SysError(format("getting status of ‘%1%’") % path);
+    }
 
     if (!S_ISDIR(st.st_mode) && st.st_nlink == 1)
         bytesFreed += st.st_blocks * 512;
@@ -338,8 +340,10 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
             _deletePath(path + "/" + i.name, bytesFreed);
     }
 
-    if (remove(path.c_str()) == -1)
+    if (remove(path.c_str()) == -1) {
+        if (errno == ENOENT) return;
         throw SysError(format("cannot unlink ‘%1%’") % path);
+    }
 }
 
 

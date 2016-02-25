@@ -12,7 +12,9 @@ builtins.fromJSON
               "Width":  100
           },
           "Animated" : false,
-          "IDs": [116, 943, 234, 38793, true  ,false,null, -100]
+          "IDs": [116, 943, 234, 38793, true  ,false,null, -100],
+          "Latitude":  37.7668,
+          "Longitude": -122.3959
         }
     }
   ''
@@ -28,5 +30,7 @@ builtins.fromJSON
         };
       Animated = false;
       IDs = [ 116 943 234 38793 true false null (0-100) ];
+      Latitude = 37.7668;
+      Longitude = -122.3959;
     };
   }

@@ -15,7 +15,7 @@ in
     as.a.b.c or as.x.y.z
     as.x.y.bla or bs.f-o-o.bar or "xyzzy"
     as.x.y.bla or bs.bar.foo or "xyzzy"
-    123.bla or null.foo or "xyzzy"
+    (123).bla or null.foo or "xyzzy"
     # Backwards compatibility test.
     (fold or [] [true false false])
   ]

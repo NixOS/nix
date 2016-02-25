@@ -195,6 +195,7 @@ static void prim_typeOf(EvalState & state, const Pos & pos, Value * * args, Valu
         case tExternal:
             t = args[0]->external->typeOf();
             break;
+        case tFloat: t = "float"; break;
         default: abort();
     }
     mkString(v, state.symbols.create(t));
@@ -224,6 +225,12 @@ static void prim_isInt(EvalState & state, const Pos & pos, Value * * args, Value
     mkBool(v, args[0]->type == tInt);
 }
 
+/* Determine whether the argument is a float. */
+static void prim_isFloat(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceValue(*args[0]);
+    mkBool(v, args[0]->type == tFloat);
+}
 
 /* Determine whether the argument is a string. */
 static void prim_isString(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -245,11 +252,17 @@ struct CompareValues
 {
     bool operator () (const Value * v1, const Value * v2) const
     {
+        if (v1->type == tFloat && v2->type == tInt)
+            return v1->fpoint < v2->integer;
+        if (v1->type == tInt && v2->type == tFloat)
+            return v1->integer < v2->fpoint;
         if (v1->type != v2->type)
             throw EvalError(format("cannot compare %1% with %2%") % showType(*v1) % showType(*v2));
         switch (v1->type) {
             case tInt:
                 return v1->integer < v2->integer;
+            case tFloat:
+                return v1->fpoint < v2->fpoint;
             case tString:
                 return strcmp(v1->string.s, v2->string.s) < 0;
             case tPath:
@@ -1423,27 +1436,40 @@ static void prim_sort(EvalState & state, const Pos & pos, Value * * args, Value 
 
 static void prim_add(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    mkInt(v, state.forceInt(*args[0], pos) + state.forceInt(*args[1], pos));
+    if (args[0]->type == tFloat || args[1]->type == tFloat)
+        mkFloat(v, state.forceFloat(*args[0], pos) + state.forceFloat(*args[1], pos));
+    else
+        mkInt(v, state.forceInt(*args[0], pos) + state.forceInt(*args[1], pos));
 }
 
 
 static void prim_sub(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    mkInt(v, state.forceInt(*args[0], pos) - state.forceInt(*args[1], pos));
+    if (args[0]->type == tFloat || args[1]->type == tFloat)
+        mkFloat(v, state.forceFloat(*args[0], pos) - state.forceFloat(*args[1], pos));
+    else
+        mkInt(v, state.forceInt(*args[0], pos) - state.forceInt(*args[1], pos));
 }
 
 
 static void prim_mul(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    mkInt(v, state.forceInt(*args[0], pos) * state.forceInt(*args[1], pos));
+    if (args[0]->type == tFloat || args[1]->type == tFloat)
+        mkFloat(v, state.forceFloat(*args[0], pos) * state.forceFloat(*args[1], pos));
+    else
+        mkInt(v, state.forceInt(*args[0], pos) * state.forceInt(*args[1], pos));
 }
 
 
 static void prim_div(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    NixInt i2 = state.forceInt(*args[1], pos);
-    if (i2 == 0) throw EvalError(format("division by zero, at %1%") % pos);
-    mkInt(v, state.forceInt(*args[0], pos) / i2);
+    NixFloat f2 = state.forceFloat(*args[1], pos);
+    if (f2 == 0) throw EvalError(format("division by zero, at %1%") % pos);
+
+    if (args[0]->type == tFloat || args[1]->type == tFloat)
+        mkFloat(v, state.forceFloat(*args[0], pos) / state.forceFloat(*args[1], pos));
+    else
+        mkInt(v, state.forceInt(*args[0], pos) / state.forceInt(*args[1], pos));
 }
 
 
@@ -1735,7 +1761,7 @@ void EvalState::createBaseEnv()
        language feature gets added.  It's not necessary to increase it
        when primops get added, because you can just use `builtins ?
        primOp' to check. */
-    mkInt(v, 3);
+    mkInt(v, 4);
     addConstant("__langVersion", v);
 
     // Miscellaneous
@@ -1752,6 +1778,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__isFunction", 1, prim_isFunction);
     addPrimOp("__isString", 1, prim_isString);
     addPrimOp("__isInt", 1, prim_isInt);
+    addPrimOp("__isFloat", 1, prim_isFloat);
     addPrimOp("__isBool", 1, prim_isBool);
     addPrimOp("__genericClosure", 1, prim_genericClosure);
     addPrimOp("abort", 1, prim_abort);

@@ -33,7 +33,7 @@ if ! [ -e $dest ]; then
 fi
 
 if ! [ -w $dest ]; then
-    echo "$0: directory $dest exists, but is not writable by you; please run ‘chown -R $USER $dest’ as root" >&2
+    echo "$0: directory $dest exists, but is not writable by you. This could indicate that another user has already performed a single-user installation of Nix on this system. If you wish to enable multi-user support see http://nixos.org/nix/manual/#ssec-multi-user. If you wish to continue with a single-user install for $USER please run ‘chown -R $USER $dest’ as root." >&2
     exit 1
 fi
 
@@ -92,7 +92,7 @@ p=$NIX_LINK/etc/profile.d/nix.sh
 added=
 for i in .bash_profile .bash_login .profile; do
     fn="$HOME/$i"
-    if [ -e "$fn" ]; then
+    if [ -w "$fn" ]; then
         if ! grep -q "$p" "$fn"; then
             echo "modifying $fn..." >&2
             echo "if [ -e $p ]; then . $p; fi # added by Nix installer" >> $fn

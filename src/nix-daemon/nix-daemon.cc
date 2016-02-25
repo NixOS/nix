@@ -515,7 +515,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         startWork();
         ValidPathInfo info = store->queryPathInfo(path);
         stopWork();
-        to << info.deriver << printHash(info.hash) << info.references
+        to << info.deriver << printHash(info.narHash) << info.references
            << info.registrationTime << info.narSize;
         break;
     }
@@ -562,9 +562,8 @@ static void processConnection(bool trusted)
     if (GET_PROTOCOL_MINOR(clientVersion) >= 14 && readInt(from))
         setAffinityTo(readInt(from));
 
-    bool reserveSpace = true;
     if (GET_PROTOCOL_MINOR(clientVersion) >= 11)
-        reserveSpace = readInt(from) != 0;
+        readInt(from); // obsolete reserveSpace
 
     /* Send startup error messages to the client. */
     startWork();
@@ -582,7 +581,7 @@ static void processConnection(bool trusted)
 #endif
 
         /* Open the store. */
-        auto store = make_ref<LocalStore>(reserveSpace);
+        auto store = make_ref<LocalStore>();
 
         stopWork();
         to.flush();

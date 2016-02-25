@@ -65,6 +65,7 @@ template<class N> N getIntArg(const string & opt,
     return n * multiplier;
 }
 
+
 /* Show the manual page for the specified program. */
 void showManPage(const string & name);
 
@@ -97,6 +98,10 @@ struct PrintFreed
         : show(show), results(results) { }
     ~PrintFreed();
 };
+
+
+/* Install a SIGSEGV handler to detect stack overflows. */
+void detectStackOverflow();
 
 
 }

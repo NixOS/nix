@@ -1,5 +1,6 @@
 #pragma once
 
+#include <limits>
 #include <string>
 
 #include "store-api.hh"
@@ -12,15 +13,14 @@ class Pipe;
 class Pid;
 struct FdSink;
 struct FdSource;
+template<typename T> class Pool;
 
 
 class RemoteStore : public Store
 {
 public:
 
-    RemoteStore();
-
-    ~RemoteStore();
+    RemoteStore(size_t maxConnections = std::numeric_limits<size_t>::max());
 
     /* Implementations of abstract store API methods. */
 
@@ -91,19 +91,24 @@ public:
     bool verifyStore(bool checkContents, bool repair) override;
 
 private:
-    AutoCloseFD fdSocket;
-    FdSink to;
-    FdSource from;
-    unsigned int daemonVersion;
-    bool initialised;
 
-    void openConnection(bool reserveSpace = true);
+    struct Connection
+    {
+        AutoCloseFD fd;
+        FdSink to;
+        FdSource from;
+        unsigned int daemonVersion;
 
-    void processStderr(Sink * sink = 0, Source * source = 0);
+        ~Connection();
 
-    void connectToDaemon();
+        void processStderr(Sink * sink = 0, Source * source = 0);
+    };
 
-    void setOptions();
+    ref<Pool<Connection>> connections;
+
+    ref<Connection> openConnection();
+
+    void setOptions(ref<Connection> conn);
 };
 
 

@@ -114,6 +114,8 @@ struct Curl
         curl_easy_setopt(curl, CURLOPT_PROGRESSFUNCTION, progressCallback_);
         curl_easy_setopt(curl, CURLOPT_PROGRESSDATA, (void *) &curl);
         curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0);
+
+        curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
     }
 
     ~Curl()
