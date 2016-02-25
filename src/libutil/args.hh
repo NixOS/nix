@@ -86,7 +86,7 @@ public:
     void mkFlag(char shortName, const std::string & name,
         const std::string & description, bool * dest)
     {
-        mkFlag(0, name, description, dest, true);
+        mkFlag(shortName, name, description, dest, true);
     }
 
     void mkFlag(char shortName, const std::string & longName,
