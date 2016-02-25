@@ -332,7 +332,9 @@ ref<Store> openStoreAt(const std::string & uri)
 
     enum { mDaemon, mLocal, mAuto } mode;
 
-    mode = uri == "daemon" ? mDaemon : mAuto;
+    mode =
+        uri == "daemon" ? mDaemon :
+        uri == "local" ? mLocal : mAuto;
 
     if (mode == mAuto) {
         if (LocalStore::haveWriteAccess())

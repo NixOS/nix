@@ -1,12 +1,13 @@
-#include "binary-cache-store.hh"
-#include "sync.hh"
-
 #include "archive.hh"
+#include "binary-cache-store.hh"
 #include "compression.hh"
 #include "derivations.hh"
+#include "fs-accessor.hh"
 #include "globals.hh"
 #include "nar-info.hh"
+#include "sync.hh"
 #include "worker-protocol.hh"
+#include "nar-accessor.hh"
 
 #include <chrono>
 
@@ -122,7 +123,8 @@ NarInfo BinaryCacheStore::readNarInfo(const Path & storePath)
 
     auto narInfoFile = narInfoFileFor(storePath);
     auto narInfo = make_ref<NarInfo>(getFile(narInfoFile), narInfoFile);
-    assert(narInfo->path == storePath);
+    if (narInfo->path != storePath)
+        throw Error(format("NAR info file for store path ‘%1%’ does not match ‘%2%’") % narInfo->path % storePath);
 
     stats.narInfoRead++;
 
@@ -142,6 +144,9 @@ NarInfo BinaryCacheStore::readNarInfo(const Path & storePath)
 
 bool BinaryCacheStore::isValidPath(const Path & storePath)
 {
+    // FIXME: this only checks whether a .narinfo with a matching hash
+    // part exists. So ‘f4kb...-foo’ matches ‘f4kb...-bar’, even
+    // though they shouldn't. Not easily fixed.
     return fileExists(narInfoFileFor(storePath));
 }
 
@@ -342,6 +347,73 @@ void BinaryCacheStore::buildPaths(const PathSet & paths, BuildMode buildMode)
 void BinaryCacheStore::ensurePath(const Path & path)
 {
     buildPaths({path});
+}
+
+/* Given requests for a path /nix/store/<x>/<y>, this accessor will
+   first download the NAR for /nix/store/<x> from the binary cache,
+   build a NAR accessor for that NAR, and use that to access <y>. */
+struct BinaryCacheStoreAccessor : public FSAccessor
+{
+    ref<BinaryCacheStore> store;
+
+    std::map<Path, ref<FSAccessor>> nars;
+
+    BinaryCacheStoreAccessor(ref<BinaryCacheStore> store)
+        : store(store)
+    {
+    }
+
+    std::pair<ref<FSAccessor>, Path> fetch(const Path & path_)
+    {
+        auto path = canonPath(path_);
+
+        auto storePath = toStorePath(path);
+        std::string restPath = std::string(path, storePath.size());
+
+        if (!store->isValidPath(storePath))
+            throw Error(format("path ‘%1%’ is not a valid store path") % storePath);
+
+        auto i = nars.find(storePath);
+        if (i != nars.end()) return {i->second, restPath};
+
+        StringSink sink;
+        store->exportPath(storePath, false, sink);
+
+        // FIXME: gratuitous string copying.
+        auto accessor = makeNarAccessor(make_ref<std::string>(sink.s));
+        nars.emplace(storePath, accessor);
+        return {accessor, restPath};
+    }
+
+    Stat stat(const Path & path) override
+    {
+        auto res = fetch(path);
+        return res.first->stat(res.second);
+    }
+
+    StringSet readDirectory(const Path & path) override
+    {
+        auto res = fetch(path);
+        return res.first->readDirectory(res.second);
+    }
+
+    std::string readFile(const Path & path) override
+    {
+        auto res = fetch(path);
+        return res.first->readFile(res.second);
+    }
+
+    std::string readLink(const Path & path) override
+    {
+        auto res = fetch(path);
+        return res.first->readLink(res.second);
+    }
+};
+
+ref<FSAccessor> BinaryCacheStore::getFSAccessor()
+{
+    return make_ref<BinaryCacheStoreAccessor>(ref<BinaryCacheStore>(
+            std::dynamic_pointer_cast<BinaryCacheStore>(shared_from_this())));
 }
 
 }

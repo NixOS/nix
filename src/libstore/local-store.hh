@@ -80,7 +80,7 @@ struct SQLiteStmt
 };
 
 
-class LocalStore : public Store
+class LocalStore : public LocalFSStore
 {
 private:
     typedef std::map<Path, RunningSubstituter> RunningSubstituters;
@@ -170,14 +170,11 @@ public:
        files with the same contents. */
     void optimiseStore(OptimiseStats & stats);
 
-    /* Generic variant of the above method.  */
     void optimiseStore() override;
 
     /* Optimise a single store path. */
     void optimisePath(const Path & path);
 
-    /* Check the integrity of the Nix store.  Returns true if errors
-       remain. */
     bool verifyStore(bool checkContents, bool repair) override;
 
     /* Register the validity of a path, i.e., that `path' exists, that
