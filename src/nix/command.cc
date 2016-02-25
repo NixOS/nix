@@ -59,7 +59,7 @@ bool MultiCommand::processArgs(const Strings & args, bool finish)
 
 void StoreCommand::run()
 {
-    run(openStore(reserveSpace));
+    run(openStore());
 }
 
 }

@@ -43,4 +43,4 @@ struct CmdBuild : StoreCommand, MixDryRun, MixInstallables
     }
 };
 
-static RegisterCommand r1(make_ref<Command, CmdBuild>());
+static RegisterCommand r1(make_ref<CmdBuild>());

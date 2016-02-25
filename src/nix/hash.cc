@@ -45,8 +45,8 @@ struct CmdHash : Command
     }
 };
 
-static RegisterCommand r1(make_ref<Command, CmdHash>(CmdHash::mFile));
-static RegisterCommand r2(make_ref<Command, CmdHash>(CmdHash::mPath));
+static RegisterCommand r1(make_ref<CmdHash>(CmdHash::mFile));
+static RegisterCommand r2(make_ref<CmdHash>(CmdHash::mPath));
 
 struct CmdToBase : Command
 {
@@ -82,8 +82,8 @@ struct CmdToBase : Command
     }
 };
 
-static RegisterCommand r3(make_ref<Command, CmdToBase>(false));
-static RegisterCommand r4(make_ref<Command, CmdToBase>(true));
+static RegisterCommand r3(make_ref<CmdToBase>(false));
+static RegisterCommand r4(make_ref<CmdToBase>(true));
 
 /* Legacy nix-hash command. */
 static int compatNixHash(int argc, char * * argv)
