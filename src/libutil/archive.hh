@@ -57,6 +57,7 @@ void dumpPath(const Path & path, Sink & sink,
 
 void dumpString(const std::string & s, Sink & sink);
 
+/* FIXME: fix this API, it sucks. */
 struct ParseSink
 {
     virtual void createDirectory(const Path & path) { };

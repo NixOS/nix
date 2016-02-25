@@ -140,9 +140,10 @@ struct BuildResult
 
 struct BasicDerivation;
 struct Derivation;
+struct FSAccessor;
 
 
-class Store
+class Store : public std::enable_shared_from_this<Store>
 {
 public:
 
@@ -314,6 +315,9 @@ public:
        remain. */
     virtual bool verifyStore(bool checkContents, bool repair) = 0;
 
+    /* Return an object to access files in the Nix store. */
+    virtual ref<FSAccessor> getFSAccessor() = 0;
+
     /* Utility functions. */
 
     /* Read a derivation, after ensuring its existence through
@@ -342,6 +346,12 @@ public:
        relation.  If p refers to q, then p preceeds q in this list. */
     Paths topoSortPaths(const PathSet & paths);
 
+};
+
+
+class LocalFSStore : public Store
+{
+    ref<FSAccessor> getFSAccessor() override;
 };
 
 
