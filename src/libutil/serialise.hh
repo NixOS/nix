@@ -76,11 +76,11 @@ struct BufferedSource : Source
 struct FdSink : BufferedSink
 {
     int fd;
-    bool warn;
-    size_t written;
+    bool warn = false;
+    size_t written = 0;
 
-    FdSink() : fd(-1), warn(false), written(0) { }
-    FdSink(int fd) : fd(fd), warn(false), written(0) { }
+    FdSink() : fd(-1) { }
+    FdSink(int fd) : fd(fd) { }
     ~FdSink();
 
     void write(const unsigned char * data, size_t len) override;
@@ -96,6 +96,8 @@ private:
 struct FdSource : BufferedSource
 {
     int fd;
+    size_t read = 0;
+
     FdSource() : fd(-1) { }
     FdSource(int fd) : fd(fd) { }
     size_t readUnbuffered(unsigned char * data, size_t len) override;
