@@ -51,7 +51,6 @@ struct NarIndexer : ParseSink, StringSource
 
     void preallocateContents(unsigned long long size) override
     {
-        assert(currentPath != "");
         currentStart = string(s, pos, 16);
         members.emplace(currentPath,
             NarMember{FSAccessor::Type::tRegular, isExec, pos, size});
