@@ -64,9 +64,9 @@ static void warnLargeDump()
 
 void FdSink::write(const unsigned char * data, size_t len)
 {
+    written += len;
     static bool warned = false;
     if (warn && !warned) {
-        written += len;
         if (written > threshold) {
             warnLargeDump();
             warned = true;
@@ -131,6 +131,7 @@ size_t FdSource::readUnbuffered(unsigned char * data, size_t len)
     } while (n == -1 && errno == EINTR);
     if (n == -1) { _good = false; throw SysError("reading from file"); }
     if (n == 0) { _good = false; throw EndOfFile("unexpected end-of-file"); }
+    read += n;
     return n;
 }
 
