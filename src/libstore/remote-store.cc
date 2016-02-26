@@ -406,7 +406,8 @@ void RemoteStore::exportPath(const Path & path, bool sign,
 }
 
 
-Paths RemoteStore::importPaths(bool requireSignature, Source & source)
+Paths RemoteStore::importPaths(bool requireSignature, Source & source,
+    std::shared_ptr<FSAccessor> accessor)
 {
     auto conn(connections->get());
     conn->to << wopImportPaths;

@@ -732,7 +732,7 @@ static void opImport(Strings opFlags, Strings opArgs)
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
     FdSource source(STDIN_FILENO);
-    Paths paths = store->importPaths(requireSignature, source);
+    Paths paths = store->importPaths(requireSignature, source, 0);
 
     for (auto & i : paths)
         cout << format("%1%\n") % i << std::flush;
@@ -935,7 +935,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             case cmdImportPaths: {
                 if (!writeAllowed) throw Error("importing paths is not allowed");
-                store->importPaths(false, in);
+                store->importPaths(false, in, 0);
                 out << 1; // indicate success
                 break;
             }

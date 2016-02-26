@@ -186,7 +186,7 @@ void importPaths(int fd)
     PPCODE:
         try {
             FdSource source(fd);
-            store()->importPaths(false, source);
+            store()->importPaths(false, source, 0);
         } catch (Error & e) {
             croak("%s", e.what());
         }

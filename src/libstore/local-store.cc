@@ -1689,7 +1689,8 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 }
 
 
-Paths LocalStore::importPaths(bool requireSignature, Source & source)
+Paths LocalStore::importPaths(bool requireSignature, Source & source,
+    std::shared_ptr<FSAccessor> accessor)
 {
     Paths res;
     while (true) {
