@@ -65,7 +65,8 @@ public:
     void exportPath(const Path & path, bool sign,
         Sink & sink) override;
 
-    Paths importPaths(bool requireSignature, Source & source) override;
+    Paths importPaths(bool requireSignature, Source & source,
+        std::shared_ptr<FSAccessor> accessor) override;
 
     void buildPaths(const PathSet & paths, BuildMode buildMode) override;
 

@@ -227,8 +227,11 @@ public:
     void exportPaths(const Paths & paths, bool sign, Sink & sink);
 
     /* Import a sequence of NAR dumps created by exportPaths() into
-       the Nix store. */
-    virtual Paths importPaths(bool requireSignature, Source & source) = 0;
+       the Nix store. Optionally, the contents of the NARs are
+       preloaded into the specified FS accessor to speed up subsequent
+       access. */
+    virtual Paths importPaths(bool requireSignature, Source & source,
+        std::shared_ptr<FSAccessor> accessor) = 0;
 
     /* For each path, if it's a derivation, build it.  Building a
        derivation means ensuring that the output paths are valid.  If

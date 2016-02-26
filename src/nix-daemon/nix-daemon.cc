@@ -310,7 +310,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     case wopImportPaths: {
         startWork();
         TunnelSource source(from);
-        Paths paths = store->importPaths(!trusted, source);
+        Paths paths = store->importPaths(!trusted, source, 0);
         stopWork();
         to << paths;
         break;
@@ -322,8 +322,8 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         if (GET_PROTOCOL_MINOR(clientVersion) >= 15) {
             mode = (BuildMode)readInt(from);
 
-	    /* Repairing is not atomic, so disallowed for "untrusted"
-	       clients.  */
+            /* Repairing is not atomic, so disallowed for "untrusted"
+               clients.  */
             if (mode == bmRepair && !trusted)
                 throw Error("repairing is not supported when building through the Nix daemon");
         }

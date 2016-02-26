@@ -183,7 +183,8 @@ void BinaryCacheStore::exportPath(const Path & storePath, bool sign, Sink & sink
     sink << exportMagic << storePath << res.references << res.deriver << 0;
 }
 
-Paths BinaryCacheStore::importPaths(bool requireSignature, Source & source)
+Paths BinaryCacheStore::importPaths(bool requireSignature, Source & source,
+    std::shared_ptr<FSAccessor> accessor)
 {
     assert(!requireSignature);
     Paths res;
@@ -191,7 +192,7 @@ Paths BinaryCacheStore::importPaths(bool requireSignature, Source & source)
         unsigned long long n = readLongLong(source);
         if (n == 0) break;
         if (n != 1) throw Error("input doesn't look like something created by ‘nix-store --export’");
-        res.push_back(importPath(source));
+        res.push_back(importPath(source, accessor));
     }
     return res;
 }
@@ -214,34 +215,6 @@ struct TeeSource : Source
 struct NopSink : ParseSink
 {
 };
-
-Path BinaryCacheStore::importPath(Source & source)
-{
-    /* FIXME: some cut&paste of LocalStore::importPath(). */
-
-    /* Extract the NAR from the source. */
-    TeeSource tee(source);
-    NopSink sink;
-    parseDump(sink, tee);
-
-    uint32_t magic = readInt(source);
-    if (magic != exportMagic)
-        throw Error("Nix archive cannot be imported; wrong format");
-
-    ValidPathInfo info;
-    info.path = readStorePath(source);
-
-    info.references = readStorePaths<PathSet>(source);
-
-    readString(source); // deriver, don't care
-
-    bool haveSignature = readInt(source) == 1;
-    assert(!haveSignature);
-
-    addToCache(info, tee.data);
-
-    return info.path;
-}
 
 ValidPathInfo BinaryCacheStore::queryPathInfo(const Path & storePath)
 {
@@ -414,6 +387,39 @@ ref<FSAccessor> BinaryCacheStore::getFSAccessor()
 {
     return make_ref<BinaryCacheStoreAccessor>(ref<BinaryCacheStore>(
             std::dynamic_pointer_cast<BinaryCacheStore>(shared_from_this())));
+}
+
+Path BinaryCacheStore::importPath(Source & source, std::shared_ptr<FSAccessor> accessor)
+{
+    /* FIXME: some cut&paste of LocalStore::importPath(). */
+
+    /* Extract the NAR from the source. */
+    TeeSource tee(source);
+    NopSink sink;
+    parseDump(sink, tee);
+
+    uint32_t magic = readInt(source);
+    if (magic != exportMagic)
+        throw Error("Nix archive cannot be imported; wrong format");
+
+    ValidPathInfo info;
+    info.path = readStorePath(source);
+
+    info.references = readStorePaths<PathSet>(source);
+
+    readString(source); // deriver, don't care
+
+    bool haveSignature = readInt(source) == 1;
+    assert(!haveSignature);
+
+    addToCache(info, tee.data);
+
+    auto accessor_ = std::dynamic_pointer_cast<BinaryCacheStoreAccessor>(accessor);
+    if (accessor_)
+        // FIXME: more gratuitous string copying
+        accessor_->nars.emplace(info.path, makeNarAccessor(make_ref<std::string>(tee.data)));
+
+    return info.path;
 }
 
 }
