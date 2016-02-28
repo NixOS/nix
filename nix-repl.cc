@@ -38,7 +38,7 @@ struct NixRepl
     StringSet completions;
     StringSet::iterator curCompletion;
 
-    NixRepl(const Strings & searchPath);
+    NixRepl(const Strings & searchPath, nix::ref<Store> store);
     void mainLoop(const Strings & files);
     void completePrefix(string prefix);
     bool getLine(string & input, const char * prompt);
@@ -73,8 +73,8 @@ string removeWhitespace(string s)
 }
 
 
-NixRepl::NixRepl(const Strings & searchPath)
-    : state(searchPath)
+NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store)
+    : state(searchPath, store)
     , staticEnv(false, &state.staticBaseEnv)
 {
     curDir = absPath(".");
@@ -334,7 +334,7 @@ bool NixRepl::processLine(string line)
         if (!getDerivation(state, v, drvInfo, false))
             throw Error("expression does not evaluation to a derivation, so I can't build it");
         Path drvPath = drvInfo.queryDrvPath();
-        if (drvPath == "" || !store->isValidPath(drvPath))
+        if (drvPath == "" || !state.store->isValidPath(drvPath))
             throw Error("expression did not evaluate to a valid derivation");
 
         if (command == ":b") {
@@ -645,8 +645,7 @@ int main(int argc, char * * argv)
             return true;
         });
 
-        store = openStore();
-        NixRepl repl(searchPath);
+        NixRepl repl(searchPath, openStore());
         repl.mainLoop(files);
     });
 }
