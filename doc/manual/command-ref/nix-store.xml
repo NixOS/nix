@@ -248,6 +248,64 @@ $ nix-build -r '&lt;nixpkgs>' -A hello --check -K
 
 <!--######################################################################-->
 
+<refsection xml:id='rsec-nix-store-serve'><title>Operation <option>--serve</option></title>
+
+<refsection><title>Synopsis</title>
+
+<cmdsynopsis>
+  <command>nix-store</command>
+  <arg choice='plain'><option>--serve</option></arg>
+  <arg><option>--write</option></arg>
+</cmdsynopsis>
+
+</refsection>
+
+<refsection><title>Description</title>
+
+<para>The operation <option>--serve</option> provides access to
+the Nix store over stdin and stdout, and is intended to be used
+as a means of providing Nix store access to a restricted ssh user.
+</para>
+
+<para>The following flags are available:</para>
+
+<variablelist>
+
+  <varlistentry><term><option>--write</option></term>
+
+    <listitem><para>Allow the connected client to request the realization
+    of derivations. In effect, this can be used to make the host act
+    as a build slave.</para></listitem>
+
+  </varlistentry>
+
+</variablelist>
+
+</refsection>
+
+
+<refsection><title>Examples</title>
+
+<para>To turn a host into a build server, the
+<filename>authorized_keys</filename> file can be used to provide build
+access to a given SSH public key:
+
+<screen>
+$ cat <<EOF >>/root/.ssh/authorized_keys
+command="nice -n20 nix-store --serve --write" ssh-rsa AAAAB3NzaC1yc2EAAAA...
+EOF</screen>
+
+</para>
+
+</refsection>
+
+
+</refsection>
+
+
+
+<!--######################################################################-->
+
 <refsection xml:id='rsec-nix-store-gc'><title>Operation <option>--gc</option></title>
 
 <refsection><title>Synopsis</title>
