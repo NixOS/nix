@@ -43,6 +43,7 @@
   <xi:include href="command-ref/command-ref.xml" />
   <xi:include href="troubleshooting/troubleshooting.xml" />
   <xi:include href="glossary/glossary.xml" />
+  <xi:include href="signing.xml" />
   <xi:include href="hacking.xml" />
   <xi:include href="release-notes/release-notes.xml" />
 

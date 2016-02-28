@@ -1,0 +1,45 @@
+<appendix xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xml:id="chap-signing">
+
+<title>Signing</title>
+
+<para>This section provides a show overview of the signing infrastructure of Nix and how you can manage the signing keys manually.</para>
+
+<para>To generate a private key:
+<screen>
+$ (umask 277 &amp;&amp; openssl genrsa -out /etc/nix/signing-key.sec 2048)
+</screen>
+</para>
+
+<para>
+  The private key should be kept secret (only readable to the Nix
+  daemon user).
+</para>
+
+<para>To generate the corresponding public key:
+<screen>
+$ openssl rsa -in /etc/nix/signing-key.sec -pubout &gt; /etc/nix/signing-key.pub
+</screen>
+</para>
+
+<para>
+  The public key should be copied to all machines to which you want to export
+  store paths.
+</para>
+
+<para>Signing works like this:
+<screen>
+$ nix-hash --type sha256 --flat svn.nar | \
+    openssl rsautl -sign -inkey mykey.sec &gt; svn.nar.sign
+</screen>
+</para>
+
+<para>Verifying a signature is re-signing and check that the content matches:
+<screen>
+$ test &quot;$(nix-hash --type sha256 --flat svn.nar)&quot; = \
+  &quot;$(openssl rsautl -verify -inkey mykey.pub -pubin -in svn.nar.sign)&quot;
+</screen>
+</para>
+
+</appendix>
