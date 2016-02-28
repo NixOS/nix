@@ -209,7 +209,7 @@ Path readLink(const Path & path)
     else if (rlsize > st.st_size)
         throw Error(format("symbolic link ‘%1%’ size overflow %2% > %3%")
             % path % rlsize % st.st_size);
-    return string(buf, st.st_size);
+    return string(buf, rlsize);
 }
 
 
