@@ -19,9 +19,6 @@ using namespace std;
 using namespace nix;
 
 
-string programId = "nix-repl";
-
-
 struct NixRepl
 {
     string curDir;
@@ -297,6 +294,7 @@ bool NixRepl::processLine(string line)
              << "  <x> = <expr>  Bind expression to variable\n"
              << "  :a <expr>     Add attributes from resulting set to scope\n"
              << "  :b <expr>     Build derivation\n"
+             << "  :i <expr>     Build derivation, then install result into current profile\n"
              << "  :l <path>     Load Nix expression and add it to scope\n"
              << "  :p <expr>     Evaluate and print expression recursively\n"
              << "  :q            Exit nix-repl\n"
@@ -327,12 +325,12 @@ bool NixRepl::processLine(string line)
         std::cout << showType(v) << std::endl;
     }
 
-    else if (command == ":b" || command == ":s") {
+    else if (command == ":b" || command == ":i" || command == ":s") {
         Value v;
         evalString(arg, v);
         DrvInfo drvInfo(state);
         if (!getDerivation(state, v, drvInfo, false))
-            throw Error("expression does not evaluation to a derivation, so I can't build it");
+            throw Error("expression does not evaluate to a derivation, so I can't build it");
         Path drvPath = drvInfo.queryDrvPath();
         if (drvPath == "" || !state.store->isValidPath(drvPath))
             throw Error("expression did not evaluate to a valid derivation");
@@ -347,8 +345,11 @@ bool NixRepl::processLine(string line)
                 for (auto & i : drv.outputs)
                     std::cout << format("  %1% -> %2%") % i.first % i.second.path << std::endl;
             }
-        } else
+        } else if (command == ":i") {
+            runProgram("nix-env", Strings{"-i", drvPath});
+        } else {
             runProgram("nix-shell", Strings{drvPath});
+        }
     }
 
     else if (command == ":p" || command == ":print") {
