@@ -10,7 +10,8 @@ struct DownloadOptions
 {
     string expectedETag;
     bool verifyTLS{true};
-    bool forceProgress{false};
+    enum { yes, no, automatic } showProgress{yes};
+    bool head{false};
 };
 
 struct DownloadResult
@@ -21,11 +22,25 @@ struct DownloadResult
 
 class Store;
 
-DownloadResult downloadFile(string url, const DownloadOptions & options);
+struct Downloader
+{
+    virtual DownloadResult download(string url, const DownloadOptions & options) = 0;
 
-Path downloadFileCached(ref<Store> store, const string & url, bool unpack);
+    Path downloadCached(ref<Store> store, const string & url, bool unpack);
 
-MakeError(DownloadError, Error)
+    enum Error { NotFound, Forbidden, Misc };
+};
+
+ref<Downloader> makeDownloader();
+
+class DownloadError : public Error
+{
+public:
+    Downloader::Error error;
+    DownloadError(Downloader::Error error, const FormatOrString & fs)
+        : Error(fs), error(error)
+    { }
+};
 
 bool isUri(const string & s);
 

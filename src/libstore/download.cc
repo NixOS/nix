@@ -18,7 +18,7 @@ double getTime()
     return tv.tv_sec + (tv.tv_usec / 1000000.0);
 }
 
-struct Curl
+struct CurlDownloader : public Downloader
 {
     CURL * curl;
     string data;
@@ -30,37 +30,40 @@ struct Curl
     double prevProgressTime{0}, startTime{0};
     unsigned int moveBack{1};
 
-    static size_t writeCallback(void * contents, size_t size, size_t nmemb, void * userp)
+    size_t writeCallback(void * contents, size_t size, size_t nmemb)
     {
-        Curl & c(* (Curl *) userp);
         size_t realSize = size * nmemb;
-        c.data.append((char *) contents, realSize);
+        data.append((char *) contents, realSize);
         return realSize;
     }
 
-    static size_t headerCallback(void * contents, size_t size, size_t nmemb, void * userp)
+    static size_t writeCallbackWrapper(void * contents, size_t size, size_t nmemb, void * userp)
     {
-        Curl & c(* (Curl *) userp);
+        return ((CurlDownloader *) userp)->writeCallback(contents, size, nmemb);
+    }
+
+    size_t headerCallback(void * contents, size_t size, size_t nmemb)
+    {
         size_t realSize = size * nmemb;
         string line = string((char *) contents, realSize);
         printMsg(lvlVomit, format("got header: %1%") % trim(line));
         if (line.compare(0, 5, "HTTP/") == 0) { // new response starts
-            c.etag = "";
+            etag = "";
             auto ss = tokenizeString<vector<string>>(line, " ");
-            c.status = ss.size() >= 2 ? ss[1] : "";
+            status = ss.size() >= 2 ? ss[1] : "";
         } else {
             auto i = line.find(':');
             if (i != string::npos) {
                 string name = trim(string(line, 0, i));
                 if (name == "ETag") { // FIXME: case
-                    c.etag = trim(string(line, i + 1));
+                    etag = trim(string(line, i + 1));
                     /* Hack to work around a GitHub bug: it sends
                        ETags, but ignores If-None-Match. So if we get
                        the expected ETag on a 200 response, then shut
                        down the connection because we already have the
                        data. */
-                    printMsg(lvlDebug, format("got ETag: %1%") % c.etag);
-                    if (c.etag == c.expectedETag && c.status == "200") {
+                    printMsg(lvlDebug, format("got ETag: %1%") % etag);
+                    if (etag == expectedETag && status == "200") {
                         printMsg(lvlDebug, format("shutting down on 200 HTTP response with expected ETag"));
                         return 0;
                     }
@@ -68,6 +71,11 @@ struct Curl
             }
         }
         return realSize;
+    }
+
+    static size_t headerCallbackWrapper(void * contents, size_t size, size_t nmemb, void * userp)
+    {
+        return ((CurlDownloader *) userp)->headerCallback(contents, size, nmemb);
     }
 
     int progressCallback(double dltotal, double dlnow)
@@ -88,37 +96,20 @@ struct Curl
         return _isInterrupted;
     }
 
-    static int progressCallback_(void * userp, double dltotal, double dlnow, double ultotal, double ulnow)
+    static int progressCallbackWrapper(void * userp, double dltotal, double dlnow, double ultotal, double ulnow)
     {
-        Curl & c(* (Curl *) userp);
-        return c.progressCallback(dltotal, dlnow);
+        return ((CurlDownloader *) userp)->progressCallback(dltotal, dlnow);
     }
 
-    Curl()
+    CurlDownloader()
     {
         requestHeaders = 0;
 
         curl = curl_easy_init();
-        if (!curl) throw Error("unable to initialize curl");
-
-        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-        curl_easy_setopt(curl, CURLOPT_USERAGENT, ("Nix/" + nixVersion).c_str());
-        curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1);
-
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *) &curl);
-
-        curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, headerCallback);
-        curl_easy_setopt(curl, CURLOPT_HEADERDATA, (void *) &curl);
-
-        curl_easy_setopt(curl, CURLOPT_PROGRESSFUNCTION, progressCallback_);
-        curl_easy_setopt(curl, CURLOPT_PROGRESSDATA, (void *) &curl);
-        curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0);
-
-        curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
+        if (!curl) throw nix::Error("unable to initialize curl");
     }
 
-    ~Curl()
+    ~CurlDownloader()
     {
         if (curl) curl_easy_cleanup(curl);
         if (requestHeaders) curl_slist_free_all(requestHeaders);
@@ -126,7 +117,27 @@ struct Curl
 
     bool fetch(const string & url, const DownloadOptions & options)
     {
-        showProgress = options.forceProgress || isatty(STDERR_FILENO);
+        showProgress =
+            options.showProgress == DownloadOptions::yes ||
+            (options.showProgress == DownloadOptions::automatic && isatty(STDERR_FILENO));
+
+        curl_easy_reset(curl);
+
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl, CURLOPT_USERAGENT, ("Nix/" + nixVersion).c_str());
+        curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1);
+
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallbackWrapper);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *) this);
+
+        curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, headerCallbackWrapper);
+        curl_easy_setopt(curl, CURLOPT_HEADERDATA, (void *) this);
+
+        curl_easy_setopt(curl, CURLOPT_PROGRESSFUNCTION, progressCallbackWrapper);
+        curl_easy_setopt(curl, CURLOPT_PROGRESSDATA, (void *) this);
+        curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0);
+
+        curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
 
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 
@@ -151,6 +162,9 @@ struct Curl
 
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, requestHeaders);
 
+        if (options.head)
+            curl_easy_setopt(curl, CURLOPT_NOBODY, 1);
+
         if (showProgress) {
             std::cerr << (format("downloading ‘%1%’... ") % url);
             std::cerr.flush();
@@ -163,34 +177,46 @@ struct Curl
             std::cerr << "\n";
         checkInterrupt();
         if (res == CURLE_WRITE_ERROR && etag == options.expectedETag) return false;
-        if (res != CURLE_OK)
-            throw DownloadError(format("unable to download ‘%1%’: %2% (%3%)")
-                % url % curl_easy_strerror(res) % res);
 
-        long httpStatus = 0;
-        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpStatus);
+        long httpStatus = -1;
+        if (res == CURLE_HTTP_RETURNED_ERROR)
+            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpStatus);
+
+        if (res != CURLE_OK) {
+            long httpStatus = 0;
+            Error err =
+                httpStatus == 404 ? NotFound :
+                httpStatus == 403 ? Forbidden : Misc;
+            throw DownloadError(err, format("unable to download ‘%1%’: %2% (%3%)")
+                % url % curl_easy_strerror(res) % res);
+        }
+
         if (httpStatus == 304) return false;
 
         return true;
     }
+
+    DownloadResult download(string url, const DownloadOptions & options) override
+    {
+        DownloadResult res;
+        if (fetch(url, options)) {
+            res.cached = false;
+            res.data = data;
+        } else
+            res.cached = true;
+        res.etag = etag;
+        return res;
+    }
 };
 
 
-DownloadResult downloadFile(string url, const DownloadOptions & options)
+ref<Downloader> makeDownloader()
 {
-    DownloadResult res;
-    Curl curl;
-    if (curl.fetch(url, options)) {
-        res.cached = false;
-        res.data = curl.data;
-    } else
-        res.cached = true;
-    res.etag = curl.etag;
-    return res;
+    return make_ref<CurlDownloader>();
 }
 
 
-Path downloadFileCached(ref<Store> store, const string & url, bool unpack)
+Path Downloader::downloadCached(ref<Store> store, const string & url, bool unpack)
 {
     Path cacheDir = getEnv("XDG_CACHE_HOME", getEnv("HOME", "") + "/.cache") + "/nix/tarballs";
     createDirs(cacheDir);
@@ -234,7 +260,7 @@ Path downloadFileCached(ref<Store> store, const string & url, bool unpack)
         try {
             DownloadOptions options;
             options.expectedETag = expectedETag;
-            auto res = downloadFile(url, options);
+            auto res = download(url, options);
 
             if (!res.cached)
                 storePath = store->addTextToStore(name, res.data, PathSet(), false);

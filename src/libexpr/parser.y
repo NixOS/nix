@@ -613,7 +613,7 @@ void EvalState::addToSearchPath(const string & s, bool warn)
     }
 
     if (isUri(path))
-        path = downloadFileCached(store, path, true);
+        path = makeDownloader()->downloadCached(store, path, true);
 
     path = absPath(path);
     if (pathExists(path)) {
