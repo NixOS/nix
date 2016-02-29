@@ -314,27 +314,38 @@ void Store::exportPaths(const Paths & paths,
 
 #include "local-store.hh"
 #include "remote-store.hh"
-#include "local-binary-cache-store.hh"
 
 
 namespace nix {
 
 
+RegisterStoreImplementation::Implementations * RegisterStoreImplementation::implementations = 0;
+
+
 ref<Store> openStoreAt(const std::string & uri)
 {
-    if (std::string(uri, 0, 7) == "file://") {
-        auto store = make_ref<LocalBinaryCacheStore>(std::shared_ptr<Store>(0),
-            "", "", // FIXME: allow the signing key to be set
-            std::string(uri, 7));
-        store->init();
-        return store;
+    for (auto fun : *RegisterStoreImplementation::implementations) {
+        auto store = fun(uri);
+        if (store) return ref<Store>(store);
     }
 
+    throw Error(format("don't know how to open Nix store ‘%s’") % uri);
+}
+
+
+ref<Store> openStore()
+{
+    return openStoreAt(getEnv("NIX_REMOTE"));
+}
+
+
+static RegisterStoreImplementation regStore([](const std::string & uri) -> std::shared_ptr<Store> {
     enum { mDaemon, mLocal, mAuto } mode;
 
-    mode =
-        uri == "daemon" ? mDaemon :
-        uri == "local" ? mLocal : mAuto;
+    if (uri == "daemon") mode = mDaemon;
+    else if (uri == "local") mode = mLocal;
+    else if (uri == "") mode = mAuto;
+    else return 0;
 
     if (mode == mAuto) {
         if (LocalStore::haveWriteAccess())
@@ -346,15 +357,9 @@ ref<Store> openStoreAt(const std::string & uri)
     }
 
     return mode == mDaemon
-        ? (ref<Store>) make_ref<RemoteStore>()
-        : (ref<Store>) make_ref<LocalStore>();
-}
-
-
-ref<Store> openStore()
-{
-    return openStoreAt(getEnv("NIX_REMOTE"));
-}
+        ? std::shared_ptr<Store>(std::make_shared<RemoteStore>())
+        : std::shared_ptr<Store>(std::make_shared<LocalStore>());
+});
 
 
 }
