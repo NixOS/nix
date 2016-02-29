@@ -17,9 +17,9 @@ void builtinFetchurl(const BasicDerivation & drv)
     options.verifyTLS = false;
 
     /* Show a progress indicator, even though stderr is not a tty. */
-    options.forceProgress = true;
+    options.showProgress = DownloadOptions::yes;
 
-    auto data = downloadFile(url->second, options);
+    auto data = makeDownloader()->download(url->second, options);
 
     auto out = drv.env.find("out");
     if (out == drv.env.end()) throw Error("attribute ‘url’ missing");

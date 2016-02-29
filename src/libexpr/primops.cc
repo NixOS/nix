@@ -1703,7 +1703,7 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     } else
         url = state.forceStringNoCtx(*args[0], pos);
 
-    Path res = downloadFileCached(state.store, url, unpack);
+    Path res = makeDownloader()->downloadCached(state.store, url, unpack);
     mkString(v, res, PathSet({res}));
 }
 
