@@ -453,6 +453,23 @@ ref<Store> openStoreAt(const std::string & uri);
 ref<Store> openStore();
 
 
+/* Store implementation registration. */
+typedef std::function<std::shared_ptr<Store>(const std::string & uri)> OpenStore;
+
+struct RegisterStoreImplementation
+{
+    typedef std::vector<OpenStore> Implementations;
+    static Implementations * implementations;
+
+    RegisterStoreImplementation(OpenStore fun)
+    {
+        if (!implementations) implementations = new Implementations;
+        implementations->push_back(fun);
+    }
+};
+
+
+
 /* Display a set of paths in human-readable form (i.e., between quotes
    and separated by commas). */
 string showPaths(const PathSet & paths);
