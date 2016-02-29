@@ -52,7 +52,6 @@
 #include <sys/param.h>
 #include <sys/mount.h>
 #include <sys/syscall.h>
-#include <linux/fs.h>
 #define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
 #endif
 
