@@ -453,6 +453,11 @@ ref<Store> openStoreAt(const std::string & uri);
 ref<Store> openStore();
 
 
+ref<Store> openLocalBinaryCacheStore(std::shared_ptr<Store> localStore,
+    const Path & secretKeyFile, const Path & publicKeyFile,
+    const Path & binaryCacheDir);
+
+
 /* Store implementation registration. */
 typedef std::function<std::shared_ptr<Store>(const std::string & uri)> OpenStore;
 
