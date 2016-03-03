@@ -21,7 +21,7 @@ AC_ARG_WITH(system, AC_HELP_STRING([--with-system=SYSTEM],
    esac
 
    case "$host_os" in
-     linux-gnu*)
+     linux-gnu*|linux-musl*)
         # For backward compatibility, strip the `-gnu' part.
         system="$machine_name-linux";;
      *)
