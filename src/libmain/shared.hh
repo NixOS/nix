@@ -1,6 +1,7 @@
 #pragma once
 
 #include "util.hh"
+#include "args.hh"
 
 #include <signal.h>
 
@@ -8,8 +9,6 @@
 
 
 namespace nix {
-
-MakeError(UsageError, nix::Error);
 
 class Exit : public std::exception
 {

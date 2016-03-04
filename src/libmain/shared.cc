@@ -1,7 +1,8 @@
 #include "config.h"
 
-#include "shared.hh"
+#include "common-args.hh"
 #include "globals.hh"
+#include "shared.hh"
 #include "store-api.hh"
 #include "util.hh"
 
@@ -82,16 +83,6 @@ void printMissing(ref<Store> store, const PathSet & willBuild,
         for (auto & i : unknown)
             printMsg(lvlInfo, format("  %1%") % i);
     }
-}
-
-
-static void setLogType(string lt)
-{
-    if (lt == "pretty") logType = ltPretty;
-    else if (lt == "escapes") logType = ltEscapes;
-    else if (lt == "flat") logType = ltFlat;
-    else if (lt == "systemd") logType = ltSystemd;
-    else throw UsageError("unknown log type");
 }
 
 
@@ -181,77 +172,80 @@ void initNix()
 }
 
 
+struct LegacyArgs : public MixCommonArgs
+{
+    std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg;
+
+    LegacyArgs(const std::string & programName,
+        std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
+        : MixCommonArgs(programName), parseArg(parseArg)
+    {
+        mkFlag('Q', "no-build-output", "do not show build output",
+            &settings.buildVerbosity, lvlVomit);
+
+        mkFlag(0, "print-build-trace", "emit special build trace message",
+            &settings.printBuildTrace);
+
+        mkFlag('K', "keep-failed", "keep temporary directories of failed builds",
+            &settings.keepFailed);
+
+        mkFlag('k', "keep-going", "keep going after a build fails",
+            &settings.keepGoing);
+
+        mkFlag(0, "fallback", "build from source if substitution fails", []() {
+            settings.set("build-fallback", "true");
+        });
+
+        auto intSettingAlias = [&](char shortName, const std::string & longName,
+            const std::string & description, const std::string & dest) {
+            mkFlag<unsigned int>(shortName, longName, description, [=](unsigned int n) {
+                settings.set(dest, std::to_string(n));
+            });
+        };
+
+        intSettingAlias('j', "max-jobs", "maximum number of parallel builds", "build-max-jobs");
+        intSettingAlias(0, "cores", "maximum number of CPU cores to use inside a build", "build-cores");
+        intSettingAlias(0, "max-silent-time", "number of seconds of silence before a build is killed", "build-max-silent-time");
+        intSettingAlias(0, "timeout", "number of seconds before a build is killed", "build-timeout");
+
+        mkFlag(0, "readonly-mode", "do not write to the Nix store",
+            &settings.readOnlyMode);
+
+        mkFlag(0, "no-build-hook", "disable use of the build hook mechanism",
+            &settings.useBuildHook, false);
+
+        mkFlag(0, "show-trace", "show Nix expression stack trace in evaluation errors",
+            &settings.showTrace);
+
+        mkFlag(0, "no-gc-warning", "disable warning about not using ‘--add-root’",
+            &gcWarning, false);
+    }
+
+    bool processFlag(Strings::iterator & pos, Strings::iterator end) override
+    {
+        if (MixCommonArgs::processFlag(pos, end)) return true;
+        bool res = parseArg(pos, end);
+        if (res) ++pos;
+        return res;
+    }
+
+    bool processArgs(const Strings & args, bool finish) override
+    {
+        if (args.empty()) return true;
+        assert(args.size() == 1);
+        Strings ss(args);
+        auto pos = ss.begin();
+        if (!parseArg(pos, ss.end()))
+            throw UsageError(format("unexpected argument ‘%1%’") % args.front());
+        return true;
+    }
+};
+
+
 void parseCmdLine(int argc, char * * argv,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
 {
-    /* Put the arguments in a vector. */
-    Strings args;
-    argc--; argv++;
-    while (argc--) args.push_back(*argv++);
-
-    /* Process default options. */
-    for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
-        string arg = *i;
-
-        /* Expand compound dash options (i.e., `-qlf' -> `-q -l -f'). */
-        if (arg.length() > 2 && arg[0] == '-' && arg[1] != '-' && isalpha(arg[1])) {
-            *i = (string) "-" + arg[1];
-            auto next = i; ++next;
-            for (unsigned int j = 2; j < arg.length(); j++)
-                if (isalpha(arg[j]))
-                    args.insert(next, (string) "-" + arg[j]);
-                else {
-                    args.insert(next, string(arg, j));
-                    break;
-                }
-            arg = *i;
-        }
-
-        if (arg == "--verbose" || arg == "-v") verbosity = (Verbosity) (verbosity + 1);
-        else if (arg == "--quiet") verbosity = verbosity > lvlError ? (Verbosity) (verbosity - 1) : lvlError;
-        else if (arg == "--log-type") {
-            string s = getArg(arg, i, args.end());
-            setLogType(s);
-        }
-        else if (arg == "--no-build-output" || arg == "-Q")
-            settings.buildVerbosity = lvlVomit;
-        else if (arg == "--print-build-trace")
-            settings.printBuildTrace = true;
-        else if (arg == "--keep-failed" || arg == "-K")
-            settings.keepFailed = true;
-        else if (arg == "--keep-going" || arg == "-k")
-            settings.keepGoing = true;
-        else if (arg == "--fallback")
-            settings.set("build-fallback", "true");
-        else if (arg == "--max-jobs" || arg == "-j")
-            settings.set("build-max-jobs", getArg(arg, i, args.end()));
-        else if (arg == "--cores")
-            settings.set("build-cores", getArg(arg, i, args.end()));
-        else if (arg == "--readonly-mode")
-            settings.readOnlyMode = true;
-        else if (arg == "--max-silent-time")
-            settings.set("build-max-silent-time", getArg(arg, i, args.end()));
-        else if (arg == "--timeout")
-            settings.set("build-timeout", getArg(arg, i, args.end()));
-        else if (arg == "--no-build-hook")
-            settings.useBuildHook = false;
-        else if (arg == "--show-trace")
-            settings.showTrace = true;
-        else if (arg == "--no-gc-warning")
-            gcWarning = false;
-        else if (arg == "--option") {
-            ++i; if (i == args.end()) throw UsageError("‘--option’ requires two arguments");
-            string name = *i;
-            ++i; if (i == args.end()) throw UsageError("‘--option’ requires two arguments");
-            string value = *i;
-            settings.set(name, value);
-        }
-        else {
-            if (!parseArg(i, args.end()))
-                throw UsageError(format("unrecognised option ‘%1%’") % *i);
-        }
-    }
-
+    LegacyArgs(baseNameOf(argv[0]), parseArg).parseCmdline(argvToStrings(argc, argv));
     settings.update();
 }
 

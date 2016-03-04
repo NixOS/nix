@@ -65,13 +65,21 @@ std::string LocalBinaryCacheStore::getFile(const std::string & path)
     return readFile(binaryCacheDir + "/" + path);
 }
 
+ref<Store> openLocalBinaryCacheStore(std::shared_ptr<Store> localStore,
+    const Path & secretKeyFile, const Path & publicKeyFile,
+    const Path & binaryCacheDir)
+{
+    auto store = std::make_shared<LocalBinaryCacheStore>(
+        localStore, secretKeyFile, publicKeyFile, binaryCacheDir);
+    store->init();
+    return ref<Store>(std::shared_ptr<Store>(store));
+}
+
 static RegisterStoreImplementation regStore([](const std::string & uri) -> std::shared_ptr<Store> {
     if (std::string(uri, 0, 7) != "file://") return 0;
-    auto store = std::make_shared<LocalBinaryCacheStore>(std::shared_ptr<Store>(0),
+    return openLocalBinaryCacheStore(std::shared_ptr<Store>(0),
         "", "", // FIXME: allow the signing key to be set
         std::string(uri, 7));
-    store->init();
-    return store;
 });
 
 }

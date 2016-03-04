@@ -33,7 +33,7 @@ namespace io {
 class format_error : public std::exception
 {
 public:
-  format_error() {}
+  format_error() { abort(); }
   virtual const char *what() const throw()
   {
     return "boost::format_error: "
@@ -44,7 +44,7 @@ public:
 class bad_format_string : public format_error
 {
 public:
-  bad_format_string() {}
+  bad_format_string() { abort(); }
   virtual const char *what() const throw()
   {
     return "boost::bad_format_string: "
@@ -55,7 +55,7 @@ public:
 class too_few_args : public format_error
 {
 public:
-  too_few_args() {}
+  too_few_args() { abort(); }
   virtual const char *what() const throw()
   {
     return "boost::too_few_args: "
@@ -66,7 +66,7 @@ public:
 class too_many_args : public format_error
 {
 public:
-  too_many_args() {}
+  too_many_args() { abort(); }
   virtual const char *what() const throw()
   {
     return "boost::too_many_args: "
@@ -78,7 +78,7 @@ public:
 class  out_of_range : public format_error
 {
 public:
-  out_of_range() {}
+  out_of_range() { abort(); }
   virtual const char *what() const throw()
   {
     return "boost::out_of_range: "
