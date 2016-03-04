@@ -1,5 +1,6 @@
 #include "binary-cache-store.hh"
 #include "download.hh"
+#include "globals.hh"
 
 namespace nix {
 
@@ -65,7 +66,7 @@ static RegisterStoreImplementation regStore([](const std::string & uri) -> std::
     if (std::string(uri, 0, 7) != "http://" &&
         std::string(uri, 0, 8) != "https://") return 0;
     auto store = std::make_shared<HttpBinaryCacheStore>(std::shared_ptr<Store>(0),
-        "", // FIXME: allow the signing key to be set
+        settings.get("binary-cache-secret-key-file", string("")),
         uri);
     store->init();
     return store;

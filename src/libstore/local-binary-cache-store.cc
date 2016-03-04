@@ -1,4 +1,5 @@
 #include "binary-cache-store.hh"
+#include "globals.hh"
 
 namespace nix {
 
@@ -75,7 +76,7 @@ ref<Store> openLocalBinaryCacheStore(std::shared_ptr<Store> localStore,
 static RegisterStoreImplementation regStore([](const std::string & uri) -> std::shared_ptr<Store> {
     if (std::string(uri, 0, 7) != "file://") return 0;
     return openLocalBinaryCacheStore(std::shared_ptr<Store>(0),
-        "", // FIXME: allow the signing key to be set
+        settings.get("binary-cache-secret-key-file", string("")),
         std::string(uri, 7));
 });
 

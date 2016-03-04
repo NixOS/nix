@@ -421,6 +421,16 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
   </varlistentry>
 
 
+  <varlistentry><term><literal>binary-cache-secret-key-file</literal></term>
+
+    <listitem><para>Path of the file containing the secret key to be
+    used for signing binary caches. This file can be generated using
+    <command>nix-store
+    --generate-binary-cache-key</command>.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry><term><literal>binary-caches-parallel-connections</literal></term>
 
     <listitem><para>The maximum number of parallel HTTP connections
