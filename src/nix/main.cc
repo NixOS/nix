@@ -16,6 +16,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
     {
         mkFlag('h', "help", "show usage information", [=]() {
             printHelp(programName, std::cout);
+            std::cout << "\nNote: this program is EXPERIMENTAL and subject to change.\n";
             throw Exit();
         });
 
