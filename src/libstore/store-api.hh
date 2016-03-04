@@ -454,8 +454,7 @@ ref<Store> openStore();
 
 
 ref<Store> openLocalBinaryCacheStore(std::shared_ptr<Store> localStore,
-    const Path & secretKeyFile, const Path & publicKeyFile,
-    const Path & binaryCacheDir);
+    const Path & secretKeyFile, const Path & binaryCacheDir);
 
 
 /* Store implementation registration. */

@@ -14,16 +14,13 @@
 namespace nix {
 
 BinaryCacheStore::BinaryCacheStore(std::shared_ptr<Store> localStore,
-    const Path & secretKeyFile, const Path & publicKeyFile)
+    const Path & secretKeyFile)
     : localStore(localStore)
 {
-    if (secretKeyFile != "")
+    if (secretKeyFile != "") {
         secretKey = std::unique_ptr<SecretKey>(new SecretKey(readFile(secretKeyFile)));
-
-    if (publicKeyFile != "") {
         publicKeys = std::unique_ptr<PublicKeys>(new PublicKeys);
-        auto key = PublicKey(readFile(publicKeyFile));
-        publicKeys->emplace(key.name, key);
+        publicKeys->emplace(secretKey->name, secretKey->toPublicKey());
     }
 
     StringSink sink;

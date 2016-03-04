@@ -15,7 +15,12 @@ struct Key
        ‘<name>:<key-in-base64>’. */
     Key(const std::string & s);
 
+protected:
+    Key(const std::string & name, const std::string & key)
+        : name(name), key(key) { }
 };
+
+struct PublicKey;
 
 struct SecretKey : Key
 {
@@ -23,11 +28,18 @@ struct SecretKey : Key
 
     /* Return a detached signature of the given string. */
     std::string signDetached(const std::string & s) const;
+
+    PublicKey toPublicKey() const;
 };
 
 struct PublicKey : Key
 {
     PublicKey(const std::string & data);
+
+private:
+    PublicKey(const std::string & name, const std::string & key)
+        : Key(name, key) { }
+    friend class SecretKey;
 };
 
 typedef std::map<std::string, PublicKey> PublicKeys;

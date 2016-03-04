@@ -14,9 +14,8 @@ private:
 public:
 
     HttpBinaryCacheStore(std::shared_ptr<Store> localStore,
-        const Path & secretKeyFile, const Path & publicKeyFile,
-        const Path & _cacheUri)
-        : BinaryCacheStore(localStore, secretKeyFile, publicKeyFile)
+        const Path & secretKeyFile, const Path & _cacheUri)
+        : BinaryCacheStore(localStore, secretKeyFile)
         , cacheUri(_cacheUri)
         , downloader(makeDownloader())
     {
@@ -66,7 +65,7 @@ static RegisterStoreImplementation regStore([](const std::string & uri) -> std::
     if (std::string(uri, 0, 7) != "http://" &&
         std::string(uri, 0, 8) != "https://") return 0;
     auto store = std::make_shared<HttpBinaryCacheStore>(std::shared_ptr<Store>(0),
-        "", "", // FIXME: allow the signing key to be set
+        "", // FIXME: allow the signing key to be set
         uri);
     store->init();
     return store;

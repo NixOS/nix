@@ -55,6 +55,17 @@ std::string SecretKey::signDetached(const std::string & data) const
 #endif
 }
 
+PublicKey SecretKey::toPublicKey() const
+{
+#if HAVE_SODIUM
+    unsigned char pk[crypto_sign_PUBLICKEYBYTES];
+    crypto_sign_ed25519_sk_to_pk(pk, (unsigned char *) key.data());
+    return PublicKey(name, std::string((char *) pk, crypto_sign_PUBLICKEYBYTES));
+#else
+    noSodium();
+#endif
+}
+
 PublicKey::PublicKey(const string & s)
     : Key(s)
 {
