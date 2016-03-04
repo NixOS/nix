@@ -110,7 +110,9 @@ private:
 /* A sink that writes data to a string. */
 struct StringSink : Sink
 {
-    string s;
+    ref<std::string> s;
+    StringSink() : s(make_ref<std::string>()) { };
+    StringSink(ref<std::string> s) : s(s) { };
     void operator () (const unsigned char * data, size_t len) override;
 };
 

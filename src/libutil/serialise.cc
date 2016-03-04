@@ -288,11 +288,11 @@ template PathSet readStrings(Source & source);
 void StringSink::operator () (const unsigned char * data, size_t len)
 {
     static bool warned = false;
-    if (!warned && s.size() > threshold) {
+    if (!warned && s->size() > threshold) {
         warnLargeDump();
         warned = true;
     }
-    s.append((const char *) data, len);
+    s->append((const char *) data, len);
 }
 
 

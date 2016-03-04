@@ -1415,9 +1415,9 @@ Path LocalStore::addToStore(const string & name, const Path & _srcPath,
     if (recursive)
         dumpPath(srcPath, sink, filter);
     else
-        sink.s = readFile(srcPath);
+        sink.s = make_ref<std::string>(readFile(srcPath));
 
-    return addToStoreFromDump(sink.s, name, recursive, hashAlgo, repair);
+    return addToStoreFromDump(*sink.s, name, recursive, hashAlgo, repair);
 }
 
 
@@ -1442,14 +1442,14 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
 
             StringSink sink;
             dumpString(s, sink);
-            auto hash = hashString(htSHA256, sink.s);
+            auto hash = hashString(htSHA256, *sink.s);
 
             optimisePath(dstPath);
 
             ValidPathInfo info;
             info.path = dstPath;
             info.narHash = hash;
-            info.narSize = sink.s.size();
+            info.narSize = sink.s->size();
             info.references = references;
             registerValidPath(info);
         }

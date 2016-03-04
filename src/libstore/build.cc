@@ -2009,7 +2009,7 @@ void DerivationGoal::startBuilder()
                         throw SysError(format("linking ‘%1%’ to ‘%2%’") % p % i);
                     StringSink sink;
                     dumpPath(i, sink);
-                    StringSource source(sink.s);
+                    StringSource source(*sink.s);
                     restorePath(p, source);
                 }
             }
@@ -2666,8 +2666,8 @@ void DerivationGoal::registerOutputs()
             StringSink sink;
             dumpPath(actualPath, sink);
             deletePath(actualPath);
-            sink.s = rewriteHashes(sink.s, rewritesFromTmp);
-            StringSource source(sink.s);
+            sink.s = make_ref<std::string>(rewriteHashes(*sink.s, rewritesFromTmp));
+            StringSource source(*sink.s);
             restorePath(actualPath, source);
 
             rewritten = true;

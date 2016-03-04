@@ -28,7 +28,7 @@ BinaryCacheStore::BinaryCacheStore(std::shared_ptr<Store> localStore,
 
     StringSink sink;
     sink << narVersionMagic1;
-    narMagic = sink.s;
+    narMagic = *sink.s;
 }
 
 void BinaryCacheStore::init()
@@ -200,14 +200,16 @@ Paths BinaryCacheStore::importPaths(bool requireSignature, Source & source,
 struct TeeSource : Source
 {
     Source & readSource;
-    std::string data;
-    TeeSource(Source & readSource) : readSource(readSource)
+    ref<std::string> data;
+    TeeSource(Source & readSource)
+        : readSource(readSource)
+        , data(make_ref<std::string>())
     {
     }
     size_t read(unsigned char * data, size_t len)
     {
         size_t n = readSource.read(data, len);
-        this->data.append((char *) data, n);
+        this->data->append((char *) data, n);
         return n;
     }
 };
@@ -257,7 +259,7 @@ Path BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
     Hash h;
     if (recursive) {
         dumpPath(srcPath, sink, filter);
-        h = hashString(hashAlgo, sink.s);
+        h = hashString(hashAlgo, *sink.s);
     } else {
         auto s = readFile(srcPath);
         dumpString(s, sink);
@@ -268,7 +270,7 @@ Path BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
     info.path = makeFixedOutputPath(recursive, hashAlgo, h, name);
 
     if (repair || !isValidPath(info.path))
-        addToCache(info, sink.s);
+        addToCache(info, *sink.s);
 
     return info.path;
 }
@@ -283,7 +285,7 @@ Path BinaryCacheStore::addTextToStore(const string & name, const string & s,
     if (repair || !isValidPath(info.path)) {
         StringSink sink;
         dumpString(s, sink);
-        addToCache(info, sink.s);
+        addToCache(info, *sink.s);
     }
 
     return info.path;
@@ -313,7 +315,7 @@ void BinaryCacheStore::buildPaths(const PathSet & paths, BuildMode buildMode)
         StringSink sink;
         dumpPath(storePath, sink);
 
-        addToCache(info, sink.s);
+        addToCache(info, *sink.s);
     }
 }
 
@@ -352,8 +354,7 @@ struct BinaryCacheStoreAccessor : public FSAccessor
         StringSink sink;
         store->exportPath(storePath, false, sink);
 
-        // FIXME: gratuitous string copying.
-        auto accessor = makeNarAccessor(make_ref<std::string>(sink.s));
+        auto accessor = makeNarAccessor(sink.s);
         nars.emplace(storePath, accessor);
         return {accessor, restPath};
     }
@@ -412,12 +413,11 @@ Path BinaryCacheStore::importPath(Source & source, std::shared_ptr<FSAccessor> a
     bool haveSignature = readInt(source) == 1;
     assert(!haveSignature);
 
-    addToCache(info, tee.data);
+    addToCache(info, *tee.data);
 
     auto accessor_ = std::dynamic_pointer_cast<BinaryCacheStoreAccessor>(accessor);
     if (accessor_)
-        // FIXME: more gratuitous string copying
-        accessor_->nars.emplace(info.path, makeNarAccessor(make_ref<std::string>(tee.data)));
+        accessor_->nars.emplace(info.path, makeNarAccessor(tee.data));
 
     return info.path;
 }
