@@ -1470,7 +1470,11 @@ static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Va
     string s = readFile(path);
     if (s.find((char) 0) != string::npos)
         throw Error("the contents of the file '%1%' cannot be represented as a Nix string", path);
-    v.mkString(s);
+    auto refs = state.store->isInStore(path) ?
+        state.store->queryPathInfo(state.store->toStorePath(path).first)->references :
+        StorePathSet{};
+    auto context = state.store->printStorePathSet(refs);
+    v.mkString(s, context);
 }
 
 static RegisterPrimOp primop_readFile({
