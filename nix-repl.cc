@@ -39,6 +39,7 @@ struct NixRepl
     void mainLoop(const Strings & files);
     void completePrefix(string prefix);
     bool getLine(string & input, const char * prompt);
+    Path getDerivationPath(Value & v);
     bool processLine(string line);
     void loadFile(const Path & path);
     void initEnv();
@@ -300,6 +301,17 @@ bool isVarName(const string & s)
 }
 
 
+Path NixRepl::getDerivationPath(Value & v) {
+    DrvInfo drvInfo(state);
+    if (!getDerivation(state, v, drvInfo, false))
+        throw Error("expression does not evaluate to a derivation, so I can't build it");
+    Path drvPath = drvInfo.queryDrvPath();
+    if (drvPath == "" || !state.store->isValidPath(drvPath))
+        throw Error("expression did not evaluate to a valid derivation");
+    return drvPath;
+}
+
+
 bool NixRepl::processLine(string line)
 {
     if (line == "") return true;
@@ -327,7 +339,8 @@ bool NixRepl::processLine(string line)
              << "  :q            Exit nix-repl\n"
              << "  :r            Reload all files\n"
              << "  :s <expr>     Build dependencies of derivation, then start nix-shell\n"
-             << "  :t <expr>     Describe result of evaluation\n";
+             << "  :t <expr>     Describe result of evaluation\n"
+             << "  :u <expr>     Build derivation, then start nix-shell\n";
     }
 
     else if (command == ":a" || command == ":add") {
@@ -350,17 +363,21 @@ bool NixRepl::processLine(string line)
         Value v;
         evalString(arg, v);
         std::cout << showType(v) << std::endl;
+
+    } else if (command == ":u") {
+        Value v, f, result;
+        evalString(arg, v);
+        evalString("drv: (import <nixpkgs> {}).runCommand \"shell\" { buildInputs = [ drv ]; } \"\"", f);
+        state.callFunction(f, v, result, Pos());
+
+        Path drvPath = getDerivationPath(result);
+        runProgram("nix-shell", Strings{drvPath});
     }
 
     else if (command == ":b" || command == ":i" || command == ":s") {
         Value v;
         evalString(arg, v);
-        DrvInfo drvInfo(state);
-        if (!getDerivation(state, v, drvInfo, false))
-            throw Error("expression does not evaluate to a derivation, so I can't build it");
-        Path drvPath = drvInfo.queryDrvPath();
-        if (drvPath == "" || !state.store->isValidPath(drvPath))
-            throw Error("expression did not evaluate to a valid derivation");
+        Path drvPath = getDerivationPath(v);
 
         if (command == ":b") {
             /* We could do the build in this process using buildPaths(),
