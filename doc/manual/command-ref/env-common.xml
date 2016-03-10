@@ -7,9 +7,11 @@
 <title>Common Environment Variables</title>
 
 
-<para>Most Nix commands interpret the following environment variables:</para>
 
 <variablelist xml:id="env-common">
+      
+<para>Most Nix commands interpret the following environment variables. 
+Exceptions can arise when <envar>NIX_REMOTE</envar> is set.</para>
 
 <varlistentry><term><envar>IN_NIX_SHELL</envar></term>
 
