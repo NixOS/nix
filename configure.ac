@@ -16,6 +16,8 @@ AC_ARG_WITH(system, AC_HELP_STRING([--with-system=SYSTEM],
         machine_name="i686";;
      amd64)
         machine_name="x86_64";;
+     armv6|armv7)
+        machine_name="${host_cpu}l";;
      *)
         machine_name="$host_cpu";;
    esac
