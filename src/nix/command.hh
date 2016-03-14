@@ -29,8 +29,9 @@ typedef std::map<std::string, ref<Command>> Commands;
 
 /* An argument parser that supports multiple subcommands,
    i.e. ‘<command> <subcommand>’. */
-struct MultiCommand : virtual Args
+class MultiCommand : virtual Args
 {
+public:
     Commands commands;
 
     std::shared_ptr<Command> command;
