@@ -141,6 +141,15 @@ NarInfo BinaryCacheStore::readNarInfo(const Path & storePath)
 
 bool BinaryCacheStore::isValidPath(const Path & storePath)
 {
+    {
+        auto state_(state.lock());
+        auto res = state_->narInfoCache.get(storePath);
+        if (res) {
+            stats.narInfoReadAverted++;
+            return true;
+        }
+    }
+
     // FIXME: this only checks whether a .narinfo with a matching hash
     // part exists. So ‘f4kb...-foo’ matches ‘f4kb...-bar’, even
     // though they shouldn't. Not easily fixed.
