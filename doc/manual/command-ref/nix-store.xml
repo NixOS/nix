@@ -291,9 +291,10 @@ as a means of providing Nix store access to a restricted ssh user.
 access to a given SSH public key:
 
 <screen>
-$ cat <<EOF >>/root/.ssh/authorized_keys
+$ cat &lt;&lt;EOF >>/root/.ssh/authorized_keys
 command="nice -n20 nix-store --serve --write" ssh-rsa AAAAB3NzaC1yc2EAAAA...
-EOF</screen>
+EOF
+</screen>
 
 </para>
 
