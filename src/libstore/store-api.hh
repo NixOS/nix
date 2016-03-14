@@ -140,7 +140,7 @@ struct BuildResult
 
 struct BasicDerivation;
 struct Derivation;
-struct FSAccessor;
+class FSAccessor;
 
 
 class Store : public std::enable_shared_from_this<Store>
