@@ -163,7 +163,7 @@ systemctl start  nix-daemon.socket
 %endif
 
 %files
-%{_bindir}/nix-*
+%{_bindir}/nix*
 %{_libdir}/*.so
 %{perl_vendorarch}/*
 %exclude %dir %{perl_vendorarch}/auto/
