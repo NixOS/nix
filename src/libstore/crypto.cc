@@ -37,10 +37,12 @@ SecretKey::SecretKey(const string & s)
 #endif
 }
 
+#if !HAVE_SODIUM
 [[noreturn]] static void noSodium()
 {
     throw Error("Nix was not compiled with libsodium, required for signed binary cache support");
 }
+#endif
 
 std::string SecretKey::signDetached(const std::string & data) const
 {

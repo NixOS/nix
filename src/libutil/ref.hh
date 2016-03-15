@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <exception>
+#include <stdexcept>
 
 namespace nix {
 

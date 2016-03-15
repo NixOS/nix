@@ -39,7 +39,7 @@ struct PublicKey : Key
 private:
     PublicKey(const std::string & name, const std::string & key)
         : Key(name, key) { }
-    friend class SecretKey;
+    friend struct SecretKey;
 };
 
 typedef std::map<std::string, PublicKey> PublicKeys;

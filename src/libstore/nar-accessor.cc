@@ -33,7 +33,7 @@ struct NarIndexer : ParseSink, StringSource
     {
     }
 
-    void createDirectory(const Path & path)
+    void createDirectory(const Path & path) override
     {
         members.emplace(path,
             NarMember{FSAccessor::Type::tDirectory, false, 0, 0});
@@ -44,7 +44,7 @@ struct NarIndexer : ParseSink, StringSource
         currentPath = path;
     }
 
-    void isExecutable()
+    void isExecutable() override
     {
         isExec = true;
     }
