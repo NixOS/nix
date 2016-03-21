@@ -331,6 +331,12 @@ LocalStore::LocalStore()
                 "which is no longer supported. To convert to the new format,\n"
                 "please upgrade Nix to version 0.12 first.");
 
+        if (curSchema < 6)
+            throw Error(
+                "Your Nix store has a database in flat file format,\n"
+                "which is no longer supported. To convert to the new format,\n"
+                "please upgrade Nix to version 1.11 first.");
+
         if (!lockFile(globalLock, ltWrite, false)) {
             printMsg(lvlError, "waiting for exclusive access to the Nix store...");
             lockFile(globalLock, ltWrite, true);
@@ -340,8 +346,7 @@ LocalStore::LocalStore()
            have performed the upgrade already. */
         curSchema = getSchema();
 
-        if (curSchema < 6) upgradeStore6();
-        else if (curSchema < 7) { upgradeStore7(); openDB(true); }
+        if (curSchema < 7) { upgradeStore7(); openDB(true); }
 
         writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
 
@@ -1876,88 +1881,6 @@ bool LocalStore::pathContentsGood(const Path & path)
 void LocalStore::markContentsGood(const Path & path)
 {
     pathContentsGoodCache[path] = true;
-}
-
-
-/* Functions for upgrading from the pre-SQLite database. */
-
-PathSet LocalStore::queryValidPathsOld()
-{
-    PathSet paths;
-    for (auto & i : readDirectory(settings.nixDBPath + "/info"))
-        if (i.name.at(0) != '.') paths.insert(settings.nixStore + "/" + i.name);
-    return paths;
-}
-
-
-ValidPathInfo LocalStore::queryPathInfoOld(const Path & path)
-{
-    ValidPathInfo res;
-    res.path = path;
-
-    /* Read the info file. */
-    string baseName = baseNameOf(path);
-    Path infoFile = (format("%1%/info/%2%") % settings.nixDBPath % baseName).str();
-    if (!pathExists(infoFile))
-        throw Error(format("path ‘%1%’ is not valid") % path);
-    string info = readFile(infoFile);
-
-    /* Parse it. */
-    Strings lines = tokenizeString<Strings>(info, "\n");
-
-    for (auto & i : lines) {
-        string::size_type p = i.find(':');
-        if (p == string::npos)
-            throw Error(format("corrupt line in ‘%1%’: %2%") % infoFile % i);
-        string name(i, 0, p);
-        string value(i, p + 2);
-        if (name == "References") {
-            Strings refs = tokenizeString<Strings>(value, " ");
-            res.references = PathSet(refs.begin(), refs.end());
-        } else if (name == "Deriver") {
-            res.deriver = value;
-        } else if (name == "Hash") {
-            res.narHash = parseHashField(path, value);
-        } else if (name == "Registered-At") {
-            int n = 0;
-            string2Int(value, n);
-            res.registrationTime = n;
-        }
-    }
-
-    return res;
-}
-
-
-/* Upgrade from schema 5 (Nix 0.12) to schema 6 (Nix >= 0.15). */
-void LocalStore::upgradeStore6()
-{
-    printMsg(lvlError, "upgrading Nix store to new schema (this may take a while)...");
-
-    openDB(true);
-
-    PathSet validPaths = queryValidPathsOld();
-
-    SQLiteTxn txn(db);
-
-    for (auto & i : validPaths) {
-        addValidPath(queryPathInfoOld(i), false);
-        std::cerr << ".";
-    }
-
-    std::cerr << "|";
-
-    for (auto & i : validPaths) {
-        ValidPathInfo info = queryPathInfoOld(i);
-        unsigned long long referrer = queryValidPathId(i);
-        for (auto & j : info.references)
-            addReference(referrer, queryValidPathId(j));
-        std::cerr << ".";
-    }
-
-    std::cerr << "\n";
-
-    txn.commit();
 }
 
 
