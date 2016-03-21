@@ -13,7 +13,6 @@ struct NarInfo : ValidPathInfo
     Hash fileHash;
     uint64_t fileSize = 0;
     std::string system;
-    std::string sig; // FIXME: support multiple signatures
 
     NarInfo() { }
     NarInfo(const ValidPathInfo & info) : ValidPathInfo(info) { }
@@ -31,9 +30,9 @@ struct NarInfo : ValidPathInfo
 
     void sign(const SecretKey & secretKey);
 
-    /* Return true iff this .narinfo is signed by one of the specified
-       keys. */
-    bool checkSignature(const PublicKeys & publicKeys) const;
+    /* Return the number of signatures on this .narinfo that were
+       produced by one of the specified keys. */
+    unsigned int checkSignatures(const PublicKeys & publicKeys) const;
 
 private:
 

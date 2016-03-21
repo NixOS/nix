@@ -66,7 +66,7 @@ NarInfo::NarInfo(const std::string & s, const std::string & whence)
         else if (name == "System")
             system = value;
         else if (name == "Sig")
-            sig = value;
+            sigs.insert(value);
 
         pos = eol + 1;
     }
@@ -98,7 +98,7 @@ std::string NarInfo::to_string() const
     if (!system.empty())
         res += "System: " + system + "\n";
 
-    if (!sig.empty())
+    for (auto sig : sigs)
         res += "Sig: " + sig + "\n";
 
     return res;
@@ -123,12 +123,16 @@ Strings NarInfo::shortRefs() const
 
 void NarInfo::sign(const SecretKey & secretKey)
 {
-    sig = secretKey.signDetached(fingerprint());
+    sigs.insert(secretKey.signDetached(fingerprint()));
 }
 
-bool NarInfo::checkSignature(const PublicKeys & publicKeys) const
+unsigned int NarInfo::checkSignatures(const PublicKeys & publicKeys) const
 {
-    return sig != "" && verifyDetached(fingerprint(), sig, publicKeys);
+    unsigned int good = 0;
+    for (auto & sig : sigs)
+        if (verifyDetached(fingerprint(), sig, publicKeys))
+            good++;
+    return good;
 }
 
 }

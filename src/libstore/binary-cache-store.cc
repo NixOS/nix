@@ -126,8 +126,8 @@ NarInfo BinaryCacheStore::readNarInfo(const Path & storePath)
     stats.narInfoRead++;
 
     if (publicKeys) {
-        if (!narInfo->checkSignature(*publicKeys))
-            throw Error(format("invalid signature on NAR info file ‘%1%’") % narInfoFile);
+        if (!narInfo->checkSignatures(*publicKeys))
+            throw Error(format("no good signature on NAR info file ‘%1%’") % narInfoFile);
     }
 
     {

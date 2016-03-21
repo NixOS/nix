@@ -98,6 +98,13 @@ struct ValidPathInfo
     unsigned long long narSize = 0; // 0 = unknown
     unsigned long long id; // internal use only
 
+    /* Whether the path is ultimately trusted, that is, it was built
+       locally or is content-addressable (e.g. added via addToStore()
+       or the result of a fixed-output derivation). */
+    bool ultimate = false;
+
+    StringSet sigs; // note: not necessarily verified
+
     bool operator == (const ValidPathInfo & i) const
     {
         return
