@@ -18,9 +18,8 @@ class Store;
 /* A command that require a Nix store. */
 struct StoreCommand : virtual Command
 {
-    bool reserveSpace;
-    StoreCommand(bool reserveSpace = true)
-        : reserveSpace(reserveSpace) { };
+    std::string storeUri;
+    StoreCommand();
     void run() override;
     virtual void run(ref<Store>) = 0;
 };
