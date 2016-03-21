@@ -156,10 +156,8 @@ bool BinaryCacheStore::isValidPath(const Path & storePath)
     return fileExists(narInfoFileFor(storePath));
 }
 
-void BinaryCacheStore::exportPath(const Path & storePath, bool sign, Sink & sink)
+void BinaryCacheStore::dumpPath(const Path & storePath, Sink & sink)
 {
-    assert(!sign);
-
     auto res = readNarInfo(storePath);
 
     auto nar = getFile(res.url);
@@ -183,6 +181,15 @@ void BinaryCacheStore::exportPath(const Path & storePath, bool sign, Sink & sink
     assert(nar.size() % 8 == 0);
 
     sink((unsigned char *) nar.c_str(), nar.size());
+}
+
+void BinaryCacheStore::exportPath(const Path & storePath, bool sign, Sink & sink)
+{
+    assert(!sign);
+
+    auto res = readNarInfo(storePath);
+
+    dumpPath(storePath, sink);
 
     // FIXME: check integrity of NAR.
 
@@ -264,7 +271,7 @@ Path BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
     StringSink sink;
     Hash h;
     if (recursive) {
-        dumpPath(srcPath, sink, filter);
+        nix::dumpPath(srcPath, sink, filter);
         h = hashString(hashAlgo, *sink.s);
     } else {
         auto s = readFile(srcPath);

@@ -783,7 +783,9 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         Path path = followLinksToStorePath(i);
         printMsg(lvlTalkative, format("checking path ‘%1%’...") % path);
         ValidPathInfo info = store->queryPathInfo(path);
-        HashResult current = hashPath(info.narHash.type, path);
+        HashSink sink(info.narHash.type);
+        store->dumpPath(path, sink);
+        auto current = sink.finish();
         if (current.first != info.narHash) {
             printMsg(lvlError,
                 format("path ‘%1%’ was modified! expected hash ‘%2%’, got ‘%3%’")

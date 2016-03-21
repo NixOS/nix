@@ -215,6 +215,9 @@ public:
     virtual Path addTextToStore(const string & name, const string & s,
         const PathSet & references, bool repair = false) = 0;
 
+    /* Write a NAR dump of a store path. */
+    virtual void dumpPath(const Path & path, Sink & sink) = 0;
+
     /* Export a store path, that is, create a NAR dump of the store
        path and append its references and its deriver.  Optionally, a
        cryptographic signature (created by OpenSSL) of the preceding
@@ -354,6 +357,8 @@ public:
 
 class LocalFSStore : public Store
 {
+public:
+    void dumpPath(const Path & path, Sink & sink) override;
     ref<FSAccessor> getFSAccessor() override;
 };
 

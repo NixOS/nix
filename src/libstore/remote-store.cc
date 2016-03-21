@@ -366,7 +366,7 @@ Path RemoteStore::addToStore(const string & name, const Path & _srcPath,
     try {
         conn->to.written = 0;
         conn->to.warn = true;
-        dumpPath(srcPath, conn->to, filter);
+        nix::dumpPath(srcPath, conn->to, filter);
         conn->to.warn = false;
         conn->processStderr();
     } catch (SysError & e) {

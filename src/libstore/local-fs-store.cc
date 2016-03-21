@@ -1,3 +1,4 @@
+#include "archive.hh"
 #include "fs-accessor.hh"
 #include "store-api.hh"
 
@@ -66,6 +67,11 @@ struct LocalStoreAccessor : public FSAccessor
 ref<FSAccessor> LocalFSStore::getFSAccessor()
 {
     return make_ref<LocalStoreAccessor>(ref<Store>(shared_from_this()));
+}
+
+void LocalFSStore::dumpPath(const Path & path, Sink & sink)
+{
+    nix::dumpPath(path, sink);
 }
 
 }
