@@ -1418,7 +1418,7 @@ Path LocalStore::addToStore(const string & name, const Path & _srcPath,
        small files. */
     StringSink sink;
     if (recursive)
-        nix::dumpPath(srcPath, sink, filter);
+        dumpPath(srcPath, sink, filter);
     else
         sink.s = make_ref<std::string>(readFile(srcPath));
 

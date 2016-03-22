@@ -223,7 +223,7 @@ public:
         const PathSet & references, bool repair = false) = 0;
 
     /* Write a NAR dump of a store path. */
-    virtual void dumpPath(const Path & path, Sink & sink) = 0;
+    virtual void narFromPath(const Path & path, Sink & sink) = 0;
 
     /* Export a store path, that is, create a NAR dump of the store
        path and append its references and its deriver.  Optionally, a
@@ -365,7 +365,7 @@ public:
 class LocalFSStore : public Store
 {
 public:
-    void dumpPath(const Path & path, Sink & sink) override;
+    void narFromPath(const Path & path, Sink & sink) override;
     ref<FSAccessor> getFSAccessor() override;
 };
 

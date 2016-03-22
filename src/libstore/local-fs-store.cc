@@ -69,9 +69,11 @@ ref<FSAccessor> LocalFSStore::getFSAccessor()
     return make_ref<LocalStoreAccessor>(ref<Store>(shared_from_this()));
 }
 
-void LocalFSStore::dumpPath(const Path & path, Sink & sink)
+void LocalFSStore::narFromPath(const Path & path, Sink & sink)
 {
-    nix::dumpPath(path, sink);
+    if (!isValidPath(path))
+        throw Error(format("path ‘%s’ is not valid") % path);
+    dumpPath(path, sink);
 }
 
 }

@@ -784,7 +784,7 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         printMsg(lvlTalkative, format("checking path ‘%1%’...") % path);
         ValidPathInfo info = store->queryPathInfo(path);
         HashSink sink(info.narHash.type);
-        store->dumpPath(path, sink);
+        store->narFromPath(path, sink);
         auto current = sink.finish();
         if (current.first != info.narHash) {
             printMsg(lvlError,

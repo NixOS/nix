@@ -124,7 +124,7 @@ public:
     Path addTextToStore(const string & name, const string & s,
         const PathSet & references, bool repair = false) override;
 
-    void dumpPath(const Path & path, Sink & sink) override;
+    void narFromPath(const Path & path, Sink & sink) override;
 
     void exportPath(const Path & path, bool sign, Sink & sink) override;
 
