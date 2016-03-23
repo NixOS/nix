@@ -23,7 +23,7 @@ struct LocalStoreAccessor : public FSAccessor
 
         struct stat st;
         if (lstat(path.c_str(), &st)) {
-            if (errno == ENOENT) return {Type::tMissing, 0, false};
+            if (errno == ENOENT || errno == ENOTDIR) return {Type::tMissing, 0, false};
             throw SysError(format("getting status of ‘%1%’") % path);
         }
 
