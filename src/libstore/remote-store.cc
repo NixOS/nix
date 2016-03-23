@@ -61,26 +61,14 @@ ref<RemoteStore::Connection> RemoteStore::openConnection()
 
     string socketPath = settings.nixDaemonSocketFile;
 
-    /* Urgh, sockaddr_un allows path names of only 108 characters.  So
-       chdir to the socket directory so that we can pass a relative
-       path name.  !!! this is probably a bad idea in multi-threaded
-       applications... */
-    AutoCloseFD fdPrevDir = open(".", O_RDONLY);
-    if (fdPrevDir == -1) throw SysError("couldn't open current directory");
-    if (chdir(dirOf(socketPath).c_str()) == -1) throw SysError(format("couldn't change to directory of ‘%1%’") % socketPath);
-    Path socketPathRel = "./" + baseNameOf(socketPath);
-
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
-    if (socketPathRel.size() >= sizeof(addr.sun_path))
-        throw Error(format("socket path ‘%1%’ is too long") % socketPathRel);
-    strcpy(addr.sun_path, socketPathRel.c_str());
+    if (socketPath.size() + 1 >= sizeof(addr.sun_path))
+        throw Error(format("socket path ‘%1%’ is too long") % socketPath);
+    strcpy(addr.sun_path, socketPath.c_str());
 
     if (connect(conn->fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
         throw SysError(format("cannot connect to daemon at ‘%1%’") % socketPath);
-
-    if (fchdir(fdPrevDir) == -1)
-        throw SysError("couldn't change back to previous directory");
 
     conn->from.fd = conn->fd;
     conn->to.fd = conn->fd;
