@@ -135,14 +135,14 @@ void checkStoreName(const string & name)
      if <type> = "source":
        the serialisation of the path from which this store path is
        copied, as returned by hashPath()
-     if <type> = "output:out":
+     if <type> = "output:<id>":
        for non-fixed derivation outputs:
          the derivation (see hashDerivationModulo() in
          primops.cc)
        for paths copied by addToStore() or produced by fixed-output
        derivations:
          the string "fixed:out:<rec><algo>:<hash>:", where
-           <rec> = "r:" for recursive (path) hashes, or "" or flat
+           <rec> = "r:" for recursive (path) hashes, or "" for flat
              (file) hashes
            <algo> = "md5", "sha1" or "sha256"
            <hash> = base-16 representation of the path or flat hash of
