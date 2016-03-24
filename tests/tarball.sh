@@ -16,8 +16,8 @@ tarball=$TEST_ROOT/tarball.tar.xz
 
 nix-env -f file://$tarball -qa --out-path | grep -q dependencies
 
-nix-build file://$tarball
+nix-build -o $TMPDIR/result file://$tarball
 
-nix-build '<foo>' -I foo=file://$tarball
+nix-build -o $TMPDIR/result '<foo>' -I foo=file://$tarball
 
-nix-build -E "import (fetchTarball file://$tarball)"
+nix-build -o $TMPDIR/result -E "import (fetchTarball file://$tarball)"

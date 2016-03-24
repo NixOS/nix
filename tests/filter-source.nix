@@ -8,5 +8,5 @@ mkDerivation {
       type != "symlink"
       && baseNameOf path != "foo"
       && !((import ./lang/lib.nix).hasSuffix ".bak" (baseNameOf path));
-    in builtins.filterSource filter ./test-tmp/filterin;
+    in builtins.filterSource filter ((builtins.getEnv "TEST_ROOT") + "/filterin");
 }
