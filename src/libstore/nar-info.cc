@@ -1,4 +1,3 @@
-#include "crypto.hh"
 #include "globals.hh"
 #include "nar-info.hh"
 
@@ -104,35 +103,12 @@ std::string NarInfo::to_string() const
     return res;
 }
 
-std::string NarInfo::fingerprint() const
-{
-    return
-        "1;" + path + ";"
-        + printHashType(narHash.type) + ":" + printHash32(narHash) + ";"
-        + std::to_string(narSize) + ";"
-        + concatStringsSep(",", references);
-}
-
 Strings NarInfo::shortRefs() const
 {
     Strings refs;
     for (auto & r : references)
         refs.push_back(baseNameOf(r));
     return refs;
-}
-
-void NarInfo::sign(const SecretKey & secretKey)
-{
-    sigs.insert(secretKey.signDetached(fingerprint()));
-}
-
-unsigned int NarInfo::checkSignatures(const PublicKeys & publicKeys) const
-{
-    unsigned int good = 0;
-    for (auto & sig : sigs)
-        if (verifyDetached(fingerprint(), sig, publicKeys))
-            good++;
-    return good;
 }
 
 }

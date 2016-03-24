@@ -1,5 +1,6 @@
-#include "store-api.hh"
+#include "crypto.hh"
 #include "globals.hh"
+#include "store-api.hh"
 #include "util.hh"
 
 
@@ -306,6 +307,32 @@ void Store::exportPaths(const Paths & paths,
         exportPath(i, sign, sink);
     }
     sink << 0;
+}
+
+
+std::string ValidPathInfo::fingerprint() const
+{
+    return
+        "1;" + path + ";"
+        + printHashType(narHash.type) + ":" + printHash32(narHash) + ";"
+        + std::to_string(narSize) + ";"
+        + concatStringsSep(",", references);
+}
+
+
+void ValidPathInfo::sign(const SecretKey & secretKey)
+{
+    sigs.insert(secretKey.signDetached(fingerprint()));
+}
+
+
+unsigned int ValidPathInfo::checkSignatures(const PublicKeys & publicKeys) const
+{
+    unsigned int good = 0;
+    for (auto & sig : sigs)
+        if (verifyDetached(fingerprint(), sig, publicKeys))
+            good++;
+    return good;
 }
 
 

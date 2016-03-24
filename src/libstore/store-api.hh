@@ -2,6 +2,7 @@
 
 #include "hash.hh"
 #include "serialise.hh"
+#include "crypto.hh"
 
 #include <string>
 #include <limits>
@@ -112,6 +113,20 @@ struct ValidPathInfo
             && narHash == i.narHash
             && references == i.references;
     }
+
+    /*  Return a fingerprint of the store path to be used in binary
+        cache signatures. It contains the store path, the base-32
+        SHA-256 hash of the NAR serialisation of the path, the size of
+        the NAR, and the sorted references. The size field is strictly
+        speaking superfluous, but might prevent endless/excessive data
+        attacks. */
+    std::string fingerprint() const;
+
+    void sign(const SecretKey & secretKey);
+
+    /* Return the number of signatures on this .narinfo that were
+       produced by one of the specified keys. */
+    unsigned int checkSignatures(const PublicKeys & publicKeys) const;
 };
 
 typedef list<ValidPathInfo> ValidPathInfos;
