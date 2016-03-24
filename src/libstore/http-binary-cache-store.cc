@@ -10,7 +10,7 @@ private:
 
     Path cacheUri;
 
-    ref<Downloader> downloader;
+    Pool<Downloader> downloaders;
 
 public:
 
@@ -18,7 +18,9 @@ public:
         const Path & secretKeyFile, const Path & _cacheUri)
         : BinaryCacheStore(localStore, secretKeyFile)
         , cacheUri(_cacheUri)
-        , downloader(makeDownloader())
+        , downloaders(
+            std::numeric_limits<size_t>::max(),
+            []() { return makeDownloader(); })
     {
         if (cacheUri.back() == '/')
             cacheUri.pop_back();
@@ -36,6 +38,7 @@ protected:
     bool fileExists(const std::string & path) override
     {
         try {
+            auto downloader(downloaders.get());
             DownloadOptions options;
             options.showProgress = DownloadOptions::no;
             options.head = true;
@@ -55,6 +58,7 @@ protected:
 
     std::string getFile(const std::string & path) override
     {
+        auto downloader(downloaders.get());
         DownloadOptions options;
         options.showProgress = DownloadOptions::no;
         return downloader->download(cacheUri + "/" + path, options).data;
