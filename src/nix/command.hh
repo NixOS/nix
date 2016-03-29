@@ -24,6 +24,23 @@ struct StoreCommand : virtual Command
     virtual void run(ref<Store>) = 0;
 };
 
+/* A command that operates on zero or more store paths. */
+struct StorePathsCommand : public StoreCommand
+{
+private:
+
+    Paths storePaths;
+    bool recursive = false;
+
+public:
+
+    StorePathsCommand();
+
+    virtual void run(ref<Store> store, Paths storePaths) = 0;
+
+    void run(ref<Store> store) override;
+};
+
 typedef std::map<std::string, ref<Command>> Commands;
 
 /* An argument parser that supports multiple subcommands,

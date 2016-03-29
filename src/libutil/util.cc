@@ -548,7 +548,7 @@ void writeToStderr(const string & s)
 }
 
 
-void (*_writeToStderr) (const unsigned char * buf, size_t count) = 0;
+std::function<void(const unsigned char * buf, size_t count)> _writeToStderr;
 
 
 void readFull(int fd, unsigned char * buf, size_t count)

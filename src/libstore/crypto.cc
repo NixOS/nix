@@ -1,5 +1,6 @@
 #include "crypto.hh"
 #include "util.hh"
+#include "globals.hh"
 
 #if HAVE_SODIUM
 #include <sodium.h>
@@ -96,6 +97,17 @@ bool verifyDetached(const std::string & data, const std::string & sig,
 #else
     noSodium();
 #endif
+}
+
+PublicKeys getDefaultPublicKeys()
+{
+    PublicKeys publicKeys;
+    for (auto s : settings.get("binary-cache-public-keys", Strings())) {
+        PublicKey key(s);
+        publicKeys.emplace(key.name, key);
+        // FIXME: filter duplicates
+    }
+    return publicKeys;
 }
 
 }

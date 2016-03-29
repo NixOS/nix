@@ -69,4 +69,25 @@ void StoreCommand::run()
     run(openStoreAt(storeUri));
 }
 
+StorePathsCommand::StorePathsCommand()
+{
+    expectArgs("paths", &storePaths);
+    mkFlag('r', "recursive", "apply operation to closure of the specified paths", &recursive);
+}
+
+void StorePathsCommand::run(ref<Store> store)
+{
+    for (auto & storePath : storePaths)
+        storePath = followLinksToStorePath(storePath);
+
+    if (recursive) {
+        PathSet closure;
+        for (auto & storePath : storePaths)
+            store->computeFSClosure(storePath, closure, false, false);
+        storePaths = store->topoSortPaths(closure);
+    }
+
+    run(store, storePaths);
+}
+
 }
