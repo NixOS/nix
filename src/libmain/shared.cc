@@ -24,15 +24,9 @@
 namespace nix {
 
 
-volatile sig_atomic_t blockInt = 0;
-
-
 static void sigintHandler(int signo)
 {
-    if (!blockInt) {
-        _isInterrupted = 1;
-        blockInt = 1;
-    }
+    _isInterrupted = 1;
 }
 
 
@@ -287,8 +281,7 @@ int handleExceptions(const string & programName, std::function<void()> fun)
                condition is discharged before we reach printMsg()
                below, since otherwise it will throw an (uncaught)
                exception. */
-            blockInt = 1; /* ignore further SIGINTs */
-            _isInterrupted = 0;
+            interruptThrown = true;
             throw;
         }
     } catch (Exit & e) {

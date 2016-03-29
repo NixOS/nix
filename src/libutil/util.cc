@@ -1062,13 +1062,15 @@ void restoreSIGPIPE()
 
 volatile sig_atomic_t _isInterrupted = 0;
 
+thread_local bool interruptThrown = false;
+
 void _interrupted()
 {
     /* Block user interrupts while an exception is being handled.
        Throwing an exception while another exception is being handled
        kills the program! */
-    if (!std::uncaught_exception()) {
-        _isInterrupted = 0;
+    if (!interruptThrown && !std::uncaught_exception()) {
+        interruptThrown = true;
         throw Interrupted("interrupted by the user");
     }
 }

@@ -316,6 +316,8 @@ void restoreSIGPIPE();
 
 extern volatile sig_atomic_t _isInterrupted;
 
+extern thread_local bool interruptThrown;
+
 void _interrupted();
 
 void inline checkInterrupt()

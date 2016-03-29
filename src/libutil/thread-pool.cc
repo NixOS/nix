@@ -55,9 +55,10 @@ void ThreadPool::process()
                     work();
                 } catch (std::exception & e) {
                     auto state_(state.lock());
-                    if (state_->exception)
-                        printMsg(lvlError, format("error: %s") % e.what());
-                    else {
+                    if (state_->exception) {
+                        if (!dynamic_cast<Interrupted*>(&e))
+                            printMsg(lvlError, format("error: %s") % e.what());
+                    } else {
                         state_->exception = std::current_exception();
                         wakeup.notify_all();
                     }
