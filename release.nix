@@ -77,8 +77,7 @@ let
 
     build = pkgs.lib.genAttrs systems (system:
 
-      # FIXME: temporarily use a different branch for the Darwin build.
-      with import (if system == "x86_64-darwin" then <nixpkgs-darwin> else <nixpkgs>) { inherit system; };
+      with import <nixpkgs> { inherit system; };
 
       releaseTools.nixBuild {
         name = "nix";
@@ -113,7 +112,7 @@ let
     binaryTarball = pkgs.lib.genAttrs systems (system:
 
       # FIXME: temporarily use a different branch for the Darwin build.
-      with import (if system == "x86_64-darwin" then <nixpkgs-darwin> else <nixpkgs>) { inherit system; };
+      with import <nixpkgs> { inherit system; };
 
       let
         toplevel = builtins.getAttr system jobs.build;
