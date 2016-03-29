@@ -10,28 +10,18 @@
 
 using namespace nix;
 
-struct CmdVerifyPaths : StorePathsCommand
+struct MixVerify : virtual Args
 {
     bool noContents = false;
     bool noSigs = false;
 
-    CmdVerifyPaths()
+    MixVerify()
     {
         mkFlag(0, "no-contents", "do not verify the contents of each store path", &noContents);
         mkFlag(0, "no-sigs", "do not verify whether each store path has a valid signature", &noSigs);
     }
 
-    std::string name() override
-    {
-        return "verify-paths";
-    }
-
-    std::string description() override
-    {
-        return "verify the integrity of store paths";
-    }
-
-    void run(ref<Store> store, Paths storePaths) override
+    void verifyPaths(ref<Store> store, const Paths & storePaths)
     {
         restoreAffinity(); // FIXME
 
@@ -121,4 +111,54 @@ struct CmdVerifyPaths : StorePathsCommand
     }
 };
 
+struct CmdVerifyPaths : StorePathsCommand, MixVerify
+{
+    CmdVerifyPaths()
+    {
+    }
+
+    std::string name() override
+    {
+        return "verify-paths";
+    }
+
+    std::string description() override
+    {
+        return "verify the integrity of store paths";
+    }
+
+    void run(ref<Store> store, Paths storePaths) override
+    {
+        verifyPaths(store, storePaths);
+    }
+};
+
 static RegisterCommand r1(make_ref<CmdVerifyPaths>());
+
+struct CmdVerifyStore : StoreCommand, MixVerify
+{
+    CmdVerifyStore()
+    {
+    }
+
+    std::string name() override
+    {
+        return "verify-store";
+    }
+
+    std::string description() override
+    {
+        return "verify the integrity of all paths in the Nix store";
+    }
+
+    void run(ref<Store> store) override
+    {
+        // FIXME: use store->verifyStore()?
+
+        PathSet validPaths = store->queryAllValidPaths();
+
+        verifyPaths(store, Paths(validPaths.begin(), validPaths.end()));
+    }
+};
+
+static RegisterCommand r2(make_ref<CmdVerifyStore>());
