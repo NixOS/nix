@@ -22,29 +22,46 @@ struct SQLite
 /* RAII wrapper to create and destroy SQLite prepared statements. */
 struct SQLiteStmt
 {
-    sqlite3 * db;
-    sqlite3_stmt * stmt;
-    unsigned int curArg;
-    SQLiteStmt() { stmt = 0; }
+    sqlite3 * db = 0;
+    sqlite3_stmt * stmt = 0;
+    SQLiteStmt() { }
     void create(sqlite3 * db, const std::string & s);
-    void reset();
     ~SQLiteStmt();
     operator sqlite3_stmt * () { return stmt; }
-    void bind(const std::string & value);
-    void bind(int value);
-    void bind64(long long value);
-    void bind();
-};
 
-/* Helper class to ensure that prepared statements are reset when
-   leaving the scope that uses them.  Unfinished prepared statements
-   prevent transactions from being aborted, and can cause locks to be
-   kept when they should be released. */
-struct SQLiteStmtUse
-{
-    SQLiteStmt & stmt;
-    SQLiteStmtUse(SQLiteStmt & stmt);
-    ~SQLiteStmtUse();
+    /* Helper for binding / executing statements. */
+    class Use
+    {
+        friend struct SQLiteStmt;
+    private:
+        SQLiteStmt & stmt;
+        unsigned int curArg = 1;
+        Use(SQLiteStmt & stmt);
+
+    public:
+
+        /* Bind the next parameter. */
+        Use & operator () (const std::string & value, bool notNull = true);
+        Use & operator () (int64_t value, bool notNull = true);
+        Use & bind(); // null
+
+        int step();
+
+        /* Execute a statement that does not return rows. */
+        void exec();
+
+        /* For statements that return 0 or more rows. Returns true iff
+           a row is available. */
+        bool next();
+
+        std::string getStr(int col);
+        int64_t getInt(int col);
+    };
+
+    Use use()
+    {
+        return Use(*this);
+    }
 };
 
 /* RAII helper that ensures transactions are aborted unless explicitly

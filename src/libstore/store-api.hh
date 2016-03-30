@@ -96,8 +96,8 @@ struct ValidPathInfo
     Hash narHash;
     PathSet references;
     time_t registrationTime = 0;
-    unsigned long long narSize = 0; // 0 = unknown
-    unsigned long long id; // internal use only
+    uint64_t narSize = 0; // 0 = unknown
+    uint64_t id; // internal use only
 
     /* Whether the path is ultimately trusted, that is, it was built
        locally or is content-addressable (e.g. added via addToStore()

@@ -208,6 +208,7 @@ private:
     SQLiteStmt stmtQueryValidDerivers;
     SQLiteStmt stmtQueryDerivationOutputs;
     SQLiteStmt stmtQueryPathFromHashPart;
+    SQLiteStmt stmtQueryValidPaths;
 
     /* Cache for pathContentsGood(). */
     std::map<Path, bool> pathContentsGoodCache;
@@ -230,11 +231,11 @@ private:
 
     void makeStoreWritable();
 
-    unsigned long long queryValidPathId(const Path & path);
+    uint64_t queryValidPathId(const Path & path);
 
-    unsigned long long addValidPath(const ValidPathInfo & info, bool checkOutputs = true);
+    uint64_t addValidPath(const ValidPathInfo & info, bool checkOutputs = true);
 
-    void addReference(unsigned long long referrer, unsigned long long reference);
+    void addReference(uint64_t referrer, uint64_t reference);
 
     void appendReferrer(const Path & from, const Path & to, bool lock);
 
