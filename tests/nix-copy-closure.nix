@@ -4,7 +4,7 @@
 
 with import <nixpkgs/nixos/lib/testing.nix> { inherit system; };
 
-makeTest (let pkgA = pkgs.aterm; pkgB = pkgs.wget; pkgC = pkgs.hello; in {
+makeTest (let pkgA = pkgs.cowsay; pkgB = pkgs.wget; pkgC = pkgs.hello; in {
 
   nodes =
     { client =
