@@ -45,7 +45,9 @@ protected:
             downloader->download(cacheUri + "/" + path, options);
             return true;
         } catch (DownloadError & e) {
-            if (e.error == Downloader::NotFound)
+            /* S3 buckets return 403 if a file doesn't exist and the
+               bucket is unlistable, so treat 403 as 404. */
+            if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
                 return false;
             throw;
         }
