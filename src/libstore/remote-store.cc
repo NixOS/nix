@@ -252,6 +252,10 @@ ValidPathInfo RemoteStore::queryPathInfo(const Path & path)
     info.references = readStorePaths<PathSet>(conn->from);
     info.registrationTime = readInt(conn->from);
     info.narSize = readLongLong(conn->from);
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
+        info.ultimate = readInt(conn->from) != 0;
+        info.sigs = readStrings<StringSet>(conn->from);
+    }
     return info;
 }
 

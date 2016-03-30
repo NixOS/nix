@@ -2743,6 +2743,14 @@ void DerivationGoal::registerOutputs()
                     throw Error(format("derivation ‘%1%’ may not be deterministic: output ‘%2%’ differs")
                         % drvPath % path);
             }
+
+            /* Since we verified the build, it's now ultimately
+               trusted. */
+            if (!info.ultimate) {
+                info.ultimate = true;
+                worker.store.registerValidPaths({info});
+            }
+
             continue;
         }
 
@@ -2799,6 +2807,7 @@ void DerivationGoal::registerOutputs()
         info.narSize = hash.second;
         info.references = references;
         info.deriver = drvPath;
+        info.ultimate = true;
         infos.push_back(info);
     }
 

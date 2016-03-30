@@ -184,7 +184,18 @@ LocalStore::LocalStore()
            have performed the upgrade already. */
         curSchema = getSchema();
 
-        if (curSchema < 7) { upgradeStore7(); openDB(true); }
+        if (curSchema < 7) { upgradeStore7(); }
+
+        openDB(false);
+
+        if (curSchema < 8) {
+            SQLiteTxn txn(db);
+            if (sqlite3_exec(db, "alter table ValidPaths add column ultimate integer", 0, 0, 0) != SQLITE_OK)
+                throwSQLiteError(db, "upgrading database schema");
+            if (sqlite3_exec(db, "alter table ValidPaths add column sigs text", 0, 0, 0) != SQLITE_OK)
+                throwSQLiteError(db, "upgrading database schema");
+            txn.commit();
+        }
 
         writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
 
@@ -299,13 +310,13 @@ void LocalStore::openDB(bool create)
 
     /* Prepare SQL statements. */
     stmtRegisterValidPath.create(db,
-        "insert into ValidPaths (path, hash, registrationTime, deriver, narSize) values (?, ?, ?, ?, ?);");
+        "insert into ValidPaths (path, hash, registrationTime, deriver, narSize, ultimate) values (?, ?, ?, ?, ?, ?);");
     stmtUpdatePathInfo.create(db,
-        "update ValidPaths set narSize = ?, hash = ? where path = ?;");
+        "update ValidPaths set narSize = ?, hash = ?, ultimate = ? where path = ?;");
     stmtAddReference.create(db,
         "insert or replace into Refs (referrer, reference) values (?, ?);");
     stmtQueryPathInfo.create(db,
-        "select id, hash, registrationTime, deriver, narSize from ValidPaths where path = ?;");
+        "select id, hash, registrationTime, deriver, narSize, ultimate, sigs from ValidPaths where path = ?;");
     stmtQueryReferences.create(db,
         "select path from Refs join ValidPaths on reference = id where referrer = ?;");
     stmtQueryReferrers.create(db,
@@ -535,6 +546,7 @@ uint64_t LocalStore::addValidPath(const ValidPathInfo & info, bool checkOutputs)
         (info.registrationTime == 0 ? time(0) : info.registrationTime)
         (info.deriver, info.deriver != "")
         (info.narSize, info.narSize != 0)
+        (info.ultimate ? 1 : 0, info.ultimate)
         .exec();
     uint64_t id = sqlite3_last_insert_rowid(db);
 
@@ -655,6 +667,11 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path)
         /* Note that narSize = NULL yields 0. */
         info.narSize = useQueryPathInfo.getInt(4);
 
+        info.ultimate = sqlite3_column_int(stmtQueryPathInfo, 5) == 1;
+
+        s = (const char *) sqlite3_column_text(stmtQueryPathInfo, 6);
+        if (s) info.sigs = tokenizeString<StringSet>(s, " ");
+
         /* Get the references. */
         auto useQueryReferences(stmtQueryReferences.use()(info.id));
 
@@ -673,6 +690,7 @@ void LocalStore::updatePathInfo(const ValidPathInfo & info)
     stmtUpdatePathInfo.use()
         (info.narSize, info.narSize != 0)
         ("sha256:" + printHash(info.narHash))
+        (info.ultimate ? 1 : 0, info.ultimate)
         (info.path)
         .exec();
 }
@@ -1022,9 +1040,10 @@ void LocalStore::registerValidPath(const ValidPathInfo & info)
 
 void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 {
-    /* SQLite will fsync by default, but the new valid paths may not be fsync-ed.
-     * So some may want to fsync them before registering the validity, at the
-     * expense of some speed of the path registering operation. */
+    /* SQLite will fsync by default, but the new valid paths may not
+       be fsync-ed.  So some may want to fsync them before registering
+       the validity, at the expense of some speed of the path
+       registering operation. */
     if (settings.syncBeforeRegistering) sync();
 
     return retrySQLite<void>([&]() {
@@ -1128,6 +1147,7 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
             info.path = dstPath;
             info.narHash = hash.first;
             info.narSize = hash.second;
+            info.ultimate = true;
             registerValidPath(info);
         }
 
@@ -1142,7 +1162,6 @@ Path LocalStore::addToStore(const string & name, const Path & _srcPath,
     bool recursive, HashType hashAlgo, PathFilter & filter, bool repair)
 {
     Path srcPath(absPath(_srcPath));
-    debug(format("adding ‘%1%’ to the store") % srcPath);
 
     /* Read the whole path into memory. This is not a very scalable
        method for very large paths, but `copyPath' is mainly used for
@@ -1187,6 +1206,7 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
             info.narHash = hash;
             info.narSize = sink.s->size();
             info.references = references;
+            info.ultimate = true;
             registerValidPath(info);
         }
 

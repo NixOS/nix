@@ -4,7 +4,9 @@ create table if not exists ValidPaths (
     hash             text not null,
     registrationTime integer not null,
     deriver          text,
-    narSize          integer
+    narSize          integer,
+    ultimate         integer, -- null implies "false"
+    sigs             text -- space-separated
 );
 
 create table if not exists Refs (
