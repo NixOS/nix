@@ -183,7 +183,6 @@ struct CurlDownloader : public Downloader
             curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpStatus);
 
         if (res != CURLE_OK) {
-            long httpStatus = 0;
             Error err =
                 httpStatus == 404 ? NotFound :
                 httpStatus == 403 ? Forbidden : Misc;
