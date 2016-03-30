@@ -1,15 +1,12 @@
 #pragma once
 
+#include "sqlite.hh"
 #include <string>
 #include <unordered_set>
 
+#include "pathlocks.hh"
 #include "store-api.hh"
 #include "util.hh"
-#include "pathlocks.hh"
-
-
-class sqlite3;
-class sqlite3_stmt;
 
 
 namespace nix {
@@ -49,34 +46,6 @@ struct RunningSubstituter
     FdSource fromBuf;
     bool disabled;
     RunningSubstituter() : disabled(false) { };
-};
-
-
-/* Wrapper object to close the SQLite database automatically. */
-struct SQLite
-{
-    sqlite3 * db;
-    SQLite() { db = 0; }
-    ~SQLite();
-    operator sqlite3 * () { return db; }
-};
-
-
-/* Wrapper object to create and destroy SQLite prepared statements. */
-struct SQLiteStmt
-{
-    sqlite3 * db;
-    sqlite3_stmt * stmt;
-    unsigned int curArg;
-    SQLiteStmt() { stmt = 0; }
-    void create(sqlite3 * db, const string & s);
-    void reset();
-    ~SQLiteStmt();
-    operator sqlite3_stmt * () { return stmt; }
-    void bind(const string & value);
-    void bind(int value);
-    void bind64(long long value);
-    void bind();
 };
 
 
