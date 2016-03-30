@@ -14,16 +14,23 @@ struct MixVerify : virtual Args
 {
     bool noContents = false;
     bool noSigs = false;
+    Strings substituterUris;
 
     MixVerify()
     {
         mkFlag(0, "no-contents", "do not verify the contents of each store path", &noContents);
         mkFlag(0, "no-sigs", "do not verify whether each store path has a valid signature", &noSigs);
+        mkFlag('s', "substituter", {"store-uri"}, "use signatures from specified store", 1,
+            [&](Strings ss) { substituterUris.push_back(ss.front()); });
     }
 
     void verifyPaths(ref<Store> store, const Paths & storePaths)
     {
         restoreAffinity(); // FIXME
+
+        std::vector<ref<Store>> substituters;
+        for (auto & s : substituterUris)
+            substituters.push_back(openStoreAt(s));
 
         auto publicKeys = getDefaultPublicKeys();
 
@@ -56,7 +63,9 @@ struct MixVerify : virtual Args
 
         auto doPath = [&](const Path & storePath) {
             try {
-                progressBar.startActivity(format("checking ‘%s’") % storePath);
+                checkInterrupt();
+
+                auto activity(progressBar.startActivity(format("checking ‘%s’") % storePath));
 
                 auto info = store->queryPathInfo(storePath);
 
@@ -78,7 +87,29 @@ struct MixVerify : virtual Args
 
                 if (!noSigs) {
 
-                    if (!info.ultimate && !info.checkSignatures(publicKeys)) {
+                    bool good = false;
+
+                    if (info.ultimate)
+                        good = true;
+
+                    if (!good && info.checkSignatures(publicKeys))
+                        good = true;
+
+                    if (!good) {
+                        for (auto & store2 : substituters) {
+                            // FIXME: catch errors?
+                            if (!store2->isValidPath(storePath)) continue;
+                            auto info2 = store2->queryPathInfo(storePath);
+                            auto info3(info);
+                            info3.sigs = info2.sigs;
+                            if (info3.checkSignatures(publicKeys)) {
+                                good = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!good) {
                         untrusted++;
                         printMsg(lvlError, format("path ‘%s’ is untrusted") % storePath);
                     }
