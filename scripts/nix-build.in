@@ -270,7 +270,7 @@ foreach my $expr (@exprs) {
         my $tmp = $ENV{"TMPDIR"} // $ENV{"XDG_RUNTIME_DIR"} // "/tmp";
         if ($pure) {
             foreach my $name (keys %ENV) {
-                next if grep { $_ eq $name } ("HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL", "TZ", "PAGER", "NIX_BUILD_SHELL");
+                next if grep { $_ eq $name } ("HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL", "TZ", "PAGER", "NIX_BUILD_SHELL", "NIX_SHELL_PS1");
                 delete $ENV{$name};
             }
             # NixOS hack: prevent /etc/bashrc from sourcing /etc/profile.
@@ -289,13 +289,16 @@ foreach my $expr (@exprs) {
             $rcfile,
             "rm -rf '$tmpDir'; " .
             'unset BASH_ENV; ' .
+            '[ -v NIX_SHELL_PS1 ] && NIX_SHELL_LOCAL_PS1="$NIX_SHELL_PS1"; ' .
             '[ -n "$PS1" ] && [ -e ~/.bashrc ] && source ~/.bashrc; ' .
             ($pure ? '' : 'p=$PATH; ' ) .
             'dontAddDisableDepTrack=1; ' .
             '[ -e $stdenv/setup ] && source $stdenv/setup; ' .
             ($pure ? '' : 'PATH=$PATH:$p; unset p; ') .
             'set +e; ' .
-            '[ -n "$PS1" ] && PS1="\n\[\033[1;32m\][nix-shell:\w]$\[\033[0m\] "; ' .
+            '[ -n "$PS1" ] && if [ -v NIX_SHELL_LOCAL_PS1 ] ; then PS1="$NIX_SHELL_LOCAL_PS1"; ' .
+            'elif [ -v NIX_SHELL_PS1 ] ; then PS1="$NIX_SHELL_PS1"; ' .
+            'else PS1="\n\[\033[1;32m\][nix-shell:\w]$\[\033[0m\] "; fi; ' .
             'if [ "$(type -t runHook)" = function ]; then runHook shellHook; fi; ' .
             'unset NIX_ENFORCE_PURITY; ' .
             'unset NIX_INDENT_MAKE; ' .

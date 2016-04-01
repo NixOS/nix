@@ -366,9 +366,15 @@ runCommand "dummy" { buildInputs = [ python pythonPackages.prettytable ]; } ""
 
 <variablelist>
   <xi:include href="env-common.xml#xmlns(db=http://docbook.org/ns/docbook)xpointer(//db:variablelist[@xml:id='env-common']/*)" />
+
+<varlistentry><term><envar>NIX_SHELL_PS1</envar></term>
+
+  <listitem><para>Overrides the prompt in a nix-shell.
+  </para></listitem>
+
+</varlistentry>
 </variablelist>
 
 </refsection>
-
 
 </refentry>
