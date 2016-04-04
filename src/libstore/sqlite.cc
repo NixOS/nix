@@ -20,6 +20,7 @@ namespace nix {
         }
         /* Sleep for a while since retrying the transaction right away
            is likely to fail again. */
+        checkInterrupt();
 #if HAVE_NANOSLEEP
         struct timespec t;
         t.tv_sec = 0;
