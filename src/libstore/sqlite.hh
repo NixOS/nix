@@ -40,6 +40,8 @@ struct SQLiteStmt
 
     public:
 
+        ~Use();
+
         /* Bind the next parameter. */
         Use & operator () (const std::string & value, bool notNull = true);
         Use & operator () (int64_t value, bool notNull = true);

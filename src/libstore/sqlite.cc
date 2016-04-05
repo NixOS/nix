@@ -73,6 +73,11 @@ SQLiteStmt::Use::Use(SQLiteStmt & stmt)
     sqlite3_reset(stmt);
 }
 
+SQLiteStmt::Use::~Use()
+{
+    sqlite3_reset(stmt);
+}
+
 SQLiteStmt::Use & SQLiteStmt::Use::operator () (const std::string & value, bool notNull)
 {
     if (notNull) {
