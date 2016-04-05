@@ -312,6 +312,9 @@ void Store::exportPaths(const Paths & paths,
 
 std::string ValidPathInfo::fingerprint() const
 {
+    if (narSize == 0 || narHash.type == htUnknown)
+        throw Error(format("cannot calculate fingerprint of path ‘%s’ because its size/hash is not known")
+            % path);
     return
         "1;" + path + ";"
         + printHashType(narHash.type) + ":" + printHash32(narHash) + ";"

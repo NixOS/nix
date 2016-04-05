@@ -34,7 +34,7 @@ struct CmdCopySigs : StorePathsCommand
         restoreAffinity(); // FIXME
 
         if (substituterUris.empty())
-            throw UsageError("you must specify at least one subtituter using ‘-s’");
+            throw UsageError("you must specify at least one substituter using ‘-s’");
 
         // FIXME: factor out commonality with MixVerify.
         std::vector<ref<Store>> substituters;
@@ -131,3 +131,51 @@ struct CmdQueryPathSigs : StorePathsCommand
 };
 
 static RegisterCommand r2(make_ref<CmdQueryPathSigs>());
+
+struct CmdSignPaths : StorePathsCommand
+{
+    Path secretKeyFile;
+
+    CmdSignPaths()
+    {
+        mkFlag('k', "key-file", {"file"}, "file containing the secret signing key", &secretKeyFile);
+    }
+
+    std::string name() override
+    {
+        return "sign-paths";
+    }
+
+    std::string description() override
+    {
+        return "sign the specified paths";
+    }
+
+    void run(ref<Store> store, Paths storePaths) override
+    {
+        if (secretKeyFile.empty())
+            throw UsageError("you must specify a secret key file using ‘-k’");
+
+        SecretKey secretKey(readFile(secretKeyFile));
+
+        size_t added{0};
+
+        for (auto & storePath : storePaths) {
+            auto info = store->queryPathInfo(storePath);
+
+            auto info2(info);
+            info2.sigs.clear();
+            info2.sign(secretKey);
+            assert(!info2.sigs.empty());
+
+            if (!info.sigs.count(*info2.sigs.begin())) {
+                store->addSignatures(storePath, info2.sigs);
+                added++;
+            }
+        }
+
+        printMsg(lvlInfo, format("added %d signatures") % added);
+    }
+};
+
+static RegisterCommand r3(make_ref<CmdSignPaths>());
