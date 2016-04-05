@@ -182,6 +182,8 @@ public:
 
     void setSubstituterEnv();
 
+    void addSignatures(const Path & storePath, const StringSet & sigs) override;
+
 private:
 
     Path schemaPath;

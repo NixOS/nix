@@ -554,6 +554,15 @@ bool RemoteStore::verifyStore(bool checkContents, bool repair)
 }
 
 
+void RemoteStore::addSignatures(const Path & storePath, const StringSet & sigs)
+{
+    auto conn(connections->get());
+    conn->to << wopAddSignatures << storePath << sigs;
+    conn->processStderr();
+    readInt(conn->from);
+}
+
+
 RemoteStore::Connection::~Connection()
 {
     try {

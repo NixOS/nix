@@ -543,6 +543,18 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         break;
     }
 
+    case wopAddSignatures: {
+        Path path = readStorePath(from);
+        StringSet sigs = readStrings<StringSet>(from);
+        startWork();
+        if (!trusted)
+            throw Error("you are not privileged to add signatures");
+        store->addSignatures(path, sigs);
+        stopWork();
+        to << 1;
+        break;
+    }
+
     default:
         throw Error(format("invalid operation %1%") % op);
     }

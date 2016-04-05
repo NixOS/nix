@@ -93,6 +93,8 @@ public:
 
     bool verifyStore(bool checkContents, bool repair) override;
 
+    void addSignatures(const Path & storePath, const StringSet & sigs) override;
+
 private:
 
     struct Connection

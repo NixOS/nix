@@ -312,7 +312,7 @@ void LocalStore::openDB(bool create)
     stmtRegisterValidPath.create(db,
         "insert into ValidPaths (path, hash, registrationTime, deriver, narSize, ultimate) values (?, ?, ?, ?, ?, ?);");
     stmtUpdatePathInfo.create(db,
-        "update ValidPaths set narSize = ?, hash = ?, ultimate = ? where path = ?;");
+        "update ValidPaths set narSize = ?, hash = ?, ultimate = ?, sigs = ? where path = ?;");
     stmtAddReference.create(db,
         "insert or replace into Refs (referrer, reference) values (?, ?);");
     stmtQueryPathInfo.create(db,
@@ -683,14 +683,14 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path)
 }
 
 
-/* Update path info in the database.  Currently only updates the
-   narSize field. */
+/* Update path info in the database. */
 void LocalStore::updatePathInfo(const ValidPathInfo & info)
 {
     stmtUpdatePathInfo.use()
         (info.narSize, info.narSize != 0)
         ("sha256:" + printHash(info.narHash))
         (info.ultimate ? 1 : 0, info.ultimate)
+        (concatStringsSep(" ", info.sigs), !info.sigs.empty())
         (info.path)
         .exec();
 }
@@ -1691,6 +1691,22 @@ void LocalStore::vacuumDB()
 {
     if (sqlite3_exec(db, "vacuum;", 0, 0, 0) != SQLITE_OK)
         throwSQLiteError(db, "vacuuming SQLite database");
+}
+
+
+void LocalStore::addSignatures(const Path & storePath, const StringSet & sigs)
+{
+    retrySQLite<void>([&]() {
+        SQLiteTxn txn(db);
+
+        auto info = queryPathInfo(storePath);
+
+        info.sigs.insert(sigs.begin(), sigs.end());
+
+        updatePathInfo(info);
+
+        txn.commit();
+    });
 }
 
 

@@ -346,6 +346,10 @@ public:
     /* Return an object to access files in the Nix store. */
     virtual ref<FSAccessor> getFSAccessor() = 0;
 
+    /* Add signatures to the specified store path. The signatures are
+       not verified. */
+    virtual void addSignatures(const Path & storePath, const StringSet & sigs) = 0;
+
     /* Utility functions. */
 
     /* Read a derivation, after ensuring its existence through
