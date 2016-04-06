@@ -179,8 +179,7 @@ struct CurlDownloader : public Downloader
         if (res == CURLE_WRITE_ERROR && etag == options.expectedETag) return false;
 
         long httpStatus = -1;
-        if (res == CURLE_HTTP_RETURNED_ERROR)
-            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpStatus);
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpStatus);
 
         if (res != CURLE_OK) {
             Error err =
