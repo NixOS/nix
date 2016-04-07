@@ -310,7 +310,7 @@ void LocalStore::openDB(bool create)
 
     /* Prepare SQL statements. */
     stmtRegisterValidPath.create(db,
-        "insert into ValidPaths (path, hash, registrationTime, deriver, narSize, ultimate) values (?, ?, ?, ?, ?, ?);");
+        "insert into ValidPaths (path, hash, registrationTime, deriver, narSize, ultimate, sigs) values (?, ?, ?, ?, ?, ?, ?);");
     stmtUpdatePathInfo.create(db,
         "update ValidPaths set narSize = ?, hash = ?, ultimate = ?, sigs = ? where path = ?;");
     stmtAddReference.create(db,
@@ -547,6 +547,7 @@ uint64_t LocalStore::addValidPath(const ValidPathInfo & info, bool checkOutputs)
         (info.deriver, info.deriver != "")
         (info.narSize, info.narSize != 0)
         (info.ultimate ? 1 : 0, info.ultimate)
+        (concatStringsSep(" ", info.sigs), !info.sigs.empty())
         .exec();
     uint64_t id = sqlite3_last_insert_rowid(db);
 
@@ -1707,6 +1708,19 @@ void LocalStore::addSignatures(const Path & storePath, const StringSet & sigs)
 
         txn.commit();
     });
+}
+
+
+void LocalStore::signPathInfo(ValidPathInfo & info)
+{
+    // FIXME: keep secret keys in memory.
+
+    auto secretKeyFiles = settings.get("secret-key-files", Strings());
+
+    for (auto & secretKeyFile : secretKeyFiles) {
+        SecretKey secretKey(readFile(secretKeyFile));
+        info.sign(secretKey);
+    }
 }
 
 

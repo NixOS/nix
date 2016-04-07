@@ -2748,6 +2748,7 @@ void DerivationGoal::registerOutputs()
                trusted. */
             if (!info.ultimate) {
                 info.ultimate = true;
+                worker.store.signPathInfo(info);
                 worker.store.registerValidPaths({info});
             }
 
@@ -2808,6 +2809,8 @@ void DerivationGoal::registerOutputs()
         info.references = references;
         info.deriver = drvPath;
         info.ultimate = true;
+        worker.store.signPathInfo(info);
+
         infos.push_back(info);
     }
 

@@ -301,6 +301,12 @@ private:
     // Internal versions that are not wrapped in retry_sqlite.
     bool isValidPath_(const Path & path);
     void queryReferrers_(const Path & path, PathSet & referrers);
+
+    /* Add signatures to a ValidPathInfo using the secret keys
+       specified by the ‘secret-key-files’ option. */
+    void signPathInfo(ValidPathInfo & info);
+
+    friend class DerivationGoal;
 };
 
 
