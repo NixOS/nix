@@ -13,15 +13,17 @@ using namespace nix;
 struct MixVerify : virtual Args
 {
     bool noContents = false;
-    bool noSigs = false;
+    bool noTrust = false;
     Strings substituterUris;
+    size_t sigsNeeded;
 
     MixVerify()
     {
         mkFlag(0, "no-contents", "do not verify the contents of each store path", &noContents);
-        mkFlag(0, "no-sigs", "do not verify whether each store path has a valid signature", &noSigs);
+        mkFlag(0, "no-trust", "do not verify whether each store path is trusted", &noTrust);
         mkFlag('s', "substituter", {"store-uri"}, "use signatures from specified store", 1,
             [&](Strings ss) { substituterUris.push_back(ss.front()); });
+        mkIntFlag('n', "sigs-needed", "require that each path has at least N valid signatures", &sigsNeeded);
     }
 
     void verifyPaths(ref<Store> store, const Paths & storePaths)
@@ -85,28 +87,42 @@ struct MixVerify : virtual Args
 
                 }
 
-                if (!noSigs) {
+                if (!noTrust) {
 
                     bool good = false;
 
-                    if (info.ultimate)
+                    if (info.ultimate && !sigsNeeded)
                         good = true;
 
-                    if (!good && info.checkSignatures(publicKeys))
-                        good = true;
+                    else {
 
-                    if (!good) {
+                        StringSet sigsSeen;
+                        size_t actualSigsNeeded = sigsNeeded ? sigsNeeded : 1;
+                        size_t validSigs = 0;
+
+                        auto doSigs = [&](StringSet sigs) {
+                            for (auto sig : sigs) {
+                                if (sigsSeen.count(sig)) continue;
+                                sigsSeen.insert(sig);
+                                if (info.checkSignature(publicKeys, sig))
+                                    validSigs++;
+                            }
+                        };
+
+                        doSigs(info.sigs);
+
                         for (auto & store2 : substituters) {
-                            // FIXME: catch errors?
-                            if (!store2->isValidPath(storePath)) continue;
-                            auto info2 = store2->queryPathInfo(storePath);
-                            auto info3(info);
-                            info3.sigs = info2.sigs;
-                            if (info3.checkSignatures(publicKeys)) {
-                                good = true;
-                                break;
+                            if (validSigs >= actualSigsNeeded) break;
+                            try {
+                                if (!store2->isValidPath(storePath)) continue;
+                                doSigs(store2->queryPathInfo(storePath).sigs);
+                            } catch (Error & e) {
+                                printMsg(lvlError, format(ANSI_RED "error:" ANSI_NORMAL " %s") % e.what());
                             }
                         }
+
+                        if (validSigs >= actualSigsNeeded)
+                            good = true;
                     }
 
                     if (!good) {

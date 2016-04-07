@@ -333,9 +333,15 @@ unsigned int ValidPathInfo::checkSignatures(const PublicKeys & publicKeys) const
 {
     unsigned int good = 0;
     for (auto & sig : sigs)
-        if (verifyDetached(fingerprint(), sig, publicKeys))
+        if (checkSignature(publicKeys, sig))
             good++;
     return good;
+}
+
+
+bool ValidPathInfo::checkSignature(const PublicKeys & publicKeys, const std::string & sig) const
+{
+    return verifyDetached(fingerprint(), sig, publicKeys);
 }
 
 

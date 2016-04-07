@@ -127,6 +127,9 @@ struct ValidPathInfo
     /* Return the number of signatures on this .narinfo that were
        produced by one of the specified keys. */
     unsigned int checkSignatures(const PublicKeys & publicKeys) const;
+
+    /* Verify a single signature. */
+    bool checkSignature(const PublicKeys & publicKeys, const std::string & sig) const;
 };
 
 typedef list<ValidPathInfo> ValidPathInfos;
