@@ -102,11 +102,24 @@ bool verifyDetached(const std::string & data, const std::string & sig,
 PublicKeys getDefaultPublicKeys()
 {
     PublicKeys publicKeys;
+
+    // FIXME: filter duplicates
+
     for (auto s : settings.get("binary-cache-public-keys", Strings())) {
         PublicKey key(s);
         publicKeys.emplace(key.name, key);
-        // FIXME: filter duplicates
     }
+
+    for (auto secretKeyFile : settings.get("secret-key-files", Strings())) {
+        try {
+            SecretKey secretKey(readFile(secretKeyFile));
+            publicKeys.emplace(secretKey.name, secretKey.toPublicKey());
+        } catch (SysError & e) {
+            /* Ignore unreadable key files. That's normal in a
+               multi-user installation. */
+        }
+    }
+
     return publicKeys;
 }
 
