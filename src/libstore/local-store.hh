@@ -1,12 +1,14 @@
 #pragma once
 
 #include "sqlite.hh"
-#include <string>
-#include <unordered_set>
 
 #include "pathlocks.hh"
 #include "store-api.hh"
+#include "sync.hh"
 #include "util.hh"
+
+#include <string>
+#include <unordered_set>
 
 
 namespace nix {
@@ -52,12 +54,47 @@ struct RunningSubstituter
 class LocalStore : public LocalFSStore
 {
 private:
-    typedef std::map<Path, RunningSubstituter> RunningSubstituters;
-    RunningSubstituters runningSubstituters;
 
-    Path linksDir;
+    /* Lock file used for upgrading. */
+    AutoCloseFD globalLock;
 
-    Path reservedPath;
+    struct State
+    {
+        /* The SQLite database object. */
+        SQLite db;
+
+        /* Some precompiled SQLite statements. */
+        SQLiteStmt stmtRegisterValidPath;
+        SQLiteStmt stmtUpdatePathInfo;
+        SQLiteStmt stmtAddReference;
+        SQLiteStmt stmtQueryPathInfo;
+        SQLiteStmt stmtQueryReferences;
+        SQLiteStmt stmtQueryReferrers;
+        SQLiteStmt stmtInvalidatePath;
+        SQLiteStmt stmtRegisterFailedPath;
+        SQLiteStmt stmtHasPathFailed;
+        SQLiteStmt stmtQueryFailedPaths;
+        SQLiteStmt stmtClearFailedPath;
+        SQLiteStmt stmtAddDerivationOutput;
+        SQLiteStmt stmtQueryValidDerivers;
+        SQLiteStmt stmtQueryDerivationOutputs;
+        SQLiteStmt stmtQueryPathFromHashPart;
+        SQLiteStmt stmtQueryValidPaths;
+
+        /* The file to which we write our temporary roots. */
+        Path fnTempRoots;
+        AutoCloseFD fdTempRoots;
+
+        typedef std::map<Path, RunningSubstituter> RunningSubstituters;
+        RunningSubstituters runningSubstituters;
+
+    };
+
+    Sync<State, std::recursive_mutex> _state;
+
+    const Path linksDir;
+    const Path reservedPath;
+    const Path schemaPath;
 
 public:
 
@@ -174,76 +211,25 @@ public:
        a substituter (if available). */
     void repairPath(const Path & path);
 
-    /* Check whether the given valid path exists and has the right
-       contents. */
-    bool pathContentsGood(const Path & path);
-
-    void markContentsGood(const Path & path);
-
     void setSubstituterEnv();
 
     void addSignatures(const Path & storePath, const StringSet & sigs) override;
-
-private:
-
-    Path schemaPath;
-
-    /* Lock file used for upgrading. */
-    AutoCloseFD globalLock;
-
-    /* The SQLite database object. */
-    SQLite db;
-
-    /* Some precompiled SQLite statements. */
-    SQLiteStmt stmtRegisterValidPath;
-    SQLiteStmt stmtUpdatePathInfo;
-    SQLiteStmt stmtAddReference;
-    SQLiteStmt stmtQueryPathInfo;
-    SQLiteStmt stmtQueryReferences;
-    SQLiteStmt stmtQueryReferrers;
-    SQLiteStmt stmtInvalidatePath;
-    SQLiteStmt stmtRegisterFailedPath;
-    SQLiteStmt stmtHasPathFailed;
-    SQLiteStmt stmtQueryFailedPaths;
-    SQLiteStmt stmtClearFailedPath;
-    SQLiteStmt stmtAddDerivationOutput;
-    SQLiteStmt stmtQueryValidDerivers;
-    SQLiteStmt stmtQueryDerivationOutputs;
-    SQLiteStmt stmtQueryPathFromHashPart;
-    SQLiteStmt stmtQueryValidPaths;
-
-    /* Cache for pathContentsGood(). */
-    std::map<Path, bool> pathContentsGoodCache;
-
-    bool didSetSubstituterEnv;
-
-    /* The file to which we write our temporary roots. */
-    Path fnTempRoots;
-    AutoCloseFD fdTempRoots;
-
-    int getSchema();
-
-public:
 
     static bool haveWriteAccess();
 
 private:
 
-    void openDB(bool create);
+    int getSchema();
+
+    void openDB(State & state, bool create);
 
     void makeStoreWritable();
 
-    uint64_t queryValidPathId(const Path & path);
+    uint64_t queryValidPathId(State & state, const Path & path);
 
-    uint64_t addValidPath(const ValidPathInfo & info, bool checkOutputs = true);
+    uint64_t addValidPath(State & state, const ValidPathInfo & info, bool checkOutputs = true);
 
-    void addReference(uint64_t referrer, uint64_t reference);
-
-    void appendReferrer(const Path & from, const Path & to, bool lock);
-
-    void rewriteReferrers(const Path & path, bool purge, PathSet referrers);
-
-    void invalidatePath(const Path & path);
+    void invalidatePath(State & state, const Path & path);
 
     /* Delete a path from the Nix store. */
     void invalidatePathChecked(const Path & path);
@@ -251,7 +237,7 @@ private:
     void verifyPath(const Path & path, const PathSet & store,
         PathSet & done, PathSet & validPaths, bool repair, bool & errors);
 
-    void updatePathInfo(const ValidPathInfo & info);
+    void updatePathInfo(State & state, const ValidPathInfo & info);
 
     void upgradeStore6();
     void upgradeStore7();
@@ -299,8 +285,8 @@ private:
     void optimisePath_(OptimiseStats & stats, const Path & path, InodeHash & inodeHash);
 
     // Internal versions that are not wrapped in retry_sqlite.
-    bool isValidPath_(const Path & path);
-    void queryReferrers_(const Path & path, PathSet & referrers);
+    bool isValidPath(State & state, const Path & path);
+    void queryReferrers(State & state, const Path & path, PathSet & referrers);
 
     /* Add signatures to a ValidPathInfo using the secret keys
        specified by the ‘secret-key-files’ option. */

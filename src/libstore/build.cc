@@ -239,6 +239,9 @@ private:
     /* Last time the goals in `waitingForAWhile' where woken up. */
     time_t lastWokenUp;
 
+    /* Cache for pathContentsGood(). */
+    std::map<Path, bool> pathContentsGoodCache;
+
 public:
 
     /* Set if at least one derivation had a BuildError (i.e. permanent
@@ -304,6 +307,12 @@ public:
     void waitForInput();
 
     unsigned int exitStatus();
+
+    /* Check whether the given valid path exists and has the right
+       contents. */
+    bool pathContentsGood(const Path & path);
+
+    void markContentsGood(const Path & path);
 };
 
 
@@ -1159,7 +1168,7 @@ void DerivationGoal::repairClosure()
     /* Check each path (slow!). */
     PathSet broken;
     for (auto & i : outputClosure) {
-        if (worker.store.pathContentsGood(i)) continue;
+        if (worker.pathContentsGood(i)) continue;
         printMsg(lvlError, format("found corrupted or missing path ‘%1%’ in the output closure of ‘%2%’") % i % drvPath);
         Path drvPath2 = outputsToDrv[i];
         if (drvPath2 == "")
@@ -2799,7 +2808,7 @@ void DerivationGoal::registerOutputs()
         if (curRound == nrRounds) {
             worker.store.optimisePath(path); // FIXME: combine with scanForReferences()
 
-            worker.store.markContentsGood(path);
+            worker.markContentsGood(path);
         }
 
         ValidPathInfo info;
@@ -2977,7 +2986,7 @@ PathSet DerivationGoal::checkPathValidity(bool returnValid, bool checkHash)
         if (!wantOutput(i.first, wantedOutputs)) continue;
         bool good =
             worker.store.isValidPath(i.second.path) &&
-            (!checkHash || worker.store.pathContentsGood(i.second.path));
+            (!checkHash || worker.pathContentsGood(i.second.path));
         if (good == returnValid) result.insert(i.second.path);
     }
     return result;
@@ -3385,7 +3394,7 @@ void SubstitutionGoal::finished()
     outputLock->setDeletion(true);
     outputLock.reset();
 
-    worker.store.markContentsGood(storePath);
+    worker.markContentsGood(storePath);
 
     printMsg(lvlChatty,
         format("substitution of path ‘%1%’ succeeded") % storePath);
@@ -3782,6 +3791,32 @@ void Worker::waitForInput()
 unsigned int Worker::exitStatus()
 {
     return timedOut ? 101 : (permanentFailure ? 100 : 1);
+}
+
+
+bool Worker::pathContentsGood(const Path & path)
+{
+    std::map<Path, bool>::iterator i = pathContentsGoodCache.find(path);
+    if (i != pathContentsGoodCache.end()) return i->second;
+    printMsg(lvlInfo, format("checking path ‘%1%’...") % path);
+    ValidPathInfo info = store.queryPathInfo(path);
+    bool res;
+    if (!pathExists(path))
+        res = false;
+    else {
+        HashResult current = hashPath(info.narHash.type, path);
+        Hash nullHash(htSHA256);
+        res = info.narHash == nullHash || info.narHash == current.first;
+    }
+    pathContentsGoodCache[path] = res;
+    if (!res) printMsg(lvlError, format("path ‘%1%’ is corrupted or missing!") % path);
+    return res;
+}
+
+
+void Worker::markContentsGood(const Path & path)
+{
+    pathContentsGoodCache[path] = true;
 }
 
 

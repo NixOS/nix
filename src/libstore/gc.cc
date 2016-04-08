@@ -147,35 +147,36 @@ Path Store::addPermRoot(const Path & _storePath,
 
 void LocalStore::addTempRoot(const Path & path)
 {
+    auto state(_state.lock());
+
     /* Create the temporary roots file for this process. */
-    if (fdTempRoots == -1) {
+    if (state->fdTempRoots == -1) {
 
         while (1) {
             Path dir = (format("%1%/%2%") % settings.nixStateDir % tempRootsDir).str();
             createDirs(dir);
 
-            fnTempRoots = (format("%1%/%2%")
-                % dir % getpid()).str();
+            state->fnTempRoots = (format("%1%/%2%") % dir % getpid()).str();
 
             AutoCloseFD fdGCLock = openGCLock(ltRead);
 
-            if (pathExists(fnTempRoots))
+            if (pathExists(state->fnTempRoots))
                 /* It *must* be stale, since there can be no two
                    processes with the same pid. */
-                unlink(fnTempRoots.c_str());
+                unlink(state->fnTempRoots.c_str());
 
-            fdTempRoots = openLockFile(fnTempRoots, true);
+            state->fdTempRoots = openLockFile(state->fnTempRoots, true);
 
             fdGCLock.close();
 
-            debug(format("acquiring read lock on ‘%1%’") % fnTempRoots);
-            lockFile(fdTempRoots, ltRead, true);
+            debug(format("acquiring read lock on ‘%1%’") % state->fnTempRoots);
+            lockFile(state->fdTempRoots, ltRead, true);
 
             /* Check whether the garbage collector didn't get in our
                way. */
             struct stat st;
-            if (fstat(fdTempRoots, &st) == -1)
-                throw SysError(format("statting ‘%1%’") % fnTempRoots);
+            if (fstat(state->fdTempRoots, &st) == -1)
+                throw SysError(format("statting ‘%1%’") % state->fnTempRoots);
             if (st.st_size == 0) break;
 
             /* The garbage collector deleted this file before we could
@@ -187,15 +188,15 @@ void LocalStore::addTempRoot(const Path & path)
 
     /* Upgrade the lock to a write lock.  This will cause us to block
        if the garbage collector is holding our lock. */
-    debug(format("acquiring write lock on ‘%1%’") % fnTempRoots);
-    lockFile(fdTempRoots, ltWrite, true);
+    debug(format("acquiring write lock on ‘%1%’") % state->fnTempRoots);
+    lockFile(state->fdTempRoots, ltWrite, true);
 
     string s = path + '\0';
-    writeFull(fdTempRoots, s);
+    writeFull(state->fdTempRoots, s);
 
     /* Downgrade to a read lock. */
-    debug(format("downgrading to read lock on ‘%1%’") % fnTempRoots);
-    lockFile(fdTempRoots, ltRead, true);
+    debug(format("downgrading to read lock on ‘%1%’") % state->fnTempRoots);
+    lockFile(state->fdTempRoots, ltRead, true);
 }
 
 

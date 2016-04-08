@@ -22,11 +22,11 @@ namespace nix {
    scope.
 */
 
-template<class T>
+template<class T, class M = std::mutex>
 class Sync
 {
 private:
-    std::mutex mutex;
+    M mutex;
     T data;
 
 public:
@@ -38,7 +38,7 @@ public:
     {
     private:
         Sync * s;
-        std::unique_lock<std::mutex> lk;
+        std::unique_lock<M> lk;
         friend Sync;
         Lock(Sync * s) : s(s), lk(s->mutex) { }
     public:
