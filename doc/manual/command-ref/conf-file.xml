@@ -306,21 +306,6 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry><term><literal>build-cache-failure</literal></term>
-
-    <listitem><para>If set to <literal>true</literal>, Nix will
-    “cache” build failures, meaning that it will remember (in its
-    database) that a derivation previously failed.  If you then try to
-    build the derivation again, Nix will immediately fail rather than
-    perform the build again.  Failures in fixed-output derivations
-    (such as <function>fetchurl</function> calls) are never cached.
-    The “failed” status of a derivation can be cleared using
-    <command>nix-store --clear-failed-paths</command>.  By default,
-    failure caching is disabled.</para></listitem>
-
-  </varlistentry>
-
-
   <varlistentry><term><literal>build-keep-log</literal></term>
 
     <listitem><para>If set to <literal>true</literal> (the default),

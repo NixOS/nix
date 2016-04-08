@@ -148,7 +148,6 @@ struct BuildResult
         InputRejected,
         OutputRejected,
         TransientFailure, // possibly transient
-        CachedFailure,
         TimedOut,
         MiscFailure,
         DependencyFailed,
@@ -324,13 +323,6 @@ public:
 
     /* Perform a garbage collection. */
     virtual void collectGarbage(const GCOptions & options, GCResults & results) = 0;
-
-    /* Return the set of paths that have failed to build.*/
-    virtual PathSet queryFailedPaths() = 0;
-
-    /* Clear the "failed" status of the given paths.  The special
-       value `*' causes all failed paths to be cleared. */
-    virtual void clearFailedPaths(const PathSet & paths) = 0;
 
     /* Return a string representing information about the path that
        can be loaded into the database using `nix-store --load-db' or

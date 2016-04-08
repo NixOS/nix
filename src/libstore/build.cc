@@ -1047,11 +1047,6 @@ void DerivationGoal::haveDerivation()
         return;
     }
 
-    /* Check whether any output previously failed to build.  If so,
-       don't bother. */
-    for (auto & i : invalidOutputs)
-        if (pathFailed(i)) return;
-
     /* Reject doing a hash build of anything other than a fixed-output
        derivation. */
     if (buildMode == bmHash) {
@@ -1322,12 +1317,6 @@ void DerivationGoal::tryToBuild()
         deletePath(path);
     }
 
-    /* Check again whether any output previously failed to build,
-       because some other process may have tried and failed before we
-       acquired the lock. */
-    for (auto & i : drv->outputs)
-        if (pathFailed(i.second.path)) return;
-
     /* Don't do a remote build if the derivation has the attribute
        `preferLocalBuild' set.  Also, check and repair modes are only
        supported for local builds. */
@@ -1549,17 +1538,6 @@ void DerivationGoal::buildDone()
                 statusOk(status) ? BuildResult::OutputRejected :
                 fixedOutput || diskFull ? BuildResult::TransientFailure :
                 BuildResult::PermanentFailure;
-
-            /* Register the outputs of this build as "failed" so we
-               won't try to build them again (negative caching).
-               However, don't do this for fixed-output derivations,
-               since they're likely to fail for transient reasons
-               (e.g., fetchurl not being able to access the network).
-               Hook errors (like communication problems with the
-               remote machine) shouldn't be cached either. */
-            if (settings.cacheFailure && !fixedOutput && !diskFull)
-                for (auto & i : drv->outputs)
-                    worker.store.registerFailedPath(i.second.path);
         }
 
         done(st, e.msg());
@@ -2993,23 +2971,6 @@ PathSet DerivationGoal::checkPathValidity(bool returnValid, bool checkHash)
 }
 
 
-bool DerivationGoal::pathFailed(const Path & path)
-{
-    if (!settings.cacheFailure) return false;
-
-    if (!worker.store.hasPathFailed(path)) return false;
-
-    printMsg(lvlError, format("builder for ‘%1%’ failed previously (cached)") % path);
-
-    if (settings.printBuildTrace)
-        printMsg(lvlError, format("@ build-failed %1% - cached") % drvPath);
-
-    done(BuildResult::CachedFailure);
-
-    return true;
-}
-
-
 Path DerivationGoal::addHashRewrite(const Path & path)
 {
     string h1 = string(path, settings.nixStore.size() + 1, 32);
@@ -3031,7 +2992,7 @@ void DerivationGoal::done(BuildResult::Status status, const string & msg)
     amDone(result.success() ? ecSuccess : ecFailed);
     if (result.status == BuildResult::TimedOut)
         worker.timedOut = true;
-    if (result.status == BuildResult::PermanentFailure || result.status == BuildResult::CachedFailure)
+    if (result.status == BuildResult::PermanentFailure)
         worker.permanentFailure = true;
 }
 

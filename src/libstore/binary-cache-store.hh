@@ -156,12 +156,6 @@ public:
     void collectGarbage(const GCOptions & options, GCResults & results) override
     { notImpl(); }
 
-    PathSet queryFailedPaths() override
-    { return {}; }
-
-    void clearFailedPaths(const PathSet & paths) override
-    { }
-
     void optimiseStore() override
     { }
 

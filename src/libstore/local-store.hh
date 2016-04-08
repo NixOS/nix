@@ -17,8 +17,8 @@ namespace nix {
 /* Nix store and database schema version.  Version 1 (or 0) was Nix <=
    0.7.  Version 2 was Nix 0.8 and 0.9.  Version 3 is Nix 0.10.
    Version 4 is Nix 0.11.  Version 5 is Nix 0.12-0.16.  Version 6 is
-   Nix 1.0.  Version 7 is Nix 1.3. Version 8 is 1.12. */
-const int nixSchemaVersion = 8;
+   Nix 1.0.  Version 7 is Nix 1.3. Version 9 is 1.12. */
+const int nixSchemaVersion = 9;
 
 
 extern string drvsLogDir;
@@ -71,10 +71,6 @@ private:
         SQLiteStmt stmtQueryReferences;
         SQLiteStmt stmtQueryReferrers;
         SQLiteStmt stmtInvalidatePath;
-        SQLiteStmt stmtRegisterFailedPath;
-        SQLiteStmt stmtHasPathFailed;
-        SQLiteStmt stmtQueryFailedPaths;
-        SQLiteStmt stmtClearFailedPath;
         SQLiteStmt stmtAddDerivationOutput;
         SQLiteStmt stmtQueryValidDerivers;
         SQLiteStmt stmtQueryDerivationOutputs;
@@ -193,17 +189,6 @@ public:
     void registerValidPath(const ValidPathInfo & info);
 
     void registerValidPaths(const ValidPathInfos & infos);
-
-    /* Register that the build of a derivation with output `path' has
-       failed. */
-    void registerFailedPath(const Path & path);
-
-    /* Query whether `path' previously failed to build. */
-    bool hasPathFailed(const Path & path);
-
-    PathSet queryFailedPaths() override;
-
-    void clearFailedPaths(const PathSet & paths) override;
 
     void vacuumDB();
 

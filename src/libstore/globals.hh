@@ -168,9 +168,6 @@ struct Settings {
        before being killed (0 means no limit). */
     unsigned long maxLogSize;
 
-    /* Whether to cache build failures. */
-    bool cacheFailure;
-
     /* How often (in seconds) to poll for locks. */
     unsigned int pollInterval;
 

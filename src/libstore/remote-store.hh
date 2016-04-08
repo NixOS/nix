@@ -85,10 +85,6 @@ public:
 
     void collectGarbage(const GCOptions & options, GCResults & results) override;
 
-    PathSet queryFailedPaths() override;
-
-    void clearFailedPaths(const PathSet & paths) override;
-
     void optimiseStore() override;
 
     bool verifyStore(bool checkContents, bool repair) override;

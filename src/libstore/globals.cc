@@ -52,7 +52,6 @@ Settings::Settings()
     keepLog = true;
     compressLog = true;
     maxLogSize = 0;
-    cacheFailure = false;
     pollInterval = 5;
     checkRootReachability = false;
     gcKeepOutputs = false;
@@ -175,7 +174,6 @@ void Settings::update()
     _get(keepLog, "build-keep-log");
     _get(compressLog, "build-compress-log");
     _get(maxLogSize, "build-max-log-size");
-    _get(cacheFailure, "build-cache-failure");
     _get(pollInterval, "build-poll-interval");
     _get(checkRootReachability, "gc-check-reachability");
     _get(gcKeepOutputs, "gc-keep-outputs");

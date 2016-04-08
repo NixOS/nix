@@ -520,23 +520,6 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
 }
 
 
-PathSet RemoteStore::queryFailedPaths()
-{
-    auto conn(connections->get());
-    conn->to << wopQueryFailedPaths;
-    conn->processStderr();
-    return readStorePaths<PathSet>(conn->from);
-}
-
-
-void RemoteStore::clearFailedPaths(const PathSet & paths)
-{
-    auto conn(connections->get());
-    conn->to << wopClearFailedPaths << paths;
-    conn->processStderr();
-    readInt(conn->from);
-}
-
 void RemoteStore::optimiseStore()
 {
     auto conn(connections->get());
@@ -544,6 +527,7 @@ void RemoteStore::optimiseStore()
     conn->processStderr();
     readInt(conn->from);
 }
+
 
 bool RemoteStore::verifyStore(bool checkContents, bool repair)
 {

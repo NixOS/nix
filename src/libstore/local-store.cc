@@ -198,6 +198,13 @@ LocalStore::LocalStore()
             txn.commit();
         }
 
+        if (curSchema < 9) {
+            SQLiteTxn txn(state->db);
+            if (sqlite3_exec(state->db, "drop table FailedPaths", 0, 0, 0) != SQLITE_OK)
+                throwSQLiteError(state->db, "upgrading database schema");
+            txn.commit();
+        }
+
         writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
 
         lockFile(globalLock, ltRead, true);
@@ -327,16 +334,6 @@ void LocalStore::openDB(State & state, bool create)
         "select path from Refs join ValidPaths on referrer = id where reference = (select id from ValidPaths where path = ?);");
     state.stmtInvalidatePath.create(db,
         "delete from ValidPaths where path = ?;");
-    state.stmtRegisterFailedPath.create(db,
-        "insert or ignore into FailedPaths (path, time) values (?, ?);");
-    state.stmtHasPathFailed.create(db,
-        "select time from FailedPaths where path = ?;");
-    state.stmtQueryFailedPaths.create(db,
-        "select path from FailedPaths;");
-    // If the path is a derivation, then clear its outputs.
-    state.stmtClearFailedPath.create(db,
-        "delete from FailedPaths where ?1 = '*' or path = ?1 "
-        "or path in (select d.path from DerivationOutputs d join ValidPaths v on d.drv = v.id where v.path = ?1);");
     state.stmtAddDerivationOutput.create(db,
         "insert or replace into DerivationOutputs (drv, id, path) values (?, ?, ?);");
     state.stmtQueryValidDerivers.create(db,
@@ -580,55 +577,6 @@ uint64_t LocalStore::addValidPath(State & state,
     }
 
     return id;
-}
-
-
-void LocalStore::registerFailedPath(const Path & path)
-{
-    retrySQLite<void>([&]() {
-        auto state(_state.lock());
-        state->stmtRegisterFailedPath.use()(path)(time(0)).step();
-    });
-}
-
-
-bool LocalStore::hasPathFailed(const Path & path)
-{
-    return retrySQLite<bool>([&]() {
-        auto state(_state.lock());
-        return state->stmtHasPathFailed.use()(path).next();
-    });
-}
-
-
-PathSet LocalStore::queryFailedPaths()
-{
-    return retrySQLite<PathSet>([&]() {
-        auto state(_state.lock());
-
-        auto useQueryFailedPaths(state->stmtQueryFailedPaths.use());
-
-        PathSet res;
-        while (useQueryFailedPaths.next())
-            res.insert(useQueryFailedPaths.getStr(0));
-
-        return res;
-    });
-}
-
-
-void LocalStore::clearFailedPaths(const PathSet & paths)
-{
-    retrySQLite<void>([&]() {
-        auto state(_state.lock());
-
-        SQLiteTxn txn(state->db);
-
-        for (auto & path : paths)
-            state->stmtClearFailedPath.use()(path).exec();
-
-        txn.commit();
-    });
 }
 
 

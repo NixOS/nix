@@ -39,8 +39,3 @@ create table if not exists DerivationOutputs (
 );
 
 create index if not exists IndexDerivationOutputs on DerivationOutputs(path);
-
-create table if not exists FailedPaths (
-    path text primary key not null,
-    time integer not null
-);

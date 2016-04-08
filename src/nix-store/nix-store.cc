@@ -821,24 +821,6 @@ static void opOptimise(Strings opFlags, Strings opArgs)
     store->optimiseStore();
 }
 
-static void opQueryFailedPaths(Strings opFlags, Strings opArgs)
-{
-    if (!opArgs.empty() || !opFlags.empty())
-        throw UsageError("no arguments expected");
-    PathSet failed = store->queryFailedPaths();
-    for (auto & i : failed)
-        cout << format("%1%\n") % i;
-}
-
-
-static void opClearFailedPaths(Strings opFlags, Strings opArgs)
-{
-    if (!opFlags.empty())
-        throw UsageError("no flags expected");
-    store->clearFailedPaths(PathSet(opArgs.begin(), opArgs.end()));
-}
-
-
 /* Serve the nix store in a way usable by a restricted ssh user. */
 static void opServe(Strings opFlags, Strings opArgs)
 {
@@ -1102,10 +1084,6 @@ int main(int argc, char * * argv)
                 op = opRepairPath;
             else if (*arg == "--optimise" || *arg == "--optimize")
                 op = opOptimise;
-            else if (*arg == "--query-failed-paths")
-                op = opQueryFailedPaths;
-            else if (*arg == "--clear-failed-paths")
-                op = opClearFailedPaths;
             else if (*arg == "--serve")
                 op = opServe;
             else if (*arg == "--generate-binary-cache-key")

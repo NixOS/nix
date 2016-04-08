@@ -493,23 +493,6 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         break;
     }
 
-    case wopQueryFailedPaths: {
-        startWork();
-        PathSet paths = store->queryFailedPaths();
-        stopWork();
-        to << paths;
-        break;
-    }
-
-    case wopClearFailedPaths: {
-        PathSet paths = readStrings<PathSet>(from);
-        startWork();
-        store->clearFailedPaths(paths);
-        stopWork();
-        to << 1;
-        break;
-    }
-
     case wopQueryPathInfo: {
         Path path = readStorePath(from);
         startWork();
