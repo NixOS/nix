@@ -10,6 +10,11 @@ if [ -n "$HOME" ]; then
 
     export PATH=$NIX_LINK/bin:$NIX_LINK/sbin:$PATH
 
+    # Append ~/.nix-profile/share/man to $MANPATH
+    if ! [[ $MANPATH =~ (^|:)$NIX_LINK/share/man($|:) ]]; then
+      export MANPATH=$NIX_LINK/share/man${MANPATH:+:$MANPATH}
+    fi
+
     # Subscribe the user to the Nixpkgs channel by default.
     if [ ! -e "$HOME/.nix-channels" ]; then
         echo "https://nixos.org/channels/nixpkgs-unstable nixpkgs" > "$HOME/.nix-channels"
