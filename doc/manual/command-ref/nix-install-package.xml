@@ -146,9 +146,7 @@ The elements are as follows:
 
   <varlistentry><term><replaceable>manifestURL</replaceable></term>
 
-    <listitem><para>The manifest to be pulled by
-    <command>nix-pull</command>.  The manifest must contain
-    <replaceable>outPath</replaceable>.</para></listitem>
+    <listitem><para>Obsolete.</para></listitem>
 
   </varlistentry>
 

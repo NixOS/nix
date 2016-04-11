@@ -1,7 +1,6 @@
 source common.sh
 
 clearStore
-clearManifests
 clearCache
 
 # Create the binary cache.

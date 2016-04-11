@@ -2,17 +2,14 @@ nix_bin_scripts := \
   $(d)/nix-build \
   $(d)/nix-channel \
   $(d)/nix-copy-closure \
-  $(d)/nix-generate-patches \
   $(d)/nix-install-package \
-  $(d)/nix-pull \
   $(d)/nix-push
 
 bin-scripts += $(nix_bin_scripts)
 
 nix_substituters := \
   $(d)/copy-from-other-stores.pl \
-  $(d)/download-from-binary-cache.pl \
-  $(d)/download-using-manifests.pl
+  $(d)/download-from-binary-cache.pl
 
 nix_noinst_scripts := \
   $(d)/build-remote.pl \

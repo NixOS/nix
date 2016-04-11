@@ -1,15 +1,14 @@
 source common.sh
 
-# Note: this test expects to be run *after* nix-push.sh.
-
 drvPath=$(nix-instantiate ./dependencies.nix)
-outPath=$(nix-store -q $drvPath)
+outPath=$(nix-store -r $drvPath)
+nix-push --dest $cacheDir $outPath
 
 clearStore
 clearProfiles
 
 cat > $TEST_ROOT/foo.nixpkg <<EOF
-NIXPKG1 file://$TEST_ROOT/cache/MANIFEST simple $system $drvPath $outPath
+NIXPKG1 - simple $system $drvPath $outPath file://$cacheDir
 EOF
 
 nix-install-package --non-interactive -p $profiles/test $TEST_ROOT/foo.nixpkg

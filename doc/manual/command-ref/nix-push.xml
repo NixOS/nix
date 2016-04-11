@@ -73,8 +73,7 @@ automatically.</para>
   <listitem><para>Optionally, a single <emphasis>manifest</emphasis>
   file is created that contains the same metadata as the
   <filename>.narinfo</filename> files.  This is for compatibility with
-  Nix versions prior to 1.2 (see <command>nix-pull</command> for
-  details).</para></listitem>
+  Nix versions prior to 1.2.</para></listitem>
 
   <listitem><para>A file named <option>nix-cache-info</option> is
   placed in the destination directory.  The existence of this file
@@ -135,7 +134,7 @@ automatically.</para>
   <varlistentry><term><option>--manifest</option></term>
 
     <listitem><para>Force the generation of a manifest suitable for
-    use by <command>nix-pull</command>.  The manifest is stored as
+    use by old versions of Nix.  The manifest is stored as
     <filename><replaceable>dest-dir</replaceable>/MANIFEST</filename>.</para></listitem>
 
   </varlistentry>
@@ -202,20 +201,6 @@ $ nix-push --dest /tmp/cache $(nix-instantiate -A thunderbird)
 </screen>
 
 </para>
-
-<para>To generate a manifest suitable for <command>nix-pull</command>:
-
-<screen>
-$ nix-push --dest /tmp/cache $(nix-build -A thunderbird) --manifest
-</screen>
-
-On another machine you can then do:
-
-<screen>
-$ nix-pull http://example.org/cache
-</screen>
-
-to cause the binaries to be used by subsequent Nix operations.</para>
 
 <para>To generate a signed binary cache, you must first generate a key
 pair, in this example called <literal>cache.example.org-1</literal>,

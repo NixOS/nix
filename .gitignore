@@ -34,7 +34,6 @@ Makefile.config
 
 # /scripts/
 /scripts/nix-profile.sh
-/scripts/nix-pull
 /scripts/nix-push
 /scripts/nix-switch
 /scripts/nix-collect-garbage
@@ -43,21 +42,14 @@ Makefile.config
 /scripts/nix-channel
 /scripts/nix-build
 /scripts/nix-copy-closure
-/scripts/nix-generate-patches
 /scripts/NixConfig.pm
 /scripts/NixManifest.pm
-/scripts/GeneratePatches.pm
-/scripts/download-using-manifests.pl
 /scripts/copy-from-other-stores.pl
 /scripts/download-from-binary-cache.pl
 /scripts/find-runtime-roots.pl
 /scripts/build-remote.pl
 /scripts/nix-reduce-build
 /scripts/nix-http-export.cgi
-
-# /src/bsdiff-4.3/
-/src/bsdiff-4.3/bsdiff
-/src/bsdiff-4.3/bspatch
 
 # /src/libexpr/
 /src/libexpr/lexer-tab.cc

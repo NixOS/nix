@@ -89,7 +89,7 @@ my $pathRE = "(?: \/ [\/A-Za-z0-9\+\-\.\_\?\=]* )";
 # store path.  We'll let nix-env do that.
 
 $contents =~
-    / ^ \s* (\S+) \s+ ($Nix::Utils::urlRE) \s+ ($nameRE) \s+ ($systemRE) \s+ ($pathRE) \s+ ($pathRE) ( \s+ ($Nix::Utils::urlRE) )?  /x
+    / ^ \s* (\S+) \s+ (\S+) \s+ ($nameRE) \s+ ($systemRE) \s+ ($pathRE) \s+ ($pathRE) ( \s+ ($Nix::Utils::urlRE) )?  /x
     or barf "invalid package contents";
 my $version = $1;
 my $manifestURL = $2;
@@ -111,25 +111,9 @@ if ($interactive) {
 }
 
 
-if (defined $binaryCacheURL) {
+die "$0: package does not supply a binary cache\n" unless defined $binaryCacheURL;
 
-    push @extraNixEnvArgs, "--option", "extra-binary-caches", $binaryCacheURL;
-
-} else {
-
-    # Store the manifest in the temporary directory so that we don't
-    # pollute /nix/var/nix/manifests.  This also requires that we
-    # don't use the Nix daemon (because otherwise
-    # download-using-manifests won't see our NIX_MANIFESTS_DIRS
-    # environment variable).
-    $ENV{NIX_MANIFESTS_DIR} = $tmpDir;
-    $ENV{NIX_REMOTE} = "";
-
-    print "\nPulling manifests...\n";
-    system("$Nix::Config::binDir/nix-pull", $manifestURL) == 0
-        or barf "nix-pull failed: $?";
-
-}
+push @extraNixEnvArgs, "--option", "extra-binary-caches", $binaryCacheURL;
 
 
 print "\nInstalling package...\n";

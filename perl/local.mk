@@ -1,7 +1,6 @@
 nix_perl_sources := \
   $(d)/lib/Nix/Store.pm \
   $(d)/lib/Nix/Manifest.pm \
-  $(d)/lib/Nix/GeneratePatches.pm \
   $(d)/lib/Nix/SSH.pm \
   $(d)/lib/Nix/CopyClosure.pm \
   $(d)/lib/Nix/Config.pm.in \

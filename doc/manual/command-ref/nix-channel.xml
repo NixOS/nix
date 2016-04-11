@@ -73,11 +73,10 @@ condition="manual">See also <xref linkend="sec-channels"
 
     <listitem><para>Downloads the Nix expressions of all subscribed
     channels (or only those included in
-    <replaceable>names</replaceable> if specified), makes them the
+    <replaceable>names</replaceable> if specified) and makes them the
     default for <command>nix-env</command> operations (by symlinking
-    them from the directory <filename>~/.nix-defexpr</filename>), and
-    performs a <command>nix-pull</command> on the manifests of all
-    channels to make pre-built binaries available.</para></listitem>
+    them from the directory
+    <filename>~/.nix-defexpr</filename>).</para></listitem>
 
   </varlistentry>
 
@@ -184,16 +183,6 @@ following files:</para>
     to the channels of non-root users are ignored. Binary caches can
     be created and maintained using
     <command>nix-push</command>.</para></listitem>
-
-  </varlistentry>
-
-  <varlistentry><term><filename>MANIFEST.bz2</filename></term>
-
-    <listitem><para>(Deprecated in favour of binary caches.) A
-    manifest as created by <command>nix-push</command>. Only used if
-    <filename>binary-cache-url</filename> is not present or if the
-    <filename>nix.conf</filename> option
-    <option>force-manifest</option> is set.</para></listitem>
 
   </varlistentry>
 

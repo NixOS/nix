@@ -1,7 +1,6 @@
 source common.sh
 
 clearProfiles
-clearManifests
 
 rm -f $TEST_ROOT/.nix-channels
 
@@ -45,7 +44,6 @@ nix-env -i dependencies
 
 
 clearProfiles
-clearManifests
 rm -f $TEST_ROOT/.nix-channels
 
 # Test updating from a tarball

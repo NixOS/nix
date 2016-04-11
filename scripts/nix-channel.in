@@ -12,8 +12,6 @@ binmode STDERR, ":encoding(utf8)";
 
 Nix::Config::readConfig;
 
-my $manifestDir = $Nix::Config::manifestDir;
-
 
 # Turn on caching in nix-prefetch-url.
 my $channelCache = "$Nix::Config::stateDir/channel-cache";
@@ -75,7 +73,6 @@ sub removeChannel {
     my ($name) = @_;
     readChannels;
     my $url = $channels{$name};
-    deleteOldManifests($url . "/MANIFEST", undef) if defined $url;
     delete $channels{$name};
     writeChannels;
 
@@ -84,8 +81,7 @@ sub removeChannel {
 }
 
 
-# Fetch Nix expressions and pull manifests from the subscribed
-# channels.
+# Fetch Nix expressions and binary cache URLs from the subscribed channels.
 sub update {
     my @channelNames = @_;
 
@@ -97,7 +93,6 @@ sub update {
         next if scalar @channelNames > 0 && ! grep { $_ eq $name } @{channelNames};
 
         my $url = $channels{$name};
-        my $origUrl = "$url/MANIFEST";
 
         # We want to download the url to a file to see if it's a tarball while also checking if we
         # got redirected in the process, so that we can grab the various parts of a nix channel
@@ -132,22 +127,8 @@ sub update {
         if ($ret != 0) {
             # Check if the channel advertises a binary cache.
             my $binaryCacheURL = `$Nix::Config::curl --silent '$url'/binary-cache-url`;
-            my $getManifest = ($Nix::Config::config{"force-manifest"} // "false") eq "true";
-            if ($? == 0 && $binaryCacheURL ne "") {
-                $extraAttrs .= "binaryCacheURL = \"$binaryCacheURL\"; ";
-                deleteOldManifests($origUrl, undef);
-            } else {
-                $getManifest = 1;
-            }
-
-            if ($getManifest) {
-                # No binary cache, so pull the channel manifest.
-                mkdir $manifestDir, 0755 unless -e $manifestDir;
-                die "$0: you do not have write permission to ‘$manifestDir’!\n" unless -W $manifestDir;
-                $ENV{'NIX_ORIG_URL'} = $origUrl;
-                system("$Nix::Config::binDir/nix-pull", "--skip-wrong-store", "$url/MANIFEST") == 0
-                    or die "cannot pull manifest from ‘$url’\n";
-            }
+            $extraAttrs .= "binaryCacheURL = \"$binaryCacheURL\"; "
+                if $? == 0 && $binaryCacheURL ne "";
 
             # Download the channel tarball.
             my $fullURL = "$url/nixexprs.tar.xz";

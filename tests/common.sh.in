@@ -54,10 +54,6 @@ clearStore() {
     rm -f "$NIX_STATE_DIR"/gcroots/ref
 }
 
-clearManifests() {
-    rm -f $NIX_STATE_DIR/manifests/*
-}
-
 clearCache() {
     rm -rf "$cacheDir"
 }

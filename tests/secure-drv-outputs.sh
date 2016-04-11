@@ -5,7 +5,6 @@
 source common.sh
 
 clearStore
-clearManifests
 
 startDaemon
 
