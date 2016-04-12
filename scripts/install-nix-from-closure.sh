@@ -68,11 +68,6 @@ if ! $nix/bin/nix-store --load-db < $self/.reginfo; then
     exit 1
 fi
 
-if ! $nix/bin/nix-store --verify; then
-    echo "$0: store verification failed! Consider deleting /nix and starting over" >&2
-    exit 1
-fi
-
 . $nix/etc/profile.d/nix.sh
 
 if ! $nix/bin/nix-env -i "$nix"; then
