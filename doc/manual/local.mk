@@ -76,17 +76,3 @@ all: $(d)/manual.html
 clean-files += $(d)/manual.html
 
 dist-files += $(d)/manual.html
-
-
-# Generate the PDF manual.
-$(d)/manual.pdf: $(d)/manual.xml $(MANUAL_SRCS) $(d)/manual.is-valid
-	$(trace-gen) if test "$(dblatex)" != ""; then \
-		cd doc/manual && $(XSLTPROC) --xinclude --stringparam profile.condition manual \
-		  $(docbookxsl)/profiling/profile.xsl manual.xml | \
-		  $(dblatex) -o $(notdir $@) $(dblatex_opts) -; \
-	else \
-		echo "Please install dblatex and rerun configure."; \
-		exit 1; \
-	fi
-
-clean-files += $(d)/manual.pdf
