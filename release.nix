@@ -25,7 +25,7 @@ let
 
         buildInputs =
           [ curl bison flex perl libxml2 libxslt bzip2 xz
-            dblatex (dblatex.tex or tetex) nukeReferences pkgconfig sqlite libsodium
+            pkgconfig sqlite libsodium
             docbook5 docbook5_xsl
           ] ++ lib.optional stdenv.isLinux libseccomp
           ++ lib.optional (!lib.inNixShell) git;
@@ -58,20 +58,7 @@ let
 
         preDist = ''
           make install docdir=$out/share/doc/nix makefiles=doc/manual/local.mk
-
-          make doc/manual/manual.pdf
-          cp doc/manual/manual.pdf $out/manual.pdf
-
-          # The PDF containes filenames of included graphics (see
-          # http://www.tug.org/pipermail/pdftex/2007-August/007290.html).
-          # This causes a retained dependency on dblatex, which Hydra
-          # doesn't like (the output of the tarball job is distributed
-          # to Windows and Macs, so there should be no Linux binaries
-          # in the closure).
-          nuke-refs $out/manual.pdf
-
           echo "doc manual $out/share/doc/nix/manual" >> $out/nix-support/hydra-build-products
-          echo "doc-pdf manual $out/manual.pdf" >> $out/nix-support/hydra-build-products
         '';
       };
 
