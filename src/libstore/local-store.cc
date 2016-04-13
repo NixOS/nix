@@ -10,6 +10,7 @@
 #include <iostream>
 #include <algorithm>
 #include <cstring>
+#include <atomic>
 
 #include <sys/types.h>
 #include <sys/stat.h>
