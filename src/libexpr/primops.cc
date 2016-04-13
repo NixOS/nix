@@ -10,6 +10,7 @@
 #include "util.hh"
 #include "value-to-json.hh"
 #include "value-to-xml.hh"
+#include "primops.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -1725,6 +1726,16 @@ static void prim_fetchTarball(EvalState & state, const Pos & pos, Value * * args
  *************************************************************/
 
 
+RegisterPrimOp::PrimOps * RegisterPrimOp::primOps;
+
+
+RegisterPrimOp::RegisterPrimOp(std::string name, size_t arity, PrimOpFun fun)
+{
+    if (!primOps) primOps = new PrimOps;
+    primOps->emplace_back(name, arity, fun);
+}
+
+
 void EvalState::createBaseEnv()
 {
     baseEnv.up = 0;
@@ -1888,6 +1899,10 @@ void EvalState::createBaseEnv()
         v2->attrs->sort();
     }
     addConstant("__nixPath", v);
+
+    if (RegisterPrimOp::primOps)
+        for (auto & primOp : *RegisterPrimOp::primOps)
+            addPrimOp(std::get<0>(primOp), std::get<1>(primOp), std::get<2>(primOp));
 
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */

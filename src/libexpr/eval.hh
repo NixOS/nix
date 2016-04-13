@@ -26,9 +26,9 @@ typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, 
 struct PrimOp
 {
     PrimOpFun fun;
-    unsigned int arity;
+    size_t arity;
     Symbol name;
-    PrimOp(PrimOpFun fun, unsigned int arity, Symbol name)
+    PrimOp(PrimOpFun fun, size_t arity, Symbol name)
         : fun(fun), arity(arity), name(name) { }
 };
 
