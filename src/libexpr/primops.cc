@@ -1785,6 +1785,24 @@ static void prim_fetchTarball(EvalState & state, const Pos & pos, Value * * args
     fetch(state, pos, args, v, "fetchTarball", true);
 }
 
+#if __APPLE__
+/*************************************************************
+ * Xcode integration
+ *************************************************************/
+
+static char * lookupXcodeVersion()
+{
+    // TODO: implement this
+    return "10.11";
+}
+
+static char * lookupSDKRoot()
+{
+    // see above
+    return "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk";
+}
+
+#endif
 
 /*************************************************************
  * Primop registration
@@ -1970,6 +1988,15 @@ void EvalState::createBaseEnv()
     if (RegisterPrimOp::primOps)
         for (auto & primOp : *RegisterPrimOp::primOps)
             addPrimOp(std::get<0>(primOp), std::get<1>(primOp), std::get<2>(primOp));
+
+#if __APPLE__
+    // Xcode integration
+    mkString(v, lookupXcodeVersion());
+    addConstant("__xcodeVersion", v);
+
+    mkString(v, lookupSDKRoot());
+    addConstant("__xcodeSDKRoot", v);
+#endif
 
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */
