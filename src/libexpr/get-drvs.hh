@@ -42,7 +42,8 @@ public:
     string queryDrvPath();
     string queryOutPath();
     string queryOutputName();
-    Outputs queryOutputs();
+    /** Return the list of outputs. The "outputs to install" are determined by `mesa.outputsToInstall`. */
+    Outputs queryOutputs(bool onlyOutputsToInstall = false);
 
     StringSet queryMetaNames();
     Value * queryMeta(const string & name);
