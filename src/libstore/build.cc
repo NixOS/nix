@@ -22,6 +22,7 @@
 #include <sys/stat.h>
 #include <sys/utsname.h>
 #include <sys/select.h>
+#include <sys/resource.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -2372,6 +2373,12 @@ void DerivationGoal::runChild()
         int cur = personality(0xffffffff);
         if (cur != -1) personality(cur | ADDR_NO_RANDOMIZE);
 #endif
+
+        /* Disable core dumps by default. */
+        struct rlimit limit = { 0, RLIM_INFINITY };
+        setrlimit(RLIMIT_CORE, &limit);
+
+        // FIXME: set other limits to deterministic values?
 
         /* Fill in the environment. */
         Strings envStrs;
