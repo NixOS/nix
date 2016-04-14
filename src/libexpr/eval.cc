@@ -273,7 +273,7 @@ EvalState::EvalState(const Strings & _searchPath)
 
     /* Initialise the Nix expression search path. */
     Strings paths = parseNixPath(getEnv("NIX_PATH", ""));
-    for (auto & i : _searchPath) addToSearchPath(i, true);
+    for (auto & i : _searchPath) addToSearchPath(i);
     for (auto & i : paths) addToSearchPath(i);
     addToSearchPath("nix=" + settings.nixDataDir + "/nix/corepkgs");
 
@@ -296,11 +296,15 @@ Path EvalState::checkSourcePath(const Path & path_)
     if (!restricted) return path_;
 
     /* Resolve symlinks. */
+    debug(format("checking access to ‘%s’") % path_);
     Path path = canonPath(path_, true);
 
-    for (auto & i : searchPath)
-        if (path == i.second || isInDir(path, i.second))
+    for (auto & i : searchPath) {
+        auto r = resolveSearchPathElem(i);
+        if (!r.first) continue;
+        if (path == r.second || isInDir(path, r.second))
             return path;
+    }
 
     /* To support import-from-derivation, allow access to anything in
        the store. FIXME: only allow access to paths that have been

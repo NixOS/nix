@@ -590,7 +590,7 @@ Expr * EvalState::parseExprFromString(const string & s, const Path & basePath)
 }
 
 
-void EvalState::addToSearchPath(const string & s, bool warn)
+void EvalState::addToSearchPath(const string & s)
 {
     size_t pos = s.find('=');
     string prefix;
@@ -602,16 +602,7 @@ void EvalState::addToSearchPath(const string & s, bool warn)
         path = string(s, pos + 1);
     }
 
-    if (isUri(path))
-        path = downloadFileCached(path, true);
-
-    path = absPath(path);
-    if (pathExists(path)) {
-        debug(format("adding path ‘%1%’ to the search path") % path);
-        /* Resolve symlinks in the path to support restricted mode. */
-        searchPath.push_back(std::pair<string, Path>(prefix, canonPath(path, true)));
-    } else if (warn)
-        printMsg(lvlError, format("warning: Nix search path entry ‘%1%’ does not exist, ignoring") % path);
+    searchPath.emplace_back(prefix, path);
 }
 
 
@@ -624,17 +615,19 @@ Path EvalState::findFile(const string & path)
 Path EvalState::findFile(SearchPath & searchPath, const string & path, const Pos & pos)
 {
     for (auto & i : searchPath) {
-        assert(!isUri(i.second));
-        Path res;
+        std::string suffix;
         if (i.first.empty())
-            res = i.second + "/" + path;
+            suffix = "/" + path;
         else {
-            if (path.compare(0, i.first.size(), i.first) != 0 ||
-                (path.size() > i.first.size() && path[i.first.size()] != '/'))
+            auto s = i.first.size();
+            if (path.compare(0, s, i.first) != 0 ||
+                (path.size() > s && path[s] != '/'))
                 continue;
-            res = i.second +
-                (path.size() == i.first.size() ? "" : "/" + string(path, i.first.size()));
+            suffix = path.size() == s ? "" : "/" + string(path, s);
         }
+        auto r = resolveSearchPathElem(i);
+        if (!r.first) continue;
+        Path res = r.second + suffix;
         if (pathExists(res)) return canonPath(res);
     }
     format f = format(
@@ -642,6 +635,37 @@ Path EvalState::findFile(SearchPath & searchPath, const string & path, const Pos
         + string(pos ? ", at %2%" : ""));
     f.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
     throw ThrownError(f % path % pos);
+}
+
+
+std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathElem & elem)
+{
+    auto i = searchPathResolved.find(elem.second);
+    if (i != searchPathResolved.end()) return i->second;
+
+    std::pair<bool, std::string> res;
+
+    if (isUri(elem.second)) {
+        try {
+            res = { true, downloadFileCached(elem.second, true) };
+        } catch (DownloadError & e) {
+            printMsg(lvlError, format("warning: Nix search path entry ‘%1%’ cannot be downloaded, ignoring") % elem.second);
+            res = { false, "" };
+        }
+    } else {
+        auto path = absPath(elem.second);
+        if (pathExists(path))
+            res = { true, path };
+        else {
+            printMsg(lvlError, format("warning: Nix search path entry ‘%1%’ does not exist, ignoring") % elem.second);
+            res = { false, "" };
+        }
+    }
+
+    debug(format("resolved search path element ‘%s’ to ‘%s’") % elem.second % res.second);
+
+    searchPathResolved[elem.second] = res;
+    return res;
 }
 
 

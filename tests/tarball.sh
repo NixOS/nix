@@ -20,4 +20,10 @@ nix-build file://$tarball
 
 nix-build '<foo>' -I foo=file://$tarball
 
-nix-build -E "import (fetchTarball file://$tarball)"
+nix-build -o $TMPDIR/result -E "import (fetchTarball file://$tarball)"
+
+nix-instantiate --eval -E '1 + 2' -I fnord=file://no-such-tarball.tar.xz
+nix-instantiate --eval -E 'with <fnord/xyzzy>; 1 + 2' -I fnord=file://no-such-tarball.tar.xz
+(! nix-instantiate --eval -E '<fnord/xyzzy> 1' -I fnord=file://no-such-tarball.tar.xz)
+
+nix-instantiate --eval -E '<fnord/config.nix>' -I fnord=file://no-such-tarball.tar.xz -I fnord=.
