@@ -73,18 +73,28 @@ StorePathsCommand::StorePathsCommand()
 {
     expectArgs("paths", &storePaths);
     mkFlag('r', "recursive", "apply operation to closure of the specified paths", &recursive);
+    mkFlag(0, "all", "apply operation to the entire store", &all);
 }
 
 void StorePathsCommand::run(ref<Store> store)
 {
-    for (auto & storePath : storePaths)
-        storePath = followLinksToStorePath(storePath);
+    if (all) {
+        if (storePaths.size())
+            throw UsageError("‘--all’ does not expect arguments");
+        for (auto & p : store->queryAllValidPaths())
+            storePaths.push_back(p);
+    }
 
-    if (recursive) {
-        PathSet closure;
+    else {
         for (auto & storePath : storePaths)
-            store->computeFSClosure(storePath, closure, false, false);
-        storePaths = store->topoSortPaths(closure);
+            storePath = followLinksToStorePath(storePath);
+
+        if (recursive) {
+            PathSet closure;
+            for (auto & storePath : storePaths)
+                store->computeFSClosure(storePath, closure, false, false);
+            storePaths = store->topoSortPaths(closure);
+        }
     }
 
     run(store, storePaths);

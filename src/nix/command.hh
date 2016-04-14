@@ -31,6 +31,7 @@ private:
 
     Paths storePaths;
     bool recursive = false;
+    bool all = false;
 
 public:
 

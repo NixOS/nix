@@ -10,14 +10,14 @@
 
 using namespace nix;
 
-struct MixVerify : virtual Args
+struct CmdVerify : StorePathsCommand
 {
     bool noContents = false;
     bool noTrust = false;
     Strings substituterUris;
     size_t sigsNeeded;
 
-    MixVerify()
+    CmdVerify()
     {
         mkFlag(0, "no-contents", "do not verify the contents of each store path", &noContents);
         mkFlag(0, "no-trust", "do not verify whether each store path is trusted", &noTrust);
@@ -26,7 +26,17 @@ struct MixVerify : virtual Args
         mkIntFlag('n', "sigs-needed", "require that each path has at least N valid signatures", &sigsNeeded);
     }
 
-    void verifyPaths(ref<Store> store, const Paths & storePaths)
+    std::string name() override
+    {
+        return "verify";
+    }
+
+    std::string description() override
+    {
+        return "verify the integrity of store paths";
+    }
+
+    void run(ref<Store> store, Paths storePaths) override
     {
         restoreAffinity(); // FIXME
 
@@ -158,54 +168,4 @@ struct MixVerify : virtual Args
     }
 };
 
-struct CmdVerifyPaths : StorePathsCommand, MixVerify
-{
-    CmdVerifyPaths()
-    {
-    }
-
-    std::string name() override
-    {
-        return "verify-paths";
-    }
-
-    std::string description() override
-    {
-        return "verify the integrity of store paths";
-    }
-
-    void run(ref<Store> store, Paths storePaths) override
-    {
-        verifyPaths(store, storePaths);
-    }
-};
-
-static RegisterCommand r1(make_ref<CmdVerifyPaths>());
-
-struct CmdVerifyStore : StoreCommand, MixVerify
-{
-    CmdVerifyStore()
-    {
-    }
-
-    std::string name() override
-    {
-        return "verify-store";
-    }
-
-    std::string description() override
-    {
-        return "verify the integrity of all paths in the Nix store";
-    }
-
-    void run(ref<Store> store) override
-    {
-        // FIXME: use store->verifyStore()?
-
-        PathSet validPaths = store->queryAllValidPaths();
-
-        verifyPaths(store, Paths(validPaths.begin(), validPaths.end()));
-    }
-};
-
-static RegisterCommand r2(make_ref<CmdVerifyStore>());
+static RegisterCommand r1(make_ref<CmdVerify>());
