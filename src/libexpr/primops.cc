@@ -778,7 +778,6 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
 
     SearchPath searchPath;
 
-    PathSet context;
     for (unsigned int n = 0; n < args[0]->listSize(); ++n) {
         Value & v2(*args[0]->listElems()[n]);
         state.forceAttrs(v2, pos);
@@ -791,21 +790,23 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
         i = v2.attrs->find(state.symbols.create("path"));
         if (i == v2.attrs->end())
             throw EvalError(format("attribute ‘path’ missing, at %1%") % pos);
-        string path = state.coerceToPath(pos, *i->value, context);
 
-        searchPath.push_back(std::pair<string, Path>(prefix, state.checkSourcePath(path)));
+        PathSet context;
+        string path = state.coerceToString(pos, *i->value, context, false, false);
+
+        try {
+            state.realiseContext(context);
+        } catch (InvalidPathError & e) {
+            throw EvalError(format("cannot find ‘%1%’, since path ‘%2%’ is not valid, at %3%")
+                % path % e.path % pos);
+        }
+
+        searchPath.emplace_back(prefix, path);
     }
 
     string path = state.forceStringNoCtx(*args[1], pos);
 
-    try {
-        state.realiseContext(context);
-    } catch (InvalidPathError & e) {
-        throw EvalError(format("cannot find ‘%1%’, since path ‘%2%’ is not valid, at %3%")
-            % path % e.path % pos);
-    }
-
-    mkPath(v, state.findFile(searchPath, path, pos).c_str());
+    mkPath(v, state.checkSourcePath(state.findFile(searchPath, path, pos)).c_str());
 }
 
 /* Read a directory (without . or ..) */

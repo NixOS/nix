@@ -56,7 +56,8 @@ typedef std::map<Path, Path> SrcToStore;
 std::ostream & operator << (std::ostream & str, const Value & v);
 
 
-typedef list<std::pair<string, Path> > SearchPath;
+typedef std::pair<std::string, std::string> SearchPathElem;
+typedef std::list<SearchPathElem> SearchPath;
 
 
 /* Initialise the Boehm GC, if applicable. */
@@ -98,12 +99,14 @@ private:
 
     SearchPath searchPath;
 
+    std::map<std::string, std::pair<bool, std::string>> searchPathResolved;
+
 public:
 
     EvalState(const Strings & _searchPath, ref<Store> store);
     ~EvalState();
 
-    void addToSearchPath(const string & s, bool warn = false);
+    void addToSearchPath(const string & s);
 
     Path checkSourcePath(const Path & path);
 
@@ -124,6 +127,9 @@ public:
     /* Look up a file in the search path. */
     Path findFile(const string & path);
     Path findFile(SearchPath & searchPath, const string & path, const Pos & pos = noPos);
+
+    /* If the specified search path element is a URI, download it. */
+    std::pair<bool, std::string> resolveSearchPathElem(const SearchPathElem & elem);
 
     /* Evaluate an expression to normal form, storing the result in
        value `v'. */
