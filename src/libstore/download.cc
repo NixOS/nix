@@ -18,6 +18,14 @@ double getTime()
     return tv.tv_sec + (tv.tv_usec / 1000000.0);
 }
 
+std::string resolveUri(const std::string & uri)
+{
+    if (uri.compare(0, 8, "channel:") == 0)
+        return "https://nixos.org/channels/" + std::string(uri, 8) + "/nixexprs.tar.xz";
+    else
+        return uri;
+}
+
 struct CurlDownloader : public Downloader
 {
     CURL * curl;
@@ -197,7 +205,7 @@ struct CurlDownloader : public Downloader
     DownloadResult download(string url, const DownloadOptions & options) override
     {
         DownloadResult res;
-        if (fetch(url, options)) {
+        if (fetch(resolveUri(url), options)) {
             res.cached = false;
             res.data = data;
         } else
@@ -207,15 +215,15 @@ struct CurlDownloader : public Downloader
     }
 };
 
-
 ref<Downloader> makeDownloader()
 {
     return make_ref<CurlDownloader>();
 }
 
-
-Path Downloader::downloadCached(ref<Store> store, const string & url, bool unpack)
+Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpack)
 {
+    auto url = resolveUri(url_);
+
     Path cacheDir = getEnv("XDG_CACHE_HOME", getEnv("HOME", "") + "/.cache") + "/nix/tarballs";
     createDirs(cacheDir);
 
@@ -300,10 +308,11 @@ Path Downloader::downloadCached(ref<Store> store, const string & url, bool unpac
 
 bool isUri(const string & s)
 {
+    if (s.compare(0, 8, "channel:") == 0) return true;
     size_t pos = s.find("://");
     if (pos == string::npos) return false;
     string scheme(s, 0, pos);
-    return scheme == "http" || scheme == "https" || scheme == "file";
+    return scheme == "http" || scheme == "https" || scheme == "file" || scheme == "channel";
 }
 
 
