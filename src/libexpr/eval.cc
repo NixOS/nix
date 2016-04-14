@@ -5,6 +5,7 @@
 #include "derivations.hh"
 #include "globals.hh"
 #include "eval-inline.hh"
+#include "download.hh"
 
 #include <algorithm>
 #include <cstring>
@@ -238,12 +239,38 @@ void initGC()
 
 /* Very hacky way to parse $NIX_PATH, which is colon-separated, but
    can contain URLs (e.g. "nixpkgs=https://bla...:foo=https://"). */
-static Strings parseNixPath(const string & in)
+static Strings parseNixPath(const string & s)
 {
-    string marker = "\001//";
-    auto res = tokenizeString<Strings>(replaceStrings(in, "://", marker), ":");
-    for (auto & s : res)
-        s = replaceStrings(s, marker, "://");
+    Strings res;
+
+    auto p = s.begin();
+
+    while (p != s.end()) {
+        auto start = p;
+        auto start2 = p;
+
+        while (p != s.end() && *p != ':') {
+            if (*p == '=') start2 = p + 1;
+            ++p;
+        }
+
+        if (p == s.end()) {
+            if (p != start) res.push_back(std::string(start, p));
+            break;
+        }
+
+        if (*p == ':') {
+            if (isUri(std::string(start2, s.end()))) {
+                ++p;
+                while (p != s.end() && *p != ':') ++p;
+            }
+            res.push_back(std::string(start, p));
+            if (p == s.end()) break;
+        }
+
+        ++p;
+    }
+
     return res;
 }
 
