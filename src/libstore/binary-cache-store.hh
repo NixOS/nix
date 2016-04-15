@@ -24,7 +24,7 @@ private:
 
     struct State
     {
-        LRUCache<Path, ref<NarInfo>> narInfoCache{32 * 1024};
+        LRUCache<Path, std::shared_ptr<NarInfo>> narInfoCache{32 * 1024};
     };
 
     Sync<State> state;
@@ -51,6 +51,7 @@ public:
     {
         std::atomic<uint64_t> narInfoRead{0};
         std::atomic<uint64_t> narInfoReadAverted{0};
+        std::atomic<uint64_t> narInfoMissing{0};
         std::atomic<uint64_t> narInfoWrite{0};
         std::atomic<uint64_t> narInfoCacheSize{0};
         std::atomic<uint64_t> narRead{0};

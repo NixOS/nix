@@ -114,14 +114,22 @@ NarInfo BinaryCacheStore::readNarInfo(const Path & storePath)
         auto res = state_->narInfoCache.get(storePath);
         if (res) {
             stats.narInfoReadAverted++;
+            if (!*res)
+                throw InvalidPath(format("path ‘%s’ is not valid") % storePath);
             return **res;
         }
     }
 
     auto narInfoFile = narInfoFileFor(storePath);
     auto data = getFile(narInfoFile);
-    if (!data)
+    if (!data) {
+        stats.narInfoMissing++;
+        auto state_(state.lock());
+        state_->narInfoCache.upsert(storePath, 0);
+        stats.narInfoCacheSize = state_->narInfoCache.size();
         throw InvalidPath(format("path ‘%s’ is not valid") % storePath);
+    }
+
     auto narInfo = make_ref<NarInfo>(*data, narInfoFile);
     if (narInfo->path != storePath)
         throw Error(format("NAR info file for store path ‘%1%’ does not match ‘%2%’") % narInfo->path % storePath);
@@ -149,7 +157,7 @@ bool BinaryCacheStore::isValidPath(const Path & storePath)
         auto res = state_->narInfoCache.get(storePath);
         if (res) {
             stats.narInfoReadAverted++;
-            return true;
+            return *res != 0;
         }
     }
 
