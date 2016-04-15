@@ -24,7 +24,7 @@ private:
 
     struct State
     {
-        LRUCache<Path, std::shared_ptr<NarInfo>> narInfoCache{32 * 1024};
+        LRUCache<Path, std::shared_ptr<NarInfo>> narInfoCache{64 * 1024};
     };
 
     Sync<State> state;
