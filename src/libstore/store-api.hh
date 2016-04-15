@@ -511,6 +511,7 @@ ValidPathInfo decodeValidPathInfo(std::istream & str,
 
 MakeError(SubstError, Error)
 MakeError(BuildError, Error) /* denotes a permanent build failure */
+MakeError(InvalidPath, Error)
 
 
 }

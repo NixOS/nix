@@ -22,7 +22,7 @@ protected:
 
     void upsertFile(const std::string & path, const std::string & data) override;
 
-    std::string getFile(const std::string & path) override;
+    std::shared_ptr<std::string> getFile(const std::string & path) override;
 
 };
 
@@ -59,9 +59,14 @@ void LocalBinaryCacheStore::upsertFile(const std::string & path, const std::stri
     atomicWrite(binaryCacheDir + "/" + path, data);
 }
 
-std::string LocalBinaryCacheStore::getFile(const std::string & path)
+std::shared_ptr<std::string> LocalBinaryCacheStore::getFile(const std::string & path)
 {
-    return readFile(binaryCacheDir + "/" + path);
+    try {
+        return std::make_shared<std::string>(readFile(binaryCacheDir + "/" + path));
+    } catch (SysError & e) {
+        if (e.errNo == ENOENT) return 0;
+        throw;
+    }
 }
 
 ref<Store> openLocalBinaryCacheStore(std::shared_ptr<Store> localStore,

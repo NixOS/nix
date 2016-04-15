@@ -39,7 +39,9 @@ protected:
 
     virtual void upsertFile(const std::string & path, const std::string & data) = 0;
 
-    virtual std::string getFile(const std::string & path) = 0;
+    /* Return the contents of the specified file, or null if it
+       doesn't exist. */
+    virtual std::shared_ptr<std::string> getFile(const std::string & path) = 0;
 
 public:
 

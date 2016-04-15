@@ -119,7 +119,10 @@ NarInfo BinaryCacheStore::readNarInfo(const Path & storePath)
     }
 
     auto narInfoFile = narInfoFileFor(storePath);
-    auto narInfo = make_ref<NarInfo>(getFile(narInfoFile), narInfoFile);
+    auto data = getFile(narInfoFile);
+    if (!data)
+        throw InvalidPath(format("path ‘%s’ is not valid") % storePath);
+    auto narInfo = make_ref<NarInfo>(*data, narInfoFile);
     if (narInfo->path != storePath)
         throw Error(format("NAR info file for store path ‘%1%’ does not match ‘%2%’") % narInfo->path % storePath);
 
@@ -162,25 +165,27 @@ void BinaryCacheStore::narFromPath(const Path & storePath, Sink & sink)
 
     auto nar = getFile(res.url);
 
+    if (!nar) throw Error(format("file ‘%s’ missing from binary cache") % res.url);
+
     stats.narRead++;
-    stats.narReadCompressedBytes += nar.size();
+    stats.narReadCompressedBytes += nar->size();
 
     /* Decompress the NAR. FIXME: would be nice to have the remote
        side do this. */
     if (res.compression == "none")
         ;
     else if (res.compression == "xz")
-        nar = decompressXZ(nar);
+        nar = decompressXZ(*nar);
     else
         throw Error(format("unknown NAR compression type ‘%1%’") % nar);
 
-    stats.narReadBytes += nar.size();
+    stats.narReadBytes += nar->size();
 
-    printMsg(lvlTalkative, format("exporting path ‘%1%’ (%2% bytes)") % storePath % nar.size());
+    printMsg(lvlTalkative, format("exporting path ‘%1%’ (%2% bytes)") % storePath % nar->size());
 
-    assert(nar.size() % 8 == 0);
+    assert(nar->size() % 8 == 0);
 
-    sink((unsigned char *) nar.c_str(), nar.size());
+    sink((unsigned char *) nar->c_str(), nar->size());
 }
 
 void BinaryCacheStore::exportPath(const Path & storePath, bool sign, Sink & sink)

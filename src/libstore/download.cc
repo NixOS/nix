@@ -29,7 +29,7 @@ std::string resolveUri(const std::string & uri)
 struct CurlDownloader : public Downloader
 {
     CURL * curl;
-    string data;
+    ref<std::string> data;
     string etag, status, expectedETag;
 
     struct curl_slist * requestHeaders;
@@ -41,7 +41,7 @@ struct CurlDownloader : public Downloader
     size_t writeCallback(void * contents, size_t size, size_t nmemb)
     {
         size_t realSize = size * nmemb;
-        data.append((char *) contents, realSize);
+        data->append((char *) contents, realSize);
         return realSize;
     }
 
@@ -110,6 +110,7 @@ struct CurlDownloader : public Downloader
     }
 
     CurlDownloader()
+        : data(make_ref<std::string>())
     {
         requestHeaders = 0;
 
@@ -156,7 +157,7 @@ struct CurlDownloader : public Downloader
             curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0);
         }
 
-        data.clear();
+        data->clear();
 
         if (requestHeaders) {
             curl_slist_free_all(requestHeaders);
@@ -269,7 +270,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
             auto res = download(url, options);
 
             if (!res.cached)
-                storePath = store->addTextToStore(name, res.data, PathSet(), false);
+                storePath = store->addTextToStore(name, *res.data, PathSet(), false);
 
             assert(!storePath.empty());
             replaceSymlink(storePath, fileLink);

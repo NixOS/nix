@@ -162,7 +162,7 @@ int main(int argc, char * * argv)
 
             AutoDelete tmpDir(createTempDir(), true);
             Path tmpFile = (Path) tmpDir + "/tmp";
-            writeFile(tmpFile, result.data);
+            writeFile(tmpFile, *result.data);
 
             /* Optionally unpack the file. */
             if (unpack) {
@@ -186,7 +186,7 @@ int main(int argc, char * * argv)
 
             /* FIXME: inefficient; addToStore() will also hash
                this. */
-            hash = unpack ? hashPath(ht, tmpFile).first : hashString(ht, result.data);
+            hash = unpack ? hashPath(ht, tmpFile).first : hashString(ht, *result.data);
 
             if (expectedHash != Hash(ht) && expectedHash != hash)
                 throw Error(format("hash mismatch for ‘%1%’") % uri);

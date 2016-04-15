@@ -20,6 +20,7 @@ void builtinFetchurl(const BasicDerivation & drv)
     options.showProgress = DownloadOptions::yes;
 
     auto data = makeDownloader()->download(url->second, options);
+    assert(data.data);
 
     auto out = drv.env.find("out");
     if (out == drv.env.end()) throw Error("attribute ‘url’ missing");
@@ -29,12 +30,12 @@ void builtinFetchurl(const BasicDerivation & drv)
 
     auto unpack = drv.env.find("unpack");
     if (unpack != drv.env.end() && unpack->second == "1") {
-        if (string(data.data, 0, 6) == string("\xfd" "7zXZ\0", 6))
-            data.data = decompressXZ(data.data);
-        StringSource source(data.data);
+        if (string(*data.data, 0, 6) == string("\xfd" "7zXZ\0", 6))
+            data.data = decompressXZ(*data.data);
+        StringSource source(*data.data);
         restorePath(storePath, source);
     } else
-        writeFile(storePath, data.data);
+        writeFile(storePath, *data.data);
 
     auto executable = drv.env.find("executable");
     if (executable != drv.env.end() && executable->second == "1") {

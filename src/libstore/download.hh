@@ -17,7 +17,8 @@ struct DownloadOptions
 struct DownloadResult
 {
     bool cached;
-    string data, etag;
+    string etag;
+    std::shared_ptr<std::string> data;
 };
 
 class Store;

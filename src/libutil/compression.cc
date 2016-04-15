@@ -55,7 +55,7 @@ std::string compressXZ(const std::string & in)
     }
 }
 
-std::string decompressXZ(const std::string & in)
+ref<std::string> decompressXZ(const std::string & in)
 {
     LzmaStream strm;
 
@@ -66,7 +66,7 @@ std::string decompressXZ(const std::string & in)
 
     lzma_action action = LZMA_RUN;
     uint8_t outbuf[BUFSIZ];
-    string res;
+    ref<std::string> res = make_ref<std::string>();
     strm().next_in = (uint8_t *) in.c_str();
     strm().avail_in = in.size();
     strm().next_out = outbuf;
@@ -80,7 +80,7 @@ std::string decompressXZ(const std::string & in)
         lzma_ret ret = lzma_code(&strm(), action);
 
         if (strm().avail_out == 0 || ret == LZMA_STREAM_END) {
-            res.append((char *) outbuf, sizeof(outbuf) - strm().avail_out);
+            res->append((char *) outbuf, sizeof(outbuf) - strm().avail_out);
             strm().next_out = outbuf;
             strm().avail_out = sizeof(outbuf);
         }
