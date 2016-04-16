@@ -2775,14 +2775,25 @@ void DerivationGoal::registerOutputs()
             } else
                 used = references;
 
+            PathSet badPaths;
+
             for (auto & i : used)
                 if (allowed) {
                     if (spec.find(i) == spec.end())
-                        throw BuildError(format("output ‘%1%’ is not allowed to refer to path ‘%2%’") % actualPath % i);
+                        badPaths.insert(i);
                 } else {
                     if (spec.find(i) != spec.end())
-                        throw BuildError(format("output ‘%1%’ is not allowed to refer to path ‘%2%’") % actualPath % i);
+                        badPaths.insert(i);
                 }
+
+            if (!badPaths.empty()) {
+                string badPathsStr;
+                for (auto & i : badPaths) {
+                    badPathsStr += "\n\t";
+                    badPathsStr += i;
+                }
+                throw BuildError(format("output ‘%1%’ is not allowed to refer to the following paths:%2%") % actualPath % badPathsStr);
+            }
         };
 
         checkRefs("allowedReferences", true, false);
