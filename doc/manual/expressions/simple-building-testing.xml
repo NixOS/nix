@@ -7,15 +7,14 @@
 <title>Building and Testing</title>
 
 <para>You can now try to build Hello.  Of course, you could do
-<literal>nix-env -f pkgs/top-level/all-packages.nix -i hello</literal>,
-but you may not want to install a possibly broken package just yet.
-The best way to test the package is by using the command <command
-linkend="sec-nix-build">nix-build</command>, which builds a Nix
-expression and creates a symlink named <filename>result</filename> in
-the current directory:
+<literal>nix-env -i hello</literal>, but you may not want to install a
+possibly broken package just yet.  The best way to test the package is by
+using the command <command linkend="sec-nix-build">nix-build</command>,
+which builds a Nix expression and creates a symlink named
+<filename>result</filename> in the current directory:
 
 <screen>
-$ nix-build pkgs/top-level/all-packages.nix -A hello
+$ nix-build -A hello
 building path `/nix/store/632d2b22514d...-hello-2.1.1'
 hello-2.1.1/
 hello-2.1.1/intl/
@@ -29,8 +28,7 @@ $ ./result/bin/hello
 Hello, world!</screen>
 
 The <link linkend='opt-attr'><option>-A</option></link> option selects
-the <literal>hello</literal> attribute from
-<filename>all-packages.nix</filename>.  This is faster than using the
+the <literal>hello</literal> attribute.  This is faster than using the
 symbolic package name specified by the <literal>name</literal>
 attribute (which also happens to be <literal>hello</literal>) and is
 unambiguous (there can be multiple packages with the symbolic name
@@ -69,7 +67,7 @@ block (or perform other derivations if available) until the build
 finishes:
 
 <screen>
-$ nix-build pkgs/top-level/all-packages.nix -A hello
+$ nix-build -A hello
 waiting for lock on `/nix/store/0h5b7hp8d4hqfrw8igvx97x1xawrjnac-hello-2.1.1x'</screen>
 
 So it is always safe to run multiple instances of Nix in parallel
