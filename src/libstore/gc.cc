@@ -407,7 +407,7 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
         queryReferrers(path, referrers);
         for (auto & i : referrers)
             if (i != path) deletePathRecursive(state, i);
-        size = queryPathInfo(path).narSize;
+        size = queryPathInfo(path)->narSize;
         invalidatePathChecked(path);
     }
 
@@ -485,7 +485,7 @@ bool LocalStore::canReachRoot(GCState & state, PathSet & visited, const Path & p
     if (state.gcKeepDerivations && isDerivation(path)) {
         PathSet outputs = queryDerivationOutputs(path);
         for (auto & i : outputs)
-            if (isValidPath(i) && queryDeriver(i) == path)
+            if (isValidPath(i) && queryPathInfo(i)->deriver == path)
                 incoming.insert(i);
     }
 

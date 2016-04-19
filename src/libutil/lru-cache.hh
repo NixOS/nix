@@ -79,6 +79,12 @@ public:
     {
         return data.size();
     }
+
+    void clear()
+    {
+        data.clear();
+        lru.clear();
+    }
 };
 
 }

@@ -14,8 +14,8 @@ namespace nix {
 typedef enum {
     wopIsValidPath = 1,
     wopHasSubstitutes = 3,
-    wopQueryPathHash = 4,
-    wopQueryReferences = 5,
+    wopQueryPathHash = 4, // obsolete
+    wopQueryReferences = 5, // obsolete
     wopQueryReferrers = 6,
     wopAddToStore = 7,
     wopAddTextToStore = 8,
@@ -26,7 +26,7 @@ typedef enum {
     wopSyncWithGC = 13,
     wopFindRoots = 14,
     wopExportPath = 16,
-    wopQueryDeriver = 18,
+    wopQueryDeriver = 18, // obsolete
     wopSetOptions = 19,
     wopCollectGarbage = 20,
     wopQuerySubstitutablePathInfo = 21,

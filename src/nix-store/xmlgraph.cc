@@ -50,15 +50,10 @@ void printXmlGraph(ref<Store> store, const PathSet & roots)
 
         cout << makeNode(path);
 
-        PathSet references;
-        store->queryReferences(path, references);
-
-        for (PathSet::iterator i = references.begin();
-             i != references.end(); ++i)
-        {
-            if (*i != path) {
-                workList.insert(*i);
-                cout << makeEdge(*i, path);
+        for (auto & p : store->queryPathInfo(path)->references) {
+            if (p != path) {
+                workList.insert(p);
+                cout << makeEdge(p, path);
             }
         }
 

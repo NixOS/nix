@@ -577,6 +577,12 @@ uint64_t LocalStore::addValidPath(State & state,
         }
     }
 
+    {
+        auto state_(Store::state.lock());
+        state_->pathInfoCache.upsert(info.path, std::make_shared<ValidPathInfo>(info));
+        stats.pathInfoCacheSize = state_->pathInfoCache.size();
+    }
+
     return id;
 }
 
@@ -595,44 +601,44 @@ Hash parseHashField(const Path & path, const string & s)
 }
 
 
-ValidPathInfo LocalStore::queryPathInfo(const Path & path)
+std::shared_ptr<ValidPathInfo> LocalStore::queryPathInfoUncached(const Path & path)
 {
-    ValidPathInfo info;
-    info.path = path;
+    auto info = std::make_shared<ValidPathInfo>();
+    info->path = path;
 
     assertStorePath(path);
 
-    return retrySQLite<ValidPathInfo>([&]() {
+    return retrySQLite<std::shared_ptr<ValidPathInfo>>([&]() {
         auto state(_state.lock());
 
         /* Get the path info. */
         auto useQueryPathInfo(state->stmtQueryPathInfo.use()(path));
 
         if (!useQueryPathInfo.next())
-            throw Error(format("path ‘%1%’ is not valid") % path);
+            return std::shared_ptr<ValidPathInfo>();
 
-        info.id = useQueryPathInfo.getInt(0);
+        info->id = useQueryPathInfo.getInt(0);
 
-        info.narHash = parseHashField(path, useQueryPathInfo.getStr(1));
+        info->narHash = parseHashField(path, useQueryPathInfo.getStr(1));
 
-        info.registrationTime = useQueryPathInfo.getInt(2);
+        info->registrationTime = useQueryPathInfo.getInt(2);
 
         auto s = (const char *) sqlite3_column_text(state->stmtQueryPathInfo, 3);
-        if (s) info.deriver = s;
+        if (s) info->deriver = s;
 
         /* Note that narSize = NULL yields 0. */
-        info.narSize = useQueryPathInfo.getInt(4);
+        info->narSize = useQueryPathInfo.getInt(4);
 
-        info.ultimate = useQueryPathInfo.getInt(5) == 1;
+        info->ultimate = useQueryPathInfo.getInt(5) == 1;
 
         s = (const char *) sqlite3_column_text(state->stmtQueryPathInfo, 6);
-        if (s) info.sigs = tokenizeString<StringSet>(s, " ");
+        if (s) info->sigs = tokenizeString<StringSet>(s, " ");
 
         /* Get the references. */
-        auto useQueryReferences(state->stmtQueryReferences.use()(info.id));
+        auto useQueryReferences(state->stmtQueryReferences.use()(info->id));
 
         while (useQueryReferences.next())
-            info.references.insert(useQueryReferences.getStr(0));
+            info->references.insert(useQueryReferences.getStr(0));
 
         return info;
     });
@@ -661,17 +667,17 @@ uint64_t LocalStore::queryValidPathId(State & state, const Path & path)
 }
 
 
-bool LocalStore::isValidPath(State & state, const Path & path)
+bool LocalStore::isValidPath_(State & state, const Path & path)
 {
     return state.stmtQueryPathInfo.use()(path).next();
 }
 
 
-bool LocalStore::isValidPath(const Path & path)
+bool LocalStore::isValidPathUncached(const Path & path)
 {
     return retrySQLite<bool>([&]() {
         auto state(_state.lock());
-        return isValidPath(*state, path);
+        return isValidPath_(*state, path);
     });
 }
 
@@ -713,12 +719,6 @@ void LocalStore::queryReferrers(const Path & path, PathSet & referrers)
         auto state(_state.lock());
         queryReferrers(*state, path, referrers);
     });
-}
-
-
-Path LocalStore::queryDeriver(const Path & path)
-{
-    return queryPathInfo(path).deriver;
 }
 
 
@@ -996,12 +996,6 @@ void LocalStore::querySubstitutablePathInfos(const PathSet & paths,
 }
 
 
-Hash LocalStore::queryPathHash(const Path & path)
-{
-    return queryPathInfo(path).narHash;
-}
-
-
 void LocalStore::registerValidPath(const ValidPathInfo & info)
 {
     ValidPathInfos infos;
@@ -1026,7 +1020,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 
         for (auto & i : infos) {
             assert(i.narHash.type == htSHA256);
-            if (isValidPath(*state, i.path))
+            if (isValidPath_(*state, i.path))
                 updatePathInfo(*state, i);
             else
                 addValidPath(*state, i, false);
@@ -1071,6 +1065,12 @@ void LocalStore::invalidatePath(State & state, const Path & path)
 
     /* Note that the foreign key constraints on the Refs table take
        care of deleting the references entries for `path'. */
+
+    {
+        auto state_(Store::state.lock());
+        state_->pathInfoCache.erase(path);
+        stats.pathInfoCacheSize = state_->pathInfoCache.size();
+    }
 }
 
 
@@ -1225,8 +1225,7 @@ void LocalStore::exportPath(const Path & path, bool sign,
 
     printMsg(lvlTalkative, format("exporting path ‘%1%’") % path);
 
-    if (!isValidPath(path))
-        throw Error(format("path ‘%1%’ is not valid") % path);
+    auto info = queryPathInfo(path);
 
     HashAndWriteSink hashAndWriteSink(sink);
 
@@ -1236,15 +1235,11 @@ void LocalStore::exportPath(const Path & path, bool sign,
        filesystem corruption from spreading to other machines.
        Don't complain if the stored hash is zero (unknown). */
     Hash hash = hashAndWriteSink.currentHash();
-    Hash storedHash = queryPathHash(path);
-    if (hash != storedHash && storedHash != Hash(storedHash.type))
+    if (hash != info->narHash && info->narHash != Hash(info->narHash.type))
         throw Error(format("hash of path ‘%1%’ has changed from ‘%2%’ to ‘%3%’!") % path
-            % printHash(storedHash) % printHash(hash));
+            % printHash(info->narHash) % printHash(hash));
 
-    PathSet references;
-    queryReferences(path, references);
-
-    hashAndWriteSink << exportMagic << path << references << queryDeriver(path);
+    hashAndWriteSink << exportMagic << path << info->references << info->deriver;
 
     if (sign) {
         Hash hash = hashAndWriteSink.currentHash();
@@ -1440,7 +1435,7 @@ void LocalStore::invalidatePathChecked(const Path & path)
 
         SQLiteTxn txn(state->db);
 
-        if (isValidPath(*state, path)) {
+        if (isValidPath_(*state, path)) {
             PathSet referrers; queryReferrers(*state, path, referrers);
             referrers.erase(path); /* ignore self-references */
             if (!referrers.empty())
@@ -1486,38 +1481,38 @@ bool LocalStore::verifyStore(bool checkContents, bool repair)
 
         for (auto & i : validPaths) {
             try {
-                ValidPathInfo info = queryPathInfo(i);
+                auto info = std::const_pointer_cast<ValidPathInfo>(std::shared_ptr<const ValidPathInfo>(queryPathInfo(i)));
 
                 /* Check the content hash (optionally - slow). */
                 printMsg(lvlTalkative, format("checking contents of ‘%1%’") % i);
-                HashResult current = hashPath(info.narHash.type, i);
+                HashResult current = hashPath(info->narHash.type, i);
 
-                if (info.narHash != nullHash && info.narHash != current.first) {
+                if (info->narHash != nullHash && info->narHash != current.first) {
                     printMsg(lvlError, format("path ‘%1%’ was modified! "
                             "expected hash ‘%2%’, got ‘%3%’")
-                        % i % printHash(info.narHash) % printHash(current.first));
+                        % i % printHash(info->narHash) % printHash(current.first));
                     if (repair) repairPath(i); else errors = true;
                 } else {
 
                     bool update = false;
 
                     /* Fill in missing hashes. */
-                    if (info.narHash == nullHash) {
+                    if (info->narHash == nullHash) {
                         printMsg(lvlError, format("fixing missing hash on ‘%1%’") % i);
-                        info.narHash = current.first;
+                        info->narHash = current.first;
                         update = true;
                     }
 
                     /* Fill in missing narSize fields (from old stores). */
-                    if (info.narSize == 0) {
+                    if (info->narSize == 0) {
                         printMsg(lvlError, format("updating size field on ‘%1%’ to %2%") % i % current.second);
-                        info.narSize = current.second;
+                        info->narSize = current.second;
                         update = true;
                     }
 
                     if (update) {
                         auto state(_state.lock());
-                        updatePathInfo(*state, info);
+                        updatePathInfo(*state, *info);
                     }
 
                 }
@@ -1656,11 +1651,11 @@ void LocalStore::addSignatures(const Path & storePath, const StringSet & sigs)
 
         SQLiteTxn txn(state->db);
 
-        auto info = queryPathInfo(storePath);
+        auto info = std::const_pointer_cast<ValidPathInfo>(std::shared_ptr<const ValidPathInfo>(queryPathInfo(storePath)));
 
-        info.sigs.insert(sigs.begin(), sigs.end());
+        info->sigs.insert(sigs.begin(), sigs.end());
 
-        updatePathInfo(*state, info);
+        updatePathInfo(*state, *info);
 
         txn.commit();
     });

@@ -225,10 +225,48 @@ Path computeStorePathForText(const string & name, const string & s,
 }
 
 
-void Store::queryReferences(const Path & path, PathSet & references)
+bool Store::isValidPath(const Path & storePath)
 {
-    ValidPathInfo info = queryPathInfo(path);
-    references.insert(info.references.begin(), info.references.end());
+    {
+        auto state_(state.lock());
+        auto res = state_->pathInfoCache.get(storePath);
+        if (res) {
+            stats.narInfoReadAverted++;
+            return *res != 0;
+        }
+    }
+
+    return isValidPathUncached(storePath);
+}
+
+
+ref<const ValidPathInfo> Store::queryPathInfo(const Path & storePath)
+{
+    {
+        auto state_(state.lock());
+        auto res = state_->pathInfoCache.get(storePath);
+        if (res) {
+            stats.narInfoReadAverted++;
+            if (!*res)
+                throw InvalidPath(format("path ‘%s’ is not valid") % storePath);
+            return ref<ValidPathInfo>(*res);
+        }
+    }
+
+    auto info = queryPathInfoUncached(storePath);
+
+    {
+        auto state_(state.lock());
+        state_->pathInfoCache.upsert(storePath, info);
+        stats.pathInfoCacheSize = state_->pathInfoCache.size();
+    }
+
+    if (!info) {
+        stats.narInfoMissing++;
+        throw InvalidPath(format("path ‘%s’ is not valid") % storePath);
+    }
+
+    return ref<ValidPathInfo>(info);
 }
 
 
@@ -243,23 +281,29 @@ string Store::makeValidityRegistration(const PathSet & paths,
     for (auto & i : paths) {
         s += i + "\n";
 
-        ValidPathInfo info = queryPathInfo(i);
+        auto info = queryPathInfo(i);
 
         if (showHash) {
-            s += printHash(info.narHash) + "\n";
-            s += (format("%1%\n") % info.narSize).str();
+            s += printHash(info->narHash) + "\n";
+            s += (format("%1%\n") % info->narSize).str();
         }
 
-        Path deriver = showDerivers ? info.deriver : "";
+        Path deriver = showDerivers ? info->deriver : "";
         s += deriver + "\n";
 
-        s += (format("%1%\n") % info.references.size()).str();
+        s += (format("%1%\n") % info->references.size()).str();
 
-        for (auto & j : info.references)
+        for (auto & j : info->references)
             s += j + "\n";
     }
 
     return s;
+}
+
+
+const Store::Stats & Store::getStats()
+{
+    return stats;
 }
 
 

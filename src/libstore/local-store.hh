@@ -102,19 +102,15 @@ public:
 
     /* Implementations of abstract store API methods. */
 
-    bool isValidPath(const Path & path) override;
+    bool isValidPathUncached(const Path & path) override;
 
     PathSet queryValidPaths(const PathSet & paths) override;
 
     PathSet queryAllValidPaths() override;
 
-    ValidPathInfo queryPathInfo(const Path & path) override;
-
-    Hash queryPathHash(const Path & path) override;
+    std::shared_ptr<ValidPathInfo> queryPathInfoUncached(const Path & path) override;
 
     void queryReferrers(const Path & path, PathSet & referrers) override;
-
-    Path queryDeriver(const Path & path) override;
 
     PathSet queryValidDerivers(const Path & path) override;
 
@@ -270,7 +266,7 @@ private:
     void optimisePath_(OptimiseStats & stats, const Path & path, InodeHash & inodeHash);
 
     // Internal versions that are not wrapped in retry_sqlite.
-    bool isValidPath(State & state, const Path & path);
+    bool isValidPath_(State & state, const Path & path);
     void queryReferrers(State & state, const Path & path, PathSet & referrers);
 
     /* Add signatures to a ValidPathInfo using the secret keys

@@ -3,11 +3,14 @@
 #include "hash.hh"
 #include "serialise.hh"
 #include "crypto.hh"
+#include "lru-cache.hh"
+#include "sync.hh"
 
-#include <string>
+#include <atomic>
 #include <limits>
 #include <map>
 #include <memory>
+#include <string>
 
 
 namespace nix {
@@ -130,6 +133,8 @@ struct ValidPathInfo
 
     /* Verify a single signature. */
     bool checkSignature(const PublicKeys & publicKeys, const std::string & sig) const;
+
+    virtual ~ValidPathInfo() { }
 };
 
 typedef list<ValidPathInfo> ValidPathInfos;
@@ -169,12 +174,27 @@ class FSAccessor;
 
 class Store : public std::enable_shared_from_this<Store>
 {
+protected:
+
+    struct State
+    {
+        LRUCache<Path, std::shared_ptr<ValidPathInfo>> pathInfoCache{64 * 1024};
+    };
+
+    Sync<State> state;
+
 public:
 
     virtual ~Store() { }
 
     /* Check whether a path is valid. */
-    virtual bool isValidPath(const Path & path) = 0;
+    bool isValidPath(const Path & path);
+
+protected:
+
+    virtual bool isValidPathUncached(const Path & path) = 0;
+
+public:
 
     /* Query which of the given paths is valid. */
     virtual PathSet queryValidPaths(const PathSet & paths) = 0;
@@ -183,23 +203,18 @@ public:
     virtual PathSet queryAllValidPaths() = 0;
 
     /* Query information about a valid path. */
-    virtual ValidPathInfo queryPathInfo(const Path & path) = 0;
+    ref<const ValidPathInfo> queryPathInfo(const Path & path);
 
-    /* Query the hash of a valid path. */
-    virtual Hash queryPathHash(const Path & path) = 0;
+protected:
 
-    /* Query the set of outgoing FS references for a store path. The
-       result is not cleared. */
-    virtual void queryReferences(const Path & path, PathSet & references);
+    virtual std::shared_ptr<ValidPathInfo> queryPathInfoUncached(const Path & path) = 0;
+
+public:
 
     /* Queries the set of incoming FS references for a store path.
        The result is not cleared. */
     virtual void queryReferrers(const Path & path,
         PathSet & referrers) = 0;
-
-    /* Query the deriver of a store path.  Return the empty string if
-       no deriver has been set. */
-    virtual Path queryDeriver(const Path & path) = 0;
 
     /* Return all currently valid derivations that have `path' as an
        output.  (Note that the result of `queryDeriver()' is the
@@ -372,6 +387,29 @@ public:
     /* Sort a set of paths topologically under the references
        relation.  If p refers to q, then p preceeds q in this list. */
     Paths topoSortPaths(const PathSet & paths);
+
+    struct Stats
+    {
+        std::atomic<uint64_t> narInfoRead{0};
+        std::atomic<uint64_t> narInfoReadAverted{0};
+        std::atomic<uint64_t> narInfoMissing{0};
+        std::atomic<uint64_t> narInfoWrite{0};
+        std::atomic<uint64_t> pathInfoCacheSize{0};
+        std::atomic<uint64_t> narRead{0};
+        std::atomic<uint64_t> narReadBytes{0};
+        std::atomic<uint64_t> narReadCompressedBytes{0};
+        std::atomic<uint64_t> narWrite{0};
+        std::atomic<uint64_t> narWriteAverted{0};
+        std::atomic<uint64_t> narWriteBytes{0};
+        std::atomic<uint64_t> narWriteCompressedBytes{0};
+        std::atomic<uint64_t> narWriteCompressionTimeMs{0};
+    };
+
+    const Stats & getStats();
+
+protected:
+
+    Stats stats;
 
 };
 

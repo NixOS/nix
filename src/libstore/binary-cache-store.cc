@@ -40,11 +40,6 @@ void BinaryCacheStore::notImpl()
     throw Error("operation not implemented for binary cache stores");
 }
 
-const BinaryCacheStore::Stats & BinaryCacheStore::getStats()
-{
-    return stats;
-}
-
 Path BinaryCacheStore::narInfoFileFor(const Path & storePath)
 {
     assertStorePath(storePath);
@@ -100,67 +95,15 @@ void BinaryCacheStore::addToCache(const ValidPathInfo & info,
 
     {
         auto state_(state.lock());
-        state_->narInfoCache.upsert(narInfo->path, narInfo);
-        stats.narInfoCacheSize = state_->narInfoCache.size();
+        state_->pathInfoCache.upsert(narInfo->path, std::shared_ptr<NarInfo>(narInfo));
+        stats.pathInfoCacheSize = state_->pathInfoCache.size();
     }
 
     stats.narInfoWrite++;
 }
 
-NarInfo BinaryCacheStore::readNarInfo(const Path & storePath)
+bool BinaryCacheStore::isValidPathUncached(const Path & storePath)
 {
-    {
-        auto state_(state.lock());
-        auto res = state_->narInfoCache.get(storePath);
-        if (res) {
-            stats.narInfoReadAverted++;
-            if (!*res)
-                throw InvalidPath(format("path ‘%s’ is not valid") % storePath);
-            return **res;
-        }
-    }
-
-    auto narInfoFile = narInfoFileFor(storePath);
-    auto data = getFile(narInfoFile);
-    if (!data) {
-        stats.narInfoMissing++;
-        auto state_(state.lock());
-        state_->narInfoCache.upsert(storePath, 0);
-        stats.narInfoCacheSize = state_->narInfoCache.size();
-        throw InvalidPath(format("path ‘%s’ is not valid") % storePath);
-    }
-
-    auto narInfo = make_ref<NarInfo>(*data, narInfoFile);
-    if (narInfo->path != storePath)
-        throw Error(format("NAR info file for store path ‘%1%’ does not match ‘%2%’") % narInfo->path % storePath);
-
-    stats.narInfoRead++;
-
-    if (publicKeys) {
-        if (!narInfo->checkSignatures(*publicKeys))
-            throw Error(format("no good signature on NAR info file ‘%1%’") % narInfoFile);
-    }
-
-    {
-        auto state_(state.lock());
-        state_->narInfoCache.upsert(storePath, narInfo);
-        stats.narInfoCacheSize = state_->narInfoCache.size();
-    }
-
-    return *narInfo;
-}
-
-bool BinaryCacheStore::isValidPath(const Path & storePath)
-{
-    {
-        auto state_(state.lock());
-        auto res = state_->narInfoCache.get(storePath);
-        if (res) {
-            stats.narInfoReadAverted++;
-            return *res != 0;
-        }
-    }
-
     // FIXME: this only checks whether a .narinfo with a matching hash
     // part exists. So ‘f4kb...-foo’ matches ‘f4kb...-bar’, even
     // though they shouldn't. Not easily fixed.
@@ -169,20 +112,20 @@ bool BinaryCacheStore::isValidPath(const Path & storePath)
 
 void BinaryCacheStore::narFromPath(const Path & storePath, Sink & sink)
 {
-    auto res = readNarInfo(storePath);
+    auto info = queryPathInfo(storePath).cast<const NarInfo>();
 
-    auto nar = getFile(res.url);
+    auto nar = getFile(info->url);
 
-    if (!nar) throw Error(format("file ‘%s’ missing from binary cache") % res.url);
+    if (!nar) throw Error(format("file ‘%s’ missing from binary cache") % info->url);
 
     stats.narRead++;
     stats.narReadCompressedBytes += nar->size();
 
     /* Decompress the NAR. FIXME: would be nice to have the remote
        side do this. */
-    if (res.compression == "none")
+    if (info->compression == "none")
         ;
-    else if (res.compression == "xz")
+    else if (info->compression == "xz")
         nar = decompressXZ(*nar);
     else
         throw Error(format("unknown NAR compression type ‘%1%’") % nar);
@@ -200,13 +143,13 @@ void BinaryCacheStore::exportPath(const Path & storePath, bool sign, Sink & sink
 {
     assert(!sign);
 
-    auto res = readNarInfo(storePath);
+    auto res = queryPathInfo(storePath);
 
     narFromPath(storePath, sink);
 
     // FIXME: check integrity of NAR.
 
-    sink << exportMagic << storePath << res.references << res.deriver << 0;
+    sink << exportMagic << storePath << res->references << res->deriver << 0;
 }
 
 Paths BinaryCacheStore::importPaths(bool requireSignature, Source & source,
@@ -244,9 +187,24 @@ struct NopSink : ParseSink
 {
 };
 
-ValidPathInfo BinaryCacheStore::queryPathInfo(const Path & storePath)
+std::shared_ptr<ValidPathInfo> BinaryCacheStore::queryPathInfoUncached(const Path & storePath)
 {
-    return ValidPathInfo(readNarInfo(storePath));
+    auto narInfoFile = narInfoFileFor(storePath);
+    auto data = getFile(narInfoFile);
+    if (!data) return 0;
+
+    auto narInfo = make_ref<NarInfo>(*data, narInfoFile);
+    if (narInfo->path != storePath)
+        throw Error(format("NAR info file for store path ‘%1%’ does not match ‘%2%’") % narInfo->path % storePath);
+
+    stats.narInfoRead++;
+
+    if (publicKeys) {
+        if (!narInfo->checkSignatures(*publicKeys))
+            throw Error(format("no good signature on NAR info file ‘%1%’") % narInfoFile);
+    }
+
+    return std::shared_ptr<NarInfo>(narInfo);
 }
 
 void BinaryCacheStore::querySubstitutablePathInfos(const PathSet & paths,
@@ -257,16 +215,16 @@ void BinaryCacheStore::querySubstitutablePathInfos(const PathSet & paths,
     if (!localStore) return;
 
     for (auto & storePath : paths) {
-        if (!localStore->isValidPath(storePath)) {
+        try {
+            auto info = localStore->queryPathInfo(storePath);
+            SubstitutablePathInfo sub;
+            sub.references = info->references;
+            sub.downloadSize = 0;
+            sub.narSize = info->narSize;
+            infos.emplace(storePath, sub);
+        } catch (InvalidPath &) {
             left.insert(storePath);
-            continue;
         }
-        ValidPathInfo info = localStore->queryPathInfo(storePath);
-        SubstitutablePathInfo sub;
-        sub.references = info.references;
-        sub.downloadSize = 0;
-        sub.narSize = info.narSize;
-        infos.emplace(storePath, sub);
     }
 
     if (settings.useSubstitutes)
@@ -332,16 +290,16 @@ void BinaryCacheStore::buildPaths(const PathSet & paths, BuildMode buildMode)
         if (!localStore->isValidPath(storePath))
             localStore->ensurePath(storePath);
 
-        ValidPathInfo info = localStore->queryPathInfo(storePath);
+        auto info = localStore->queryPathInfo(storePath);
 
-        for (auto & ref : info.references)
+        for (auto & ref : info->references)
             if (ref != storePath)
                 ensurePath(ref);
 
         StringSink sink;
         dumpPath(storePath, sink);
 
-        addToCache(info, *sink.s);
+        addToCache(*info, *sink.s);
     }
 }
 

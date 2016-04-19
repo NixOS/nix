@@ -2724,7 +2724,7 @@ void DerivationGoal::registerOutputs()
 
         if (buildMode == bmCheck) {
             if (!worker.store.isValidPath(path)) continue;
-            ValidPathInfo info = worker.store.queryPathInfo(path);
+            auto info = *worker.store.queryPathInfo(path);
             if (hash.first != info.narHash) {
                 if (settings.keepFailed) {
                     Path dst = path + checkSuffix;
@@ -3778,14 +3778,14 @@ bool Worker::pathContentsGood(const Path & path)
     std::map<Path, bool>::iterator i = pathContentsGoodCache.find(path);
     if (i != pathContentsGoodCache.end()) return i->second;
     printMsg(lvlInfo, format("checking path ‘%1%’...") % path);
-    ValidPathInfo info = store.queryPathInfo(path);
+    auto info = store.queryPathInfo(path);
     bool res;
     if (!pathExists(path))
         res = false;
     else {
-        HashResult current = hashPath(info.narHash.type, path);
+        HashResult current = hashPath(info->narHash.type, path);
         Hash nullHash(htSHA256);
-        res = info.narHash == nullHash || info.narHash == current.first;
+        res = info->narHash == nullHash || info->narHash == current.first;
     }
     pathContentsGoodCache[path] = res;
     if (!res) printMsg(lvlError, format("path ‘%1%’ is corrupted or missing!") % path);
@@ -3881,7 +3881,7 @@ void LocalStore::repairPath(const Path & path)
     if (goal->getExitCode() != Goal::ecSuccess) {
         /* Since substituting the path didn't work, if we have a valid
            deriver, then rebuild the deriver. */
-        Path deriver = queryDeriver(path);
+        auto deriver = queryPathInfo(path)->deriver;
         if (deriver != "" && isValidPath(deriver)) {
             goals.clear();
             goals.insert(worker.makeDerivationGoal(deriver, StringSet(), bmRepair));

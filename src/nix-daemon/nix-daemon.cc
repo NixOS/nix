@@ -199,7 +199,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     case wopQueryPathHash: {
         Path path = readStorePath(from);
         startWork();
-        Hash hash = store->queryPathHash(path);
+        auto hash = store->queryPathInfo(path)->narHash;
         stopWork();
         to << printHash(hash);
         break;
@@ -213,7 +213,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         startWork();
         PathSet paths;
         if (op == wopQueryReferences)
-            store->queryReferences(path, paths);
+            paths = store->queryPathInfo(path)->references;
         else if (op == wopQueryReferrers)
             store->queryReferrers(path, paths);
         else if (op == wopQueryValidDerivers)
@@ -237,7 +237,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     case wopQueryDeriver: {
         Path path = readStorePath(from);
         startWork();
-        Path deriver = store->queryDeriver(path);
+        auto deriver = store->queryPathInfo(path)->deriver;
         stopWork();
         to << deriver;
         break;
@@ -496,13 +496,13 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     case wopQueryPathInfo: {
         Path path = readStorePath(from);
         startWork();
-        ValidPathInfo info = store->queryPathInfo(path);
+        auto info = store->queryPathInfo(path);
         stopWork();
-        to << info.deriver << printHash(info.narHash) << info.references
-           << info.registrationTime << info.narSize;
+        to << info->deriver << printHash(info->narHash) << info->references
+           << info->registrationTime << info->narSize;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
-            to << info.ultimate
-               << info.sigs;
+            to << info->ultimate
+               << info->sigs;
         }
         break;
     }

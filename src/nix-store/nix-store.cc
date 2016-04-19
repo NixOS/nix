@@ -51,7 +51,7 @@ ref<LocalStore> ensureLocalStore()
 static Path useDeriver(Path path)
 {
     if (isDerivation(path)) return path;
-    Path drvPath = store->queryDeriver(path);
+    Path drvPath = store->queryPathInfo(path)->deriver;
     if (drvPath == "")
         throw Error(format("deriver of path ‘%1%’ is not known") % path);
     return drvPath;
@@ -247,8 +247,7 @@ static void printTree(const Path & path,
 
     cout << format("%1%%2%\n") % firstPad % path;
 
-    PathSet references;
-    store->queryReferences(path, references);
+    auto references = store->queryPathInfo(path)->references;
 
     /* Topologically sort under the relation A < B iff A \in
        closure(B).  That is, if derivation A is an (possibly indirect)
@@ -335,7 +334,10 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 PathSet ps = maybeUseOutputs(followLinksToStorePath(i), useOutput, forceRealise);
                 for (auto & j : ps) {
                     if (query == qRequisites) store->computeFSClosure(j, paths, false, includeOutputs);
-                    else if (query == qReferences) store->queryReferences(j, paths);
+                    else if (query == qReferences) {
+                        for (auto & p : store->queryPathInfo(j)->references)
+                            paths.insert(p);
+                    }
                     else if (query == qReferrers) store->queryReferrers(j, paths);
                     else if (query == qReferrersClosure) store->computeFSClosure(j, paths, true);
                 }
@@ -349,7 +351,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qDeriver:
             for (auto & i : opArgs) {
-                Path deriver = store->queryDeriver(followLinksToStorePath(i));
+                Path deriver = store->queryPathInfo(followLinksToStorePath(i))->deriver;
                 cout << format("%1%\n") %
                     (deriver == "" ? "unknown-deriver" : deriver);
             }
@@ -372,12 +374,12 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (auto & i : opArgs) {
                 PathSet paths = maybeUseOutputs(followLinksToStorePath(i), useOutput, forceRealise);
                 for (auto & j : paths) {
-                    ValidPathInfo info = store->queryPathInfo(j);
+                    auto info = store->queryPathInfo(j);
                     if (query == qHash) {
-                        assert(info.narHash.type == htSHA256);
-                        cout << format("sha256:%1%\n") % printHash32(info.narHash);
+                        assert(info->narHash.type == htSHA256);
+                        cout << format("sha256:%1%\n") % printHash32(info->narHash);
                     } else if (query == qSize)
-                        cout << format("%1%\n") % info.narSize;
+                        cout << format("%1%\n") % info->narSize;
                 }
             }
             break;
@@ -782,14 +784,14 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
     for (auto & i : opArgs) {
         Path path = followLinksToStorePath(i);
         printMsg(lvlTalkative, format("checking path ‘%1%’...") % path);
-        ValidPathInfo info = store->queryPathInfo(path);
-        HashSink sink(info.narHash.type);
+        auto info = store->queryPathInfo(path);
+        HashSink sink(info->narHash.type);
         store->narFromPath(path, sink);
         auto current = sink.finish();
-        if (current.first != info.narHash) {
+        if (current.first != info->narHash) {
             printMsg(lvlError,
                 format("path ‘%1%’ was modified! expected hash ‘%2%’, got ‘%3%’")
-                % path % printHash(info.narHash) % printHash(current.first));
+                % path % printHash(info->narHash) % printHash(current.first));
             status = 1;
         }
     }
@@ -901,13 +903,14 @@ static void opServe(Strings opFlags, Strings opArgs)
                 PathSet paths = readStorePaths<PathSet>(in);
                 // !!! Maybe we want a queryPathInfos?
                 for (auto & i : paths) {
-                    if (!store->isValidPath(i))
-                        continue;
-                    ValidPathInfo info = store->queryPathInfo(i);
-                    out << info.path << info.deriver << info.references;
-                    // !!! Maybe we want compression?
-                    out << info.narSize // downloadSize
-                        << info.narSize;
+                    try {
+                        auto info = store->queryPathInfo(i);
+                        out << info->path << info->deriver << info->references;
+                        // !!! Maybe we want compression?
+                        out << info->narSize // downloadSize
+                            << info->narSize;
+                    } catch (InvalidPath &) {
+                    }
                 }
                 out << "";
                 break;

@@ -141,7 +141,7 @@ void RemoteStore::setOptions(ref<Connection> conn)
 }
 
 
-bool RemoteStore::isValidPath(const Path & path)
+bool RemoteStore::isValidPathUncached(const Path & path)
 {
     auto conn(connections->get());
     conn->to << wopIsValidPath << path;
@@ -239,45 +239,24 @@ void RemoteStore::querySubstitutablePathInfos(const PathSet & paths,
 }
 
 
-ValidPathInfo RemoteStore::queryPathInfo(const Path & path)
+std::shared_ptr<ValidPathInfo> RemoteStore::queryPathInfoUncached(const Path & path)
 {
     auto conn(connections->get());
     conn->to << wopQueryPathInfo << path;
     conn->processStderr();
-    ValidPathInfo info;
-    info.path = path;
-    info.deriver = readString(conn->from);
-    if (info.deriver != "") assertStorePath(info.deriver);
-    info.narHash = parseHash(htSHA256, readString(conn->from));
-    info.references = readStorePaths<PathSet>(conn->from);
-    info.registrationTime = readInt(conn->from);
-    info.narSize = readLongLong(conn->from);
+    auto info = std::make_shared<ValidPathInfo>();
+    info->path = path;
+    info->deriver = readString(conn->from);
+    if (info->deriver != "") assertStorePath(info->deriver);
+    info->narHash = parseHash(htSHA256, readString(conn->from));
+    info->references = readStorePaths<PathSet>(conn->from);
+    info->registrationTime = readInt(conn->from);
+    info->narSize = readLongLong(conn->from);
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
-        info.ultimate = readInt(conn->from) != 0;
-        info.sigs = readStrings<StringSet>(conn->from);
+        info->ultimate = readInt(conn->from) != 0;
+        info->sigs = readStrings<StringSet>(conn->from);
     }
     return info;
-}
-
-
-Hash RemoteStore::queryPathHash(const Path & path)
-{
-    auto conn(connections->get());
-    conn->to << wopQueryPathHash << path;
-    conn->processStderr();
-    string hash = readString(conn->from);
-    return parseHash(htSHA256, hash);
-}
-
-
-void RemoteStore::queryReferences(const Path & path,
-    PathSet & references)
-{
-    auto conn(connections->get());
-    conn->to << wopQueryReferences << path;
-    conn->processStderr();
-    PathSet references2 = readStorePaths<PathSet>(conn->from);
-    references.insert(references2.begin(), references2.end());
 }
 
 
@@ -289,17 +268,6 @@ void RemoteStore::queryReferrers(const Path & path,
     conn->processStderr();
     PathSet referrers2 = readStorePaths<PathSet>(conn->from);
     referrers.insert(referrers2.begin(), referrers2.end());
-}
-
-
-Path RemoteStore::queryDeriver(const Path & path)
-{
-    auto conn(connections->get());
-    conn->to << wopQueryDeriver << path;
-    conn->processStderr();
-    Path drvPath = readString(conn->from);
-    if (drvPath != "") assertStorePath(drvPath);
-    return drvPath;
 }
 
 
@@ -517,6 +485,12 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
     results.paths = readStrings<PathSet>(conn->from);
     results.bytesFreed = readLongLong(conn->from);
     readLongLong(conn->from); // obsolete
+
+    {
+        auto state_(Store::state.lock());
+        state_->pathInfoCache.clear();
+        stats.pathInfoCacheSize = 0;
+    }
 }
 
 

@@ -3,8 +3,6 @@
 #include "crypto.hh"
 #include "store-api.hh"
 
-#include "lru-cache.hh"
-#include "sync.hh"
 #include "pool.hh"
 
 #include <atomic>
@@ -21,13 +19,6 @@ private:
     std::unique_ptr<PublicKeys> publicKeys;
 
     std::shared_ptr<Store> localStore;
-
-    struct State
-    {
-        LRUCache<Path, std::shared_ptr<NarInfo>> narInfoCache{64 * 1024};
-    };
-
-    Sync<State> state;
 
 protected:
 
@@ -47,28 +38,7 @@ public:
 
     virtual void init();
 
-    struct Stats
-    {
-        std::atomic<uint64_t> narInfoRead{0};
-        std::atomic<uint64_t> narInfoReadAverted{0};
-        std::atomic<uint64_t> narInfoMissing{0};
-        std::atomic<uint64_t> narInfoWrite{0};
-        std::atomic<uint64_t> narInfoCacheSize{0};
-        std::atomic<uint64_t> narRead{0};
-        std::atomic<uint64_t> narReadBytes{0};
-        std::atomic<uint64_t> narReadCompressedBytes{0};
-        std::atomic<uint64_t> narWrite{0};
-        std::atomic<uint64_t> narWriteAverted{0};
-        std::atomic<uint64_t> narWriteBytes{0};
-        std::atomic<uint64_t> narWriteCompressedBytes{0};
-        std::atomic<uint64_t> narWriteCompressionTimeMs{0};
-    };
-
-    const Stats & getStats();
-
 private:
-
-    Stats stats;
 
     std::string narMagic;
 
@@ -76,13 +46,9 @@ private:
 
     void addToCache(const ValidPathInfo & info, const string & nar);
 
-protected:
-
-    NarInfo readNarInfo(const Path & storePath);
-
 public:
 
-    bool isValidPath(const Path & path) override;
+    bool isValidPathUncached(const Path & path) override;
 
     PathSet queryValidPaths(const PathSet & paths) override
     { notImpl(); }
@@ -90,17 +56,11 @@ public:
     PathSet queryAllValidPaths() override
     { notImpl(); }
 
-    ValidPathInfo queryPathInfo(const Path & path) override;
-
-    Hash queryPathHash(const Path & path) override
-    { notImpl(); }
+    std::shared_ptr<ValidPathInfo> queryPathInfoUncached(const Path & path) override;
 
     void queryReferrers(const Path & path,
         PathSet & referrers) override
     { notImpl(); }
-
-    Path queryDeriver(const Path & path) override
-    { return ""; }
 
     PathSet queryValidDerivers(const Path & path) override
     { return {}; }

@@ -83,16 +83,16 @@ struct CmdVerify : StorePathsCommand
 
                 if (!noContents) {
 
-                    HashSink sink(info.narHash.type);
+                    HashSink sink(info->narHash.type);
                     store->narFromPath(storePath, sink);
 
                     auto hash = sink.finish();
 
-                    if (hash.first != info.narHash) {
+                    if (hash.first != info->narHash) {
                         corrupted = 1;
                         printMsg(lvlError,
                             format("path ‘%s’ was modified! expected hash ‘%s’, got ‘%s’")
-                            % storePath % printHash(info.narHash) % printHash(hash.first));
+                            % storePath % printHash(info->narHash) % printHash(hash.first));
                     }
 
                 }
@@ -101,7 +101,7 @@ struct CmdVerify : StorePathsCommand
 
                     bool good = false;
 
-                    if (info.ultimate && !sigsNeeded)
+                    if (info->ultimate && !sigsNeeded)
                         good = true;
 
                     else {
@@ -114,18 +114,18 @@ struct CmdVerify : StorePathsCommand
                             for (auto sig : sigs) {
                                 if (sigsSeen.count(sig)) continue;
                                 sigsSeen.insert(sig);
-                                if (info.checkSignature(publicKeys, sig))
+                                if (info->checkSignature(publicKeys, sig))
                                     validSigs++;
                             }
                         };
 
-                        doSigs(info.sigs);
+                        doSigs(info->sigs);
 
                         for (auto & store2 : substituters) {
                             if (validSigs >= actualSigsNeeded) break;
                             try {
-                                if (!store2->isValidPath(storePath)) continue;
-                                doSigs(store2->queryPathInfo(storePath).sigs);
+                                doSigs(store2->queryPathInfo(storePath)->sigs);
+                            } catch (InvalidPath &) {
                             } catch (Error & e) {
                                 printMsg(lvlError, format(ANSI_RED "error:" ANSI_NORMAL " %s") % e.what());
                             }

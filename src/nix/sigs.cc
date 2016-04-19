@@ -64,19 +64,21 @@ struct CmdCopySigs : StorePathsCommand
             StringSet newSigs;
 
             for (auto & store2 : substituters) {
-                if (!store2->isValidPath(storePath)) continue;
-                auto info2 = store2->queryPathInfo(storePath);
+                try {
+                    auto info2 = store2->queryPathInfo(storePath);
 
-                /* Don't import signatures that don't match this
-                   binary. */
-                if (info.narHash != info2.narHash ||
-                    info.narSize != info2.narSize ||
-                    info.references != info2.references)
-                    continue;
+                    /* Don't import signatures that don't match this
+                       binary. */
+                    if (info->narHash != info2->narHash ||
+                        info->narSize != info2->narSize ||
+                        info->references != info2->references)
+                        continue;
 
-                for (auto & sig : info2.sigs)
-                    if (!info.sigs.count(sig))
-                        newSigs.insert(sig);
+                    for (auto & sig : info2->sigs)
+                        if (!info->sigs.count(sig))
+                            newSigs.insert(sig);
+                } catch (InvalidPath &) {
+                }
             }
 
             if (!newSigs.empty()) {
@@ -122,8 +124,8 @@ struct CmdQueryPathSigs : StorePathsCommand
         for (auto & storePath : storePaths) {
             auto info = store->queryPathInfo(storePath);
             std::cout << storePath << " ";
-            if (info.ultimate) std::cout << "ultimate ";
-            for (auto & sig : info.sigs)
+            if (info->ultimate) std::cout << "ultimate ";
+            for (auto & sig : info->sigs)
                 std::cout << sig << " ";
             std::cout << "\n";
         }
@@ -163,12 +165,12 @@ struct CmdSignPaths : StorePathsCommand
         for (auto & storePath : storePaths) {
             auto info = store->queryPathInfo(storePath);
 
-            auto info2(info);
+            auto info2(*info);
             info2.sigs.clear();
             info2.sign(secretKey);
             assert(!info2.sigs.empty());
 
-            if (!info.sigs.count(*info2.sigs.begin())) {
+            if (!info->sigs.count(*info2.sigs.begin())) {
                 store->addSignatures(storePath, info2.sigs);
                 added++;
             }

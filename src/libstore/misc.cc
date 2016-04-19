@@ -35,12 +35,13 @@ void Store::computeFSClosure(const Path & path,
         if (includeDerivers && isDerivation(path)) {
             PathSet outputs = queryDerivationOutputs(path);
             for (auto & i : outputs)
-                if (isValidPath(i) && queryDeriver(i) == path)
+                if (isValidPath(i) && queryPathInfo(i)->deriver == path)
                     edges.insert(i);
         }
 
     } else {
-        queryReferences(path, edges);
+        auto info = queryPathInfo(path);
+        edges = info->references;
 
         if (includeOutputs && isDerivation(path)) {
             PathSet outputs = queryDerivationOutputs(path);
@@ -48,10 +49,8 @@ void Store::computeFSClosure(const Path & path,
                 if (isValidPath(i)) edges.insert(i);
         }
 
-        if (includeDerivers) {
-            Path deriver = queryDeriver(path);
-            if (isValidPath(deriver)) edges.insert(deriver);
-        }
+        if (includeDerivers && isValidPath(info->deriver))
+            edges.insert(info->deriver);
     }
 
     for (auto & i : edges)
@@ -189,8 +188,10 @@ Paths Store::topoSortPaths(const PathSet & paths)
         parents.insert(path);
 
         PathSet references;
-        if (isValidPath(path))
-            queryReferences(path, references);
+        try {
+            references = queryPathInfo(path)->references;
+        } catch (InvalidPath &) {
+        }
 
         for (auto & i : references)
             /* Don't traverse into paths that don't exist.  That can

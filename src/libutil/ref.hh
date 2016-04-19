@@ -44,6 +44,12 @@ public:
     }
 
     template<typename T2>
+    ref<T2> cast()
+    {
+        return ref<T2>(std::dynamic_pointer_cast<T2>(p));
+    }
+
+    template<typename T2>
     operator ref<T2> ()
     {
         return ref<T2>((std::shared_ptr<T2>) p);

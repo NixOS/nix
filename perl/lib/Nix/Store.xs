@@ -70,8 +70,7 @@ int isValidPath(char * path)
 SV * queryReferences(char * path)
     PPCODE:
         try {
-            PathSet paths;
-            store()->queryReferences(path, paths);
+            PathSet paths = store()->queryPathInfo(path)->references;
             for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i)
                 XPUSHs(sv_2mortal(newSVpv(i->c_str(), 0)));
         } catch (Error & e) {
@@ -82,7 +81,7 @@ SV * queryReferences(char * path)
 SV * queryPathHash(char * path)
     PPCODE:
         try {
-            Hash hash = store()->queryPathHash(path);
+            auto hash = store()->queryPathInfo(path)->narHash;
             string s = "sha256:" + printHash32(hash);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
@@ -93,7 +92,7 @@ SV * queryPathHash(char * path)
 SV * queryDeriver(char * path)
     PPCODE:
         try {
-            Path deriver = store()->queryDeriver(path);
+            auto deriver = store()->queryPathInfo(path)->deriver;
             if (deriver == "") XSRETURN_UNDEF;
             XPUSHs(sv_2mortal(newSVpv(deriver.c_str(), 0)));
         } catch (Error & e) {
@@ -104,17 +103,17 @@ SV * queryDeriver(char * path)
 SV * queryPathInfo(char * path, int base32)
     PPCODE:
         try {
-            ValidPathInfo info = store()->queryPathInfo(path);
-            if (info.deriver == "")
+            auto info = store()->queryPathInfo(path);
+            if (info->deriver == "")
                 XPUSHs(&PL_sv_undef);
             else
-                XPUSHs(sv_2mortal(newSVpv(info.deriver.c_str(), 0)));
-            string s = "sha256:" + (base32 ? printHash32(info.narHash) : printHash(info.narHash));
+                XPUSHs(sv_2mortal(newSVpv(info->deriver.c_str(), 0)));
+            string s = "sha256:" + (base32 ? printHash32(info->narHash) : printHash(info->narHash));
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
-            mXPUSHi(info.registrationTime);
-            mXPUSHi(info.narSize);
+            mXPUSHi(info->registrationTime);
+            mXPUSHi(info->narSize);
             AV * arr = newAV();
-            for (PathSet::iterator i = info.references.begin(); i != info.references.end(); ++i)
+            for (PathSet::iterator i = info->references.begin(); i != info->references.end(); ++i)
                 av_push(arr, newSVpv(i->c_str(), 0));
             XPUSHs(sv_2mortal(newRV((SV *) arr)));
         } catch (Error & e) {
