@@ -5,16 +5,16 @@ namespace nix {
 
 NarInfo::NarInfo(const std::string & s, const std::string & whence)
 {
-    auto corrupt = [&]() {
+    auto corrupt = [&]() [[noreturn]] {
         throw Error("NAR info file ‘%1%’ is corrupt");
     };
 
     auto parseHashField = [&](const string & s) {
-        string::size_type colon = s.find(':');
-        if (colon == string::npos) corrupt();
-        HashType ht = parseHashType(string(s, 0, colon));
-        if (ht == htUnknown) corrupt();
-        return parseHash16or32(ht, string(s, colon + 1));
+        try {
+            return parseHash(s);
+        } catch (BadHash &) {
+            corrupt();
+        }
     };
 
     size_t pos = 0;
@@ -101,14 +101,6 @@ std::string NarInfo::to_string() const
         res += "Sig: " + sig + "\n";
 
     return res;
-}
-
-Strings NarInfo::shortRefs() const
-{
-    Strings refs;
-    for (auto & r : references)
-        refs.push_back(baseNameOf(r));
-    return refs;
 }
 
 }

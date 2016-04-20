@@ -225,7 +225,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
 {
     auto url = resolveUri(url_);
 
-    Path cacheDir = getEnv("XDG_CACHE_HOME", getEnv("HOME", "") + "/.cache") + "/nix/tarballs";
+    Path cacheDir = getCacheDir() + "/nix/tarballs";
     createDirs(cacheDir);
 
     string urlHash = printHash32(hashString(htSHA256, url));

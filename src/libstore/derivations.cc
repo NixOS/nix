@@ -290,7 +290,7 @@ Hash hashDerivationModulo(Store & store, Derivation drv)
     DerivationInputs inputs2;
     for (auto & i : drv.inputDrvs) {
         Hash h = drvHashes[i.first];
-        if (h.type == htUnknown) {
+        if (!h) {
             assert(store.isValidPath(i.first));
             Derivation drv2 = readDerivation(i.first);
             h = hashDerivationModulo(store, drv2);

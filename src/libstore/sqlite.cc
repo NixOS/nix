@@ -139,6 +139,11 @@ int64_t SQLiteStmt::Use::getInt(int col)
     return sqlite3_column_int64(stmt, col);
 }
 
+bool SQLiteStmt::Use::isNull(int col)
+{
+    return sqlite3_column_type(stmt, col) == SQLITE_NULL;
+}
+
 SQLiteTxn::SQLiteTxn(sqlite3 * db)
 {
     this->db = db;

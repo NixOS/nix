@@ -19,10 +19,6 @@ struct NarInfo : ValidPathInfo
     NarInfo(const std::string & s, const std::string & whence);
 
     std::string to_string() const;
-
-private:
-
-    Strings shortRefs() const;
 };
 
 }

@@ -58,6 +58,7 @@ struct SQLiteStmt
 
         std::string getStr(int col);
         int64_t getInt(int col);
+        bool isNull(int col);
     };
 
     Use use()

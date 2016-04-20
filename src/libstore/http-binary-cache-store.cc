@@ -1,6 +1,7 @@
 #include "binary-cache-store.hh"
 #include "download.hh"
 #include "globals.hh"
+#include "nar-info-disk-cache.hh"
 
 namespace nix {
 
@@ -24,13 +25,23 @@ public:
     {
         if (cacheUri.back() == '/')
             cacheUri.pop_back();
+
+        diskCache = getNarInfoDiskCache();
+    }
+
+    std::string getUri() override
+    {
+        return cacheUri;
     }
 
     void init() override
     {
         // FIXME: do this lazily?
-        if (!fileExists("nix-cache-info"))
-            throw Error(format("‘%s’ does not appear to be a binary cache") % cacheUri);
+        if (!diskCache->cacheExists(cacheUri)) {
+            if (!fileExists("nix-cache-info"))
+                throw Error(format("‘%s’ does not appear to be a binary cache") % cacheUri);
+            diskCache->createCache(cacheUri);
+        }
     }
 
 protected:

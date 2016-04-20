@@ -134,6 +134,8 @@ struct ValidPathInfo
     /* Verify a single signature. */
     bool checkSignature(const PublicKeys & publicKeys, const std::string & sig) const;
 
+    Strings shortRefs() const;
+
     virtual ~ValidPathInfo() { }
 };
 
@@ -170,6 +172,7 @@ struct BuildResult
 struct BasicDerivation;
 struct Derivation;
 class FSAccessor;
+class NarInfoDiskCache;
 
 
 class Store : public std::enable_shared_from_this<Store>
@@ -183,9 +186,13 @@ protected:
 
     Sync<State> state;
 
+    std::shared_ptr<NarInfoDiskCache> diskCache;
+
 public:
 
     virtual ~Store() { }
+
+    virtual std::string getUri();
 
     /* Check whether a path is valid. */
     bool isValidPath(const Path & path);

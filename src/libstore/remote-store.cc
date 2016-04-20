@@ -489,7 +489,6 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
     {
         auto state_(Store::state.lock());
         state_->pathInfoCache.clear();
-        stats.pathInfoCacheSize = 0;
     }
 }
 

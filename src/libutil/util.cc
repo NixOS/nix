@@ -403,6 +403,18 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
 }
 
 
+Path getCacheDir()
+{
+    Path cacheDir = getEnv("XDG_CACHE_HOME");
+    if (cacheDir.empty()) {
+        Path homeDir = getEnv("HOME");
+        if (homeDir.empty()) throw Error("$XDG_CACHE_HOME and $HOME are not set");
+        cacheDir = homeDir + "/.cache";
+    }
+    return cacheDir;
+}
+
+
 Paths createDirs(const Path & path)
 {
     Paths created;

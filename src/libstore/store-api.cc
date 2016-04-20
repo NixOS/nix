@@ -2,6 +2,7 @@
 #include "globals.hh"
 #include "store-api.hh"
 #include "util.hh"
+#include "nar-info-disk-cache.hh"
 
 
 namespace nix {
@@ -225,6 +226,12 @@ Path computeStorePathForText(const string & name, const string & s,
 }
 
 
+std::string Store::getUri()
+{
+    return "";
+}
+
+
 bool Store::isValidPath(const Path & storePath)
 {
     {
@@ -236,7 +243,19 @@ bool Store::isValidPath(const Path & storePath)
         }
     }
 
+    if (diskCache) {
+        auto res = diskCache->lookupNarInfo(getUri(), storePath);
+        if (res.first != NarInfoDiskCache::oUnknown) {
+            auto state_(state.lock());
+            state_->pathInfoCache.upsert(storePath,
+                res.first == NarInfoDiskCache::oInvalid ? 0 : res.second);
+            return res.first == NarInfoDiskCache::oValid;
+        }
+    }
+
     return isValidPathUncached(storePath);
+
+    // FIXME: insert result into NARExistence table of diskCache.
 }
 
 
@@ -253,12 +272,26 @@ ref<const ValidPathInfo> Store::queryPathInfo(const Path & storePath)
         }
     }
 
+    if (diskCache) {
+        auto res = diskCache->lookupNarInfo(getUri(), storePath);
+        if (res.first != NarInfoDiskCache::oUnknown) {
+            auto state_(state.lock());
+            state_->pathInfoCache.upsert(storePath,
+                res.first == NarInfoDiskCache::oInvalid ? 0 : res.second);
+            if (res.first == NarInfoDiskCache::oInvalid)
+                throw InvalidPath(format("path ‘%s’ is not valid") % storePath);
+            return ref<ValidPathInfo>(res.second);
+        }
+    }
+
     auto info = queryPathInfoUncached(storePath);
+
+    if (diskCache && info)
+        diskCache->upsertNarInfo(getUri(), info);
 
     {
         auto state_(state.lock());
         state_->pathInfoCache.upsert(storePath, info);
-        stats.pathInfoCacheSize = state_->pathInfoCache.size();
     }
 
     if (!info) {
@@ -303,6 +336,10 @@ string Store::makeValidityRegistration(const PathSet & paths,
 
 const Store::Stats & Store::getStats()
 {
+    {
+        auto state_(state.lock());
+        stats.pathInfoCacheSize = state_->pathInfoCache.size();
+    }
     return stats;
 }
 
@@ -356,7 +393,7 @@ void Store::exportPaths(const Paths & paths,
 
 std::string ValidPathInfo::fingerprint() const
 {
-    if (narSize == 0 || narHash.type == htUnknown)
+    if (narSize == 0 || !narHash)
         throw Error(format("cannot calculate fingerprint of path ‘%s’ because its size/hash is not known")
             % path);
     return
@@ -386,6 +423,15 @@ unsigned int ValidPathInfo::checkSignatures(const PublicKeys & publicKeys) const
 bool ValidPathInfo::checkSignature(const PublicKeys & publicKeys, const std::string & sig) const
 {
     return verifyDetached(fingerprint(), sig, publicKeys);
+}
+
+
+Strings ValidPathInfo::shortRefs() const
+{
+    Strings refs;
+    for (auto & r : references)
+        refs.push_back(baseNameOf(r));
+    return refs;
 }
 
 

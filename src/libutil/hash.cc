@@ -33,7 +33,7 @@ Hash::Hash(HashType type)
     else if (type == htSHA1) hashSize = sha1HashSize;
     else if (type == htSHA256) hashSize = sha256HashSize;
     else if (type == htSHA512) hashSize = sha512HashSize;
-    else throw Error("unknown hash type");
+    else abort();
     assert(hashSize <= maxHashSize);
     memset(hash, 0, maxHashSize);
 }
@@ -64,6 +64,12 @@ bool Hash::operator < (const Hash & h) const
 }
 
 
+std::string Hash::to_string(bool base32) const
+{
+    return printHashType(type) + ":" + (base32 ? printHash32(*this) : printHash(*this));
+}
+
+
 const string base16Chars = "0123456789abcdef";
 
 
@@ -78,15 +84,28 @@ string printHash(const Hash & hash)
 }
 
 
+Hash parseHash(const string & s)
+{
+    string::size_type colon = s.find(':');
+    if (colon == string::npos)
+        throw BadHash(format("invalid hash ‘%s’") % s);
+    string hts = string(s, 0, colon);
+    HashType ht = parseHashType(hts);
+    if (ht == htUnknown)
+        throw BadHash(format("unknown hash type ‘%s’") % hts);
+    return parseHash16or32(ht, string(s, colon + 1));
+}
+
+
 Hash parseHash(HashType ht, const string & s)
 {
     Hash hash(ht);
     if (s.length() != hash.hashSize * 2)
-        throw Error(format("invalid hash ‘%1%’") % s);
+        throw BadHash(format("invalid hash ‘%1%’") % s);
     for (unsigned int i = 0; i < hash.hashSize; i++) {
         string s2(s, i * 2, 2);
         if (!isxdigit(s2[0]) || !isxdigit(s2[1]))
-            throw Error(format("invalid hash ‘%1%’") % s);
+            throw BadHash(format("invalid hash ‘%1%’") % s);
         std::istringstream str(s2);
         int n;
         str >> std::hex >> n;
@@ -103,6 +122,7 @@ const string base32Chars = "0123456789abcdfghijklmnpqrsvwxyz";
 string printHash32(const Hash & hash)
 {
     size_t len = hash.base32Len();
+    assert(len);
 
     string s;
     s.reserve(len);
@@ -139,7 +159,7 @@ Hash parseHash32(HashType ht, const string & s)
         for (digit = 0; digit < base32Chars.size(); ++digit) /* !!! slow */
             if (base32Chars[digit] == c) break;
         if (digit >= 32)
-            throw Error(format("invalid base-32 hash ‘%1%’") % s);
+            throw BadHash(format("invalid base-32 hash ‘%1%’") % s);
         unsigned int b = n * 5;
         unsigned int i = b / 8;
         unsigned int j = b % 8;
@@ -161,7 +181,7 @@ Hash parseHash16or32(HashType ht, const string & s)
         /* base-32 representation */
         hash = parseHash32(ht, s);
     else
-        throw Error(format("hash ‘%1%’ has wrong length for hash type ‘%2%’")
+        throw BadHash(format("hash ‘%1%’ has wrong length for hash type ‘%2%’")
             % s % printHashType(ht));
     return hash;
 }
@@ -322,7 +342,7 @@ string printHashType(HashType ht)
     else if (ht == htSHA1) return "sha1";
     else if (ht == htSHA256) return "sha256";
     else if (ht == htSHA512) return "sha512";
-    else throw Error("cannot print unknown hash type");
+    else abort();
 }
 
 

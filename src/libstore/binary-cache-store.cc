@@ -59,7 +59,7 @@ void BinaryCacheStore::addToCache(const ValidPathInfo & info,
     narInfo->narSize = nar.size();
     narInfo->narHash = hashString(htSHA256, nar);
 
-    if (info.narHash.type != htUnknown && info.narHash != narInfo->narHash)
+    if (info.narHash && info.narHash != narInfo->narHash)
         throw Error(format("refusing to copy corrupted path ‘%1%’ to binary cache") % info.path);
 
     /* Compress the NAR. */
@@ -96,7 +96,6 @@ void BinaryCacheStore::addToCache(const ValidPathInfo & info,
     {
         auto state_(state.lock());
         state_->pathInfoCache.upsert(narInfo->path, std::shared_ptr<NarInfo>(narInfo));
-        stats.pathInfoCacheSize = state_->pathInfoCache.size();
     }
 
     stats.narInfoWrite++;
