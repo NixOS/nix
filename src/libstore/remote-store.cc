@@ -243,7 +243,18 @@ std::shared_ptr<ValidPathInfo> RemoteStore::queryPathInfoUncached(const Path & p
 {
     auto conn(connections->get());
     conn->to << wopQueryPathInfo << path;
-    conn->processStderr();
+    try {
+        conn->processStderr();
+    } catch (Error & e) {
+        // Ugly backwards compatibility hack.
+        if (e.msg().find("is not valid") != std::string::npos)
+            throw InvalidPath(e.what());
+        throw;
+    }
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 17) {
+        bool valid = readInt(conn->from) != 0;
+        if (!valid) throw InvalidPath(format("path ‘%s’ is not valid") % path);
+    }
     auto info = std::make_shared<ValidPathInfo>();
     info->path = path;
     info->deriver = readString(conn->from);

@@ -495,15 +495,23 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
 
     case wopQueryPathInfo: {
         Path path = readStorePath(from);
+        std::shared_ptr<const ValidPathInfo> info;
         startWork();
-        auto info = store->queryPathInfo(path);
-        stopWork();
-        to << info->deriver << printHash(info->narHash) << info->references
-           << info->registrationTime << info->narSize;
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
-            to << info->ultimate
-               << info->sigs;
+        try {
+            info = store->queryPathInfo(path);
+        } catch (InvalidPath &) {
+            if (GET_PROTOCOL_MINOR(clientVersion) < 17) throw;
         }
+        stopWork();
+        if (info) {
+            to << 1 << info->deriver << printHash(info->narHash) << info->references
+               << info->registrationTime << info->narSize;
+            if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
+                to << info->ultimate
+                   << info->sigs;
+            }
+        } else
+            to << 0;
         break;
     }
 
