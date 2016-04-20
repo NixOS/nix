@@ -8,6 +8,7 @@
 #include "sync.hh"
 #include "worker-protocol.hh"
 #include "nar-accessor.hh"
+#include "nar-info-disk-cache.hh"
 
 #include <chrono>
 
@@ -97,6 +98,9 @@ void BinaryCacheStore::addToCache(const ValidPathInfo & info,
         auto state_(state.lock());
         state_->pathInfoCache.upsert(narInfo->path, std::shared_ptr<NarInfo>(narInfo));
     }
+
+    if (diskCache)
+        diskCache->upsertNarInfo(getUri(), std::shared_ptr<NarInfo>(narInfo));
 
     stats.narInfoWrite++;
 }
