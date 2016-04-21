@@ -71,7 +71,14 @@ let
         src = tarball;
 
         buildInputs =
-          [ curl perl bzip2 xz openssl pkgconfig sqlite boehmgc ]
+          [ curl perl bzip2 xz openssl pkgconfig sqlite boehmgc
+
+            (aws-sdk-cpp.override {
+              apis = ["s3"];
+              customMemoryManagement = false;
+            })
+
+          ]
           ++ lib.optional stdenv.isLinux libsodium;
 
         configureFlags = ''
