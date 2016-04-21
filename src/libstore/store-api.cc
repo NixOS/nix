@@ -17,6 +17,7 @@ bool isInStore(const Path & path)
 bool isStorePath(const Path & path)
 {
     return isInStore(path)
+        && path.size() >= settings.nixStore.size() + 1 + storePathHashLen
         && path.find('/', settings.nixStore.size() + 1) == Path::npos;
 }
 

@@ -691,7 +691,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 string name = dirent->d_name;
                 if (name == "." || name == "..") continue;
                 Path path = settings.nixStore + "/" + name;
-                if (isValidPath(path))
+                if (isStorePath(path) && isValidPath(path))
                     entries.push_back(path);
                 else
                     tryToDelete(state, path);
