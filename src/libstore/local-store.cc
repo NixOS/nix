@@ -579,7 +579,7 @@ uint64_t LocalStore::addValidPath(State & state,
 
     {
         auto state_(Store::state.lock());
-        state_->pathInfoCache.upsert(info.path, std::make_shared<ValidPathInfo>(info));
+        state_->pathInfoCache.upsert(storePathToHash(info.path), std::make_shared<ValidPathInfo>(info));
     }
 
     return id;
@@ -1067,7 +1067,7 @@ void LocalStore::invalidatePath(State & state, const Path & path)
 
     {
         auto state_(Store::state.lock());
-        state_->pathInfoCache.erase(path);
+        state_->pathInfoCache.erase(storePathToHash(path));
     }
 }
 

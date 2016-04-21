@@ -10,6 +10,7 @@
 #include <aws/s3/model/GetObjectRequest.h>
 #include <aws/s3/model/HeadObjectRequest.h>
 #include <aws/s3/model/PutObjectRequest.h>
+#include <aws/s3/model/ListObjectsRequest.h>
 
 namespace nix {
 
@@ -164,7 +165,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
     std::shared_ptr<std::string> getFile(const std::string & path)
     {
-        printMsg(lvlDebug, format("fetching ‘s3://%1%/%2%’...") % bucketName % path);
+        debug(format("fetching ‘s3://%1%/%2%’...") % bucketName % path);
 
         auto request =
             Aws::S3::Model::GetObjectRequest()
@@ -202,6 +203,38 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
             if (e.err == Aws::S3::S3Errors::NO_SUCH_KEY) return 0;
             throw;
         }
+    }
+
+    PathSet queryAllValidPaths() override
+    {
+        PathSet paths;
+        std::string marker;
+
+        do {
+            debug(format("listing bucket ‘s3://%s’ from key ‘%s’...") % bucketName % marker);
+
+            auto res = checkAws(format("AWS error listing bucket ‘%s’") % bucketName,
+                client->ListObjects(
+                    Aws::S3::Model::ListObjectsRequest()
+                    .WithBucket(bucketName)
+                    .WithDelimiter("/")
+                    .WithMarker(marker)));
+
+            auto & contents = res.GetContents();
+
+            debug(format("got %d keys, next marker ‘%s’")
+                % contents.size() % res.GetNextMarker());
+
+            for (auto object : contents) {
+                auto & key = object.GetKey();
+                if (!hasSuffix(key, ".narinfo")) continue;
+                paths.insert(settings.nixStore + "/" + std::string(key, 0, key.size() - 8));
+            }
+
+            marker = res.GetNextMarker();
+        } while (!marker.empty());
+
+        return paths;
     }
 
 };

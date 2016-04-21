@@ -20,7 +20,8 @@ create table if not exists BinaryCaches (
 
 create table if not exists NARs (
     cache            integer not null,
-    storePath        text not null,
+    hashPart         text not null,
+    namePart         text not null,
     url              text,
     compression      text,
     fileHash         text,
@@ -31,7 +32,7 @@ create table if not exists NARs (
     deriver          text,
     sigs             text,
     timestamp        integer not null,
-    primary key (cache, storePath),
+    primary key (cache, hashPart),
     foreign key (cache) references BinaryCaches(id) on delete cascade
 );
 
@@ -66,7 +67,7 @@ public:
     {
         auto state(_state.lock());
 
-        Path dbPath = getCacheDir() + "/nix/binary-cache-v3.sqlite";
+        Path dbPath = getCacheDir() + "/nix/binary-cache-v4.sqlite";
         createDirs(dirOf(dbPath));
 
         if (sqlite3_open_v2(dbPath.c_str(), &state->db.db,
@@ -92,11 +93,11 @@ public:
             "select id, storeDir, wantMassQuery, priority from BinaryCaches where url = ?");
 
         state->insertNAR.create(state->db,
-            "insert or replace into NARs(cache, storePath, url, compression, fileHash, fileSize, narHash, "
-            "narSize, refs, deriver, sigs, timestamp) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            "insert or replace into NARs(cache, hashPart, namePart, url, compression, fileHash, fileSize, narHash, "
+            "narSize, refs, deriver, sigs, timestamp) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
         state->queryNAR.create(state->db,
-            "select * from NARs where cache = ? and storePath = ?");
+            "select * from NARs where cache = ? and hashPart = ?");
 
         state->insertNARExistence.create(state->db,
             "insert or replace into NARExistence(cache, storePath, exist, timestamp) values (?, ?, ?, ?)");
@@ -141,13 +142,13 @@ public:
     }
 
     std::pair<Outcome, std::shared_ptr<NarInfo>> lookupNarInfo(
-        const std::string & uri, const Path & storePath) override
+        const std::string & uri, const std::string & hashPart) override
     {
         auto state(_state.lock());
 
         auto queryNAR(state->queryNAR.use()
             (uriToInt(*state, uri))
-            (baseNameOf(storePath)));
+            (hashPart));
 
         if (!queryNAR.next())
             // FIXME: check NARExistence
@@ -157,26 +158,29 @@ public:
 
         // FIXME: implement TTL.
 
-        narInfo->path = storePath;
-        narInfo->url = queryNAR.getStr(2);
-        narInfo->compression = queryNAR.getStr(3);
-        if (!queryNAR.isNull(4))
-            narInfo->fileHash = parseHash(queryNAR.getStr(4));
-        narInfo->fileSize = queryNAR.getInt(5);
-        narInfo->narHash = parseHash(queryNAR.getStr(6));
-        narInfo->narSize = queryNAR.getInt(7);
-        for (auto & r : tokenizeString<Strings>(queryNAR.getStr(8), " "))
+        auto namePart = queryNAR.getStr(2);
+        narInfo->path = settings.nixStore + "/" +
+            hashPart + (namePart.empty() ? "" : "-" + namePart);
+        narInfo->url = queryNAR.getStr(3);
+        narInfo->compression = queryNAR.getStr(4);
+        if (!queryNAR.isNull(5))
+            narInfo->fileHash = parseHash(queryNAR.getStr(5));
+        narInfo->fileSize = queryNAR.getInt(6);
+        narInfo->narHash = parseHash(queryNAR.getStr(7));
+        narInfo->narSize = queryNAR.getInt(8);
+        for (auto & r : tokenizeString<Strings>(queryNAR.getStr(9), " "))
             narInfo->references.insert(settings.nixStore + "/" + r);
-        if (!queryNAR.isNull(9))
-            narInfo->deriver = settings.nixStore + "/" + queryNAR.getStr(9);
-        for (auto & sig : tokenizeString<Strings>(queryNAR.getStr(10), " "))
+        if (!queryNAR.isNull(10))
+            narInfo->deriver = settings.nixStore + "/" + queryNAR.getStr(10);
+        for (auto & sig : tokenizeString<Strings>(queryNAR.getStr(11), " "))
             narInfo->sigs.insert(sig);
 
         return {oValid, narInfo};
     }
 
     void upsertNarInfo(
-        const std::string & uri, std::shared_ptr<ValidPathInfo> info) override
+        const std::string & uri, const std::string & hashPart,
+        std::shared_ptr<ValidPathInfo> info) override
     {
         auto state(_state.lock());
 
@@ -184,9 +188,12 @@ public:
 
             auto narInfo = std::dynamic_pointer_cast<NarInfo>(info);
 
+            assert(hashPart == storePathToHash(info->path));
+
             state->insertNAR.use()
                 (uriToInt(*state, uri))
-                (baseNameOf(info->path))
+                (hashPart)
+                (storePathToName(info->path))
                 (narInfo ? narInfo->url : "", narInfo != 0)
                 (narInfo ? narInfo->compression : "", narInfo != 0)
                 (narInfo && narInfo->fileHash ? narInfo->fileHash.to_string() : "", narInfo && narInfo->fileHash)

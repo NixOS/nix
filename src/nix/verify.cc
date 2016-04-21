@@ -98,7 +98,7 @@ struct CmdVerify : StorePathsCommand
                 if (!noContents) {
 
                     HashSink sink(info->narHash.type);
-                    store->narFromPath(storePath, sink);
+                    store->narFromPath(info->path, sink);
 
                     auto hash = sink.finish();
 
@@ -106,7 +106,7 @@ struct CmdVerify : StorePathsCommand
                         corrupted = 1;
                         printMsg(lvlError,
                             format("path ‘%s’ was modified! expected hash ‘%s’, got ‘%s’")
-                            % storePath % printHash(info->narHash) % printHash(hash.first));
+                            % info->path % printHash(info->narHash) % printHash(hash.first));
                     }
 
                 }
@@ -138,7 +138,7 @@ struct CmdVerify : StorePathsCommand
                         for (auto & store2 : substituters) {
                             if (validSigs >= actualSigsNeeded) break;
                             try {
-                                doSigs(store2->queryPathInfo(storePath)->sigs);
+                                doSigs(store2->queryPathInfo(info->path)->sigs);
                             } catch (InvalidPath &) {
                             } catch (Error & e) {
                                 printMsg(lvlError, format(ANSI_RED "error:" ANSI_NORMAL " %s") % e.what());
@@ -151,7 +151,7 @@ struct CmdVerify : StorePathsCommand
 
                     if (!good) {
                         untrusted++;
-                        printMsg(lvlError, format("path ‘%s’ is untrusted") % storePath);
+                        printMsg(lvlError, format("path ‘%s’ is untrusted") % info->path);
                     }
 
                 }

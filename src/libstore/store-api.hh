@@ -181,7 +181,7 @@ protected:
 
     struct State
     {
-        LRUCache<Path, std::shared_ptr<ValidPathInfo>> pathInfoCache{64 * 1024};
+        LRUCache<std::string, std::shared_ptr<ValidPathInfo>> pathInfoCache{64 * 1024};
     };
 
     Sync<State> state;
@@ -206,10 +206,15 @@ public:
     /* Query which of the given paths is valid. */
     virtual PathSet queryValidPaths(const PathSet & paths) = 0;
 
-    /* Query the set of all valid paths. */
+    /* Query the set of all valid paths. Note that for some store
+       backends, the name part of store paths may be omitted
+       (i.e. you'll get /nix/store/<hash> rather than
+       /nix/store/<hash>-<name>). Use queryPathInfo() to obtain the
+       full store path. */
     virtual PathSet queryAllValidPaths() = 0;
 
-    /* Query information about a valid path. */
+    /* Query information about a valid path. It is permitted to omit
+       the name part of the store path. */
     ref<const ValidPathInfo> queryPathInfo(const Path & path);
 
 protected:

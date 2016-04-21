@@ -63,13 +63,16 @@ Path followLinksToStorePath(const Path & path)
 string storePathToName(const Path & path)
 {
     assertStorePath(path);
-    return string(path, settings.nixStore.size() + storePathHashLen + 2);
+    auto l = settings.nixStore.size() + 1 + storePathHashLen;
+    assert(path.size() >= l);
+    return path.size() == l ? "" : string(path, l + 1);
 }
 
 
 string storePathToHash(const Path & path)
 {
     assertStorePath(path);
+    assert(path.size() >= settings.nixStore.size() + 1 + storePathHashLen);
     return string(path, settings.nixStore.size() + 1, storePathHashLen);
 }
 
@@ -234,9 +237,11 @@ std::string Store::getUri()
 
 bool Store::isValidPath(const Path & storePath)
 {
+    auto hashPart = storePathToHash(storePath);
+
     {
         auto state_(state.lock());
-        auto res = state_->pathInfoCache.get(storePath);
+        auto res = state_->pathInfoCache.get(hashPart);
         if (res) {
             stats.narInfoReadAverted++;
             return *res != 0;
@@ -244,10 +249,11 @@ bool Store::isValidPath(const Path & storePath)
     }
 
     if (diskCache) {
-        auto res = diskCache->lookupNarInfo(getUri(), storePath);
+        auto res = diskCache->lookupNarInfo(getUri(), hashPart);
         if (res.first != NarInfoDiskCache::oUnknown) {
+            stats.narInfoReadAverted++;
             auto state_(state.lock());
-            state_->pathInfoCache.upsert(storePath,
+            state_->pathInfoCache.upsert(hashPart,
                 res.first == NarInfoDiskCache::oInvalid ? 0 : res.second);
             return res.first == NarInfoDiskCache::oValid;
         }
@@ -261,9 +267,11 @@ bool Store::isValidPath(const Path & storePath)
 
 ref<const ValidPathInfo> Store::queryPathInfo(const Path & storePath)
 {
+    auto hashPart = storePathToHash(storePath);
+
     {
         auto state_(state.lock());
-        auto res = state_->pathInfoCache.get(storePath);
+        auto res = state_->pathInfoCache.get(hashPart);
         if (res) {
             stats.narInfoReadAverted++;
             if (!*res)
@@ -273,12 +281,14 @@ ref<const ValidPathInfo> Store::queryPathInfo(const Path & storePath)
     }
 
     if (diskCache) {
-        auto res = diskCache->lookupNarInfo(getUri(), storePath);
+        auto res = diskCache->lookupNarInfo(getUri(), hashPart);
         if (res.first != NarInfoDiskCache::oUnknown) {
+            stats.narInfoReadAverted++;
             auto state_(state.lock());
-            state_->pathInfoCache.upsert(storePath,
+            state_->pathInfoCache.upsert(hashPart,
                 res.first == NarInfoDiskCache::oInvalid ? 0 : res.second);
-            if (res.first == NarInfoDiskCache::oInvalid)
+            if (res.first == NarInfoDiskCache::oInvalid ||
+                (res.second->path != storePath && storePathToName(storePath) != ""))
                 throw InvalidPath(format("path ‘%s’ is not valid") % storePath);
             return ref<ValidPathInfo>(res.second);
         }
@@ -287,14 +297,16 @@ ref<const ValidPathInfo> Store::queryPathInfo(const Path & storePath)
     auto info = queryPathInfoUncached(storePath);
 
     if (diskCache && info)
-        diskCache->upsertNarInfo(getUri(), info);
+        diskCache->upsertNarInfo(getUri(), hashPart, info);
 
     {
         auto state_(state.lock());
-        state_->pathInfoCache.upsert(storePath, info);
+        state_->pathInfoCache.upsert(hashPart, info);
     }
 
-    if (!info) {
+    if (!info
+        || (info->path != storePath && storePathToName(storePath) != ""))
+    {
         stats.narInfoMissing++;
         throw InvalidPath(format("path ‘%s’ is not valid") % storePath);
     }

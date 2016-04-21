@@ -94,13 +94,15 @@ void BinaryCacheStore::addToCache(const ValidPathInfo & info,
 
     upsertFile(narInfoFile, narInfo->to_string());
 
+    auto hashPart = storePathToHash(narInfo->path);
+
     {
         auto state_(state.lock());
-        state_->pathInfoCache.upsert(narInfo->path, std::shared_ptr<NarInfo>(narInfo));
+        state_->pathInfoCache.upsert(hashPart, std::shared_ptr<NarInfo>(narInfo));
     }
 
     if (diskCache)
-        diskCache->upsertNarInfo(getUri(), std::shared_ptr<NarInfo>(narInfo));
+        diskCache->upsertNarInfo(getUri(), hashPart, std::shared_ptr<NarInfo>(narInfo));
 
     stats.narInfoWrite++;
 }
@@ -197,8 +199,6 @@ std::shared_ptr<ValidPathInfo> BinaryCacheStore::queryPathInfoUncached(const Pat
     if (!data) return 0;
 
     auto narInfo = make_ref<NarInfo>(*data, narInfoFile);
-    if (narInfo->path != storePath)
-        throw Error(format("NAR info file for store path ‘%1%’ does not match ‘%2%’") % narInfo->path % storePath);
 
     stats.narInfoRead++;
 

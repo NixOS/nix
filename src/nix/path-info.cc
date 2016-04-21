@@ -4,6 +4,7 @@
 #include "store-api.hh"
 
 #include <iomanip>
+#include <algorithm>
 
 using namespace nix;
 
@@ -48,14 +49,14 @@ struct CmdPathInfo : StorePathsCommand
         for (auto & storePath : storePaths)
             pathLen = std::max(pathLen, storePath.size());
 
-        for (auto & storePath : storePaths) {
-            if (!store->isValidPath(storePath))
-                throw Error(format("path ‘%s’ is not valid") % storePath);
+        for (auto storePath : storePaths) {
+            auto info = store->queryPathInfo(storePath);
+            storePath = info->path; // FIXME: screws up padding
 
-            std::cout << storePath << std::string(pathLen - storePath.size(), ' ');
+            std::cout << storePath << std::string(std::max(0, (int) pathLen - (int) storePath.size()), ' ');
 
             if (showSize) {
-                std::cout << '\t' << std::setw(11) << store->queryPathInfo(storePath)->narSize;
+                std::cout << '\t' << std::setw(11) << info->narSize;
             }
 
             if (showClosureSize) {
