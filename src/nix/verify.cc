@@ -36,6 +36,20 @@ struct CmdVerify : StorePathsCommand
         return "verify the integrity of store paths";
     }
 
+    Examples examples() override
+    {
+        return {
+            Example{
+                "To verify the entire Nix store:",
+                "nix verify --all"
+            },
+            Example{
+                "To check whether each path in the closure of Firefox has at least 2 signatures:",
+                "nix verify -r -n2 --no-contents $(type -p firefox)"
+            },
+        };
+    }
+
     void run(ref<Store> store, Paths storePaths) override
     {
         restoreAffinity(); // FIXME

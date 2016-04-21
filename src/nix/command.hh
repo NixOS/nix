@@ -11,6 +11,18 @@ struct Command : virtual Args
     virtual std::string name() = 0;
     virtual void prepare() { };
     virtual void run() = 0;
+
+    struct Example
+    {
+        std::string description;
+        std::string command;
+    };
+
+    typedef std::list<Example> Examples;
+
+    virtual Examples examples() { return Examples(); }
+
+    void printHelp(const string & programName, std::ostream & out) override;
 };
 
 class Store;

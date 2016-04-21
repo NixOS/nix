@@ -5,6 +5,21 @@ namespace nix {
 
 Commands * RegisterCommand::commands = 0;
 
+void Command::printHelp(const string & programName, std::ostream & out)
+{
+    Args::printHelp(programName, out);
+
+    auto exs = examples();
+    if (!exs.empty()) {
+        out << "\n";
+        out << "Examples:\n";
+        for (auto & ex : exs)
+            out << "\n"
+                << "  " << ex.description << "\n" // FIXME: wrap
+                << "  $ " << ex.command << "\n";
+    }
+}
+
 MultiCommand::MultiCommand(const Commands & _commands)
     : commands(_commands)
 {
