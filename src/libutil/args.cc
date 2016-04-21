@@ -71,10 +71,11 @@ void Args::printHelp(const string & programName, std::ostream & out)
 void Args::printFlags(std::ostream & out)
 {
     Table2 table;
-    for (auto & flags : longFlags)
+    for (auto & flag : longFlags)
         table.push_back(std::make_pair(
-                "--" + flags.first + renderLabels(flags.second.labels),
-                flags.second.description));
+                (flag.second.shortName ? std::string("-") + flag.second.shortName + ", " : "    ")
+                + "--" + flag.first + renderLabels(flag.second.labels),
+                flag.second.description));
     printTable(out, table);
 }
 

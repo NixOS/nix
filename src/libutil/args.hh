@@ -29,6 +29,7 @@ protected:
     /* Flags. */
     struct Flag
     {
+        char shortName;
         std::string description;
         Strings labels;
         size_t arity;
@@ -63,7 +64,7 @@ public:
         const Strings & labels, const std::string & description,
         size_t arity, std::function<void(Strings)> handler)
     {
-        auto flag = Flag{description, labels, arity, handler};
+        auto flag = Flag{shortName, description, labels, arity, handler};
         if (shortName) shortFlags[shortName] = flag;
         longFlags[longName] = flag;
     }
