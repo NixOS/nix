@@ -50,6 +50,17 @@ Path BinaryCacheStore::narInfoFileFor(const Path & storePath)
 void BinaryCacheStore::addToCache(const ValidPathInfo & info,
     const string & nar)
 {
+    /* Verify that all references are valid. This may do some .narinfo
+       reads, but typically they'll already be cached. */
+    for (auto & ref : info.references)
+        try {
+            if (ref != info.path)
+                queryPathInfo(ref);
+        } catch (InvalidPath &) {
+            throw Error(format("cannot add ‘%s’ to the binary cache because the reference ‘%s’ is not valid")
+                % info.path % ref);
+        }
+
     auto narInfoFile = narInfoFileFor(info.path);
     if (fileExists(narInfoFile)) return;
 
