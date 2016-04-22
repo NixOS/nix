@@ -103,37 +103,6 @@ struct CmdCopySigs : StorePathsCommand
 
 static RegisterCommand r1(make_ref<CmdCopySigs>());
 
-struct CmdQueryPathSigs : StorePathsCommand
-{
-    CmdQueryPathSigs()
-    {
-    }
-
-    std::string name() override
-    {
-        return "query-path-sigs";
-    }
-
-    std::string description() override
-    {
-        return "print store path signatures";
-    }
-
-    void run(ref<Store> store, Paths storePaths) override
-    {
-        for (auto & storePath : storePaths) {
-            auto info = store->queryPathInfo(storePath);
-            std::cout << storePath << " ";
-            if (info->ultimate) std::cout << "ultimate ";
-            for (auto & sig : info->sigs)
-                std::cout << sig << " ";
-            std::cout << "\n";
-        }
-    }
-};
-
-static RegisterCommand r2(make_ref<CmdQueryPathSigs>());
-
 struct CmdSignPaths : StorePathsCommand
 {
     Path secretKeyFile;

@@ -12,11 +12,13 @@ struct CmdPathInfo : StorePathsCommand
 {
     bool showSize = false;
     bool showClosureSize = false;
+    bool showSigs = false;
 
     CmdPathInfo()
     {
         mkFlag('s', "size", "print size of the NAR dump of each path", &showSize);
         mkFlag('S', "closure-size", "print sum size of the NAR dumps of the closure of each path", &showClosureSize);
+        mkFlag(0, "sigs", "show signatures", &showSigs);
     }
 
     std::string name() override
@@ -66,6 +68,14 @@ struct CmdPathInfo : StorePathsCommand
                 for (auto & p : closure)
                     totalSize += store->queryPathInfo(p)->narSize;
                 std::cout << '\t' << std::setw(11) << totalSize;
+            }
+
+            if (showSigs) {
+                std::cout << '\t';
+                Strings ss;
+                if (info->ultimate) ss.push_back("ultimate");
+                for (auto & sig : info->sigs) ss.push_back(sig);
+                std::cout << concatStringsSep(" ", ss);
             }
 
             std::cout << std::endl;
