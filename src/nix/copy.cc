@@ -3,6 +3,7 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "sync.hh"
+#include "thread-pool.hh"
 
 #include <atomic>
 
@@ -57,28 +58,72 @@ struct CmdCopy : StorePathsCommand
 
         progressBar.updateStatus(showProgress());
 
-        storePaths.reverse(); // FIXME: assumes reverse topo sort
+        struct Graph
+        {
+            std::set<Path> left;
+            std::map<Path, std::set<Path>> refs, rrefs;
+        };
 
-        for (auto & storePath : storePaths) {
+        Sync<Graph> graph_;
+        {
+            auto graph(graph_.lock());
+            graph->left = PathSet(storePaths.begin(), storePaths.end());
+        }
+
+        ThreadPool pool;
+
+        std::function<void(const Path &)> doPath;
+
+        doPath = [&](const Path & storePath) {
             checkInterrupt();
 
-            if (dstStore->isValidPath(storePath)) {
+            if (!dstStore->isValidPath(storePath)) {
+                auto activity(progressBar.startActivity(format("copying ‘%s’...") % storePath));
+
+                StringSink sink;
+                srcStore->exportPaths({storePath}, false, sink);
+
+                StringSource source(*sink.s);
+                dstStore->importPaths(false, source, 0);
+
+                done++;
+            } else
                 total--;
-                progressBar.updateStatus(showProgress());
-                continue;
-            }
 
-            auto activity(progressBar.startActivity(format("copying ‘%s’...") % storePath));
-
-            StringSink sink;
-            srcStore->exportPaths({storePath}, false, sink);
-
-            StringSource source(*sink.s);
-            dstStore->importPaths(false, source, 0);
-
-            done++;
             progressBar.updateStatus(showProgress());
+
+            /* Enqueue all paths that were waiting for this one. */
+            {
+                auto graph(graph_.lock());
+                graph->left.erase(storePath);
+                for (auto & rref : graph->rrefs[storePath]) {
+                    auto & refs(graph->refs[rref]);
+                    auto i = refs.find(storePath);
+                    assert(i != refs.end());
+                    refs.erase(i);
+                    if (refs.empty())
+                        pool.enqueue(std::bind(doPath, rref));
+                }
+            }
+        };
+
+        /* Build the dependency graph; enqueue all paths with no
+           dependencies. */
+        for (auto & storePath : storePaths) {
+            auto info = srcStore->queryPathInfo(storePath);
+            {
+                auto graph(graph_.lock());
+                for (auto & ref : info->references)
+                    if (ref != storePath && graph->left.count(ref)) {
+                        graph->refs[storePath].insert(ref);
+                        graph->rrefs[ref].insert(storePath);
+                    }
+                if (graph->refs[storePath].empty())
+                    pool.enqueue(std::bind(doPath, storePath));
+            }
         }
+
+        pool.process();
 
         progressBar.done();
     }

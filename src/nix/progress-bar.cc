@@ -29,12 +29,12 @@ void ProgressBar::updateStatus(const std::string & s)
 
 void ProgressBar::done()
 {
+    _writeToStderr = decltype(_writeToStderr)();
     auto state_(state.lock());
     assert(state_->activities.empty());
     state_->done = true;
     std::cerr << "\r\e[K";
     std::cerr.flush();
-    _writeToStderr = decltype(_writeToStderr)();
 }
 
 void ProgressBar::render(State & state_)

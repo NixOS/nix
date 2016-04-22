@@ -1,4 +1,3 @@
-#include "affinity.hh" // FIXME
 #include "command.hh"
 #include "progress-bar.hh"
 #include "shared.hh"
@@ -31,8 +30,6 @@ struct CmdCopySigs : StorePathsCommand
 
     void run(ref<Store> store, Paths storePaths) override
     {
-        restoreAffinity(); // FIXME
-
         if (substituterUris.empty())
             throw UsageError("you must specify at least one substituter using ‘-s’");
 

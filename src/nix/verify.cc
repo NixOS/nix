@@ -1,4 +1,3 @@
-#include "affinity.hh" // FIXME
 #include "command.hh"
 #include "progress-bar.hh"
 #include "shared.hh"
@@ -52,8 +51,6 @@ struct CmdVerify : StorePathsCommand
 
     void run(ref<Store> store, Paths storePaths) override
     {
-        restoreAffinity(); // FIXME
-
         std::vector<ref<Store>> substituters;
         for (auto & s : substituterUris)
             substituters.push_back(openStoreAt(s));
