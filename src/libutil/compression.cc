@@ -1,5 +1,5 @@
 #include "compression.hh"
-#include "types.hh"
+#include "util.hh"
 
 #include <lzma.h>
 #include <cstdio>
@@ -35,6 +35,7 @@ std::string compressXZ(const std::string & in)
     strm().avail_out = sizeof(outbuf);
 
     while (true) {
+        checkInterrupt();
 
         if (strm().avail_in == 0)
             action = LZMA_FINISH;
@@ -73,6 +74,7 @@ ref<std::string> decompressXZ(const std::string & in)
     strm().avail_out = sizeof(outbuf);
 
     while (true) {
+        checkInterrupt();
 
         if (strm().avail_in == 0)
             action = LZMA_FINISH;
