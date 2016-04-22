@@ -15,7 +15,9 @@ class ThreadPool
 {
 public:
 
-    ThreadPool(size_t nrThreads = 0);
+    ThreadPool(size_t maxThreads = 0);
+
+    ~ThreadPool();
 
     // FIXME: use std::packaged_task?
     typedef std::function<void()> work_t;
@@ -34,19 +36,22 @@ public:
 
 private:
 
-    size_t nrThreads;
+    size_t maxThreads;
 
     struct State
     {
         std::queue<work_t> left;
         size_t pending = 0;
         std::exception_ptr exception;
+        std::vector<std::thread> workers;
+        bool quit = false;
     };
 
-    Sync<State> state;
+    Sync<State> state_;
 
-    std::condition_variable wakeup;
+    std::condition_variable work, done;
 
+    void workerEntry();
 };
 
 }
