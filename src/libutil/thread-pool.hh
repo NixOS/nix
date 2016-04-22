@@ -6,6 +6,7 @@
 #include <queue>
 #include <functional>
 #include <thread>
+#include <map>
 
 namespace nix {
 
@@ -53,5 +54,64 @@ private:
 
     void workerEntry();
 };
+
+/* Process in parallel a set of items of type T that have a partial
+   ordering between them. Thus, any item is only processed after all
+   its dependencies have been processed. */
+template<typename T>
+void processGraph(
+    ThreadPool & pool,
+    const std::set<T> & nodes,
+    std::function<std::set<T>(const T &)> getEdges,
+    std::function<void(const T &)> processNode)
+{
+    struct Graph {
+        std::set<T> left;
+        std::map<T, std::set<T>> refs, rrefs;
+        std::function<void(T)> wrap;
+    };
+
+    ref<Sync<Graph>> graph_ = make_ref<Sync<Graph>>();
+
+    auto wrapWork = [&pool, graph_, processNode](const T & node) {
+        processNode(node);
+
+        /* Enqueue work for all nodes that were waiting on this one. */
+        {
+            auto graph(graph_->lock());
+            graph->left.erase(node);
+            for (auto & rref : graph->rrefs[node]) {
+                auto & refs(graph->refs[rref]);
+                auto i = refs.find(node);
+                assert(i != refs.end());
+                refs.erase(i);
+                if (refs.empty())
+                    pool.enqueue(std::bind(graph->wrap, rref));
+            }
+        }
+    };
+
+    {
+        auto graph(graph_->lock());
+        graph->left = nodes;
+        graph->wrap = wrapWork;
+    }
+
+    /* Build the dependency graph; enqueue all nodes with no
+       dependencies. */
+    for (auto & node : nodes) {
+        auto refs = getEdges(node);
+        {
+            auto graph(graph_->lock());
+            for (auto & ref : refs)
+                if (ref != node && graph->left.count(ref)) {
+                    graph->refs[node].insert(ref);
+                    graph->rrefs[ref].insert(node);
+                }
+            if (graph->refs[node].empty())
+                pool.enqueue(std::bind(graph->wrap, node));
+        }
+    }
+}
 
 }
