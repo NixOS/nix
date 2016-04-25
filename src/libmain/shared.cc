@@ -171,7 +171,7 @@ struct LegacyArgs : public MixCommonArgs
         : MixCommonArgs(programName), parseArg(parseArg)
     {
         mkFlag('Q', "no-build-output", "do not show build output",
-            &settings.buildVerbosity, lvlVomit);
+            &settings.verboseBuild, false);
 
         mkFlag('K', "keep-failed", "keep temporary directories of failed builds",
             &settings.keepFailed);

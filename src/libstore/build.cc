@@ -747,6 +747,11 @@ private:
     /* Number of bytes received from the builder's stdout/stderr. */
     unsigned long logSize;
 
+    /* The most recent log lines. */
+    std::list<std::string> logTail;
+
+    std::string currentLogLine;
+
     /* Pipe for the builder's standard output/error. */
     Pipe builderOut;
 
@@ -872,6 +877,7 @@ private:
     /* Callback used by the worker to write to the log. */
     void handleChildOutput(int fd, const string & data) override;
     void handleEOF(int fd) override;
+    void flushLine();
 
     /* Return the set of (in)valid paths. */
     PathSet checkPathValidity(bool returnValid, bool checkHash);
@@ -1462,11 +1468,19 @@ void DerivationGoal::buildDone()
                     if (pathExists(chrootRootDir + i))
                         rename((chrootRootDir + i).c_str(), i.c_str());
 
-            if (diskFull)
-                printMsg(lvlError, "note: build failure may have been caused by lack of free disk space");
+            std::string msg = (format("builder for ‘%1%’ %2%")
+                % drvPath % statusToString(status)).str();
 
-            throw BuildError(format("builder for ‘%1%’ %2%")
-                % drvPath % statusToString(status));
+            if (!settings.verboseBuild && !logTail.empty()) {
+                msg += (format("; last %d log lines:") % logTail.size()).str();
+                for (auto & line : logTail)
+                    msg += "\n  " + line;
+            }
+
+            if (diskFull)
+                msg += "\nnote: build failure may have been caused by lack of free disk space";
+
+            throw BuildError(msg);
         }
 
         /* Compute the FS closure of the outputs and register them as
@@ -2920,8 +2934,20 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
             done(BuildResult::LogLimitExceeded);
             return;
         }
-        if (verbosity >= settings.buildVerbosity)
-            printMsg(lvlError, filterANSIEscapes(data, true)); // FIXME
+
+        for (size_t pos = 0; true; ) {
+            auto newline = data.find('\n', pos);
+
+            if (newline == std::string::npos) {
+                currentLogLine.append(data, pos, std::string::npos);
+                break;
+            }
+
+            currentLogLine.append(data, pos, newline - pos);
+            flushLine();
+            pos = newline + 1;
+        }
+
         if (bzLogFile) {
             int err;
             BZ2_bzWrite(&err, bzLogFile, (unsigned char *) data.data(), data.size());
@@ -2937,7 +2963,20 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
 
 void DerivationGoal::handleEOF(int fd)
 {
+    flushLine();
     worker.wakeUp(shared_from_this());
+}
+
+
+void DerivationGoal::flushLine()
+{
+    if (settings.verboseBuild)
+        printMsg(lvlInfo, filterANSIEscapes(currentLogLine, true));
+    else {
+        logTail.push_back(currentLogLine);
+        if (logTail.size() > settings.logLines) logTail.pop_front();
+    }
+    currentLogLine = "";
 }
 
 
@@ -3341,10 +3380,7 @@ void SubstitutionGoal::finished()
 void SubstitutionGoal::handleChildOutput(int fd, const string & data)
 {
     assert(fd == logPipe.readSide);
-    if (verbosity >= settings.buildVerbosity)
-        printMsg(lvlError, data); // FIXME
-    /* Don't write substitution output to a log file for now.  We
-       probably should, though. */
+    printMsg(lvlError, data); // FIXME
 }
 
 

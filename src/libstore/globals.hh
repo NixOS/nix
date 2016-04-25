@@ -78,8 +78,12 @@ struct Settings {
        instead. */
     bool tryFallback;
 
-    /* Verbosity level for build output. */
-    Verbosity buildVerbosity;
+    /* Whether to show build log output in real time. */
+    bool verboseBuild = true;
+
+    /* If verboseBuild is false, the number of lines of the tail of
+       the log to show if a build fails. */
+    size_t logLines = 10;
 
     /* Maximum number of parallel build jobs.  0 means unlimited. */
     unsigned int maxBuildJobs;

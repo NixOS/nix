@@ -120,7 +120,7 @@ void RemoteStore::setOptions(ref<Connection> conn)
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 2)
         conn->to << settings.useBuildHook;
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 4)
-        conn->to << settings.buildVerbosity
+        conn->to << (settings.verboseBuild ? lvlError : lvlVomit)
                  << 0 // obsolete log type
                  << 0 /* obsolete print build trace */;
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 6)

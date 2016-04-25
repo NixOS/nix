@@ -28,7 +28,6 @@ Settings::Settings()
     keepFailed = false;
     keepGoing = false;
     tryFallback = false;
-    buildVerbosity = lvlError;
     maxBuildJobs = 1;
     buildCores = 1;
 #ifdef _SC_NPROCESSORS_ONLN

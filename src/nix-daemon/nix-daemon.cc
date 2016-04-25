@@ -443,7 +443,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         if (GET_PROTOCOL_MINOR(clientVersion) >= 2)
             settings.useBuildHook = readInt(from) != 0;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 4) {
-            settings.buildVerbosity = (Verbosity) readInt(from);
+            settings.verboseBuild = lvlError == (Verbosity) readInt(from);
             readInt(from); // obsolete logType
             readInt(from); // obsolete printBuildTrace
         }
