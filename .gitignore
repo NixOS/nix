@@ -68,9 +68,6 @@ Makefile.config
 # /src/nix-instantiate/
 /src/nix-instantiate/nix-instantiate
 
-# /src/nix-log2xml/
-/src/nix-log2xml/nix-log2xml
-
 # /src/nix-store/
 /src/nix-store/nix-store
 

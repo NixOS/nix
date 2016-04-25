@@ -12,7 +12,6 @@ makefiles = \
   src/nix-daemon/local.mk \
   src/nix-collect-garbage/local.mk \
   src/download-via-ssh/local.mk \
-  src/nix-log2xml/local.mk \
   src/nix-prefetch-url/local.mk \
   perl/local.mk \
   scripts/local.mk \
