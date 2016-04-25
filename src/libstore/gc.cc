@@ -305,7 +305,7 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
 
         else if (type == DT_REG) {
             Path storePath = settings.nixStore + "/" + baseNameOf(path);
-            if (isValidPath(storePath))
+            if (isStorePath(storePath) && isValidPath(storePath))
                 roots[path] = storePath;
         }
 
