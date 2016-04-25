@@ -173,9 +173,6 @@ struct LegacyArgs : public MixCommonArgs
         mkFlag('Q', "no-build-output", "do not show build output",
             &settings.buildVerbosity, lvlVomit);
 
-        mkFlag(0, "print-build-trace", "emit special build trace message",
-            &settings.printBuildTrace);
-
         mkFlag('K', "keep-failed", "keep temporary directories of failed builds",
             &settings.keepFailed);
 

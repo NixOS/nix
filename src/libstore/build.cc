@@ -633,7 +633,6 @@ HookInstance::HookInstance()
             baseNameOf(buildHook),
             settings.thisSystem,
             (format("%1%") % settings.maxSilentTime).str(),
-            (format("%1%") % settings.printBuildTrace).str(),
             (format("%1%") % settings.buildTimeout).str()
         };
 
@@ -960,8 +959,6 @@ void DerivationGoal::killChild()
 
 void DerivationGoal::timedOut()
 {
-    if (settings.printBuildTrace)
-        printMsg(lvlError, format("@ build-failed %1% - timeout") % drvPath);
     killChild();
     done(BuildResult::TimedOut);
 }
@@ -1362,9 +1359,6 @@ void DerivationGoal::tryToBuild()
         printMsg(lvlError, e.msg());
         outputLocks.unlock();
         buildUser.release();
-        if (settings.printBuildTrace)
-            printMsg(lvlError, format("@ build-failed %1% - %2% %3%")
-                % drvPath % 0 % e.msg());
         worker.permanentFailure = true;
         done(BuildResult::InputRejected, e.msg());
         return;
@@ -1517,23 +1511,13 @@ void DerivationGoal::buildDone()
 
         BuildResult::Status st = BuildResult::MiscFailure;
 
-        if (hook && WIFEXITED(status) && WEXITSTATUS(status) == 101) {
-            if (settings.printBuildTrace)
-                printMsg(lvlError, format("@ build-failed %1% - timeout") % drvPath);
+        if (hook && WIFEXITED(status) && WEXITSTATUS(status) == 101)
             st = BuildResult::TimedOut;
-        }
 
         else if (hook && (!WIFEXITED(status) || WEXITSTATUS(status) != 100)) {
-            if (settings.printBuildTrace)
-                printMsg(lvlError, format("@ hook-failed %1% - %2% %3%")
-                    % drvPath % status % e.msg());
         }
 
         else {
-            if (settings.printBuildTrace)
-                printMsg(lvlError, format("@ build-failed %1% - %2% %3%")
-                    % drvPath % 1 % e.msg());
-
             st =
                 dynamic_cast<NotDeterministic*>(&e) ? BuildResult::NotDeterministic :
                 statusOk(status) ? BuildResult::OutputRejected :
@@ -1547,9 +1531,6 @@ void DerivationGoal::buildDone()
 
     /* Release the build user, if applicable. */
     buildUser.release();
-
-    if (settings.printBuildTrace)
-        printMsg(lvlError, format("@ build-succeeded %1% -") % drvPath);
 
     done(BuildResult::Built);
 }
@@ -1627,10 +1608,6 @@ HookReply DerivationGoal::tryBuildHook()
     fds.insert(hook->builderOut.readSide);
     worker.childStarted(shared_from_this(), hook->pid, fds, false, false);
 
-    if (settings.printBuildTrace)
-        printMsg(lvlError, format("@ build-started %1% - %2% %3%")
-            % drvPath % drv->platform % logFile);
-
     return rpAccept;
 }
 
@@ -1661,8 +1638,6 @@ void DerivationGoal::startBuilder()
 
     /* Right platform? */
     if (!drv->canBuildLocally()) {
-        if (settings.printBuildTrace)
-            printMsg(lvlError, format("@ unsupported-platform %1% %2%") % drvPath % drv->platform);
         throw Error(
             format("a ‘%1%’ is required to build ‘%3%’, but I am a ‘%2%’")
             % drv->platform % settings.thisSystem % drvPath);
@@ -2176,11 +2151,6 @@ void DerivationGoal::startBuilder()
             throw Error(string(msg, 1));
         }
         printMsg(lvlDebug, msg);
-    }
-
-    if (settings.printBuildTrace) {
-        printMsg(lvlError, format("@ build-started %1% - %2% %3%")
-            % drvPath % drv->platform % logFile);
     }
 }
 
@@ -3107,8 +3077,6 @@ SubstitutionGoal::~SubstitutionGoal()
 
 void SubstitutionGoal::timedOut()
 {
-    if (settings.printBuildTrace)
-        printMsg(lvlError, format("@ substituter-failed %1% timeout") % storePath);
     if (pid != -1) {
         pid_t savedPid = pid;
         pid.kill();
@@ -3283,9 +3251,6 @@ void SubstitutionGoal::tryToRun()
         pid, singleton<set<int> >(logPipe.readSide), true, true);
 
     state = &SubstitutionGoal::finished;
-
-    if (settings.printBuildTrace)
-        printMsg(lvlError, format("@ substituter-started %1% %2%") % storePath % sub);
 }
 
 
@@ -3341,11 +3306,6 @@ void SubstitutionGoal::finished()
 
         printMsg(lvlInfo, e.msg());
 
-        if (settings.printBuildTrace) {
-            printMsg(lvlError, format("@ substituter-failed %1% %2% %3%")
-                % storePath % status % e.msg());
-        }
-
         /* Try the next substitute. */
         state = &SubstitutionGoal::tryNext;
         worker.wakeUp(shared_from_this());
@@ -3373,9 +3333,6 @@ void SubstitutionGoal::finished()
 
     printMsg(lvlChatty,
         format("substitution of path ‘%1%’ succeeded") % storePath);
-
-    if (settings.printBuildTrace)
-        printMsg(lvlError, format("@ substituter-succeeded %1%") % storePath);
 
     amDone(ecSuccess);
 }

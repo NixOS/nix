@@ -445,7 +445,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         if (GET_PROTOCOL_MINOR(clientVersion) >= 4) {
             settings.buildVerbosity = (Verbosity) readInt(from);
             readInt(from); // obsolete logType
-            settings.printBuildTrace = readInt(from) != 0;
+            readInt(from); // obsolete printBuildTrace
         }
         if (GET_PROTOCOL_MINOR(clientVersion) >= 6)
             settings.set("build-cores", std::to_string(readInt(from)));

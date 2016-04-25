@@ -115,22 +115,6 @@ struct Settings {
        users want to disable this from the command-line. */
     bool useBuildHook;
 
-    /* Whether buildDerivations() should print out lines on stderr in
-       a fixed format to allow its progress to be monitored.  Each
-       line starts with a "@".  The following are defined:
-
-       @ build-started <drvpath> <outpath> <system> <logfile>
-       @ build-failed <drvpath> <outpath> <exitcode> <error text>
-       @ build-succeeded <drvpath> <outpath>
-       @ substituter-started <outpath> <substituter>
-       @ substituter-failed <outpath> <exitcode> <error text>
-       @ substituter-succeeded <outpath>
-
-       Best combined with --no-build-output, otherwise stderr might
-       conceivably contain lines in this format printed by the
-       builders. */
-    bool printBuildTrace;
-
     /* Amount of reserved space for the garbage collector
        (/nix/var/nix/db/reserved). */
     off_t reservedSize;
