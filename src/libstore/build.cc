@@ -2935,18 +2935,13 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
             return;
         }
 
-        for (size_t pos = 0; true; ) {
-            auto newline = data.find('\n', pos);
-
-            if (newline == std::string::npos) {
-                currentLogLine.append(data, pos, std::string::npos);
-                break;
-            }
-
-            currentLogLine.append(data, pos, newline - pos);
-            flushLine();
-            pos = newline + 1;
-        }
+        for (auto c : data)
+            if (c == '\r')
+                currentLogLine.clear(); // FIXME: not quite right
+            else if (c == '\n')
+                flushLine();
+            else
+                currentLogLine += c;
 
         if (bzLogFile) {
             int err;
