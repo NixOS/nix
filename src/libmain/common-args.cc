@@ -18,15 +18,6 @@ MixCommonArgs::MixCommonArgs(const string & programName)
         verbosity = lvlDebug;
     });
 
-    mkFlag1(0, "log-type", "type", "set logging format ('pretty', 'flat', 'systemd')",
-        [](std::string s) {
-            if (s == "pretty") logType = ltPretty;
-            else if (s == "escapes") logType = ltEscapes;
-            else if (s == "flat") logType = ltFlat;
-            else if (s == "systemd") logType = ltSystemd;
-            else throw UsageError("unknown log type");
-        });
-
     mkFlag(0, "option", {"name", "value"}, "set a Nix configuration option (overriding nix.conf)", 2,
         [](Strings ss) {
             auto name = ss.front(); ss.pop_front();

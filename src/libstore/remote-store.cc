@@ -121,8 +121,8 @@ void RemoteStore::setOptions(ref<Connection> conn)
         conn->to << settings.useBuildHook;
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 4)
         conn->to << settings.buildVerbosity
-           << logType
-           << settings.printBuildTrace;
+                 << 0 // obsolete log type
+                 << settings.printBuildTrace;
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 6)
         conn->to << settings.buildCores;
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 10)
@@ -561,10 +561,8 @@ void RemoteStore::Connection::processStderr(Sink * sink, Source * source)
             writeString(buf, source->read(buf, len), to);
             to.flush();
         }
-        else {
-            string s = readString(from);
-            writeToStderr(s);
-        }
+        else
+            printMsg(lvlError, chomp(readString(from)));
     }
     if (msg == STDERR_ERROR) {
         string error = readString(from);

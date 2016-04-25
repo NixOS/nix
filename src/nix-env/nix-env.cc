@@ -996,7 +996,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         try {
             if (i.hasFailed()) continue;
 
-            startNest(nest, lvlDebug, format("outputting query result ‘%1%’") % i.attrPath);
+            Activity act(*logger, lvlDebug, format("outputting query result ‘%1%’") % i.attrPath);
 
             if (globals.prebuiltOnly &&
                 validPaths.find(i.queryOutPath()) == validPaths.end() &&

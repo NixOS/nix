@@ -1,5 +1,4 @@
 #include "command.hh"
-#include "progress-bar.hh"
 #include "shared.hh"
 #include "store-api.hh"
 

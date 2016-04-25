@@ -1,5 +1,4 @@
 #include "command.hh"
-#include "progress-bar.hh"
 #include "shared.hh"
 #include "store-api.hh"
 #include "sync.hh"
@@ -57,30 +56,16 @@ struct CmdVerify : StorePathsCommand
 
         auto publicKeys = getDefaultPublicKeys();
 
+        std::atomic<size_t> done{0};
         std::atomic<size_t> untrusted{0};
         std::atomic<size_t> corrupted{0};
-        std::atomic<size_t> done{0};
         std::atomic<size_t> failed{0};
 
-        ProgressBar progressBar;
-
-        auto showProgress = [&](bool final) {
-            std::string s;
-            if (final)
-                s = (format("checked %d paths") % storePaths.size()).str();
-            else
-                s = (format("[%d/%d checked") % done % storePaths.size()).str();
-            if (corrupted > 0)
-                s += (format(", %d corrupted") % corrupted).str();
-            if (untrusted > 0)
-                s += (format(", %d untrusted") % untrusted).str();
-            if (failed > 0)
-                s += (format(", %d failed") % failed).str();
-            if (!final) s += "]";
-            return s;
-        };
-
-        progressBar.updateStatus(showProgress(false));
+        std::string doneLabel("paths checked");
+        std::string untrustedLabel("untrusted");
+        std::string corruptedLabel("corrupted");
+        std::string failedLabel("failed");
+        logger->setExpected(doneLabel, storePaths.size());
 
         ThreadPool pool;
 
@@ -88,7 +73,7 @@ struct CmdVerify : StorePathsCommand
             try {
                 checkInterrupt();
 
-                auto activity(progressBar.startActivity(format("checking ‘%s’") % storePath));
+                Activity act(*logger, lvlInfo, format("checking ‘%s’") % storePath);
 
                 auto info = store->queryPathInfo(storePath);
 
@@ -100,6 +85,7 @@ struct CmdVerify : StorePathsCommand
                     auto hash = sink.finish();
 
                     if (hash.first != info->narHash) {
+                        logger->incProgress(corruptedLabel);
                         corrupted = 1;
                         printMsg(lvlError,
                             format("path ‘%s’ was modified! expected hash ‘%s’, got ‘%s’")
@@ -147,18 +133,19 @@ struct CmdVerify : StorePathsCommand
                     }
 
                     if (!good) {
+                        logger->incProgress(untrustedLabel);
                         untrusted++;
                         printMsg(lvlError, format("path ‘%s’ is untrusted") % info->path);
                     }
 
                 }
 
+                logger->incProgress(doneLabel);
                 done++;
-
-                progressBar.updateStatus(showProgress(false));
 
             } catch (Error & e) {
                 printMsg(lvlError, format(ANSI_RED "error:" ANSI_NORMAL " %s") % e.what());
+                logger->incProgress(failedLabel);
                 failed++;
             }
         };
@@ -168,9 +155,8 @@ struct CmdVerify : StorePathsCommand
 
         pool.process();
 
-        progressBar.done();
-
-        printMsg(lvlInfo, showProgress(true));
+        printMsg(lvlInfo, format("%d paths checked, %d untrusted, %d corrupted, %d failed")
+            % done % untrusted % corrupted % failed);
 
         throw Exit(
             (corrupted ? 1 : 0) |

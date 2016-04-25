@@ -1,5 +1,4 @@
 #include "command.hh"
-#include "progress-bar.hh"
 #include "shared.hh"
 #include "store-api.hh"
 #include "thread-pool.hh"
@@ -38,21 +37,15 @@ struct CmdCopySigs : StorePathsCommand
         for (auto & s : substituterUris)
             substituters.push_back(openStoreAt(s));
 
-        ProgressBar progressBar;
-
         ThreadPool pool;
 
-        std::atomic<size_t> done{0};
+        std::string doneLabel = "done";
         std::atomic<size_t> added{0};
 
-        auto showProgress = [&]() {
-            return (format("[%d/%d done]") % done % storePaths.size()).str();
-        };
-
-        progressBar.updateStatus(showProgress());
+        logger->setExpected(doneLabel, storePaths.size());
 
         auto doPath = [&](const Path & storePath) {
-            auto activity(progressBar.startActivity(format("getting signatures for ‘%s’") % storePath));
+            Activity act(*logger, lvlInfo, format("getting signatures for ‘%s’") % storePath);
 
             checkInterrupt();
 
@@ -83,16 +76,13 @@ struct CmdCopySigs : StorePathsCommand
                 added += newSigs.size();
             }
 
-            done++;
-            progressBar.updateStatus(showProgress());
+            logger->incProgress(doneLabel);
         };
 
         for (auto & storePath : storePaths)
             pool.enqueue(std::bind(doPath, storePath));
 
         pool.process();
-
-        progressBar.done();
 
         printMsg(lvlInfo, format("imported %d signatures") % added);
     }

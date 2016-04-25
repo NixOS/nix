@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.hh"
+#include "logging.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -123,54 +124,6 @@ T singleton(const A & a)
     t.insert(a);
     return t;
 }
-
-
-/* Messages. */
-
-
-typedef enum {
-    ltPretty,   /* nice, nested output */
-    ltEscapes,  /* nesting indicated using escape codes (for log2xml) */
-    ltFlat,     /* no nesting */
-    ltSystemd,  /* use systemd severity prefixes */
-} LogType;
-
-extern LogType logType;
-extern Verbosity verbosity; /* suppress msgs > this */
-
-class Nest
-{
-private:
-    bool nest;
-public:
-    Nest();
-    ~Nest();
-    void open(Verbosity level, const FormatOrString & fs);
-    void close();
-};
-
-void printMsg_(Verbosity level, const FormatOrString & fs);
-
-#define startNest(varName, level, f) \
-    Nest varName; \
-    if (level <= verbosity) { \
-      varName.open(level, (f)); \
-    }
-
-#define printMsg(level, f) \
-    do { \
-        if (level <= nix::verbosity) { \
-            nix::printMsg_(level, (f)); \
-        } \
-    } while (0)
-
-#define debug(f) printMsg(lvlDebug, f)
-
-void warnOnce(bool & haveWarned, const FormatOrString & fs);
-
-void writeToStderr(const string & s);
-
-extern std::function<void(const unsigned char * buf, size_t count)> _writeToStderr;
 
 
 /* Wrappers arount read()/write() that read/write exactly the

@@ -7,6 +7,7 @@
 #include "legacy.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "progress-bar.hh"
 
 namespace nix {
 
@@ -41,6 +42,8 @@ void mainWrapped(int argc, char * * argv)
     args.parseCmdline(argvToStrings(argc, argv));
 
     assert(args.command);
+
+    StartProgressBar bar;
 
     args.command->prepare();
     args.command->run();

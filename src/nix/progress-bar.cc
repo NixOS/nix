@@ -1,72 +1,157 @@
 #include "progress-bar.hh"
+#include "util.hh"
+#include "sync.hh"
 
-#include <iostream>
+#include <map>
 
 namespace nix {
 
-ProgressBar::ProgressBar()
+class ProgressBar : public Logger
 {
-    _writeToStderr = [&](const unsigned char * buf, size_t count) {
-        auto state_(state.lock());
-        assert(!state_->done);
-        std::cerr << "\r\e[K" << std::string((const char *) buf, count);
-        render(*state_);
+private:
+
+    struct ActInfo
+    {
+        Activity * activity;
+        Verbosity lvl;
+        std::string s;
     };
-}
 
-ProgressBar::~ProgressBar()
-{
-    done();
-}
+    struct Progress
+    {
+        uint64_t expected = 0, progress = 0;
+    };
 
-void ProgressBar::updateStatus(const std::string & s)
-{
-    auto state_(state.lock());
-    assert(!state_->done);
-    state_->status = s;
-    render(*state_);
-}
+    struct State
+    {
+        std::list<ActInfo> activities;
+        std::map<Activity *, std::list<ActInfo>::iterator> its;
+        std::map<std::string, Progress> progress;
+    };
 
-void ProgressBar::done()
-{
-    _writeToStderr = decltype(_writeToStderr)();
-    auto state_(state.lock());
-    assert(state_->activities.empty());
-    state_->done = true;
-    std::cerr << "\r\e[K";
-    std::cerr.flush();
-}
+    Sync<State> state_;
 
-void ProgressBar::render(State & state_)
-{
-    std::cerr << '\r' << state_.status;
-    if (!state_.activities.empty()) {
-        if (!state_.status.empty()) std::cerr << ' ';
-        std::cerr << *state_.activities.rbegin();
+public:
+
+    ~ProgressBar()
+    {
+        auto state(state_.lock());
+        assert(state->activities.empty());
+        writeToStderr("\r\e[K");
     }
-    std::cerr << "\e[K";
-    std::cerr.flush();
+
+    void log(Verbosity lvl, const FormatOrString & fs) override
+    {
+        auto state(state_.lock());
+        log(*state, lvl, fs.s);
+    }
+
+    void log(State & state, Verbosity lvl, const std::string & s)
+    {
+        writeToStderr("\r\e[K" + s + "\n");
+        update(state);
+    }
+
+    void startActivity(Activity & activity, Verbosity lvl, const FormatOrString & fs) override
+    {
+        if (lvl > verbosity) return;
+        auto state(state_.lock());
+        state->activities.emplace_back(ActInfo{&activity, lvl, fs.s});
+        state->its.emplace(&activity, std::prev(state->activities.end()));
+        update(*state);
+    }
+
+    void stopActivity(Activity & activity) override
+    {
+        auto state(state_.lock());
+        auto i = state->its.find(&activity);
+        if (i == state->its.end()) return;
+        state->activities.erase(i->second);
+        state->its.erase(i);
+        update(*state);
+    }
+
+    void setExpected(const std::string & label, uint64_t value) override
+    {
+        auto state(state_.lock());
+        state->progress[label].expected = value;
+    }
+
+    void setProgress(const std::string & label, uint64_t value) override
+    {
+        auto state(state_.lock());
+        state->progress[label].progress = value;
+    }
+
+    void incExpected(const std::string & label, uint64_t value) override
+    {
+        auto state(state_.lock());
+        state->progress[label].expected += value;
+    }
+
+    void incProgress(const std::string & label, uint64_t value)
+    {
+        auto state(state_.lock());
+        state->progress[label].progress += value;
+    }
+
+    void update()
+    {
+        auto state(state_.lock());
+    }
+
+    void update(State & state)
+    {
+        std::string line = "\r";
+
+        std::string status = getStatus(state);
+        if (!status.empty()) {
+            line += '[';
+            line += status;
+            line += "]";
+        }
+
+        if (!state.activities.empty()) {
+            if (!status.empty()) line += " ";
+            line += state.activities.rbegin()->s;
+        }
+
+        line += "\e[K";
+        writeToStderr(line);
+    }
+
+    std::string getStatus(State & state)
+    {
+        std::string res;
+        for (auto & p : state.progress)
+            if (p.second.expected || p.second.progress) {
+                if (!res.empty()) res += ", ";
+                res += std::to_string(p.second.progress);
+                if (p.second.expected) {
+                    res += "/";
+                    res += std::to_string(p.second.expected);
+                }
+                res += " "; res += p.first;
+            }
+        return res;
+    }
+};
+
+StartProgressBar::StartProgressBar()
+{
+    if (isatty(STDERR_FILENO)) {
+        prev = logger;
+        logger = new ProgressBar();
+    }
 }
 
-
-ProgressBar::Activity ProgressBar::startActivity(const FormatOrString & fs)
+StartProgressBar::~StartProgressBar()
 {
-    return Activity(*this, fs);
-}
-
-ProgressBar::Activity::Activity(ProgressBar & pb, const FormatOrString & fs)
-    : pb(pb)
-{
-    auto state_(pb.state.lock());
-    state_->activities.push_back(fs.s);
-    it = state_->activities.end(); --it;
-    pb.render(*state_);
-}
-
-ProgressBar::Activity::~Activity()
-{
-    auto state_(pb.state.lock());
-    state_->activities.erase(it);
+    if (prev) {
+        auto bar = logger;
+        logger = prev;
+        delete bar;
+    }
 }
 
 }

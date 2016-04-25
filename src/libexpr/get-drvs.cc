@@ -290,7 +290,7 @@ static void getDerivations(EvalState & state, Value & vIn,
             attrs.insert(std::pair<string, Symbol>(i.name, i.name));
 
         for (auto & i : attrs) {
-            startNest(nest, lvlDebug, format("evaluating attribute ‘%1%’") % i.first);
+            Activity act(*logger, lvlDebug, format("evaluating attribute ‘%1%’") % i.first);
             string pathPrefix2 = addToPath(pathPrefix, i.first);
             Value & v2(*v.attrs->find(i.second)->value);
             if (combineChannels)
@@ -310,8 +310,7 @@ static void getDerivations(EvalState & state, Value & vIn,
 
     else if (v.isList()) {
         for (unsigned int n = 0; n < v.listSize(); ++n) {
-            startNest(nest, lvlDebug,
-                format("evaluating list element"));
+            Activity act(*logger, lvlDebug, "evaluating list element");
             string pathPrefix2 = addToPath(pathPrefix, (format("%1%") % n).str());
             if (getDerivation(state, *v.listElems()[n], pathPrefix2, drvs, done, ignoreAssertionFailures))
                 getDerivations(state, *v.listElems()[n], pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);

@@ -1,5 +1,4 @@
 #include "command.hh"
-#include "progress-bar.hh"
 #include "shared.hh"
 #include "store-api.hh"
 #include "sync.hh"
@@ -47,16 +46,9 @@ struct CmdCopy : StorePathsCommand
         ref<Store> srcStore = srcUri.empty() ? store : openStoreAt(srcUri);
         ref<Store> dstStore = dstUri.empty() ? store : openStoreAt(dstUri);
 
-        ProgressBar progressBar;
+        std::string copiedLabel = "copied";
 
-        std::atomic<size_t> done{0};
-        std::atomic<size_t> total{storePaths.size()};
-
-        auto showProgress = [&]() {
-            return (format("[%d/%d copied]") % done % total).str();
-        };
-
-        progressBar.updateStatus(showProgress());
+        logger->setExpected(copiedLabel, storePaths.size());
 
         ThreadPool pool;
 
@@ -71,7 +63,7 @@ struct CmdCopy : StorePathsCommand
                 checkInterrupt();
 
                 if (!dstStore->isValidPath(storePath)) {
-                    auto activity(progressBar.startActivity(format("copying ‘%s’...") % storePath));
+                    Activity act(*logger, lvlInfo, format("copying ‘%s’...") % storePath);
 
                     StringSink sink;
                     srcStore->exportPaths({storePath}, false, sink);
@@ -79,16 +71,12 @@ struct CmdCopy : StorePathsCommand
                     StringSource source(*sink.s);
                     dstStore->importPaths(false, source, 0);
 
-                    done++;
+                    logger->incProgress(copiedLabel);
                 } else
-                    total--;
-
-                progressBar.updateStatus(showProgress());
+                    logger->incExpected(copiedLabel, -1);
             });
 
         pool.process();
-
-        progressBar.done();
     }
 };
 

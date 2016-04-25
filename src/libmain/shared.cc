@@ -111,8 +111,7 @@ void initNix()
     std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
 #endif
 
-    if (getEnv("IN_SYSTEMD") == "1")
-        logType = ltSystemd;
+    logger = makeDefaultLogger();
 
     /* Initialise OpenSSL locking. */
     opensslLocks = std::vector<std::mutex>(CRYPTO_num_locks());

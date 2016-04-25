@@ -641,7 +641,7 @@ void EvalState::evalFile(const Path & path, Value & v)
         return;
     }
 
-    startNest(nest, lvlTalkative, format("evaluating file ‘%1%’") % path2);
+    Activity act(*logger, lvlTalkative, format("evaluating file ‘%1%’") % path2);
     Expr * e = parseExprFromFile(checkSourcePath(path2));
     try {
         eval(e, v);

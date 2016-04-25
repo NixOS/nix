@@ -1657,7 +1657,7 @@ void DerivationGoal::startBuilder()
         nrRounds > 1 ? "building path(s) %1% (round %2%/%3%)" :
         "building path(s) %1%");
     f.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
-    startNest(nest, lvlInfo, f % showPaths(missingPaths) % curRound % nrRounds);
+    printMsg(lvlInfo, f % showPaths(missingPaths) % curRound % nrRounds);
 
     /* Right platform? */
     if (!drv->canBuildLocally()) {
@@ -2192,8 +2192,6 @@ void DerivationGoal::runChild()
 
     try { /* child */
 
-        logType = ltFlat;
-
         commonChildInit(builderOut);
 
 #if __linux__
@@ -2535,7 +2533,6 @@ void DerivationGoal::runChild()
         /* Execute the program.  This should not return. */
         if (drv->isBuiltin()) {
             try {
-                logType = ltFlat;
                 if (drv->builder == "builtin:fetchurl")
                     builtinFetchurl(*drv);
                 else
@@ -2667,8 +2664,7 @@ void DerivationGoal::registerOutputs()
             rewritten = true;
         }
 
-        startNest(nest, lvlTalkative,
-            format("scanning for references inside ‘%1%’") % path);
+        Activity act(*logger, lvlTalkative, format("scanning for references inside ‘%1%’") % path);
 
         /* Check that fixed-output derivations produced the right
            outputs (i.e., the content hash should match the specified
@@ -2955,7 +2951,7 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
             return;
         }
         if (verbosity >= settings.buildVerbosity)
-            writeToStderr(filterANSIEscapes(data, true));
+            printMsg(lvlError, filterANSIEscapes(data, true)); // FIXME
         if (bzLogFile) {
             int err;
             BZ2_bzWrite(&err, bzLogFile, (unsigned char *) data.data(), data.size());
@@ -2965,7 +2961,7 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
     }
 
     if (hook && fd == hook->fromHook.readSide)
-        writeToStderr(data);
+        printMsg(lvlError, data); // FIXME?
 }
 
 
@@ -3388,7 +3384,8 @@ void SubstitutionGoal::finished()
 void SubstitutionGoal::handleChildOutput(int fd, const string & data)
 {
     assert(fd == logPipe.readSide);
-    if (verbosity >= settings.buildVerbosity) writeToStderr(data);
+    if (verbosity >= settings.buildVerbosity)
+        printMsg(lvlError, data); // FIXME
     /* Don't write substitution output to a log file for now.  We
        probably should, though. */
 }
@@ -3586,7 +3583,7 @@ void Worker::run(const Goals & _topGoals)
 {
     for (auto & i : _topGoals) topGoals.insert(i);
 
-    startNest(nest, lvlDebug, format("entered goal loop"));
+    Activity act(*logger, lvlDebug, "entered goal loop");
 
     while (1) {
 
@@ -3804,8 +3801,6 @@ void Worker::markContentsGood(const Path & path)
 
 void LocalStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
 {
-    startNest(nest, lvlDebug, format("building %1%") % showPaths(drvPaths));
-
     Worker worker(*this);
 
     Goals goals;
@@ -3835,8 +3830,6 @@ void LocalStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
 BuildResult LocalStore::buildDerivation(const Path & drvPath, const BasicDerivation & drv,
     BuildMode buildMode)
 {
-    startNest(nest, lvlDebug, format("building %1%") % showPaths({drvPath}));
-
     Worker worker(*this);
     auto goal = worker.makeBasicDerivationGoal(drvPath, drv, buildMode);
 

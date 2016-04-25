@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.hh"
+#include "logging.hh"
 
 #include <map>
 #include <sys/types.h>

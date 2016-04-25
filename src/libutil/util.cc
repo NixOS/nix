@@ -356,8 +356,7 @@ void deletePath(const Path & path)
 
 void deletePath(const Path & path, unsigned long long & bytesFreed)
 {
-    startNest(nest, lvlDebug,
-        format("recursively deleting path ‘%1%’") % path);
+    Activity act(*logger, lvlDebug, format("recursively deleting path ‘%1%’") % path);
     bytesFreed = 0;
     _deletePath(path, bytesFreed);
 }
@@ -454,113 +453,6 @@ void replaceSymlink(const Path & target, const Path & link)
     if (rename(tmp.c_str(), link.c_str()) != 0)
         throw SysError(format("renaming ‘%1%’ to ‘%2%’") % tmp % link);
 }
-
-
-LogType logType = ltPretty;
-Verbosity verbosity = lvlInfo;
-
-static int nestingLevel = 0;
-
-
-Nest::Nest()
-{
-    nest = false;
-}
-
-
-Nest::~Nest()
-{
-    close();
-}
-
-
-static string escVerbosity(Verbosity level)
-{
-    return std::to_string((int) level);
-}
-
-
-void Nest::open(Verbosity level, const FormatOrString & fs)
-{
-    if (level <= verbosity) {
-        if (logType == ltEscapes)
-            std::cerr << "\033[" << escVerbosity(level) << "p"
-                      << fs.s << "\n";
-        else
-            printMsg_(level, fs);
-        nest = true;
-        nestingLevel++;
-    }
-}
-
-
-void Nest::close()
-{
-    if (nest) {
-        nestingLevel--;
-        if (logType == ltEscapes)
-            std::cerr << "\033[q";
-        nest = false;
-    }
-}
-
-
-void printMsg_(Verbosity level, const FormatOrString & fs)
-{
-    checkInterrupt();
-    if (level > verbosity) return;
-
-    string prefix;
-    if (logType == ltPretty)
-        for (int i = 0; i < nestingLevel; i++)
-            prefix += "|   ";
-    else if (logType == ltEscapes && level != lvlInfo)
-        prefix = "\033[" + escVerbosity(level) + "s";
-    else if (logType == ltSystemd) {
-        char c;
-        switch (level) {
-            case lvlError: c = '3'; break;
-            case lvlInfo: c = '5'; break;
-            case lvlTalkative: case lvlChatty: c = '6'; break;
-            default: c = '7';
-        }
-        prefix = string("<") + c + ">";
-    }
-
-    string s = (format("%1%%2%\n") % prefix % fs.s).str();
-    if (!isatty(STDERR_FILENO)) s = filterANSIEscapes(s);
-    writeToStderr(s);
-}
-
-
-void warnOnce(bool & haveWarned, const FormatOrString & fs)
-{
-    if (!haveWarned) {
-        printMsg(lvlError, format("warning: %1%") % fs.s);
-        haveWarned = true;
-    }
-}
-
-
-void writeToStderr(const string & s)
-{
-    try {
-        if (_writeToStderr)
-            _writeToStderr((const unsigned char *) s.data(), s.size());
-        else
-            writeFull(STDERR_FILENO, s);
-    } catch (SysError & e) {
-        /* Ignore failing writes to stderr if we're in an exception
-           handler, otherwise throw an exception.  We need to ignore
-           write errors in exception handlers to ensure that cleanup
-           code runs to completion if the other side of stderr has
-           been closed unexpectedly. */
-        if (!std::uncaught_exception()) throw;
-    }
-}
-
-
-std::function<void(const unsigned char * buf, size_t count)> _writeToStderr;
 
 
 void readFull(int fd, unsigned char * buf, size_t count)
@@ -953,7 +845,8 @@ static pid_t doFork(bool allowVfork, std::function<void()> fun)
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
 {
     auto wrapper = [&]() {
-        if (!options.allowVfork) _writeToStderr = 0;
+        if (!options.allowVfork)
+            logger = makeDefaultLogger();
         try {
 #if __linux__
             if (options.dieWithParent && prctl(PR_SET_PDEATHSIG, SIGKILL) == -1)

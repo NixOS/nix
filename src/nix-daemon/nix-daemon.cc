@@ -33,29 +33,43 @@ using namespace nix;
 static FdSource from(STDIN_FILENO);
 static FdSink to(STDOUT_FILENO);
 
-bool canSendStderr;
+static bool canSendStderr;
+
+static Logger * defaultLogger;
 
 
-/* This function is called anytime we want to write something to
-   stderr.  If we're in a state where the protocol allows it (i.e.,
-   when canSendStderr), send the message to the client over the
-   socket. */
-static void tunnelStderr(const unsigned char * buf, size_t count)
+/* Logger that forwards log messages to the client, *if* we're in a
+   state where the protocol allows it (i.e., when canSendStderr is
+   true). */
+class TunnelLogger : public Logger
 {
-    if (canSendStderr) {
-        try {
-            to << STDERR_NEXT;
-            writeString(buf, count, to);
-            to.flush();
-        } catch (...) {
-            /* Write failed; that means that the other side is
-               gone. */
-            canSendStderr = false;
-            throw;
-        }
-    } else
-        writeFull(STDERR_FILENO, buf, count);
-}
+    void log(Verbosity lvl, const FormatOrString & fs) override
+    {
+        if (lvl > verbosity) return;
+
+        if (canSendStderr) {
+            try {
+                to << STDERR_NEXT << (fs.s + "\n");
+                to.flush();
+            } catch (...) {
+                /* Write failed; that means that the other side is
+                   gone. */
+                canSendStderr = false;
+                throw;
+            }
+        } else
+            defaultLogger->log(lvl, fs);
+    }
+
+    void startActivity(Activity & activity, Verbosity lvl, const FormatOrString & fs) override
+    {
+        log(lvl, fs);
+    }
+
+    void stopActivity(Activity & activity) override
+    {
+    }
+};
 
 
 /* startWork() means that we're starting an operation for which we
@@ -430,7 +444,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
             settings.useBuildHook = readInt(from) != 0;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 4) {
             settings.buildVerbosity = (Verbosity) readInt(from);
-            logType = (LogType) readInt(from);
+            readInt(from); // obsolete logType
             settings.printBuildTrace = readInt(from) != 0;
         }
         if (GET_PROTOCOL_MINOR(clientVersion) >= 6)
@@ -557,7 +571,8 @@ static void processConnection(bool trusted)
     MonitorFdHup monitor(from.fd);
 
     canSendStderr = false;
-    _writeToStderr = tunnelStderr;
+    defaultLogger = logger;
+    logger = new TunnelLogger();
 
     /* Exchange the greeting. */
     unsigned int magic = readInt(from);

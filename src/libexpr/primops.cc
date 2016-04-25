@@ -124,7 +124,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
                 env->values[displ++] = attr.value;
             }
 
-            startNest(nest, lvlTalkative, format("evaluating file ‘%1%’") % path);
+            Activity act(*logger, lvlTalkative, format("evaluating file ‘%1%’") % path);
             Expr * e = state.parseExprFromFile(resolveExprPath(path), staticEnv);
 
             e->eval(state, *env, v);
@@ -284,7 +284,7 @@ typedef list<Value *> ValueList;
 
 static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    startNest(nest, lvlDebug, "finding dependencies");
+    Activity act(*logger, lvlDebug, "finding dependencies");
 
     state.forceAttrs(*args[0], pos);
 
@@ -457,7 +457,7 @@ void prim_valueSize(EvalState & state, const Pos & pos, Value * * args, Value & 
    derivation. */
 static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    startNest(nest, lvlVomit, "evaluating derivation");
+    Activity act(*logger, lvlVomit, "evaluating derivation");
 
     state.forceAttrs(*args[0], pos);
 
@@ -494,7 +494,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     for (auto & i : *args[0]->attrs) {
         if (i.name == state.sIgnoreNulls) continue;
         string key = i.name;
-        startNest(nest, lvlVomit, format("processing attribute ‘%1%’") % key);
+        Activity act(*logger, lvlVomit, format("processing attribute ‘%1%’") % key);
 
         try {
 

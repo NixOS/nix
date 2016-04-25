@@ -514,7 +514,7 @@ void LocalStore::tryToDelete(GCState & state, const Path & path)
 
     if (path == linksDir || path == state.trashDir) return;
 
-    startNest(nest, lvlDebug, format("considering whether to delete ‘%1%’") % path);
+    Activity act(*logger, lvlDebug, format("considering whether to delete ‘%1%’") % path);
 
     if (!isValidPath(path)) {
         /* A lock file belonging to a path that we're building right

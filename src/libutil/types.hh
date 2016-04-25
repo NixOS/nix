@@ -89,14 +89,4 @@ typedef list<Path> Paths;
 typedef set<Path> PathSet;
 
 
-typedef enum {
-    lvlError = 0,
-    lvlInfo,
-    lvlTalkative,
-    lvlChatty,
-    lvlDebug,
-    lvlVomit
-} Verbosity;
-
-
 }
