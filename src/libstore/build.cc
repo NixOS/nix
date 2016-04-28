@@ -751,6 +751,7 @@ private:
     std::list<std::string> logTail;
 
     std::string currentLogLine;
+    size_t currentLogLinePos = 0; // to handle carriage return
 
     /* Pipe for the builder's standard output/error. */
     Pipe builderOut;
@@ -2937,11 +2938,14 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
 
         for (auto c : data)
             if (c == '\r')
-                currentLogLine.clear(); // FIXME: not quite right
+                currentLogLinePos = 0;
             else if (c == '\n')
                 flushLine();
-            else
-                currentLogLine += c;
+            else {
+                if (currentLogLinePos >= currentLogLine.size())
+                    currentLogLine.resize(currentLogLinePos + 1);
+                currentLogLine[currentLogLinePos++] = c;
+            }
 
         if (bzLogFile) {
             int err;
@@ -2958,7 +2962,7 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
 
 void DerivationGoal::handleEOF(int fd)
 {
-    flushLine();
+    if (!currentLogLine.empty()) flushLine();
     worker.wakeUp(shared_from_this());
 }
 
@@ -2972,6 +2976,7 @@ void DerivationGoal::flushLine()
         if (logTail.size() > settings.logLines) logTail.pop_front();
     }
     currentLogLine = "";
+    currentLogLinePos = 0;
 }
 
 
