@@ -144,7 +144,7 @@ void BinaryCacheStore::narFromPath(const Path & storePath, Sink & sink)
     else if (info->compression == "xz")
         nar = decompressXZ(*nar);
     else
-        throw Error(format("unknown NAR compression type ‘%1%’") % nar);
+        throw Error(format("unknown NAR compression type ‘%1%’") % info->compression);
 
     stats.narReadBytes += nar->size();
 
