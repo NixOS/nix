@@ -16,7 +16,6 @@ class BinaryCacheStore : public Store
 private:
 
     std::unique_ptr<SecretKey> secretKey;
-    std::unique_ptr<PublicKeys> publicKeys;
 
     std::shared_ptr<Store> localStore;
 

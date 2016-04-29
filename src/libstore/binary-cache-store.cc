@@ -18,11 +18,8 @@ BinaryCacheStore::BinaryCacheStore(std::shared_ptr<Store> localStore,
     const Path & secretKeyFile)
     : localStore(localStore)
 {
-    if (secretKeyFile != "") {
+    if (secretKeyFile != "")
         secretKey = std::unique_ptr<SecretKey>(new SecretKey(readFile(secretKeyFile)));
-        publicKeys = std::unique_ptr<PublicKeys>(new PublicKeys);
-        publicKeys->emplace(secretKey->name, secretKey->toPublicKey());
-    }
 
     StringSink sink;
     sink << narVersionMagic1;
@@ -212,11 +209,6 @@ std::shared_ptr<ValidPathInfo> BinaryCacheStore::queryPathInfoUncached(const Pat
     auto narInfo = make_ref<NarInfo>(*data, narInfoFile);
 
     stats.narInfoRead++;
-
-    if (publicKeys) {
-        if (!narInfo->checkSignatures(*publicKeys))
-            throw Error(format("no good signature on NAR info file ‘%1%’") % narInfoFile);
-    }
 
     return std::shared_ptr<NarInfo>(narInfo);
 }
