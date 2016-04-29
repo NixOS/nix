@@ -5,6 +5,43 @@
 
 namespace nix {
 
+Path exportGit(ref<Store> store, const std::string & uri, const std::string & rev)
+{
+    if (!isUri(uri))
+        throw EvalError(format("‘%s’ is not a valid URI") % uri);
+
+    Path cacheDir = getCacheDir() + "/nix/git";
+
+    if (!pathExists(cacheDir)) {
+        createDirs(cacheDir);
+        runProgram("git", true, { "init", "--bare", cacheDir });
+    }
+
+    Activity act(*logger, lvlInfo, format("fetching Git repository ‘%s’") % uri);
+
+    std::string localRef = "pid-" + std::to_string(getpid());
+    Path localRefFile = cacheDir + "/refs/heads/" + localRef;
+
+    runProgram("git", true, { "-C", cacheDir, "fetch", uri, rev + ":" + localRef });
+
+    std::string commitHash = chomp(readFile(localRefFile));
+
+    unlink(localRefFile.c_str());
+
+    debug(format("got revision ‘%s’") % commitHash);
+
+    // FIXME: should pipe this, or find some better way to extract a
+    // revision.
+    auto tar = runProgram("git", true, { "-C", cacheDir, "archive", commitHash });
+
+    Path tmpDir = createTempDir();
+    AutoDelete delTmpDir(tmpDir, true);
+
+    runProgram("tar", true, { "x", "-C", tmpDir }, tar);
+
+    return store->addToStore("git-export", tmpDir);
+}
+
 static void prim_fetchgit(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     // FIXME: cut&paste from fetch().
@@ -35,39 +72,7 @@ static void prim_fetchgit(EvalState & state, const Pos & pos, Value * * args, Va
     } else
         url = state.forceStringNoCtx(*args[0], pos);
 
-    if (!isUri(url))
-        throw EvalError(format("‘%s’ is not a valid URI, at %s") % url % pos);
-
-    Path cacheDir = getCacheDir() + "/nix/git";
-
-    if (!pathExists(cacheDir)) {
-        createDirs(cacheDir);
-        runProgram("git", true, { "init", "--bare", cacheDir });
-    }
-
-    Activity act(*logger, lvlInfo, format("fetching Git repository ‘%s’") % url);
-
-    std::string localRef = "pid-" + std::to_string(getpid());
-    Path localRefFile = cacheDir + "/refs/heads/" + localRef;
-
-    runProgram("git", true, { "-C", cacheDir, "fetch", url, rev + ":" + localRef });
-
-    std::string commitHash = chomp(readFile(localRefFile));
-
-    unlink(localRefFile.c_str());
-
-    debug(format("got revision ‘%s’") % commitHash);
-
-    // FIXME: should pipe this, or find some better way to extract a
-    // revision.
-    auto tar = runProgram("git", true, { "-C", cacheDir, "archive", commitHash });
-
-    Path tmpDir = createTempDir();
-    AutoDelete delTmpDir(tmpDir, true);
-
-    runProgram("tar", true, { "x", "-C", tmpDir }, tar);
-
-    Path storePath = state.store->addToStore("git-export", tmpDir);
+    Path storePath = exportGit(state.store, url, rev);
 
     mkString(v, storePath, PathSet({storePath}));
 }
