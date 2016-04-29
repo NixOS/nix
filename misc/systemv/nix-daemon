@@ -1,0 +1,113 @@
+#!/bin/sh
+#
+# nix-daemon: Starts the nix package manager daemon
+#
+# chkconfig:   345 24 02
+# description: This is a daemon which enable the multi-user mode 
+#               of the nix package manager.
+# processname: nix-daemon
+# pidfile:     /var/run/nix/nix-daemon.pid
+
+### BEGIN INIT INFO
+# Required-Start:    
+# Required-Stop:     
+# Should-Start:      
+# Should-Stop:       
+# Default-Start:     3 4 5
+# Default-Stop:      0 1 2 6
+# Short-Description: Starts the nix daemon
+# Description:       This is a daemon which enable the multi-user mode 
+#                     of the nix package manager.
+### END INIT INFO
+
+NIX_DAEMON_BIN=/usr/bin/nix-daemon
+#NIX_DAEMON_USER="root"
+NIX_DAEMON_USER="nix-daemon"
+NIX_DAEMON_OPTS="--daemon"
+
+umask 0022
+
+if [ "$1" = 'status' ]; then
+    test -x $NIX_DAEMON_BIN || exit 4
+else
+    test -x $NIX_DAEMON_BIN || exit 5
+fi
+
+# Source function library.
+. /etc/init.d/functions
+
+LOCKFILE=/var/lock/subsys/nix-daemon
+RUNDIR=/var/run/nix
+PIDFILE=${RUNDIR}/nix-daemon.pid
+RETVAL=0
+
+base=${0##*/}
+
+start() {
+
+    mkdir -p ${RUNDIR}
+    chown ${NIX_DAEMON_USER}:${NIX_DAEMON_USER} ${RUNDIR}
+
+    echo -n $"Starting nix daemon... "
+
+    daemonize -u $NIX_DAEMON_USER -p ${PIDFILE} $NIX_DAEMON_BIN $NIX_DAEMON_OPTS
+    RETVAL=$?
+    echo
+    [ $RETVAL -eq 0 ] && touch ${LOCKFILE}
+    return $RETVAL
+}
+
+stop() {
+    echo -n $"Shutting down nix daemon: "
+    killproc -p ${PIDFILE} $NIX_DAEMON_BIN
+    RETVAL=$?
+    [ $RETVAL -eq 0 ] && rm -f ${LOCKFILE} ${PIDFILE}
+    echo
+    return $RETVAL
+}
+
+reload() {
+    echo -n $"Reloading nix daemon... "
+    killproc -p ${PIDFILE} $NIX_DAEMON_BIN -HUP
+    RETVAL=$?
+    echo
+    return $RETVAL
+}
+
+restart() {
+    stop
+    start
+}
+
+RETVAL=0
+
+# caller switch
+case "$1" in
+  start)
+        start
+    ;;
+  stop)
+        stop
+    ;;
+  status)
+        status -p ${PIDFILE} $NIX_DAEMON_BIN
+            RETVAL=$?
+    ;;
+  restart)
+        restart
+    ;;
+  reload)
+        reload
+    ;;
+  condrestart)
+        if [ -f $LOCKFILE ]; then
+            restart
+        fi
+    ;;
+  *)
+        echo $"Usage: $0 {start|stop|status|restart|condrestart}"
+        exit 2
+    ;;
+esac
+
+exit $RETVAL
