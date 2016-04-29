@@ -9,6 +9,7 @@
 #include "util.hh"
 #include "worker-protocol.hh"
 #include "xmlgraph.hh"
+#include "compression.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -502,21 +503,7 @@ static void opReadLog(Strings opFlags, Strings opArgs)
             }
 
             else if (pathExists(logBz2Path)) {
-                AutoCloseFD fd = open(logBz2Path.c_str(), O_RDONLY);
-                FILE * f = 0;
-                if (fd == -1 || (f = fdopen(fd.borrow(), "r")) == 0)
-                    throw SysError(format("opening file ‘%1%’") % logBz2Path);
-                int err;
-                BZFILE * bz = BZ2_bzReadOpen(&err, f, 0, 0, 0, 0);
-                if (!bz) throw Error(format("cannot open bzip2 file ‘%1%’") % logBz2Path);
-                unsigned char buf[128 * 1024];
-                do {
-                    int n = BZ2_bzRead(&err, bz, buf, sizeof(buf));
-                    if (err != BZ_OK && err != BZ_STREAM_END)
-                        throw Error(format("error reading bzip2 file ‘%1%’") % logBz2Path);
-                    writeFull(STDOUT_FILENO, buf, n);
-                } while (err != BZ_STREAM_END);
-                BZ2_bzReadClose(&err, bz);
+                std::cout << *decompress("bzip2", make_ref<std::string>(readFile(logBz2Path)));
                 found = true;
                 break;
             }
