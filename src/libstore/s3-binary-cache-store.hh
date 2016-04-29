@@ -11,8 +11,8 @@ class S3BinaryCacheStore : public BinaryCacheStore
 protected:
 
     S3BinaryCacheStore(std::shared_ptr<Store> localStore,
-        const Path & secretKeyFile)
-        : BinaryCacheStore(localStore, secretKeyFile)
+        const StoreParams & params)
+        : BinaryCacheStore(localStore, params)
     { }
 
 public:

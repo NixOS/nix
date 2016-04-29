@@ -15,9 +15,10 @@
 namespace nix {
 
 BinaryCacheStore::BinaryCacheStore(std::shared_ptr<Store> localStore,
-    const Path & secretKeyFile)
+    const StoreParams & params)
     : localStore(localStore)
 {
+    auto secretKeyFile = get(params, "secret-key", "");
     if (secretKeyFile != "")
         secretKey = std::unique_ptr<SecretKey>(new SecretKey(readFile(secretKeyFile)));
 

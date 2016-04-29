@@ -21,7 +21,8 @@ private:
 
 protected:
 
-    BinaryCacheStore(std::shared_ptr<Store> localStore, const Path & secretKeyFile);
+    BinaryCacheStore(std::shared_ptr<Store> localStore,
+        const StoreParams & params);
 
     [[noreturn]] void notImpl();
 

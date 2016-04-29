@@ -12,7 +12,11 @@ private:
 public:
 
     LocalBinaryCacheStore(std::shared_ptr<Store> localStore,
-        const Path & secretKeyFile, const Path & binaryCacheDir);
+        const StoreParams & params, const Path & binaryCacheDir)
+        : BinaryCacheStore(localStore, params)
+        , binaryCacheDir(binaryCacheDir)
+    {
+    }
 
     void init() override;
 
@@ -30,13 +34,6 @@ protected:
     std::shared_ptr<std::string> getFile(const std::string & path) override;
 
 };
-
-LocalBinaryCacheStore::LocalBinaryCacheStore(std::shared_ptr<Store> localStore,
-    const Path & secretKeyFile, const Path & binaryCacheDir)
-    : BinaryCacheStore(localStore, secretKeyFile)
-    , binaryCacheDir(binaryCacheDir)
-{
-}
 
 void LocalBinaryCacheStore::init()
 {
@@ -74,23 +71,15 @@ std::shared_ptr<std::string> LocalBinaryCacheStore::getFile(const std::string & 
     }
 }
 
-ref<Store> openLocalBinaryCacheStore(std::shared_ptr<Store> localStore,
-    const Path & secretKeyFile, const Path & binaryCacheDir)
-{
-    auto store = make_ref<LocalBinaryCacheStore>(
-        localStore, secretKeyFile, binaryCacheDir);
-    store->init();
-    return store;
-}
-
 static RegisterStoreImplementation regStore([](
     const std::string & uri, const StoreParams & params)
     -> std::shared_ptr<Store>
 {
     if (std::string(uri, 0, 7) != "file://") return 0;
-    return openLocalBinaryCacheStore(std::shared_ptr<Store>(0),
-        settings.get("binary-cache-secret-key-file", string("")),
-        std::string(uri, 7));
+    auto store = std::make_shared<LocalBinaryCacheStore>(
+        std::shared_ptr<Store>(0), params, std::string(uri, 7));
+    store->init();
+    return store;
 });
 
 }

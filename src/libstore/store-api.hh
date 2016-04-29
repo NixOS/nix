@@ -529,10 +529,6 @@ ref<Store> openStoreAt(const std::string & uri);
 ref<Store> openStore();
 
 
-ref<Store> openLocalBinaryCacheStore(std::shared_ptr<Store> localStore,
-    const Path & secretKeyFile, const Path & binaryCacheDir);
-
-
 /* Return the default substituter stores, defined by the
    ‘substituters’ option and various legacy options like
    ‘binary-caches’. */

@@ -43,8 +43,8 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
     Stats stats;
 
     S3BinaryCacheStoreImpl(std::shared_ptr<Store> localStore,
-        const Path & secretKeyFile, const std::string & bucketName)
-        : S3BinaryCacheStore(localStore, secretKeyFile)
+        const StoreParams & params, const std::string & bucketName)
+        : S3BinaryCacheStore(localStore, params)
         , bucketName(bucketName)
         , config(makeConfig())
         , client(make_ref<Aws::S3::S3Client>(*config))
@@ -245,8 +245,7 @@ static RegisterStoreImplementation regStore([](
 {
     if (std::string(uri, 0, 5) != "s3://") return 0;
     auto store = std::make_shared<S3BinaryCacheStoreImpl>(std::shared_ptr<Store>(0),
-        settings.get("binary-cache-secret-key-file", string("")),
-        std::string(uri, 5));
+        params, std::string(uri, 5));
     store->init();
     return store;
 });
