@@ -87,7 +87,10 @@ void BinaryCacheStore::addToCache(const ValidPathInfo & info, ref<std::string> n
         % duration);
 
     /* Atomically write the NAR file. */
-    narInfo->url = "nar/" + printHash32(narInfo->fileHash) + ".nar.xz";
+    narInfo->url = "nar/" + printHash32(narInfo->fileHash) + ".nar"
+        + (compression == "xz" ? ".xz" :
+           compression == "bzip2" ? ".bz2" :
+           "");
     if (!fileExists(narInfo->url)) {
         stats.narWrite++;
         upsertFile(narInfo->url, *narCompressed);
