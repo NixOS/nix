@@ -227,8 +227,8 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
             for (auto object : contents) {
                 auto & key = object.GetKey();
-                if (!hasSuffix(key, ".narinfo")) continue;
-                paths.insert(settings.nixStore + "/" + std::string(key, 0, key.size() - 8));
+                if (key.size() != 40 || !hasSuffix(key, ".narinfo")) continue;
+                paths.insert(settings.nixStore + "/" + key.substr(0, key.size() - 8));
             }
 
             marker = res.GetNextMarker();

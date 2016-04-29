@@ -33,6 +33,20 @@ protected:
 
     std::shared_ptr<std::string> getFile(const std::string & path) override;
 
+    PathSet queryAllValidPaths() override
+    {
+        PathSet paths;
+
+        for (auto & entry : readDirectory(binaryCacheDir)) {
+            if (entry.name.size() != 40 ||
+                !hasSuffix(entry.name, ".narinfo"))
+                continue;
+            paths.insert(settings.nixStore + "/" + entry.name.substr(0, entry.name.size() - 8));
+        }
+
+        return paths;
+    }
+
 };
 
 void LocalBinaryCacheStore::init()
