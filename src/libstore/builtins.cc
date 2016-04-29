@@ -31,7 +31,7 @@ void builtinFetchurl(const BasicDerivation & drv)
     auto unpack = drv.env.find("unpack");
     if (unpack != drv.env.end() && unpack->second == "1") {
         if (string(*data.data, 0, 6) == string("\xfd" "7zXZ\0", 6))
-            data.data = decompressXZ(*data.data);
+            data.data = decompress("xz", ref<std::string>(data.data));
         StringSource source(*data.data);
         restorePath(storePath, source);
     } else

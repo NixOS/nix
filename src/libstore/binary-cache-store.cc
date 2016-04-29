@@ -17,6 +17,7 @@ namespace nix {
 BinaryCacheStore::BinaryCacheStore(std::shared_ptr<Store> localStore,
     const StoreParams & params)
     : localStore(localStore)
+    , compression(get(params, "compression", "xz"))
 {
     auto secretKeyFile = get(params, "secret-key", "");
     if (secretKeyFile != "")
@@ -45,8 +46,7 @@ Path BinaryCacheStore::narInfoFileFor(const Path & storePath)
     return storePathToHash(storePath) + ".narinfo";
 }
 
-void BinaryCacheStore::addToCache(const ValidPathInfo & info,
-    const string & nar)
+void BinaryCacheStore::addToCache(const ValidPathInfo & info, ref<std::string> nar)
 {
     /* Verify that all references are valid. This may do some .narinfo
        reads, but typically they'll already be cached. */
@@ -62,40 +62,40 @@ void BinaryCacheStore::addToCache(const ValidPathInfo & info,
     auto narInfoFile = narInfoFileFor(info.path);
     if (fileExists(narInfoFile)) return;
 
-    assert(nar.compare(0, narMagic.size(), narMagic) == 0);
+    assert(nar->compare(0, narMagic.size(), narMagic) == 0);
 
     auto narInfo = make_ref<NarInfo>(info);
 
-    narInfo->narSize = nar.size();
-    narInfo->narHash = hashString(htSHA256, nar);
+    narInfo->narSize = nar->size();
+    narInfo->narHash = hashString(htSHA256, *nar);
 
     if (info.narHash && info.narHash != narInfo->narHash)
         throw Error(format("refusing to copy corrupted path ‘%1%’ to binary cache") % info.path);
 
     /* Compress the NAR. */
-    narInfo->compression = "xz";
+    narInfo->compression = compression;
     auto now1 = std::chrono::steady_clock::now();
-    string narXz = compressXZ(nar);
+    auto narCompressed = compress(compression, nar);
     auto now2 = std::chrono::steady_clock::now();
-    narInfo->fileHash = hashString(htSHA256, narXz);
-    narInfo->fileSize = narXz.size();
+    narInfo->fileHash = hashString(htSHA256, *narCompressed);
+    narInfo->fileSize = narCompressed->size();
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
     printMsg(lvlTalkative, format("copying path ‘%1%’ (%2% bytes, compressed %3$.1f%% in %4% ms) to binary cache")
         % narInfo->path % narInfo->narSize
-        % ((1.0 - (double) narXz.size() / nar.size()) * 100.0)
+        % ((1.0 - (double) narCompressed->size() / nar->size()) * 100.0)
         % duration);
 
     /* Atomically write the NAR file. */
     narInfo->url = "nar/" + printHash32(narInfo->fileHash) + ".nar.xz";
     if (!fileExists(narInfo->url)) {
         stats.narWrite++;
-        upsertFile(narInfo->url, narXz);
+        upsertFile(narInfo->url, *narCompressed);
     } else
         stats.narWriteAverted++;
 
-    stats.narWriteBytes += nar.size();
-    stats.narWriteCompressedBytes += narXz.size();
+    stats.narWriteBytes += nar->size();
+    stats.narWriteCompressedBytes += narCompressed->size();
     stats.narWriteCompressionTimeMs += duration;
 
     /* Atomically write the NAR info file.*/
@@ -137,12 +137,7 @@ void BinaryCacheStore::narFromPath(const Path & storePath, Sink & sink)
 
     /* Decompress the NAR. FIXME: would be nice to have the remote
        side do this. */
-    if (info->compression == "none")
-        ;
-    else if (info->compression == "xz")
-        nar = decompressXZ(*nar);
-    else
-        throw Error(format("unknown NAR compression type ‘%1%’") % info->compression);
+    nar = decompress(info->compression, ref<std::string>(nar));
 
     stats.narReadBytes += nar->size();
 
@@ -261,7 +256,7 @@ Path BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
     info.path = makeFixedOutputPath(recursive, hashAlgo, h, name);
 
     if (repair || !isValidPath(info.path))
-        addToCache(info, *sink.s);
+        addToCache(info, sink.s);
 
     return info.path;
 }
@@ -276,7 +271,7 @@ Path BinaryCacheStore::addTextToStore(const string & name, const string & s,
     if (repair || !isValidPath(info.path)) {
         StringSink sink;
         dumpString(s, sink);
-        addToCache(info, *sink.s);
+        addToCache(info, sink.s);
     }
 
     return info.path;
@@ -306,7 +301,7 @@ void BinaryCacheStore::buildPaths(const PathSet & paths, BuildMode buildMode)
         StringSink sink;
         dumpPath(storePath, sink);
 
-        addToCache(*info, *sink.s);
+        addToCache(*info, sink.s);
     }
 }
 
@@ -404,7 +399,7 @@ Path BinaryCacheStore::importPath(Source & source, std::shared_ptr<FSAccessor> a
     bool haveSignature = readInt(source) == 1;
     assert(!haveSignature);
 
-    addToCache(info, *tee.data);
+    addToCache(info, tee.data);
 
     auto accessor_ = std::dynamic_pointer_cast<BinaryCacheStoreAccessor>(accessor);
     if (accessor_)

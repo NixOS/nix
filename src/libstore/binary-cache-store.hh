@@ -19,6 +19,8 @@ private:
 
     std::shared_ptr<Store> localStore;
 
+    std::string compression;
+
 protected:
 
     BinaryCacheStore(std::shared_ptr<Store> localStore,
@@ -44,7 +46,7 @@ private:
 
     std::string narInfoFileFor(const Path & storePath);
 
-    void addToCache(const ValidPathInfo & info, const string & nar);
+    void addToCache(const ValidPathInfo & info, ref<std::string> nar);
 
 public:
 

@@ -1,13 +1,16 @@
 #pragma once
 
 #include "ref.hh"
+#include "types.hh"
 
 #include <string>
 
 namespace nix {
 
-std::string compressXZ(const std::string & in);
+ref<std::string> compress(const std::string & method, ref<std::string> in);
 
-ref<std::string> decompressXZ(const std::string & in);
+ref<std::string> decompress(const std::string & method, ref<std::string> in);
+
+MakeError(UnknownCompressionMethod, Error);
 
 }

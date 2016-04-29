@@ -15,7 +15,7 @@ struct LzmaStream
     lzma_stream & operator()() { return strm; }
 };
 
-std::string compressXZ(const std::string & in)
+static ref<std::string> compressXZ(const std::string & in)
 {
     LzmaStream strm;
 
@@ -28,7 +28,7 @@ std::string compressXZ(const std::string & in)
 
     lzma_action action = LZMA_RUN;
     uint8_t outbuf[BUFSIZ];
-    string res;
+    ref<std::string> res = make_ref<std::string>();
     strm().next_in = (uint8_t *) in.c_str();
     strm().avail_in = in.size();
     strm().next_out = outbuf;
@@ -43,7 +43,7 @@ std::string compressXZ(const std::string & in)
         lzma_ret ret = lzma_code(&strm(), action);
 
         if (strm().avail_out == 0 || ret == LZMA_STREAM_END) {
-            res.append((char *) outbuf, sizeof(outbuf) - strm().avail_out);
+            res->append((char *) outbuf, sizeof(outbuf) - strm().avail_out);
             strm().next_out = outbuf;
             strm().avail_out = sizeof(outbuf);
         }
@@ -56,7 +56,7 @@ std::string compressXZ(const std::string & in)
     }
 }
 
-ref<std::string> decompressXZ(const std::string & in)
+static ref<std::string> decompressXZ(const std::string & in)
 {
     LzmaStream strm;
 
@@ -93,6 +93,26 @@ ref<std::string> decompressXZ(const std::string & in)
         if (ret != LZMA_OK)
             throw Error("error while decompressing xz file");
     }
+}
+
+ref<std::string> compress(const std::string & method, ref<std::string> in)
+{
+    if (method == "none")
+        return in;
+    else if (method == "xz")
+        return compressXZ(*in);
+    else
+        throw UnknownCompressionMethod(format("unknown compression method ‘%s’") % method);
+}
+
+ref<std::string> decompress(const std::string & method, ref<std::string> in)
+{
+    if (method == "none")
+        return in;
+    else if (method == "xz")
+        return decompressXZ(*in);
+    else
+        throw UnknownCompressionMethod(format("unknown compression method ‘%s’") % method);
 }
 
 }
