@@ -137,7 +137,12 @@ void BinaryCacheStore::narFromPath(const Path & storePath, Sink & sink)
 
     /* Decompress the NAR. FIXME: would be nice to have the remote
        side do this. */
-    nar = decompress(info->compression, ref<std::string>(nar));
+    try {
+        nar = decompress(info->compression, ref<std::string>(nar));
+    } catch (UnknownCompressionMethod &) {
+        throw Error(format("binary cache path ‘%s’ uses unknown compression method ‘%s’")
+            % storePath % info->compression);
+    }
 
     stats.narReadBytes += nar->size();
 
