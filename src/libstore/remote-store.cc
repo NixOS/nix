@@ -49,6 +49,12 @@ RemoteStore::RemoteStore(size_t maxConnections)
 }
 
 
+std::string RemoteStore::getUri()
+{
+    return "daemon";
+}
+
+
 ref<RemoteStore::Connection> RemoteStore::openConnection()
 {
     auto conn = make_ref<Connection>();

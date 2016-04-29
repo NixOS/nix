@@ -16,6 +16,11 @@ public:
 
     void init() override;
 
+    std::string getUri() override
+    {
+        return "file://" + binaryCacheDir;
+    }
+
 protected:
 
     bool fileExists(const std::string & path) override;
@@ -78,7 +83,10 @@ ref<Store> openLocalBinaryCacheStore(std::shared_ptr<Store> localStore,
     return store;
 }
 
-static RegisterStoreImplementation regStore([](const std::string & uri) -> std::shared_ptr<Store> {
+static RegisterStoreImplementation regStore([](
+    const std::string & uri, const StoreParams & params)
+    -> std::shared_ptr<Store>
+{
     if (std::string(uri, 0, 7) != "file://") return 0;
     return openLocalBinaryCacheStore(std::shared_ptr<Store>(0),
         settings.get("binary-cache-secret-key-file", string("")),

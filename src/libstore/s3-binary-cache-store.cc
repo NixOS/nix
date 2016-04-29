@@ -239,7 +239,10 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
 };
 
-static RegisterStoreImplementation regStore([](const std::string & uri) -> std::shared_ptr<Store> {
+static RegisterStoreImplementation regStore([](
+    const std::string & uri, const StoreParams & params)
+    -> std::shared_ptr<Store>
+{
     if (std::string(uri, 0, 5) != "s3://") return 0;
     auto store = std::make_shared<S3BinaryCacheStoreImpl>(std::shared_ptr<Store>(0),
         settings.get("binary-cache-secret-key-file", string("")),

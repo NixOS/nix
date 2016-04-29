@@ -87,6 +87,8 @@ public:
 
     /* Implementations of abstract store API methods. */
 
+    std::string getUri() override;
+
     bool isValidPathUncached(const Path & path) override;
 
     PathSet queryValidPaths(const PathSet & paths) override;

@@ -85,7 +85,10 @@ protected:
 
 };
 
-static RegisterStoreImplementation regStore([](const std::string & uri) -> std::shared_ptr<Store> {
+static RegisterStoreImplementation regStore([](
+    const std::string & uri, const StoreParams & params)
+    -> std::shared_ptr<Store>
+{
     if (std::string(uri, 0, 7) != "http://" &&
         std::string(uri, 0, 8) != "https://") return 0;
     auto store = std::make_shared<HttpBinaryCacheStore>(std::shared_ptr<Store>(0),

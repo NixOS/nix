@@ -461,10 +461,22 @@ namespace nix {
 RegisterStoreImplementation::Implementations * RegisterStoreImplementation::implementations = 0;
 
 
-ref<Store> openStoreAt(const std::string & uri)
+ref<Store> openStoreAt(const std::string & uri_)
 {
+    auto uri(uri_);
+    StoreParams params;
+    auto q = uri.find('?');
+    if (q != std::string::npos) {
+        for (auto s : tokenizeString<Strings>(uri.substr(q + 1), "&")) {
+            auto e = s.find('=');
+            if (e != std::string::npos)
+                params[s.substr(0, e)] = s.substr(e + 1);
+        }
+        uri = uri_.substr(0, q);
+    }
+
     for (auto fun : *RegisterStoreImplementation::implementations) {
-        auto store = fun(uri);
+        auto store = fun(uri, params);
         if (store) return ref<Store>(store);
     }
 
@@ -478,7 +490,10 @@ ref<Store> openStore()
 }
 
 
-static RegisterStoreImplementation regStore([](const std::string & uri) -> std::shared_ptr<Store> {
+static RegisterStoreImplementation regStore([](
+    const std::string & uri, const StoreParams & params)
+    -> std::shared_ptr<Store>
+{
     enum { mDaemon, mLocal, mAuto } mode;
 
     if (uri == "daemon") mode = mDaemon;

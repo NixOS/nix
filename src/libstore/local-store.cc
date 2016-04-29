@@ -229,6 +229,12 @@ LocalStore::~LocalStore()
 }
 
 
+std::string LocalStore::getUri()
+{
+    return "local";
+}
+
+
 int LocalStore::getSchema()
 {
     int curSchema = 0;

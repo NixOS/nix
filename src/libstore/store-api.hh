@@ -192,7 +192,7 @@ public:
 
     virtual ~Store() { }
 
-    virtual std::string getUri();
+    virtual std::string getUri() = 0;
 
     /* Check whether a path is valid. */
     bool isValidPath(const Path & path);
@@ -540,7 +540,10 @@ std::list<ref<Store>> getDefaultSubstituters();
 
 
 /* Store implementation registration. */
-typedef std::function<std::shared_ptr<Store>(const std::string & uri)> OpenStore;
+typedef std::map<std::string, std::string> StoreParams;
+
+typedef std::function<std::shared_ptr<Store>(
+    const std::string & uri, const StoreParams & params)> OpenStore;
 
 struct RegisterStoreImplementation
 {
