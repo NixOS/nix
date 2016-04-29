@@ -184,19 +184,6 @@ void Settings::update()
     _get(enableImportNative, "allow-unsafe-native-code-during-evaluation");
     _get(useCaseHack, "use-case-hack");
     _get(preBuildHook, "pre-build-hook");
-
-    string subs = getEnv("NIX_SUBSTITUTERS", "default");
-    if (subs == "default") {
-        substituters.clear();
-#if 0
-        if (getEnv("NIX_OTHER_STORES") != "")
-            substituters.push_back(nixLibexecDir + "/nix/substituters/copy-from-other-stores.pl");
-#endif
-        substituters.push_back(nixLibexecDir + "/nix/substituters/download-from-binary-cache.pl");
-        if (useSshSubstituter && !sshSubstituterHosts.empty())
-            substituters.push_back(nixLibexecDir + "/nix/substituters/download-via-ssh");
-    } else
-        substituters = tokenizeString<Strings>(subs, ":");
 }
 
 

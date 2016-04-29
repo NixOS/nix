@@ -501,4 +501,39 @@ static RegisterStoreImplementation regStore([](const std::string & uri) -> std::
 });
 
 
+std::list<ref<Store>> getDefaultSubstituters()
+{
+    struct State {
+        bool done = false;
+        std::list<ref<Store>> stores;
+    };
+    static Sync<State> state_;
+
+    auto state(state_.lock());
+
+    if (state->done) return state->stores;
+
+    StringSet done;
+
+    auto addStore = [&](const std::string & uri) {
+        if (done.count(uri)) return;
+        done.insert(uri);
+        state->stores.push_back(openStoreAt(uri));
+    };
+
+    for (auto uri : settings.get("substituters", Strings()))
+        addStore(uri);
+
+    for (auto uri : settings.get("binary-caches", Strings()))
+        addStore(uri);
+
+    for (auto uri : settings.get("extra-binary-caches", Strings()))
+        addStore(uri);
+
+    state->done = true;
+
+    return state->stores;
+}
+
+
 }

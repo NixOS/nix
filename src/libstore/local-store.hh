@@ -40,17 +40,6 @@ struct OptimiseStats
 };
 
 
-struct RunningSubstituter
-{
-    Path program;
-    Pid pid;
-    AutoCloseFD to, from, error;
-    FdSource fromBuf;
-    bool disabled;
-    RunningSubstituter() : disabled(false) { };
-};
-
-
 class LocalStore : public LocalFSStore
 {
 private:
@@ -80,10 +69,6 @@ private:
         /* The file to which we write our temporary roots. */
         Path fnTempRoots;
         AutoCloseFD fdTempRoots;
-
-        typedef std::map<Path, RunningSubstituter> RunningSubstituters;
-        RunningSubstituters runningSubstituters;
-
     };
 
     Sync<State, std::recursive_mutex> _state;
@@ -121,9 +106,6 @@ public:
     Path queryPathFromHashPart(const string & hashPart) override;
 
     PathSet querySubstitutablePaths(const PathSet & paths) override;
-
-    void querySubstitutablePathInfos(const Path & substituter,
-        PathSet & paths, SubstitutablePathInfos & infos);
 
     void querySubstitutablePathInfos(const PathSet & paths,
         SubstitutablePathInfos & infos) override;
@@ -192,8 +174,6 @@ public:
        a substituter (if available). */
     void repairPath(const Path & path);
 
-    void setSubstituterEnv();
-
     void addSignatures(const Path & storePath, const StringSet & sigs) override;
 
     static bool haveWriteAccess();
@@ -245,13 +225,6 @@ private:
     void findRuntimeRoots(PathSet & roots);
 
     void removeUnusedLinks(const GCState & state);
-
-    void startSubstituter(const Path & substituter,
-        RunningSubstituter & runningSubstituter);
-
-    string getLineFromSubstituter(RunningSubstituter & run);
-
-    template<class T> T getIntLineFromSubstituter(RunningSubstituter & run);
 
     Path createTempDirInStore();
 

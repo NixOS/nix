@@ -8,7 +8,7 @@ libstore_SOURCES := $(wildcard $(d)/*.cc)
 
 libstore_LIBS = libutil libformat
 
-libstore_LDFLAGS = $(SQLITE3_LIBS) -lbz2 $(LIBCURL_LIBS) $(SODIUM_LIBS) -laws-cpp-sdk-s3 -laws-cpp-sdk-core
+libstore_LDFLAGS = $(SQLITE3_LIBS) -lbz2 $(LIBCURL_LIBS) $(SODIUM_LIBS) -laws-cpp-sdk-s3 -laws-cpp-sdk-core -pthread
 
 ifeq ($(OS), SunOS)
 	libstore_LDFLAGS += -lsocket

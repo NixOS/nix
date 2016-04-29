@@ -5,12 +5,11 @@
 #include "pathlocks.hh"
 #include "worker-protocol.hh"
 #include "derivations.hh"
-#include "affinity.hh"
+#include "nar-info.hh"
 
 #include <iostream>
 #include <algorithm>
 #include <cstring>
-#include <atomic>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -218,19 +217,6 @@ LocalStore::LocalStore()
 LocalStore::~LocalStore()
 {
     auto state(_state.lock());
-
-    try {
-        for (auto & i : state->runningSubstituters) {
-            if (i.second.disabled) continue;
-            i.second.to.close();
-            i.second.from.close();
-            i.second.error.close();
-            if (i.second.pid != -1)
-                i.second.pid.wait(true);
-        }
-    } catch (...) {
-        ignoreException();
-    }
 
     try {
         if (state->fdTempRoots != -1) {
@@ -792,205 +778,42 @@ Path LocalStore::queryPathFromHashPart(const string & hashPart)
 }
 
 
-void LocalStore::setSubstituterEnv()
-{
-    static std::atomic_flag done;
-
-    if (done.test_and_set()) return;
-
-    /* Pass configuration options (including those overridden with
-       --option) to substituters. */
-    setenv("_NIX_OPTIONS", settings.pack().c_str(), 1);
-}
-
-
-void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter & run)
-{
-    if (run.disabled || run.pid != -1) return;
-
-    debug(format("starting substituter program ‘%1%’") % substituter);
-
-    Pipe toPipe, fromPipe, errorPipe;
-
-    toPipe.create();
-    fromPipe.create();
-    errorPipe.create();
-
-    setSubstituterEnv();
-
-    run.pid = startProcess([&]() {
-        if (dup2(toPipe.readSide, STDIN_FILENO) == -1)
-            throw SysError("dupping stdin");
-        if (dup2(fromPipe.writeSide, STDOUT_FILENO) == -1)
-            throw SysError("dupping stdout");
-        if (dup2(errorPipe.writeSide, STDERR_FILENO) == -1)
-            throw SysError("dupping stderr");
-        execl(substituter.c_str(), substituter.c_str(), "--query", NULL);
-        throw SysError(format("executing ‘%1%’") % substituter);
-    });
-
-    run.program = baseNameOf(substituter);
-    run.to = toPipe.writeSide.borrow();
-    run.from = run.fromBuf.fd = fromPipe.readSide.borrow();
-    run.error = errorPipe.readSide.borrow();
-
-    toPipe.readSide.close();
-    fromPipe.writeSide.close();
-    errorPipe.writeSide.close();
-
-    /* The substituter may exit right away if it's disabled in any way
-       (e.g. copy-from-other-stores.pl will exit if no other stores
-       are configured). */
-    try {
-        getLineFromSubstituter(run);
-    } catch (EndOfFile & e) {
-        run.to.close();
-        run.from.close();
-        run.error.close();
-        run.disabled = true;
-        if (run.pid.wait(true) != 0) throw;
-    }
-}
-
-
-/* Read a line from the substituter's stdout, while also processing
-   its stderr. */
-string LocalStore::getLineFromSubstituter(RunningSubstituter & run)
-{
-    string res, err;
-
-    /* We might have stdout data left over from the last time. */
-    if (run.fromBuf.hasData()) goto haveData;
-
-    while (1) {
-        checkInterrupt();
-
-        fd_set fds;
-        FD_ZERO(&fds);
-        FD_SET(run.from, &fds);
-        FD_SET(run.error, &fds);
-
-        /* Wait for data to appear on the substituter's stdout or
-           stderr. */
-        if (select(run.from > run.error ? run.from + 1 : run.error + 1, &fds, 0, 0, 0) == -1) {
-            if (errno == EINTR) continue;
-            throw SysError("waiting for input from the substituter");
-        }
-
-        /* Completely drain stderr before dealing with stdout. */
-        if (FD_ISSET(run.error, &fds)) {
-            char buf[4096];
-            ssize_t n = read(run.error, (unsigned char *) buf, sizeof(buf));
-            if (n == -1) {
-                if (errno == EINTR) continue;
-                throw SysError("reading from substituter's stderr");
-            }
-            if (n == 0) throw EndOfFile(format("substituter ‘%1%’ died unexpectedly") % run.program);
-            err.append(buf, n);
-            string::size_type p;
-            while ((p = err.find('\n')) != string::npos) {
-                printMsg(lvlError, run.program + ": " + string(err, 0, p));
-                err = string(err, p + 1);
-            }
-        }
-
-        /* Read from stdout until we get a newline or the buffer is empty. */
-        else if (run.fromBuf.hasData() || FD_ISSET(run.from, &fds)) {
-        haveData:
-            do {
-                unsigned char c;
-                run.fromBuf(&c, 1);
-                if (c == '\n') {
-                    if (!err.empty()) printMsg(lvlError, run.program + ": " + err);
-                    return res;
-                }
-                res += c;
-            } while (run.fromBuf.hasData());
-        }
-    }
-}
-
-
-template<class T> T LocalStore::getIntLineFromSubstituter(RunningSubstituter & run)
-{
-    string s = getLineFromSubstituter(run);
-    T res;
-    if (!string2Int(s, res)) throw Error("integer expected from stream");
-    return res;
-}
-
-
 PathSet LocalStore::querySubstitutablePaths(const PathSet & paths)
 {
-    auto state(_state.lock());
-
     PathSet res;
-    for (auto & i : settings.substituters) {
-        if (res.size() == paths.size()) break;
-        RunningSubstituter & run(state->runningSubstituters[i]);
-        startSubstituter(i, run);
-        if (run.disabled) continue;
-        string s = "have ";
-        for (auto & j : paths)
-            if (res.find(j) == res.end()) { s += j; s += " "; }
-        writeLine(run.to, s);
-        while (true) {
-            /* FIXME: we only read stderr when an error occurs, so
-               substituters should only write (short) messages to
-               stderr when they fail.  I.e. they shouldn't write debug
-               output. */
-            Path path = getLineFromSubstituter(run);
-            if (path == "") break;
-            res.insert(path);
+    for (auto & sub : getDefaultSubstituters()) {
+        for (auto & path : paths) {
+            if (res.count(path)) continue;
+            debug(format("checking substituter ‘%s’ for path ‘%s’")
+                % sub->getUri() % path);
+            if (sub->isValidPath(path))
+                res.insert(path);
         }
     }
-
     return res;
-}
-
-
-void LocalStore::querySubstitutablePathInfos(const Path & substituter,
-    PathSet & paths, SubstitutablePathInfos & infos)
-{
-    auto state(_state.lock());
-
-    RunningSubstituter & run(state->runningSubstituters[substituter]);
-    startSubstituter(substituter, run);
-    if (run.disabled) return;
-
-    string s = "info ";
-    for (auto & i : paths)
-        if (infos.find(i) == infos.end()) { s += i; s += " "; }
-    writeLine(run.to, s);
-
-    while (true) {
-        Path path = getLineFromSubstituter(run);
-        if (path == "") break;
-        if (paths.find(path) == paths.end())
-            throw Error(format("got unexpected path ‘%1%’ from substituter") % path);
-        paths.erase(path);
-        SubstitutablePathInfo & info(infos[path]);
-        info.deriver = getLineFromSubstituter(run);
-        if (info.deriver != "") assertStorePath(info.deriver);
-        int nrRefs = getIntLineFromSubstituter<int>(run);
-        while (nrRefs--) {
-            Path p = getLineFromSubstituter(run);
-            assertStorePath(p);
-            info.references.insert(p);
-        }
-        info.downloadSize = getIntLineFromSubstituter<long long>(run);
-        info.narSize = getIntLineFromSubstituter<long long>(run);
-    }
 }
 
 
 void LocalStore::querySubstitutablePathInfos(const PathSet & paths,
     SubstitutablePathInfos & infos)
 {
-    PathSet todo = paths;
-    for (auto & i : settings.substituters) {
-        if (todo.empty()) break;
-        querySubstitutablePathInfos(i, todo, infos);
+    for (auto & sub : getDefaultSubstituters()) {
+        for (auto & path : paths) {
+            if (infos.count(path)) continue;
+            debug(format("checking substituter ‘%s’ for path ‘%s’")
+                % sub->getUri() % path);
+            try {
+                auto info = sub->queryPathInfo(path);
+                auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
+                    std::shared_ptr<const ValidPathInfo>(info));
+                infos[path] = SubstitutablePathInfo{
+                    info->deriver,
+                    info->references,
+                    narInfo ? narInfo->fileSize : 0,
+                    info->narSize};
+            } catch (InvalidPath) {
+            }
+        }
     }
 }
 
