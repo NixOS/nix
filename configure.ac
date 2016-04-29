@@ -166,6 +166,12 @@ AC_ARG_WITH(store-dir, AC_HELP_STRING([--with-store-dir=PATH],
   storedir=$withval, storedir='/nix/store')
 AC_SUBST(storedir)
 
+AC_ARG_WITH(runstatedir, AC_HELP_STRING([--with-runstatedir=PATH],
+   [path of the directory used for nix-daemon sockets ]),
+   runstatedir=$withval, runstatedir='${localstatedir}/run')
+AC_SUBST(runstatedir)
+
+
 
 # Look for OpenSSL, a required dependency.
 AC_PATH_PROG(openssl, openssl, openssl) # if not found, call openssl in $PATH

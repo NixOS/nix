@@ -115,18 +115,18 @@ into the users’ login scripts.</para>
 
 <para>To limit which users can perform Nix operations, you can use the
 permissions on the directory
-<filename>/nix/var/nix/daemon-socket</filename>.  For instance, if you
+<envar>$NIX_RUNSTATE_DIR</envar><filename>/daemon-socket</filename>.  For instance, if you
 want to restrict the use of Nix to the members of a group called
 <literal>nix-users</literal>, do
 
 <screen>
-$ chgrp nix-users /nix/var/nix/daemon-socket
-$ chmod ug=rwx,o= /nix/var/nix/daemon-socket
+$ chgrp nix-users <envar>$NIX_RUNSTATE_DIR</envar>/daemon-socket
+$ chmod ug=rwx,o= <envar>$NIX_RUNSTATE_DIR</envar>/daemon-socket
 </screen>
 
 This way, users who are not in the <literal>nix-users</literal> group
 cannot connect to the Unix domain socket
-<filename>/nix/var/nix/daemon-socket/socket</filename>, so they cannot
+<envar>$NIX_RUNSTATE_DIR</envar><filename>/daemon-socket/socket</filename>, so they cannot
 perform Nix operations.</para>
 
 </simplesect>

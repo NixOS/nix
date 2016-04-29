@@ -128,6 +128,13 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 
 </varlistentry>
 
+<varlistentry><term><envar>NIX_RUNSTATE_DIR</envar></term>
+
+  <listitem><para>Overrides the location of the nix-daemon socket directory
+  (default <filename><replaceable>prefix</replaceable>/var/run/nix</filename>).</para></listitem>
+
+</varlistentry>
+
 
 <varlistentry><term><envar>NIX_DB_DIR</envar></term>
 
