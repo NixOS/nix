@@ -28,6 +28,13 @@ public:
             throw std::invalid_argument("null pointer cast to ref");
     }
 
+    explicit ref<T>(T * p)
+        : p(p)
+    {
+        if (!p)
+            throw std::invalid_argument("null pointer cast to ref");
+    }
+
     T* operator ->() const
     {
         return &*p;

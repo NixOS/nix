@@ -3222,11 +3222,7 @@ void SubstitutionGoal::tryToRun()
             /* Wake up the worker loop when we're done. */
             Finally updateStats([this]() { outPipe.writeSide.close(); });
 
-            StringSink sink;
-            sub->exportPaths({storePath}, false, sink);
-
-            StringSource source(*sink.s);
-            worker.store.importPaths(false, source, 0);
+            copyStorePath(ref<Store>(sub), ref<Store>(worker.store.shared_from_this()), storePath);
 
             promise.set_value();
         } catch (...) {

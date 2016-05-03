@@ -357,6 +357,19 @@ const Store::Stats & Store::getStats()
 }
 
 
+void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
+    const Path & storePath)
+{
+    auto info = srcStore->queryPathInfo(storePath);
+
+    StringSink sink;
+    srcStore->exportPaths({storePath}, false, sink);
+
+    StringSource source(*sink.s);
+    dstStore->importPaths(false, source, 0);
+}
+
+
 ValidPathInfo decodeValidPathInfo(std::istream & str, bool hashGiven)
 {
     ValidPathInfo info;

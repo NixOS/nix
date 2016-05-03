@@ -502,6 +502,11 @@ Path computeStorePathForText(const string & name, const string & s,
     const PathSet & references);
 
 
+/* Copy a path from one store to another. */
+void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
+    const Path & storePath);
+
+
 /* Remove the temporary roots file for this process.  Any temporary
    root becomes garbage after this point unless it has been registered
    as a (permanent) root. */

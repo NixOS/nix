@@ -65,11 +65,7 @@ struct CmdCopy : StorePathsCommand
                 if (!dstStore->isValidPath(storePath)) {
                     Activity act(*logger, lvlInfo, format("copying ‘%s’...") % storePath);
 
-                    StringSink sink;
-                    srcStore->exportPaths({storePath}, false, sink);
-
-                    StringSource source(*sink.s);
-                    dstStore->importPaths(false, source, 0);
+                    copyStorePath(srcStore, dstStore, storePath);
 
                     logger->incProgress(copiedLabel);
                 } else
