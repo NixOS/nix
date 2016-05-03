@@ -699,29 +699,25 @@ static void opRestore(Strings opFlags, Strings opArgs)
 
 static void opExport(Strings opFlags, Strings opArgs)
 {
-    bool sign = false;
     for (auto & i : opFlags)
-        if (i == "--sign") sign = true;
-        else throw UsageError(format("unknown flag ‘%1%’") % i);
+        throw UsageError(format("unknown flag ‘%1%’") % i);
 
     FdSink sink(STDOUT_FILENO);
     Paths sorted = store->topoSortPaths(PathSet(opArgs.begin(), opArgs.end()));
     reverse(sorted.begin(), sorted.end());
-    store->exportPaths(sorted, sign, sink);
+    store->exportPaths(sorted, sink);
 }
 
 
 static void opImport(Strings opFlags, Strings opArgs)
 {
-    bool requireSignature = false;
     for (auto & i : opFlags)
-        if (i == "--require-signature") requireSignature = true;
-        else throw UsageError(format("unknown flag ‘%1%’") % i);
+        throw UsageError(format("unknown flag ‘%1%’") % i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
     FdSource source(STDIN_FILENO);
-    Paths paths = store->importPaths(requireSignature, source, 0);
+    Paths paths = store->importPaths(source, 0);
 
     for (auto & i : paths)
         cout << format("%1%\n") % i << std::flush;
@@ -909,16 +905,16 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             case cmdImportPaths: {
                 if (!writeAllowed) throw Error("importing paths is not allowed");
-                store->importPaths(false, in, 0);
+                store->importPaths(in, 0);
                 out << 1; // indicate success
                 break;
             }
 
             case cmdExportPaths: {
-                bool sign = readInt(in);
+                readInt(in); // obsolete
                 Paths sorted = store->topoSortPaths(readStorePaths<PathSet>(in));
                 reverse(sorted.begin(), sorted.end());
-                store->exportPaths(sorted, sign, out);
+                store->exportPaths(sorted, out);
                 break;
             }
 

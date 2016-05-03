@@ -58,10 +58,9 @@ public:
     Path addTextToStore(const string & name, const string & s,
         const PathSet & references, bool repair = false) override;
 
-    void exportPath(const Path & path, bool sign,
-        Sink & sink) override;
+    void exportPath(const Path & path, Sink & sink) override;
 
-    Paths importPaths(bool requireSignature, Source & source,
+    Paths importPaths(Source & source,
         std::shared_ptr<FSAccessor> accessor) override;
 
     void buildPaths(const PathSet & paths, BuildMode buildMode) override;

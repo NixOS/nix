@@ -156,10 +156,8 @@ void BinaryCacheStore::narFromPath(const Path & storePath, Sink & sink)
     sink((unsigned char *) nar->c_str(), nar->size());
 }
 
-void BinaryCacheStore::exportPath(const Path & storePath, bool sign, Sink & sink)
+void BinaryCacheStore::exportPath(const Path & storePath, Sink & sink)
 {
-    assert(!sign);
-
     auto res = queryPathInfo(storePath);
 
     narFromPath(storePath, sink);
@@ -169,10 +167,9 @@ void BinaryCacheStore::exportPath(const Path & storePath, bool sign, Sink & sink
     sink << exportMagic << storePath << res->references << res->deriver << 0;
 }
 
-Paths BinaryCacheStore::importPaths(bool requireSignature, Source & source,
+Paths BinaryCacheStore::importPaths(Source & source,
     std::shared_ptr<FSAccessor> accessor)
 {
-    assert(!requireSignature);
     Paths res;
     while (true) {
         unsigned long long n = readLongLong(source);
@@ -346,7 +343,7 @@ struct BinaryCacheStoreAccessor : public FSAccessor
         if (i != nars.end()) return {i->second, restPath};
 
         StringSink sink;
-        store->exportPath(storePath, false, sink);
+        store->exportPath(storePath, sink);
 
         auto accessor = makeNarAccessor(sink.s);
         nars.emplace(storePath, accessor);

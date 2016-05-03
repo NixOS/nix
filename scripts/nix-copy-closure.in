@@ -12,7 +12,7 @@ binmode STDERR, ":encoding(utf8)";
 
 if (scalar @ARGV < 1) {
     print STDERR <<EOF
-Usage: nix-copy-closure [--from | --to] HOSTNAME [--sign] [--gzip] [--bzip2] [--xz] PATHS...
+Usage: nix-copy-closure [--from | --to] HOSTNAME [--gzip] [--bzip2] [--xz] PATHS...
 EOF
     ;
     exit 1;
@@ -21,7 +21,6 @@ EOF
 
 # Get the target host.
 my $sshHost;
-my $sign = 0;
 my $toMode = 1;
 my $includeOutputs = 0;
 my $dryRun = 0;
@@ -37,9 +36,6 @@ while (@ARGV) {
 
     if ($arg eq "--help") {
         exec "man nix-copy-closure" or die;
-    }
-    elsif ($arg eq "--sign") {
-        $sign = 1;
     }
     elsif ($arg eq "--gzip" || $arg eq "--bzip2" || $arg eq "--xz") {
         warn "$0: ‘$arg’ is not implemented\n" if $arg ne "--gzip";
@@ -81,7 +77,7 @@ die "$0: you did not specify a host name\n" unless defined $sshHost;
 if ($toMode) { # Copy TO the remote machine.
     Nix::CopyClosure::copyTo(
         $sshHost, [ @storePaths ],
-        $includeOutputs, $dryRun, $sign, $useSubstitutes);
+        $includeOutputs, $dryRun, $useSubstitutes);
 }
 
 else { # Copy FROM the remote machine.
@@ -99,7 +95,7 @@ else { # Copy FROM the remote machine.
     if (scalar @missing > 0) {
         print STDERR "copying ", scalar @missing, " missing paths from ‘$sshHost’...\n";
         writeInt(5, $to); # == cmdExportPaths
-        writeInt($sign ? 1 : 0, $to);
+        writeInt(0, $to); # obsolete
         writeStrings(\@missing, $to);
         importPaths(fileno($from));
     }

@@ -91,9 +91,9 @@ public:
 
     void narFromPath(const Path & path, Sink & sink) override;
 
-    void exportPath(const Path & path, bool sign, Sink & sink) override;
+    void exportPath(const Path & path, Sink & sink) override;
 
-    Paths importPaths(bool requireSignature, Source & source,
+    Paths importPaths(Source & source,
         std::shared_ptr<FSAccessor> accessor) override;
 
     Path importPath(Source & source, std::shared_ptr<FSAccessor> accessor);

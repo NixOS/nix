@@ -10,7 +10,7 @@ use IPC::Open2;
 
 
 sub copyToOpen {
-    my ($from, $to, $sshHost, $storePaths, $includeOutputs, $dryRun, $sign, $useSubstitutes) = @_;
+    my ($from, $to, $sshHost, $storePaths, $includeOutputs, $dryRun, $useSubstitutes) = @_;
 
     $useSubstitutes = 0 if $dryRun || !defined $useSubstitutes;
 
@@ -41,13 +41,13 @@ sub copyToOpen {
 
     # Send the "import paths" command.
     syswrite($to, pack("L<x4", 4)) or die;
-    exportPaths(fileno($to), $sign, @missing);
+    exportPaths(fileno($to), @missing);
     readInt($from) == 1 or die "remote machine ‘$sshHost’ failed to import closure\n";
 }
 
 
 sub copyTo {
-    my ($sshHost, $storePaths, $includeOutputs, $dryRun, $sign, $useSubstitutes) = @_;
+    my ($sshHost, $storePaths, $includeOutputs, $dryRun, $useSubstitutes) = @_;
 
     # Connect to the remote host.
     my ($from, $to);
@@ -61,7 +61,7 @@ sub copyTo {
         return oldCopyTo(@_);
     }
 
-    copyToOpen($from, $to, $sshHost, $storePaths, $includeOutputs, $dryRun, $sign, $useSubstitutes);
+    copyToOpen($from, $to, $sshHost, $storePaths, $includeOutputs, $dryRun, $useSubstitutes);
 
     close $to;
 }
@@ -70,7 +70,7 @@ sub copyTo {
 # For backwards compatibility with Nix <= 1.7. Will be removed
 # eventually.
 sub oldCopyTo {
-    my ($sshHost, $storePaths, $includeOutputs, $dryRun, $sign, $useSubstitutes) = @_;
+    my ($sshHost, $storePaths, $includeOutputs, $dryRun, $useSubstitutes) = @_;
 
     # Get the closure of this path.
     my @closure = reverse(topoSortPaths(computeFSClosure(0, $includeOutputs,
@@ -105,7 +105,7 @@ sub oldCopyTo {
         print STDERR "copying ", scalar @missing, " missing paths to ‘$sshHost’...\n";
         unless ($dryRun) {
             open SSH, "| ssh $sshHost @globalSshOpts 'nix-store --import' > /dev/null" or die;
-            exportPaths(fileno(SSH), $sign, @missing);
+            exportPaths(fileno(SSH), @missing);
             close SSH or die "copying store paths to remote machine ‘$sshHost’ failed: $?";
         }
     }

@@ -270,21 +270,18 @@ public:
     virtual void narFromPath(const Path & path, Sink & sink) = 0;
 
     /* Export a store path, that is, create a NAR dump of the store
-       path and append its references and its deriver.  Optionally, a
-       cryptographic signature (created by OpenSSL) of the preceding
-       data is attached. */
-    virtual void exportPath(const Path & path, bool sign,
-        Sink & sink) = 0;
+       path and append its references and its deriver. */
+    virtual void exportPath(const Path & path, Sink & sink) = 0;
 
     /* Export multiple paths in the format expected by ‘nix-store
        --import’. */
-    void exportPaths(const Paths & paths, bool sign, Sink & sink);
+    void exportPaths(const Paths & paths, Sink & sink);
 
     /* Import a sequence of NAR dumps created by exportPaths() into
        the Nix store. Optionally, the contents of the NARs are
        preloaded into the specified FS accessor to speed up subsequent
        access. */
-    virtual Paths importPaths(bool requireSignature, Source & source,
+    virtual Paths importPaths(Source & source,
         std::shared_ptr<FSAccessor> accessor) = 0;
 
     /* For each path, if it's a derivation, build it.  Building a

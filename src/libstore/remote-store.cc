@@ -373,23 +373,20 @@ Path RemoteStore::addTextToStore(const string & name, const string & s,
 }
 
 
-void RemoteStore::exportPath(const Path & path, bool sign,
-    Sink & sink)
+void RemoteStore::exportPath(const Path & path, Sink & sink)
 {
     auto conn(connections->get());
-    conn->to << wopExportPath << path << (sign ? 1 : 0);
+    conn->to << wopExportPath << path << 0;
     conn->processStderr(&sink); /* sink receives the actual data */
     readInt(conn->from);
 }
 
 
-Paths RemoteStore::importPaths(bool requireSignature, Source & source,
+Paths RemoteStore::importPaths(Source & source,
     std::shared_ptr<FSAccessor> accessor)
 {
     auto conn(connections->get());
     conn->to << wopImportPaths;
-    /* We ignore requireSignature, since the worker forces it to true
-       anyway. */
     conn->processStderr(0, &source);
     return readStorePaths<Paths>(conn->from);
 }

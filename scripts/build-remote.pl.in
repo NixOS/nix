@@ -223,10 +223,6 @@ my @inputs = split /\s/, readline(STDIN);
 my @outputs = split /\s/, readline(STDIN);
 
 
-my $maybeSign = "";
-$maybeSign = "--sign" if -e "$Nix::Config::confDir/signing-key.sec";
-
-
 # Copy the derivation and its dependencies to the build machine.  This
 # is guarded by an exclusive lock per machine to prevent multiple
 # build-remote instances from copying to a machine simultaneously.
@@ -250,7 +246,7 @@ if ($@) {
     print STDERR "somebody is hogging $uploadLock, continuing...\n";
     unlink $uploadLock;
 }
-Nix::CopyClosure::copyToOpen($from, $to, $hostName, [ $drvPath, @inputs ], 0, 0, $maybeSign ne "");
+Nix::CopyClosure::copyToOpen($from, $to, $hostName, [ $drvPath, @inputs ], 0, 0);
 close UPLOADLOCK;
 
 

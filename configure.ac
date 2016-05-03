@@ -168,10 +168,6 @@ AC_SUBST(storedir)
 
 
 # Look for OpenSSL, a required dependency.
-AC_PATH_PROG(openssl, openssl, openssl) # if not found, call openssl in $PATH
-AC_SUBST(openssl)
-AC_DEFINE_UNQUOTED(OPENSSL_PATH, ["$openssl"], [Path of the OpenSSL binary])
-
 PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
 
 

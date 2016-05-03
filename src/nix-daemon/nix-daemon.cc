@@ -312,10 +312,10 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
 
     case wopExportPath: {
         Path path = readStorePath(from);
-        bool sign = readInt(from) == 1;
+        readInt(from); // obsolete
         startWork();
         TunnelSink sink(to);
-        store->exportPath(path, sign, sink);
+        store->exportPath(path, sink);
         stopWork();
         to << 1;
         break;
@@ -324,7 +324,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     case wopImportPaths: {
         startWork();
         TunnelSource source(from);
-        Paths paths = store->importPaths(!trusted, source, 0);
+        Paths paths = store->importPaths(source, 0);
         stopWork();
         to << paths;
         break;

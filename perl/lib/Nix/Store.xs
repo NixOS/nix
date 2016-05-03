@@ -169,13 +169,13 @@ SV * followLinksToStorePath(char * path)
         RETVAL
 
 
-void exportPaths(int fd, int sign, ...)
+void exportPaths(int fd, ...)
     PPCODE:
         try {
             Paths paths;
             for (int n = 2; n < items; ++n) paths.push_back(SvPV_nolen(ST(n)));
             FdSink sink(fd);
-            store()->exportPaths(paths, sign, sink);
+            store()->exportPaths(paths, sink);
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -185,7 +185,7 @@ void importPaths(int fd)
     PPCODE:
         try {
             FdSource source(fd);
-            store()->importPaths(false, source, 0);
+            store()->importPaths(source, 0);
         } catch (Error & e) {
             croak("%s", e.what());
         }

@@ -363,10 +363,10 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     auto info = srcStore->queryPathInfo(storePath);
 
     StringSink sink;
-    srcStore->exportPaths({storePath}, false, sink);
+    srcStore->exportPaths({storePath}, sink);
 
     StringSource source(*sink.s);
-    dstStore->importPaths(false, source, 0);
+    dstStore->importPaths(source, 0);
 }
 
 
@@ -406,12 +406,11 @@ string showPaths(const PathSet & paths)
 }
 
 
-void Store::exportPaths(const Paths & paths,
-    bool sign, Sink & sink)
+void Store::exportPaths(const Paths & paths, Sink & sink)
 {
     for (auto & i : paths) {
         sink << 1;
-        exportPath(i, sign, sink);
+        exportPath(i, sink);
     }
     sink << 0;
 }

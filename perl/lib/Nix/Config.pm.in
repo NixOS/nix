@@ -14,7 +14,6 @@ $storeDir = $ENV{"NIX_STORE_DIR"} || "@storedir@";
 $bzip2 = "@bzip2@";
 $xz = "@xz@";
 $curl = "@curl@";
-$openssl = "@openssl@";
 
 $useBindings = "@perlbindings@" eq "yes";
 

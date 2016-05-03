@@ -1035,18 +1035,7 @@ struct HashAndWriteSink : Sink
 };
 
 
-static void checkSecrecy(const Path & path)
-{
-    struct stat st;
-    if (stat(path.c_str(), &st))
-        throw SysError(format("getting status of ‘%1%’") % path);
-    if ((st.st_mode & (S_IRWXG | S_IRWXO)) != 0)
-        throw Error(format("file ‘%1%’ should be secret (inaccessible to everybody else)!") % path);
-}
-
-
-void LocalStore::exportPath(const Path & path, bool sign,
-    Sink & sink)
+void LocalStore::exportPath(const Path & path, Sink & sink)
 {
     assertStorePath(path);
 
@@ -1068,30 +1057,7 @@ void LocalStore::exportPath(const Path & path, bool sign,
 
     hashAndWriteSink << exportMagic << path << info->references << info->deriver;
 
-    if (sign) {
-        Hash hash = hashAndWriteSink.currentHash();
-
-        Path tmpDir = createTempDir();
-        AutoDelete delTmp(tmpDir);
-        Path hashFile = tmpDir + "/hash";
-        writeFile(hashFile, printHash(hash));
-
-        Path secretKey = settings.nixConfDir + "/signing-key.sec";
-        checkSecrecy(secretKey);
-
-        Strings args;
-        args.push_back("rsautl");
-        args.push_back("-sign");
-        args.push_back("-inkey");
-        args.push_back(secretKey);
-        args.push_back("-in");
-        args.push_back(hashFile);
-        string signature = runProgram(OPENSSL_PATH, true, args);
-
-        hashAndWriteSink << 1 << signature;
-
-    } else
-        hashAndWriteSink << 0;
+    hashAndWriteSink << 0; // backwards compatibility
 }
 
 
@@ -1129,7 +1095,7 @@ Path LocalStore::createTempDirInStore()
 }
 
 
-Path LocalStore::importPath(bool requireSignature, Source & source)
+Path LocalStore::importPath(Source & source)
 {
     HashAndReadSource hashAndReadSource(source);
 
@@ -1160,36 +1126,9 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 
     bool haveSignature = readInt(hashAndReadSource) == 1;
 
-    if (requireSignature && !haveSignature)
-        throw Error(format("imported archive of ‘%1%’ lacks a signature") % dstPath);
-
-    if (haveSignature) {
-        string signature = readString(hashAndReadSource);
-
-        if (requireSignature) {
-            Path sigFile = tmpDir + "/sig";
-            writeFile(sigFile, signature);
-
-            Strings args;
-            args.push_back("rsautl");
-            args.push_back("-verify");
-            args.push_back("-inkey");
-            args.push_back(settings.nixConfDir + "/signing-key.pub");
-            args.push_back("-pubin");
-            args.push_back("-in");
-            args.push_back(sigFile);
-            string hash2 = runProgram(OPENSSL_PATH, true, args);
-
-            /* Note: runProgram() throws an exception if the signature
-               is invalid. */
-
-            if (printHash(hash) != hash2)
-                throw Error(
-                    "signed hash doesn't match actual contents of imported "
-                    "archive; archive could be corrupt, or someone is trying "
-                    "to import a Trojan horse");
-        }
-    }
+    if (haveSignature)
+        // Ignore legacy signature.
+        readString(hashAndReadSource);
 
     /* Do the actual import. */
 
@@ -1239,7 +1178,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 }
 
 
-Paths LocalStore::importPaths(bool requireSignature, Source & source,
+Paths LocalStore::importPaths(Source & source,
     std::shared_ptr<FSAccessor> accessor)
 {
     Paths res;
@@ -1247,7 +1186,7 @@ Paths LocalStore::importPaths(bool requireSignature, Source & source,
         unsigned long long n = readLongLong(source);
         if (n == 0) break;
         if (n != 1) throw Error("input doesn't look like something created by ‘nix-store --export’");
-        res.push_back(importPath(requireSignature, source));
+        res.push_back(importPath(source));
     }
     return res;
 }
