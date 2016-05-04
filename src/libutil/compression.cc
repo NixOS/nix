@@ -11,7 +11,7 @@ namespace nix {
 
 static ref<std::string> compressXZ(const std::string & in)
 {
-    lzma_stream strm;
+    lzma_stream strm(LZMA_STREAM_INIT);
 
     // FIXME: apply the x86 BCJ filter?
 
@@ -54,7 +54,7 @@ static ref<std::string> compressXZ(const std::string & in)
 
 static ref<std::string> decompressXZ(const std::string & in)
 {
-    lzma_stream strm;
+    lzma_stream strm(LZMA_STREAM_INIT);
 
     lzma_ret ret = lzma_stream_decoder(
         &strm, UINT64_MAX, LZMA_CONCATENATED);
