@@ -19,8 +19,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include <bzlib.h>
-
 #if HAVE_SODIUM
 #include <sodium.h>
 #endif

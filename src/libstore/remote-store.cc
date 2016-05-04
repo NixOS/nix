@@ -541,7 +541,7 @@ void RemoteStore::Connection::processStderr(Sink * sink, Source * source)
         if (msg == STDERR_WRITE) {
             string s = readString(from);
             if (!sink) throw Error("no sink");
-            (*sink)((const unsigned char *) s.data(), s.size());
+            (*sink)(s);
         }
         else if (msg == STDERR_READ) {
             if (!source) throw Error("no source");

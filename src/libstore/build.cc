@@ -9,6 +9,7 @@
 #include "affinity.hh"
 #include "builtins.hh"
 #include "finally.hh"
+#include "compression.hh"
 
 #include <algorithm>
 #include <iostream>
@@ -29,13 +30,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
-#include <stdio.h>
 #include <cstring>
 
 #include <pwd.h>
 #include <grp.h>
-
-#include <bzlib.h>
 
 /* chroot-like behavior from Apple's sandbox */
 #if __APPLE__
@@ -741,9 +739,8 @@ private:
     Path tmpDirInSandbox;
 
     /* File descriptor for the log file. */
-    FILE * fLogFile = 0;
-    BZFILE * bzLogFile = 0;
     AutoCloseFD fdLogFile;
+    std::shared_ptr<BufferedSink> logFileSink, logSink;
 
     /* Number of bytes received from the builder's stdout/stderr. */
     unsigned long logSize;
@@ -2854,46 +2851,31 @@ Path DerivationGoal::openLogFile()
     Path dir = (format("%1%/%2%/%3%/") % settings.nixLogDir % drvsLogDir % string(baseName, 0, 2)).str();
     createDirs(dir);
 
-    if (settings.compressLog) {
+    Path logFileName = (format("%1%/%2%%3%")
+        % dir
+        % string(baseName, 2)
+        % (settings.compressLog ? ".bz2" : "")).str();
 
-        Path logFileName = (format("%1%/%2%.bz2") % dir % string(baseName, 2)).str();
-        AutoCloseFD fd = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0666);
-        if (fd == -1) throw SysError(format("creating log file ‘%1%’") % logFileName);
-        closeOnExec(fd);
+    fdLogFile = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0666);
+    if (fdLogFile == -1) throw SysError(format("creating log file ‘%1%’") % logFileName);
 
-        if (!(fLogFile = fdopen(fd.borrow(), "w")))
-            throw SysError(format("opening file ‘%1%’") % logFileName);
+    logFileSink = std::make_shared<FdSink>(fdLogFile);
 
-        int err;
-        if (!(bzLogFile = BZ2_bzWriteOpen(&err, fLogFile, 9, 0, 0)))
-            throw Error(format("cannot open compressed log file ‘%1%’") % logFileName);
+    if (settings.compressLog)
+        logSink = std::shared_ptr<CompressionSink>(makeCompressionSink("bzip2", *logFileSink));
+    else
+        logSink = logFileSink;
 
-        return logFileName;
-
-    } else {
-        Path logFileName = (format("%1%/%2%") % dir % string(baseName, 2)).str();
-        fdLogFile = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0666);
-        if (fdLogFile == -1) throw SysError(format("creating log file ‘%1%’") % logFileName);
-        closeOnExec(fdLogFile);
-        return logFileName;
-    }
+    return logFileName;
 }
 
 
 void DerivationGoal::closeLogFile()
 {
-    if (bzLogFile) {
-        int err;
-        BZ2_bzWriteClose(&err, bzLogFile, 0, 0, 0);
-        bzLogFile = 0;
-        if (err != BZ_OK) throw Error(format("cannot close compressed log file (BZip2 error = %1%)") % err);
-    }
-
-    if (fLogFile) {
-        fclose(fLogFile);
-        fLogFile = 0;
-    }
-
+    auto logSink2 = std::dynamic_pointer_cast<CompressionSink>(logSink);
+    if (logSink2) logSink2->finish();
+    if (logFileSink) logFileSink->flush();
+    logSink = logFileSink = 0;
     fdLogFile.close();
 }
 
@@ -2940,12 +2922,7 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
                 currentLogLine[currentLogLinePos++] = c;
             }
 
-        if (bzLogFile) {
-            int err;
-            BZ2_bzWrite(&err, bzLogFile, (unsigned char *) data.data(), data.size());
-            if (err != BZ_OK) throw Error(format("cannot write to compressed log file (BZip2 error = %1%)") % err);
-        } else if (fdLogFile != -1)
-            writeFull(fdLogFile, data);
+        if (logSink) (*logSink)(data);
     }
 
     if (hook && fd == hook->fromHook.readSide)

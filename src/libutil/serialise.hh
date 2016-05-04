@@ -13,6 +13,11 @@ struct Sink
     virtual ~Sink() { }
     virtual void operator () (const unsigned char * data, size_t len) = 0;
     virtual bool good() { return true; }
+
+    void operator () (const std::string & s)
+    {
+        (*this)((const unsigned char *) s.data(), s.size());
+    }
 };
 
 
@@ -27,6 +32,11 @@ struct BufferedSink : Sink
     ~BufferedSink();
 
     void operator () (const unsigned char * data, size_t len) override;
+
+    void operator () (const std::string & s)
+    {
+        Sink::operator()(s);
+    }
 
     void flush();
 
