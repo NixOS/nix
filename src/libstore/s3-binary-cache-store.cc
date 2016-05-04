@@ -46,9 +46,9 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
     Stats stats;
 
-    S3BinaryCacheStoreImpl(std::shared_ptr<Store> localStore,
+    S3BinaryCacheStoreImpl(
         const StoreParams & params, const std::string & bucketName)
-        : S3BinaryCacheStore(localStore, params)
+        : S3BinaryCacheStore(params)
         , bucketName(bucketName)
         , config(makeConfig())
         , client(make_ref<Aws::S3::S3Client>(*config))
@@ -248,8 +248,7 @@ static RegisterStoreImplementation regStore([](
     -> std::shared_ptr<Store>
 {
     if (std::string(uri, 0, 5) != "s3://") return 0;
-    auto store = std::make_shared<S3BinaryCacheStoreImpl>(std::shared_ptr<Store>(0),
-        params, std::string(uri, 5));
+    auto store = std::make_shared<S3BinaryCacheStoreImpl>(params, std::string(uri, 5));
     store->init();
     return store;
 });

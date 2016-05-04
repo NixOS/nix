@@ -15,9 +15,9 @@ private:
 
 public:
 
-    HttpBinaryCacheStore(std::shared_ptr<Store> localStore,
+    HttpBinaryCacheStore(
         const StoreParams & params, const Path & _cacheUri)
-        : BinaryCacheStore(localStore, params)
+        : BinaryCacheStore(params)
         , cacheUri(_cacheUri)
         , downloaders(
             std::numeric_limits<size_t>::max(),
@@ -91,8 +91,7 @@ static RegisterStoreImplementation regStore([](
 {
     if (std::string(uri, 0, 7) != "http://" &&
         std::string(uri, 0, 8) != "https://") return 0;
-    auto store = std::make_shared<HttpBinaryCacheStore>(std::shared_ptr<Store>(0),
-        params, uri);
+    auto store = std::make_shared<HttpBinaryCacheStore>(params, uri);
     store->init();
     return store;
 });

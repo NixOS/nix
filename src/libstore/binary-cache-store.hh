@@ -17,14 +17,11 @@ private:
 
     std::unique_ptr<SecretKey> secretKey;
 
-    std::shared_ptr<Store> localStore;
-
     std::string compression;
 
 protected:
 
-    BinaryCacheStore(std::shared_ptr<Store> localStore,
-        const StoreParams & params);
+    BinaryCacheStore(const StoreParams & params);
 
     [[noreturn]] void notImpl();
 
@@ -78,7 +75,8 @@ public:
     { return {}; }
 
     void querySubstitutablePathInfos(const PathSet & paths,
-        SubstitutablePathInfos & infos) override;
+        SubstitutablePathInfos & infos)
+    { }
 
     void addToStore(const ValidPathInfo & info, const std::string & nar,
         bool repair = false) override;
@@ -92,13 +90,15 @@ public:
 
     void narFromPath(const Path & path, Sink & sink) override;
 
-    void buildPaths(const PathSet & paths, BuildMode buildMode = bmNormal) override;
+    void buildPaths(const PathSet & paths, BuildMode buildMode = bmNormal) override
+    { notImpl(); }
 
     BuildResult buildDerivation(const Path & drvPath, const BasicDerivation & drv,
         BuildMode buildMode = bmNormal) override
     { notImpl(); }
 
-    void ensurePath(const Path & path) override;
+    void ensurePath(const Path & path) override
+    { notImpl(); }
 
     void addTempRoot(const Path & path) override
     { notImpl(); }

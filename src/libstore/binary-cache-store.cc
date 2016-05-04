@@ -14,10 +14,8 @@
 
 namespace nix {
 
-BinaryCacheStore::BinaryCacheStore(std::shared_ptr<Store> localStore,
-    const StoreParams & params)
-    : localStore(localStore)
-    , compression(get(params, "compression", "xz"))
+BinaryCacheStore::BinaryCacheStore(const StoreParams & params)
+    : compression(get(params, "compression", "xz"))
 {
     auto secretKeyFile = get(params, "secret-key", "");
     if (secretKeyFile != "")
@@ -170,30 +168,6 @@ std::shared_ptr<ValidPathInfo> BinaryCacheStore::queryPathInfoUncached(const Pat
     return std::shared_ptr<NarInfo>(narInfo);
 }
 
-void BinaryCacheStore::querySubstitutablePathInfos(const PathSet & paths,
-    SubstitutablePathInfos & infos)
-{
-    PathSet left;
-
-    if (!localStore) return;
-
-    for (auto & storePath : paths) {
-        try {
-            auto info = localStore->queryPathInfo(storePath);
-            SubstitutablePathInfo sub;
-            sub.references = info->references;
-            sub.downloadSize = 0;
-            sub.narSize = info->narSize;
-            infos.emplace(storePath, sub);
-        } catch (InvalidPath &) {
-            left.insert(storePath);
-        }
-    }
-
-    if (settings.useSubstitutes)
-        localStore->querySubstitutablePathInfos(left, infos);
-}
-
 Path BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
     bool recursive, HashType hashAlgo, PathFilter & filter, bool repair)
 {
@@ -235,39 +209,6 @@ Path BinaryCacheStore::addTextToStore(const string & name, const string & s,
     }
 
     return info.path;
-}
-
-void BinaryCacheStore::buildPaths(const PathSet & paths, BuildMode buildMode)
-{
-    for (auto & storePath : paths) {
-        assert(!isDerivation(storePath));
-
-        if (isValidPath(storePath)) continue;
-
-        if (!localStore)
-            throw Error(format("don't know how to realise path ‘%1%’ in a binary cache") % storePath);
-
-        localStore->addTempRoot(storePath);
-
-        if (!localStore->isValidPath(storePath))
-            localStore->ensurePath(storePath);
-
-        auto info = localStore->queryPathInfo(storePath);
-
-        for (auto & ref : info->references)
-            if (ref != storePath)
-                ensurePath(ref);
-
-        StringSink sink;
-        dumpPath(storePath, sink);
-
-        addToStore(*info, *sink.s, buildMode == bmRepair);
-    }
-}
-
-void BinaryCacheStore::ensurePath(const Path & path)
-{
-    buildPaths({path});
 }
 
 /* Given requests for a path /nix/store/<x>/<y>, this accessor will

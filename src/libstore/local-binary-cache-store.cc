@@ -11,9 +11,9 @@ private:
 
 public:
 
-    LocalBinaryCacheStore(std::shared_ptr<Store> localStore,
+    LocalBinaryCacheStore(
         const StoreParams & params, const Path & binaryCacheDir)
-        : BinaryCacheStore(localStore, params)
+        : BinaryCacheStore(params)
         , binaryCacheDir(binaryCacheDir)
     {
     }
@@ -90,8 +90,7 @@ static RegisterStoreImplementation regStore([](
     -> std::shared_ptr<Store>
 {
     if (std::string(uri, 0, 7) != "file://") return 0;
-    auto store = std::make_shared<LocalBinaryCacheStore>(
-        std::shared_ptr<Store>(0), params, std::string(uri, 7));
+    auto store = std::make_shared<LocalBinaryCacheStore>(params, std::string(uri, 7));
     store->init();
     return store;
 });
