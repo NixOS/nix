@@ -105,11 +105,6 @@ AC_CHECK_HEADERS([locale])
 AC_LANG_POP(C++)
 
 
-# Check for <err.h>.
-AC_CHECK_HEADER([err.h], [], [bsddiff_compat_include="-Icompat-include"])
-AC_SUBST([bsddiff_compat_include])
-
-
 AC_DEFUN([NEED_PROG],
 [
 AC_PATH_PROG($1, $2)
