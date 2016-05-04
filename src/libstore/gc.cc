@@ -265,7 +265,7 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
 {
     auto foundRoot = [&](const Path & path, const Path & target) {
         Path storePath = toStorePath(target);
-        if (isValidPath(storePath))
+        if (isStorePath(storePath) && isValidPath(storePath))
             roots[path] = storePath;
         else
             printMsg(lvlInfo, format("skipping invalid root from ‘%1%’ to ‘%2%’") % path % storePath);
@@ -351,7 +351,7 @@ void LocalStore::findRuntimeRoots(PathSet & roots)
     for (auto & i : paths)
         if (isInStore(i)) {
             Path path = toStorePath(i);
-            if (roots.find(path) == roots.end() && isValidPath(path)) {
+            if (roots.find(path) == roots.end() && isStorePath(path) && isValidPath(path)) {
                 debug(format("got additional root ‘%1%’") % path);
                 roots.insert(path);
             }
@@ -402,7 +402,7 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
 
     unsigned long long size = 0;
 
-    if (isValidPath(path)) {
+    if (isStorePath(path) && isValidPath(path)) {
         PathSet referrers;
         queryReferrers(path, referrers);
         for (auto & i : referrers)
@@ -473,7 +473,7 @@ bool LocalStore::canReachRoot(GCState & state, PathSet & visited, const Path & p
 
     visited.insert(path);
 
-    if (!isValidPath(path)) return false;
+    if (!isStorePath(path) || !isValidPath(path)) return false;
 
     PathSet incoming;
 
@@ -516,7 +516,7 @@ void LocalStore::tryToDelete(GCState & state, const Path & path)
 
     Activity act(*logger, lvlDebug, format("considering whether to delete ‘%1%’") % path);
 
-    if (!isValidPath(path)) {
+    if (!isStorePath(path) || !isValidPath(path)) {
         /* A lock file belonging to a path that we're building right
            now isn't garbage. */
         if (isActiveTempFile(state, path, ".lock")) return;
