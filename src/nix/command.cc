@@ -108,7 +108,7 @@ void StorePathsCommand::run(ref<Store> store)
             PathSet closure;
             for (auto & storePath : storePaths)
                 store->computeFSClosure(storePath, closure, false, false);
-            storePaths = store->topoSortPaths(closure);
+            storePaths = Paths(closure.begin(), closure.end());
         }
     }
 

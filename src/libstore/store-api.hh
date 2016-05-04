@@ -19,7 +19,7 @@ namespace nix {
 /* Size of the hash part of store paths, in base-32 characters. */
 const size_t storePathHashLen = 32; // i.e. 160 bits
 
-/* Magic header of exportPath() output. */
+/* Magic header of exportPath() output (obsolete). */
 const uint32_t exportMagic = 0x4558494e;
 
 
@@ -253,6 +253,10 @@ public:
     virtual void querySubstitutablePathInfos(const PathSet & paths,
         SubstitutablePathInfos & infos) = 0;
 
+    /* Import a path into the store. */
+    virtual void addToStore(const ValidPathInfo & info, const std::string & nar,
+        bool repair = false) = 0;
+
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
        The function object `filter' can be used to exclude files (see
@@ -268,21 +272,6 @@ public:
 
     /* Write a NAR dump of a store path. */
     virtual void narFromPath(const Path & path, Sink & sink) = 0;
-
-    /* Export a store path, that is, create a NAR dump of the store
-       path and append its references and its deriver. */
-    virtual void exportPath(const Path & path, Sink & sink) = 0;
-
-    /* Export multiple paths in the format expected by ‘nix-store
-       --import’. */
-    void exportPaths(const Paths & paths, Sink & sink);
-
-    /* Import a sequence of NAR dumps created by exportPaths() into
-       the Nix store. Optionally, the contents of the NARs are
-       preloaded into the specified FS accessor to speed up subsequent
-       access. */
-    virtual Paths importPaths(Source & source,
-        std::shared_ptr<FSAccessor> accessor) = 0;
 
     /* For each path, if it's a derivation, build it.  Building a
        derivation means ensuring that the output paths are valid.  If
@@ -396,6 +385,19 @@ public:
     /* Sort a set of paths topologically under the references
        relation.  If p refers to q, then p preceeds q in this list. */
     Paths topoSortPaths(const PathSet & paths);
+
+    /* Export multiple paths in the format expected by ‘nix-store
+       --import’. */
+    void exportPaths(const Paths & paths, Sink & sink);
+
+    void exportPath(const Path & path, Sink & sink);
+
+    /* Import a sequence of NAR dumps created by exportPaths() into
+       the Nix store. Optionally, the contents of the NARs are
+       preloaded into the specified FS accessor to speed up subsequent
+       access. */
+    Paths importPaths(Source & source,
+        std::shared_ptr<FSAccessor> accessor);
 
     struct Stats
     {

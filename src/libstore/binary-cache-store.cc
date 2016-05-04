@@ -46,8 +46,10 @@ Path BinaryCacheStore::narInfoFileFor(const Path & storePath)
     return storePathToHash(storePath) + ".narinfo";
 }
 
-void BinaryCacheStore::addToCache(const ValidPathInfo & info, ref<std::string> nar)
+void BinaryCacheStore::addToStore(const ValidPathInfo & info, const std::string & nar, bool repair)
 {
+    if (!repair && isValidPath(info.path)) return;
+
     /* Verify that all references are valid. This may do some .narinfo
        reads, but typically they'll already be cached. */
     for (auto & ref : info.references)
@@ -60,14 +62,13 @@ void BinaryCacheStore::addToCache(const ValidPathInfo & info, ref<std::string> n
         }
 
     auto narInfoFile = narInfoFileFor(info.path);
-    if (fileExists(narInfoFile)) return;
 
-    assert(nar->compare(0, narMagic.size(), narMagic) == 0);
+    assert(nar.compare(0, narMagic.size(), narMagic) == 0);
 
     auto narInfo = make_ref<NarInfo>(info);
 
-    narInfo->narSize = nar->size();
-    narInfo->narHash = hashString(htSHA256, *nar);
+    narInfo->narSize = nar.size();
+    narInfo->narHash = hashString(htSHA256, nar);
 
     if (info.narHash && info.narHash != narInfo->narHash)
         throw Error(format("refusing to copy corrupted path ‘%1%’ to binary cache") % info.path);
@@ -83,7 +84,7 @@ void BinaryCacheStore::addToCache(const ValidPathInfo & info, ref<std::string> n
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
     printMsg(lvlTalkative, format("copying path ‘%1%’ (%2% bytes, compressed %3$.1f%% in %4% ms) to binary cache")
         % narInfo->path % narInfo->narSize
-        % ((1.0 - (double) narCompressed->size() / nar->size()) * 100.0)
+        % ((1.0 - (double) narCompressed->size() / nar.size()) * 100.0)
         % duration);
 
     /* Atomically write the NAR file. */
@@ -91,13 +92,13 @@ void BinaryCacheStore::addToCache(const ValidPathInfo & info, ref<std::string> n
         + (compression == "xz" ? ".xz" :
            compression == "bzip2" ? ".bz2" :
            "");
-    if (!fileExists(narInfo->url)) {
+    if (repair || !fileExists(narInfo->url)) {
         stats.narWrite++;
         upsertFile(narInfo->url, *narCompressed);
     } else
         stats.narWriteAverted++;
 
-    stats.narWriteBytes += nar->size();
+    stats.narWriteBytes += nar.size();
     stats.narWriteCompressedBytes += narCompressed->size();
     stats.narWriteCompressionTimeMs += duration;
 
@@ -141,7 +142,7 @@ void BinaryCacheStore::narFromPath(const Path & storePath, Sink & sink)
     /* Decompress the NAR. FIXME: would be nice to have the remote
        side do this. */
     try {
-        nar = decompress(info->compression, ref<std::string>(nar));
+        nar = decompress(info->compression, *nar);
     } catch (UnknownCompressionMethod &) {
         throw Error(format("binary cache path ‘%s’ uses unknown compression method ‘%s’")
             % storePath % info->compression);
@@ -155,51 +156,6 @@ void BinaryCacheStore::narFromPath(const Path & storePath, Sink & sink)
 
     sink((unsigned char *) nar->c_str(), nar->size());
 }
-
-void BinaryCacheStore::exportPath(const Path & storePath, Sink & sink)
-{
-    auto res = queryPathInfo(storePath);
-
-    narFromPath(storePath, sink);
-
-    // FIXME: check integrity of NAR.
-
-    sink << exportMagic << storePath << res->references << res->deriver << 0;
-}
-
-Paths BinaryCacheStore::importPaths(Source & source,
-    std::shared_ptr<FSAccessor> accessor)
-{
-    Paths res;
-    while (true) {
-        unsigned long long n = readLongLong(source);
-        if (n == 0) break;
-        if (n != 1) throw Error("input doesn't look like something created by ‘nix-store --export’");
-        res.push_back(importPath(source, accessor));
-    }
-    return res;
-}
-
-struct TeeSource : Source
-{
-    Source & readSource;
-    ref<std::string> data;
-    TeeSource(Source & readSource)
-        : readSource(readSource)
-        , data(make_ref<std::string>())
-    {
-    }
-    size_t read(unsigned char * data, size_t len)
-    {
-        size_t n = readSource.read(data, len);
-        this->data->append((char *) data, n);
-        return n;
-    }
-};
-
-struct NopSink : ParseSink
-{
-};
 
 std::shared_ptr<ValidPathInfo> BinaryCacheStore::queryPathInfoUncached(const Path & storePath)
 {
@@ -260,8 +216,7 @@ Path BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
     ValidPathInfo info;
     info.path = makeFixedOutputPath(recursive, hashAlgo, h, name);
 
-    if (repair || !isValidPath(info.path))
-        addToCache(info, sink.s);
+    addToStore(info, *sink.s, repair);
 
     return info.path;
 }
@@ -276,7 +231,7 @@ Path BinaryCacheStore::addTextToStore(const string & name, const string & s,
     if (repair || !isValidPath(info.path)) {
         StringSink sink;
         dumpString(s, sink);
-        addToCache(info, sink.s);
+        addToStore(info, *sink.s, repair);
     }
 
     return info.path;
@@ -306,7 +261,7 @@ void BinaryCacheStore::buildPaths(const PathSet & paths, BuildMode buildMode)
         StringSink sink;
         dumpPath(storePath, sink);
 
-        addToCache(*info, sink.s);
+        addToStore(*info, *sink.s, buildMode == bmRepair);
     }
 }
 
@@ -343,7 +298,7 @@ struct BinaryCacheStoreAccessor : public FSAccessor
         if (i != nars.end()) return {i->second, restPath};
 
         StringSink sink;
-        store->exportPath(storePath, sink);
+        store->narFromPath(storePath, sink);
 
         auto accessor = makeNarAccessor(sink.s);
         nars.emplace(storePath, accessor);
@@ -379,38 +334,6 @@ ref<FSAccessor> BinaryCacheStore::getFSAccessor()
 {
     return make_ref<BinaryCacheStoreAccessor>(ref<BinaryCacheStore>(
             std::dynamic_pointer_cast<BinaryCacheStore>(shared_from_this())));
-}
-
-Path BinaryCacheStore::importPath(Source & source, std::shared_ptr<FSAccessor> accessor)
-{
-    /* FIXME: some cut&paste of LocalStore::importPath(). */
-
-    /* Extract the NAR from the source. */
-    TeeSource tee(source);
-    NopSink sink;
-    parseDump(sink, tee);
-
-    uint32_t magic = readInt(source);
-    if (magic != exportMagic)
-        throw Error("Nix archive cannot be imported; wrong format");
-
-    ValidPathInfo info;
-    info.path = readStorePath(source);
-
-    info.references = readStorePaths<PathSet>(source);
-
-    readString(source); // deriver, don't care
-
-    bool haveSignature = readInt(source) == 1;
-    assert(!haveSignature);
-
-    addToCache(info, tee.data);
-
-    auto accessor_ = std::dynamic_pointer_cast<BinaryCacheStoreAccessor>(accessor);
-    if (accessor_)
-        accessor_->nars.emplace(info.path, makeNarAccessor(tee.data));
-
-    return info.path;
 }
 
 }

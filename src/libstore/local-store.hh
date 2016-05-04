@@ -112,6 +112,9 @@ public:
     void querySubstitutablePathInfos(const PathSet & paths,
         SubstitutablePathInfos & infos) override;
 
+    void addToStore(const ValidPathInfo & info, const std::string & nar,
+        bool repair) override;
+
     Path addToStore(const string & name, const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, bool repair = false) override;
@@ -125,11 +128,6 @@ public:
 
     Path addTextToStore(const string & name, const string & s,
         const PathSet & references, bool repair = false) override;
-
-    void exportPath(const Path & path, Sink & sink) override;
-
-    Paths importPaths(Source & source,
-        std::shared_ptr<FSAccessor> accessor) override;
 
     void buildPaths(const PathSet & paths, BuildMode buildMode) override;
 
@@ -228,8 +226,6 @@ private:
     void removeUnusedLinks(const GCState & state);
 
     Path createTempDirInStore();
-
-    Path importPath(Source & source);
 
     void checkDerivationOutputs(const Path & drvPath, const Derivation & drv);
 

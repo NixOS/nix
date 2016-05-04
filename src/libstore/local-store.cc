@@ -901,6 +901,40 @@ void LocalStore::invalidatePath(State & state, const Path & path)
 }
 
 
+void LocalStore::addToStore(const ValidPathInfo & info, const std::string & nar, bool repair)
+{
+    addTempRoot(info.path);
+
+    if (repair || !isValidPath(info.path)) {
+
+        PathLocks outputLock;
+
+        /* Lock the output path.  But don't lock if we're being called
+           from a build hook (whose parent process already acquired a
+           lock on this path). */
+        Strings locksHeld = tokenizeString<Strings>(getEnv("NIX_HELD_LOCKS"));
+        if (find(locksHeld.begin(), locksHeld.end(), info.path) == locksHeld.end())
+            outputLock.lockPaths({info.path});
+
+        if (repair || !isValidPath(info.path)) {
+
+            deletePath(info.path);
+
+            StringSource source(nar);
+            restorePath(info.path, source);
+
+            canonicalisePathMetaData(info.path, -1);
+
+            optimisePath(info.path); // FIXME: combine with hashPath()
+
+            registerValidPath(info);
+        }
+
+        outputLock.setDeletion(true);
+    }
+}
+
+
 Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
     bool recursive, HashType hashAlgo, bool repair)
 {
@@ -1016,69 +1050,6 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
 }
 
 
-struct HashAndWriteSink : Sink
-{
-    Sink & writeSink;
-    HashSink hashSink;
-    HashAndWriteSink(Sink & writeSink) : writeSink(writeSink), hashSink(htSHA256)
-    {
-    }
-    virtual void operator () (const unsigned char * data, size_t len)
-    {
-        writeSink(data, len);
-        hashSink(data, len);
-    }
-    Hash currentHash()
-    {
-        return hashSink.currentHash().first;
-    }
-};
-
-
-void LocalStore::exportPath(const Path & path, Sink & sink)
-{
-    assertStorePath(path);
-
-    printMsg(lvlTalkative, format("exporting path ‘%1%’") % path);
-
-    auto info = queryPathInfo(path);
-
-    HashAndWriteSink hashAndWriteSink(sink);
-
-    dumpPath(path, hashAndWriteSink);
-
-    /* Refuse to export paths that have changed.  This prevents
-       filesystem corruption from spreading to other machines.
-       Don't complain if the stored hash is zero (unknown). */
-    Hash hash = hashAndWriteSink.currentHash();
-    if (hash != info->narHash && info->narHash != Hash(info->narHash.type))
-        throw Error(format("hash of path ‘%1%’ has changed from ‘%2%’ to ‘%3%’!") % path
-            % printHash(info->narHash) % printHash(hash));
-
-    hashAndWriteSink << exportMagic << path << info->references << info->deriver;
-
-    hashAndWriteSink << 0; // backwards compatibility
-}
-
-
-struct HashAndReadSource : Source
-{
-    Source & readSource;
-    HashSink hashSink;
-    bool hashing;
-    HashAndReadSource(Source & readSource) : readSource(readSource), hashSink(htSHA256)
-    {
-        hashing = true;
-    }
-    size_t read(unsigned char * data, size_t len)
-    {
-        size_t n = readSource.read(data, len);
-        if (hashing) hashSink(data, n);
-        return n;
-    }
-};
-
-
 /* Create a temporary directory in the store that won't be
    garbage-collected. */
 Path LocalStore::createTempDirInStore()
@@ -1092,103 +1063,6 @@ Path LocalStore::createTempDirInStore()
         addTempRoot(tmpDir);
     } while (!pathExists(tmpDir));
     return tmpDir;
-}
-
-
-Path LocalStore::importPath(Source & source)
-{
-    HashAndReadSource hashAndReadSource(source);
-
-    /* We don't yet know what store path this archive contains (the
-       store path follows the archive data proper), and besides, we
-       don't know yet whether the signature is valid. */
-    Path tmpDir = createTempDirInStore();
-    AutoDelete delTmp(tmpDir);
-    Path unpacked = tmpDir + "/unpacked";
-
-    restorePath(unpacked, hashAndReadSource);
-
-    uint32_t magic = readInt(hashAndReadSource);
-    if (magic != exportMagic)
-        throw Error("Nix archive cannot be imported; wrong format");
-
-    Path dstPath = readStorePath(hashAndReadSource);
-
-    printMsg(lvlTalkative, format("importing path ‘%1%’") % dstPath);
-
-    PathSet references = readStorePaths<PathSet>(hashAndReadSource);
-
-    Path deriver = readString(hashAndReadSource);
-    if (deriver != "") assertStorePath(deriver);
-
-    Hash hash = hashAndReadSource.hashSink.finish().first;
-    hashAndReadSource.hashing = false;
-
-    bool haveSignature = readInt(hashAndReadSource) == 1;
-
-    if (haveSignature)
-        // Ignore legacy signature.
-        readString(hashAndReadSource);
-
-    /* Do the actual import. */
-
-    /* !!! way too much code duplication with addTextToStore() etc. */
-    addTempRoot(dstPath);
-
-    if (!isValidPath(dstPath)) {
-
-        PathLocks outputLock;
-
-        /* Lock the output path.  But don't lock if we're being called
-           from a build hook (whose parent process already acquired a
-           lock on this path). */
-        Strings locksHeld = tokenizeString<Strings>(getEnv("NIX_HELD_LOCKS"));
-        if (find(locksHeld.begin(), locksHeld.end(), dstPath) == locksHeld.end())
-            outputLock.lockPaths(singleton<PathSet, Path>(dstPath));
-
-        if (!isValidPath(dstPath)) {
-
-            deletePath(dstPath);
-
-            if (rename(unpacked.c_str(), dstPath.c_str()) == -1)
-                throw SysError(format("cannot move ‘%1%’ to ‘%2%’")
-                    % unpacked % dstPath);
-
-            canonicalisePathMetaData(dstPath, -1);
-
-            /* !!! if we were clever, we could prevent the hashPath()
-               here. */
-            HashResult hash = hashPath(htSHA256, dstPath);
-
-            optimisePath(dstPath); // FIXME: combine with hashPath()
-
-            ValidPathInfo info;
-            info.path = dstPath;
-            info.narHash = hash.first;
-            info.narSize = hash.second;
-            info.references = references;
-            info.deriver = deriver != "" && isValidPath(deriver) ? deriver : "";
-            registerValidPath(info);
-        }
-
-        outputLock.setDeletion(true);
-    }
-
-    return dstPath;
-}
-
-
-Paths LocalStore::importPaths(Source & source,
-    std::shared_ptr<FSAccessor> accessor)
-{
-    Paths res;
-    while (true) {
-        unsigned long long n = readLongLong(source);
-        if (n == 0) break;
-        if (n != 1) throw Error("input doesn't look like something created by ‘nix-store --export’");
-        res.push_back(importPath(source));
-    }
-    return res;
 }
 
 

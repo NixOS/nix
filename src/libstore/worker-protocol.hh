@@ -25,7 +25,7 @@ typedef enum {
     wopAddIndirectRoot = 12,
     wopSyncWithGC = 13,
     wopFindRoots = 14,
-    wopExportPath = 16,
+    wopExportPath = 16, // obsolete
     wopQueryDeriver = 18, // obsolete
     wopSetOptions = 19,
     wopCollectGarbage = 20,
@@ -35,7 +35,7 @@ typedef enum {
     wopQueryFailedPaths = 24,
     wopClearFailedPaths = 25,
     wopQueryPathInfo = 26,
-    wopImportPaths = 27,
+    wopImportPaths = 27, // obsolete
     wopQueryDerivationOutputNames = 28,
     wopQueryPathFromHashPart = 29,
     wopQuerySubstitutablePathInfos = 30,

@@ -503,7 +503,7 @@ static void opReadLog(Strings opFlags, Strings opArgs)
             }
 
             else if (pathExists(logBz2Path)) {
-                std::cout << *decompress("bzip2", make_ref<std::string>(readFile(logBz2Path)));
+                std::cout << *decompress("bzip2", readFile(logBz2Path));
                 found = true;
                 break;
             }
@@ -703,9 +703,7 @@ static void opExport(Strings opFlags, Strings opArgs)
         throw UsageError(format("unknown flag ‘%1%’") % i);
 
     FdSink sink(STDOUT_FILENO);
-    Paths sorted = store->topoSortPaths(PathSet(opArgs.begin(), opArgs.end()));
-    reverse(sorted.begin(), sorted.end());
-    store->exportPaths(sorted, sink);
+    store->exportPaths(opArgs, sink);
 }
 
 

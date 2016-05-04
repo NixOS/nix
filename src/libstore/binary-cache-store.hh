@@ -46,8 +46,6 @@ private:
 
     std::string narInfoFileFor(const Path & storePath);
 
-    void addToCache(const ValidPathInfo & info, ref<std::string> nar);
-
 public:
 
     bool isValidPathUncached(const Path & path) override;
@@ -82,6 +80,9 @@ public:
     void querySubstitutablePathInfos(const PathSet & paths,
         SubstitutablePathInfos & infos) override;
 
+    void addToStore(const ValidPathInfo & info, const std::string & nar,
+        bool repair = false) override;
+
     Path addToStore(const string & name, const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, bool repair = false) override;
@@ -90,13 +91,6 @@ public:
         const PathSet & references, bool repair = false) override;
 
     void narFromPath(const Path & path, Sink & sink) override;
-
-    void exportPath(const Path & path, Sink & sink) override;
-
-    Paths importPaths(Source & source,
-        std::shared_ptr<FSAccessor> accessor) override;
-
-    Path importPath(Source & source, std::shared_ptr<FSAccessor> accessor);
 
     void buildPaths(const PathSet & paths, BuildMode buildMode = bmNormal) override;
 

@@ -173,26 +173,26 @@ static ref<std::string> decompressBzip2(const std::string & in)
     }
 }
 
-ref<std::string> compress(const std::string & method, ref<std::string> in)
+ref<std::string> compress(const std::string & method, const std::string & in)
 {
     if (method == "none")
-        return in;
+        return make_ref<std::string>(in);
     else if (method == "xz")
-        return compressXZ(*in);
+        return compressXZ(in);
     else if (method == "bzip2")
-        return compressBzip2(*in);
+        return compressBzip2(in);
     else
         throw UnknownCompressionMethod(format("unknown compression method ‘%s’") % method);
 }
 
-ref<std::string> decompress(const std::string & method, ref<std::string> in)
+ref<std::string> decompress(const std::string & method, const std::string & in)
 {
     if (method == "none")
-        return in;
+        return make_ref<std::string>(in);
     else if (method == "xz")
-        return decompressXZ(*in);
+        return decompressXZ(in);
     else if (method == "bzip2")
-        return decompressBzip2(*in);
+        return decompressBzip2(in);
     else
         throw UnknownCompressionMethod(format("unknown compression method ‘%s’") % method);
 }

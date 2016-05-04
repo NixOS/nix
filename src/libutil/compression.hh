@@ -7,9 +7,9 @@
 
 namespace nix {
 
-ref<std::string> compress(const std::string & method, ref<std::string> in);
+ref<std::string> compress(const std::string & method, const std::string & in);
 
-ref<std::string> decompress(const std::string & method, ref<std::string> in);
+ref<std::string> decompress(const std::string & method, const std::string & in);
 
 MakeError(UnknownCompressionMethod, Error);
 

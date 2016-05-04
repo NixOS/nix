@@ -326,6 +326,12 @@ Path RemoteStore::queryPathFromHashPart(const string & hashPart)
 }
 
 
+void RemoteStore::addToStore(const ValidPathInfo & info, const std::string & nar, bool repair)
+{
+    throw Error("RemoteStore::addToStore() not implemented");
+}
+
+
 Path RemoteStore::addToStore(const string & name, const Path & _srcPath,
     bool recursive, HashType hashAlgo, PathFilter & filter, bool repair)
 {
@@ -370,25 +376,6 @@ Path RemoteStore::addTextToStore(const string & name, const string & s,
 
     conn->processStderr();
     return readStorePath(conn->from);
-}
-
-
-void RemoteStore::exportPath(const Path & path, Sink & sink)
-{
-    auto conn(connections->get());
-    conn->to << wopExportPath << path << 0;
-    conn->processStderr(&sink); /* sink receives the actual data */
-    readInt(conn->from);
-}
-
-
-Paths RemoteStore::importPaths(Source & source,
-    std::shared_ptr<FSAccessor> accessor)
-{
-    auto conn(connections->get());
-    conn->to << wopImportPaths;
-    conn->processStderr(0, &source);
-    return readStorePaths<Paths>(conn->from);
 }
 
 
