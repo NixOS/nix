@@ -25,6 +25,7 @@ static ref<Store> store()
     static std::shared_ptr<Store> _store;
     if (!_store) {
         try {
+            logger = makeDefaultLogger();
             settings.processEnvironment();
             settings.loadConfFile();
             settings.update();
@@ -173,7 +174,7 @@ void exportPaths(int fd, ...)
     PPCODE:
         try {
             Paths paths;
-            for (int n = 2; n < items; ++n) paths.push_back(SvPV_nolen(ST(n)));
+            for (int n = 1; n < items; ++n) paths.push_back(SvPV_nolen(ST(n)));
             FdSink sink(fd);
             store()->exportPaths(paths, sink);
         } catch (Error & e) {
