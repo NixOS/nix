@@ -949,7 +949,7 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
         /* The first check above is an optimisation to prevent
            unnecessary lock acquisition. */
 
-        PathLocks outputLock(singleton<PathSet, Path>(dstPath));
+        PathLocks outputLock({dstPath});
 
         if (repair || !isValidPath(dstPath)) {
 
@@ -1018,7 +1018,7 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
 
     if (repair || !isValidPath(dstPath)) {
 
-        PathLocks outputLock(singleton<PathSet, Path>(dstPath));
+        PathLocks outputLock({dstPath});
 
         if (repair || !isValidPath(dstPath)) {
 

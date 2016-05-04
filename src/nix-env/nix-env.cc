@@ -224,7 +224,7 @@ static bool isPrebuilt(EvalState & state, DrvInfo & elem)
 {
     Path path = elem.queryOutPath();
     if (state.store->isValidPath(path)) return true;
-    PathSet ps = state.store->querySubstitutablePaths(singleton<PathSet>(path));
+    PathSet ps = state.store->querySubstitutablePaths({path});
     return ps.find(path) != ps.end();
 }
 
@@ -710,13 +710,13 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
         drv.name = globals.forceName;
 
     if (drv.queryDrvPath() != "") {
-        PathSet paths = singleton<PathSet>(drv.queryDrvPath());
+        PathSet paths = {drv.queryDrvPath()};
         printMissing(globals.state->store, paths);
         if (globals.dryRun) return;
         globals.state->store->buildPaths(paths, globals.state->repair ? bmRepair : bmNormal);
     }
     else {
-        printMissing(globals.state->store, singleton<PathSet>(drv.queryOutPath()));
+        printMissing(globals.state->store, {drv.queryOutPath()});
         if (globals.dryRun) return;
         globals.state->store->ensurePath(drv.queryOutPath());
     }

@@ -87,7 +87,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
         Value & w = *state.allocValue();
         state.mkAttrs(w, 3 + drv.outputs.size());
         Value * v2 = state.allocAttr(w, state.sDrvPath);
-        mkString(*v2, path, singleton<PathSet>("=" + path));
+        mkString(*v2, path, {"=" + path});
         v2 = state.allocAttr(w, state.sName);
         mkString(*v2, drv.env["name"]);
         Value * outputsVal =
@@ -97,8 +97,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
 
         for (const auto & o : drv.outputs) {
             v2 = state.allocAttr(w, state.symbols.create(o.first));
-            mkString(*v2, o.second.path,
-                singleton<PathSet>("!" + o.first + "!" + path));
+            mkString(*v2, o.second.path, {"!" + o.first + "!" + path});
             outputsVal->listElems()[outputs_index] = state.allocValue();
             mkString(*(outputsVal->listElems()[outputs_index++]), o.first);
         }
@@ -665,10 +664,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     drvHashes[drvPath] = hashDerivationModulo(*state.store, drv);
 
     state.mkAttrs(v, 1 + drv.outputs.size());
-    mkString(*state.allocAttr(v, state.sDrvPath), drvPath, singleton<PathSet>("=" + drvPath));
+    mkString(*state.allocAttr(v, state.sDrvPath), drvPath, {"=" + drvPath});
     for (auto & i : drv.outputs) {
         mkString(*state.allocAttr(v, state.symbols.create(i.first)),
-            i.second.path, singleton<PathSet>("!" + i.first + "!" + drvPath));
+            i.second.path, {"!" + i.first + "!" + drvPath});
     }
     v.attrs->sort();
 }
@@ -905,7 +904,7 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
        result, since `storePath' itself has references to the paths
        used in args[1]. */
 
-    mkString(v, storePath, singleton<PathSet>(storePath));
+    mkString(v, storePath, {storePath});
 }
 
 
@@ -967,7 +966,7 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
         ? computeStorePathForPath(path, true, htSHA256, filter).first
         : state.store->addToStore(baseNameOf(path), path, true, htSHA256, filter, state.repair);
 
-    mkString(v, dstPath, singleton<PathSet>(dstPath));
+    mkString(v, dstPath, {dstPath});
 }
 
 

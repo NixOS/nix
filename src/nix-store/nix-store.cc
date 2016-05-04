@@ -64,7 +64,7 @@ static PathSet realisePath(Path path, bool build = true)
     DrvPathWithOutputs p = parseDrvPathWithOutputs(path);
 
     if (isDerivation(p.first)) {
-        if (build) store->buildPaths(singleton<PathSet>(path));
+        if (build) store->buildPaths({path});
         Derivation drv = store->derivationFromPath(p.first);
         rootNr++;
 
@@ -101,7 +101,7 @@ static PathSet realisePath(Path path, bool build = true)
             if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
             path = store->addPermRoot(path, rootName, indirectRoot);
         }
-        return singleton<PathSet>(path);
+        return {path};
     }
 }
 
@@ -222,7 +222,7 @@ static PathSet maybeUseOutputs(const Path & storePath, bool useOutput, bool forc
             outputs.insert(i.second.path);
         return outputs;
     }
-    else return singleton<PathSet>(storePath);
+    else return {storePath};
 }
 
 
@@ -537,7 +537,7 @@ static void opDumpDB(Strings opFlags, Strings opArgs)
         throw UsageError("no arguments expected");
     PathSet validPaths = store->queryAllValidPaths();
     for (auto & i : validPaths)
-        cout << store->makeValidityRegistration(singleton<PathSet>(i), true, true);
+        cout << store->makeValidityRegistration({i}, true, true);
 }
 
 

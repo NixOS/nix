@@ -195,7 +195,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     case wopHasSubstitutes: {
         Path path = readStorePath(from);
         startWork();
-        PathSet res = store->querySubstitutablePaths(singleton<PathSet>(path));
+        PathSet res = store->querySubstitutablePaths({path});
         stopWork();
         to << (res.find(path) != res.end());
         break;
@@ -472,7 +472,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         Path path = absPath(readString(from));
         startWork();
         SubstitutablePathInfos infos;
-        store->querySubstitutablePathInfos(singleton<PathSet>(path), infos);
+        store->querySubstitutablePathInfos({path}, infos);
         stopWork();
         SubstitutablePathInfos::iterator i = infos.find(path);
         if (i == infos.end())

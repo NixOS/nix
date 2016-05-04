@@ -222,8 +222,7 @@ void switchLink(Path link, Path target)
 
 void lockProfile(PathLocks & lock, const Path & profile)
 {
-    lock.lockPaths(singleton<PathSet>(profile),
-        (format("waiting for lock on profile ‘%1%’") % profile).str());
+    lock.lockPaths({profile}, (format("waiting for lock on profile ‘%1%’") % profile).str());
     lock.setDeletion(true);
 }
 

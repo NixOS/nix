@@ -117,15 +117,6 @@ void createSymlink(const Path & target, const Path & link);
 void replaceSymlink(const Path & target, const Path & link);
 
 
-template<class T, class A>
-T singleton(const A & a)
-{
-    T t;
-    t.insert(a);
-    return t;
-}
-
-
 /* Wrappers arount read()/write() that read/write exactly the
    requested number of bytes. */
 void readFull(int fd, unsigned char * buf, size_t count);

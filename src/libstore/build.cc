@@ -2145,8 +2145,7 @@ void DerivationGoal::startBuilder()
     /* parent */
     pid.setSeparatePG(true);
     builderOut.writeSide.close();
-    worker.childStarted(shared_from_this(),
-        singleton<set<int> >(builderOut.readSide), true, true);
+    worker.childStarted(shared_from_this(), {builderOut.readSide}, true, true);
 
     /* Check if setting up the build environment failed. */
     while (true) {
@@ -3698,7 +3697,7 @@ void LocalStore::ensurePath(const Path & path)
 
     Worker worker(*this);
     GoalPtr goal = worker.makeSubstitutionGoal(path);
-    Goals goals = singleton<Goals>(goal);
+    Goals goals = {goal};
 
     worker.run(goals);
 
@@ -3711,7 +3710,7 @@ void LocalStore::repairPath(const Path & path)
 {
     Worker worker(*this);
     GoalPtr goal = worker.makeSubstitutionGoal(path, true);
-    Goals goals = singleton<Goals>(goal);
+    Goals goals = {goal};
 
     worker.run(goals);
 
