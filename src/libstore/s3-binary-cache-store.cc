@@ -1,3 +1,7 @@
+#include "config.h"
+
+#if ENABLE_S3
+
 #include "s3-binary-cache-store.hh"
 #include "nar-info.hh"
 #include "nar-info-disk-cache.hh"
@@ -251,3 +255,5 @@ static RegisterStoreImplementation regStore([](
 });
 
 }
+
+#endif

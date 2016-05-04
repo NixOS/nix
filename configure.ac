@@ -61,6 +61,7 @@ CFLAGS=
 CXXFLAGS=
 AC_PROG_CC
 AC_PROG_CXX
+AX_CXX_COMPILE_STDCXX_11
 
 
 # Use 64-bit file system calls so that we can support files > 2 GiB.
@@ -191,6 +192,15 @@ AC_SUBST(HAVE_SODIUM, [$have_sodium])
 
 # Look for liblzma, a required dependency.
 PKG_CHECK_MODULES([LIBLZMA], [liblzma], [CXXFLAGS="$LIBLZMA_CFLAGS $CXXFLAGS"])
+
+
+# Look for aws-cpp-sdk-s3.
+AC_LANG_PUSH(C++)
+AC_CHECK_HEADERS([aws/s3/S3Client.h],
+  [AC_DEFINE([ENABLE_S3], [1], [Whether to enable S3 support via aws-cpp-sdk-s3.])
+  enable_s3=1], [enable_s3=])
+AC_SUBST(ENABLE_S3, [$enable_s3])
+AC_LANG_POP(C++)
 
 
 # Whether to use the Boehm garbage collector.

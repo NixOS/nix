@@ -27,6 +27,7 @@ let
           [ curl bison flex perl libxml2 libxslt bzip2 xz
             pkgconfig sqlite libsodium
             docbook5 docbook5_xsl
+            autoconf-archive
           ] ++ lib.optional (!lib.inNixShell) git;
 
         configureFlags = ''
@@ -71,15 +72,13 @@ let
         src = tarball;
 
         buildInputs =
-          [ curl perl bzip2 xz openssl pkgconfig sqlite boehmgc
-
+          [ curl perl bzip2 xz openssl pkgconfig sqlite boehmgc ]
+          ++ lib.optional stdenv.isLinux libsodium
+          ++ lib.optional stdenv.isLinux
             (aws-sdk-cpp.override {
               apis = ["s3"];
               customMemoryManagement = false;
-            })
-
-          ]
-          ++ lib.optional stdenv.isLinux libsodium;
+            });
 
         configureFlags = ''
           --disable-init-state
