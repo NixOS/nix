@@ -518,14 +518,18 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         }
         stopWork();
         if (info) {
-            to << 1 << info->deriver << printHash(info->narHash) << info->references
+            if (GET_PROTOCOL_MINOR(clientVersion) >= 17)
+                to << 1;
+            to << info->deriver << printHash(info->narHash) << info->references
                << info->registrationTime << info->narSize;
             if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
                 to << info->ultimate
                    << info->sigs;
             }
-        } else
+        } else {
+            assert(GET_PROTOCOL_MINOR(clientVersion) >= 17);
             to << 0;
+        }
         break;
     }
 
