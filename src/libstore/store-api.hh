@@ -503,7 +503,7 @@ Path computeStorePathForText(const string & name, const string & s,
 
 /* Copy a path from one store to another. */
 void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
-    const Path & storePath);
+    const Path & storePath, bool repair = false);
 
 
 /* Remove the temporary roots file for this process.  Any temporary

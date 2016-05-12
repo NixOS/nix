@@ -3198,7 +3198,8 @@ void SubstitutionGoal::tryToRun()
             /* Wake up the worker loop when we're done. */
             Finally updateStats([this]() { outPipe.writeSide.close(); });
 
-            copyStorePath(ref<Store>(sub), ref<Store>(worker.store.shared_from_this()), storePath);
+            copyStorePath(ref<Store>(sub), ref<Store>(worker.store.shared_from_this()),
+                storePath, repair);
 
             promise.set_value();
         } catch (...) {

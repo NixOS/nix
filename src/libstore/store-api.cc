@@ -358,14 +358,14 @@ const Store::Stats & Store::getStats()
 
 
 void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
-    const Path & storePath)
+    const Path & storePath, bool repair)
 {
     auto info = srcStore->queryPathInfo(storePath);
 
     StringSink sink;
     srcStore->narFromPath({storePath}, sink);
 
-    dstStore->addToStore(*info, *sink.s);
+    dstStore->addToStore(*info, *sink.s, repair);
 }
 
 
