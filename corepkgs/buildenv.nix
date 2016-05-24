@@ -1,9 +1,9 @@
 with import <nix/config.nix>;
 
-{ derivations, manifest }:
+{ derivations, manifest, name ? "user-environment" }:
 
 derivation {
-  name = "user-environment";
+  inherit name;
   system = builtins.currentSystem;
   builder = perl;
   args = [ "-w" ./buildenv.pl ];
