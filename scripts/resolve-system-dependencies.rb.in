@@ -6,6 +6,10 @@ require 'set'
 
 deps = open(ARGV[0]).read.scan(/\("__impureHostDeps","(.*?)"\)/).flatten.map{|x|x.split}[0]
 
+CACHE_DIR = File.join(ENV["NIX_STATE_DIR"] || "@localstatedir@/nix", "dependency-cache")
+
+FileUtils.mkdir_p CACHE_DIR
+
 def untbd(x)
   Pathname.new(YAML.load(open(x))['install-name'])
 end
@@ -17,7 +21,7 @@ def absolute_readlink(x)
 end
 
 def cache_path(x)
-  File.join(File.dirname(__FILE__), "cache", x.to_s.gsub("/", "%"))
+  File.join(CACHE_DIR, x.to_s.gsub("/", "%"))
 end
 
 def get_path(x, deps = {})
