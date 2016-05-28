@@ -1,8 +1,9 @@
 #! @ruby@
 
-require 'yaml'
+require 'fileutils'
 require 'pathname'
 require 'set'
+require 'yaml'
 
 deps = open(ARGV[0]).read.scan(/\("__impureHostDeps","(.*?)"\)/).flatten.map{|x|x.split}[0]
 
