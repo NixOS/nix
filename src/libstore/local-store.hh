@@ -248,6 +248,7 @@ private:
     void signPathInfo(ValidPathInfo & info);
 
     friend class DerivationGoal;
+    friend class SubstitutionGoal;
 };
 
 

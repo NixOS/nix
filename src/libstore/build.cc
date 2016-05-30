@@ -3142,6 +3142,16 @@ void SubstitutionGoal::tryNext()
 
     hasSubstitute = true;
 
+    /* Bail out early if this substituter lacks a valid
+       signature. LocalStore::addToStore() also checks for this, but
+       only after we've downloaded the path. */
+    if (worker.store.requireSigs && !info->checkSignatures(worker.store.publicKeys)) {
+        printMsg(lvlInfo, format("warning: substituter ‘%s’ does not have a valid signature for path ‘%s’")
+            % sub->getUri() % storePath);
+        tryNext();
+        return;
+    }
+
     /* To maintain the closure invariant, we first have to realise the
        paths referenced by this one. */
     for (auto & i : info->references)
