@@ -95,7 +95,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
             BinaryCacheStore::init();
 
-            diskCache->createCache(getUri(), wantMassQuery, priority);
+            diskCache->createCache(getUri(), wantMassQuery_, priority);
         }
     }
 
