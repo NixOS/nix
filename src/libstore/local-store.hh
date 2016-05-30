@@ -77,6 +77,10 @@ private:
     const Path reservedPath;
     const Path schemaPath;
 
+    bool requireSigs;
+
+    PublicKeys publicKeys;
+
 public:
 
     /* Initialise the local store, upgrading the schema if

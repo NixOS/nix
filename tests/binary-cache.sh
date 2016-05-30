@@ -85,7 +85,7 @@ clearStore
 rm $(grep -l "StorePath:.*dependencies-input-2" $cacheDir/*.narinfo)
 
 nix-build --option binary-caches "file://$cacheDir" dependencies.nix -o $TEST_ROOT/result 2>&1 | tee $TEST_ROOT/log
-grep -q "Downloading" $TEST_ROOT/log
+grep -q "fetching path" $TEST_ROOT/log
 
 
 if [ -n "$HAVE_SODIUM" ]; then
