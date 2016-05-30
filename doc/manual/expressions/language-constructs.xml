@@ -177,13 +177,19 @@ map (concat "foo") [ "bar" "bla" "abc" ]</programlisting>
   <listitem><para>An <literal>@</literal>-pattern provides a means of referring
   to the whole value being matched:
 
-<programlisting>
-args@{ x, y, z, ... }: z + y + x + args.a</programlisting>
+<programlisting> args@{ x, y, z, ... }: z + y + x + args.a</programlisting>
+
+but can also be written as:
+
+<programlisting> { x, y, z, ... } @ args: z + y + x + args.a</programlisting>
 
   Here <varname>args</varname> is bound to the entire argument, which
   is further matched against the pattern <literal>{ x, y, z,
-  ... }</literal>.</para></listitem>
-
+  ... }</literal>. <literal>@</literal>-pattern makes mainly sense with an 
+  ellipsis(<literal>...</literal>) as you can access attribute names as 
+  <literal>a</literal>, using <literal>args.a</literal>, which was given as an
+  additional attribute to the function.
+  </para></listitem>
 
 </itemizedlist>
 
