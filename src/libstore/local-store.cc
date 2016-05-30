@@ -788,6 +788,7 @@ PathSet LocalStore::querySubstitutablePaths(const PathSet & paths)
 {
     PathSet res;
     for (auto & sub : getDefaultSubstituters()) {
+        if (!sub->wantMassQuery()) continue;
         for (auto & path : paths) {
             if (res.count(path)) continue;
             debug(format("checking substituter ‘%s’ for path ‘%s’")

@@ -33,6 +33,9 @@ protected:
        doesn't exist. */
     virtual std::shared_ptr<std::string> getFile(const std::string & path) = 0;
 
+    bool wantMassQuery_ = false;
+    int priority = 50;
+
 public:
 
     virtual void init();
@@ -77,6 +80,8 @@ public:
     void querySubstitutablePathInfos(const PathSet & paths,
         SubstitutablePathInfos & infos)
     { }
+
+    bool wantMassQuery() { return wantMassQuery_; }
 
     void addToStore(const ValidPathInfo & info, const std::string & nar,
         bool repair = false) override;

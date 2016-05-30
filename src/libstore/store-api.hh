@@ -253,6 +253,8 @@ public:
     virtual void querySubstitutablePathInfos(const PathSet & paths,
         SubstitutablePathInfos & infos) = 0;
 
+    virtual bool wantMassQuery() { return false; }
+
     /* Import a path into the store. */
     virtual void addToStore(const ValidPathInfo & info, const std::string & nar,
         bool repair = false) = 0;

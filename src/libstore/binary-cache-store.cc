@@ -29,8 +29,27 @@ BinaryCacheStore::BinaryCacheStore(const StoreParams & params)
 void BinaryCacheStore::init()
 {
     std::string cacheInfoFile = "nix-cache-info";
-    if (!fileExists(cacheInfoFile))
+
+    auto cacheInfo = getFile(cacheInfoFile);
+    if (!cacheInfo) {
         upsertFile(cacheInfoFile, "StoreDir: " + settings.nixStore + "\n");
+    } else {
+        for (auto & line : tokenizeString<Strings>(*cacheInfo, "\n")) {
+            size_t colon = line.find(':');
+            if (colon == std::string::npos) continue;
+            auto name = line.substr(0, colon);
+            auto value = trim(line.substr(colon + 1, std::string::npos));
+            if (name == "StoreDir") {
+                if (value != settings.nixStore)
+                    throw Error(format("binary cache ‘%s’ is for Nix stores with prefix ‘%s’, not ‘%s’")
+                        % getUri() % value % settings.nixStore);
+            } else if (name == "WantMassQuery") {
+                wantMassQuery_ = value == "1";
+            } else if (name == "Priority") {
+                string2Int(value, priority);
+            }
+        }
+    }
 }
 
 void BinaryCacheStore::notImpl()

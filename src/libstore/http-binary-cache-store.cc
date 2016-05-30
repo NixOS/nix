@@ -5,6 +5,8 @@
 
 namespace nix {
 
+MakeError(UploadToHTTP, Error);
+
 class HttpBinaryCacheStore : public BinaryCacheStore
 {
 private:
@@ -38,9 +40,12 @@ public:
     {
         // FIXME: do this lazily?
         if (!diskCache->cacheExists(cacheUri)) {
-            if (!fileExists("nix-cache-info"))
+            try {
+                BinaryCacheStore::init();
+            } catch (UploadToHTTP &) {
                 throw Error(format("‘%s’ does not appear to be a binary cache") % cacheUri);
-            diskCache->createCache(cacheUri);
+            }
+            diskCache->createCache(cacheUri, wantMassQuery_, priority);
         }
     }
 
@@ -66,7 +71,7 @@ protected:
 
     void upsertFile(const std::string & path, const std::string & data) override
     {
-        throw Error("uploading to an HTTP binary cache is not supported");
+        throw UploadToHTTP("uploading to an HTTP binary cache is not supported");
     }
 
     std::shared_ptr<std::string> getFile(const std::string & path) override

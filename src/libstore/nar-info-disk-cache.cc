@@ -113,13 +113,13 @@ public:
         return i->second;
     }
 
-    void createCache(const std::string & uri) override
+    void createCache(const std::string & uri, bool wantMassQuery, int priority) override
     {
         auto state(_state.lock());
 
         // FIXME: race
 
-        state->insertCache.use()(uri)(time(0))(settings.nixStore)(1)(0).exec();
+        state->insertCache.use()(uri)(time(0))(settings.nixStore)(wantMassQuery)(priority).exec();
         assert(sqlite3_changes(state->db) == 1);
         state->caches[uri] = sqlite3_last_insert_rowid(state->db);
     }
