@@ -125,13 +125,21 @@ nix-store -r $outPath --option binary-caches "file://$cacheDir" --option signed-
 # It should fail if we corrupt the .narinfo.
 clearStore
 
-for i in $cacheDir/*.narinfo; do
+cacheDir2=$TEST_ROOT/binary-cache-2
+rm -rf $cacheDir2
+cp -r $cacheDir $cacheDir2
+
+for i in $cacheDir2/*.narinfo; do
     grep -v References $i > $i.tmp
     mv $i.tmp $i
 done
 
 clearCacheCache
 
-(! nix-store -r $outPath --option binary-caches "file://$cacheDir" --option signed-binary-caches '*' --option binary-cache-public-keys "$publicKey")
+(! nix-store -r $outPath --option binary-caches "file://$cacheDir2" --option signed-binary-caches '*' --option binary-cache-public-keys "$publicKey")
+
+# If we provide a bad and a good binary cache, it should succeed.
+
+nix-store -r $outPath --option binary-caches "file://$cacheDir2 file://$cacheDir" --option signed-binary-caches '*' --option binary-cache-public-keys "$publicKey"
 
 fi # HAVE_LIBSODIUM
