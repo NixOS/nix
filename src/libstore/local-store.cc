@@ -904,6 +904,11 @@ void LocalStore::invalidatePath(State & state, const Path & path)
 
 void LocalStore::addToStore(const ValidPathInfo & info, const std::string & nar, bool repair)
 {
+    Hash h = hashString(htSHA256, nar);
+    if (h != info.narHash)
+        throw Error(format("hash mismatch importing path ‘%s’; expected hash ‘%s’, got ‘%s’") %
+            info.path % info.narHash.to_string() % h.to_string());
+
     addTempRoot(info.path);
 
     if (repair || !isValidPath(info.path)) {

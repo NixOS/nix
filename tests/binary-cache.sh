@@ -48,7 +48,7 @@ mkdir -p $TEST_ROOT/empty
 nix-store --dump $TEST_ROOT/empty | xz > $nar
 
 nix-build --option binary-caches "file://$cacheDir" dependencies.nix -o $TEST_ROOT/result 2>&1 | tee $TEST_ROOT/log
-grep -q "hash mismatch in downloaded path" $TEST_ROOT/log
+grep -q "hash mismatch" $TEST_ROOT/log
 
 mv $nar.good $nar
 
