@@ -2,8 +2,7 @@ source common.sh
 
 clearStore
 
-export HOME=$TEST_ROOT/home
-rm -rf $TEST_ROOT/home
+rm -rf $TEST_HOME
 
 tarroot=$TEST_ROOT/tarball
 rm -rf $tarroot

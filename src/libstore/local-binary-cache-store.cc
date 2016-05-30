@@ -1,5 +1,6 @@
 #include "binary-cache-store.hh"
 #include "globals.hh"
+#include "nar-info-disk-cache.hh"
 
 namespace nix {
 
@@ -16,6 +17,9 @@ public:
         : BinaryCacheStore(params)
         , binaryCacheDir(binaryCacheDir)
     {
+        /* For testing the NAR info cache. */
+        if (getEnv("_NIX_CACHE_FILE_URLS") == "1")
+            diskCache = getNarInfoDiskCache();
     }
 
     void init() override;
@@ -53,6 +57,9 @@ void LocalBinaryCacheStore::init()
 {
     createDirs(binaryCacheDir + "/nar");
     BinaryCacheStore::init();
+
+    if (diskCache && !diskCache->cacheExists(getUri()))
+        diskCache->createCache(getUri(), wantMassQuery_, priority);
 }
 
 static void atomicWrite(const Path & path, const std::string & s)

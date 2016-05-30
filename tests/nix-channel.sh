@@ -2,18 +2,15 @@ source common.sh
 
 clearProfiles
 
-rm -f $TEST_ROOT/.nix-channels
-
-# Override location of ~/.nix-channels.
-export HOME=$TEST_ROOT
+rm -f $TEST_HOME/.nix-channels $TEST_HOME/.nix-profile
 
 # Test add/list/remove.
 nix-channel --add http://foo/bar xyzzy
 nix-channel --list | grep -q http://foo/bar
 nix-channel --remove xyzzy
 
-[ -e $TEST_ROOT/.nix-channels ]
-[ "$(cat $TEST_ROOT/.nix-channels)" = '' ]
+[ -e $TEST_HOME/.nix-channels ]
+[ "$(cat $TEST_HOME/.nix-channels)" = '' ]
 
 # Create a channel.
 rm -rf $TEST_ROOT/foo
@@ -41,10 +38,8 @@ grep -q 'item.*attrPath="foo".*name="dependencies"' $TEST_ROOT/meta.xml
 nix-env -i dependencies
 [ -e $TEST_ROOT/var/nix/profiles/default/foobar ]
 
-
-
 clearProfiles
-rm -f $TEST_ROOT/.nix-channels
+rm -f $TEST_HOME/.nix-channels
 
 # Test updating from a tarball
 nix-channel --add file://$TEST_ROOT/foo/nixexprs.tar.bz2 foo

@@ -12,7 +12,7 @@ nix-push --dest $cacheDir $outPath
 # By default, a binary cache doesn't support "nix-env -qas", but does
 # support installation.
 clearStore
-rm -f $NIX_STATE_DIR/binary-cache*
+clearCacheCache
 
 export _NIX_CACHE_FILE_URLS=1
 
@@ -25,7 +25,7 @@ nix-store --option binary-caches "file://$cacheDir" -r $outPath
 
 # But with the right configuration, "nix-env -qas" should also work.
 clearStore
-rm -f $NIX_STATE_DIR/binary-cache*
+clearCacheCache
 echo "WantMassQuery: 1" >> $cacheDir/nix-cache-info
 
 nix-env --option binary-caches "file://$cacheDir" -f dependencies.nix -qas \* | grep -- "--S"
@@ -55,8 +55,7 @@ mv $nar.good $nar
 
 # Test whether this unsigned cache is rejected if the user requires signed caches.
 clearStore
-
-rm -f $NIX_STATE_DIR/binary-cache*
+clearCacheCache
 
 if nix-store --option binary-caches "file://$cacheDir" --option signed-binary-caches '*' -r $outPath; then
     echo "unsigned binary cache incorrectly accepted"
@@ -107,16 +106,14 @@ nix-push --dest $cacheDir --key-file $TEST_ROOT/sk1 $outPath
 
 # Downloading should fail if we don't provide a key.
 clearStore
-
-rm -f $NIX_STATE_DIR/binary-cache*
+clearCacheCache
 
 (! nix-store -r $outPath --option binary-caches "file://$cacheDir" --option signed-binary-caches '*' )
 
 
 # And it should fail if we provide an incorrect key.
 clearStore
-
-rm -f $NIX_STATE_DIR/binary-cache*
+clearCacheCache
 
 (! nix-store -r $outPath --option binary-caches "file://$cacheDir" --option signed-binary-caches '*' --option binary-cache-public-keys "$badKey")
 
@@ -133,7 +130,7 @@ for i in $cacheDir/*.narinfo; do
     mv $i.tmp $i
 done
 
-rm -f $NIX_STATE_DIR/binary-cache*
+clearCacheCache
 
 (! nix-store -r $outPath --option binary-caches "file://$cacheDir" --option signed-binary-caches '*' --option binary-cache-public-keys "$publicKey")
 
