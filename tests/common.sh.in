@@ -22,6 +22,7 @@ export HOME=$TEST_HOME
 mkdir -p $TEST_HOME
 
 export PATH=@bindir@:$PATH
+coreutils=@coreutils@
 
 export NIX_BUILD_HOOK=
 export dot=@dot@
