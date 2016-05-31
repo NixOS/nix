@@ -50,65 +50,11 @@ sub copyTo {
     my ($sshHost, $storePaths, $includeOutputs, $dryRun, $useSubstitutes) = @_;
 
     # Connect to the remote host.
-    my ($from, $to);
-    eval {
-        ($from, $to) = connectToRemoteNix($sshHost, []);
-    };
-    if ($@) {
-        chomp $@;
-        warn "$@; falling back to old closure copying method\n";
-        $@ = "";
-        return oldCopyTo(@_);
-    }
+    my ($from, $to) = connectToRemoteNix($sshHost, []);
 
     copyToOpen($from, $to, $sshHost, $storePaths, $includeOutputs, $dryRun, $useSubstitutes);
 
     close $to;
-}
-
-
-# For backwards compatibility with Nix <= 1.7. Will be removed
-# eventually.
-sub oldCopyTo {
-    my ($sshHost, $storePaths, $includeOutputs, $dryRun, $useSubstitutes) = @_;
-
-    # Get the closure of this path.
-    my @closure = reverse(topoSortPaths(computeFSClosure(0, $includeOutputs,
-        map { followLinksToStorePath $_ } @{$storePaths})));
-
-    # Optionally use substitutes on the remote host.
-    if (!$dryRun && $useSubstitutes) {
-        system "ssh $sshHost @globalSshOpts nix-store -r --ignore-unknown @closure";
-        # Ignore exit status because this is just an optimisation.
-    }
-
-    # Ask the remote host which paths are invalid.  Because of limits
-    # to the command line length, do this in chunks.  Eventually,
-    # we'll want to use ‘--from-stdin’, but we can't rely on the
-    # target having this option yet.
-    my @missing;
-    my $missingSize = 0;
-    while (scalar(@closure) > 0) {
-        my @ps = splice(@closure, 0, 1500);
-        open(READ, "set -f; ssh $sshHost @globalSshOpts nix-store --check-validity --print-invalid @ps|");
-        while (<READ>) {
-            chomp;
-            push @missing, $_;
-            my ($deriver, $narHash, $time, $narSize, $refs) = queryPathInfo($_, 1);
-            $missingSize += $narSize;
-        }
-        close READ or die;
-    }
-
-    # Export the store paths and import them on the remote machine.
-    if (scalar @missing > 0) {
-        print STDERR "copying ", scalar @missing, " missing paths to ‘$sshHost’...\n";
-        unless ($dryRun) {
-            open SSH, "| ssh $sshHost @globalSshOpts 'nix-store --import' > /dev/null" or die;
-            exportPaths(fileno(SSH), @missing);
-            close SSH or die "copying store paths to remote machine ‘$sshHost’ failed: $?";
-        }
-    }
 }
 
 
