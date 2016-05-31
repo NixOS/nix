@@ -89,7 +89,7 @@ public:
         state->progress[label].expected += value;
     }
 
-    void incProgress(const std::string & label, uint64_t value)
+    void incProgress(const std::string & label, uint64_t value) override
     {
         auto state(state_.lock());
         state->progress[label].progress += value;

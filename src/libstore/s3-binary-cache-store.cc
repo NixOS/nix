@@ -56,7 +56,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         diskCache = getNarInfoDiskCache();
     }
 
-    std::string getUri()
+    std::string getUri() override
     {
         return "s3://" + bucketName;
     }
@@ -69,7 +69,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         return res;
     }
 
-    void init()
+    void init() override
     {
         if (!diskCache->cacheExists(getUri())) {
 
@@ -108,7 +108,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
        fetches the .narinfo file, rather than first checking for its
        existence via a HEAD request. Since .narinfos are small, doing
        a GET is unlikely to be slower than HEAD. */
-    bool isValidPathUncached(const Path & storePath)
+    bool isValidPathUncached(const Path & storePath) override
     {
         try {
             queryPathInfo(storePath);
@@ -118,7 +118,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         }
     }
 
-    bool fileExists(const std::string & path)
+    bool fileExists(const std::string & path) override
     {
         stats.head++;
 
@@ -138,7 +138,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         return true;
     }
 
-    void upsertFile(const std::string & path, const std::string & data)
+    void upsertFile(const std::string & path, const std::string & data) override
     {
         auto request =
             Aws::S3::Model::PutObjectRequest()
@@ -167,7 +167,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         stats.putTimeMs += duration;
     }
 
-    std::shared_ptr<std::string> getFile(const std::string & path)
+    std::shared_ptr<std::string> getFile(const std::string & path) override
     {
         debug(format("fetching ‘s3://%1%/%2%’...") % bucketName % path);
 

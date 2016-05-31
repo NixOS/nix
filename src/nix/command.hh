@@ -49,6 +49,8 @@ public:
 
     StorePathsCommand();
 
+    using StoreCommand::run;
+
     virtual void run(ref<Store> store, Paths storePaths) = 0;
 
     void run(ref<Store> store) override;

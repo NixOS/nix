@@ -78,10 +78,10 @@ public:
     { return {}; }
 
     void querySubstitutablePathInfos(const PathSet & paths,
-        SubstitutablePathInfos & infos)
+        SubstitutablePathInfos & infos) override
     { }
 
-    bool wantMassQuery() { return wantMassQuery_; }
+    bool wantMassQuery() override { return wantMassQuery_; }
 
     void addToStore(const ValidPathInfo & info, const std::string & nar,
         bool repair = false, bool dontCheckSigs = false) override;
@@ -128,7 +128,7 @@ public:
 
     ref<FSAccessor> getFSAccessor() override;
 
-    void addSignatures(const Path & storePath, const StringSet & sigs)
+    void addSignatures(const Path & storePath, const StringSet & sigs) override
     { notImpl(); }
 
 };
