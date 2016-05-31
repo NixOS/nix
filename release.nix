@@ -214,13 +214,15 @@ let
         ''
           useradd -m alice
           su - alice -c 'tar xf ${binaryTarball.x86_64-linux}/*.tar.*'
-          mount -t tmpfs none /nix # Provide a writable /nix.
+          mkdir /dest-nix
+          mount -o bind /dest-nix /nix # Provide a writable /nix.
           chown alice /nix
           su - alice -c '_NIX_INSTALLER_TEST=1 ./nix-*/install'
           su - alice -c 'nix-store --verify'
-          su - alice -c 'nix-store -qR ${build.x86_64-linux}'
+          su - alice -c 'PAGER= nix-store -qR ${build.x86_64-linux}'
           mkdir -p $out/nix-support
           touch $out/nix-support/hydra-build-products
+          umount /nix
         ''); # */
 
     tests.evalNixpkgs =
