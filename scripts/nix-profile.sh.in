@@ -5,9 +5,9 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
     # Set up the per-user profile.
     # This part should be kept in sync with nixpkgs:nixos/modules/programs/shell.nix
 
-    : ${NIX_LINK:=$HOME/.nix-profile}
+    NIX_LINK=$HOME/.nix-profile
 
-    : ${NIX_USER_PROFILE_DIR:=@localstatedir@/nix/profiles/per-user/$USER}
+    NIX_USER_PROFILE_DIR=@localstatedir@/nix/profiles/per-user/$USER
 
     mkdir -m 0755 -p "$NIX_USER_PROFILE_DIR"
 
@@ -58,8 +58,7 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
 
     # Set up environment.
     # This part should be kept in sync with nixpkgs:nixos/modules/programs/environment.nix
-    export NIX_USER_PROFILE_DIR
-    export NIX_PROFILES="@localstatedir@/nix/profiles/default $NIX_USER_PROFILE_DIR"
+    NIX_PROFILES="@localstatedir@/nix/profiles/default $NIX_USER_PROFILE_DIR"
 
     for i in $NIX_PROFILES; do
         if [ -d "$i/lib/aspell" ]; then
@@ -83,5 +82,5 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
     fi
 
     export PATH="$NIX_LINK/bin:$NIX_LINK/sbin:$__savedpath"
-    unset __savedpath
+    unset __savedpath NIX_LINK NIX_USER_PROFILE_DIR NIX_PROFILES
 fi
