@@ -90,7 +90,7 @@ if [ -z "$_NIX_INSTALLER_TEST" ]; then
 fi
 
 # Make the shell source nix.sh during login.
-p=$NIX_LINK/etc/profile.d/nix.sh
+p=$HOME/.nix-profile/etc/profile.d/nix.sh
 
 added=
 for i in .bash_profile .bash_login .profile; do
