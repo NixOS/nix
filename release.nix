@@ -99,6 +99,8 @@ let
 
         doInstallCheck = true;
         installCheckFlags = "sysconfdir=$(out)/etc";
+
+        stdenv = clangStdenv;
       });
 
 

@@ -5,7 +5,7 @@ namespace nix {
 
 NarInfo::NarInfo(const std::string & s, const std::string & whence)
 {
-    auto corrupt = [&]() [[noreturn]] {
+    auto corrupt = [&]() {
         throw Error("NAR info file ‘%1%’ is corrupt");
     };
 
@@ -14,6 +14,7 @@ NarInfo::NarInfo(const std::string & s, const std::string & whence)
             return parseHash(s);
         } catch (BadHash &) {
             corrupt();
+            return Hash(); // never reached
         }
     };
 
