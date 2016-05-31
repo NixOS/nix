@@ -84,7 +84,7 @@ public:
     bool wantMassQuery() { return wantMassQuery_; }
 
     void addToStore(const ValidPathInfo & info, const std::string & nar,
-        bool repair = false) override;
+        bool repair = false, bool dontCheckSigs = false) override;
 
     Path addToStore(const string & name, const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,

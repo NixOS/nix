@@ -82,7 +82,7 @@ struct NopSink : ParseSink
 {
 };
 
-Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor)
+Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, bool dontCheckSigs)
 {
     Paths res;
     while (true) {
@@ -117,7 +117,7 @@ Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor)
         if (readInt(source) == 1)
             readString(source);
 
-        addToStore(info, *tee.data);
+        addToStore(info, *tee.data, false, dontCheckSigs);
 
         // FIXME: implement accessors?
         assert(!accessor);

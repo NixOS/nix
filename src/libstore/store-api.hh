@@ -257,7 +257,7 @@ public:
 
     /* Import a path into the store. */
     virtual void addToStore(const ValidPathInfo & info, const std::string & nar,
-        bool repair = false) = 0;
+        bool repair = false, bool dontCheckSigs = false) = 0;
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
@@ -398,8 +398,8 @@ public:
        the Nix store. Optionally, the contents of the NARs are
        preloaded into the specified FS accessor to speed up subsequent
        access. */
-    Paths importPaths(Source & source,
-        std::shared_ptr<FSAccessor> accessor);
+    Paths importPaths(Source & source, std::shared_ptr<FSAccessor> accessor,
+        bool dontCheckSigs = false);
 
     struct Stats
     {

@@ -117,7 +117,7 @@ public:
         SubstitutablePathInfos & infos) override;
 
     void addToStore(const ValidPathInfo & info, const std::string & nar,
-        bool repair) override;
+        bool repair, bool dontCheckSigs) override;
 
     Path addToStore(const string & name, const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,

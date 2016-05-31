@@ -904,14 +904,15 @@ void LocalStore::invalidatePath(State & state, const Path & path)
 }
 
 
-void LocalStore::addToStore(const ValidPathInfo & info, const std::string & nar, bool repair)
+void LocalStore::addToStore(const ValidPathInfo & info, const std::string & nar,
+    bool repair, bool dontCheckSigs)
 {
     Hash h = hashString(htSHA256, nar);
     if (h != info.narHash)
         throw Error(format("hash mismatch importing path ‘%s’; expected hash ‘%s’, got ‘%s’") %
             info.path % info.narHash.to_string() % h.to_string());
 
-    if (requireSigs && !info.checkSignatures(publicKeys))
+    if (requireSigs && !dontCheckSigs && !info.checkSignatures(publicKeys))
         throw Error(format("cannot import path ‘%s’ because it lacks a valid signature") % info.path);
 
     addTempRoot(info.path);

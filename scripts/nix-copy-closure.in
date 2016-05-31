@@ -97,7 +97,7 @@ else { # Copy FROM the remote machine.
         writeInt(5, $to); # == cmdExportPaths
         writeInt(0, $to); # obsolete
         writeStrings(\@missing, $to);
-        importPaths(fileno($from));
+        importPaths(fileno($from), 1);
     }
 
 }

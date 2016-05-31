@@ -326,7 +326,8 @@ Path RemoteStore::queryPathFromHashPart(const string & hashPart)
 }
 
 
-void RemoteStore::addToStore(const ValidPathInfo & info, const std::string & nar, bool repair)
+void RemoteStore::addToStore(const ValidPathInfo & info, const std::string & nar,
+    bool repair, bool dontCheckSigs)
 {
     throw Error("RemoteStore::addToStore() not implemented");
 }

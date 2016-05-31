@@ -63,7 +63,8 @@ Path BinaryCacheStore::narInfoFileFor(const Path & storePath)
     return storePathToHash(storePath) + ".narinfo";
 }
 
-void BinaryCacheStore::addToStore(const ValidPathInfo & info, const std::string & nar, bool repair)
+void BinaryCacheStore::addToStore(const ValidPathInfo & info, const std::string & nar,
+    bool repair, bool dontCheckSigs)
 {
     if (!repair && isValidPath(info.path)) return;
 

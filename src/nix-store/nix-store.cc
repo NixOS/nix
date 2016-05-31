@@ -901,7 +901,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             case cmdImportPaths: {
                 if (!writeAllowed) throw Error("importing paths is not allowed");
-                store->importPaths(in, 0);
+                store->importPaths(in, 0, true); // FIXME: should we skip sig checking?
                 out << 1; // indicate success
                 break;
             }

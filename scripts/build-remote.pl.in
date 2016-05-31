@@ -271,5 +271,5 @@ if (scalar @outputs2 > 0) {
     writeInt(0, $to); # don't sign
     writeStrings(\@outputs2, $to);
     $ENV{'NIX_HELD_LOCKS'} = "@outputs2"; # FIXME: ugly
-    importPaths(fileno($from));
+    importPaths(fileno($from), 1);
 }
