@@ -3132,6 +3132,11 @@ void SubstitutionGoal::tryNext()
     sub = subs.front();
     subs.pop_front();
 
+    if (sub->storeDir != worker.store.storeDir) {
+        tryNext();
+        return;
+    }
+
     try {
         // FIXME: make async
         info = sub->queryPathInfo(storePath);
