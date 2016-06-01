@@ -9,34 +9,50 @@ outPath=$(nix-build dependencies.nix --no-out-link)
 nix-push --dest $cacheDir $outPath
 
 
-# By default, a binary cache doesn't support "nix-env -qas", but does
-# support installation.
-clearStore
-clearCacheCache
+basicTests() {
 
-export _NIX_CACHE_FILE_URLS=1
+    # By default, a binary cache doesn't support "nix-env -qas", but does
+    # support installation.
+    clearStore
+    clearCacheCache
 
-nix-env --option binary-caches "file://$cacheDir" -f dependencies.nix -qas \* | grep -- "---"
+    nix-env --option binary-caches "file://$cacheDir" -f dependencies.nix -qas \* | grep -- "---"
 
-nix-store --option binary-caches "file://$cacheDir" -r $outPath
+    nix-store --option binary-caches "file://$cacheDir" -r $outPath
 
-[ -x $outPath/program ]
+    [ -x $outPath/program ]
 
 
-# But with the right configuration, "nix-env -qas" should also work.
-clearStore
-clearCacheCache
-echo "WantMassQuery: 1" >> $cacheDir/nix-cache-info
+    # But with the right configuration, "nix-env -qas" should also work.
+    clearStore
+    clearCacheCache
+    echo "WantMassQuery: 1" >> $cacheDir/nix-cache-info
 
-nix-env --option binary-caches "file://$cacheDir" -f dependencies.nix -qas \* | grep -- "--S"
+    nix-env --option binary-caches "file://$cacheDir" -f dependencies.nix -qas \* | grep -- "--S"
+    nix-env --option binary-caches "file://$cacheDir" -f dependencies.nix -qas \* | grep -- "--S"
 
-x=$(nix-env -f dependencies.nix -qas \* --prebuilt-only)
-[ -z "$x" ]
+    x=$(nix-env -f dependencies.nix -qas \* --prebuilt-only)
+    [ -z "$x" ]
 
-nix-store --option binary-caches "file://$cacheDir" -r $outPath
+    nix-store --option binary-caches "file://$cacheDir" -r $outPath
 
-nix-store --check-validity $outPath
-nix-store -qR $outPath | grep input-2
+    nix-store --check-validity $outPath
+    nix-store -qR $outPath | grep input-2
+
+    echo "WantMassQuery: 0" >> $cacheDir/nix-cache-info
+}
+
+
+# Test LocalBinaryCacheStore.
+basicTests
+
+
+# Test HttpBinaryCacheStore.
+export _NIX_FORCE_HTTP_BINARY_CACHE_STORE=1
+basicTests
+
+
+unset _NIX_FORCE_HTTP_BINARY_CACHE_STORE
 
 
 # Test whether Nix notices if the NAR doesn't match the hash in the NAR info.

@@ -57,6 +57,8 @@ public:
     {
         int id;
         Path storeDir;
+        bool wantMassQuery;
+        int priority;
     };
 
     struct State
@@ -126,24 +128,28 @@ public:
 
         state->insertCache.use()(uri)(time(0))(storeDir)(wantMassQuery)(priority).exec();
         assert(sqlite3_changes(state->db) == 1);
-        state->caches[uri] = Cache{(int) sqlite3_last_insert_rowid(state->db), storeDir};
+        state->caches[uri] = Cache{(int) sqlite3_last_insert_rowid(state->db), storeDir, wantMassQuery, priority};
     }
 
-    bool cacheExists(const std::string & uri) override
+    bool cacheExists(const std::string & uri,
+        bool & wantMassQuery, int & priority) override
     {
         auto state(_state.lock());
 
         auto i = state->caches.find(uri);
-        if (i != state->caches.end()) return true;
-
-        auto queryCache(state->queryCache.use()(uri));
-
-        if (queryCache.next()) {
-            state->caches[uri] = Cache{(int) queryCache.getInt(0), queryCache.getStr(1)};
-            return true;
+        if (i == state->caches.end()) {
+            auto queryCache(state->queryCache.use()(uri));
+            if (!queryCache.next()) return false;
+            state->caches.emplace(uri,
+                Cache{(int) queryCache.getInt(0), queryCache.getStr(1), queryCache.getInt(2), (int) queryCache.getInt(3)});
         }
 
-        return false;
+        auto & cache(getCache(*state, uri));
+
+        wantMassQuery = cache.wantMassQuery;
+        priority = cache.priority;
+
+        return true;
     }
 
     std::pair<Outcome, std::shared_ptr<NarInfo>> lookupNarInfo(

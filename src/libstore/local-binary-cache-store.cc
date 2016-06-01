@@ -17,9 +17,6 @@ public:
         : BinaryCacheStore(params)
         , binaryCacheDir(binaryCacheDir)
     {
-        /* For testing the NAR info cache. */
-        if (getEnv("_NIX_CACHE_FILE_URLS") == "1")
-            diskCache = getNarInfoDiskCache();
     }
 
     void init() override;
@@ -57,9 +54,6 @@ void LocalBinaryCacheStore::init()
 {
     createDirs(binaryCacheDir + "/nar");
     BinaryCacheStore::init();
-
-    if (diskCache && !diskCache->cacheExists(getUri()))
-        diskCache->createCache(getUri(), storeDir, wantMassQuery_, priority);
 }
 
 static void atomicWrite(const Path & path, const std::string & s)
@@ -96,7 +90,9 @@ static RegisterStoreImplementation regStore([](
     const std::string & uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
-    if (std::string(uri, 0, 7) != "file://") return 0;
+    if (getEnv("_NIX_FORCE_HTTP_BINARY_CACHE_STORE") == "1" ||
+        std::string(uri, 0, 7) != "file://")
+        return 0;
     auto store = std::make_shared<LocalBinaryCacheStore>(params, std::string(uri, 7));
     store->init();
     return store;

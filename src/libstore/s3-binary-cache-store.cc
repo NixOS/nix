@@ -71,7 +71,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
     void init() override
     {
-        if (!diskCache->cacheExists(getUri())) {
+        if (!diskCache->cacheExists(getUri(), wantMassQuery_, priority)) {
 
             /* Create the bucket if it doesn't already exists. */
             // FIXME: HeadBucket would be more appropriate, but doesn't return

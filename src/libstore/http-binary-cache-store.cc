@@ -39,7 +39,7 @@ public:
     void init() override
     {
         // FIXME: do this lazily?
-        if (!diskCache->cacheExists(cacheUri)) {
+        if (!diskCache->cacheExists(cacheUri, wantMassQuery_, priority)) {
             try {
                 BinaryCacheStore::init();
             } catch (UploadToHTTP &) {
@@ -95,7 +95,9 @@ static RegisterStoreImplementation regStore([](
     -> std::shared_ptr<Store>
 {
     if (std::string(uri, 0, 7) != "http://" &&
-        std::string(uri, 0, 8) != "https://") return 0;
+        std::string(uri, 0, 8) != "https://" &&
+        (getEnv("_NIX_FORCE_HTTP_BINARY_CACHE_STORE") != "1" || std::string(uri, 0, 7) != "file://")
+        ) return 0;
     auto store = std::make_shared<HttpBinaryCacheStore>(params, uri);
     store->init();
     return store;
