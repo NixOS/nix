@@ -23,7 +23,7 @@ void builtinFetchurl(const BasicDerivation & drv)
     assert(data.data);
 
     auto out = drv.env.find("out");
-    if (out == drv.env.end()) throw Error("attribute ‘url’ missing");
+    if (out == drv.env.end()) throw Error("attribute ‘out’ missing");
 
     Path storePath = out->second;
 
