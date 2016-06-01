@@ -177,6 +177,12 @@ class NarInfoDiskCache;
 
 class Store : public std::enable_shared_from_this<Store>
 {
+public:
+
+    typedef std::map<std::string, std::string> Params;
+
+    const Path storeDir;
+
 protected:
 
     struct State
@@ -188,11 +194,70 @@ protected:
 
     std::shared_ptr<NarInfoDiskCache> diskCache;
 
+    Store(const Params & params);
+
 public:
 
     virtual ~Store() { }
 
     virtual std::string getUri() = 0;
+
+    /* Return true if ‘path’ is in the Nix store (but not the Nix
+       store itself). */
+    bool isInStore(const Path & path) const;
+
+    /* Return true if ‘path’ is a store path, i.e. a direct child of
+       the Nix store. */
+    bool isStorePath(const Path & path) const;
+
+    /* Throw an exception if ‘path’ is not a store path. */
+    void assertStorePath(const Path & path) const;
+
+    /* Chop off the parts after the top-level store name, e.g.,
+       /nix/store/abcd-foo/bar => /nix/store/abcd-foo. */
+    Path toStorePath(const Path & path) const;
+
+    /* Follow symlinks until we end up with a path in the Nix store. */
+    Path followLinksToStore(const Path & path) const;
+
+    /* Same as followLinksToStore(), but apply toStorePath() to the
+       result. */
+    Path followLinksToStorePath(const Path & path) const;
+
+    /* Constructs a unique store path name. */
+    Path makeStorePath(const string & type,
+        const Hash & hash, const string & name) const;
+
+    Path makeOutputPath(const string & id,
+        const Hash & hash, const string & name) const;
+
+    Path makeFixedOutputPath(bool recursive,
+        HashType hashAlgo, Hash hash, string name) const;
+
+    /* This is the preparatory part of addToStore() and
+       addToStoreFixed(); it computes the store path to which srcPath
+       is to be copied.  Returns the store path and the cryptographic
+       hash of the contents of srcPath. */
+    std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
+        bool recursive = true, HashType hashAlgo = htSHA256,
+        PathFilter & filter = defaultPathFilter) const;
+
+    /* Preparatory part of addTextToStore().
+
+       !!! Computation of the path should take the references given to
+       addTextToStore() into account, otherwise we have a (relatively
+       minor) security hole: a caller can register a source file with
+       bogus references.  If there are too many references, the path may
+       not be garbage collected when it has to be (not really a problem,
+       the caller could create a root anyway), or it may be garbage
+       collected when it shouldn't be (more serious).
+
+       Hashing the references would solve this (bogus references would
+       simply yield a different store path, so other users wouldn't be
+       affected), but it has some backwards compatibility issues (the
+       hashing scheme changes), so I'm not doing that for now. */
+    Path computeStorePathForText(const string & name, const string & s,
+        const PathSet & references) const;
 
     /* Check whether a path is valid. */
     bool isValidPath(const Path & path);
@@ -429,19 +494,13 @@ protected:
 
 class LocalFSStore : public Store
 {
+protected:
+    using Store::Store;
 public:
     void narFromPath(const Path & path, Sink & sink) override;
     ref<FSAccessor> getFSAccessor() override;
 };
 
-
-/* !!! These should be part of the store API, I guess. */
-
-/* Throw an exception if `path' is not directly in the Nix store. */
-void assertStorePath(const Path & path);
-
-bool isInStore(const Path & path);
-bool isStorePath(const Path & path);
 
 /* Extract the name part of the given store path. */
 string storePathToName(const Path & path);
@@ -449,58 +508,10 @@ string storePathToName(const Path & path);
 /* Extract the hash part of the given store path. */
 string storePathToHash(const Path & path);
 
+/* Check whether ‘name’ is a valid store path name part, i.e. contains
+   only the characters [a-zA-Z0-9\+\-\.\_\?\=] and doesn't start with
+   a dot. */
 void checkStoreName(const string & name);
-
-
-/* Chop off the parts after the top-level store name, e.g.,
-   /nix/store/abcd-foo/bar => /nix/store/abcd-foo. */
-Path toStorePath(const Path & path);
-
-
-/* Follow symlinks until we end up with a path in the Nix store. */
-Path followLinksToStore(const Path & path);
-
-
-/* Same as followLinksToStore(), but apply toStorePath() to the
-   result. */
-Path followLinksToStorePath(const Path & path);
-
-
-/* Constructs a unique store path name. */
-Path makeStorePath(const string & type,
-    const Hash & hash, const string & name);
-
-Path makeOutputPath(const string & id,
-    const Hash & hash, const string & name);
-
-Path makeFixedOutputPath(bool recursive,
-    HashType hashAlgo, Hash hash, string name);
-
-
-/* This is the preparatory part of addToStore() and addToStoreFixed();
-   it computes the store path to which srcPath is to be copied.
-   Returns the store path and the cryptographic hash of the
-   contents of srcPath. */
-std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
-    bool recursive = true, HashType hashAlgo = htSHA256,
-    PathFilter & filter = defaultPathFilter);
-
-/* Preparatory part of addTextToStore().
-
-   !!! Computation of the path should take the references given to
-   addTextToStore() into account, otherwise we have a (relatively
-   minor) security hole: a caller can register a source file with
-   bogus references.  If there are too many references, the path may
-   not be garbage collected when it has to be (not really a problem,
-   the caller could create a root anyway), or it may be garbage
-   collected when it shouldn't be (more serious).
-
-   Hashing the references would solve this (bogus references would
-   simply yield a different store path, so other users wouldn't be
-   affected), but it has some backwards compatibility issues (the
-   hashing scheme changes), so I'm not doing that for now. */
-Path computeStorePathForText(const string & name, const string & s,
-    const PathSet & references);
 
 
 /* Copy a path from one store to another. */
@@ -542,10 +553,8 @@ std::list<ref<Store>> getDefaultSubstituters();
 
 
 /* Store implementation registration. */
-typedef std::map<std::string, std::string> StoreParams;
-
 typedef std::function<std::shared_ptr<Store>(
-    const std::string & uri, const StoreParams & params)> OpenStore;
+    const std::string & uri, const Store::Params & params)> OpenStore;
 
 struct RegisterStoreImplementation
 {

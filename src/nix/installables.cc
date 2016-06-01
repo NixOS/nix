@@ -17,7 +17,7 @@ UserEnvElems MixInstallables::evalInstallables(ref<Store> store)
 
         if (std::string(installable, 0, 1) == "/") {
 
-            if (isStorePath(installable)) {
+            if (store->isStorePath(installable)) {
 
                 if (isDerivation(installable)) {
                     UserEnvElem elem;

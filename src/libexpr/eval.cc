@@ -341,7 +341,7 @@ Path EvalState::checkSourcePath(const Path & path_)
     /* To support import-from-derivation, allow access to anything in
        the store. FIXME: only allow access to paths that have been
        constructed by this evaluation. */
-    if (isInStore(path)) return path;
+    if (store->isInStore(path)) return path;
 
 #if 0
     /* Hack to support the chroot dependencies of corepkgs (see
@@ -1517,7 +1517,7 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
         dstPath = srcToStore[path];
     else {
         dstPath = settings.readOnlyMode
-            ? computeStorePathForPath(checkSourcePath(path)).first
+            ? store->computeStorePathForPath(checkSourcePath(path)).first
             : store->addToStore(baseNameOf(path), checkSourcePath(path), true, htSHA256, defaultPathFilter, repair);
         srcToStore[path] = dstPath;
         printMsg(lvlChatty, format("copied source ‘%1%’ -> ‘%2%’")

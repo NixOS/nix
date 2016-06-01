@@ -13,7 +13,7 @@ private:
 public:
 
     LocalBinaryCacheStore(
-        const StoreParams & params, const Path & binaryCacheDir)
+        const Params & params, const Path & binaryCacheDir)
         : BinaryCacheStore(params)
         , binaryCacheDir(binaryCacheDir)
     {
@@ -45,7 +45,7 @@ protected:
             if (entry.name.size() != 40 ||
                 !hasSuffix(entry.name, ".narinfo"))
                 continue;
-            paths.insert(settings.nixStore + "/" + entry.name.substr(0, entry.name.size() - 8));
+            paths.insert(storeDir + "/" + entry.name.substr(0, entry.name.size() - 8));
         }
 
         return paths;
@@ -59,7 +59,7 @@ void LocalBinaryCacheStore::init()
     BinaryCacheStore::init();
 
     if (diskCache && !diskCache->cacheExists(getUri()))
-        diskCache->createCache(getUri(), wantMassQuery_, priority);
+        diskCache->createCache(getUri(), storeDir, wantMassQuery_, priority);
 }
 
 static void atomicWrite(const Path & path, const std::string & s)
@@ -93,7 +93,7 @@ std::shared_ptr<std::string> LocalBinaryCacheStore::getFile(const std::string & 
 }
 
 static RegisterStoreImplementation regStore([](
-    const std::string & uri, const StoreParams & params)
+    const std::string & uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
     if (std::string(uri, 0, 7) != "file://") return 0;

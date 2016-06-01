@@ -85,7 +85,7 @@ public:
 
     /* Initialise the local store, upgrading the schema if
        necessary. */
-    LocalStore();
+    LocalStore(const Params & params);
 
     ~LocalStore();
 

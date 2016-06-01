@@ -22,7 +22,7 @@ class RemoteStore : public LocalFSStore
 {
 public:
 
-    RemoteStore(size_t maxConnections = std::numeric_limits<size_t>::max());
+    RemoteStore(const Params & params, size_t maxConnections = std::numeric_limits<size_t>::max());
 
     /* Implementations of abstract store API methods. */
 

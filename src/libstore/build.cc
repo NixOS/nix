@@ -1442,7 +1442,7 @@ void DerivationGoal::buildDone()
 #if HAVE_STATVFS
             unsigned long long required = 8ULL * 1024 * 1024; // FIXME: make configurable
             struct statvfs st;
-            if (statvfs(settings.nixStore.c_str(), &st) == 0 &&
+            if (statvfs(worker.store.storeDir.c_str(), &st) == 0 &&
                 (unsigned long long) st.f_bavail * st.f_bsize < required)
                 diskFull = true;
             if (statvfs(tmpDir.c_str(), &st) == 0 &&
@@ -1701,7 +1701,7 @@ void DerivationGoal::startBuilder()
        shouldn't care, but this is useful for purity checking (e.g.,
        the compiler or linker might only want to accept paths to files
        in the store or in the build directory). */
-    env["NIX_STORE"] = settings.nixStore;
+    env["NIX_STORE"] = worker.store.storeDir;
 
     /* The maximum number of cores to utilize for parallel building. */
     env["NIX_BUILD_CORES"] = (format("%d") % settings.buildCores).str();
@@ -1784,10 +1784,10 @@ void DerivationGoal::startBuilder()
 
         /* Check that the store path is valid. */
         Path storePath = *i++;
-        if (!isInStore(storePath))
+        if (!worker.store.isInStore(storePath))
             throw BuildError(format("‘exportReferencesGraph’ contains a non-store path ‘%1%’")
                 % storePath);
-        storePath = toStorePath(storePath);
+        storePath = worker.store.toStorePath(storePath);
         if (!worker.store.isValidPath(storePath))
             throw BuildError(format("‘exportReferencesGraph’ contains an invalid path ‘%1%’")
                 % storePath);
@@ -1838,7 +1838,7 @@ void DerivationGoal::startBuilder()
 
         string defaultChrootDirs;
 #if __linux__
-        if (isInStore(BASH_PATH))
+        if (worker.store.isInStore(BASH_PATH))
             defaultChrootDirs = "/bin/sh=" BASH_PATH;
 #endif
 
@@ -1867,8 +1867,8 @@ void DerivationGoal::startBuilder()
         /* Add the closure of store paths to the chroot. */
         PathSet closure;
         for (auto & i : dirsInChroot)
-            if (isInStore(i.second))
-                worker.store.computeFSClosure(toStorePath(i.second), closure);
+            if (worker.store.isInStore(i.second))
+                worker.store.computeFSClosure(worker.store.toStorePath(i.second), closure);
         for (auto & i : closure)
             dirsInChroot[i] = i;
 
@@ -1953,7 +1953,7 @@ void DerivationGoal::startBuilder()
            can be bind-mounted).  !!! As an extra security
            precaution, make the fake Nix store only writable by the
            build user. */
-        Path chrootStoreDir = chrootRootDir + settings.nixStore;
+        Path chrootStoreDir = chrootRootDir + worker.store.storeDir;
         createDirs(chrootStoreDir);
         chmod_(chrootStoreDir, 01775);
 
@@ -2408,7 +2408,7 @@ void DerivationGoal::runChild()
 
             /* And we want the store in there regardless of how empty dirsInChroot. We include the innermost
                path component this time, since it's typically /nix/store and we care about that. */
-            Path cur = settings.nixStore;
+            Path cur = worker.store.storeDir;
             while (cur.compare("/") != 0) {
                 ancestry.insert(cur);
                 cur = dirOf(cur);
@@ -2532,12 +2532,12 @@ void DerivationGoal::runChild()
 /* Parse a list of reference specifiers.  Each element must either be
    a store path, or the symbolic name of the output of the derivation
    (such as `out'). */
-PathSet parseReferenceSpecifiers(const BasicDerivation & drv, string attr)
+PathSet parseReferenceSpecifiers(Store & store, const BasicDerivation & drv, string attr)
 {
     PathSet result;
     Paths paths = tokenizeString<Paths>(attr);
     for (auto & i : paths) {
-        if (isStorePath(i))
+        if (store.isStorePath(i))
             result.insert(i);
         else if (drv.outputs.find(i) != drv.outputs.end())
             result.insert(drv.outputs.find(i)->second.path);
@@ -2660,7 +2660,7 @@ void DerivationGoal::registerOutputs()
                the derivation to its content-addressed location. */
             Hash h2 = recursive ? hashPath(ht, actualPath).first : hashFile(ht, actualPath);
             if (buildMode == bmHash) {
-                Path dest = makeFixedOutputPath(recursive, ht, h2, drv->env["name"]);
+                Path dest = worker.store.makeFixedOutputPath(recursive, ht, h2, drv->env["name"]);
                 printMsg(lvlError, format("build produced path ‘%1%’ with %2% hash ‘%3%’")
                     % dest % printHashType(ht) % printHash16or32(h2));
                 if (worker.store.isValidPath(dest))
@@ -2733,7 +2733,7 @@ void DerivationGoal::registerOutputs()
         auto checkRefs = [&](const string & attrName, bool allowed, bool recursive) {
             if (drv->env.find(attrName) == drv->env.end()) return;
 
-            PathSet spec = parseReferenceSpecifiers(*drv, get(drv->env, attrName));
+            PathSet spec = parseReferenceSpecifiers(worker.store, *drv, get(drv->env, attrName));
 
             PathSet used;
             if (recursive) {
@@ -2965,9 +2965,9 @@ PathSet DerivationGoal::checkPathValidity(bool returnValid, bool checkHash)
 
 Path DerivationGoal::addHashRewrite(const Path & path)
 {
-    string h1 = string(path, settings.nixStore.size() + 1, 32);
+    string h1 = string(path, worker.store.storeDir.size() + 1, 32);
     string h2 = string(printHash32(hashString(htSHA256, "rewrite:" + drvPath + ":" + path)), 0, 32);
-    Path p = settings.nixStore + "/" + h2 + string(path, settings.nixStore.size() + 33);
+    Path p = worker.store.storeDir + "/" + h2 + string(path, worker.store.storeDir.size() + 33);
     deletePath(p);
     assert(path.size() == p.size());
     rewritesToTmp[h1] = h2;

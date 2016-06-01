@@ -11,7 +11,6 @@ makefiles = \
   src/nix-env/local.mk \
   src/nix-daemon/local.mk \
   src/nix-collect-garbage/local.mk \
-  src/download-via-ssh/local.mk \
   src/nix-prefetch-url/local.mk \
   perl/local.mk \
   scripts/local.mk \
@@ -22,6 +21,7 @@ makefiles = \
   misc/emacs/local.mk \
   doc/manual/local.mk \
   tests/local.mk
+  #src/download-via-ssh/local.mk \
 
 GLOBAL_CXXFLAGS += -std=c++11 -g -Wall
 

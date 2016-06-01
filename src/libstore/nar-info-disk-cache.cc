@@ -1,7 +1,6 @@
 #include "nar-info-disk-cache.hh"
 #include "sync.hh"
 #include "sqlite.hh"
-#include "globals.hh"
 
 #include <sqlite3.h>
 
@@ -54,11 +53,17 @@ public:
     /* How long negative lookups are valid. */
     const int ttlNegative = 3600;
 
+    struct Cache
+    {
+        int id;
+        Path storeDir;
+    };
+
     struct State
     {
         SQLite db;
         SQLiteStmt insertCache, queryCache, insertNAR, queryNAR, insertNARExistence, queryNARExistence;
-        std::map<std::string, int> caches;
+        std::map<std::string, Cache> caches;
     };
 
     Sync<State> _state;
@@ -106,22 +111,22 @@ public:
             "select exist, timestamp from NARExistence where cache = ? and storePath = ?");
     }
 
-    int uriToInt(State & state, const std::string & uri)
+    Cache & getCache(State & state, const std::string & uri)
     {
         auto i = state.caches.find(uri);
         if (i == state.caches.end()) abort();
         return i->second;
     }
 
-    void createCache(const std::string & uri, bool wantMassQuery, int priority) override
+    void createCache(const std::string & uri, const Path & storeDir, bool wantMassQuery, int priority) override
     {
         auto state(_state.lock());
 
         // FIXME: race
 
-        state->insertCache.use()(uri)(time(0))(settings.nixStore)(wantMassQuery)(priority).exec();
+        state->insertCache.use()(uri)(time(0))(storeDir)(wantMassQuery)(priority).exec();
         assert(sqlite3_changes(state->db) == 1);
-        state->caches[uri] = sqlite3_last_insert_rowid(state->db);
+        state->caches[uri] = Cache{(int) sqlite3_last_insert_rowid(state->db), storeDir};
     }
 
     bool cacheExists(const std::string & uri) override
@@ -134,7 +139,7 @@ public:
         auto queryCache(state->queryCache.use()(uri));
 
         if (queryCache.next()) {
-            state->caches[uri] = queryCache.getInt(0);
+            state->caches[uri] = Cache{(int) queryCache.getInt(0), queryCache.getStr(1)};
             return true;
         }
 
@@ -146,9 +151,9 @@ public:
     {
         auto state(_state.lock());
 
-        auto queryNAR(state->queryNAR.use()
-            (uriToInt(*state, uri))
-            (hashPart));
+        auto & cache(getCache(*state, uri));
+
+        auto queryNAR(state->queryNAR.use()(cache.id)(hashPart));
 
         if (!queryNAR.next())
             // FIXME: check NARExistence
@@ -159,7 +164,7 @@ public:
         // FIXME: implement TTL.
 
         auto namePart = queryNAR.getStr(2);
-        narInfo->path = settings.nixStore + "/" +
+        narInfo->path = cache.storeDir + "/" +
             hashPart + (namePart.empty() ? "" : "-" + namePart);
         narInfo->url = queryNAR.getStr(3);
         narInfo->compression = queryNAR.getStr(4);
@@ -169,9 +174,9 @@ public:
         narInfo->narHash = parseHash(queryNAR.getStr(7));
         narInfo->narSize = queryNAR.getInt(8);
         for (auto & r : tokenizeString<Strings>(queryNAR.getStr(9), " "))
-            narInfo->references.insert(settings.nixStore + "/" + r);
+            narInfo->references.insert(cache.storeDir + "/" + r);
         if (!queryNAR.isNull(10))
-            narInfo->deriver = settings.nixStore + "/" + queryNAR.getStr(10);
+            narInfo->deriver = cache.storeDir + "/" + queryNAR.getStr(10);
         for (auto & sig : tokenizeString<Strings>(queryNAR.getStr(11), " "))
             narInfo->sigs.insert(sig);
 
@@ -184,6 +189,8 @@ public:
     {
         auto state(_state.lock());
 
+        auto & cache(getCache(*state, uri));
+
         if (info) {
 
             auto narInfo = std::dynamic_pointer_cast<NarInfo>(info);
@@ -191,7 +198,7 @@ public:
             assert(hashPart == storePathToHash(info->path));
 
             state->insertNAR.use()
-                (uriToInt(*state, uri))
+                (cache.id)
                 (hashPart)
                 (storePathToName(info->path))
                 (narInfo ? narInfo->url : "", narInfo != 0)

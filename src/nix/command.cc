@@ -102,7 +102,7 @@ void StorePathsCommand::run(ref<Store> store)
 
     else {
         for (auto & storePath : storePaths)
-            storePath = followLinksToStorePath(storePath);
+            storePath = store->followLinksToStorePath(storePath);
 
         if (recursive) {
             PathSet closure;

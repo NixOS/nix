@@ -10,7 +10,7 @@ class S3BinaryCacheStore : public BinaryCacheStore
 {
 protected:
 
-    S3BinaryCacheStore(const StoreParams & params)
+    S3BinaryCacheStore(const Params & params)
         : BinaryCacheStore(params)
     { }
 

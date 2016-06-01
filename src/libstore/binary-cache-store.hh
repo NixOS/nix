@@ -21,7 +21,7 @@ private:
 
 protected:
 
-    BinaryCacheStore(const StoreParams & params);
+    BinaryCacheStore(const Params & params);
 
     [[noreturn]] void notImpl();
 

@@ -101,11 +101,11 @@ Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, 
 
         ValidPathInfo info;
 
-        info.path = readStorePath(source);
+        info.path = readStorePath(*this, source);
 
         Activity act(*logger, lvlInfo, format("importing path ‘%s’") % info.path);
 
-        info.references = readStorePaths<PathSet>(source);
+        info.references = readStorePaths<PathSet>(*this, source);
 
         info.deriver = readString(source);
         if (info.deriver != "") assertStorePath(info.deriver);

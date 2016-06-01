@@ -18,7 +18,7 @@ private:
 public:
 
     HttpBinaryCacheStore(
-        const StoreParams & params, const Path & _cacheUri)
+        const Params & params, const Path & _cacheUri)
         : BinaryCacheStore(params)
         , cacheUri(_cacheUri)
         , downloaders(
@@ -45,7 +45,7 @@ public:
             } catch (UploadToHTTP &) {
                 throw Error(format("‘%s’ does not appear to be a binary cache") % cacheUri);
             }
-            diskCache->createCache(cacheUri, wantMassQuery_, priority);
+            diskCache->createCache(cacheUri, storeDir, wantMassQuery_, priority);
         }
     }
 
@@ -91,7 +91,7 @@ protected:
 };
 
 static RegisterStoreImplementation regStore([](
-    const std::string & uri, const StoreParams & params)
+    const std::string & uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
     if (std::string(uri, 0, 7) != "http://" &&

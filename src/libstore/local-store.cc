@@ -36,26 +36,9 @@
 namespace nix {
 
 
-void checkStoreNotSymlink()
-{
-    if (getEnv("NIX_IGNORE_SYMLINK_STORE") == "1") return;
-    Path path = settings.nixStore;
-    struct stat st;
-    while (path != "/") {
-        if (lstat(path.c_str(), &st))
-            throw SysError(format("getting status of ‘%1%’") % path);
-        if (S_ISLNK(st.st_mode))
-            throw Error(format(
-                "the path ‘%1%’ is a symlink; "
-                "this is not allowed for the Nix store and its parent directories")
-                % path);
-        path = dirOf(path);
-    }
-}
-
-
-LocalStore::LocalStore()
-    : linksDir(settings.nixStore + "/.links")
+LocalStore::LocalStore(const Params & params)
+    : LocalFSStore(params)
+    , linksDir(storeDir + "/.links")
     , reservedPath(settings.nixDBPath + "/reserved")
     , schemaPath(settings.nixDBPath + "/schema")
     , requireSigs(settings.get("signed-binary-caches", std::string("")) != "") // FIXME: rename option
@@ -69,7 +52,7 @@ LocalStore::LocalStore()
     }
 
     /* Create missing state directories if they don't already exist. */
-    createDirs(settings.nixStore);
+    createDirs(storeDir);
     makeStoreWritable();
     createDirs(linksDir);
     Path profilesDir = settings.nixStateDir + "/profiles";
@@ -99,19 +82,33 @@ LocalStore::LocalStore()
                 % settings.buildUsersGroup);
         else {
             struct stat st;
-            if (stat(settings.nixStore.c_str(), &st))
-                throw SysError(format("getting attributes of path ‘%1%’") % settings.nixStore);
+            if (stat(storeDir.c_str(), &st))
+                throw SysError(format("getting attributes of path ‘%1%’") % storeDir);
 
             if (st.st_uid != 0 || st.st_gid != gr->gr_gid || (st.st_mode & ~S_IFMT) != perm) {
-                if (chown(settings.nixStore.c_str(), 0, gr->gr_gid) == -1)
-                    throw SysError(format("changing ownership of path ‘%1%’") % settings.nixStore);
-                if (chmod(settings.nixStore.c_str(), perm) == -1)
-                    throw SysError(format("changing permissions on path ‘%1%’") % settings.nixStore);
+                if (chown(storeDir.c_str(), 0, gr->gr_gid) == -1)
+                    throw SysError(format("changing ownership of path ‘%1%’") % storeDir);
+                if (chmod(storeDir.c_str(), perm) == -1)
+                    throw SysError(format("changing permissions on path ‘%1%’") % storeDir);
             }
         }
     }
 
-    checkStoreNotSymlink();
+    /* Ensure that the store and its parents are not symlinks. */
+    if (getEnv("NIX_IGNORE_SYMLINK_STORE") != "1") {
+        Path path = storeDir;
+        struct stat st;
+        while (path != "/") {
+            if (lstat(path.c_str(), &st))
+                throw SysError(format("getting status of ‘%1%’") % path);
+            if (S_ISLNK(st.st_mode))
+                throw Error(format(
+                        "the path ‘%1%’ is a symlink; "
+                        "this is not allowed for the Nix store and its parent directories")
+                    % path);
+            path = dirOf(path);
+        }
+    }
 
     /* We can't open a SQLite database if the disk is full.  Since
        this prevents the garbage collector from running when it's most
@@ -351,15 +348,15 @@ void LocalStore::makeStoreWritable()
     if (getuid() != 0) return;
     /* Check if /nix/store is on a read-only mount. */
     struct statvfs stat;
-    if (statvfs(settings.nixStore.c_str(), &stat) != 0)
+    if (statvfs(storeDir.c_str(), &stat) != 0)
         throw SysError("getting info about the Nix store mount point");
 
     if (stat.f_flag & ST_RDONLY) {
         if (unshare(CLONE_NEWNS) == -1)
             throw SysError("setting up a private mount namespace");
 
-        if (mount(0, settings.nixStore.c_str(), "none", MS_REMOUNT | MS_BIND, 0) == -1)
-            throw SysError(format("remounting %1% writable") % settings.nixStore);
+        if (mount(0, storeDir.c_str(), "none", MS_REMOUNT | MS_BIND, 0) == -1)
+            throw SysError(format("remounting %1% writable") % storeDir);
     }
 #endif
 }
@@ -771,7 +768,7 @@ Path LocalStore::queryPathFromHashPart(const string & hashPart)
 {
     if (hashPart.size() != storePathHashLen) throw Error("invalid hash part");
 
-    Path prefix = settings.nixStore + "/" + hashPart;
+    Path prefix = storeDir + "/" + hashPart;
 
     return retrySQLite<Path>([&]() {
         auto state(_state.lock());
@@ -1071,7 +1068,7 @@ Path LocalStore::createTempDirInStore()
         /* There is a slight possibility that `tmpDir' gets deleted by
            the GC between createTempDir() and addTempRoot(), so repeat
            until `tmpDir' exists. */
-        tmpDir = createTempDir(settings.nixStore);
+        tmpDir = createTempDir(storeDir);
         addTempRoot(tmpDir);
     } while (!pathExists(tmpDir));
     return tmpDir;
@@ -1111,7 +1108,7 @@ bool LocalStore::verifyStore(bool checkContents, bool repair)
     AutoCloseFD fdGCLock = openGCLock(ltWrite);
 
     PathSet store;
-    for (auto & i : readDirectory(settings.nixStore)) store.insert(i.name);
+    for (auto & i : readDirectory(storeDir)) store.insert(i.name);
 
     /* Check whether all valid paths actually exist. */
     printMsg(lvlInfo, "checking path existence...");
@@ -1275,7 +1272,7 @@ void LocalStore::upgradeStore7()
 {
     if (getuid() != 0) return;
     printMsg(lvlError, "removing immutable bits from the Nix store (this may take a while)...");
-    makeMutable(settings.nixStore);
+    makeMutable(storeDir);
 }
 
 #else

@@ -124,7 +124,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
     Paths paths;
     for (auto & i : opArgs) {
         DrvPathWithOutputs p = parseDrvPathWithOutputs(i);
-        paths.push_back(makeDrvPathWithOutputs(followLinksToStorePath(p.first), p.second));
+        paths.push_back(makeDrvPathWithOutputs(store->followLinksToStorePath(p.first), p.second));
     }
 
     unsigned long long downloadSize, narSize;
@@ -207,7 +207,7 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
     string name = *i++;
 
     cout << format("%1%\n") %
-        makeFixedOutputPath(recursive, hashAlgo,
+        store->makeFixedOutputPath(recursive, hashAlgo,
             parseHash16or32(hashAlgo, hash), name);
 }
 
@@ -315,7 +315,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qOutputs: {
             for (auto & i : opArgs) {
-                i = followLinksToStorePath(i);
+                i = store->followLinksToStorePath(i);
                 if (forceRealise) realisePath(i);
                 Derivation drv = store->derivationFromPath(i);
                 for (auto & j : drv.outputs)
@@ -330,7 +330,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         case qReferrersClosure: {
             PathSet paths;
             for (auto & i : opArgs) {
-                PathSet ps = maybeUseOutputs(followLinksToStorePath(i), useOutput, forceRealise);
+                PathSet ps = maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise);
                 for (auto & j : ps) {
                     if (query == qRequisites) store->computeFSClosure(j, paths, false, includeOutputs);
                     else if (query == qReferences) {
@@ -350,7 +350,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qDeriver:
             for (auto & i : opArgs) {
-                Path deriver = store->queryPathInfo(followLinksToStorePath(i))->deriver;
+                Path deriver = store->queryPathInfo(store->followLinksToStorePath(i))->deriver;
                 cout << format("%1%\n") %
                     (deriver == "" ? "unknown-deriver" : deriver);
             }
@@ -358,7 +358,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qBinding:
             for (auto & i : opArgs) {
-                Path path = useDeriver(followLinksToStorePath(i));
+                Path path = useDeriver(store->followLinksToStorePath(i));
                 Derivation drv = store->derivationFromPath(path);
                 StringPairs::iterator j = drv.env.find(bindingName);
                 if (j == drv.env.end())
@@ -371,7 +371,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         case qHash:
         case qSize:
             for (auto & i : opArgs) {
-                PathSet paths = maybeUseOutputs(followLinksToStorePath(i), useOutput, forceRealise);
+                PathSet paths = maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise);
                 for (auto & j : paths) {
                     auto info = store->queryPathInfo(j);
                     if (query == qHash) {
@@ -386,14 +386,14 @@ static void opQuery(Strings opFlags, Strings opArgs)
         case qTree: {
             PathSet done;
             for (auto & i : opArgs)
-                printTree(followLinksToStorePath(i), "", "", done);
+                printTree(store->followLinksToStorePath(i), "", "", done);
             break;
         }
 
         case qGraph: {
             PathSet roots;
             for (auto & i : opArgs) {
-                PathSet paths = maybeUseOutputs(followLinksToStorePath(i), useOutput, forceRealise);
+                PathSet paths = maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise);
                 roots.insert(paths.begin(), paths.end());
             }
             printDotGraph(ref<Store>(store), roots);
@@ -403,7 +403,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         case qXml: {
             PathSet roots;
             for (auto & i : opArgs) {
-                PathSet paths = maybeUseOutputs(followLinksToStorePath(i), useOutput, forceRealise);
+                PathSet paths = maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise);
                 roots.insert(paths.begin(), paths.end());
             }
             printXmlGraph(ref<Store>(store), roots);
@@ -412,14 +412,14 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qResolve: {
             for (auto & i : opArgs)
-                cout << format("%1%\n") % followLinksToStorePath(i);
+                cout << format("%1%\n") % store->followLinksToStorePath(i);
             break;
         }
 
         case qRoots: {
             PathSet referrers;
             for (auto & i : opArgs) {
-                PathSet paths = maybeUseOutputs(followLinksToStorePath(i), useOutput, forceRealise);
+                PathSet paths = maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise);
                 for (auto & j : paths)
                     store->computeFSClosure(j, referrers, true,
                         settings.gcKeepOutputs, settings.gcKeepDerivations);
@@ -479,7 +479,7 @@ static void opReadLog(Strings opFlags, Strings opArgs)
     RunPager pager;
 
     for (auto & i : opArgs) {
-        Path path = useDeriver(followLinksToStorePath(i));
+        Path path = useDeriver(store->followLinksToStorePath(i));
 
         string baseName = baseNameOf(path);
         bool found = false;
@@ -599,7 +599,7 @@ static void opCheckValidity(Strings opFlags, Strings opArgs)
         else throw UsageError(format("unknown flag ‘%1%’") % i);
 
     for (auto & i : opArgs) {
-        Path path = followLinksToStorePath(i);
+        Path path = store->followLinksToStorePath(i);
         if (!store->isValidPath(path)) {
             if (printInvalid)
                 cout << format("%1%\n") % path;
@@ -662,7 +662,7 @@ static void opDelete(Strings opFlags, Strings opArgs)
         else throw UsageError(format("unknown flag ‘%1%’") % i);
 
     for (auto & i : opArgs)
-        options.pathsToDelete.insert(followLinksToStorePath(i));
+        options.pathsToDelete.insert(store->followLinksToStorePath(i));
 
     GCResults results;
     PrintFreed freed(true, results);
@@ -761,7 +761,7 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
     int status = 0;
 
     for (auto & i : opArgs) {
-        Path path = followLinksToStorePath(i);
+        Path path = store->followLinksToStorePath(i);
         printMsg(lvlTalkative, format("checking path ‘%1%’...") % path);
         auto info = store->queryPathInfo(path);
         HashSink sink(info->narHash.type);
@@ -787,7 +787,7 @@ static void opRepairPath(Strings opFlags, Strings opArgs)
         throw UsageError("no flags expected");
 
     for (auto & i : opArgs) {
-        Path path = followLinksToStorePath(i);
+        Path path = store->followLinksToStorePath(i);
         ensureLocalStore()->repairPath(path);
     }
 }
@@ -847,7 +847,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             case cmdQueryValidPaths: {
                 bool lock = readInt(in);
                 bool substitute = readInt(in);
-                PathSet paths = readStorePaths<PathSet>(in);
+                PathSet paths = readStorePaths<PathSet>(*store, in);
                 if (lock && writeAllowed)
                     for (auto & path : paths)
                         store->addTempRoot(path);
@@ -879,7 +879,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             }
 
             case cmdQueryPathInfos: {
-                PathSet paths = readStorePaths<PathSet>(in);
+                PathSet paths = readStorePaths<PathSet>(*store, in);
                 // !!! Maybe we want a queryPathInfos?
                 for (auto & i : paths) {
                     try {
@@ -896,7 +896,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             }
 
             case cmdDumpStorePath:
-                dumpPath(readStorePath(in), out);
+                dumpPath(readStorePath(*store, in), out);
                 break;
 
             case cmdImportPaths: {
@@ -908,7 +908,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             case cmdExportPaths: {
                 readInt(in); // obsolete
-                Paths sorted = store->topoSortPaths(readStorePaths<PathSet>(in));
+                Paths sorted = store->topoSortPaths(readStorePaths<PathSet>(*store, in));
                 reverse(sorted.begin(), sorted.end());
                 store->exportPaths(sorted, out);
                 break;
@@ -917,7 +917,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             case cmdBuildPaths: { /* Used by build-remote.pl. */
 
                 if (!writeAllowed) throw Error("building paths is not allowed");
-                PathSet paths = readStorePaths<PathSet>(in);
+                PathSet paths = readStorePaths<PathSet>(*store, in);
 
                 getBuildSettings();
 
@@ -936,9 +936,9 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 if (!writeAllowed) throw Error("building paths is not allowed");
 
-                Path drvPath = readStorePath(in); // informational only
+                Path drvPath = readStorePath(*store, in); // informational only
                 BasicDerivation drv;
-                in >> drv;
+                readDerivation(in, *store, drv);
 
                 getBuildSettings();
 
@@ -952,7 +952,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             case cmdQueryClosure: {
                 bool includeOutputs = readInt(in);
-                PathSet paths = readStorePaths<PathSet>(in);
+                PathSet paths = readStorePaths<PathSet>(*store, in);
                 PathSet closure;
                 for (auto & i : paths)
                     store->computeFSClosure(i, closure, false, includeOutputs);

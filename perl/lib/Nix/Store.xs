@@ -161,8 +161,7 @@ SV * topoSortPaths(...)
 SV * followLinksToStorePath(char * path)
     CODE:
         try {
-            store();
-            RETVAL = newSVpv(followLinksToStorePath(path).c_str(), 0);
+            RETVAL = newSVpv(store()->followLinksToStorePath(path).c_str(), 0);
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -289,7 +288,7 @@ SV * makeFixedOutputPath(int recursive, char * algo, char * hash, char * name)
     PPCODE:
         try {
             HashType ht = parseHashType(algo);
-            Path path = makeFixedOutputPath(recursive, ht,
+            Path path = store()->makeFixedOutputPath(recursive, ht,
                 parseHash16or32(ht, hash), name);
             XPUSHs(sv_2mortal(newSVpv(path.c_str(), 0)));
         } catch (Error & e) {

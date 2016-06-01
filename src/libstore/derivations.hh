@@ -114,7 +114,7 @@ bool wantOutput(const string & output, const std::set<string> & wanted);
 struct Source;
 struct Sink;
 
-Source & operator >> (Source & in, BasicDerivation & drv);
+Source & readDerivation(Source & in, Store & store, BasicDerivation & drv);
 Sink & operator << (Sink & out, const BasicDerivation & drv);
 
 }

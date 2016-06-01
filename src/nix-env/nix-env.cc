@@ -387,7 +387,7 @@ static void queryInstSources(EvalState & state,
         case srcStorePaths: {
 
             for (auto & i : args) {
-                Path path = followLinksToStorePath(i);
+                Path path = state.store->followLinksToStorePath(i);
 
                 string name = baseNameOf(path);
                 string::size_type dash = name.find('-');
@@ -742,7 +742,7 @@ static void uninstallDerivations(Globals & globals, Strings & selectors,
             for (auto & j : selectors)
                 /* !!! the repeated calls to followLinksToStorePath()
                    are expensive, should pre-compute them. */
-                if ((isPath(j) && i.queryOutPath() == followLinksToStorePath(j))
+                if ((isPath(j) && i.queryOutPath() == globals.state->store->followLinksToStorePath(j))
                     || DrvName(j).matches(drvName))
                 {
                     printMsg(lvlInfo, format("uninstalling ‘%1%’") % i.name);

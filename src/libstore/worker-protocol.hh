@@ -56,8 +56,8 @@ typedef enum {
 #define STDERR_ERROR 0x63787470
 
 
-Path readStorePath(Source & from);
-template<class T> T readStorePaths(Source & from);
+Path readStorePath(Store & store, Source & from);
+template<class T> T readStorePaths(Store & store, Source & from);
 
 
 }

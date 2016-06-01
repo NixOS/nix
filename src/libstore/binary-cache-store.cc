@@ -14,8 +14,9 @@
 
 namespace nix {
 
-BinaryCacheStore::BinaryCacheStore(const StoreParams & params)
-    : compression(get(params, "compression", "xz"))
+BinaryCacheStore::BinaryCacheStore(const Params & params)
+    : Store(params)
+    , compression(get(params, "compression", "xz"))
 {
     auto secretKeyFile = get(params, "secret-key", "");
     if (secretKeyFile != "")
@@ -32,7 +33,7 @@ void BinaryCacheStore::init()
 
     auto cacheInfo = getFile(cacheInfoFile);
     if (!cacheInfo) {
-        upsertFile(cacheInfoFile, "StoreDir: " + settings.nixStore + "\n");
+        upsertFile(cacheInfoFile, "StoreDir: " + storeDir + "\n");
     } else {
         for (auto & line : tokenizeString<Strings>(*cacheInfo, "\n")) {
             size_t colon = line.find(':');
@@ -40,9 +41,9 @@ void BinaryCacheStore::init()
             auto name = line.substr(0, colon);
             auto value = trim(line.substr(colon + 1, std::string::npos));
             if (name == "StoreDir") {
-                if (value != settings.nixStore)
+                if (value != storeDir)
                     throw Error(format("binary cache ‘%s’ is for Nix stores with prefix ‘%s’, not ‘%s’")
-                        % getUri() % value % settings.nixStore);
+                        % getUri() % value % storeDir);
             } else if (name == "WantMassQuery") {
                 wantMassQuery_ = value == "1";
             } else if (name == "Priority") {
@@ -181,7 +182,7 @@ std::shared_ptr<ValidPathInfo> BinaryCacheStore::queryPathInfoUncached(const Pat
     auto data = getFile(narInfoFile);
     if (!data) return 0;
 
-    auto narInfo = make_ref<NarInfo>(*data, narInfoFile);
+    auto narInfo = make_ref<NarInfo>(*this, *data, narInfoFile);
 
     stats.narInfoRead++;
 
@@ -249,7 +250,7 @@ struct BinaryCacheStoreAccessor : public FSAccessor
     {
         auto path = canonPath(path_);
 
-        auto storePath = toStorePath(path);
+        auto storePath = store->toStorePath(path);
         std::string restPath = std::string(path, storePath.size());
 
         if (!store->isValidPath(storePath))

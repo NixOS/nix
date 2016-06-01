@@ -176,7 +176,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
            connection.  */
         Path path = readString(from);
         startWork();
-        assertStorePath(path);
+        store->assertStorePath(path);
         bool result = store->isValidPath(path);
         stopWork();
         to << result;
@@ -184,7 +184,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     }
 
     case wopQueryValidPaths: {
-        PathSet paths = readStorePaths<PathSet>(from);
+        PathSet paths = readStorePaths<PathSet>(*store, from);
         startWork();
         PathSet res = store->queryValidPaths(paths);
         stopWork();
@@ -193,7 +193,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     }
 
     case wopHasSubstitutes: {
-        Path path = readStorePath(from);
+        Path path = readStorePath(*store, from);
         startWork();
         PathSet res = store->querySubstitutablePaths({path});
         stopWork();
@@ -202,7 +202,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     }
 
     case wopQuerySubstitutablePaths: {
-        PathSet paths = readStorePaths<PathSet>(from);
+        PathSet paths = readStorePaths<PathSet>(*store, from);
         startWork();
         PathSet res = store->querySubstitutablePaths(paths);
         stopWork();
@@ -211,7 +211,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     }
 
     case wopQueryPathHash: {
-        Path path = readStorePath(from);
+        Path path = readStorePath(*store, from);
         startWork();
         auto hash = store->queryPathInfo(path)->narHash;
         stopWork();
@@ -223,7 +223,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     case wopQueryReferrers:
     case wopQueryValidDerivers:
     case wopQueryDerivationOutputs: {
-        Path path = readStorePath(from);
+        Path path = readStorePath(*store, from);
         startWork();
         PathSet paths;
         if (op == wopQueryReferences)
@@ -239,7 +239,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     }
 
     case wopQueryDerivationOutputNames: {
-        Path path = readStorePath(from);
+        Path path = readStorePath(*store, from);
         startWork();
         StringSet names;
         names = store->queryDerivationOutputNames(path);
@@ -249,7 +249,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     }
 
     case wopQueryDeriver: {
-        Path path = readStorePath(from);
+        Path path = readStorePath(*store, from);
         startWork();
         auto deriver = store->queryPathInfo(path)->deriver;
         stopWork();
@@ -302,7 +302,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     case wopAddTextToStore: {
         string suffix = readString(from);
         string s = readString(from);
-        PathSet refs = readStorePaths<PathSet>(from);
+        PathSet refs = readStorePaths<PathSet>(*store, from);
         startWork();
         Path path = store->addTextToStore(suffix, s, refs);
         stopWork();
@@ -311,7 +311,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     }
 
     case wopExportPath: {
-        Path path = readStorePath(from);
+        Path path = readStorePath(*store, from);
         readInt(from); // obsolete
         startWork();
         TunnelSink sink(to);
@@ -331,7 +331,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     }
 
     case wopBuildPaths: {
-        PathSet drvs = readStorePaths<PathSet>(from);
+        PathSet drvs = readStorePaths<PathSet>(*store, from);
         BuildMode mode = bmNormal;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 15) {
             mode = (BuildMode)readInt(from);
@@ -349,9 +349,9 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     }
 
     case wopBuildDerivation: {
-        Path drvPath = readStorePath(from);
+        Path drvPath = readStorePath(*store, from);
         BasicDerivation drv;
-        from >> drv;
+        readDerivation(from, *store, drv);
         BuildMode buildMode = (BuildMode) readInt(from);
         startWork();
         if (!trusted)
@@ -363,7 +363,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     }
 
     case wopEnsurePath: {
-        Path path = readStorePath(from);
+        Path path = readStorePath(*store, from);
         startWork();
         store->ensurePath(path);
         stopWork();
@@ -372,7 +372,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     }
 
     case wopAddTempRoot: {
-        Path path = readStorePath(from);
+        Path path = readStorePath(*store, from);
         startWork();
         store->addTempRoot(path);
         stopWork();
@@ -410,7 +410,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     case wopCollectGarbage: {
         GCOptions options;
         options.action = (GCOptions::GCAction) readInt(from);
-        options.pathsToDelete = readStorePaths<PathSet>(from);
+        options.pathsToDelete = readStorePaths<PathSet>(*store, from);
         options.ignoreLiveness = readInt(from);
         options.maxFreed = readLongLong(from);
         readInt(from); // obsolete field
@@ -486,7 +486,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     }
 
     case wopQuerySubstitutablePathInfos: {
-        PathSet paths = readStorePaths<PathSet>(from);
+        PathSet paths = readStorePaths<PathSet>(*store, from);
         startWork();
         SubstitutablePathInfos infos;
         store->querySubstitutablePathInfos(paths, infos);
@@ -508,7 +508,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     }
 
     case wopQueryPathInfo: {
-        Path path = readStorePath(from);
+        Path path = readStorePath(*store, from);
         std::shared_ptr<const ValidPathInfo> info;
         startWork();
         try {
@@ -553,7 +553,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     }
 
     case wopAddSignatures: {
-        Path path = readStorePath(from);
+        Path path = readStorePath(*store, from);
         StringSet sigs = readStrings<StringSet>(from);
         startWork();
         if (!trusted)
@@ -607,7 +607,7 @@ static void processConnection(bool trusted)
 #endif
 
         /* Open the store. */
-        auto store = make_ref<LocalStore>();
+        auto store = make_ref<LocalStore>(Store::Params()); // FIXME: get params from somewhere
 
         stopWork();
         to.flush();

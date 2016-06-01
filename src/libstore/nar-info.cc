@@ -3,7 +3,7 @@
 
 namespace nix {
 
-NarInfo::NarInfo(const std::string & s, const std::string & whence)
+NarInfo::NarInfo(const Store & store, const std::string & s, const std::string & whence)
 {
     auto corrupt = [&]() {
         throw Error("NAR info file ‘%1%’ is corrupt");
@@ -32,7 +32,7 @@ NarInfo::NarInfo(const std::string & s, const std::string & whence)
         std::string value(s, colon + 2, eol - colon - 2);
 
         if (name == "StorePath") {
-            if (!isStorePath(value)) corrupt();
+            if (!store.isStorePath(value)) corrupt();
             path = value;
         }
         else if (name == "URL")
@@ -53,14 +53,14 @@ NarInfo::NarInfo(const std::string & s, const std::string & whence)
             auto refs = tokenizeString<Strings>(value, " ");
             if (!references.empty()) corrupt();
             for (auto & r : refs) {
-                auto r2 = settings.nixStore + "/" + r;
-                if (!isStorePath(r2)) corrupt();
+                auto r2 = store.storeDir + "/" + r;
+                if (!store.isStorePath(r2)) corrupt();
                 references.insert(r2);
             }
         }
         else if (name == "Deriver") {
-            auto p = settings.nixStore + "/" + value;
-            if (!isStorePath(p)) corrupt();
+            auto p = store.storeDir + "/" + value;
+            if (!store.isStorePath(p)) corrupt();
             deriver = p;
         }
         else if (name == "System")

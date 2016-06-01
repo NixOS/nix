@@ -204,7 +204,7 @@ typedef std::shared_ptr<AutoCloseFD> FDPtr;
 typedef list<FDPtr> FDs;
 
 
-static void readTempRoots(PathSet & tempRoots, FDs & fds)
+static void readTempRoots(Store & store, PathSet & tempRoots, FDs & fds)
 {
     /* Read the `temproots' directory for per-process temporary root
        files. */
@@ -251,7 +251,7 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
         while ((end = contents.find((char) 0, pos)) != string::npos) {
             Path root(contents, pos, end - pos);
             debug(format("got temporary root ‘%1%’") % root);
-            assertStorePath(root);
+            store.assertStorePath(root);
             tempRoots.insert(root);
             pos = end + 1;
         }
@@ -304,7 +304,7 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
         }
 
         else if (type == DT_REG) {
-            Path storePath = settings.nixStore + "/" + baseNameOf(path);
+            Path storePath = storeDir + "/" + baseNameOf(path);
             if (isStorePath(storePath) && isValidPath(storePath))
                 roots[path] = storePath;
         }
@@ -594,7 +594,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
     GCState state(results);
     state.options = options;
-    state.trashDir = settings.nixStore + "/trash";
+    state.trashDir = storeDir + "/trash";
     state.gcKeepOutputs = settings.gcKeepOutputs;
     state.gcKeepDerivations = settings.gcKeepDerivations;
 
@@ -635,7 +635,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        per-process temporary root files.  So after this point no paths
        can be added to the set of temporary roots. */
     FDs fds;
-    readTempRoots(state.tempRoots, fds);
+    readTempRoots(*this, state.tempRoots, fds);
     state.roots.insert(state.tempRoots.begin(), state.tempRoots.end());
 
     /* After this point the set of roots or temporary roots cannot
@@ -675,8 +675,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
         try {
 
-            AutoCloseDir dir = opendir(settings.nixStore.c_str());
-            if (!dir) throw SysError(format("opening directory ‘%1%’") % settings.nixStore);
+            AutoCloseDir dir = opendir(storeDir.c_str());
+            if (!dir) throw SysError(format("opening directory ‘%1%’") % storeDir);
 
             /* Read the store and immediately delete all paths that
                aren't valid.  When using --max-freed etc., deleting
@@ -690,7 +690,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 checkInterrupt();
                 string name = dirent->d_name;
                 if (name == "." || name == "..") continue;
-                Path path = settings.nixStore + "/" + name;
+                Path path = storeDir + "/" + name;
                 if (isStorePath(path) && isValidPath(path))
                     entries.push_back(path);
                 else

@@ -50,7 +50,7 @@ void EvalState::realiseContext(const PathSet & context)
     for (auto & i : context) {
         std::pair<string, string> decoded = decodeContext(i);
         Path ctx = decoded.first;
-        assert(isStorePath(ctx));
+        assert(store->isStorePath(ctx));
         if (!store->isValidPath(ctx))
             throw InvalidPathError(ctx);
         if (!decoded.second.empty() && nix::isDerivation(ctx))
@@ -82,7 +82,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
 
     path = state.checkSourcePath(path);
 
-    if (isStorePath(path) && state.store->isValidPath(path) && isDerivation(path)) {
+    if (state.store->isStorePath(path) && state.store->isValidPath(path) && isDerivation(path)) {
         Derivation drv = readDerivation(path);
         Value & w = *state.allocValue();
         state.mkAttrs(w, 3 + drv.outputs.size());
@@ -624,7 +624,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         outputHash = printHash(h);
         if (outputHashRecursive) outputHashAlgo = "r:" + outputHashAlgo;
 
-        Path outPath = makeFixedOutputPath(outputHashRecursive, ht, h, drvName);
+        Path outPath = state.store->makeFixedOutputPath(outputHashRecursive, ht, h, drvName);
         drv.env["out"] = outPath;
         drv.outputs["out"] = DerivationOutput(outPath, outputHashAlgo, outputHash);
     }
@@ -646,7 +646,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
         for (auto & i : drv.outputs)
             if (i.second.path == "") {
-                Path outPath = makeOutputPath(i.first, h, drvName);
+                Path outPath = state.store->makeOutputPath(i.first, h, drvName);
                 drv.env[i.first] = outPath;
                 i.second.path = outPath;
             }
@@ -702,10 +702,10 @@ static void prim_storePath(EvalState & state, const Pos & pos, Value * * args, V
     /* Resolve symlinks in ‘path’, unless ‘path’ itself is a symlink
        directly in the store.  The latter condition is necessary so
        e.g. nix-push does the right thing. */
-    if (!isStorePath(path)) path = canonPath(path, true);
-    if (!isInStore(path))
+    if (!state.store->isStorePath(path)) path = canonPath(path, true);
+    if (!state.store->isInStore(path))
         throw EvalError(format("path ‘%1%’ is not in the Nix store, at %2%") % path % pos);
-    Path path2 = toStorePath(path);
+    Path path2 = state.store->toStorePath(path);
     if (!settings.readOnlyMode)
         state.store->ensurePath(path2);
     context.insert(path2);
@@ -897,7 +897,7 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
     }
 
     Path storePath = settings.readOnlyMode
-        ? computeStorePathForText(name, contents, refs)
+        ? state.store->computeStorePathForText(name, contents, refs)
         : state.store->addTextToStore(name, contents, refs, state.repair);
 
     /* Note: we don't need to add `context' to the context of the
@@ -963,7 +963,7 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
     path = state.checkSourcePath(path);
 
     Path dstPath = settings.readOnlyMode
-        ? computeStorePathForPath(path, true, htSHA256, filter).first
+        ? state.store->computeStorePathForPath(path, true, htSHA256, filter).first
         : state.store->addToStore(baseNameOf(path), path, true, htSHA256, filter, state.repair);
 
     mkString(v, dstPath, {dstPath});
@@ -1765,7 +1765,7 @@ void EvalState::createBaseEnv()
     mkString(v, nixVersion);
     addConstant("__nixVersion", v);
 
-    mkString(v, settings.nixStore);
+    mkString(v, store->storeDir);
     addConstant("__storeDir", v);
 
     /* Language version.  This should be increased every time a new

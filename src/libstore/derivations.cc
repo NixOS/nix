@@ -81,7 +81,7 @@ Path writeDerivation(ref<Store> store,
     string suffix = name + drvExtension;
     string contents = drv.unparse();
     return settings.readOnlyMode
-        ? computeStorePathForText(suffix, contents, references)
+        ? store->computeStorePathForText(suffix, contents, references)
         : store->addTextToStore(suffix, contents, references, repair);
 }
 
@@ -336,7 +336,7 @@ PathSet BasicDerivation::outputPaths() const
 }
 
 
-Source & operator >> (Source & in, BasicDerivation & drv)
+Source & readDerivation(Source & in, Store & store, BasicDerivation & drv)
 {
     drv.outputs.clear();
     auto nr = readInt(in);
@@ -344,11 +344,11 @@ Source & operator >> (Source & in, BasicDerivation & drv)
         auto name = readString(in);
         DerivationOutput o;
         in >> o.path >> o.hashAlgo >> o.hash;
-        assertStorePath(o.path);
+        store.assertStorePath(o.path);
         drv.outputs[name] = o;
     }
 
-    drv.inputSrcs = readStorePaths<PathSet>(in);
+    drv.inputSrcs = readStorePaths<PathSet>(store, in);
     in >> drv.platform >> drv.builder;
     drv.args = readStrings<Strings>(in);
 

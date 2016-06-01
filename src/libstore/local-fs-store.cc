@@ -12,7 +12,7 @@ struct LocalStoreAccessor : public FSAccessor
 
     void assertStore(const Path & path)
     {
-        Path storePath = toStorePath(path);
+        Path storePath = store->toStorePath(path);
         if (!store->isValidPath(storePath))
             throw Error(format("path ‘%1%’ is not a valid store path") % storePath);
     }

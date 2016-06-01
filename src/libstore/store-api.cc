@@ -8,32 +8,32 @@
 namespace nix {
 
 
-bool isInStore(const Path & path)
+bool Store::isInStore(const Path & path) const
 {
-    return isInDir(path, settings.nixStore);
+    return isInDir(path, storeDir);
 }
 
 
-bool isStorePath(const Path & path)
+bool Store::isStorePath(const Path & path) const
 {
     return isInStore(path)
-        && path.size() >= settings.nixStore.size() + 1 + storePathHashLen
-        && path.find('/', settings.nixStore.size() + 1) == Path::npos;
+        && path.size() >= storeDir.size() + 1 + storePathHashLen
+        && path.find('/', storeDir.size() + 1) == Path::npos;
 }
 
 
-void assertStorePath(const Path & path)
+void Store::assertStorePath(const Path & path) const
 {
     if (!isStorePath(path))
         throw Error(format("path ‘%1%’ is not in the Nix store") % path);
 }
 
 
-Path toStorePath(const Path & path)
+Path Store::toStorePath(const Path & path) const
 {
     if (!isInStore(path))
         throw Error(format("path ‘%1%’ is not in the Nix store") % path);
-    Path::size_type slash = path.find('/', settings.nixStore.size() + 1);
+    Path::size_type slash = path.find('/', storeDir.size() + 1);
     if (slash == Path::npos)
         return path;
     else
@@ -41,7 +41,7 @@ Path toStorePath(const Path & path)
 }
 
 
-Path followLinksToStore(const Path & _path)
+Path Store::followLinksToStore(const Path & _path) const
 {
     Path path = absPath(_path);
     while (!isInStore(path)) {
@@ -55,7 +55,7 @@ Path followLinksToStore(const Path & _path)
 }
 
 
-Path followLinksToStorePath(const Path & path)
+Path Store::followLinksToStorePath(const Path & path) const
 {
     return toStorePath(followLinksToStore(path));
 }
@@ -63,18 +63,17 @@ Path followLinksToStorePath(const Path & path)
 
 string storePathToName(const Path & path)
 {
-    assertStorePath(path);
-    auto l = settings.nixStore.size() + 1 + storePathHashLen;
-    assert(path.size() >= l);
-    return path.size() == l ? "" : string(path, l + 1);
+    auto base = baseNameOf(path);
+    assert(base.size() == storePathHashLen || (base.size() > storePathHashLen && base[storePathHashLen] == '-'));
+    return base.size() == storePathHashLen ? "" : string(base, storePathHashLen + 1);
 }
 
 
 string storePathToHash(const Path & path)
 {
-    assertStorePath(path);
-    assert(path.size() >= settings.nixStore.size() + 1 + storePathHashLen);
-    return string(path, settings.nixStore.size() + 1, storePathHashLen);
+    auto base = baseNameOf(path);
+    assert(base.size() >= storePathHashLen);
+    return string(base, 0, storePathHashLen);
 }
 
 
@@ -168,31 +167,31 @@ void checkStoreName(const string & name)
 */
 
 
-Path makeStorePath(const string & type,
-    const Hash & hash, const string & name)
+Path Store::makeStorePath(const string & type,
+    const Hash & hash, const string & name) const
 {
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
     string s = type + ":sha256:" + printHash(hash) + ":"
-        + settings.nixStore + ":" + name;
+        + storeDir + ":" + name;
 
     checkStoreName(name);
 
-    return settings.nixStore + "/"
+    return storeDir + "/"
         + printHash32(compressHash(hashString(htSHA256, s), 20))
         + "-" + name;
 }
 
 
-Path makeOutputPath(const string & id,
-    const Hash & hash, const string & name)
+Path Store::makeOutputPath(const string & id,
+    const Hash & hash, const string & name) const
 {
     return makeStorePath("output:" + id, hash,
         name + (id == "out" ? "" : "-" + id));
 }
 
 
-Path makeFixedOutputPath(bool recursive,
-    HashType hashAlgo, Hash hash, string name)
+Path Store::makeFixedOutputPath(bool recursive,
+    HashType hashAlgo, Hash hash, string name) const
 {
     return hashAlgo == htSHA256 && recursive
         ? makeStorePath("source", hash, name)
@@ -203,8 +202,8 @@ Path makeFixedOutputPath(bool recursive,
 }
 
 
-std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
-    bool recursive, HashType hashAlgo, PathFilter & filter)
+std::pair<Path, Hash> Store::computeStorePathForPath(const Path & srcPath,
+    bool recursive, HashType hashAlgo, PathFilter & filter) const
 {
     HashType ht(hashAlgo);
     Hash h = recursive ? hashPath(ht, srcPath, filter).first : hashFile(ht, srcPath);
@@ -214,8 +213,8 @@ std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
 }
 
 
-Path computeStorePathForText(const string & name, const string & s,
-    const PathSet & references)
+Path Store::computeStorePathForText(const string & name, const string & s,
+    const PathSet & references) const
 {
     Hash hash = hashString(htSHA256, s);
     /* Stuff the references (if any) into the type.  This is a bit
@@ -227,6 +226,12 @@ Path computeStorePathForText(const string & name, const string & s,
         type += i;
     }
     return makeStorePath(type, hash, name);
+}
+
+
+Store::Store(const Params & params)
+    : storeDir(settings.nixStore)
+{
 }
 
 
@@ -465,7 +470,7 @@ RegisterStoreImplementation::Implementations * RegisterStoreImplementation::impl
 ref<Store> openStoreAt(const std::string & uri_)
 {
     auto uri(uri_);
-    StoreParams params;
+    Store::Params params;
     auto q = uri.find('?');
     if (q != std::string::npos) {
         for (auto s : tokenizeString<Strings>(uri.substr(q + 1), "&")) {
@@ -492,7 +497,7 @@ ref<Store> openStore()
 
 
 static RegisterStoreImplementation regStore([](
-    const std::string & uri, const StoreParams & params)
+    const std::string & uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
     enum { mDaemon, mLocal, mAuto } mode;
@@ -512,8 +517,8 @@ static RegisterStoreImplementation regStore([](
     }
 
     return mode == mDaemon
-        ? std::shared_ptr<Store>(std::make_shared<RemoteStore>())
-        : std::shared_ptr<Store>(std::make_shared<LocalStore>());
+        ? std::shared_ptr<Store>(std::make_shared<RemoteStore>(params))
+        : std::shared_ptr<Store>(std::make_shared<LocalStore>(params));
 });
 
 

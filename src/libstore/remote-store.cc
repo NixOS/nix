@@ -21,26 +21,27 @@
 namespace nix {
 
 
-Path readStorePath(Source & from)
+Path readStorePath(Store & store, Source & from)
 {
     Path path = readString(from);
-    assertStorePath(path);
+    store.assertStorePath(path);
     return path;
 }
 
 
-template<class T> T readStorePaths(Source & from)
+template<class T> T readStorePaths(Store & store, Source & from)
 {
     T paths = readStrings<T>(from);
-    for (auto & i : paths) assertStorePath(i);
+    for (auto & i : paths) store.assertStorePath(i);
     return paths;
 }
 
-template PathSet readStorePaths(Source & from);
+template PathSet readStorePaths(Store & store, Source & from);
 
 
-RemoteStore::RemoteStore(size_t maxConnections)
-    : connections(make_ref<Pool<Connection>>(
+RemoteStore::RemoteStore(const Params & params, size_t maxConnections)
+    : LocalFSStore(params)
+    , connections(make_ref<Pool<Connection>>(
             maxConnections,
             [this]() { return openConnection(); },
             [](const ref<Connection> & r) { return r->to.good() && r->from.good(); }
@@ -168,7 +169,7 @@ PathSet RemoteStore::queryValidPaths(const PathSet & paths)
     } else {
         conn->to << wopQueryValidPaths << paths;
         conn->processStderr();
-        return readStorePaths<PathSet>(conn->from);
+        return readStorePaths<PathSet>(*this, conn->from);
     }
 }
 
@@ -178,7 +179,7 @@ PathSet RemoteStore::queryAllValidPaths()
     auto conn(connections->get());
     conn->to << wopQueryAllValidPaths;
     conn->processStderr();
-    return readStorePaths<PathSet>(conn->from);
+    return readStorePaths<PathSet>(*this, conn->from);
 }
 
 
@@ -196,7 +197,7 @@ PathSet RemoteStore::querySubstitutablePaths(const PathSet & paths)
     } else {
         conn->to << wopQuerySubstitutablePaths << paths;
         conn->processStderr();
-        return readStorePaths<PathSet>(conn->from);
+        return readStorePaths<PathSet>(*this, conn->from);
     }
 }
 
@@ -220,7 +221,7 @@ void RemoteStore::querySubstitutablePathInfos(const PathSet & paths,
             if (reply == 0) continue;
             info.deriver = readString(conn->from);
             if (info.deriver != "") assertStorePath(info.deriver);
-            info.references = readStorePaths<PathSet>(conn->from);
+            info.references = readStorePaths<PathSet>(*this, conn->from);
             info.downloadSize = readLongLong(conn->from);
             info.narSize = GET_PROTOCOL_MINOR(conn->daemonVersion) >= 7 ? readLongLong(conn->from) : 0;
             infos[i] = info;
@@ -232,11 +233,11 @@ void RemoteStore::querySubstitutablePathInfos(const PathSet & paths,
         conn->processStderr();
         unsigned int count = readInt(conn->from);
         for (unsigned int n = 0; n < count; n++) {
-            Path path = readStorePath(conn->from);
+            Path path = readStorePath(*this, conn->from);
             SubstitutablePathInfo & info(infos[path]);
             info.deriver = readString(conn->from);
             if (info.deriver != "") assertStorePath(info.deriver);
-            info.references = readStorePaths<PathSet>(conn->from);
+            info.references = readStorePaths<PathSet>(*this, conn->from);
             info.downloadSize = readLongLong(conn->from);
             info.narSize = readLongLong(conn->from);
         }
@@ -266,7 +267,7 @@ std::shared_ptr<ValidPathInfo> RemoteStore::queryPathInfoUncached(const Path & p
     info->deriver = readString(conn->from);
     if (info->deriver != "") assertStorePath(info->deriver);
     info->narHash = parseHash(htSHA256, readString(conn->from));
-    info->references = readStorePaths<PathSet>(conn->from);
+    info->references = readStorePaths<PathSet>(*this, conn->from);
     info->registrationTime = readInt(conn->from);
     info->narSize = readLongLong(conn->from);
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
@@ -283,7 +284,7 @@ void RemoteStore::queryReferrers(const Path & path,
     auto conn(connections->get());
     conn->to << wopQueryReferrers << path;
     conn->processStderr();
-    PathSet referrers2 = readStorePaths<PathSet>(conn->from);
+    PathSet referrers2 = readStorePaths<PathSet>(*this, conn->from);
     referrers.insert(referrers2.begin(), referrers2.end());
 }
 
@@ -293,7 +294,7 @@ PathSet RemoteStore::queryValidDerivers(const Path & path)
     auto conn(connections->get());
     conn->to << wopQueryValidDerivers << path;
     conn->processStderr();
-    return readStorePaths<PathSet>(conn->from);
+    return readStorePaths<PathSet>(*this, conn->from);
 }
 
 
@@ -302,7 +303,7 @@ PathSet RemoteStore::queryDerivationOutputs(const Path & path)
     auto conn(connections->get());
     conn->to << wopQueryDerivationOutputs << path;
     conn->processStderr();
-    return readStorePaths<PathSet>(conn->from);
+    return readStorePaths<PathSet>(*this, conn->from);
 }
 
 
@@ -363,7 +364,7 @@ Path RemoteStore::addToStore(const string & name, const Path & _srcPath,
         throw;
     }
 
-    return readStorePath(conn->from);
+    return readStorePath(*this, conn->from);
 }
 
 
@@ -376,7 +377,7 @@ Path RemoteStore::addTextToStore(const string & name, const string & s,
     conn->to << wopAddTextToStore << name << s << references;
 
     conn->processStderr();
-    return readStorePath(conn->from);
+    return readStorePath(*this, conn->from);
 }
 
 
@@ -465,7 +466,7 @@ Roots RemoteStore::findRoots()
     Roots result;
     while (count--) {
         Path link = readString(conn->from);
-        Path target = readStorePath(conn->from);
+        Path target = readStorePath(*this, conn->from);
         result[link] = target;
     }
     return result;

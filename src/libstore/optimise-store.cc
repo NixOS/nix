@@ -184,7 +184,7 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
     MakeReadOnly makeReadOnly(mustToggle ? dirOf(path) : "");
 
     Path tempLink = (format("%1%/.tmp-link-%2%-%3%")
-        % settings.nixStore % getpid() % rand()).str();
+        % storeDir % getpid() % rand()).str();
 
     if (link(linkPath.c_str(), tempLink.c_str()) == -1) {
         if (errno == EMLINK) {

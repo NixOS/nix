@@ -16,7 +16,7 @@ struct NarInfo : ValidPathInfo
 
     NarInfo() { }
     NarInfo(const ValidPathInfo & info) : ValidPathInfo(info) { }
-    NarInfo(const std::string & s, const std::string & whence);
+    NarInfo(const Store & store, const std::string & s, const std::string & whence);
 
     std::string to_string() const;
 };

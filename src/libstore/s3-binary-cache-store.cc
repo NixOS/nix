@@ -47,7 +47,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
     Stats stats;
 
     S3BinaryCacheStoreImpl(
-        const StoreParams & params, const std::string & bucketName)
+        const Params & params, const std::string & bucketName)
         : S3BinaryCacheStore(params)
         , bucketName(bucketName)
         , config(makeConfig())
@@ -95,7 +95,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
             BinaryCacheStore::init();
 
-            diskCache->createCache(getUri(), wantMassQuery_, priority);
+            diskCache->createCache(getUri(), storeDir, wantMassQuery_, priority);
         }
     }
 
@@ -232,7 +232,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
             for (auto object : contents) {
                 auto & key = object.GetKey();
                 if (key.size() != 40 || !hasSuffix(key, ".narinfo")) continue;
-                paths.insert(settings.nixStore + "/" + key.substr(0, key.size() - 8));
+                paths.insert(storeDir + "/" + key.substr(0, key.size() - 8));
             }
 
             marker = res.GetNextMarker();
@@ -244,7 +244,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 };
 
 static RegisterStoreImplementation regStore([](
-    const std::string & uri, const StoreParams & params)
+    const std::string & uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
     if (std::string(uri, 0, 5) != "s3://") return 0;
