@@ -79,7 +79,9 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 else {
                     Path rootName = gcRoot;
                     if (++rootNr > 1) rootName += "-" + std::to_string(rootNr);
-                    drvPath = state.store->addPermRoot(drvPath, rootName, indirectRoot);
+                    auto store2 = state.store.dynamic_pointer_cast<LocalFSStore>();
+                    if (store2)
+                        drvPath = store2->addPermRoot(drvPath, rootName, indirectRoot);
                 }
                 std::cout << format("%1%%2%\n") % drvPath % (outputName != "out" ? "!" + outputName : "");
             }

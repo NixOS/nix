@@ -29,7 +29,7 @@ static string gcRootsDir = "gcroots";
 int LocalStore::openGCLock(LockType lockType)
 {
     Path fnGCLock = (format("%1%/%2%")
-        % settings.nixStateDir % gcLockName).str();
+        % stateDir % gcLockName).str();
 
     debug(format("acquiring global GC lock ‘%1%’") % fnGCLock);
 
@@ -78,12 +78,12 @@ void LocalStore::addIndirectRoot(const Path & path)
 {
     string hash = printHash32(hashString(htSHA1, path));
     Path realRoot = canonPath((format("%1%/%2%/auto/%3%")
-        % settings.nixStateDir % gcRootsDir % hash).str());
+        % stateDir % gcRootsDir % hash).str());
     makeSymlink(realRoot, path);
 }
 
 
-Path Store::addPermRoot(const Path & _storePath,
+Path LocalFSStore::addPermRoot(const Path & _storePath,
     const Path & _gcRoot, bool indirect, bool allowOutsideRootsDir)
 {
     Path storePath(canonPath(_storePath));
@@ -106,7 +106,7 @@ Path Store::addPermRoot(const Path & _storePath,
 
     else {
         if (!allowOutsideRootsDir) {
-            Path rootsDir = canonPath((format("%1%/%2%") % settings.nixStateDir % gcRootsDir).str());
+            Path rootsDir = canonPath((format("%1%/%2%") % stateDir % gcRootsDir).str());
 
             if (string(gcRoot, 0, rootsDir.size() + 1) != rootsDir + "/")
                 throw Error(format(
@@ -153,7 +153,7 @@ void LocalStore::addTempRoot(const Path & path)
     if (state->fdTempRoots == -1) {
 
         while (1) {
-            Path dir = (format("%1%/%2%") % settings.nixStateDir % tempRootsDir).str();
+            Path dir = (format("%1%/%2%") % stateDir % tempRootsDir).str();
             createDirs(dir);
 
             state->fnTempRoots = (format("%1%/%2%") % dir % getpid()).str();
@@ -200,19 +200,15 @@ void LocalStore::addTempRoot(const Path & path)
 }
 
 
-typedef std::shared_ptr<AutoCloseFD> FDPtr;
-typedef list<FDPtr> FDs;
-
-
-static void readTempRoots(Store & store, PathSet & tempRoots, FDs & fds)
+void LocalStore::readTempRoots(PathSet & tempRoots, FDs & fds)
 {
     /* Read the `temproots' directory for per-process temporary root
        files. */
     DirEntries tempRootFiles = readDirectory(
-        (format("%1%/%2%") % settings.nixStateDir % tempRootsDir).str());
+        (format("%1%/%2%") % stateDir % tempRootsDir).str());
 
     for (auto & i : tempRootFiles) {
-        Path path = (format("%1%/%2%/%3%") % settings.nixStateDir % tempRootsDir % i.name).str();
+        Path path = (format("%1%/%2%/%3%") % stateDir % tempRootsDir % i.name).str();
 
         debug(format("reading temporary root file ‘%1%’") % path);
         FDPtr fd(new AutoCloseFD(open(path.c_str(), O_RDWR, 0666)));
@@ -251,7 +247,7 @@ static void readTempRoots(Store & store, PathSet & tempRoots, FDs & fds)
         while ((end = contents.find((char) 0, pos)) != string::npos) {
             Path root(contents, pos, end - pos);
             debug(format("got temporary root ‘%1%’") % root);
-            store.assertStorePath(root);
+            assertStorePath(root);
             tempRoots.insert(root);
             pos = end + 1;
         }
@@ -290,7 +286,7 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
             else {
                 target = absPath(target, dirOf(path));
                 if (!pathExists(target)) {
-                    if (isInDir(path, settings.nixStateDir + "/" + gcRootsDir + "/auto")) {
+                    if (isInDir(path, stateDir + "/" + gcRootsDir + "/auto")) {
                         printMsg(lvlInfo, format("removing stale link from ‘%1%’ to ‘%2%’") % path % target);
                         unlink(path.c_str());
                     }
@@ -326,10 +322,10 @@ Roots LocalStore::findRoots()
     Roots roots;
 
     /* Process direct roots in {gcroots,manifests,profiles}. */
-    findRoots(settings.nixStateDir + "/" + gcRootsDir, DT_UNKNOWN, roots);
-    if (pathExists(settings.nixStateDir + "/manifests"))
-        findRoots(settings.nixStateDir + "/manifests", DT_UNKNOWN, roots);
-    findRoots(settings.nixStateDir + "/profiles", DT_UNKNOWN, roots);
+    findRoots(stateDir + "/" + gcRootsDir, DT_UNKNOWN, roots);
+    if (pathExists(stateDir + "/manifests"))
+        findRoots(stateDir + "/manifests", DT_UNKNOWN, roots);
+    findRoots(stateDir + "/profiles", DT_UNKNOWN, roots);
 
     return roots;
 }
@@ -635,7 +631,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        per-process temporary root files.  So after this point no paths
        can be added to the set of temporary roots. */
     FDs fds;
-    readTempRoots(*this, state.tempRoots, fds);
+    readTempRoots(state.tempRoots, fds);
     state.roots.insert(state.tempRoots.begin(), state.tempRoots.end());
 
     /* After this point the set of roots or temporary roots cannot

@@ -230,7 +230,7 @@ Path Store::computeStorePathForText(const string & name, const string & s,
 
 
 Store::Store(const Params & params)
-    : storeDir(settings.nixStore)
+    : storeDir(get(params, "store", settings.nixStore))
 {
 }
 
@@ -508,7 +508,8 @@ static RegisterStoreImplementation regStore([](
     else return 0;
 
     if (mode == mAuto) {
-        if (LocalStore::haveWriteAccess())
+        auto stateDir = get(params, "state", settings.nixStateDir);
+        if (access(stateDir.c_str(), R_OK | W_OK) == 0)
             mode = mLocal;
         else if (pathExists(settings.nixDaemonSocketFile))
             mode = mDaemon;

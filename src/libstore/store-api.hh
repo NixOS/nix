@@ -372,10 +372,6 @@ public:
        `path' has disappeared. */
     virtual void addIndirectRoot(const Path & path) = 0;
 
-    /* Register a permanent GC root. */
-    Path addPermRoot(const Path & storePath,
-        const Path & gcRoot, bool indirect, bool allowOutsideRootsDir = false);
-
     /* Acquire the global GC lock, then immediately release it.  This
        function must be called after registering a new permanent root,
        but before exiting.  Otherwise, it is possible that a running
@@ -494,11 +490,17 @@ protected:
 
 class LocalFSStore : public Store
 {
-protected:
-    using Store::Store;
 public:
+    const Path stateDir;
+
+    LocalFSStore(const Params & params);
+
     void narFromPath(const Path & path, Sink & sink) override;
     ref<FSAccessor> getFSAccessor() override;
+
+    /* Register a permanent GC root. */
+    Path addPermRoot(const Path & storePath,
+        const Path & gcRoot, bool indirect, bool allowOutsideRootsDir = false);
 };
 
 

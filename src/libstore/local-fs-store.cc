@@ -1,8 +1,15 @@
 #include "archive.hh"
 #include "fs-accessor.hh"
 #include "store-api.hh"
+#include "globals.hh"
 
 namespace nix {
+
+LocalFSStore::LocalFSStore(const Params & params)
+    : Store(params)
+    , stateDir(get(params, "state", settings.nixStateDir))
+{
+}
 
 struct LocalStoreAccessor : public FSAccessor
 {

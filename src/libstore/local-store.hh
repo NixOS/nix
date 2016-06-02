@@ -73,6 +73,7 @@ private:
 
     Sync<State, std::recursive_mutex> _state;
 
+    const Path dbDir;
     const Path linksDir;
     const Path reservedPath;
     const Path schemaPath;
@@ -146,6 +147,15 @@ public:
 
     void syncWithGC() override;
 
+private:
+
+    typedef std::shared_ptr<AutoCloseFD> FDPtr;
+    typedef list<FDPtr> FDs;
+
+    void readTempRoots(PathSet & tempRoots, FDs & fds);
+
+public:
+
     Roots findRoots() override;
 
     void collectGarbage(const GCOptions & options, GCResults & results) override;
@@ -178,8 +188,6 @@ public:
     void repairPath(const Path & path);
 
     void addSignatures(const Path & storePath, const StringSet & sigs) override;
-
-    static bool haveWriteAccess();
 
 private:
 

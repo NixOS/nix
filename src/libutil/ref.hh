@@ -45,19 +45,30 @@ public:
         return *p;
     }
 
-    operator std::shared_ptr<T> ()
+    operator std::shared_ptr<T> () const
+    {
+        return p;
+    }
+
+    std::shared_ptr<T> get_ptr() const
     {
         return p;
     }
 
     template<typename T2>
-    ref<T2> cast()
+    ref<T2> cast() const
     {
         return ref<T2>(std::dynamic_pointer_cast<T2>(p));
     }
 
     template<typename T2>
-    operator ref<T2> ()
+    std::shared_ptr<T2> dynamic_pointer_cast() const
+    {
+        return std::dynamic_pointer_cast<T2>(p);
+    }
+
+    template<typename T2>
+    operator ref<T2> () const
     {
         return ref<T2>((std::shared_ptr<T2>) p);
     }

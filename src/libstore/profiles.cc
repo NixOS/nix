@@ -74,7 +74,7 @@ static void makeName(const Path & profile, unsigned int num,
 }
 
 
-Path createGeneration(ref<Store> store, Path profile, Path outPath)
+Path createGeneration(ref<LocalFSStore> store, Path profile, Path outPath)
 {
     /* The new generation number should be higher than old the
        previous ones. */

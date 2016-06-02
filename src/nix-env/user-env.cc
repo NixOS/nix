@@ -131,18 +131,22 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     state.store->buildPaths({topLevelDrv}, state.repair ? bmRepair : bmNormal);
 
     /* Switch the current user environment to the output path. */
-    PathLocks lock;
-    lockProfile(lock, profile);
+    auto store2 = state.store.dynamic_pointer_cast<LocalFSStore>();
 
-    Path lockTokenCur = optimisticLockProfile(profile);
-    if (lockToken != lockTokenCur) {
-        printMsg(lvlError, format("profile ‘%1%’ changed while we were busy; restarting") % profile);
-        return false;
+    if (store2) {
+        PathLocks lock;
+        lockProfile(lock, profile);
+
+        Path lockTokenCur = optimisticLockProfile(profile);
+        if (lockToken != lockTokenCur) {
+            printMsg(lvlError, format("profile ‘%1%’ changed while we were busy; restarting") % profile);
+            return false;
+        }
+
+        debug(format("switching to new user environment"));
+        Path generation = createGeneration(ref<LocalFSStore>(store2), profile, topLevelOut);
+        switchLink(profile, generation);
     }
-
-    debug(format("switching to new user environment"));
-    Path generation = createGeneration(state.store, profile, topLevelOut);
-    switchLink(profile, generation);
 
     return true;
 }

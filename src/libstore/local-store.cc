@@ -38,9 +38,10 @@ namespace nix {
 
 LocalStore::LocalStore(const Params & params)
     : LocalFSStore(params)
+    , dbDir(get(params, "state", "") != "" ? get(params, "state", "") + "/db" : settings.nixDBPath)
     , linksDir(storeDir + "/.links")
-    , reservedPath(settings.nixDBPath + "/reserved")
-    , schemaPath(settings.nixDBPath + "/schema")
+    , reservedPath(dbDir + "/reserved")
+    , schemaPath(dbDir + "/schema")
     , requireSigs(settings.get("signed-binary-caches", std::string("")) != "") // FIXME: rename option
     , publicKeys(getDefaultPublicKeys())
 {
@@ -55,11 +56,11 @@ LocalStore::LocalStore(const Params & params)
     createDirs(storeDir);
     makeStoreWritable();
     createDirs(linksDir);
-    Path profilesDir = settings.nixStateDir + "/profiles";
+    Path profilesDir = stateDir + "/profiles";
     createDirs(profilesDir);
-    createDirs(settings.nixStateDir + "/temproots");
-    createDirs(settings.nixDBPath);
-    Path gcRootsDir = settings.nixStateDir + "/gcroots";
+    createDirs(stateDir + "/temproots");
+    createDirs(dbDir);
+    Path gcRootsDir = stateDir + "/gcroots";
     if (!pathExists(gcRootsDir)) {
         createDirs(gcRootsDir);
         createSymlink(profilesDir, gcRootsDir + "/profiles");
@@ -135,7 +136,7 @@ LocalStore::LocalStore(const Params & params)
     /* Acquire the big fat lock in shared mode to make sure that no
        schema upgrade is in progress. */
     try {
-        Path globalLockPath = settings.nixDBPath + "/big-lock";
+        Path globalLockPath = dbDir + "/big-lock";
         globalLock = openLockFile(globalLockPath.c_str(), true);
     } catch (SysError & e) {
         if (e.errNo != EACCES) throw;
@@ -246,19 +247,13 @@ int LocalStore::getSchema()
 }
 
 
-bool LocalStore::haveWriteAccess()
-{
-    return access(settings.nixDBPath.c_str(), R_OK | W_OK) == 0;
-}
-
-
 void LocalStore::openDB(State & state, bool create)
 {
-    if (!haveWriteAccess())
-        throw SysError(format("Nix database directory ‘%1%’ is not writable") % settings.nixDBPath);
+    if (access(dbDir.c_str(), R_OK | W_OK))
+        throw SysError(format("Nix database directory ‘%1%’ is not writable") % dbDir);
 
     /* Open the Nix database. */
-    string dbPath = settings.nixDBPath + "/db.sqlite";
+    string dbPath = dbDir + "/db.sqlite";
     auto & db(state.db);
     if (sqlite3_open_v2(dbPath.c_str(), &db.db,
             SQLITE_OPEN_READWRITE | (create ? SQLITE_OPEN_CREATE : 0), 0) != SQLITE_OK)

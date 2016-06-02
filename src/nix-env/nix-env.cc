@@ -692,6 +692,9 @@ static void opSetFlag(Globals & globals, Strings opFlags, Strings opArgs)
 
 static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
 {
+    auto store2 = globals.state->store.dynamic_pointer_cast<LocalFSStore>();
+    if (!store2) throw Error("--set is not supported for this Nix store");
+
     for (Strings::iterator i = opFlags.begin(); i != opFlags.end(); ) {
         string arg = *i++;
         if (parseInstallSourceOptions(globals, i, opFlags, arg)) ;
@@ -722,7 +725,7 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
     }
 
     debug(format("switching to new user environment"));
-    Path generation = createGeneration(globals.state->store, globals.profile, drv.queryOutPath());
+    Path generation = createGeneration(ref<LocalFSStore>(store2), globals.profile, drv.queryOutPath());
     switchLink(globals.profile, generation);
 }
 

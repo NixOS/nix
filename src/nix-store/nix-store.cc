@@ -63,6 +63,8 @@ static PathSet realisePath(Path path, bool build = true)
 {
     DrvPathWithOutputs p = parseDrvPathWithOutputs(path);
 
+    auto store2 = std::dynamic_pointer_cast<LocalFSStore>(store);
+
     if (isDerivation(p.first)) {
         if (build) store->buildPaths({path});
         Derivation drv = store->derivationFromPath(p.first);
@@ -77,13 +79,15 @@ static PathSet realisePath(Path path, bool build = true)
             if (i == drv.outputs.end())
                 throw Error(format("derivation ‘%1%’ does not have an output named ‘%2%’") % p.first % j);
             Path outPath = i->second.path;
-            if (gcRoot == "")
-                printGCWarning();
-            else {
-                Path rootName = gcRoot;
-                if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
-                if (i->first != "out") rootName += "-" + i->first;
-                outPath = store->addPermRoot(outPath, rootName, indirectRoot);
+            if (store2) {
+                if (gcRoot == "")
+                    printGCWarning();
+                else {
+                    Path rootName = gcRoot;
+                    if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
+                    if (i->first != "out") rootName += "-" + i->first;
+                    outPath = store2->addPermRoot(outPath, rootName, indirectRoot);
+                }
             }
             outputs.insert(outPath);
         }
@@ -93,13 +97,15 @@ static PathSet realisePath(Path path, bool build = true)
     else {
         if (build) store->ensurePath(path);
         else if (!store->isValidPath(path)) throw Error(format("path ‘%1%’ does not exist and cannot be created") % path);
-        if (gcRoot == "")
-            printGCWarning();
-        else {
-            Path rootName = gcRoot;
-            rootNr++;
-            if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
-            path = store->addPermRoot(path, rootName, indirectRoot);
+        if (store2) {
+            if (gcRoot == "")
+                printGCWarning();
+            else {
+                Path rootName = gcRoot;
+                rootNr++;
+                if (rootNr > 1) rootName += "-" + std::to_string(rootNr);
+                path = store2->addPermRoot(path, rootName, indirectRoot);
+            }
         }
         return {path};
     }
