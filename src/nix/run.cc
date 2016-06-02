@@ -5,6 +5,7 @@
 #include "store-api.hh"
 #include "derivations.hh"
 #include "local-store.hh"
+#include "finally.hh"
 
 #if __linux__
 #include <sys/mount.h>
@@ -52,8 +53,44 @@ struct CmdRun : StoreCommand, MixInstallables
             if (unshare(CLONE_NEWUSER | CLONE_NEWNS) == -1)
                 throw SysError("setting up a private mount namespace");
 
-            if (mount(store2->realStoreDir.c_str(), store->storeDir.c_str(), "", MS_BIND, 0) == -1)
-                throw SysError(format("mounting ‘%s’ on ‘%s’") % store2->realStoreDir % store->storeDir);
+            /* Bind-mount realStoreDir on /nix/store. If the latter
+               mount point doesn't already exists, we have to create a
+               chroot environment containing the mount point and bind
+               mounts for the children of /. Would be nice if we could
+               use overlayfs here, but that doesn't work in a user
+               namespace yet (Ubuntu has a patch for this:
+               https://bugs.launchpad.net/ubuntu/+source/linux/+bug/1478578). */
+            if (!pathExists(store->storeDir)) {
+                // FIXME: Use overlayfs?
+
+                Path tmpDir = createTempDir();
+
+                createDirs(tmpDir + store->storeDir);
+
+                if (mount(store2->realStoreDir.c_str(), (tmpDir + store->storeDir).c_str(), "", MS_BIND, 0) == -1)
+                    throw SysError(format("mounting ‘%s’ on ‘%s’") % store2->realStoreDir % store->storeDir);
+
+                for (auto entry : readDirectory("/")) {
+                    Path dst = tmpDir + "/" + entry.name;
+                    if (pathExists(dst)) continue;
+                    if (mkdir(dst.c_str(), 0700) == -1)
+                        throw SysError(format("creating directory ‘%s’") % dst);
+                    if (mount(("/" + entry.name).c_str(), dst.c_str(), "", MS_BIND | MS_REC, 0) == -1)
+                        throw SysError(format("mounting ‘%s’ on ‘%s’") %  ("/" + entry.name) % dst);
+                }
+
+                char * cwd = getcwd(0, 0);
+                if (!cwd) throw SysError("getting current directory");
+                Finally freeCwd([&]() { free(cwd); });
+
+                if (chroot(tmpDir.c_str()) == -1)
+                    throw SysError(format("chrooting into ‘%s’") % tmpDir);
+
+                if (chdir(cwd) == -1)
+                    throw SysError(format("chdir to ‘%s’ in chroot") % cwd);
+            } else
+                if (mount(store2->realStoreDir.c_str(), store->storeDir.c_str(), "", MS_BIND, 0) == -1)
+                    throw SysError(format("mounting ‘%s’ on ‘%s’") % store2->realStoreDir % store->storeDir);
 #else
             throw Error(format("mounting the Nix store on ‘%s’ is not supported on this platform") % store->storeDir);
 #endif
