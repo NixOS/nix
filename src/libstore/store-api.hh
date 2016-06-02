@@ -501,6 +501,8 @@ public:
     /* Register a permanent GC root. */
     Path addPermRoot(const Path & storePath,
         const Path & gcRoot, bool indirect, bool allowOutsideRootsDir = false);
+
+    virtual Path getRealStoreDir() { return storeDir; }
 };
 
 

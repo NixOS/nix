@@ -3,6 +3,7 @@
 #include "globals.hh"
 #include "util.hh"
 #include "worker-protocol.hh"
+#include "fs-accessor.hh"
 
 
 namespace nix {
@@ -158,6 +159,19 @@ Derivation readDerivation(const Path & drvPath)
 {
     try {
         return parseDerivation(readFile(drvPath));
+    } catch (FormatError & e) {
+        throw Error(format("error parsing derivation ‘%1%’: %2%") % drvPath % e.msg());
+    }
+}
+
+
+Derivation Store::derivationFromPath(const Path & drvPath)
+{
+    assertStorePath(drvPath);
+    ensurePath(drvPath);
+    auto accessor = getFSAccessor();
+    try {
+        return parseDerivation(accessor->readFile(drvPath));
     } catch (FormatError & e) {
         throw Error(format("error parsing derivation ‘%1%’: %2%") % drvPath % e.msg());
     }

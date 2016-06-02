@@ -261,6 +261,8 @@ private:
        specified by the ‘secret-key-files’ option. */
     void signPathInfo(ValidPathInfo & info);
 
+    Path getRealStoreDir() override { return realStoreDir; }
+
     friend class DerivationGoal;
     friend class SubstitutionGoal;
 };

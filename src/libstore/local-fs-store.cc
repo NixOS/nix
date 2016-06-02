@@ -13,20 +13,21 @@ LocalFSStore::LocalFSStore(const Params & params)
 
 struct LocalStoreAccessor : public FSAccessor
 {
-    ref<Store> store;
+    ref<LocalFSStore> store;
 
-    LocalStoreAccessor(ref<Store> store) : store(store) { }
+    LocalStoreAccessor(ref<LocalFSStore> store) : store(store) { }
 
-    void assertStore(const Path & path)
+    Path toRealPath(const Path & path)
     {
         Path storePath = store->toStorePath(path);
         if (!store->isValidPath(storePath))
             throw Error(format("path ‘%1%’ is not a valid store path") % storePath);
+        return store->getRealStoreDir() + std::string(path, store->storeDir.size());
     }
 
     FSAccessor::Stat stat(const Path & path) override
     {
-        assertStore(path);
+        auto realPath = toRealPath(path);
 
         struct stat st;
         if (lstat(path.c_str(), &st)) {
@@ -47,7 +48,7 @@ struct LocalStoreAccessor : public FSAccessor
 
     StringSet readDirectory(const Path & path) override
     {
-        assertStore(path);
+        auto realPath = toRealPath(path);
 
         auto entries = nix::readDirectory(path);
 
@@ -60,20 +61,18 @@ struct LocalStoreAccessor : public FSAccessor
 
     std::string readFile(const Path & path) override
     {
-        assertStore(path);
-        return nix::readFile(path);
+        return nix::readFile(toRealPath(path));
     }
 
     std::string readLink(const Path & path) override
     {
-        assertStore(path);
-        return nix::readLink(path);
+        return nix::readLink(toRealPath(path));
     }
 };
 
 ref<FSAccessor> LocalFSStore::getFSAccessor()
 {
-    return make_ref<LocalStoreAccessor>(ref<Store>(shared_from_this()));
+    return make_ref<LocalStoreAccessor>(ref<LocalFSStore>(std::dynamic_pointer_cast<LocalFSStore>(shared_from_this())));
 }
 
 void LocalFSStore::narFromPath(const Path & path, Sink & sink)

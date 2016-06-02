@@ -7,14 +7,6 @@
 namespace nix {
 
 
-Derivation Store::derivationFromPath(const Path & drvPath)
-{
-    assertStorePath(drvPath);
-    ensurePath(drvPath);
-    return readDerivation(drvPath);
-}
-
-
 void Store::computeFSClosure(const Path & path,
     PathSet & paths, bool flipDirection, bool includeOutputs, bool includeDerivers)
 {
