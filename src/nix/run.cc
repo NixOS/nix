@@ -50,6 +50,9 @@ struct CmdRun : StoreCommand, MixInstallables
 
         if (store2 && store->storeDir != store2->realStoreDir) {
 #if __linux__
+            uid_t uid = getuid();
+            uid_t gid = getgid();
+
             if (unshare(CLONE_NEWUSER | CLONE_NEWNS) == -1)
                 throw SysError("setting up a private mount namespace");
 
@@ -91,6 +94,10 @@ struct CmdRun : StoreCommand, MixInstallables
             } else
                 if (mount(store2->realStoreDir.c_str(), store->storeDir.c_str(), "", MS_BIND, 0) == -1)
                     throw SysError(format("mounting ‘%s’ on ‘%s’") % store2->realStoreDir % store->storeDir);
+
+            writeFile("/proc/self/setgroups", "deny");
+            writeFile("/proc/self/uid_map", (format("%d %d %d") % uid % uid % 1).str());
+            writeFile("/proc/self/gid_map", (format("%d %d %d") % gid % gid % 1).str());
 #else
             throw Error(format("mounting the Nix store on ‘%s’ is not supported on this platform") % store->storeDir);
 #endif
