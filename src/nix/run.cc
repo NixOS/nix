@@ -4,6 +4,11 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "derivations.hh"
+#include "local-store.hh"
+
+#if __linux__
+#include <sys/mount.h>
+#endif
 
 using namespace nix;
 
@@ -40,6 +45,20 @@ struct CmdRun : StoreCommand, MixInstallables
 
         store->buildPaths(pathsToBuild);
 
+        auto store2 = store.dynamic_pointer_cast<LocalStore>();
+
+        if (store2 && store->storeDir != store2->realStoreDir) {
+#if __linux__
+            if (unshare(CLONE_NEWUSER | CLONE_NEWNS) == -1)
+                throw SysError("setting up a private mount namespace");
+
+            if (mount(store2->realStoreDir.c_str(), store->storeDir.c_str(), "", MS_BIND, 0) == -1)
+                throw SysError(format("mounting ‘%s’ on ‘%s’") % store2->realStoreDir % store->storeDir);
+#else
+            throw Error(format("mounting the Nix store on ‘%s’ is not supported on this platform") % store->storeDir);
+#endif
+        }
+
         PathSet outPaths;
         for (auto & path : pathsToBuild)
             if (isDerivation(path)) {
@@ -55,7 +74,8 @@ struct CmdRun : StoreCommand, MixInstallables
                 unixPath.push_front(path + "/bin");
         setenv("PATH", concatStringsSep(":", unixPath).c_str(), 1);
 
-        execlp("bash", "bash", nullptr);
+        if (execlp("bash", "bash", nullptr) == -1)
+            throw SysError("unable to exec ‘bash’");
     }
 };
 

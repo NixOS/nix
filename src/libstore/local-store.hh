@@ -73,12 +73,16 @@ private:
 
     Sync<State, std::recursive_mutex> _state;
 
+public:
+
     const Path realStoreDir;
     const Path dbDir;
     const Path linksDir;
     const Path reservedPath;
     const Path schemaPath;
     const Path trashDir;
+
+private:
 
     bool requireSigs;
 
