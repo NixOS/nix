@@ -384,6 +384,7 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
         checkInterrupt();
         Path tmpDir = tempName(tmpRoot, prefix, includePid, counter);
         if (mkdir(tmpDir.c_str(), mode) == 0) {
+#if __FreeBSD__
             /* Explicitly set the group of the directory.  This is to
                work around around problems caused by BSD's group
                ownership semantics (directories inherit the group of
@@ -394,6 +395,7 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
                have the setgid bit set on directories. */
             if (chown(tmpDir.c_str(), (uid_t) -1, getegid()) != 0)
                 throw SysError(format("setting group of directory ‘%1%’") % tmpDir);
+#endif
             return tmpDir;
         }
         if (errno != EEXIST)
