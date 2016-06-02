@@ -38,10 +38,12 @@ namespace nix {
 
 LocalStore::LocalStore(const Params & params)
     : LocalFSStore(params)
+    , realStoreDir(get(params, "real", storeDir))
     , dbDir(get(params, "state", "") != "" ? get(params, "state", "") + "/db" : settings.nixDBPath)
-    , linksDir(storeDir + "/.links")
+    , linksDir(realStoreDir + "/.links")
     , reservedPath(dbDir + "/reserved")
     , schemaPath(dbDir + "/schema")
+    , trashDir(realStoreDir + "/trash")
     , requireSigs(settings.get("signed-binary-caches", std::string("")) != "") // FIXME: rename option
     , publicKeys(getDefaultPublicKeys())
 {
@@ -53,7 +55,7 @@ LocalStore::LocalStore(const Params & params)
     }
 
     /* Create missing state directories if they don't already exist. */
-    createDirs(storeDir);
+    createDirs(realStoreDir);
     makeStoreWritable();
     createDirs(linksDir);
     Path profilesDir = stateDir + "/profiles";
@@ -83,21 +85,21 @@ LocalStore::LocalStore(const Params & params)
                 % settings.buildUsersGroup);
         else {
             struct stat st;
-            if (stat(storeDir.c_str(), &st))
-                throw SysError(format("getting attributes of path ‘%1%’") % storeDir);
+            if (stat(realStoreDir.c_str(), &st))
+                throw SysError(format("getting attributes of path ‘%1%’") % realStoreDir);
 
             if (st.st_uid != 0 || st.st_gid != gr->gr_gid || (st.st_mode & ~S_IFMT) != perm) {
-                if (chown(storeDir.c_str(), 0, gr->gr_gid) == -1)
-                    throw SysError(format("changing ownership of path ‘%1%’") % storeDir);
-                if (chmod(storeDir.c_str(), perm) == -1)
-                    throw SysError(format("changing permissions on path ‘%1%’") % storeDir);
+                if (chown(realStoreDir.c_str(), 0, gr->gr_gid) == -1)
+                    throw SysError(format("changing ownership of path ‘%1%’") % realStoreDir);
+                if (chmod(realStoreDir.c_str(), perm) == -1)
+                    throw SysError(format("changing permissions on path ‘%1%’") % realStoreDir);
             }
         }
     }
 
     /* Ensure that the store and its parents are not symlinks. */
     if (getEnv("NIX_IGNORE_SYMLINK_STORE") != "1") {
-        Path path = storeDir;
+        Path path = realStoreDir;
         struct stat st;
         while (path != "/") {
             if (lstat(path.c_str(), &st))
@@ -343,15 +345,15 @@ void LocalStore::makeStoreWritable()
     if (getuid() != 0) return;
     /* Check if /nix/store is on a read-only mount. */
     struct statvfs stat;
-    if (statvfs(storeDir.c_str(), &stat) != 0)
+    if (statvfs(realStoreDir.c_str(), &stat) != 0)
         throw SysError("getting info about the Nix store mount point");
 
     if (stat.f_flag & ST_RDONLY) {
         if (unshare(CLONE_NEWNS) == -1)
             throw SysError("setting up a private mount namespace");
 
-        if (mount(0, storeDir.c_str(), "none", MS_REMOUNT | MS_BIND, 0) == -1)
-            throw SysError(format("remounting %1% writable") % storeDir);
+        if (mount(0, realStoreDir.c_str(), "none", MS_REMOUNT | MS_BIND, 0) == -1)
+            throw SysError(format("remounting %1% writable") % realStoreDir);
     }
 #endif
 }
@@ -917,23 +919,25 @@ void LocalStore::addToStore(const ValidPathInfo & info, const std::string & nar,
 
         PathLocks outputLock;
 
+        Path realPath = realStoreDir + "/" + baseNameOf(info.path);
+
         /* Lock the output path.  But don't lock if we're being called
            from a build hook (whose parent process already acquired a
            lock on this path). */
         Strings locksHeld = tokenizeString<Strings>(getEnv("NIX_HELD_LOCKS"));
         if (find(locksHeld.begin(), locksHeld.end(), info.path) == locksHeld.end())
-            outputLock.lockPaths({info.path});
+            outputLock.lockPaths({realPath});
 
         if (repair || !isValidPath(info.path)) {
 
-            deletePath(info.path);
+            deletePath(realPath);
 
             StringSource source(nar);
-            restorePath(info.path, source);
+            restorePath(realPath, source);
 
-            canonicalisePathMetaData(info.path, -1);
+            canonicalisePathMetaData(realPath, -1);
 
-            optimisePath(info.path); // FIXME: combine with hashPath()
+            optimisePath(realPath); // FIXME: combine with hashPath()
 
             registerValidPath(info);
         }
@@ -957,19 +961,21 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
         /* The first check above is an optimisation to prevent
            unnecessary lock acquisition. */
 
-        PathLocks outputLock({dstPath});
+        Path realPath = realStoreDir + "/" + baseNameOf(dstPath);
+
+        PathLocks outputLock({realPath});
 
         if (repair || !isValidPath(dstPath)) {
 
-            deletePath(dstPath);
+            deletePath(realPath);
 
             if (recursive) {
                 StringSource source(dump);
-                restorePath(dstPath, source);
+                restorePath(realPath, source);
             } else
-                writeFile(dstPath, dump);
+                writeFile(realPath, dump);
 
-            canonicalisePathMetaData(dstPath, -1);
+            canonicalisePathMetaData(realPath, -1);
 
             /* Register the SHA-256 hash of the NAR serialisation of
                the path in the database.  We may just have computed it
@@ -980,9 +986,9 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
                 hash.first = hashAlgo == htSHA256 ? h : hashString(htSHA256, dump);
                 hash.second = dump.size();
             } else
-                hash = hashPath(htSHA256, dstPath);
+                hash = hashPath(htSHA256, realPath);
 
-            optimisePath(dstPath); // FIXME: combine with hashPath()
+            optimisePath(realPath); // FIXME: combine with hashPath()
 
             ValidPathInfo info;
             info.path = dstPath;
@@ -1026,21 +1032,23 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
 
     if (repair || !isValidPath(dstPath)) {
 
-        PathLocks outputLock({dstPath});
+        Path realPath = realStoreDir + "/" + baseNameOf(dstPath);
+
+        PathLocks outputLock({realPath});
 
         if (repair || !isValidPath(dstPath)) {
 
-            deletePath(dstPath);
+            deletePath(realPath);
 
-            writeFile(dstPath, s);
+            writeFile(realPath, s);
 
-            canonicalisePathMetaData(dstPath, -1);
+            canonicalisePathMetaData(realPath, -1);
 
             StringSink sink;
             dumpString(s, sink);
             auto hash = hashString(htSHA256, *sink.s);
 
-            optimisePath(dstPath);
+            optimisePath(realPath);
 
             ValidPathInfo info;
             info.path = dstPath;
@@ -1067,7 +1075,7 @@ Path LocalStore::createTempDirInStore()
         /* There is a slight possibility that `tmpDir' gets deleted by
            the GC between createTempDir() and addTempRoot(), so repeat
            until `tmpDir' exists. */
-        tmpDir = createTempDir(storeDir);
+        tmpDir = createTempDir(realStoreDir);
         addTempRoot(tmpDir);
     } while (!pathExists(tmpDir));
     return tmpDir;
@@ -1107,7 +1115,7 @@ bool LocalStore::verifyStore(bool checkContents, bool repair)
     AutoCloseFD fdGCLock = openGCLock(ltWrite);
 
     PathSet store;
-    for (auto & i : readDirectory(storeDir)) store.insert(i.name);
+    for (auto & i : readDirectory(realStoreDir)) store.insert(i.name);
 
     /* Check whether all valid paths actually exist. */
     printMsg(lvlInfo, "checking path existence...");
@@ -1271,7 +1279,7 @@ void LocalStore::upgradeStore7()
 {
     if (getuid() != 0) return;
     printMsg(lvlError, "removing immutable bits from the Nix store (this may take a while)...");
-    makeMutable(storeDir);
+    makeMutable(realStoreDir);
 }
 
 #else

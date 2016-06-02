@@ -370,7 +370,6 @@ struct LocalStore::GCState
     bool gcKeepDerivations;
     unsigned long long bytesInvalidated;
     bool moveToTrash = true;
-    Path trashDir;
     bool shouldDelete;
     GCState(GCResults & results_) : results(results_), bytesInvalidated(0) { }
 };
@@ -407,10 +406,12 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
         invalidatePathChecked(path);
     }
 
+    Path realPath = realStoreDir + "/" + baseNameOf(path);
+
     struct stat st;
-    if (lstat(path.c_str(), &st)) {
+    if (lstat(realPath.c_str(), &st)) {
         if (errno == ENOENT) return;
-        throw SysError(format("getting status of %1%") % path);
+        throw SysError(format("getting status of %1%") % realPath);
     }
 
     printMsg(lvlInfo, format("deleting ‘%1%’") % path);
@@ -427,20 +428,20 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
         // if the path was not valid, need to determine the actual
         // size.
         try {
-            if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
-                throw SysError(format("making ‘%1%’ writable") % path);
-            Path tmp = state.trashDir + "/" + baseNameOf(path);
-            if (rename(path.c_str(), tmp.c_str()))
-                throw SysError(format("unable to rename ‘%1%’ to ‘%2%’") % path % tmp);
+            if (chmod(realPath.c_str(), st.st_mode | S_IWUSR) == -1)
+                throw SysError(format("making ‘%1%’ writable") % realPath);
+            Path tmp = trashDir + "/" + baseNameOf(path);
+            if (rename(realPath.c_str(), tmp.c_str()))
+                throw SysError(format("unable to rename ‘%1%’ to ‘%2%’") % realPath % tmp);
             state.bytesInvalidated += size;
         } catch (SysError & e) {
             if (e.errNo == ENOSPC) {
-                printMsg(lvlInfo, format("note: can't create move ‘%1%’: %2%") % path % e.msg());
-                deleteGarbage(state, path);
+                printMsg(lvlInfo, format("note: can't create move ‘%1%’: %2%") % realPath % e.msg());
+                deleteGarbage(state, realPath);
             }
         }
     } else
-        deleteGarbage(state, path);
+        deleteGarbage(state, realPath);
 
     if (state.results.bytesFreed + state.bytesInvalidated > state.options.maxFreed) {
         printMsg(lvlInfo, format("deleted or invalidated more than %1% bytes; stopping") % state.options.maxFreed);
@@ -508,7 +509,8 @@ void LocalStore::tryToDelete(GCState & state, const Path & path)
 {
     checkInterrupt();
 
-    if (path == linksDir || path == state.trashDir) return;
+    auto realPath = realStoreDir + "/" + baseNameOf(path);
+    if (realPath == linksDir || realPath == trashDir) return;
 
     Activity act(*logger, lvlDebug, format("considering whether to delete ‘%1%’") % path);
 
@@ -590,7 +592,6 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
     GCState state(results);
     state.options = options;
-    state.trashDir = storeDir + "/trash";
     state.gcKeepOutputs = settings.gcKeepOutputs;
     state.gcKeepDerivations = settings.gcKeepDerivations;
 
@@ -639,9 +640,9 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        that is not reachable from `roots' is garbage. */
 
     if (state.shouldDelete) {
-        if (pathExists(state.trashDir)) deleteGarbage(state, state.trashDir);
+        if (pathExists(trashDir)) deleteGarbage(state, trashDir);
         try {
-            createDirs(state.trashDir);
+            createDirs(trashDir);
         } catch (SysError & e) {
             if (e.errNo == ENOSPC) {
                 printMsg(lvlInfo, format("note: can't create trash directory: %1%") % e.msg());
@@ -671,8 +672,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
         try {
 
-            AutoCloseDir dir = opendir(storeDir.c_str());
-            if (!dir) throw SysError(format("opening directory ‘%1%’") % storeDir);
+            AutoCloseDir dir = opendir(realStoreDir.c_str());
+            if (!dir) throw SysError(format("opening directory ‘%1%’") % realStoreDir);
 
             /* Read the store and immediately delete all paths that
                aren't valid.  When using --max-freed etc., deleting
@@ -725,8 +726,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     fds.clear();
 
     /* Delete the trash directory. */
-    printMsg(lvlInfo, format("deleting ‘%1%’") % state.trashDir);
-    deleteGarbage(state, state.trashDir);
+    printMsg(lvlInfo, format("deleting ‘%1%’") % trashDir);
+    deleteGarbage(state, trashDir);
 
     /* Clean up the links directory. */
     if (options.action == GCOptions::gcDeleteDead || options.action == GCOptions::gcDeleteSpecific) {

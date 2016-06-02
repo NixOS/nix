@@ -1269,6 +1269,9 @@ void DerivationGoal::tryToBuild()
 {
     trace("trying to build");
 
+    if (worker.store.storeDir != worker.store.realStoreDir)
+        throw Error("building with a diverted Nix store is not supported");
+
     /* Check for the possibility that some other goal in this process
        has locked the output since we checked in haveDerivation().
        (It can't happen between here and the lockPaths() call below

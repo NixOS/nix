@@ -44,7 +44,6 @@ Makefile.config
 /scripts/nix-copy-closure
 /scripts/NixConfig.pm
 /scripts/NixManifest.pm
-/scripts/copy-from-other-stores.pl
 /scripts/download-from-binary-cache.pl
 /scripts/find-runtime-roots.pl
 /scripts/build-remote.pl

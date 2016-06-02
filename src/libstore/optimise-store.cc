@@ -176,7 +176,7 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
     /* Make the containing directory writable, but only if it's not
        the store itself (we don't want or need to mess with its
        permissions). */
-    bool mustToggle = !isStorePath(path);
+    bool mustToggle = dirOf(path) != realStoreDir;
     if (mustToggle) makeWritable(dirOf(path));
 
     /* When we're done, make the directory read-only again and reset
@@ -184,7 +184,7 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
     MakeReadOnly makeReadOnly(mustToggle ? dirOf(path) : "");
 
     Path tempLink = (format("%1%/.tmp-link-%2%-%3%")
-        % storeDir % getpid() % rand()).str();
+        % realStoreDir % getpid() % rand()).str();
 
     if (link(linkPath.c_str(), tempLink.c_str()) == -1) {
         if (errno == EMLINK) {
@@ -229,7 +229,7 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
         addTempRoot(i);
         if (!isValidPath(i)) continue; /* path was GC'ed, probably */
         Activity act(*logger, lvlChatty, format("hashing files in ‘%1%’") % i);
-        optimisePath_(stats, i, inodeHash);
+        optimisePath_(stats, realStoreDir + "/" + baseNameOf(i), inodeHash);
     }
 }
 
