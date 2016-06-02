@@ -3107,7 +3107,7 @@ void SubstitutionGoal::init()
     if (settings.readOnlyMode)
         throw Error(format("cannot substitute path ‘%1%’ - no write access to the Nix store") % storePath);
 
-    subs = getDefaultSubstituters();
+    subs = settings.useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>();
 
     tryNext();
 }

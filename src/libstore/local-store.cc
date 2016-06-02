@@ -780,6 +780,7 @@ Path LocalStore::queryPathFromHashPart(const string & hashPart)
 
 PathSet LocalStore::querySubstitutablePaths(const PathSet & paths)
 {
+    if (!settings.useSubstitutes) return PathSet();
     PathSet res;
     for (auto & sub : getDefaultSubstituters()) {
         if (sub->storeDir != storeDir) continue;
@@ -799,6 +800,7 @@ PathSet LocalStore::querySubstitutablePaths(const PathSet & paths)
 void LocalStore::querySubstitutablePathInfos(const PathSet & paths,
     SubstitutablePathInfos & infos)
 {
+    if (!settings.useSubstitutes) return;
     for (auto & sub : getDefaultSubstituters()) {
         if (sub->storeDir != storeDir) continue;
         for (auto & path : paths) {
