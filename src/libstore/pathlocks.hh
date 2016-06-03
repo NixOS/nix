@@ -39,6 +39,7 @@ public:
 };
 
 
+// FIXME: not thread-safe!
 bool pathIsLockedByMe(const Path & path);
 
 

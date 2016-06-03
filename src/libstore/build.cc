@@ -436,12 +436,11 @@ private:
     AutoCloseFD fdUserLock;
 
     string user;
-    uid_t uid;
-    gid_t gid;
+    uid_t uid = 0;
+    gid_t gid = 0;
     std::vector<gid_t> supplementaryGIDs;
 
 public:
-    UserLock();
     ~UserLock();
 
     void acquire();
@@ -450,8 +449,8 @@ public:
     void kill();
 
     string getUser() { return user; }
-    uid_t getUID() { return uid; }
-    uid_t getGID() { return gid; }
+    uid_t getUID() { assert(uid); return uid; }
+    uid_t getGID() { assert(gid); return gid; }
     std::vector<gid_t> getSupplementaryGIDs() { return supplementaryGIDs; }
 
     bool enabled() { return uid != 0; }
@@ -460,12 +459,6 @@ public:
 
 
 PathSet UserLock::lockedPaths;
-
-
-UserLock::UserLock()
-{
-    uid = gid = 0;
-}
 
 
 UserLock::~UserLock()
@@ -767,6 +760,9 @@ private:
 
     /* Whether this is a fixed-output derivation. */
     bool fixedOutput;
+
+    /* Whether to run the build in a private network namespace. */
+    bool privateNetwork = false;
 
     typedef void (DerivationGoal::*GoalState)();
     GoalState state;
@@ -1269,16 +1265,13 @@ void DerivationGoal::tryToBuild()
 {
     trace("trying to build");
 
-    if (worker.store.storeDir != worker.store.realStoreDir)
-        throw Error("building with a diverted Nix store is not supported");
-
     /* Check for the possibility that some other goal in this process
        has locked the output since we checked in haveDerivation().
        (It can't happen between here and the lockPaths() call below
        because we're not allowing multi-threading.)  If so, put this
        goal to sleep until another goal finishes, then try again. */
     for (auto & i : drv->outputs)
-        if (pathIsLockedByMe(i.second.path)) {
+        if (pathIsLockedByMe(worker.store.toRealPath(i.second.path))) {
             debug(format("putting derivation ‘%1%’ to sleep because ‘%2%’ is locked by another goal")
                 % drvPath % i.second.path);
             worker.waitForAnyGoal(shared_from_this());
@@ -1290,7 +1283,11 @@ void DerivationGoal::tryToBuild()
        can't acquire the lock, then continue; hopefully some other
        goal can start a build, and if not, the main loop will sleep a
        few seconds and then retry this goal. */
-    if (!outputLocks.lockPaths(drv->outputPaths(), "", false)) {
+    PathSet lockFiles;
+    for (auto & outPath : drv->outputPaths())
+        lockFiles.insert(worker.store.toRealPath(outPath));
+
+    if (!outputLocks.lockPaths(lockFiles, "", false)) {
         worker.waitForAWhile(shared_from_this());
         return;
     }
@@ -1320,7 +1317,7 @@ void DerivationGoal::tryToBuild()
         Path path = i.second.path;
         if (worker.store.isValidPath(path)) continue;
         debug(format("removing invalid path ‘%1%’") % path);
-        deletePath(path);
+        deletePath(worker.store.toRealPath(path));
     }
 
     /* Don't do a remote build if the derivation has the attribute
@@ -1445,7 +1442,7 @@ void DerivationGoal::buildDone()
 #if HAVE_STATVFS
             unsigned long long required = 8ULL * 1024 * 1024; // FIXME: make configurable
             struct statvfs st;
-            if (statvfs(worker.store.storeDir.c_str(), &st) == 0 &&
+            if (statvfs(worker.store.realStoreDir.c_str(), &st) == 0 &&
                 (unsigned long long) st.f_bavail * st.f_bsize < required)
                 diskFull = true;
             if (statvfs(tmpDir.c_str(), &st) == 0 &&
@@ -1683,6 +1680,9 @@ void DerivationGoal::startBuilder()
             useChroot = !fixedOutput && get(drv->env, "__noChroot") != "1";
     }
 
+    if (worker.store.storeDir != worker.store.realStoreDir)
+        useChroot = true;
+
     /* Construct the environment passed to the builder. */
     env.clear();
 
@@ -1819,10 +1819,8 @@ void DerivationGoal::startBuilder()
 
     /* If `build-users-group' is not empty, then we have to build as
        one of the members of that group. */
-    if (settings.buildUsersGroup != "") {
+    if (settings.buildUsersGroup != "" && getuid() == 0) {
         buildUser.acquire();
-        assert(buildUser.getUID() != 0);
-        assert(buildUser.getGID() != 0);
 
         /* Make sure that no other processes are executing under this
            uid. */
@@ -1906,7 +1904,7 @@ void DerivationGoal::startBuilder()
            environment using bind-mounts.  We put it in the Nix store
            to ensure that we can create hard-links to non-directory
            inputs in the fake Nix store in the chroot (see below). */
-        chrootRootDir = drvPath + ".chroot";
+        chrootRootDir = worker.store.toRealPath(drvPath) + ".chroot";
         deletePath(chrootRootDir);
 
         /* Clean up the chroot directory automatically. */
@@ -1917,7 +1915,7 @@ void DerivationGoal::startBuilder()
         if (mkdir(chrootRootDir.c_str(), 0750) == -1)
             throw SysError(format("cannot create ‘%1%’") % chrootRootDir);
 
-        if (chown(chrootRootDir.c_str(), 0, buildUser.getGID()) == -1)
+        if (buildUser.enabled() && chown(chrootRootDir.c_str(), 0, buildUser.getGID()) == -1)
             throw SysError(format("cannot change ownership of ‘%1%’") % chrootRootDir);
 
         /* Create a writable /tmp in the chroot.  Many builders need
@@ -1960,18 +1958,19 @@ void DerivationGoal::startBuilder()
         createDirs(chrootStoreDir);
         chmod_(chrootStoreDir, 01775);
 
-        if (chown(chrootStoreDir.c_str(), 0, buildUser.getGID()) == -1)
+        if (buildUser.enabled() && chown(chrootStoreDir.c_str(), 0, buildUser.getGID()) == -1)
             throw SysError(format("cannot change ownership of ‘%1%’") % chrootStoreDir);
 
         for (auto & i : inputPaths) {
+            Path r = worker.store.toRealPath(i);
             struct stat st;
-            if (lstat(i.c_str(), &st))
+            if (lstat(r.c_str(), &st))
                 throw SysError(format("getting attributes of path ‘%1%’") % i);
             if (S_ISDIR(st.st_mode))
-                dirsInChroot[i] = i;
+                dirsInChroot[i] = r;
             else {
                 Path p = chrootRootDir + i;
-                if (link(i.c_str(), p.c_str()) == -1) {
+                if (link(r.c_str(), p.c_str()) == -1) {
                     /* Hard-linking fails if we exceed the maximum
                        link count on a file (e.g. 32000 of ext3),
                        which is quite possible after a `nix-store
@@ -1979,7 +1978,7 @@ void DerivationGoal::startBuilder()
                     if (errno != EMLINK)
                         throw SysError(format("linking ‘%1%’ to ‘%2%’") % p % i);
                     StringSink sink;
-                    dumpPath(i, sink);
+                    dumpPath(r, sink);
                     StringSource source(*sink.s);
                     restorePath(p, source);
                 }
@@ -2112,6 +2111,10 @@ void DerivationGoal::startBuilder()
            CLONE_PARENT to ensure that the real builder is parented to
            us.
         */
+
+        if (!fixedOutput)
+            privateNetwork = true;
+
         ProcessOptions options;
         options.allowVfork = false;
         Pid helper = startProcess([&]() {
@@ -2120,7 +2123,10 @@ void DerivationGoal::startBuilder()
                 PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
             if (stack == MAP_FAILED) throw SysError("allocating stack");
             int flags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
-            if (!fixedOutput) flags |= CLONE_NEWNET;
+            if (getuid() != 0)
+                flags |= CLONE_NEWUSER;
+            if (privateNetwork)
+                flags |= CLONE_NEWNET;
             pid_t child = clone(childEntry, stack + stackSize, flags, this);
             if (child == -1 && errno == EINVAL)
                 /* Fallback for Linux < 2.13 where CLONE_NEWPID and
@@ -2174,17 +2180,20 @@ void DerivationGoal::runChild()
 #if __linux__
         if (useChroot) {
 
-            /* Initialise the loopback interface. */
-            AutoCloseFD fd(socket(PF_INET, SOCK_DGRAM, IPPROTO_IP));
-            if (fd == -1) throw SysError("cannot open IP socket");
+            if (privateNetwork) {
 
-            struct ifreq ifr;
-            strcpy(ifr.ifr_name, "lo");
-            ifr.ifr_flags = IFF_UP | IFF_LOOPBACK | IFF_RUNNING;
-            if (ioctl(fd, SIOCSIFFLAGS, &ifr) == -1)
-                throw SysError("cannot set loopback interface flags");
+                /* Initialise the loopback interface. */
+                AutoCloseFD fd(socket(PF_INET, SOCK_DGRAM, IPPROTO_IP));
+                if (fd == -1) throw SysError("cannot open IP socket");
 
-            fd.close();
+                struct ifreq ifr;
+                strcpy(ifr.ifr_name, "lo");
+                ifr.ifr_flags = IFF_UP | IFF_LOOPBACK | IFF_RUNNING;
+                if (ioctl(fd, SIOCSIFFLAGS, &ifr) == -1)
+                    throw SysError("cannot set loopback interface flags");
+
+                fd.close();
+            }
 
             /* Set the hostname etc. to fixed values. */
             char hostname[] = "localhost";
@@ -2266,7 +2275,7 @@ void DerivationGoal::runChild()
                     createDirs(dirOf(target));
                     writeFile(target, "");
                 }
-                if (mount(source.c_str(), target.c_str(), "", MS_BIND, 0) == -1)
+                if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
                     throw SysError(format("bind mount from ‘%1%’ to ‘%2%’ failed") % source % target);
             }
 
@@ -2284,7 +2293,8 @@ void DerivationGoal::runChild()
                requires the kernel to be compiled with
                CONFIG_DEVPTS_MULTIPLE_INSTANCES=y (which is the case
                if /dev/ptx/ptmx exists). */
-            if (pathExists("/dev/pts/ptmx") &&
+            if (getuid() == 0 &&
+                pathExists("/dev/pts/ptmx") &&
                 !pathExists(chrootRootDir + "/dev/ptmx")
                 && dirsInChroot.find("/dev/pts") == dirsInChroot.end())
             {
@@ -2587,10 +2597,10 @@ void DerivationGoal::registerOutputs()
                 if (buildMode == bmRepair)
                     replaceValidPath(path, actualPath);
                 else
-                    if (buildMode != bmCheck && rename(actualPath.c_str(), path.c_str()) == -1)
+                    if (buildMode != bmCheck && rename(actualPath.c_str(), worker.store.toRealPath(path).c_str()) == -1)
                         throw SysError(format("moving build output ‘%1%’ from the sandbox to the Nix store") % path);
             }
-            if (buildMode != bmCheck) actualPath = path;
+            if (buildMode != bmCheck) actualPath = worker.store.toRealPath(path);
         } else {
             Path redirected = redirectedOutputs[path];
             if (buildMode == bmRepair
@@ -2641,8 +2651,6 @@ void DerivationGoal::registerOutputs()
             rewritten = true;
         }
 
-        Activity act(*logger, lvlTalkative, format("scanning for references inside ‘%1%’") % path);
-
         /* Check that fixed-output derivations produced the right
            outputs (i.e., the content hash should match the specified
            hash). */
@@ -2668,13 +2676,15 @@ void DerivationGoal::registerOutputs()
                     % dest % printHashType(ht) % printHash16or32(h2));
                 if (worker.store.isValidPath(dest))
                     return;
-                if (actualPath != dest) {
-                    PathLocks outputLocks({dest});
-                    deletePath(dest);
-                    if (rename(actualPath.c_str(), dest.c_str()) == -1)
+                Path actualDest = worker.store.toRealPath(dest);
+                if (actualPath != actualDest) {
+                    PathLocks outputLocks({actualDest});
+                    deletePath(actualDest);
+                    if (rename(actualPath.c_str(), actualDest.c_str()) == -1)
                         throw SysError(format("moving ‘%1%’ to ‘%2%’") % actualPath % dest);
                 }
-                path = actualPath = dest;
+                path = dest;
+                actualPath = actualDest;
             } else {
                 if (h != h2)
                     throw BuildError(
@@ -2692,6 +2702,7 @@ void DerivationGoal::registerOutputs()
            contained in it.  Compute the SHA-256 NAR hash at the same
            time.  The hash is stored in the database so that we can
            verify later on whether nobody has messed with the store. */
+        Activity act(*logger, lvlTalkative, format("scanning for references inside ‘%1%’") % path);
         HashResult hash;
         PathSet references = scanForReferences(actualPath, allPaths, hash);
 
@@ -2700,7 +2711,7 @@ void DerivationGoal::registerOutputs()
             auto info = *worker.store.queryPathInfo(path);
             if (hash.first != info.narHash) {
                 if (settings.keepFailed) {
-                    Path dst = path + checkSuffix;
+                    Path dst = worker.store.toRealPath(path + checkSuffix);
                     deletePath(dst);
                     if (rename(actualPath.c_str(), dst.c_str()))
                         throw SysError(format("renaming ‘%1%’ to ‘%2%’") % actualPath % dst);
@@ -2743,7 +2754,7 @@ void DerivationGoal::registerOutputs()
                 /* Our requisites are the union of the closures of our references. */
                 for (auto & i : references)
                     /* Don't call computeFSClosure on ourselves. */
-                    if (actualPath != i)
+                    if (path != i)
                         worker.store.computeFSClosure(i, used);
             } else
                 used = references;
@@ -2775,8 +2786,7 @@ void DerivationGoal::registerOutputs()
         checkRefs("disallowedRequisites", false, true);
 
         if (curRound == nrRounds) {
-            worker.store.optimisePath(path); // FIXME: combine with scanForReferences()
-
+            worker.store.optimisePath(actualPath); // FIXME: combine with scanForReferences()
             worker.markContentsGood(path);
         }
 

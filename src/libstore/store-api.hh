@@ -503,6 +503,11 @@ public:
         const Path & gcRoot, bool indirect, bool allowOutsideRootsDir = false);
 
     virtual Path getRealStoreDir() { return storeDir; }
+
+    Path toRealPath(const Path & storePath)
+    {
+        return getRealStoreDir() + "/" + baseNameOf(storePath);
+    }
 };
 
 
