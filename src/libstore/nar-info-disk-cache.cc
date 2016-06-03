@@ -141,7 +141,7 @@ public:
             auto queryCache(state->queryCache.use()(uri));
             if (!queryCache.next()) return false;
             state->caches.emplace(uri,
-                Cache{(int) queryCache.getInt(0), queryCache.getStr(1), queryCache.getInt(2), (int) queryCache.getInt(3)});
+                Cache{(int) queryCache.getInt(0), queryCache.getStr(1), queryCache.getInt(2) != 0, (int) queryCache.getInt(3)});
         }
 
         auto & cache(getCache(*state, uri));
