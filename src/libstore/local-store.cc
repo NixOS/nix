@@ -49,11 +49,6 @@ LocalStore::LocalStore(const Params & params)
 {
     auto state(_state.lock());
 
-    if (settings.readOnlyMode) {
-        openDB(*state, false);
-        return;
-    }
-
     /* Create missing state directories if they don't already exist. */
     createDirs(realStoreDir);
     makeStoreWritable();
@@ -137,15 +132,8 @@ LocalStore::LocalStore(const Params & params)
 
     /* Acquire the big fat lock in shared mode to make sure that no
        schema upgrade is in progress. */
-    try {
-        Path globalLockPath = dbDir + "/big-lock";
-        globalLock = openLockFile(globalLockPath.c_str(), true);
-    } catch (SysError & e) {
-        if (e.errNo != EACCES) throw;
-        settings.readOnlyMode = true;
-        openDB(*state, false);
-        return;
-    }
+    Path globalLockPath = dbDir + "/big-lock";
+    globalLock = openLockFile(globalLockPath.c_str(), true);
 
     if (!lockFile(globalLock, ltRead, false)) {
         printMsg(lvlError, "waiting for the big Nix store lock...");
@@ -213,6 +201,33 @@ LocalStore::LocalStore(const Params & params)
     }
 
     else openDB(*state, false);
+
+    /* Prepare SQL statements. */
+    state->stmtRegisterValidPath.create(state->db,
+        "insert into ValidPaths (path, hash, registrationTime, deriver, narSize, ultimate, sigs) values (?, ?, ?, ?, ?, ?, ?);");
+    state->stmtUpdatePathInfo.create(state->db,
+        "update ValidPaths set narSize = ?, hash = ?, ultimate = ?, sigs = ? where path = ?;");
+    state->stmtAddReference.create(state->db,
+        "insert or replace into Refs (referrer, reference) values (?, ?);");
+    state->stmtQueryPathInfo.create(state->db,
+        "select id, hash, registrationTime, deriver, narSize, ultimate, sigs from ValidPaths where path = ?;");
+    state->stmtQueryReferences.create(state->db,
+        "select path from Refs join ValidPaths on reference = id where referrer = ?;");
+    state->stmtQueryReferrers.create(state->db,
+        "select path from Refs join ValidPaths on referrer = id where reference = (select id from ValidPaths where path = ?);");
+    state->stmtInvalidatePath.create(state->db,
+        "delete from ValidPaths where path = ?;");
+    state->stmtAddDerivationOutput.create(state->db,
+        "insert or replace into DerivationOutputs (drv, id, path) values (?, ?, ?);");
+    state->stmtQueryValidDerivers.create(state->db,
+        "select v.id, v.path from DerivationOutputs d join ValidPaths v on d.drv = v.id where d.path = ?;");
+    state->stmtQueryDerivationOutputs.create(state->db,
+        "select id, path from DerivationOutputs where drv = ?;");
+    // Use "path >= ?" with limit 1 rather than "path like '?%'" to
+    // ensure efficient lookup.
+    state->stmtQueryPathFromHashPart.create(state->db,
+        "select path from ValidPaths where path >= ? limit 1;");
+    state->stmtQueryValidPaths.create(state->db, "select path from ValidPaths");
 }
 
 
@@ -307,33 +322,6 @@ void LocalStore::openDB(State & state, bool create)
         if (sqlite3_exec(db, (const char *) schema, 0, 0, 0) != SQLITE_OK)
             throwSQLiteError(db, "initialising database schema");
     }
-
-    /* Prepare SQL statements. */
-    state.stmtRegisterValidPath.create(db,
-        "insert into ValidPaths (path, hash, registrationTime, deriver, narSize, ultimate, sigs) values (?, ?, ?, ?, ?, ?, ?);");
-    state.stmtUpdatePathInfo.create(db,
-        "update ValidPaths set narSize = ?, hash = ?, ultimate = ?, sigs = ? where path = ?;");
-    state.stmtAddReference.create(db,
-        "insert or replace into Refs (referrer, reference) values (?, ?);");
-    state.stmtQueryPathInfo.create(db,
-        "select id, hash, registrationTime, deriver, narSize, ultimate, sigs from ValidPaths where path = ?;");
-    state.stmtQueryReferences.create(db,
-        "select path from Refs join ValidPaths on reference = id where referrer = ?;");
-    state.stmtQueryReferrers.create(db,
-        "select path from Refs join ValidPaths on referrer = id where reference = (select id from ValidPaths where path = ?);");
-    state.stmtInvalidatePath.create(db,
-        "delete from ValidPaths where path = ?;");
-    state.stmtAddDerivationOutput.create(db,
-        "insert or replace into DerivationOutputs (drv, id, path) values (?, ?, ?);");
-    state.stmtQueryValidDerivers.create(db,
-        "select v.id, v.path from DerivationOutputs d join ValidPaths v on d.drv = v.id where d.path = ?;");
-    state.stmtQueryDerivationOutputs.create(db,
-        "select id, path from DerivationOutputs where drv = ?;");
-    // Use "path >= ?" with limit 1 rather than "path like '?%'" to
-    // ensure efficient lookup.
-    state.stmtQueryPathFromHashPart.create(db,
-        "select path from ValidPaths where path >= ? limit 1;");
-    state.stmtQueryValidPaths.create(db, "select path from ValidPaths");
 }
 
 
