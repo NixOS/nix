@@ -169,11 +169,11 @@ Paths Store::topoSortPaths(const PathSet & paths)
     Paths sorted;
     PathSet visited, parents;
 
-    std::function<void(const Path & path)> dfsVisit;
+    std::function<void(const Path & path, const Path * parent)> dfsVisit;
 
-    dfsVisit = [&](const Path & path) {
+    dfsVisit = [&](const Path & path, const Path * parent) {
         if (parents.find(path) != parents.end())
-            throw BuildError(format("cycle detected in the references of ‘%1%’") % path);
+            throw BuildError(format("cycle detected in the references of '%1%' from '%2%'") % path % *parent);
 
         if (visited.find(path) != visited.end()) return;
         visited.insert(path);
@@ -189,14 +189,14 @@ Paths Store::topoSortPaths(const PathSet & paths)
             /* Don't traverse into paths that don't exist.  That can
                happen due to substitutes for non-existent paths. */
             if (i != path && paths.find(i) != paths.end())
-                dfsVisit(i);
+                dfsVisit(i, &path);
 
         sorted.push_front(path);
         parents.erase(path);
     };
 
     for (auto & i : paths)
-        dfsVisit(i);
+        dfsVisit(i, nullptr);
 
     return sorted;
 }
