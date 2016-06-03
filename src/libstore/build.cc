@@ -3081,7 +3081,7 @@ SubstitutionGoal::~SubstitutionGoal()
     try {
         if (thr.joinable()) {
             thr.join();
-            worker.childTerminated(shared_from_this());
+            //worker.childTerminated(shared_from_this()); // FIXME
         }
     } catch (...) {
         ignoreException();
