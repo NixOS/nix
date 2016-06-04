@@ -28,6 +28,7 @@ let
             pkgconfig sqlite libsodium
             docbook5 docbook5_xsl
             autoconf-archive
+            perlPackages.DBI perlPackages.DBDSQLite perlPackages.WWWCurl
           ] ++ lib.optional (!lib.inNixShell) git;
 
         configureFlags = ''
