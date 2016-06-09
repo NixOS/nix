@@ -509,10 +509,9 @@ void UserLock::acquire()
             /* We already have a lock on this one. */
             continue;
 
-        AutoCloseFD fd = open(fnUserLock.c_str(), O_RDWR | O_CREAT, 0600);
+        AutoCloseFD fd = open(fnUserLock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
         if (fd == -1)
             throw SysError(format("opening user lock ‘%1%’") % fnUserLock);
-        closeOnExec(fd);
 
         if (lockFile(fd, ltWrite, false)) {
             fdUserLock = fd.borrow();

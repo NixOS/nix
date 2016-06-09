@@ -33,10 +33,9 @@ int LocalStore::openGCLock(LockType lockType)
 
     debug(format("acquiring global GC lock ‘%1%’") % fnGCLock);
 
-    AutoCloseFD fdGCLock = open(fnGCLock.c_str(), O_RDWR | O_CREAT, 0600);
+    AutoCloseFD fdGCLock = open(fnGCLock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
     if (fdGCLock == -1)
         throw SysError(format("opening global GC lock ‘%1%’") % fnGCLock);
-    closeOnExec(fdGCLock);
 
     if (!lockFile(fdGCLock, lockType, false)) {
         printMsg(lvlError, format("waiting for the big garbage collector lock..."));
@@ -211,7 +210,7 @@ void LocalStore::readTempRoots(PathSet & tempRoots, FDs & fds)
         Path path = (format("%1%/%2%/%3%") % stateDir % tempRootsDir % i.name).str();
 
         debug(format("reading temporary root file ‘%1%’") % path);
-        FDPtr fd(new AutoCloseFD(open(path.c_str(), O_RDWR, 0666)));
+        FDPtr fd(new AutoCloseFD(open(path.c_str(), O_CLOEXEC | O_RDWR, 0666)));
         if (*fd == -1) {
             /* It's okay if the file has disappeared. */
             if (errno == ENOENT) continue;

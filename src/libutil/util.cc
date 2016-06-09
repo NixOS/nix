@@ -273,7 +273,7 @@ string readFile(int fd)
 
 string readFile(const Path & path, bool drain)
 {
-    AutoCloseFD fd = open(path.c_str(), O_RDONLY);
+    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
     if (fd == -1)
         throw SysError(format("opening file ‘%1%’") % path);
     return drain ? drainFD(fd) : readFile(fd);
@@ -282,7 +282,7 @@ string readFile(const Path & path, bool drain)
 
 void writeFile(const Path & path, const string & s)
 {
-    AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT, 0666);
+    AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, 0666);
     if (fd == -1)
         throw SysError(format("opening file ‘%1%’") % path);
     writeFull(fd, s);
@@ -633,11 +633,15 @@ int AutoCloseFD::borrow()
 void Pipe::create()
 {
     int fds[2];
+#if HAVE_PIPE2
+    if (pipe2(fds, O_CLOEXEC) != 0) throw SysError("creating pipe");
+#else
     if (pipe(fds) != 0) throw SysError("creating pipe");
+    closeOnExec(fds[0]);
+    closeOnExec(fds[1]);
+#endif
     readSide = fds[0];
     writeSide = fds[1];
-    closeOnExec(readSide);
-    closeOnExec(writeSide);
 }
 
 

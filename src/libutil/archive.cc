@@ -41,7 +41,7 @@ static void dumpContents(const Path & path, size_t size,
 {
     sink << "contents" << size;
 
-    AutoCloseFD fd = open(path.c_str(), O_RDONLY);
+    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
     if (fd == -1) throw SysError(format("opening file ‘%1%’") % path);
 
     unsigned char buf[65536];
@@ -304,7 +304,7 @@ struct RestoreSink : ParseSink
     {
         Path p = dstPath + path;
         fd.close();
-        fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY, 0666);
+        fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666);
         if (fd == -1) throw SysError(format("creating file ‘%1%’") % p);
     }
 

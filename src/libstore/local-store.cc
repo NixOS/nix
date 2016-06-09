@@ -117,7 +117,7 @@ LocalStore::LocalStore(const Params & params)
         if (stat(reservedPath.c_str(), &st) == -1 ||
             st.st_size != settings.reservedSize)
         {
-            AutoCloseFD fd = open(reservedPath.c_str(), O_WRONLY | O_CREAT, 0600);
+            AutoCloseFD fd = open(reservedPath.c_str(), O_WRONLY | O_CREAT | O_CLOEXEC, 0600);
             int res = -1;
 #if HAVE_POSIX_FALLOCATE
             res = posix_fallocate(fd, 0, settings.reservedSize);
@@ -1245,7 +1245,7 @@ static void makeMutable(const Path & path)
     /* The O_NOFOLLOW is important to prevent us from changing the
        mutable bit on the target of a symlink (which would be a
        security hole). */
-    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_NOFOLLOW);
+    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
     if (fd == -1) {
         if (errno == ELOOP) return; // it's a symlink
         throw SysError(format("opening file ‘%1%’") % path);

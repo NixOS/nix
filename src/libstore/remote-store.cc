@@ -61,7 +61,11 @@ ref<RemoteStore::Connection> RemoteStore::openConnection()
     auto conn = make_ref<Connection>();
 
     /* Connect to a daemon that does the privileged work for us. */
-    conn->fd = socket(PF_UNIX, SOCK_STREAM, 0);
+    conn->fd = socket(PF_UNIX, SOCK_STREAM
+        #ifdef SOCK_CLOEXEC
+        | SOCK_CLOEXEC
+        #endif
+        , 0);
     if (conn->fd == -1)
         throw SysError("cannot create Unix domain socket");
     closeOnExec(conn->fd);

@@ -16,11 +16,9 @@ int openLockFile(const Path & path, bool create)
 {
     AutoCloseFD fd;
 
-    fd = open(path.c_str(), O_RDWR | (create ? O_CREAT : 0), 0600);
+    fd = open(path.c_str(), O_CLOEXEC | O_RDWR | (create ? O_CREAT : 0), 0600);
     if (fd == -1 && (create || errno != ENOENT))
         throw SysError(format("opening lock file ‘%1%’") % path);
-
-    closeOnExec(fd);
 
     return fd.borrow();
 }
