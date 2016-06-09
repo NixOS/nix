@@ -746,6 +746,9 @@ private:
     /* Pipe for the builder's standard output/error. */
     Pipe builderOut;
 
+    /* Pipe for synchronising updates to the builder user namespace. */
+    Pipe userNamespaceSync;
+
     /* The build hook. */
     std::shared_ptr<HookInstance> hook;
 
@@ -1930,17 +1933,14 @@ void DerivationGoal::startBuilder()
         createDirs(chrootRootDir + "/etc");
 
         writeFile(chrootRootDir + "/etc/passwd",
-            (format(
-                "nixbld:x:%1%:%2%:Nix build user:/:/noshell\n"
-                "nobody:x:65534:65534:Nobody:/:/noshell\n")
-                % (buildUser.enabled() ? buildUser.getUID() : getuid())
-                % (buildUser.enabled() ? buildUser.getGID() : getgid())).str());
+            "root:x:0:0:Nix build user:/:/noshell\n"
+            "nobody:x:65534:65534:Nobody:/:/noshell\n");
 
         /* Declare the build user's group so that programs get a consistent
            view of the system (e.g., "id -gn"). */
         writeFile(chrootRootDir + "/etc/group",
-            (format("nixbld:!:%1%:\n")
-                % (buildUser.enabled() ? buildUser.getGID() : getgid())).str());
+            "root:x:0:\n"
+            "nobody:x:65534:\n");
 
         /* Create /etc/hosts with localhost entry. */
         if (!fixedOutput)
@@ -2114,32 +2114,66 @@ void DerivationGoal::startBuilder()
         if (!fixedOutput)
             privateNetwork = true;
 
+        userNamespaceSync.create();
+
         ProcessOptions options;
         options.allowVfork = false;
+
         Pid helper = startProcess([&]() {
+
+            /* Drop additional groups here because we can't do it
+               after we've created the new user namespace. */
+            if (getuid() == 0 && setgroups(0, 0) == -1)
+                throw SysError("setgroups failed");
+
             size_t stackSize = 1 * 1024 * 1024;
             char * stack = (char *) mmap(0, stackSize,
                 PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
             if (stack == MAP_FAILED) throw SysError("allocating stack");
-            int flags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
-            if (getuid() != 0)
-                flags |= CLONE_NEWUSER;
+
+            int flags = CLONE_NEWUSER | CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
             if (privateNetwork)
                 flags |= CLONE_NEWNET;
+
             pid_t child = clone(childEntry, stack + stackSize, flags, this);
             if (child == -1 && errno == EINVAL)
                 /* Fallback for Linux < 2.13 where CLONE_NEWPID and
                    CLONE_PARENT are not allowed together. */
                 child = clone(childEntry, stack + stackSize, flags & ~CLONE_NEWPID, this);
             if (child == -1) throw SysError("cloning builder process");
+
             writeFull(builderOut.writeSide, std::to_string(child) + "\n");
             _exit(0);
         }, options);
+
         if (helper.wait(true) != 0)
             throw Error("unable to start build process");
+
+        userNamespaceSync.readSide.close();
+
         pid_t tmp;
         if (!string2Int<pid_t>(readLine(builderOut.readSide), tmp)) abort();
         pid = tmp;
+
+        /* Set the UID/GID mapping of the builder's user
+           namespace such that root maps to the build user, or to the
+           calling user (if build users are disabled). */
+        uid_t targetUid = buildUser.enabled() ? buildUser.getUID() : getuid();
+        uid_t targetGid = buildUser.enabled() ? buildUser.getGID() : getgid();
+
+        writeFile("/proc/" + std::to_string(pid) + "/uid_map",
+            (format("0 %d 1") % targetUid).str());
+
+        writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
+
+        writeFile("/proc/" + std::to_string(pid) + "/gid_map",
+            (format("0 %d 1") % targetGid).str());
+
+        /* Signal the builder that we've updated its user
+           namespace. */
+        writeFull(userNamespaceSync.writeSide, "1");
+        userNamespaceSync.writeSide.close();
+
     } else
 #endif
     {
@@ -2176,8 +2210,17 @@ void DerivationGoal::runChild()
 
         commonChildInit(builderOut);
 
+        bool setUser = true;
+
 #if __linux__
         if (useChroot) {
+
+            userNamespaceSync.writeSide.close();
+
+            if (drainFD(userNamespaceSync.readSide) != "1")
+                throw Error("user namespace initialisation failed");
+
+            userNamespaceSync.readSide.close();
 
             if (privateNetwork) {
 
@@ -2292,8 +2335,7 @@ void DerivationGoal::runChild()
                requires the kernel to be compiled with
                CONFIG_DEVPTS_MULTIPLE_INSTANCES=y (which is the case
                if /dev/ptx/ptmx exists). */
-            if (getuid() == 0 &&
-                pathExists("/dev/pts/ptmx") &&
+            if (pathExists("/dev/pts/ptmx") &&
                 !pathExists(chrootRootDir + "/dev/ptmx")
                 && dirsInChroot.find("/dev/pts") == dirsInChroot.end())
             {
@@ -2324,6 +2366,15 @@ void DerivationGoal::runChild()
 
             if (rmdir("real-root") == -1)
                 throw SysError("cannot remove real-root directory");
+
+            /* Become root in the user namespace, which corresponds to
+               the build user or calling user in the parent namespace. */
+            if (setgid(0) == -1)
+                throw SysError("setgid failed");
+            if (setuid(0) == -1)
+                throw SysError("setuid failed");
+
+            setUser = false;
         }
 #endif
 
@@ -2375,7 +2426,7 @@ void DerivationGoal::runChild()
            descriptors except std*, so that's safe.  Also note that
            setuid() when run as root sets the real, effective and
            saved UIDs. */
-        if (buildUser.enabled()) {
+        if (setUser && buildUser.enabled()) {
             /* Preserve supplementary groups of the build user, to allow
                admins to specify groups such as "kvm".  */
             if (!buildUser.getSupplementaryGIDs().empty() &&
@@ -2819,7 +2870,7 @@ void DerivationGoal::registerOutputs()
                         format("output ‘%1%’ of ‘%2%’ differs from previous round")
                         % i->path % drvPath);
             }
-        assert(false); // shouldn't happen
+        abort(); // shouldn't happen
     }
 
     if (settings.keepFailed) {
