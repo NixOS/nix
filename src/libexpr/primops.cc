@@ -1729,16 +1729,26 @@ static void prim_fetchTarball(EvalState & state, const Pos & pos, Value * * args
  * Xcode integration
  *************************************************************/
 
-static char * lookupXcodeVersion()
-{
-    // TODO: implement this
-    return "10.11";
+std::string exec(const char* cmd) {
+  char buffer[128];
+  std::string result = "";
+  std::shared_ptr<FILE> pipe(popen(cmd, "r"), pclose);
+  if(!pipe) throw std::runtime_error("popen() failed!");
+  while(!feof(pipe.get())) {
+    if (fgets(buffer, 128, pipe.get()) != NULL)
+      result += buffer;
+  }
+  return result.substr(0, result.find_last_not_of("\n") + 1);
 }
 
-static char * lookupSDKRoot()
+static std::string lookupXcodeVersion()
 {
-    // see above
-    return "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk";
+    return exec("/usr/bin/xcrun --show-sdk-version 2>&1");
+}
+
+static std::string lookupSDKRoot()
+{
+    return exec("/usr/bin/xcrun --show-sdk-path 2>&1");
 }
 
 #endif
