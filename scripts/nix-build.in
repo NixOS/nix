@@ -237,7 +237,11 @@ if ($packages) {
     @exprs = ("default.nix") if scalar @exprs == 0;
 }
 
-$ENV{'IN_NIX_SHELL'} = 1 if $runEnv;
+if ($runEnv && $pure) {
+    $ENV{'IN_NIX_SHELL'} = "pure";
+} elsif ($runEnv) {
+    $ENV{'IN_NIX_SHELL'} = "impure";
+};
 
 
 foreach my $expr (@exprs) {
