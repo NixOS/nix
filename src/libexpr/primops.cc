@@ -1793,23 +1793,26 @@ static void prim_fetchTarball(EvalState & state, const Pos & pos, Value * * args
 std::string exec(const char* cmd) {
   char buffer[128];
   std::string result = "";
-  std::shared_ptr<FILE> pipe(popen(cmd, "r"), pclose);
-  if(!pipe) throw std::runtime_error("popen() failed!");
-  while(!feof(pipe.get())) {
-    if (fgets(buffer, 128, pipe.get()) != NULL)
+  FILE* pipe(popen(cmd, "r"));
+  if(!pipe) throw EvalError("popen() failed!");
+  while(!feof(pipe)) {
+    if (fgets(buffer, 128, pipe) != NULL)
       result += buffer;
   }
+  int status = pclose(pipe);
+  if(WEXITSTATUS(status) != 0)
+    throw EvalError("could not execute subprocess");
   return result.substr(0, result.find_last_not_of("\n") + 1);
 }
 
 static std::string lookupXcodeVersion()
 {
-    return exec("/usr/bin/xcrun --show-sdk-version 2>&1");
+    return exec("/usr/bin/xcrun --show-sdk-version");
 }
 
 static std::string lookupSDKRoot()
 {
-    return exec("/usr/bin/xcrun --show-sdk-path 2>&1");
+    return exec("/usr/bin/xcrun --show-sdk-path");
 }
 
 #endif
