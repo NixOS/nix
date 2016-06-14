@@ -267,7 +267,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   std::vector<std::vector<nix::Expr *> *> * string_lines;
 }
 
-%type <e> start expr expr_function expr_if expr_op
+%type <e> start expr expr_function expr_if expr_op empty_expr
 %type <e> expr_app expr_select expr_simple
 %type <list> expr_list
 %type <attrs> binds
@@ -419,9 +419,9 @@ string_parts
 
 string_parts_interpolated
   : string_parts_interpolated STR { $$ = $1; $1->push_back($2); }
-  | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = $1; $1->push_back($3); }
-  | DOLLAR_CURLY expr '}' { $$ = new vector<Expr *>; $$->push_back($2); }
-  | STR DOLLAR_CURLY expr '}' {
+  | string_parts_interpolated DOLLAR_CURLY empty_expr '}' { $$ = $1; $1->push_back($3); }
+  | DOLLAR_CURLY empty_expr '}' { $$ = new vector<Expr *>; $$->push_back($2); }
+  | STR DOLLAR_CURLY empty_expr '}' {
       $$ = new vector<Expr *>;
       $$->push_back($1);
       $$->push_back($3);
@@ -436,8 +436,13 @@ ind_string_lines
 
 ind_string_line
   : ind_string_line IND_STR { $$ = $1; $1->push_back($2); }
-  | ind_string_line DOLLAR_CURLY expr '}' { $$ = $1; $1->push_back(new ExprAntiquot($3)); }
+  | ind_string_line DOLLAR_CURLY empty_expr '}' { $$ = $1; $1->push_back(new ExprAntiquot($3)); }
   | IND_STR_INDENT { $$ = new vector<Expr *>; $$->push_back($1); }
+  ;
+
+empty_expr
+  : expr { $$ = $1; }
+  | { $$ = new ExprString(data->symbols.create("")); }
   ;
 
 binds
