@@ -6,9 +6,9 @@
 %option nounput noyy_top_state
 
 
+%s DEFAULT
 %x STRING
 %x IND_STRING
-%x INSIDE_DOLLAR_CURLY
 
 
 %{
@@ -95,8 +95,6 @@ URI         [a-zA-Z][a-zA-Z0-9\+\-\.]*\:[a-zA-Z0-9\%\/\?\:\@\&\=\+\$\,\-\_\.\!\~
 
 %%
 
-<INITIAL,INSIDE_DOLLAR_CURLY>{
-
 
 if          { return IF; }
 then        { return THEN; }
@@ -134,15 +132,19 @@ or          { return OR_KW; }
               return FLOAT;
             }
 
-\$\{        { PUSH_STATE(INSIDE_DOLLAR_CURLY); return DOLLAR_CURLY; }
-}
+\$\{        { PUSH_STATE(DEFAULT); return DOLLAR_CURLY; }
 
-\}                           { return '}'; }
-<INSIDE_DOLLAR_CURLY>\}      { POP_STATE(); return '}'; }
-\{                           { return '{'; }
-<INSIDE_DOLLAR_CURLY>\{      { PUSH_STATE(INSIDE_DOLLAR_CURLY); return '{'; }
+\}          { /* State INITIAL only exists at the bottom of the stack and is
+                 used as a marker. DEFAULT replaces it everywhere else.
+                 Popping when in INITIAL state causes an empty stack exception,
+                 so don't */
+              if (YYSTATE != INITIAL)
+                POP_STATE();
+              return '}'; 
+            }
+\{          { PUSH_STATE(DEFAULT); return '{'; }
 
-<INITIAL,INSIDE_DOLLAR_CURLY>\"          { PUSH_STATE(STRING); return '"'; }
+\"          { PUSH_STATE(STRING); return '"'; }
 <STRING>([^\$\"\\]|\$[^\{\"\\]|\\.|\$\\.)*\$/\" |
 <STRING>([^\$\"\\]|\$[^\{\"\\]|\\.|\$\\.)+ {
               /* It is impossible to match strings ending with '$' with one
@@ -151,11 +153,11 @@ or          { return OR_KW; }
               yylval->e = unescapeStr(data->symbols, yytext);
               return STR;
             }
-<STRING>\$\{  { PUSH_STATE(INSIDE_DOLLAR_CURLY); return DOLLAR_CURLY; }
+<STRING>\$\{  { PUSH_STATE(DEFAULT); return DOLLAR_CURLY; }
 <STRING>\"  { POP_STATE(); return '"'; }
 <STRING>.   return yytext[0]; /* just in case: shouldn't be reached */
 
-<INITIAL,INSIDE_DOLLAR_CURLY>\'\'(\ *\n)?     { PUSH_STATE(IND_STRING); return IND_STRING_OPEN; }
+\'\'(\ *\n)?     { PUSH_STATE(IND_STRING); return IND_STRING_OPEN; }
 <IND_STRING>([^\$\']|\$[^\{\']|\'[^\'\$])+ {
                    yylval->e = new ExprIndStr(yytext);
                    return IND_STR;
@@ -172,7 +174,7 @@ or          { return OR_KW; }
                    yylval->e = unescapeStr(data->symbols, yytext + 2);
                    return IND_STR;
                  }
-<IND_STRING>\$\{ { PUSH_STATE(INSIDE_DOLLAR_CURLY); return DOLLAR_CURLY; }
+<IND_STRING>\$\{ { PUSH_STATE(DEFAULT); return DOLLAR_CURLY; }
 <IND_STRING>\'\' { POP_STATE(); return IND_STRING_CLOSE; }
 <IND_STRING>\'   {
                    yylval->e = new ExprIndStr("'");
@@ -180,7 +182,6 @@ or          { return OR_KW; }
                  }
 <IND_STRING>.    return yytext[0]; /* just in case: shouldn't be reached */
 
-<INITIAL,INSIDE_DOLLAR_CURLY>{
 
 {PATH}      { yylval->path = strdup(yytext); return PATH; }
 {HPATH}     { yylval->path = strdup(yytext); return HPATH; }
@@ -192,8 +193,6 @@ or          { return OR_KW; }
 \/\*([^*]|\*[^\/])*\*\/  /* long comments */
 
 .           return yytext[0];
-
-}
 
 <<EOF>> { data->atEnd = true; return 0; }
 
