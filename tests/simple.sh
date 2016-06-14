@@ -18,7 +18,7 @@ if test "$text" != "Hello World!"; then exit 1; fi
 nix-store --delete $outPath
 if test -e $outPath/hello; then false; fi
 
-outPath="$(NIX_STORE_DIR=/foo nix-instantiate --readonly-mode hash-check.nix)"
+outPath="$(NIX_REMOTE=local?store=/foo\&real=$TMPDIR/real-store nix-instantiate --readonly-mode hash-check.nix)"
 if test "$outPath" != "/foo/lfy1s6ca46rm5r6w4gg9hc0axiakjcnm-dependencies.drv"; then
     echo "hashDerivationModulo appears broken, got $outPath"
     exit 1
