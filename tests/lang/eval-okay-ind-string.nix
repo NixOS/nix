@@ -52,14 +52,14 @@ let
     consists only of whitespace, it's ignored.  But here there is
     some non-whitespace stuff, so the line isn't removed. '';
 
-  s8 = ''    ${""}
+  s8 = ''    ${}
     This shows a hacky way to preserve an empty line after the start.
     But there's no reason to do so: you could just repeat the empty
     line.
   '';
 
   s9 = ''
-  ${""}  Similarly you can force an indentation level,
+  ${}  Similarly you can force an indentation level,
     in this case to 2 spaces.  This works because the anti-quote
     is significant (not whitespace).
   '';
