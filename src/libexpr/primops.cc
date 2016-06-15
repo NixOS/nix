@@ -441,6 +441,13 @@ void prim_valueSize(EvalState & state, const Pos & pos, Value * * args, Value & 
     mkInt(v, valueSize(*args[0]));
 }
 
+void prim_forceSmartAntiquot(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    mkBool(v, settings.enableSmartAntiquotations);
+    settings.set("smart-antiquotations", "true");
+    settings.update();
+}
+
 
 /*************************************************************
  * Derivations
@@ -1782,6 +1789,7 @@ void EvalState::createBaseEnv()
     mkApp(v, *baseEnv.values[baseEnvDispl - 1], *v2);
     forceValue(v);
     addConstant("import", v);
+    addPrimOp("__forceSmartAntiquotations", 1, prim_forceSmartAntiquot);
     if (settings.enableImportNative)
         addPrimOp("__importNative", 2, prim_importNative);
     addPrimOp("__typeOf", 1, prim_typeOf);
