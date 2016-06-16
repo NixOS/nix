@@ -1115,17 +1115,17 @@ path).</para>
 <para>This command does not produce a <emphasis>closure</emphasis> of
 the specified paths, so if a store path references other store paths
 that are missing in the target Nix store, the import will fail.  To
-copy a whole closure, do something like
+copy a whole closure, do something like:
 
 <screen>
 $ nix-store --export $(nix-store -qR <replaceable>paths</replaceable>) > out</screen>
 
-</para>
+To import the whole closure again, run:
 
-<para>For an example of how <option>--export</option> and
-<option>--import</option> can be used, see the source of the <command
-linkend="sec-nix-copy-closure">nix-copy-closure</command>
-command.</para>
+<screen>
+$ nix-store --import < out</screen>
+
+</para>
 
 </refsection>
 
