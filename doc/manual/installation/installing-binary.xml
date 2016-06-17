@@ -53,6 +53,7 @@ install it like this:
 $ dpkg -i nix_1.8-1_amd64.deb</screen>
 
 </para>
+-->
 
 <para>You can also download a binary tarball that contains Nix and all
 its dependencies.  (This is what the install script at
@@ -79,7 +80,6 @@ other auxiliary data, if desired:
 $ rm -rf /nix</screen>
 
 </para>
--->
 
 <para>You can uninstall Nix simply by running:
 
