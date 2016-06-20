@@ -1123,7 +1123,7 @@ $ nix-store --export $(nix-store -qR <replaceable>paths</replaceable>) > out</sc
 To import the whole closure again, run:
 
 <screen>
-$ nix-store --import < out</screen>
+$ nix-store --import &lt; out</screen>
 
 </para>
 
