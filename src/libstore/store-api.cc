@@ -265,9 +265,13 @@ bool Store::isValidPath(const Path & storePath)
         }
     }
 
-    return isValidPathUncached(storePath);
+    bool valid = isValidPathUncached(storePath);
 
-    // FIXME: insert result into NARExistence table of diskCache.
+    if (diskCache && !valid)
+        // FIXME: handle valid = true case.
+        diskCache->upsertNarInfo(getUri(), hashPart, 0);
+
+    return valid;
 }
 
 
@@ -302,7 +306,7 @@ ref<const ValidPathInfo> Store::queryPathInfo(const Path & storePath)
 
     auto info = queryPathInfoUncached(storePath);
 
-    if (diskCache && info)
+    if (diskCache)
         diskCache->upsertNarInfo(getUri(), hashPart, info);
 
     {

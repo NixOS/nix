@@ -20,7 +20,7 @@ create table if not exists BinaryCaches (
 create table if not exists NARs (
     cache            integer not null,
     hashPart         text not null,
-    namePart         text not null,
+    namePart         text,
     url              text,
     compression      text,
     fileHash         text,
@@ -31,6 +31,7 @@ create table if not exists NARs (
     deriver          text,
     sigs             text,
     timestamp        integer not null,
+    present          integer not null,
     primary key (cache, hashPart),
     foreign key (cache) references BinaryCaches(id) on delete cascade
 );
@@ -64,7 +65,7 @@ public:
     struct State
     {
         SQLite db;
-        SQLiteStmt insertCache, queryCache, insertNAR, queryNAR, insertNARExistence, queryNARExistence;
+        SQLiteStmt insertCache, queryCache, insertNAR, insertMissingNAR, queryNAR;
         std::map<std::string, Cache> caches;
     };
 
@@ -74,7 +75,7 @@ public:
     {
         auto state(_state.lock());
 
-        Path dbPath = getCacheDir() + "/nix/binary-cache-v4.sqlite";
+        Path dbPath = getCacheDir() + "/nix/binary-cache-v5.sqlite";
         createDirs(dirOf(dbPath));
 
         if (sqlite3_open_v2(dbPath.c_str(), &state->db.db,
@@ -101,16 +102,13 @@ public:
 
         state->insertNAR.create(state->db,
             "insert or replace into NARs(cache, hashPart, namePart, url, compression, fileHash, fileSize, narHash, "
-            "narSize, refs, deriver, sigs, timestamp) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            "narSize, refs, deriver, sigs, timestamp, present) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)");
+
+        state->insertMissingNAR.create(state->db,
+            "insert or replace into NARs(cache, hashPart, timestamp, present) values (?, ?, ?, 0)");
 
         state->queryNAR.create(state->db,
             "select * from NARs where cache = ? and hashPart = ?");
-
-        state->insertNARExistence.create(state->db,
-            "insert or replace into NARExistence(cache, storePath, exist, timestamp) values (?, ?, ?, ?)");
-
-        state->queryNARExistence.create(state->db,
-            "select exist, timestamp from NARExistence where cache = ? and storePath = ?");
     }
 
     Cache & getCache(State & state, const std::string & uri)
@@ -164,6 +162,9 @@ public:
         if (!queryNAR.next())
             // FIXME: check NARExistence
             return {oUnknown, 0};
+
+        if (!queryNAR.getInt(13))
+            return {oInvalid, 0};
 
         auto narInfo = make_ref<NarInfo>();
 
@@ -219,8 +220,10 @@ public:
                 (time(0)).exec();
 
         } else {
-            // not implemented
-            abort();
+            state->insertMissingNAR.use()
+                (cache.id)
+                (hashPart)
+                (time(0)).exec();
         }
     }
 };
