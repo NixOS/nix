@@ -152,7 +152,8 @@ also <xref linkend="sec-common-options" />.</phrase></para>
     <literal>nix-shell -p libjpeg openjdk</literal> will start a shell
     in which the packages denoted by the attribute names
     <varname>libjpeg</varname> and <varname>openjdk</varname> are
-    present.</para></listitem>
+    present, along with all their build-time and runtime dependencies.
+    </para></listitem>
 
   </varlistentry>
 
