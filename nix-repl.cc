@@ -551,7 +551,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
 
     case tBool:
-        str << ESC_CYA << (v.boolean ? "true" :  "false") << ESC_END;
+        str << ESC_CYA << (v.boolean ? "true" : "false") << ESC_END;
         break;
 
     case tString:
@@ -666,7 +666,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
 
     default:
-        str << "ESC_RED «unknown»" ESC_END;
+        str << ESC_RED "«unknown»" ESC_END;
         break;
     }
 
