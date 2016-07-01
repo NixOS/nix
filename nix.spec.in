@@ -10,7 +10,7 @@ License: LGPLv2+
 Group: Applications/System
 %endif
 URL: http://nixos.org/
-Source0: %{name}-%{version}.tar.bz2
+Source0: %{name}-%{version}.tar.xz
 %if 0%{?el5}
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 %endif
