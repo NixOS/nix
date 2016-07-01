@@ -1,5 +1,5 @@
 %global nixbld_user "nix-builder-"
-%global nixbld_group "nix-builders"
+%global nixbld_group "nixbld"
 
 Summary: The Nix software deployment system
 Name: nix
