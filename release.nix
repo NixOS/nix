@@ -1,6 +1,7 @@
 { nix ? { outPath = ./.; revCount = 1234; shortRev = "abcdef"; }
 , nixpkgs ? { outPath = <nixpkgs>; revCount = 1234; shortRev = "abcdef"; }
 , officialRelease ? false
+, shell ? (import <nixpkgs/lib>).inNixShell
 }:
 
 let
@@ -20,7 +21,7 @@ let
         name = "nix-tarball";
         version = builtins.readFile ./version;
         versionSuffix = if officialRelease then "" else "pre${toString nix.revCount}_${nix.shortRev}";
-        src = if lib.inNixShell then null else nix;
+        src = if shell then null else nix;
         inherit officialRelease;
 
         buildInputs =
@@ -28,7 +29,7 @@ let
             pkgconfig sqlite libsodium
             docbook5 docbook5_xsl
             autoconf-archive
-          ] ++ lib.optional (!lib.inNixShell) git;
+          ] ++ lib.optional (!shell) git;
 
         configureFlags = ''
           --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
