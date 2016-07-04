@@ -596,6 +596,9 @@ HookInstance::HookInstance()
     if (string(buildHook, 0, 1) != "/") buildHook = settings.nixLibexecDir + "/nix/" + buildHook;
     buildHook = canonPath(buildHook);
 
+    if (!pathExists(buildHook))
+        throw SysError(format("NIX_BUILD_HOOK does not exist"));
+
     /* Create a pipe to get the output of the child. */
     fromHook.create();
 
