@@ -10,7 +10,7 @@ XSLTPROC = $(xsltproc) --nonet $(xmlflags) \
   --stringparam generate.toc "book toc" \
   --param keep.relative.image.uris 0
 
-docbookxsl = http://docbook.sourceforge.net/release/xsl-ns/1.78.1
+docbookxsl = http://docbook.sourceforge.net/release/xsl-ns/current
 docbookrng = http://docbook.org/xml/5.0/rng/docbook.rng
 
 MANUAL_SRCS := $(call rwildcard, $(d), *.xml)
