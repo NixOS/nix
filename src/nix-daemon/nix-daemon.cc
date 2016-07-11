@@ -767,7 +767,7 @@ static void daemonLoop(char * * argv)
 
         /* Create and bind to a Unix domain socket. */
         fdSocket = socket(PF_UNIX, SOCK_STREAM, 0);
-        if (fdSocket == -1)
+        if (!fdSocket)
             throw SysError("cannot create Unix domain socket");
 
         string socketPath = settings.nixDaemonSocketFile;
@@ -793,7 +793,7 @@ static void daemonLoop(char * * argv)
            (everybody can connect --- provided they have access to the
            directory containing the socket). */
         mode_t oldMode = umask(0111);
-        int res = bind(fdSocket, (struct sockaddr *) &addr, sizeof(addr));
+        int res = bind(fdSocket.get(), (struct sockaddr *) &addr, sizeof(addr));
         umask(oldMode);
         if (res == -1)
             throw SysError(format("cannot bind to socket ‘%1%’") % socketPath);
@@ -801,11 +801,11 @@ static void daemonLoop(char * * argv)
         if (chdir("/") == -1) /* back to the root */
             throw SysError("cannot change current directory");
 
-        if (listen(fdSocket, 5) == -1)
+        if (listen(fdSocket.get(), 5) == -1)
             throw SysError(format("cannot listen on socket ‘%1%’") % socketPath);
     }
 
-    closeOnExec(fdSocket);
+    closeOnExec(fdSocket.get());
 
     /* Loop accepting connections. */
     while (1) {
@@ -815,18 +815,18 @@ static void daemonLoop(char * * argv)
             struct sockaddr_un remoteAddr;
             socklen_t remoteAddrLen = sizeof(remoteAddr);
 
-            AutoCloseFD remote = accept(fdSocket,
+            AutoCloseFD remote = accept(fdSocket.get(),
                 (struct sockaddr *) &remoteAddr, &remoteAddrLen);
             checkInterrupt();
-            if (remote == -1) {
+            if (!remote) {
                 if (errno == EINTR) continue;
                 throw SysError("accepting connection");
             }
 
-            closeOnExec(remote);
+            closeOnExec(remote.get());
 
             bool trusted = false;
-            PeerInfo peer = getPeerInfo(remote);
+            PeerInfo peer = getPeerInfo(remote.get());
 
             struct passwd * pw = peer.uidKnown ? getpwuid(peer.uid) : 0;
             string user = pw ? pw->pw_name : std::to_string(peer.uid);
@@ -854,7 +854,7 @@ static void daemonLoop(char * * argv)
             options.runExitHandlers = true;
             options.allowVfork = false;
             startProcess([&]() {
-                fdSocket.close();
+                fdSocket = -1;
 
                 /* Background the daemon. */
                 if (setsid() == -1)
@@ -870,8 +870,8 @@ static void daemonLoop(char * * argv)
                 }
 
                 /* Handle the connection. */
-                from.fd = remote;
-                to.fd = remote;
+                from.fd = remote.get();
+                to.fd = remote.get();
                 processConnection(trusted);
 
                 exit(0);

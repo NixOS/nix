@@ -120,11 +120,11 @@ LocalStore::LocalStore(const Params & params)
             AutoCloseFD fd = open(reservedPath.c_str(), O_WRONLY | O_CREAT | O_CLOEXEC, 0600);
             int res = -1;
 #if HAVE_POSIX_FALLOCATE
-            res = posix_fallocate(fd, 0, settings.reservedSize);
+            res = posix_fallocate(fd.get(), 0, settings.reservedSize);
 #endif
             if (res == -1) {
-                writeFull(fd, string(settings.reservedSize, 'X'));
-                ftruncate(fd, settings.reservedSize);
+                writeFull(fd.get(), string(settings.reservedSize, 'X'));
+                ftruncate(fd.get(), settings.reservedSize);
             }
         }
     } catch (SysError & e) { /* don't care about errors */
@@ -135,9 +135,9 @@ LocalStore::LocalStore(const Params & params)
     Path globalLockPath = dbDir + "/big-lock";
     globalLock = openLockFile(globalLockPath.c_str(), true);
 
-    if (!lockFile(globalLock, ltRead, false)) {
+    if (!lockFile(globalLock.get(), ltRead, false)) {
         printMsg(lvlError, "waiting for the big Nix store lock...");
-        lockFile(globalLock, ltRead, true);
+        lockFile(globalLock.get(), ltRead, true);
     }
 
     /* Check the current database schema and if necessary do an
@@ -166,9 +166,9 @@ LocalStore::LocalStore(const Params & params)
                 "which is no longer supported. To convert to the new format,\n"
                 "please upgrade Nix to version 1.11 first.");
 
-        if (!lockFile(globalLock, ltWrite, false)) {
+        if (!lockFile(globalLock.get(), ltWrite, false)) {
             printMsg(lvlError, "waiting for exclusive access to the Nix store...");
-            lockFile(globalLock, ltWrite, true);
+            lockFile(globalLock.get(), ltWrite, true);
         }
 
         /* Get the schema version again, because another process may
@@ -197,7 +197,7 @@ LocalStore::LocalStore(const Params & params)
 
         writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
 
-        lockFile(globalLock, ltRead, true);
+        lockFile(globalLock.get(), ltRead, true);
     }
 
     else openDB(*state, false);
@@ -236,8 +236,8 @@ LocalStore::~LocalStore()
     auto state(_state.lock());
 
     try {
-        if (state->fdTempRoots != -1) {
-            state->fdTempRoots.close();
+        if (state->fdTempRoots) {
+            state->fdTempRoots = -1;
             unlink(state->fnTempRoots.c_str());
         }
     } catch (...) {
@@ -1115,7 +1115,7 @@ bool LocalStore::verifyStore(bool checkContents, bool repair)
 
     /* Release the GC lock so that checking content hashes (which can
        take ages) doesn't block the GC or builds. */
-    fdGCLock.close();
+    fdGCLock = -1;
 
     /* Optionally, check the content hashes (slow). */
     if (checkContents) {

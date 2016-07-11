@@ -42,14 +42,14 @@ static void dumpContents(const Path & path, size_t size,
     sink << "contents" << size;
 
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
-    if (fd == -1) throw SysError(format("opening file ‘%1%’") % path);
+    if (!fd) throw SysError(format("opening file ‘%1%’") % path);
 
     unsigned char buf[65536];
     size_t left = size;
 
     while (left > 0) {
         size_t n = left > sizeof(buf) ? sizeof(buf) : left;
-        readFull(fd, buf, n);
+        readFull(fd.get(), buf, n);
         left -= n;
         sink(buf, n);
     }
@@ -303,17 +303,16 @@ struct RestoreSink : ParseSink
     void createRegularFile(const Path & path)
     {
         Path p = dstPath + path;
-        fd.close();
         fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666);
-        if (fd == -1) throw SysError(format("creating file ‘%1%’") % p);
+        if (!fd) throw SysError(format("creating file ‘%1%’") % p);
     }
 
     void isExecutable()
     {
         struct stat st;
-        if (fstat(fd, &st) == -1)
+        if (fstat(fd.get(), &st) == -1)
             throw SysError("fstat");
-        if (fchmod(fd, st.st_mode | (S_IXUSR | S_IXGRP | S_IXOTH)) == -1)
+        if (fchmod(fd.get(), st.st_mode | (S_IXUSR | S_IXGRP | S_IXOTH)) == -1)
             throw SysError("fchmod");
     }
 
@@ -321,7 +320,7 @@ struct RestoreSink : ParseSink
     {
 #if HAVE_POSIX_FALLOCATE
         if (len) {
-            errno = posix_fallocate(fd, 0, len);
+            errno = posix_fallocate(fd.get(), 0, len);
             /* Note that EINVAL may indicate that the underlying
                filesystem doesn't support preallocation (e.g. on
                OpenSolaris).  Since preallocation is just an
@@ -334,7 +333,7 @@ struct RestoreSink : ParseSink
 
     void receiveContents(unsigned char * data, unsigned int len)
     {
-        writeFull(fd, data, len);
+        writeFull(fd.get(), data, len);
     }
 
     void createSymlink(const Path & path, const string & target)

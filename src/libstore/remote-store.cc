@@ -66,9 +66,9 @@ ref<RemoteStore::Connection> RemoteStore::openConnection()
         | SOCK_CLOEXEC
         #endif
         , 0);
-    if (conn->fd == -1)
+    if (!conn->fd)
         throw SysError("cannot create Unix domain socket");
-    closeOnExec(conn->fd);
+    closeOnExec(conn->fd.get());
 
     string socketPath = settings.nixDaemonSocketFile;
 
@@ -78,11 +78,11 @@ ref<RemoteStore::Connection> RemoteStore::openConnection()
         throw Error(format("socket path ‘%1%’ is too long") % socketPath);
     strcpy(addr.sun_path, socketPath.c_str());
 
-    if (connect(conn->fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+    if (connect(conn->fd.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
         throw SysError(format("cannot connect to daemon at ‘%1%’") % socketPath);
 
-    conn->from.fd = conn->fd;
-    conn->to.fd = conn->fd;
+    conn->from.fd = conn->fd.get();
+    conn->to.fd = conn->fd.get();
 
     /* Send the magic greeting, check for the reply. */
     try {
@@ -531,7 +531,7 @@ RemoteStore::Connection::~Connection()
 {
     try {
         to.flush();
-        fd.close();
+        fd = -1;
     } catch (...) {
         ignoreException();
     }

@@ -164,16 +164,18 @@ public:
 class AutoCloseFD
 {
     int fd;
+    void close();
 public:
     AutoCloseFD();
     AutoCloseFD(int fd);
-    AutoCloseFD(const AutoCloseFD & fd);
+    AutoCloseFD(const AutoCloseFD & fd) = delete;
+    AutoCloseFD(AutoCloseFD&& fd);
     ~AutoCloseFD();
-    void operator =(int fd);
-    operator int() const;
-    void close();
-    bool isOpen();
-    int borrow();
+    AutoCloseFD& operator =(const AutoCloseFD & fd) = delete;
+    AutoCloseFD& operator =(AutoCloseFD&& fd);
+    int get() const;
+    explicit operator bool() const;
+    int release();
 };
 
 

@@ -17,10 +17,10 @@ int openLockFile(const Path & path, bool create)
     AutoCloseFD fd;
 
     fd = open(path.c_str(), O_CLOEXEC | O_RDWR | (create ? O_CREAT : 0), 0600);
-    if (fd == -1 && (create || errno != ENOENT))
+    if (!fd && (create || errno != ENOENT))
         throw SysError(format("opening lock file ‘%1%’") % path);
 
-    return fd.borrow();
+    return fd.release();
 }
 
 
@@ -119,10 +119,10 @@ bool PathLocks::lockPaths(const PathSet & _paths,
             fd = openLockFile(lockPath, true);
 
             /* Acquire an exclusive lock. */
-            if (!lockFile(fd, ltWrite, false)) {
+            if (!lockFile(fd.get(), ltWrite, false)) {
                 if (wait) {
                     if (waitMsg != "") printMsg(lvlError, waitMsg);
-                    lockFile(fd, ltWrite, true);
+                    lockFile(fd.get(), ltWrite, true);
                 } else {
                     /* Failed to lock this path; release all other
                        locks. */
@@ -136,7 +136,7 @@ bool PathLocks::lockPaths(const PathSet & _paths,
             /* Check that the lock file hasn't become stale (i.e.,
                hasn't been unlinked). */
             struct stat st;
-            if (fstat(fd, &st) == -1)
+            if (fstat(fd.get(), &st) == -1)
                 throw SysError(format("statting lock file ‘%1%’") % lockPath);
             if (st.st_size != 0)
                 /* This lock file has been unlinked, so we're holding
@@ -149,7 +149,7 @@ bool PathLocks::lockPaths(const PathSet & _paths,
         }
 
         /* Use borrow so that the descriptor isn't closed. */
-        fds.push_back(FDPair(fd.borrow(), lockPath));
+        fds.push_back(FDPair(fd.release(), lockPath));
         lockedPaths.insert(lockPath);
     }
 

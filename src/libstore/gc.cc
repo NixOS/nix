@@ -34,19 +34,19 @@ int LocalStore::openGCLock(LockType lockType)
     debug(format("acquiring global GC lock ‘%1%’") % fnGCLock);
 
     AutoCloseFD fdGCLock = open(fnGCLock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
-    if (fdGCLock == -1)
+    if (!fdGCLock)
         throw SysError(format("opening global GC lock ‘%1%’") % fnGCLock);
 
-    if (!lockFile(fdGCLock, lockType, false)) {
+    if (!lockFile(fdGCLock.get(), lockType, false)) {
         printMsg(lvlError, format("waiting for the big garbage collector lock..."));
-        lockFile(fdGCLock, lockType, true);
+        lockFile(fdGCLock.get(), lockType, true);
     }
 
     /* !!! Restrict read permission on the GC root.  Otherwise any
        process that can open the file for reading can DoS the
        collector. */
 
-    return fdGCLock.borrow();
+    return fdGCLock.release();
 }
 
 
@@ -149,7 +149,7 @@ void LocalStore::addTempRoot(const Path & path)
     auto state(_state.lock());
 
     /* Create the temporary roots file for this process. */
-    if (state->fdTempRoots == -1) {
+    if (!state->fdTempRoots) {
 
         while (1) {
             Path dir = (format("%1%/%2%") % stateDir % tempRootsDir).str();
@@ -166,15 +166,15 @@ void LocalStore::addTempRoot(const Path & path)
 
             state->fdTempRoots = openLockFile(state->fnTempRoots, true);
 
-            fdGCLock.close();
+            fdGCLock = -1;
 
             debug(format("acquiring read lock on ‘%1%’") % state->fnTempRoots);
-            lockFile(state->fdTempRoots, ltRead, true);
+            lockFile(state->fdTempRoots.get(), ltRead, true);
 
             /* Check whether the garbage collector didn't get in our
                way. */
             struct stat st;
-            if (fstat(state->fdTempRoots, &st) == -1)
+            if (fstat(state->fdTempRoots.get(), &st) == -1)
                 throw SysError(format("statting ‘%1%’") % state->fnTempRoots);
             if (st.st_size == 0) break;
 
@@ -188,14 +188,14 @@ void LocalStore::addTempRoot(const Path & path)
     /* Upgrade the lock to a write lock.  This will cause us to block
        if the garbage collector is holding our lock. */
     debug(format("acquiring write lock on ‘%1%’") % state->fnTempRoots);
-    lockFile(state->fdTempRoots, ltWrite, true);
+    lockFile(state->fdTempRoots.get(), ltWrite, true);
 
     string s = path + '\0';
-    writeFull(state->fdTempRoots, s);
+    writeFull(state->fdTempRoots.get(), s);
 
     /* Downgrade to a read lock. */
     debug(format("downgrading to read lock on ‘%1%’") % state->fnTempRoots);
-    lockFile(state->fdTempRoots, ltRead, true);
+    lockFile(state->fdTempRoots.get(), ltRead, true);
 }
 
 
@@ -211,7 +211,7 @@ void LocalStore::readTempRoots(PathSet & tempRoots, FDs & fds)
 
         debug(format("reading temporary root file ‘%1%’") % path);
         FDPtr fd(new AutoCloseFD(open(path.c_str(), O_CLOEXEC | O_RDWR, 0666)));
-        if (*fd == -1) {
+        if (!*fd) {
             /* It's okay if the file has disappeared. */
             if (errno == ENOENT) continue;
             throw SysError(format("opening temporary roots file ‘%1%’") % path);
@@ -224,10 +224,10 @@ void LocalStore::readTempRoots(PathSet & tempRoots, FDs & fds)
         /* Try to acquire a write lock without blocking.  This can
            only succeed if the owning process has died.  In that case
            we don't care about its temporary roots. */
-        if (lockFile(*fd, ltWrite, false)) {
+        if (lockFile(fd->get(), ltWrite, false)) {
             printMsg(lvlError, format("removing stale temporary roots file ‘%1%’") % path);
             unlink(path.c_str());
-            writeFull(*fd, "d");
+            writeFull(fd->get(), "d");
             continue;
         }
 
@@ -235,10 +235,10 @@ void LocalStore::readTempRoots(PathSet & tempRoots, FDs & fds)
            from upgrading to a write lock, therefore it will block in
            addTempRoot(). */
         debug(format("waiting for read lock on ‘%1%’") % path);
-        lockFile(*fd, ltRead, true);
+        lockFile(fd->get(), ltRead, true);
 
         /* Read the entire file. */
-        string contents = readFile(*fd);
+        string contents = readFile(fd->get());
 
         /* Extract the roots. */
         string::size_type pos = 0, end;
@@ -721,7 +721,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     }
 
     /* Allow other processes to add to the store from here on. */
-    fdGCLock.close();
+    fdGCLock = -1;
     fds.clear();
 
     /* Delete the trash directory. */

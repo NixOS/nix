@@ -403,7 +403,7 @@ static void commonChildInit(Pipe & logPipe)
         throw SysError(format("creating a new session"));
 
     /* Dup the write side of the logger pipe into stderr. */
-    if (dup2(logPipe.writeSide, STDERR_FILENO) == -1)
+    if (dup2(logPipe.writeSide.get(), STDERR_FILENO) == -1)
         throw SysError("cannot pipe standard error into log file");
 
     /* Dup stderr to stdout. */
@@ -510,11 +510,11 @@ void UserLock::acquire()
             continue;
 
         AutoCloseFD fd = open(fnUserLock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
-        if (fd == -1)
+        if (!fd)
             throw SysError(format("opening user lock ‘%1%’") % fnUserLock);
 
-        if (lockFile(fd, ltWrite, false)) {
-            fdUserLock = fd.borrow();
+        if (lockFile(fd.get(), ltWrite, false)) {
+            fdUserLock = std::move(fd);
             lockedPaths.insert(fnUserLock);
             user = i;
             uid = pw->pw_uid;
@@ -550,7 +550,7 @@ void UserLock::acquire()
 void UserLock::release()
 {
     if (uid == 0) return;
-    fdUserLock.close(); /* releases lock */
+    fdUserLock = -1; /* releases lock */
     assert(lockedPaths.find(fnUserLock) != lockedPaths.end());
     lockedPaths.erase(fnUserLock);
     fnUserLock = "";
@@ -613,11 +613,11 @@ HookInstance::HookInstance()
         if (chdir("/") == -1) throw SysError("changing into /");
 
         /* Dup the communication pipes. */
-        if (dup2(toHook.readSide, STDIN_FILENO) == -1)
+        if (dup2(toHook.readSide.get(), STDIN_FILENO) == -1)
             throw SysError("dupping to-hook read side");
 
         /* Use fd 4 for the builder's stdout/stderr. */
-        if (dup2(builderOut.writeSide, 4) == -1)
+        if (dup2(builderOut.writeSide.get(), 4) == -1)
             throw SysError("dupping builder's stdout/stderr");
 
         Strings args = {
@@ -633,15 +633,15 @@ HookInstance::HookInstance()
     });
 
     pid.setSeparatePG(true);
-    fromHook.writeSide.close();
-    toHook.readSide.close();
+    fromHook.writeSide = -1;
+    toHook.readSide = -1;
 }
 
 
 HookInstance::~HookInstance()
 {
     try {
-        toHook.writeSide.close();
+        toHook.writeSide = -1;
         pid.kill(true);
     } catch (...) {
         ignoreException();
@@ -1414,10 +1414,10 @@ void DerivationGoal::buildDone()
 
     /* Close the read side of the logger pipe. */
     if (hook) {
-        hook->builderOut.readSide.close();
-        hook->fromHook.readSide.close();
+        hook->builderOut.readSide = -1;
+        hook->fromHook.readSide = -1;
     }
-    else builderOut.readSide.close();
+    else builderOut.readSide = -1;
 
     /* Close the log file. */
     closeLogFile();
@@ -1557,7 +1557,7 @@ HookReply DerivationGoal::tryBuildHook()
     for (auto & i : features) checkStoreName(i); /* !!! abuse */
 
     /* Send the request to the hook. */
-    writeLine(worker.hook->toHook.writeSide, (format("%1% %2% %3% %4%")
+    writeLine(worker.hook->toHook.writeSide.get(), (format("%1% %2% %3% %4%")
         % (worker.getNrLocalBuilds() < settings.maxBuildJobs ? "1" : "0")
         % drv->platform % drvPath % concatStringsSep(",", features)).str());
 
@@ -1565,7 +1565,7 @@ HookReply DerivationGoal::tryBuildHook()
        whether the hook wishes to perform the build. */
     string reply;
     while (true) {
-        string s = readLine(worker.hook->fromHook.readSide);
+        string s = readLine(worker.hook->fromHook.readSide.get());
         if (string(s, 0, 2) == "# ") {
             reply = string(s, 2);
             break;
@@ -1597,22 +1597,22 @@ HookReply DerivationGoal::tryBuildHook()
 
     string s;
     for (auto & i : allInputs) { s += i; s += ' '; }
-    writeLine(hook->toHook.writeSide, s);
+    writeLine(hook->toHook.writeSide.get(), s);
 
     /* Tell the hooks the missing outputs that have to be copied back
        from the remote system. */
     s = "";
     for (auto & i : missingPaths) { s += i; s += ' '; }
-    writeLine(hook->toHook.writeSide, s);
+    writeLine(hook->toHook.writeSide.get(), s);
 
-    hook->toHook.writeSide.close();
+    hook->toHook.writeSide = -1;
 
     /* Create the log file and pipe. */
     Path logFile = openLogFile();
 
     set<int> fds;
-    fds.insert(hook->fromHook.readSide);
-    fds.insert(hook->builderOut.readSide);
+    fds.insert(hook->fromHook.readSide.get());
+    fds.insert(hook->builderOut.readSide.get());
     worker.childStarted(shared_from_this(), fds, false, false);
 
     return rpAccept;
@@ -2142,17 +2142,17 @@ void DerivationGoal::startBuilder()
                 child = clone(childEntry, stack + stackSize, flags & ~CLONE_NEWPID, this);
             if (child == -1) throw SysError("cloning builder process");
 
-            writeFull(builderOut.writeSide, std::to_string(child) + "\n");
+            writeFull(builderOut.writeSide.get(), std::to_string(child) + "\n");
             _exit(0);
         }, options);
 
         if (helper.wait(true) != 0)
             throw Error("unable to start build process");
 
-        userNamespaceSync.readSide.close();
+        userNamespaceSync.readSide = -1;
 
         pid_t tmp;
-        if (!string2Int<pid_t>(readLine(builderOut.readSide), tmp)) abort();
+        if (!string2Int<pid_t>(readLine(builderOut.readSide.get()), tmp)) abort();
         pid = tmp;
 
         /* Set the UID/GID mapping of the builder's user
@@ -2171,8 +2171,8 @@ void DerivationGoal::startBuilder()
 
         /* Signal the builder that we've updated its user
            namespace. */
-        writeFull(userNamespaceSync.writeSide, "1");
-        userNamespaceSync.writeSide.close();
+        writeFull(userNamespaceSync.writeSide.get(), "1");
+        userNamespaceSync.writeSide = -1;
 
     } else
 #endif
@@ -2186,12 +2186,12 @@ void DerivationGoal::startBuilder()
 
     /* parent */
     pid.setSeparatePG(true);
-    builderOut.writeSide.close();
-    worker.childStarted(shared_from_this(), {builderOut.readSide}, true, true);
+    builderOut.writeSide = -1;
+    worker.childStarted(shared_from_this(), {builderOut.readSide.get()}, true, true);
 
     /* Check if setting up the build environment failed. */
     while (true) {
-        string msg = readLine(builderOut.readSide);
+        string msg = readLine(builderOut.readSide.get());
         if (string(msg, 0, 1) == "\1") {
             if (msg.size() == 1) break;
             throw Error(string(msg, 1));
@@ -2215,26 +2215,24 @@ void DerivationGoal::runChild()
 #if __linux__
         if (useChroot) {
 
-            userNamespaceSync.writeSide.close();
+            userNamespaceSync.writeSide = -1;
 
-            if (drainFD(userNamespaceSync.readSide) != "1")
+            if (drainFD(userNamespaceSync.readSide.get()) != "1")
                 throw Error("user namespace initialisation failed");
 
-            userNamespaceSync.readSide.close();
+            userNamespaceSync.readSide = -1;
 
             if (privateNetwork) {
 
                 /* Initialise the loopback interface. */
                 AutoCloseFD fd(socket(PF_INET, SOCK_DGRAM, IPPROTO_IP));
-                if (fd == -1) throw SysError("cannot open IP socket");
+                if (!fd) throw SysError("cannot open IP socket");
 
                 struct ifreq ifr;
                 strcpy(ifr.ifr_name, "lo");
                 ifr.ifr_flags = IFF_UP | IFF_LOOPBACK | IFF_RUNNING;
-                if (ioctl(fd, SIOCSIFFLAGS, &ifr) == -1)
+                if (ioctl(fd.get(), SIOCSIFFLAGS, &ifr) == -1)
                     throw SysError("cannot set loopback interface flags");
-
-                fd.close();
             }
 
             /* Set the hostname etc. to fixed values. */
@@ -2919,9 +2917,9 @@ Path DerivationGoal::openLogFile()
         % (settings.compressLog ? ".bz2" : "")).str();
 
     fdLogFile = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0666);
-    if (fdLogFile == -1) throw SysError(format("creating log file ‘%1%’") % logFileName);
+    if (!fdLogFile) throw SysError(format("creating log file ‘%1%’") % logFileName);
 
-    logFileSink = std::make_shared<FdSink>(fdLogFile);
+    logFileSink = std::make_shared<FdSink>(fdLogFile.get());
 
     if (settings.compressLog)
         logSink = std::shared_ptr<CompressionSink>(makeCompressionSink("bzip2", *logFileSink));
@@ -2938,7 +2936,7 @@ void DerivationGoal::closeLogFile()
     if (logSink2) logSink2->finish();
     if (logFileSink) logFileSink->flush();
     logSink = logFileSink = 0;
-    fdLogFile.close();
+    fdLogFile = -1;
 }
 
 
@@ -2960,8 +2958,8 @@ void DerivationGoal::deleteTmpDir(bool force)
 
 void DerivationGoal::handleChildOutput(int fd, const string & data)
 {
-    if ((hook && fd == hook->builderOut.readSide) ||
-        (!hook && fd == builderOut.readSide))
+    if ((hook && fd == hook->builderOut.readSide.get()) ||
+        (!hook && fd == builderOut.readSide.get()))
     {
         logSize += data.size();
         if (settings.maxLogSize && logSize > settings.maxLogSize) {
@@ -2987,7 +2985,7 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
         if (logSink) (*logSink)(data);
     }
 
-    if (hook && fd == hook->fromHook.readSide)
+    if (hook && fd == hook->fromHook.readSide.get())
         printMsg(lvlError, data); // FIXME?
 }
 
@@ -3274,7 +3272,7 @@ void SubstitutionGoal::tryToRun()
     thr = std::thread([this]() {
         try {
             /* Wake up the worker loop when we're done. */
-            Finally updateStats([this]() { outPipe.writeSide.close(); });
+            Finally updateStats([this]() { outPipe.writeSide = -1; });
 
             copyStorePath(ref<Store>(sub), ref<Store>(worker.store.shared_from_this()),
                 storePath, repair);
@@ -3285,7 +3283,7 @@ void SubstitutionGoal::tryToRun()
         }
     });
 
-    worker.childStarted(shared_from_this(), {outPipe.readSide}, true, false);
+    worker.childStarted(shared_from_this(), {outPipe.readSide.get()}, true, false);
 
     state = &SubstitutionGoal::finished;
 }
@@ -3325,7 +3323,7 @@ void SubstitutionGoal::handleChildOutput(int fd, const string & data)
 
 void SubstitutionGoal::handleEOF(int fd)
 {
-    if (fd == outPipe.readSide) worker.wakeUp(shared_from_this());
+    if (fd == outPipe.readSide.get()) worker.wakeUp(shared_from_this());
 }
 
 

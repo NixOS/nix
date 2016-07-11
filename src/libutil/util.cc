@@ -274,18 +274,18 @@ string readFile(int fd)
 string readFile(const Path & path, bool drain)
 {
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
-    if (fd == -1)
+    if (!fd)
         throw SysError(format("opening file ‘%1%’") % path);
-    return drain ? drainFD(fd) : readFile(fd);
+    return drain ? drainFD(fd.get()) : readFile(fd.get());
 }
 
 
 void writeFile(const Path & path, const string & s)
 {
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, 0666);
-    if (fd == -1)
+    if (!fd)
         throw SysError(format("opening file ‘%1%’") % path);
-    writeFull(fd, s);
+    writeFull(fd.get(), s);
 }
 
 
@@ -556,28 +556,24 @@ void AutoDelete::reset(const Path & p, bool recursive) {
 //////////////////////////////////////////////////////////////////////
 
 
-AutoCloseFD::AutoCloseFD()
+AutoCloseFD::AutoCloseFD() : fd{-1} {}
+
+
+AutoCloseFD::AutoCloseFD(int fd) : fd{fd} {}
+
+
+AutoCloseFD::AutoCloseFD(AutoCloseFD&& that) : fd{that.fd}
 {
-    fd = -1;
+    that.fd = -1;
 }
 
 
-AutoCloseFD::AutoCloseFD(int fd)
+AutoCloseFD& AutoCloseFD::operator =(AutoCloseFD&& that)
 {
-    this->fd = fd;
-}
-
-
-AutoCloseFD::AutoCloseFD(const AutoCloseFD & fd)
-{
-    /* Copying an AutoCloseFD isn't allowed (who should get to close
-       it?).  But as an edge case, allow copying of closed
-       AutoCloseFDs.  This is necessary due to tiresome reasons
-       involving copy constructor use on default object values in STL
-       containers (like when you do `map[value]' where value isn't in
-       the map yet). */
-    this->fd = fd.fd;
-    if (this->fd != -1) abort();
+    close();
+    fd = that.fd;
+    that.fd = -1;
+    return *this;
 }
 
 
@@ -591,14 +587,7 @@ AutoCloseFD::~AutoCloseFD()
 }
 
 
-void AutoCloseFD::operator =(int fd)
-{
-    if (this->fd != fd) close();
-    this->fd = fd;
-}
-
-
-AutoCloseFD::operator int() const
+int AutoCloseFD::get() const
 {
     return fd;
 }
@@ -610,19 +599,17 @@ void AutoCloseFD::close()
         if (::close(fd) == -1)
             /* This should never happen. */
             throw SysError(format("closing file descriptor %1%") % fd);
-        fd = -1;
     }
 }
 
 
-bool AutoCloseFD::isOpen()
+AutoCloseFD::operator bool() const
 {
     return fd != -1;
 }
 
 
-/* Pass responsibility for closing this fd to the caller. */
-int AutoCloseFD::borrow()
+int AutoCloseFD::release()
 {
     int oldFD = fd;
     fd = -1;
@@ -899,10 +886,10 @@ string runProgram(Path program, bool searchPath, const Strings & args,
 
     /* Fork. */
     Pid pid = startProcess([&]() {
-        if (dup2(out.writeSide, STDOUT_FILENO) == -1)
+        if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
             throw SysError("dupping stdout");
         if (!input.empty()) {
-            if (dup2(in.readSide, STDIN_FILENO) == -1)
+            if (dup2(in.readSide.get(), STDIN_FILENO) == -1)
                 throw SysError("dupping stdin");
         }
 
@@ -917,16 +904,16 @@ string runProgram(Path program, bool searchPath, const Strings & args,
         throw SysError(format("executing ‘%1%’") % program);
     });
 
-    out.writeSide.close();
+    out.writeSide = -1;
 
     /* FIXME: This can deadlock if the input is too long. */
     if (!input.empty()) {
-        in.readSide.close();
-        writeFull(in.writeSide, input);
-        in.writeSide.close();
+        in.readSide = -1;
+        writeFull(in.writeSide.get(), input);
+        in.writeSide = -1;
     }
 
-    string result = drainFD(out.readSide);
+    string result = drainFD(out.readSide.get());
 
     /* Wait for the child to finish. */
     int status = pid.wait(true);

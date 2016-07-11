@@ -325,7 +325,7 @@ RunPager::RunPager()
     toPager.create();
 
     pid = startProcess([&]() {
-        if (dup2(toPager.readSide, STDIN_FILENO) == -1)
+        if (dup2(toPager.readSide.get(), STDIN_FILENO) == -1)
             throw SysError("dupping stdin");
         if (!getenv("LESS"))
             setenv("LESS", "FRSXMK", 1);
@@ -337,7 +337,7 @@ RunPager::RunPager()
         throw SysError(format("executing ‘%1%’") % pager);
     });
 
-    if (dup2(toPager.writeSide, STDOUT_FILENO) == -1)
+    if (dup2(toPager.writeSide.get(), STDOUT_FILENO) == -1)
         throw SysError("dupping stdout");
 }
 
