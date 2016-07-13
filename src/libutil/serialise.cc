@@ -8,18 +8,9 @@
 namespace nix {
 
 
-BufferedSink::~BufferedSink()
-{
-    /* We can't call flush() here, because C++ for some insane reason
-       doesn't allow you to call virtual methods from a destructor. */
-    assert(!bufPos);
-    delete[] buffer;
-}
-
-
 void BufferedSink::operator () (const unsigned char * data, size_t len)
 {
-    if (!buffer) buffer = new unsigned char[bufSize];
+    if (!buffer) buffer = decltype(buffer)(new unsigned char[bufSize]);
 
     while (len) {
         /* Optimisation: bypass the buffer if the data exceeds the
@@ -32,7 +23,7 @@ void BufferedSink::operator () (const unsigned char * data, size_t len)
         /* Otherwise, copy the bytes to the buffer.  Flush the buffer
            when it's full. */
         size_t n = bufPos + len > bufSize ? bufSize - bufPos : len;
-        memcpy(buffer + bufPos, data, n);
+        memcpy(buffer.get() + bufPos, data, n);
         data += n; bufPos += n; len -= n;
         if (bufPos == bufSize) flush();
     }
@@ -44,7 +35,7 @@ void BufferedSink::flush()
     if (bufPos == 0) return;
     size_t n = bufPos;
     bufPos = 0; // don't trigger the assert() in ~BufferedSink()
-    write(buffer, n);
+    write(buffer.get(), n);
 }
 
 
@@ -95,21 +86,15 @@ void Source::operator () (unsigned char * data, size_t len)
 }
 
 
-BufferedSource::~BufferedSource()
-{
-    delete[] buffer;
-}
-
-
 size_t BufferedSource::read(unsigned char * data, size_t len)
 {
-    if (!buffer) buffer = new unsigned char[bufSize];
+    if (!buffer) buffer = decltype(buffer)(new unsigned char[bufSize]);
 
-    if (!bufPosIn) bufPosIn = readUnbuffered(buffer, bufSize);
+    if (!bufPosIn) bufPosIn = readUnbuffered(buffer.get(), bufSize);
 
     /* Copy out the data in the buffer. */
     size_t n = len > bufPosIn - bufPosOut ? bufPosIn - bufPosOut : len;
-    memcpy(data, buffer + bufPosOut, n);
+    memcpy(data, buffer.get() + bufPosOut, n);
     bufPosOut += n;
     if (bufPosIn == bufPosOut) bufPosIn = bufPosOut = 0;
     return n;

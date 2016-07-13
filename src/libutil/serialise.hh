@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "types.hh"
 #include "util.hh"
 
@@ -25,11 +27,10 @@ struct Sink
 struct BufferedSink : Sink
 {
     size_t bufSize, bufPos;
-    unsigned char * buffer;
+    std::unique_ptr<unsigned char[]> buffer;
 
     BufferedSink(size_t bufSize = 32 * 1024)
-        : bufSize(bufSize), bufPos(0), buffer(0) { }
-    ~BufferedSink();
+        : bufSize(bufSize), bufPos(0), buffer(nullptr) { }
 
     void operator () (const unsigned char * data, size_t len) override;
 
@@ -67,11 +68,10 @@ struct Source
 struct BufferedSource : Source
 {
     size_t bufSize, bufPosIn, bufPosOut;
-    unsigned char * buffer;
+    std::unique_ptr<unsigned char[]> buffer;
 
     BufferedSource(size_t bufSize = 32 * 1024)
-        : bufSize(bufSize), bufPosIn(0), bufPosOut(0), buffer(0) { }
-    ~BufferedSource();
+        : bufSize(bufSize), bufPosIn(0), bufPosOut(0), buffer(nullptr) { }
 
     size_t read(unsigned char * data, size_t len) override;
 
