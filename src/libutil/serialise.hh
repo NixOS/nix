@@ -91,6 +91,8 @@ struct FdSink : BufferedSink
 
     FdSink() : fd(-1) { }
     FdSink(int fd) : fd(fd) { }
+    FdSink(FdSink&&) = default;
+    FdSink& operator=(FdSink&&) = default;
     ~FdSink();
 
     void write(const unsigned char * data, size_t len) override;
