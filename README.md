@@ -1,9 +1,13 @@
 Nix, the purely functional package manager
 ------------------------------------------
 
-Nix is a new take on package management that is fairly unique. Because of it's
+Nix is a new take on package management that is fairly unique. Because of its
 purity aspects, a lot of issues found in traditional package managers don't
 appear with Nix.
+
+*Darwinix* is an OSX-specific port of nix that integrates more tightly with Xcode,
+avoiding a host of problems introduced by the fact that the vast majority of OSX's system
+libraries are closed-source.
 
 To find out more about the tool, usage and installation instructions, please
 read the manual, which is available on the Nix website at
