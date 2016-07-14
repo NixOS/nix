@@ -37,7 +37,7 @@
 
 /* chroot-like behavior from Apple's sandbox */
 #if __APPLE__
-    #define DEFAULT_ALLOWED_IMPURE_PREFIXES "/System/Library /usr/lib /dev /bin/sh"
+    #define DEFAULT_ALLOWED_IMPURE_PREFIXES "/Applications /System/Library /usr/lib /dev /bin/sh"
 #else
     #define DEFAULT_ALLOWED_IMPURE_PREFIXES ""
 #endif
