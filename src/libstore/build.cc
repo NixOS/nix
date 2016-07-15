@@ -1664,7 +1664,7 @@ void DerivationGoal::startBuilder()
     {
         string x = settings.get("build-use-sandbox",
             /* deprecated alias */
-            settings.get("build-use-chroot", string("false")));
+            settings.get("build-use-chroot", string("relaxed")));
         if (x != "true" && x != "false" && x != "relaxed")
             throw Error("option ‘build-use-sandbox’ must be set to one of ‘true’, ‘false’ or ‘relaxed’");
         if (x == "true") {
