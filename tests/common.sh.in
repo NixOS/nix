@@ -21,6 +21,9 @@ export TEST_HOME=$TEST_ROOT/test-home
 export HOME=$TEST_HOME
 mkdir -p $TEST_HOME
 
+mkdir -p "$NIX_CONF_DIR"
+echo "build-use-sandbox = false" > "$NIX_CONF_DIR/nix.conf"
+
 export PATH=@bindir@:$PATH
 coreutils=@coreutils@
 

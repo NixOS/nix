@@ -71,6 +71,8 @@ let
         name = "nix";
         src = tarball;
 
+        __noChroot = true;
+
         buildInputs =
           [ curl perl bzip2 xz openssl pkgconfig sqlite boehmgc ruby ]
           ++ lib.optional stdenv.isLinux libsodium
