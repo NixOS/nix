@@ -16,6 +16,7 @@ makefiles = \
   src/resolve-system-dependencies/local.mk \
   src/nix-channel/local.mk \
   src/nix-build/local.mk \
+  src/build-remote/local.mk \
   perl/local.mk \
   scripts/local.mk \
   corepkgs/local.mk \

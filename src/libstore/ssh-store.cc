@@ -49,6 +49,8 @@ SSHStore::SSHStore(string uri, const Params & params, size_t maxConnections)
     , uri(std::move(uri))
     , key(get(params, "ssh-key", ""))
 {
+    /* open a connection and perform the handshake to verify all is well */
+    connections->get();
 }
 
 string SSHStore::getUri()
