@@ -5,13 +5,14 @@
 #include <functional>
 #include <queue>
 #include <algorithm>
+#include <regex>
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
-
+#include <climits>
 
 namespace nix {
 
@@ -330,18 +331,117 @@ Roots LocalStore::findRoots()
 }
 
 
+static void readProcLink(const string & file, StringSet & paths)
+{
+    /* 64 is the starting buffer size gnu readlink uses... */
+    auto bufsiz = ssize_t{64};
+try_again:
+    char buf[bufsiz];
+    auto res = readlink(file.c_str(), buf, bufsiz);
+    if (res == -1) {
+        if (errno == ENOENT || errno == EACCES)
+            return;
+        throw SysError("reading symlink");
+    }
+    if (res == bufsiz) {
+        if (SSIZE_MAX / 2 < bufsiz)
+            throw Error("stupidly long symlink");
+        bufsiz *= 2;
+        goto try_again;
+    }
+    if (res > 0 && buf[0] == '/')
+        paths.emplace(static_cast<char *>(buf), res);
+    return;
+}
+
+static string quoteRegexChars(const string & raw)
+{
+    static auto specialRegex = std::regex(R"([.^$\\*+?()\[\]{}|])");
+    return std::regex_replace(raw, specialRegex, R"(\$&)");
+}
+
+static void readFileRoots(const char * path, StringSet & paths)
+{
+    try {
+        paths.emplace(readFile(path));
+    } catch (SysError & e) {
+        if (e.errNo != ENOENT && e.errNo != EACCES)
+            throw;
+    }
+}
+
 void LocalStore::findRuntimeRoots(PathSet & roots)
 {
-    Path rootFinder = getEnv("NIX_ROOT_FINDER",
-        settings.nixLibexecDir + "/nix/find-runtime-roots.pl");
+    StringSet paths;
+    auto procDir = AutoCloseDir{opendir("/proc")};
+    if (procDir) {
+        struct dirent * ent;
+        auto digitsRegex = std::regex(R"(^\d+$)");
+        auto mapRegex = std::regex(R"(^\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(/\S+)\s*$)");
+        auto storePathRegex = std::regex(quoteRegexChars(storeDir) + R"(/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*)");
+        while (errno = 0, ent = readdir(procDir)) {
+            checkInterrupt();
+            if (std::regex_match(ent->d_name, digitsRegex)) {
+                readProcLink((format("/proc/%1%/exe") % ent->d_name).str(), paths);
+                readProcLink((format("/proc/%1%/cwd") % ent->d_name).str(), paths);
 
-    if (rootFinder.empty()) return;
+                auto fdStr = (format("/proc/%1%/fd") % ent->d_name).str();
+                auto fdDir = AutoCloseDir(opendir(fdStr.c_str()));
+                if (!fdDir) {
+                    if (errno == ENOENT || errno == EACCES)
+                        continue;
+                    throw SysError(format("opening %1%") % fdStr);
+                }
+                struct dirent * fd_ent;
+                while (errno = 0, fd_ent = readdir(fdDir)) {
+                    if (fd_ent->d_name[0] != '.') {
+                        readProcLink((format("%1%/%2%") % fdStr % fd_ent->d_name).str(), paths);
+                    }
+                }
+                if (errno)
+                    throw SysError(format("iterating /proc/%1%/fd") % ent->d_name);
+                fdDir.close();
 
-    debug(format("executing ‘%1%’ to find additional roots") % rootFinder);
+                auto mapLines =
+                    tokenizeString<std::vector<string>>(readFile((format("/proc/%1%/maps") % ent->d_name).str(), true), "\n");
+                for (const auto& line : mapLines) {
+                    auto match = std::smatch{};
+                    if (std::regex_match(line, match, mapRegex))
+                        paths.emplace(match[1]);
+                }
 
-    string result = runProgram(rootFinder);
+                try {
+                    auto envString = readFile((format("/proc/%1%/environ") % ent->d_name).str(), true);
+                    auto env_end = std::sregex_iterator{};
+                    for (auto i = std::sregex_iterator{envString.begin(), envString.end(), storePathRegex}; i != env_end; ++i)
+                        paths.emplace(i->str());
+                } catch (SysError & e) {
+                    if (errno == ENOENT || errno == EACCES)
+                        continue;
+                    throw;
+                }
+            }
+        }
+        if (errno)
+            throw SysError("iterating /proc");
+    }
 
-    StringSet paths = tokenizeString<StringSet>(result, "\n");
+    try {
+        auto lsofRegex = std::regex(R"(^n(/.*)$)");
+        auto lsofLines =
+            tokenizeString<std::vector<string>>(runProgram("lsof", true, { "-n", "-w", "-F", "n" }), "\n");
+        for (const auto & line : lsofLines) {
+            auto match = std::smatch{};
+            if (std::regex_match(line, match, lsofRegex))
+                paths.emplace(match[1]);
+        }
+    } catch (ExecError & e) {
+        /* lsof not installed, lsof failed */
+    }
+
+    readFileRoots("/proc/sys/kernel/modprobe", paths);
+    readFileRoots("/proc/sys/kernel/fbsplash", paths);
+    readFileRoots("/proc/sys/kernel/poweroff_cmd", paths);
 
     for (auto & i : paths)
         if (isInStore(i)) {
