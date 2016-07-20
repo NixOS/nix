@@ -9,6 +9,11 @@ To find out more about the tool, usage and installation instructions, please
 read the manual, which is available on the Nix website at
 <http://nixos.org/nix/manual>.
 
+## Contributing
+
+Take a look at the [Hacking Section](http://nixos.org/nix/manual/#chap-hacking)
+of the manual. It helps you to get started with building nix from source.
+
 ## License
 
 Nix is released under the LGPL v2.1
