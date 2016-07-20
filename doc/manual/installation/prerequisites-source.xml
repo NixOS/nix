@@ -19,6 +19,10 @@
   it from <link
   xlink:href="http://www.freedesktop.org/wiki/Software/pkg-config"
   />.</para></listitem>
+  
+  <listitem><para>The OpenSSL library to calculate cryptographic hashes.
+  If your distribution does not provide it, you can get it from <link
+  xlink:href="https://www.openssl.org"/>.</para></listitem>
 
   <listitem><para>The bzip2 compressor program and the
   <literal>libbz2</literal> library.  Thus you must have bzip2
