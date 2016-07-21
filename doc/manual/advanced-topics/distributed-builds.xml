@@ -44,8 +44,8 @@ outputs and perform the remote build.  To use it, you should set
 <envar>NIX_BUILD_HOOK</envar> to
 <filename><replaceable>prefix</replaceable>/libexec/nix/build-remote.pl</filename>.
 You should also define a list of available build machines and point
-the environment variable <envar>NIX_REMOTE_SYSTEMS</envar> to it (the
-path has to be absolute, otherwise nix will fail to distribute the build).  An
+the environment variable <envar>NIX_REMOTE_SYSTEMS</envar> to
+it. <envar>NIX_REMOTE_SYSTEMS</envar> must be an absolute path. An
 example configuration is shown in <xref linkend='ex-remote-systems'
 />.  Each line in the file specifies a machine, with the following
 bits of information:
