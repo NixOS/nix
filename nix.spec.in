@@ -1,16 +1,16 @@
 %global nixbld_user "nix-builder-"
-%global nixbld_group "nix-builders"
+%global nixbld_group "nixbld"
 
 Summary: The Nix software deployment system
 Name: nix
 Version: @PACKAGE_VERSION@
 Release: 2%{?dist}
 License: LGPLv2+
-%if 0%{?rhel}
+%if 0%{?rhel} && 0%{?rhel} < 7
 Group: Applications/System
 %endif
 URL: http://nixos.org/
-Source0: %{name}-%{version}.tar.bz2
+Source0: %{name}-%{version}.tar.xz
 %if 0%{?el5}
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 %endif
@@ -41,7 +41,7 @@ it can be used equally well under other Unix systems.
 
 %package        devel
 Summary:        Development files for %{name}
-%if 0%{?rhel}
+%if 0%{?rhel} && 0%{?rhel} < 7
 Group:          Development/Libraries
 %endif
 Requires:       %{name}%{?_isa} = %{version}-%{release}
@@ -53,7 +53,7 @@ developing applications that use %{name}.
 
 %package doc
 Summary:        Documentation files for %{name}
-%if 0%{?rhel}
+%if 0%{?rhel} && 0%{?rhel} < 7
 Group:          Documentation
 %endif
 BuildArch:      noarch
@@ -65,7 +65,7 @@ The %{name}-doc package contains documentation files for %{name}.
 
 %package -n emacs-%{name}
 Summary:        Nix mode for Emacs
-%if 0%{?rhel}
+%if 0%{?rhel} && 0%{?rhel} < 7
 Group:          Applications/Editors
 %endif
 BuildArch:      noarch
@@ -77,7 +77,7 @@ This package provides a major mode for editing Nix expressions.
 
 %package -n emacs-%{name}-el
 Summary:        Elisp source files for emacs-%{name}
-%if 0%{?rhel}
+%if 0%{?rhel} && 0%{?rhel} < 7
 Group:          Applications/Editors
 %endif
 BuildArch:      noarch
@@ -118,6 +118,10 @@ make DESTDIR=$RPM_BUILD_ROOT install
 
 find $RPM_BUILD_ROOT -name '*.la' -exec rm -f {} ';'
 
+# make the store
+mkdir -p $RPM_BUILD_ROOT/nix/store
+chmod 1775 $RPM_BUILD_ROOT/nix/store
+
 # make per-user directories
 for d in profiles gcroots;
 do
@@ -155,8 +159,7 @@ done
 
 %post
 chgrp %{nixbld_group} /nix/store
-chmod 1775 /nix/store
-%if ! 0%{?rhel}
+%if ! 0%{?rhel} || 0%{?rhel} >= 7
 # Enable and start Nix worker
 systemctl enable nix-daemon.socket nix-daemon.service
 systemctl start  nix-daemon.socket
@@ -168,7 +171,7 @@ systemctl start  nix-daemon.socket
 %{perl_vendorarch}/*
 %exclude %dir %{perl_vendorarch}/auto/
 %{_prefix}/libexec/*
-%if ! 0%{?rhel}
+%if ! 0%{?rhel} || 0%{?rhel} >= 7
 %{_prefix}/lib/systemd/system/nix-daemon.socket
 %{_prefix}/lib/systemd/system/nix-daemon.service
 %endif
