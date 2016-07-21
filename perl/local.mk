@@ -37,6 +37,8 @@ ifeq ($(perlbindings), yes)
     Store_LDFLAGS += $(shell find ${archlib} -name ${libperl})
   endif
 
+  Store_LDFLAGS = -lperl -pthread
+
   Store_ALLOW_UNDEFINED = 1
 
   Store_FORCE_INSTALL = 1
