@@ -14,6 +14,7 @@
 #include "get-drvs.hh"
 #include "derivations.hh"
 #include "affinity.hh"
+#include "globals.hh"
 
 using namespace std;
 using namespace nix;
@@ -115,6 +116,7 @@ NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store)
 
 void NixRepl::mainLoop(const Strings & files)
 {
+    string error = ANSI_RED "error:" ANSI_NORMAL " ";
     std::cout << "Welcome to Nix version " << NIX_VERSION << ". Type :? for help." << std::endl << std::endl;
 
     for (auto & i : files)
@@ -145,12 +147,12 @@ void NixRepl::mainLoop(const Strings & files)
                 // input without clearing the input so far.
                 continue;
             } else {
-                printMsg(lvlError, "error: " + e.msg());
+              printMsg(lvlError, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
             }
         } catch (Error & e) {
-            printMsg(lvlError, "error: " + e.msg());
+            printMsg(lvlError, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
         } catch (Interrupted & e) {
-            printMsg(lvlError, "error: " + e.msg());
+            printMsg(lvlError, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
         }
 
         // We handled the current input fully, so we should clear it and read brand new input.
