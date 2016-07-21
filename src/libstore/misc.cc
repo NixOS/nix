@@ -2,6 +2,7 @@
 #include "globals.hh"
 #include "local-store.hh"
 #include "store-api.hh"
+#include "thread-pool.hh"
 
 
 namespace nix {
@@ -10,43 +11,63 @@ namespace nix {
 void Store::computeFSClosure(const Path & path,
     PathSet & paths, bool flipDirection, bool includeOutputs, bool includeDerivers)
 {
-    if (paths.find(path) != paths.end()) return;
-    paths.insert(path);
+    ThreadPool pool;
 
-    PathSet edges;
+    Sync<bool> state_;
 
-    if (flipDirection) {
-        queryReferrers(path, edges);
+    std::function<void(Path)> doPath;
 
-        if (includeOutputs) {
-            PathSet derivers = queryValidDerivers(path);
-            for (auto & i : derivers)
-                edges.insert(i);
+    doPath = [&](const Path & path) {
+        {
+            auto state(state_.lock());
+            if (paths.count(path)) return;
+            paths.insert(path);
         }
 
-        if (includeDerivers && isDerivation(path)) {
-            PathSet outputs = queryDerivationOutputs(path);
-            for (auto & i : outputs)
-                if (isValidPath(i) && queryPathInfo(i)->deriver == path)
-                    edges.insert(i);
-        }
-
-    } else {
         auto info = queryPathInfo(path);
-        edges = info->references;
 
-        if (includeOutputs && isDerivation(path)) {
-            PathSet outputs = queryDerivationOutputs(path);
-            for (auto & i : outputs)
-                if (isValidPath(i)) edges.insert(i);
+        if (flipDirection) {
+
+            PathSet referrers;
+            queryReferrers(path, referrers);
+            for (auto & ref : referrers)
+                if (ref != path)
+                    pool.enqueue(std::bind(doPath, ref));
+
+            if (includeOutputs) {
+                PathSet derivers = queryValidDerivers(path);
+                for (auto & i : derivers)
+                    pool.enqueue(std::bind(doPath, i));
+            }
+
+            if (includeDerivers && isDerivation(path)) {
+                PathSet outputs = queryDerivationOutputs(path);
+                for (auto & i : outputs)
+                    if (isValidPath(i) && queryPathInfo(i)->deriver == path)
+                        pool.enqueue(std::bind(doPath, i));
+            }
+
+        } else {
+
+            for (auto & ref : info->references)
+                if (ref != path)
+                    pool.enqueue(std::bind(doPath, ref));
+
+            if (includeOutputs && isDerivation(path)) {
+                PathSet outputs = queryDerivationOutputs(path);
+                for (auto & i : outputs)
+                    if (isValidPath(i)) pool.enqueue(std::bind(doPath, i));
+            }
+
+            if (includeDerivers && isValidPath(info->deriver))
+                pool.enqueue(std::bind(doPath, info->deriver));
+
         }
+    };
 
-        if (includeDerivers && isValidPath(info->deriver))
-            edges.insert(info->deriver);
-    }
+    pool.enqueue(std::bind(doPath, path));
 
-    for (auto & i : edges)
-        computeFSClosure(i, paths, flipDirection, includeOutputs, includeDerivers);
+    pool.process();
 }
 
 
