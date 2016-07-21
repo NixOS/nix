@@ -157,7 +157,7 @@ struct CurlDownloader : public Downloader
             curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0);
         }
 
-        data->clear();
+        data = make_ref<std::string>();
 
         if (requestHeaders) {
             curl_slist_free_all(requestHeaders);
