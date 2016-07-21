@@ -121,6 +121,7 @@ const string base32Chars = "0123456789abcdfghijklmnpqrsvwxyz";
 
 string printHash32(const Hash & hash)
 {
+    assert(hash.type != htUnknown);
     size_t len = hash.base32Len();
     assert(len);
 

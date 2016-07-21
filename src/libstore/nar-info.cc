@@ -6,7 +6,7 @@ namespace nix {
 NarInfo::NarInfo(const Store & store, const std::string & s, const std::string & whence)
 {
     auto corrupt = [&]() {
-        throw Error("NAR info file ‘%1%’ is corrupt");
+        throw Error(format("NAR info file ‘%1%’ is corrupt") % whence);
     };
 
     auto parseHashField = [&](const string & s) {
@@ -73,7 +73,7 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
 
     if (compression == "") compression = "bzip2";
 
-    if (path.empty() || url.empty()) corrupt();
+    if (path.empty() || url.empty() || narSize == 0 || !narHash) corrupt();
 }
 
 std::string NarInfo::to_string() const
