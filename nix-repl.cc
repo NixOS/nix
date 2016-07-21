@@ -22,7 +22,7 @@ using namespace nix;
 #define ESC_RED "\033[31m"
 #define ESC_GRE "\033[32m"
 #define ESC_YEL "\033[33m"
-#define ESC_BLU "\033[34m"
+#define ESC_BLU "\033[34;1m"
 #define ESC_MAG "\033[35m"
 #define ESC_CYA "\033[36m"
 #define ESC_END "\033[0m"
@@ -655,9 +655,12 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         str << "]";
         break;
 
-    case tLambda:
-        str << ESC_BLU "«lambda defined at " << v.lambda.fun->pos << "»" ESC_END;
+    case tLambda: {
+        std::ostringstream s;
+        s << v.lambda.fun->pos;
+        str << ESC_BLU "«lambda @ " << filterANSIEscapes(s.str()) << "»" ESC_END;
         break;
+    }
 
     case tPrimOp:
         str << ESC_MAG "«primop»" ESC_END;
