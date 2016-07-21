@@ -12,7 +12,7 @@ read the manual, which is available on the Nix website at
 ## Contributing
 
 Take a look at the [Hacking Section](http://nixos.org/nix/manual/#chap-hacking)
-of the manual. It helps you to get started with building nix from source.
+of the manual. It helps you to get started with building Nix from source.
 
 ## License
 
