@@ -656,7 +656,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
 
     case tLambda:
-        str << ESC_BLU "«lambda»" ESC_END;
+        str << ESC_BLU "«lambda defined at " << v.lambda.fun->pos << "»" ESC_END;
         break;
 
     case tPrimOp:
