@@ -18,6 +18,13 @@
 using namespace std;
 using namespace nix;
 
+#define ESC_RED "\033[31m"
+#define ESC_GRE "\033[32m"
+#define ESC_YEL "\033[33m"
+#define ESC_BLU "\033[34m"
+#define ESC_MAG "\033[35m"
+#define ESC_CYA "\033[36m"
+#define ESC_END "\033[0m"
 
 struct NixRepl
 {
@@ -540,23 +547,25 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     switch (v.type) {
 
     case tInt:
-        str << v.integer;
+        str << ESC_CYA << v.integer << ESC_END;
         break;
 
     case tBool:
-        str << (v.boolean ? "true" : "false");
+        str << ESC_CYA << (v.boolean ? "true" : "false") << ESC_END;
         break;
 
     case tString:
+        str << ESC_YEL;
         printStringValue(str, v.string.s);
+        str << ESC_END;
         break;
 
     case tPath:
-        str << v.path; // !!! escaping?
+        str << ESC_GRE << v.path << ESC_END; // !!! escaping?
         break;
 
     case tNull:
-        str << "null";
+        str << ESC_CYA "null" ESC_END;
         break;
 
     case tAttrs: {
@@ -609,7 +618,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
                     try {
                         printValue(str, *i.second, maxDepth - 1, seen);
                     } catch (AssertionError & e) {
-                        str << "«error: " << e.msg() << "»";
+                        str << ESC_RED "«error: " << e.msg() << "»" ESC_END;
                     }
                 str << "; ";
             }
@@ -635,7 +644,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
                     try {
                         printValue(str, *v.listElems()[n], maxDepth - 1, seen);
                     } catch (AssertionError & e) {
-                        str << "«error: " << e.msg() << "»";
+                        str << ESC_RED "«error: " << e.msg() << "»" ESC_END;
                     }
                 str << " ";
             }
@@ -645,19 +654,19 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
 
     case tLambda:
-        str << "«lambda»";
+        str << ESC_BLU "«lambda»" ESC_END;
         break;
 
     case tPrimOp:
-        str << "«primop»";
+        str << ESC_MAG "«primop»" ESC_END;
         break;
 
     case tPrimOpApp:
-        str << "«primop-app»";
+        str << ESC_BLU "«primop-app»" ESC_END;
         break;
 
     default:
-        str << "«unknown»";
+        str << ESC_RED "«unknown»" ESC_END;
         break;
     }
 
