@@ -36,7 +36,8 @@ ThreadPool::~ThreadPool()
 void ThreadPool::enqueue(const work_t & t)
 {
     auto state(state_.lock());
-    assert(!state->quit);
+    if (state->quit)
+        throw ThreadPoolShutDown("cannot enqueue a work item while the thread pool is shutting down");
     state->left.push(t);
     if (state->left.size() > state->workers.size() && state->workers.size() < maxThreads)
         state->workers.emplace_back(&ThreadPool::workerEntry, this);
@@ -84,7 +85,8 @@ void ThreadPool::workerEntry()
         } catch (std::exception & e) {
             auto state(state_.lock());
             if (state->exception) {
-                if (!dynamic_cast<Interrupted*>(&e))
+                if (!dynamic_cast<Interrupted*>(&e) &&
+                    !dynamic_cast<ThreadPoolShutDown*>(&e))
                     printMsg(lvlError, format("error: %s") % e.what());
             } else {
                 state->exception = std::current_exception();

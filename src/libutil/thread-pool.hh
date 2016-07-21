@@ -10,6 +10,8 @@
 
 namespace nix {
 
+MakeError(ThreadPoolShutDown, Error)
+
 /* A simple thread pool that executes a queue of work items
    (lambdas). */
 class ThreadPool
