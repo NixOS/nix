@@ -49,6 +49,7 @@ Makefile.config
 /scripts/build-remote.pl
 /scripts/nix-reduce-build
 /scripts/nix-http-export.cgi
+/scripts/resolve-system-dependencies.pl
 
 # /src/libexpr/
 /src/libexpr/lexer-tab.cc
@@ -57,9 +58,11 @@ Makefile.config
 /src/libexpr/parser-tab.hh
 /src/libexpr/parser-tab.output
 /src/libexpr/nix.tbl
+/src/libexpr/libnixexpr.dylib
 
 # /src/libstore/
 /src/libstore/schema.sql.hh
+/src/libstore/libnixstore.dylib
 
 # /src/nix-env/
 /src/nix-env/nix-env
@@ -76,6 +79,24 @@ Makefile.config
 # /src/download-via-ssh/
 /src/download-via-ssh/download-via-ssh
 
+# /src/nix/
+/src/nix/nix
+
+# /src/libmain/
+/src/libmain/libnixmain.dylib
+
+# /src/libutil/
+/src/libutil/libnixutil.dylib
+
+# /src/boost/format/
+/src/boost/format/libnixformat.dylib
+
+# /src/nix-prefetch-url/
+/src/nix-prefetch-url/nix-prefetch-url
+
+# /src/nix-collect-garbage/
+/src/nix-collect-garbage/nix-collect-garbage
+
 # /tests/
 /tests/test-tmp
 /tests/common.sh
@@ -89,6 +110,7 @@ Makefile.config
 
 /perl/lib/Nix/Config.pm
 /perl/lib/Nix/Store.cc
+/perl/lib/Nix/Store.dylib
 
 /misc/systemd/nix-daemon.service
 /misc/systemd/nix-daemon.socket
