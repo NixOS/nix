@@ -1063,8 +1063,10 @@ void DerivationGoal::outputsSubstituted()
 {
     trace("all outputs substituted (maybe)");
 
-    if (nrFailed > 0 && nrFailed > nrNoSubstituters + nrIncompleteClosure && !settings.tryFallback)
-        throw Error(format("some substitutes for the outputs of derivation ‘%1%’ failed (usually happens due to networking issues); try ‘--fallback’ to build derivation from source ") % drvPath);
+    if (nrFailed > 0 && nrFailed > nrNoSubstituters + nrIncompleteClosure && !settings.tryFallback) {
+        done(BuildResult::TransientFailure, (format("some substitutes for the outputs of derivation ‘%1%’ failed (usually happens due to networking issues); try ‘--fallback’ to build derivation from source ") % drvPath).str());
+        return;
+    }
 
     /*  If the substitutes form an incomplete closure, then we should
         build the dependencies of this derivation, but after that, we
