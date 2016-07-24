@@ -494,30 +494,37 @@ ref<Store> openStore(const std::string & uri_)
 }
 
 
+StoreType getStoreType(const std::string & uri, const std::string & stateDir)
+{
+    if (uri == "daemon") {
+        return tDaemon;
+    } else if (uri == "local") {
+        return tLocal;
+    } else if (uri == "") {
+        if (access(stateDir.c_str(), R_OK | W_OK) == 0)
+            return tLocal;
+        else if (pathExists(settings.nixDaemonSocketFile))
+            return tDaemon;
+        else
+            return tLocal;
+    } else {
+        return tOther;
+    }
+}
+
+
 static RegisterStoreImplementation regStore([](
     const std::string & uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
-    enum { mDaemon, mLocal, mAuto } mode;
-
-    if (uri == "daemon") mode = mDaemon;
-    else if (uri == "local") mode = mLocal;
-    else if (uri == "") mode = mAuto;
-    else return 0;
-
-    if (mode == mAuto) {
-        auto stateDir = get(params, "state", settings.nixStateDir);
-        if (access(stateDir.c_str(), R_OK | W_OK) == 0)
-            mode = mLocal;
-        else if (pathExists(settings.nixDaemonSocketFile))
-            mode = mDaemon;
-        else
-            mode = mLocal;
+    switch (getStoreType(uri, get(params, "state", settings.nixStateDir))) {
+        case tDaemon:
+            return std::shared_ptr<Store>(std::make_shared<RemoteStore>(params));
+        case tLocal:
+            return std::shared_ptr<Store>(std::make_shared<LocalStore>(params));
+        default:
+            return nullptr;
     }
-
-    return mode == mDaemon
-        ? std::shared_ptr<Store>(std::make_shared<RemoteStore>(params))
-        : std::shared_ptr<Store>(std::make_shared<LocalStore>(params));
 });
 
 

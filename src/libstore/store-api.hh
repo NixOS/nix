@@ -5,6 +5,7 @@
 #include "crypto.hh"
 #include "lru-cache.hh"
 #include "sync.hh"
+#include "globals.hh"
 
 #include <atomic>
 #include <limits>
@@ -550,6 +551,15 @@ void removeTempRoots();
    set to true *unless* you're going to collect garbage. */
 ref<Store> openStore(const std::string & uri = getEnv("NIX_REMOTE"));
 
+
+enum StoreType {
+    tDaemon,
+    tLocal,
+    tOther
+};
+
+
+StoreType getStoreType(const std::string & uri = getEnv("NIX_REMOTE"), const std::string & stateDir = settings.nixStateDir);
 
 /* Return the default substituter stores, defined by the
    ‘substituters’ option and various legacy options like
