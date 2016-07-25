@@ -330,10 +330,11 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
         bytesFreed += st.st_blocks * 512;
 
     if (S_ISDIR(st.st_mode)) {
-        /* Make the directory writable. */
-        if (!(st.st_mode & S_IWUSR)) {
-            if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
-                throw SysError(format("making ‘%1%’ writable") % path);
+        /* Make the directory accessible. */
+        const auto PERM_MASK = S_IRUSR | S_IWUSR | S_IXUSR;
+        if ((st.st_mode & PERM_MASK) != PERM_MASK) {
+            if (chmod(path.c_str(), st.st_mode | PERM_MASK) == -1)
+                throw SysError(format("chmod ‘%1%’") % path);
         }
 
         for (auto & i : readDirectory(path))
