@@ -489,7 +489,7 @@ protected:
 };
 
 
-class LocalFSStore : public Store
+class LocalFSStore : public virtual Store
 {
 public:
     const Path stateDir;
