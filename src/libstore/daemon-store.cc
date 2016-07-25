@@ -286,7 +286,12 @@ Path DaemonStore::queryPathFromHashPart(const string & hashPart)
 void DaemonStore::addToStore(const ValidPathInfo & info, const std::string & nar,
     bool repair, bool dontCheckSigs)
 {
-    throw Error("DaemonStore::addToStore() not implemented");
+    auto conn(connections->get());
+    conn->to << wopAddToStoreNar
+             << info.path << info.deriver << printHash(info.narHash)
+             << info.references << info.registrationTime << info.narSize
+             << info.ultimate << info.sigs << nar << repair << dontCheckSigs;
+    conn->processStderr();
 }
 
 

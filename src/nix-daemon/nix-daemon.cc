@@ -587,7 +587,30 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     case wopNarFromPath: {
         auto path = readStorePath(*store, from);
         startWork();
+        stopWork();
         dumpPath(path, to);
+        break;
+    }
+
+    case wopAddToStoreNar: {
+        ValidPathInfo info;
+        info.path = readStorePath(*store, from);
+        info.deriver = readString(from);
+        if (!info.deriver.empty())
+            store->assertStorePath(info.deriver);
+        info.narHash = parseHash(htSHA256, readString(from));
+        info.references = readStorePaths<PathSet>(*store, from);
+        info.registrationTime = readInt(from);
+        info.narSize = readLongLong(from);
+        info.ultimate = readLongLong(from);
+        info.sigs = readStrings<StringSet>(from);
+        auto nar = readString(from);
+        auto repair = readInt(from) ? true : false;
+        auto dontCheckSigs = readInt(from) ? true : false;
+        if (!trusted && dontCheckSigs)
+            dontCheckSigs = false;
+        startWork();
+        store->addToStore(info, nar, repair, dontCheckSigs);
         stopWork();
         break;
     }
