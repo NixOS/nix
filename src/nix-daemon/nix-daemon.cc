@@ -584,6 +584,14 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         break;
     }
 
+    case wopNarFromPath: {
+        auto path = readStorePath(*store, from);
+        startWork();
+        dumpPath(path, to);
+        stopWork();
+        break;
+    }
+
     default:
         throw Error(format("invalid operation %1%") % op);
     }

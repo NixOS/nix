@@ -10,13 +10,6 @@
 namespace nix {
 
 
-class Pipe;
-class Pid;
-struct FdSink;
-struct FdSource;
-template<typename T> class Pool;
-
-
 /* FIXME: RemoteStore is a misnomer - should be something like
    DaemonStore. */
 class RemoteStore : public LocalFSStore, public DaemonStore

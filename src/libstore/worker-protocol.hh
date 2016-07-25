@@ -46,6 +46,7 @@ typedef enum {
     wopVerifyStore = 35,
     wopBuildDerivation = 36,
     wopAddSignatures = 37,
+    wopNarFromPath = 38
 } WorkerOp;
 
 
