@@ -29,7 +29,7 @@ struct DerivationOutput
         this->hashAlgo = hashAlgo;
         this->hash = hash;
     }
-    void parseHashInfo(bool & recursive, HashType & hashType, Hash & hash) const;
+    void parseHashInfo(bool & recursive, Hash & hash) const;
 };
 
 typedef std::map<string, DerivationOutput> DerivationOutputs;

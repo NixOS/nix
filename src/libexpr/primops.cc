@@ -624,7 +624,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         outputHash = printHash(h);
         if (outputHashRecursive) outputHashAlgo = "r:" + outputHashAlgo;
 
-        Path outPath = state.store->makeFixedOutputPath(outputHashRecursive, ht, h, drvName);
+        Path outPath = state.store->makeFixedOutputPath(outputHashRecursive, h, drvName);
         drv.env["out"] = outPath;
         drv.outputs["out"] = DerivationOutput(outPath, outputHashAlgo, outputHash);
     }

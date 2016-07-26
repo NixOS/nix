@@ -288,8 +288,8 @@ SV * makeFixedOutputPath(int recursive, char * algo, char * hash, char * name)
     PPCODE:
         try {
             HashType ht = parseHashType(algo);
-            Path path = store()->makeFixedOutputPath(recursive, ht,
-                parseHash16or32(ht, hash), name);
+            Hash h = parseHash16or32(ht, hash);
+            Path path = store()->makeFixedOutputPath(recursive, h, name);
             XPUSHs(sv_2mortal(newSVpv(path.c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());

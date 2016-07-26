@@ -191,13 +191,13 @@ Path Store::makeOutputPath(const string & id,
 
 
 Path Store::makeFixedOutputPath(bool recursive,
-    HashType hashAlgo, Hash hash, string name) const
+    const Hash & hash, const string & name) const
 {
-    return hashAlgo == htSHA256 && recursive
+    return hash.type == htSHA256 && recursive
         ? makeStorePath("source", hash, name)
         : makeStorePath("output:out", hashString(htSHA256,
                 "fixed:out:" + (recursive ? (string) "r:" : "") +
-                printHashType(hashAlgo) + ":" + printHash(hash) + ":"),
+                printHashType(hash.type) + ":" + printHash(hash) + ":"),
             name);
 }
 
@@ -205,10 +205,9 @@ Path Store::makeFixedOutputPath(bool recursive,
 std::pair<Path, Hash> Store::computeStorePathForPath(const Path & srcPath,
     bool recursive, HashType hashAlgo, PathFilter & filter) const
 {
-    HashType ht(hashAlgo);
-    Hash h = recursive ? hashPath(ht, srcPath, filter).first : hashFile(ht, srcPath);
+    Hash h = recursive ? hashPath(hashAlgo, srcPath, filter).first : hashFile(hashAlgo, srcPath);
     string name = baseNameOf(srcPath);
-    Path dstPath = makeFixedOutputPath(recursive, hashAlgo, h, name);
+    Path dstPath = makeFixedOutputPath(recursive, h, name);
     return std::pair<Path, Hash>(dstPath, h);
 }
 

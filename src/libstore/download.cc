@@ -232,7 +232,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
 
     Path expectedStorePath;
     if (expectedHash) {
-        expectedStorePath = store->makeFixedOutputPath(unpack, expectedHash.type, expectedHash, name);
+        expectedStorePath = store->makeFixedOutputPath(unpack, expectedHash, name);
         if (store->isValidPath(expectedStorePath))
             return expectedStorePath;
     }
@@ -282,7 +282,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
                 StringSink sink;
                 dumpString(*res.data, sink);
                 Hash hash = hashString(expectedHash ? expectedHash.type : htSHA256, *res.data);
-                info.path = store->makeFixedOutputPath(false, hash.type, hash, name);
+                info.path = store->makeFixedOutputPath(false, hash, name);
                 info.narHash = hashString(htSHA256, *sink.s);
                 store->addToStore(info, *sink.s, false, true);
                 storePath = info.path;

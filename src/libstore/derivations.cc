@@ -9,7 +9,7 @@
 namespace nix {
 
 
-void DerivationOutput::parseHashInfo(bool & recursive, HashType & hashType, Hash & hash) const
+void DerivationOutput::parseHashInfo(bool & recursive, Hash & hash) const
 {
     recursive = false;
     string algo = hashAlgo;
@@ -19,7 +19,7 @@ void DerivationOutput::parseHashInfo(bool & recursive, HashType & hashType, Hash
         algo = string(algo, 2);
     }
 
-    hashType = parseHashType(algo);
+    HashType hashType = parseHashType(algo);
     if (hashType == htUnknown)
         throw Error(format("unknown hash algorithm ‘%1%’") % algo);
 

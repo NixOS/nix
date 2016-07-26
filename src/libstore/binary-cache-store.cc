@@ -209,7 +209,7 @@ Path BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
     }
 
     ValidPathInfo info;
-    info.path = makeFixedOutputPath(recursive, hashAlgo, h, name);
+    info.path = makeFixedOutputPath(recursive, h, name);
 
     addToStore(info, *sink.s, repair);
 

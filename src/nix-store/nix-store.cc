@@ -213,8 +213,7 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
     string name = *i++;
 
     cout << format("%1%\n") %
-        store->makeFixedOutputPath(recursive, hashAlgo,
-            parseHash16or32(hashAlgo, hash), name);
+        store->makeFixedOutputPath(recursive, parseHash16or32(hashAlgo, hash), name);
 }
 
 

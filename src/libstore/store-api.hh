@@ -232,7 +232,7 @@ public:
         const Hash & hash, const string & name) const;
 
     Path makeFixedOutputPath(bool recursive,
-        HashType hashAlgo, Hash hash, string name) const;
+        const Hash & hash, const string & name) const;
 
     /* This is the preparatory part of addToStore() and
        addToStoreFixed(); it computes the store path to which srcPath

@@ -2706,8 +2706,8 @@ void DerivationGoal::registerOutputs()
            hash). */
         if (i.second.hash != "") {
 
-            bool recursive; HashType ht; Hash h;
-            i.second.parseHashInfo(recursive, ht, h);
+            bool recursive; Hash h;
+            i.second.parseHashInfo(recursive, h);
 
             if (!recursive) {
                 /* The output path should be a regular file without
@@ -2719,11 +2719,11 @@ void DerivationGoal::registerOutputs()
 
             /* Check the hash. In hash mode, move the path produced by
                the derivation to its content-addressed location. */
-            Hash h2 = recursive ? hashPath(ht, actualPath).first : hashFile(ht, actualPath);
+            Hash h2 = recursive ? hashPath(h.type, actualPath).first : hashFile(h.type, actualPath);
             if (buildMode == bmHash) {
-                Path dest = worker.store.makeFixedOutputPath(recursive, ht, h2, drv->env["name"]);
+                Path dest = worker.store.makeFixedOutputPath(recursive, h2, drv->env["name"]);
                 printMsg(lvlError, format("build produced path ‘%1%’ with %2% hash ‘%3%’")
-                    % dest % printHashType(ht) % printHash16or32(h2));
+                    % dest % printHashType(h.type) % printHash16or32(h2));
                 if (worker.store.isValidPath(dest))
                     return;
                 Path actualDest = worker.store.toRealPath(dest);

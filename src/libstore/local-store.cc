@@ -486,9 +486,9 @@ void LocalStore::checkDerivationOutputs(const Path & drvPath, const Derivation &
         if (out == drv.outputs.end())
             throw Error(format("derivation ‘%1%’ does not have an output named ‘out’") % drvPath);
 
-        bool recursive; HashType ht; Hash h;
-        out->second.parseHashInfo(recursive, ht, h);
-        Path outPath = makeFixedOutputPath(recursive, ht, h, drvName);
+        bool recursive; Hash h;
+        out->second.parseHashInfo(recursive, h);
+        Path outPath = makeFixedOutputPath(recursive, h, drvName);
 
         StringPairs::const_iterator j = drv.env.find("out");
         if (out->second.path != outPath || j == drv.env.end() || j->second != outPath)
@@ -940,7 +940,7 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
 {
     Hash h = hashString(hashAlgo, dump);
 
-    Path dstPath = makeFixedOutputPath(recursive, hashAlgo, h, name);
+    Path dstPath = makeFixedOutputPath(recursive, h, name);
 
     addTempRoot(dstPath);
 

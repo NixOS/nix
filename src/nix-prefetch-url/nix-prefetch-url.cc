@@ -146,7 +146,7 @@ int main(int argc, char * * argv)
         Path storePath;
         if (args.size() == 2) {
             expectedHash = parseHash16or32(ht, args[1]);
-            storePath = store->makeFixedOutputPath(unpack, ht, expectedHash, name);
+            storePath = store->makeFixedOutputPath(unpack, expectedHash, name);
             if (store->isValidPath(storePath))
                 hash = expectedHash;
             else
@@ -197,7 +197,7 @@ int main(int argc, char * * argv)
                into the Nix store. */
             storePath = store->addToStore(name, tmpFile, unpack, ht);
 
-            assert(storePath == store->makeFixedOutputPath(unpack, ht, hash, name));
+            assert(storePath == store->makeFixedOutputPath(unpack, hash, name));
         }
 
         if (!printPath)
