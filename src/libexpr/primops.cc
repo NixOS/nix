@@ -358,9 +358,7 @@ static void prim_abort(EvalState & state, const Pos & pos, Value * * args, Value
 
 static void prim_throw(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    PathSet context;
-    string s = state.coerceToString(pos, *args[0], context);
-    throw ThrownError(s);
+    throw ThrownError(state, pos, args[0]);
 }
 
 
@@ -381,11 +379,16 @@ static void prim_addErrorContext(EvalState & state, const Pos & pos, Value * * a
  * else => {success=false; value=false;} */
 static void prim_tryEval(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.mkAttrs(v, 2);
+    auto succSym = state.symbols.create("success");
+    state.mkAttrs(v, 3);
     try {
         state.forceValue(*args[0]);
         v.attrs->push_back(Attr(state.sValue, args[0]));
-        mkBool(*state.allocAttr(v, state.symbols.create("success")), true);
+        mkBool(*state.allocAttr(v, succSym), true);
+    } catch (ThrownError & e) {
+        mkBool(*state.allocAttr(v, state.sValue), false);
+        v.attrs->push_back(Attr(state.symbols.create("error"), e.v));
+        mkBool(*state.allocAttr(v, succSym), false);
     } catch (AssertionError & e) {
         mkBool(*state.allocAttr(v, state.sValue), false);
         mkBool(*state.allocAttr(v, state.symbols.create("success")), false);
