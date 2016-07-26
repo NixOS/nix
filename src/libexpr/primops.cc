@@ -1680,9 +1680,8 @@ static void prim_compareVersions(EvalState & state, const Pos & pos, Value * * a
 void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     const string & who, bool unpack)
 {
-    if (state.restricted) throw Error(format("‘%1%’ is not allowed in restricted mode") % who);
-
     string url;
+    Hash expectedHash;
 
     state.forceValue(*args[0]);
 
@@ -1694,6 +1693,8 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
             string name(attr.name);
             if (name == "url")
                 url = state.forceStringNoCtx(*attr.value, *attr.pos);
+            else if (name == "sha256")
+                expectedHash = parseHash16or32(htSHA256, state.forceStringNoCtx(*attr.value, *attr.pos));
             else
                 throw EvalError(format("unsupported argument ‘%1%’ to ‘%2%’, at %3%") % attr.name % who % attr.pos);
         }
@@ -1704,7 +1705,10 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     } else
         url = state.forceStringNoCtx(*args[0], pos);
 
-    Path res = makeDownloader()->downloadCached(state.store, url, unpack);
+    if (state.restricted && !expectedHash)
+        throw Error(format("‘%1%’ is not allowed in restricted mode") % who);
+
+    Path res = makeDownloader()->downloadCached(state.store, url, unpack, expectedHash);
     mkString(v, res, PathSet({res}));
 }
 

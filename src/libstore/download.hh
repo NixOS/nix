@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.hh"
+#include "hash.hh"
 
 #include <string>
 
@@ -27,7 +28,8 @@ struct Downloader
 {
     virtual DownloadResult download(string url, const DownloadOptions & options) = 0;
 
-    Path downloadCached(ref<Store> store, const string & url, bool unpack);
+    Path downloadCached(ref<Store> store, const string & url, bool unpack,
+        const Hash & expectedHash = Hash());
 
     enum Error { NotFound, Forbidden, Misc };
 };
