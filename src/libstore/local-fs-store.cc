@@ -7,7 +7,9 @@ namespace nix {
 
 LocalFSStore::LocalFSStore(const Params & params)
     : Store(params)
-    , stateDir(get(params, "state", settings.nixStateDir))
+    , rootDir(get(params, "root"))
+    , stateDir(canonPath(get(params, "state", rootDir != "" ? rootDir + "/nix/var/nix" : settings.nixStateDir)))
+    , logDir(canonPath(get(params, "log", rootDir != "" ? rootDir + "/nix/var/log/nix" : settings.nixLogDir)))
 {
 }
 

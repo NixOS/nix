@@ -491,7 +491,9 @@ protected:
 class LocalFSStore : public Store
 {
 public:
+    const Path rootDir;
     const Path stateDir;
+    const Path logDir;
 
     LocalFSStore(const Params & params);
 
