@@ -94,6 +94,8 @@ ref<RemoteStore::Connection> RemoteStore::openConnection()
         conn->daemonVersion = readInt(conn->from);
         if (GET_PROTOCOL_MAJOR(conn->daemonVersion) != GET_PROTOCOL_MAJOR(PROTOCOL_VERSION))
             throw Error("Nix daemon protocol version not supported");
+        if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 10)
+            throw Error("the Nix daemon version is too old");
         conn->to << PROTOCOL_VERSION;
 
         if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 14) {
@@ -127,17 +129,13 @@ void RemoteStore::setOptions(ref<Connection> conn)
        << settings.tryFallback
        << verbosity
        << settings.maxBuildJobs
-       << settings.maxSilentTime;
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 2)
-        conn->to << settings.useBuildHook;
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 4)
-        conn->to << (settings.verboseBuild ? lvlError : lvlVomit)
-                 << 0 // obsolete log type
-                 << 0 /* obsolete print build trace */;
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 6)
-        conn->to << settings.buildCores;
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 10)
-        conn->to << settings.useSubstitutes;
+       << settings.maxSilentTime
+       << settings.useBuildHook
+       << (settings.verboseBuild ? lvlError : lvlVomit)
+       << 0 // obsolete log type
+       << 0 /* obsolete print build trace */
+       << settings.buildCores
+       << settings.useSubstitutes;
 
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 12) {
         Settings::SettingsMap overrides = settings.getOverrides();
@@ -213,8 +211,6 @@ void RemoteStore::querySubstitutablePathInfos(const PathSet & paths,
 
     auto conn(connections->get());
 
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 3) return;
-
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {
 
         for (auto & i : paths) {
@@ -227,7 +223,7 @@ void RemoteStore::querySubstitutablePathInfos(const PathSet & paths,
             if (info.deriver != "") assertStorePath(info.deriver);
             info.references = readStorePaths<PathSet>(*this, conn->from);
             info.downloadSize = readLongLong(conn->from);
-            info.narSize = GET_PROTOCOL_MINOR(conn->daemonVersion) >= 7 ? readLongLong(conn->from) : 0;
+            info.narSize = readLongLong(conn->from);
             infos[i] = info;
         }
 
@@ -481,11 +477,11 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
     auto conn(connections->get());
 
-    conn->to << wopCollectGarbage << options.action << options.pathsToDelete << options.ignoreLiveness
-       << options.maxFreed << 0;
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 5)
+    conn->to
+        << wopCollectGarbage << options.action << options.pathsToDelete << options.ignoreLiveness
+        << options.maxFreed
         /* removed options */
-        conn->to << 0 << 0;
+        << 0 << 0 << 0;
 
     conn->processStderr();
 
@@ -562,7 +558,7 @@ void RemoteStore::Connection::processStderr(Sink * sink, Source * source)
     }
     if (msg == STDERR_ERROR) {
         string error = readString(from);
-        unsigned int status = GET_PROTOCOL_MINOR(daemonVersion) >= 8 ? readInt(from) : 1;
+        unsigned int status = readInt(from);
         throw Error(format("%1%") % error, status);
     }
     else if (msg != STDERR_LAST)

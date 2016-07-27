@@ -413,12 +413,10 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         options.pathsToDelete = readStorePaths<PathSet>(*store, from);
         options.ignoreLiveness = readInt(from);
         options.maxFreed = readLongLong(from);
-        readInt(from); // obsolete field
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 5) {
-            /* removed options */
-            readInt(from);
-            readInt(from);
-        }
+        // obsolete fields
+        readInt(from);
+        readInt(from);
+        readInt(from);
 
         GCResults results;
 
@@ -440,17 +438,12 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         verbosity = (Verbosity) readInt(from);
         settings.set("build-max-jobs", std::to_string(readInt(from)));
         settings.set("build-max-silent-time", std::to_string(readInt(from)));
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 2)
-            settings.useBuildHook = readInt(from) != 0;
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 4) {
-            settings.verboseBuild = lvlError == (Verbosity) readInt(from);
-            readInt(from); // obsolete logType
-            readInt(from); // obsolete printBuildTrace
-        }
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 6)
-            settings.set("build-cores", std::to_string(readInt(from)));
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 10)
-            settings.set("build-use-substitutes", readInt(from) ? "true" : "false");
+        settings.useBuildHook = readInt(from) != 0;
+        settings.verboseBuild = lvlError == (Verbosity) readInt(from);
+        readInt(from); // obsolete logType
+        readInt(from); // obsolete printBuildTrace
+        settings.set("build-cores", std::to_string(readInt(from)));
+        settings.set("build-use-substitutes", readInt(from) ? "true" : "false");
         if (GET_PROTOCOL_MINOR(clientVersion) >= 12) {
             unsigned int n = readInt(from);
             for (unsigned int i = 0; i < n; i++) {
@@ -478,9 +471,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         if (i == infos.end())
             to << 0;
         else {
-            to << 1 << i->second.deriver << i->second.references << i->second.downloadSize;
-            if (GET_PROTOCOL_MINOR(clientVersion) >= 7)
-                to << i->second.narSize;
+            to << 1 << i->second.deriver << i->second.references << i->second.downloadSize << i->second.narSize;
         }
         break;
     }
@@ -585,11 +576,13 @@ static void processConnection(bool trusted)
     to.flush();
     unsigned int clientVersion = readInt(from);
 
+    if (clientVersion < 0x10a)
+        throw Error("the Nix client version is too old");
+
     if (GET_PROTOCOL_MINOR(clientVersion) >= 14 && readInt(from))
         setAffinityTo(readInt(from));
 
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 11)
-        readInt(from); // obsolete reserveSpace
+    readInt(from); // obsolete reserveSpace
 
     /* Send startup error messages to the client. */
     startWork();
@@ -636,10 +629,10 @@ static void processConnection(bool trusted)
                    during addTextToStore() / importPath().  If that
                    happens, just send the error message and exit. */
                 bool errorAllowed = canSendStderr;
-                stopWork(false, e.msg(), GET_PROTOCOL_MINOR(clientVersion) >= 8 ? e.status : 0);
+                stopWork(false, e.msg(), e.status);
                 if (!errorAllowed) throw;
             } catch (std::bad_alloc & e) {
-                stopWork(false, "Nix daemon out of memory", GET_PROTOCOL_MINOR(clientVersion) >= 8 ? 1 : 0);
+                stopWork(false, "Nix daemon out of memory", 1);
                 throw;
             }
 
@@ -653,7 +646,7 @@ static void processConnection(bool trusted)
         printMsg(lvlDebug, format("%1% operations") % opCount);
 
     } catch (Error & e) {
-        stopWork(false, e.msg(), GET_PROTOCOL_MINOR(clientVersion) >= 8 ? 1 : 0);
+        stopWork(false, e.msg(), 1);
         to.flush();
         return;
     }
