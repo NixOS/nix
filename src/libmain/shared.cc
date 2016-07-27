@@ -252,7 +252,6 @@ void printVersion(const string & programName)
         std::cout << "Configuration file: " << settings.nixConfDir + "/nix.conf" << "\n";
         std::cout << "Store directory: " << settings.nixStore << "\n";
         std::cout << "State directory: " << settings.nixStateDir << "\n";
-        std::cout << "Database directory: " << settings.nixDBPath << "\n";
     }
     throw Exit();
 }

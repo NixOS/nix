@@ -4,7 +4,7 @@ clearStore
 
 startDaemon
 
-$SHELL ./user-envs.sh
+storeCleared=1 $SHELL ./user-envs.sh
 
 nix-store --dump-db > $TEST_ROOT/d1
 NIX_REMOTE= nix-store --dump-db > $TEST_ROOT/d2

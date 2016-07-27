@@ -129,15 +129,6 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 </varlistentry>
 
 
-<varlistentry><term><envar>NIX_DB_DIR</envar></term>
-
-  <listitem><para>Overrides the location of the Nix database (default
-  <filename><replaceable>$NIX_STATE_DIR</replaceable>/db</filename>, i.e.,
-  <filename><replaceable>prefix</replaceable>/var/nix/db</filename>).</para></listitem>
-
-</varlistentry>
-
-
 <varlistentry><term><envar>NIX_CONF_DIR</envar></term>
 
   <listitem><para>Overrides the location of the Nix configuration

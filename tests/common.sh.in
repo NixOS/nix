@@ -12,7 +12,6 @@ fi
 export NIX_LOCALSTATE_DIR=$TEST_ROOT/var
 export NIX_LOG_DIR=$TEST_ROOT/var/log/nix
 export NIX_STATE_DIR=$TEST_ROOT/var/nix
-export NIX_DB_DIR=$TEST_ROOT/db
 export NIX_CONF_DIR=$TEST_ROOT/etc
 export NIX_MANIFESTS_DIR=$TEST_ROOT/var/nix/manifests
 export _NIX_TEST_SHARED=$TEST_ROOT/shared
@@ -51,12 +50,10 @@ clearStore() {
     chmod -R +w "$NIX_STORE_DIR"
     rm -rf "$NIX_STORE_DIR"
     mkdir "$NIX_STORE_DIR"
-    rm -rf "$NIX_DB_DIR"
-    mkdir "$NIX_DB_DIR"
+    rm -rf "$NIX_STATE_DIR"
+    mkdir "$NIX_STATE_DIR"
     nix-store --init
     clearProfiles
-    rm -f "$NIX_STATE_DIR"/gcroots/auto/*
-    rm -f "$NIX_STATE_DIR"/gcroots/ref
 }
 
 clearCache() {

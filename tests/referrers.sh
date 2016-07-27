@@ -30,7 +30,7 @@ echo "collecting garbage..."
 ln -sfn $reference "$NIX_STATE_DIR"/gcroots/ref
 nix-store --gc
 
-if [ -n "$(type -p sqlite3)" -a "$(sqlite3 $NIX_DB_DIR/db.sqlite 'select count(*) from Refs')" -ne 0 ]; then
+if [ -n "$(type -p sqlite3)" -a "$(sqlite3 $NIX_STATE_DIR/db/db.sqlite 'select count(*) from Refs')" -ne 0 ]; then
     echo "referrers not cleaned up"
     exit 1
 fi

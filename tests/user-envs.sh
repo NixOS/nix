@@ -1,6 +1,9 @@
 source common.sh
 
-clearStore
+if [ -z "$storeCleared" ]; then
+    clearStore
+fi
+
 clearProfiles
 
 # Query installed: should be empty.

@@ -51,9 +51,6 @@ struct Settings {
     /* The directory where state is stored. */
     Path nixStateDir;
 
-    /* The directory where we keep the SQLite database. */
-    Path nixDBPath;
-
     /* The directory where configuration files are stored. */
     Path nixConfDir;
 
