@@ -81,7 +81,7 @@ void LocalFSStore::narFromPath(const Path & path, Sink & sink)
 {
     if (!isValidPath(path))
         throw Error(format("path ‘%s’ is not valid") % path);
-    dumpPath(path, sink);
+    dumpPath(getRealStoreDir() + std::string(path, storeDir.size()), sink);
 }
 
 }
