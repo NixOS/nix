@@ -139,8 +139,8 @@ int main (int argc, char * * argv)
         auto store = openStore();
 
         auto localSystem = argv[1];
-        settings.maxSilentTime = strtoull(argv[2], NULL, 10);
-        settings.buildTimeout = strtoull(argv[3], NULL, 10);
+        settings.maxSilentTime = stoull(string(argv[2]));
+        settings.buildTimeout = stoull(string(argv[3]));
 
         currentLoad = getEnv("NIX_CURRENT_LOAD", "/run/nix/current-load");
 
