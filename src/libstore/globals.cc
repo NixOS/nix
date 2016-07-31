@@ -69,11 +69,12 @@ void Settings::processEnvironment()
     nixDataDir = canonPath(getEnv("NIX_DATA_DIR", NIX_DATA_DIR));
     nixLogDir = canonPath(getEnv("NIX_LOG_DIR", NIX_LOG_DIR));
     nixStateDir = canonPath(getEnv("NIX_STATE_DIR", NIX_STATE_DIR));
+    nixRunStateDir = canonPath(getEnv("NIX_RUNSTATE_DIR", NIX_RUNSTATE_DIR));    
     nixDBPath = getEnv("NIX_DB_DIR", nixStateDir + "/db");
     nixConfDir = canonPath(getEnv("NIX_CONF_DIR", NIX_CONF_DIR));
     nixLibexecDir = canonPath(getEnv("NIX_LIBEXEC_DIR", NIX_LIBEXEC_DIR));
     nixBinDir = canonPath(getEnv("NIX_BIN_DIR", NIX_BIN_DIR));
-    nixDaemonSocketFile = canonPath(nixStateDir + DEFAULT_SOCKET_PATH);
+    nixDaemonSocketFile = canonPath(nixRunStateDir + DEFAULT_SOCKET_PATH);
 
     // should be set with the other config options, but depends on nixLibexecDir
 #ifdef __APPLE__

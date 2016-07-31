@@ -2,10 +2,10 @@
 Description=Nix Daemon Socket
 Before=multi-user.target
 RequiresMountsFor=@storedir@
-ConditionPathIsReadWrite=@localstatedir@/nix/daemon-socket
+ConditionPathIsReadWrite=@runstatedir@/nix/daemon-socket
 
 [Socket]
-ListenStream=@localstatedir@/nix/daemon-socket/socket
+ListenStream=@runstatedir@/nix/daemon-socket/socket
 
 [Install]
 WantedBy=sockets.target
