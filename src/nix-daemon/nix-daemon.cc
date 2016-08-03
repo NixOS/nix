@@ -515,7 +515,8 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
                << info->registrationTime << info->narSize;
             if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
                 to << info->ultimate
-                   << info->sigs;
+                   << info->sigs
+                   << info->ca;
             }
         } else {
             assert(GET_PROTOCOL_MINOR(clientVersion) >= 17);

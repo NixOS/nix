@@ -273,6 +273,7 @@ std::shared_ptr<ValidPathInfo> RemoteStore::queryPathInfoUncached(const Path & p
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
         info->ultimate = readInt(conn->from) != 0;
         info->sigs = readStrings<StringSet>(conn->from);
+        info->ca = readString(conn->from);
     }
     return info;
 }

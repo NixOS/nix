@@ -6,7 +6,8 @@ create table if not exists ValidPaths (
     deriver          text,
     narSize          integer,
     ultimate         integer, -- null implies "false"
-    sigs             text -- space-separated
+    sigs             text, -- space-separated
+    ca               text -- if not null, an assertion that the path is content-addressed; see ValidPathInfo
 );
 
 create table if not exists Refs (

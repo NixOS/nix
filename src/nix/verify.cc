@@ -116,12 +116,16 @@ struct CmdVerify : StorePathsCommand
                             }
                         };
 
+                        if (info->isContentAddressed(*store)) validSigs = ValidPathInfo::maxSigs;
+
                         doSigs(info->sigs);
 
                         for (auto & store2 : substituters) {
                             if (validSigs >= actualSigsNeeded) break;
                             try {
-                                doSigs(store2->queryPathInfo(info->path)->sigs);
+                                auto info2 = store2->queryPathInfo(info->path);
+                                if (info2->isContentAddressed(*store)) validSigs = ValidPathInfo::maxSigs;
+                                doSigs(info2->sigs);
                             } catch (InvalidPath &) {
                             } catch (Error & e) {
                                 printMsg(lvlError, format(ANSI_RED "error:" ANSI_NORMAL " %s") % e.what());

@@ -195,6 +195,13 @@ LocalStore::LocalStore(const Params & params)
             txn.commit();
         }
 
+        if (curSchema < 10) {
+            SQLiteTxn txn(state->db);
+            if (sqlite3_exec(state->db, "alter table ValidPaths add column ca text", 0, 0, 0) != SQLITE_OK)
+                throwSQLiteError(state->db, "upgrading database schema");
+            txn.commit();
+        }
+
         writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
 
         lockFile(globalLock.get(), ltRead, true);
@@ -204,13 +211,13 @@ LocalStore::LocalStore(const Params & params)
 
     /* Prepare SQL statements. */
     state->stmtRegisterValidPath.create(state->db,
-        "insert into ValidPaths (path, hash, registrationTime, deriver, narSize, ultimate, sigs) values (?, ?, ?, ?, ?, ?, ?);");
+        "insert into ValidPaths (path, hash, registrationTime, deriver, narSize, ultimate, sigs, ca) values (?, ?, ?, ?, ?, ?, ?, ?);");
     state->stmtUpdatePathInfo.create(state->db,
-        "update ValidPaths set narSize = ?, hash = ?, ultimate = ?, sigs = ? where path = ?;");
+        "update ValidPaths set narSize = ?, hash = ?, ultimate = ?, sigs = ?, ca = ? where path = ?;");
     state->stmtAddReference.create(state->db,
         "insert or replace into Refs (referrer, reference) values (?, ?);");
     state->stmtQueryPathInfo.create(state->db,
-        "select id, hash, registrationTime, deriver, narSize, ultimate, sigs from ValidPaths where path = ?;");
+        "select id, hash, registrationTime, deriver, narSize, ultimate, sigs, ca from ValidPaths where path = ?;");
     state->stmtQueryReferences.create(state->db,
         "select path from Refs join ValidPaths on reference = id where referrer = ?;");
     state->stmtQueryReferrers.create(state->db,
@@ -527,6 +534,7 @@ uint64_t LocalStore::addValidPath(State & state,
         (info.narSize, info.narSize != 0)
         (info.ultimate ? 1 : 0, info.ultimate)
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
+        (info.ca, !info.ca.empty())
         .exec();
     uint64_t id = sqlite3_last_insert_rowid(state.db);
 
@@ -609,6 +617,9 @@ std::shared_ptr<ValidPathInfo> LocalStore::queryPathInfoUncached(const Path & pa
         s = (const char *) sqlite3_column_text(state->stmtQueryPathInfo, 6);
         if (s) info->sigs = tokenizeString<StringSet>(s, " ");
 
+        s = (const char *) sqlite3_column_text(state->stmtQueryPathInfo, 7);
+        if (s) info->ca = s;
+
         /* Get the references. */
         auto useQueryReferences(state->stmtQueryReferences.use()(info->id));
 
@@ -628,6 +639,7 @@ void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
         ("sha256:" + printHash(info.narHash))
         (info.ultimate ? 1 : 0, info.ultimate)
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
+        (info.ca, !info.ca.empty())
         (info.path)
         .exec();
 }
@@ -898,7 +910,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, const std::string & nar,
         throw Error(format("hash mismatch importing path ‘%s’; expected hash ‘%s’, got ‘%s’") %
             info.path % info.narHash.to_string() % h.to_string());
 
-    if (requireSigs && !dontCheckSigs && !info.checkSignatures(publicKeys))
+    if (requireSigs && !dontCheckSigs && !info.checkSignatures(*this, publicKeys))
         throw Error(format("cannot import path ‘%s’ because it lacks a valid signature") % info.path);
 
     addTempRoot(info.path);
@@ -983,6 +995,7 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
             info.narHash = hash.first;
             info.narSize = hash.second;
             info.ultimate = true;
+            info.ca = "fixed:" + (recursive ? (std::string) "r:" : "") + h.to_string();
             registerValidPath(info);
         }
 
@@ -1014,7 +1027,8 @@ Path LocalStore::addToStore(const string & name, const Path & _srcPath,
 Path LocalStore::addTextToStore(const string & name, const string & s,
     const PathSet & references, bool repair)
 {
-    Path dstPath = computeStorePathForText(name, s, references);
+    auto hash = hashString(htSHA256, s);
+    auto dstPath = makeTextPath(name, hash, references);
 
     addTempRoot(dstPath);
 
@@ -1034,16 +1048,17 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
 
             StringSink sink;
             dumpString(s, sink);
-            auto hash = hashString(htSHA256, *sink.s);
+            auto narHash = hashString(htSHA256, *sink.s);
 
             optimisePath(realPath);
 
             ValidPathInfo info;
             info.path = dstPath;
-            info.narHash = hash;
+            info.narHash = narHash;
             info.narSize = sink.s->size();
             info.references = references;
             info.ultimate = true;
+            info.ca = "text:" + hash.to_string();
             registerValidPath(info);
         }
 

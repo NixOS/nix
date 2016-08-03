@@ -67,6 +67,10 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
             system = value;
         else if (name == "Sig")
             sigs.insert(value);
+        else if (name == "CA") {
+            if (!ca.empty()) corrupt();
+            ca = value;
+        }
 
         pos = eol + 1;
     }
@@ -100,6 +104,9 @@ std::string NarInfo::to_string() const
 
     for (auto sig : sigs)
         res += "Sig: " + sig + "\n";
+
+    if (!ca.empty())
+        res += "CA: " + ca + "\n";
 
     return res;
 }
