@@ -324,6 +324,8 @@ done
 
 rm -f Makefile.config
 
+AC_DEFINE([_POSIX_C_SOURCE], [200809L], [Define the POSIX version])
+
 AC_CONFIG_HEADER([config.h])
 AC_CONFIG_FILES([])
 AC_OUTPUT
