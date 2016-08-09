@@ -181,24 +181,20 @@ LocalStore::LocalStore(const Params & params)
 
         if (curSchema < 8) {
             SQLiteTxn txn(state->db);
-            if (sqlite3_exec(state->db, "alter table ValidPaths add column ultimate integer", 0, 0, 0) != SQLITE_OK)
-                throwSQLiteError(state->db, "upgrading database schema");
-            if (sqlite3_exec(state->db, "alter table ValidPaths add column sigs text", 0, 0, 0) != SQLITE_OK)
-                throwSQLiteError(state->db, "upgrading database schema");
+            state->db.exec("alter table ValidPaths add column ultimate integer");
+            state->db.exec("alter table ValidPaths add column sigs text");
             txn.commit();
         }
 
         if (curSchema < 9) {
             SQLiteTxn txn(state->db);
-            if (sqlite3_exec(state->db, "drop table FailedPaths", 0, 0, 0) != SQLITE_OK)
-                throwSQLiteError(state->db, "upgrading database schema");
+            state->db.exec("drop table FailedPaths");
             txn.commit();
         }
 
         if (curSchema < 10) {
             SQLiteTxn txn(state->db);
-            if (sqlite3_exec(state->db, "alter table ValidPaths add column ca text", 0, 0, 0) != SQLITE_OK)
-                throwSQLiteError(state->db, "upgrading database schema");
+            state->db.exec("alter table ValidPaths add column ca text");
             txn.commit();
         }
 
@@ -286,8 +282,7 @@ void LocalStore::openDB(State & state, bool create)
     if (sqlite3_busy_timeout(db, 60 * 60 * 1000) != SQLITE_OK)
         throwSQLiteError(db, "setting timeout");
 
-    if (sqlite3_exec(db, "pragma foreign_keys = 1;", 0, 0, 0) != SQLITE_OK)
-        throwSQLiteError(db, "enabling foreign keys");
+    db.exec("pragma foreign_keys = 1");
 
     /* !!! check whether sqlite has been built with foreign key
        support */
@@ -297,8 +292,7 @@ void LocalStore::openDB(State & state, bool create)
        all.  This can cause database corruption if the system
        crashes. */
     string syncMode = settings.fsyncMetadata ? "normal" : "off";
-    if (sqlite3_exec(db, ("pragma synchronous = " + syncMode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
-        throwSQLiteError(db, "setting synchronous mode");
+    db.exec("pragma synchronous = " + syncMode);
 
     /* Set the SQLite journal mode.  WAL mode is fastest, so it's the
        default. */
@@ -326,8 +320,7 @@ void LocalStore::openDB(State & state, bool create)
         const char * schema =
 #include "schema.sql.hh"
             ;
-        if (sqlite3_exec(db, (const char *) schema, 0, 0, 0) != SQLITE_OK)
-            throwSQLiteError(db, "initialising database schema");
+        db.exec(schema);
     }
 }
 
@@ -1297,9 +1290,7 @@ void LocalStore::upgradeStore7()
 void LocalStore::vacuumDB()
 {
     auto state(_state.lock());
-
-    if (sqlite3_exec(state->db, "vacuum;", 0, 0, 0) != SQLITE_OK)
-        throwSQLiteError(state->db, "vacuuming SQLite database");
+    state->db.exec("vacuum");
 }
 
 

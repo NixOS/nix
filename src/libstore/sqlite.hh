@@ -13,10 +13,16 @@ namespace nix {
 /* RAII wrapper to close a SQLite database automatically. */
 struct SQLite
 {
-    sqlite3 * db;
-    SQLite() { db = 0; }
+    sqlite3 * db = 0;
+    SQLite() { }
+    SQLite(const Path & path);
+    SQLite(const SQLite & from) = delete;
+    SQLite& operator = (const SQLite & from) = delete;
+    SQLite& operator = (SQLite && from) { db = from.db; from.db = 0; return *this; }
     ~SQLite();
     operator sqlite3 * () { return db; }
+
+    void exec(const std::string & stmt);
 };
 
 /* RAII wrapper to create and destroy SQLite prepared statements. */

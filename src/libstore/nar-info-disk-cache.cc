@@ -78,21 +78,16 @@ public:
         Path dbPath = getCacheDir() + "/nix/binary-cache-v5.sqlite";
         createDirs(dirOf(dbPath));
 
-        if (sqlite3_open_v2(dbPath.c_str(), &state->db.db,
-                SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, 0) != SQLITE_OK)
-            throw Error(format("cannot open store cache ‘%s’") % dbPath);
+        state->db = SQLite(dbPath);
 
         if (sqlite3_busy_timeout(state->db, 60 * 60 * 1000) != SQLITE_OK)
             throwSQLiteError(state->db, "setting timeout");
 
         // We can always reproduce the cache.
-        if (sqlite3_exec(state->db, "pragma synchronous = off", 0, 0, 0) != SQLITE_OK)
-            throwSQLiteError(state->db, "making database asynchronous");
-        if (sqlite3_exec(state->db, "pragma main.journal_mode = truncate", 0, 0, 0) != SQLITE_OK)
-            throwSQLiteError(state->db, "setting journal mode");
+        state->db.exec("pragma synchronous = off");
+        state->db.exec("pragma main.journal_mode = truncate");
 
-        if (sqlite3_exec(state->db, schema, 0, 0, 0) != SQLITE_OK)
-            throwSQLiteError(state->db, "initialising database schema");
+        state->db.exec(schema);
 
         state->insertCache.create(state->db,
             "insert or replace into BinaryCaches(url, timestamp, storeDir, wantMassQuery, priority) values (?, ?, ?, ?, ?)");
