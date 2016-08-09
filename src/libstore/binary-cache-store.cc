@@ -254,7 +254,7 @@ struct BinaryCacheStoreAccessor : public FSAccessor
         std::string restPath = std::string(path, storePath.size());
 
         if (!store->isValidPath(storePath))
-            throw Error(format("path ‘%1%’ is not a valid store path") % storePath);
+            throw InvalidPath(format("path ‘%1%’ is not a valid store path") % storePath);
 
         auto i = nars.find(storePath);
         if (i != nars.end()) return {i->second, restPath};
