@@ -40,7 +40,6 @@ Makefile.config
 /scripts/nix-prefetch-url
 /scripts/nix-install-package
 /scripts/nix-channel
-/scripts/nix-build
 /scripts/nix-copy-closure
 /scripts/NixConfig.pm
 /scripts/NixManifest.pm
@@ -76,6 +75,9 @@ Makefile.config
 
 # /src/download-via-ssh/
 /src/download-via-ssh/download-via-ssh
+
+# /src/nix-build/
+/src/nix-build/nix-build
 
 # /tests/
 /tests/test-tmp
