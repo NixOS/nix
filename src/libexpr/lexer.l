@@ -180,12 +180,13 @@ or          { return OR_KW; }
                  }
 <IND_STRING>.    return yytext[0]; /* just in case: shouldn't be reached */
 
+<INITIAL>{URI}       { yylval->uri = strdup(yytext); return URI; }
+
 <INITIAL,INSIDE_DOLLAR_CURLY>{
 
 {PATH}      { yylval->path = strdup(yytext); return PATH; }
 {HPATH}     { yylval->path = strdup(yytext); return HPATH; }
 {SPATH}     { yylval->path = strdup(yytext); return SPATH; }
-{URI}       { yylval->uri = strdup(yytext); return URI; }
 
 [ \t\r\n]+    /* eat up whitespace */
 \#[^\r\n]*    /* single-line comments */
