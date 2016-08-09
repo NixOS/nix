@@ -27,7 +27,7 @@ struct NarIndexer : ParseSink, StringSource
 
     Path currentPath;
     std::string currentStart;
-    bool isExec;
+    bool isExec = false;
 
     NarIndexer(const std::string & nar) : StringSource(nar)
     {
