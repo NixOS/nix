@@ -81,7 +81,7 @@ StoreCommand::StoreCommand()
 
 void StoreCommand::run()
 {
-    run(openStoreAt(storeUri));
+    run(openStore(storeUri));
 }
 
 StorePathsCommand::StorePathsCommand()
