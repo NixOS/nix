@@ -58,6 +58,7 @@ protected:
             DownloadOptions options;
             options.showProgress = DownloadOptions::no;
             options.head = true;
+            options.tries = 5;
             downloader->download(cacheUri + "/" + path, options);
             return true;
         } catch (DownloadError & e) {
@@ -79,6 +80,7 @@ protected:
         auto downloader(downloaders.get());
         DownloadOptions options;
         options.showProgress = DownloadOptions::no;
+        options.tries = 3;
         try {
             return downloader->download(cacheUri + "/" + path, options).data;
         } catch (DownloadError & e) {
