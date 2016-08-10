@@ -142,7 +142,7 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
     evaluates to the Nix platform identifier for the Nix installation
     on which the expression is being evaluated, such as
     <literal>"i686-linux"</literal> or
-    <literal>"powerpc-darwin"</literal>.</para></listitem>
+    <literal>"x86_64-darwin"</literal>.</para></listitem>
 
   </varlistentry>
 

@@ -11,9 +11,9 @@ forward Nix builds to other machines over the network.  This allows
 multiple builds to be performed in parallel (thus improving
 performance) and allows Nix to perform multi-platform builds in a
 semi-transparent way.  For instance, if you perform a build for a
-<literal>powerpc-darwin</literal> on an <literal>i686-linux</literal>
+<literal>x86_64-darwin</literal> on an <literal>i686-linux</literal>
 machine, Nix can automatically forward the build to a
-<literal>powerpc-darwin</literal> machine, if available.</para>
+<literal>x86_64-darwin</literal> machine, if available.</para>
 
 <para>You can enable distributed builds by setting the environment
 variable <envar>NIX_BUILD_HOOK</envar> to point to a program that Nix
@@ -30,7 +30,7 @@ variable</link>.</para>
 <example xml:id='ex-remote-systems'><title>Remote machine configuration:
 <filename>remote-systems.conf</filename></title>
 <programlisting>
-nix@mcflurry.labs.cs.uu.nl  powerpc-darwin  /home/nix/.ssh/id_quarterpounder_auto  2
+nix@mcflurry.labs.cs.uu.nl  x86_64-darwin   /home/nix/.ssh/id_quarterpounder_auto  2
 nix@scratchy.labs.cs.uu.nl  i686-linux      /home/nix/.ssh/id_scratchy_auto        8 1 kvm
 nix@itchy.labs.cs.uu.nl     i686-linux      /home/nix/.ssh/id_scratchy_auto        8 2
 nix@poochie.labs.cs.uu.nl   i686-linux      /home/nix/.ssh/id_scratchy_auto        8 2 kvm perf
@@ -59,7 +59,7 @@ bits of information:
   <filename>~/.ssh/config</filename>.</para></listitem>
 
   <listitem><para>A comma-separated list of Nix platform type
-  identifiers, such as <literal>powerpc-darwin</literal>.  It is
+  identifiers, such as <literal>x86_64-darwin</literal>.  It is
   possible for a machine to support multiple platform types, e.g.,
   <literal>i686-linux,x86_64-linux</literal>.</para></listitem>
 
