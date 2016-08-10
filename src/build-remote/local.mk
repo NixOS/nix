@@ -8,4 +8,4 @@ build-remote_LIBS = libmain libutil libformat libstore
 
 build-remote_SOURCES := $(d)/build-remote.cc
 
-build-remote_CXXFLAGS = -DSYSCONFDIR="\"$(sysconfdir)\"" -Isrc/nix-store
+build-remote_CXXFLAGS = -DSYSCONFDIR="\"$(sysconfdir)\""

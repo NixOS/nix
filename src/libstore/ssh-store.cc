@@ -39,6 +39,8 @@ private:
     string uri;
 
     Path key;
+
+    bool compress;
 };
 
 SSHStore::SSHStore(string uri, const Params & params, size_t maxConnections)
@@ -48,6 +50,7 @@ SSHStore::SSHStore(string uri, const Params & params, size_t maxConnections)
     , socketPath((Path) tmpDir + "/ssh.sock")
     , uri(std::move(uri))
     , key(get(params, "ssh-key", ""))
+    , compress(get(params, "compress", "") == "true")
 {
     /* open a connection and perform the handshake to verify all is well */
     connections->get();
@@ -90,11 +93,12 @@ ref<FSAccessor> SSHStore::getFSAccessor()
 ref<RemoteStore::Connection> SSHStore::openConnection()
 {
     if ((pid_t) sshMaster == -1) {
+        auto flags = compress ? "-NMCS" : "-NMS";
         sshMaster = startProcess([&]() {
             if (key.empty())
-                execlp("ssh", "ssh", "-N", "-M", "-S", socketPath.c_str(), uri.c_str(), NULL);
+                execlp("ssh", "ssh", flags, socketPath.c_str(), uri.c_str(), NULL);
             else
-                execlp("ssh", "ssh", "-N", "-M", "-S", socketPath.c_str(), "-i", key.c_str(), uri.c_str(), NULL);
+                execlp("ssh", "ssh", flags, socketPath.c_str(), "-i", key.c_str(), uri.c_str(), NULL);
             throw SysError("starting ssh master");
         });
     }

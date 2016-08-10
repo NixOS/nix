@@ -9,7 +9,6 @@
 #include "shared.hh"
 #include "pathlocks.hh"
 #include "globals.hh"
-#include "serve-protocol.hh"
 #include "serialise.hh"
 #include "store-api.hh"
 #include "derivations.hh"
