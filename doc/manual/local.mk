@@ -39,7 +39,7 @@ dist-files += $(d)/manual.xmli $(d)/version.txt $(d)/manual.is-valid
 # Generate man pages.
 man-pages := $(foreach n, \
   nix-env.1 nix-build.1 nix-shell.1 nix-store.1 nix-instantiate.1 \
-  nix-collect-garbage.1 nix-push.1 \
+  nix-collect-garbage.1 \
   nix-prefetch-url.1 nix-channel.1 \
   nix-hash.1 nix-copy-closure.1 \
   nix.conf.5 nix-daemon.8, \

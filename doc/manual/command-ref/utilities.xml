@@ -16,6 +16,5 @@ work with Nix.</para>
 <xi:include href="nix-hash.xml" />
 <xi:include href="nix-instantiate.xml" />
 <xi:include href="nix-prefetch-url.xml" />
-<xi:include href="nix-push.xml" />
 
 </chapter>
