@@ -195,8 +195,12 @@ struct CurlDownloader : public Downloader
             Error err =
                 httpStatus == 404 ? NotFound :
                 httpStatus == 403 ? Forbidden : Misc;
-            throw DownloadError(err, format("unable to download ‘%1%’: %2% (%3%)")
-                % url % curl_easy_strerror(res) % res);
+            if (res == CURLE_HTTP_RETURNED_ERROR && httpStatus != -1)
+                throw DownloadError(err, format("unable to download ‘%s’: HTTP error %d")
+                    % url % httpStatus);
+            else
+                throw DownloadError(err, format("unable to download ‘%s’: %s (%d)")
+                    % url % curl_easy_strerror(res) % res);
         }
 
         if (httpStatus == 304) return false;
