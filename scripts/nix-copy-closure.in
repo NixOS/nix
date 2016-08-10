@@ -1,0 +1,4 @@
+#! @bash@
+
+echo "nix-copy-closure has been removed from nix, please use 'nix copy' instead" >&2
+exit 1

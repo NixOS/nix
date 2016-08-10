@@ -41,6 +41,7 @@ Makefile.config
 /scripts/nix-install-package
 /scripts/nix-channel
 /scripts/nix-build
+/scripts/nix-copy-closure
 /scripts/NixConfig.pm
 /scripts/NixManifest.pm
 /scripts/download-from-binary-cache.pl
