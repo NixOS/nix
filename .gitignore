@@ -38,7 +38,6 @@ Makefile.config
 /scripts/nix-switch
 /scripts/nix-collect-garbage
 /scripts/nix-prefetch-url
-/scripts/nix-install-package
 /scripts/nix-channel
 /scripts/nix-build
 /scripts/nix-copy-closure

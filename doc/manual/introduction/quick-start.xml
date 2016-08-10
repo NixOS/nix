@@ -95,18 +95,6 @@ The latter command will upgrade each installed package for which there
 is a “newer” version (as determined by comparing the version
 numbers).</para></step>
 
-<!--
-<step><para>You can also install specific packages directly from
-your web browser.  For instance, you can go to <link
-xlink:href="http://hydra.nixos.org/jobset/nixpkgs/trunk/channel/latest"
-/> and click on any link for the individual packages for your
-platform.  Associate <literal>application/nix-package</literal> with
-the program <command>nix-install-package</command>.  A window should
-appear asking you whether it’s okay to install the package.  Say
-<literal>Y</literal>.  The package and all its dependencies will be
-installed.</para></step>
--->
-
 <step><para>If you're unhappy with the result of a
 <command>nix-env</command> action (e.g., an upgraded package turned
 out not to work properly), you can go back:
