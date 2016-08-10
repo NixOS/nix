@@ -6,7 +6,7 @@ clearCache
 # Create the binary cache.
 outPath=$(nix-build dependencies.nix --no-out-link)
 
-nix-push --dest $cacheDir $outPath
+nix copy --recursive --to file://$cacheDir $outPath
 
 
 basicTests() {
@@ -58,7 +58,7 @@ unset _NIX_FORCE_HTTP_BINARY_CACHE_STORE
 # Test whether Nix notices if the NAR doesn't match the hash in the NAR info.
 clearStore
 
-nar=$(ls $cacheDir/*.nar.xz | head -n1)
+nar=$(ls $cacheDir/nar/*.nar.xz | head -n1)
 mv $nar $nar.good
 mkdir -p $TEST_ROOT/empty
 nix-store --dump $TEST_ROOT/empty | xz > $nar
@@ -117,7 +117,7 @@ badKey="$(cat $TEST_ROOT/pk2)"
 res=($(nix-store --generate-binary-cache-key foo.nixos.org-1 $TEST_ROOT/sk3 $TEST_ROOT/pk3))
 otherKey="$(cat $TEST_ROOT/pk3)"
 
-nix-push --dest $cacheDir --key-file $TEST_ROOT/sk1 $outPath
+nix copy --recursive --to file://$cacheDir?secret-key=$TEST_ROOT/sk1 $outPath
 
 
 # Downloading should fail if we don't provide a key.

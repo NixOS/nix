@@ -1390,8 +1390,7 @@ parameters:
 
 </orderedlist>
 
-For an example, see the manual page for <command
-linkend="sec-nix-push">nix-push</command>.</para>
+</para>
 
 </refsection>
 

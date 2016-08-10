@@ -34,7 +34,6 @@ Makefile.config
 
 # /scripts/
 /scripts/nix-profile.sh
-/scripts/nix-push
 /scripts/nix-switch
 /scripts/nix-collect-garbage
 /scripts/nix-prefetch-url

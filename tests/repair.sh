@@ -46,7 +46,7 @@ fi
 # --verify can fix it.
 clearCache
 
-nix-push --dest $cacheDir $path
+nix copy --recursive --to file://$cacheDir $path
 
 chmod u+w $path2
 rm -rf $path2

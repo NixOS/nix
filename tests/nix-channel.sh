@@ -15,7 +15,7 @@ nix-channel --remove xyzzy
 # Create a channel.
 rm -rf $TEST_ROOT/foo
 mkdir -p $TEST_ROOT/foo
-nix-push --dest $TEST_ROOT/foo --manifest --bzip2 $(nix-store -r $(nix-instantiate dependencies.nix))
+nix copy --recursive --to file://$TEST_ROOT/foo?compression="bzip2" $(nix-store -r $(nix-instantiate dependencies.nix))
 rm -rf $TEST_ROOT/nixexprs
 mkdir -p $TEST_ROOT/nixexprs
 cp config.nix dependencies.nix dependencies.builder*.sh $TEST_ROOT/nixexprs/

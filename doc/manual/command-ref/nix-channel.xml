@@ -180,9 +180,7 @@ following files:</para>
     sufficient rights to add binary caches. For instance, in a
     multi-user Nix setup, the binary caches provided by the channels
     of the root user are used automatically, but caches corresponding
-    to the channels of non-root users are ignored. Binary caches can
-    be created and maintained using
-    <command>nix-push</command>.</para></listitem>
+    to the channels of non-root users are ignored.</para></listitem>
 
   </varlistentry>
 
