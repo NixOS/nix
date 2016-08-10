@@ -37,7 +37,7 @@ $ nix-store -r /nix/store/m85bxg…-firefox-34.0.5 --option ssh-substituter-host
 This is essentially equivalent to doing
 
 <screen>
-$ nix-copy-closure --from alice@avalon /nix/store/m85bxg…-firefox-34.0.5
+$ nix copy --from alice@avalon /nix/store/m85bxg…-firefox-34.0.5
 </screen>
 
 </para>

@@ -113,7 +113,7 @@ for i in "$@"; do
 	if [ "$i" != "$sshHost" ]; then
 		cat needed-paths | while read; do 
 			echo "Getting $REPLY and its closure over ssh" >&2
-			nix-copy-closure --from "$sshHost" --gzip "$REPLY" </dev/null || true; 
+			nix copy --from "$sshHost" --gzip "$REPLY" </dev/null || true;
 		done;
 	elif [ "$i" != "$httpHost" ] || [ "$i" != "$httpsHost" ]; then
 		cat needed-paths | while read; do

@@ -11,7 +11,6 @@ work with Nix.</para>
 
 <xi:include href="nix-channel.xml" />
 <xi:include href="nix-collect-garbage.xml" />
-<xi:include href="nix-copy-closure.xml" />
 <xi:include href="nix-daemon.xml" />
 <xi:include href="nix-hash.xml" />
 <xi:include href="nix-install-package.xml" />

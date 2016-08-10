@@ -202,10 +202,6 @@ let
       nix = build.x86_64-linux; system = "x86_64-linux";
     });
 
-    tests.nix-copy-closure = (import ./tests/nix-copy-closure.nix rec {
-      nix = build.x86_64-linux; system = "x86_64-linux";
-    });
-
     tests.binaryTarball =
       with import <nixpkgs> { system = "x86_64-linux"; };
       vmTools.runInLinuxImage (runCommand "nix-binary-tarball-test"
@@ -273,7 +269,6 @@ let
           rpm_fedora21i386
           rpm_fedora21x86_64
           tests.remoteBuilds
-          tests.nix-copy-closure
           tests.binaryTarball
           tests.evalNixpkgs
           tests.evalNixOS
