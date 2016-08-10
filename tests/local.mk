@@ -5,7 +5,7 @@ nix_tests = \
   init.sh hash.sh lang.sh add.sh simple.sh dependencies.sh \
   build-hook.sh nix-push.sh gc.sh gc-concurrent.sh \
   referrers.sh user-envs.sh logging.sh nix-build.sh misc.sh fixed.sh \
-  gc-runtime.sh install-package.sh check-refs.sh filter-source.sh \
+  gc-runtime.sh check-refs.sh filter-source.sh \
   remote-store.sh export.sh export-graph.sh \
   timeout.sh secure-drv-outputs.sh nix-channel.sh \
   multiple-outputs.sh import-derivation.sh fetchurl.sh optimise-store.sh \

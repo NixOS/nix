@@ -18,7 +18,6 @@ who want to <emphasis>create</emphasis> packages should consult
 <xi:include href="profiles.xml" />
 <xi:include href="garbage-collection.xml" />
 <xi:include href="channels.xml" />
-<xi:include href="one-click.xml" />
 <xi:include href="sharing-packages.xml" />
 
 </part>
