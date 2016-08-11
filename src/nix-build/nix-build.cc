@@ -332,7 +332,7 @@ int main(int argc, char ** argv)
         }
 
         if (runEnv)
-            setenv("IN_NIX_SHELL", "1", 1);
+            setenv("IN_NIX_SHELL", pure ? "pure" : "impure", 1);
 
         for (auto & expr : exprs) {
             // Instantiate.
