@@ -75,6 +75,9 @@ Makefile.config
 # /src/download-via-ssh/
 /src/download-via-ssh/download-via-ssh
 
+# /src/buildenv/
+/src/buildenv/buildenv
+
 # /tests/
 /tests/test-tmp
 /tests/common.sh
