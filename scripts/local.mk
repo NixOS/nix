@@ -1,6 +1,5 @@
 nix_bin_scripts := \
   $(d)/nix-build \
-  $(d)/nix-channel \
   $(d)/nix-copy-closure \
   $(d)/nix-push
 
