@@ -5,8 +5,7 @@ with import <nix/config.nix>;
 derivation {
   name = "user-environment";
   system = builtins.currentSystem;
-  builder = perl;
-  args = [ "-w" ./buildenv.pl ];
+  builder = nixLibexecDir + "/nix/buildenv";
 
   inherit manifest;
 
