@@ -7,14 +7,12 @@ bin-scripts += $(nix_bin_scripts)
 
 nix_noinst_scripts := \
   $(d)/build-remote.pl \
-  $(d)/find-runtime-roots.pl \
-  $(d)/resolve-system-dependencies.rb \
   $(d)/nix-http-export.cgi \
   $(d)/nix-profile.sh \
   $(d)/nix-reduce-build
 
 ifeq ($(OS), Darwin)
-  nix_noinst_scripts += $(d)/resolve-system-dependencies.pl
+  nix_noinst_scripts += $(d)/resolve-system-dependencies.rb
 endif
 
 noinst-scripts += $(nix_noinst_scripts)
