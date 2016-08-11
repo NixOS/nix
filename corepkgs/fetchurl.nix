@@ -1,5 +1,3 @@
-with import <nix/config.nix>;
-
 { system ? builtins.currentSystem
 , url
 , outputHash ? ""
