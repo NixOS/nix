@@ -12,5 +12,10 @@
     <string>/var/log/nix-daemon.log</string>
     <key>StandardOutPath</key>
     <string>/dev/null</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>SSL_CERT_FILE</key>
+      <string>/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt</string>
+    </dict>
   </dict>
 </plist>
