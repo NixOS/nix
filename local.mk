@@ -3,7 +3,7 @@ ifeq ($(MAKECMDGOALS), dist)
   dist-files += $(shell git --git-dir=.git ls-files || find * -type f)
 endif
 
-dist-files += configure config.h.in nix.spec
+dist-files += configure config.h.in nix.spec perl/configure
 
 clean-files += Makefile.config
 

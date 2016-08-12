@@ -41,6 +41,7 @@ let
         '';
 
         preConfigure = ''
+          (cd perl ; autoreconf --install --force --verbose)
           # TeX needs a writable font cache.
           export VARTEXFONTS=$TMPDIR/texfonts
         '';
@@ -93,6 +94,32 @@ let
 
         doInstallCheck = true;
         installCheckFlags = "sysconfdir=$(out)/etc";
+      });
+
+
+    perl = pkgs.lib.genAttrs systems (system:
+
+      let pkgs = import <nixpkgs> { inherit system; }; in with pkgs;
+
+      releaseTools.nixBuild {
+        name = "nix-perl";
+        src = tarball;
+
+        buildInputs =
+          [ (builtins.getAttr system jobs.build) curl bzip2 xz pkgconfig pkgs.perl ]
+          ++ lib.optional stdenv.isLinux libsodium;
+
+	configureFlags = ''
+          --with-dbi=${perlPackages.DBI}/${pkgs.perl.libPrefix}
+          --with-dbd-sqlite=${perlPackages.DBDSQLite}/${pkgs.perl.libPrefix}
+          --with-www-curl=${perlPackages.WWWCurl}/${pkgs.perl.libPrefix}
+        '';
+
+        enableParallelBuilding = true;
+
+	postUnpack = "sourceRoot=$sourceRoot/perl";
+
+        preBuild = "unset NIX_INDENT_MAKE";
       });
 
 
