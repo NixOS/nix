@@ -42,7 +42,7 @@ purposes.  It uses <command>ssh</command> and
 <command>nix-copy-closure</command> to copy the build inputs and
 outputs and perform the remote build.  To use it, you should set
 <envar>NIX_BUILD_HOOK</envar> to
-<filename><replaceable>prefix</replaceable>/libexec/nix/build-remote.pl</filename>.
+<filename><replaceable>prefix</replaceable>/libexec/nix/build-remote</filename>.
 You should also define a list of available build machines and point
 the environment variable <envar>NIX_REMOTE_SYSTEMS</envar> to
 it. <envar>NIX_REMOTE_SYSTEMS</envar> must be an absolute path. An
@@ -68,7 +68,7 @@ bits of information:
   should not have a passphrase!</para></listitem>
 
   <listitem><para>The maximum number of builds that
-  <filename>build-remote.pl</filename> will execute in parallel on the
+  <filename>build-remote</filename> will execute in parallel on the
   machine.  Typically this should be equal to the number of CPU cores.
   For instance, the machine <literal>itchy</literal> in the example
   will execute up to 8 builds in parallel.</para></listitem>
@@ -80,7 +80,7 @@ bits of information:
   <listitem><para>A comma-separated list of <emphasis>supported
   features</emphasis>.  If a derivation has the
   <varname>requiredSystemFeatures</varname> attribute, then
-  <filename>build-remote.pl</filename> will only perform the
+  <filename>build-remote</filename> will only perform the
   derivation on a machine that has the specified features.  For
   instance, the attribute
 
@@ -106,11 +106,11 @@ requiredSystemFeatures = [ "kvm" ];
 You should also set up the environment variable
 <envar>NIX_CURRENT_LOAD</envar> to point at a directory (e.g.,
 <filename>/var/run/nix/current-load</filename>) that
-<filename>build-remote.pl</filename> uses to remember how many builds
+<filename>build-remote</filename> uses to remember how many builds
 it is currently executing remotely.  It doesn't look at the actual
 load on the remote machine, so if you have multiple instances of Nix
 running, they should use the same <envar>NIX_CURRENT_LOAD</envar>
-file.  Maybe in the future <filename>build-remote.pl</filename> will
+file.  Maybe in the future <filename>build-remote</filename> will
 look at the actual remote load.</para>
 
 </chapter>

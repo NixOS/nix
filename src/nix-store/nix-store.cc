@@ -926,7 +926,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 break;
             }
 
-            case cmdBuildPaths: { /* Used by build-remote.pl. */
+            case cmdBuildPaths: {
 
                 if (!writeAllowed) throw Error("building paths is not allowed");
                 PathSet paths = readStorePaths<PathSet>(*store, in);

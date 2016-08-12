@@ -121,7 +121,6 @@ AC_PATH_PROG(xmllint, xmllint, false)
 AC_PATH_PROG(xsltproc, xsltproc, false)
 AC_PATH_PROG(flex, flex, false)
 AC_PATH_PROG(bison, bison, false)
-NEED_PROG(perl, perl)
 NEED_PROG(sed, sed)
 NEED_PROG(tar, tar)
 NEED_PROG(bzip2, bzip2)
@@ -129,23 +128,6 @@ NEED_PROG(gzip, gzip)
 NEED_PROG(xz, xz)
 AC_PATH_PROG(dot, dot)
 AC_PATH_PROG(pv, pv, pv)
-
-
-# Test that Perl has the open/fork feature (Perl 5.8.0 and beyond).
-AC_MSG_CHECKING([whether Perl is recent enough])
-if ! $perl -e 'open(FOO, "-|", "true"); while (<FOO>) { print; }; close FOO or die;'; then
-    AC_MSG_RESULT(no)
-    AC_MSG_ERROR([Your Perl version is too old.  Nix requires Perl 5.8.0 or newer.])
-fi
-AC_MSG_RESULT(yes)
-
-
-# Figure out where to install Perl modules.
-AC_MSG_CHECKING([for the Perl installation prefix])
-perlversion=$($perl -e 'use Config; print $Config{version};')
-perlarchname=$($perl -e 'use Config; print $Config{archname};')
-AC_SUBST(perllibdir, [${libdir}/perl5/site_perl/$perlversion/$perlarchname])
-AC_MSG_RESULT($perllibdir)
 
 
 NEED_PROG(cat, cat)
@@ -211,40 +193,6 @@ if test "$gc" = yes; then
   CXXFLAGS="$BDW_GC_CFLAGS $CXXFLAGS"
   AC_DEFINE(HAVE_BOEHMGC, 1, [Whether to use the Boehm garbage collector.])
 fi
-
-
-# Check for the required Perl dependencies (DBI, DBD::SQLite).
-perlFlags="-I$perllibdir"
-
-AC_ARG_WITH(dbi, AC_HELP_STRING([--with-dbi=PATH],
-  [prefix of the Perl DBI library]),
-  perlFlags="$perlFlags -I$withval")
-
-AC_ARG_WITH(dbd-sqlite, AC_HELP_STRING([--with-dbd-sqlite=PATH],
-  [prefix of the Perl DBD::SQLite library]),
-  perlFlags="$perlFlags -I$withval")
-
-AC_MSG_CHECKING([whether DBD::SQLite works])
-if ! $perl $perlFlags -e 'use DBI; use DBD::SQLite;' 2>&5; then
-    AC_MSG_RESULT(no)
-    AC_MSG_FAILURE([The Perl modules DBI and/or DBD::SQLite are missing.])
-fi
-AC_MSG_RESULT(yes)
-
-AC_SUBST(perlFlags)
-
-
-# Whether to build the Perl bindings
-AC_MSG_CHECKING([whether to build the Perl bindings])
-AC_ARG_ENABLE(perl-bindings, AC_HELP_STRING([--enable-perl-bindings],
-  [whether to build the Perl bindings (recommended) [default=yes]]),
-  perlbindings=$enableval, perlbindings=yes)
-if test "$enable_shared" = no; then
-   # Perl bindings require shared libraries.
-   perlbindings=no
-fi
-AC_SUBST(perlbindings)
-AC_MSG_RESULT($perlbindings)
 
 
 AC_ARG_ENABLE(init-state, AC_HELP_STRING([--disable-init-state],

@@ -24,18 +24,14 @@ let
         inherit officialRelease;
 
         buildInputs =
-          [ curl bison flex perl libxml2 libxslt bzip2 xz
+          [ curl bison flex libxml2 libxslt bzip2 xz
             pkgconfig sqlite libsodium boehmgc
             docbook5 docbook5_xsl
             autoconf-archive
             git
           ];
 
-        configureFlags = ''
-          --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
-          --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
-          --enable-gc
-        '';
+	configureFlags = "--enable-gc";
 
         postUnpack = ''
           # Clean up when building from a working tree.
@@ -73,7 +69,7 @@ let
         src = tarball;
 
         buildInputs =
-          [ curl perl bzip2 xz openssl pkgconfig sqlite boehmgc ]
+          [ curl bzip2 xz openssl pkgconfig sqlite boehmgc ]
           ++ lib.optional stdenv.isLinux libsodium
           ++ lib.optional stdenv.isLinux
             (aws-sdk-cpp.override {
@@ -83,8 +79,6 @@ let
 
         configureFlags = ''
           --disable-init-state
-          --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
-          --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
           --enable-gc
           --sysconfdir=/etc
         '';
@@ -147,15 +141,13 @@ let
         src = tarball;
 
         buildInputs =
-          [ curl perl bzip2 openssl pkgconfig sqlite xz libsodium
+          [ curl bzip2 openssl pkgconfig sqlite xz libsodium
             # These are for "make check" only:
             graphviz libxml2 libxslt
           ];
 
         configureFlags = ''
           --disable-init-state
-          --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
-          --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
         '';
 
         dontInstall = false;
@@ -282,7 +274,7 @@ let
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages =
-            [ "perl-DBD-SQLite" "perl-devel" "sqlite" "sqlite-devel" "bzip2-devel" "emacs" "libcurl-devel" "openssl-devel" "xz-devel" ]
+            [ "sqlite" "sqlite-devel" "bzip2-devel" "emacs" "libcurl-devel" "openssl-devel" "xz-devel" ]
             ++ extraPackages; };
       memSize = 1024;
       meta.schedulingPriority = 50;
@@ -303,14 +295,14 @@ let
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages =
-            [ "libdbd-sqlite3-perl" "libsqlite3-dev" "libbz2-dev" "libwww-curl-perl" "libcurl-dev" "libcurl3-nss" "libssl-dev" "liblzma-dev" ]
+            [ "libsqlite3-dev" "libbz2-dev" "libcurl-dev" "libcurl3-nss" "libssl-dev" "liblzma-dev" ]
             ++ extraPackages; };
       memSize = 1024;
       meta.schedulingPriority = 50;
       postInstall = "make installcheck";
       configureFlags = "--sysconfdir=/etc";
       debRequires =
-        [ "curl" "libdbd-sqlite3-perl" "libsqlite3-0" "libbz2-1.0" "bzip2" "xz-utils" "libwww-curl-perl" "libssl1.0.0" "liblzma5" ]
+        [ "curl" "libsqlite3-0" "libbz2-1.0" "bzip2" "xz-utils" "libssl1.0.0" "liblzma5" ]
         ++ extraDebPackages;
       debMaintainer = "Eelco Dolstra <eelco.dolstra@logicblox.com>";
       doInstallCheck = true;
