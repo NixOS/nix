@@ -76,7 +76,7 @@ void Settings::processEnvironment()
 
     // should be set with the other config options, but depends on nixLibexecDir
 #ifdef __APPLE__
-    preBuildHook = nixLibexecDir + "/nix/resolve-system-dependencies.pl";
+    preBuildHook = nixLibexecDir + "/nix/resolve-system-dependencies";
 #endif
 }
 
