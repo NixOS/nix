@@ -27,7 +27,7 @@ let
           [ curl bison flex perl libxml2 libxslt bzip2 xz
             pkgconfig sqlite libsodium
             docbook5 docbook5_xsl
-            autoconf-archive ruby
+            autoconf-archive libyamlcpp
           ] ++ lib.optional (!lib.inNixShell) git;
 
         configureFlags = ''
@@ -74,7 +74,7 @@ let
         __noChroot = true;
 
         buildInputs =
-          [ curl perl bzip2 xz openssl pkgconfig sqlite boehmgc ruby ]
+          [ curl perl bzip2 xz openssl pkgconfig sqlite boehmgc libyamlcpp ]
           ++ lib.optional stdenv.isLinux libsodium
           ++ lib.optional stdenv.isLinux
             (aws-sdk-cpp.override {
