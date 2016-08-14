@@ -247,23 +247,6 @@ AC_MSG_RESULT(yes)
 AC_SUBST(perlFlags)
 
 
-# Check for otool, an optional dependency on Darwin.
-AC_PATH_PROG(otool, otool)
-AC_MSG_CHECKING([that otool works])
-case $host_os in
-  darwin*)
-    if test -z "$otool" || ! $otool --version 2>/dev/null; then
-      AC_MSG_RESULT(no)
-      AC_MSG_ERROR([Can't get version from otool; do you need to install developer tools?])
-    fi
-    AC_MSG_RESULT(yes)
-    ;;
-  *)
-    AC_MSG_RESULT(not needed)
-    ;;
-esac
-
-
 # Whether to build the Perl bindings
 AC_MSG_CHECKING([whether to build the Perl bindings])
 AC_ARG_ENABLE(perl-bindings, AC_HELP_STRING([--enable-perl-bindings],
