@@ -1620,13 +1620,18 @@ static void prim_replaceStrings(EvalState & state, const Pos & pos, Value * * ar
     if (args[0]->listSize() != args[1]->listSize())
         throw EvalError(format("‘from’ and ‘to’ arguments to ‘replaceStrings’ have different lengths, at %1%") % pos);
 
-    Strings from;
+    vector<string> from;
+    from.reserve(args[0]->listSize());
     for (unsigned int n = 0; n < args[0]->listSize(); ++n)
-        from.push_back(state.forceStringNoCtx(*args[0]->listElems()[n], pos));
+        from.push_back(state.forceString(*args[0]->listElems()[n], pos));
 
-    Strings to;
-    for (unsigned int n = 0; n < args[1]->listSize(); ++n)
-        to.push_back(state.forceStringNoCtx(*args[1]->listElems()[n], pos));
+    vector<std::pair<string, PathSet>> to;
+    to.reserve(args[1]->listSize());
+    for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
+        PathSet ctx;
+        auto s = state.forceString(*args[1]->listElems()[n], ctx, pos);
+        to.push_back(std::make_pair(std::move(s), std::move(ctx)));
+    }
 
     PathSet context;
     auto s = state.forceString(*args[2], context, pos);
@@ -1634,11 +1639,16 @@ static void prim_replaceStrings(EvalState & state, const Pos & pos, Value * * ar
     string res;
     for (size_t p = 0; p < s.size(); ) {
         bool found = false;
-        for (auto i = from.begin(), j = to.begin(); i != from.end(); ++i, ++j)
+        auto i = from.begin();
+        auto j = to.begin();
+        for (; i != from.end(); ++i, ++j)
             if (s.compare(p, i->size(), *i) == 0) {
                 found = true;
                 p += i->size();
-                res += *j;
+                res += j->first;
+                for (auto& path : j->second)
+                    context.insert(path);
+                j->second.clear();
                 break;
             }
         if (!found) res += s[p++];
