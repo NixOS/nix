@@ -6,8 +6,10 @@
 #include <algorithm>
 #include <iostream>
 #include <fstream>
+#include <libgen.h>
 #include <mach-o/loader.h>
 #include <mach-o/swap.h>
+#include <yaml-cpp/yaml.h>
 
 using namespace nix;
 
@@ -119,7 +121,11 @@ Path resolveSymlink(const Path & path) {
     ssize_t len = readlink(path.c_str(), buf, sizeof(buf) - 1);
     if(len != -1) {
       buf[len] = 0;
-      return Path(buf);
+      if(buf[0] == '/') {
+        return Path(buf);
+      } else {
+        return Path(dirname(strdup(path.c_str()))) + "/" + Path(buf);
+      }
     } else {
       throw SysError(format("readlink('%1%')") % path);
     }
@@ -128,6 +134,11 @@ Path resolveSymlink(const Path & path) {
 bool isTbdFile(const Path & path) {
     std::string ending = ".tbd";
     return 0 == path.compare(path.length() - ending.length(), ending.length(), ending);
+}
+
+std::string resolveTbdTarget(const Path & path) {
+    YAML::Node tbd = YAML::LoadFile(path);
+    return tbd["install-name"].as<std::string>();
 }
 
 std::set<string> resolve_tree(const Path & path, PathSet & deps) {
@@ -188,6 +199,8 @@ int main(int argc, char ** argv) {
             % _uname.machine
             % _uname.sysname
             % _uname.release).str();
+
+        mkdir(cacheDir.c_str(), 0644);
 
         auto store = openStore();
 

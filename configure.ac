@@ -122,7 +122,6 @@ AC_PATH_PROG(xsltproc, xsltproc, false)
 AC_PATH_PROG(flex, flex, false)
 AC_PATH_PROG(bison, bison, false)
 NEED_PROG(perl, perl)
-NEED_PROG(ruby, ruby)
 NEED_PROG(sed, sed)
 NEED_PROG(tar, tar)
 NEED_PROG(bzip2, bzip2)
@@ -181,6 +180,10 @@ PKG_CHECK_MODULES([SQLITE3], [sqlite3 >= 3.6.19], [CXXFLAGS="$SQLITE3_CFLAGS $CX
 
 # Look for libcurl, a required dependency.
 PKG_CHECK_MODULES([LIBCURL], [libcurl], [CXXFLAGS="$LIBCURL_CFLAGS $CXXFLAGS"])
+
+
+# Look for yaml-cpp, a required dependency.
+PKG_CHECK_MODULES([LIBYAML], [yaml-cpp], [CXXFLAGS="$LIBYAML_CFLAGS $CXXFLAGS"])
 
 
 # Look for libsodium, an optional dependency.
