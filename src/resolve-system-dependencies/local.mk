@@ -1,4 +1,6 @@
-programs += resolve-system-dependencies
+ifeq ($(OS), Darwin)
+  programs += resolve-system-dependencies
+endif
 
 resolve-system-dependencies_DIR := $(d)
 
