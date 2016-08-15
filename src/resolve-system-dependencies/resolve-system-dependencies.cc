@@ -95,6 +95,7 @@ std::set<std::string> runResolver(const Path & filename) {
     fread(&cmd.cmdsize, sizeof(uint32_t), 1, obj_file);
     switch(cmd.cmd) {
       case LC_LOAD_DYLIB:
+      case LC_LOAD_UPWARD_DYLIB:
       case LC_REEXPORT_DYLIB:
         libs.insert(find_dylib_name(obj_file, cmd));
         break;
