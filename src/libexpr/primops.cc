@@ -1682,6 +1682,7 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
 {
     string url;
     Hash expectedHash;
+    string name;
 
     state.forceValue(*args[0]);
 
@@ -1690,11 +1691,13 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
         state.forceAttrs(*args[0], pos);
 
         for (auto & attr : *args[0]->attrs) {
-            string name(attr.name);
-            if (name == "url")
+            string n(attr.name);
+            if (n == "url")
                 url = state.forceStringNoCtx(*attr.value, *attr.pos);
-            else if (name == "sha256")
+            else if (n == "sha256")
                 expectedHash = parseHash16or32(htSHA256, state.forceStringNoCtx(*attr.value, *attr.pos));
+            else if (n == "name")
+                name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
                 throw EvalError(format("unsupported argument ‘%1%’ to ‘%2%’, at %3%") % attr.name % who % attr.pos);
         }
@@ -1708,7 +1711,7 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     if (state.restricted && !expectedHash)
         throw Error(format("‘%1%’ is not allowed in restricted mode") % who);
 
-    Path res = makeDownloader()->downloadCached(state.store, url, unpack, expectedHash);
+    Path res = makeDownloader()->downloadCached(state.store, url, unpack, name, expectedHash);
     mkString(v, res, PathSet({res}));
 }
 

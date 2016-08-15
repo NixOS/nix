@@ -243,13 +243,14 @@ ref<Downloader> makeDownloader()
     return make_ref<CurlDownloader>();
 }
 
-Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpack, const Hash & expectedHash)
+Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpack, string name, const Hash & expectedHash)
 {
     auto url = resolveUri(url_);
 
-    string name;
-    auto p = url.rfind('/');
-    if (p != string::npos) name = string(url, p + 1);
+    if (name == "") {
+        auto p = url.rfind('/');
+        if (p != string::npos) name = string(url, p + 1);
+    }
 
     Path expectedStorePath;
     if (expectedHash) {
