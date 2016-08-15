@@ -1657,6 +1657,7 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     if (state.restricted) throw Error(format("‘%1%’ is not allowed in restricted mode") % who);
 
     string url;
+    string name;
 
     state.forceValue(*args[0]);
 
@@ -1665,9 +1666,11 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
         state.forceAttrs(*args[0], pos);
 
         for (auto & attr : *args[0]->attrs) {
-            string name(attr.name);
-            if (name == "url")
+            string n(attr.name);
+            if (n == "url")
                 url = state.forceStringNoCtx(*attr.value, *attr.pos);
+            else if (n == "name")
+                name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
                 throw EvalError(format("unsupported argument ‘%1%’ to ‘%2%’, at %3%") % attr.name % who % attr.pos);
         }
@@ -1678,7 +1681,7 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     } else
         url = state.forceStringNoCtx(*args[0], pos);
 
-    Path res = downloadFileCached(url, unpack);
+    Path res = downloadFileCached(url, unpack, name);
     mkString(v, res, PathSet({res}));
 }
 

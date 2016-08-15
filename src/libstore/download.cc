@@ -188,7 +188,7 @@ DownloadResult downloadFile(string url, const DownloadOptions & options)
 }
 
 
-Path downloadFileCached(const string & url, bool unpack)
+Path downloadFileCached(const string & url, bool unpack, string name)
 {
     Path cacheDir = getEnv("XDG_CACHE_HOME", getEnv("HOME", "") + "/.cache") + "/nix/tarballs";
     createDirs(cacheDir);
@@ -223,9 +223,10 @@ Path downloadFileCached(const string & url, bool unpack)
             storePath = "";
     }
 
-    string name;
-    auto p = url.rfind('/');
-    if (p != string::npos) name = string(url, p + 1);
+    if (name == "") {
+        auto p = url.rfind('/');
+        if (p != string::npos) name = string(url, p + 1);
+    }
 
     if (!skip) {
 

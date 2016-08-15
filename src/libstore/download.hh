@@ -20,7 +20,7 @@ struct DownloadResult
 
 DownloadResult downloadFile(string url, const DownloadOptions & options);
 
-Path downloadFileCached(const string & url, bool unpack);
+Path downloadFileCached(const string & url, bool unpack, string name = "");
 
 MakeError(DownloadError, Error)
 
