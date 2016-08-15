@@ -171,11 +171,16 @@ int main(int argc, char ** argv) {
 
             uname(&_uname);
 
-            cacheDir = (format("%1%/dependency-maps/%2%-%3%-%4%")
-                    % settings.nixStateDir
+            auto cacheParentDir = (format("%1%/dependency-maps") % settings.nixStateDir).str();
+
+            cacheDir = (format("%1%/%2%-%3%-%4%")
+                    % cacheParentDir
                     % _uname.machine
                     % _uname.sysname
                     % _uname.release).str();
+
+            mkdir(cacheParentDir.c_str(), 0755);
+            mkdir(cacheDir.c_str(), 0755);
 
             auto store = openStore();
 
