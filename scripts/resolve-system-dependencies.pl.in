@@ -87,16 +87,24 @@ sub cache_insert($) {
 
 sub find_deps($) {
   my $lib = shift;
+
+  my $ok = 0;
+  my @libs;
+
   my($chld_in, $chld_out, $chld_err);
   my $pid = open3($chld_in, $chld_out, $chld_err, "@otool@", "-L", "-arch", "x86_64", $lib);
-  waitpid($pid, 0);
   my $line = readline $chld_out;
-  if($? == 0 and $line !~ /not an object file/) {
-    my @libs;
+  if($line !~ /not an object file/) {
     while(<$chld_out>) {
       my $dep = (split /\s+/)[1];
       push @libs, $dep unless $dep eq $lib or $dep =~ /\@rpath/;
     }
+    waitpid($pid, 0);
+    if ($? == 0) {
+      $ok = 1;
+    }
+  }
+  if ($ok) {
     @libs
   } elsif (-l $lib) {
     (realpath($lib))
