@@ -129,24 +129,26 @@ static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
 }
 
 
-static bool isIndAntiquotLine(vector<Expr *> * line)
+static ExprIndAntiquot * makeIndAntiquotLine(const Pos & pos, vector<Expr *> * line, int indent)
 {
     size_t len = line->size();
 
-    if (len < 2 || len > 3) return false;
-    if (!dynamic_cast<ExprAntiquot *>(line->at(1))) return false;
+    if (len < 2 || len > 3) return nullptr;
+    if (!dynamic_cast<ExprAntiquot *>(line->at(1))) return nullptr;
 
     if (len == 3) {
-        if (!dynamic_cast<ExprIndStr *>(line->at(2))) return false;
+        if (!dynamic_cast<ExprIndStr *>(line->at(2))) return nullptr;
         string & trailStr = dynamic_cast<ExprIndStr *>(line->at(2))->s;
-        if (trailStr.find_first_not_of(" ") != string::npos) return false;
+        if (trailStr.find_first_not_of(" ") != string::npos) return nullptr;
 
         // The last empty string is useless for an indented antiquotation.
-        delete line->back();
-        line->pop_back();
+        //delete line->back();
+        //line->pop_back();
+        // But we keep it for compatibility
+        return new ExprIndAntiquot(pos, line->at(1), indent, trailStr);
     }
 
-    return true;
+    return new ExprIndAntiquot(pos, line->at(1), indent, "");
 }
 
 static void pushStringThenExpr(SymbolTable & symbols, vector<Expr *> * es, string & s, Expr * e)
@@ -193,8 +195,9 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<ve
 
         /* Single antiquotations on their own lines are ExprIndAntiquot
            and manage their own indentation. */
-        if (settings.enableSmartAntiquotations && isIndAntiquotLine(line)) {
-            pushStringThenExpr(symbols, es2, s2, new ExprIndAntiquot(pos, line->at(1), indent));
+        ExprIndAntiquot * antiquotation = makeIndAntiquotLine(pos, line, indent);
+        if (antiquotation) {
+            pushStringThenExpr(symbols, es2, s2, antiquotation);
             delete line;
             continue;
         }
@@ -284,7 +287,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %token <nf> FLOAT
 %token <path> PATH HPATH SPATH
 %token <uri> URI
-%token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL OR_KW
+%token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL OR_KW REQUIRE
 %token DOLLAR_CURLY /* == ${ */
 %token IND_STRING_OPEN IND_STRING_CLOSE
 %token ELLIPSIS
@@ -321,6 +324,8 @@ expr_function
     { $$ = new ExprAssert(CUR_POS, $2, $4); }
   | WITH expr ';' expr_function
     { $$ = new ExprWith(CUR_POS, $2, $4); }
+  | REQUIRE ID expr ';' expr_function
+    { $$ = new ExprRequire(CUR_POS, $2, $3, $5); }
   | LET binds IN expr_function
     { if (!$2->dynamicAttrs.empty())
         throw ParseError(format("dynamic attributes not allowed in let at %1%")

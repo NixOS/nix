@@ -35,6 +35,7 @@ struct Env
     unsigned short size; // used by ‘valueSize’
     unsigned short prevWith:15; // nr of levels up to next `with' environment
     unsigned short haveWithAttrs:1;
+    bool smartAntiquotations;
     Value * values[0];
 };
 
@@ -75,9 +76,11 @@ public:
        already exist there. */
     bool repair = false;
 
-    /* If set, don't allow access to files outside of the Nix search
+    /* If set, don allow access to files outside of the Nix search
        path or to environment variables. */
     bool restricted;
+
+    bool smartAntiquotations;
 
     Value vEmptySet;
 
@@ -233,7 +236,7 @@ public:
 
     /* Allocation primitives. */
     Value * allocValue();
-    Env & allocEnv(unsigned int size);
+    Env & allocEnv(unsigned int size, Env * up = nullptr);
 
     Value * allocAttr(Value & vAttrs, const Symbol & name);
 

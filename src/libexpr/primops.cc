@@ -113,8 +113,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
         if (args[0]->attrs->empty())
             state.evalFile(path, v);
         else {
-            Env * env = &state.allocEnv(args[0]->attrs->size());
-            env->up = &state.baseEnv;
+            Env * env = &state.allocEnv(args[0]->attrs->size(), &state.baseEnv);
 
             StaticEnv staticEnv(false, &state.staticBaseEnv);
 

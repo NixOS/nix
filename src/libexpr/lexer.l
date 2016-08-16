@@ -108,6 +108,7 @@ rec         { return REC; }
 inherit     { return INHERIT; }
 or          { return OR_KW; }
 \.\.\.      { return ELLIPSIS; }
+require-option { return REQUIRE; }
 
 \=\=        { return EQ; }
 \!\=        { return NEQ; }

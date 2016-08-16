@@ -170,6 +170,11 @@ void ExprAssert::show(std::ostream & str)
     str << "assert " << *cond << "; " << *body;
 }
 
+void ExprRequire::show(std::ostream & str)
+{
+    str << "require " << option << " " << *value << "; " << *body;
+}
+
 void ExprOpNot::show(std::ostream & str)
 {
     str << "(! " << *e << ")";
@@ -395,6 +400,13 @@ void ExprAssert::bindVars(const StaticEnv & env)
 {
     cond->bindVars(env);
     body->bindVars(env);
+}
+
+void ExprRequire::bindVars(const StaticEnv & env)
+{
+    value->bindVars(env);
+    StaticEnv newEnv(false, &env);
+    body->bindVars(newEnv);
 }
 
 void ExprOpNot::bindVars(const StaticEnv & env)

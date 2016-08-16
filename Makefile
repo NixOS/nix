@@ -27,7 +27,7 @@ makefiles = \
   tests/local.mk
   #src/download-via-ssh/local.mk \
 
-GLOBAL_CXXFLAGS += -std=c++11 -g -Wall
+GLOBAL_CXXFLAGS += -std=c++11 -ggdb -Wall
 
 -include Makefile.config
 

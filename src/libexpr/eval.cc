@@ -303,6 +303,8 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
 
     restricted = settings.get("restrict-eval", false);
 
+    smartAntiquotations = settings.get("smart-antiquotations", false);
+
     assert(gcInitialised);
 
     /* Initialise the Nix expression search path. */
@@ -518,7 +520,7 @@ Value * EvalState::allocValue()
 }
 
 
-Env & EvalState::allocEnv(unsigned int size)
+Env & EvalState::allocEnv(unsigned int size, Env * up)
 {
     assert(size <= std::numeric_limits<decltype(Env::size)>::max());
 
@@ -526,6 +528,8 @@ Env & EvalState::allocEnv(unsigned int size)
     nrValuesInEnvs += size;
     Env * env = (Env *) allocBytes(sizeof(Env) + size * sizeof(Value *));
     env->size = size;
+    env->up = up;
+    env->smartAntiquotations = smartAntiquotations;
 
     /* Clear the values because maybeThunk() and lookupVar fromWith expect this. */
     for (unsigned i = 0; i < size; ++i)
@@ -735,8 +739,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
     if (recursive) {
         /* Create a new environment that contains the attributes in
            this `rec'. */
-        Env & env2(state.allocEnv(attrs.size()));
-        env2.up = &env;
+        Env & env2(state.allocEnv(attrs.size(), &env));
         dynamicEnv = &env2;
 
         AttrDefs::iterator overrides = attrs.find(state.sOverrides);
@@ -813,8 +816,7 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 {
     /* Create a new environment that contains the attributes in this
        `let'. */
-    Env & env2(state.allocEnv(attrs->attrs.size()));
-    env2.up = &env;
+    Env & env2(state.allocEnv(attrs->attrs.size(), &env));
 
     /* The recursive attributes are evaluated in the new environment,
        while the inherited attributes are evaluated in the original
@@ -1019,8 +1021,9 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
     unsigned int size =
         (lambda.arg.empty() ? 0 : 1) +
         (lambda.matchAttrs ? lambda.formals->formals.size() : 0);
-    Env & env2(allocEnv(size));
-    env2.up = fun.lambda.env;
+    Env & env2(allocEnv(size, fun.lambda.env));
+    // Hmm... I know...
+    //env2.smartAntiquotations = env.smartAntiquotations;
 
     unsigned int displ = 0;
 
@@ -1125,8 +1128,7 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
 
 void ExprWith::eval(EvalState & state, Env & env, Value & v)
 {
-    Env & env2(state.allocEnv(1));
-    env2.up = &env;
+    Env & env2(state.allocEnv(1, &env));
     env2.prevWith = prevWith;
     env2.haveWithAttrs = false;
     env2.values[0] = (Value *) attrs;
@@ -1146,6 +1148,23 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
     if (!state.evalBool(env, cond, pos))
         throwAssertionError("assertion failed at %1%", pos);
     body->eval(state, env, v);
+}
+
+
+void ExprRequire::eval(EvalState & state, Env & env, Value & v)
+{
+    if (option == "smart-antiquotations") {
+        bool tmp = state.smartAntiquotations;
+        state.smartAntiquotations = state.evalBool(env, value, pos); 
+
+        Env &env2(state.allocEnv(0, &env));
+        body->eval(state, env2, v);
+
+        state.smartAntiquotations = tmp;
+        return;
+    }
+
+    throwEvalError("unsupported option '%1%' for require-option at %2%", option, pos);
 }
 
 
@@ -1331,6 +1350,16 @@ void ExprIndAntiquot::eval(EvalState & state, Env & env, Value & v)
 
     e->eval(state, env, vTmp);
     string s = state.coerceToString(pos, vTmp, context, false, true);
+
+    if (!env.smartAntiquotations) {
+        // Old semantics
+        s.insert(0, indentLevel, ' ');
+        s.append(trail);
+        s.push_back('\n');
+        mkString(v, s, context);
+        return;
+    }
+
     if (s.empty()) {
         mkString(v, "", context);
         return;

@@ -275,6 +275,15 @@ struct ExprAssert : Expr
     COMMON_METHODS
 };
 
+struct ExprRequire : Expr
+{
+    Pos pos;
+    string option;
+    Expr * value, * body;
+    ExprRequire(const Pos & pos, const char * option, Expr * value, Expr * body) : pos(pos), option(option), value(value), body(body) { };
+    COMMON_METHODS
+};
+
 struct ExprOpNot : Expr
 {
     Expr * e;
@@ -331,8 +340,9 @@ struct ExprIndAntiquot : Expr
     Pos pos;
     Expr * e;
     size_t indentLevel;
-    ExprIndAntiquot(const Pos & pos, Expr * e, size_t indentLevel)
-        : pos(pos), e(e), indentLevel(indentLevel) { };
+    string trail;
+    ExprIndAntiquot(const Pos & pos, Expr * e, size_t indentLevel, const string & trail)
+        : pos(pos), e(e), indentLevel(indentLevel), trail(trail) { };
     COMMON_METHODS
 };
 
