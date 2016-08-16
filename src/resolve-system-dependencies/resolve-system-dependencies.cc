@@ -37,7 +37,6 @@ void writeCacheFile(const Path & file, std::set<string> & deps) {
 
 std::string findDylibName(bool should_swap, ptrdiff_t dylib_command_start) {
     struct dylib_command *dylc = (struct dylib_command*)dylib_command_start;
-
     return std::string((char*)(dylib_command_start + DO_SWAP(should_swap, dylc->dylib.name.offset)));
 }
 
@@ -73,10 +72,11 @@ std::set<std::string> runResolver(const Path & filename) {
         return std::set<string>();
     }
 
-    struct mach_header_64 *m_header = (struct mach_header_64 *)((ptrdiff_t)obj + mach64_offset);
+    ptrdiff_t mach_header_offset = (ptrdiff_t)obj + mach64_offset;
+    struct mach_header_64 *m_header = (struct mach_header_64 *)mach_header_offset;
 
     bool should_swap = magic == MH_CIGAM_64;
-    ptrdiff_t cmd_offset = (ptrdiff_t)m_header + sizeof(struct mach_header_64);
+    ptrdiff_t cmd_offset = mach_header_offset + sizeof(struct mach_header_64);
 
     std::set<string> libs;
     for(uint32_t i = 0; i < DO_SWAP(should_swap, m_header->ncmds); i++) {
