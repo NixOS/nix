@@ -295,7 +295,6 @@ foreach my $expr (@exprs) {
         writeFile(
             $rcfile,
             "rm -rf '$tmpDir'; " .
-            'unset BASH_ENV; ' .
             '[ -n "$PS1" ] && [ -e ~/.bashrc ] && source ~/.bashrc; ' .
             ($pure ? '' : 'p=$PATH; ' ) .
             'dontAddDisableDepTrack=1; ' .
@@ -309,7 +308,6 @@ foreach my $expr (@exprs) {
             'shopt -u nullglob; ' .
             'unset TZ; ' . (defined $ENV{'TZ'} ? "export TZ='${ENV{'TZ'}}'; " : '') .
             $envCommand);
-        $ENV{BASH_ENV} = $rcfile;
         my @args = ($ENV{NIX_BUILD_SHELL} // "bash");
         push @args, "--rcfile" if $interactive;
         push @args, $rcfile;
