@@ -68,6 +68,9 @@ std::set<std::string> runResolver(const Path & filename) {
         }
     } else if (magic == MH_MAGIC_64 || magic == MH_CIGAM_64) {
         mach64_offset = 0;
+    } else {
+        printMsg(lvlError, format("Object file has unknown magic number ‘%1%’, skipping it...") % magic);
+        return std::set<string>();
     }
 
     struct mach_header_64 *m_header = (struct mach_header_64 *)((ptrdiff_t)obj + mach64_offset);
