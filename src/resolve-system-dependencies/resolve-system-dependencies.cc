@@ -54,7 +54,7 @@ std::set<std::string> runResolver(const Path & filename) {
         uint32_t narches = DO_SWAP(should_swap, ((struct fat_header*)obj)->nfat_arch);
 
         for(uint32_t iter = 0; iter < narches; iter++) {
-            ptrdiff_t header_offset = (ptrdiff_t)obj + sizeof(struct fat_header);
+            ptrdiff_t header_offset = (ptrdiff_t)obj + sizeof(struct fat_header) * (iter + 1);
             struct fat_arch* arch = (struct fat_arch*)header_offset;
             if(DO_SWAP(should_swap, arch->cputype) == CPU_TYPE_X86_64) {
                 mach64_offset = (ptrdiff_t)DO_SWAP(should_swap, arch->offset);
