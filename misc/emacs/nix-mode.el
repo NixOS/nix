@@ -8,6 +8,12 @@
 
 ;;; Code:
 
+;; Emacs 24.2 compatability
+(unless (fboundp 'setq-local)
+  (defmacro setq-local (var val)
+    "Set variable VAR to value VAL in current buffer."
+    `(set (make-local-variable ',var) ,val)))
+
 (defun nix-syntax-match-antiquote (limit)
   (let ((pos (next-single-char-property-change (point) 'nix-syntax-antiquote
                                                nil limit)))
@@ -159,17 +165,17 @@ The hook `nix-mode-hook' is run when Nix mode is started.
   (setq-local parse-sexp-lookup-properties t)
 
   ;; Automatic indentation [C-j].
-  (set (make-local-variable 'indent-line-function) 'nix-indent-line)
+  (setq-local indent-line-function 'nix-indent-line)
 
   ;; Indenting of comments.
-  (set (make-local-variable 'comment-start) "# ")
-  (set (make-local-variable 'comment-end) "")
-  (set (make-local-variable 'comment-start-skip) "\\(^\\|\\s-\\);?#+ *")
+  (setq-local comment-start "# ")
+  (setq-local comment-end "")
+  (setq-local comment-start-skip "\\(^\\|\\s-\\);?#+ *")
 
   ;; Filling of comments.
-  (set (make-local-variable 'adaptive-fill-mode) t)
-  (set (make-local-variable 'paragraph-start) "[ \t]*\\(#+[ \t]*\\)?$")
-  (set (make-local-variable 'paragraph-separate) paragraph-start))
+  (setq-local adaptive-fill-mode t)
+  (setq-local paragraph-start "[ \t]*\\(#+[ \t]*\\)?$")
+  (setq-local paragraph-separate paragraph-start))
 
 
 ;;;###autoload
