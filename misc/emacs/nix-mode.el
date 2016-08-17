@@ -15,6 +15,7 @@
     `(set (make-local-variable ',var) ,val)))
 
 (defun nix-syntax-match-antiquote (limit)
+  "Find antiquote within a Nix expression up to LIMIT."
   (let ((pos (next-single-char-property-change (point) 'nix-syntax-antiquote
                                                nil limit)))
     (when (and pos (> pos (point)))
@@ -60,7 +61,7 @@
   "Syntax table for Nix mode.")
 
 (defun nix-syntax-propertize-escaped-antiquote ()
-  "Set syntax properies for escaped antiquote marks."
+  "Set syntax properies for an escaped antiquote mark."
   nil)
 
 (defun nix-syntax-propertize-multiline-string ()
@@ -81,7 +82,7 @@
                           'syntax-table (string-to-syntax "|"))))))
 
 (defun nix-syntax-propertize-antiquote ()
-  "Set syntax properties for antiquote marks."
+  "Set syntax properties for an antiquote mark."
   (let* ((start (match-beginning 0)))
     (put-text-property start (1+ start)
                        'syntax-table (string-to-syntax "|"))
@@ -104,7 +105,7 @@ If a close brace `}' ends an antiquote, the next character begins a string."
                              'nix-syntax-antiquote t))))))
 
 (defun nix-syntax-propertize (start end)
-  "Special syntax properties for Nix."
+  "Special syntax properties for Nix from START to END."
   ;; search for multi-line string delimiters
   (goto-char start)
   (remove-text-properties start end '(syntax-table nil nix-syntax-antiquote nil))
