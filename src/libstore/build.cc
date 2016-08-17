@@ -652,18 +652,15 @@ HookInstance::~HookInstance()
 //////////////////////////////////////////////////////////////////////
 
 
-typedef map<string, string> HashRewrites;
+typedef map<std::string, std::string> StringRewrites;
 
 
-string rewriteHashes(string s, const HashRewrites & rewrites)
+std::string rewriteStrings(std::string s, const StringRewrites & rewrites)
 {
     for (auto & i : rewrites) {
-        assert(i.first.size() == i.second.size());
         size_t j = 0;
-        while ((j = s.find(i.first, j)) != string::npos) {
-            debug(format("rewriting @ %1%") % j);
-            s.replace(j, i.second.size(), i.second);
-        }
+        while ((j = s.find(i.first, j)) != string::npos)
+            s.replace(j, i.first.size(), i.second);
     }
     return s;
 }
@@ -782,7 +779,7 @@ private:
 #endif
 
     /* Hash rewriting. */
-    HashRewrites rewritesToTmp, rewritesFromTmp;
+    StringRewrites inputRewrites, outputRewrites;
     typedef map<Path, Path> RedirectedOutputs;
     RedirectedOutputs redirectedOutputs;
 
@@ -1774,6 +1771,10 @@ void DerivationGoal::startBuilder()
         for (auto & i : varNames) env[i] = getEnv(i);
     }
 
+    /* Substitute output placeholders with the actual output paths. */
+    for (auto & output : drv->outputs)
+        inputRewrites[hashPlaceholder(output.first)] = output.second.path;
+
     /* The `exportReferencesGraph' feature allows the references graph
        to be passed to a builder.  This attribute should be a list of
        pairs [name1 path1 name2 path2 ...].  The references graph of
@@ -2418,7 +2419,7 @@ void DerivationGoal::runChild()
         /* Fill in the environment. */
         Strings envStrs;
         for (auto & i : env)
-            envStrs.push_back(rewriteHashes(i.first + "=" + i.second, rewritesToTmp));
+            envStrs.push_back(rewriteStrings(i.first + "=" + i.second, inputRewrites));
 
         /* If we are running in `build-users' mode, then switch to the
            user we allocated above.  Make sure that we drop all root
@@ -2560,7 +2561,7 @@ void DerivationGoal::runChild()
         }
 
         for (auto & i : drv->args)
-            args.push_back(rewriteHashes(i, rewritesToTmp));
+            args.push_back(rewriteStrings(i, inputRewrites));
 
         restoreSIGPIPE();
 
@@ -2682,7 +2683,7 @@ void DerivationGoal::registerOutputs()
 
         /* Apply hash rewriting if necessary. */
         bool rewritten = false;
-        if (!rewritesFromTmp.empty()) {
+        if (!outputRewrites.empty()) {
             printMsg(lvlError, format("warning: rewriting hashes in ‘%1%’; cross fingers") % path);
 
             /* Canonicalise first.  This ensures that the path we're
@@ -2694,7 +2695,7 @@ void DerivationGoal::registerOutputs()
             StringSink sink;
             dumpPath(actualPath, sink);
             deletePath(actualPath);
-            sink.s = make_ref<std::string>(rewriteHashes(*sink.s, rewritesFromTmp));
+            sink.s = make_ref<std::string>(rewriteStrings(*sink.s, outputRewrites));
             StringSource source(*sink.s);
             restorePath(actualPath, source);
 
@@ -3033,8 +3034,8 @@ Path DerivationGoal::addHashRewrite(const Path & path)
     Path p = worker.store.storeDir + "/" + h2 + string(path, worker.store.storeDir.size() + 33);
     deletePath(p);
     assert(path.size() == p.size());
-    rewritesToTmp[h1] = h2;
-    rewritesFromTmp[h2] = h1;
+    inputRewrites[h1] = h2;
+    outputRewrites[h2] = h1;
     redirectedOutputs[path] = p;
     return p;
 }

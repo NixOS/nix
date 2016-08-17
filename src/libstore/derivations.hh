@@ -117,4 +117,6 @@ struct Sink;
 Source & readDerivation(Source & in, Store & store, BasicDerivation & drv);
 Sink & operator << (Sink & out, const BasicDerivation & drv);
 
+std::string hashPlaceholder(const std::string & outputName);
+
 }

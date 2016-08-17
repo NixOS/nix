@@ -673,6 +673,19 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 }
 
 
+/* Return a placeholder string for the specified output that will be
+   substituted by the corresponding output path at build time. For
+   example, ‘placeholder "out"’ returns the string
+   /1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9. At build
+   time, any occurence of this string in an derivation attribute will
+   be replaced with the concrete path in the Nix store of the output
+   ‘out’. */
+static void prim_placeholder(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    mkString(v, hashPlaceholder(state.forceStringNoCtx(*args[0], pos)));
+}
+
+
 /*************************************************************
  * Paths
  *************************************************************/
@@ -1893,6 +1906,7 @@ void EvalState::createBaseEnv()
 
     // Derivations
     addPrimOp("derivationStrict", 1, prim_derivationStrict);
+    addPrimOp("placeholder", 1, prim_placeholder);
 
     // Networking
     addPrimOp("__fetchurl", 1, prim_fetchurl);

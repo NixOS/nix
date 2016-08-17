@@ -390,4 +390,11 @@ Sink & operator << (Sink & out, const BasicDerivation & drv)
 }
 
 
+std::string hashPlaceholder(const std::string & outputName)
+{
+    // FIXME: memoize?
+    return "/" + printHash32(hashString(htSHA256, "nix-output:" + outputName));
+}
+
+
 }
