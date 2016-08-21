@@ -597,7 +597,7 @@ HookInstance::HookInstance()
     buildHook = canonPath(buildHook);
 
     if (!pathExists(buildHook))
-        throw SysError(format("NIX_BUILD_HOOK '%1%' does not exist" % buildHook));
+        throw SysError(format("NIX_BUILD_HOOK '%1%' does not exist") % buildHook);
 
     /* Create a pipe to get the output of the child. */
     fromHook.create();
