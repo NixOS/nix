@@ -12,8 +12,6 @@
 
   <listitem><para>A version of GCC or Clang that supports C++11.</para></listitem>
 
-  <listitem><para>Perl 5.8 or higher.</para></listitem>
-
   <listitem><para><command>pkg-config</command> to locate
   dependencies.  If your distribution does not provide it, you can get
   it from <link
@@ -33,11 +31,6 @@
   <listitem><para>The SQLite embedded database library, version 3.6.19
   or higher.  If your distribution does not provide it, please install
   it from <link xlink:href="http://www.sqlite.org/" />.</para></listitem>
-
-  <listitem><para>The Perl DBI and DBD::SQLite libraries, which are
-  available from <link
-  xlink:href="http://search.cpan.org/">CPAN</link> if your
-  distribution does not provide them.</para></listitem>
 
   <listitem><para>The <link
   xlink:href="http://www.hboehm.info/gc/">Boehm
