@@ -1812,7 +1812,7 @@ static std::string lookupXcodeVersion()
 
 static std::string lookupSDKRoot()
 {
-    return exec("/usr/bin/xcrun --show-sdk-path");
+    return canonPath(exec("/usr/bin/xcrun --show-sdk-path"), true);
 }
 
 #endif
