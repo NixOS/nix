@@ -9,6 +9,41 @@
 
 namespace nix {
 
+Value * MixInstallables::buildSourceExpr(EvalState & state)
+{
+    Value * vRoot = state.allocValue();
+
+    if (file != "") {
+        Expr * e = state.parseExprFromFile(resolveExprPath(lookupFileArg(state, file)));
+        state.eval(e, *vRoot);
+    }
+
+    else {
+
+        /* Construct the installation source from $NIX_PATH. */
+
+        auto searchPath = state.getSearchPath();
+
+        state.mkAttrs(*vRoot, searchPath.size());
+
+        std::unordered_set<std::string> seen;
+
+        for (auto & i : searchPath) {
+            if (i.first == "") continue;
+            if (seen.count(i.first)) continue;
+            seen.insert(i.first);
+            if (!pathExists(i.second)) continue;
+            mkApp(*state.allocAttr(*vRoot, state.symbols.create(i.first)),
+                state.getBuiltin("import"),
+                mkString(*state.allocValue(), i.second));
+        }
+
+        vRoot->attrs->sort();
+    }
+
+    return vRoot;
+}
+
 UserEnvElems MixInstallables::evalInstallables(ref<Store> store)
 {
     UserEnvElems res;
@@ -46,15 +81,12 @@ UserEnvElems MixInstallables::evalInstallables(ref<Store> store)
 
             EvalState state({}, store);
 
-            Expr * e = state.parseExprFromFile(resolveExprPath(lookupFileArg(state, file)));
-
-            Value vRoot;
-            state.eval(e, vRoot);
+            auto vRoot = buildSourceExpr(state);
 
             std::map<string, string> autoArgs_;
             Bindings & autoArgs(*evalAutoArgs(state, autoArgs_));
 
-            Value & v(*findAlongAttrPath(state, installable, autoArgs, vRoot));
+            Value & v(*findAlongAttrPath(state, installable, autoArgs, *vRoot));
             state.forceValue(v);
 
             DrvInfos drvs;

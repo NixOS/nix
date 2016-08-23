@@ -43,7 +43,7 @@ struct Env
 };
 
 
-void mkString(Value & v, const string & s, const PathSet & context = PathSet());
+Value & mkString(Value & v, const string & s, const PathSet & context = PathSet());
 
 void copyContext(const Value & v, PathSet & context);
 
@@ -107,6 +107,8 @@ public:
     ~EvalState();
 
     void addToSearchPath(const string & s);
+
+    SearchPath getSearchPath() { return searchPath; }
 
     Path checkSourcePath(const Path & path);
 
@@ -204,7 +206,7 @@ private:
 
 public:
 
-    void getBuiltin(const string & name, Value & v);
+    Value & getBuiltin(const string & name);
 
 private:
 

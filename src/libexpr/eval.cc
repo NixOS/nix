@@ -379,9 +379,9 @@ void EvalState::addPrimOp(const string & name,
 }
 
 
-void EvalState::getBuiltin(const string & name, Value & v)
+Value & EvalState::getBuiltin(const string & name)
 {
-    v = *baseEnv.values[0]->attrs->find(symbols.create(name))->value;
+    return *baseEnv.values[0]->attrs->find(symbols.create(name))->value;
 }
 
 
@@ -462,7 +462,7 @@ void mkString(Value & v, const char * s)
 }
 
 
-void mkString(Value & v, const string & s, const PathSet & context)
+Value & mkString(Value & v, const string & s, const PathSet & context)
 {
     mkString(v, s.c_str());
     if (!context.empty()) {
@@ -473,6 +473,7 @@ void mkString(Value & v, const string & s, const PathSet & context)
             v.string.context[n++] = dupString(i.c_str());
         v.string.context[n] = 0;
     }
+    return v;
 }
 
 

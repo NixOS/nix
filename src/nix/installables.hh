@@ -21,10 +21,13 @@ struct UserEnvElem
 
 typedef std::vector<UserEnvElem> UserEnvElems;
 
+struct Value;
+class EvalState;
+
 struct MixInstallables : virtual Args
 {
     Strings installables;
-    Path file = "<nixpkgs>";
+    Path file;
 
     MixInstallables()
     {
@@ -33,6 +36,13 @@ struct MixInstallables : virtual Args
     }
 
     UserEnvElems evalInstallables(ref<Store> store);
+
+    /* Return a value representing the Nix expression from which we
+       are installing. This is either the file specified by ‘--file’,
+       or an attribute set constructed from $NIX_PATH, e.g. ‘{ nixpkgs
+       = import ...; bla = import ...; }’. */
+    Value * buildSourceExpr(EvalState & state);
+
 };
 
 }

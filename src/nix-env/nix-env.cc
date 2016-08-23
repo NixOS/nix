@@ -128,9 +128,8 @@ static void getAllExprs(EvalState & state,
             }
             attrs.insert(attrName);
             /* Load the expression on demand. */
-            Value & vFun(*state.allocValue());
+            Value & vFun = state.getBuiltin("import");
             Value & vArg(*state.allocValue());
-            state.getBuiltin("import", vFun);
             mkString(vArg, path2);
             if (v.attrs->size() == v.attrs->capacity())
                 throw Error(format("too many Nix expressions in directory ‘%1%’") % path);
