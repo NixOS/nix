@@ -760,7 +760,7 @@ Path LocalStore::queryPathFromHashPart(const string & hashPart)
 
     Path prefix = storeDir + "/" + hashPart;
 
-    return retrySQLite<Path>([&]() {
+    return retrySQLite<Path>([&]() -> std::string {
         auto state(_state.lock());
 
         auto useQueryPathFromHashPart(state->stmtQueryPathFromHashPart.use()(prefix));
