@@ -2,6 +2,10 @@
 #include "shared.hh"
 #include "store-api.hh"
 
+
+#include "json.hh"
+
+
 #include <iomanip>
 #include <algorithm>
 
@@ -12,12 +16,14 @@ struct CmdPathInfo : StorePathsCommand
     bool showSize = false;
     bool showClosureSize = false;
     bool showSigs = false;
+    bool json = false;
 
     CmdPathInfo()
     {
         mkFlag('s', "size", "print size of the NAR dump of each path", &showSize);
         mkFlag('S', "closure-size", "print sum size of the NAR dumps of the closure of each path", &showClosureSize);
         mkFlag(0, "sigs", "show signatures", &showSigs);
+        mkFlag(0, "json", "produce JSON output", &json);
     }
 
     std::string name() override
@@ -41,6 +47,10 @@ struct CmdPathInfo : StorePathsCommand
                 "To check the existence of a path in a binary cache:",
                 "nix path-info -r /nix/store/7qvk5c91...-geeqie-1.1 --store https://cache.nixos.org/"
             },
+            Example{
+                "To print the 10 most recently added paths (using --json and the jq(1) command):",
+                "nix path-info --all --json | jq -r 'sort_by(.registrationTime)[-11:-1][].path'"
+            },
         };
     }
 
@@ -50,36 +60,85 @@ struct CmdPathInfo : StorePathsCommand
         for (auto & storePath : storePaths)
             pathLen = std::max(pathLen, storePath.size());
 
-        for (auto storePath : storePaths) {
-            auto info = store->queryPathInfo(storePath);
-            storePath = info->path; // FIXME: screws up padding
+        auto getClosureSize = [&](const Path & storePath) {
+            size_t totalSize = 0;
+            PathSet closure;
+            store->computeFSClosure(storePath, closure, false, false);
+            for (auto & p : closure)
+                totalSize += store->queryPathInfo(p)->narSize;
+            return totalSize;
+        };
 
-            std::cout << storePath << std::string(std::max(0, (int) pathLen - (int) storePath.size()), ' ');
+        if (json) {
+            JSONList jsonRoot(std::cout, true);
 
-            if (showSize) {
-                std::cout << '\t' << std::setw(11) << info->narSize;
+            for (auto storePath : storePaths) {
+                auto info = store->queryPathInfo(storePath);
+                storePath = info->path;
+
+                auto jsonPath = jsonRoot.object();
+                jsonPath
+                    .attr("path", storePath)
+                    .attr("narHash", info->narHash.to_string())
+                    .attr("narSize", info->narSize);
+
+                if (showClosureSize)
+                    jsonPath.attr("closureSize", getClosureSize(storePath));
+
+                if (info->deriver != "")
+                    jsonPath.attr("deriver", info->deriver);
+
+                {
+                    auto jsonRefs = jsonPath.list("references");
+                    for (auto & ref : info->references)
+                        jsonRefs.elem(ref);
+                }
+
+                if (info->registrationTime)
+                    jsonPath.attr("registrationTime", info->registrationTime);
+
+                if (info->ultimate)
+                    jsonPath.attr("ultimate", info->ultimate);
+
+                if (info->ca != "")
+                    jsonPath.attr("ca", info->ca);
+
+                if (!info->sigs.empty()) {
+                    auto jsonSigs = jsonPath.list("signatures");
+                    for (auto & sig : info->sigs)
+                        jsonSigs.elem(sig);
+                }
             }
-
-            if (showClosureSize) {
-                size_t totalSize = 0;
-                PathSet closure;
-                store->computeFSClosure(storePath, closure, false, false);
-                for (auto & p : closure)
-                    totalSize += store->queryPathInfo(p)->narSize;
-                std::cout << '\t' << std::setw(11) << totalSize;
-            }
-
-            if (showSigs) {
-                std::cout << '\t';
-                Strings ss;
-                if (info->ultimate) ss.push_back("ultimate");
-                if (info->ca != "") ss.push_back("ca:" + info->ca);
-                for (auto & sig : info->sigs) ss.push_back(sig);
-                std::cout << concatStringsSep(" ", ss);
-            }
-
-            std::cout << std::endl;
         }
+
+        else {
+
+            for (auto storePath : storePaths) {
+                auto info = store->queryPathInfo(storePath);
+                storePath = info->path; // FIXME: screws up padding
+
+                std::cout << storePath << std::string(std::max(0, (int) pathLen - (int) storePath.size()), ' ');
+
+                if (showSize)
+                    std::cout << '\t' << std::setw(11) << info->narSize;
+
+                if (showClosureSize)
+                    std::cout << '\t' << std::setw(11) << getClosureSize(storePath);
+
+                if (showSigs) {
+                    std::cout << '\t';
+                    Strings ss;
+                    if (info->ultimate) ss.push_back("ultimate");
+                    if (info->ca != "") ss.push_back("ca:" + info->ca);
+                    for (auto & sig : info->sigs) ss.push_back(sig);
+                    std::cout << concatStringsSep(" ", ss);
+                }
+
+                std::cout << std::endl;
+            }
+
+        }
+
     }
 };
 

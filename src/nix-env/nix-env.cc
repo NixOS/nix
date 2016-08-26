@@ -10,6 +10,7 @@
 #include "store-api.hh"
 #include "user-env.hh"
 #include "util.hh"
+#include "json.hh"
 #include "value-to-json.hh"
 #include "xml-writer.hh"
 
@@ -860,26 +861,24 @@ static VersionDiff compareVersionAgainstSet(
 
 static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
 {
-    JSONObject topObj(cout);
+    JSONObject topObj(cout, true);
     for (auto & i : elems) {
-        topObj.attr(i.attrPath);
-        JSONObject pkgObj(cout);
+        JSONObject pkgObj = topObj.object(i.attrPath);
 
         pkgObj.attr("name", i.name);
         pkgObj.attr("system", i.system);
 
-        pkgObj.attr("meta");
-        JSONObject metaObj(cout);
+        JSONObject metaObj = pkgObj.object("meta");
         StringSet metaNames = i.queryMetaNames();
         for (auto & j : metaNames) {
-            metaObj.attr(j);
+            auto placeholder = metaObj.placeholder(j);
             Value * v = i.queryMeta(j);
             if (!v) {
                 printMsg(lvlError, format("derivation ‘%1%’ has invalid meta attribute ‘%2%’") % i.name % j);
-                cout << "null";
+                placeholder.write(nullptr);
             } else {
                 PathSet context;
-                printValueAsJSON(*globals.state, true, *v, cout, context);
+                printValueAsJSON(*globals.state, true, *v, placeholder, context);
             }
         }
     }

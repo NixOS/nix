@@ -8,73 +8,12 @@
 
 namespace nix {
 
+class JSONPlaceholder;
+
 void printValueAsJSON(EvalState & state, bool strict,
-    Value & v, std::ostream & out, PathSet & context);
+    Value & v, JSONPlaceholder & out, PathSet & context);
 
-void escapeJSON(std::ostream & str, const string & s);
-
-struct JSONObject
-{
-    std::ostream & str;
-    bool first;
-    JSONObject(std::ostream & str) : str(str), first(true)
-    {
-        str << "{";
-    }
-    ~JSONObject()
-    {
-        str << "}";
-    }
-    void attr(const string & s)
-    {
-        if (!first) str << ","; else first = false;
-        escapeJSON(str, s);
-        str << ":";
-    }
-    void attr(const string & s, const string & t)
-    {
-        attr(s);
-        escapeJSON(str, t);
-    }
-    void attr(const string & s, const char * t)
-    {
-        attr(s);
-        escapeJSON(str, t);
-    }
-    void attr(const string & s, bool b)
-    {
-        attr(s);
-        str << (b ? "true" : "false");
-    }
-    template<typename T>
-    void attr(const string & s, const T & n)
-    {
-        attr(s);
-        str << n;
-    }
-};
-
-struct JSONList
-{
-    std::ostream & str;
-    bool first;
-    JSONList(std::ostream & str) : str(str), first(true)
-    {
-        str << "[";
-    }
-    ~JSONList()
-    {
-        str << "]";
-    }
-    void elem()
-    {
-        if (!first) str << ","; else first = false;
-    }
-    void elem(const string & s)
-    {
-        elem();
-        escapeJSON(str, s);
-    }
-};
+void printValueAsJSON(EvalState & state, bool strict,
+    Value & v, std::ostream & str, PathSet & context);
 
 }

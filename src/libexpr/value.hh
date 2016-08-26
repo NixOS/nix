@@ -36,6 +36,7 @@ class Symbol;
 struct Pos;
 class EvalState;
 class XMLWriter;
+class JSONPlaceholder;
 
 
 typedef long NixInt;
@@ -73,7 +74,7 @@ class ExternalValueBase
 
     /* Print the value as JSON. Defaults to unconvertable, i.e. throws an error */
     virtual void printValueAsJSON(EvalState & state, bool strict,
-        std::ostream & str, PathSet & context) const;
+        JSONPlaceholder & out, PathSet & context) const;
 
     /* Print the value as XML. Defaults to unevaluated */
     virtual void printValueAsXML(EvalState & state, bool strict, bool location,
