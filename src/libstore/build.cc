@@ -2739,7 +2739,7 @@ void DerivationGoal::registerOutputs()
             } else {
                 if (h != h2)
                     throw BuildError(
-                        format("output path ‘%1%’ has %2% hash ‘%3%’ when ‘%4%’ was expected")
+                        format("output path %1% has %2% hash %3% when %4% was expected")
                         % path % i.second.hashAlgo % printHash16or32(h2) % printHash16or32(h));
             }
         }
