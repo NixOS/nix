@@ -1,0 +1,117 @@
+#! /usr/bin/env nix-shell
+#! nix-shell -i perl -p perl perlPackages.LWPUserAgent perlPackages.LWPProtocolHttps perlPackages.FileSlurp gnupg1
+
+use strict;
+use Data::Dumper;
+use File::Basename;
+use File::Path;
+use File::Slurp;
+use JSON::PP;
+use LWP::UserAgent;
+
+my $evalId = $ARGV[0] or die "Usage: $0 EVAL-ID\n";
+
+my $releasesDir = "/home/eelco/mnt/releases";
+
+# FIXME: cut&paste from nixos-channel-scripts.
+sub fetch {
+    my ($url, $type) = @_;
+
+    my $ua = LWP::UserAgent->new;
+    $ua->default_header('Accept', $type) if defined $type;
+
+    my $response = $ua->get($url);
+    die "could not download $url: ", $response->status_line, "\n" unless $response->is_success;
+
+    return $response->decoded_content;
+}
+
+my $evalUrl = "https://hydra.nixos.org/eval/$evalId";
+my $evalInfo = decode_json(fetch($evalUrl, 'application/json'));
+#print Dumper($evalInfo);
+
+my $nixRev = $evalInfo->{jobsetevalinputs}->{nix}->{revision} or die;
+
+my $tarballInfo = decode_json(fetch("$evalUrl/job/tarball", 'application/json'));
+
+my $releaseName = $tarballInfo->{releasename};
+$releaseName =~ /nix-(.*)$/ or die;
+my $version = $1;
+
+print STDERR "Nix revision is $nixRev, version is $version\n";
+
+File::Path::make_path($releasesDir);
+if (system("mountpoint -q $releasesDir") != 0) {
+    system("sshfs hydra-mirror:/releases $releasesDir") == 0 or die;
+}
+
+my $releaseDir = "$releasesDir/nix/$releaseName";
+File::Path::make_path($releaseDir);
+
+sub downloadFile {
+    my ($jobName, $productNr, $dstName) = @_;
+
+    my $buildInfo = decode_json(fetch("$evalUrl/job/$jobName", 'application/json'));
+
+    my $srcFile = $buildInfo->{buildproducts}->{$productNr}->{path} or die;
+    $dstName //= basename($srcFile);
+    my $dstFile = "$releaseDir/" . $dstName;
+
+    if (! -e $dstFile) {
+        print STDERR "downloading $srcFile to $dstFile...\n";
+        system("NIX_REMOTE=https://cache.nixos.org/ nix cat-store '$srcFile' > '$dstFile.tmp'") == 0
+            or die "unable to fetch $srcFile\n";
+        rename("$dstFile.tmp", $dstFile) or die;
+    }
+
+    my $sha256_expected = $buildInfo->{buildproducts}->{$productNr}->{sha256hash} or die;
+    my $sha256_actual = `nix hash-file --type sha256 '$dstFile'`;
+    chomp $sha256_actual;
+    if ($sha256_expected ne $sha256_actual) {
+        print STDERR "file $dstFile is corrupt\n";
+        exit 1;
+    }
+
+    write_file("$dstFile.sha256", $sha256_expected);
+
+    return ($dstFile, $sha256_expected);
+}
+
+downloadFile("tarball", "2"); # PDF
+downloadFile("tarball", "3"); # .tar.bz2
+my ($tarball, $tarballHash) = downloadFile("tarball", "4"); # .tar.xz
+my ($tarball_i686_linux, $tarball_i686_linux_hash) = downloadFile("binaryTarball.i686-linux", "1");
+my ($tarball_x86_64_linux, $tarball_x86_64_linux_hash) = downloadFile("binaryTarball.x86_64-linux", "1");
+my ($tarball_x86_64_darwin, $tarball_x86_64_darwin_hash) = downloadFile("binaryTarball.x86_64-darwin", "1");
+
+# Extract the HTML manual.
+File::Path::make_path("$releaseDir/manual");
+
+system("tar xvf $tarball --strip-components=3 -C $releaseDir/manual --wildcards '*/doc/manual/*.html' '*/doc/manual/*.css' '*/doc/manual/*.gif' '*/doc/manual/*.png'") == 0 or die;
+
+if (! -e "$releaseDir/manual/index.html") {
+    symlink("manual.html", "$releaseDir/manual/index.html") or die;
+}
+
+# Update the "latest" symlink.
+symlink("$releaseName", "$releasesDir/nix/latest-tmp") or die;
+rename("$releasesDir/nix/latest-tmp", "$releasesDir/nix/latest") or die;
+
+# Tag the release in Git.
+chdir("/home/eelco/Dev/nix-pristine") or die;
+system("git remote update origin") == 0 or die;
+system("git tag --force --sign $version $nixRev -m 'Tagging release $version'") == 0 or die;
+
+# Update the website.
+my $siteDir = "/home/eelco/Dev/nixos-homepage-pristine";
+write_file("$siteDir/nix-release.tt",
+           "[%-\n" .
+           "latestNixVersion = \"$version\"\n" .
+           "nix_hash_i686_linux = \"$tarball_i686_linux_hash\"\n" .
+           "nix_hash_x86_64_linux = \"$tarball_x86_64_linux_hash\"\n" .
+           "nix_hash_x86_64_darwin = \"$tarball_x86_64_darwin_hash\"\n" .
+           "-%]\n");
+
+system("cd $siteDir && nix-shell --run 'make nix/install nix/install.sig'") == 0 or die;
+
+system("cd $siteDir && git commit -a -m 'Nix $version released'") == 0 or die;
