@@ -477,7 +477,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     bool ignoreNulls = false;
     attr = args[0]->attrs->find(state.sIgnoreNulls);
     if (attr != args[0]->attrs->end())
-        ignoreNulls = state.forceBool(*attr->value);
+        ignoreNulls = state.forceBool(*attr->value, pos);
 
     /* Build the derivation expression by processing the attributes. */
     Derivation drv;
@@ -925,9 +925,10 @@ struct FilterFromExpr : PathFilter
 {
     EvalState & state;
     Value & filter;
+    Pos pos;
 
-    FilterFromExpr(EvalState & state, Value & filter)
-        : state(state), filter(filter)
+    FilterFromExpr(EvalState & state, Value & filter, const Pos & pos)
+        : state(state), filter(filter), pos(pos)
     {
     }
 
@@ -955,7 +956,7 @@ struct FilterFromExpr : PathFilter
         Value res;
         state.callFunction(fun2, arg2, res, noPos);
 
-        return state.forceBool(res);
+        return state.forceBool(res, pos);
     }
 };
 
@@ -971,7 +972,7 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
     if (args[0]->type != tLambda)
         throw TypeError(format("first argument in call to ‘filterSource’ is not a function but %1%, at %2%") % showType(*args[0]) % pos);
 
-    FilterFromExpr filter(state, *args[0]);
+    FilterFromExpr filter(state, *args[0], pos);
 
     path = state.checkSourcePath(path);
 
@@ -1291,7 +1292,7 @@ static void prim_filter(EvalState & state, const Pos & pos, Value * * args, Valu
     for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
         Value res;
         state.callFunction(*args[0], *args[1]->listElems()[n], res, noPos);
-        if (state.forceBool(res))
+        if (state.forceBool(res, pos))
             vs[k++] = args[1]->listElems()[n];
         else
             same = false;
@@ -1367,7 +1368,7 @@ static void anyOrAll(bool any, EvalState & state, const Pos & pos, Value * * arg
     Value vTmp;
     for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
         state.callFunction(*args[0], *args[1]->listElems()[n], vTmp, pos);
-        bool res = state.forceBool(vTmp);
+        bool res = state.forceBool(vTmp, pos);
         if (res == any) {
             mkBool(v, any);
             return;
@@ -1433,7 +1434,7 @@ static void prim_sort(EvalState & state, const Pos & pos, Value * * args, Value 
         Value vTmp1, vTmp2;
         state.callFunction(*args[0], *a, vTmp1, pos);
         state.callFunction(vTmp1, *b, vTmp2, pos);
-        return state.forceBool(vTmp2);
+        return state.forceBool(vTmp2, pos);
     };
 
     /* FIXME: std::sort can segfault if the comparator is not a strict
@@ -1457,7 +1458,7 @@ static void prim_partition(EvalState & state, const Pos & pos, Value * * args, V
         state.forceValue(*vElem);
         Value res;
         state.callFunction(*args[0], *vElem, res, pos);
-        if (state.forceBool(res))
+        if (state.forceBool(res, pos))
             right.push_back(vElem);
         else
             wrong.push_back(vElem);

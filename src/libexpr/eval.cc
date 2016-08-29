@@ -1378,11 +1378,11 @@ NixFloat EvalState::forceFloat(Value & v, const Pos & pos)
 }
 
 
-bool EvalState::forceBool(Value & v)
+bool EvalState::forceBool(Value & v, const Pos & pos)
 {
     forceValue(v);
     if (v.type != tBool)
-        throwTypeError("value is %1% while a Boolean was expected", v);
+        throwTypeError("value is %1% while a Boolean was expected, at %2%", v, pos);
     return v.boolean;
 }
 

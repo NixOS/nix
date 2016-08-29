@@ -301,7 +301,7 @@ static void getDerivations(EvalState & state, Value & vIn,
                    `recurseForDerivations = true' attribute. */
                 if (v2.type == tAttrs) {
                     Bindings::iterator j = v2.attrs->find(state.symbols.create("recurseForDerivations"));
-                    if (j != v2.attrs->end() && state.forceBool(*j->value))
+                    if (j != v2.attrs->end() && state.forceBool(*j->value, *j->pos))
                         getDerivations(state, v2, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
                 }
             }

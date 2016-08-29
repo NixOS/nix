@@ -157,7 +157,7 @@ public:
     /* Force `v', and then verify that it has the expected type. */
     NixInt forceInt(Value & v, const Pos & pos);
     NixFloat forceFloat(Value & v, const Pos & pos);
-    bool forceBool(Value & v);
+    bool forceBool(Value & v, const Pos & pos);
     inline void forceAttrs(Value & v);
     inline void forceAttrs(Value & v, const Pos & pos);
     inline void forceList(Value & v);
