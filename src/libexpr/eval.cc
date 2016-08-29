@@ -994,11 +994,18 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
     if (fun.type == tAttrs) {
       auto found = fun.attrs->find(sFunctor);
       if (found != fun.attrs->end()) {
+        /* fun may be allocated on the stack of the calling function,
+         * but for functors we may keep a reference, so heap-allocate
+         * a copy and use that instead.
+         */
+        auto & fun2 = *allocValue();
+        fun2 = fun;
+        /* !!! Should we use the attr pos here? */
         forceValue(*found->value, pos);
-        Value * v2 = allocValue();
-        callFunction(*found->value, fun, *v2, pos);
-        forceValue(*v2, pos);
-        return callFunction(*v2, arg, v, pos);
+        Value v2;
+        callFunction(*found->value, fun2, v2, pos);
+        forceValue(v2, pos);
+        return callFunction(v2, arg, v, pos);
       }
     }
 
