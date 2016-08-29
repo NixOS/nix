@@ -250,4 +250,13 @@ void mkPath(Value & v, const char * s);
 size_t valueSize(Value & v);
 
 
+#if HAVE_BOEHMGC
+typedef std::vector<Value *, gc_allocator<Value *> > ValueVector;
+typedef std::map<Symbol, Value *, std::less<Symbol>, gc_allocator<Value *> > ValueMap;
+#else
+typedef std::vector<Value *> ValueVector;
+typedef std::map<Symbol, Value *> ValueMap;
+#endif
+
+
 }

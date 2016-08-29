@@ -1443,6 +1443,40 @@ static void prim_sort(EvalState & state, const Pos & pos, Value * * args, Value 
 }
 
 
+static void prim_partition(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceFunction(*args[0], pos);
+    state.forceList(*args[1], pos);
+
+    auto len = args[1]->listSize();
+
+    ValueVector right, wrong;
+
+    for (unsigned int n = 0; n < len; ++n) {
+        auto vElem = args[1]->listElems()[n];
+        state.forceValue(*vElem);
+        Value res;
+        state.callFunction(*args[0], *vElem, res, pos);
+        if (state.forceBool(res))
+            right.push_back(vElem);
+        else
+            wrong.push_back(vElem);
+    }
+
+    state.mkAttrs(v, 2);
+
+    Value * vRight = state.allocAttr(v, state.sRight);
+    state.mkList(*vRight, right.size());
+    memcpy(vRight->listElems(), right.data(), sizeof(Value *) * right.size());
+
+    Value * vWrong = state.allocAttr(v, state.sWrong);
+    state.mkList(*vWrong, wrong.size());
+    memcpy(vWrong->listElems(), wrong.data(), sizeof(Value *) * wrong.size());
+
+    v.attrs->sort();
+}
+
+
 /*************************************************************
  * Integer arithmetic
  *************************************************************/
@@ -1881,6 +1915,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__all", 2, prim_all);
     addPrimOp("__genList", 2, prim_genList);
     addPrimOp("__sort", 2, prim_sort);
+    addPrimOp("__partition", 2, prim_partition);
 
     // Integer arithmetic
     addPrimOp("__add", 2, prim_add);
