@@ -29,6 +29,11 @@ void toJSON(std::ostream & str, const char * s)
     if (!s) str << "null"; else toJSON(str, s, s + strlen(s));
 }
 
+void toJSON(std::ostream & str, unsigned long long n)
+{
+    str << n;
+}
+
 void toJSON(std::ostream & str, unsigned long n)
 {
     str << n;

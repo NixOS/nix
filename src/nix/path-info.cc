@@ -1,10 +1,7 @@
 #include "command.hh"
 #include "shared.hh"
 #include "store-api.hh"
-
-
 #include "json.hh"
-
 
 #include <iomanip>
 #include <algorithm>
@@ -60,8 +57,8 @@ struct CmdPathInfo : StorePathsCommand
         for (auto & storePath : storePaths)
             pathLen = std::max(pathLen, storePath.size());
 
-        auto getClosureSize = [&](const Path & storePath) {
-            size_t totalSize = 0;
+        auto getClosureSize = [&](const Path & storePath) -> unsigned long long {
+            unsigned long long totalSize = 0;
             PathSet closure;
             store->computeFSClosure(storePath, closure, false, false);
             for (auto & p : closure)
