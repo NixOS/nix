@@ -14,6 +14,7 @@ struct DownloadOptions
     enum { yes, no, automatic } showProgress = yes;
     bool head = false;
     size_t tries = 1;
+    unsigned int baseRetryTimeMs = 100;
 };
 
 struct DownloadResult

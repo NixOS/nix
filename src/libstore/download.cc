@@ -230,7 +230,7 @@ struct CurlDownloader : public Downloader
             } catch (DownloadError & e) {
                 attempt++;
                 if (e.error != Transient || attempt >= options.tries) throw;
-                auto ms = 25 * (1 << (attempt - 1));
+                auto ms = options.baseRetryTimeMs * (1 << (attempt - 1));
                 printMsg(lvlError, format("warning: %s; retrying in %d ms") % e.what() % ms);
                 std::this_thread::sleep_for(std::chrono::milliseconds(ms));
             }

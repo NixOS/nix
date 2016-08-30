@@ -80,7 +80,8 @@ protected:
         auto downloader(downloaders.get());
         DownloadOptions options;
         options.showProgress = DownloadOptions::no;
-        options.tries = 3;
+        options.tries = 5;
+        options.baseRetryTimeMs = 1000;
         try {
             return downloader->download(cacheUri + "/" + path, options).data;
         } catch (DownloadError & e) {
