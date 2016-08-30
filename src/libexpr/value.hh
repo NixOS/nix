@@ -1,6 +1,11 @@
 #pragma once
 
+#include "config.h"
 #include "symbol-table.hh"
+
+#if HAVE_BOEHMGC
+#include <gc/gc_allocator.h>
+#endif
 
 namespace nix {
 

@@ -8,10 +8,6 @@
 
 #include <map>
 
-#if HAVE_BOEHMGC
-#include <gc/gc_allocator.h>
-#endif
-
 
 namespace nix {
 
