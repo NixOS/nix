@@ -172,10 +172,6 @@ let
       };
 
 
-    rpm_fedora19i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora19i386) [];
-    rpm_fedora19x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora19x86_64) [];
-    rpm_fedora20i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora20i386) [];
-    rpm_fedora20x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora20x86_64) [];
     rpm_fedora21i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora21i386) [ "libsodium-devel" ];
     rpm_fedora21x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora21x86_64) [ "libsodium-devel" ];
 
@@ -261,8 +257,6 @@ let
           deb_debian8x86_64
           deb_ubuntu1504i386
           deb_ubuntu1504x86_64
-          rpm_fedora20i386
-          rpm_fedora20x86_64
           rpm_fedora21i386
           rpm_fedora21x86_64
           tests.remoteBuilds
