@@ -193,6 +193,7 @@ bool CompareGoalPtrs::operator() (const GoalPtr & a, const GoalPtr & b) {
 struct Child
 {
     WeakGoalPtr goal;
+    Goal * goal2; // ugly hackery
     set<int> fds;
     bool respectTimeouts;
     bool inBuildSlot;
@@ -284,7 +285,7 @@ public:
        false if there is no sense in waking up goals that are sleeping
        because they can't run yet (e.g., there is no free build slot,
        or the hook would still say `postpone'). */
-    void childTerminated(GoalPtr goal, bool wakeSleepers = true);
+    void childTerminated(Goal * goal, bool wakeSleepers = true);
 
     /* Put `goal' to sleep until a build slot becomes available (which
        might be right away). */
@@ -935,7 +936,7 @@ DerivationGoal::~DerivationGoal()
 void DerivationGoal::killChild()
 {
     if (pid != -1) {
-        worker.childTerminated(shared_from_this());
+        worker.childTerminated(this);
 
         if (buildUser.enabled()) {
             /* If we're using a build user, then there is a tricky
@@ -1409,7 +1410,7 @@ void DerivationGoal::buildDone()
     debug(format("builder process for ‘%1%’ finished") % drvPath);
 
     /* So the child is gone now. */
-    worker.childTerminated(shared_from_this());
+    worker.childTerminated(this);
 
     /* Close the read side of the logger pipe. */
     if (hook) {
@@ -3141,8 +3142,9 @@ SubstitutionGoal::~SubstitutionGoal()
 {
     try {
         if (thr.joinable()) {
+            // FIXME: signal worker thread to quit.
             thr.join();
-            //worker.childTerminated(shared_from_this()); // FIXME
+            worker.childTerminated(this);
         }
     } catch (...) {
         ignoreException();
@@ -3297,7 +3299,7 @@ void SubstitutionGoal::finished()
     trace("substitute finished");
 
     thr.join();
-    worker.childTerminated(shared_from_this());
+    worker.childTerminated(this);
 
     try {
         promise.get_future().get();
@@ -3450,6 +3452,7 @@ void Worker::childStarted(GoalPtr goal, const set<int> & fds,
 {
     Child child;
     child.goal = goal;
+    child.goal2 = goal.get();
     child.fds = fds;
     child.timeStarted = child.lastOutput = time(0);
     child.inBuildSlot = inBuildSlot;
@@ -3459,10 +3462,10 @@ void Worker::childStarted(GoalPtr goal, const set<int> & fds,
 }
 
 
-void Worker::childTerminated(GoalPtr goal, bool wakeSleepers)
+void Worker::childTerminated(Goal * goal, bool wakeSleepers)
 {
     auto i = std::find_if(children.begin(), children.end(),
-        [&](const Child & child) { return child.goal.lock() == goal; });
+        [&](const Child & child) { return child.goal2 == goal; });
     assert(i != children.end());
 
     if (i->inBuildSlot) {
