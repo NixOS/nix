@@ -21,6 +21,7 @@ struct DownloadResult
 {
     bool cached;
     string etag;
+    string effectiveUrl;
     std::shared_ptr<std::string> data;
 };
 
@@ -32,6 +33,11 @@ struct Downloader
 
     Path downloadCached(ref<Store> store, const string & url, bool unpack, string name = "",
         const Hash & expectedHash = Hash());
+
+    /* Need to overload because can't have an rvalue default value for non-const reference */
+
+    Path downloadCached(ref<Store> store, const string & url, bool unpack,
+        string & effectiveUrl, const Hash & expectedHash = Hash());
 
     enum Error { NotFound, Forbidden, Misc, Transient };
 };
