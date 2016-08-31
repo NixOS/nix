@@ -13,6 +13,7 @@ makefiles = \
   src/nix-collect-garbage/local.mk \
   src/nix-prefetch-url/local.mk \
   src/buildenv/local.mk \
+  src/resolve-system-dependencies/local.mk \
   perl/local.mk \
   scripts/local.mk \
   corepkgs/local.mk \
