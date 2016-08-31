@@ -37,7 +37,6 @@ Makefile.config
 /scripts/nix-switch
 /scripts/nix-collect-garbage
 /scripts/nix-prefetch-url
-/scripts/nix-build
 /scripts/nix-copy-closure
 /scripts/NixConfig.pm
 /scripts/NixManifest.pm
@@ -79,6 +78,9 @@ Makefile.config
 
 # /src/buildenv/
 /src/buildenv/buildenv
+
+# /src/nix-build/
+/src/nix-build/nix-build
 
 # /tests/
 /tests/test-tmp
