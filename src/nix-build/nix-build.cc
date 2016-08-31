@@ -16,6 +16,9 @@ using std::stringstream;
 
 extern char ** environ;
 
+/* Recreate the effect of the perl shellwords function, breaking up a
+ * string into arguments like a shell word, including escapes
+ */
 std::vector<string> shellwords(const string & s)
 {
     auto whitespace = std::regex("^(\\s+).*");
@@ -101,15 +104,14 @@ int main(int argc, char ** argv)
         if (runEnv && argc > 1 && !std::regex_search(argv[1], std::regex("nix-shell"))) {
             script = argv[1];
             if (access(script.c_str(), F_OK) == 0 && access(script.c_str(), X_OK) == 0) {
-                auto SCRIPT = std::ifstream(script);
-                string first;
-                std::getline(SCRIPT, first);
-                if (std::regex_search(first, std::regex("^#!"))) {
+                auto lines = tokenizeString<Strings>(readFile(script), "\n");
+                if (std::regex_search(lines.front(), std::regex("^#!"))) {
+                    lines.pop_front();
                     inShebang = true;
                     for (int i = 2; i < argc - 1; ++i)
                         savedArgs.push_back(argv[i]);
                     args = std::vector<string>{};
-                    for (string line; std::getline(SCRIPT, line);) {
+                    for (auto line : lines) {
                         line = chomp(line);
                         std::smatch match;
                         if (std::regex_match(line, match, std::regex("^#!\\s*nix-shell (.*)$")))
@@ -120,7 +122,7 @@ int main(int argc, char ** argv)
             }
         }
 
-        for (auto n = decltype(args)::size_type{0}; n < args.size(); ++n) {
+        for (size_t n = 0; n < args.size(); ++n) {
             auto arg = args[n];
 
             if (arg == "--help") {
