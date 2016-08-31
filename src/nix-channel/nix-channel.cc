@@ -86,7 +86,7 @@ static void update(const StringSet & channelNames)
         // definition from a consistent location if the redirect changes mid-download.
         auto effectiveUrl = string{};
         auto dl = makeDownloader();
-        auto filename = dl->downloadCached(store, url, false, effectiveUrl);
+        auto filename = dl->downloadCached(store, url, false, "", Hash(), &effectiveUrl);
         url = chomp(std::move(effectiveUrl));
 
         // If the URL contains a version number, append it to the name

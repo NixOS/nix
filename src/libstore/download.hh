@@ -32,12 +32,7 @@ struct Downloader
     virtual DownloadResult download(string url, const DownloadOptions & options) = 0;
 
     Path downloadCached(ref<Store> store, const string & url, bool unpack, string name = "",
-        const Hash & expectedHash = Hash());
-
-    /* Need to overload because can't have an rvalue default value for non-const reference */
-
-    Path downloadCached(ref<Store> store, const string & url, bool unpack,
-        string & effectiveUrl, const Hash & expectedHash = Hash());
+        const Hash & expectedHash = Hash(), string * effectiveUrl = nullptr);
 
     enum Error { NotFound, Forbidden, Misc, Transient };
 };

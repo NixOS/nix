@@ -249,13 +249,7 @@ ref<Downloader> makeDownloader()
     return make_ref<CurlDownloader>();
 }
 
-Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpack, string name, const Hash & expectedHash)
-{
-    string ignored;
-    return downloadCached(store, url_, unpack, ignored, expectedHash);
-}
-
-Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpack, string & effectiveUrl, const Hash & expectedHash)
+Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpack, string name, const Hash & expectedHash, string * effectiveUrl)
 {
     auto url = resolveUri(url_);
 
@@ -295,7 +289,8 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
                 time_t lastChecked;
                 if (string2Int(ss[2], lastChecked) && lastChecked + ttl >= time(0)) {
                     skip = true;
-                    effectiveUrl = url_;
+                    if (effectiveUrl)
+                        *effectiveUrl = url_;
                 } else if (!ss[1].empty()) {
                     printMsg(lvlDebug, format("verifying previous ETag ‘%1%’") % ss[1]);
                     expectedETag = ss[1];
@@ -311,7 +306,8 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
             DownloadOptions options;
             options.expectedETag = expectedETag;
             auto res = download(url, options);
-            effectiveUrl = res.effectiveUrl;
+            if (effectiveUrl)
+                *effectiveUrl = res.effectiveUrl;
 
             if (!res.cached) {
                 ValidPathInfo info;
