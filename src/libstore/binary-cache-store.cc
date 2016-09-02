@@ -6,8 +6,7 @@
 #include "globals.hh"
 #include "nar-info.hh"
 #include "sync.hh"
-#include "worker-protocol.hh"
-#include "nar-accessor.hh"
+#include "remote-fs-accessor.hh"
 #include "nar-info-disk-cache.hh"
 
 #include <chrono>
@@ -232,70 +231,9 @@ Path BinaryCacheStore::addTextToStore(const string & name, const string & s,
     return info.path;
 }
 
-/* Given requests for a path /nix/store/<x>/<y>, this accessor will
-   first download the NAR for /nix/store/<x> from the binary cache,
-   build a NAR accessor for that NAR, and use that to access <y>. */
-struct BinaryCacheStoreAccessor : public FSAccessor
-{
-    ref<BinaryCacheStore> store;
-
-    std::map<Path, ref<FSAccessor>> nars;
-
-    BinaryCacheStoreAccessor(ref<BinaryCacheStore> store)
-        : store(store)
-    {
-    }
-
-    std::pair<ref<FSAccessor>, Path> fetch(const Path & path_)
-    {
-        auto path = canonPath(path_);
-
-        auto storePath = store->toStorePath(path);
-        std::string restPath = std::string(path, storePath.size());
-
-        if (!store->isValidPath(storePath))
-            throw InvalidPath(format("path ‘%1%’ is not a valid store path") % storePath);
-
-        auto i = nars.find(storePath);
-        if (i != nars.end()) return {i->second, restPath};
-
-        StringSink sink;
-        store->narFromPath(storePath, sink);
-
-        auto accessor = makeNarAccessor(sink.s);
-        nars.emplace(storePath, accessor);
-        return {accessor, restPath};
-    }
-
-    Stat stat(const Path & path) override
-    {
-        auto res = fetch(path);
-        return res.first->stat(res.second);
-    }
-
-    StringSet readDirectory(const Path & path) override
-    {
-        auto res = fetch(path);
-        return res.first->readDirectory(res.second);
-    }
-
-    std::string readFile(const Path & path) override
-    {
-        auto res = fetch(path);
-        return res.first->readFile(res.second);
-    }
-
-    std::string readLink(const Path & path) override
-    {
-        auto res = fetch(path);
-        return res.first->readLink(res.second);
-    }
-};
-
 ref<FSAccessor> BinaryCacheStore::getFSAccessor()
 {
-    return make_ref<BinaryCacheStoreAccessor>(ref<BinaryCacheStore>(
-            std::dynamic_pointer_cast<BinaryCacheStore>(shared_from_this())));
+    return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()));
 }
 
 }
