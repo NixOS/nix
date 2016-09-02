@@ -90,20 +90,20 @@ protected:
         FdSource from;
         unsigned int daemonVersion;
 
-        ~Connection();
+        virtual ~Connection();
 
         void processStderr(Sink * sink = 0, Source * source = 0);
     };
 
     virtual ref<Connection> openConnection() = 0;
 
-    void setOptions(Connection & conn);
-
     void initConnection(Connection & conn);
+
+    ref<Pool<Connection>> connections;
 
 private:
 
-    ref<Pool<Connection>> connections;
+    void setOptions(Connection & conn);
 };
 
 class UDSRemoteStore : public LocalFSStore, public RemoteStore
