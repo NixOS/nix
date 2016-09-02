@@ -18,15 +18,13 @@ template<typename T> class Pool;
 
 /* FIXME: RemoteStore is a misnomer - should be something like
    DaemonStore. */
-class RemoteStore : public LocalFSStore
+class RemoteStore : public virtual Store
 {
 public:
 
     RemoteStore(const Params & params, size_t maxConnections = std::numeric_limits<size_t>::max());
 
     /* Implementations of abstract store API methods. */
-
-    std::string getUri() override;
 
     bool isValidPathUncached(const Path & path) override;
 
@@ -84,11 +82,10 @@ public:
 
     void addSignatures(const Path & storePath, const StringSet & sigs) override;
 
-private:
+protected:
 
     struct Connection
     {
-        AutoCloseFD fd;
         FdSink to;
         FdSource from;
         unsigned int daemonVersion;
@@ -98,11 +95,33 @@ private:
         void processStderr(Sink * sink = 0, Source * source = 0);
     };
 
+    virtual ref<Connection> openConnection() = 0;
+
+    void setOptions(Connection & conn);
+
+    void initConnection(Connection & conn);
+
+private:
+
     ref<Pool<Connection>> connections;
+};
 
-    ref<Connection> openConnection();
+class UDSRemoteStore : public LocalFSStore, public RemoteStore
+{
+public:
 
-    void setOptions(ref<Connection> conn);
+    UDSRemoteStore(const Params & params, size_t maxConnections = std::numeric_limits<size_t>::max());
+
+    std::string getUri() override;
+
+private:
+
+    struct Connection : RemoteStore::Connection
+    {
+        AutoCloseFD fd;
+    };
+
+    ref<RemoteStore::Connection> openConnection() override;
 };
 
 

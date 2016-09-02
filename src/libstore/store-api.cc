@@ -554,7 +554,7 @@ static RegisterStoreImplementation regStore([](
 {
     switch (getStoreType(uri, get(params, "state", settings.nixStateDir))) {
         case tDaemon:
-            return std::shared_ptr<Store>(std::make_shared<RemoteStore>(params));
+            return std::shared_ptr<Store>(std::make_shared<UDSRemoteStore>(params));
         case tLocal:
             return std::shared_ptr<Store>(std::make_shared<LocalStore>(params));
         default:
