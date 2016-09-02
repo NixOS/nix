@@ -506,7 +506,7 @@ namespace nix {
 RegisterStoreImplementation::Implementations * RegisterStoreImplementation::implementations = 0;
 
 
-ref<Store> openStoreAt(const std::string & uri_)
+ref<Store> openStore(const std::string & uri_)
 {
     auto uri(uri_);
     Store::Params params;
@@ -526,12 +526,6 @@ ref<Store> openStoreAt(const std::string & uri_)
     }
 
     throw Error(format("don't know how to open Nix store ‘%s’") % uri);
-}
-
-
-ref<Store> openStore()
-{
-    return openStoreAt(getEnv("NIX_REMOTE"));
 }
 
 
@@ -579,7 +573,7 @@ std::list<ref<Store>> getDefaultSubstituters()
     auto addStore = [&](const std::string & uri) {
         if (done.count(uri)) return;
         done.insert(uri);
-        state->stores.push_back(openStoreAt(uri));
+        state->stores.push_back(openStore(uri));
     };
 
     for (auto uri : settings.get("substituters", Strings()))

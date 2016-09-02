@@ -587,11 +587,7 @@ void removeTempRoots();
    If ‘uri’ is empty, it defaults to ‘direct’ or ‘daemon’ depending on
    whether the user has write access to the local Nix store/database.
    set to true *unless* you're going to collect garbage. */
-ref<Store> openStoreAt(const std::string & uri);
-
-
-/* Open the store indicated by the ‘NIX_REMOTE’ environment variable. */
-ref<Store> openStore();
+ref<Store> openStore(const std::string & uri = getEnv("NIX_REMOTE"));
 
 
 /* Return the default substituter stores, defined by the
