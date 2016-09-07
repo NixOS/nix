@@ -12,6 +12,7 @@ use LWP::UserAgent;
 my $evalId = $ARGV[0] or die "Usage: $0 EVAL-ID\n";
 
 my $releasesDir = "/home/eelco/mnt/releases";
+my $nixpkgsDir = "/home/eelco/Dev/nixpkgs-pristine";
 
 # FIXME: cut&paste from nixos-channel-scripts.
 sub fetch {
@@ -83,6 +84,36 @@ my ($tarball, $tarballHash) = downloadFile("tarball", "4"); # .tar.xz
 my ($tarball_i686_linux, $tarball_i686_linux_hash) = downloadFile("binaryTarball.i686-linux", "1");
 my ($tarball_x86_64_linux, $tarball_x86_64_linux_hash) = downloadFile("binaryTarball.x86_64-linux", "1");
 my ($tarball_x86_64_darwin, $tarball_x86_64_darwin_hash) = downloadFile("binaryTarball.x86_64-darwin", "1");
+
+# Update Nixpkgs in a very hacky way.
+my $oldName = `nix-instantiate --eval $nixpkgsDir -A nix.name`; chomp $oldName;
+my $oldHash = `nix-instantiate --eval $nixpkgsDir -A nix.src.outputHash`; chomp $oldHash;
+print STDERR "old stable version in Nixpkgs = $oldName / $oldHash\n";
+
+my $fn = "$nixpkgsDir/pkgs/tools/package-management/nix/default.nix";
+my $oldFile = read_file($fn);
+$oldFile =~ s/$oldName/"$releaseName"/g;
+$oldFile =~ s/$oldHash/"$tarballHash"/g;
+write_file($fn, $oldFile);
+
+$oldName =~ s/nix-//g;
+$oldName =~ s/"//g;
+
+sub getStorePath {
+    my ($jobName) = @_;
+    my $buildInfo = decode_json(fetch("$evalUrl/job/$jobName", 'application/json'));
+    die unless $buildInfo->{buildproducts}->{1}->{type} eq "nix-build";
+    return $buildInfo->{buildproducts}->{1}->{path};
+}
+
+write_file("$nixpkgsDir/nixos/modules/installer/tools/nix-fallback-paths.nix",
+           "{\n" .
+           "  x86_64-linux = \"" . getStorePath("build.x86_64-linux") . "\";\n" .
+           "  i686-linux = \"" . getStorePath("build.i686-linux") . "\";\n" .
+           "  x86_64-darwin = \"" . getStorePath("build.x86_64-darwin") . "\";\n" .
+           "}\n");
+
+system("cd $nixpkgsDir && git commit -a -m 'nix: $oldName -> $version'") == 0 or die;
 
 # Extract the HTML manual.
 File::Path::make_path("$releaseDir/manual");
