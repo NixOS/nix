@@ -16,11 +16,11 @@ tarball=$TEST_ROOT/tarball.tar.xz
 
 nix-env -f file://$tarball -qa --out-path | grep -q dependencies
 
-nix-build file://$tarball
+nix-build -o $TEST_ROOT/result file://$tarball
 
-nix-build '<foo>' -I foo=file://$tarball
+nix-build -o $TEST_ROOT/result '<foo>' -I foo=file://$tarball
 
-nix-build -o $TMPDIR/result -E "import (fetchTarball file://$tarball)"
+nix-build -o $TEST_ROOT/result -E "import (fetchTarball file://$tarball)"
 
 nix-instantiate --eval -E '1 + 2' -I fnord=file://no-such-tarball.tar.xz
 nix-instantiate --eval -E 'with <fnord/xyzzy>; 1 + 2' -I fnord=file://no-such-tarball.tar.xz
