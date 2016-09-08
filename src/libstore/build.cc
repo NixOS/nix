@@ -3466,7 +3466,7 @@ void Worker::childTerminated(Goal * goal, bool wakeSleepers)
 {
     auto i = std::find_if(children.begin(), children.end(),
         [&](const Child & child) { return child.goal2 == goal; });
-    assert(i != children.end());
+    if (i == children.end()) return;
 
     if (i->inBuildSlot) {
         assert(nrLocalBuilds > 0);
