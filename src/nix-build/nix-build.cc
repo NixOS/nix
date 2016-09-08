@@ -410,7 +410,6 @@ int main(int argc, char ** argv)
                 auto rcfile = (Path) tmpDir + "/rc";
                 writeFile(rcfile, (format(
                         "rm -rf '%1%'; "
-                        "unset BASH_ENV; "
                         "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc; "
                         "%2%"
                         "dontAddDisableDepTrack=1; "
@@ -425,7 +424,6 @@ int main(int argc, char ** argv)
                         "unset TZ; %4%"
                         "%5%"
                         ) % (Path) tmpDir % (pure ? "" : "p=$PATH") % (pure ? "" : "PATH=$PATH:$p; unset p; ") % (getenv("TZ") ? (string("export TZ='") + getenv("TZ") + "'; ") : "") % envCommand).str());
-                setenv("BASH_ENV", rcfile.c_str(), 1);
                 if (interactive)
                     execlp(getEnv("NIX_BUILD_SHELL", "bash").c_str(), "bash", "--rcfile", rcfile.c_str(), NULL);
                 else
