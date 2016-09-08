@@ -1874,8 +1874,12 @@ void DerivationGoal::startBuilder()
         /* Add the closure of store paths to the chroot. */
         PathSet closure;
         for (auto & i : dirsInChroot)
-            if (worker.store.isInStore(i.second))
-                worker.store.computeFSClosure(worker.store.toStorePath(i.second), closure);
+            try {
+                if (worker.store.isInStore(i.second))
+                    worker.store.computeFSClosure(worker.store.toStorePath(i.second), closure);
+            } catch (Error & e) {
+                throw Error(format("while processing ‘build-sandbox-paths’: %s") % e.what());
+            }
         for (auto & i : closure)
             dirsInChroot[i] = i;
 
