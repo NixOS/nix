@@ -804,6 +804,9 @@ private:
        result. */
     ValidPathInfos prevInfos;
 
+    const uid_t sandboxUid = 1000;
+    const gid_t sandboxGid = 100;
+
 public:
     DerivationGoal(const Path & drvPath, const StringSet & wantedOutputs,
         Worker & worker, BuildMode buildMode = bmNormal);
@@ -1941,14 +1944,18 @@ void DerivationGoal::startBuilder()
         createDirs(chrootRootDir + "/etc");
 
         writeFile(chrootRootDir + "/etc/passwd",
-            "root:x:0:0:Nix build user:/:/noshell\n"
-            "nobody:x:65534:65534:Nobody:/:/noshell\n");
+            (format(
+                "root:x:0:0:Nix build user:/:/noshell\n"
+                "nixbld:x:%1%:%2%:Nix build user:/:/noshell\n"
+                "nobody:x:65534:65534:Nobody:/:/noshell\n") % sandboxUid % sandboxGid).str());
 
         /* Declare the build user's group so that programs get a consistent
            view of the system (e.g., "id -gn"). */
         writeFile(chrootRootDir + "/etc/group",
-            "root:x:0:\n"
-            "nobody:x:65534:\n");
+            (format(
+                "root:x:0:\n"
+                "nixbld:!:%1%:\n"
+                "nogroup:x:65534:\n") % sandboxGid).str());
 
         /* Create /etc/hosts with localhost entry. */
         if (!fixedOutput)
@@ -2130,7 +2137,12 @@ void DerivationGoal::startBuilder()
         Pid helper = startProcess([&]() {
 
             /* Drop additional groups here because we can't do it
-               after we've created the new user namespace. */
+               after we've created the new user namespace.  FIXME:
+               this means that if we're not root in the parent
+               namespace, we can't drop additional groups; they will
+               be mapped to nogroup in the child namespace. There does
+               not seem to be a workaround for this. (But who can tell
+               from reading user_namespaces(7)?)*/
             if (getuid() == 0 && setgroups(0, 0) == -1)
                 throw SysError("setgroups failed");
 
@@ -2163,19 +2175,19 @@ void DerivationGoal::startBuilder()
         if (!string2Int<pid_t>(readLine(builderOut.readSide.get()), tmp)) abort();
         pid = tmp;
 
-        /* Set the UID/GID mapping of the builder's user
-           namespace such that root maps to the build user, or to the
-           calling user (if build users are disabled). */
-        uid_t targetUid = buildUser.enabled() ? buildUser.getUID() : getuid();
-        uid_t targetGid = buildUser.enabled() ? buildUser.getGID() : getgid();
+        /* Set the UID/GID mapping of the builder's user namespace
+           such that the sandbox user maps to the build user, or to
+           the calling user (if build users are disabled). */
+        uid_t hostUid = buildUser.enabled() ? buildUser.getUID() : getuid();
+        uid_t hostGid = buildUser.enabled() ? buildUser.getGID() : getgid();
 
         writeFile("/proc/" + std::to_string(pid) + "/uid_map",
-            (format("0 %d 1") % targetUid).str());
+            (format("%d %d 1") % sandboxUid % hostUid).str());
 
         writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
 
         writeFile("/proc/" + std::to_string(pid) + "/gid_map",
-            (format("0 %d 1") % targetGid).str());
+            (format("%d %d 1") % sandboxGid % hostGid).str());
 
         /* Signal the builder that we've updated its user
            namespace. */
@@ -2341,6 +2353,7 @@ void DerivationGoal::runChild()
                requires the kernel to be compiled with
                CONFIG_DEVPTS_MULTIPLE_INSTANCES=y (which is the case
                if /dev/ptx/ptmx exists). */
+#if 0
             if (pathExists("/dev/pts/ptmx") &&
                 !pathExists(chrootRootDir + "/dev/ptmx")
                 && dirsInChroot.find("/dev/pts") == dirsInChroot.end())
@@ -2353,6 +2366,7 @@ void DerivationGoal::runChild()
                    Linux versions, it is created with permissions 0.  */
                 chmod_(chrootRootDir + "/dev/pts/ptmx", 0666);
             }
+#endif
 
             /* Do the chroot(). */
             if (chdir(chrootRootDir.c_str()) == -1)
@@ -2373,11 +2387,12 @@ void DerivationGoal::runChild()
             if (rmdir("real-root") == -1)
                 throw SysError("cannot remove real-root directory");
 
-            /* Become root in the user namespace, which corresponds to
-               the build user or calling user in the parent namespace. */
-            if (setgid(0) == -1)
+            /* Switch to the sandbox uid/gid in the user namespace,
+               which corresponds to the build user or calling user in
+               the parent namespace. */
+            if (setgid(sandboxGid) == -1)
                 throw SysError("setgid failed");
-            if (setuid(0) == -1)
+            if (setuid(sandboxUid) == -1)
                 throw SysError("setuid failed");
 
             setUser = false;
