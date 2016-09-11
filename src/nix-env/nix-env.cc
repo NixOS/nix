@@ -1316,6 +1316,7 @@ int main(int argc, char * * argv)
         initGC();
 
         Strings opFlags, opArgs, searchPath;
+        int opFlagsToDoubleCheck = 0;
         std::map<string, string> autoArgs_;
         Operation op = 0;
         bool repair = false;
@@ -1355,8 +1356,10 @@ int main(int argc, char * * argv)
                 op = opSetFlag;
             else if (*arg == "--set")
                 op = opSet;
-            else if (*arg == "--query" || *arg == "-q")
+            else if (*arg == "--query" || *arg == "-q") {
                 op = opQuery;
+                opFlagsToDoubleCheck = opFlags.size();
+            }
             else if (*arg == "--profile" || *arg == "-p")
                 globals.profile = absPath(getArg(*arg, arg, end));
             else if (*arg == "--file" || *arg == "-f")
@@ -1398,6 +1401,20 @@ int main(int argc, char * * argv)
         });
 
         if (!op) throw UsageError("no operation specified");
+
+        for(Strings::iterator arg=opFlags.begin();opFlagsToDoubleCheck>0;) {
+            if(*arg == "--from-profile") {
+                opFlagsToDoubleCheck--;
+                arg++;
+            }
+            else if(*arg == "-A")
+                throw UsageError("‘-A’ can only be specified after ‘-q’");
+            else if(*arg == "--attr")
+                throw UsageError("‘--attr’ can only be specified after ‘-q’");
+
+            opFlagsToDoubleCheck--;
+            arg++;
+        }
 
         auto store = openStore();
 
