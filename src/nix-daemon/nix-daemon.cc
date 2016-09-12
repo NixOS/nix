@@ -961,7 +961,7 @@ int main(int argc, char * * argv)
 
                 auto socketDir = dirOf(socketPath);
                 if (chdir(socketDir.c_str()) == -1)
-                    throw SysError(format("changing to socket directory %1%") % socketDir);
+                    throw SysError(format("changing to socket directory ‘%1%’") % socketDir);
 
                 auto socketName = baseNameOf(socketPath);
                 auto addr = sockaddr_un{};
