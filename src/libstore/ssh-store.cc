@@ -37,6 +37,8 @@ private:
     Pid sshMaster;
 
     string uri;
+
+    Path key;
 };
 
 SSHStore::SSHStore(string uri, const Params & params, size_t maxConnections)
@@ -44,15 +46,8 @@ SSHStore::SSHStore(string uri, const Params & params, size_t maxConnections)
     , RemoteStore(params, maxConnections)
     , tmpDir(createTempDir("", "nix", true, true, 0700))
     , socketPath((Path) tmpDir + "/ssh.sock")
-    , sshMaster(startProcess([&]() {
-                auto key = get(params, "ssh-key", "");
-                if (key.empty())
-                    execlp("ssh", "ssh", "-N", "-M", "-S", socketPath.c_str(), uri.c_str(), NULL);
-                else
-                    execlp("ssh", "ssh", "-N", "-M", "-S", socketPath.c_str(), "-i", key.c_str(), uri.c_str(), NULL);
-                throw SysError("starting ssh master");
-      }))
     , uri(std::move(uri))
+    , key(get(params, "ssh-key", ""))
 {
 }
 
@@ -92,6 +87,16 @@ ref<FSAccessor> SSHStore::getFSAccessor()
 
 ref<RemoteStore::Connection> SSHStore::openConnection()
 {
+    if ((pid_t) sshMaster == -1) {
+        sshMaster = startProcess([&]() {
+            if (key.empty())
+                execlp("ssh", "ssh", "-N", "-M", "-S", socketPath.c_str(), uri.c_str(), NULL);
+            else
+                execlp("ssh", "ssh", "-N", "-M", "-S", socketPath.c_str(), "-i", key.c_str(), uri.c_str(), NULL);
+            throw SysError("starting ssh master");
+        });
+    }
+
     auto conn = make_ref<Connection>();
     Pipe in, out;
     in.create();
