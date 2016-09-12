@@ -24,7 +24,7 @@ std::vector<string> shellwords(const string & s)
     std::regex whitespace("^(\\s+).*");
     auto begin = s.cbegin();
     std::vector<string> res;
-    std::stringstream cur;
+    std::string cur;
     enum state {
         sBegin,
         sQuote
@@ -35,31 +35,28 @@ std::vector<string> shellwords(const string & s)
         if (st == sBegin) {
             std::smatch match;
             if (regex_search(it, s.cend(), match, whitespace)) {
-                cur << string(begin, it);
-                res.push_back(cur.str());
-                cur = stringstream{};
+                cur.append(begin, it);
+                res.push_back(cur);
+                cur.clear();
                 it = match[1].second;
                 begin = it;
             }
         }
         switch (*it) {
             case '"':
-                cur << string(begin, it);
+                cur.append(begin, it);
                 begin = it + 1;
                 st = st == sBegin ? sQuote : sBegin;
                 break;
             case '\\':
                 /* perl shellwords mostly just treats the next char as part of the string with no special processing */
-                cur << string(begin, it);
+                cur.append(begin, it);
                 begin = ++it;
                 break;
         }
     }
-    cur << string(begin, it);
-    auto last = cur.str();
-    if (!last.empty()) {
-        res.push_back(std::move(last));
-    }
+    cur.append(begin, it);
+    if (!cur.empty()) res.push_back(cur);
     return res;
 }
 
