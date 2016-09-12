@@ -10,7 +10,7 @@ esac
 set -m # enable job control, needed for kill
 
 profiles="$NIX_STATE_DIR"/profiles
-rm -f $profiles/*
+rm -rf $profiles
 
 nix-env -p $profiles/test -f ./gc-runtime.nix -i gc-runtime
 
