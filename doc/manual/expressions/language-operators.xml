@@ -32,7 +32,9 @@ weakest binding).</para>
         <replaceable>e</replaceable>.  (An attribute path is a
         dot-separated list of attribute names.)  If the attribute
         doesn’t exist, return <replaceable>def</replaceable> if
-        provided, otherwise abort evaluation.</entry>
+        provided, otherwise abort evaluation. A function equivalent to this
+        operator, <literal>getAttrFromPath</literal>, is available in the
+        <literal>nixpkgs</literal> library.</entry>
       </row>
       <row>
         <entry><replaceable>e1</replaceable> <replaceable>e2</replaceable></entry>
@@ -47,7 +49,9 @@ weakest binding).</para>
         <entry>Test whether set <replaceable>e</replaceable> contains
         the attribute denoted by <replaceable>attrpath</replaceable>;
         return <literal>true</literal> or
-        <literal>false</literal>.</entry>
+        <literal>false</literal>. A function equivalent to this operator,
+        <literal>hasAttrByPath</literal>, is available in the
+        <literal>nixpkgs</literal> library.</entry>
       </row>
       <row>
         <entry><replaceable>e1</replaceable> <literal>++</literal> <replaceable>e2</replaceable></entry>
