@@ -21,10 +21,10 @@ extern char ** environ;
  */
 std::vector<string> shellwords(const string & s)
 {
-    auto whitespace = std::regex("^(\\s+).*");
+    std::regex whitespace("^(\\s+).*");
     auto begin = s.cbegin();
-    auto res = std::vector<string>{};
-    auto cur = stringstream{};
+    std::vector<string> res;
+    std::stringstream cur;
     enum state {
         sBegin,
         sQuote
@@ -33,7 +33,7 @@ std::vector<string> shellwords(const string & s)
     auto it = begin;
     for (; it != s.cend(); ++it) {
         if (st == sBegin) {
-            auto match = std::smatch{};
+            std::smatch match;
             if (regex_search(it, s.cend(), match, whitespace)) {
                 cur << string(begin, it);
                 res.push_back(cur.str());
@@ -76,26 +76,26 @@ int main(int argc, char ** argv)
         auto packages = false;
         auto interactive = true;
 
-        auto instArgs = Strings{};
-        auto buildArgs = Strings{};
-        auto exprs = Strings{};
+        Strings instArgs;
+        Strings buildArgs;
+        Strings exprs;
 
         auto shell = getEnv("SHELL", "/bin/sh");
-        auto envCommand = string{}; // interactive shell
-        auto envExclude = Strings{};
+        std::string envCommand; // interactive shell
+        Strings envExclude;
 
         auto myName = runEnv ? "nix-shell" : "nix-build";
 
         auto inShebang = false;
-        auto script = string{};
-        auto savedArgs = std::vector<string>{};
+        std::string script;
+        std::vector<string> savedArgs;
 
-        auto tmpDir = AutoDelete{createTempDir("", myName)};
+        AutoDelete tmpDir(createTempDir("", myName));
 
-        auto outLink = string("./result");
+        std::string outLink = "./result";
         auto drvLink = (Path) tmpDir + "/derivation";
 
-        auto args = std::vector<string>{};
+        std::vector<string> args;
         for (int i = 1; i < argc; ++i)
             args.push_back(argv[i]);
         // Heuristic to see if we're invoked as a shebang script, namely, if we
@@ -110,7 +110,7 @@ int main(int argc, char ** argv)
                     inShebang = true;
                     for (int i = 2; i < argc - 1; ++i)
                         savedArgs.push_back(argv[i]);
-                    args = std::vector<string>{};
+                    std::vector<string> args;
                     for (auto line : lines) {
                         line = chomp(line);
                         std::smatch match;
@@ -284,7 +284,7 @@ int main(int argc, char ** argv)
                         execArgs = "-a PERL";
                 }
 
-                auto joined = stringstream{};
+                std::ostringstream joined;
                 for (const auto & i : savedArgs)
                     joined << shellEscape(i) << ' ';
 
@@ -320,7 +320,7 @@ int main(int argc, char ** argv)
 
         if (packages) {
             instArgs.push_back("--expr");
-            auto joined = stringstream{};
+            std::ostringstream joined;
             joined << "with import <nixpkgs> { }; runCommand \"shell\" { buildInputs = [ ";
             for (const auto & i : exprs)
                 joined << '(' << i << ") ";
@@ -338,14 +338,14 @@ int main(int argc, char ** argv)
 
         for (auto & expr : exprs) {
             // Instantiate.
-            auto drvPaths = std::vector<string>{};
+            std::vector<string> drvPaths;
             if (!std::regex_match(expr, std::regex("^/.*\\.drv$"))) {
                 // If we're in a #! script, interpret filenames relative to the
                 // script.
                 if (inShebang && !packages)
                     expr = absPath(expr, dirOf(script));
 
-                auto instantiateArgs = Strings{"--add-root", drvLink, "--indirect"};
+                Strings instantiateArgs{"--add-root", drvLink, "--indirect"};
                 for (const auto & arg : instArgs)
                     instantiateArgs.push_back(arg);
                 instantiateArgs.push_back(expr);
@@ -365,7 +365,7 @@ int main(int argc, char ** argv)
                 auto drv = store->derivationFromPath(drvPath);
 
                 // Build or fetch all dependencies of the derivation.
-                auto nixStoreArgs = Strings{"-r", "--no-output", "--no-gc-warning"};
+                Strings nixStoreArgs{"-r", "--no-output", "--no-gc-warning"};
                 for (const auto & arg : buildArgs)
                     nixStoreArgs.push_back(arg);
                 for (const auto & input : drv.inputDrvs)
@@ -378,14 +378,14 @@ int main(int argc, char ** argv)
                 // Set the environment.
                 auto tmp = getEnv("TMPDIR", getEnv("XDG_RUNTIME_DIR", "/tmp"));
                 if (pure) {
-                    auto skippedEnv = std::vector<string>{"HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL", "TZ", "PAGER", "NIX_BUILD_SHELL"};
-                    auto removed = std::vector<string>{};
+                    std::vector<string> skippedEnv{"HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL", "TZ", "PAGER", "NIX_BUILD_SHELL"};
+                    std::vector<string> removed;
                     for (auto i = size_t{0}; environ[i]; ++i) {
                         auto eq = strchr(environ[i], '=');
                         if (!eq)
                             // invalid env, just keep going
                             continue;
-                        auto name = string(environ[i], eq);
+                        std::string name(environ[i], eq);
                         if (find(skippedEnv.begin(), skippedEnv.end(), name) == skippedEnv.end())
                             removed.emplace_back(std::move(name));
                     }
@@ -435,11 +435,11 @@ int main(int argc, char ** argv)
             // ./result, ./result-dev, and so on, rather than ./result,
             // ./result-2-dev, and so on.  This combines multiple derivation
             // paths into one "/nix/store/drv-path!out1,out2,..." argument.
-            auto prevDrvPath = string{};
-            auto drvPaths2 = Strings{};
+            std::string prevDrvPath;
+            Strings drvPaths2;
             for (const auto & drvPath : drvPaths) {
                 auto p = drvPath;
-                auto output = string{"out"};
+                std::string output = "out";
                 std::smatch match;
                 if (std::regex_match(drvPath, match, std::regex("(.*)!(.*)"))) {
                     p = match[1].str();
@@ -458,25 +458,22 @@ int main(int argc, char ** argv)
                 }
             }
             // Build.
-            auto outPaths = Strings{};
-            auto nixStoreArgs = Strings{"--add-root", outLink, "--indirect", "-r"};
+            Strings outPaths;
+            Strings nixStoreArgs{"--add-root", outLink, "--indirect", "-r"};
             for (const auto & arg : buildArgs)
                 nixStoreArgs.push_back(arg);
             for (const auto & path : drvPaths2)
                 nixStoreArgs.push_back(path);
             auto nixStoreRes = runProgram(settings.nixBinDir + "/nix-store", false, nixStoreArgs);
-            for (const auto & outpath : tokenizeString<std::vector<string>>(nixStoreRes)) {
+            for (const auto & outpath : tokenizeString<std::vector<string>>(nixStoreRes))
                 outPaths.push_back(chomp(outpath));
-            }
 
             if (dryRun)
                 continue;
-            for (const auto & outPath : outPaths) {
-                auto target = readLink(outPath);
-                std::cout << target << '\n';
-            }
+
+            for (const auto & outPath : outPaths)
+                std::cout << readLink(outPath) << '\n';
         }
-        return;
     });
 }
 
