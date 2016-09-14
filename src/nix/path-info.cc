@@ -46,7 +46,15 @@ struct CmdPathInfo : StorePathsCommand
             },
             Example{
                 "To print the 10 most recently added paths (using --json and the jq(1) command):",
-                "nix path-info --all --json | jq -r 'sort_by(.registrationTime)[-11:-1][].path'"
+                "nix path-info --json --all | jq -r 'sort_by(.registrationTime)[-11:-1][].path'"
+            },
+            Example{
+                "To show the size of the entire Nix store:",
+                "nix path-info --json --all | jq 'map(.narSize) | add'"
+            },
+            Example{
+                "To show every path whose closure is bigger than 1 GB, sorted by closure size:",
+                "nix path-info --json --all -S | jq 'map(select(.closureSize > 1e9)) | sort_by(.closureSize) | map([.path, .closureSize])'"
             },
         };
     }
