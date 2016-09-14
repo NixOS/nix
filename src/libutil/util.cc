@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <sstream>
 #include <cstring>
+#include <cctype>
 
 #include <sys/wait.h>
 #include <unistd.h>
@@ -1084,6 +1085,15 @@ bool hasPrefix(const string & s, const string & suffix)
 bool hasSuffix(const string & s, const string & suffix)
 {
     return s.size() >= suffix.size() && string(s, s.size() - suffix.size()) == suffix;
+}
+
+
+std::string toLower(const std::string & s)
+{
+    std::string r(s);
+    for (auto & c : r)
+        c = std::tolower(c);
+    return r;
 }
 
 

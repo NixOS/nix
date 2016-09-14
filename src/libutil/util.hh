@@ -334,6 +334,10 @@ bool hasPrefix(const string & s, const string & prefix);
 bool hasSuffix(const string & s, const string & suffix);
 
 
+/* Convert a string to lower case. */
+std::string toLower(const std::string & s);
+
+
 /* Escape a string that contains octal-encoded escape codes such as
    used in /etc/fstab and /proc/mounts (e.g. "foo\040bar" decodes to
    "foo bar"). */
