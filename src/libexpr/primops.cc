@@ -1769,7 +1769,7 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     if (state.restricted && !expectedHash)
         throw Error(format("‘%1%’ is not allowed in restricted mode") % who);
 
-    Path res = makeDownloader()->downloadCached(state.store, url, unpack, name, expectedHash);
+    Path res = getDownloader()->downloadCached(state.store, url, unpack, name, expectedHash);
     mkString(v, res, PathSet({res}));
 }
 

@@ -55,7 +55,7 @@ bool parseSearchPathArg(Strings::iterator & i,
 Path lookupFileArg(EvalState & state, string s)
 {
     if (isUri(s))
-        return makeDownloader()->downloadCached(state.store, s, true);
+        return getDownloader()->downloadCached(state.store, s, true);
     else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
         Path p = s.substr(1, s.size() - 2);
         return state.findFile(p);

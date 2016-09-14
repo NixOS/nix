@@ -662,7 +662,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
                 // FIXME: support specifying revision/branch
                 res = { true, exportGit(store, elem.second, "master") };
             else
-                res = { true, makeDownloader()->downloadCached(store, elem.second, true) };
+                res = { true, getDownloader()->downloadCached(store, elem.second, true) };
         } catch (DownloadError & e) {
             printMsg(lvlError, format("warning: Nix search path entry ‘%1%’ cannot be downloaded, ignoring") % elem.second);
             res = { false, "" };

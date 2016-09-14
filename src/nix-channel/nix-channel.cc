@@ -85,7 +85,7 @@ static void update(const StringSet & channelNames)
         // got redirected in the process, so that we can grab the various parts of a nix channel
         // definition from a consistent location if the redirect changes mid-download.
         auto effectiveUrl = string{};
-        auto dl = makeDownloader();
+        auto dl = getDownloader();
         auto filename = dl->downloadCached(store, url, false, "", Hash(), &effectiveUrl);
         url = chomp(std::move(effectiveUrl));
 
@@ -114,10 +114,10 @@ static void update(const StringSet & channelNames)
         if (!unpacked) {
             // The URL doesn't unpack directly, so let's try treating it like a full channel folder with files in it
             // Check if the channel advertises a binary cache.
-            DownloadOptions opts;
-            opts.showProgress = DownloadOptions::no;
+            DownloadRequest request(url + "/binary-cache-url");
+            request.showProgress = DownloadRequest::no;
             try {
-                auto dlRes = dl->download(url + "/binary-cache-url", opts);
+                auto dlRes = dl->download(request);
                 extraAttrs = "binaryCacheURL = \"" + *dlRes.data + "\";";
             } catch (DownloadError & e) {
             }

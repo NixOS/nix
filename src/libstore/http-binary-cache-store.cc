@@ -13,17 +13,12 @@ private:
 
     Path cacheUri;
 
-    Pool<Downloader> downloaders;
-
 public:
 
     HttpBinaryCacheStore(
         const Params & params, const Path & _cacheUri)
         : BinaryCacheStore(params)
         , cacheUri(_cacheUri)
-        , downloaders(
-            std::numeric_limits<size_t>::max(),
-            []() { return makeDownloader(); })
     {
         if (cacheUri.back() == '/')
             cacheUri.pop_back();
@@ -54,12 +49,11 @@ protected:
     bool fileExists(const std::string & path) override
     {
         try {
-            auto downloader(downloaders.get());
-            DownloadOptions options;
-            options.showProgress = DownloadOptions::no;
-            options.head = true;
-            options.tries = 5;
-            downloader->download(cacheUri + "/" + path, options);
+            DownloadRequest request(cacheUri + "/" + path);
+            request.showProgress = DownloadRequest::no;
+            request.head = true;
+            request.tries = 5;
+            getDownloader()->download(request);
             return true;
         } catch (DownloadError & e) {
             /* S3 buckets return 403 if a file doesn't exist and the
@@ -77,13 +71,11 @@ protected:
 
     std::shared_ptr<std::string> getFile(const std::string & path) override
     {
-        auto downloader(downloaders.get());
-        DownloadOptions options;
-        options.showProgress = DownloadOptions::no;
-        options.tries = 5;
-        options.baseRetryTimeMs = 1000;
+        DownloadRequest request(cacheUri + "/" + path);
+        request.showProgress = DownloadRequest::no;
+        request.tries = 8;
         try {
-            return downloader->download(cacheUri + "/" + path, options).data;
+            return getDownloader()->download(request).data;
         } catch (DownloadError & e) {
             if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
                 return 0;

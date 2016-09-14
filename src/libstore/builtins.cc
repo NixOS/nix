@@ -17,13 +17,15 @@ void builtinFetchurl(const BasicDerivation & drv)
     auto fetch = [&](const string & url) {
         /* No need to do TLS verification, because we check the hash of
            the result anyway. */
-        DownloadOptions options;
-        options.verifyTLS = false;
+        DownloadRequest request(url);
+        request.verifyTLS = false;
 
         /* Show a progress indicator, even though stderr is not a tty. */
-        options.showProgress = DownloadOptions::yes;
+        request.showProgress = DownloadRequest::yes;
 
-        auto data = makeDownloader()->download(url, options);
+        /* Note: have to use a fresh downloader here because we're in
+           a forked process. */
+        auto data = makeDownloader()->download(request);
         assert(data.data);
 
         return data.data;
