@@ -40,6 +40,8 @@ struct CurlDownloader : public Downloader
     std::random_device rd;
     std::mt19937 mt19937;
 
+    bool enableHttp2;
+
     struct DownloadItem : public std::enable_shared_from_this<DownloadItem>
     {
         CurlDownloader & downloader;
@@ -185,7 +187,8 @@ struct CurlDownloader : public Downloader
             curl_easy_setopt(req, CURLOPT_NOSIGNAL, 1);
             curl_easy_setopt(req, CURLOPT_USERAGENT, ("Nix/" + nixVersion).c_str());
             curl_easy_setopt(req, CURLOPT_PIPEWAIT, 1);
-            curl_easy_setopt(req, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
+            if (downloader.enableHttp2)
+                curl_easy_setopt(req, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
             curl_easy_setopt(req, CURLOPT_WRITEFUNCTION, DownloadItem::writeCallbackWrapper);
             curl_easy_setopt(req, CURLOPT_WRITEDATA, this);
             curl_easy_setopt(req, CURLOPT_HEADERFUNCTION, DownloadItem::headerCallbackWrapper);
@@ -291,7 +294,10 @@ struct CurlDownloader : public Downloader
         curlm = curl_multi_init();
 
         curl_multi_setopt(curlm, CURLMOPT_PIPELINING, CURLPIPE_MULTIPLEX);
-        curl_multi_setopt(curlm, CURLMOPT_MAX_TOTAL_CONNECTIONS, 25); // FIXME: configurable
+        curl_multi_setopt(curlm, CURLMOPT_MAX_TOTAL_CONNECTIONS,
+            settings.get("binary-caches-parallel-connections", 25));
+
+        enableHttp2 = settings.get("enable-http2", true);
 
         wakeupPipe.create();
         fcntl(wakeupPipe.readSide.get(), F_SETFL, O_NONBLOCK);

@@ -408,10 +408,9 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
 
   <varlistentry><term><literal>binary-caches-parallel-connections</literal></term>
 
-    <listitem><para>The maximum number of parallel HTTP connections
-    used by the binary cache substituter to get NAR info files.  This
-    number should be high to minimise latency.  It defaults to
-    25.</para></listitem>
+    <listitem><para>The maximum number of parallel TCP connections
+    used to fetch files from binary caches and by other downloads. It
+    defaults to 25. 0 means no limit.</para></listitem>
 
   </varlistentry>
 
