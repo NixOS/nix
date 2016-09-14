@@ -87,12 +87,58 @@ Path writeDerivation(ref<Store> store,
 }
 
 
+MakeError(FormatError, Error)
+
+
+/* Read string `s' from stream `str'. */
+static void expect(std::istream & str, const string & s)
+{
+    char s2[s.size()];
+    str.read(s2, s.size());
+    if (string(s2, s.size()) != s)
+        throw FormatError(format("expected string ‘%1%’") % s);
+}
+
+
+/* Read a C-style string from stream `str'. */
+static string parseString(std::istream & str)
+{
+    string res;
+    expect(str, "\"");
+    int c;
+    while ((c = str.get()) != '"')
+        if (c == '\\') {
+            c = str.get();
+            if (c == 'n') res += '\n';
+            else if (c == 'r') res += '\r';
+            else if (c == 't') res += '\t';
+            else res += c;
+        }
+        else res += c;
+    return res;
+}
+
+
 static Path parsePath(std::istream & str)
 {
     string s = parseString(str);
     if (s.size() == 0 || s[0] != '/')
         throw FormatError(format("bad path ‘%1%’ in derivation") % s);
     return s;
+}
+
+
+static bool endOfList(std::istream & str)
+{
+    if (str.peek() == ',') {
+        str.get();
+        return false;
+    }
+    if (str.peek() == ']') {
+        str.get();
+        return true;
+    }
+    return false;
 }
 
 

@@ -334,20 +334,6 @@ bool hasPrefix(const string & s, const string & prefix);
 bool hasSuffix(const string & s, const string & suffix);
 
 
-/* Read string `s' from stream `str'. */
-void expect(std::istream & str, const string & s);
-
-MakeError(FormatError, Error)
-
-
-/* Read a C-style string from stream `str'. */
-string parseString(std::istream & str);
-
-
-/* Utility function used to parse legacy ATerms. */
-bool endOfList(std::istream & str);
-
-
 /* Escape a string that contains octal-encoded escape codes such as
    used in /etc/fstab and /proc/mounts (e.g. "foo\040bar" decodes to
    "foo bar"). */
