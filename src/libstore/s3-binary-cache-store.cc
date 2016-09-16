@@ -167,46 +167,50 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         stats.putTimeMs += duration;
     }
 
-    std::shared_ptr<std::string> getFile(const std::string & path) override
+    void getFile(const std::string & path,
+        std::function<void(std::shared_ptr<std::string>)> success,
+        std::function<void(std::exception_ptr exc)> failure) override
     {
-        debug(format("fetching ‘s3://%1%/%2%’...") % bucketName % path);
+        sync2async<std::shared_ptr<std::string>>(success, failure, [&]() {
+            debug(format("fetching ‘s3://%1%/%2%’...") % bucketName % path);
 
-        auto request =
-            Aws::S3::Model::GetObjectRequest()
-            .WithBucket(bucketName)
-            .WithKey(path);
+            auto request =
+                Aws::S3::Model::GetObjectRequest()
+                .WithBucket(bucketName)
+                .WithKey(path);
 
-        request.SetResponseStreamFactory([&]() {
-            return Aws::New<std::stringstream>("STRINGSTREAM");
+            request.SetResponseStreamFactory([&]() {
+                return Aws::New<std::stringstream>("STRINGSTREAM");
+            });
+
+            stats.get++;
+
+            try {
+
+                auto now1 = std::chrono::steady_clock::now();
+
+                auto result = checkAws(format("AWS error fetching ‘%s’") % path,
+                    client->GetObject(request));
+
+                auto now2 = std::chrono::steady_clock::now();
+
+                auto res = dynamic_cast<std::stringstream &>(result.GetBody()).str();
+
+                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
+
+                printMsg(lvlTalkative, format("downloaded ‘s3://%1%/%2%’ (%3% bytes) in %4% ms")
+                    % bucketName % path % res.size() % duration);
+
+                stats.getBytes += res.size();
+                stats.getTimeMs += duration;
+
+                return std::make_shared<std::string>(res);
+
+            } catch (S3Error & e) {
+                if (e.err == Aws::S3::S3Errors::NO_SUCH_KEY) return std::shared_ptr<std::string>();
+                throw;
+            }
         });
-
-        stats.get++;
-
-        try {
-
-            auto now1 = std::chrono::steady_clock::now();
-
-            auto result = checkAws(format("AWS error fetching ‘%s’") % path,
-                client->GetObject(request));
-
-            auto now2 = std::chrono::steady_clock::now();
-
-            auto res = dynamic_cast<std::stringstream &>(result.GetBody()).str();
-
-            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
-
-            printMsg(lvlTalkative, format("downloaded ‘s3://%1%/%2%’ (%3% bytes) in %4% ms")
-                % bucketName % path % res.size() % duration);
-
-            stats.getBytes += res.size();
-            stats.getTimeMs += duration;
-
-            return std::make_shared<std::string>(res);
-
-        } catch (S3Error & e) {
-            if (e.err == Aws::S3::S3Errors::NO_SUCH_KEY) return 0;
-            throw;
-        }
     }
 
     PathSet queryAllValidPaths() override

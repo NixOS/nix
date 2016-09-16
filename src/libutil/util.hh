@@ -376,4 +376,43 @@ string get(const T & map, const string & key, const string & def = "")
 }
 
 
+/* Call ‘failure’ with the current exception as argument. If ‘failure’
+   throws an exception, abort the program. */
+void callFailure(const std::function<void(std::exception_ptr exc)> & failure);
+
+
+/* Evaluate the function ‘f’. If it returns a value, call ‘success’
+   with that value as its argument. If it or ‘success’ throws an
+   exception, call ‘failure’. If ‘failure’ throws an exception, abort
+   the program. */
+template<class T>
+void sync2async(
+    const std::function<void(T)> & success,
+    const std::function<void(std::exception_ptr exc)> & failure,
+    const std::function<T()> & f)
+{
+    try {
+        success(f());
+    } catch (...) {
+        callFailure(failure);
+    }
+}
+
+
+/* Call the function ‘success’. If it throws an exception, call
+   ‘failure’. If that throws an exception, abort the program. */
+template<class T>
+void callSuccess(
+    const std::function<void(T)> & success,
+    const std::function<void(std::exception_ptr exc)> & failure,
+    T && arg)
+{
+    try {
+        success(arg);
+    } catch (...) {
+        callFailure(failure);
+    }
+}
+
+
 }

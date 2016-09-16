@@ -4,6 +4,8 @@
 #include "util.hh"
 #include "nar-info-disk-cache.hh"
 
+#include <future>
+
 
 namespace nix {
 
@@ -283,51 +285,79 @@ bool Store::isValidPath(const Path & storePath)
 
 ref<const ValidPathInfo> Store::queryPathInfo(const Path & storePath)
 {
+    std::promise<ref<ValidPathInfo>> promise;
+
+    queryPathInfo(storePath,
+        [&](ref<ValidPathInfo> info) {
+            promise.set_value(info);
+        },
+        [&](std::exception_ptr exc) {
+            promise.set_exception(exc);
+        });
+
+    return promise.get_future().get();
+}
+
+
+void Store::queryPathInfo(const Path & storePath,
+    std::function<void(ref<ValidPathInfo>)> success,
+    std::function<void(std::exception_ptr exc)> failure)
+{
     auto hashPart = storePathToHash(storePath);
 
-    {
-        auto state_(state.lock());
-        auto res = state_->pathInfoCache.get(hashPart);
-        if (res) {
-            stats.narInfoReadAverted++;
-            if (!*res)
-                throw InvalidPath(format("path ‘%s’ is not valid") % storePath);
-            return ref<ValidPathInfo>(*res);
+    try {
+
+        {
+            auto res = state.lock()->pathInfoCache.get(hashPart);
+            if (res) {
+                stats.narInfoReadAverted++;
+                if (!*res)
+                    throw InvalidPath(format("path ‘%s’ is not valid") % storePath);
+                return success(ref<ValidPathInfo>(*res));
+            }
         }
-    }
 
-    if (diskCache) {
-        auto res = diskCache->lookupNarInfo(getUri(), hashPart);
-        if (res.first != NarInfoDiskCache::oUnknown) {
-            stats.narInfoReadAverted++;
-            auto state_(state.lock());
-            state_->pathInfoCache.upsert(hashPart,
-                res.first == NarInfoDiskCache::oInvalid ? 0 : res.second);
-            if (res.first == NarInfoDiskCache::oInvalid ||
-                (res.second->path != storePath && storePathToName(storePath) != ""))
-                throw InvalidPath(format("path ‘%s’ is not valid") % storePath);
-            return ref<ValidPathInfo>(res.second);
+        if (diskCache) {
+            auto res = diskCache->lookupNarInfo(getUri(), hashPart);
+            if (res.first != NarInfoDiskCache::oUnknown) {
+                stats.narInfoReadAverted++;
+                {
+                    auto state_(state.lock());
+                    state_->pathInfoCache.upsert(hashPart,
+                        res.first == NarInfoDiskCache::oInvalid ? 0 : res.second);
+                    if (res.first == NarInfoDiskCache::oInvalid ||
+                        (res.second->path != storePath && storePathToName(storePath) != ""))
+                        throw InvalidPath(format("path ‘%s’ is not valid") % storePath);
+                }
+                return success(ref<ValidPathInfo>(res.second));
+            }
         }
+
+    } catch (std::exception & e) {
+        return callFailure(failure);
     }
 
-    auto info = queryPathInfoUncached(storePath);
+    queryPathInfoUncached(storePath,
+        [this, storePath, hashPart, success, failure](std::shared_ptr<ValidPathInfo> info) {
 
-    if (diskCache)
-        diskCache->upsertNarInfo(getUri(), hashPart, info);
+            if (diskCache)
+                diskCache->upsertNarInfo(getUri(), hashPart, info);
 
-    {
-        auto state_(state.lock());
-        state_->pathInfoCache.upsert(hashPart, info);
-    }
+            {
+                auto state_(state.lock());
+                state_->pathInfoCache.upsert(hashPart, info);
+            }
 
-    if (!info
-        || (info->path != storePath && storePathToName(storePath) != ""))
-    {
-        stats.narInfoMissing++;
-        throw InvalidPath(format("path ‘%s’ is not valid") % storePath);
-    }
+            if (!info
+                || (info->path != storePath && storePathToName(storePath) != ""))
+            {
+                stats.narInfoMissing++;
+                return failure(std::make_exception_ptr(InvalidPath(format("path ‘%s’ is not valid") % storePath)));
+            }
 
-    return ref<ValidPathInfo>(info);
+            callSuccess(success, failure, ref<ValidPathInfo>(info));
+
+        }, failure);
 }
 
 

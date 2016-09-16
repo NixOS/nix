@@ -246,36 +246,40 @@ void RemoteStore::querySubstitutablePathInfos(const PathSet & paths,
 }
 
 
-std::shared_ptr<ValidPathInfo> RemoteStore::queryPathInfoUncached(const Path & path)
+void RemoteStore::queryPathInfoUncached(const Path & path,
+    std::function<void(std::shared_ptr<ValidPathInfo>)> success,
+    std::function<void(std::exception_ptr exc)> failure)
 {
-    auto conn(connections->get());
-    conn->to << wopQueryPathInfo << path;
-    try {
-        conn->processStderr();
-    } catch (Error & e) {
-        // Ugly backwards compatibility hack.
-        if (e.msg().find("is not valid") != std::string::npos)
-            throw InvalidPath(e.what());
-        throw;
-    }
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 17) {
-        bool valid = readInt(conn->from) != 0;
-        if (!valid) throw InvalidPath(format("path ‘%s’ is not valid") % path);
-    }
-    auto info = std::make_shared<ValidPathInfo>();
-    info->path = path;
-    info->deriver = readString(conn->from);
-    if (info->deriver != "") assertStorePath(info->deriver);
-    info->narHash = parseHash(htSHA256, readString(conn->from));
-    info->references = readStorePaths<PathSet>(*this, conn->from);
-    info->registrationTime = readInt(conn->from);
-    info->narSize = readLongLong(conn->from);
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
-        info->ultimate = readInt(conn->from) != 0;
-        info->sigs = readStrings<StringSet>(conn->from);
-        info->ca = readString(conn->from);
-    }
-    return info;
+    sync2async<std::shared_ptr<ValidPathInfo>>(success, failure, [&]() {
+        auto conn(connections->get());
+        conn->to << wopQueryPathInfo << path;
+        try {
+            conn->processStderr();
+        } catch (Error & e) {
+            // Ugly backwards compatibility hack.
+            if (e.msg().find("is not valid") != std::string::npos)
+                throw InvalidPath(e.what());
+            throw;
+        }
+        if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 17) {
+            bool valid = readInt(conn->from) != 0;
+            if (!valid) throw InvalidPath(format("path ‘%s’ is not valid") % path);
+        }
+        auto info = std::make_shared<ValidPathInfo>();
+        info->path = path;
+        info->deriver = readString(conn->from);
+        if (info->deriver != "") assertStorePath(info->deriver);
+        info->narHash = parseHash(htSHA256, readString(conn->from));
+        info->references = readStorePaths<PathSet>(*this, conn->from);
+        info->registrationTime = readInt(conn->from);
+        info->narSize = readLongLong(conn->from);
+        if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
+            info->ultimate = readInt(conn->from) != 0;
+            info->sigs = readStrings<StringSet>(conn->from);
+            info->ca = readString(conn->from);
+        }
+        return info;
+    });
 }
 
 

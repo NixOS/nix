@@ -47,8 +47,9 @@ struct CurlDownloader : public Downloader
         CurlDownloader & downloader;
         DownloadRequest request;
         DownloadResult result;
-        bool done = false; // whether the promise has been set
-        std::promise<DownloadResult> promise;
+        bool done = false; // whether either the success or failure function has been called
+        std::function<void(const DownloadResult &)> success;
+        std::function<void(std::exception_ptr exc)> failure;
         CURL * req = 0;
         bool active = false; // whether the handle has been added to the multi object
         std::string status;
@@ -86,7 +87,7 @@ struct CurlDownloader : public Downloader
             if (requestHeaders) curl_slist_free_all(requestHeaders);
             try {
                 if (!done)
-                    fail(DownloadError(Transient, format("download of ‘%s’ was interrupted") % request.uri));
+                    fail(DownloadError(Interrupted, format("download of ‘%s’ was interrupted") % request.uri));
             } catch (...) {
                 ignoreException();
             }
@@ -95,8 +96,9 @@ struct CurlDownloader : public Downloader
         template<class T>
         void fail(const T & e)
         {
-            promise.set_exception(std::make_exception_ptr(e));
+            assert(!done);
             done = true;
+            failure(std::make_exception_ptr(e));
         }
 
         size_t writeCallback(void * contents, size_t size, size_t nmemb)
@@ -239,7 +241,7 @@ struct CurlDownloader : public Downloader
                 (httpStatus == 200 || httpStatus == 304 || httpStatus == 226 /* FTP */ || httpStatus == 0 /* other protocol */))
             {
                 result.cached = httpStatus == 304;
-                promise.set_value(result);
+                success(result);
                 done = true;
             } else {
                 Error err =
@@ -253,9 +255,11 @@ struct CurlDownloader : public Downloader
                 attempt++;
 
                 auto exc =
-                    httpStatus != 0
-                    ? DownloadError(err, format("unable to download ‘%s’: HTTP error %d") % request.uri % httpStatus)
-                    : DownloadError(err, format("unable to download ‘%s’: %s (%d)") % request.uri % curl_easy_strerror(code) % code);
+                    code == CURLE_ABORTED_BY_CALLBACK && _isInterrupted
+                    ? DownloadError(Interrupted, format("download of ‘%s’ was interrupted") % request.uri)
+                    : httpStatus != 0
+                      ? DownloadError(err, format("unable to download ‘%s’: HTTP error %d") % request.uri % httpStatus)
+                      : DownloadError(err, format("unable to download ‘%s’: %s (%d)") % request.uri % curl_easy_strerror(code) % code);
 
                 /* If this is a transient error, then maybe retry the
                    download after a while. */
@@ -414,7 +418,7 @@ struct CurlDownloader : public Downloader
     {
         try {
             workerThreadMain();
-        } catch (Interrupted & e) {
+        } catch (nix::Interrupted & e) {
         } catch (std::exception & e) {
             printMsg(lvlError, format("unexpected error in download thread: %s") % e.what());
         }
@@ -437,11 +441,14 @@ struct CurlDownloader : public Downloader
         writeFull(wakeupPipe.writeSide.get(), " ");
     }
 
-    std::future<DownloadResult> enqueueDownload(const DownloadRequest & request) override
+    void enqueueDownload(const DownloadRequest & request,
+        std::function<void(const DownloadResult &)> success,
+        std::function<void(std::exception_ptr exc)> failure) override
     {
         auto item = std::make_shared<DownloadItem>(*this, request);
+        item->success = success;
+        item->failure = failure;
         enqueueItem(item);
-        return item->promise.get_future();
     }
 };
 
@@ -456,6 +463,15 @@ ref<Downloader> getDownloader()
 ref<Downloader> makeDownloader()
 {
     return make_ref<CurlDownloader>();
+}
+
+std::future<DownloadResult> Downloader::enqueueDownload(const DownloadRequest & request)
+{
+    auto promise = std::make_shared<std::promise<DownloadResult>>();
+    enqueueDownload(request,
+        [promise](const DownloadResult & result) { promise->set_value(result); },
+        [promise](std::exception_ptr exc) { promise->set_exception(exc); });
+    return promise->get_future();
 }
 
 DownloadResult Downloader::download(const DownloadRequest & request)

@@ -32,7 +32,19 @@ protected:
 
     void upsertFile(const std::string & path, const std::string & data) override;
 
-    std::shared_ptr<std::string> getFile(const std::string & path) override;
+    void getFile(const std::string & path,
+        std::function<void(std::shared_ptr<std::string>)> success,
+        std::function<void(std::exception_ptr exc)> failure) override
+    {
+        sync2async<std::shared_ptr<std::string>>(success, failure, [&]() {
+            try {
+                return std::make_shared<std::string>(readFile(binaryCacheDir + "/" + path));
+            } catch (SysError & e) {
+                if (e.errNo == ENOENT) return std::shared_ptr<std::string>();
+                throw;
+            }
+        });
+    }
 
     PathSet queryAllValidPaths() override
     {
@@ -74,16 +86,6 @@ bool LocalBinaryCacheStore::fileExists(const std::string & path)
 void LocalBinaryCacheStore::upsertFile(const std::string & path, const std::string & data)
 {
     atomicWrite(binaryCacheDir + "/" + path, data);
-}
-
-std::shared_ptr<std::string> LocalBinaryCacheStore::getFile(const std::string & path)
-{
-    try {
-        return std::make_shared<std::string>(readFile(binaryCacheDir + "/" + path));
-    } catch (SysError & e) {
-        if (e.errNo == ENOENT) return 0;
-        throw;
-    }
 }
 
 static RegisterStoreImplementation regStore([](

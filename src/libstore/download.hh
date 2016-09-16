@@ -23,8 +23,6 @@ struct DownloadRequest
 
 struct DownloadResult
 {
-    enum Status { Success, NotFound, Forbidden, Misc, Transient };
-    Status status;
     bool cached;
     std::string etag;
     std::string effectiveUrl;
@@ -38,7 +36,11 @@ struct Downloader
     /* Enqueue a download request, returning a future to the result of
        the download. The future may throw a DownloadError
        exception. */
-    virtual std::future<DownloadResult> enqueueDownload(const DownloadRequest & request) = 0;
+    virtual void enqueueDownload(const DownloadRequest & request,
+        std::function<void(const DownloadResult &)> success,
+        std::function<void(std::exception_ptr exc)> failure) = 0;
+
+    std::future<DownloadResult> enqueueDownload(const DownloadRequest & request);
 
     /* Synchronously download a file. */
     DownloadResult download(const DownloadRequest & request);
@@ -50,7 +52,7 @@ struct Downloader
     Path downloadCached(ref<Store> store, const string & uri, bool unpack, string name = "",
         const Hash & expectedHash = Hash(), string * effectiveUri = nullptr);
 
-    enum Error { NotFound, Forbidden, Misc, Transient };
+    enum Error { NotFound, Forbidden, Misc, Transient, Interrupted };
 };
 
 /* Return a shared Downloader object. Using this object is preferred

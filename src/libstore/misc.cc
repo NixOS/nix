@@ -8,66 +8,90 @@
 namespace nix {
 
 
-void Store::computeFSClosure(const Path & path,
-    PathSet & paths, bool flipDirection, bool includeOutputs, bool includeDerivers)
+void Store::computeFSClosure(const Path & startPath,
+    PathSet & paths_, bool flipDirection, bool includeOutputs, bool includeDerivers)
 {
-    ThreadPool pool;
-
-    Sync<bool> state_;
-
-    std::function<void(Path)> doPath;
-
-    doPath = [&](const Path & path) {
-        {
-            auto state(state_.lock());
-            if (paths.count(path)) return;
-            paths.insert(path);
-        }
-
-        auto info = queryPathInfo(path);
-
-        if (flipDirection) {
-
-            PathSet referrers;
-            queryReferrers(path, referrers);
-            for (auto & ref : referrers)
-                if (ref != path)
-                    pool.enqueue(std::bind(doPath, ref));
-
-            if (includeOutputs) {
-                PathSet derivers = queryValidDerivers(path);
-                for (auto & i : derivers)
-                    pool.enqueue(std::bind(doPath, i));
-            }
-
-            if (includeDerivers && isDerivation(path)) {
-                PathSet outputs = queryDerivationOutputs(path);
-                for (auto & i : outputs)
-                    if (isValidPath(i) && queryPathInfo(i)->deriver == path)
-                        pool.enqueue(std::bind(doPath, i));
-            }
-
-        } else {
-
-            for (auto & ref : info->references)
-                if (ref != path)
-                    pool.enqueue(std::bind(doPath, ref));
-
-            if (includeOutputs && isDerivation(path)) {
-                PathSet outputs = queryDerivationOutputs(path);
-                for (auto & i : outputs)
-                    if (isValidPath(i)) pool.enqueue(std::bind(doPath, i));
-            }
-
-            if (includeDerivers && isValidPath(info->deriver))
-                pool.enqueue(std::bind(doPath, info->deriver));
-
-        }
+    struct State
+    {
+        size_t pending;
+        PathSet & paths;
+        std::exception_ptr exc;
     };
 
-    pool.enqueue(std::bind(doPath, path));
+    Sync<State> state_(State{0, paths_, 0});
 
-    pool.process();
+    std::function<void(const Path &)> enqueue;
+
+    std::condition_variable done;
+
+    enqueue = [&](const Path & path) -> void {
+        {
+            auto state(state_.lock());
+            if (state->exc) return;
+            if (state->paths.count(path)) return;
+            state->paths.insert(path);
+            state->pending++;
+        }
+
+        queryPathInfo(path,
+            [&, path](ref<ValidPathInfo> info) {
+                // FIXME: calls to isValidPath() should be async
+
+                if (flipDirection) {
+
+                    PathSet referrers;
+                    queryReferrers(path, referrers);
+                    for (auto & ref : referrers)
+                        if (ref != path)
+                            enqueue(ref);
+
+                    if (includeOutputs)
+                        for (auto & i : queryValidDerivers(path))
+                            enqueue(i);
+
+                    if (includeDerivers && isDerivation(path))
+                        for (auto & i : queryDerivationOutputs(path))
+                            if (isValidPath(i) && queryPathInfo(i)->deriver == path)
+                                enqueue(i);
+
+                } else {
+
+                    for (auto & ref : info->references)
+                        if (ref != path)
+                            enqueue(ref);
+
+                    if (includeOutputs && isDerivation(path))
+                        for (auto & i : queryDerivationOutputs(path))
+                            if (isValidPath(i)) enqueue(i);
+
+                    if (includeDerivers && isValidPath(info->deriver))
+                        enqueue(info->deriver);
+
+                }
+
+                {
+                    auto state(state_.lock());
+                    assert(state->pending);
+                    if (!--state->pending) done.notify_one();
+                }
+
+            },
+
+            [&, path](std::exception_ptr exc) {
+                auto state(state_.lock());
+                if (!state->exc) state->exc = exc;
+                assert(state->pending);
+                if (!--state->pending) done.notify_one();
+            });
+    };
+
+    enqueue(startPath);
+
+    {
+        auto state(state_.lock());
+        while (state->pending) state.wait(done);
+        if (state->exc) std::rethrow_exception(state->exc);
+    }
 }
 
 

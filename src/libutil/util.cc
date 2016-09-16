@@ -1215,4 +1215,15 @@ string base64Decode(const string & s)
 }
 
 
+void callFailure(const std::function<void(std::exception_ptr exc)> & failure)
+{
+    try {
+        failure(std::current_exception());
+    } catch (std::exception & e) {
+        printMsg(lvlError, format("uncaught exception: %s") % e.what());
+        abort();
+    }
+}
+
+
 }

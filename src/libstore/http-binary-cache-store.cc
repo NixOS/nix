@@ -69,18 +69,27 @@ protected:
         throw UploadToHTTP("uploading to an HTTP binary cache is not supported");
     }
 
-    std::shared_ptr<std::string> getFile(const std::string & path) override
+    void getFile(const std::string & path,
+        std::function<void(std::shared_ptr<std::string>)> success,
+        std::function<void(std::exception_ptr exc)> failure)
     {
         DownloadRequest request(cacheUri + "/" + path);
         request.showProgress = DownloadRequest::no;
         request.tries = 8;
-        try {
-            return getDownloader()->download(request).data;
-        } catch (DownloadError & e) {
-            if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
-                return 0;
-            throw;
-        }
+
+        getDownloader()->enqueueDownload(request,
+            [success](const DownloadResult & result) {
+                success(result.data);
+            },
+            [success, failure](std::exception_ptr exc) {
+                try {
+                    std::rethrow_exception(exc);
+                } catch (DownloadError & e) {
+                    if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
+                        success(0);
+                    failure(exc);
+                }
+            });
     }
 
 };

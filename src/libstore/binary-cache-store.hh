@@ -31,7 +31,11 @@ protected:
 
     /* Return the contents of the specified file, or null if it
        doesn't exist. */
-    virtual std::shared_ptr<std::string> getFile(const std::string & path) = 0;
+    virtual void getFile(const std::string & path,
+        std::function<void(std::shared_ptr<std::string>)> success,
+        std::function<void(std::exception_ptr exc)> failure) = 0;
+
+    std::shared_ptr<std::string> getFile(const std::string & path);
 
     bool wantMassQuery_ = false;
     int priority = 50;
@@ -56,7 +60,9 @@ public:
     PathSet queryAllValidPaths() override
     { notImpl(); }
 
-    std::shared_ptr<ValidPathInfo> queryPathInfoUncached(const Path & path) override;
+    void queryPathInfoUncached(const Path & path,
+        std::function<void(std::shared_ptr<ValidPathInfo>)> success,
+        std::function<void(std::exception_ptr exc)> failure) override;
 
     void queryReferrers(const Path & path,
         PathSet & referrers) override

@@ -319,9 +319,16 @@ public:
        the name part of the store path. */
     ref<const ValidPathInfo> queryPathInfo(const Path & path);
 
+    /* Asynchronous version of queryPathInfo(). */
+    void queryPathInfo(const Path & path,
+        std::function<void(ref<ValidPathInfo>)> success,
+        std::function<void(std::exception_ptr exc)> failure);
+
 protected:
 
-    virtual std::shared_ptr<ValidPathInfo> queryPathInfoUncached(const Path & path) = 0;
+    virtual void queryPathInfoUncached(const Path & path,
+        std::function<void(std::shared_ptr<ValidPathInfo>)> success,
+        std::function<void(std::exception_ptr exc)> failure) = 0;
 
 public:
 

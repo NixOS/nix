@@ -577,49 +577,54 @@ Hash parseHashField(const Path & path, const string & s)
 }
 
 
-std::shared_ptr<ValidPathInfo> LocalStore::queryPathInfoUncached(const Path & path)
+void LocalStore::queryPathInfoUncached(const Path & path,
+    std::function<void(std::shared_ptr<ValidPathInfo>)> success,
+    std::function<void(std::exception_ptr exc)> failure)
 {
-    auto info = std::make_shared<ValidPathInfo>();
-    info->path = path;
+    sync2async<std::shared_ptr<ValidPathInfo>>(success, failure, [&]() {
 
-    assertStorePath(path);
+        auto info = std::make_shared<ValidPathInfo>();
+        info->path = path;
 
-    return retrySQLite<std::shared_ptr<ValidPathInfo>>([&]() {
-        auto state(_state.lock());
+        assertStorePath(path);
 
-        /* Get the path info. */
-        auto useQueryPathInfo(state->stmtQueryPathInfo.use()(path));
+        return retrySQLite<std::shared_ptr<ValidPathInfo>>([&]() {
+            auto state(_state.lock());
 
-        if (!useQueryPathInfo.next())
-            return std::shared_ptr<ValidPathInfo>();
+            /* Get the path info. */
+            auto useQueryPathInfo(state->stmtQueryPathInfo.use()(path));
 
-        info->id = useQueryPathInfo.getInt(0);
+            if (!useQueryPathInfo.next())
+                return std::shared_ptr<ValidPathInfo>();
 
-        info->narHash = parseHashField(path, useQueryPathInfo.getStr(1));
+            info->id = useQueryPathInfo.getInt(0);
 
-        info->registrationTime = useQueryPathInfo.getInt(2);
+            info->narHash = parseHashField(path, useQueryPathInfo.getStr(1));
 
-        auto s = (const char *) sqlite3_column_text(state->stmtQueryPathInfo, 3);
-        if (s) info->deriver = s;
+            info->registrationTime = useQueryPathInfo.getInt(2);
 
-        /* Note that narSize = NULL yields 0. */
-        info->narSize = useQueryPathInfo.getInt(4);
+            auto s = (const char *) sqlite3_column_text(state->stmtQueryPathInfo, 3);
+            if (s) info->deriver = s;
 
-        info->ultimate = useQueryPathInfo.getInt(5) == 1;
+            /* Note that narSize = NULL yields 0. */
+            info->narSize = useQueryPathInfo.getInt(4);
 
-        s = (const char *) sqlite3_column_text(state->stmtQueryPathInfo, 6);
-        if (s) info->sigs = tokenizeString<StringSet>(s, " ");
+            info->ultimate = useQueryPathInfo.getInt(5) == 1;
 
-        s = (const char *) sqlite3_column_text(state->stmtQueryPathInfo, 7);
-        if (s) info->ca = s;
+            s = (const char *) sqlite3_column_text(state->stmtQueryPathInfo, 6);
+            if (s) info->sigs = tokenizeString<StringSet>(s, " ");
 
-        /* Get the references. */
-        auto useQueryReferences(state->stmtQueryReferences.use()(info->id));
+            s = (const char *) sqlite3_column_text(state->stmtQueryPathInfo, 7);
+            if (s) info->ca = s;
 
-        while (useQueryReferences.next())
-            info->references.insert(useQueryReferences.getStr(0));
+            /* Get the references. */
+            auto useQueryReferences(state->stmtQueryReferences.use()(info->id));
 
-        return info;
+            while (useQueryReferences.next())
+                info->references.insert(useQueryReferences.getStr(0));
+
+            return info;
+        });
     });
 }
 

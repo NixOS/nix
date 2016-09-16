@@ -34,7 +34,9 @@ public:
 
     PathSet queryAllValidPaths() override;
 
-    std::shared_ptr<ValidPathInfo> queryPathInfoUncached(const Path & path) override;
+    void queryPathInfoUncached(const Path & path,
+        std::function<void(std::shared_ptr<ValidPathInfo>)> success,
+        std::function<void(std::exception_ptr exc)> failure) override;
 
     void queryReferrers(const Path & path, PathSet & referrers) override;
 

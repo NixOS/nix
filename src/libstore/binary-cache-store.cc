@@ -12,6 +12,8 @@
 
 #include <chrono>
 
+#include <future>
+
 namespace nix {
 
 BinaryCacheStore::BinaryCacheStore(const Params & params)
@@ -56,6 +58,19 @@ void BinaryCacheStore::init()
 void BinaryCacheStore::notImpl()
 {
     throw Error("operation not implemented for binary cache stores");
+}
+
+std::shared_ptr<std::string> BinaryCacheStore::getFile(const std::string & path)
+{
+    std::promise<std::shared_ptr<std::string>> promise;
+    getFile(path,
+        [&](std::shared_ptr<std::string> result) {
+            promise.set_value(result);
+        },
+        [&](std::exception_ptr exc) {
+            promise.set_exception(exc);
+        });
+    return promise.get_future().get();
 }
 
 Path BinaryCacheStore::narInfoFileFor(const Path & storePath)
@@ -176,17 +191,22 @@ void BinaryCacheStore::narFromPath(const Path & storePath, Sink & sink)
     sink((unsigned char *) nar->c_str(), nar->size());
 }
 
-std::shared_ptr<ValidPathInfo> BinaryCacheStore::queryPathInfoUncached(const Path & storePath)
+void BinaryCacheStore::queryPathInfoUncached(const Path & storePath,
+        std::function<void(std::shared_ptr<ValidPathInfo>)> success,
+        std::function<void(std::exception_ptr exc)> failure)
 {
     auto narInfoFile = narInfoFileFor(storePath);
-    auto data = getFile(narInfoFile);
-    if (!data) return 0;
 
-    auto narInfo = make_ref<NarInfo>(*this, *data, narInfoFile);
+    getFile(narInfoFile,
+        [=](std::shared_ptr<std::string> data) {
+            if (!data) return success(0);
 
-    stats.narInfoRead++;
+            stats.narInfoRead++;
 
-    return std::shared_ptr<NarInfo>(narInfo);
+            callSuccess(success, failure, (std::shared_ptr<ValidPathInfo>)
+                std::make_shared<NarInfo>(*this, *data, narInfoFile));
+        },
+        failure);
 }
 
 Path BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
