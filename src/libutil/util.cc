@@ -474,24 +474,24 @@ void readFull(int fd, unsigned char * buf, size_t count)
 }
 
 
-void writeFull(int fd, const unsigned char * buf, size_t count)
+void writeFull(int fd, const unsigned char * buf, size_t count, bool allowInterrupts)
 {
     while (count) {
-        checkInterrupt();
         ssize_t res = write(fd, (char *) buf, count);
-        if (res == -1) {
-            if (errno == EINTR) continue;
+        if (res == -1 && errno != EINTR)
             throw SysError("writing to file");
+        if (res > 0) {
+            count -= res;
+            buf += res;
         }
-        count -= res;
-        buf += res;
+        if (allowInterrupts) checkInterrupt();
     }
 }
 
 
-void writeFull(int fd, const string & s)
+void writeFull(int fd, const string & s, bool allowInterrupts)
 {
-    writeFull(fd, (const unsigned char *) s.data(), s.size());
+    writeFull(fd, (const unsigned char *) s.data(), s.size(), allowInterrupts);
 }
 
 

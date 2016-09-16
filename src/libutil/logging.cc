@@ -60,14 +60,12 @@ void warnOnce(bool & haveWarned, const FormatOrString & fs)
 void writeToStderr(const string & s)
 {
     try {
-        writeFull(STDERR_FILENO, s);
+        writeFull(STDERR_FILENO, s, false);
     } catch (SysError & e) {
-        /* Ignore failing writes to stderr if we're in an exception
-           handler, otherwise throw an exception.  We need to ignore
-           write errors in exception handlers to ensure that cleanup
-           code runs to completion if the other side of stderr has
-           been closed unexpectedly. */
-        if (!std::uncaught_exception()) throw;
+        /* Ignore failing writes to stderr.  We need to ignore write
+           errors to ensure that cleanup code that logs to stderr runs
+           to completion if the other side of stderr has been closed
+           unexpectedly. */
     }
 }
 
