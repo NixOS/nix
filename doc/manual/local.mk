@@ -1,3 +1,6 @@
+
+ifeq ($(doc_generate),yes)
+
 XSLTPROC = $(xsltproc) --nonet $(xmlflags) \
   --param section.autolabel 1 \
   --param section.label.includes.component.label 1 \
@@ -71,8 +74,14 @@ $(foreach file, $(wildcard $(d)/images/callouts/*.gif), $(eval $(call install-da
 
 $(eval $(call install-symlink, manual.html, $(docdir)/manual/index.html))
 
+
 all: $(d)/manual.html
+
+
 
 clean-files += $(d)/manual.html
 
 dist-files += $(d)/manual.html
+
+
+endif
