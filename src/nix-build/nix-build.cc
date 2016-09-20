@@ -1,18 +1,20 @@
 #include <cstring>
+#include <fstream>
+#include <iostream>
 #include <regex>
-#include "util.hh"
-#include <unistd.h>
-#include "shared.hh"
 #include <sstream>
 #include <vector>
-#include <iostream>
-#include <fstream>
+
+#include <unistd.h>
+
 #include "store-api.hh"
 #include "globals.hh"
 #include "derivations.hh"
+#include "affinity.hh"
+#include "util.hh"
+#include "shared.hh"
 
 using namespace nix;
-using std::stringstream;
 
 extern char ** environ;
 
@@ -399,6 +401,8 @@ int main(int argc, char ** argv)
                 setenv("NIX_STORE", store->storeDir.c_str(), 1);
                 for (const auto & env : drv.env)
                     setenv(env.first.c_str(), env.second.c_str(), 1);
+
+                restoreAffinity();
 
                 // Run a shell using the derivation's environment.  For
                 // convenience, source $stdenv/setup to setup additional
