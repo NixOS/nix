@@ -59,6 +59,21 @@ string getEnv(const string & key, const string & def)
 }
 
 
+std::map<std::string, std::string> getEnv()
+{
+    std::map<std::string, std::string> env;
+    for (size_t i = 0; environ[i]; ++i) {
+        auto s = environ[i];
+        auto eq = strchr(s, '=');
+        if (!eq)
+            // invalid env, just keep going
+            continue;
+        env.emplace(std::string(s, eq), std::string(eq + 1));
+    }
+    return env;
+}
+
+
 Path absPath(Path path, Path dir)
 {
     if (path[0] != '/') {

@@ -8,9 +8,11 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <signal.h>
+
 #include <functional>
 #include <limits>
 #include <cstdio>
+#include <map>
 
 #ifndef HAVE_STRUCT_DIRENT_D_TYPE
 #define DT_UNKNOWN 0
@@ -24,6 +26,9 @@ namespace nix {
 
 /* Return an environment variable. */
 string getEnv(const string & key, const string & def = "");
+
+/* Get the entire environment. */
+std::map<std::string, std::string> getEnv();
 
 /* Return an absolutized path, resolving paths relative to the
    specified directory, or the current directory otherwise.  The path
