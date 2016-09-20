@@ -383,7 +383,8 @@ string get(const T & map, const string & key, const string & def = "")
 
 /* Call ‘failure’ with the current exception as argument. If ‘failure’
    throws an exception, abort the program. */
-void callFailure(const std::function<void(std::exception_ptr exc)> & failure);
+void callFailure(const std::function<void(std::exception_ptr exc)> & failure,
+    std::exception_ptr exc = std::current_exception());
 
 
 /* Evaluate the function ‘f’. If it returns a value, call ‘success’

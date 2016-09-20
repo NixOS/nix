@@ -98,11 +98,7 @@ struct CurlDownloader : public Downloader
         {
             assert(!done);
             done = true;
-            try {
-                throw e;
-            } catch (...) {
-                callFailure(failure);
-            }
+            callFailure(failure, std::make_exception_ptr(e));
         }
 
         size_t writeCallback(void * contents, size_t size, size_t nmemb)
