@@ -98,7 +98,11 @@ struct CurlDownloader : public Downloader
         {
             assert(!done);
             done = true;
-            failure(std::make_exception_ptr(e));
+            try {
+                throw e;
+            } catch (...) {
+                callFailure(failure);
+            }
         }
 
         size_t writeCallback(void * contents, size_t size, size_t nmemb)
@@ -241,8 +245,8 @@ struct CurlDownloader : public Downloader
                 (httpStatus == 200 || httpStatus == 304 || httpStatus == 226 /* FTP */ || httpStatus == 0 /* other protocol */))
             {
                 result.cached = httpStatus == 304;
-                success(result);
                 done = true;
+                callSuccess(success, failure, const_cast<const DownloadResult &>(result));
             } else {
                 Error err =
                     (httpStatus == 404 || code == CURLE_FILE_COULDNT_READ_FILE) ? NotFound :
