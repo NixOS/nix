@@ -13,6 +13,12 @@ To find out more about the tool, usage and installation instructions, please
 read the manual, which is available on the Nix website at
 <http://nixos.org/nix/manual>.
 
+## Installing
+
+``` bash
+$ nix-env -f release.nix -iA build.x86_64-darwin
+```
+
 ## Contributing
 
 Take a look at the [Hacking Section](http://nixos.org/nix/manual/#chap-hacking)
