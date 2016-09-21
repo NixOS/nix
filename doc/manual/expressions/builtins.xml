@@ -995,9 +995,9 @@ in foo</programlisting>
     <listitem><para>Convert the expression
     <replaceable>e</replaceable> to a string.
     <replaceable>e</replaceable> can be a string (in which case
-    <function>toString</function> is a no-op) or a path (e.g.,
+    <function>toString</function> is a no-op), a path (e.g.,
     <literal>toString /foo/bar</literal> yields
-    <literal>"/foo/bar"</literal>.</para></listitem>
+    <literal>"/foo/bar"</literal> or a set containing <literal>{ __toString = self: ...; }</literal>.</para></listitem>
 
   </varlistentry>
 
