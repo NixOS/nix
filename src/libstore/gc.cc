@@ -39,7 +39,7 @@ int LocalStore::openGCLock(LockType lockType)
         throw SysError(format("opening global GC lock ‘%1%’") % fnGCLock);
 
     if (!lockFile(fdGCLock.get(), lockType, false)) {
-        printMsg(lvlError, format("waiting for the big garbage collector lock..."));
+        printError(format("waiting for the big garbage collector lock..."));
         lockFile(fdGCLock.get(), lockType, true);
     }
 
@@ -129,7 +129,7 @@ Path LocalFSStore::addPermRoot(const Path & _storePath,
     if (settings.checkRootReachability) {
         Roots roots = findRoots();
         if (roots.find(gcRoot) == roots.end())
-            printMsg(lvlError,
+            printError(
                 format(
                     "warning: ‘%1%’ is not in a directory where the garbage collector looks for roots; "
                     "therefore, ‘%2%’ might be removed by the garbage collector")
@@ -226,7 +226,7 @@ void LocalStore::readTempRoots(PathSet & tempRoots, FDs & fds)
            only succeed if the owning process has died.  In that case
            we don't care about its temporary roots. */
         if (lockFile(fd->get(), ltWrite, false)) {
-            printMsg(lvlError, format("removing stale temporary roots file ‘%1%’") % path);
+            printError(format("removing stale temporary roots file ‘%1%’") % path);
             unlink(path.c_str());
             writeFull(fd->get(), "d");
             continue;
@@ -264,7 +264,7 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
         if (isStorePath(storePath) && isValidPath(storePath))
             roots[path] = storePath;
         else
-            printMsg(lvlInfo, format("skipping invalid root from ‘%1%’ to ‘%2%’") % path % storePath);
+            printInfo(format("skipping invalid root from ‘%1%’ to ‘%2%’") % path % storePath);
     };
 
     try {
@@ -287,7 +287,7 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
                 target = absPath(target, dirOf(path));
                 if (!pathExists(target)) {
                     if (isInDir(path, stateDir + "/" + gcRootsDir + "/auto")) {
-                        printMsg(lvlInfo, format("removing stale link from ‘%1%’ to ‘%2%’") % path % target);
+                        printInfo(format("removing stale link from ‘%1%’ to ‘%2%’") % path % target);
                         unlink(path.c_str());
                     }
                 } else {
@@ -310,7 +310,7 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
     catch (SysError & e) {
         /* We only ignore permanent failures. */
         if (e.errNo == EACCES || e.errNo == ENOENT || e.errNo == ENOTDIR)
-            printMsg(lvlInfo, format("cannot read potential root ‘%1%’") % path);
+            printInfo(format("cannot read potential root ‘%1%’") % path);
         else
             throw;
     }
@@ -513,7 +513,7 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
         throw SysError(format("getting status of %1%") % realPath);
     }
 
-    printMsg(lvlInfo, format("deleting ‘%1%’") % path);
+    printInfo(format("deleting ‘%1%’") % path);
 
     state.results.paths.insert(path);
 
@@ -535,7 +535,7 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
             state.bytesInvalidated += size;
         } catch (SysError & e) {
             if (e.errNo == ENOSPC) {
-                printMsg(lvlInfo, format("note: can't create move ‘%1%’: %2%") % realPath % e.msg());
+                printInfo(format("note: can't create move ‘%1%’: %2%") % realPath % e.msg());
                 deleteGarbage(state, realPath);
             }
         }
@@ -543,7 +543,7 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
         deleteGarbage(state, realPath);
 
     if (state.results.bytesFreed + state.bytesInvalidated > state.options.maxFreed) {
-        printMsg(lvlInfo, format("deleted or invalidated more than %1% bytes; stopping") % state.options.maxFreed);
+        printInfo(format("deleted or invalidated more than %1% bytes; stopping") % state.options.maxFreed);
         throw GCLimitReached();
     }
 }
@@ -562,7 +562,7 @@ bool LocalStore::canReachRoot(GCState & state, PathSet & visited, const Path & p
     }
 
     if (state.roots.find(path) != state.roots.end()) {
-        printMsg(lvlDebug, format("cannot delete ‘%1%’ because it's a root") % path);
+        debug(format("cannot delete ‘%1%’ because it's a root") % path);
         state.alive.insert(path);
         return true;
     }
@@ -626,7 +626,7 @@ void LocalStore::tryToDelete(GCState & state, const Path & path)
     PathSet visited;
 
     if (canReachRoot(state, visited, path)) {
-        printMsg(lvlDebug, format("cannot delete ‘%1%’ because it's still reachable") % path);
+        debug(format("cannot delete ‘%1%’ because it's still reachable") % path);
     } else {
         /* No path we visited was a root, so everything is garbage.
            But we only delete ‘path’ and its referrers here so that
@@ -682,7 +682,7 @@ void LocalStore::removeUnusedLinks(const GCState & state)
         throw SysError(format("statting ‘%1%’") % linksDir);
     long long overhead = st.st_blocks * 512ULL;
 
-    printMsg(lvlInfo, format("note: currently hard linking saves %.2f MiB")
+    printInfo(format("note: currently hard linking saves %.2f MiB")
         % ((unsharedSize - actualSize - overhead) / (1024.0 * 1024.0)));
 }
 
@@ -715,7 +715,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     /* Find the roots.  Since we've grabbed the GC lock, the set of
        permanent roots cannot increase now. */
-    printMsg(lvlError, format("finding garbage collector roots..."));
+    printError(format("finding garbage collector roots..."));
     Roots rootMap = options.ignoreLiveness ? Roots() : findRoots();
 
     for (auto & i : rootMap) state.roots.insert(i.second);
@@ -744,7 +744,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             createDirs(trashDir);
         } catch (SysError & e) {
             if (e.errNo == ENOSPC) {
-                printMsg(lvlInfo, format("note: can't create trash directory: %1%") % e.msg());
+                printInfo(format("note: can't create trash directory: %1%") % e.msg());
                 state.moveToTrash = false;
             }
         }
@@ -765,9 +765,9 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     } else if (options.maxFreed > 0) {
 
         if (state.shouldDelete)
-            printMsg(lvlError, format("deleting garbage..."));
+            printError(format("deleting garbage..."));
         else
-            printMsg(lvlError, format("determining live/dead paths..."));
+            printError(format("determining live/dead paths..."));
 
         try {
 
@@ -825,12 +825,12 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     fds.clear();
 
     /* Delete the trash directory. */
-    printMsg(lvlInfo, format("deleting ‘%1%’") % trashDir);
+    printInfo(format("deleting ‘%1%’") % trashDir);
     deleteGarbage(state, trashDir);
 
     /* Clean up the links directory. */
     if (options.action == GCOptions::gcDeleteDead || options.action == GCOptions::gcDeleteSpecific) {
-        printMsg(lvlError, format("deleting unused links..."));
+        printError(format("deleting unused links..."));
         removeUnusedLinks(state);
     }
 

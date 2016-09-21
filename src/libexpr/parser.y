@@ -664,7 +664,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
             else
                 res = { true, getDownloader()->downloadCached(store, elem.second, true) };
         } catch (DownloadError & e) {
-            printMsg(lvlError, format("warning: Nix search path entry ‘%1%’ cannot be downloaded, ignoring") % elem.second);
+            printError(format("warning: Nix search path entry ‘%1%’ cannot be downloaded, ignoring") % elem.second);
             res = { false, "" };
         }
     } else {
@@ -672,7 +672,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
         if (pathExists(path))
             res = { true, path };
         else {
-            printMsg(lvlError, format("warning: Nix search path entry ‘%1%’ does not exist, ignoring") % elem.second);
+            printError(format("warning: Nix search path entry ‘%1%’ does not exist, ignoring") % elem.second);
             res = { false, "" };
         }
     }

@@ -1014,7 +1014,7 @@ void DerivationGoal::loadDerivation()
     trace("loading derivation");
 
     if (nrFailed != 0) {
-        printMsg(lvlError, format("cannot build missing derivation ‘%1%’") % drvPath);
+        printError(format("cannot build missing derivation ‘%1%’") % drvPath);
         done(BuildResult::MiscFailure);
         return;
     }
@@ -1168,7 +1168,7 @@ void DerivationGoal::repairClosure()
     PathSet broken;
     for (auto & i : outputClosure) {
         if (worker.pathContentsGood(i)) continue;
-        printMsg(lvlError, format("found corrupted or missing path ‘%1%’ in the output closure of ‘%2%’") % i % drvPath);
+        printError(format("found corrupted or missing path ‘%1%’ in the output closure of ‘%2%’") % i % drvPath);
         Path drvPath2 = outputsToDrv[i];
         if (drvPath2 == "")
             addWaitee(worker.makeSubstitutionGoal(i, true));
@@ -1201,7 +1201,7 @@ void DerivationGoal::inputsRealised()
     if (nrFailed != 0) {
         if (!useDerivation)
             throw Error(format("some dependencies of ‘%1%’ are missing") % drvPath);
-        printMsg(lvlError,
+        printError(
             format("cannot build derivation ‘%1%’: %2% dependencies couldn't be built")
             % drvPath % nrFailed);
         done(BuildResult::DependencyFailed);
@@ -1366,7 +1366,7 @@ void DerivationGoal::tryToBuild()
         startBuilder();
 
     } catch (BuildError & e) {
-        printMsg(lvlError, e.msg());
+        printError(e.msg());
         outputLocks.unlock();
         buildUser.release();
         worker.permanentFailure = true;
@@ -1515,7 +1515,7 @@ void DerivationGoal::buildDone()
 
     } catch (BuildError & e) {
         if (!hook)
-            printMsg(lvlError, e.msg());
+            printError(e.msg());
         outputLocks.unlock();
         buildUser.release();
 
@@ -1644,7 +1644,7 @@ void DerivationGoal::startBuilder()
         nrRounds > 1 ? "building path(s) %1% (round %2%/%3%)" :
         "building path(s) %1%");
     f.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
-    printMsg(lvlInfo, f % showPaths(missingPaths) % curRound % nrRounds);
+    printInfo(f % showPaths(missingPaths) % curRound % nrRounds);
 
     /* Right platform? */
     if (!drv->canBuildLocally()) {
@@ -2216,7 +2216,7 @@ void DerivationGoal::startBuilder()
             if (msg.size() == 1) break;
             throw Error(string(msg, 1));
         }
-        printMsg(lvlDebug, msg);
+        debug(msg);
     }
 }
 
@@ -2704,7 +2704,7 @@ void DerivationGoal::registerOutputs()
         /* Apply hash rewriting if necessary. */
         bool rewritten = false;
         if (!outputRewrites.empty()) {
-            printMsg(lvlError, format("warning: rewriting hashes in ‘%1%’; cross fingers") % path);
+            printError(format("warning: rewriting hashes in ‘%1%’; cross fingers") % path);
 
             /* Canonicalise first.  This ensures that the path we're
                rewriting doesn't contain a hard link to /etc/shadow or
@@ -2743,7 +2743,7 @@ void DerivationGoal::registerOutputs()
             Hash h2 = recursive ? hashPath(h.type, actualPath).first : hashFile(h.type, actualPath);
             if (buildMode == bmHash) {
                 Path dest = worker.store.makeFixedOutputPath(recursive, h2, drv->env["name"]);
-                printMsg(lvlError, format("build produced path ‘%1%’ with %2% hash ‘%3%’")
+                printError(format("build produced path ‘%1%’ with %2% hash ‘%3%’")
                     % dest % printHashType(h.type) % printHash16or32(h2));
                 if (worker.store.isValidPath(dest))
                     return;
@@ -2967,7 +2967,7 @@ void DerivationGoal::deleteTmpDir(bool force)
 {
     if (tmpDir != "") {
         if (settings.keepFailed && !force) {
-            printMsg(lvlError,
+            printError(
                 format("note: keeping build directory ‘%2%’")
                 % drvPath % tmpDir);
             chmod(tmpDir.c_str(), 0755);
@@ -2986,7 +2986,7 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
     {
         logSize += data.size();
         if (settings.maxLogSize && logSize > settings.maxLogSize) {
-            printMsg(lvlError,
+            printError(
                 format("%1% killed after writing more than %2% bytes of log output")
                 % getName() % settings.maxLogSize);
             killChild();
@@ -3009,7 +3009,7 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
     }
 
     if (hook && fd == hook->fromHook.readSide.get())
-        printMsg(lvlError, data); // FIXME?
+        printError(data); // FIXME?
 }
 
 
@@ -3023,7 +3023,7 @@ void DerivationGoal::handleEOF(int fd)
 void DerivationGoal::flushLine()
 {
     if (settings.verboseBuild)
-        printMsg(lvlInfo, filterANSIEscapes(currentLogLine, true));
+        printInfo(filterANSIEscapes(currentLogLine, true));
     else {
         logTail.push_back(currentLogLine);
         if (logTail.size() > settings.logLines) logTail.pop_front();
@@ -3236,7 +3236,7 @@ void SubstitutionGoal::tryNext()
        signature. LocalStore::addToStore() also checks for this, but
        only after we've downloaded the path. */
     if (worker.store.requireSigs && !info->checkSignatures(worker.store, worker.store.publicKeys)) {
-        printMsg(lvlInfo, format("warning: substituter ‘%s’ does not have a valid signature for path ‘%s’")
+        printInfo(format("warning: substituter ‘%s’ does not have a valid signature for path ‘%s’")
             % sub->getUri() % storePath);
         tryNext();
         return;
@@ -3287,7 +3287,7 @@ void SubstitutionGoal::tryToRun()
         return;
     }
 
-    printMsg(lvlInfo, format("fetching path ‘%1%’...") % storePath);
+    printInfo(format("fetching path ‘%1%’...") % storePath);
 
     outPipe.create();
 
@@ -3323,7 +3323,7 @@ void SubstitutionGoal::finished()
     try {
         promise.get_future().get();
     } catch (Error & e) {
-        printMsg(lvlInfo, e.msg());
+        printInfo(e.msg());
 
         /* Try the next substitute. */
         state = &SubstitutionGoal::tryNext;
@@ -3617,7 +3617,7 @@ void Worker::waitForInput()
     if (!waitingForAWhile.empty()) {
         useTimeout = true;
         if (lastWokenUp == 0)
-            printMsg(lvlError, "waiting for locks or build slots...");
+            printError("waiting for locks or build slots...");
         if (lastWokenUp == 0 || lastWokenUp > before) lastWokenUp = before;
         timeout.tv_sec = std::max((time_t) 1, (time_t) (lastWokenUp + settings.pollInterval - before));
     } else lastWokenUp = 0;
@@ -3680,7 +3680,7 @@ void Worker::waitForInput()
             j->respectTimeouts &&
             after - j->lastOutput >= (time_t) settings.maxSilentTime)
         {
-            printMsg(lvlError,
+            printError(
                 format("%1% timed out after %2% seconds of silence")
                 % goal->getName() % settings.maxSilentTime);
             goal->timedOut();
@@ -3691,7 +3691,7 @@ void Worker::waitForInput()
             j->respectTimeouts &&
             after - j->timeStarted >= (time_t) settings.buildTimeout)
         {
-            printMsg(lvlError,
+            printError(
                 format("%1% timed out after %2% seconds")
                 % goal->getName() % settings.buildTimeout);
             goal->timedOut();
@@ -3719,7 +3719,7 @@ bool Worker::pathContentsGood(const Path & path)
 {
     std::map<Path, bool>::iterator i = pathContentsGoodCache.find(path);
     if (i != pathContentsGoodCache.end()) return i->second;
-    printMsg(lvlInfo, format("checking path ‘%1%’...") % path);
+    printInfo(format("checking path ‘%1%’...") % path);
     auto info = store.queryPathInfo(path);
     bool res;
     if (!pathExists(path))
@@ -3730,7 +3730,7 @@ bool Worker::pathContentsGood(const Path & path)
         res = info->narHash == nullHash || info->narHash == current.first;
     }
     pathContentsGoodCache[path] = res;
-    if (!res) printMsg(lvlError, format("path ‘%1%’ is corrupted or missing!") % path);
+    if (!res) printError(format("path ‘%1%’ is corrupted or missing!") % path);
     return res;
 }
 

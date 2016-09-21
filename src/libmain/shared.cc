@@ -56,26 +56,26 @@ void printMissing(ref<Store> store, const PathSet & willBuild,
     unsigned long long downloadSize, unsigned long long narSize)
 {
     if (!willBuild.empty()) {
-        printMsg(lvlInfo, format("these derivations will be built:"));
+        printInfo(format("these derivations will be built:"));
         Paths sorted = store->topoSortPaths(willBuild);
         reverse(sorted.begin(), sorted.end());
         for (auto & i : sorted)
-            printMsg(lvlInfo, format("  %1%") % i);
+            printInfo(format("  %1%") % i);
     }
 
     if (!willSubstitute.empty()) {
-        printMsg(lvlInfo, format("these paths will be fetched (%.2f MiB download, %.2f MiB unpacked):")
+        printInfo(format("these paths will be fetched (%.2f MiB download, %.2f MiB unpacked):")
             % (downloadSize / (1024.0 * 1024.0))
             % (narSize / (1024.0 * 1024.0)));
         for (auto & i : willSubstitute)
-            printMsg(lvlInfo, format("  %1%") % i);
+            printInfo(format("  %1%") % i);
     }
 
     if (!unknown.empty()) {
-        printMsg(lvlInfo, format("don't know how to build these paths%1%:")
+        printInfo(format("don't know how to build these paths%1%:")
             % (settings.readOnlyMode ? " (may be caused by read-only store access)" : ""));
         for (auto & i : unknown)
-            printMsg(lvlInfo, format("  %1%") % i);
+            printInfo(format("  %1%") % i);
     }
 }
 
@@ -282,20 +282,20 @@ int handleExceptions(const string & programName, std::function<void()> fun)
     } catch (Exit & e) {
         return e.status;
     } catch (UsageError & e) {
-        printMsg(lvlError,
+        printError(
             format(error + "%1%\nTry ‘%2% --help’ for more information.")
             % e.what() % programName);
         return 1;
     } catch (BaseError & e) {
-        printMsg(lvlError, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
+        printError(format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
         if (e.prefix() != "" && !settings.showTrace)
-            printMsg(lvlError, "(use ‘--show-trace’ to show detailed location information)");
+            printError("(use ‘--show-trace’ to show detailed location information)");
         return e.status;
     } catch (std::bad_alloc & e) {
-        printMsg(lvlError, error + "out of memory");
+        printError(error + "out of memory");
         return 1;
     } catch (std::exception & e) {
-        printMsg(lvlError, error + e.what());
+        printError(error + e.what());
         return 1;
     }
 

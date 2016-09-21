@@ -559,7 +559,7 @@ void RemoteStore::Connection::processStderr(Sink * sink, Source * source)
             to.flush();
         }
         else
-            printMsg(lvlError, chomp(readString(from)));
+            printError(chomp(readString(from)));
     }
     if (msg == STDERR_ERROR) {
         string error = readString(from);

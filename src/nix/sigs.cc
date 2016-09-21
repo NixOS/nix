@@ -84,7 +84,7 @@ struct CmdCopySigs : StorePathsCommand
 
         pool.process();
 
-        printMsg(lvlInfo, format("imported %d signatures") % added);
+        printInfo(format("imported %d signatures") % added);
     }
 };
 
@@ -132,7 +132,7 @@ struct CmdSignPaths : StorePathsCommand
             }
         }
 
-        printMsg(lvlInfo, format("added %d signatures") % added);
+        printInfo(format("added %d signatures") % added);
     }
 };
 

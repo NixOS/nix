@@ -644,7 +644,7 @@ static void processConnection(bool trusted)
 
         canSendStderr = false;
         _isInterrupted = false;
-        printMsg(lvlDebug, format("%1% operations") % opCount);
+        debug(format("%1% operations") % opCount);
 
     } catch (Error & e) {
         stopWork(false, e.msg(), 1);
@@ -837,7 +837,7 @@ static void daemonLoop(char * * argv)
             if (!trusted && !matchUser(user, group, allowedUsers))
                 throw Error(format("user ‘%1%’ is not allowed to connect to the Nix daemon") % user);
 
-            printMsg(lvlInfo, format((string) "accepted connection from pid %1%, user %2%" + (trusted ? " (trusted)" : ""))
+            printInfo(format((string) "accepted connection from pid %1%, user %2%" + (trusted ? " (trusted)" : ""))
                 % (peer.pidKnown ? std::to_string(peer.pid) : "<unknown>")
                 % (peer.uidKnown ? user : "<unknown>"));
 
@@ -874,7 +874,7 @@ static void daemonLoop(char * * argv)
         } catch (Interrupted & e) {
             throw;
         } catch (Error & e) {
-            printMsg(lvlError, format("error processing connection: %1%") % e.msg());
+            printError(format("error processing connection: %1%") % e.msg());
         }
     }
 }

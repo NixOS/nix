@@ -132,7 +132,7 @@ int main(int argc, char * * argv)
                 throw UsageError("download-via-ssh: --substitute takes exactly two arguments");
             Path storePath = argv[2];
             Path destPath = argv[3];
-            printMsg(lvlError, format("downloading ‘%1%’ via SSH from ‘%2%’...") % storePath % host);
+            printError(format("downloading ‘%1%’ via SSH from ‘%2%’...") % storePath % host);
             substitute(pipes, storePath, destPath);
         }
         else

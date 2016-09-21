@@ -62,13 +62,13 @@ std::set<std::string> runResolver(const Path & filename) {
             }
         }
         if (mach64_offset == 0) {
-            printMsg(lvlError, format("Could not find any mach64 blobs in file ‘%1%’, continuing...") % filename);
+            printError(format("Could not find any mach64 blobs in file ‘%1%’, continuing...") % filename);
             return std::set<string>();
         }
     } else if (magic == MH_MAGIC_64 || magic == MH_CIGAM_64) {
         mach64_offset = 0;
     } else {
-        printMsg(lvlError, format("Object file has unknown magic number ‘%1%’, skipping it...") % magic);
+        printError(format("Object file has unknown magic number ‘%1%’, skipping it...") % magic);
         return std::set<string>();
     }
 

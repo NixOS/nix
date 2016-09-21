@@ -43,7 +43,7 @@ struct MakeReadOnly
 
 LocalStore::InodeHash LocalStore::loadInodeHash()
 {
-    printMsg(lvlDebug, "loading hash inodes in memory");
+    debug("loading hash inodes in memory");
     InodeHash inodeHash;
 
     AutoCloseDir dir = opendir(linksDir.c_str());
@@ -75,7 +75,7 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
         checkInterrupt();
 
         if (inodeHash.count(dirent->d_ino)) {
-            printMsg(lvlDebug, format("‘%1%’ is already linked") % dirent->d_name);
+            debug(format("‘%1%’ is already linked") % dirent->d_name);
             continue;
         }
 
@@ -116,13 +116,13 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
        NixOS (example: $fontconfig/var/cache being modified).  Skip
        those files.  FIXME: check the modification time. */
     if (S_ISREG(st.st_mode) && (st.st_mode & S_IWUSR)) {
-        printMsg(lvlError, format("skipping suspicious writable file ‘%1%’") % path);
+        printError(format("skipping suspicious writable file ‘%1%’") % path);
         return;
     }
 
     /* This can still happen on top-level files. */
     if (st.st_nlink > 1 && inodeHash.count(st.st_ino)) {
-        printMsg(lvlDebug, format("‘%1%’ is already linked, with %2% other file(s)") % path % (st.st_nlink - 2));
+        debug(format("‘%1%’ is already linked, with %2% other file(s)") % path % (st.st_nlink - 2));
         return;
     }
 
@@ -136,7 +136,7 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
        contents of the symlink (i.e. the result of readlink()), not
        the contents of the target (which may not even exist). */
     Hash hash = hashPath(htSHA256, path).first;
-    printMsg(lvlDebug, format("‘%1%’ has hash ‘%2%’") % path % printHash(hash));
+    debug(format("‘%1%’ has hash ‘%2%’") % path % printHash(hash));
 
     /* Check if this is a known hash. */
     Path linkPath = linksDir + "/" + printHash32(hash);
@@ -161,12 +161,12 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
         throw SysError(format("getting attributes of path ‘%1%’") % linkPath);
 
     if (st.st_ino == stLink.st_ino) {
-        printMsg(lvlDebug, format("‘%1%’ is already linked to ‘%2%’") % path % linkPath);
+        debug(format("‘%1%’ is already linked to ‘%2%’") % path % linkPath);
         return;
     }
 
     if (st.st_size != stLink.st_size) {
-        printMsg(lvlError, format("removing corrupted link ‘%1%’") % linkPath);
+        printError(format("removing corrupted link ‘%1%’") % linkPath);
         unlink(linkPath.c_str());
         goto retry;
     }
@@ -192,7 +192,7 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
                systems).  This is likely to happen with empty files.
                Just shrug and ignore. */
             if (st.st_size)
-                printMsg(lvlInfo, format("‘%1%’ has maximum number of links") % linkPath);
+                printInfo(format("‘%1%’ has maximum number of links") % linkPath);
             return;
         }
         throw SysError(format("cannot link ‘%1%’ to ‘%2%’") % tempLink % linkPath);
@@ -201,14 +201,14 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
     /* Atomically replace the old file with the new hard link. */
     if (rename(tempLink.c_str(), path.c_str()) == -1) {
         if (unlink(tempLink.c_str()) == -1)
-            printMsg(lvlError, format("unable to unlink ‘%1%’") % tempLink);
+            printError(format("unable to unlink ‘%1%’") % tempLink);
         if (errno == EMLINK) {
             /* Some filesystems generate too many links on the rename,
                rather than on the original link.  (Probably it
                temporarily increases the st_nlink field before
                decreasing it again.) */
             if (st.st_size)
-                printMsg(lvlInfo, format("‘%1%’ has maximum number of links") % linkPath);
+                printInfo(format("‘%1%’ has maximum number of links") % linkPath);
             return;
         }
         throw SysError(format("cannot rename ‘%1%’ to ‘%2%’") % tempLink % path);
@@ -244,7 +244,7 @@ void LocalStore::optimiseStore()
 
     optimiseStore(stats);
 
-    printMsg(lvlError,
+    printError(
         format("%1% freed by hard-linking %2% files")
         % showBytes(stats.bytesFreed)
         % stats.filesLinked);

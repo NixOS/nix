@@ -76,7 +76,7 @@ LocalStore::LocalStore(const Params & params)
 
         struct group * gr = getgrnam(settings.buildUsersGroup.c_str());
         if (!gr)
-            printMsg(lvlError, format("warning: the group ‘%1%’ specified in ‘build-users-group’ does not exist")
+            printError(format("warning: the group ‘%1%’ specified in ‘build-users-group’ does not exist")
                 % settings.buildUsersGroup);
         else {
             struct stat st;
@@ -136,7 +136,7 @@ LocalStore::LocalStore(const Params & params)
     globalLock = openLockFile(globalLockPath.c_str(), true);
 
     if (!lockFile(globalLock.get(), ltRead, false)) {
-        printMsg(lvlError, "waiting for the big Nix store lock...");
+        printError("waiting for the big Nix store lock...");
         lockFile(globalLock.get(), ltRead, true);
     }
 
@@ -167,7 +167,7 @@ LocalStore::LocalStore(const Params & params)
                 "please upgrade Nix to version 1.11 first.");
 
         if (!lockFile(globalLock.get(), ltWrite, false)) {
-            printMsg(lvlError, "waiting for exclusive access to the Nix store...");
+            printError("waiting for exclusive access to the Nix store...");
             lockFile(globalLock.get(), ltWrite, true);
         }
 
@@ -1108,7 +1108,7 @@ void LocalStore::invalidatePathChecked(const Path & path)
 
 bool LocalStore::verifyStore(bool checkContents, bool repair)
 {
-    printMsg(lvlError, format("reading the Nix store..."));
+    printError(format("reading the Nix store..."));
 
     bool errors = false;
 
@@ -1119,7 +1119,7 @@ bool LocalStore::verifyStore(bool checkContents, bool repair)
     for (auto & i : readDirectory(realStoreDir)) store.insert(i.name);
 
     /* Check whether all valid paths actually exist. */
-    printMsg(lvlInfo, "checking path existence...");
+    printInfo("checking path existence...");
 
     PathSet validPaths2 = queryAllValidPaths(), validPaths, done;
 
@@ -1132,7 +1132,7 @@ bool LocalStore::verifyStore(bool checkContents, bool repair)
 
     /* Optionally, check the content hashes (slow). */
     if (checkContents) {
-        printMsg(lvlInfo, "checking hashes...");
+        printInfo("checking hashes...");
 
         Hash nullHash(htSHA256);
 
@@ -1145,7 +1145,7 @@ bool LocalStore::verifyStore(bool checkContents, bool repair)
                 HashResult current = hashPath(info->narHash.type, i);
 
                 if (info->narHash != nullHash && info->narHash != current.first) {
-                    printMsg(lvlError, format("path ‘%1%’ was modified! "
+                    printError(format("path ‘%1%’ was modified! "
                             "expected hash ‘%2%’, got ‘%3%’")
                         % i % printHash(info->narHash) % printHash(current.first));
                     if (repair) repairPath(i); else errors = true;
@@ -1155,14 +1155,14 @@ bool LocalStore::verifyStore(bool checkContents, bool repair)
 
                     /* Fill in missing hashes. */
                     if (info->narHash == nullHash) {
-                        printMsg(lvlError, format("fixing missing hash on ‘%1%’") % i);
+                        printError(format("fixing missing hash on ‘%1%’") % i);
                         info->narHash = current.first;
                         update = true;
                     }
 
                     /* Fill in missing narSize fields (from old stores). */
                     if (info->narSize == 0) {
-                        printMsg(lvlError, format("updating size field on ‘%1%’ to %2%") % i % current.second);
+                        printError(format("updating size field on ‘%1%’ to %2%") % i % current.second);
                         info->narSize = current.second;
                         update = true;
                     }
@@ -1178,9 +1178,9 @@ bool LocalStore::verifyStore(bool checkContents, bool repair)
                 /* It's possible that the path got GC'ed, so ignore
                    errors on invalid paths. */
                 if (isValidPath(i))
-                    printMsg(lvlError, format("error: %1%") % e.msg());
+                    printError(format("error: %1%") % e.msg());
                 else
-                    printMsg(lvlError, format("warning: %1%") % e.msg());
+                    printError(format("warning: %1%") % e.msg());
                 errors = true;
             }
         }
@@ -1199,7 +1199,7 @@ void LocalStore::verifyPath(const Path & path, const PathSet & store,
     done.insert(path);
 
     if (!isStorePath(path)) {
-        printMsg(lvlError, format("path ‘%1%’ is not in the Nix store") % path);
+        printError(format("path ‘%1%’ is not in the Nix store") % path);
         auto state(_state.lock());
         invalidatePath(*state, path);
         return;
@@ -1218,16 +1218,16 @@ void LocalStore::verifyPath(const Path & path, const PathSet & store,
             }
 
         if (canInvalidate) {
-            printMsg(lvlError, format("path ‘%1%’ disappeared, removing from database...") % path);
+            printError(format("path ‘%1%’ disappeared, removing from database...") % path);
             auto state(_state.lock());
             invalidatePath(*state, path);
         } else {
-            printMsg(lvlError, format("path ‘%1%’ disappeared, but it still has valid referrers!") % path);
+            printError(format("path ‘%1%’ disappeared, but it still has valid referrers!") % path);
             if (repair)
                 try {
                     repairPath(path);
                 } catch (Error & e) {
-                    printMsg(lvlError, format("warning: %1%") % e.msg());
+                    printError(format("warning: %1%") % e.msg());
                     errors = true;
                 }
             else errors = true;
@@ -1279,7 +1279,7 @@ static void makeMutable(const Path & path)
 void LocalStore::upgradeStore7()
 {
     if (getuid() != 0) return;
-    printMsg(lvlError, "removing immutable bits from the Nix store (this may take a while)...");
+    printError("removing immutable bits from the Nix store (this may take a while)...");
     makeMutable(realStoreDir);
 }
 

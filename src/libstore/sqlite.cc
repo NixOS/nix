@@ -10,11 +10,11 @@ namespace nix {
     int err = sqlite3_errcode(db);
     if (err == SQLITE_BUSY || err == SQLITE_PROTOCOL) {
         if (err == SQLITE_PROTOCOL)
-            printMsg(lvlError, "warning: SQLite database is busy (SQLITE_PROTOCOL)");
+            printError("warning: SQLite database is busy (SQLITE_PROTOCOL)");
         else {
             static bool warned = false;
             if (!warned) {
-                printMsg(lvlError, "warning: SQLite database is busy");
+                printError("warning: SQLite database is busy");
                 warned = true;
             }
         }

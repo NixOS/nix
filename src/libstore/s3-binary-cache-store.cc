@@ -161,7 +161,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
 
-        printMsg(lvlInfo, format("uploaded ‘s3://%1%/%2%’ (%3% bytes) in %4% ms")
+        printInfo(format("uploaded ‘s3://%1%/%2%’ (%3% bytes) in %4% ms")
             % bucketName % path % data.size() % duration);
 
         stats.putTimeMs += duration;
