@@ -602,6 +602,19 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
   </varlistentry>
 
 
+  <varlistentry xml:id="conf-sandbox-dev-shm-size"><term><literal>sandbox-dev-shm-size</literal></term>
+
+    <listitem><para>This option determines the maximum size of the
+    <literal>tmpfs</literal> filesystem mounted on
+    <filename>/dev/shm</filename> in Linux sandboxes. For the format,
+    see the description of the <option>size</option> option of
+    <literal>tmpfs</literal> in
+    <citerefentry><refentrytitle>mount</refentrytitle><manvolnum>8</manvolnum></citerefentry>. The
+    default is <literal>50%</literal>.</para></listitem>
+
+  </varlistentry>
+
+
 </variablelist>
 
 </para>
