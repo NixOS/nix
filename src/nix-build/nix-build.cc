@@ -60,6 +60,14 @@ std::vector<string> shellwords(const string & s)
     return res;
 }
 
+static void maybePrintExecError(ExecError & e)
+{
+    if (WIFEXITED(e.status))
+        throw Exit(WEXITSTATUS(e.status));
+    else
+        throw e;
+}
+
 int main(int argc, char ** argv)
 {
     return handleExceptions(argv[0], [&]() {
@@ -346,8 +354,12 @@ int main(int argc, char ** argv)
                 for (const auto & arg : instArgs)
                     instantiateArgs.push_back(arg);
                 instantiateArgs.push_back(expr);
-                auto instOutput = runProgram(settings.nixBinDir + "/nix-instantiate", false, instantiateArgs);
-                drvPaths = tokenizeString<std::vector<string>>(instOutput);
+                try {
+                    auto instOutput = runProgram(settings.nixBinDir + "/nix-instantiate", false, instantiateArgs);
+                    drvPaths = tokenizeString<std::vector<string>>(instOutput);
+                } catch (ExecError & e) {
+                    maybePrintExecError(e);
+                }
             } else {
                 drvPaths.push_back(expr);
             }
@@ -370,7 +382,12 @@ int main(int argc, char ** argv)
                         nixStoreArgs.push_back(input.first);
                 for (const auto & src : drv.inputSrcs)
                     nixStoreArgs.push_back(src);
-                runProgram(settings.nixBinDir + "/nix-store", false, nixStoreArgs);
+
+                try {
+                    runProgram(settings.nixBinDir + "/nix-store", false, nixStoreArgs);
+                } catch (ExecError & e) {
+                    maybePrintExecError(e);
+                }
 
                 // Set the environment.
                 auto env = getEnv();
@@ -471,7 +488,14 @@ int main(int argc, char ** argv)
                 nixStoreArgs.push_back(arg);
             for (const auto & path : drvPaths2)
                 nixStoreArgs.push_back(path);
-            auto nixStoreRes = runProgram(settings.nixBinDir + "/nix-store", false, nixStoreArgs);
+
+            std::string nixStoreRes;
+            try {
+                nixStoreRes = runProgram(settings.nixBinDir + "/nix-store", false, nixStoreArgs);
+            } catch (ExecError & e) {
+                maybePrintExecError(e);
+            }
+
             for (const auto & outpath : tokenizeString<std::vector<string>>(nixStoreRes))
                 outPaths.push_back(chomp(outpath));
 

@@ -247,7 +247,16 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = P
 string runProgram(Path program, bool searchPath = false,
     const Strings & args = Strings(), const string & input = "");
 
-MakeError(ExecError, Error)
+class ExecError : public Error
+{
+public:
+    int status;
+
+    template<typename... Args>
+    ExecError(int status, Args... args)
+        : Error(args...), status(status)
+    { }
+};
 
 /* Convert a list of strings to a null-terminated vector of char
    *'s. The result must not be accessed beyond the lifetime of the
