@@ -8,7 +8,7 @@
 
 namespace nix {
 
-MakeError(UsageError, nix::Error);
+MakeError(UsageError, Error);
 
 enum HashType : char;
 

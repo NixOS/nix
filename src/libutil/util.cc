@@ -31,13 +31,6 @@ extern char * * environ;
 namespace nix {
 
 
-BaseError::BaseError(const FormatOrString & fs, unsigned int status)
-    : status(status)
-{
-    err = fs.s;
-}
-
-
 BaseError & BaseError::addPrefix(const FormatOrString & fs)
 {
     prefix_ = fs.s + prefix_;
@@ -45,10 +38,10 @@ BaseError & BaseError::addPrefix(const FormatOrString & fs)
 }
 
 
-SysError::SysError(const FormatOrString & fs)
-    : Error(format("%1%: %2%") % fs.s % strerror(errno))
-    , errNo(errno)
+std::string SysError::addErrno(const std::string & s)
 {
+    errNo = errno;
+    return s + ": " + strerror(errNo);
 }
 
 

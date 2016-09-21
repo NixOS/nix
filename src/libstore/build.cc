@@ -3768,7 +3768,7 @@ void LocalStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
         }
 
     if (!failed.empty())
-        throw Error(format("build of %1% failed") % showPaths(failed), worker.exitStatus());
+        throw Error(worker.exitStatus(), "build of %s failed",showPaths(failed));
 }
 
 
@@ -3804,7 +3804,7 @@ void LocalStore::ensurePath(const Path & path)
     worker.run(goals);
 
     if (goal->getExitCode() != Goal::ecSuccess)
-        throw Error(format("path ‘%1%’ does not exist and cannot be created") % path, worker.exitStatus());
+        throw Error(worker.exitStatus(), "path ‘%s’ does not exist and cannot be created", path);
 }
 
 
@@ -3825,7 +3825,7 @@ void LocalStore::repairPath(const Path & path)
             goals.insert(worker.makeDerivationGoal(deriver, StringSet(), bmRepair));
             worker.run(goals);
         } else
-            throw Error(format("cannot repair path ‘%1%’") % path, worker.exitStatus());
+            throw Error(worker.exitStatus(), "cannot repair path ‘%s’", path);
     }
 }
 
