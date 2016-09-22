@@ -33,4 +33,7 @@ derivation {
     # by definition pure.
     "http_proxy" "https_proxy" "ftp_proxy" "all_proxy" "no_proxy"
   ];
+
+  # To make "nix-prefetch-url" work.
+  urls = [ url ];
 }
