@@ -18,7 +18,7 @@
   "Find antiquote within a Nix expression up to LIMIT."
   (let ((pos (next-single-char-property-change (point) 'nix-syntax-antiquote
                                                nil limit)))
-    (when (and pos (> pos (point)))
+    (when (and pos (> pos (point)) (< pos (point-max)))
       (goto-char pos)
       (let ((char (char-after pos)))
         (pcase char
