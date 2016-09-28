@@ -85,8 +85,24 @@
   "Syntax table for Nix mode.")
 
 (defun nix-syntax-propertize-escaped-antiquote ()
-  "Set syntax properies for an escaped antiquote mark."
-  nil)
+  "Set syntax properties for escaped antiquote."
+  (let* ((start (match-beginning 0))
+         (context (save-excursion (save-match-data (syntax-ppss start))))
+         (string-type (nth 3 context)))
+
+    ;; treat like multiline when not already in string
+    ;; else ignore
+    (when (not string-type)
+      (put-text-property start (1+ start)
+       'syntax-table (string-to-syntax "|"))
+
+      (when (string= (buffer-substring (+ 2 start) (+ 4 start)) "${")
+        (put-text-property (+ 2 start) (+ 3 start)
+                           'syntax-table (string-to-syntax "|"))
+        (put-text-property (+ 2 start) (+ 4 start)
+                           'nix-syntax-antiquote t))
+      )
+    ))
 
 (defun nix-syntax-propertize-multiline-string ()
   "Set syntax properies for multiline string delimiters."
@@ -135,7 +151,7 @@ If a close brace `}' ends an antiquote, the next character begins a string."
   (remove-text-properties start end '(syntax-table nil nix-syntax-antiquote nil))
   (funcall
    (syntax-propertize-rules
-    ("''\\${"
+    ("''['\\$\]" ;; ignore ''* characters
      (0 (ignore (nix-syntax-propertize-escaped-antiquote))))
     ("''"
      (0 (ignore (nix-syntax-propertize-multiline-string))))
