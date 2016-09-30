@@ -269,6 +269,13 @@ AC_ARG_ENABLE(init-state, AC_HELP_STRING([--disable-init-state],
 #AM_CONDITIONAL(INIT_STATE, test "$init_state" = "yes")
 
 
+# documentation generation switch
+AC_ARG_ENABLE(doc-gen, AC_HELP_STRING([--disable-doc-gen],
+  [disable documentation generation]),
+  doc_generate=$enableval, doc_generate=yes)
+AC_SUBST(doc_generate)
+
+
 # Setuid installations.
 AC_CHECK_FUNCS([setresuid setreuid lchown])
 

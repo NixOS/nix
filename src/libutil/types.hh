@@ -41,6 +41,45 @@ struct FormatOrString
 };
 
 
+/* A helper for formatting strings. ‘fmt(format, a_0, ..., a_n)’ is
+   equivalent to ‘boost::format(format) % a_0 % ... %
+   ... a_n’. However, ‘fmt(s)’ is equivalent to ‘s’ (so no %-expansion
+   takes place). */
+
+inline void formatHelper(boost::format & f)
+{
+}
+
+template<typename T, typename... Args>
+inline void formatHelper(boost::format & f, T x, Args... args)
+{
+    formatHelper(f % x, args...);
+}
+
+inline std::string fmt(const std::string & s)
+{
+    return s;
+}
+
+inline std::string fmt(const char * s)
+{
+    return s;
+}
+
+inline std::string fmt(const FormatOrString & fs)
+{
+    return fs.s;
+}
+
+template<typename... Args>
+inline std::string fmt(const std::string & fs, Args... args)
+{
+    boost::format f(fs);
+    formatHelper(f, args...);
+    return f.str();
+}
+
+
 /* BaseError should generally not be caught, as it has Interrupted as
    a subclass. Catch Error instead. */
 class BaseError : public std::exception
@@ -49,14 +88,28 @@ protected:
     string prefix_; // used for location traces etc.
     string err;
 public:
-    unsigned int status; // exit status
-    BaseError(const FormatOrString & fs, unsigned int status = 1);
+    unsigned int status = 1; // exit status
+
+    template<typename... Args>
+    BaseError(unsigned int status, Args... args)
+        : err(fmt(args...))
+        , status(status)
+    {
+    }
+
+    template<typename... Args>
+    BaseError(Args... args)
+        : err(fmt(args...))
+    {
+    }
+
 #ifdef EXCEPTION_NEEDS_THROW_SPEC
     ~BaseError() throw () { };
     const char * what() const throw () { return err.c_str(); }
 #else
     const char * what() const noexcept { return err.c_str(); }
 #endif
+
     const string & msg() const { return err; }
     const string & prefix() const { return prefix_; }
     BaseError & addPrefix(const FormatOrString & fs);
@@ -66,7 +119,7 @@ public:
     class newClass : public superClass                  \
     {                                                   \
     public:                                             \
-        newClass(const FormatOrString & fs, unsigned int status = 1) : superClass(fs, status) { }; \
+        using superClass::superClass;                   \
     };
 
 MakeError(Error, BaseError)
@@ -75,7 +128,15 @@ class SysError : public Error
 {
 public:
     int errNo;
-    SysError(const FormatOrString & fs);
+
+    template<typename... Args>
+    SysError(Args... args)
+        : Error(addErrno(fmt(args...)))
+    { }
+
+private:
+
+    std::string addErrno(const std::string & s);
 };
 
 

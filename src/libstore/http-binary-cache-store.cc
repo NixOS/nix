@@ -86,7 +86,9 @@ protected:
                     std::rethrow_exception(exc);
                 } catch (DownloadError & e) {
                     if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
-                        success(0);
+                        return success(0);
+                    failure(exc);
+                } catch (...) {
                     failure(exc);
                 }
             });

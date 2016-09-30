@@ -33,5 +33,6 @@ pkglibdir = $(libdir)/$(PACKAGE_NAME)
 prefix = @prefix@
 storedir = @storedir@
 sysconfdir = @sysconfdir@
+doc_generate = @doc_generate@
 xmllint = @xmllint@
 xsltproc = @xsltproc@

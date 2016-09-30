@@ -36,7 +36,7 @@ void removeOldGenerations(std::string dir)
                 if (e.errNo == ENOENT) continue;
             }
             if (link.find("link") != string::npos) {
-                printMsg(lvlInfo, format("removing old generations of profile %1%") % path);
+                printInfo(format("removing old generations of profile %1%") % path);
                 if (deleteOlderThan != "")
                     deleteGenerationsOlderThan(path, deleteOlderThan, dryRun);
                 else

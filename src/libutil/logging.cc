@@ -52,7 +52,7 @@ Verbosity verbosity = lvlInfo;
 void warnOnce(bool & haveWarned, const FormatOrString & fs)
 {
     if (!haveWarned) {
-        printMsg(lvlError, format("warning: %1%") % fs.s);
+        printError(format("warning: %1%") % fs.s);
         haveWarned = true;
     }
 }

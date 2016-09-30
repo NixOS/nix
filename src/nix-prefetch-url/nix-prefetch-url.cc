@@ -122,7 +122,7 @@ int main(int argc, char * * argv)
             /* Extract the hash mode. */
             attr = v.attrs->find(state.symbols.create("outputHashMode"));
             if (attr == v.attrs->end())
-                printMsg(lvlInfo, "warning: this does not look like a fetchurl call");
+                printInfo("warning: this does not look like a fetchurl call");
             else
                 unpack = state.forceString(*attr->value) == "recursive";
 
@@ -166,7 +166,7 @@ int main(int argc, char * * argv)
 
             /* Optionally unpack the file. */
             if (unpack) {
-                printMsg(lvlInfo, "unpacking...");
+                printInfo("unpacking...");
                 Path unpacked = (Path) tmpDir + "/unpacked";
                 createDirs(unpacked);
                 if (hasSuffix(baseNameOf(uri), ".zip"))
@@ -201,7 +201,7 @@ int main(int argc, char * * argv)
         }
 
         if (!printPath)
-            printMsg(lvlInfo, format("path is ‘%1%’") % storePath);
+            printInfo(format("path is ‘%1%’") % storePath);
 
         std::cout << printHash16or32(hash) << std::endl;
         if (printPath)

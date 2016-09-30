@@ -49,7 +49,7 @@ size_t threshold = 256 * 1024 * 1024;
 
 static void warnLargeDump()
 {
-    printMsg(lvlError, "warning: dumping very large path (> 256 MiB); this may run out of memory");
+    printError("warning: dumping very large path (> 256 MiB); this may run out of memory");
 }
 
 

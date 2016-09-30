@@ -121,7 +121,7 @@ bool PathLocks::lockPaths(const PathSet & _paths,
             /* Acquire an exclusive lock. */
             if (!lockFile(fd.get(), ltWrite, false)) {
                 if (wait) {
-                    if (waitMsg != "") printMsg(lvlError, waitMsg);
+                    if (waitMsg != "") printError(waitMsg);
                     lockFile(fd.get(), ltWrite, true);
                 } else {
                     /* Failed to lock this path; release all other
@@ -174,7 +174,7 @@ void PathLocks::unlock()
 
         lockedPaths.erase(i.second);
         if (close(i.first) == -1)
-            printMsg(lvlError,
+            printError(
                 format("error (ignored): cannot close lock file on ‘%1%’") % i.second);
 
         debug(format("lock released on ‘%1%’") % i.second);

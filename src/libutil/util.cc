@@ -31,13 +31,6 @@ extern char * * environ;
 namespace nix {
 
 
-BaseError::BaseError(const FormatOrString & fs, unsigned int status)
-    : status(status)
-{
-    err = fs.s;
-}
-
-
 BaseError & BaseError::addPrefix(const FormatOrString & fs)
 {
     prefix_ = fs.s + prefix_;
@@ -45,10 +38,10 @@ BaseError & BaseError::addPrefix(const FormatOrString & fs)
 }
 
 
-SysError::SysError(const FormatOrString & fs)
-    : Error(format("%1%: %2%") % fs.s % strerror(errno))
-    , errNo(errno)
+std::string SysError::addErrno(const std::string & s)
 {
+    errNo = errno;
+    return s + ": " + strerror(errNo);
 }
 
 
@@ -56,6 +49,21 @@ string getEnv(const string & key, const string & def)
 {
     char * value = getenv(key.c_str());
     return value ? string(value) : def;
+}
+
+
+std::map<std::string, std::string> getEnv()
+{
+    std::map<std::string, std::string> env;
+    for (size_t i = 0; environ[i]; ++i) {
+        auto s = environ[i];
+        auto eq = strchr(s, '=');
+        if (!eq)
+            // invalid env, just keep going
+            continue;
+        env.emplace(std::string(s, eq), std::string(eq + 1));
+    }
+    return env;
 }
 
 
@@ -716,20 +724,20 @@ void Pid::kill(bool quiet)
     if (pid == -1 || pid == 0) return;
 
     if (!quiet)
-        printMsg(lvlError, format("killing process %1%") % pid);
+        printError(format("killing process %1%") % pid);
 
     /* Send the requested signal to the child.  If it has its own
        process group, send the signal to every process in the child
        process group (which hopefully includes *all* its children). */
     if (::kill(separatePG ? -pid : pid, killSignal) != 0)
-        printMsg(lvlError, (SysError(format("killing process %1%") % pid).msg()));
+        printError((SysError(format("killing process %1%") % pid).msg()));
 
     /* Wait until the child dies, disregarding the exit status. */
     int status;
     while (waitpid(pid, &status, 0) == -1) {
         checkInterrupt();
         if (errno != EINTR) {
-            printMsg(lvlError,
+            printError(
                 (SysError(format("waiting for process %1%") % pid).msg()));
             break;
         }
@@ -919,7 +927,7 @@ string runProgram(Path program, bool searchPath, const Strings & args,
     /* Wait for the child to finish. */
     int status = pid.wait(true);
     if (!statusOk(status))
-        throw ExecError(format("program ‘%1%’ %2%")
+        throw ExecError(status, format("program ‘%1%’ %2%")
             % program % statusToString(status));
 
     return result;
@@ -1117,7 +1125,7 @@ void ignoreException()
     try {
         throw;
     } catch (std::exception & e) {
-        printMsg(lvlError, format("error (ignored): %1%") % e.what());
+        printError(format("error (ignored): %1%") % e.what());
     }
 }
 
@@ -1215,12 +1223,12 @@ string base64Decode(const string & s)
 }
 
 
-void callFailure(const std::function<void(std::exception_ptr exc)> & failure)
+void callFailure(const std::function<void(std::exception_ptr exc)> & failure, std::exception_ptr exc)
 {
     try {
-        failure(std::current_exception());
+        failure(exc);
     } catch (std::exception & e) {
-        printMsg(lvlError, format("uncaught exception: %s") % e.what());
+        printError(format("uncaught exception: %s") % e.what());
         abort();
     }
 }

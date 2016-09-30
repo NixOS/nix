@@ -132,9 +132,9 @@ void deleteGeneration(const Path & profile, unsigned int gen)
 static void deleteGeneration2(const Path & profile, unsigned int gen, bool dryRun)
 {
     if (dryRun)
-        printMsg(lvlInfo, format("would remove generation %1%") % gen);
+        printInfo(format("would remove generation %1%") % gen);
     else {
-        printMsg(lvlInfo, format("removing generation %1%") % gen);
+        printInfo(format("removing generation %1%") % gen);
         deleteGeneration(profile, gen);
     }
 }

@@ -98,7 +98,7 @@ struct CurlDownloader : public Downloader
         {
             assert(!done);
             done = true;
-            failure(std::make_exception_ptr(e));
+            callFailure(failure, std::make_exception_ptr(e));
         }
 
         size_t writeCallback(void * contents, size_t size, size_t nmemb)
@@ -241,8 +241,8 @@ struct CurlDownloader : public Downloader
                 (httpStatus == 200 || httpStatus == 304 || httpStatus == 226 /* FTP */ || httpStatus == 0 /* other protocol */))
             {
                 result.cached = httpStatus == 304;
-                success(result);
                 done = true;
+                callSuccess(success, failure, const_cast<const DownloadResult &>(result));
             } else {
                 Error err =
                     (httpStatus == 404 || code == CURLE_FILE_COULDNT_READ_FILE) ? NotFound :
@@ -265,7 +265,7 @@ struct CurlDownloader : public Downloader
                    download after a while. */
                 if (err == Transient && attempt < request.tries) {
                     int ms = request.baseRetryTimeMs * std::pow(2.0f, attempt - 1 + std::uniform_real_distribution<>(0.0, 0.5)(downloader.mt19937));
-                    printMsg(lvlError, format("warning: %s; retrying in %d ms") % exc.what() % ms);
+                    printError(format("warning: %s; retrying in %d ms") % exc.what() % ms);
                     embargo = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
                     downloader.enqueueItem(shared_from_this());
                 }
@@ -420,7 +420,7 @@ struct CurlDownloader : public Downloader
             workerThreadMain();
         } catch (nix::Interrupted & e) {
         } catch (std::exception & e) {
-            printMsg(lvlError, format("unexpected error in download thread: %s") % e.what());
+            printError(format("unexpected error in download thread: %s") % e.what());
         }
 
         {
@@ -522,7 +522,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
                     if (effectiveUrl)
                         *effectiveUrl = url_;
                 } else if (!ss[1].empty()) {
-                    printMsg(lvlDebug, format("verifying previous ETag ‘%1%’") % ss[1]);
+                    debug(format("verifying previous ETag ‘%1%’") % ss[1]);
                     expectedETag = ss[1];
                 }
             }
@@ -556,7 +556,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
             writeFile(dataFile, url + "\n" + res.etag + "\n" + std::to_string(time(0)) + "\n");
         } catch (DownloadError & e) {
             if (storePath.empty()) throw;
-            printMsg(lvlError, format("warning: %1%; using cached result") % e.msg());
+            printError(format("warning: %1%; using cached result") % e.msg());
         }
     }
 
@@ -570,7 +570,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
                 unpackedStorePath = "";
         }
         if (unpackedStorePath.empty()) {
-            printMsg(lvlInfo, format("unpacking ‘%1%’...") % url);
+            printInfo(format("unpacking ‘%1%’...") % url);
             Path tmpDir = createTempDir();
             AutoDelete autoDelete(tmpDir, true);
             // FIXME: this requires GNU tar for decompression.

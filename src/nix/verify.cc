@@ -87,7 +87,7 @@ struct CmdVerify : StorePathsCommand
                     if (hash.first != info->narHash) {
                         logger->incProgress(corruptedLabel);
                         corrupted = 1;
-                        printMsg(lvlError,
+                        printError(
                             format("path ‘%s’ was modified! expected hash ‘%s’, got ‘%s’")
                             % info->path % printHash(info->narHash) % printHash(hash.first));
                     }
@@ -128,7 +128,7 @@ struct CmdVerify : StorePathsCommand
                                 doSigs(info2->sigs);
                             } catch (InvalidPath &) {
                             } catch (Error & e) {
-                                printMsg(lvlError, format(ANSI_RED "error:" ANSI_NORMAL " %s") % e.what());
+                                printError(format(ANSI_RED "error:" ANSI_NORMAL " %s") % e.what());
                             }
                         }
 
@@ -139,7 +139,7 @@ struct CmdVerify : StorePathsCommand
                     if (!good) {
                         logger->incProgress(untrustedLabel);
                         untrusted++;
-                        printMsg(lvlError, format("path ‘%s’ is untrusted") % info->path);
+                        printError(format("path ‘%s’ is untrusted") % info->path);
                     }
 
                 }
@@ -148,7 +148,7 @@ struct CmdVerify : StorePathsCommand
                 done++;
 
             } catch (Error & e) {
-                printMsg(lvlError, format(ANSI_RED "error:" ANSI_NORMAL " %s") % e.what());
+                printError(format(ANSI_RED "error:" ANSI_NORMAL " %s") % e.what());
                 logger->incProgress(failedLabel);
                 failed++;
             }
@@ -159,7 +159,7 @@ struct CmdVerify : StorePathsCommand
 
         pool.process();
 
-        printMsg(lvlInfo, format("%d paths checked, %d untrusted, %d corrupted, %d failed")
+        printInfo(format("%d paths checked, %d untrusted, %d corrupted, %d failed")
             % done % untrusted % corrupted % failed);
 
         throw Exit(

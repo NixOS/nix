@@ -66,14 +66,19 @@ Logger * makeDefaultLogger();
 
 extern Verbosity verbosity; /* suppress msgs > this */
 
-#define printMsg(level, f) \
+/* Print a message if the current log level is at least the specified
+   level. Note that this has to be implemented as a macro to ensure
+   that the arguments are evaluated lazily. */
+#define printMsg(level, args...) \
     do { \
         if (level <= nix::verbosity) { \
-            logger->log(level, (f)); \
+            logger->log(level, fmt(args)); \
         } \
     } while (0)
 
-#define debug(f) printMsg(lvlDebug, f)
+#define printError(args...) printMsg(lvlError, args)
+#define printInfo(args...) printMsg(lvlInfo, args)
+#define debug(args...) printMsg(lvlDebug, args)
 
 void warnOnce(bool & haveWarned, const FormatOrString & fs);
 

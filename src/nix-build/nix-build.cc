@@ -1,20 +1,20 @@
 #include <cstring>
+#include <fstream>
+#include <iostream>
 #include <regex>
-#include "util.hh"
-#include <unistd.h>
-#include "shared.hh"
 #include <sstream>
 #include <vector>
-#include <iostream>
-#include <fstream>
+
+#include <unistd.h>
+
 #include "store-api.hh"
 #include "globals.hh"
 #include "derivations.hh"
+#include "affinity.hh"
+#include "util.hh"
+#include "shared.hh"
 
 using namespace nix;
-using std::stringstream;
-
-extern char ** environ;
 
 /* Recreate the effect of the perl shellwords function, breaking up a
  * string into arguments like a shell word, including escapes
@@ -58,6 +58,14 @@ std::vector<string> shellwords(const string & s)
     cur.append(begin, it);
     if (!cur.empty()) res.push_back(cur);
     return res;
+}
+
+static void maybePrintExecError(ExecError & e)
+{
+    if (WIFEXITED(e.status))
+        throw Exit(WEXITSTATUS(e.status));
+    else
+        throw e;
 }
 
 int main(int argc, char ** argv)
@@ -346,8 +354,12 @@ int main(int argc, char ** argv)
                 for (const auto & arg : instArgs)
                     instantiateArgs.push_back(arg);
                 instantiateArgs.push_back(expr);
-                auto instOutput = runProgram(settings.nixBinDir + "/nix-instantiate", false, instantiateArgs);
-                drvPaths = tokenizeString<std::vector<string>>(instOutput);
+                try {
+                    auto instOutput = runProgram(settings.nixBinDir + "/nix-instantiate", false, instantiateArgs);
+                    drvPaths = tokenizeString<std::vector<string>>(instOutput);
+                } catch (ExecError & e) {
+                    maybePrintExecError(e);
+                }
             } else {
                 drvPaths.push_back(expr);
             }
@@ -370,35 +382,36 @@ int main(int argc, char ** argv)
                         nixStoreArgs.push_back(input.first);
                 for (const auto & src : drv.inputSrcs)
                     nixStoreArgs.push_back(src);
-                runProgram(settings.nixBinDir + "/nix-store", false, nixStoreArgs);
+
+                try {
+                    runProgram(settings.nixBinDir + "/nix-store", false, nixStoreArgs);
+                } catch (ExecError & e) {
+                    maybePrintExecError(e);
+                }
 
                 // Set the environment.
+                auto env = getEnv();
+
                 auto tmp = getEnv("TMPDIR", getEnv("XDG_RUNTIME_DIR", "/tmp"));
+
                 if (pure) {
-                    std::vector<string> skippedEnv{"HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL", "TZ", "PAGER", "NIX_BUILD_SHELL"};
-                    std::vector<string> removed;
-                    for (auto i = size_t{0}; environ[i]; ++i) {
-                        auto eq = strchr(environ[i], '=');
-                        if (!eq)
-                            // invalid env, just keep going
-                            continue;
-                        std::string name(environ[i], eq);
-                        if (find(skippedEnv.begin(), skippedEnv.end(), name) == skippedEnv.end())
-                            removed.emplace_back(std::move(name));
-                    }
-                    for (const auto & name : removed)
-                        unsetenv(name.c_str());
+                    std::set<string> keepVars{"HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL", "TZ", "PAGER", "NIX_BUILD_SHELL"};
+                    decltype(env) newEnv;
+                    for (auto & i : env)
+                        if (keepVars.count(i.first))
+                            newEnv.emplace(i);
+                    env = newEnv;
                     // NixOS hack: prevent /etc/bashrc from sourcing /etc/profile.
-                    setenv("__ETC_PROFILE_SOURCED", "1", 1);
+                    env["__ETC_PROFILE_SOURCED"] = "1";
                 }
-                setenv("NIX_BUILD_TOP", tmp.c_str(), 1);
-                setenv("TMPDIR", tmp.c_str(), 1);
-                setenv("TEMPDIR", tmp.c_str(), 1);
-                setenv("TMP", tmp.c_str(), 1);
-                setenv("TEMP", tmp.c_str(), 1);
-                setenv("NIX_STORE", store->storeDir.c_str(), 1);
-                for (const auto & env : drv.env)
-                    setenv(env.first.c_str(), env.second.c_str(), 1);
+
+                env["NIX_BUILD_TOP"] = env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmp;
+                env["NIX_STORE"] = store->storeDir;
+
+                for (auto & var : drv.env)
+                    env.emplace(var);
+
+                restoreAffinity();
 
                 // Run a shell using the derivation's environment.  For
                 // convenience, source $stdenv/setup to setup additional
@@ -420,11 +433,25 @@ int main(int argc, char ** argv)
                         "shopt -u nullglob; "
                         "unset TZ; %4%"
                         "%5%"
-                        ) % (Path) tmpDir % (pure ? "" : "p=$PATH") % (pure ? "" : "PATH=$PATH:$p; unset p; ") % (getenv("TZ") ? (string("export TZ='") + getenv("TZ") + "'; ") : "") % envCommand).str());
-                if (interactive)
-                    execlp(getEnv("NIX_BUILD_SHELL", "bash").c_str(), "bash", "--rcfile", rcfile.c_str(), NULL);
-                else
-                    execlp(getEnv("NIX_BUILD_SHELL", "bash").c_str(), "bash", rcfile.c_str(), NULL);
+                        )
+                        % (Path) tmpDir
+                        % (pure ? "" : "p=$PATH; ")
+                        % (pure ? "" : "PATH=$PATH:$p; unset p; ")
+                        % (getenv("TZ") ? (string("export TZ='") + getenv("TZ") + "'; ") : "")
+                        % envCommand).str());
+
+                Strings envStrs;
+                for (auto & i : env)
+                    envStrs.push_back(i.first + "=" + i.second);
+
+                auto args = interactive
+                    ? Strings{"bash", "--rcfile", rcfile}
+                    : Strings{"bash", rcfile};
+
+                execvpe(getEnv("NIX_BUILD_SHELL", "bash").c_str(),
+                        stringsToCharPtrs(args).data(),
+                        stringsToCharPtrs(envStrs).data());
+
                 throw SysError("executing shell");
             }
 
@@ -461,7 +488,14 @@ int main(int argc, char ** argv)
                 nixStoreArgs.push_back(arg);
             for (const auto & path : drvPaths2)
                 nixStoreArgs.push_back(path);
-            auto nixStoreRes = runProgram(settings.nixBinDir + "/nix-store", false, nixStoreArgs);
+
+            std::string nixStoreRes;
+            try {
+                nixStoreRes = runProgram(settings.nixBinDir + "/nix-store", false, nixStoreArgs);
+            } catch (ExecError & e) {
+                maybePrintExecError(e);
+            }
+
             for (const auto & outpath : tokenizeString<std::vector<string>>(nixStoreRes))
                 outPaths.push_back(chomp(outpath));
 

@@ -755,7 +755,7 @@ static void opVerify(Strings opFlags, Strings opArgs)
         else throw UsageError(format("unknown flag ‘%1%’") % i);
 
     if (store->verifyStore(checkContents, repair)) {
-        printMsg(lvlError, "warning: not all errors were fixed");
+        printError("warning: not all errors were fixed");
         throw Exit(1);
     }
 }
@@ -777,7 +777,7 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         store->narFromPath(path, sink);
         auto current = sink.finish();
         if (current.first != info->narHash) {
-            printMsg(lvlError,
+            printError(
                 format("path ‘%1%’ was modified! expected hash ‘%2%’, got ‘%3%’")
                 % path % printHash(info->narHash) % printHash(current.first));
             status = 1;
@@ -879,7 +879,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                         try {
                             store->buildPaths(willSubstitute);
                         } catch (Error & e) {
-                            printMsg(lvlError, format("warning: %1%") % e.msg());
+                            printError(format("warning: %1%") % e.msg());
                         }
                 }
 

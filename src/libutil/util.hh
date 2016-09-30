@@ -8,9 +8,11 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <signal.h>
+
 #include <functional>
 #include <limits>
 #include <cstdio>
+#include <map>
 
 #ifndef HAVE_STRUCT_DIRENT_D_TYPE
 #define DT_UNKNOWN 0
@@ -24,6 +26,9 @@ namespace nix {
 
 /* Return an environment variable. */
 string getEnv(const string & key, const string & def = "");
+
+/* Get the entire environment. */
+std::map<std::string, std::string> getEnv();
 
 /* Return an absolutized path, resolving paths relative to the
    specified directory, or the current directory otherwise.  The path
@@ -242,7 +247,16 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = P
 string runProgram(Path program, bool searchPath = false,
     const Strings & args = Strings(), const string & input = "");
 
-MakeError(ExecError, Error)
+class ExecError : public Error
+{
+public:
+    int status;
+
+    template<typename... Args>
+    ExecError(int status, Args... args)
+        : Error(args...), status(status)
+    { }
+};
 
 /* Convert a list of strings to a null-terminated vector of char
    *'s. The result must not be accessed beyond the lifetime of the
@@ -378,7 +392,8 @@ string get(const T & map, const string & key, const string & def = "")
 
 /* Call ‘failure’ with the current exception as argument. If ‘failure’
    throws an exception, abort the program. */
-void callFailure(const std::function<void(std::exception_ptr exc)> & failure);
+void callFailure(const std::function<void(std::exception_ptr exc)> & failure,
+    std::exception_ptr exc = std::current_exception());
 
 
 /* Evaluate the function ‘f’. If it returns a value, call ‘success’

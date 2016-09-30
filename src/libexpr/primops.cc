@@ -427,9 +427,9 @@ static void prim_trace(EvalState & state, const Pos & pos, Value * * args, Value
 {
     state.forceValue(*args[0]);
     if (args[0]->type == tString)
-        printMsg(lvlError, format("trace: %1%") % args[0]->string.s);
+        printError(format("trace: %1%") % args[0]->string.s);
     else
-        printMsg(lvlError, format("trace: %1%") % *args[0]);
+        printError(format("trace: %1%") % *args[0]);
     state.forceValue(*args[1]);
     v = *args[1];
 }

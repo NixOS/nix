@@ -559,12 +559,12 @@ void RemoteStore::Connection::processStderr(Sink * sink, Source * source)
             to.flush();
         }
         else
-            printMsg(lvlError, chomp(readString(from)));
+            printError(chomp(readString(from)));
     }
     if (msg == STDERR_ERROR) {
         string error = readString(from);
         unsigned int status = readInt(from);
-        throw Error(format("%1%") % error, status);
+        throw Error(status, error);
     }
     else if (msg != STDERR_LAST)
         throw Error("protocol error processing standard error");

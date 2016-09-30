@@ -124,7 +124,7 @@ static void getAllExprs(EvalState & state,
             if (hasSuffix(attrName, ".nix"))
                 attrName = string(attrName, 0, attrName.size() - 4);
             if (attrs.find(attrName) != attrs.end()) {
-                printMsg(lvlError, format("warning: name collision in input Nix expressions, skipping ‘%1%’") % path2);
+                printError(format("warning: name collision in input Nix expressions, skipping ‘%1%’") % path2);
                 continue;
             }
             attrs.insert(attrName);
@@ -304,7 +304,7 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
             matches.clear();
             for (auto & j : newest) {
                 if (multiple.find(j.second.first.name) != multiple.end())
-                    printMsg(lvlInfo,
+                    printInfo(
                         format("warning: there are multiple derivations named ‘%1%’; using the first one")
                         % j.second.first.name);
                 matches.push_back(j.second);
@@ -496,13 +496,13 @@ static void installDerivations(Globals & globals,
                 if (!globals.preserveInstalled &&
                     newNames.find(drvName.name) != newNames.end() &&
                     !keep(i))
-                    printMsg(lvlInfo, format("replacing old ‘%1%’") % i.name);
+                    printInfo(format("replacing old ‘%1%’") % i.name);
                 else
                     allElems.push_back(i);
             }
 
             for (auto & i : newElems)
-                printMsg(lvlInfo, format("installing ‘%1%’") % i.name);
+                printInfo(format("installing ‘%1%’") % i.name);
         }
 
         printMissing(*globals.state, newElems);
@@ -604,7 +604,7 @@ static void upgradeDerivations(Globals & globals,
                 {
                     const char * action = compareVersions(drvName.version, bestVersion) <= 0
                         ? "upgrading" : "downgrading";
-                    printMsg(lvlInfo,
+                    printInfo(
                         format("%1% ‘%2%’ to ‘%3%’")
                         % action % i.name % bestElem->name);
                     newElems.push_back(*bestElem);
@@ -674,7 +674,7 @@ static void opSetFlag(Globals & globals, Strings opFlags, Strings opArgs)
             DrvName drvName(i.name);
             for (auto & j : selectors)
                 if (j.matches(drvName)) {
-                    printMsg(lvlInfo, format("setting flag on ‘%1%’") % i.name);
+                    printInfo(format("setting flag on ‘%1%’") % i.name);
                     j.hits++;
                     setMetaFlag(*globals.state, i, flagName, flagValue);
                     break;
@@ -748,7 +748,7 @@ static void uninstallDerivations(Globals & globals, Strings & selectors,
                 if ((isPath(j) && i.queryOutPath() == globals.state->store->followLinksToStorePath(j))
                     || DrvName(j).matches(drvName))
                 {
-                    printMsg(lvlInfo, format("uninstalling ‘%1%’") % i.name);
+                    printInfo(format("uninstalling ‘%1%’") % i.name);
                     found = true;
                     break;
                 }
@@ -874,7 +874,7 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
             auto placeholder = metaObj.placeholder(j);
             Value * v = i.queryMeta(j);
             if (!v) {
-                printMsg(lvlError, format("derivation ‘%1%’ has invalid meta attribute ‘%2%’") % i.name % j);
+                printError(format("derivation ‘%1%’ has invalid meta attribute ‘%2%’") % i.name % j);
                 placeholder.write(nullptr);
             } else {
                 PathSet context;
@@ -1118,7 +1118,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                             attrs2["name"] = j;
                             Value * v = i.queryMeta(j);
                             if (!v)
-                                printMsg(lvlError, format("derivation ‘%1%’ has invalid meta attribute ‘%2%’") % i.name % j);
+                                printError(format("derivation ‘%1%’ has invalid meta attribute ‘%2%’") % i.name % j);
                             else {
                                 if (v->type == tString) {
                                     attrs2["type"] = "string";
@@ -1219,7 +1219,7 @@ static void switchGeneration(Globals & globals, int dstGen)
             throw Error(format("generation %1% does not exist") % dstGen);
     }
 
-    printMsg(lvlInfo, format("switching from generation %1% to %2%")
+    printInfo(format("switching from generation %1% to %2%")
         % curGen % dst.number);
 
     if (globals.dryRun) return;
@@ -1372,7 +1372,7 @@ int main(int argc, char * * argv)
             else if (*arg == "--delete-generations")
                 op = opDeleteGenerations;
             else if (*arg == "--dry-run") {
-                printMsg(lvlInfo, "(dry run; not doing anything)");
+                printInfo("(dry run; not doing anything)");
                 globals.dryRun = true;
             }
             else if (*arg == "--system-filter")

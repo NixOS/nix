@@ -87,7 +87,7 @@ void ThreadPool::workerEntry()
             if (state->exception) {
                 if (!dynamic_cast<Interrupted*>(&e) &&
                     !dynamic_cast<ThreadPoolShutDown*>(&e))
-                    printMsg(lvlError, format("error: %s") % e.what());
+                    printError(format("error: %s") % e.what());
             } else {
                 state->exception = std::current_exception();
                 work.notify_all();
