@@ -295,6 +295,7 @@ struct CurlDownloader : public Downloader
     std::thread workerThread;
 
     CurlDownloader()
+        : mt19937(rd())
     {
         static std::once_flag globalInit;
         std::call_once(globalInit, curl_global_init, CURL_GLOBAL_ALL);
