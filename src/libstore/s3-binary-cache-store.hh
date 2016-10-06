@@ -27,7 +27,7 @@ public:
         std::atomic<uint64_t> head{0};
     };
 
-    const Stats & getS3Stats();
+    virtual const Stats & getS3Stats() = 0;
 };
 
 }

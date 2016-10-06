@@ -99,7 +99,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         }
     }
 
-    const Stats & getS3Stats()
+    const Stats & getS3Stats() override
     {
         return stats;
     }
