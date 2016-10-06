@@ -1,35 +1,90 @@
-if test -n $HOME
-    set NIX_LINK $HOME/.nix-profile
+if [ -n $HOME -a -n $USER ]
+    set -l __savedpath $PATH
+    set -xg PATH @coreutils@
 
-    # Set the default profile.
-    if not test -L "$NIX_LINK"
-        echo "creating $NIX_LINK" >&2
-        set _NIX_DEF_LINK @localstatedir@/nix/profiles/default
-        @coreutils@/ln -s $_NIX_DEF_LINK $NIX_LINK
+    # Set up the per-user profile.
+    # This part should be kept in sync with nixpkgs:nixos/modules/programs/shell.nix
+
+    set -l NIX_LINK $HOME/.nix-profile
+
+    set -l NIX_USER_PROFILE_DIR @localstatedir@/nix/profiles/per-user/$USER
+
+    mkdir -m 0755 -p $NIX_USER_PROFILE_DIR
+
+    if [ (stat --printf '%u' $NIX_USER_PROFILE_DIR) -ne (id -u) ]
+        echo "Nix: WARNING: bad ownership on $NIX_USER_PROFILE_DIR, should be "(id -u) >&2
     end
 
-    set PATH $NIX_LINK/bin $NIX_LINK/sbin $PATH
+    if [ -w $HOME ]
+        if not [ -L $NIX_LINK ]
+            echo "Nix: creating $NIX_LINK" >&2
+            if [ $USER != root ]
+                ln -s $NIX_USER_PROFILE_DIR/profile $NIX_LINK
+                if [ $status -ne 0 ]
+                    echo "Nix: WARNING: could not create $NIX_LINK -> $NIX_USER_PROFILE_DIR/profile" >&2
+                end
+            else
+                # Root installs in the system-wide profile by default.
+                ln -s @localstatedir@/nix/profiles/default $NIX_LINK
+            end
+        end
 
-    # Subscribe the user to the Nixpkgs channel by default.
-    if not test -e $HOME/.nix-channels
-        echo "https://nixos.org/channels/nixpkgs-unstable nixpkgs" > $HOME/.nix-channels
+        # Subscribe the user to the unstable Nixpkgs channel by default.
+        if not [ -e $HOME/.nix-channels ]
+            echo 'https://nixos.org/channels/nixpkgs-unstable nixpkgs' > $HOME/.nix-channels
+        end
+
+        # Create the per-user garbage collector roots directory.
+        set -l __user_gcroots @localstatedir@/nix/gcroots/per-user/$USER
+        mkdir -m 0755 -p $__user_gcroots
+        if [ (stat --printf '%u' $__user_gcroots) -ne (id -u) ]
+            echo "Nix: WARNING: bad ownership on $__user_gcroots, should be "(id -u) >&2
+        end
+
+        # Set up a default Nix expression from which to install stuff.
+        set -l __nix_defexpr $HOME/.nix-defexpr
+        if [ -L $__nix_defexpr ]; rm -f $__nix_defexpr; end
+        mkdir -m 0755 -p $__nix_defexpr
+        if [ $USER != root ]
+            if not [ -L $__nix_defexpr/channels_root ]
+                ln -s @localstatedir@/nix/profiles/per-user/root/channels "$__nix_defexpr"/channels_root
+            end
+        end
     end
 
     # Append ~/.nix-defexpr/channels/nixpkgs to $NIX_PATH so that
     # <nixpkgs> paths work when the user has fetched the Nixpkgs
     # channel.
-    set -xg NIX_PATH $NIX_PATH:$HOME/.nix-defexpr/channels/nixpkgs
+    set -xg NIX_PATH $NIX_PATH nixpkgs=$HOME/.nix-defexpr/channels/nixpkgs
+
+    # Set up environment.
+    # This part should be kept in sync with nixpkgs:nixos/modules/programs/environment.nix
+    set -l NIX_PROFILES "@localstatedir@/nix/profiles/default $NIX_USER_PROFILE_DIR"
+
+    for i in $NIX_PROFILES
+        if [ -d "$i/lib/aspell" ]
+            set -xg ASPELL_CONF "dict-dir $i/lib/aspell"
+        end
+    end
 
     # Set $SSL_CERT_FILE so that Nixpkgs applications like curl work.
-    if test -e /etc/ssl/certs/ca-certificates.crt # NixOS, Ubuntu, Debian, Gentoo, Arch
+    if [ -e /etc/ssl/certs/ca-certificates.crt ] # NixOS, Ubuntu, Debian, Gentoo, Arch
         set -xg SSL_CERT_FILE /etc/ssl/certs/ca-certificates.crt
-    else if test -e /etc/ssl/certs/ca-bundle.crt # Old NixOS
-         set -xg SSL_CERT_FILE /etc/ssl/certs/ca-bundle.crt
-    else if test -e /etc/pki/tls/certs/ca-bundle.crt # Fedora, CentOS
+    else if [ -e /etc/ssl/ca-bundle.pem ] # openSUSE Tumbleweed
+        set -xg SSL_CERT_FILE /etc/ssl/ca-bundle.pem
+    else if [ -e /etc/ssl/certs/ca-bundle.crt ] # Old NixOS
+        set -xg SSL_CERT_FILE /etc/ssl/certs/ca-bundle.crt
+    else if [ -e /etc/pki/tls/certs/ca-bundle.crt ] # Fedora, CentOS
         set -xg SSL_CERT_FILE /etc/pki/tls/certs/ca-bundle.crt
-    else if test -e $NIX_LINK/etc/ssl/certs/ca-bundle.crt # fall back to cacert in Nix profile
-        set -xg SSL_CERT_FILE $NIX_LINK/etc/ssl/certs/ca-bundle.crt
-    else if test -e $NIX_LINK/etc/ca-bundle.crt # old cacert in Nix profile
-        set -xg SSL_CERT_FILE $NIX_LINK/etc/ca-bundle.crt
+    else if [ -e "$NIX_LINK/etc/ssl/certs/ca-bundle.crt" ] # fall back to cacert in Nix profile
+        set -xg SSL_CERT_FILE "$NIX_LINK/etc/ssl/certs/ca-bundle.crt"
+    else if [ -e "$NIX_LINK/etc/ca-bundle.crt" ] # old cacert in Nix profile
+        set -xg SSL_CERT_FILE "$NIX_LINK/etc/ca-bundle.crt"
     end
+
+    if [ -n "$MANPATH" ]
+        set -xg MANPATH $NIX_LINK/share/man $MANPATH
+    end
+
+    set -xg PATH $NIX_LINK/bin $NIX_LINK/sbin $__savedpath
 end
