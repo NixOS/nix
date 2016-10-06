@@ -44,6 +44,16 @@ void toJSON(std::ostream & str, long n)
     str << n;
 }
 
+void toJSON(std::ostream & str, unsigned int n)
+{
+    str << n;
+}
+
+void toJSON(std::ostream & str, int n)
+{
+    str << n;
+}
+
 void toJSON(std::ostream & str, double f)
 {
     str << f;
