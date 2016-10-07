@@ -119,13 +119,8 @@ Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, 
 
         addToStore(info, *tee.data, false, dontCheckSigs);
 
-        // FIXME: implement accessors?
-        assert(!accessor);
-#if 0
-        auto accessor_ = std::dynamic_pointer_cast<BinaryCacheStoreAccessor>(accessor);
-        if (accessor_)
-            accessor_->nars.emplace(info.path, makeNarAccessor(tee.data));
-#endif
+        if (accessor)
+            addPathToAccessor(ref<FSAccessor>(accessor), info.path, tee.data);
 
         res.push_back(info.path);
     }

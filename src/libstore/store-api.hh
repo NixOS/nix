@@ -461,6 +461,17 @@ public:
     /* Return an object to access files in the Nix store. */
     virtual ref<FSAccessor> getFSAccessor() = 0;
 
+private:
+
+    /* Inform an accessor about the NAR contents of a store path. Used
+       by importPaths() to speed up subsequent access to the imported
+       paths when used with binary cache stores. */
+    virtual void addPathToAccessor(ref<FSAccessor>, const Path & storePath, const ref<std::string> & data)
+    {
+    }
+
+public:
+
     /* Add signatures to the specified store path. The signatures are
        not verified. */
     virtual void addSignatures(const Path & storePath, const StringSet & sigs) = 0;

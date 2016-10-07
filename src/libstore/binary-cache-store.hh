@@ -134,6 +134,12 @@ public:
 
     ref<FSAccessor> getFSAccessor() override;
 
+private:
+
+    void addPathToAccessor(ref<FSAccessor>, const Path & storePath, const ref<std::string> & data) override;
+
+public:
+
     void addSignatures(const Path & storePath, const StringSet & sigs) override
     { notImpl(); }
 

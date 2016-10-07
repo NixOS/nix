@@ -318,4 +318,12 @@ ref<FSAccessor> BinaryCacheStore::getFSAccessor()
             std::dynamic_pointer_cast<BinaryCacheStore>(shared_from_this())));
 }
 
+void BinaryCacheStore::addPathToAccessor(ref<FSAccessor> accessor,
+    const Path & storePath, const ref<std::string> & data)
+{
+    auto accessor_ = accessor.dynamic_pointer_cast<BinaryCacheStoreAccessor>();
+    if (accessor_)
+        accessor_->nars.emplace(storePath, makeNarAccessor(data));
+}
+
 }
