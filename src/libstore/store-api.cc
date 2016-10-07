@@ -363,12 +363,47 @@ void Store::queryPathInfo(const Path & storePath,
 
 PathSet Store::queryValidPaths(const PathSet & paths)
 {
-    PathSet valid;
+    struct State
+    {
+        size_t left;
+        PathSet valid;
+        std::exception_ptr exc;
+    };
+
+    Sync<State> state_(State{paths.size(), PathSet()});
+
+    std::condition_variable wakeup;
 
     for (auto & path : paths)
-        if (isValidPath(path)) valid.insert(path);
+        queryPathInfo(path,
+            [path, &state_, &wakeup](ref<ValidPathInfo> info) {
+                auto state(state_.lock());
+                state->valid.insert(path);
+                assert(state->left);
+                if (!--state->left)
+                    wakeup.notify_one();
+            },
+            [path, &state_, &wakeup](std::exception_ptr exc) {
+                auto state(state_.lock());
+                try {
+                    std::rethrow_exception(exc);
+                } catch (InvalidPath &) {
+                } catch (...) {
+                    state->exc = exc;
+                }
+                assert(state->left);
+                if (!--state->left)
+                    wakeup.notify_one();
+            });
 
-    return valid;
+    while (true) {
+        auto state(state_.lock());
+        if (!state->left) {
+            if (state->exc) std::rethrow_exception(state->exc);
+            return state->valid;
+        }
+        state.wait(wakeup);
+    }
 }
 
 
