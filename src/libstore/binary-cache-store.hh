@@ -54,9 +54,6 @@ public:
 
     bool isValidPathUncached(const Path & path) override;
 
-    PathSet queryValidPaths(const PathSet & paths) override
-    { notImpl(); }
-
     PathSet queryAllValidPaths() override
     { notImpl(); }
 

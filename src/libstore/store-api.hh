@@ -306,7 +306,7 @@ protected:
 public:
 
     /* Query which of the given paths is valid. */
-    virtual PathSet queryValidPaths(const PathSet & paths) = 0;
+    virtual PathSet queryValidPaths(const PathSet & paths);
 
     /* Query the set of all valid paths. Note that for some store
        backends, the name part of store paths may be omitted

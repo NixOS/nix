@@ -361,6 +361,17 @@ void Store::queryPathInfo(const Path & storePath,
 }
 
 
+PathSet Store::queryValidPaths(const PathSet & paths)
+{
+    PathSet valid;
+
+    for (auto & path : paths)
+        if (isValidPath(path)) valid.insert(path);
+
+    return valid;
+}
+
+
 /* Return a string accepted by decodeValidPathInfo() that
    registers the specified paths as valid.  Note: it's the
    responsibility of the caller to provide a closure. */
