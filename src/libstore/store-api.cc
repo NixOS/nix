@@ -414,6 +414,30 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
 }
 
 
+void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
+    const PathSet & storePaths, bool repair)
+{
+    PathSet closure;
+    for (auto & path : storePaths)
+        srcStore->computeFSClosure(path, closure);
+
+    PathSet valid = dstStore->queryValidPaths(closure);
+
+    if (valid.size() == closure.size()) return;
+
+    Paths sorted = srcStore->topoSortPaths(closure);
+
+    Paths missing;
+    for (auto i = sorted.rbegin(); i != sorted.rend(); ++i)
+        if (!valid.count(*i)) missing.push_back(*i);
+
+    printMsg(lvlDebug, format("copying %1% missing paths") % missing.size());
+
+    for (auto & i : missing)
+        copyStorePath(srcStore, dstStore, i, repair);
+}
+
+
 ValidPathInfo decodeValidPathInfo(std::istream & str, bool hashGiven)
 {
     ValidPathInfo info;
