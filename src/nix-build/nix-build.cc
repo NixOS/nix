@@ -448,7 +448,11 @@ int main(int argc, char ** argv)
                     ? Strings{"bash", "--rcfile", rcfile}
                     : Strings{"bash", rcfile};
 
+#if __APPLE__
+                execve(getEnv("NIX_BUILD_SHELL", "bash").c_str(),
+#else
                 execvpe(getEnv("NIX_BUILD_SHELL", "bash").c_str(),
+#endif
                         stringsToCharPtrs(args).data(),
                         stringsToCharPtrs(envStrs).data());
 
