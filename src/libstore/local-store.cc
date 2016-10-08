@@ -781,18 +781,27 @@ Path LocalStore::queryPathFromHashPart(const string & hashPart)
 PathSet LocalStore::querySubstitutablePaths(const PathSet & paths)
 {
     if (!settings.useSubstitutes) return PathSet();
+
+    auto remaining = paths;
     PathSet res;
+
     for (auto & sub : getDefaultSubstituters()) {
+        if (remaining.empty()) break;
         if (sub->storeDir != storeDir) continue;
         if (!sub->wantMassQuery()) continue;
-        for (auto & path : paths) {
-            if (res.count(path)) continue;
-            debug(format("checking substituter ‘%s’ for path ‘%s’")
-                % sub->getUri() % path);
-            if (sub->isValidPath(path))
+
+        auto valid = sub->queryValidPaths(remaining);
+
+        PathSet remaining2;
+        for (auto & path : remaining)
+            if (valid.count(path))
                 res.insert(path);
-        }
+            else
+                remaining2.insert(path);
+
+        std::swap(remaining, remaining2);
     }
+
     return res;
 }
 

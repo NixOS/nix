@@ -54,9 +54,6 @@ public:
 
     bool isValidPathUncached(const Path & path) override;
 
-    PathSet queryValidPaths(const PathSet & paths) override
-    { notImpl(); }
-
     PathSet queryAllValidPaths() override
     { notImpl(); }
 
@@ -133,6 +130,12 @@ public:
     { return true; }
 
     ref<FSAccessor> getFSAccessor() override;
+
+private:
+
+    void addPathToAccessor(ref<FSAccessor>, const Path & storePath, const ref<std::string> & data) override;
+
+public:
 
     void addSignatures(const Path & storePath, const StringSet & sigs) override
     { notImpl(); }

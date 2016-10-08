@@ -361,6 +361,52 @@ void Store::queryPathInfo(const Path & storePath,
 }
 
 
+PathSet Store::queryValidPaths(const PathSet & paths)
+{
+    struct State
+    {
+        size_t left;
+        PathSet valid;
+        std::exception_ptr exc;
+    };
+
+    Sync<State> state_(State{paths.size(), PathSet()});
+
+    std::condition_variable wakeup;
+
+    for (auto & path : paths)
+        queryPathInfo(path,
+            [path, &state_, &wakeup](ref<ValidPathInfo> info) {
+                auto state(state_.lock());
+                state->valid.insert(path);
+                assert(state->left);
+                if (!--state->left)
+                    wakeup.notify_one();
+            },
+            [path, &state_, &wakeup](std::exception_ptr exc) {
+                auto state(state_.lock());
+                try {
+                    std::rethrow_exception(exc);
+                } catch (InvalidPath &) {
+                } catch (...) {
+                    state->exc = exc;
+                }
+                assert(state->left);
+                if (!--state->left)
+                    wakeup.notify_one();
+            });
+
+    while (true) {
+        auto state(state_.lock());
+        if (!state->left) {
+            if (state->exc) std::rethrow_exception(state->exc);
+            return state->valid;
+        }
+        state.wait(wakeup);
+    }
+}
+
+
 /* Return a string accepted by decodeValidPathInfo() that
    registers the specified paths as valid.  Note: it's the
    responsibility of the caller to provide a closure. */
@@ -411,6 +457,30 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     srcStore->narFromPath({storePath}, sink);
 
     dstStore->addToStore(*info, *sink.s, repair);
+}
+
+
+void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
+    const PathSet & storePaths, bool repair)
+{
+    PathSet closure;
+    for (auto & path : storePaths)
+        srcStore->computeFSClosure(path, closure);
+
+    PathSet valid = dstStore->queryValidPaths(closure);
+
+    if (valid.size() == closure.size()) return;
+
+    Paths sorted = srcStore->topoSortPaths(closure);
+
+    Paths missing;
+    for (auto i = sorted.rbegin(); i != sorted.rend(); ++i)
+        if (!valid.count(*i)) missing.push_back(*i);
+
+    printMsg(lvlDebug, format("copying %1% missing paths") % missing.size());
+
+    for (auto & i : missing)
+        copyStorePath(srcStore, dstStore, i, repair);
 }
 
 

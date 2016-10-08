@@ -306,7 +306,7 @@ protected:
 public:
 
     /* Query which of the given paths is valid. */
-    virtual PathSet queryValidPaths(const PathSet & paths) = 0;
+    virtual PathSet queryValidPaths(const PathSet & paths);
 
     /* Query the set of all valid paths. Note that for some store
        backends, the name part of store paths may be omitted
@@ -461,6 +461,17 @@ public:
     /* Return an object to access files in the Nix store. */
     virtual ref<FSAccessor> getFSAccessor() = 0;
 
+private:
+
+    /* Inform an accessor about the NAR contents of a store path. Used
+       by importPaths() to speed up subsequent access to the imported
+       paths when used with binary cache stores. */
+    virtual void addPathToAccessor(ref<FSAccessor>, const Path & storePath, const ref<std::string> & data)
+    {
+    }
+
+public:
+
     /* Add signatures to the specified store path. The signatures are
        not verified. */
     virtual void addSignatures(const Path & storePath, const StringSet & sigs) = 0;
@@ -572,6 +583,11 @@ void checkStoreName(const string & name);
 /* Copy a path from one store to another. */
 void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     const Path & storePath, bool repair = false);
+
+
+/* Copy the closure of the specified paths from one store to another. */
+void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
+    const PathSet & storePaths, bool repair = false);
 
 
 /* Remove the temporary roots file for this process.  Any temporary
