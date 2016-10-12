@@ -220,6 +220,7 @@ public:
     int wait(bool block);
     void setSeparatePG(bool separatePG);
     void setKillSignal(int signal);
+    pid_t release();
 };
 
 
