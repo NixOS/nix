@@ -124,7 +124,7 @@ LocalStore::LocalStore(const Params & params)
 #endif
             if (res == -1) {
                 writeFull(fd.get(), string(settings.reservedSize, 'X'));
-                ftruncate(fd.get(), settings.reservedSize);
+                [[gnu::unused]] auto res2 = ftruncate(fd.get(), settings.reservedSize);
             }
         }
     } catch (SysError & e) { /* don't care about errors */
