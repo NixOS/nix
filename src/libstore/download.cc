@@ -188,10 +188,10 @@ struct CurlDownloader : public Downloader
             curl_easy_setopt(req, CURLOPT_FOLLOWLOCATION, 1L);
             curl_easy_setopt(req, CURLOPT_NOSIGNAL, 1);
             curl_easy_setopt(req, CURLOPT_USERAGENT, ("Nix/" + nixVersion).c_str());
-            #ifdef CURLOPT_PIPEWAIT
+            #if CURL_AT_LEAST_VERSION(7, 43, 0)
             curl_easy_setopt(req, CURLOPT_PIPEWAIT, 1);
             #endif
-            #ifdef CURL_HTTP_VERSION_2TLS
+            #if CURL_AT_LEAST_VERSION(7, 47, 0)
             if (downloader.enableHttp2)
                 curl_easy_setopt(req, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
             #endif
@@ -303,7 +303,7 @@ struct CurlDownloader : public Downloader
 
         curlm = curl_multi_init();
 
-        #ifdef CURLPIPE_MULTIPLEX
+        #if CURL_AT_LEAST_VERSION(7, 43, 0) // correct?
         curl_multi_setopt(curlm, CURLMOPT_PIPELINING, CURLPIPE_MULTIPLEX);
         #endif
         curl_multi_setopt(curlm, CURLMOPT_MAX_TOTAL_CONNECTIONS,
