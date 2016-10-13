@@ -92,15 +92,21 @@ fi
 added=
 if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
 
-    # Make the shell source nix.sh during login.
+    # Make the shell source nix.sh/nix.fish during login.
     p=$HOME/.nix-profile/etc/profile.d/nix.sh
+    pfish=$HOME/.nix-profile/etc/profile.d/nix.fish
 
-    for i in .bash_profile .bash_login .profile; do
+    for i in .bash_profile .bash_login .profile .config/fish/config.fish; do
         fn="$HOME/$i"
         if [ -w "$fn" ]; then
-            if ! grep -q "$p" "$fn"; then
-                echo "modifying $fn..." >&2
-                echo "if [ -e $p ]; then . $p; fi # added by Nix installer" >> $fn
+            if [ "$fn" = "$HOME/.config/fish/config.fish" ]; then
+                if ! grep -q "$pfish" "$fn"; then
+                    echo "modifying $fn..." >&2
+                    echo "if [ -e $p ]; source $pfish; end # added by Nix installer" >> $fn
+                fi
+            else if ! grep -q "$p" "$fn"; then
+                    echo "modifying $fn..." >&2
+                    echo "if [ -e $p ]; then . $p; fi # added by Nix installer" >> $fn
             fi
             added=1
             break
@@ -118,6 +124,12 @@ variables are set, please add the line
   . $p
 
 to your shell profile (e.g. ~/.profile).
+
+For the fish shell, please add the line
+
+  source $pfish
+
+to your fish config file (~/.config/fish/config.fish).
 EOF
 else
     cat >&2 <<EOF
@@ -126,6 +138,12 @@ Installation finished!  To ensure that the necessary environment
 variables are set, either log in again, or type
 
   . $p
+
+in your shell.
+
+For the fish shell, please type
+
+  source $pfish
 
 in your shell.
 EOF
