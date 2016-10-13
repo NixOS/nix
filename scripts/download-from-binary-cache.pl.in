@@ -41,7 +41,7 @@ my $activeRequests = 0;
 my $curlIdCount = 1;
 my %requests;
 my %scheduled;
-my $caBundle = $ENV{"SSL_CERT_FILE"} // $ENV{"CURL_CA_BUNDLE"} // $ENV{"OPENSSL_X509_CERT_FILE"};
+my $caBundle = $ENV{"NIX_SSL_CERT_FILE"} // $ENV{"SSL_CERT_FILE"} // $ENV{"CURL_CA_BUNDLE"} // $ENV{"OPENSSL_X509_CERT_FILE"};
 $caBundle = "/etc/ssl/certs/ca-bundle.crt" if !$caBundle && -f "/etc/ssl/certs/ca-bundle.crt";
 $caBundle = "/etc/ssl/certs/ca-certificates.crt" if !$caBundle && -f "/etc/ssl/certs/ca-certificates.crt";
 
