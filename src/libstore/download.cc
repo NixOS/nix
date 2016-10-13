@@ -210,7 +210,8 @@ struct CurlDownloader : public Downloader
                 curl_easy_setopt(req, CURLOPT_NOBODY, 1);
 
             if (request.verifyTLS)
-                curl_easy_setopt(req, CURLOPT_CAINFO, getEnv("SSL_CERT_FILE", "/etc/ssl/certs/ca-certificates.crt").c_str());
+                curl_easy_setopt(req, CURLOPT_CAINFO,
+                    getEnv("NIX_SSL_CERT_FILE", getEnv("SSL_CERT_FILE", "/etc/ssl/certs/ca-certificates.crt")).c_str());
             else {
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYPEER, 0);
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYHOST, 0);

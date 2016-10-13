@@ -76,9 +76,9 @@ if ! $nix/bin/nix-env -i "$nix"; then
 fi
 
 # Install an SSL certificate bundle.
-if [ -z "$SSL_CERT_FILE" -o ! -f "$SSL_CERT_FILE" ]; then
+if [ -z "$NIX_SSL_CERT_FILE" -o ! -f "$NIX_SSL_CERT_FILE" ]; then
     $nix/bin/nix-env -i "$cacert"
-    export SSL_CERT_FILE="$HOME/.nix-profile/etc/ssl/certs/ca-bundle.crt"
+    export NIX_SSL_CERT_FILE="$HOME/.nix-profile/etc/ssl/certs/ca-bundle.crt"
 fi
 
 # Subscribe the user to the Nixpkgs channel and fetch it.
