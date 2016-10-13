@@ -14,7 +14,7 @@
     <string>/dev/null</string>
     <key>EnvironmentVariables</key>
     <dict>
-      <key>SSL_CERT_FILE</key>
+      <key>NIX_SSL_CERT_FILE</key>
       <string>/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt</string>
     </dict>
   </dict>

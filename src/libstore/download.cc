@@ -129,7 +129,7 @@ struct Curl
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 
         if (options.verifyTLS)
-            curl_easy_setopt(curl, CURLOPT_CAINFO, getEnv("SSL_CERT_FILE", "/etc/ssl/certs/ca-certificates.crt").c_str());
+            curl_easy_setopt(curl, CURLOPT_CAINFO, getEnv("NIX_SSL_CERT_FILE", "/etc/ssl/certs/ca-certificates.crt").c_str());
         else {
             curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0);
             curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0);
