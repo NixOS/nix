@@ -2300,6 +2300,8 @@ void DerivationGoal::runChild()
                 ss.push_back("/dev/tty");
                 ss.push_back("/dev/urandom");
                 ss.push_back("/dev/zero");
+                ss.push_back("/dev/ptmx");
+                ss.push_back("/dev/pts");
                 createSymlink("/proc/self/fd", chrootRootDir + "/dev/fd");
                 createSymlink("/proc/self/fd/0", chrootRootDir + "/dev/stdin");
                 createSymlink("/proc/self/fd/1", chrootRootDir + "/dev/stdout");
@@ -2350,11 +2352,14 @@ void DerivationGoal::runChild()
                     fmt("size=%s", settings.get("sandbox-dev-shm-size", std::string("50%"))).c_str()) == -1)
                 throw SysError("mounting /dev/shm");
 
+#if 0
+            // FIXME: can't figure out how to do this in a user
+            // namespace.
+
             /* Mount a new devpts on /dev/pts.  Note that this
                requires the kernel to be compiled with
                CONFIG_DEVPTS_MULTIPLE_INSTANCES=y (which is the case
                if /dev/ptx/ptmx exists). */
-#if 0
             if (pathExists("/dev/pts/ptmx") &&
                 !pathExists(chrootRootDir + "/dev/ptmx")
                 && dirsInChroot.find("/dev/pts") == dirsInChroot.end())
