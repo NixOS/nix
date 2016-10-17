@@ -20,6 +20,7 @@
 
 #include "nixexpr.hh"
 #include "eval.hh"
+#include "globals.hh"
 
 namespace nix {
 
@@ -128,93 +129,104 @@ static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
 }
 
 
-static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Expr *> & es)
+static bool isIndAntiquotLine(vector<Expr *> * line)
 {
-    if (es.empty()) return new ExprString(symbols.create(""));
+    size_t len = line->size();
 
+    if (len < 2 || len > 3) return false;
+    if (!dynamic_cast<ExprAntiquot *>(line->at(1))) return false;
+
+    if (len == 3) {
+        if (!dynamic_cast<ExprIndStr *>(line->at(2))) return false;
+        string & trailStr = dynamic_cast<ExprIndStr *>(line->at(2))->s;
+        if (trailStr.find_first_not_of(" ") != string::npos) return false;
+
+        // The last empty string is useless for an indented antiquotation.
+        delete line->back();
+        line->pop_back();
+    }
+
+    return true;
+}
+
+static void pushStringThenExpr(SymbolTable & symbols, vector<Expr *> * es, string & s, Expr * e)
+{
+    if (!s.empty()) {
+        es->push_back(new ExprString(symbols.create(s)));
+        s.clear();
+    }
+
+    if (e) es->push_back(e);
+}
+
+static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<vector<Expr *> *> * es)
+{
     /* Figure out the minimum indentation.  Note that by design
        whitespace-only final lines are not taken into account.  (So
        the " " in "\n ''" is ignored, but the " " in "\n foo''" is.) */
-    bool atStartOfLine = true; /* = seen only whitespace in the current line */
-    unsigned int minIndent = 1000000;
-    unsigned int curIndent = 0;
-    for (auto & i : es) {
-        ExprIndStr * e = dynamic_cast<ExprIndStr *>(i);
-        if (!e) {
-            /* Anti-quotations end the current start-of-line whitespace. */
-            if (atStartOfLine) {
-                atStartOfLine = false;
-                if (curIndent < minIndent) minIndent = curIndent;
-            }
-            continue;
-        }
-        for (unsigned int j = 0; j < e->s.size(); ++j) {
-            if (atStartOfLine) {
-                if (e->s[j] == ' ')
-                    curIndent++;
-                else if (e->s[j] == '\n') {
-                    /* Empty line, doesn't influence minimum
-                       indentation. */
-                    curIndent = 0;
-                } else {
-                    atStartOfLine = false;
-                    if (curIndent < minIndent) minIndent = curIndent;
-                }
-            } else if (e->s[j] == '\n') {
-                atStartOfLine = true;
-                curIndent = 0;
-            }
-        }
+    string::size_type minIndent = string::npos;
+    for (auto & line: *es) {
+
+        /* Skip whitespace only lines. */
+        if (line->size() <= 1) continue;
+
+        /* First line token is an ExprIndString with every leading spaces. */
+        ExprIndStr * indent = static_cast<ExprIndStr *>(line->front());
+        minIndent = std::min(minIndent, indent->s.length());
     }
 
-    /* Strip spaces from each line. */
+    /* Strip spaces from each line and merge consecutive string parts into one. */
     vector<Expr *> * es2 = new vector<Expr *>;
-    atStartOfLine = true;
-    unsigned int curDropped = 0;
-    unsigned int n = es.size();
-    for (vector<Expr *>::iterator i = es.begin(); i != es.end(); ++i, --n) {
-        ExprIndStr * e = dynamic_cast<ExprIndStr *>(*i);
-        if (!e) {
-            atStartOfLine = false;
-            curDropped = 0;
-            es2->push_back(*i);
+    string s2;
+    for (auto & line: *es) {
+
+        /* Ignore empty last line */
+        if (line == es->back() && line->size() <= 1) {
+            delete line->front();
+            delete line;
+            break;
+        }
+
+        size_t realIndent = static_cast<ExprIndStr *>(line->front())->s.size();
+        size_t indent = realIndent > minIndent ? realIndent - minIndent : 0;
+        delete line->front();
+
+        /* Single antiquotations on their own lines are ExprIndAntiquot
+           and manage their own indentation. */
+        if (settings.enableSmartAntiquotations && isIndAntiquotLine(line)) {
+            pushStringThenExpr(symbols, es2, s2, new ExprIndAntiquot(pos, line->at(1), indent));
+            delete line;
             continue;
         }
 
-        string s2;
-        for (unsigned int j = 0; j < e->s.size(); ++j) {
-            if (atStartOfLine) {
-                if (e->s[j] == ' ') {
-                    if (curDropped++ >= minIndent)
-                        s2 += e->s[j];
-                }
-                else if (e->s[j] == '\n') {
-                    curDropped = 0;
-                    s2 += e->s[j];
-                } else {
-                    atStartOfLine = false;
-                    curDropped = 0;
-                    s2 += e->s[j];
-                }
+        /* Add the required indent level */
+        s2.append(indent, ' ');
+
+        for (auto i = ++line->begin(); i != line->end(); ++i) {
+            ExprIndStr * e = dynamic_cast<ExprIndStr *>(*i);
+            if (e) {
+                s2 += e->s;
+                delete e;
             } else {
-                s2 += e->s[j];
-                if (e->s[j] == '\n') atStartOfLine = true;
+                pushStringThenExpr(symbols, es2, s2, *i);
             }
         }
 
-        /* Remove the last line if it is empty and consists only of
-           spaces. */
-        if (n == 1) {
-            string::size_type p = s2.find_last_of('\n');
-            if (p != string::npos && s2.find_first_not_of(' ', p + 1) == string::npos)
-                s2 = string(s2, 0, p + 1);
-        }
-
-        es2->push_back(new ExprString(symbols.create(s2)));
+        if (line != es->back()) s2.push_back('\n');
+        delete line;
     }
+    pushStringThenExpr(symbols, es2, s2, nullptr);
+    delete es;
 
     /* If this is a single string, then don't do a concatenation. */
-    return es2->size() == 1 && dynamic_cast<ExprString *>((*es2)[0]) ? (*es2)[0] : new ExprConcatStrings(pos, true, es2);
+    Expr * result;
+    if (es2->size() == 1 && dynamic_cast<ExprString *>(es2->front())) {
+        result = es2->front();
+        delete es2;
+    } else {
+        result = new ExprConcatStrings(pos, true, es2);
+    }
+    return result;
 }
 
 
@@ -252,20 +264,22 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   char * uri;
   std::vector<nix::AttrName> * attrNames;
   std::vector<nix::Expr *> * string_parts;
+  std::vector<std::vector<nix::Expr *> *> * string_lines;
 }
 
-%type <e> start expr expr_function expr_if expr_op
+%type <e> start expr expr_function expr_if expr_op empty_expr
 %type <e> expr_app expr_select expr_simple
 %type <list> expr_list
 %type <attrs> binds
 %type <formals> formals
 %type <formal> formal
 %type <attrNames> attrs attrpath
-%type <string_parts> string_parts_interpolated ind_string_parts
+%type <string_parts> string_parts_interpolated ind_string_line
+%type <string_lines> ind_string_lines
 %type <e> string_parts string_attr
 %type <id> attr
 %token <id> ID ATTRPATH
-%token <e> STR IND_STR
+%token <e> STR IND_STR IND_STR_INDENT
 %token <n> INT
 %token <nf> FLOAT
 %token <path> PATH HPATH SPATH
@@ -372,8 +386,8 @@ expr_simple
   | INT { $$ = new ExprInt($1); }
   | FLOAT { $$ = new ExprFloat($1); }
   | '"' string_parts '"' { $$ = $2; }
-  | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
-      $$ = stripIndentation(CUR_POS, data->symbols, *$2);
+  | IND_STRING_OPEN ind_string_lines IND_STRING_CLOSE {
+      $$ = stripIndentation(CUR_POS, data->symbols, $2);
   }
   | PATH { $$ = new ExprPath(absPath($1, data->basePath)); }
   | HPATH { $$ = new ExprPath(getEnv("HOME", "") + string{$1 + 1}); }
@@ -405,19 +419,30 @@ string_parts
 
 string_parts_interpolated
   : string_parts_interpolated STR { $$ = $1; $1->push_back($2); }
-  | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = $1; $1->push_back($3); }
-  | DOLLAR_CURLY expr '}' { $$ = new vector<Expr *>; $$->push_back($2); }
-  | STR DOLLAR_CURLY expr '}' {
+  | string_parts_interpolated DOLLAR_CURLY empty_expr '}' { $$ = $1; $1->push_back($3); }
+  | DOLLAR_CURLY empty_expr '}' { $$ = new vector<Expr *>; $$->push_back($2); }
+  | STR DOLLAR_CURLY empty_expr '}' {
       $$ = new vector<Expr *>;
       $$->push_back($1);
       $$->push_back($3);
     }
   ;
 
-ind_string_parts
-  : ind_string_parts IND_STR { $$ = $1; $1->push_back($2); }
-  | ind_string_parts DOLLAR_CURLY expr '}' { $$ = $1; $1->push_back($3); }
-  | { $$ = new vector<Expr *>; }
+ind_string_lines
+  : ind_string_lines '\n' ind_string_line { $$ = $1; $1->push_back($3); }
+  | ind_string_line { $$ = new vector<vector<Expr *> *>; $$->push_back($1); }
+  | { $$ = new vector<vector<Expr *> *>; }
+  ;
+
+ind_string_line
+  : ind_string_line IND_STR { $$ = $1; $1->push_back($2); }
+  | ind_string_line DOLLAR_CURLY empty_expr '}' { $$ = $1; $1->push_back(new ExprAntiquot($3)); }
+  | IND_STR_INDENT { $$ = new vector<Expr *>; $$->push_back($1); }
+  ;
+
+empty_expr
+  : expr { $$ = $1; }
+  | { $$ = new ExprString(data->symbols.create("")); }
   ;
 
 binds
@@ -538,8 +563,9 @@ Expr * EvalState::parse(const char * text,
     data.path = data.symbols.create(path);
 
     yylex_init(&scanner);
-    yy_scan_string(text, scanner);
+    YY_BUFFER_STATE handle = yy_scan_string(text, scanner);
     int res = yyparse(scanner, &data);
+    yy_delete_buffer(handle, scanner);
     yylex_destroy(scanner);
 
     if (res) {
