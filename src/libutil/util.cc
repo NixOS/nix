@@ -1015,26 +1015,11 @@ template StringSet tokenizeString(const string & s, const string & separators);
 template vector<string> tokenizeString(const string & s, const string & separators);
 
 
-string concatStringsSep(const string & sep, const Strings & ss)
-{
-    string s;
-    for (auto & i : ss) {
-        if (s.size() != 0) s += sep;
-        s += i;
-    }
-    return s;
-}
+template std::string concatStringsSep(const std::string & sep, const Strings & ss);
+template std::string concatStringsSep(const std::string & sep, const StringSet & ss);
 
-
-string concatStringsSep(const string & sep, const StringSet & ss)
-{
-    string s;
-    for (auto & i : ss) {
-        if (s.size() != 0) s += sep;
-        s += i;
-    }
-    return s;
-}
+template std::ostream& printItemsSep(std::ostream& stream, const std::string& sep, Strings::const_iterator begin, Strings::const_iterator end);
+template std::ostream& printItemsSep(std::ostream& stream, const std::string& sep, StringSet::const_iterator begin, StringSet::const_iterator end);
 
 
 string chomp(const string & s)

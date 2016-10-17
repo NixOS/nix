@@ -295,12 +295,31 @@ MakeError(Interrupted, BaseError)
 /* String tokenizer. */
 template<class C> C tokenizeString(const string & s, const string & separators = " \t\n\r");
 
+/* concatenate the items with a separator in between and print to stream */
+template <typename Iter>
+std::ostream& printItemsSep(std::ostream& stream, const std::string& sep, Iter begin, Iter end)
+{
+    if (begin == end)
+      return stream;
+
+    stream << *begin;
+    begin++;
+    for (; begin != end; ++begin) {
+        stream << sep;
+        stream << *begin;
+    }
+    return stream;
+}
 
 /* Concatenate the given strings with a separator between the
    elements. */
-string concatStringsSep(const string & sep, const Strings & ss);
-string concatStringsSep(const string & sep, const StringSet & ss);
-
+template<typename C>
+std::string concatStringsSep(const std::string & sep, const C & ss)
+{
+    std::ostringstream os;
+    printItemsSep(os, sep, ss.begin(), ss.end());
+    return os.str();
+}
 
 /* Remove trailing whitespace from a string. */
 string chomp(const string & s);
