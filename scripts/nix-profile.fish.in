@@ -55,7 +55,7 @@ if [ -n $HOME -a -n $USER ]
     # Append ~/.nix-defexpr/channels/nixpkgs to $NIX_PATH so that
     # <nixpkgs> paths work when the user has fetched the Nixpkgs
     # channel.
-    set -xg NIX_PATH $NIX_PATH nixpkgs=$HOME/.nix-defexpr/channels/nixpkgs
+    set -xg NIX_PATH (string join : $NIX_PATH nixpkgs=$HOME/.nix-defexpr/channels/nixpkgs)
 
     # Set up environment.
     # This part should be kept in sync with nixpkgs:nixos/modules/programs/environment.nix
