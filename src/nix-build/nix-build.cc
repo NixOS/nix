@@ -444,13 +444,11 @@ int main(int argc, char ** argv)
                 for (auto & i : env)
                     envStrs.push_back(i.first + "=" + i.second);
 
-                auto args = interactive
-                    ? Strings{"bash", "--rcfile", rcfile}
-                    : Strings{"bash", rcfile};
-
-                execvpe(getEnv("NIX_BUILD_SHELL", "bash").c_str(),
-                        stringsToCharPtrs(args).data(),
-                        stringsToCharPtrs(envStrs).data());
+                if (interactive) {
+                    execle(getEnv("NIX_BUILD_SHELL", "bash").c_str(), "bash", "--rcfile", rcfile.c_str(), NULL, stringsToCharPtrs(envStrs).data());
+                } else {
+                    execle(getEnv("NIX_BUILD_SHELL", "bash").c_str(), "bash", rcfile.c_str(), NULL, stringsToCharPtrs(envStrs).data());
+                }
 
                 throw SysError("executing shell");
             }
