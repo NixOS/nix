@@ -120,9 +120,9 @@ struct CmdPathInfo : StorePathsCommand
 
             for (auto storePath : storePaths) {
                 auto info = store->queryPathInfo(storePath);
-                storePath = info->path; // FIXME: screws up padding
+                storePath = info->path;
 
-                std::cout << storePath << std::string(std::max(0, (int) pathLen - (int) storePath.size()), ' ');
+                std::cout << std::left << std::setw(pathLen) << storePath << std::right;
 
                 if (showSize)
                     std::cout << '\t' << std::setw(11) << info->narSize;
