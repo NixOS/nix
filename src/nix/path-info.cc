@@ -135,8 +135,8 @@ struct CmdPathInfo : StorePathsCommand
                     Strings ss;
                     if (info->ultimate) ss.push_back("ultimate");
                     if (info->ca != "") ss.push_back("ca:" + info->ca);
-                    for (auto & sig : info->sigs) ss.push_back(sig);
-                    std::cout << concatStringsSep(" ", ss);
+                    ss.insert(ss.end(), info->sigs.begin(), info->sigs.end());
+                    printItemsSep(std::cout, " ", ss.begin(), ss.end());
                 }
 
                 std::cout << std::endl;
