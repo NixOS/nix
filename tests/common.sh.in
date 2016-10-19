@@ -2,7 +2,7 @@ set -e
 
 datadir="@datadir@"
 
-export TEST_ROOT=${TMPDIR:-/tmp}/nix-test
+export TEST_ROOT=$(realpath ${TMPDIR:-/tmp}/nix-test)
 export NIX_STORE_DIR
 if ! NIX_STORE_DIR=$(readlink -f $TEST_ROOT/store 2> /dev/null); then
     # Maybe the build directory is symlinked.
