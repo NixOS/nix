@@ -334,7 +334,7 @@ struct CurlDownloader : public Downloader
     {
         std::map<CURL *, std::shared_ptr<DownloadItem>> items;
 
-        bool quit;
+        bool quit = false;
 
         std::chrono::steady_clock::time_point nextWakeup;
 
