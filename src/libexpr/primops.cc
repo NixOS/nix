@@ -1635,7 +1635,10 @@ static void prim_match(EvalState & state, const Pos & pos, Value * * args, Value
     const size_t len = match.size() - 1;
     state.mkList(v, len);
     for (size_t i = 0; i < len; ++i) {
-        mkString(*(v.listElems()[i] = state.allocValue()), match[i + 1].str().c_str());
+        if (!match[i+1].matched)
+            mkNull(*(v.listElems()[i] = state.allocValue()));
+        else
+            mkString(*(v.listElems()[i] = state.allocValue()), match[i + 1].str().c_str());
     }
 }
 
