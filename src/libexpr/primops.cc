@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <regex>
 #include <dlfcn.h>
 
 
@@ -1618,25 +1619,26 @@ static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, 
    ‘null’ or a list containing substring matches. */
 static void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    Regex regex(state.forceStringNoCtx(*args[0], pos), true);
+    std::regex regex(state.forceStringNoCtx(*args[0], pos), std::regex::extended);
 
     PathSet context;
-    string s = state.forceString(*args[1], context, pos);
+    const std::string str = state.forceString(*args[1], context, pos);
 
-    Regex::Subs subs;
-    if (!regex.matches(s, subs)) {
+
+    std::smatch match;
+    if (!std::regex_match(str, match, regex)) {
         mkNull(v);
         return;
     }
 
-    unsigned int len = subs.empty() ? 0 : subs.rbegin()->first + 1;
+    // the first match is the whole string
+    const size_t len = match.size() - 1;
     state.mkList(v, len);
-    for (unsigned int n = 0; n < len; ++n) {
-        auto i = subs.find(n);
-        if (i == subs.end())
-            mkNull(*(v.listElems()[n] = state.allocValue()));
+    for (size_t i = 0; i < len; ++i) {
+        if (!match[i+1].matched)
+            mkNull(*(v.listElems()[i] = state.allocValue()));
         else
-            mkString(*(v.listElems()[n] = state.allocValue()), i->second);
+            mkString(*(v.listElems()[i] = state.allocValue()), match[i + 1].str().c_str());
     }
 }
 
