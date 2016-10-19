@@ -16,6 +16,8 @@
 
 using namespace nix;
 
+extern char * * environ;
+
 /* Recreate the effect of the perl shellwords function, breaking up a
  * string into arguments like a shell word, including escapes
  */
@@ -448,9 +450,10 @@ int main(int argc, char ** argv)
                     ? Strings{"bash", "--rcfile", rcfile}
                     : Strings{"bash", rcfile};
 
-                execvpe(getEnv("NIX_BUILD_SHELL", "bash").c_str(),
-                        stringsToCharPtrs(args).data(),
-                        stringsToCharPtrs(envStrs).data());
+                environ = stringsToCharPtrs(envStrs).data();
+
+                execvp(getEnv("NIX_BUILD_SHELL", "bash").c_str(),
+                    stringsToCharPtrs(args).data());
 
                 throw SysError("executing shell");
             }
@@ -507,4 +510,3 @@ int main(int argc, char ** argv)
         }
     });
 }
-
