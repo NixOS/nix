@@ -365,7 +365,7 @@ public:
     virtual bool wantMassQuery() { return false; }
 
     /* Import a path into the store. */
-    virtual void addToStore(const ValidPathInfo & info, const std::string & nar,
+    virtual void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
         bool repair = false, bool dontCheckSigs = false) = 0;
 
     /* Copy the contents of a path to the store and register the

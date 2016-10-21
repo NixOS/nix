@@ -456,7 +456,7 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     StringSink sink;
     srcStore->narFromPath({storePath}, sink);
 
-    dstStore->addToStore(*info, *sink.s, repair);
+    dstStore->addToStore(*info, sink.s, repair);
 }
 
 

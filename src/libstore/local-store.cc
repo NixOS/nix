@@ -909,10 +909,10 @@ void LocalStore::invalidatePath(State & state, const Path & path)
 }
 
 
-void LocalStore::addToStore(const ValidPathInfo & info, const std::string & nar,
+void LocalStore::addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
     bool repair, bool dontCheckSigs)
 {
-    Hash h = hashString(htSHA256, nar);
+    Hash h = hashString(htSHA256, *nar);
     if (h != info.narHash)
         throw Error(format("hash mismatch importing path ‘%s’; expected hash ‘%s’, got ‘%s’") %
             info.path % info.narHash.to_string() % h.to_string());
@@ -939,7 +939,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, const std::string & nar,
 
             deletePath(realPath);
 
-            StringSource source(nar);
+            StringSource source(*nar);
             restorePath(realPath, source);
 
             canonicalisePathMetaData(realPath, -1);

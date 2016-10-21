@@ -19,11 +19,15 @@ private:
 
     std::string compression;
 
+    bool writeNARListing;
+
 protected:
 
     BinaryCacheStore(const Params & params);
 
     [[noreturn]] void notImpl();
+
+public:
 
     virtual bool fileExists(const std::string & path) = 0;
 
@@ -36,6 +40,8 @@ protected:
         std::function<void(std::exception_ptr exc)> failure) = 0;
 
     std::shared_ptr<std::string> getFile(const std::string & path);
+
+protected:
 
     bool wantMassQuery_ = false;
     int priority = 50;
@@ -86,7 +92,7 @@ public:
 
     bool wantMassQuery() override { return wantMassQuery_; }
 
-    void addToStore(const ValidPathInfo & info, const std::string & nar,
+    void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
         bool repair = false, bool dontCheckSigs = false) override;
 
     Path addToStore(const string & name, const Path & srcPath,

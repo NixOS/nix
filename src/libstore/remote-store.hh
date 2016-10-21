@@ -53,7 +53,7 @@ public:
     void querySubstitutablePathInfos(const PathSet & paths,
         SubstitutablePathInfos & infos) override;
 
-    void addToStore(const ValidPathInfo & info, const std::string & nar,
+    void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
         bool repair, bool dontCheckSigs) override;
 
     Path addToStore(const string & name, const Path & srcPath,
