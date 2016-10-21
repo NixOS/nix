@@ -304,7 +304,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         string s = readString(from);
         PathSet refs = readStorePaths<PathSet>(*store, from);
         startWork();
-        Path path = store->addTextToStore(suffix, s, refs);
+        Path path = store->addTextToStore(suffix, s, refs, false);
         stopWork();
         to << path;
         break;

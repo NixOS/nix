@@ -910,7 +910,7 @@ void LocalStore::invalidatePath(State & state, const Path & path)
 
 
 void LocalStore::addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-    bool repair, bool dontCheckSigs)
+    bool repair, bool dontCheckSigs, std::shared_ptr<FSAccessor> accessor)
 {
     Hash h = hashString(htSHA256, *nar);
     if (h != info.narHash)

@@ -54,7 +54,8 @@ public:
         SubstitutablePathInfos & infos) override;
 
     void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-        bool repair, bool dontCheckSigs) override;
+        bool repair, bool dontCheckSigs,
+        std::shared_ptr<FSAccessor> accessor) override;
 
     Path addToStore(const string & name, const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,
