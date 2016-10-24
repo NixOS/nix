@@ -107,14 +107,14 @@
 (defun nix-syntax-propertize-multiline-string ()
   "Set syntax properies for multiline string delimiters."
   (let* ((start (match-beginning 0))
-         (end (match-end 0))
          (context (save-excursion (save-match-data (syntax-ppss start))))
          (string-type (nth 3 context)))
+
     (pcase string-type
       (`t
        ;; inside a multiline string
        ;; ending multi-line string delimiter
-       (put-text-property (1- end) end
+       (put-text-property (1+ start) (+ 2 start)
                           'syntax-table (string-to-syntax "|")))
       (`nil
        ;; beginning multi-line string delimiter
@@ -133,7 +133,6 @@
   "Set syntax properties for close braces.
 If a close brace `}' ends an antiquote, the next character begins a string."
   (let* ((start (match-beginning 0))
-         (end (match-end 0))
          (context (save-excursion (save-match-data (syntax-ppss start))))
          (open (nth 1 context)))
     (when open ;; a corresponding open-brace was found
