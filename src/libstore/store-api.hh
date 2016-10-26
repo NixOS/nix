@@ -188,6 +188,9 @@ enum BuildMode { bmNormal, bmRepair, bmCheck, bmHash };
 
 struct BuildResult
 {
+    /* Note: don't remove status codes, and only add new status codes
+       at the end of the list, to prevent client/server
+       incompatibilities in the nix-store --serve protocol. */
     enum Status {
         Built = 0,
         Substituted,
@@ -196,6 +199,7 @@ struct BuildResult
         InputRejected,
         OutputRejected,
         TransientFailure, // possibly transient
+        CachedFailure, // no longer used
         TimedOut,
         MiscFailure,
         DependencyFailed,
