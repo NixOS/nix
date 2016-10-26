@@ -3029,7 +3029,7 @@ void DerivationGoal::handleEOF(int fd)
 void DerivationGoal::flushLine()
 {
     if (settings.verboseBuild)
-        printInfo(filterANSIEscapes(currentLogLine, true));
+        printError(filterANSIEscapes(currentLogLine, true));
     else {
         logTail.push_back(currentLogLine);
         if (logTail.size() > settings.logLines) logTail.pop_front();
