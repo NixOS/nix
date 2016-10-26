@@ -1516,10 +1516,16 @@ static void prim_div(EvalState & state, const Pos & pos, Value * * args, Value &
     NixFloat f2 = state.forceFloat(*args[1], pos);
     if (f2 == 0) throw EvalError(format("division by zero, at %1%") % pos);
 
-    if (args[0]->type == tFloat || args[1]->type == tFloat)
+    if (args[0]->type == tFloat || args[1]->type == tFloat) {
         mkFloat(v, state.forceFloat(*args[0], pos) / state.forceFloat(*args[1], pos));
-    else
-        mkInt(v, state.forceInt(*args[0], pos) / state.forceInt(*args[1], pos));
+    } else {
+        NixInt i1 = state.forceInt(*args[0], pos);
+        NixInt i2 = state.forceInt(*args[1], pos);
+        /* Avoid division overflow as it might raise SIGFPE. */
+        if (i1 == std::numeric_limits<NixInt>::min() && i2 == -1)
+            throw EvalError(format("overflow in integer division, at %1%") % pos);
+        mkInt(v, i1 / i2);
+    }
 }
 
 
