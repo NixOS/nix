@@ -768,7 +768,14 @@ private:
     GoalState state;
 
     /* Stuff we need to pass to initChild(). */
-    typedef map<Path, Path> DirsInChroot; // maps target path to source path
+    struct ChrootPath {
+        Path source;
+        bool optional;
+        ChrootPath(Path source = "", bool optional = false)
+            : source(source), optional(optional)
+        { }
+    };
+    typedef map<Path, ChrootPath> DirsInChroot; // maps target path to source path
     DirsInChroot dirsInChroot;
     typedef map<string, string> Environment;
     Environment env;
@@ -1865,12 +1872,18 @@ void DerivationGoal::startBuilder()
 
         dirsInChroot.clear();
 
-        for (auto & i : dirs) {
+        for (auto i : dirs) {
+            if (i.empty()) continue;
+            bool optional = false;
+            if (i[i.size() - 1] == '?') {
+                optional = true;
+                i.pop_back();
+            }
             size_t p = i.find('=');
             if (p == string::npos)
-                dirsInChroot[i] = i;
+                dirsInChroot[i] = {i, optional};
             else
-                dirsInChroot[string(i, 0, p)] = string(i, p + 1);
+                dirsInChroot[string(i, 0, p)] = {string(i, p + 1), optional};
         }
         dirsInChroot[tmpDirInSandbox] = tmpDir;
 
@@ -1878,8 +1891,8 @@ void DerivationGoal::startBuilder()
         PathSet closure;
         for (auto & i : dirsInChroot)
             try {
-                if (worker.store.isInStore(i.second))
-                    worker.store.computeFSClosure(worker.store.toStorePath(i.second), closure);
+                if (worker.store.isInStore(i.second.source))
+                    worker.store.computeFSClosure(worker.store.toStorePath(i.second.source), closure);
             } catch (Error & e) {
                 throw Error(format("while processing ‘build-sandbox-paths’: %s") % e.what());
             }
@@ -2325,12 +2338,16 @@ void DerivationGoal::runChild()
                environment. */
             for (auto & i : dirsInChroot) {
                 struct stat st;
-                Path source = i.second;
+                Path source = i.second.source;
                 Path target = chrootRootDir + i.first;
                 if (source == "/proc") continue; // backwards compatibility
                 debug(format("bind mounting ‘%1%’ to ‘%2%’") % source % target);
-                if (stat(source.c_str(), &st) == -1)
-                    throw SysError(format("getting attributes of path ‘%1%’") % source);
+                if (stat(source.c_str(), &st) == -1) {
+                    if (i.second.optional && errno == ENOENT)
+                        continue;
+                    else
+                        throw SysError(format("getting attributes of path ‘%1%’") % source);
+                }
                 if (S_ISDIR(st.st_mode))
                     createDirs(target);
                 else {
