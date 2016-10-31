@@ -268,7 +268,12 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
     to mount a path in a different location in the sandbox; for
     instance, <literal>/bin=/nix-bin</literal> will mount the path
     <literal>/nix-bin</literal> as <literal>/bin</literal> inside the
-    sandbox.</para>
+    sandbox. If <replaceable>source</replaceable> is followed by
+    <literal>?</literal>, then it is not an error if
+    <replaceable>source</replaceable> does not exist; for example,
+    <literal>/dev/nvidiactl?</literal> specifies that
+    <filename>/dev/nvidiactl</filename> will only be mounted in the
+    sandbox if it exists in the host filesystem.</para>
 
     <para>Depending on how Nix was built, the default value for this option
     may be empty or provide <filename>/bin/sh</filename> as a
