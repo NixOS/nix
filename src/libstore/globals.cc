@@ -26,7 +26,7 @@ Settings settings;
 Settings::Settings()
 {
     keepFailed = false;
-    keepGoing = false;
+    keepGoing = true;
     tryFallback = false;
     maxBuildJobs = 1;
     buildCores = 1;

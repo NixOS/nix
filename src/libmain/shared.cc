@@ -179,6 +179,10 @@ struct LegacyArgs : public MixCommonArgs
         mkFlag('k', "keep-going", "keep going after a build fails",
             &settings.keepGoing);
 
+        mkFlag(0, "fail-early", "stop all builds if one fails", []() {
+            settings.keepGoing = false;
+        });
+
         mkFlag(0, "fallback", "build from source if substitution fails", []() {
             settings.set("build-fallback", "true");
         });
