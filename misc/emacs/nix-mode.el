@@ -74,28 +74,61 @@
        (put-text-property start (1+ start)
                           'syntax-table (string-to-syntax "|"))))))
 
+(defun nix-syntax-find-antiquote-open (start)
+  "Find the beginning of the current antiquote, if any.
+
+Returns point before starting `${' delimiter, or `nil' if not inside one."
+  (let ((depth 0) (pos start))
+    (while (and (>= depth 0))
+      (setq pos (previous-single-char-property-change pos 'nix-syntax-antiquote))
+      (pcase (char-before pos)
+        (`nil
+         (setq pos nil)
+         (setq depth -1))
+        (`?}
+         (setq depth (1+ depth))
+         (setq pos (1- pos)))
+        (`?{
+         (setq depth (1- depth))
+         (setq pos (- pos 2)))))
+    pos))
+
 (defun nix-syntax-propertize-antiquote ()
   "Set syntax properties for antiquote marks."
-  (let* ((start (match-beginning 0)))
-    (put-text-property start (1+ start)
-                       'syntax-table (string-to-syntax "|"))
+  (let* ((start (match-beginning 0))
+         (context (save-excursion (save-match-data (syntax-ppss start))))
+         (string-type (nth 3 context)))
+    (pcase string-type
+      (`nil
+       ;; outside string
+       ;; `foo.${bar}' returns the attribute of `foo' matching the string `bar'
+       ;; this is seldom used, but allowed
+       nil)
+      (`t
+       ;; inside a multiline string
+       (put-text-property start (1+ start)
+                          'syntax-table (string-to-syntax "|"))))
     (put-text-property start (+ start 2)
-                       'nix-syntax-antiquote t)))
+                       'nix-syntax-antiquote start)))
 
 (defun nix-syntax-propertize-close-brace ()
   "Set syntax properties for close braces.
 If a close brace `}' ends an antiquote, the next character begins a string."
   (let* ((start (match-beginning 0))
          (end (match-end 0))
-         (context (save-excursion (save-match-data (syntax-ppss start))))
-         (open (nth 1 context)))
+         (open (nix-syntax-find-antiquote-open start)))
     (when open ;; a corresponding open-brace was found
-      (let* ((antiquote (get-text-property open 'nix-syntax-antiquote)))
-        (when antiquote
-          (put-text-property (+ start 1) (+ start 2)
-                             'syntax-table (string-to-syntax "|"))
-          (put-text-property start (1+ start)
-                             'nix-syntax-antiquote t))))))
+      (let* ((context-antiquote
+              (save-excursion (save-match-data (syntax-ppss open))))
+             (string-type (nth 3 context-antiquote)))
+        (pcase string-type
+          (`nil nil)
+          (`t
+           ;; continue multiline string
+           (put-text-property (+ start 1) (+ start 2)
+                              'syntax-table (string-to-syntax "|")))))
+      (put-text-property start (1+ start)
+                         'nix-syntax-antiquote t))))
 
 (defun nix-syntax-propertize (start end)
   "Special syntax properties for Nix."
