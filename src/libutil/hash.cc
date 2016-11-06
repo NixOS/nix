@@ -165,7 +165,13 @@ Hash parseHash32(HashType ht, const string & s)
         unsigned int i = b / 8;
         unsigned int j = b % 8;
         hash.hash[i] |= digit << j;
-        if (i < hash.hashSize - 1) hash.hash[i + 1] |= digit >> (8 - j);
+
+        if (i < hash.hashSize - 1) {
+            hash.hash[i + 1] |= digit >> (8 - j);
+        } else {
+            if (digit >> (8 - j))
+                throw BadHash(format("invalid base-32 hash ‘%1%’") % s);
+        }
     }
 
     return hash;
