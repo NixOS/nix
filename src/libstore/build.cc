@@ -3791,7 +3791,7 @@ void LocalStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
         }
 
     if (!failed.empty())
-        throw Error(worker.exitStatus(), "build of %s failed",showPaths(failed));
+        throw Error(worker.exitStatus(), "build of %s failed", showPaths(failed));
 }
 
 
