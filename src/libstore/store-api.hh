@@ -577,12 +577,12 @@ void checkStoreName(const string & name);
 
 /* Copy a path from one store to another. */
 void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
-    const Path & storePath, bool repair = false);
+    const Path & storePath, bool repair = false, bool dontCheckSigs = false);
 
 
 /* Copy the closure of the specified paths from one store to another. */
 void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
-    const PathSet & storePaths, bool repair = false);
+    const PathSet & storePaths, bool repair = false, bool dontCheckSigs = false);
 
 
 /* Remove the temporary roots file for this process.  Any temporary

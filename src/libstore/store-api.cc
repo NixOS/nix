@@ -449,19 +449,19 @@ const Store::Stats & Store::getStats()
 
 
 void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
-    const Path & storePath, bool repair)
+    const Path & storePath, bool repair, bool dontCheckSigs)
 {
     auto info = srcStore->queryPathInfo(storePath);
 
     StringSink sink;
     srcStore->narFromPath({storePath}, sink);
 
-    dstStore->addToStore(*info, sink.s, repair);
+    dstStore->addToStore(*info, sink.s, repair, dontCheckSigs);
 }
 
 
 void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
-    const PathSet & storePaths, bool repair)
+    const PathSet & storePaths, bool repair, bool dontCheckSigs)
 {
     PathSet closure;
     for (auto & path : storePaths)
@@ -480,7 +480,7 @@ void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
     printMsg(lvlDebug, format("copying %1% missing paths") % missing.size());
 
     for (auto & i : missing)
-        copyStorePath(srcStore, dstStore, i, repair);
+        copyStorePath(srcStore, dstStore, i, repair, dontCheckSigs);
 }
 
 
