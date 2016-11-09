@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "types.hh"
-#include "regex.hh"
+#include <regex>
 
 namespace nix {
 
@@ -19,7 +19,7 @@ struct DrvName
     bool matches(DrvName & n);
 
 private:
-    std::shared_ptr<Regex> regex;
+    std::unique_ptr<std::regex> regex;
 };
 
 typedef list<DrvName> DrvNames;

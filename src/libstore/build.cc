@@ -768,7 +768,14 @@ private:
     GoalState state;
 
     /* Stuff we need to pass to initChild(). */
-    typedef map<Path, Path> DirsInChroot; // maps target path to source path
+    struct ChrootPath {
+        Path source;
+        bool optional;
+        ChrootPath(Path source = "", bool optional = false)
+            : source(source), optional(optional)
+        { }
+    };
+    typedef map<Path, ChrootPath> DirsInChroot; // maps target path to source path
     DirsInChroot dirsInChroot;
     typedef map<string, string> Environment;
     Environment env;
@@ -1869,12 +1876,18 @@ void DerivationGoal::startBuilder()
 
         dirsInChroot.clear();
 
-        for (auto & i : dirs) {
+        for (auto i : dirs) {
+            if (i.empty()) continue;
+            bool optional = false;
+            if (i[i.size() - 1] == '?') {
+                optional = true;
+                i.pop_back();
+            }
             size_t p = i.find('=');
             if (p == string::npos)
-                dirsInChroot[i] = i;
+                dirsInChroot[i] = {i, optional};
             else
-                dirsInChroot[string(i, 0, p)] = string(i, p + 1);
+                dirsInChroot[string(i, 0, p)] = {string(i, p + 1), optional};
         }
         dirsInChroot[tmpDirInSandbox] = tmpDir;
 
@@ -1882,8 +1895,8 @@ void DerivationGoal::startBuilder()
         PathSet closure;
         for (auto & i : dirsInChroot)
             try {
-                if (worker.store.isInStore(i.second))
-                    worker.store.computeFSClosure(worker.store.toStorePath(i.second), closure);
+                if (worker.store.isInStore(i.second.source))
+                    worker.store.computeFSClosure(worker.store.toStorePath(i.second.source), closure);
             } catch (Error & e) {
                 throw Error(format("while processing ‘build-sandbox-paths’: %s") % e.what());
             }
@@ -2304,6 +2317,8 @@ void DerivationGoal::runChild()
                 ss.push_back("/dev/tty");
                 ss.push_back("/dev/urandom");
                 ss.push_back("/dev/zero");
+                ss.push_back("/dev/ptmx");
+                ss.push_back("/dev/pts");
                 createSymlink("/proc/self/fd", chrootRootDir + "/dev/fd");
                 createSymlink("/proc/self/fd/0", chrootRootDir + "/dev/stdin");
                 createSymlink("/proc/self/fd/1", chrootRootDir + "/dev/stdout");
@@ -2327,12 +2342,16 @@ void DerivationGoal::runChild()
                environment. */
             for (auto & i : dirsInChroot) {
                 struct stat st;
-                Path source = i.second;
+                Path source = i.second.source;
                 Path target = chrootRootDir + i.first;
                 if (source == "/proc") continue; // backwards compatibility
                 debug(format("bind mounting ‘%1%’ to ‘%2%’") % source % target);
-                if (stat(source.c_str(), &st) == -1)
-                    throw SysError(format("getting attributes of path ‘%1%’") % source);
+                if (stat(source.c_str(), &st) == -1) {
+                    if (i.second.optional && errno == ENOENT)
+                        continue;
+                    else
+                        throw SysError(format("getting attributes of path ‘%1%’") % source);
+                }
                 if (S_ISDIR(st.st_mode))
                     createDirs(target);
                 else {
@@ -2354,11 +2373,14 @@ void DerivationGoal::runChild()
                     fmt("size=%s", settings.get("sandbox-dev-shm-size", std::string("50%"))).c_str()) == -1)
                 throw SysError("mounting /dev/shm");
 
+#if 0
+            // FIXME: can't figure out how to do this in a user
+            // namespace.
+
             /* Mount a new devpts on /dev/pts.  Note that this
                requires the kernel to be compiled with
                CONFIG_DEVPTS_MULTIPLE_INSTANCES=y (which is the case
                if /dev/ptx/ptmx exists). */
-#if 0
             if (pathExists("/dev/pts/ptmx") &&
                 !pathExists(chrootRootDir + "/dev/ptmx")
                 && dirsInChroot.find("/dev/pts") == dirsInChroot.end())
@@ -3028,7 +3050,7 @@ void DerivationGoal::handleEOF(int fd)
 void DerivationGoal::flushLine()
 {
     if (settings.verboseBuild)
-        printInfo(filterANSIEscapes(currentLogLine, true));
+        printError(filterANSIEscapes(currentLogLine, true));
     else {
         logTail.push_back(currentLogLine);
         if (logTail.size() > settings.logLines) logTail.pop_front();

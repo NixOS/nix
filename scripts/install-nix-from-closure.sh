@@ -76,9 +76,9 @@ if ! $nix/bin/nix-env -i "$nix"; then
 fi
 
 # Install an SSL certificate bundle.
-if [ -z "$SSL_CERT_FILE" -o ! -f "$SSL_CERT_FILE" ]; then
+if [ -z "$NIX_SSL_CERT_FILE" -o ! -f "$NIX_SSL_CERT_FILE" ]; then
     $nix/bin/nix-env -i "$cacert"
-    export SSL_CERT_FILE="$HOME/.nix-profile/etc/ssl/certs/ca-bundle.crt"
+    export NIX_SSL_CERT_FILE="$HOME/.nix-profile/etc/ssl/certs/ca-bundle.crt"
 fi
 
 # Subscribe the user to the Nixpkgs channel and fetch it.
@@ -89,21 +89,25 @@ if [ -z "$_NIX_INSTALLER_TEST" ]; then
     $nix/bin/nix-channel --update nixpkgs
 fi
 
-# Make the shell source nix.sh during login.
-p=$HOME/.nix-profile/etc/profile.d/nix.sh
-
 added=
-for i in .bash_profile .bash_login .profile; do
-    fn="$HOME/$i"
-    if [ -w "$fn" ]; then
-        if ! grep -q "$p" "$fn"; then
-            echo "modifying $fn..." >&2
-            echo "if [ -e $p ]; then . $p; fi # added by Nix installer" >> $fn
+if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
+
+    # Make the shell source nix.sh during login.
+    p=$HOME/.nix-profile/etc/profile.d/nix.sh
+
+    for i in .bash_profile .bash_login .profile; do
+        fn="$HOME/$i"
+        if [ -w "$fn" ]; then
+            if ! grep -q "$p" "$fn"; then
+                echo "modifying $fn..." >&2
+                echo "if [ -e $p ]; then . $p; fi # added by Nix installer" >> $fn
+            fi
+            added=1
+            break
         fi
-        added=1
-        break
-    fi
-done
+    done
+
+fi
 
 if [ -z "$added" ]; then
     cat >&2 <<EOF

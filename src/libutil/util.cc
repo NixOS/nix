@@ -778,6 +778,14 @@ void Pid::setKillSignal(int signal)
 }
 
 
+pid_t Pid::release()
+{
+    pid_t p = pid;
+    pid = -1;
+    return p;
+}
+
+
 void killUser(uid_t uid)
 {
     debug(format("killing all processes running under uid ‘%1%’") % uid);

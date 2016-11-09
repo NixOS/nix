@@ -71,7 +71,7 @@ protected:
 
     void getFile(const std::string & path,
         std::function<void(std::shared_ptr<std::string>)> success,
-        std::function<void(std::exception_ptr exc)> failure)
+        std::function<void(std::exception_ptr exc)> failure) override
     {
         DownloadRequest request(cacheUri + "/" + path);
         request.showProgress = DownloadRequest::no;

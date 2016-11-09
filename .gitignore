@@ -34,14 +34,7 @@ Makefile.config
 
 # /scripts/
 /scripts/nix-profile.sh
-/scripts/nix-switch
-/scripts/nix-collect-garbage
-/scripts/nix-prefetch-url
 /scripts/nix-copy-closure
-/scripts/NixConfig.pm
-/scripts/NixManifest.pm
-/scripts/download-from-binary-cache.pl
-/scripts/find-runtime-roots.pl
 /scripts/build-remote.pl
 /scripts/nix-reduce-build
 /scripts/nix-http-export.cgi
@@ -58,6 +51,8 @@ Makefile.config
 /src/libstore/schema.sql.hh
 /src/libstore/sandbox-defaults.sb
 
+/src/nix/nix
+
 # /src/nix-env/
 /src/nix-env/nix-env
 
@@ -67,8 +62,12 @@ Makefile.config
 # /src/nix-store/
 /src/nix-store/nix-store
 
+/src/nix-prefetch-url/nix-prefetch-url
+
 # /src/nix-daemon/
 /src/nix-daemon/nix-daemon
+
+/src/nix-collect-garbage/nix-collect-garbage
 
 # /src/nix-channel/
 /src/nix-channel/nix-channel

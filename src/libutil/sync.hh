@@ -54,6 +54,14 @@ public:
             cv.wait(lk);
         }
 
+        template<class Rep, class Period>
+        void wait_for(std::condition_variable & cv,
+            const std::chrono::duration<Rep, Period> & duration)
+        {
+            assert(s);
+            cv.wait_for(lk, duration);
+        }
+
         template<class Rep, class Period, class Predicate>
         bool wait_for(std::condition_variable & cv,
             const std::chrono::duration<Rep, Period> & duration,

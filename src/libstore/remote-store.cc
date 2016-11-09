@@ -332,8 +332,8 @@ Path RemoteStore::queryPathFromHashPart(const string & hashPart)
 }
 
 
-void RemoteStore::addToStore(const ValidPathInfo & info, const std::string & nar,
-    bool repair, bool dontCheckSigs)
+void RemoteStore::addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
+    bool repair, bool dontCheckSigs, std::shared_ptr<FSAccessor> accessor)
 {
     throw Error("RemoteStore::addToStore() not implemented");
 }

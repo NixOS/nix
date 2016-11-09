@@ -13,11 +13,11 @@ ONBUILD ENV \
     ENV=/etc/profile \
     PATH=/root/.nix-profile/bin:/root/.nix-profile/sbin:/bin:/sbin:/usr/bin:/usr/sbin \
     GIT_SSL_CAINFO=/root/.nix-profile/etc/ssl/certs/ca-bundle.crt \
-    SSL_CERT_FILE=/root/.nix-profile/etc/ssl/certs/ca-bundle.crt
+    NIX_SSL_CERT_FILE=/root/.nix-profile/etc/ssl/certs/ca-bundle.crt
 
 ENV \
     ENV=/etc/profile \
     PATH=/root/.nix-profile/bin:/root/.nix-profile/sbin:/bin:/sbin:/usr/bin:/usr/sbin \
     GIT_SSL_CAINFO=/root/.nix-profile/etc/ssl/certs/ca-bundle.crt \
-    SSL_CERT_FILE=/root/.nix-profile/etc/ssl/certs/ca-bundle.crt \
+    NIX_SSL_CERT_FILE=/root/.nix-profile/etc/ssl/certs/ca-bundle.crt \
     NIX_PATH=/nix/var/nix/profiles/per-user/root/channels/

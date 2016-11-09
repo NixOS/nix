@@ -188,6 +188,9 @@ enum BuildMode { bmNormal, bmRepair, bmCheck, bmHash };
 
 struct BuildResult
 {
+    /* Note: don't remove status codes, and only add new status codes
+       at the end of the list, to prevent client/server
+       incompatibilities in the nix-store --serve protocol. */
     enum Status {
         Built = 0,
         Substituted,
@@ -196,6 +199,7 @@ struct BuildResult
         InputRejected,
         OutputRejected,
         TransientFailure, // possibly transient
+        CachedFailure, // no longer used
         TimedOut,
         MiscFailure,
         DependencyFailed,
@@ -365,8 +369,9 @@ public:
     virtual bool wantMassQuery() { return false; }
 
     /* Import a path into the store. */
-    virtual void addToStore(const ValidPathInfo & info, const std::string & nar,
-        bool repair = false, bool dontCheckSigs = false) = 0;
+    virtual void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
+        bool repair = false, bool dontCheckSigs = false,
+        std::shared_ptr<FSAccessor> accessor = 0) = 0;
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
@@ -460,17 +465,6 @@ public:
 
     /* Return an object to access files in the Nix store. */
     virtual ref<FSAccessor> getFSAccessor() = 0;
-
-private:
-
-    /* Inform an accessor about the NAR contents of a store path. Used
-       by importPaths() to speed up subsequent access to the imported
-       paths when used with binary cache stores. */
-    virtual void addPathToAccessor(ref<FSAccessor>, const Path & storePath, const ref<std::string> & data)
-    {
-    }
-
-public:
 
     /* Add signatures to the specified store path. The signatures are
        not verified. */

@@ -10,11 +10,11 @@
 
 #include <curl/curl.h>
 
+#include <queue>
 #include <iostream>
 #include <thread>
 #include <cmath>
 #include <random>
-
 
 namespace nix {
 
@@ -188,10 +188,10 @@ struct CurlDownloader : public Downloader
             curl_easy_setopt(req, CURLOPT_FOLLOWLOCATION, 1L);
             curl_easy_setopt(req, CURLOPT_NOSIGNAL, 1);
             curl_easy_setopt(req, CURLOPT_USERAGENT, ("Nix/" + nixVersion).c_str());
-            #ifdef CURLOPT_PIPEWAIT
+            #if LIBCURL_VERSION_NUM >= 0x072b00
             curl_easy_setopt(req, CURLOPT_PIPEWAIT, 1);
             #endif
-            #ifdef CURL_HTTP_VERSION_2TLS
+            #if LIBCURL_VERSION_NUM >= 0x072f00
             if (downloader.enableHttp2)
                 curl_easy_setopt(req, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
             #endif
@@ -210,7 +210,8 @@ struct CurlDownloader : public Downloader
                 curl_easy_setopt(req, CURLOPT_NOBODY, 1);
 
             if (request.verifyTLS)
-                curl_easy_setopt(req, CURLOPT_CAINFO, getEnv("SSL_CERT_FILE", "/etc/ssl/certs/ca-certificates.crt").c_str());
+                curl_easy_setopt(req, CURLOPT_CAINFO,
+                    getEnv("NIX_SSL_CERT_FILE", getEnv("SSL_CERT_FILE", "/etc/ssl/certs/ca-certificates.crt")).c_str());
             else {
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYPEER, 0);
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYHOST, 0);
@@ -281,8 +282,13 @@ struct CurlDownloader : public Downloader
 
     struct State
     {
+        struct EmbargoComparator {
+            bool operator() (const std::shared_ptr<DownloadItem> & i1, const std::shared_ptr<DownloadItem> & i2) {
+                return i1->embargo > i2->embargo;
+            }
+        };
         bool quit = false;
-        std::vector<std::shared_ptr<DownloadItem>> incoming;
+        std::priority_queue<std::shared_ptr<DownloadItem>, std::vector<std::shared_ptr<DownloadItem>>, EmbargoComparator> incoming;
     };
 
     Sync<State> state_;
@@ -302,7 +308,7 @@ struct CurlDownloader : public Downloader
 
         curlm = curl_multi_init();
 
-        #ifdef CURLPIPE_MULTIPLEX
+        #if LIBCURL_VERSION_NUM >= 0x072b00 // correct?
         curl_multi_setopt(curlm, CURLMOPT_PIPELINING, CURLPIPE_MULTIPLEX);
         #endif
         curl_multi_setopt(curlm, CURLMOPT_MAX_TOTAL_CONNECTIONS,
@@ -334,7 +340,7 @@ struct CurlDownloader : public Downloader
     {
         std::map<CURL *, std::shared_ptr<DownloadItem>> items;
 
-        bool quit;
+        bool quit = false;
 
         std::chrono::steady_clock::time_point nextWakeup;
 
@@ -380,9 +386,7 @@ struct CurlDownloader : public Downloader
 
             /* Add new curl requests from the incoming requests queue,
                except for requests that are embargoed (waiting for a
-               retry timeout to expire). FIXME: should use a priority
-               queue for the embargoed items to prevent repeated O(n)
-               checks. */
+               retry timeout to expire). */
             if (extraFDs[0].revents & CURL_WAIT_POLLIN) {
                 char buf[1024];
                 auto res = read(extraFDs[0].fd, buf, sizeof(buf));
@@ -390,22 +394,23 @@ struct CurlDownloader : public Downloader
                     throw SysError("reading curl wakeup socket");
             }
 
-            std::vector<std::shared_ptr<DownloadItem>> incoming, embargoed;
+            std::vector<std::shared_ptr<DownloadItem>> incoming;
             auto now = std::chrono::steady_clock::now();
 
             {
                 auto state(state_.lock());
-                for (auto & item: state->incoming) {
-                    if (item->embargo <= now)
+                while (!state->incoming.empty()) {
+                    auto item = state->incoming.top();
+                    if (item->embargo <= now) {
                         incoming.push_back(item);
-                    else {
-                        embargoed.push_back(item);
+                        state->incoming.pop();
+                    } else {
                         if (nextWakeup == std::chrono::steady_clock::time_point()
                             || item->embargo < nextWakeup)
                             nextWakeup = item->embargo;
+                        break;
                     }
                 }
-                state->incoming = embargoed;
                 quit = state->quit;
             }
 
@@ -432,7 +437,7 @@ struct CurlDownloader : public Downloader
 
         {
             auto state(state_.lock());
-            state->incoming.clear();
+            while (!state->incoming.empty()) state->incoming.pop();
             state->quit = true;
         }
     }
@@ -443,7 +448,7 @@ struct CurlDownloader : public Downloader
             auto state(state_.lock());
             if (state->quit)
                 throw nix::Error("cannot enqueue download request because the download thread is shutting down");
-            state->incoming.push_back(item);
+            state->incoming.push(item);
         }
         writeFull(wakeupPipe.writeSide.get(), " ");
     }
@@ -553,7 +558,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
                 Hash hash = hashString(expectedHash ? expectedHash.type : htSHA256, *res.data);
                 info.path = store->makeFixedOutputPath(false, hash, name);
                 info.narHash = hashString(htSHA256, *sink.s);
-                store->addToStore(info, *sink.s, false, true);
+                store->addToStore(info, sink.s, false, true);
                 storePath = info.path;
             }
 

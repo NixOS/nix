@@ -19,11 +19,15 @@ private:
 
     std::string compression;
 
+    bool writeNARListing;
+
 protected:
 
     BinaryCacheStore(const Params & params);
 
     [[noreturn]] void notImpl();
+
+public:
 
     virtual bool fileExists(const std::string & path) = 0;
 
@@ -36,6 +40,8 @@ protected:
         std::function<void(std::exception_ptr exc)> failure) = 0;
 
     std::shared_ptr<std::string> getFile(const std::string & path);
+
+protected:
 
     bool wantMassQuery_ = false;
     int priority = 50;
@@ -86,23 +92,24 @@ public:
 
     bool wantMassQuery() override { return wantMassQuery_; }
 
-    void addToStore(const ValidPathInfo & info, const std::string & nar,
-        bool repair = false, bool dontCheckSigs = false) override;
+    void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
+        bool repair, bool dontCheckSigs,
+        std::shared_ptr<FSAccessor> accessor) override;
 
     Path addToStore(const string & name, const Path & srcPath,
-        bool recursive = true, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter, bool repair = false) override;
+        bool recursive, HashType hashAlgo,
+        PathFilter & filter, bool repair) override;
 
     Path addTextToStore(const string & name, const string & s,
-        const PathSet & references, bool repair = false) override;
+        const PathSet & references, bool repair) override;
 
     void narFromPath(const Path & path, Sink & sink) override;
 
-    void buildPaths(const PathSet & paths, BuildMode buildMode = bmNormal) override
+    void buildPaths(const PathSet & paths, BuildMode buildMode) override
     { notImpl(); }
 
     BuildResult buildDerivation(const Path & drvPath, const BasicDerivation & drv,
-        BuildMode buildMode = bmNormal) override
+        BuildMode buildMode) override
     { notImpl(); }
 
     void ensurePath(const Path & path) override
@@ -130,10 +137,6 @@ public:
     { return true; }
 
     ref<FSAccessor> getFSAccessor() override;
-
-private:
-
-    void addPathToAccessor(ref<FSAccessor>, const Path & storePath, const ref<std::string> & data) override;
 
 public:
 
