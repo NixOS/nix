@@ -26,6 +26,14 @@ $ mkdir /nix
 $ chown alice /nix
 </screen>
 
+The install script will modify the first writable file from amongst
+<filename>.bash_profile</filename>, <filename>.bash_login</filename>
+and <filename>.profile</filename> to source
+<filename>~/.nix-profile/etc/profile.d/nix.sh</filename>. You can set
+the <command>NIX_INSTALLER_NO_MODIFY_PROFILE</command> environment
+variable before executing the install script to disable this
+behaviour.
+
 </para>
 
 <!--
