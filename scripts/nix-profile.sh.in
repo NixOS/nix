@@ -31,6 +31,15 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
         # Subscribe the user to the unstable Nixpkgs channel by default.
         if [ ! -e "$HOME/.nix-channels" ]; then
             echo "https://nixos.org/channels/nixpkgs-unstable nixpkgs" > "$HOME/.nix-channels"
+        else
+
+          # Append channels in $HOME/.nix-channels to $NIX_PATH so that
+          # subscribed channels work when the user has fetched them.
+
+          while read entry; do
+            channel=$(echo $entry | awk '{ print $2 }')
+            export NIX_PATH=${NIX_PATH:+$NIX_PATH:}${channel}=$HOME/.nix-defexpr/channels/${channel}
+          done < $HOME/.nix-channels
         fi
 
         # Create the per-user garbage collector roots directory.
