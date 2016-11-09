@@ -324,7 +324,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     case wopImportPaths: {
         startWork();
         TunnelSource source(from);
-        Paths paths = store->importPaths(source, 0);
+        Paths paths = store->importPaths(source, 0, trusted);
         stopWork();
         to << paths;
         break;

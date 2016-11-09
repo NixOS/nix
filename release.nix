@@ -25,7 +25,7 @@ let
 
         buildInputs =
           [ curl bison flex perl libxml2 libxslt bzip2 xz
-            pkgconfig sqlite libsodium
+            pkgconfig sqlite libsodium boehmgc
             docbook5 docbook5_xsl
             autoconf-archive
           ] ++ lib.optional (!lib.inNixShell) git;
@@ -34,6 +34,7 @@ let
           --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
           --with-www-curl=${perlPackages.WWWCurl}/${perl.libPrefix}
+          --enable-gc
         '';
 
         postUnpack = ''
