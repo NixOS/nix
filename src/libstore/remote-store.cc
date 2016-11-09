@@ -38,9 +38,9 @@ template<class T> T readStorePaths(Store & store, Source & from)
 
 template PathSet readStorePaths(Store & store, Source & from);
 
-
+/* TODO: Separate these store impls into different files, give them better names */
 RemoteStore::RemoteStore(const Params & params, size_t maxConnections)
-    : LocalFSStore(params)
+    : Store(params)
     , connections(make_ref<Pool<Connection>>(
             maxConnections,
             [this]() { return openConnection(); },
@@ -50,13 +50,21 @@ RemoteStore::RemoteStore(const Params & params, size_t maxConnections)
 }
 
 
-std::string RemoteStore::getUri()
+UDSRemoteStore::UDSRemoteStore(const Params & params, size_t maxConnections)
+    : Store(params)
+    , LocalFSStore(params)
+    , RemoteStore(params, maxConnections)
+{
+}
+
+
+std::string UDSRemoteStore::getUri()
 {
     return "daemon";
 }
 
 
-ref<RemoteStore::Connection> RemoteStore::openConnection()
+ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
 {
     auto conn = make_ref<Connection>();
 
@@ -84,46 +92,52 @@ ref<RemoteStore::Connection> RemoteStore::openConnection()
     conn->from.fd = conn->fd.get();
     conn->to.fd = conn->fd.get();
 
+    initConnection(*conn);
+
+    return conn;
+}
+
+
+void RemoteStore::initConnection(Connection & conn)
+{
     /* Send the magic greeting, check for the reply. */
     try {
-        conn->to << WORKER_MAGIC_1;
-        conn->to.flush();
-        unsigned int magic = readInt(conn->from);
+        conn.to << WORKER_MAGIC_1;
+        conn.to.flush();
+        unsigned int magic = readInt(conn.from);
         if (magic != WORKER_MAGIC_2) throw Error("protocol mismatch");
 
-        conn->daemonVersion = readInt(conn->from);
-        if (GET_PROTOCOL_MAJOR(conn->daemonVersion) != GET_PROTOCOL_MAJOR(PROTOCOL_VERSION))
+        conn.daemonVersion = readInt(conn.from);
+        if (GET_PROTOCOL_MAJOR(conn.daemonVersion) != GET_PROTOCOL_MAJOR(PROTOCOL_VERSION))
             throw Error("Nix daemon protocol version not supported");
-        if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 10)
+        if (GET_PROTOCOL_MINOR(conn.daemonVersion) < 10)
             throw Error("the Nix daemon version is too old");
-        conn->to << PROTOCOL_VERSION;
+        conn.to << PROTOCOL_VERSION;
 
-        if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 14) {
+        if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 14) {
             int cpu = settings.lockCPU ? lockToCurrentCPU() : -1;
             if (cpu != -1)
-                conn->to << 1 << cpu;
+                conn.to << 1 << cpu;
             else
-                conn->to << 0;
+                conn.to << 0;
         }
 
-        if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 11)
-            conn->to << false;
+        if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 11)
+            conn.to << false;
 
-        conn->processStderr();
+        conn.processStderr();
     }
     catch (Error & e) {
         throw Error(format("cannot start daemon worker: %1%") % e.msg());
     }
 
     setOptions(conn);
-
-    return conn;
 }
 
 
-void RemoteStore::setOptions(ref<Connection> conn)
+void RemoteStore::setOptions(Connection & conn)
 {
-    conn->to << wopSetOptions
+    conn.to << wopSetOptions
        << settings.keepFailed
        << settings.keepGoing
        << settings.tryFallback
@@ -137,16 +151,16 @@ void RemoteStore::setOptions(ref<Connection> conn)
        << settings.buildCores
        << settings.useSubstitutes;
 
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 12) {
+    if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 12) {
         Settings::SettingsMap overrides = settings.getOverrides();
         if (overrides["ssh-auth-sock"] == "")
             overrides["ssh-auth-sock"] = getEnv("SSH_AUTH_SOCK");
-        conn->to << overrides.size();
+        conn.to << overrides.size();
         for (auto & i : overrides)
-            conn->to << i.first << i.second;
+            conn.to << i.first << i.second;
     }
 
-    conn->processStderr();
+    conn.processStderr();
 }
 
 
@@ -336,27 +350,39 @@ void RemoteStore::addToStore(const ValidPathInfo & info, const ref<std::string> 
     bool repair, bool dontCheckSigs, std::shared_ptr<FSAccessor> accessor)
 {
     auto conn(connections->get());
-    conn->to << wopImportPaths;
 
-    StringSink sink;
-    sink << 1 // == path follows
-        ;
-    assert(nar->size() % 8 == 0);
-    sink((unsigned char *) nar->data(), nar->size());
-    sink
-        << exportMagic
-        << info.path
-        << info.references
-        << info.deriver
-        << 0 // == no legacy signature
-        << 0 // == no path follows
-        ;
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 18) {
+        conn->to << wopImportPaths;
 
-    StringSource source(*sink.s);
-    conn->processStderr(0, &source);
+        StringSink sink;
+        sink << 1 // == path follows
+            ;
+        assert(nar->size() % 8 == 0);
+        sink((unsigned char *) nar->data(), nar->size());
+        sink
+            << exportMagic
+            << info.path
+            << info.references
+            << info.deriver
+            << 0 // == no legacy signature
+            << 0 // == no path follows
+            ;
 
-    auto importedPaths = readStorePaths<PathSet>(*this, conn->from);
-    assert(importedPaths.size() <= 1);
+        StringSource source(*sink.s);
+        conn->processStderr(0, &source);
+
+        auto importedPaths = readStorePaths<PathSet>(*this, conn->from);
+        assert(importedPaths.size() <= 1);
+    }
+
+    else {
+        conn->to << wopAddToStoreNar
+                 << info.path << info.deriver << printHash(info.narHash)
+                 << info.references << info.registrationTime << info.narSize
+                 << info.ultimate << info.sigs << *nar << repair << dontCheckSigs;
+        // FIXME: don't send nar as a string
+        conn->processStderr();
+    }
 }
 
 
@@ -553,7 +579,6 @@ RemoteStore::Connection::~Connection()
 {
     try {
         to.flush();
-        fd = -1;
     } catch (...) {
         ignoreException();
     }

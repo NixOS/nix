@@ -43,8 +43,8 @@ struct CmdCopy : StorePathsCommand
         if (srcUri.empty() && dstUri.empty())
             throw UsageError("you must pass ‘--from’ and/or ‘--to’");
 
-        ref<Store> srcStore = srcUri.empty() ? store : openStoreAt(srcUri);
-        ref<Store> dstStore = dstUri.empty() ? store : openStoreAt(dstUri);
+        ref<Store> srcStore = srcUri.empty() ? store : openStore(srcUri);
+        ref<Store> dstStore = dstUri.empty() ? store : openStore(dstUri);
 
         std::string copiedLabel = "copied";
 

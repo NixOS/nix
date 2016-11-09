@@ -6,7 +6,7 @@ namespace nix {
 #define WORKER_MAGIC_1 0x6e697863
 #define WORKER_MAGIC_2 0x6478696f
 
-#define PROTOCOL_VERSION 0x111
+#define PROTOCOL_VERSION 0x112
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
@@ -46,6 +46,8 @@ typedef enum {
     wopVerifyStore = 35,
     wopBuildDerivation = 36,
     wopAddSignatures = 37,
+    wopNarFromPath = 38,
+    wopAddToStoreNar = 39
 } WorkerOp;
 
 

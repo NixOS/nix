@@ -5,6 +5,7 @@
 #include "crypto.hh"
 #include "lru-cache.hh"
 #include "sync.hh"
+#include "globals.hh"
 
 #include <atomic>
 #include <limits>
@@ -537,7 +538,7 @@ protected:
 };
 
 
-class LocalFSStore : public Store
+class LocalFSStore : public virtual Store
 {
 public:
     const Path rootDir;
@@ -604,12 +605,17 @@ void removeTempRoots();
    If ‘uri’ is empty, it defaults to ‘direct’ or ‘daemon’ depending on
    whether the user has write access to the local Nix store/database.
    set to true *unless* you're going to collect garbage. */
-ref<Store> openStoreAt(const std::string & uri);
+ref<Store> openStore(const std::string & uri = getEnv("NIX_REMOTE"));
 
 
-/* Open the store indicated by the ‘NIX_REMOTE’ environment variable. */
-ref<Store> openStore();
+enum StoreType {
+    tDaemon,
+    tLocal,
+    tOther
+};
 
+
+StoreType getStoreType(const std::string & uri = getEnv("NIX_REMOTE"), const std::string & stateDir = settings.nixStateDir);
 
 /* Return the default substituter stores, defined by the
    ‘substituters’ option and various legacy options like
