@@ -477,15 +477,19 @@ public:
        ensurePath(). */
     Derivation derivationFromPath(const Path & drvPath);
 
-    /* Place in `paths' the set of all store paths in the file system
+    /* Place in `out' the set of all store paths in the file system
        closure of `storePath'; that is, all paths than can be directly
-       or indirectly reached from it.  `paths' is not cleared.  If
+       or indirectly reached from it.  `out' is not cleared.  If
        `flipDirection' is true, the set of paths that can reach
        `storePath' is returned; that is, the closures under the
        `referrers' relation instead of the `references' relation is
        returned. */
+    void computeFSClosure(const PathSet & paths,
+        PathSet & out, bool flipDirection = false,
+        bool includeOutputs = false, bool includeDerivers = false);
+
     void computeFSClosure(const Path & path,
-        PathSet & paths, bool flipDirection = false,
+        PathSet & out, bool flipDirection = false,
         bool includeOutputs = false, bool includeDerivers = false);
 
     /* Given a set of paths that are to be built, return the set of

@@ -1249,8 +1249,7 @@ void DerivationGoal::inputsRealised()
         }
 
     /* Second, the input sources. */
-    for (auto & i : drv->inputSrcs)
-        worker.store.computeFSClosure(i, inputPaths);
+    worker.store.computeFSClosure(drv->inputSrcs, inputPaths);
 
     debug(format("added input paths %1%") % showPaths(inputPaths));
 

@@ -106,8 +106,8 @@ void StorePathsCommand::run(ref<Store> store)
 
         if (recursive) {
             PathSet closure;
-            for (auto & storePath : storePaths)
-                store->computeFSClosure(storePath, closure, false, false);
+            store->computeFSClosure(PathSet(storePaths.begin(), storePaths.end()),
+                closure, false, false);
             storePaths = Paths(closure.begin(), closure.end());
         }
     }
