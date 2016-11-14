@@ -3783,7 +3783,7 @@ void LocalStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
 
     PathSet failed;
     for (auto & i : goals)
-        if (i->getExitCode() == Goal::ecFailed) {
+        if (i->getExitCode() != Goal::ecSuccess) {
             DerivationGoal * i2 = dynamic_cast<DerivationGoal *>(i.get());
             if (i2) failed.insert(i2->getDrvPath());
             else failed.insert(dynamic_cast<SubstitutionGoal *>(i.get())->getStorePath());
