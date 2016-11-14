@@ -189,7 +189,7 @@ or          { return OR_KW; }
 
 [ \t\r\n]+    /* eat up whitespace */
 \#[^\r\n]*    /* single-line comments */
-\/\*([^*]|\*[^\/])*\*\/  /* long comments */
+\/\*([^*]|\*+[^*/])*\*+\/  /* long comments */
 
 .           return yytext[0];
 
