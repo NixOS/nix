@@ -5,6 +5,7 @@
 #include "globals.hh"
 
 #include <cstdlib>
+#include <cstring>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -160,7 +161,7 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
                full.  When that happens, it's fine to ignore it: we
                just effectively disable deduplication of this
                file.  */
-            printInfo("cannot link ‘%s’ to ‘%s’: %m", linkPath, path);
+            printInfo("cannot link ‘%s’ to ‘%s’: %s", linkPath, path, strerror(errno));
             return;
 
         default:
