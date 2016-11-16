@@ -1654,6 +1654,10 @@ void setupSeccomp(void) {
     }
 #endif
 
+    FORCE_SUCCESS(chown32);
+    FORCE_SUCCESS(fchown32);
+    FORCE_SUCCESS(lchown32);
+
     FORCE_SUCCESS(chown);
     FORCE_SUCCESS(fchown);
     FORCE_SUCCESS(fchownat);
