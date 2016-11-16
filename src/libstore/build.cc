@@ -54,6 +54,7 @@
 #include <sys/param.h>
 #include <sys/mount.h>
 #include <sys/syscall.h>
+#include <seccomp.h>
 #define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
 #endif
 
@@ -1632,8 +1633,48 @@ void chmod_(const Path & path, mode_t mode)
 }
 
 
+#if __linux__
+
+#define FORCE_SUCCESS(syscall) \
+    if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(0), SCMP_SYS(syscall), 0) != 0) { \
+        seccomp_release(ctx); \
+        throw SysError("unable to add seccomp rule for " #syscall); \
+    }
+
+void setupSeccomp(void) {
+    scmp_filter_ctx ctx;
+
+    if ((ctx = seccomp_init(SCMP_ACT_ALLOW)) == NULL)
+        throw SysError("unable to initialize seccomp mode 2");
+
+#if defined(__x86_64__)
+    if (seccomp_arch_add(ctx, SCMP_ARCH_X86) != 0) {
+        seccomp_release(ctx);
+        throw SysError("unable to add 32bit seccomp architecture");
+    }
+#endif
+
+    FORCE_SUCCESS(chown);
+    FORCE_SUCCESS(fchown);
+    FORCE_SUCCESS(fchownat);
+    FORCE_SUCCESS(lchown);
+
+    if (seccomp_load(ctx) != 0) {
+        seccomp_release(ctx);
+        throw SysError("unable to load seccomp BPF program");
+    }
+
+    seccomp_release(ctx);
+}
+
+#undef FORCE_SUCCESS
+
+#endif
+
+
 int childEntry(void * arg)
 {
+    setupSeccomp();
     ((DerivationGoal *) arg)->runChild();
     return 1;
 }
