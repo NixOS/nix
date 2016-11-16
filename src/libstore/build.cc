@@ -1659,6 +1659,10 @@ void setupSeccomp(void) {
     FORCE_SUCCESS(fchownat);
     FORCE_SUCCESS(lchown);
 
+    FORCE_SUCCESS(setxattr);
+    FORCE_SUCCESS(lsetxattr);
+    FORCE_SUCCESS(fsetxattr);
+
     if (seccomp_load(ctx) != 0) {
         seccomp_release(ctx);
         throw SysError("unable to load seccomp BPF program");

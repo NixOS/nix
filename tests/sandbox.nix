@@ -16,7 +16,7 @@ let
 
   sandboxTestScript = pkgs.writeText "sandbox-testscript.sh" ''
     [ $(id -u) -eq 0 ]
-    touch foo
+    cp -p "$testfile" foo
     chown 1024:1024 foo
     touch "$out"
   '';
@@ -31,6 +31,7 @@ let
       builder = "''${utils}/bin/bash";
       args = ["-e" ${sandboxTestScript}];
       PATH = "''${utils}/bin";
+      testfile = builtins.toFile "test" "i am a test file";
     }
   '';
 
