@@ -431,4 +431,18 @@ void callSuccess(
 }
 
 
+/* A variant of std::istringstream that doesn't its string
+   argument. This is useful for large strings. The caller must ensure
+   that the string object is not destroyed while it's referenced by
+   this object. */
+struct istringstream_nocopy : public std::stringstream
+{
+    istringstream_nocopy(const std::string & s)
+    {
+        rdbuf()->pubsetbuf(
+            (char *) s.data(), s.size());
+    }
+};
+
+
 }
