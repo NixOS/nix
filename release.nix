@@ -200,6 +200,10 @@ let
       nix = build.x86_64-linux; system = "x86_64-linux";
     });
 
+    tests.sandbox = (import ./tests/sandbox.nix rec {
+      nix = build.x86_64-linux; system = "x86_64-linux";
+    });
+
     tests.binaryTarball =
       with import <nixpkgs> { system = "x86_64-linux"; };
       vmTools.runInLinuxImage (runCommand "nix-binary-tarball-test"
