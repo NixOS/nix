@@ -194,6 +194,15 @@ AC_SUBST(HAVE_SODIUM, [$have_sodium])
 PKG_CHECK_MODULES([LIBLZMA], [liblzma], [CXXFLAGS="$LIBLZMA_CFLAGS $CXXFLAGS"])
 
 
+# Look for libseccomp, required for Linux sandboxing.
+if test "$sys_name" = linux; then
+  PKG_CHECK_MODULES([LIBSECCOMP], [libseccomp],
+                    [CXXFLAGS="$LIBSECCOMP_CFLAGS $CXXFLAGS"])
+#  AC_CHECK_LIB([seccomp], [seccomp_init], [true],
+#    [AC_MSG_ERROR([Nix requires libseccomp for sandboxing.  See https://github.com/seccomp/libseccomp.])])
+fi
+
+
 # Look for aws-cpp-sdk-s3.
 AC_LANG_PUSH(C++)
 AC_CHECK_HEADERS([aws/s3/S3Client.h],
