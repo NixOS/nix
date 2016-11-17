@@ -438,23 +438,24 @@ void callSuccess(
 class istringbuf_nocopy : public std::streambuf
 {
     const std::string & s;
-    std::streamsize off;
+    decltype(s.size()) off;
+    decltype(s.size()) size;
 public:
-    istringbuf_nocopy(const std::string & s) : s{s}, off{0}
+    istringbuf_nocopy(const std::string & s) : s{s}, off{0}, size{s.size()}
     {
     }
 
 private:
     int_type underflow()
     {
-      if (off == s.size())
+      if (off == size)
           return traits_type::eof();
       return traits_type::to_int_type(s[off]);
     }
 
     int_type uflow()
     {
-        if (off == s.size())
+        if (off == size)
             return traits_type::eof();
         return traits_type::to_int_type(s[off++]);
     }
@@ -469,15 +470,15 @@ private:
 
     std::streamsize showmanyc()
     {
-        return s.size() - off;
+        return size - off;
     }
 };
 
 
-struct istringstream_nocopy : public std::istream
+struct istringstream_nocopy : public std::iostream
 {
     istringbuf_nocopy buf;
-    istringstream_nocopy(const std::string & s) : std::istream(&buf), buf(s) {};
+    istringstream_nocopy(const std::string & s) : std::iostream(&buf), buf(s) {};
 };
 
 
