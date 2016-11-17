@@ -435,13 +435,49 @@ void callSuccess(
    argument. This is useful for large strings. The caller must ensure
    that the string object is not destroyed while it's referenced by
    this object. */
-struct istringstream_nocopy : public std::stringstream
+class istringbuf_nocopy : public std::streambuf
 {
-    istringstream_nocopy(const std::string & s)
+    const std::string & s;
+    std::streamsize off;
+public:
+    istringbuf_nocopy(const std::string & s) : s{s}, off{0}
     {
-        rdbuf()->pubsetbuf(
-            (char *) s.data(), s.size());
     }
+
+private:
+    int_type underflow()
+    {
+      if (off == s.size())
+          return traits_type::eof();
+      return traits_type::to_int_type(s[off]);
+    }
+
+    int_type uflow()
+    {
+        if (off == s.size())
+            return traits_type::eof();
+        return traits_type::to_int_type(s[off++]);
+    }
+
+    int_type pbackfail(int_type ch)
+    {
+        if (off == 0 || (ch != traits_type::eof() && ch != s[off - 1]))
+            return traits_type::eof();
+
+        return traits_type::to_int_type(s[--off]);
+    }
+
+    std::streamsize showmanyc()
+    {
+        return s.size() - off;
+    }
+};
+
+
+struct istringstream_nocopy : public std::istream
+{
+    istringbuf_nocopy buf;
+    istringstream_nocopy(const std::string & s) : std::istream(&buf), buf(s) {};
 };
 
 
