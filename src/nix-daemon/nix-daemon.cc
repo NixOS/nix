@@ -32,14 +32,14 @@ using namespace nix;
 
 #ifndef __linux__
 #define SPLICE_F_MOVE 0
-static ssize_t splice(int fd_in, loff_t *off_in, int fd_out, loff_t *off_out, size_t len, unsigned int flags)
+static ssize_t splice(int fd_in, void *off_in, int fd_out, void *off_out, size_t len, unsigned int flags)
 {
     /* We ignore most parameters, we just have them for conformance with the linux syscall */
     char buf[8192];
     auto read_count = read(fd_in, buf, sizeof(buf));
     if (read_count == -1)
         return read_count;
-    auto write_count = decltype<read_count>(0);
+    auto write_count = decltype(read_count)(0);
     while (write_count < read_count) {
         auto res = write(fd_out, buf + write_count, read_count - write_count);
         if (res == -1)
