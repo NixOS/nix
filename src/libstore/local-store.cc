@@ -37,7 +37,8 @@ namespace nix {
 
 
 LocalStore::LocalStore(const Params & params)
-    : LocalFSStore(params)
+    : Store(params)
+    , LocalFSStore(params)
     , realStoreDir(get(params, "real", rootDir != "" ? rootDir + "/nix/store" : storeDir))
     , dbDir(stateDir + "/db")
     , linksDir(realStoreDir + "/.links")

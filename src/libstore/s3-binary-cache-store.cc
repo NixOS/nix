@@ -145,7 +145,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
             .WithBucket(bucketName)
             .WithKey(path);
 
-        auto stream = std::make_shared<std::stringstream>(data);
+        auto stream = std::make_shared<istringstream_nocopy>(data);
 
         request.SetBody(stream);
 

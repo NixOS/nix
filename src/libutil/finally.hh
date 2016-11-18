@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 /* A trivial class to run a function at the end of a scope. */
 class Finally
 {

@@ -52,7 +52,7 @@ struct CmdVerify : StorePathsCommand
     {
         std::vector<ref<Store>> substituters;
         for (auto & s : substituterUris)
-            substituters.push_back(openStoreAt(s));
+            substituters.push_back(openStore(s));
 
         auto publicKeys = getDefaultPublicKeys();
 

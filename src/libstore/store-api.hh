@@ -5,6 +5,7 @@
 #include "crypto.hh"
 #include "lru-cache.hh"
 #include "sync.hh"
+#include "globals.hh"
 
 #include <atomic>
 #include <limits>
@@ -476,15 +477,19 @@ public:
        ensurePath(). */
     Derivation derivationFromPath(const Path & drvPath);
 
-    /* Place in `paths' the set of all store paths in the file system
+    /* Place in `out' the set of all store paths in the file system
        closure of `storePath'; that is, all paths than can be directly
-       or indirectly reached from it.  `paths' is not cleared.  If
+       or indirectly reached from it.  `out' is not cleared.  If
        `flipDirection' is true, the set of paths that can reach
        `storePath' is returned; that is, the closures under the
        `referrers' relation instead of the `references' relation is
        returned. */
+    void computeFSClosure(const PathSet & paths,
+        PathSet & out, bool flipDirection = false,
+        bool includeOutputs = false, bool includeDerivers = false);
+
     void computeFSClosure(const Path & path,
-        PathSet & paths, bool flipDirection = false,
+        PathSet & out, bool flipDirection = false,
         bool includeOutputs = false, bool includeDerivers = false);
 
     /* Given a set of paths that are to be built, return the set of
@@ -537,7 +542,7 @@ protected:
 };
 
 
-class LocalFSStore : public Store
+class LocalFSStore : public virtual Store
 {
 public:
     const Path rootDir;
@@ -576,12 +581,12 @@ void checkStoreName(const string & name);
 
 /* Copy a path from one store to another. */
 void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
-    const Path & storePath, bool repair = false);
+    const Path & storePath, bool repair = false, bool dontCheckSigs = false);
 
 
 /* Copy the closure of the specified paths from one store to another. */
 void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
-    const PathSet & storePaths, bool repair = false);
+    const PathSet & storePaths, bool repair = false, bool dontCheckSigs = false);
 
 
 /* Remove the temporary roots file for this process.  Any temporary
@@ -604,12 +609,17 @@ void removeTempRoots();
    If ‘uri’ is empty, it defaults to ‘direct’ or ‘daemon’ depending on
    whether the user has write access to the local Nix store/database.
    set to true *unless* you're going to collect garbage. */
-ref<Store> openStoreAt(const std::string & uri);
+ref<Store> openStore(const std::string & uri = getEnv("NIX_REMOTE"));
 
 
-/* Open the store indicated by the ‘NIX_REMOTE’ environment variable. */
-ref<Store> openStore();
+enum StoreType {
+    tDaemon,
+    tLocal,
+    tOther
+};
 
+
+StoreType getStoreType(const std::string & uri = getEnv("NIX_REMOTE"), const std::string & stateDir = settings.nixStateDir);
 
 /* Return the default substituter stores, defined by the
    ‘substituters’ option and various legacy options like

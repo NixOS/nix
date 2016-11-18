@@ -8,7 +8,7 @@
 namespace nix {
 
 
-void Store::computeFSClosure(const Path & startPath,
+void Store::computeFSClosure(const PathSet & startPaths,
     PathSet & paths_, bool flipDirection, bool includeOutputs, bool includeDerivers)
 {
     struct State
@@ -85,13 +85,21 @@ void Store::computeFSClosure(const Path & startPath,
             });
     };
 
-    enqueue(startPath);
+    for (auto & startPath : startPaths)
+        enqueue(startPath);
 
     {
         auto state(state_.lock());
         while (state->pending) state.wait(done);
         if (state->exc) std::rethrow_exception(state->exc);
     }
+}
+
+
+void Store::computeFSClosure(const Path & startPath,
+    PathSet & paths_, bool flipDirection, bool includeOutputs, bool includeDerivers)
+{
+    computeFSClosure(PathSet{startPath}, paths_, flipDirection, includeOutputs, includeDerivers);
 }
 
 

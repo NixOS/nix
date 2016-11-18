@@ -6,9 +6,9 @@
 #include "globals.hh"
 #include "nar-info.hh"
 #include "sync.hh"
-#include "worker-protocol.hh"
-#include "nar-accessor.hh"
+#include "remote-fs-accessor.hh"
 #include "nar-info-disk-cache.hh"
+#include "nar-accessor.hh"
 #include "json.hh"
 
 #include <chrono>
@@ -379,8 +379,7 @@ Path BinaryCacheStore::addTextToStore(const string & name, const string & s,
 
 ref<FSAccessor> BinaryCacheStore::getFSAccessor()
 {
-    return make_ref<BinaryCacheStoreAccessor>(ref<BinaryCacheStore>(
-            std::dynamic_pointer_cast<BinaryCacheStore>(shared_from_this())));
+    return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()));
 }
 
 }

@@ -424,10 +424,9 @@ static void opQuery(Strings opFlags, Strings opArgs)
         case qRoots: {
             PathSet referrers;
             for (auto & i : opArgs) {
-                PathSet paths = maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise);
-                for (auto & j : paths)
-                    store->computeFSClosure(j, referrers, true,
-                        settings.gcKeepOutputs, settings.gcKeepDerivations);
+                store->computeFSClosure(
+                    maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise),
+                    referrers, true, settings.gcKeepOutputs, settings.gcKeepDerivations);
             }
             Roots roots = store->findRoots();
             for (auto & i : roots)
@@ -961,10 +960,9 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             case cmdQueryClosure: {
                 bool includeOutputs = readInt(in);
-                PathSet paths = readStorePaths<PathSet>(*store, in);
                 PathSet closure;
-                for (auto & i : paths)
-                    store->computeFSClosure(i, closure, false, includeOutputs);
+                store->computeFSClosure(readStorePaths<PathSet>(*store, in),
+                    closure, false, includeOutputs);
                 out << closure;
                 break;
             }

@@ -1249,8 +1249,7 @@ void DerivationGoal::inputsRealised()
         }
 
     /* Second, the input sources. */
-    for (auto & i : drv->inputSrcs)
-        worker.store.computeFSClosure(i, inputPaths);
+    worker.store.computeFSClosure(drv->inputSrcs, inputPaths);
 
     debug(format("added input paths %1%") % showPaths(inputPaths));
 
@@ -2559,15 +2558,18 @@ void DerivationGoal::runChild()
              */
             sandboxProfile += "(allow file-read* file-write* process-exec\n";
             for (auto & i : dirsInChroot) {
-                if (i.first != i.second)
+                if (i.first != i.second.source)
                     throw Error(format(
                         "can't map '%1%' to '%2%': mismatched impure paths not supported on Darwin")
-                        % i.first % i.second);
+                        % i.first % i.second.source);
 
                 string path = i.first;
                 struct stat st;
-                if (lstat(path.c_str(), &st))
+                if (lstat(path.c_str(), &st)) {
+                    if (i.second.optional && errno == ENOENT)
+                        continue;
                     throw SysError(format("getting attributes of path ‘%1%’") % path);
+                }
                 if (S_ISDIR(st.st_mode))
                     sandboxProfile += (format("\t(subpath \"%1%\")\n") % path).str();
                 else
@@ -3788,14 +3790,14 @@ void LocalStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
 
     PathSet failed;
     for (auto & i : goals)
-        if (i->getExitCode() == Goal::ecFailed) {
+        if (i->getExitCode() != Goal::ecSuccess) {
             DerivationGoal * i2 = dynamic_cast<DerivationGoal *>(i.get());
             if (i2) failed.insert(i2->getDrvPath());
             else failed.insert(dynamic_cast<SubstitutionGoal *>(i.get())->getStorePath());
         }
 
     if (!failed.empty())
-        throw Error(worker.exitStatus(), "build of %s failed",showPaths(failed));
+        throw Error(worker.exitStatus(), "build of %s failed", showPaths(failed));
 }
 
 
