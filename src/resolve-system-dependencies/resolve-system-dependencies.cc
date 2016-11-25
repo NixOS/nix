@@ -62,13 +62,13 @@ std::set<std::string> runResolver(const Path & filename) {
             }
         }
         if (mach64_offset == 0) {
-            printError(format("Could not find any mach64 blobs in file '%1%', continuing...") % filename);
+            printError(format("Could not find any mach64 blobs in file ‘%1%’, continuing...") % filename);
             return std::set<string>();
         }
     } else if (magic == MH_MAGIC_64 || magic == MH_CIGAM_64) {
         mach64_offset = 0;
     } else {
-        printError(format("Object file has unknown magic number '%1%', skipping it...") % magic);
+        printError(format("Object file has unknown magic number ‘%1%’, skipping it...") % magic);
         return std::set<string>();
     }
 
@@ -97,7 +97,7 @@ std::set<std::string> runResolver(const Path & filename) {
 bool isSymlink(const Path & path) {
     struct stat st;
     if(lstat(path.c_str(), &st))
-        throw SysError(format("getting attributes of path '%1%'") % path);
+        throw SysError(format("getting attributes of path ‘%1%’") % path);
 
     return S_ISLNK(st.st_mode);
 }

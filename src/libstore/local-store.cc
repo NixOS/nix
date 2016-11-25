@@ -71,24 +71,24 @@ LocalStore::LocalStore(const Params & params)
         Path perUserDir = profilesDir + "/per-user";
         createDirs(perUserDir);
         if (chmod(perUserDir.c_str(), 01777) == -1)
-            throw SysError(format("could not set permissions on '%1%' to 1777") % perUserDir);
+            throw SysError(format("could not set permissions on ‘%1%’ to 1777") % perUserDir);
 
         mode_t perm = 01775;
 
         struct group * gr = getgrnam(settings.buildUsersGroup.c_str());
         if (!gr)
-            printError(format("warning: the group '%1%' specified in 'build-users-group' does not exist")
+            printError(format("warning: the group ‘%1%’ specified in ‘build-users-group’ does not exist")
                 % settings.buildUsersGroup);
         else {
             struct stat st;
             if (stat(realStoreDir.c_str(), &st))
-                throw SysError(format("getting attributes of path '%1%'") % realStoreDir);
+                throw SysError(format("getting attributes of path ‘%1%’") % realStoreDir);
 
             if (st.st_uid != 0 || st.st_gid != gr->gr_gid || (st.st_mode & ~S_IFMT) != perm) {
                 if (chown(realStoreDir.c_str(), 0, gr->gr_gid) == -1)
-                    throw SysError(format("changing ownership of path '%1%'") % realStoreDir);
+                    throw SysError(format("changing ownership of path ‘%1%’") % realStoreDir);
                 if (chmod(realStoreDir.c_str(), perm) == -1)
-                    throw SysError(format("changing permissions on path '%1%'") % realStoreDir);
+                    throw SysError(format("changing permissions on path ‘%1%’") % realStoreDir);
             }
         }
     }
@@ -99,10 +99,10 @@ LocalStore::LocalStore(const Params & params)
         struct stat st;
         while (path != "/") {
             if (lstat(path.c_str(), &st))
-                throw SysError(format("getting status of '%1%'") % path);
+                throw SysError(format("getting status of ‘%1%’") % path);
             if (S_ISLNK(st.st_mode))
                 throw Error(format(
-                        "the path '%1%' is a symlink; "
+                        "the path ‘%1%’ is a symlink; "
                         "this is not allowed for the Nix store and its parent directories")
                     % path);
             path = dirOf(path);
@@ -262,7 +262,7 @@ int LocalStore::getSchema()
     if (pathExists(schemaPath)) {
         string s = readFile(schemaPath);
         if (!string2Int(s, curSchema))
-            throw Error(format("'%1%' is corrupt") % schemaPath);
+            throw Error(format("‘%1%’ is corrupt") % schemaPath);
     }
     return curSchema;
 }
@@ -271,14 +271,14 @@ int LocalStore::getSchema()
 void LocalStore::openDB(State & state, bool create)
 {
     if (access(dbDir.c_str(), R_OK | W_OK))
-        throw SysError(format("Nix database directory '%1%' is not writable") % dbDir);
+        throw SysError(format("Nix database directory ‘%1%’ is not writable") % dbDir);
 
     /* Open the Nix database. */
     string dbPath = dbDir + "/db.sqlite";
     auto & db(state.db);
     if (sqlite3_open_v2(dbPath.c_str(), &db.db,
             SQLITE_OPEN_READWRITE | (create ? SQLITE_OPEN_CREATE : 0), 0) != SQLITE_OK)
-        throw Error(format("cannot open Nix database '%1%'") % dbPath);
+        throw Error(format("cannot open Nix database ‘%1%’") % dbPath);
 
     if (sqlite3_busy_timeout(db, 60 * 60 * 1000) != SQLITE_OK)
         throwSQLiteError(db, "setting timeout");
@@ -363,7 +363,7 @@ static void canonicaliseTimestampAndPermissions(const Path & path, const struct 
                  | 0444
                  | (st.st_mode & S_IXUSR ? 0111 : 0);
             if (chmod(path.c_str(), mode) == -1)
-                throw SysError(format("changing mode of '%1%' to %2$o") % path % mode);
+                throw SysError(format("changing mode of ‘%1%’ to %2$o") % path % mode);
         }
 
     }
@@ -381,7 +381,7 @@ static void canonicaliseTimestampAndPermissions(const Path & path, const struct 
 #else
         if (!S_ISLNK(st.st_mode) && utimes(path.c_str(), times) == -1)
 #endif
-            throw SysError(format("changing modification time of '%1%'") % path);
+            throw SysError(format("changing modification time of ‘%1%’") % path);
     }
 }
 
@@ -390,7 +390,7 @@ void canonicaliseTimestampAndPermissions(const Path & path)
 {
     struct stat st;
     if (lstat(path.c_str(), &st))
-        throw SysError(format("getting attributes of path '%1%'") % path);
+        throw SysError(format("getting attributes of path ‘%1%’") % path);
     canonicaliseTimestampAndPermissions(path, st);
 }
 
@@ -401,11 +401,11 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
 
     struct stat st;
     if (lstat(path.c_str(), &st))
-        throw SysError(format("getting attributes of path '%1%'") % path);
+        throw SysError(format("getting attributes of path ‘%1%’") % path);
 
     /* Really make sure that the path is of a supported type. */
     if (!(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode)))
-        throw Error(format("file '%1%' has an unsupported type") % path);
+        throw Error(format("file ‘%1%’ has an unsupported type") % path);
 
     /* Fail if the file is not owned by the build user.  This prevents
        us from messing up the ownership/permissions of files
@@ -416,7 +416,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
     if (fromUid != (uid_t) -1 && st.st_uid != fromUid) {
         assert(!S_ISDIR(st.st_mode));
         if (inodesSeen.find(Inode(st.st_dev, st.st_ino)) == inodesSeen.end())
-            throw BuildError(format("invalid ownership on file '%1%'") % path);
+            throw BuildError(format("invalid ownership on file ‘%1%’") % path);
         mode_t mode = st.st_mode & ~S_IFMT;
         assert(S_ISLNK(st.st_mode) || (st.st_uid == geteuid() && (mode == 0444 || mode == 0555) && st.st_mtime == mtimeStore));
         return;
@@ -440,7 +440,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
         if (!S_ISLNK(st.st_mode) &&
             chown(path.c_str(), geteuid(), getegid()) == -1)
 #endif
-            throw SysError(format("changing owner of '%1%' to %2%")
+            throw SysError(format("changing owner of ‘%1%’ to %2%")
                 % path % geteuid());
     }
 
@@ -460,11 +460,11 @@ void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & ino
        be a symlink, since we can't change its ownership. */
     struct stat st;
     if (lstat(path.c_str(), &st))
-        throw SysError(format("getting attributes of path '%1%'") % path);
+        throw SysError(format("getting attributes of path ‘%1%’") % path);
 
     if (st.st_uid != geteuid()) {
         assert(S_ISLNK(st.st_mode));
-        throw Error(format("wrong ownership of top-level store path '%1%'") % path);
+        throw Error(format("wrong ownership of top-level store path ‘%1%’") % path);
     }
 }
 
@@ -485,7 +485,7 @@ void LocalStore::checkDerivationOutputs(const Path & drvPath, const Derivation &
     if (drv.isFixedOutput()) {
         DerivationOutputs::const_iterator out = drv.outputs.find("out");
         if (out == drv.outputs.end())
-            throw Error(format("derivation '%1%' does not have an output named 'out'") % drvPath);
+            throw Error(format("derivation ‘%1%’ does not have an output named ‘out’") % drvPath);
 
         bool recursive; Hash h;
         out->second.parseHashInfo(recursive, h);
@@ -493,7 +493,7 @@ void LocalStore::checkDerivationOutputs(const Path & drvPath, const Derivation &
 
         StringPairs::const_iterator j = drv.env.find("out");
         if (out->second.path != outPath || j == drv.env.end() || j->second != outPath)
-            throw Error(format("derivation '%1%' has incorrect output '%2%', should be '%3%'")
+            throw Error(format("derivation ‘%1%’ has incorrect output ‘%2%’, should be ‘%3%’")
                 % drvPath % out->second.path % outPath);
     }
 
@@ -510,7 +510,7 @@ void LocalStore::checkDerivationOutputs(const Path & drvPath, const Derivation &
             Path outPath = makeOutputPath(i.first, h, drvName);
             StringPairs::const_iterator j = drv.env.find(i.first);
             if (i.second.path != outPath || j == drv.env.end() || j->second != outPath)
-                throw Error(format("derivation '%1%' has incorrect output '%2%', should be '%3%'")
+                throw Error(format("derivation ‘%1%’ has incorrect output ‘%2%’, should be ‘%3%’")
                     % drvPath % i.second.path % outPath);
         }
     }
@@ -568,11 +568,11 @@ Hash parseHashField(const Path & path, const string & s)
 {
     string::size_type colon = s.find(':');
     if (colon == string::npos)
-        throw Error(format("corrupt hash '%1%' in valid-path entry for '%2%'")
+        throw Error(format("corrupt hash ‘%1%’ in valid-path entry for ‘%2%’")
             % s % path);
     HashType ht = parseHashType(string(s, 0, colon));
     if (ht == htUnknown)
-        throw Error(format("unknown hash type '%1%' in valid-path entry for '%2%'")
+        throw Error(format("unknown hash type ‘%1%’ in valid-path entry for ‘%2%’")
             % string(s, 0, colon) % path);
     return parseHash(ht, string(s, colon + 1));
 }
@@ -648,7 +648,7 @@ uint64_t LocalStore::queryValidPathId(State & state, const Path & path)
 {
     auto use(state.stmtQueryPathInfo.use()(path));
     if (!use.next())
-        throw Error(format("path '%1%' is not valid") % path);
+        throw Error(format("path ‘%1%’ is not valid") % path);
     return use.getInt(0);
 }
 
@@ -815,7 +815,7 @@ void LocalStore::querySubstitutablePathInfos(const PathSet & paths,
         if (sub->storeDir != storeDir) continue;
         for (auto & path : paths) {
             if (infos.count(path)) continue;
-            debug(format("checking substituter '%s' for path '%s'")
+            debug(format("checking substituter ‘%s’ for path ‘%s’")
                 % sub->getUri() % path);
             try {
                 auto info = sub->queryPathInfo(path);
@@ -896,7 +896,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
    there are no referrers. */
 void LocalStore::invalidatePath(State & state, const Path & path)
 {
-    debug(format("invalidating path '%1%'") % path);
+    debug(format("invalidating path ‘%1%’") % path);
 
     state.stmtInvalidatePath.use()(path).exec();
 
@@ -915,11 +915,11 @@ void LocalStore::addToStore(const ValidPathInfo & info, const ref<std::string> &
 {
     Hash h = hashString(htSHA256, *nar);
     if (h != info.narHash)
-        throw Error(format("hash mismatch importing path '%s'; expected hash '%s', got '%s'") %
+        throw Error(format("hash mismatch importing path ‘%s’; expected hash ‘%s’, got ‘%s’") %
             info.path % info.narHash.to_string() % h.to_string());
 
     if (requireSigs && !dontCheckSigs && !info.checkSignatures(*this, publicKeys))
-        throw Error(format("cannot import path '%s' because it lacks a valid signature") % info.path);
+        throw Error(format("cannot import path ‘%s’ because it lacks a valid signature") % info.path);
 
     addTempRoot(info.path);
 
@@ -1106,7 +1106,7 @@ void LocalStore::invalidatePathChecked(const Path & path)
             PathSet referrers; queryReferrers(*state, path, referrers);
             referrers.erase(path); /* ignore self-references */
             if (!referrers.empty())
-                throw PathInUse(format("cannot delete path '%1%' because it is in use by %2%")
+                throw PathInUse(format("cannot delete path ‘%1%’ because it is in use by %2%")
                     % path % showPaths(referrers));
             invalidatePath(*state, path);
         }
@@ -1151,12 +1151,12 @@ bool LocalStore::verifyStore(bool checkContents, bool repair)
                 auto info = std::const_pointer_cast<ValidPathInfo>(std::shared_ptr<const ValidPathInfo>(queryPathInfo(i)));
 
                 /* Check the content hash (optionally - slow). */
-                printMsg(lvlTalkative, format("checking contents of '%1%'") % i);
+                printMsg(lvlTalkative, format("checking contents of ‘%1%’") % i);
                 HashResult current = hashPath(info->narHash.type, i);
 
                 if (info->narHash != nullHash && info->narHash != current.first) {
-                    printError(format("path '%1%' was modified! "
-                            "expected hash '%2%', got '%3%'")
+                    printError(format("path ‘%1%’ was modified! "
+                            "expected hash ‘%2%’, got ‘%3%’")
                         % i % printHash(info->narHash) % printHash(current.first));
                     if (repair) repairPath(i); else errors = true;
                 } else {
@@ -1165,14 +1165,14 @@ bool LocalStore::verifyStore(bool checkContents, bool repair)
 
                     /* Fill in missing hashes. */
                     if (info->narHash == nullHash) {
-                        printError(format("fixing missing hash on '%1%'") % i);
+                        printError(format("fixing missing hash on ‘%1%’") % i);
                         info->narHash = current.first;
                         update = true;
                     }
 
                     /* Fill in missing narSize fields (from old stores). */
                     if (info->narSize == 0) {
-                        printError(format("updating size field on '%1%' to %2%") % i % current.second);
+                        printError(format("updating size field on ‘%1%’ to %2%") % i % current.second);
                         info->narSize = current.second;
                         update = true;
                     }
@@ -1209,7 +1209,7 @@ void LocalStore::verifyPath(const Path & path, const PathSet & store,
     done.insert(path);
 
     if (!isStorePath(path)) {
-        printError(format("path '%1%' is not in the Nix store") % path);
+        printError(format("path ‘%1%’ is not in the Nix store") % path);
         auto state(_state.lock());
         invalidatePath(*state, path);
         return;
@@ -1228,11 +1228,11 @@ void LocalStore::verifyPath(const Path & path, const PathSet & store,
             }
 
         if (canInvalidate) {
-            printError(format("path '%1%' disappeared, removing from database...") % path);
+            printError(format("path ‘%1%’ disappeared, removing from database...") % path);
             auto state(_state.lock());
             invalidatePath(*state, path);
         } else {
-            printError(format("path '%1%' disappeared, but it still has valid referrers!") % path);
+            printError(format("path ‘%1%’ disappeared, but it still has valid referrers!") % path);
             if (repair)
                 try {
                     repairPath(path);
@@ -1271,7 +1271,7 @@ static void makeMutable(const Path & path)
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
     if (fd == -1) {
         if (errno == ELOOP) return; // it's a symlink
-        throw SysError(format("opening file '%1%'") % path);
+        throw SysError(format("opening file ‘%1%’") % path);
     }
 
     unsigned int flags = 0, old;

@@ -84,7 +84,7 @@ sub connectToRemoteNix {
 
     $extraFlags ||= "";
 
-    # Start 'nix-store --serve' on the remote host.
+    # Start ‘nix-store --serve’ on the remote host.
     my ($from, $to);
     # FIXME: don't start a shell, start ssh directly.
     my $pid = open2($from, $to, "exec ssh -x -a $sshHost @globalSshOpts @{$sshOpts} nix-store --serve --write $extraFlags");
@@ -97,7 +97,7 @@ sub connectToRemoteNix {
         syswrite($to, pack("L<x4L<x4", $SERVE_MAGIC_1, $clientVersion)) or die;
         $magic = readInt($from);
     };
-    die "unable to connect to '$sshHost'\n" if $@;
+    die "unable to connect to ‘$sshHost’\n" if $@;
     die "did not get valid handshake from remote host\n" if $magic  != 0x5452eecb;
 
     my $serverVersion = readInt($from);

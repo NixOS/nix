@@ -30,7 +30,7 @@ struct CmdCopySigs : StorePathsCommand
     void run(ref<Store> store, Paths storePaths) override
     {
         if (substituterUris.empty())
-            throw UsageError("you must specify at least one substituter using '-s'");
+            throw UsageError("you must specify at least one substituter using ‘-s’");
 
         // FIXME: factor out commonality with MixVerify.
         std::vector<ref<Store>> substituters;
@@ -45,7 +45,7 @@ struct CmdCopySigs : StorePathsCommand
         logger->setExpected(doneLabel, storePaths.size());
 
         auto doPath = [&](const Path & storePath) {
-            Activity act(*logger, lvlInfo, format("getting signatures for '%s'") % storePath);
+            Activity act(*logger, lvlInfo, format("getting signatures for ‘%s’") % storePath);
 
             checkInterrupt();
 
@@ -112,7 +112,7 @@ struct CmdSignPaths : StorePathsCommand
     void run(ref<Store> store, Paths storePaths) override
     {
         if (secretKeyFile.empty())
-            throw UsageError("you must specify a secret key file using '-k'");
+            throw UsageError("you must specify a secret key file using ‘-k’");
 
         SecretKey secretKey(readFile(secretKeyFile));
 

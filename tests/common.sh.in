@@ -66,7 +66,7 @@ clearCacheCache() {
 
 startDaemon() {
     # Start the daemon, wait for the socket to appear.  !!!
-    # 'nix-daemon' should have an option to fork into the background.
+    # ‘nix-daemon’ should have an option to fork into the background.
     rm -f $NIX_STATE_DIR/daemon-socket/socket
     nix-daemon &
     for ((i = 0; i < 30; i++)); do

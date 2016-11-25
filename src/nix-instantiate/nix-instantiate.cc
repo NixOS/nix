@@ -72,7 +72,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 /* What output do we want? */
                 string outputName = i.queryOutputName();
                 if (outputName == "")
-                    throw Error(format("derivation '%1%' lacks an 'outputName' attribute ") % drvPath);
+                    throw Error(format("derivation ‘%1%’ lacks an ‘outputName’ attribute ") % drvPath);
 
                 if (gcRoot == "")
                     printGCWarning();
@@ -171,7 +171,7 @@ int main(int argc, char * * argv)
         if (findFile) {
             for (auto & i : files) {
                 Path p = state.findFile(i);
-                if (p == "") throw Error(format("unable to find '%1%'") % i);
+                if (p == "") throw Error(format("unable to find ‘%1%’") % i);
                 std::cout << p << std::endl;
             }
             return;

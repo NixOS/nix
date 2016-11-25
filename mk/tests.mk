@@ -1,4 +1,4 @@
-# Run program $1 as part of 'make installcheck'.
+# Run program $1 as part of ‘make installcheck’.
 define run-install-test
 
   installcheck: $1

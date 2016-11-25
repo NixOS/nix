@@ -27,7 +27,7 @@ MultiCommand::MultiCommand(const Commands & _commands)
         assert(!command);
         auto i = commands.find(ss.front());
         if (i == commands.end())
-            throw UsageError(format("'%1%' is not a recognised command") % ss.front());
+            throw UsageError(format("‘%1%’ is not a recognised command") % ss.front());
         command = i->second;
     }});
 }
@@ -54,7 +54,7 @@ void MultiCommand::printHelp(const string & programName, std::ostream & out)
     printTable(out, table);
 
     out << "\n";
-    out << "For full documentation, run 'man " << programName << "' or 'man " << programName << "-<COMMAND>'.\n";
+    out << "For full documentation, run ‘man " << programName << "’ or ‘man " << programName << "-<COMMAND>’.\n";
 }
 
 bool MultiCommand::processFlag(Strings::iterator & pos, Strings::iterator end)
@@ -95,7 +95,7 @@ void StorePathsCommand::run(ref<Store> store)
 {
     if (all) {
         if (storePaths.size())
-            throw UsageError("'--all' does not expect arguments");
+            throw UsageError("‘--all’ does not expect arguments");
         for (auto & p : store->queryAllValidPaths())
             storePaths.push_back(p);
     }

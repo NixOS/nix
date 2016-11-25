@@ -1,4 +1,4 @@
-# Test 'nix-copy-closure'.
+# Test ‘nix-copy-closure’.
 
 { system, nix }:
 

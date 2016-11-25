@@ -41,7 +41,7 @@ struct CmdCopy : StorePathsCommand
     void run(ref<Store> store, Paths storePaths) override
     {
         if (srcUri.empty() && dstUri.empty())
-            throw UsageError("you must pass '--from' and/or '--to'");
+            throw UsageError("you must pass ‘--from’ and/or ‘--to’");
 
         ref<Store> srcStore = srcUri.empty() ? store : openStore(srcUri);
         ref<Store> dstStore = dstUri.empty() ? store : openStore(dstUri);
@@ -63,7 +63,7 @@ struct CmdCopy : StorePathsCommand
                 checkInterrupt();
 
                 if (!dstStore->isValidPath(storePath)) {
-                    Activity act(*logger, lvlInfo, format("copying '%s'...") % storePath);
+                    Activity act(*logger, lvlInfo, format("copying ‘%s’...") % storePath);
 
                     copyStorePath(srcStore, dstStore, storePath);
 

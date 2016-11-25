@@ -21,7 +21,7 @@ void DerivationOutput::parseHashInfo(bool & recursive, Hash & hash) const
 
     HashType hashType = parseHashType(algo);
     if (hashType == htUnknown)
-        throw Error(format("unknown hash algorithm '%1%'") % algo);
+        throw Error(format("unknown hash algorithm ‘%1%’") % algo);
 
     hash = parseHash(hashType, this->hash);
 }
@@ -31,7 +31,7 @@ Path BasicDerivation::findOutput(const string & id) const
 {
     auto i = outputs.find(id);
     if (i == outputs.end())
-        throw Error(format("derivation has no output '%1%'") % id);
+        throw Error(format("derivation has no output ‘%1%’") % id);
     return i->second.path;
 }
 
@@ -97,7 +97,7 @@ static void expect(std::istream & str, const string & s)
     char s2[s.size()];
     str.read(s2, s.size());
     if (string(s2, s.size()) != s)
-        throw FormatError(format("expected string '%1%'") % s);
+        throw FormatError(format("expected string ‘%1%’") % s);
 }
 
 
@@ -124,7 +124,7 @@ static Path parsePath(std::istream & str)
 {
     string s = parseString(str);
     if (s.size() == 0 || s[0] != '/')
-        throw FormatError(format("bad path '%1%' in derivation") % s);
+        throw FormatError(format("bad path ‘%1%’ in derivation") % s);
     return s;
 }
 
@@ -207,7 +207,7 @@ Derivation readDerivation(const Path & drvPath)
     try {
         return parseDerivation(readFile(drvPath));
     } catch (FormatError & e) {
-        throw Error(format("error parsing derivation '%1%': %2%") % drvPath % e.msg());
+        throw Error(format("error parsing derivation ‘%1%’: %2%") % drvPath % e.msg());
     }
 }
 
@@ -220,7 +220,7 @@ Derivation Store::derivationFromPath(const Path & drvPath)
     try {
         return parseDerivation(accessor->readFile(drvPath));
     } catch (FormatError & e) {
-        throw Error(format("error parsing derivation '%1%': %2%") % drvPath % e.msg());
+        throw Error(format("error parsing derivation ‘%1%’: %2%") % drvPath % e.msg());
     }
 }
 

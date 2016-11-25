@@ -12,7 +12,7 @@ static bool isDirectory (const Path & path)
 {
     struct stat st;
     if (stat(path.c_str(), &st) == -1)
-        throw SysError(format("getting status of '%1%'") % path);
+        throw SysError(format("getting status of ‘%1%’") % path);
     return S_ISDIR(st.st_mode);
 }
 
@@ -53,18 +53,18 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
                 } else if (S_ISLNK(dstSt.st_mode)) {
                     auto target = readLink(dstFile);
                     if (!isDirectory(target))
-                        throw Error(format("collision between '%1%' and non-directory '%2%'")
+                        throw Error(format("collision between ‘%1%’ and non-directory ‘%2%’")
                             % srcFile % target);
                     if (unlink(dstFile.c_str()) == -1)
-                        throw SysError(format("unlinking '%1%'") % dstFile);
+                        throw SysError(format("unlinking ‘%1%’") % dstFile);
                     if (mkdir(dstFile.c_str(), 0755) == -1)
-                        throw SysError(format("creating directory '%1%'"));
+                        throw SysError(format("creating directory ‘%1%’"));
                     createLinks(target, dstFile, priorities[dstFile]);
                     createLinks(srcFile, dstFile, priority);
                     continue;
                 }
             } else if (errno != ENOENT)
-                throw SysError(format("getting status of '%1%'") % dstFile);
+                throw SysError(format("getting status of ‘%1%’") % dstFile);
         } else {
             struct stat dstSt;
             auto res = lstat(dstFile.c_str(), &dstSt);
@@ -74,17 +74,17 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
                     auto prevPriority = priorities[dstFile];
                     if (prevPriority == priority)
                         throw Error(format(
-                                "collision between '%1%' and '%2%'; "
-                                "use 'nix-env --set-flag priority NUMBER PKGNAME' "
+                                "collision between ‘%1%’ and ‘%2%’; "
+                                "use ‘nix-env --set-flag priority NUMBER PKGNAME’ "
                                 "to change the priority of one of the conflicting packages"
                                 ) % srcFile % target);
                     if (prevPriority < priority)
                         continue;
                     if (unlink(dstFile.c_str()) == -1)
-                        throw SysError(format("unlinking '%1%'") % dstFile);
+                        throw SysError(format("unlinking ‘%1%’") % dstFile);
                 }
             } else if (errno != ENOENT)
-                throw SysError(format("getting status of '%1%'") % dstFile);
+                throw SysError(format("getting status of ‘%1%’") % dstFile);
         }
         createSymlink(srcFile, dstFile);
         priorities[dstFile] = priority;
@@ -112,7 +112,7 @@ static void addPkg(const Path & pkgDir, int priority)
         if (!fd) {
             if (errno == ENOENT)
                 return;
-            throw SysError(format("opening '%1%'") % propagatedFN);
+            throw SysError(format("opening ‘%1%’") % propagatedFN);
         }
         propagated = readLine(fd.get());
     }

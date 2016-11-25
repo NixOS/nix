@@ -71,15 +71,15 @@ struct CmdRun : StoreCommand, MixInstallables
                 createDirs(tmpDir + store->storeDir);
 
                 if (mount(store2->realStoreDir.c_str(), (tmpDir + store->storeDir).c_str(), "", MS_BIND, 0) == -1)
-                    throw SysError(format("mounting '%s' on '%s'") % store2->realStoreDir % store->storeDir);
+                    throw SysError(format("mounting ‘%s’ on ‘%s’") % store2->realStoreDir % store->storeDir);
 
                 for (auto entry : readDirectory("/")) {
                     Path dst = tmpDir + "/" + entry.name;
                     if (pathExists(dst)) continue;
                     if (mkdir(dst.c_str(), 0700) == -1)
-                        throw SysError(format("creating directory '%s'") % dst);
+                        throw SysError(format("creating directory ‘%s’") % dst);
                     if (mount(("/" + entry.name).c_str(), dst.c_str(), "", MS_BIND | MS_REC, 0) == -1)
-                        throw SysError(format("mounting '%s' on '%s'") %  ("/" + entry.name) % dst);
+                        throw SysError(format("mounting ‘%s’ on ‘%s’") %  ("/" + entry.name) % dst);
                 }
 
                 char * cwd = getcwd(0, 0);
@@ -87,19 +87,19 @@ struct CmdRun : StoreCommand, MixInstallables
                 Finally freeCwd([&]() { free(cwd); });
 
                 if (chroot(tmpDir.c_str()) == -1)
-                    throw SysError(format("chrooting into '%s'") % tmpDir);
+                    throw SysError(format("chrooting into ‘%s’") % tmpDir);
 
                 if (chdir(cwd) == -1)
-                    throw SysError(format("chdir to '%s' in chroot") % cwd);
+                    throw SysError(format("chdir to ‘%s’ in chroot") % cwd);
             } else
                 if (mount(store2->realStoreDir.c_str(), store->storeDir.c_str(), "", MS_BIND, 0) == -1)
-                    throw SysError(format("mounting '%s' on '%s'") % store2->realStoreDir % store->storeDir);
+                    throw SysError(format("mounting ‘%s’ on ‘%s’") % store2->realStoreDir % store->storeDir);
 
             writeFile("/proc/self/setgroups", "deny");
             writeFile("/proc/self/uid_map", (format("%d %d %d") % uid % uid % 1).str());
             writeFile("/proc/self/gid_map", (format("%d %d %d") % gid % gid % 1).str());
 #else
-            throw Error(format("mounting the Nix store on '%s' is not supported on this platform") % store->storeDir);
+            throw Error(format("mounting the Nix store on ‘%s’ is not supported on this platform") % store->storeDir);
 #endif
         }
 
@@ -119,7 +119,7 @@ struct CmdRun : StoreCommand, MixInstallables
         setenv("PATH", concatStringsSep(":", unixPath).c_str(), 1);
 
         if (execlp("bash", "bash", nullptr) == -1)
-            throw SysError("unable to exec 'bash'");
+            throw SysError("unable to exec ‘bash’");
     }
 };
 
