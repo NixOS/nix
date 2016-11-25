@@ -3,7 +3,7 @@ source common.sh
 clearStore
 
 # Test whether read-only evaluation works when referring to the
-# ‘drvPath’ attribute.
+# 'drvPath' attribute.
 echo "evaluating c..."
 #drvPath=$(nix-instantiate multiple-outputs.nix -A c --readonly-mode)
 
@@ -14,7 +14,7 @@ drvPath=$(nix-instantiate multiple-outputs.nix -A c)
 grep -q 'multiple-outputs-a.drv",\["first","second"\]' $drvPath
 grep -q 'multiple-outputs-b.drv",\["out"\]' $drvPath
 
-# While we're at it, test the ‘unsafeDiscardOutputDependency’ primop.
+# While we're at it, test the 'unsafeDiscardOutputDependency' primop.
 outPath=$(nix-build multiple-outputs.nix -A d --no-out-link)
 drvPath=$(cat $outPath/drv)
 outPath=$(nix-store -q $drvPath)

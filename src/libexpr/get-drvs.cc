@@ -33,7 +33,7 @@ string DrvInfo::queryOutPath()
 DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
 {
     if (outputs.empty()) {
-        /* Get the ‘outputs’ list. */
+        /* Get the 'outputs' list. */
         Bindings::iterator i;
         if (attrs && (i = attrs->find(state->sOutputs)) != attrs->end()) {
             state->forceList(*i->value, *i->pos);
@@ -46,7 +46,7 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
                 if (out == attrs->end()) continue; // FIXME: throw error?
                 state->forceAttrs(*out->value);
 
-                /* And evaluate its ‘outPath’ attribute. */
+                /* And evaluate its 'outPath' attribute. */
                 Bindings::iterator outPath = out->value->attrs->find(state->sOutPath);
                 if (outPath == out->value->attrs->end()) continue; // FIXME: throw error?
                 PathSet context;
@@ -61,7 +61,7 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
     /* Check for `meta.outputsToInstall` and return `outputs` reduced to that. */
     const Value * outTI = queryMeta("outputsToInstall");
     if (!outTI) return outputs;
-    const auto errMsg = Error("this derivation has bad ‘meta.outputsToInstall’");
+    const auto errMsg = Error("this derivation has bad 'meta.outputsToInstall'");
         /* ^ this shows during `nix-env -i` right under the bad derivation */
     if (!outTI->isList()) throw errMsg;
     Outputs result;
@@ -290,7 +290,7 @@ static void getDerivations(EvalState & state, Value & vIn,
             attrs.insert(std::pair<string, Symbol>(i.name, i.name));
 
         for (auto & i : attrs) {
-            Activity act(*logger, lvlDebug, format("evaluating attribute ‘%1%’") % i.first);
+            Activity act(*logger, lvlDebug, format("evaluating attribute '%1%'") % i.first);
             string pathPrefix2 = addToPath(pathPrefix, i.first);
             Value & v2(*v.attrs->find(i.second)->value);
             if (combineChannels)

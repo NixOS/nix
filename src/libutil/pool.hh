@@ -24,8 +24,8 @@ namespace nix {
        conn->exec("select ...");
      }
 
-   Here, the Connection object referenced by ‘conn’ is automatically
-   returned to the pool when ‘conn’ goes out of scope.
+   Here, the Connection object referenced by 'conn' is automatically
+   returned to the pool when 'conn' goes out of scope.
 */
 
 template <class R>

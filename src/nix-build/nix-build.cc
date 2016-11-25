@@ -322,7 +322,7 @@ int main(int argc, char ** argv)
         }
 
         if (packages && fromArgs) {
-            throw UsageError("‘-p’ and ‘-E’ are mutually exclusive");
+            throw UsageError("'-p' and '-E' are mutually exclusive");
         }
 
         if (packages) {

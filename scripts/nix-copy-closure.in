@@ -38,7 +38,7 @@ while (@ARGV) {
         exec "man nix-copy-closure" or die;
     }
     elsif ($arg eq "--gzip" || $arg eq "--bzip2" || $arg eq "--xz") {
-        warn "$0: ‘$arg’ is not implemented\n" if $arg ne "--gzip";
+        warn "$0: '$arg' is not implemented\n" if $arg ne "--gzip";
         push @globalSshOpts, "-C";
     }
     elsif ($arg eq "--from") {
@@ -51,7 +51,7 @@ while (@ARGV) {
         $includeOutputs = 1;
     }
     elsif ($arg eq "--show-progress") {
-        warn "$0: ‘$arg’ is not implemented\n";
+        warn "$0: '$arg' is not implemented\n";
     }
     elsif ($arg eq "--dry-run") {
         $dryRun = 1;
@@ -93,7 +93,7 @@ else { # Copy FROM the remote machine.
 
     # Export the store paths on the remote machine and import them locally.
     if (scalar @missing > 0) {
-        print STDERR "copying ", scalar @missing, " missing paths from ‘$sshHost’...\n";
+        print STDERR "copying ", scalar @missing, " missing paths from '$sshHost'...\n";
         writeInt(5, $to); # == cmdExportPaths
         writeInt(0, $to); # obsolete
         writeStrings(\@missing, $to);

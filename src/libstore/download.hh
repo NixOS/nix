@@ -46,7 +46,7 @@ struct Downloader
     DownloadResult download(const DownloadRequest & request);
 
     /* Check if the specified file is already in ~/.cache/nix/tarballs
-       and is more recent than ‘tarball-ttl’ seconds. Otherwise,
+       and is more recent than 'tarball-ttl' seconds. Otherwise,
        use the recorded ETag to verify if the server has a more
        recent version, and if so, download it to the Nix store. */
     Path downloadCached(ref<Store> store, const string & uri, bool unpack, string name = "",
