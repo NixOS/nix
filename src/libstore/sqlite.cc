@@ -39,7 +39,7 @@ SQLite::SQLite(const Path & path)
 {
     if (sqlite3_open_v2(path.c_str(), &db,
             SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, 0) != SQLITE_OK)
-        throw Error(format("cannot open SQLite database ‘%s’") % path);
+        throw Error(format("cannot open SQLite database '%s'") % path);
 }
 
 SQLite::~SQLite()
@@ -55,7 +55,7 @@ SQLite::~SQLite()
 void SQLite::exec(const std::string & stmt)
 {
     if (sqlite3_exec(db, stmt.c_str(), 0, 0, 0) != SQLITE_OK)
-        throwSQLiteError(db, format("executing SQLite statement ‘%s’") % stmt);
+        throwSQLiteError(db, format("executing SQLite statement '%s'") % stmt);
 }
 
 void SQLiteStmt::create(sqlite3 * db, const string & s)

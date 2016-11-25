@@ -75,7 +75,7 @@ struct NarIndexer : ParseSink, StringSource
     {
         auto i = members.find(path);
         if (i == members.end())
-            throw Error(format("NAR file does not contain path ‘%1%’") % path);
+            throw Error(format("NAR file does not contain path '%1%'") % path);
         return i;
     }
 };
@@ -103,7 +103,7 @@ struct NarAccessor : public FSAccessor
         auto i = indexer.find(path);
 
         if (i->second.type != FSAccessor::Type::tDirectory)
-            throw Error(format("path ‘%1%’ inside NAR file is not a directory") % path);
+            throw Error(format("path '%1%' inside NAR file is not a directory") % path);
 
         ++i;
         StringSet res;
@@ -120,7 +120,7 @@ struct NarAccessor : public FSAccessor
     {
         auto i = indexer.find(path);
         if (i->second.type != FSAccessor::Type::tRegular)
-            throw Error(format("path ‘%1%’ inside NAR file is not a regular file") % path);
+            throw Error(format("path '%1%' inside NAR file is not a regular file") % path);
         return std::string(*nar, i->second.start, i->second.size);
     }
 
@@ -128,7 +128,7 @@ struct NarAccessor : public FSAccessor
     {
         auto i = indexer.find(path);
         if (i->second.type != FSAccessor::Type::tSymlink)
-            throw Error(format("path ‘%1%’ inside NAR file is not a symlink") % path);
+            throw Error(format("path '%1%' inside NAR file is not a symlink") % path);
         return i->second.target;
     }
 };

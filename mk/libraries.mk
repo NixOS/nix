@@ -11,9 +11,9 @@ else
 endif
 
 # Build a library with symbolic name $(1).  The library is defined by
-# various variables prefixed by ‘$(1)_’:
+# various variables prefixed by '$(1)_':
 #
-# - $(1)_NAME: the name of the library (e.g. ‘libfoo’); defaults to
+# - $(1)_NAME: the name of the library (e.g. 'libfoo'); defaults to
 #   $(1).
 #
 # - $(1)_DIR: the directory where the (non-installed) library will be
@@ -45,7 +45,7 @@ endif
 # - $(1)_INSTALL_DIR: the directory where the library will be
 #   installed.  Defaults to $(libdir).
 #
-# - BUILD_SHARED_LIBS: if equal to ‘1’, a dynamic library will be
+# - BUILD_SHARED_LIBS: if equal to '1', a dynamic library will be
 #   built, otherwise a static library.
 define build-library
   $(1)_NAME ?= $(1)

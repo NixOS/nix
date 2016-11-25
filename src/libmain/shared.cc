@@ -37,7 +37,7 @@ void printGCWarning()
     if (!gcWarning) return;
     static bool haveWarned = false;
     warnOnce(haveWarned,
-        "you did not specify ‘--add-root’; "
+        "you did not specify '--add-root'; "
         "the result might be removed by the garbage collector");
 }
 
@@ -84,7 +84,7 @@ string getArg(const string & opt,
     Strings::iterator & i, const Strings::iterator & end)
 {
     ++i;
-    if (i == end) throw UsageError(format("‘%1%’ requires an argument") % opt);
+    if (i == end) throw UsageError(format("'%1%' requires an argument") % opt);
     return *i;
 }
 
@@ -204,7 +204,7 @@ struct LegacyArgs : public MixCommonArgs
         mkFlag(0, "show-trace", "show Nix expression stack trace in evaluation errors",
             &settings.showTrace);
 
-        mkFlag(0, "no-gc-warning", "disable warning about not using ‘--add-root’",
+        mkFlag(0, "no-gc-warning", "disable warning about not using '--add-root'",
             &gcWarning, false);
     }
 
@@ -223,7 +223,7 @@ struct LegacyArgs : public MixCommonArgs
         Strings ss(args);
         auto pos = ss.begin();
         if (!parseArg(pos, ss.end()))
-            throw UsageError(format("unexpected argument ‘%1%’") % args.front());
+            throw UsageError(format("unexpected argument '%1%'") % args.front());
         return true;
     }
 };
@@ -261,7 +261,7 @@ void showManPage(const string & name)
 {
     restoreSIGPIPE();
     execlp("man", "man", name.c_str(), NULL);
-    throw SysError(format("command ‘man %1%’ failed") % name.c_str());
+    throw SysError(format("command 'man %1%' failed") % name.c_str());
 }
 
 
@@ -283,13 +283,13 @@ int handleExceptions(const string & programName, std::function<void()> fun)
         return e.status;
     } catch (UsageError & e) {
         printError(
-            format(error + "%1%\nTry ‘%2% --help’ for more information.")
+            format(error + "%1%\nTry '%2% --help' for more information.")
             % e.what() % programName);
         return 1;
     } catch (BaseError & e) {
         printError(format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
         if (e.prefix() != "" && !settings.showTrace)
-            printError("(use ‘--show-trace’ to show detailed location information)");
+            printError("(use '--show-trace' to show detailed location information)");
         return e.status;
     } catch (std::bad_alloc & e) {
         printError(error + "out of memory");
@@ -333,7 +333,7 @@ RunPager::RunPager()
         execlp("pager", "pager", NULL);
         execlp("less", "less", NULL);
         execlp("more", "more", NULL);
-        throw SysError(format("executing ‘%1%’") % pager);
+        throw SysError(format("executing '%1%'") % pager);
     });
 
     if (dup2(toPager.writeSide.get(), STDOUT_FILENO) == -1)

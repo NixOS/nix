@@ -59,7 +59,7 @@ public:
 typedef std::map<std::string, ref<Command>> Commands;
 
 /* An argument parser that supports multiple subcommands,
-   i.e. ‘<command> <subcommand>’. */
+   i.e. '<command> <subcommand>'. */
 class MultiCommand : virtual Args
 {
 public:

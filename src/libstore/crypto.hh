@@ -12,7 +12,7 @@ struct Key
     std::string key;
 
     /* Construct Key from a string in the format
-       ‘<name>:<key-in-base64>’. */
+       '<name>:<key-in-base64>'. */
     Key(const std::string & s);
 
 protected:
@@ -44,7 +44,7 @@ private:
 
 typedef std::map<std::string, PublicKey> PublicKeys;
 
-/* Return true iff ‘sig’ is a correct signature over ‘data’ using one
+/* Return true iff 'sig' is a correct signature over 'data' using one
    of the given public keys. */
 bool verifyDetached(const std::string & data, const std::string & sig,
     const PublicKeys & publicKeys);

@@ -35,14 +35,14 @@ sub copyToOpen {
     my $missingSize = 0;
     $missingSize += (queryPathInfo($_, 1))[3] foreach @missing;
 
-    printf STDERR "copying %d missing paths (%.2f MiB) to ‘$sshHost’...\n",
+    printf STDERR "copying %d missing paths (%.2f MiB) to '$sshHost'...\n",
         scalar(@missing), $missingSize / (1024**2);
     return if $dryRun;
 
     # Send the "import paths" command.
     syswrite($to, pack("L<x4", 4)) or die;
     exportPaths(fileno($to), @missing);
-    readInt($from) == 1 or die "remote machine ‘$sshHost’ failed to import closure\n";
+    readInt($from) == 1 or die "remote machine '$sshHost' failed to import closure\n";
 }
 
 

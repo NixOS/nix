@@ -27,14 +27,14 @@ bool Store::isStorePath(const Path & path) const
 void Store::assertStorePath(const Path & path) const
 {
     if (!isStorePath(path))
-        throw Error(format("path ‘%1%’ is not in the Nix store") % path);
+        throw Error(format("path '%1%' is not in the Nix store") % path);
 }
 
 
 Path Store::toStorePath(const Path & path) const
 {
     if (!isInStore(path))
-        throw Error(format("path ‘%1%’ is not in the Nix store") % path);
+        throw Error(format("path '%1%' is not in the Nix store") % path);
     Path::size_type slash = path.find('/', storeDir.size() + 1);
     if (slash == Path::npos)
         return path;
@@ -52,7 +52,7 @@ Path Store::followLinksToStore(const Path & _path) const
         path = absPath(target, dirOf(path));
     }
     if (!isInStore(path))
-        throw Error(format("path ‘%1%’ is not in the Nix store") % path);
+        throw Error(format("path '%1%' is not in the Nix store") % path);
     return path;
 }
 
@@ -85,14 +85,14 @@ void checkStoreName(const string & name)
     /* Disallow names starting with a dot for possible security
        reasons (e.g., "." and ".."). */
     if (string(name, 0, 1) == ".")
-        throw Error(format("illegal name: ‘%1%’") % name);
+        throw Error(format("illegal name: '%1%'") % name);
     for (auto & i : name)
         if (!((i >= 'A' && i <= 'Z') ||
               (i >= 'a' && i <= 'z') ||
               (i >= '0' && i <= '9') ||
               validChars.find(i) != string::npos))
         {
-            throw Error(format("invalid character ‘%1%’ in name ‘%2%’")
+            throw Error(format("invalid character '%1%' in name '%2%'")
                 % i % name);
         }
 }
@@ -312,7 +312,7 @@ void Store::queryPathInfo(const Path & storePath,
             if (res) {
                 stats.narInfoReadAverted++;
                 if (!*res)
-                    throw InvalidPath(format("path ‘%s’ is not valid") % storePath);
+                    throw InvalidPath(format("path '%s' is not valid") % storePath);
                 return success(ref<ValidPathInfo>(*res));
             }
         }
@@ -327,7 +327,7 @@ void Store::queryPathInfo(const Path & storePath,
                         res.first == NarInfoDiskCache::oInvalid ? 0 : res.second);
                     if (res.first == NarInfoDiskCache::oInvalid ||
                         (res.second->path != storePath && storePathToName(storePath) != ""))
-                        throw InvalidPath(format("path ‘%s’ is not valid") % storePath);
+                        throw InvalidPath(format("path '%s' is not valid") % storePath);
                 }
                 return success(ref<ValidPathInfo>(res.second));
             }
@@ -352,7 +352,7 @@ void Store::queryPathInfo(const Path & storePath,
                 || (info->path != storePath && storePathToName(storePath) != ""))
             {
                 stats.narInfoMissing++;
-                return failure(std::make_exception_ptr(InvalidPath(format("path ‘%s’ is not valid") % storePath)));
+                return failure(std::make_exception_ptr(InvalidPath(format("path '%s' is not valid") % storePath)));
             }
 
             callSuccess(success, failure, ref<ValidPathInfo>(info));
@@ -514,7 +514,7 @@ string showPaths(const PathSet & paths)
     string s;
     for (auto & i : paths) {
         if (s.size() != 0) s += ", ";
-        s += "‘" + i + "’";
+        s += "'" + i + "'";
     }
     return s;
 }
@@ -523,7 +523,7 @@ string showPaths(const PathSet & paths)
 std::string ValidPathInfo::fingerprint() const
 {
     if (narSize == 0 || !narHash)
-        throw Error(format("cannot calculate fingerprint of path ‘%s’ because its size/hash is not known")
+        throw Error(format("cannot calculate fingerprint of path '%s' because its size/hash is not known")
             % path);
     return
         "1;" + path + ";"
@@ -542,7 +542,7 @@ void ValidPathInfo::sign(const SecretKey & secretKey)
 bool ValidPathInfo::isContentAddressed(const Store & store) const
 {
     auto warn = [&]() {
-        printError(format("warning: path ‘%s’ claims to be content-addressed but isn't") % path);
+        printError(format("warning: path '%s' claims to be content-addressed but isn't") % path);
     };
 
     if (hasPrefix(ca, "text:")) {
@@ -625,7 +625,7 @@ ref<Store> openStore(const std::string & uri_)
         if (store) return ref<Store>(store);
     }
 
-    throw Error(format("don't know how to open Nix store ‘%s’") % uri);
+    throw Error(format("don't know how to open Nix store '%s'") % uri);
 }
 
 

@@ -8,7 +8,7 @@ namespace nix {
 Path exportGit(ref<Store> store, const std::string & uri, const std::string & rev)
 {
     if (!isUri(uri))
-        throw EvalError(format("‘%s’ is not a valid URI") % uri);
+        throw EvalError(format("'%s' is not a valid URI") % uri);
 
     Path cacheDir = getCacheDir() + "/nix/git";
 
@@ -17,7 +17,7 @@ Path exportGit(ref<Store> store, const std::string & uri, const std::string & re
         runProgram("git", true, { "init", "--bare", cacheDir });
     }
 
-    Activity act(*logger, lvlInfo, format("fetching Git repository ‘%s’") % uri);
+    Activity act(*logger, lvlInfo, format("fetching Git repository '%s'") % uri);
 
     std::string localRef = "pid-" + std::to_string(getpid());
     Path localRefFile = cacheDir + "/refs/heads/" + localRef;
@@ -28,7 +28,7 @@ Path exportGit(ref<Store> store, const std::string & uri, const std::string & re
 
     unlink(localRefFile.c_str());
 
-    debug(format("got revision ‘%s’") % commitHash);
+    debug(format("got revision '%s'") % commitHash);
 
     // FIXME: should pipe this, or find some better way to extract a
     // revision.
@@ -45,7 +45,7 @@ Path exportGit(ref<Store> store, const std::string & uri, const std::string & re
 static void prim_fetchgit(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     // FIXME: cut&paste from fetch().
-    if (state.restricted) throw Error("‘fetchgit’ is not allowed in restricted mode");
+    if (state.restricted) throw Error("'fetchgit' is not allowed in restricted mode");
 
     std::string url;
     std::string rev = "master";
@@ -63,11 +63,11 @@ static void prim_fetchgit(EvalState & state, const Pos & pos, Value * * args, Va
             else if (name == "rev")
                 rev = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
-                throw EvalError(format("unsupported argument ‘%1%’ to ‘fetchgit’, at %3%") % attr.name % attr.pos);
+                throw EvalError(format("unsupported argument '%1%' to 'fetchgit', at %3%") % attr.name % attr.pos);
         }
 
         if (url.empty())
-            throw EvalError(format("‘url’ argument required, at %1%") % pos);
+            throw EvalError(format("'url' argument required, at %1%") % pos);
 
     } else
         url = state.forceStringNoCtx(*args[0], pos);
