@@ -1,0 +1,24 @@
+FROM ubuntu:16.04
+
+RUN apt-get update && apt-get -y --force-yes upgrade
+
+RUN apt-get -y --force-yes install sudo git vim dh-make
+
+RUN useradd -mG sudo user && echo '%sudo ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+
+USER root
+RUN apt-get -y --force-yes install make libssl-dev libbz2-dev libsqlite3-dev libcurl4-openssl-dev liblzma-dev libsodium-dev libseccomp-dev
+RUN apt-get -y --force-yes install autoconf automake pkg-config flex bison libxml2-utils docbook5-xml xsltproc docbook-xsl-ns autoconf-archive
+USER user
+
+WORKDIR /home/user/nix
+COPY . /home/user/nix
+USER root
+RUN git clean -fdx && chown -R user:users .
+USER user
+
+RUN ./bootstrap.sh
+RUN ./configure
+RUN make dist
+
+CMD "bash"

@@ -1,0 +1,28 @@
+FROM fedora:25
+
+RUN yum update -y
+
+RUN yum install -y sudo git rpm-build redhat-rpm-config vim
+
+RUN useradd -mG wheel user && echo '%wheel ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+
+USER user
+RUN mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+RUN echo '%_topdir %(echo $HOME)/rpmbuild' > ~/.rpmmacros
+
+USER root
+RUN yum install -y make gcc-c++ openssl-devel bzip2-devel sqlite-devel curl-devel xz-devel emacs libsodium-devel libsodium libseccomp-devel
+RUN yum install -y autoconf automake flex bison libxslt docbook5-schemas docbook5-style-xsl autoconf-archive
+USER user
+
+WORKDIR /home/user/nix
+COPY . /home/user/nix
+USER root
+RUN git clean -fdx && chown -R user:users .
+USER user
+
+RUN ./bootstrap.sh
+RUN ./configure
+RUN make dist
+
+CMD "bash"
