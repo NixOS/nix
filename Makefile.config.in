@@ -37,3 +37,4 @@ sysconfdir = @sysconfdir@
 doc_generate = @doc_generate@
 xmllint = @xmllint@
 xsltproc = @xsltproc@
+initsystem = @initsystem@

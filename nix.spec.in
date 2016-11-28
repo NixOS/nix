@@ -71,6 +71,7 @@ extraFlags=
 # - set localstatedir by hand to the preferred nix value
 %configure --localstatedir=/nix/var \
            --docdir=%{_defaultdocdir}/%{name}-doc-%{version} \
+           --with-init-system=systemd \
            $extraFlags
 make -j$NIX_BUILD_CORES -l$NIX_BUILD_CORES
 

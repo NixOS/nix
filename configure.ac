@@ -245,6 +245,13 @@ AC_ARG_ENABLE(doc-gen, AC_HELP_STRING([--disable-doc-gen],
 AC_SUBST(doc_generate)
 
 
+# host init system to install nix-daemon scripts
+AC_ARG_WITH(init-system, AC_HELP_STRING([--with-init-system=NAME],
+  [host init system (launchd, systemd, upstart, systemv, none, defaults to none)]),
+  initsystem=$withval, test "$(uname)" = "Darwin" && initsystem='launchd' || initsystem='none')
+AC_SUBST(initsystem)
+
+
 # Setuid installations.
 AC_CHECK_FUNCS([setresuid setreuid lchown])
 
