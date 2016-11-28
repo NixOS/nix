@@ -337,14 +337,14 @@ let
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages =
-            [ "libsqlite3-dev" "libbz2-dev" "libcurl-dev" "libcurl3-nss" "libssl-dev" "liblzma-dev" "libseccomp-dev" ]
+            [ "libsqlite3-dev" "libbz2-dev" "libcurl-dev" "libcurl4-openssl-dev" "libssl-dev" "liblzma-dev" "libseccomp-dev" ]
             ++ extraPackages; };
       memSize = 1024;
       meta.schedulingPriority = 50;
       postInstall = "make installcheck";
       configureFlags = "--sysconfdir=/etc";
       debRequires =
-        [ "curl" "libsqlite3-0" "libbz2-1.0" "bzip2" "xz-utils" "libssl1.0.0" "liblzma5" "libseccomp2" ]
+        [ "curl" "libsqlite3-0" "libbz2-1.0" "bzip2" "xz-utils" "libssl1.0.0" "liblzma5" "libcurl3" "libseccomp2" ]
         ++ extraDebPackages;
       debMaintainer = "Eelco Dolstra <eelco.dolstra@logicblox.com>";
       doInstallCheck = true;
