@@ -214,7 +214,7 @@ if test "$gc" = yes; then
 fi
 
 
-# Check for the required Perl dependencies (DBI, DBD::SQLite and WWW::Curl).
+# Check for the required Perl dependencies (DBI, DBD::SQLite).
 perlFlags="-I$perllibdir"
 
 AC_ARG_WITH(dbi, AC_HELP_STRING([--with-dbi=PATH],
@@ -225,21 +225,10 @@ AC_ARG_WITH(dbd-sqlite, AC_HELP_STRING([--with-dbd-sqlite=PATH],
   [prefix of the Perl DBD::SQLite library]),
   perlFlags="$perlFlags -I$withval")
 
-AC_ARG_WITH(www-curl, AC_HELP_STRING([--with-www-curl=PATH],
-  [prefix of the Perl WWW::Curl library]),
-  perlFlags="$perlFlags -I$withval")
-
 AC_MSG_CHECKING([whether DBD::SQLite works])
 if ! $perl $perlFlags -e 'use DBI; use DBD::SQLite;' 2>&5; then
     AC_MSG_RESULT(no)
     AC_MSG_FAILURE([The Perl modules DBI and/or DBD::SQLite are missing.])
-fi
-AC_MSG_RESULT(yes)
-
-AC_MSG_CHECKING([whether WWW::Curl works])
-if ! $perl $perlFlags -e 'use WWW::Curl;' 2>&5; then
-    AC_MSG_RESULT(no)
-    AC_MSG_FAILURE([The Perl module WWW::Curl is missing.])
 fi
 AC_MSG_RESULT(yes)
 

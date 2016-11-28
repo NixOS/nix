@@ -33,7 +33,6 @@ let
         configureFlags = ''
           --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
-          --with-www-curl=${perlPackages.WWWCurl}/${perl.libPrefix}
           --enable-gc
         '';
 
@@ -85,7 +84,6 @@ let
           --disable-init-state
           --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
-          --with-www-curl=${perlPackages.WWWCurl}/${perl.libPrefix}
           --enable-gc
           --sysconfdir=/etc
         '';
@@ -157,7 +155,6 @@ let
           --disable-init-state
           --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
-          --with-www-curl=${perlPackages.WWWCurl}/${perl.libPrefix}
         '';
 
         dontInstall = false;
@@ -284,7 +281,7 @@ let
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages =
-            [ "perl-DBD-SQLite" "perl-devel" "sqlite" "sqlite-devel" "bzip2-devel" "emacs" "perl-WWW-Curl" "libcurl-devel" "openssl-devel" "xz-devel" ]
+            [ "perl-DBD-SQLite" "perl-devel" "sqlite" "sqlite-devel" "bzip2-devel" "emacs" "libcurl-devel" "openssl-devel" "xz-devel" ]
             ++ extraPackages; };
       memSize = 1024;
       meta.schedulingPriority = 50;
