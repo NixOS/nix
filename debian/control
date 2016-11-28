@@ -1,0 +1,21 @@
+Source: nix
+Maintainer: Eelco Dolstra <eelco.dolstra@logicblox.com>
+Section: admin
+Priority: optional
+Build-Depends: libsqlite3-dev,
+               libbz2-dev,
+               libcurl-dev,
+               libcurl4-openssl-dev,
+               libssl-dev,
+               liblzma-dev,
+               libsodium-dev,
+               libseccomp-dev
+
+Package: nix
+Architecture: any
+Description: The Nix software deployment system
+Depends: curl,
+         bzip2,
+         xz-utils,
+         ${shlibs:Depends},
+         ${misc:Depends}

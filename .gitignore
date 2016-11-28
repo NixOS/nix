@@ -93,6 +93,12 @@ perl/Makefile.config
 /tests/lang/*.out.xml
 /tests/lang/*.ast
 
+# /debian/
+/debian/changelog
+/debian/prerm
+/debian/postinst
+/debian/postrm
+
 /perl/lib/Nix/Config.pm
 /perl/lib/Nix/Store.cc
 

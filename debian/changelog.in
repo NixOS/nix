@@ -1,0 +1,5 @@
+nix (@PACKAGE_VERSION@) unstable; urgency=low
+
+  * Initial release.
+
+ -- Eelco Dolstra <eelco.dolstra@logicblox.com>  Mon, 28 Nov 2016 11:33:29 +0000

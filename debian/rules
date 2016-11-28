@@ -1,0 +1,18 @@
+#!/usr/bin/make -f
+
+INIT_SYSTEM ?= systemd
+
+# Prevent marking of /etc/profile.d/nix.sh as a conffile.
+override_dh_installdeb:
+	dh_installdeb
+	sed -i '/^\/etc\/profile.d\//d' ${CURDIR}/debian/*/DEBIAN/conffiles
+
+# Allow /nix to retain needed permissions.
+override_dh_fixperms:
+	dh_fixperms --exclude nix/
+
+override_dh_auto_configure:
+	dh_auto_configure -- --localstatedir=/nix/var --with-init-system=$(INIT_SYSTEM)
+
+%:
+	dh $@

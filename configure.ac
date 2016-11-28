@@ -57,8 +57,6 @@ if test "$sys_name" = sunos; then
 fi
 
 
-CFLAGS=
-CXXFLAGS=
 AC_PROG_CC
 AC_PROG_CXX
 AC_PROG_CPP
@@ -297,6 +295,13 @@ for name in $ac_subst_vars; do
     declare $name="$(eval echo "${!name}")"
     declare $name="$(eval echo "${!name}")"
 done
+
+AC_SUBST_FILE(post_install_linux)
+post_install_linux=scripts/post-install-linux.sh
+AC_SUBST_FILE(pre_remove_linux)
+pre_remove_linux=scripts/pre-remove-linux.sh
+AC_SUBST_FILE(post_remove_linux)
+post_remove_linux=scripts/post-remove-linux.sh
 
 rm -f Makefile.config
 

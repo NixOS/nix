@@ -1,8 +1,5 @@
 %undefine _hardened_build
 
-%global nixbld_user "nix-builder-"
-%global nixbld_group "nixbld"
-
 Summary: The Nix software deployment system
 Name: nix
 Version: @PACKAGE_VERSION@
@@ -102,31 +99,21 @@ chmod -x $RPM_BUILD_ROOT%{_sysconfdir}/profile.d/nix.sh
 # we ship this file in the base package
 rm -f $RPM_BUILD_ROOT%{_defaultdocdir}/%{name}-doc-%{version}/README
 
-# Get rid of Upstart job.
-rm -rf $RPM_BUILD_ROOT%{_sysconfdir}/init
-
 
 %clean
 rm -rf $RPM_BUILD_ROOT
+make clean
 
-
-%pre
-getent group %{nixbld_group} >/dev/null || groupadd -r %{nixbld_group}
-for i in $(seq 10);
-do
-  getent passwd %{nixbld_user}$i >/dev/null || \
-    useradd -r -g %{nixbld_group} -G %{nixbld_group} -d /var/empty \
-      -s %{_sbindir}/nologin \
-      -c "Nix build user $i" %{nixbld_user}$i
-done
 
 %post
-chgrp %{nixbld_group} /nix/store
-%if ! 0%{?rhel} || 0%{?rhel} >= 7
-# Enable and start Nix worker
-systemctl enable nix-daemon.socket nix-daemon.service
-systemctl start  nix-daemon.socket
-%endif
+%(cat scripts/post-install-linux.sh)
+
+%preun
+%(cat scripts/pre-remove-linux.sh)
+
+%postun
+%(cat scripts/post-remove-linux.sh)
+
 
 %files
 %{_bindir}/nix*

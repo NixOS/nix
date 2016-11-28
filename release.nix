@@ -205,13 +205,13 @@ let
     rpm_fedora25x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora25x86_64) [ "libsodium-devel" ];
 
 
-    #deb_debian8i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian8i386) [ "libsodium-dev" ] [ "libsodium13" ];
-    #deb_debian8x86_64 = makeDeb_x86_64 (diskImageFunsFun: diskImageFunsFun.debian8x86_64) [ "libsodium-dev" ] [ "libsodium13" ];
+    #deb_debian8i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian8i386) [ "libsodium-dev" ];
+    #deb_debian8x86_64 = makeDeb_x86_64 (diskImageFunsFun: diskImageFunsFun.debian8x86_64) [ "libsodium-dev" ];
 
-    deb_ubuntu1604i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1604i386) [ "libsodium-dev" ] [ "libsodium18" ];
-    deb_ubuntu1604x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1604x86_64) [ "libsodium-dev" ] [ "libsodium18" ];
-    deb_ubuntu1610i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1610i386) [ "libsodium-dev" ] [ "libsodium18" ];
-    deb_ubuntu1610x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1610x86_64) [ "libsodium-dev" ] [ "libsodium18" ];
+    deb_ubuntu1604i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1604i386) [ "libsodium-dev" ];
+    deb_ubuntu1604x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1604x86_64) [ "libsodium-dev" ];
+    deb_ubuntu1610i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1610i386) [ "libsodium-dev" ];
+    deb_ubuntu1610x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1610x86_64) [ "libsodium-dev" ];
 
 
     # System tests.
@@ -328,26 +328,39 @@ let
   makeDeb_x86_64 = makeDeb "x86_64-linux";
 
   makeDeb =
-    system: diskImageFun: extraPackages: extraDebPackages:
+    system: diskImageFun: extraPackages:
 
     with import nixpkgs { inherit system; };
 
     releaseTools.debBuild {
       name = "nix-deb";
       src = jobs.tarball;
+
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages =
-            [ "libsqlite3-dev" "libbz2-dev" "libcurl-dev" "libcurl4-openssl-dev" "libssl-dev" "liblzma-dev" "libseccomp-dev" ]
+            [ "build-essential" "debhelper" "mount"
+              "libsqlite3-dev" "libbz2-dev" "libcurl-dev" "libcurl4-openssl-dev" "libssl-dev" "liblzma-dev" "libseccomp-dev" ]
             ++ extraPackages; };
       memSize = 1024;
       meta.schedulingPriority = 50;
-      postInstall = "make installcheck";
-      configureFlags = "--sysconfdir=/etc";
-      debRequires =
-        [ "curl" "libsqlite3-0" "libbz2-1.0" "bzip2" "xz-utils" "libssl1.0.0" "liblzma5" "libcurl3" "libseccomp2" ]
-        ++ extraDebPackages;
+
+      configurePhase = "true";
+
+      buildPhase = ''
+        dpkg-buildpackage -us -uc
+      '';
+
+      installPhase = ''
+        mkdir -p $out/debs
+        cp -r ../*.deb $out/debs
+      '';
+
+      postDebInstall = ''
+        make installcheck
+      '';
+
       debMaintainer = "Eelco Dolstra <eelco.dolstra@logicblox.com>";
-      doInstallCheck = true;
+
       #enableParallelBuilding = true;
     };
 
