@@ -1,6 +1,6 @@
 if [ -n "$HOME" ] && [ -n "$USER" ]; then
     __savedpath="$PATH"
-    export PATH=@coreutils@
+    export PATH=@coreutils@:/usr/bin:/bin
 
     # Set up the per-user profile.
     # This part should be kept in sync with nixpkgs:nixos/modules/programs/shell.nix
