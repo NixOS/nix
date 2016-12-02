@@ -18,10 +18,10 @@ if [ -z "$USER" ]; then
 fi
 
 if [ "$(id -u)" -eq 0 ]; then
-    printf '\e[1;31mwarning: installing Nix as root is not supported by this script!\e[0m\n'
+    printf '\e[1;31mwarning: although it has some users, installing Nix as root is not supported by this script. This install will continue, but we recommend aborting and installing as a user instead.\e[0m\n'
+else
+  echo "performing a single-user installation of Nix..." >&2
 fi
-
-echo "performing a single-user installation of Nix..." >&2
 
 if ! [ -e $dest ]; then
     cmd="mkdir -m 0755 $dest && chown $USER $dest"
