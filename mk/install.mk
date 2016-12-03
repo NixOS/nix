@@ -10,6 +10,13 @@ define create-dir
 endef
 
 
+# Add a rule for copying $(1) to $(2).
+define copy-file
+  $(2): $(1)
+	$$(trace-cp) cp "$$<" "$$@"
+endef
+
+
 # Add a rule for installing file $(1) as file $(2) with mode $(3).
 # The directory containing $(2) will be created automatically.
 define install-file-as
