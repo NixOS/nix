@@ -193,6 +193,15 @@ struct Settings {
        build settings */
     Path preBuildHook;
 
+    /* Host where a IPFS API can be reached (usually localhost) */
+    std::string ipfsAPIHost;
+    /* Port where a IPFS API can be reached (usually 5001) */
+    uint16_t    ipfsAPIPort;
+    /* Whether to use a IPFS Gateway instead of the API */
+    bool        useIpfsGateway;
+    /* Where to find a IPFS Gateway */
+    std::string ipfsGatewayURL;
+
 private:
     SettingsMap settings, overrides;
 

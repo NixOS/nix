@@ -14,6 +14,10 @@ ifeq ($(ENABLE_S3), 1)
 	libstore_LDFLAGS += -laws-cpp-sdk-s3 -laws-cpp-sdk-core
 endif
 
+ifeq ($(ENABLE_IPFS), 1)
+	libstore_LDFLAGS += -lipfs-api
+endif
+
 ifeq ($(OS), SunOS)
 	libstore_LDFLAGS += -lsocket
 endif

@@ -72,7 +72,7 @@ let
         src = tarball;
 
         buildInputs =
-          [ curl perl bzip2 xz openssl pkgconfig sqlite boehmgc ]
+          [ curl perl bzip2 xz openssl pkgconfig sqlite boehmgc cpp-ipfs-api nlohmann_json ]
           ++ lib.optional stdenv.isLinux libsodium
           ++ lib.optional stdenv.isLinux
             (aws-sdk-cpp.override {

@@ -10,6 +10,7 @@
 #include "nar-info-disk-cache.hh"
 #include "nar-accessor.hh"
 #include "json.hh"
+#include "ipfs-accessor.hh"
 
 #include <chrono>
 
@@ -223,7 +224,6 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
                 recurse("", res);
             }
         }
-
         upsertFile(storePathToHash(info.path) + ".ls.xz", *compress("xz", jsonOut.str()));
     }
 
@@ -246,6 +246,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
         % ((1.0 - (double) narCompressed->size() / nar->size()) * 100.0)
         % duration);
 
+    std::string ipfsHash;
     /* Atomically write the NAR file. */
     narInfo->url = "nar/" + printHash32(narInfo->fileHash) + ".nar"
         + (compression == "xz" ? ".xz" :
@@ -254,6 +255,22 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
     if (repair || !fileExists(narInfo->url)) {
         stats.narWrite++;
         upsertFile(narInfo->url, *narCompressed);
+#if ENABLE_IPFS
+        try {
+          auto narPath = narInfo->url;
+          auto pos = narInfo->url.find_last_of("/");
+          if (pos != std::string::npos) {
+            narPath = narInfo->url.substr(pos+1);
+          }
+          ipfsHash = IPFSAccessor::addFile(narPath, *narCompressed);
+
+          if (!ipfsHash.empty()) {
+            narInfo->ipfsHash = ipfsHash;
+          }
+        } catch (...) {
+          printMsg(lvlTalkative, format("IPFS Upload of '%s' failed") % narInfo->url);
+        }
+#endif
     } else
         stats.narWriteAverted++;
 
@@ -290,8 +307,23 @@ bool BinaryCacheStore::isValidPathUncached(const Path & storePath)
 void BinaryCacheStore::narFromPath(const Path & storePath, Sink & sink)
 {
     auto info = queryPathInfo(storePath).cast<const NarInfo>();
+    std::shared_ptr<std::string> nar;
 
-    auto nar = getFile(info->url);
+#if ENABLE_IPFS
+    if (!info->ipfsHash.empty()) {
+      try {
+        nar = IPFSAccessor::getFile(info->ipfsHash);
+      } catch (...) {
+        printMsg(lvlTalkative, format("IPFS Download of '%s' failed, trying binary store method") % info->url);
+        nar = getFile(info->url);
+      }
+    } else {
+        nar = getFile(info->url);
+    }
+#else
+    nar = getFile(info->url);
+#endif
+
 
     if (!nar) throw Error(format("file ‘%s’ missing from binary cache") % info->url);
 
