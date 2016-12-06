@@ -17,9 +17,9 @@
 #include <sstream>
 #include <thread>
 #include <future>
+#include <chrono>
 
 #include <limits.h>
-#include <time.h>
 #include <sys/time.h>
 #include <sys/wait.h>
 #include <sys/types.h>
@@ -187,6 +187,9 @@ bool CompareGoalPtrs::operator() (const GoalPtr & a, const GoalPtr & b) {
 }
 
 
+typedef std::chrono::time_point<std::chrono::steady_clock> steady_time_point;
+
+
 /* A mapping used to remember for each child process to what goal it
    belongs, and file descriptors for receiving log data and output
    path creation commands. */
@@ -197,8 +200,8 @@ struct Child
     set<int> fds;
     bool respectTimeouts;
     bool inBuildSlot;
-    time_t lastOutput; /* time we last got output on stdout/stderr */
-    time_t timeStarted;
+    steady_time_point lastOutput; /* time we last got output on stdout/stderr */
+    steady_time_point timeStarted;
 };
 
 
@@ -238,7 +241,7 @@ private:
     WeakGoals waitingForAWhile;
 
     /* Last time the goals in `waitingForAWhile' where woken up. */
-    time_t lastWokenUp;
+    steady_time_point lastWokenUp;
 
     /* Cache for pathContentsGood(). */
     std::map<Path, bool> pathContentsGoodCache;
@@ -3390,7 +3393,7 @@ Worker::Worker(LocalStore & store)
     if (working) abort();
     working = true;
     nrLocalBuilds = 0;
-    lastWokenUp = 0;
+    lastWokenUp = steady_time_point::min();
     permanentFailure = false;
     timedOut = false;
 }
@@ -3499,7 +3502,7 @@ void Worker::childStarted(GoalPtr goal, const set<int> & fds,
     child.goal = goal;
     child.goal2 = goal.get();
     child.fds = fds;
-    child.timeStarted = child.lastOutput = time(0);
+    child.timeStarted = child.lastOutput = steady_time_point::clock::now();
     child.inBuildSlot = inBuildSlot;
     child.respectTimeouts = respectTimeouts;
     children.emplace_back(child);
@@ -3618,35 +3621,38 @@ void Worker::waitForInput()
     bool useTimeout = false;
     struct timeval timeout;
     timeout.tv_usec = 0;
-    time_t before = time(0);
+    auto before = steady_time_point::clock::now();
 
     /* If we're monitoring for silence on stdout/stderr, or if there
        is a build timeout, then wait for input until the first
        deadline for any child. */
-    assert(sizeof(time_t) >= sizeof(long));
-    time_t nearest = LONG_MAX; // nearest deadline
+    auto nearest = steady_time_point::max(); // nearest deadline
     for (auto & i : children) {
         if (!i.respectTimeouts) continue;
         if (settings.maxSilentTime != 0)
-            nearest = std::min(nearest, i.lastOutput + settings.maxSilentTime);
+            nearest = std::min(nearest, i.lastOutput + std::chrono::seconds(settings.maxSilentTime));
         if (settings.buildTimeout != 0)
-            nearest = std::min(nearest, i.timeStarted + settings.buildTimeout);
+            nearest = std::min(nearest, i.timeStarted + std::chrono::seconds(settings.buildTimeout));
     }
-    if (nearest != LONG_MAX) {
-        timeout.tv_sec = std::max((time_t) 1, nearest - before);
+    if (nearest != steady_time_point::max()) {
+        timeout.tv_sec = std::max(1L, std::chrono::duration_cast<std::chrono::seconds>(nearest - before).count());
         useTimeout = true;
-        printMsg(lvlVomit, format("sleeping %1% seconds") % timeout.tv_sec);
     }
 
     /* If we are polling goals that are waiting for a lock, then wake
        up after a few seconds at most. */
     if (!waitingForAWhile.empty()) {
         useTimeout = true;
-        if (lastWokenUp == 0)
+        if (lastWokenUp == steady_time_point::min())
             printError("waiting for locks or build slots...");
-        if (lastWokenUp == 0 || lastWokenUp > before) lastWokenUp = before;
-        timeout.tv_sec = std::max((time_t) 1, (time_t) (lastWokenUp + settings.pollInterval - before));
-    } else lastWokenUp = 0;
+        if (lastWokenUp == steady_time_point::min() || lastWokenUp > before) lastWokenUp = before;
+        timeout.tv_sec = std::max(1L,
+            std::chrono::duration_cast<std::chrono::seconds>(
+                lastWokenUp + std::chrono::seconds(settings.pollInterval) - before).count());
+    } else lastWokenUp = steady_time_point::min();
+
+    if (useTimeout)
+        vomit("sleeping %d seconds", timeout.tv_sec);
 
     /* Use select() to wait for the input side of any logger pipe to
        become `available'.  Note that `available' (i.e., non-blocking)
@@ -3666,7 +3672,7 @@ void Worker::waitForInput()
         throw SysError("waiting for input");
     }
 
-    time_t after = time(0);
+    auto after = steady_time_point::clock::now();
 
     /* Process all available file descriptors. */
     decltype(children)::iterator i;
@@ -3704,7 +3710,7 @@ void Worker::waitForInput()
         if (goal->getExitCode() == Goal::ecBusy &&
             settings.maxSilentTime != 0 &&
             j->respectTimeouts &&
-            after - j->lastOutput >= (time_t) settings.maxSilentTime)
+            after - j->lastOutput >= std::chrono::seconds(settings.maxSilentTime))
         {
             printError(
                 format("%1% timed out after %2% seconds of silence")
@@ -3715,7 +3721,7 @@ void Worker::waitForInput()
         else if (goal->getExitCode() == Goal::ecBusy &&
             settings.buildTimeout != 0 &&
             j->respectTimeouts &&
-            after - j->timeStarted >= (time_t) settings.buildTimeout)
+            after - j->timeStarted >= std::chrono::seconds(settings.buildTimeout))
         {
             printError(
                 format("%1% timed out after %2% seconds")
@@ -3724,7 +3730,7 @@ void Worker::waitForInput()
         }
     }
 
-    if (!waitingForAWhile.empty() && lastWokenUp + (time_t) settings.pollInterval <= after) {
+    if (!waitingForAWhile.empty() && lastWokenUp + std::chrono::seconds(settings.pollInterval) <= after) {
         lastWokenUp = after;
         for (auto & i : waitingForAWhile) {
             GoalPtr goal = i.lock();
