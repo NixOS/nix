@@ -840,6 +840,8 @@ static void opServe(Strings opFlags, Strings opArgs)
         settings.buildTimeout = readInt(in);
         if (GET_PROTOCOL_MINOR(clientVersion) >= 2)
             settings.maxLogSize = readInt(in);
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 3)
+            settings.set("build-repeat", std::to_string(readInt(in)));
     };
 
     while (true) {
