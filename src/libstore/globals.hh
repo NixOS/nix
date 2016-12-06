@@ -149,6 +149,11 @@ struct Settings {
        before being killed (0 means no limit). */
     unsigned long maxLogSize;
 
+    /* When build-repeat > 0 and verboseBuild == true, whether to
+       print repeated builds (i.e. builds other than the first one) to
+       stderr. Hack to prevent Hydra logs from being polluted. */
+    bool printRepeatedBuilds = true;
+
     /* How often (in seconds) to poll for locks. */
     unsigned int pollInterval;
 

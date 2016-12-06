@@ -842,6 +842,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             settings.maxLogSize = readInt(in);
         if (GET_PROTOCOL_MINOR(clientVersion) >= 3)
             settings.set("build-repeat", std::to_string(readInt(in)));
+        settings.printRepeatedBuilds = false;
     };
 
     while (true) {

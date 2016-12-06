@@ -3047,7 +3047,8 @@ void DerivationGoal::handleEOF(int fd)
 
 void DerivationGoal::flushLine()
 {
-    if (settings.verboseBuild)
+    if (settings.verboseBuild &&
+        (settings.printRepeatedBuilds || curRound == 1))
         printError(filterANSIEscapes(currentLogLine, true));
     else {
         logTail.push_back(currentLogLine);
