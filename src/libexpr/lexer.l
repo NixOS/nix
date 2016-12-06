@@ -183,12 +183,12 @@ or          { return OR_KW; }
 <INITIAL,INSIDE_DOLLAR_CURLY>{
 
 {PATH}      { if (yytext[yyleng-1] == '/')
-                  throw ParseError(format("Invalid path '%1%'; trailing slashes are not allowed in paths") % yytext);
+                  throw ParseError("path ‘%s’ has a trailing slash", yytext);
               yylval->path = strdup(yytext);
               return PATH;
             }
 {HPATH}     { if (yytext[yyleng-1] == '/')
-                  throw ParseError(format("Invalid path '%1%'; trailing slashes are not allowed in paths") % yytext);
+                  throw ParseError("path ‘%s’ has a trailing slash", yytext);
               yylval->path = strdup(yytext);
               return HPATH;
             }
