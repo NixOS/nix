@@ -1272,6 +1272,8 @@ void DerivationGoal::inputsRealised()
        build hook. */
     state = &DerivationGoal::tryToBuild;
     worker.wakeUp(shared_from_this());
+
+    result = BuildResult();
 }
 
 
@@ -1420,6 +1422,8 @@ void DerivationGoal::buildDone()
     int status = hook ? hook->pid.wait(true) : pid.wait(true);
 
     debug(format("builder process for ‘%1%’ finished") % drvPath);
+
+    result.timesBuilt++;
 
     /* So the child is gone now. */
     worker.childTerminated(this);
@@ -2909,17 +2913,15 @@ void DerivationGoal::registerOutputs()
         assert(prevInfos.size() == infos.size());
         for (auto i = prevInfos.begin(), j = infos.begin(); i != prevInfos.end(); ++i, ++j)
             if (!(*i == *j)) {
+                result.isNonDeterministic = true;
                 Path prev = i->path + checkSuffix;
-                if (pathExists(prev))
-                    throw NotDeterministic(
-                        format("output ‘%1%’ of ‘%2%’ differs from ‘%3%’ from previous round")
-                        % i->path % drvPath % prev);
-                else
-                    throw NotDeterministic(
-                        format("output ‘%1%’ of ‘%2%’ differs from previous round")
-                        % i->path % drvPath);
+                auto msg = pathExists(prev)
+                    ? fmt("output ‘%1%’ of ‘%2%’ differs from ‘%3%’ from previous round", i->path, drvPath, prev)
+                    : fmt("output ‘%1%’ of ‘%2%’ differs from previous round", i->path, drvPath);
+                if (settings.get("enforce-determinism", true))
+                    throw NotDeterministic(msg);
+                printError(msg);
             }
-        abort(); // shouldn't happen
     }
 
     if (settings.keepFailed) {
@@ -2932,7 +2934,6 @@ void DerivationGoal::registerOutputs()
                     throw SysError(format("renaming ‘%1%’ to ‘%2%’") % i.second.path % dst);
             }
         }
-
     }
 
     if (curRound < nrRounds) {
@@ -3792,12 +3793,13 @@ void LocalStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
     worker.run(goals);
 
     PathSet failed;
-    for (auto & i : goals)
+    for (auto & i : goals) {
         if (i->getExitCode() != Goal::ecSuccess) {
             DerivationGoal * i2 = dynamic_cast<DerivationGoal *>(i.get());
             if (i2) failed.insert(i2->getDrvPath());
             else failed.insert(dynamic_cast<SubstitutionGoal *>(i.get())->getStorePath());
         }
+    }
 
     if (!failed.empty())
         throw Error(worker.exitStatus(), "build of %s failed", showPaths(failed));

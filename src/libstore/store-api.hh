@@ -208,7 +208,18 @@ struct BuildResult
         NotDeterministic,
     } status = MiscFailure;
     std::string errorMsg;
+
+    /* How many times this build was performed. */
+    unsigned int timesBuilt = 0;
+
+    /* If timesBuilt > 1, whether some builds did not produce the same
+       result. (Note that 'isNonDeterministic = false' does not mean
+       the build is deterministic, just that we don't have evidence of
+       non-determinism.) */
+    bool isNonDeterministic = false;
+
     //time_t startTime = 0, stopTime = 0;
+
     bool success() {
         return status == Built || status == Substituted || status == AlreadyValid;
     }
