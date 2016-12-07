@@ -843,6 +843,7 @@ static void opServe(Strings opFlags, Strings opArgs)
         if (GET_PROTOCOL_MINOR(clientVersion) >= 3) {
             settings.set("build-repeat", std::to_string(readInt(in)));
             settings.set("enforce-determinism", readInt(in) != 0 ? "true" : "false");
+            settings.set("run-diff-hook", "true");
         }
         settings.printRepeatedBuilds = false;
     };

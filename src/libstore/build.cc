@@ -2688,6 +2688,8 @@ void DerivationGoal::registerOutputs()
     InodesSeen inodesSeen;
 
     Path checkSuffix = "-check";
+    bool runDiffHook = settings.get("run-diff-hook", false);
+    bool keepPreviousRound = settings.keepFailed || runDiffHook;
 
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all
@@ -2919,31 +2921,54 @@ void DerivationGoal::registerOutputs()
             if (!(*i == *j)) {
                 result.isNonDeterministic = true;
                 Path prev = i->path + checkSuffix;
-                auto msg = pathExists(prev)
+                bool prevExists = keepPreviousRound && pathExists(prev);
+                auto msg = prevExists
                     ? fmt("output ‘%1%’ of ‘%2%’ differs from ‘%3%’ from previous round", i->path, drvPath, prev)
                     : fmt("output ‘%1%’ of ‘%2%’ differs from previous round", i->path, drvPath);
+
+                auto diffHook = settings.get("diff-hook", std::string(""));
+                if (prevExists && diffHook != "" && runDiffHook) {
+                    try {
+                        auto diff = runProgram(diffHook, true, {prev, i->path});
+                        if (diff != "")
+                            printError(chomp(diff));
+                    } catch (Error & error) {
+                        printError("diff hook execution failed: %s", error.what());
+                    }
+                }
+
                 if (settings.get("enforce-determinism", true))
                     throw NotDeterministic(msg);
+
                 printError(msg);
                 curRound = nrRounds; // we know enough, bail out early
             }
     }
 
-    if (settings.keepFailed) {
+    /* If this is the first round of several, then move the output out
+       of the way. */
+    if (nrRounds > 1 && curRound == 1 && curRound < nrRounds && keepPreviousRound) {
         for (auto & i : drv->outputs) {
             Path prev = i.second.path + checkSuffix;
             deletePath(prev);
-            if (curRound < nrRounds) {
-                Path dst = i.second.path + checkSuffix;
-                if (rename(i.second.path.c_str(), dst.c_str()))
-                    throw SysError(format("renaming ‘%1%’ to ‘%2%’") % i.second.path % dst);
-            }
+            Path dst = i.second.path + checkSuffix;
+            if (rename(i.second.path.c_str(), dst.c_str()))
+                throw SysError(format("renaming ‘%1%’ to ‘%2%’") % i.second.path % dst);
         }
     }
 
     if (curRound < nrRounds) {
         prevInfos = infos;
         return;
+    }
+
+    /* Remove the -check directories if we're done. FIXME: keep them
+       if the result was not determistic? */
+    if (curRound == nrRounds) {
+        for (auto & i : drv->outputs) {
+            Path prev = i.second.path + checkSuffix;
+            deletePath(prev);
+        }
     }
 
     /* Register each output path as valid, and register the sets of
