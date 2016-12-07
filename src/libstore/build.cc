@@ -1347,6 +1347,7 @@ void DerivationGoal::tryToBuild()
             case rpAccept:
                 /* Yes, it has started doing so.  Wait until we get
                    EOF from the hook. */
+                result.startTime = time(0); // inexact
                 state = &DerivationGoal::buildDone;
                 return;
             case rpPostpone:
@@ -1424,6 +1425,7 @@ void DerivationGoal::buildDone()
     debug(format("builder process for ‘%1%’ finished") % drvPath);
 
     result.timesBuilt++;
+    result.stopTime = time(0);
 
     /* So the child is gone now. */
     worker.childTerminated(this);
@@ -2107,6 +2109,8 @@ void DerivationGoal::startBuilder()
 
     /* Create a pipe to get the output of the builder. */
     builderOut.create();
+
+    result.startTime = time(0);
 
     /* Fork a child to build the package. */
 #if __linux__

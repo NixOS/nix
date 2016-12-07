@@ -961,7 +961,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 out << status.status << status.errorMsg;
 
                 if (GET_PROTOCOL_MINOR(clientVersion) >= 3)
-                    out << status.timesBuilt << status.isNonDeterministic;
+                    out << status.timesBuilt << status.isNonDeterministic << status.startTime << status.stopTime;
 
                 break;
             }

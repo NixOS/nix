@@ -218,7 +218,9 @@ struct BuildResult
        non-determinism.) */
     bool isNonDeterministic = false;
 
-    //time_t startTime = 0, stopTime = 0;
+    /* The start/stop times of the build (or one of the rounds, if it
+       was repeated). */
+    time_t startTime = 0, stopTime = 0;
 
     bool success() {
         return status == Built || status == Substituted || status == AlreadyValid;
