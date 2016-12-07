@@ -2921,6 +2921,7 @@ void DerivationGoal::registerOutputs()
                 if (settings.get("enforce-determinism", true))
                     throw NotDeterministic(msg);
                 printError(msg);
+                curRound = nrRounds; // we know enough, bail out early
             }
     }
 
