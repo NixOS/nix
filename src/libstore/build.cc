@@ -2687,7 +2687,7 @@ void DerivationGoal::registerOutputs()
        outputs to allow hard links between outputs. */
     InodesSeen inodesSeen;
 
-    Path checkSuffix = "-check";
+    Path checkSuffix = ".check";
     bool runDiffHook = settings.get("run-diff-hook", false);
     bool keepPreviousRound = settings.keepFailed || runDiffHook;
 
@@ -2962,7 +2962,7 @@ void DerivationGoal::registerOutputs()
         return;
     }
 
-    /* Remove the -check directories if we're done. FIXME: keep them
+    /* Remove the .check directories if we're done. FIXME: keep them
        if the result was not determistic? */
     if (curRound == nrRounds) {
         for (auto & i : drv->outputs) {

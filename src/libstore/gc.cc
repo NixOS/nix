@@ -621,6 +621,11 @@ void LocalStore::tryToDelete(GCState & state, const Path & path)
         /* Don't delete .chroot directories for derivations that are
            currently being built. */
         if (isActiveTempFile(state, path, ".chroot")) return;
+
+        /* Don't delete .check directories for derivations that are
+           currently being built, because we may need to run
+           diff-hook. */
+        if (isActiveTempFile(state, path, ".check")) return;
     }
 
     PathSet visited;
