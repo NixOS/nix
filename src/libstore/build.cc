@@ -3666,7 +3666,7 @@ void Worker::waitForInput()
             nearest = std::min(nearest, i.timeStarted + std::chrono::seconds(settings.buildTimeout));
     }
     if (nearest != steady_time_point::max()) {
-        timeout.tv_sec = std::max(1L, std::chrono::duration_cast<std::chrono::seconds>(nearest - before).count());
+        timeout.tv_sec = std::max(1L, (long) std::chrono::duration_cast<std::chrono::seconds>(nearest - before).count());
         useTimeout = true;
     }
 
@@ -3678,7 +3678,7 @@ void Worker::waitForInput()
             printError("waiting for locks or build slots...");
         if (lastWokenUp == steady_time_point::min() || lastWokenUp > before) lastWokenUp = before;
         timeout.tv_sec = std::max(1L,
-            std::chrono::duration_cast<std::chrono::seconds>(
+            (long) std::chrono::duration_cast<std::chrono::seconds>(
                 lastWokenUp + std::chrono::seconds(settings.pollInterval) - before).count());
     } else lastWokenUp = steady_time_point::min();
 
