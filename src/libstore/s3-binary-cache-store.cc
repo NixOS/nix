@@ -1,6 +1,7 @@
 #include "config.h"
 
 #if ENABLE_S3
+#if __linux__
 
 #include "s3-binary-cache-store.hh"
 #include "nar-info.hh"
@@ -268,4 +269,5 @@ static RegisterStoreImplementation regStore([](
 
 }
 
+#endif
 #endif
