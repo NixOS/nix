@@ -18,6 +18,15 @@
 
 namespace nix {
 
+struct istringstream_nocopy : public std::stringstream
+{
+    istringstream_nocopy(const std::string & s)
+    {
+        rdbuf()->pubsetbuf(
+            (char *) s.data(), s.size());
+    }
+};
+
 struct S3Error : public Error
 {
     Aws::S3::S3Errors err;

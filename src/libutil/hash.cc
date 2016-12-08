@@ -106,7 +106,7 @@ Hash parseHash(HashType ht, const string & s)
         string s2(s, i * 2, 2);
         if (!isxdigit(s2[0]) || !isxdigit(s2[1]))
             throw BadHash(format("invalid hash ‘%1%’") % s);
-        istringstream_nocopy str(s2);
+        std::istringstream str(s2);
         int n;
         str >> std::hex >> n;
         hash.hash[i] = n;
