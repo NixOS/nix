@@ -1,2 +1,6 @@
-os: osx
-script: ./tests/install-darwin.sh
+sudo: required
+os:
+  - osx
+  - linux
+language: nix
+script: scripts/ci.sh
