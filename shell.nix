@@ -14,6 +14,7 @@ stdenv.mkDerivation {
         customMemoryManagement = false;
       })
       autoreconfHook
+      perlPackages.DBDSQLite
     ];
 
   configureFlags =

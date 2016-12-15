@@ -210,6 +210,35 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
   </varlistentry>
 
+  <varlistentry><term><function>builtins.match</function>
+  <replaceable>regex</replaceable> <replaceable>str</replaceable></term>
+
+  <listitem><para>Returns a list if
+    <replaceable>regex</replaceable> matches
+    <replaceable>str</replaceable> precisely, otherwise returns <literal>null</literal>.
+    Each item in the list is a regex group.
+
+<programlisting>
+builtins.match "ab" "abc"
+</programlisting>
+
+Evaluates to <literal>null</literal>.
+
+<programlisting>
+builtins.match "abc" "abc"
+</programlisting>
+
+Evaluates to <literal>[ ]</literal>.
+
+<programlisting>
+builtins.match "a(b)(c)" "abc"
+</programlisting>
+
+Evaluates to <literal>[ "b" "c" ]</literal>.
+
+
+  </para></listitem>
+  </varlistentry>
 
   <varlistentry><term><function>builtins.elem</function>
   <replaceable>x</replaceable> <replaceable>xs</replaceable></term>
