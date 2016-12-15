@@ -25,7 +25,7 @@ let
 
         buildInputs =
           [ curl bison flex perl libxml2 libxslt bzip2 xz
-            pkgconfig sqlite libsodium boehmgc
+            pkgconfig sqlite libsodium libseccomp boehmgc
             docbook5 docbook5_xsl
             autoconf-archive
           ] ++ lib.optional (!lib.inNixShell) git;
@@ -74,6 +74,7 @@ let
         buildInputs =
           [ curl perl bzip2 xz openssl pkgconfig sqlite boehmgc ]
           ++ lib.optional stdenv.isLinux libsodium
+          ++ lib.optional stdenv.isLinux libseccomp
           ++ lib.optional stdenv.isLinux
             (aws-sdk-cpp.override {
               apis = ["s3"];
@@ -193,6 +194,10 @@ let
     });
 
     tests.nix-copy-closure = (import ./tests/nix-copy-closure.nix rec {
+      nix = build.x86_64-linux; system = "x86_64-linux";
+    });
+
+    tests.sandbox = (import ./tests/sandbox.nix rec {
       nix = build.x86_64-linux; system = "x86_64-linux";
     });
 
