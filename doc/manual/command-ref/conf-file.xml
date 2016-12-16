@@ -18,7 +18,8 @@
 <refsection><title>Description</title>
 
 <para>A number of persistent settings of Nix are stored in the file
-<filename><replaceable>sysconfdir</replaceable>/nix/nix.conf</filename>.
+<filename><replaceable>sysconfdir</replaceable>/nix/nix.conf</filename> or
+<filename>$NIX_CONF_DIR/nix.conf</filename> if <envar>NIX_CONF_DIR</envar> is set.
 This file is a list of <literal><replaceable>name</replaceable> =
 <replaceable>value</replaceable></literal> pairs, one per line.
 Comments start with a <literal>#</literal> character.  Here is an example
