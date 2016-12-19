@@ -54,7 +54,6 @@
 #include <sys/param.h>
 #include <sys/mount.h>
 #include <sys/syscall.h>
-#include <seccomp.h>
 #define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
 #endif
 
@@ -814,6 +813,9 @@ private:
        allows us to compare whether two rounds produced the same
        result. */
     ValidPathInfos prevInfos;
+
+    const uid_t sandboxUid = 1000;
+    const gid_t sandboxGid = 100;
 
 public:
     DerivationGoal(const Path & drvPath, const StringSet & wantedOutputs,
@@ -1642,56 +1644,8 @@ void chmod_(const Path & path, mode_t mode)
 }
 
 
-#if __linux__
-
-#define FORCE_SUCCESS(syscall) \
-    if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(0), SCMP_SYS(syscall), 0) != 0) { \
-        seccomp_release(ctx); \
-        throw SysError("unable to add seccomp rule for " #syscall); \
-    }
-
-void setupSeccomp(void) {
-    scmp_filter_ctx ctx;
-
-    if ((ctx = seccomp_init(SCMP_ACT_ALLOW)) == NULL)
-        throw SysError("unable to initialize seccomp mode 2");
-
-#if defined(__x86_64__)
-    if (seccomp_arch_add(ctx, SCMP_ARCH_X86) != 0) {
-        seccomp_release(ctx);
-        throw SysError("unable to add 32bit seccomp architecture");
-    }
-#endif
-
-    FORCE_SUCCESS(chown32);
-    FORCE_SUCCESS(fchown32);
-    FORCE_SUCCESS(lchown32);
-
-    FORCE_SUCCESS(chown);
-    FORCE_SUCCESS(fchown);
-    FORCE_SUCCESS(fchownat);
-    FORCE_SUCCESS(lchown);
-
-    FORCE_SUCCESS(setxattr);
-    FORCE_SUCCESS(lsetxattr);
-    FORCE_SUCCESS(fsetxattr);
-
-    if (seccomp_load(ctx) != 0) {
-        seccomp_release(ctx);
-        throw SysError("unable to load seccomp BPF program");
-    }
-
-    seccomp_release(ctx);
-}
-
-#undef FORCE_SUCCESS
-
-#endif
-
-
 int childEntry(void * arg)
 {
-    setupSeccomp();
     ((DerivationGoal *) arg)->runChild();
     return 1;
 }
@@ -2011,14 +1965,18 @@ void DerivationGoal::startBuilder()
         createDirs(chrootRootDir + "/etc");
 
         writeFile(chrootRootDir + "/etc/passwd",
-            "root:x:0:0:Nix build user:/:/noshell\n"
-            "nobody:x:65534:65534:Nobody:/:/noshell\n");
+            (format(
+                "root:x:0:0:Nix build user:/:/noshell\n"
+                "nixbld:x:%1%:%2%:Nix build user:/:/noshell\n"
+                "nobody:x:65534:65534:Nobody:/:/noshell\n") % sandboxUid % sandboxGid).str());
 
         /* Declare the build user's group so that programs get a consistent
            view of the system (e.g., "id -gn"). */
         writeFile(chrootRootDir + "/etc/group",
-            "root:x:0:\n"
-            "nobody:x:65534:\n");
+            (format(
+                "root:x:0:\n"
+                "nixbld:!:%1%:\n"
+                "nogroup:x:65534:\n") % sandboxGid).str());
 
         /* Create /etc/hosts with localhost entry. */
         if (!fixedOutput)
@@ -2202,7 +2160,12 @@ void DerivationGoal::startBuilder()
         Pid helper = startProcess([&]() {
 
             /* Drop additional groups here because we can't do it
-               after we've created the new user namespace. */
+               after we've created the new user namespace.  FIXME:
+               this means that if we're not root in the parent
+               namespace, we can't drop additional groups; they will
+               be mapped to nogroup in the child namespace. There does
+               not seem to be a workaround for this. (But who can tell
+               from reading user_namespaces(7)?)*/
             if (getuid() == 0 && setgroups(0, 0) == -1)
                 throw SysError("setgroups failed");
 
@@ -2235,19 +2198,19 @@ void DerivationGoal::startBuilder()
         if (!string2Int<pid_t>(readLine(builderOut.readSide.get()), tmp)) abort();
         pid = tmp;
 
-        /* Set the UID/GID mapping of the builder's user
-           namespace such that root maps to the build user, or to the
-           calling user (if build users are disabled). */
-        uid_t targetUid = buildUser.enabled() ? buildUser.getUID() : getuid();
-        uid_t targetGid = buildUser.enabled() ? buildUser.getGID() : getgid();
+        /* Set the UID/GID mapping of the builder's user namespace
+           such that the sandbox user maps to the build user, or to
+           the calling user (if build users are disabled). */
+        uid_t hostUid = buildUser.enabled() ? buildUser.getUID() : getuid();
+        uid_t hostGid = buildUser.enabled() ? buildUser.getGID() : getgid();
 
         writeFile("/proc/" + std::to_string(pid) + "/uid_map",
-            (format("0 %d 1") % targetUid).str());
+            (format("%d %d 1") % sandboxUid % hostUid).str());
 
         writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
 
         writeFile("/proc/" + std::to_string(pid) + "/gid_map",
-            (format("0 %d 1") % targetGid).str());
+            (format("%d %d 1") % sandboxGid % hostGid).str());
 
         /* Signal the builder that we've updated its user
            namespace. */
@@ -2457,11 +2420,12 @@ void DerivationGoal::runChild()
             if (rmdir("real-root") == -1)
                 throw SysError("cannot remove real-root directory");
 
-            /* Become root in the user namespace, which corresponds to
-               the build user or calling user in the parent namespace. */
-            if (setgid(0) == -1)
+            /* Switch to the sandbox uid/gid in the user namespace,
+               which corresponds to the build user or calling user in
+               the parent namespace. */
+            if (setgid(sandboxGid) == -1)
                 throw SysError("setgid failed");
-            if (setuid(0) == -1)
+            if (setuid(sandboxUid) == -1)
                 throw SysError("setuid failed");
 
             setUser = false;
