@@ -2010,9 +2010,9 @@ void DerivationGoal::startBuilder()
            Samba-in-QEMU. */
         createDirs(chrootRootDir + "/etc");
 
-        writeFile(chrootRootDir + "/etc/passwd", fmt(
-            "root:x:0:0:Nix build user:%s:/noshell\n"
-            "nobody:x:65534:65534:Nobody:/:/noshell\n", "/tmp"));
+        writeFile(chrootRootDir + "/etc/passwd",
+            "root:x:0:0:Nix build user:/:/noshell\n"
+            "nobody:x:65534:65534:Nobody:/:/noshell\n");
 
         /* Declare the build user's group so that programs get a consistent
            view of the system (e.g., "id -gn"). */
