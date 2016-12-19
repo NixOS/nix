@@ -8,7 +8,6 @@ stdenv.mkDerivation {
       pkgconfig sqlite libsodium boehmgc
       docbook5 docbook5_xsl
       autoconf-archive
-      libseccomp
       (aws-sdk-cpp.override {
         apis = ["s3"];
         customMemoryManagement = false;
