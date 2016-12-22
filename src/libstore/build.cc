@@ -2165,7 +2165,8 @@ void DerivationGoal::startBuilder()
                namespace, we can't drop additional groups; they will
                be mapped to nogroup in the child namespace. There does
                not seem to be a workaround for this. (But who can tell
-               from reading user_namespaces(7)?)*/
+               from reading user_namespaces(7)?)
+               See also https://lwn.net/Articles/621612/. */
             if (getuid() == 0 && setgroups(0, 0) == -1)
                 throw SysError("setgroups failed");
 
