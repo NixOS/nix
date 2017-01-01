@@ -41,7 +41,7 @@ Here is a typical `nix-repl` session:
     nix-repl> map (x: x * x) xs
     [ 1 4 9 16 25 ]
 
-    nix-repl> :l <nixos>
+    nix-repl> :l <nixpkgs/nixos>
     Added 7 variables.
 
     nix-repl> config.services.dhcpd
@@ -86,7 +86,7 @@ Here is a typical `nix-repl` session:
 Tab completion works on variables in scope and on attribute sets.  For
 example:
 
-    $ nix-repl  '<nixpkgs>' '<nixos>'
+    $ nix-repl  '<nixpkgs>' '<nixpkgs/nixos>'
     Welcome to Nix version 1.6pre3215_2c1ecf8. Type :? for help.
 
     nix-repl> thunder<TAB> => thunderbird
