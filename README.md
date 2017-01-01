@@ -19,4 +19,4 @@ of the manual. It helps you to get started with building Nix from source.
 Nix is released under the LGPL v2.1
 
 This product includes software developed by the OpenSSL Project for
-use in the OpenSSL Toolkit (http://www.OpenSSL.org/).
+use in the [OpenSSL Toolkit](http://www.OpenSSL.org/).
