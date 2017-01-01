@@ -117,7 +117,7 @@ int main(int argc, char ** argv)
                     inShebang = true;
                     for (int i = 2; i < argc - 1; ++i)
                         savedArgs.push_back(argv[i]);
-                    std::vector<string> args;
+                    args.clear();
                     for (auto line : lines) {
                         line = chomp(line);
                         std::smatch match;
