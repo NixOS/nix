@@ -21,6 +21,8 @@ private:
 
     bool writeNARListing;
 
+    bool publishToIPFS;
+
 protected:
 
     BinaryCacheStore(const Params & params);

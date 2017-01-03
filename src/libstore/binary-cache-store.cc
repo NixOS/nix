@@ -82,6 +82,7 @@ BinaryCacheStore::BinaryCacheStore(const Params & params)
     : Store(params)
     , compression(get(params, "compression", "xz"))
     , writeNARListing(get(params, "write-nar-listing", "0") == "1")
+    , publishToIPFS(get(params, "publish-to-ipfs", "0") == "1")
 {
     auto secretKeyFile = get(params, "secret-key", "");
     if (secretKeyFile != "")
@@ -256,19 +257,21 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
         stats.narWrite++;
         upsertFile(narInfo->url, *narCompressed);
 #if ENABLE_IPFS
-        try {
-          auto narPath = narInfo->url;
-          auto pos = narInfo->url.find_last_of("/");
-          if (pos != std::string::npos) {
-            narPath = narInfo->url.substr(pos+1);
-          }
-          ipfsHash = IPFSAccessor::addFile(narPath, *narCompressed);
+        if (publishToIPFS) {
+          try {
+            auto narPath = narInfo->url;
+            auto pos = narInfo->url.find_last_of("/");
+            if (pos != std::string::npos) {
+              narPath = narInfo->url.substr(pos+1);
+            }
+            ipfsHash = IPFSAccessor::addFile(narPath, *narCompressed);
 
-          if (!ipfsHash.empty()) {
-            narInfo->ipfsHash = ipfsHash;
+            if (!ipfsHash.empty()) {
+              narInfo->ipfsHash = ipfsHash;
+            }
+          } catch (...) {
+            printMsg(lvlTalkative, format("IPFS Upload of '%s' failed") % narInfo->url);
           }
-        } catch (...) {
-          printMsg(lvlTalkative, format("IPFS Upload of '%s' failed") % narInfo->url);
         }
 #endif
     } else
