@@ -493,17 +493,11 @@ set returned by calling the function defined in
 source:
 
 <screen>
-$ nix-env -f pkgs/top-level/all-packages.nix -i f-spot --dry-run
+$ nix-env -f '&lt;nixpkgs>' -iA hello --dry-run
 (dry run; not doing anything)
-installing `f-spot-0.0.10'
-the following derivations will be built:
-  /nix/store/0g63jv9aagwbgci4nnzs2dkxqz84kdja-libgnomeprintui-2.12.1.tar.bz2.drv
-  /nix/store/0gfarvxq6sannsdw8a1ir40j1ys2mqb4-ORBit2-2.14.2.tar.bz2.drv
-  /nix/store/0i9gs5zc04668qiy60ga2rc16abkj7g8-sqlite-2.8.17.drv
-  <replaceable>...</replaceable>
-the following paths will be substituted:
-  /nix/store/8zbipvm4gp9jfqh9nnk1n3bary1a37gs-perl-XML-Parser-2.34
-  /nix/store/b8a2bg7gnyvvvjjibp4axg9x1hzkw36c-mono-1.1.4
+installing ‘hello-2.10’
+these paths will be fetched (0.04 MiB download, 0.19 MiB unpacked):
+  /nix/store/wkhdf9jinag5750mqlax6z2zbwhqb76n-hello-2.10
   <replaceable>...</replaceable></screen>
 
 </para>
