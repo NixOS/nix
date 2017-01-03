@@ -276,6 +276,7 @@ int main(int argc, char ** argv)
                 if (n >= args.size()) {
                     throw UsageError(format("%1% requires an argument") % arg);
                 }
+                interactive = false;
                 auto interpreter = args[n];
                 auto execArgs = "";
 
