@@ -32,8 +32,6 @@ libstore_SOURCES := \
 	$(d)/ssh-store.cc \
 	$(d)/store-api.cc \
 
-#libstore_SOURCES := $(wildcard $(d)/*.cc)
-
 libstore_LIBS = libutil libformat
 
 libstore_LDFLAGS = $(SQLITE3_LIBS) -lbz2 $(LIBCURL_LIBS) $(SODIUM_LIBS) -pthread
