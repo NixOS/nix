@@ -17,5 +17,5 @@ output=$(NIX_PATH=nixpkgs=shell.nix nix-shell --pure -p foo bar --run 'echo "$(f
 sed -e "s|@ENV_PROG@|$(type -p env)|" shell.shebang.sh > $TEST_ROOT/shell.shebang.sh
 chmod a+rx $TEST_ROOT/shell.shebang.sh
 
-output=$($TEST_ROOT/shell.shebang.sh)
-[ "$output" = "foo bar" ]
+output=$($TEST_ROOT/shell.shebang.sh abc def)
+[ "$output" = "foo bar abc def" ]
