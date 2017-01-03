@@ -117,7 +117,7 @@ int main(int argc, char ** argv)
                     inShebang = true;
                     for (int i = 2; i < argc - 1; ++i)
                         savedArgs.push_back(argv[i]);
-                    std::vector<string> args;
+                    args.clear();
                     for (auto line : lines) {
                         line = chomp(line);
                         std::smatch match;
@@ -276,6 +276,7 @@ int main(int argc, char ** argv)
                 if (n >= args.size()) {
                     throw UsageError(format("%1% requires an argument") % arg);
                 }
+                interactive = false;
                 auto interpreter = args[n];
                 auto execArgs = "";
 
