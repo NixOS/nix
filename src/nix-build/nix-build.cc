@@ -446,10 +446,13 @@ int main(int argc, char ** argv)
                     ? Strings{"bash", "--rcfile", rcfile}
                     : Strings{"bash", rcfile};
 
-                environ = stringsToCharPtrs(envStrs).data();
+                auto envPtrs = stringsToCharPtrs(envStrs);
 
-                execvp(getEnv("NIX_BUILD_SHELL", "bash").c_str(),
-                    stringsToCharPtrs(args).data());
+                environ = envPtrs.data();
+
+                auto argPtrs = stringsToCharPtrs(args);
+
+                execvp(getEnv("NIX_BUILD_SHELL", "bash").c_str(), argPtrs.data());
 
                 throw SysError("executing shell");
             }
