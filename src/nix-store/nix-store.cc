@@ -840,6 +840,12 @@ static void opServe(Strings opFlags, Strings opArgs)
         settings.buildTimeout = readInt(in);
         if (GET_PROTOCOL_MINOR(clientVersion) >= 2)
             settings.maxLogSize = readInt(in);
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 3) {
+            settings.set("build-repeat", std::to_string(readInt(in)));
+            settings.set("enforce-determinism", readInt(in) != 0 ? "true" : "false");
+            settings.set("run-diff-hook", "true");
+        }
+        settings.printRepeatedBuilds = false;
     };
 
     while (true) {
@@ -954,6 +960,9 @@ static void opServe(Strings opFlags, Strings opArgs)
                 auto status = store->buildDerivation(drvPath, drv);
 
                 out << status.status << status.errorMsg;
+
+                if (GET_PROTOCOL_MINOR(clientVersion) >= 3)
+                    out << status.timesBuilt << status.isNonDeterministic << status.startTime << status.stopTime;
 
                 break;
             }

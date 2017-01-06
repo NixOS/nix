@@ -87,8 +87,8 @@ static Expr * unescapeStr(SymbolTable & symbols, const char * s)
 ID          [a-zA-Z\_][a-zA-Z0-9\_\'\-]*
 INT         [0-9]+
 FLOAT       (([1-9][0-9]*\.[0-9]*)|(0?\.[0-9]+))([Ee][+-]?[0-9]+)?
-PATH        [a-zA-Z0-9\.\_\-\+]*(\/[a-zA-Z0-9\.\_\-\+]+)+
-HPATH       \~(\/[a-zA-Z0-9\.\_\-\+]+)+
+PATH        [a-zA-Z0-9\.\_\-\+]*(\/[a-zA-Z0-9\.\_\-\+]+)+\/?
+HPATH       \~(\/[a-zA-Z0-9\.\_\-\+]+)+\/?
 SPATH       \<[a-zA-Z0-9\.\_\-\+]+(\/[a-zA-Z0-9\.\_\-\+]+)*\>
 URI         [a-zA-Z][a-zA-Z0-9\+\-\.]*\:[a-zA-Z0-9\%\/\?\:\@\&\=\+\$\,\-\_\.\!\~\*\']+
 
@@ -182,8 +182,16 @@ or          { return OR_KW; }
 
 <INITIAL,INSIDE_DOLLAR_CURLY>{
 
-{PATH}      { yylval->path = strdup(yytext); return PATH; }
-{HPATH}     { yylval->path = strdup(yytext); return HPATH; }
+{PATH}      { if (yytext[yyleng-1] == '/')
+                  throw ParseError("path ‘%s’ has a trailing slash", yytext);
+              yylval->path = strdup(yytext);
+              return PATH;
+            }
+{HPATH}     { if (yytext[yyleng-1] == '/')
+                  throw ParseError("path ‘%s’ has a trailing slash", yytext);
+              yylval->path = strdup(yytext);
+              return HPATH;
+            }
 {SPATH}     { yylval->path = strdup(yytext); return SPATH; }
 {URI}       { yylval->uri = strdup(yytext); return URI; }
 

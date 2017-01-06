@@ -1,22 +1,33 @@
 #include "config.h"
 
 #if ENABLE_S3
+#if __linux__
 
 #include "s3-binary-cache-store.hh"
 #include "nar-info.hh"
 #include "nar-info-disk-cache.hh"
 #include "globals.hh"
 
+#include <aws/core/Aws.h>
 #include <aws/core/client/ClientConfiguration.h>
 #include <aws/s3/S3Client.h>
 #include <aws/s3/model/CreateBucketRequest.h>
 #include <aws/s3/model/GetBucketLocationRequest.h>
 #include <aws/s3/model/GetObjectRequest.h>
 #include <aws/s3/model/HeadObjectRequest.h>
-#include <aws/s3/model/PutObjectRequest.h>
 #include <aws/s3/model/ListObjectsRequest.h>
+#include <aws/s3/model/PutObjectRequest.h>
 
 namespace nix {
+
+struct istringstream_nocopy : public std::stringstream
+{
+    istringstream_nocopy(const std::string & s)
+    {
+        rdbuf()->pubsetbuf(
+            (char *) s.data(), s.size());
+    }
+};
 
 struct S3Error : public Error
 {
@@ -35,6 +46,20 @@ R && checkAws(const FormatOrString & fs, Aws::Utils::Outcome<R, E> && outcome)
             outcome.GetError().GetErrorType(),
             fs.s + ": " + outcome.GetError().GetMessage());
     return outcome.GetResultWithOwnership();
+}
+
+static void initAWS()
+{
+    static std::once_flag flag;
+    std::call_once(flag, []() {
+        Aws::SDKOptions options;
+
+        /* We install our own OpenSSL locking function (see
+           shared.cc), so don't let aws-sdk-cpp override it. */
+        options.cryptoOptions.initAndCleanupOpenSSL = false;
+
+        Aws::InitAPI(options);
+    });
 }
 
 struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
@@ -63,6 +88,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
     ref<Aws::Client::ClientConfiguration> makeConfig()
     {
+        initAWS();
         auto res = make_ref<Aws::Client::ClientConfiguration>();
         res->region = Aws::Region::US_EAST_1; // FIXME: make configurable
         res->requestTimeoutMs = 600 * 1000;
@@ -259,4 +285,5 @@ static RegisterStoreImplementation regStore([](
 
 }
 
+#endif
 #endif

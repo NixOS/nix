@@ -16,7 +16,6 @@ BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 %endif
 BuildRequires: perl(DBD::SQLite)
 BuildRequires: perl(DBI)
-BuildRequires: perl(WWW::Curl)
 BuildRequires: perl(ExtUtils::ParseXS)
 Requires: /usr/bin/perl
 Requires: curl

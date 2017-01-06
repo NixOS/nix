@@ -191,6 +191,23 @@
 
 </varlistentry>
 
+<varlistentry><term><option>--no-build-hook</option></term>
+
+  <listitem>
+
+  <para>Disables the build hook mechanism.  This allows to ignore remote
+  builders if they are setup on the machine.</para>
+
+  <para>It's useful in cases where the bandwidth between the client and the
+  remote builder is too low.  In that case it can take more time to upload the
+  sources to the remote builder and fetch back the result than to do the
+  computation locally.</para>
+
+  </listitem>
+
+</varlistentry>
+
+
 
 <varlistentry><term><option>--readonly-mode</option></term>
 
@@ -218,9 +235,8 @@
   named <replaceable>name</replaceable>, it will call it with value
   <replaceable>value</replaceable>.</para>
 
-  <para>For instance, the file
-  <literal>pkgs/top-level/all-packages.nix</literal> in Nixpkgs is
-  actually a function:
+  <para>For instance, the top-level <literal>default.nix</literal> in
+  Nixpkgs is actually a function:
 
 <programlisting>
 { # The system (e.g., `i686-linux') for which to build the packages.

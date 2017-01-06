@@ -52,8 +52,9 @@ struct NarIndexer : ParseSink, StringSource
     void preallocateContents(unsigned long long size) override
     {
         currentStart = string(s, pos, 16);
+        assert(size <= std::numeric_limits<size_t>::max());
         members.emplace(currentPath,
-            NarMember{FSAccessor::Type::tRegular, isExec, pos, size});
+            NarMember{FSAccessor::Type::tRegular, isExec, pos, (size_t) size});
     }
 
     void receiveContents(unsigned char * data, unsigned int len) override

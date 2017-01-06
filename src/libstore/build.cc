@@ -17,9 +17,9 @@
 #include <sstream>
 #include <thread>
 #include <future>
+#include <chrono>
 
 #include <limits.h>
-#include <time.h>
 #include <sys/time.h>
 #include <sys/wait.h>
 #include <sys/types.h>
@@ -187,6 +187,9 @@ bool CompareGoalPtrs::operator() (const GoalPtr & a, const GoalPtr & b) {
 }
 
 
+typedef std::chrono::time_point<std::chrono::steady_clock> steady_time_point;
+
+
 /* A mapping used to remember for each child process to what goal it
    belongs, and file descriptors for receiving log data and output
    path creation commands. */
@@ -197,8 +200,8 @@ struct Child
     set<int> fds;
     bool respectTimeouts;
     bool inBuildSlot;
-    time_t lastOutput; /* time we last got output on stdout/stderr */
-    time_t timeStarted;
+    steady_time_point lastOutput; /* time we last got output on stdout/stderr */
+    steady_time_point timeStarted;
 };
 
 
@@ -238,7 +241,7 @@ private:
     WeakGoals waitingForAWhile;
 
     /* Last time the goals in `waitingForAWhile' where woken up. */
-    time_t lastWokenUp;
+    steady_time_point lastWokenUp;
 
     /* Cache for pathContentsGood(). */
     std::map<Path, bool> pathContentsGoodCache;
@@ -1269,6 +1272,8 @@ void DerivationGoal::inputsRealised()
        build hook. */
     state = &DerivationGoal::tryToBuild;
     worker.wakeUp(shared_from_this());
+
+    result = BuildResult();
 }
 
 
@@ -1342,6 +1347,7 @@ void DerivationGoal::tryToBuild()
             case rpAccept:
                 /* Yes, it has started doing so.  Wait until we get
                    EOF from the hook. */
+                result.startTime = time(0); // inexact
                 state = &DerivationGoal::buildDone;
                 return;
             case rpPostpone:
@@ -1417,6 +1423,9 @@ void DerivationGoal::buildDone()
     int status = hook ? hook->pid.wait(true) : pid.wait(true);
 
     debug(format("builder process for ‘%1%’ finished") % drvPath);
+
+    result.timesBuilt++;
+    result.stopTime = time(0);
 
     /* So the child is gone now. */
     worker.childTerminated(this);
@@ -2105,6 +2114,8 @@ void DerivationGoal::startBuilder()
     /* Create a pipe to get the output of the builder. */
     builderOut.create();
 
+    result.startTime = time(0);
+
     /* Fork a child to build the package. */
 #if __linux__
     if (useChroot) {
@@ -2158,7 +2169,8 @@ void DerivationGoal::startBuilder()
                namespace, we can't drop additional groups; they will
                be mapped to nogroup in the child namespace. There does
                not seem to be a workaround for this. (But who can tell
-               from reading user_namespaces(7)?)*/
+               from reading user_namespaces(7)?)
+               See also https://lwn.net/Articles/621612/. */
             if (getuid() == 0 && setgroups(0, 0) == -1)
                 throw SysError("setgroups failed");
 
@@ -2332,6 +2344,7 @@ void DerivationGoal::runChild()
                 ss.push_back("/etc/nsswitch.conf");
                 ss.push_back("/etc/services");
                 ss.push_back("/etc/hosts");
+                ss.push_back("/var/run/nscd/socket");
             }
 
             for (auto & i : ss) dirsInChroot[i] = i;
@@ -2680,7 +2693,9 @@ void DerivationGoal::registerOutputs()
        outputs to allow hard links between outputs. */
     InodesSeen inodesSeen;
 
-    Path checkSuffix = "-check";
+    Path checkSuffix = ".check";
+    bool runDiffHook = settings.get("run-diff-hook", false);
+    bool keepPreviousRound = settings.keepFailed || runDiffHook;
 
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all
@@ -2910,35 +2925,56 @@ void DerivationGoal::registerOutputs()
         assert(prevInfos.size() == infos.size());
         for (auto i = prevInfos.begin(), j = infos.begin(); i != prevInfos.end(); ++i, ++j)
             if (!(*i == *j)) {
+                result.isNonDeterministic = true;
                 Path prev = i->path + checkSuffix;
-                if (pathExists(prev))
-                    throw NotDeterministic(
-                        format("output ‘%1%’ of ‘%2%’ differs from ‘%3%’ from previous round")
-                        % i->path % drvPath % prev);
-                else
-                    throw NotDeterministic(
-                        format("output ‘%1%’ of ‘%2%’ differs from previous round")
-                        % i->path % drvPath);
+                bool prevExists = keepPreviousRound && pathExists(prev);
+                auto msg = prevExists
+                    ? fmt("output ‘%1%’ of ‘%2%’ differs from ‘%3%’ from previous round", i->path, drvPath, prev)
+                    : fmt("output ‘%1%’ of ‘%2%’ differs from previous round", i->path, drvPath);
+
+                auto diffHook = settings.get("diff-hook", std::string(""));
+                if (prevExists && diffHook != "" && runDiffHook) {
+                    try {
+                        auto diff = runProgram(diffHook, true, {prev, i->path});
+                        if (diff != "")
+                            printError(chomp(diff));
+                    } catch (Error & error) {
+                        printError("diff hook execution failed: %s", error.what());
+                    }
+                }
+
+                if (settings.get("enforce-determinism", true))
+                    throw NotDeterministic(msg);
+
+                printError(msg);
+                curRound = nrRounds; // we know enough, bail out early
             }
-        abort(); // shouldn't happen
     }
 
-    if (settings.keepFailed) {
+    /* If this is the first round of several, then move the output out
+       of the way. */
+    if (nrRounds > 1 && curRound == 1 && curRound < nrRounds && keepPreviousRound) {
         for (auto & i : drv->outputs) {
             Path prev = i.second.path + checkSuffix;
             deletePath(prev);
-            if (curRound < nrRounds) {
-                Path dst = i.second.path + checkSuffix;
-                if (rename(i.second.path.c_str(), dst.c_str()))
-                    throw SysError(format("renaming ‘%1%’ to ‘%2%’") % i.second.path % dst);
-            }
+            Path dst = i.second.path + checkSuffix;
+            if (rename(i.second.path.c_str(), dst.c_str()))
+                throw SysError(format("renaming ‘%1%’ to ‘%2%’") % i.second.path % dst);
         }
-
     }
 
     if (curRound < nrRounds) {
         prevInfos = infos;
         return;
+    }
+
+    /* Remove the .check directories if we're done. FIXME: keep them
+       if the result was not determistic? */
+    if (curRound == nrRounds) {
+        for (auto & i : drv->outputs) {
+            Path prev = i.second.path + checkSuffix;
+            deletePath(prev);
+        }
     }
 
     /* Register each output path as valid, and register the sets of
@@ -3051,7 +3087,8 @@ void DerivationGoal::handleEOF(int fd)
 
 void DerivationGoal::flushLine()
 {
-    if (settings.verboseBuild)
+    if (settings.verboseBuild &&
+        (settings.printRepeatedBuilds || curRound == 1))
         printError(filterANSIEscapes(currentLogLine, true));
     else {
         logTail.push_back(currentLogLine);
@@ -3393,7 +3430,7 @@ Worker::Worker(LocalStore & store)
     if (working) abort();
     working = true;
     nrLocalBuilds = 0;
-    lastWokenUp = 0;
+    lastWokenUp = steady_time_point::min();
     permanentFailure = false;
     timedOut = false;
 }
@@ -3502,7 +3539,7 @@ void Worker::childStarted(GoalPtr goal, const set<int> & fds,
     child.goal = goal;
     child.goal2 = goal.get();
     child.fds = fds;
-    child.timeStarted = child.lastOutput = time(0);
+    child.timeStarted = child.lastOutput = steady_time_point::clock::now();
     child.inBuildSlot = inBuildSlot;
     child.respectTimeouts = respectTimeouts;
     children.emplace_back(child);
@@ -3621,35 +3658,38 @@ void Worker::waitForInput()
     bool useTimeout = false;
     struct timeval timeout;
     timeout.tv_usec = 0;
-    time_t before = time(0);
+    auto before = steady_time_point::clock::now();
 
     /* If we're monitoring for silence on stdout/stderr, or if there
        is a build timeout, then wait for input until the first
        deadline for any child. */
-    assert(sizeof(time_t) >= sizeof(long));
-    time_t nearest = LONG_MAX; // nearest deadline
+    auto nearest = steady_time_point::max(); // nearest deadline
     for (auto & i : children) {
         if (!i.respectTimeouts) continue;
         if (settings.maxSilentTime != 0)
-            nearest = std::min(nearest, i.lastOutput + settings.maxSilentTime);
+            nearest = std::min(nearest, i.lastOutput + std::chrono::seconds(settings.maxSilentTime));
         if (settings.buildTimeout != 0)
-            nearest = std::min(nearest, i.timeStarted + settings.buildTimeout);
+            nearest = std::min(nearest, i.timeStarted + std::chrono::seconds(settings.buildTimeout));
     }
-    if (nearest != LONG_MAX) {
-        timeout.tv_sec = std::max((time_t) 1, nearest - before);
+    if (nearest != steady_time_point::max()) {
+        timeout.tv_sec = std::max(1L, (long) std::chrono::duration_cast<std::chrono::seconds>(nearest - before).count());
         useTimeout = true;
-        printMsg(lvlVomit, format("sleeping %1% seconds") % timeout.tv_sec);
     }
 
     /* If we are polling goals that are waiting for a lock, then wake
        up after a few seconds at most. */
     if (!waitingForAWhile.empty()) {
         useTimeout = true;
-        if (lastWokenUp == 0)
+        if (lastWokenUp == steady_time_point::min())
             printError("waiting for locks or build slots...");
-        if (lastWokenUp == 0 || lastWokenUp > before) lastWokenUp = before;
-        timeout.tv_sec = std::max((time_t) 1, (time_t) (lastWokenUp + settings.pollInterval - before));
-    } else lastWokenUp = 0;
+        if (lastWokenUp == steady_time_point::min() || lastWokenUp > before) lastWokenUp = before;
+        timeout.tv_sec = std::max(1L,
+            (long) std::chrono::duration_cast<std::chrono::seconds>(
+                lastWokenUp + std::chrono::seconds(settings.pollInterval) - before).count());
+    } else lastWokenUp = steady_time_point::min();
+
+    if (useTimeout)
+        vomit("sleeping %d seconds", timeout.tv_sec);
 
     /* Use select() to wait for the input side of any logger pipe to
        become `available'.  Note that `available' (i.e., non-blocking)
@@ -3669,7 +3709,7 @@ void Worker::waitForInput()
         throw SysError("waiting for input");
     }
 
-    time_t after = time(0);
+    auto after = steady_time_point::clock::now();
 
     /* Process all available file descriptors. */
     decltype(children)::iterator i;
@@ -3707,7 +3747,7 @@ void Worker::waitForInput()
         if (goal->getExitCode() == Goal::ecBusy &&
             settings.maxSilentTime != 0 &&
             j->respectTimeouts &&
-            after - j->lastOutput >= (time_t) settings.maxSilentTime)
+            after - j->lastOutput >= std::chrono::seconds(settings.maxSilentTime))
         {
             printError(
                 format("%1% timed out after %2% seconds of silence")
@@ -3718,7 +3758,7 @@ void Worker::waitForInput()
         else if (goal->getExitCode() == Goal::ecBusy &&
             settings.buildTimeout != 0 &&
             j->respectTimeouts &&
-            after - j->timeStarted >= (time_t) settings.buildTimeout)
+            after - j->timeStarted >= std::chrono::seconds(settings.buildTimeout))
         {
             printError(
                 format("%1% timed out after %2% seconds")
@@ -3727,7 +3767,7 @@ void Worker::waitForInput()
         }
     }
 
-    if (!waitingForAWhile.empty() && lastWokenUp + (time_t) settings.pollInterval <= after) {
+    if (!waitingForAWhile.empty() && lastWokenUp + std::chrono::seconds(settings.pollInterval) <= after) {
         lastWokenUp = after;
         for (auto & i : waitingForAWhile) {
             GoalPtr goal = i.lock();
@@ -3789,12 +3829,13 @@ void LocalStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
     worker.run(goals);
 
     PathSet failed;
-    for (auto & i : goals)
+    for (auto & i : goals) {
         if (i->getExitCode() != Goal::ecSuccess) {
             DerivationGoal * i2 = dynamic_cast<DerivationGoal *>(i.get());
             if (i2) failed.insert(i2->getDrvPath());
             else failed.insert(dynamic_cast<SubstitutionGoal *>(i.get())->getStorePath());
         }
+    }
 
     if (!failed.empty())
         throw Error(worker.exitStatus(), "build of %s failed", showPaths(failed));

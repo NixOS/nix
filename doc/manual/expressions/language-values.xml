@@ -167,7 +167,16 @@ stdenv.mkDerivation {
   user's home directory. e.g. <filename>~/foo</filename> would be
   equivalent to <filename>/home/edolstra/foo</filename> for a user
   whose home directory is <filename>/home/edolstra</filename>.
-  </para></listitem>
+  </para>
+
+  <para>Paths can also be specified between angle brackets, e.g.
+  <literal>&lt;nixpkgs&gt;</literal>. This means that the directories
+  listed in the environment variable
+  <envar linkend="env-NIX_PATH">NIX_PATH</envar> will be searched
+  for the given file or directory name.
+  </para>
+
+  </listitem>
 
   <listitem><para><emphasis>Booleans</emphasis> with values
   <literal>true</literal> and

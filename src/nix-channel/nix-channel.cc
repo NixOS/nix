@@ -76,10 +76,10 @@ static void update(const StringSet & channelNames)
     // Download each channel.
     auto exprs = Strings{};
     for (const auto & channel : channels) {
-        if (!channelNames.empty() && channelNames.find(channel.first) != channelNames.end())
-            continue;
         auto name = channel.first;
         auto url = channel.second;
+        if (!(channelNames.empty() || channelNames.count(name)))
+            continue;
 
         // We want to download the url to a file to see if it's a tarball while also checking if we
         // got redirected in the process, so that we can grab the various parts of a nix channel

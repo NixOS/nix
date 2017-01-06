@@ -18,7 +18,6 @@ bsddiff_compat_include = @bsddiff_compat_include@
 curl = @curl@
 datadir = @datadir@
 datarootdir = @datarootdir@
-dblatex = @dblatex@
 docdir = @docdir@
 exec_prefix = @exec_prefix@
 includedir = @includedir@

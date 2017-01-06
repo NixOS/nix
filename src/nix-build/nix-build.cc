@@ -105,6 +105,7 @@ int main(int argc, char ** argv)
         std::vector<string> args;
         for (int i = 1; i < argc; ++i)
             args.push_back(argv[i]);
+
         // Heuristic to see if we're invoked as a shebang script, namely, if we
         // have a single argument, it's the name of an executable file, and it
         // starts with "#!".
@@ -115,9 +116,9 @@ int main(int argc, char ** argv)
                 if (std::regex_search(lines.front(), std::regex("^#!"))) {
                     lines.pop_front();
                     inShebang = true;
-                    for (int i = 2; i < argc - 1; ++i)
+                    for (int i = 2; i < argc; ++i)
                         savedArgs.push_back(argv[i]);
-                    std::vector<string> args;
+                    args.clear();
                     for (auto line : lines) {
                         line = chomp(line);
                         std::smatch match;
@@ -276,6 +277,7 @@ int main(int argc, char ** argv)
                 if (n >= args.size()) {
                     throw UsageError(format("%1% requires an argument") % arg);
                 }
+                interactive = false;
                 auto interpreter = args[n];
                 auto execArgs = "";
 
@@ -287,9 +289,8 @@ int main(int argc, char ** argv)
                 // executes it unless it contains the string "perl" or "indir",
                 // or (undocumented) argv[0] does not contain "perl". Exploit
                 // the latter by doing "exec -a".
-                if (std::regex_search(interpreter, std::regex("perl"))) {
-                        execArgs = "-a PERL";
-                }
+                if (std::regex_search(interpreter, std::regex("perl")))
+                    execArgs = "-a PERL";
 
                 std::ostringstream joined;
                 for (const auto & i : savedArgs)
@@ -300,7 +301,6 @@ int main(int argc, char ** argv)
                     // read the shebang to understand which packages to read from. Since
                     // this is handled via nix-shell -p, we wrap our ruby script execution
                     // in ruby -e 'load' which ignores the shebangs.
-
                     envCommand = (format("exec %1% %2% -e 'load(\"%3%\") -- %4%") % execArgs % interpreter % script % joined.str()).str();
                 } else {
                     envCommand = (format("exec %1% %2% %3% %4%") % execArgs % interpreter % script % joined.str()).str();
@@ -420,7 +420,7 @@ int main(int argc, char ** argv)
                 // environment variables and shell functions.  Also don't lose
                 // the current $PATH directories.
                 auto rcfile = (Path) tmpDir + "/rc";
-                writeFile(rcfile, (format(
+                writeFile(rcfile, fmt(
                         "rm -rf '%1%'; "
                         "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc; "
                         "%2%"
@@ -434,13 +434,12 @@ int main(int argc, char ** argv)
                         "unset NIX_INDENT_MAKE; "
                         "shopt -u nullglob; "
                         "unset TZ; %4%"
-                        "%5%"
-                        )
-                        % (Path) tmpDir
-                        % (pure ? "" : "p=$PATH; ")
-                        % (pure ? "" : "PATH=$PATH:$p; unset p; ")
-                        % (getenv("TZ") ? (string("export TZ='") + getenv("TZ") + "'; ") : "")
-                        % envCommand).str());
+                        "%5%",
+                        (Path) tmpDir,
+                        (pure ? "" : "p=$PATH; "),
+                        (pure ? "" : "PATH=$PATH:$p; unset p; "),
+                        (getenv("TZ") ? (string("export TZ='") + getenv("TZ") + "'; ") : ""),
+                        envCommand));
 
                 Strings envStrs;
                 for (auto & i : env)
