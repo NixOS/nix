@@ -81,7 +81,8 @@ int main(int argc, char ** argv)
         auto pure = false;
         auto fromArgs = false;
         auto packages = false;
-        auto interactive = true;
+        // Same condition as bash uses for interactive shells
+        auto interactive = isatty(STDIN_FILENO) && isatty(STDERR_FILENO);
 
         Strings instArgs;
         Strings buildArgs;
