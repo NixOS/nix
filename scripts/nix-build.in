@@ -17,7 +17,8 @@ my $runEnv = $0 =~ /nix-shell$/;
 my $pure = 0;
 my $fromArgs = 0;
 my $packages = 0;
-my $interactive = 1;
+# Same condition as bash uses for interactive shells
+my $interactive = -t STDIN && -t STDERR;
 
 my @instArgs = ();
 my @buildArgs = ();
