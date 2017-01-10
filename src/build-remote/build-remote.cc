@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <fstream>
 #include <sstream>
-#include <vector>
+#include <set>
 #include <memory>
 #include <tuple>
 #include <iomanip>
@@ -24,8 +24,8 @@ static void handle_alarm(int sig) {
 }
 
 class machine {
-    const std::vector<string> supportedFeatures;
-    const std::vector<string> mandatoryFeatures;
+    const std::set<string> supportedFeatures;
+    const std::set<string> mandatoryFeatures;
 
 public:
     const string hostName;
@@ -35,22 +35,18 @@ public:
     const unsigned long long speedFactor;
     bool enabled;
 
-    bool allSupported(const std::vector<string> & features) const {
+    bool allSupported(const std::set<string> & features) const {
         return std::all_of(features.begin(), features.end(),
             [&](const string & feature) {
-                return std::find(supportedFeatures.begin(),
-                    supportedFeatures.end(),
-                    feature) != supportedFeatures.end() ||
-                        std::find(mandatoryFeatures.begin(),
-                            mandatoryFeatures.end(),
-                            feature) != mandatoryFeatures.end();
+                return supportedFeatures.count(feature) ||
+                    mandatoryFeatures.count(feature);
             });
     }
 
-    bool mandatoryMet(const std::vector<string> & features) const {
+    bool mandatoryMet(const std::set<string> & features) const {
         return std::all_of(mandatoryFeatures.begin(), mandatoryFeatures.end(),
             [&](const string & feature) {
-                return std::find(features.begin(), features.end(), feature) != features.end();
+                return features.count(feature);
             });
     }
 
@@ -96,11 +92,11 @@ static std::vector<machine> read_conf() {
                 stoull(tokens[3]),
                 sz >= 5 ? stoull(tokens[4]) : 1LL,
                 sz >= 6 ?
-                    tokenizeString<std::vector<string>>(tokens[5], ",") :
-                    std::vector<string>{},
+                    tokenizeString<std::set<string>>(tokens[5], ",") :
+                    std::set<string>{},
                 sz >= 7 ?
-                    tokenizeString<std::vector<string>>(tokens[6], ",") :
-                    std::vector<string>{});
+                    tokenizeString<std::set<string>>(tokens[6], ",") :
+                    std::set<string>{});
         }
     }
     confFile.close();
@@ -160,8 +156,8 @@ int main (int argc, char * * argv)
             auto neededSystem = tokens[1];
             drvPath = tokens[2];
             auto requiredFeatures = sz == 3 ?
-                std::vector<string>{} :
-                tokenizeString<std::vector<string>>(tokens[3], ",");
+                std::set<string>{} :
+                tokenizeString<std::set<string>>(tokens[3], ",");
             auto canBuildLocally = amWilling && (neededSystem == localSystem);
 
             /* Error ignored here, will be caught later */
