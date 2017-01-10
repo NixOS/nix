@@ -779,6 +779,9 @@ static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Va
     string s = readFile(state.checkSourcePath(path));
     if (s.find((char) 0) != string::npos)
         throw Error(format("the contents of the file ‘%1%’ cannot be represented as a Nix string") % path);
+    context = state.store->isInStore(path) ?
+        state.store->queryPathInfo(state.store->toStorePath(path))->references :
+        PathSet{};
     mkString(v, s.c_str(), context);
 }
 
