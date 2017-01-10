@@ -1,8 +1,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <algorithm>
-#include <fstream>
-#include <sstream>
 #include <set>
 #include <memory>
 #include <tuple>
@@ -71,35 +69,37 @@ static std::vector<machine> read_conf() {
     auto conf = getEnv("NIX_REMOTE_SYSTEMS", SYSCONFDIR "/nix/machines");
 
     auto machines = std::vector<machine>{};
-    auto confFile = std::ifstream{conf};
-    if (confFile.good()) {
-        confFile.exceptions(std::ifstream::badbit);
-        for (string line; getline(confFile, line);) {
-            chomp(line);
-            line.erase(std::find(line.begin(), line.end(), '#'), line.end());
-            if (line.empty()) {
-                continue;
-            }
-            auto tokens = tokenizeString<std::vector<string>>(line);
-            auto sz = tokens.size();
-            if (sz < 4) {
-                throw new FormatError(format("Bad machines.conf file %1%")
-                    % conf);
-            }
-            machines.emplace_back(tokens[0],
-                tokenizeString<std::vector<string>>(tokens[1], ","),
-                tokens[2],
-                stoull(tokens[3]),
-                sz >= 5 ? stoull(tokens[4]) : 1LL,
-                sz >= 6 ?
-                    tokenizeString<std::set<string>>(tokens[5], ",") :
-                    std::set<string>{},
-                sz >= 7 ?
-                    tokenizeString<std::set<string>>(tokens[6], ",") :
-                    std::set<string>{});
-        }
+    auto lines = std::vector<string>{};
+    try {
+        lines = tokenizeString<std::vector<string>>(readFile(conf), "\n");
+    } catch (const SysError & e) {
+        if (e.errNo != ENOENT)
+            throw;
     }
-    confFile.close();
+    for (auto line : lines) {
+        chomp(line);
+        line.erase(std::find(line.begin(), line.end(), '#'), line.end());
+        if (line.empty()) {
+            continue;
+        }
+        auto tokens = tokenizeString<std::vector<string>>(line);
+        auto sz = tokens.size();
+        if (sz < 4) {
+            throw new FormatError(format("Bad machines.conf file %1%")
+                % conf);
+        }
+        machines.emplace_back(tokens[0],
+            tokenizeString<std::vector<string>>(tokens[1], ","),
+            tokens[2],
+            stoull(tokens[3]),
+            sz >= 5 ? stoull(tokens[4]) : 1LL,
+            sz >= 6 ?
+            tokenizeString<std::set<string>>(tokens[5], ",") :
+            std::set<string>{},
+            sz >= 7 ?
+            tokenizeString<std::set<string>>(tokens[6], ",") :
+            std::set<string>{});
+    }
     return machines;
 }
 
