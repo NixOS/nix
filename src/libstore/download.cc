@@ -217,6 +217,9 @@ struct CurlDownloader : public Downloader
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYHOST, 0);
             }
 
+            if(getEnv("NIX_CURL_VERBOSE", "") != "")
+                curl_easy_setopt(req, CURLOPT_VERBOSE, 1);
+
             result.data = std::make_shared<std::string>();
         }
 
