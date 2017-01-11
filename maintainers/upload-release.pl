@@ -86,6 +86,7 @@ my ($tarball_x86_64_linux, $tarball_x86_64_linux_hash) = downloadFile("binaryTar
 my ($tarball_x86_64_darwin, $tarball_x86_64_darwin_hash) = downloadFile("binaryTarball.x86_64-darwin", "1");
 
 # Update Nixpkgs in a very hacky way.
+system("cd $nixpkgsDir && git pull") == 0 or die;
 my $oldName = `nix-instantiate --eval $nixpkgsDir -A nix.name`; chomp $oldName;
 my $oldHash = `nix-instantiate --eval $nixpkgsDir -A nix.src.outputHash`; chomp $oldHash;
 print STDERR "old stable version in Nixpkgs = $oldName / $oldHash\n";
@@ -135,6 +136,9 @@ system("git tag --force --sign $version $nixRev -m 'Tagging release $version'") 
 
 # Update the website.
 my $siteDir = "/home/eelco/Dev/nixos-homepage-pristine";
+
+system("cd $siteDir && git pull") == 0 or die;
+
 write_file("$siteDir/nix-release.tt",
            "[%-\n" .
            "latestNixVersion = \"$version\"\n" .

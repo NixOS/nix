@@ -2295,12 +2295,8 @@ void DerivationGoal::runChild()
                outside of the namespace.  Making a subtree private is
                local to the namespace, though, so setting MS_PRIVATE
                does not affect the outside world. */
-            Strings mounts = tokenizeString<Strings>(readFile("/proc/self/mountinfo", true), "\n");
-            for (auto & i : mounts) {
-                vector<string> fields = tokenizeString<vector<string> >(i, " ");
-                string fs = decodeOctalEscaped(fields.at(4));
-                if (mount(0, fs.c_str(), 0, MS_PRIVATE, 0) == -1)
-                    throw SysError(format("unable to make filesystem ‘%1%’ private") % fs);
+            if (mount(0, "/", 0, MS_REC|MS_PRIVATE, 0) == -1) {
+                throw SysError("unable to make ‘/’ private mount");
             }
 
             /* Bind-mount chroot directory to itself, to treat it as a
@@ -2340,6 +2336,7 @@ void DerivationGoal::runChild()
                 ss.push_back("/etc/nsswitch.conf");
                 ss.push_back("/etc/services");
                 ss.push_back("/etc/hosts");
+                ss.push_back("/var/run/nscd/socket");
             }
 
             for (auto & i : ss) dirsInChroot[i] = i;

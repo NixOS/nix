@@ -235,9 +235,8 @@
   named <replaceable>name</replaceable>, it will call it with value
   <replaceable>value</replaceable>.</para>
 
-  <para>For instance, the file
-  <literal>pkgs/top-level/all-packages.nix</literal> in Nixpkgs is
-  actually a function:
+  <para>For instance, the top-level <literal>default.nix</literal> in
+  Nixpkgs is actually a function:
 
 <programlisting>
 { # The system (e.g., `i686-linux') for which to build the packages.
