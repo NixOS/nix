@@ -3,6 +3,7 @@
 
 #include <cstring>
 #include <cerrno>
+#include <memory>
 
 
 namespace nix {
@@ -236,11 +237,10 @@ size_t readString(unsigned char * buf, size_t max, Source & source)
 string readString(Source & source)
 {
     size_t len = readInt(source);
-    unsigned char * buf = new unsigned char[len];
-    AutoDeleteArray<unsigned char> d(buf);
-    source(buf, len);
+    auto buf = std::make_unique<unsigned char[]>(len);
+    source(buf.get(), len);
     readPadding(len, source);
-    return string((char *) buf, len);
+    return string((char *) buf.get(), len);
 }
 
 Source & operator >> (Source & in, string & s)

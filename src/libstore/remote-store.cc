@@ -599,9 +599,8 @@ void RemoteStore::Connection::processStderr(Sink * sink, Source * source)
         else if (msg == STDERR_READ) {
             if (!source) throw Error("no source");
             size_t len = readInt(from);
-            unsigned char * buf = new unsigned char[len];
-            AutoDeleteArray<unsigned char> d(buf);
-            writeString(buf, source->read(buf, len), to);
+            auto buf = std::make_unique<unsigned char[]>(len);
+            writeString(buf.get(), source->read(buf.get(), len), to);
             to.flush();
         }
         else

@@ -139,18 +139,6 @@ string drainFD(int fd);
 /* Automatic cleanup of resources. */
 
 
-template <class T>
-struct AutoDeleteArray
-{
-    T * p;
-    AutoDeleteArray(T * p) : p(p) { }
-    ~AutoDeleteArray()
-    {
-        delete [] p;
-    }
-};
-
-
 class AutoDelete
 {
     Path path;
