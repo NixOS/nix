@@ -234,11 +234,11 @@ DirEntries readDirectory(const Path & path)
     DirEntries entries;
     entries.reserve(64);
 
-    AutoCloseDir dir = opendir(path.c_str());
+    AutoCloseDir dir(opendir(path.c_str()));
     if (!dir) throw SysError(format("opening directory ‘%1%’") % path);
 
     struct dirent * dirent;
-    while (errno = 0, dirent = readdir(dir)) { /* sic */
+    while (errno = 0, dirent = readdir(dir.get())) { /* sic */
         checkInterrupt();
         string name = dirent->d_name;
         if (name == "." || name == "..") continue;
@@ -640,48 +640,6 @@ void Pipe::create()
     writeSide = fds[1];
 }
 
-
-
-//////////////////////////////////////////////////////////////////////
-
-
-AutoCloseDir::AutoCloseDir()
-{
-    dir = 0;
-}
-
-
-AutoCloseDir::AutoCloseDir(DIR * dir)
-{
-    this->dir = dir;
-}
-
-
-AutoCloseDir::~AutoCloseDir()
-{
-    close();
-}
-
-
-void AutoCloseDir::operator =(DIR * dir)
-{
-    this->dir = dir;
-}
-
-
-AutoCloseDir::operator DIR *()
-{
-    return dir;
-}
-
-
-void AutoCloseDir::close()
-{
-    if (dir) {
-        closedir(dir);
-        dir = 0;
-    }
-}
 
 
 //////////////////////////////////////////////////////////////////////

@@ -379,7 +379,7 @@ void LocalStore::findRuntimeRoots(PathSet & roots)
         auto digitsRegex = std::regex(R"(^\d+$)");
         auto mapRegex = std::regex(R"(^\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(/\S+)\s*$)");
         auto storePathRegex = std::regex(quoteRegexChars(storeDir) + R"(/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*)");
-        while (errno = 0, ent = readdir(procDir)) {
+        while (errno = 0, ent = readdir(procDir.get())) {
             checkInterrupt();
             if (std::regex_match(ent->d_name, digitsRegex)) {
                 readProcLink((format("/proc/%1%/exe") % ent->d_name).str(), paths);
@@ -393,14 +393,14 @@ void LocalStore::findRuntimeRoots(PathSet & roots)
                     throw SysError(format("opening %1%") % fdStr);
                 }
                 struct dirent * fd_ent;
-                while (errno = 0, fd_ent = readdir(fdDir)) {
+                while (errno = 0, fd_ent = readdir(fdDir.get())) {
                     if (fd_ent->d_name[0] != '.') {
                         readProcLink((format("%1%/%2%") % fdStr % fd_ent->d_name).str(), paths);
                     }
                 }
                 if (errno)
                     throw SysError(format("iterating /proc/%1%/fd") % ent->d_name);
-                fdDir.close();
+                fdDir.reset();
 
                 auto mapLines =
                     tokenizeString<std::vector<string>>(readFile((format("/proc/%1%/maps") % ent->d_name).str(), true), "\n");
@@ -651,13 +651,13 @@ void LocalStore::tryToDelete(GCState & state, const Path & path)
    the link count. */
 void LocalStore::removeUnusedLinks(const GCState & state)
 {
-    AutoCloseDir dir = opendir(linksDir.c_str());
+    AutoCloseDir dir(opendir(linksDir.c_str()));
     if (!dir) throw SysError(format("opening directory ‘%1%’") % linksDir);
 
     long long actualSize = 0, unsharedSize = 0;
 
     struct dirent * dirent;
-    while (errno = 0, dirent = readdir(dir)) {
+    while (errno = 0, dirent = readdir(dir.get())) {
         checkInterrupt();
         string name = dirent->d_name;
         if (name == "." || name == "..") continue;
@@ -776,7 +776,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
         try {
 
-            AutoCloseDir dir = opendir(realStoreDir.c_str());
+            AutoCloseDir dir(opendir(realStoreDir.c_str()));
             if (!dir) throw SysError(format("opening directory ‘%1%’") % realStoreDir);
 
             /* Read the store and immediately delete all paths that
@@ -787,7 +787,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                can start faster. */
             Paths entries;
             struct dirent * dirent;
-            while (errno = 0, dirent = readdir(dir)) {
+            while (errno = 0, dirent = readdir(dir.get())) {
                 checkInterrupt();
                 string name = dirent->d_name;
                 if (name == "." || name == "..") continue;
@@ -798,7 +798,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                     tryToDelete(state, path);
             }
 
-            dir.close();
+            dir.reset();
 
             /* Now delete the unreachable valid paths.  Randomise the
                order in which we delete entries to make the collector

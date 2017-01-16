@@ -180,17 +180,14 @@ public:
 };
 
 
-class AutoCloseDir
+struct DIRDeleter
 {
-    DIR * dir;
-public:
-    AutoCloseDir();
-    AutoCloseDir(DIR * dir);
-    ~AutoCloseDir();
-    void operator =(DIR * dir);
-    operator DIR *();
-    void close();
+    void operator()(DIR * dir) const {
+        closedir(dir);
+    }
 };
+
+typedef std::unique_ptr<DIR, DIRDeleter> AutoCloseDir;
 
 
 class Pid

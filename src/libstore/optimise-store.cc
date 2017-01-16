@@ -47,11 +47,11 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
     debug("loading hash inodes in memory");
     InodeHash inodeHash;
 
-    AutoCloseDir dir = opendir(linksDir.c_str());
+    AutoCloseDir dir(opendir(linksDir.c_str()));
     if (!dir) throw SysError(format("opening directory ‘%1%’") % linksDir);
 
     struct dirent * dirent;
-    while (errno = 0, dirent = readdir(dir)) { /* sic */
+    while (errno = 0, dirent = readdir(dir.get())) { /* sic */
         checkInterrupt();
         // We don't care if we hit non-hash files, anything goes
         inodeHash.insert(dirent->d_ino);
@@ -68,11 +68,11 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
 {
     Strings names;
 
-    AutoCloseDir dir = opendir(path.c_str());
+    AutoCloseDir dir(opendir(path.c_str()));
     if (!dir) throw SysError(format("opening directory ‘%1%’") % path);
 
     struct dirent * dirent;
-    while (errno = 0, dirent = readdir(dir)) { /* sic */
+    while (errno = 0, dirent = readdir(dir.get())) { /* sic */
         checkInterrupt();
 
         if (inodeHash.count(dirent->d_ino)) {
