@@ -136,15 +136,11 @@ int main(int argc, char ** argv)
 
             if (arg == "--help") {
                 deletePath(tmpDir);
-                tmpDir.cancel();
-                execlp("man", "man", myName, NULL);
-                throw SysError("executing man");
+                showManPage(myName);
             }
 
-            else if (arg == "--version") {
-                std::cout << myName << " (Nix) " << nixVersion << '\n';
-                return;
-            }
+            else if (arg == "--version")
+                printVersion(myName);
 
             else if (arg == "--add-drv-link") {
                 drvLink = "./derivation";
