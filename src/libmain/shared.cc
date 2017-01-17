@@ -24,12 +24,6 @@
 namespace nix {
 
 
-static void sigintHandler(int signo)
-{
-    _isInterrupted = 1;
-}
-
-
 static bool gcWarning = true;
 
 void printGCWarning()
@@ -120,19 +114,11 @@ void initNix()
     settings.processEnvironment();
     settings.loadConfFile();
 
-    /* Catch SIGINT. */
-    struct sigaction act;
-    act.sa_handler = sigintHandler;
-    sigemptyset(&act.sa_mask);
-    act.sa_flags = 0;
-    if (sigaction(SIGINT, &act, 0))
-        throw SysError("installing handler for SIGINT");
-    if (sigaction(SIGTERM, &act, 0))
-        throw SysError("installing handler for SIGTERM");
-    if (sigaction(SIGHUP, &act, 0))
-        throw SysError("installing handler for SIGHUP");
+    startSignalHandlerThread();
 
     /* Ignore SIGPIPE. */
+    struct sigaction act;
+    sigemptyset(&act.sa_mask);
     act.sa_handler = SIG_IGN;
     act.sa_flags = 0;
     if (sigaction(SIGPIPE, &act, 0))

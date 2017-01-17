@@ -263,7 +263,7 @@ void restoreSIGPIPE();
 
 /* User interruption. */
 
-extern volatile sig_atomic_t _isInterrupted;
+extern bool _isInterrupted;
 
 extern thread_local bool interruptThrown;
 
@@ -414,6 +414,21 @@ void callSuccess(
         callFailure(failure);
     }
 }
+
+
+/* Start a thread that handles various signals. Also block those signals
+   on the current thread (and thus any threads created by it). */
+void startSignalHandlerThread();
+
+struct InterruptCallback
+{
+    virtual ~InterruptCallback() { };
+};
+
+/* Register a function that gets called on SIGINT (in a non-signal
+   context). */
+std::unique_ptr<InterruptCallback> createInterruptCallback(
+    std::function<void()> callback);
 
 
 }

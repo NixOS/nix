@@ -324,20 +324,30 @@ struct CurlDownloader : public Downloader
 
     ~CurlDownloader()
     {
-        /* Signal the worker thread to exit. */
-        {
-            auto state(state_.lock());
-            state->quit = true;
-        }
-        writeFull(wakeupPipe.writeSide.get(), " ");
+        stopWorkerThread();
 
         workerThread.join();
 
         if (curlm) curl_multi_cleanup(curlm);
     }
 
+    void stopWorkerThread()
+    {
+        /* Signal the worker thread to exit. */
+        {
+            auto state(state_.lock());
+            state->quit = true;
+        }
+        writeFull(wakeupPipe.writeSide.get(), " ", false);
+    }
+
     void workerThreadMain()
     {
+        /* Cause this thread to be notified on SIGINT. */
+        auto callback = createInterruptCallback([&]() {
+            stopWorkerThread();
+        });
+
         std::map<CURL *, std::shared_ptr<DownloadItem>> items;
 
         bool quit = false;

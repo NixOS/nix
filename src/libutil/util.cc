@@ -2,14 +2,16 @@
 
 #include "util.hh"
 #include "affinity.hh"
+#include "sync.hh"
 
-#include <iostream>
+#include <cctype>
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
-#include <sstream>
 #include <cstring>
-#include <cctype>
+#include <iostream>
+#include <sstream>
+#include <thread>
 
 #include <sys/wait.h>
 #include <unistd.h>
@@ -933,7 +935,7 @@ void restoreSIGPIPE()
 //////////////////////////////////////////////////////////////////////
 
 
-volatile sig_atomic_t _isInterrupted = 0;
+bool _isInterrupted = false;
 
 thread_local bool interruptThrown = false;
 
@@ -1199,5 +1201,65 @@ void callFailure(const std::function<void(std::exception_ptr exc)> & failure, st
     }
 }
 
+
+static Sync<std::list<std::function<void()>>> _interruptCallbacks;
+
+static void signalHandlerThread(sigset_t set)
+{
+    while (true) {
+        int signal = 0;
+        sigwait(&set, &signal);
+
+        if (signal == SIGINT || signal == SIGTERM || signal == SIGHUP) {
+            _isInterrupted = 1;
+
+            {
+                auto interruptCallbacks(_interruptCallbacks.lock());
+                for (auto & callback : *interruptCallbacks) {
+                    try {
+                        callback();
+                    } catch (...) {
+                        ignoreException();
+                    }
+                }
+            }
+        }
+    }
+}
+
+void startSignalHandlerThread()
+{
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGINT);
+    sigaddset(&set, SIGTERM);
+    sigaddset(&set, SIGHUP);
+    if (pthread_sigmask(SIG_BLOCK, &set, nullptr))
+        throw SysError("blocking signals");
+
+    std::thread(signalHandlerThread, set).detach();
+}
+
+/* RAII helper to automatically deregister a callback. */
+struct InterruptCallbackImpl : InterruptCallback
+{
+    std::list<std::function<void()>>::iterator it;
+    ~InterruptCallbackImpl() override
+    {
+        _interruptCallbacks.lock()->erase(it);
+    }
+};
+
+std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()> callback)
+{
+    auto interruptCallbacks(_interruptCallbacks.lock());
+    interruptCallbacks->push_back(callback);
+
+    auto res = std::make_unique<InterruptCallbackImpl>();
+    res->it = interruptCallbacks->end();
+    res->it--;
+
+    return res;
+}
 
 }
