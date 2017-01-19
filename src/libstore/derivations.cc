@@ -88,9 +88,6 @@ Path writeDerivation(ref<Store> store,
 }
 
 
-MakeError(FormatError, Error)
-
-
 /* Read string `s' from stream `str'. */
 static void expect(std::istream & str, const string & s)
 {

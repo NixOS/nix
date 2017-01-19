@@ -43,6 +43,7 @@ in
         { config, pkgs, ... }:
         { nix.maxJobs = 0; # force remote building
           nix.distributedBuilds = true;
+          nix.envVars = pkgs.lib.mkAfter { NIX_BUILD_HOOK = "${nix}/libexec/nix/build-remote"; };
           nix.buildMachines =
             [ { hostName = "slave1";
                 sshUser = "root";

@@ -3,6 +3,7 @@
 #include "store-api.hh"
 #include "util.hh"
 #include "nar-info-disk-cache.hh"
+#include "thread-pool.hh"
 
 #include <future>
 
@@ -695,6 +696,38 @@ std::list<ref<Store>> getDefaultSubstituters()
     state->done = true;
 
     return state->stores;
+}
+
+
+void copyPaths(ref<Store> from, ref<Store> to, const Paths & storePaths)
+{
+    std::string copiedLabel = "copied";
+
+    logger->setExpected(copiedLabel, storePaths.size());
+
+    ThreadPool pool;
+
+    processGraph<Path>(pool,
+        PathSet(storePaths.begin(), storePaths.end()),
+
+        [&](const Path & storePath) {
+            return from->queryPathInfo(storePath)->references;
+        },
+
+        [&](const Path & storePath) {
+            checkInterrupt();
+
+            if (!to->isValidPath(storePath)) {
+                Activity act(*logger, lvlInfo, format("copying ‘%s’...") % storePath);
+
+                copyStorePath(from, to, storePath);
+
+                logger->incProgress(copiedLabel);
+            } else
+                logger->incExpected(copiedLabel, -1);
+        });
+
+    pool.process();
 }
 
 

@@ -81,6 +81,8 @@ Makefile.config
 # /src/nix-build/
 /src/nix-build/nix-build
 
+/src/build-remote/build-remote
+
 # /tests/
 /tests/test-tmp
 /tests/common.sh

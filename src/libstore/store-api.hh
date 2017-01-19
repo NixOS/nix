@@ -625,6 +625,8 @@ void removeTempRoots();
 ref<Store> openStore(const std::string & uri = getEnv("NIX_REMOTE"));
 
 
+void copyPaths(ref<Store> from, ref<Store> to, const Paths & storePaths);
+
 enum StoreType {
     tDaemon,
     tLocal,

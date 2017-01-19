@@ -54,6 +54,8 @@ bool lockFile(int fd, LockType lockType, bool wait)
             checkInterrupt();
             if (errno != EINTR)
                 throw SysError(format("acquiring/releasing lock"));
+            else
+                return false;
         }
     } else {
         while (fcntl(fd, F_SETLK, &lock) != 0) {

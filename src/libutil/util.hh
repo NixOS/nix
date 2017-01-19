@@ -277,6 +277,9 @@ void inline checkInterrupt()
 MakeError(Interrupted, BaseError)
 
 
+MakeError(FormatError, Error)
+
+
 /* String tokenizer. */
 template<class C> C tokenizeString(const string & s, const string & separators = " \t\n\r");
 
