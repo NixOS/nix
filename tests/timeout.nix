@@ -1,6 +1,20 @@
 with import ./config.nix;
 
-mkDerivation {
-  name = "timeout";
-  builder = ./timeout.builder.sh;
+{
+
+  infiniteLoop = mkDerivation {
+    name = "timeout";
+    buildCommand = ''
+      echo "‘timeout’ builder entering an infinite loop"
+      while true ; do echo -n .; done
+    '';
+  };
+
+  silent = mkDerivation {
+    name = "silent";
+    buildCommand = ''
+      sleep 60
+    '';
+  };
+
 }

@@ -3,7 +3,7 @@
 source common.sh
 
 failed=0
-messages="`nix-build -Q timeout.nix --timeout 2 2>&1 || failed=1`"
+messages="`nix-build -Q timeout.nix -A infiniteLoop --timeout 2 2>&1 || failed=1`"
 if [ $failed -ne 0 ]; then
     echo "error: ‘nix-store’ succeeded; should have timed out"
     exit 1
@@ -15,7 +15,12 @@ if ! echo "$messages" | grep -q "timed out"; then
     exit 1
 fi
 
-if nix-build -Q timeout.nix --option build-max-log-size 100; then
+if nix-build -Q timeout.nix -A infiniteLoop --option build-max-log-size 100; then
+    echo "build should have failed"
+    exit 1
+fi
+
+if nix-build timeout.nix -A silent --max-silent-time 2; then
     echo "build should have failed"
     exit 1
 fi
