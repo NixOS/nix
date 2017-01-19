@@ -218,11 +218,10 @@ void killUser(uid_t uid);
    pid to the caller. */
 struct ProcessOptions
 {
-    string errorPrefix;
-    bool dieWithParent;
-    bool runExitHandlers;
-    bool allowVfork;
-    ProcessOptions() : errorPrefix("error: "), dieWithParent(true), runExitHandlers(false), allowVfork(true) { };
+    string errorPrefix = "error: ";
+    bool dieWithParent = true;
+    bool runExitHandlers = false;
+    bool allowVfork = true;
 };
 
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = ProcessOptions());
