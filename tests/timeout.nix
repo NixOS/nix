@@ -17,4 +17,12 @@ with import ./config.nix;
     '';
   };
 
+  closeLog = mkDerivation {
+    name = "silent";
+    buildCommand = ''
+      exec > /dev/null 2>&1
+      sleep 1000000000
+    '';
+  };
+
 }

@@ -648,26 +648,25 @@ void Pipe::create()
 
 
 Pid::Pid()
-    : pid(-1), separatePG(false), killSignal(SIGKILL)
 {
 }
 
 
 Pid::Pid(pid_t pid)
-    : pid(pid), separatePG(false), killSignal(SIGKILL)
+    : pid(pid)
 {
 }
 
 
 Pid::~Pid()
 {
-    kill();
+    if (pid != -1) kill();
 }
 
 
 void Pid::operator =(pid_t pid)
 {
-    if (this->pid != pid) kill();
+    if (this->pid != -1 && this->pid != pid) kill();
     this->pid = pid;
     killSignal = SIGKILL; // reset signal to default
 }
@@ -679,9 +678,9 @@ Pid::operator pid_t()
 }
 
 
-void Pid::kill(bool quiet)
+int Pid::kill(bool quiet)
 {
-    if (pid == -1 || pid == 0) return;
+    assert(pid != -1);
 
     if (!quiet)
         printError(format("killing process %1%") % pid);
@@ -692,32 +691,20 @@ void Pid::kill(bool quiet)
     if (::kill(separatePG ? -pid : pid, killSignal) != 0)
         printError((SysError(format("killing process %1%") % pid).msg()));
 
-    /* Wait until the child dies, disregarding the exit status. */
-    int status;
-    while (waitpid(pid, &status, 0) == -1) {
-        checkInterrupt();
-        if (errno != EINTR) {
-            printError(
-                (SysError(format("waiting for process %1%") % pid).msg()));
-            break;
-        }
-    }
-
-    pid = -1;
+    return wait();
 }
 
 
-int Pid::wait(bool block)
+int Pid::wait()
 {
     assert(pid != -1);
     while (1) {
         int status;
-        int res = waitpid(pid, &status, block ? 0 : WNOHANG);
+        int res = waitpid(pid, &status, 0);
         if (res == pid) {
             pid = -1;
             return status;
         }
-        if (res == 0 && !block) return -1;
         if (errno != EINTR)
             throw SysError("cannot get child exit status");
         checkInterrupt();
@@ -782,7 +769,7 @@ void killUser(uid_t uid)
         _exit(0);
     }, options);
 
-    int status = pid.wait(true);
+    int status = pid.wait();
     if (status != 0)
         throw Error(format("cannot kill processes for uid ‘%1%’: %2%") % uid % statusToString(status));
 
@@ -893,7 +880,7 @@ string runProgram(Path program, bool searchPath, const Strings & args,
     string result = drainFD(out.readSide.get());
 
     /* Wait for the child to finish. */
-    int status = pid.wait(true);
+    int status = pid.wait();
     if (!statusOk(status))
         throw ExecError(status, format("program ‘%1%’ %2%")
             % program % statusToString(status));

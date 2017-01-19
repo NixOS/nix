@@ -192,17 +192,18 @@ typedef std::unique_ptr<DIR, DIRDeleter> AutoCloseDir;
 
 class Pid
 {
-    pid_t pid;
-    bool separatePG;
-    int killSignal;
+    pid_t pid = -1;
+    bool separatePG = false;
+    int killSignal = SIGKILL;
 public:
     Pid();
     Pid(pid_t pid);
     ~Pid();
     void operator =(pid_t pid);
     operator pid_t();
-    void kill(bool quiet = false);
-    int wait(bool block);
+    int kill(bool quiet = false);
+    int wait();
+
     void setSeparatePG(bool separatePG);
     void setKillSignal(int signal);
     pid_t release();

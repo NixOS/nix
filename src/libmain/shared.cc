@@ -333,7 +333,7 @@ RunPager::~RunPager()
         if (pid != -1) {
             std::cout.flush();
             close(STDOUT_FILENO);
-            pid.wait(true);
+            pid.wait();
         }
     } catch (...) {
         ignoreException();

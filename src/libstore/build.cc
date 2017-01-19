@@ -646,7 +646,7 @@ HookInstance::~HookInstance()
 {
     try {
         toHook.writeSide = -1;
-        pid.kill(true);
+        if (pid != -1) pid.kill(true);
     } catch (...) {
         ignoreException();
     }
@@ -960,7 +960,7 @@ void DerivationGoal::killChild()
                child. */
             ::kill(-pid, SIGKILL); /* ignore the result */
             buildUser.kill();
-            pid.wait(true);
+            pid.wait();
         } else
             pid.kill();
 
@@ -1416,11 +1416,9 @@ void DerivationGoal::buildDone()
 
     /* Since we got an EOF on the logger pipe, the builder is presumed
        to have terminated.  In fact, the builder could also have
-       simply have closed its end of the pipe --- just don't do that
-       :-) */
-    /* !!! this could block! security problem! solution: kill the
-       child */
-    int status = hook ? hook->pid.wait(true) : pid.wait(true);
+       simply have closed its end of the pipe, so just to be sure,
+       kill it. */
+    int status = hook ? hook->pid.kill(true) : pid.kill(true);
 
     debug(format("builder process for ‘%1%’ finished") % drvPath);
 
@@ -2112,6 +2110,8 @@ void DerivationGoal::startBuilder()
     result.startTime = time(0);
 
     /* Fork a child to build the package. */
+    ProcessOptions options;
+
 #if __linux__
     if (useChroot) {
         /* Set up private namespaces for the build:
@@ -2153,7 +2153,6 @@ void DerivationGoal::startBuilder()
 
         userNamespaceSync.create();
 
-        ProcessOptions options;
         options.allowVfork = false;
 
         Pid helper = startProcess([&]() {
@@ -2189,7 +2188,7 @@ void DerivationGoal::startBuilder()
             _exit(0);
         }, options);
 
-        if (helper.wait(true) != 0)
+        if (helper.wait() != 0)
             throw Error("unable to start build process");
 
         userNamespaceSync.readSide = -1;
@@ -2220,7 +2219,6 @@ void DerivationGoal::startBuilder()
     } else
 #endif
     {
-        ProcessOptions options;
         options.allowVfork = !buildUser.enabled() && !drv->isBuiltin();
         pid = startProcess([&]() {
             runChild();
@@ -3702,7 +3700,8 @@ void Worker::waitForInput()
 
     auto after = steady_time_point::clock::now();
 
-    /* Process all available file descriptors. */
+    /* Process all available file descriptors. FIXME: this is
+       O(children * fds). */
     decltype(children)::iterator i;
     for (auto j = children.begin(); j != children.end(); j = i) {
         i = std::next(j);
