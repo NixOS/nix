@@ -257,7 +257,7 @@ public:
 
     LocalStore & store;
 
-    std::shared_ptr<HookInstance> hook;
+    std::unique_ptr<HookInstance> hook;
 
     Worker(LocalStore & store);
     ~Worker();
@@ -751,7 +751,7 @@ private:
     Pipe userNamespaceSync;
 
     /* The build hook. */
-    std::shared_ptr<HookInstance> hook;
+    std::unique_ptr<HookInstance> hook;
 
     /* Whether we're currently doing a chroot build. */
     bool useChroot = false;
@@ -1566,7 +1566,7 @@ HookReply DerivationGoal::tryBuildHook()
     if (!settings.useBuildHook || getEnv("NIX_BUILD_HOOK") == "" || !useDerivation) return rpDecline;
 
     if (!worker.hook)
-        worker.hook = std::make_shared<HookInstance>();
+        worker.hook = std::make_unique<HookInstance>();
 
     /* Tell the hook about system features (beyond the system type)
        required from the build machine.  (The hook could parse the
@@ -1601,8 +1601,7 @@ HookReply DerivationGoal::tryBuildHook()
 
     printMsg(lvlTalkative, format("using hook to build path(s) %1%") % showPaths(missingPaths));
 
-    hook = worker.hook;
-    worker.hook.reset();
+    hook = std::move(worker.hook);
 
     /* Tell the hook all the inputs that have to be copied to the
        remote system.  This unfortunately has to contain the entire
