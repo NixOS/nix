@@ -15,7 +15,8 @@ let
       else
         ${bzip2} -d < $src | ${tar} xf - ${tarFlags}
       fi
-      mv * $out/$channelName
+      shopt -s nullglob
+      test * == "$channelName" || mv * $out/$channelName
       if [ -n "$binaryCacheURL" ]; then
         mkdir $out/binary-caches
         echo -n "$binaryCacheURL" > $out/binary-caches/$channelName
