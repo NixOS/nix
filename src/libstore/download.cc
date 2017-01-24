@@ -276,7 +276,7 @@ struct CurlDownloader : public Downloader
                     code == CURLE_ABORTED_BY_CALLBACK && _isInterrupted
                     ? DownloadError(Interrupted, format("download of ‘%s’ was interrupted") % request.uri)
                     : httpStatus != 0
-                      ? DownloadError(err, format("unable to download ‘%s’: HTTP error %d") % request.uri % httpStatus)
+                      ? DownloadError(err, format("unable to download ‘%s’: HTTP error %d (curl error: %s)") % request.uri % httpStatus % curl_easy_strerror(code))
                       : DownloadError(err, format("unable to download ‘%s’: %s (%d)") % request.uri % curl_easy_strerror(code) % code);
 
                 /* If this is a transient error, then maybe retry the
