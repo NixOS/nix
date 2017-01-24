@@ -172,6 +172,13 @@ struct CurlDownloader : public Downloader
             return ((DownloadItem *) userp)->progressCallback(dltotal, dlnow);
         }
 
+        static int debugCallback(CURL * handle, curl_infotype type, char * data, size_t size, void * userptr)
+        {
+            if (type == CURLINFO_TEXT)
+                vomit("curl: %s", chomp(std::string(data, size)));
+            return 0;
+        }
+
         void init()
         {
             // FIXME: handle parallel downloads.
@@ -184,6 +191,12 @@ struct CurlDownloader : public Downloader
             if (!req) req = curl_easy_init();
 
             curl_easy_reset(req);
+
+            if (verbosity >= lvlVomit) {
+                curl_easy_setopt(req, CURLOPT_VERBOSE, 1);
+                curl_easy_setopt(req, CURLOPT_DEBUGFUNCTION, DownloadItem::debugCallback);
+            }
+
             curl_easy_setopt(req, CURLOPT_URL, request.uri.c_str());
             curl_easy_setopt(req, CURLOPT_FOLLOWLOCATION, 1L);
             curl_easy_setopt(req, CURLOPT_NOSIGNAL, 1);
@@ -387,7 +400,7 @@ struct CurlDownloader : public Downloader
                 nextWakeup != std::chrono::steady_clock::time_point()
                 ? std::max(0, (int) std::chrono::duration_cast<std::chrono::milliseconds>(nextWakeup - std::chrono::steady_clock::now()).count())
                 : 1000000000;
-            //printMsg(lvlVomit, format("download thread waiting for %d ms") % sleepTimeMs);
+            vomit("download thread waiting for %d ms", sleepTimeMs);
             mc = curl_multi_wait(curlm, extraFDs, 1, sleepTimeMs, &numfds);
             if (mc != CURLM_OK)
                 throw nix::Error(format("unexpected error from curl_multi_wait(): %s") % curl_multi_strerror(mc));
