@@ -5,6 +5,9 @@
 #include <memory>
 #include <tuple>
 #include <iomanip>
+if __APPLE__
+#include <sys/time.h>
+#endif
 
 #include "shared.hh"
 #include "pathlocks.hh"
@@ -225,7 +228,11 @@ int main (int argc, char * * argv)
                     break;
                 }
 
+#if __APPLE__
+                futimes(bestSlotLock.get(), NULL);
+#else
                 futimens(bestSlotLock.get(), NULL);
+#endif
 
                 lock = -1;
 
