@@ -14,7 +14,6 @@ LIBLZMA_LIBS = @LIBLZMA_LIBS@
 SQLITE3_LIBS = @SQLITE3_LIBS@
 bash = @bash@
 bindir = @bindir@
-bsddiff_compat_include = @bsddiff_compat_include@
 curl = @curl@
 datadir = @datadir@
 datarootdir = @datarootdir@
