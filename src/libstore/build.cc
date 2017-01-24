@@ -864,6 +864,9 @@ private:
     /* Start building a derivation. */
     void startBuilder();
 
+    /* Handle the exportReferencesGraph attribute. */
+    void doExportReferencesGraph();
+
     /* Run the builder's process. */
     void runChild();
 
@@ -1791,51 +1794,9 @@ void DerivationGoal::startBuilder()
     for (auto & output : drv->outputs)
         inputRewrites[hashPlaceholder(output.first)] = output.second.path;
 
-    /* The `exportReferencesGraph' feature allows the references graph
-       to be passed to a builder.  This attribute should be a list of
-       pairs [name1 path1 name2 path2 ...].  The references graph of
-       each `pathN' will be stored in a text file `nameN' in the
-       temporary build directory.  The text files have the format used
-       by `nix-store --register-validity'.  However, the deriver
-       fields are left empty. */
-    string s = get(drv->env, "exportReferencesGraph");
-    Strings ss = tokenizeString<Strings>(s);
-    if (ss.size() % 2 != 0)
-        throw BuildError(format("odd number of tokens in ‘exportReferencesGraph’: ‘%1%’") % s);
-    for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
-        string fileName = *i++;
-        checkStoreName(fileName); /* !!! abuse of this function */
 
-        /* Check that the store path is valid. */
-        Path storePath = *i++;
-        if (!worker.store.isInStore(storePath))
-            throw BuildError(format("‘exportReferencesGraph’ contains a non-store path ‘%1%’")
-                % storePath);
-        storePath = worker.store.toStorePath(storePath);
-        if (!worker.store.isValidPath(storePath))
-            throw BuildError(format("‘exportReferencesGraph’ contains an invalid path ‘%1%’")
-                % storePath);
-
-        /* If there are derivations in the graph, then include their
-           outputs as well.  This is useful if you want to do things
-           like passing all build-time dependencies of some path to a
-           derivation that builds a NixOS DVD image. */
-        PathSet paths, paths2;
-        worker.store.computeFSClosure(storePath, paths);
-        paths2 = paths;
-
-        for (auto & j : paths2) {
-            if (isDerivation(j)) {
-                Derivation drv = worker.store.derivationFromPath(j);
-                for (auto & k : drv.outputs)
-                    worker.store.computeFSClosure(k.second.path, paths);
-            }
-        }
-
-        /* Write closure info to `fileName'. */
-        writeFile(tmpDir + "/" + fileName,
-            worker.store.makeValidityRegistration(paths, false, false));
-    }
+    /* Handle exportReferencesGraph(), if set. */
+    doExportReferencesGraph();
 
 
     /* If `build-users-group' is not empty, then we have to build as
@@ -2238,6 +2199,56 @@ void DerivationGoal::startBuilder()
             throw Error(string(msg, 1));
         }
         debug(msg);
+    }
+}
+
+
+void DerivationGoal::doExportReferencesGraph()
+{
+    /* The `exportReferencesGraph' feature allows the references graph
+       to be passed to a builder.  This attribute should be a list of
+       pairs [name1 path1 name2 path2 ...].  The references graph of
+       each `pathN' will be stored in a text file `nameN' in the
+       temporary build directory.  The text files have the format used
+       by `nix-store --register-validity'.  However, the deriver
+       fields are left empty. */
+    string s = get(drv->env, "exportReferencesGraph");
+    Strings ss = tokenizeString<Strings>(s);
+    if (ss.size() % 2 != 0)
+        throw BuildError(format("odd number of tokens in ‘exportReferencesGraph’: ‘%1%’") % s);
+    for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
+        string fileName = *i++;
+        checkStoreName(fileName); /* !!! abuse of this function */
+
+        /* Check that the store path is valid. */
+        Path storePath = *i++;
+        if (!worker.store.isInStore(storePath))
+            throw BuildError(format("‘exportReferencesGraph’ contains a non-store path ‘%1%’")
+                % storePath);
+        storePath = worker.store.toStorePath(storePath);
+        if (!worker.store.isValidPath(storePath))
+            throw BuildError(format("‘exportReferencesGraph’ contains an invalid path ‘%1%’")
+                % storePath);
+
+        /* If there are derivations in the graph, then include their
+           outputs as well.  This is useful if you want to do things
+           like passing all build-time dependencies of some path to a
+           derivation that builds a NixOS DVD image. */
+        PathSet paths, paths2;
+        worker.store.computeFSClosure(storePath, paths);
+        paths2 = paths;
+
+        for (auto & j : paths2) {
+            if (isDerivation(j)) {
+                Derivation drv = worker.store.derivationFromPath(j);
+                for (auto & k : drv.outputs)
+                    worker.store.computeFSClosure(k.second.path, paths);
+            }
+        }
+
+        /* Write closure info to `fileName'. */
+        writeFile(tmpDir + "/" + fileName,
+            worker.store.makeValidityRegistration(paths, false, false));
     }
 }
 
