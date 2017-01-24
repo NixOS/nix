@@ -1,6 +1,8 @@
+{ useClang ? false }:
+
 with import <nixpkgs> {};
 
-stdenv.mkDerivation {
+(if useClang then clangStdenv else stdenv).mkDerivation {
   name = "nix";
 
   buildInputs =
