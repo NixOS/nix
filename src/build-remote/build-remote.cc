@@ -68,7 +68,8 @@ public:
         enabled{true} {};
 };;
 
-static std::vector<machine> read_conf() {
+static std::vector<machine> read_conf()
+{
     auto conf = getEnv("NIX_REMOTE_SYSTEMS", SYSCONFDIR "/nix/machines");
 
     auto machines = std::vector<machine>{};
@@ -108,8 +109,9 @@ static std::vector<machine> read_conf() {
 
 static string currentLoad;
 
-static int openSlotLock(const machine & m, unsigned long long slot) {
-    auto fn_stream = std::stringstream(currentLoad, std::ios_base::ate | std::ios_base::out);
+static int openSlotLock(const machine & m, unsigned long long slot)
+{
+    std::ostringstream fn_stream(currentLoad, std::ios_base::ate | std::ios_base::out);
     fn_stream << "/";
     for (auto t : m.systemTypes) {
         fn_stream << t << "-";
