@@ -1246,7 +1246,7 @@ std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()>
     res->it = interruptCallbacks->end();
     res->it--;
 
-    return res;
+    return std::unique_ptr<InterruptCallback>(res.release());
 }
 
 }
