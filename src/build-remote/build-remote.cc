@@ -5,7 +5,7 @@
 #include <memory>
 #include <tuple>
 #include <iomanip>
-if __APPLE__
+#if __APPLE__
 #include <sys/time.h>
 #endif
 
