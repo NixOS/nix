@@ -7,6 +7,13 @@ self="$(dirname "$0")"
 nix="@nix@"
 cacert="@cacert@"
 
+
+# macOS support for 10.10 or higher
+if [[ "$(uname -s)" = "Darwin" && $(($(sw_vers -productVersion | cut -d '.' -f 2))) -lt 10 ]]; then
+    echo "$0: macOS $(sw_vers -productVersion) is not supported, upgrade to 10.10 or higher"
+    exit 1
+fi
+
 if ! [ -e "$self/.reginfo" ]; then
     echo "$0: incomplete installer (.reginfo is missing)" >&2
     exit 1
