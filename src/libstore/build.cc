@@ -780,6 +780,7 @@ private:
     };
     typedef map<Path, ChrootPath> DirsInChroot; // maps target path to source path
     DirsInChroot dirsInChroot;
+
     typedef map<string, string> Environment;
     Environment env;
 
@@ -816,6 +817,8 @@ private:
 
     const uid_t sandboxUid = 1000;
     const gid_t sandboxGid = 100;
+
+    const static Path homeDir;
 
 public:
     DerivationGoal(const Path & drvPath, const StringSet & wantedOutputs,
@@ -864,6 +867,12 @@ private:
     /* Start building a derivation. */
     void startBuilder();
 
+    /* Fill in the environment for the builder. */
+    void initEnv();
+
+    /* Make a file owned by the builder. */
+    void chownToBuilder(const Path & path);
+
     /* Handle the exportReferencesGraph attribute. */
     void doExportReferencesGraph();
 
@@ -905,6 +914,9 @@ private:
 
     void done(BuildResult::Status status, const string & msg = "");
 };
+
+
+const Path DerivationGoal::homeDir = "/homeless-shelter";
 
 
 DerivationGoal::DerivationGoal(const Path & drvPath, const StringSet & wantedOutputs,
@@ -1672,11 +1684,7 @@ void DerivationGoal::startBuilder()
     additionalSandboxProfile = get(drv->env, "__sandboxProfile");
 #endif
 
-    /* Are we doing a chroot build?  Note that fixed-output
-       derivations are never done in a chroot, mainly so that
-       functions like fetchurl (which needs a proper /etc/resolv.conf)
-       work properly.  Purity checking for fixed-output derivations
-       is somewhat pointless anyway. */
+    /* Are we doing a chroot build? */
     {
         string x = settings.get("build-use-sandbox",
             /* deprecated alias */
@@ -1703,31 +1711,15 @@ void DerivationGoal::startBuilder()
     if (worker.store.storeDir != worker.store.realStoreDir)
         useChroot = true;
 
-    /* Construct the environment passed to the builder. */
-    env.clear();
+    /* If `build-users-group' is not empty, then we have to build as
+       one of the members of that group. */
+    if (settings.buildUsersGroup != "" && getuid() == 0) {
+        buildUser.acquire();
 
-    /* Most shells initialise PATH to some default (/bin:/usr/bin:...) when
-       PATH is not set.  We don't want this, so we fill it in with some dummy
-       value. */
-    env["PATH"] = "/path-not-set";
-
-    /* Set HOME to a non-existing path to prevent certain programs from using
-       /etc/passwd (or NIS, or whatever) to locate the home directory (for
-       example, wget looks for ~/.wgetrc).  I.e., these tools use /etc/passwd
-       if HOME is not set, but they will just assume that the settings file
-       they are looking for does not exist if HOME is set but points to some
-       non-existing path. */
-    Path homeDir = "/homeless-shelter";
-    env["HOME"] = homeDir;
-
-    /* Tell the builder where the Nix store is.  Usually they
-       shouldn't care, but this is useful for purity checking (e.g.,
-       the compiler or linker might only want to accept paths to files
-       in the store or in the build directory). */
-    env["NIX_STORE"] = worker.store.storeDir;
-
-    /* The maximum number of cores to utilize for parallel building. */
-    env["NIX_BUILD_CORES"] = (format("%d") % settings.buildCores).str();
+        /* Make sure that no other processes are executing under this
+           uid. */
+        buildUser.kill();
+    }
 
     /* Create a temporary directory where the build will take
        place. */
@@ -1737,85 +1729,17 @@ void DerivationGoal::startBuilder()
     /* In a sandbox, for determinism, always use the same temporary
        directory. */
     tmpDirInSandbox = useChroot ? canonPath("/tmp", true) + "/nix-build-" + drvName + "-0" : tmpDir;
+    chownToBuilder(tmpDir);
 
-    /* Add all bindings specified in the derivation via the
-       environments, except those listed in the passAsFile
-       attribute. Those are passed as file names pointing to
-       temporary files containing the contents. */
-    PathSet filesToChown;
-    StringSet passAsFile = tokenizeString<StringSet>(get(drv->env, "passAsFile"));
-    int fileNr = 0;
-    for (auto & i : drv->env) {
-        if (passAsFile.find(i.first) == passAsFile.end()) {
-            env[i.first] = i.second;
-        } else {
-            string fn = ".attr-" + std::to_string(fileNr++);
-            Path p = tmpDir + "/" + fn;
-            writeFile(p, i.second);
-            filesToChown.insert(p);
-            env[i.first + "Path"] = tmpDirInSandbox + "/" + fn;
-        }
-    }
-
-    /* For convenience, set an environment pointing to the top build
-       directory. */
-    env["NIX_BUILD_TOP"] = tmpDirInSandbox;
-
-    /* Also set TMPDIR and variants to point to this directory. */
-    env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmpDirInSandbox;
-
-    /* Explicitly set PWD to prevent problems with chroot builds.  In
-       particular, dietlibc cannot figure out the cwd because the
-       inode of the current directory doesn't appear in .. (because
-       getdents returns the inode of the mount point). */
-    env["PWD"] = tmpDirInSandbox;
-
-    /* Compatibility hack with Nix <= 0.7: if this is a fixed-output
-       derivation, tell the builder, so that for instance `fetchurl'
-       can skip checking the output.  On older Nixes, this environment
-       variable won't be set, so `fetchurl' will do the check. */
-    if (fixedOutput) env["NIX_OUTPUT_CHECKED"] = "1";
-
-    /* *Only* if this is a fixed-output derivation, propagate the
-       values of the environment variables specified in the
-       `impureEnvVars' attribute to the builder.  This allows for
-       instance environment variables for proxy configuration such as
-       `http_proxy' to be easily passed to downloaders like
-       `fetchurl'.  Passing such environment variables from the caller
-       to the builder is generally impure, but the output of
-       fixed-output derivations is by definition pure (since we
-       already know the cryptographic hash of the output). */
-    if (fixedOutput) {
-        Strings varNames = tokenizeString<Strings>(get(drv->env, "impureEnvVars"));
-        for (auto & i : varNames) env[i] = getEnv(i);
-    }
+    /* Construct the environment passed to the builder. */
+    initEnv();
 
     /* Substitute output placeholders with the actual output paths. */
     for (auto & output : drv->outputs)
         inputRewrites[hashPlaceholder(output.first)] = output.second.path;
 
-
     /* Handle exportReferencesGraph(), if set. */
     doExportReferencesGraph();
-
-
-    /* If `build-users-group' is not empty, then we have to build as
-       one of the members of that group. */
-    if (settings.buildUsersGroup != "" && getuid() == 0) {
-        buildUser.acquire();
-
-        /* Make sure that no other processes are executing under this
-           uid. */
-        buildUser.kill();
-
-        /* Change ownership of the temporary build directory. */
-        filesToChown.insert(tmpDir);
-
-        for (auto & p : filesToChown)
-            if (chown(p.c_str(), buildUser.getUID(), buildUser.getGID()) == -1)
-                throw SysError(format("cannot change ownership of ‘%1%’") % p);
-    }
-
 
     if (useChroot) {
 
@@ -2200,6 +2124,93 @@ void DerivationGoal::startBuilder()
         }
         debug(msg);
     }
+}
+
+
+void DerivationGoal::initEnv()
+{
+    env.clear();
+
+    /* Most shells initialise PATH to some default (/bin:/usr/bin:...) when
+       PATH is not set.  We don't want this, so we fill it in with some dummy
+       value. */
+    env["PATH"] = "/path-not-set";
+
+    /* Set HOME to a non-existing path to prevent certain programs from using
+       /etc/passwd (or NIS, or whatever) to locate the home directory (for
+       example, wget looks for ~/.wgetrc).  I.e., these tools use /etc/passwd
+       if HOME is not set, but they will just assume that the settings file
+       they are looking for does not exist if HOME is set but points to some
+       non-existing path. */
+    env["HOME"] = homeDir;
+
+    /* Tell the builder where the Nix store is.  Usually they
+       shouldn't care, but this is useful for purity checking (e.g.,
+       the compiler or linker might only want to accept paths to files
+       in the store or in the build directory). */
+    env["NIX_STORE"] = worker.store.storeDir;
+
+    /* The maximum number of cores to utilize for parallel building. */
+    env["NIX_BUILD_CORES"] = (format("%d") % settings.buildCores).str();
+
+    /* Add all bindings specified in the derivation via the
+       environments, except those listed in the passAsFile
+       attribute. Those are passed as file names pointing to
+       temporary files containing the contents. */
+    StringSet passAsFile = tokenizeString<StringSet>(get(drv->env, "passAsFile"));
+    int fileNr = 0;
+    for (auto & i : drv->env) {
+        if (passAsFile.find(i.first) == passAsFile.end()) {
+            env[i.first] = i.second;
+        } else {
+            string fn = ".attr-" + std::to_string(fileNr++);
+            Path p = tmpDir + "/" + fn;
+            writeFile(p, i.second);
+            chownToBuilder(p);
+            env[i.first + "Path"] = tmpDirInSandbox + "/" + fn;
+        }
+    }
+
+    /* For convenience, set an environment pointing to the top build
+       directory. */
+    env["NIX_BUILD_TOP"] = tmpDirInSandbox;
+
+    /* Also set TMPDIR and variants to point to this directory. */
+    env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmpDirInSandbox;
+
+    /* Explicitly set PWD to prevent problems with chroot builds.  In
+       particular, dietlibc cannot figure out the cwd because the
+       inode of the current directory doesn't appear in .. (because
+       getdents returns the inode of the mount point). */
+    env["PWD"] = tmpDirInSandbox;
+
+    /* Compatibility hack with Nix <= 0.7: if this is a fixed-output
+       derivation, tell the builder, so that for instance `fetchurl'
+       can skip checking the output.  On older Nixes, this environment
+       variable won't be set, so `fetchurl' will do the check. */
+    if (fixedOutput) env["NIX_OUTPUT_CHECKED"] = "1";
+
+    /* *Only* if this is a fixed-output derivation, propagate the
+       values of the environment variables specified in the
+       `impureEnvVars' attribute to the builder.  This allows for
+       instance environment variables for proxy configuration such as
+       `http_proxy' to be easily passed to downloaders like
+       `fetchurl'.  Passing such environment variables from the caller
+       to the builder is generally impure, but the output of
+       fixed-output derivations is by definition pure (since we
+       already know the cryptographic hash of the output). */
+    if (fixedOutput) {
+        Strings varNames = tokenizeString<Strings>(get(drv->env, "impureEnvVars"));
+        for (auto & i : varNames) env[i] = getEnv(i);
+    }
+}
+
+
+void DerivationGoal::chownToBuilder(const Path & path)
+{
+    if (!buildUser.enabled()) return;
+    if (chown(path.c_str(), buildUser.getUID(), buildUser.getGID()) == -1)
+        throw SysError(format("cannot change ownership of ‘%1%’") % path);
 }
 
 
