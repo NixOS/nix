@@ -13,7 +13,7 @@
 namespace nix {
 
 
-int openLockFile(const Path & path, bool create)
+AutoCloseFD openLockFile(const Path & path, bool create)
 {
     AutoCloseFD fd;
 
@@ -21,7 +21,7 @@ int openLockFile(const Path & path, bool create)
     if (!fd && (create || errno != ENOENT))
         throw SysError(format("opening lock file ‘%1%’") % path);
 
-    return fd.release();
+    return fd;
 }
 
 

@@ -109,7 +109,7 @@ static std::vector<machine> read_conf()
 
 static string currentLoad;
 
-static int openSlotLock(const machine & m, unsigned long long slot)
+static AutoCloseFD openSlotLock(const machine & m, unsigned long long slot)
 {
     std::ostringstream fn_stream(currentLoad, std::ios_base::ate | std::ios_base::out);
     fn_stream << "/";
@@ -187,7 +187,7 @@ int main (int argc, char * * argv)
                         AutoCloseFD free;
                         unsigned long long load = 0;
                         for (unsigned long long slot = 0; slot < m.maxJobs; ++slot) {
-                            AutoCloseFD slotLock = openSlotLock(m, slot);
+                            auto slotLock = openSlotLock(m, slot);
                             if (lockFile(slotLock.get(), ltWrite, false)) {
                                 if (!free) {
                                     free = std::move(slotLock);

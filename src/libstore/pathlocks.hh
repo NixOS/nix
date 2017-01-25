@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types.hh"
+#include "util.hh"
 
 
 namespace nix {
@@ -9,7 +9,7 @@ namespace nix {
 /* Open (possibly create) a lock file and return the file descriptor.
    -1 is returned if create is false and the lock could not be opened
    because it doesn't exist.  Any other error throws an exception. */
-int openLockFile(const Path & path, bool create);
+AutoCloseFD openLockFile(const Path & path, bool create);
 
 /* Delete an open lock file. */
 void deleteLockFile(const Path & path, int fd);
@@ -19,7 +19,7 @@ enum LockType { ltRead, ltWrite, ltNone };
 bool lockFile(int fd, LockType lockType, bool wait);
 
 
-class PathLocks 
+class PathLocks
 {
 private:
     typedef std::pair<int, Path> FDPair;
