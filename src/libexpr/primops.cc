@@ -998,12 +998,9 @@ static void prim_attrNames(EvalState & state, const Pos & pos, Value * * args, V
 
     state.mkList(v, args[0]->attrs->size());
 
-    unsigned int n = 0;
-    for (auto & i : *args[0]->attrs)
-        mkString(*(v.listElems()[n++] = state.allocValue()), i.name);
-
-    std::sort(v.listElems(), v.listElems() + n,
-        [](Value * v1, Value * v2) { return strcmp(v1->string.s, v2->string.s) < 0; });
+    size_t n = 0;
+    for (auto & i : args[0]->attrs->lexicographicOrder())
+        mkString(*(v.listElems()[n++] = state.allocValue()), i->name);
 }
 
 

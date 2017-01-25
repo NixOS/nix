@@ -91,13 +91,9 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
         break;
     case tAttrs: {
         str << "{ ";
-        typedef std::map<string, Value *> Sorted;
-        Sorted sorted;
-        for (auto & i : *v.attrs)
-            sorted[i.name] = i.value;
-        for (auto & i : sorted) {
-            str << i.first << " = ";
-            printValue(str, active, *i.second);
+        for (auto & i : v.attrs->lexicographicOrder()) {
+            str << i->name << " = ";
+            printValue(str, active, *i->value);
             str << "; ";
         }
         str << "}";

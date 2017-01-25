@@ -284,25 +284,19 @@ static void getDerivations(EvalState & state, Value & vIn,
            there are names clashes between derivations, the derivation
            bound to the attribute with the "lower" name should take
            precedence). */
-        typedef std::map<string, Symbol> SortedSymbols;
-        SortedSymbols attrs;
-        for (auto & i : *v.attrs)
-            attrs.insert(std::pair<string, Symbol>(i.name, i.name));
-
-        for (auto & i : attrs) {
-            Activity act(*logger, lvlDebug, format("evaluating attribute ‘%1%’") % i.first);
-            string pathPrefix2 = addToPath(pathPrefix, i.first);
-            Value & v2(*v.attrs->find(i.second)->value);
+        for (auto & i : v.attrs->lexicographicOrder()) {
+            Activity act(*logger, lvlDebug, format("evaluating attribute ‘%1%’") % i->name);
+            string pathPrefix2 = addToPath(pathPrefix, i->name);
             if (combineChannels)
-                getDerivations(state, v2, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
-            else if (getDerivation(state, v2, pathPrefix2, drvs, done, ignoreAssertionFailures)) {
+                getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
+            else if (getDerivation(state, *i->value, pathPrefix2, drvs, done, ignoreAssertionFailures)) {
                 /* If the value of this attribute is itself a set,
                    should we recurse into it?  => Only if it has a
                    `recurseForDerivations = true' attribute. */
-                if (v2.type == tAttrs) {
-                    Bindings::iterator j = v2.attrs->find(state.symbols.create("recurseForDerivations"));
-                    if (j != v2.attrs->end() && state.forceBool(*j->value, *j->pos))
-                        getDerivations(state, v2, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
+                if (i->value->type == tAttrs) {
+                    Bindings::iterator j = i->value->attrs->find(state.symbols.create("recurseForDerivations"));
+                    if (j != i->value->attrs->end() && state.forceBool(*j->value, *j->pos))
+                        getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
                 }
             }
         }
