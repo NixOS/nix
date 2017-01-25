@@ -230,6 +230,10 @@ struct CurlDownloader : public Downloader
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYHOST, 0);
             }
 
+	    std::string proxy(getEnv("NIX_CURL_PROXY","NOTHING"));
+	    if (proxy != "NOTHING")
+		curl_easy_setopt(req, CURLOPT_PROXY, proxy.c_str());
+
             result.data = std::make_shared<std::string>();
         }
 
