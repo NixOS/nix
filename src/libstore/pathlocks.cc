@@ -136,6 +136,7 @@ bool PathLocks::lockPaths(const PathSet & _paths,
                         /* Failed to lock this path; release all other
                            locks. */
                         unlock();
+                        lockedPaths_.lock()->erase(lockPath);
                         return false;
                     }
                 }
