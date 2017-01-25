@@ -865,6 +865,9 @@ private:
     /* Fill in the environment for the builder. */
     void initEnv();
 
+    /* Write a JSON file containing the derivation attributes. */
+    void writeStructuredAttrs();
+
     /* Make a file owned by the builder. */
     void chownToBuilder(const Path & path);
 
@@ -1726,12 +1729,14 @@ void DerivationGoal::startBuilder()
     tmpDirInSandbox = useChroot ? canonPath("/tmp", true) + "/nix-build-" + drvName + "-0" : tmpDir;
     chownToBuilder(tmpDir);
 
-    /* Construct the environment passed to the builder. */
-    initEnv();
-
     /* Substitute output placeholders with the actual output paths. */
     for (auto & output : drv->outputs)
         inputRewrites[hashPlaceholder(output.first)] = output.second.path;
+
+    /* Construct the environment passed to the builder. */
+    initEnv();
+
+    writeStructuredAttrs();
 
     /* Handle exportReferencesGraph(), if set. */
     doExportReferencesGraph();
@@ -2148,22 +2153,29 @@ void DerivationGoal::initEnv()
     /* The maximum number of cores to utilize for parallel building. */
     env["NIX_BUILD_CORES"] = (format("%d") % settings.buildCores).str();
 
-    /* Add all bindings specified in the derivation via the
-       environments, except those listed in the passAsFile
-       attribute. Those are passed as file names pointing to
-       temporary files containing the contents. */
-    StringSet passAsFile = tokenizeString<StringSet>(get(drv->env, "passAsFile"));
-    int fileNr = 0;
-    for (auto & i : drv->env) {
-        if (passAsFile.find(i.first) == passAsFile.end()) {
-            env[i.first] = i.second;
-        } else {
-            string fn = ".attr-" + std::to_string(fileNr++);
-            Path p = tmpDir + "/" + fn;
-            writeFile(p, i.second);
-            chownToBuilder(p);
-            env[i.first + "Path"] = tmpDirInSandbox + "/" + fn;
+    /* In non-structured mode, add all bindings specified in the
+       derivation via the environments, except those listed in the
+       passAsFile attribute. Those are passed as file names pointing
+       to temporary files containing the contents. Note that
+       passAsFile is ignored in structure mode because it's not
+       needed (attributes are not passed through the environment, so
+       there is no size constraint). */
+    if (!drv->env.count("__json")) {
+
+        StringSet passAsFile = tokenizeString<StringSet>(get(drv->env, "passAsFile"));
+        int fileNr = 0;
+        for (auto & i : drv->env) {
+            if (passAsFile.find(i.first) == passAsFile.end()) {
+                env[i.first] = i.second;
+            } else {
+                string fn = ".attr-" + std::to_string(fileNr++);
+                Path p = tmpDir + "/" + fn;
+                writeFile(p, i.second);
+                chownToBuilder(p);
+                env[i.first + "Path"] = tmpDirInSandbox + "/" + fn;
+            }
         }
+
     }
 
     /* For convenience, set an environment pointing to the top build
@@ -2198,6 +2210,15 @@ void DerivationGoal::initEnv()
         Strings varNames = tokenizeString<Strings>(get(drv->env, "impureEnvVars"));
         for (auto & i : varNames) env[i] = getEnv(i);
     }
+}
+
+
+void DerivationGoal::writeStructuredAttrs()
+{
+    auto json = drv->env.find("__json");
+    if (json == drv->env.end()) return;
+
+    writeFile(tmpDir + "/.attrs.json", rewriteStrings(json->second, inputRewrites));
 }
 
 

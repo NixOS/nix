@@ -8,6 +8,7 @@
 #include "names.hh"
 #include "store-api.hh"
 #include "util.hh"
+#include "json.hh"
 #include "value-to-json.hh"
 #include "value-to-xml.hh"
 #include "primops.hh"
@@ -474,6 +475,13 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         throw;
     }
 
+    /* Check whether attributes should be passed as a JSON file. */
+    std::ostringstream jsonBuf;
+    std::unique_ptr<JSONObject> jsonObject;
+    attr = args[0]->attrs->find(state.sStructuredAttrs);
+    if (attr != args[0]->attrs->end() && state.forceBool(*attr->value, pos))
+        jsonObject = std::make_unique<JSONObject>(jsonBuf);
+
     /* Check whether null attributes should be ignored. */
     bool ignoreNulls = false;
     attr = args[0]->attrs->find(state.sIgnoreNulls);
@@ -491,24 +499,48 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     StringSet outputs;
     outputs.insert("out");
 
-    for (auto & i : *args[0]->attrs) {
-        if (i.name == state.sIgnoreNulls) continue;
-        string key = i.name;
+    for (auto & i : args[0]->attrs->lexicographicOrder()) {
+        if (i->name == state.sIgnoreNulls) continue;
+        string key = i->name;
         Activity act(*logger, lvlVomit, format("processing attribute ‘%1%’") % key);
+
+        auto handleHashMode = [&](const std::string & s) {
+            if (s == "recursive") outputHashRecursive = true;
+            else if (s == "flat") outputHashRecursive = false;
+            else throw EvalError("invalid value ‘%s’ for ‘outputHashMode’ attribute, at %s", s, posDrvName);
+        };
+
+        auto handleOutputs = [&](const Strings & ss) {
+            outputs.clear();
+            for (auto & j : ss) {
+                if (outputs.find(j) != outputs.end())
+                    throw EvalError(format("duplicate derivation output ‘%1%’, at %2%") % j % posDrvName);
+                /* !!! Check whether j is a valid attribute
+                   name. */
+                /* Derivations cannot be named ‘drv’, because
+                   then we'd have an attribute ‘drvPath’ in
+                   the resulting set. */
+                if (j == "drv")
+                    throw EvalError(format("invalid derivation output name ‘drv’, at %1%") % posDrvName);
+                outputs.insert(j);
+            }
+            if (outputs.empty())
+                throw EvalError(format("derivation cannot have an empty set of outputs, at %1%") % posDrvName);
+        };
 
         try {
 
             if (ignoreNulls) {
-                state.forceValue(*i.value);
-                if (i.value->type == tNull) continue;
+                state.forceValue(*i->value);
+                if (i->value->type == tNull) continue;
             }
 
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
             if (key == "args") {
-                state.forceList(*i.value, pos);
-                for (unsigned int n = 0; n < i.value->listSize(); ++n) {
-                    string s = state.coerceToString(posDrvName, *i.value->listElems()[n], context, true);
+                state.forceList(*i->value, pos);
+                for (unsigned int n = 0; n < i->value->listSize(); ++n) {
+                    string s = state.coerceToString(posDrvName, *i->value->listElems()[n], context, true);
                     drv.args.push_back(s);
                 }
             }
@@ -516,39 +548,51 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             /* All other attributes are passed to the builder through
                the environment. */
             else {
-                string s = state.coerceToString(posDrvName, *i.value, context, true);
-                drv.env[key] = s;
-                if (key == "builder") drv.builder = s;
-                else if (i.name == state.sSystem) drv.platform = s;
-                else if (i.name == state.sName) {
-                    drvName = s;
-                    printMsg(lvlVomit, format("derivation name is ‘%1%’") % drvName);
-                }
-                else if (key == "outputHash") outputHash = s;
-                else if (key == "outputHashAlgo") outputHashAlgo = s;
-                else if (key == "outputHashMode") {
-                    if (s == "recursive") outputHashRecursive = true;
-                    else if (s == "flat") outputHashRecursive = false;
-                    else throw EvalError(format("invalid value ‘%1%’ for ‘outputHashMode’ attribute, at %2%") % s % posDrvName);
-                }
-                else if (key == "outputs") {
-                    Strings tmp = tokenizeString<Strings>(s);
-                    outputs.clear();
-                    for (auto & j : tmp) {
-                        if (outputs.find(j) != outputs.end())
-                            throw EvalError(format("duplicate derivation output ‘%1%’, at %2%") % j % posDrvName);
-                        /* !!! Check whether j is a valid attribute
-                           name. */
-                        /* Derivations cannot be named ‘drv’, because
-                           then we'd have an attribute ‘drvPath’ in
-                           the resulting set. */
-                        if (j == "drv")
-                            throw EvalError(format("invalid derivation output name ‘drv’, at %1%") % posDrvName);
-                        outputs.insert(j);
+
+                if (jsonObject) {
+
+                    if (i->name == state.sStructuredAttrs) continue;
+
+                    auto placeholder(jsonObject->placeholder(key));
+                    printValueAsJSON(state, true, *i->value, placeholder, context);
+
+                    if (i->name == state.sBuilder)
+                        drv.builder = state.forceString(*i->value, context, posDrvName);
+                    else if (i->name == state.sSystem)
+                        drv.platform = state.forceStringNoCtx(*i->value, posDrvName);
+                    else if (i->name == state.sName)
+                        drvName = state.forceStringNoCtx(*i->value, posDrvName);
+                    else if (key == "outputHash")
+                        outputHash = state.forceStringNoCtx(*i->value, posDrvName);
+                    else if (key == "outputHashAlgo")
+                        outputHashAlgo = state.forceStringNoCtx(*i->value, posDrvName);
+                    else if (key == "outputHashMode")
+                        handleHashMode(state.forceStringNoCtx(*i->value, posDrvName));
+                    else if (key == "outputs") {
+                        /* Require ‘outputs’ to be a list of strings. */
+                        state.forceList(*i->value, posDrvName);
+                        Strings ss;
+                        for (unsigned int n = 0; n < i->value->listSize(); ++n)
+                            ss.emplace_back(state.forceStringNoCtx(*i->value->listElems()[n], posDrvName));
+                        handleOutputs(ss);
                     }
-                    if (outputs.empty())
-                        throw EvalError(format("derivation cannot have an empty set of outputs, at %1%") % posDrvName);
+
+                } else {
+                    auto s = state.coerceToString(posDrvName, *i->value, context, true);
+                    drv.env.emplace(key, s);
+                    if (i->name == state.sBuilder) drv.builder = s;
+                    else if (i->name == state.sSystem) drv.platform = s;
+                    else if (i->name == state.sName) {
+                        drvName = s;
+                        printMsg(lvlVomit, format("derivation name is ‘%1%’") % drvName);
+                    }
+                    else if (key == "outputHash") outputHash = s;
+                    else if (key == "outputHashAlgo") outputHashAlgo = s;
+                    else if (key == "outputHashMode") handleHashMode(s);
+                    else if (key == "outputs")
+                        handleOutputs(tokenizeString<Strings>(s));
                 }
+
             }
 
         } catch (Error & e) {
@@ -556,6 +600,11 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                 % key % drvName % posDrvName);
             throw;
         }
+    }
+
+    if (jsonObject) {
+        jsonObject.reset();
+        drv.env.emplace("__json", jsonBuf.str());
     }
 
     /* Everything in the context of the strings in the derivation
