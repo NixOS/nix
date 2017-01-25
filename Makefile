@@ -32,8 +32,6 @@ GLOBAL_CXXFLAGS += -std=c++14 -g -Wall
 
 -include Makefile.config
 
-OPTIMIZE = 1
-
 ifeq ($(OPTIMIZE), 1)
   GLOBAL_CFLAGS += -O3
   GLOBAL_CXXFLAGS += -O3

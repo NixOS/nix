@@ -57,8 +57,17 @@ if test "$sys_name" = sunos; then
 fi
 
 
-CFLAGS=
-CXXFLAGS=
+# The default autotools value for C{,XX}FLAGS
+# is '-O2 -g'. Our intention is to have C{,XX}FLAGS=''
+# so 'make OPTIMIZE=0' would do the unoptimised build.
+AC_ARG_ENABLE(vanilla-opt, AC_HELP_STRING([--enable-vanilla-opt],
+  [Allow user to override CFLAGS/CXXFLAGS [default=no].]),
+  [OPTIMIZE=0],
+  [OPTIMIZE=1
+  CFLAGS=
+  CXXFLAGS=])
+AC_SUBST(OPTIMIZE)
+
 AC_PROG_CC
 AC_PROG_CXX
 AX_CXX_COMPILE_STDCXX_11
