@@ -27,8 +27,7 @@ public:
             fds[0].events = 0;
             if (poll(fds, 1, -1) == -1) abort(); // can't happen
             assert(fds[0].revents & POLLHUP);
-            /* We got POLLHUP, so send an INT signal to the main thread. */
-            kill(getpid(), SIGINT);
+            triggerInterrupt();
         });
     };
 

@@ -433,5 +433,21 @@ struct InterruptCallback
 std::unique_ptr<InterruptCallback> createInterruptCallback(
     std::function<void()> callback);
 
+void triggerInterrupt();
+
+/* A RAII class that causes the current thread to receive SIGUSR1 when
+   the signal handler thread receives SIGINT. That is, this allows
+   SIGINT to be multiplexed to multiple threads. */
+struct ReceiveInterrupts
+{
+    pthread_t target;
+    std::unique_ptr<InterruptCallback> callback;
+
+    ReceiveInterrupts()
+        : target(pthread_self())
+        , callback(createInterruptCallback([&]() { pthread_kill(target, SIGUSR1); }))
+    { }
+};
+
 
 }

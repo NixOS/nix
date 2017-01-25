@@ -97,6 +97,9 @@ static void opensslLockCallback(int mode, int type, const char * file, int line)
 }
 
 
+static void sigHandler(int signo) { }
+
+
 void initNix()
 {
     /* Turn on buffering for cerr. */
@@ -129,6 +132,10 @@ void initNix()
     act.sa_flags = 0;
     if (sigaction(SIGCHLD, &act, 0))
         throw SysError("resetting SIGCHLD");
+
+    /* Install a dummy SIGUSR1 handler for use with pthread_kill(). */
+    act.sa_handler = sigHandler;
+    if (sigaction(SIGUSR1, &act, 0)) throw SysError("handling SIGUSR1");
 
     /* Register a SIGSEGV handler to detect stack overflows. */
     detectStackOverflow();
@@ -253,6 +260,8 @@ void showManPage(const string & name)
 
 int handleExceptions(const string & programName, std::function<void()> fun)
 {
+    ReceiveInterrupts receiveInterrupts; // FIXME: need better place for this
+
     string error = ANSI_RED "error:" ANSI_NORMAL " ";
     try {
         try {

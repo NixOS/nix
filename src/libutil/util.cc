@@ -1197,18 +1197,22 @@ static void signalHandlerThread(sigset_t set)
         int signal = 0;
         sigwait(&set, &signal);
 
-        if (signal == SIGINT || signal == SIGTERM || signal == SIGHUP) {
-            _isInterrupted = 1;
+        if (signal == SIGINT || signal == SIGTERM || signal == SIGHUP)
+            triggerInterrupt();
+    }
+}
 
-            {
-                auto interruptCallbacks(_interruptCallbacks.lock());
-                for (auto & callback : *interruptCallbacks) {
-                    try {
-                        callback();
-                    } catch (...) {
-                        ignoreException();
-                    }
-                }
+void triggerInterrupt()
+{
+    _isInterrupted = 1;
+
+    {
+        auto interruptCallbacks(_interruptCallbacks.lock());
+        for (auto & callback : *interruptCallbacks) {
+            try {
+                callback();
+            } catch (...) {
+                ignoreException();
             }
         }
     }
