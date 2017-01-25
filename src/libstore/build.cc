@@ -440,15 +440,13 @@ private:
     AutoCloseFD fdUserLock;
 
     string user;
-    uid_t uid = 0;
-    gid_t gid = 0;
+    uid_t uid;
+    gid_t gid;
     std::vector<gid_t> supplementaryGIDs;
 
 public:
+    UserLock();
     ~UserLock();
-
-    void acquire();
-    void release();
 
     void kill();
 
@@ -465,16 +463,8 @@ public:
 PathSet UserLock::lockedPaths;
 
 
-UserLock::~UserLock()
+UserLock::UserLock()
 {
-    release();
-}
-
-
-void UserLock::acquire()
-{
-    assert(uid == 0);
-
     assert(settings.buildUsersGroup != "");
 
     /* Get the members of the build-users-group. */
@@ -551,20 +541,15 @@ void UserLock::acquire()
 }
 
 
-void UserLock::release()
+UserLock::~UserLock()
 {
-    if (uid == 0) return;
-    fdUserLock = -1; /* releases lock */
-    assert(lockedPaths.find(fnUserLock) != lockedPaths.end());
+    assert(lockedPaths.count(fnUserLock));
     lockedPaths.erase(fnUserLock);
-    fnUserLock = "";
-    uid = 0;
 }
 
 
 void UserLock::kill()
 {
-    assert(enabled());
     killUser(uid);
 }
 
@@ -720,7 +705,7 @@ private:
     PathSet missingPaths;
 
     /* User selected for running the builder. */
-    UserLock buildUser;
+    std::unique_ptr<UserLock> buildUser;
 
     /* The process ID of the builder. */
     Pid pid;
@@ -966,7 +951,7 @@ void DerivationGoal::killChild()
     if (pid != -1) {
         worker.childTerminated(this);
 
-        if (buildUser.enabled()) {
+        if (buildUser) {
             /* If we're using a build user, then there is a tricky
                race condition: if we kill the build user before the
                child has done its setuid() to the build user uid, then
@@ -974,7 +959,7 @@ void DerivationGoal::killChild()
                pid.wait().  So also send a conventional kill to the
                child. */
             ::kill(-pid, SIGKILL); /* ignore the result */
-            buildUser.kill();
+            buildUser->kill();
             pid.wait();
         } else
             pid.kill();
@@ -1395,7 +1380,7 @@ void DerivationGoal::tryToBuild()
     } catch (BuildError & e) {
         printError(e.msg());
         outputLocks.unlock();
-        buildUser.release();
+        buildUser.reset();
         worker.permanentFailure = true;
         done(BuildResult::InputRejected, e.msg());
         return;
@@ -1429,6 +1414,11 @@ void DerivationGoal::buildDone()
 {
     trace("build done");
 
+    /* Release the build user at the end of this function. We don't do
+       it right away because we don't want another build grabbing this
+       uid and then messing around with our output. */
+    Finally releaseBuildUser([&]() { buildUser.reset(); });
+
     /* Since we got an EOF on the logger pipe, the builder is presumed
        to have terminated.  In fact, the builder could also have
        simply have closed its end of the pipe, so just to be sure,
@@ -1458,7 +1448,7 @@ void DerivationGoal::buildDone()
        malicious user from leaving behind a process that keeps files
        open and modifies them after they have been chown'ed to
        root. */
-    if (buildUser.enabled()) buildUser.kill();
+    if (buildUser) buildUser->kill();
 
     bool diskFull = false;
 
@@ -1528,7 +1518,6 @@ void DerivationGoal::buildDone()
         /* Repeat the build if necessary. */
         if (curRound++ < nrRounds) {
             outputLocks.unlock();
-            buildUser.release();
             state = &DerivationGoal::tryToBuild;
             worker.wakeUp(shared_from_this());
             return;
@@ -1545,7 +1534,6 @@ void DerivationGoal::buildDone()
         if (!hook)
             printError(e.msg());
         outputLocks.unlock();
-        buildUser.release();
 
         BuildResult::Status st = BuildResult::MiscFailure;
 
@@ -1566,9 +1554,6 @@ void DerivationGoal::buildDone()
         done(st, e.msg());
         return;
     }
-
-    /* Release the build user, if applicable. */
-    buildUser.release();
 
     done(BuildResult::Built);
 }
@@ -1714,11 +1699,11 @@ void DerivationGoal::startBuilder()
     /* If `build-users-group' is not empty, then we have to build as
        one of the members of that group. */
     if (settings.buildUsersGroup != "" && getuid() == 0) {
-        buildUser.acquire();
+        buildUser = std::make_unique<UserLock>();
 
         /* Make sure that no other processes are executing under this
            uid. */
-        buildUser.kill();
+        buildUser->kill();
     }
 
     /* Create a temporary directory where the build will take
@@ -1831,7 +1816,7 @@ void DerivationGoal::startBuilder()
         if (mkdir(chrootRootDir.c_str(), 0750) == -1)
             throw SysError(format("cannot create ‘%1%’") % chrootRootDir);
 
-        if (buildUser.enabled() && chown(chrootRootDir.c_str(), 0, buildUser.getGID()) == -1)
+        if (buildUser && chown(chrootRootDir.c_str(), 0, buildUser->getGID()) == -1)
             throw SysError(format("cannot change ownership of ‘%1%’") % chrootRootDir);
 
         /* Create a writable /tmp in the chroot.  Many builders need
@@ -1875,7 +1860,7 @@ void DerivationGoal::startBuilder()
         createDirs(chrootStoreDir);
         chmod_(chrootStoreDir, 01775);
 
-        if (buildUser.enabled() && chown(chrootStoreDir.c_str(), 0, buildUser.getGID()) == -1)
+        if (buildUser && chown(chrootStoreDir.c_str(), 0, buildUser->getGID()) == -1)
             throw SysError(format("cannot change ownership of ‘%1%’") % chrootStoreDir);
 
         for (auto & i : inputPaths) {
@@ -2085,8 +2070,8 @@ void DerivationGoal::startBuilder()
         /* Set the UID/GID mapping of the builder's user namespace
            such that the sandbox user maps to the build user, or to
            the calling user (if build users are disabled). */
-        uid_t hostUid = buildUser.enabled() ? buildUser.getUID() : getuid();
-        uid_t hostGid = buildUser.enabled() ? buildUser.getGID() : getgid();
+        uid_t hostUid = buildUser ? buildUser->getUID() : getuid();
+        uid_t hostGid = buildUser ? buildUser->getGID() : getgid();
 
         writeFile("/proc/" + std::to_string(pid) + "/uid_map",
             (format("%d %d 1") % sandboxUid % hostUid).str());
@@ -2104,7 +2089,7 @@ void DerivationGoal::startBuilder()
     } else
 #endif
     {
-        options.allowVfork = !buildUser.enabled() && !drv->isBuiltin();
+        options.allowVfork = !buildUser && !drv->isBuiltin();
         pid = startProcess([&]() {
             runChild();
         }, options);
@@ -2208,8 +2193,8 @@ void DerivationGoal::initEnv()
 
 void DerivationGoal::chownToBuilder(const Path & path)
 {
-    if (!buildUser.enabled()) return;
-    if (chown(path.c_str(), buildUser.getUID(), buildUser.getGID()) == -1)
+    if (!buildUser) return;
+    if (chown(path.c_str(), buildUser->getUID(), buildUser->getGID()) == -1)
         throw SysError(format("cannot change ownership of ‘%1%’") % path);
 }
 
@@ -2497,22 +2482,22 @@ void DerivationGoal::runChild()
            descriptors except std*, so that's safe.  Also note that
            setuid() when run as root sets the real, effective and
            saved UIDs. */
-        if (setUser && buildUser.enabled()) {
+        if (setUser && buildUser) {
             /* Preserve supplementary groups of the build user, to allow
                admins to specify groups such as "kvm".  */
-            if (!buildUser.getSupplementaryGIDs().empty() &&
-                setgroups(buildUser.getSupplementaryGIDs().size(),
-                          buildUser.getSupplementaryGIDs().data()) == -1)
+            if (!buildUser->getSupplementaryGIDs().empty() &&
+                setgroups(buildUser->getSupplementaryGIDs().size(),
+                          buildUser->getSupplementaryGIDs().data()) == -1)
                 throw SysError("cannot set supplementary groups of build user");
 
-            if (setgid(buildUser.getGID()) == -1 ||
-                getgid() != buildUser.getGID() ||
-                getegid() != buildUser.getGID())
+            if (setgid(buildUser->getGID()) == -1 ||
+                getgid() != buildUser->getGID() ||
+                getegid() != buildUser->getGID())
                 throw SysError("setgid failed");
 
-            if (setuid(buildUser.getUID()) == -1 ||
-                getuid() != buildUser.getUID() ||
-                geteuid() != buildUser.getUID())
+            if (setuid(buildUser->getUID()) == -1 ||
+                getuid() != buildUser->getUID() ||
+                geteuid() != buildUser->getUID())
                 throw SysError("setuid failed");
         }
 
@@ -2752,7 +2737,7 @@ void DerivationGoal::registerOutputs()
            build.  Also, the output should be owned by the build
            user. */
         if ((!S_ISLNK(st.st_mode) && (st.st_mode & (S_IWGRP | S_IWOTH))) ||
-            (buildUser.enabled() && st.st_uid != buildUser.getUID()))
+            (buildUser && st.st_uid != buildUser->getUID()))
             throw BuildError(format("suspicious ownership or permission on ‘%1%’; rejecting this build output") % path);
 #endif
 
@@ -2764,7 +2749,7 @@ void DerivationGoal::registerOutputs()
             /* Canonicalise first.  This ensures that the path we're
                rewriting doesn't contain a hard link to /etc/shadow or
                something like that. */
-            canonicalisePathMetaData(actualPath, buildUser.enabled() ? buildUser.getUID() : -1, inodesSeen);
+            canonicalisePathMetaData(actualPath, buildUser ? buildUser->getUID() : -1, inodesSeen);
 
             /* FIXME: this is in-memory. */
             StringSink sink;
@@ -2822,7 +2807,7 @@ void DerivationGoal::registerOutputs()
         /* Get rid of all weird permissions.  This also checks that
            all files are owned by the build user, if applicable. */
         canonicalisePathMetaData(actualPath,
-            buildUser.enabled() && !rewritten ? buildUser.getUID() : -1, inodesSeen);
+            buildUser && !rewritten ? buildUser->getUID() : -1, inodesSeen);
 
         /* For this output path, find the references to other paths
            contained in it.  Compute the SHA-256 NAR hash at the same
