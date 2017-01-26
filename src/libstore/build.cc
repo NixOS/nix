@@ -10,6 +10,7 @@
 #include "builtins.hh"
 #include "finally.hh"
 #include "compression.hh"
+#include "json.hh"
 
 #include <algorithm>
 #include <iostream>
@@ -2273,9 +2274,18 @@ void DerivationGoal::doExportReferencesGraph()
             }
         }
 
-        /* Write closure info to `fileName'. */
+        /* Write closure info to <fileName>. */
         writeFile(tmpDir + "/" + fileName,
             worker.store.makeValidityRegistration(paths, false, false));
+
+        /* Write a more comprehensive JSON serialisation to
+           <fileName>.json. */
+        std::ostringstream str;
+        {
+            JSONPlaceholder jsonRoot(str, true);
+            worker.store.pathInfoToJSON(jsonRoot, paths, false, true);
+        }
+        writeFile(tmpDir + "/" + fileName + ".json", str.str());
     }
 }
 

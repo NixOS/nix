@@ -22,6 +22,7 @@ struct Derivation;
 class FSAccessor;
 class NarInfoDiskCache;
 class Store;
+class JSONPlaceholder;
 
 
 /* Size of the hash part of store paths, in base-32 characters. */
@@ -468,6 +469,19 @@ public:
        `nix-store --register-validity'. */
     string makeValidityRegistration(const PathSet & paths,
         bool showDerivers, bool showHash);
+
+    /* Write a JSON representation of store path metadata, such as the
+       hash and the references. If ‘includeImpureInfo’ is true,
+       variable elements such as the registration time are
+       included. If ‘showClosureSize’ is true, the closure size of
+       each path is included. */
+    void pathInfoToJSON(JSONPlaceholder & jsonOut, const PathSet & storePaths,
+        bool includeImpureInfo, bool showClosureSize);
+
+    /* Return the size of the closure of the specified path, that is,
+       the sum of the size of the NAR serialisation of each path in
+       the closure. */
+    unsigned long long getClosureSize(const Path & storePath);
 
     /* Optimise the disk space usage of the Nix store by hard-linking files
        with the same contents. */

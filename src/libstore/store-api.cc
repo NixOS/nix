@@ -4,6 +4,7 @@
 #include "util.hh"
 #include "nar-info-disk-cache.hh"
 #include "thread-pool.hh"
+#include "json.hh"
 
 #include <future>
 
@@ -436,6 +437,64 @@ string Store::makeValidityRegistration(const PathSet & paths,
     }
 
     return s;
+}
+
+
+void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const PathSet & storePaths,
+    bool includeImpureInfo, bool showClosureSize)
+{
+    auto jsonList = jsonOut.list();
+
+    for (auto storePath : storePaths) {
+        auto info = queryPathInfo(storePath);
+        storePath = info->path;
+
+        auto jsonPath = jsonList.object();
+        jsonPath
+            .attr("path", storePath)
+            .attr("narHash", info->narHash.to_string())
+            .attr("narSize", info->narSize);
+
+        {
+            auto jsonRefs = jsonPath.list("references");
+            for (auto & ref : info->references)
+                jsonRefs.elem(ref);
+        }
+
+        if (info->ca != "")
+            jsonPath.attr("ca", info->ca);
+
+        if (showClosureSize)
+            jsonPath.attr("closureSize", getClosureSize(storePath));
+
+        if (!includeImpureInfo) continue;
+
+        if (info->deriver != "")
+            jsonPath.attr("deriver", info->deriver);
+
+        if (info->registrationTime)
+            jsonPath.attr("registrationTime", info->registrationTime);
+
+        if (info->ultimate)
+            jsonPath.attr("ultimate", info->ultimate);
+
+        if (!info->sigs.empty()) {
+            auto jsonSigs = jsonPath.list("signatures");
+            for (auto & sig : info->sigs)
+                jsonSigs.elem(sig);
+        }
+    }
+}
+
+
+unsigned long long Store::getClosureSize(const Path & storePath)
+{
+    unsigned long long totalSize = 0;
+    PathSet closure;
+    computeFSClosure(storePath, closure, false, false);
+    for (auto & p : closure)
+        totalSize += queryPathInfo(p)->narSize;
+    return totalSize;
 }
 
 
