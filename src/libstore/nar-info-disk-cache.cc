@@ -42,8 +42,9 @@ class NarInfoDiskCacheImpl : public NarInfoDiskCache
 {
 public:
 
-    /* How long negative lookups are valid. */
+    /* How long negative and positive lookups are valid. */
     const int ttlNegative = 3600;
+    const int ttlPositive = 30 * 24 * 3600;
 
     struct Cache
     {
@@ -94,7 +95,7 @@ public:
             "insert or replace into NARs(cache, hashPart, timestamp, present) values (?, ?, ?, 0)");
 
         state->queryNAR.create(state->db,
-            "select * from NARs where cache = ? and hashPart = ?");
+            "select * from NARs where cache = ? and hashPart = ? and ((present = 0 and timestamp > ?) or (present = 1 and timestamp > ?))");
     }
 
     Cache & getCache(State & state, const std::string & uri)
@@ -143,7 +144,13 @@ public:
 
         auto & cache(getCache(*state, uri));
 
-        auto queryNAR(state->queryNAR.use()(cache.id)(hashPart));
+        auto now = time(0);
+
+        auto queryNAR(state->queryNAR.use()
+            (cache.id)
+            (hashPart)
+            (now - ttlNegative)
+            (now - ttlPositive));
 
         if (!queryNAR.next())
             return {oUnknown, 0};
@@ -152,8 +159,6 @@ public:
             return {oInvalid, 0};
 
         auto narInfo = make_ref<NarInfo>();
-
-        // FIXME: implement TTL.
 
         auto namePart = queryNAR.getStr(2);
         narInfo->path = cache.storeDir + "/" +
