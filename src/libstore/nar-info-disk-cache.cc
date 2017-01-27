@@ -36,15 +36,6 @@ create table if not exists NARs (
     foreign key (cache) references BinaryCaches(id) on delete cascade
 );
 
-create table if not exists NARExistence (
-    cache            integer not null,
-    storePath        text not null,
-    exist            integer not null,
-    timestamp        integer not null,
-    primary key (cache, storePath),
-    foreign key (cache) references BinaryCaches(id) on delete cascade
-);
-
 )sql";
 
 class NarInfoDiskCacheImpl : public NarInfoDiskCache
@@ -155,7 +146,6 @@ public:
         auto queryNAR(state->queryNAR.use()(cache.id)(hashPart));
 
         if (!queryNAR.next())
-            // FIXME: check NARExistence
             return {oUnknown, 0};
 
         if (!queryNAR.getInt(13))
