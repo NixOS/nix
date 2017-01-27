@@ -31,6 +31,7 @@ struct SQLiteStmt
     sqlite3 * db = 0;
     sqlite3_stmt * stmt = 0;
     SQLiteStmt() { }
+    SQLiteStmt(sqlite3 * db, const std::string & s) { create(db, s); }
     void create(sqlite3 * db, const std::string & s);
     ~SQLiteStmt();
     operator sqlite3_stmt * () { return stmt; }

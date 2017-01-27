@@ -36,6 +36,11 @@ create table if not exists NARs (
     foreign key (cache) references BinaryCaches(id) on delete cascade
 );
 
+create table if not exists LastPurge (
+    dummy            text primary key,
+    value            integer
+);
+
 )sql";
 
 class NarInfoDiskCacheImpl : public NarInfoDiskCache
@@ -45,6 +50,9 @@ public:
     /* How long negative and positive lookups are valid. */
     const int ttlNegative = 3600;
     const int ttlPositive = 30 * 24 * 3600;
+
+    /* How often to purge expired entries from the cache. */
+    const int purgeInterval = 24 * 3600;
 
     struct Cache
     {
@@ -57,7 +65,7 @@ public:
     struct State
     {
         SQLite db;
-        SQLiteStmt insertCache, queryCache, insertNAR, insertMissingNAR, queryNAR;
+        SQLiteStmt insertCache, queryCache, insertNAR, insertMissingNAR, queryNAR, purgeCache;
         std::map<std::string, Cache> caches;
     };
 
@@ -96,6 +104,27 @@ public:
 
         state->queryNAR.create(state->db,
             "select * from NARs where cache = ? and hashPart = ? and ((present = 0 and timestamp > ?) or (present = 1 and timestamp > ?))");
+
+        /* Periodically purge expired entries from the database. */
+        auto now = time(0);
+
+        SQLiteStmt queryLastPurge(state->db, "select value from LastPurge");
+        auto queryLastPurge_(queryLastPurge.use());
+
+        if (!queryLastPurge_.next() || queryLastPurge_.getInt(0) < now - purgeInterval) {
+            SQLiteStmt(state->db,
+                "delete from NARs where ((present = 0 and timestamp < ?) or (present = 1 and timestamp < ?))")
+                .use()
+                (now - ttlNegative)
+                (now - ttlPositive)
+                .exec();
+
+            debug("deleted %d entries from the NAR info disk cache", sqlite3_changes(state->db));
+
+            SQLiteStmt(state->db,
+                "insert or replace into LastPurge(dummy, value) values ('', ?)")
+                .use()(now).exec();
+        }
     }
 
     Cache & getCache(State & state, const std::string & uri)
