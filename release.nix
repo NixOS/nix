@@ -20,7 +20,7 @@ let
         name = "nix-tarball";
         version = builtins.readFile ./version;
         versionSuffix = if officialRelease then "" else "pre${toString nix.revCount}_${nix.shortRev}";
-        src = if lib.inNixShell then null else nix;
+        src = nix;
         inherit officialRelease;
 
         buildInputs =
@@ -28,7 +28,8 @@ let
             pkgconfig sqlite libsodium boehmgc
             docbook5 docbook5_xsl
             autoconf-archive
-          ] ++ lib.optional (!lib.inNixShell) git;
+            git
+          ];
 
         configureFlags = ''
           --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
