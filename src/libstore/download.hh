@@ -52,6 +52,8 @@ struct Downloader
     Path downloadCached(ref<Store> store, const string & uri, bool unpack, string name = "",
         const Hash & expectedHash = Hash(), string * effectiveUri = nullptr);
 
+    virtual std::string urlEncode(const std::string & param);
+
     enum Error { NotFound, Forbidden, Misc, Transient, Interrupted };
 };
 

@@ -18,6 +18,8 @@
 
 namespace nix {
 
+MakeError(URLEncodeError, Error);
+
 double getTime()
 {
     struct timeval tv;
@@ -485,6 +487,22 @@ struct CurlDownloader : public Downloader
         item->failure = failure;
         enqueueItem(item);
     }
+
+    std::string urlEncode(const std::string & param) override {
+        //TODO reuse curl handle or move function to another class/file
+        CURL *curl = curl_easy_init();
+        char *encoded = NULL;
+        if (curl) {
+            encoded = curl_easy_escape(curl, param.c_str(), 0);
+        }
+        if ((curl == NULL) || (encoded == NULL)) {
+          throw URLEncodeError("Could not encode param");
+        }
+        std::string ret(encoded);
+        curl_free(encoded);
+        curl_easy_cleanup(curl);
+        return ret;
+    }
 };
 
 ref<Downloader> getDownloader()
@@ -622,6 +640,9 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
     return storePath;
 }
 
+std::string Downloader::urlEncode(const std::string & param) {
+    throw URLEncodeError("not implemented");
+}
 
 bool isUri(const string & s)
 {
