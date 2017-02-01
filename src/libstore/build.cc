@@ -400,6 +400,8 @@ void Goal::trace(const format & f)
 /* Common initialisation performed in child processes. */
 static void commonChildInit(Pipe & logPipe)
 {
+    restoreSignals();
+
     /* Put the child in a separate session (and thus a separate
        process group) so that it has no controlling terminal (meaning
        that e.g. ssh cannot open /dev/tty) and it doesn't receive
@@ -2661,8 +2663,6 @@ void DerivationGoal::runChild()
 
         for (auto & i : drv->args)
             args.push_back(rewriteStrings(i, inputRewrites));
-
-        restoreSIGPIPE();
 
         /* Indicate that we managed to set up the build environment. */
         writeFull(STDERR_FILENO, string("\1\n"));

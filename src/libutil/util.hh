@@ -256,10 +256,6 @@ void closeMostFDs(const set<int> & exceptions);
 /* Set the close-on-exec flag for the given file descriptor. */
 void closeOnExec(int fd);
 
-/* Restore default handling of SIGPIPE, otherwise some programs will
-   randomly say "Broken pipe". */
-void restoreSIGPIPE();
-
 
 /* User interruption. */
 
@@ -422,6 +418,9 @@ void callSuccess(
 /* Start a thread that handles various signals. Also block those signals
    on the current thread (and thus any threads created by it). */
 void startSignalHandlerThread();
+
+/* Restore default signal handling. */
+void restoreSignals();
 
 struct InterruptCallback
 {

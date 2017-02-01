@@ -91,6 +91,7 @@ ref<RemoteStore::Connection> SSHStore::openConnection()
 {
     if ((pid_t) sshMaster == -1) {
         sshMaster = startProcess([&]() {
+            restoreSignals();
             if (key.empty())
                 execlp("ssh", "ssh", "-N", "-M", "-S", socketPath.c_str(), uri.c_str(), NULL);
             else

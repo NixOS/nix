@@ -119,15 +119,9 @@ void initNix()
 
     startSignalHandlerThread();
 
-    /* Ignore SIGPIPE. */
+    /* Reset SIGCHLD to its default. */
     struct sigaction act;
     sigemptyset(&act.sa_mask);
-    act.sa_handler = SIG_IGN;
-    act.sa_flags = 0;
-    if (sigaction(SIGPIPE, &act, 0))
-        throw SysError("ignoring SIGPIPE");
-
-    /* Reset SIGCHLD to its default. */
     act.sa_handler = SIG_DFL;
     act.sa_flags = 0;
     if (sigaction(SIGCHLD, &act, 0))
@@ -252,7 +246,7 @@ void printVersion(const string & programName)
 
 void showManPage(const string & name)
 {
-    restoreSIGPIPE();
+    restoreSignals();
     execlp("man", "man", name.c_str(), NULL);
     throw SysError(format("command ‘man %1%’ failed") % name.c_str());
 }
@@ -305,16 +299,6 @@ RunPager::RunPager()
     if (!pager) pager = getenv("PAGER");
     if (pager && ((string) pager == "" || (string) pager == "cat")) return;
 
-    /* Ignore SIGINT. The pager will handle it (and we'll get
-       SIGPIPE). */
-    struct sigaction act;
-    act.sa_handler = SIG_IGN;
-    act.sa_flags = 0;
-    sigemptyset(&act.sa_mask);
-    if (sigaction(SIGINT, &act, 0)) throw SysError("ignoring SIGINT");
-
-    restoreSIGPIPE();
-
     Pipe toPager;
     toPager.create();
 
@@ -323,6 +307,7 @@ RunPager::RunPager()
             throw SysError("dupping stdin");
         if (!getenv("LESS"))
             setenv("LESS", "FRSXMK", 1);
+        restoreSignals();
         if (pager)
             execl("/bin/sh", "sh", "-c", pager, NULL);
         execlp("pager", "pager", NULL);
@@ -330,6 +315,8 @@ RunPager::RunPager()
         execlp("more", "more", NULL);
         throw SysError(format("executing ‘%1%’") % pager);
     });
+
+    pid.setKillSignal(SIGINT);
 
     if (dup2(toPager.writeSide.get(), STDOUT_FILENO) == -1)
         throw SysError("dupping stdout");
@@ -345,7 +332,11 @@ RunPager::~RunPager()
             pid.wait();
         }
     } catch (...) {
-        ignoreException();
+        try {
+            pid.kill(true);
+        } catch (...) {
+            ignoreException();
+        }
     }
 }
 

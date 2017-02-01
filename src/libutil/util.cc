@@ -860,6 +860,8 @@ string runProgram(Path program, bool searchPath, const Strings & args,
         Strings args_(args);
         args_.push_front(program);
 
+        restoreSignals();
+
         if (searchPath)
             execvp(program.c_str(), stringsToCharPtrs(args_).data());
         else
@@ -906,16 +908,6 @@ void closeOnExec(int fd)
     if ((prev = fcntl(fd, F_GETFD, 0)) == -1 ||
         fcntl(fd, F_SETFD, prev | FD_CLOEXEC) == -1)
         throw SysError("setting close-on-exec flag");
-}
-
-
-void restoreSIGPIPE()
-{
-    struct sigaction act;
-    act.sa_handler = SIG_DFL;
-    act.sa_flags = 0;
-    sigemptyset(&act.sa_mask);
-    if (sigaction(SIGPIPE, &act, 0)) throw SysError("resetting SIGPIPE");
 }
 
 
@@ -1218,17 +1210,29 @@ void triggerInterrupt()
     }
 }
 
+static sigset_t savedSignalMask;
+
 void startSignalHandlerThread()
 {
+    if (sigprocmask(SIG_BLOCK, nullptr, &savedSignalMask))
+        throw SysError("quering signal mask");
+
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGINT);
     sigaddset(&set, SIGTERM);
     sigaddset(&set, SIGHUP);
+    sigaddset(&set, SIGPIPE);
     if (pthread_sigmask(SIG_BLOCK, &set, nullptr))
         throw SysError("blocking signals");
 
     std::thread(signalHandlerThread, set).detach();
+}
+
+void restoreSignals()
+{
+    if (sigprocmask(SIG_SETMASK, &savedSignalMask, nullptr))
+        throw SysError("restoring signals");
 }
 
 /* RAII helper to automatically deregister a callback. */

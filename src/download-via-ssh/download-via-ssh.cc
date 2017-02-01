@@ -30,6 +30,7 @@ static std::pair<FdSink, FdSource> connect(const string & conn)
             throw SysError("dupping stdin");
         if (dup2(from.writeSide, STDOUT_FILENO) == -1)
             throw SysError("dupping stdout");
+        restoreSignals();
         execlp("ssh", "ssh", "-x", "-T", conn.c_str(), "nix-store --serve", NULL);
         throw SysError("executing ssh");
     });

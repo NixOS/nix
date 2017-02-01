@@ -452,6 +452,8 @@ int main(int argc, char ** argv)
 
                 auto argPtrs = stringsToCharPtrs(args);
 
+                restoreSignals();
+
                 execvp(getEnv("NIX_BUILD_SHELL", "bash").c_str(), argPtrs.data());
 
                 throw SysError("executing shell");
