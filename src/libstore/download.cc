@@ -230,6 +230,11 @@ struct CurlDownloader : public Downloader
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYHOST, 0);
             }
 
+            Path netrcFile = settings.get("netrc-file",
+               (format("%1%/%2%") % settings.nixConfDir % "netrc").str());
+            curl_easy_setopt(req, CURLOPT_NETRC_FILE, netrcFile.c_str());
+            curl_easy_setopt(req, CURLOPT_NETRC, CURL_NETRC_OPTIONAL);
+
             result.data = std::make_shared<std::string>();
         }
 

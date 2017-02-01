@@ -430,6 +430,21 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
   </varlistentry>
 
 
+  <varlistentry><term><literal>netrc-file</literal></term>
+
+    <listitem><para>If set to an absolute path to a <filename>netrc</filename>
+    file, Nix will use the HTTP authentication credentials in this file when
+    trying to download from a remote host through HTTP or HTTPS. Defaults to
+    <filename>$NIX_CONF_DIR/netrc</filename>.</para>
+
+    <para>The <filename>netrc</filename> file consists of zero or more lines
+    like: <literal>machine <replaceable>my-machine</replaceable> login
+    <replaceable>my-username</replaceable> password
+    <replaceable>my-password</replaceable></literal>.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry><term><literal>system</literal></term>
 
     <listitem><para>This option specifies the canonical Nix system
