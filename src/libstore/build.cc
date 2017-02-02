@@ -2276,18 +2276,24 @@ void DerivationGoal::doExportReferencesGraph()
             }
         }
 
-        /* Write closure info to <fileName>. */
-        writeFile(tmpDir + "/" + fileName,
-            worker.store.makeValidityRegistration(paths, false, false));
+        if (!drv->env.count("__json")) {
 
-        /* Write a more comprehensive JSON serialisation to
-           <fileName>.json. */
-        std::ostringstream str;
-        {
-            JSONPlaceholder jsonRoot(str, true);
-            worker.store.pathInfoToJSON(jsonRoot, paths, false, true);
+            /* Write closure info to <fileName>. */
+            writeFile(tmpDir + "/" + fileName,
+                worker.store.makeValidityRegistration(paths, false, false));
+
+        } else {
+
+            /* Write a more comprehensive JSON serialisation to
+               <fileName>. */
+            std::ostringstream str;
+            {
+                JSONPlaceholder jsonRoot(str, true);
+                worker.store.pathInfoToJSON(jsonRoot, paths, false, true);
+            }
+            writeFile(tmpDir + "/" + fileName, str.str());
+
         }
-        writeFile(tmpDir + "/" + fileName + ".json", str.str());
     }
 }
 
