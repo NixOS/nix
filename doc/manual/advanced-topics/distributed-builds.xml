@@ -113,4 +113,14 @@ running, they should use the same <envar>NIX_CURRENT_LOAD</envar>
 file.  Maybe in the future <filename>build-remote.pl</filename> will
 look at the actual remote load.</para>
 
+<para>Additionally, you may define the environment variable
+<envar>NIX_REMOTE_USE_SUBSTITUTES</envar>, which will instruct
+<filename>build-remote.pl</filename> to enable the substitutes mechanism when
+using <filename>nix-copy-closure</filename>. This will allow the remote end to
+fetch itself some of the build inputs, instead of expecting the local machine to
+upload all of them, which can be useful when the connection between the local
+machine and the remote build machine is slow, but the connection between the
+remote build machine and <literal>nixos.org</literal> is fast, for
+example.</para>
+
 </chapter>

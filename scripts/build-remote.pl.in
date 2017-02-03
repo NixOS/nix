@@ -246,7 +246,8 @@ if ($@) {
     print STDERR "somebody is hogging $uploadLock, continuing...\n";
     unlink $uploadLock;
 }
-Nix::CopyClosure::copyToOpen($from, $to, $hostName, [ $drvPath, @inputs ], 0, 0);
+my $useSubstitutes = defined $ENV{NIX_REMOTE_USE_SUBSTITUTES};
+Nix::CopyClosure::copyToOpen($from, $to, $hostName, [ $drvPath, @inputs ], 0, 0, $useSubstitutes);
 close UPLOADLOCK;
 
 
