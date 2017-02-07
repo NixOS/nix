@@ -7,11 +7,13 @@
 
 namespace nix {
 
+static std::string uriScheme = "ssh://";
+
 class SSHStore : public RemoteStore
 {
 public:
 
-    SSHStore(string uri, const Params & params, size_t maxConnections = std::numeric_limits<size_t>::max());
+    SSHStore(string host, const Params & params, size_t maxConnections = std::numeric_limits<size_t>::max());
 
     std::string getUri() override;
 
@@ -36,17 +38,17 @@ private:
 
     Pid sshMaster;
 
-    string uri;
+    string host;
 
     Path key;
 };
 
-SSHStore::SSHStore(string uri, const Params & params, size_t maxConnections)
+SSHStore::SSHStore(string host, const Params & params, size_t maxConnections)
     : Store(params)
     , RemoteStore(params, maxConnections)
     , tmpDir(createTempDir("", "nix", true, true, 0700))
     , socketPath((Path) tmpDir + "/ssh.sock")
-    , uri(std::move(uri))
+    , host(std::move(host))
     , key(get(params, "ssh-key", ""))
 {
     /* open a connection and perform the handshake to verify all is well */
@@ -55,7 +57,7 @@ SSHStore::SSHStore(string uri, const Params & params, size_t maxConnections)
 
 string SSHStore::getUri()
 {
-    return "ssh://" + uri;
+    return uriScheme + host;
 }
 
 class ForwardSource : public Source
@@ -93,9 +95,9 @@ ref<RemoteStore::Connection> SSHStore::openConnection()
         sshMaster = startProcess([&]() {
             restoreSignals();
             if (key.empty())
-                execlp("ssh", "ssh", "-N", "-M", "-S", socketPath.c_str(), uri.c_str(), NULL);
+                execlp("ssh", "ssh", "-N", "-M", "-S", socketPath.c_str(), host.c_str(), NULL);
             else
-                execlp("ssh", "ssh", "-N", "-M", "-S", socketPath.c_str(), "-i", key.c_str(), uri.c_str(), NULL);
+                execlp("ssh", "ssh", "-N", "-M", "-S", socketPath.c_str(), "-i", key.c_str(), host.c_str(), NULL);
             throw SysError("starting ssh master");
         });
     }
@@ -109,7 +111,7 @@ ref<RemoteStore::Connection> SSHStore::openConnection()
             throw SysError("duping over STDIN");
         if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
             throw SysError("duping over STDOUT");
-        execlp("ssh", "ssh", "-S", socketPath.c_str(), uri.c_str(), "nix-daemon", "--stdio", NULL);
+        execlp("ssh", "ssh", "-S", socketPath.c_str(), host.c_str(), "nix-daemon", "--stdio", NULL);
         throw SysError("executing nix-daemon --stdio over ssh");
     });
     in.readSide = -1;
@@ -126,8 +128,8 @@ static RegisterStoreImplementation regStore([](
     const std::string & uri, const Store::Params & params)
     -> std::shared_ptr<Store>
 {
-    if (std::string(uri, 0, 6) != "ssh://") return 0;
-    return std::make_shared<SSHStore>(uri.substr(6), params);
+    if (std::string(uri, 0, uriScheme.size()) != uriScheme) return 0;
+    return std::make_shared<SSHStore>(std::string(uri, uriScheme.size()), params);
 });
 
 }
