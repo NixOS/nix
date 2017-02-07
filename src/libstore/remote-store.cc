@@ -37,6 +37,7 @@ template<class T> T readStorePaths(Store & store, Source & from)
 }
 
 template PathSet readStorePaths(Store & store, Source & from);
+template Paths readStorePaths(Store & store, Source & from);
 
 /* TODO: Separate these store impls into different files, give them better names */
 RemoteStore::RemoteStore(const Params & params, size_t maxConnections)
