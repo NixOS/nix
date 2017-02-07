@@ -71,9 +71,6 @@ public:
         PathSet & referrers) override
     { notImpl(); }
 
-    PathSet queryValidDerivers(const Path & path) override
-    { return {}; }
-
     PathSet queryDerivationOutputs(const Path & path) override
     { notImpl(); }
 
@@ -82,13 +79,6 @@ public:
 
     Path queryPathFromHashPart(const string & hashPart) override
     { notImpl(); }
-
-    PathSet querySubstitutablePaths(const PathSet & paths) override
-    { return {}; }
-
-    void querySubstitutablePathInfos(const PathSet & paths,
-        SubstitutablePathInfos & infos) override
-    { }
 
     bool wantMassQuery() override { return wantMassQuery_; }
 
@@ -121,20 +111,11 @@ public:
     void addIndirectRoot(const Path & path) override
     { notImpl(); }
 
-    void syncWithGC() override
-    { }
-
     Roots findRoots() override
     { notImpl(); }
 
     void collectGarbage(const GCOptions & options, GCResults & results) override
     { notImpl(); }
-
-    void optimiseStore() override
-    { }
-
-    bool verifyStore(bool checkContents, bool repair) override
-    { return true; }
 
     ref<FSAccessor> getFSAccessor() override;
 

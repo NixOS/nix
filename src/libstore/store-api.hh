@@ -320,7 +320,7 @@ public:
 
 protected:
 
-    virtual bool isValidPathUncached(const Path & path) = 0;
+    virtual bool isValidPathUncached(const Path & path);
 
 public:
 
@@ -360,7 +360,7 @@ public:
        output.  (Note that the result of `queryDeriver()' is the
        derivation that was actually used to produce `path', which may
        not exist anymore.) */
-    virtual PathSet queryValidDerivers(const Path & path) = 0;
+    virtual PathSet queryValidDerivers(const Path & path) { return {}; };
 
     /* Query the outputs of the derivation denoted by `path'. */
     virtual PathSet queryDerivationOutputs(const Path & path) = 0;
@@ -373,13 +373,13 @@ public:
     virtual Path queryPathFromHashPart(const string & hashPart) = 0;
 
     /* Query which of the given paths have substitutes. */
-    virtual PathSet querySubstitutablePaths(const PathSet & paths) = 0;
+    virtual PathSet querySubstitutablePaths(const PathSet & paths) { return {}; };
 
     /* Query substitute info (i.e. references, derivers and download
        sizes) of a set of paths.  If a path does not have substitute
        info, it's omitted from the resulting ‘infos’ map. */
     virtual void querySubstitutablePathInfos(const PathSet & paths,
-        SubstitutablePathInfos & infos) = 0;
+        SubstitutablePathInfos & infos) { return; };
 
     virtual bool wantMassQuery() { return false; }
 
@@ -454,7 +454,7 @@ public:
          permanent root and sees our's.
 
        In either case the permanent root is seen by the collector. */
-    virtual void syncWithGC() = 0;
+    virtual void syncWithGC() { };
 
     /* Find the roots of the garbage collector.  Each root is a pair
        (link, storepath) where `link' is the path of the symlink
@@ -485,11 +485,11 @@ public:
 
     /* Optimise the disk space usage of the Nix store by hard-linking files
        with the same contents. */
-    virtual void optimiseStore() = 0;
+    virtual void optimiseStore() { };
 
     /* Check the integrity of the Nix store.  Returns true if errors
        remain. */
-    virtual bool verifyStore(bool checkContents, bool repair) = 0;
+    virtual bool verifyStore(bool checkContents, bool repair) { return false; };
 
     /* Return an object to access files in the Nix store. */
     virtual ref<FSAccessor> getFSAccessor() = 0;

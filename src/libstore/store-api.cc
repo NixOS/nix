@@ -285,6 +285,19 @@ bool Store::isValidPath(const Path & storePath)
 }
 
 
+/* Default implementation for stores that only implement
+   queryPathInfoUncached(). */
+bool Store::isValidPathUncached(const Path & path)
+{
+    try {
+        queryPathInfo(path);
+        return true;
+    } catch (InvalidPath &) {
+        return false;
+    }
+}
+
+
 ref<const ValidPathInfo> Store::queryPathInfo(const Path & storePath)
 {
     std::promise<ref<ValidPathInfo>> promise;
