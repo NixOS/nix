@@ -5,6 +5,7 @@
 #include "nar-info-disk-cache.hh"
 #include "thread-pool.hh"
 #include "json.hh"
+#include "derivations.hh"
 
 #include <future>
 
@@ -780,8 +781,27 @@ std::list<ref<Store>> getDefaultSubstituters()
 }
 
 
-void copyPaths(ref<Store> from, ref<Store> to, const Paths & storePaths)
+void copyPaths(ref<Store> from, ref<Store> to, const Paths & storePaths, bool substitute)
 {
+    if (substitute) {
+        /* Filter out .drv files (we don't want to build anything). */
+        PathSet paths2;
+        for (auto & path : storePaths)
+            if (!isDerivation(path)) paths2.insert(path);
+        unsigned long long downloadSize, narSize;
+        PathSet willBuild, willSubstitute, unknown;
+        to->queryMissing(PathSet(paths2.begin(), paths2.end()),
+            willBuild, willSubstitute, unknown, downloadSize, narSize);
+        /* FIXME: should use ensurePath(), but it only
+           does one path at a time. */
+        if (!willSubstitute.empty())
+            try {
+                to->buildPaths(willSubstitute);
+            } catch (Error & e) {
+                printMsg(lvlError, format("warning: %1%") % e.msg());
+            }
+    }
+
     std::string copiedLabel = "copied";
 
     logger->setExpected(copiedLabel, storePaths.size());

@@ -77,6 +77,8 @@ Makefile.config
 # /src/nix-build/
 /src/nix-build/nix-build
 
+/src/nix-copy-closure/nix-copy-closure
+
 /src/build-remote/build-remote
 
 # /tests/

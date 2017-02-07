@@ -11,6 +11,7 @@ makefiles = \
   src/nix-env/local.mk \
   src/nix-daemon/local.mk \
   src/nix-collect-garbage/local.mk \
+  src/nix-copy-closure/local.mk \
   src/nix-prefetch-url/local.mk \
   src/buildenv/local.mk \
   src/resolve-system-dependencies/local.mk \

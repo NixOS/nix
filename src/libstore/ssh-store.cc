@@ -41,6 +41,8 @@ private:
     string host;
 
     Path key;
+
+    bool compress;
 };
 
 SSHStore::SSHStore(string host, const Params & params, size_t maxConnections)
@@ -50,6 +52,7 @@ SSHStore::SSHStore(string host, const Params & params, size_t maxConnections)
     , socketPath((Path) tmpDir + "/ssh.sock")
     , host(std::move(host))
     , key(get(params, "ssh-key", ""))
+    , compress(get(params, "compress", "") == "true")
 {
     /* open a connection and perform the handshake to verify all is well */
     connections->get();
