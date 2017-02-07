@@ -7,13 +7,15 @@ int main(int argc, char ** argv)
 {
     return handleExceptions(argv[0], [&]() {
         initNix();
+
         auto gzip = false;
         auto toMode = true;
         auto includeOutputs = false;
         auto dryRun = false;
         auto useSubstitutes = false;
-        auto sshHost = string{};
-        auto storePaths = PathSet{};
+        std::string sshHost;
+        PathSet storePaths;
+
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--help")
                 showManPage("nix-copy-closure");
@@ -41,20 +43,17 @@ int main(int argc, char ** argv)
                 storePaths.insert(*arg);
             return true;
         });
+
         if (sshHost.empty())
             throw UsageError("no host name specified");
 
-        auto remoteUri = "ssh://" + sshHost + (gzip ? "?compress=true" : "");
+        auto remoteUri = "legacy-ssh://" + sshHost + (gzip ? "?compress=true" : "");
         auto to = toMode ? openStore(remoteUri) : openStore();
         auto from = toMode ? openStore() : openStore(remoteUri);
-        if (includeOutputs) {
-            auto newPaths = PathSet{};
-            for (const auto & p : storePaths) {
-                auto outputs = from->queryDerivationOutputs(p);
-                newPaths.insert(outputs.begin(), outputs.end());
-            }
-            storePaths.insert(newPaths.begin(), newPaths.end());
-        }
-        copyPaths(from, to, Paths(storePaths.begin(), storePaths.end()), useSubstitutes);
+
+        PathSet closure;
+        from->computeFSClosure(storePaths, closure, false, includeOutputs);
+
+        copyPaths(from, to, Paths(closure.begin(), closure.end()), useSubstitutes);
     });
 }
