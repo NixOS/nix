@@ -71,9 +71,6 @@ Makefile.config
 # /src/nix-channel/
 /src/nix-channel/nix-channel
 
-# /src/download-via-ssh/
-/src/download-via-ssh/download-via-ssh
-
 # /src/buildenv/
 /src/buildenv/buildenv
 
