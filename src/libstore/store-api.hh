@@ -562,6 +562,10 @@ public:
 
     const Stats & getStats();
 
+    /* Whether this store paths from this store can be imported even
+       if they lack a signature. */
+    virtual bool isTrusted() { return false; }
+
 protected:
 
     Stats stats;

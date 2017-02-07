@@ -529,6 +529,15 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     StringSink sink;
     srcStore->narFromPath({storePath}, sink);
 
+    if (srcStore->isTrusted())
+        dontCheckSigs = true;
+
+    if (!info->narHash && dontCheckSigs) {
+        auto info2 = make_ref<ValidPathInfo>(*info);
+        info2->narHash = hashString(htSHA256, *sink.s);
+        info = info2;
+    }
+
     dstStore->addToStore(*info, sink.s, repair, dontCheckSigs);
 }
 
