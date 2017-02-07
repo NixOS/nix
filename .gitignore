@@ -35,7 +35,6 @@ Makefile.config
 # /scripts/
 /scripts/nix-profile.sh
 /scripts/nix-copy-closure
-/scripts/build-remote.pl
 /scripts/nix-reduce-build
 /scripts/nix-http-export.cgi
 
