@@ -139,6 +139,21 @@ struct StringSource : Source
 };
 
 
+/* Adapter class of a Source that saves all data read to `s'. */
+struct SavingSourceAdapter : Source
+{
+    Source & orig;
+    string s;
+    SavingSourceAdapter(Source & orig) : orig(orig) { }
+    size_t read(unsigned char * data, size_t len)
+    {
+        size_t n = orig.read(data, len);
+        s.append((const char *) data, n);
+        return n;
+    }
+};
+
+
 void writePadding(size_t len, Sink & sink);
 void writeString(const unsigned char * buf, size_t len, Sink & sink);
 

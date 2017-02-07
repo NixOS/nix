@@ -168,21 +168,6 @@ struct RetrieveRegularNARSink : ParseSink
 };
 
 
-/* Adapter class of a Source that saves all data read to `s'. */
-struct SavingSourceAdapter : Source
-{
-    Source & orig;
-    string s;
-    SavingSourceAdapter(Source & orig) : orig(orig) { }
-    size_t read(unsigned char * data, size_t len)
-    {
-        size_t n = orig.read(data, len);
-        s.append((const char *) data, n);
-        return n;
-    }
-};
-
-
 static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVersion,
     Source & from, Sink & to, unsigned int op)
 {
