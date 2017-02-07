@@ -138,8 +138,6 @@ public:
 
     ref<FSAccessor> getFSAccessor() override;
 
-public:
-
     void addSignatures(const Path & storePath, const StringSet & sigs) override
     { notImpl(); }
 
