@@ -1,5 +1,3 @@
-#include "config.h"
-
 #include "common-args.hh"
 #include "globals.hh"
 #include "shared.hh"

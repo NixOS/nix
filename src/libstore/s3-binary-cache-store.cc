@@ -1,5 +1,3 @@
-#include "config.h"
-
 #if ENABLE_S3
 #if __linux__
 

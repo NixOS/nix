@@ -28,7 +28,7 @@ makefiles = \
   doc/manual/local.mk \
   tests/local.mk
 
-GLOBAL_CXXFLAGS += -std=c++14 -g -Wall
+GLOBAL_CXXFLAGS += -std=c++14 -g -Wall -include config.h
 
 -include Makefile.config
 

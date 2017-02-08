@@ -1,4 +1,3 @@
-#include "config.h"
 #include "json-to-value.hh"
 
 #include <cstring>

@@ -1,5 +1,3 @@
-#include "config.h"
-
 #include "types.hh"
 
 #include <cstring>

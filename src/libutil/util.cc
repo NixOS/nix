@@ -1,5 +1,3 @@
-#include "config.h"
-
 #include "util.hh"
 #include "affinity.hh"
 #include "sync.hh"

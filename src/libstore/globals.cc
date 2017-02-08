@@ -1,5 +1,3 @@
-#include "config.h"
-
 #include "globals.hh"
 #include "util.hh"
 #include "archive.hh"
