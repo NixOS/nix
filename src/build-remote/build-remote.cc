@@ -268,7 +268,8 @@ connected:
         }
         alarm(0);
         signal(SIGALRM, old);
-        copyPaths(store, ref<Store>(sshStore), inputs);
+        copyPaths(store, ref<Store>(sshStore), inputs,
+                  settings.buildHookUseSubstitutes);
         uploadLock = -1;
 
         cerr << "building ‘" << drvPath << "’ on ‘" << hostName << "’\n";
@@ -277,7 +278,8 @@ connected:
         std::remove_if(outputs.begin(), outputs.end(), [=](const Path & path) { return store->isValidPath(path); });
         if (!outputs.empty()) {
             setenv("NIX_HELD_LOCKS", concatStringsSep(" ", outputs).c_str(), 1); /* FIXME: ugly */
-            copyPaths(ref<Store>(sshStore), store, outputs);
+            copyPaths(ref<Store>(sshStore), store, outputs,
+                      settings.buildHookUseSubstitutes);
         }
         return;
     });
