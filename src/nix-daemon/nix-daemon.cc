@@ -23,6 +23,7 @@
 #include <pwd.h>
 #include <grp.h>
 #include <fcntl.h>
+#include <limits.h>
 
 #if __APPLE__ || __FreeBSD__
 #include <sys/ucred.h>
@@ -967,14 +968,14 @@ int main(int argc, char * * argv)
                     if (select(nfds, &fds, nullptr, nullptr, nullptr) == -1)
                         throw SysError("waiting for data from client or server");
                     if (FD_ISSET(s, &fds)) {
-                        auto res = splice(s, nullptr, STDOUT_FILENO, nullptr, SIZE_MAX, SPLICE_F_MOVE);
+                        auto res = splice(s, nullptr, STDOUT_FILENO, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
                         if (res == -1)
                             throw SysError("splicing data from daemon socket to stdout");
                         else if (res == 0)
                             throw EndOfFile("unexpected EOF from daemon socket");
                     }
                     if (FD_ISSET(STDIN_FILENO, &fds)) {
-                        auto res = splice(STDIN_FILENO, nullptr, s, nullptr, SIZE_MAX, SPLICE_F_MOVE);
+                        auto res = splice(STDIN_FILENO, nullptr, s, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
                         if (res == -1)
                             throw SysError("splicing data from stdin to daemon socket");
                         else if (res == 0)
