@@ -1,5 +1,3 @@
-#include "config.h"
-
 #include <iostream>
 #include <cstring>
 

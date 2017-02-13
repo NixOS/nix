@@ -1,5 +1,3 @@
-#include "config.h"
-
 #include "references.hh"
 #include "pathlocks.hh"
 #include "globals.hh"

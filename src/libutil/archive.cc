@@ -1,5 +1,3 @@
-#include "config.h"
-
 #include <cerrno>
 #include <algorithm>
 #include <vector>

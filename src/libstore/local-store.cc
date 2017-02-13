@@ -1,4 +1,3 @@
-#include "config.h"
 #include "local-store.hh"
 #include "globals.hh"
 #include "archive.hh"

@@ -61,7 +61,7 @@ CFLAGS=
 CXXFLAGS=
 AC_PROG_CC
 AC_PROG_CXX
-AX_CXX_COMPILE_STDCXX_11
+AX_CXX_COMPILE_STDCXX_14
 
 
 # Use 64-bit file system calls so that we can support files > 2 GiB.
