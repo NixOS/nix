@@ -31,7 +31,7 @@
 
 <para>The command <command>nix-prefetch-url</command> downloads the
 file referenced by the URL <replaceable>url</replaceable>, prints its
-cryptographic hash, and copies it into the Nix store.  The file name
+cryptographic hash in base32, and copies it into the Nix store.  The file name
 in the store is
 <filename><replaceable>hash</replaceable>-<replaceable>baseName</replaceable></filename>,
 where <replaceable>baseName</replaceable> is everything following the
