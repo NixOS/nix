@@ -23,7 +23,7 @@ struct DownloadRequest
 
 struct DownloadResult
 {
-    bool cached;
+    bool cached = false;
     std::string etag;
     std::string effectiveUrl;
     std::shared_ptr<std::string> data;

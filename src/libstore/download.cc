@@ -4,6 +4,7 @@
 #include "hash.hh"
 #include "store-api.hh"
 #include "archive.hh"
+#include "s3.hh"
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -480,6 +481,31 @@ struct CurlDownloader : public Downloader
         std::function<void(const DownloadResult &)> success,
         std::function<void(std::exception_ptr exc)> failure) override
     {
+        /* Ugly hack to support s3:// URIs. */
+        if (hasPrefix(request.uri, "s3://")) {
+            // FIXME: do this on a worker thread
+            sync2async<DownloadResult>(success, failure, [&]() {
+#ifdef ENABLE_S3
+                S3Helper s3Helper;
+                auto slash = request.uri.find('/', 5);
+                if (slash == std::string::npos)
+                    throw nix::Error("bad S3 URI ‘%s’", request.uri);
+                std::string bucketName(request.uri, 5, slash - 5);
+                std::string key(request.uri, slash + 1);
+                // FIXME: implement ETag
+                auto s3Res = s3Helper.getObject(bucketName, key);
+                DownloadResult res;
+                if (!s3Res.data)
+                    throw DownloadError(NotFound, fmt("S3 object ‘%s’ does not exist", request.uri));
+                res.data = s3Res.data;
+                return res;
+#else
+                throw nix::Error("cannot download ‘%s’ because Nix is not built with S3 support", request.uri);
+#endif
+            });
+            return;
+        }
+
         auto item = std::make_shared<DownloadItem>(*this, request);
         item->success = success;
         item->failure = failure;
@@ -629,7 +655,7 @@ bool isUri(const string & s)
     size_t pos = s.find("://");
     if (pos == string::npos) return false;
     string scheme(s, 0, pos);
-    return scheme == "http" || scheme == "https" || scheme == "file" || scheme == "channel" || scheme == "git";
+    return scheme == "http" || scheme == "https" || scheme == "file" || scheme == "channel" || scheme == "git" || scheme == "s3";
 }
 
 
