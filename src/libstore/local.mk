@@ -4,7 +4,33 @@ libstore_NAME = libnixstore
 
 libstore_DIR := $(d)
 
-libstore_SOURCES := $(wildcard $(d)/*.cc)
+libstore_SOURCES := \
+	$(d)/binary-cache-store.cc \
+	$(d)/build.cc \
+	$(d)/builtins.cc \
+	$(d)/crypto.cc \
+	$(d)/derivations.cc \
+	$(d)/download.cc \
+	$(d)/export-import.cc \
+	$(d)/gc.cc \
+	$(d)/globals.cc \
+	$(d)/http-binary-cache-store.cc \
+	$(d)/local-binary-cache-store.cc \
+	$(d)/local-fs-store.cc \
+	$(d)/local-store.cc \
+	$(d)/misc.cc \
+	$(d)/nar-accessor.cc \
+	$(d)/nar-info.cc \
+	$(d)/nar-info-disk-cache.cc \
+	$(d)/optimise-store.cc \
+	$(d)/pathlocks.cc \
+	$(d)/profiles.cc \
+	$(d)/references.cc \
+	$(d)/remote-fs-accessor.cc \
+	$(d)/remote-store.cc \
+	$(d)/sqlite.cc \
+	$(d)/ssh-store.cc \
+	$(d)/store-api.cc \
 
 libstore_LIBS = libutil libformat
 
@@ -12,6 +38,12 @@ libstore_LDFLAGS = $(SQLITE3_LIBS) -lbz2 $(LIBCURL_LIBS) $(SODIUM_LIBS) -pthread
 
 ifeq ($(ENABLE_S3), 1)
 	libstore_LDFLAGS += -laws-cpp-sdk-s3 -laws-cpp-sdk-core
+	libstore_SOURCES += $(d)/s3-binary-cache-store.cc
+endif
+
+ifeq ($(ENABLE_IPFS), 1)
+	libstore_LDFLAGS += -lipfs-api
+	libstore_SOURCES += $(d)/ipfs-accessor.cc
 endif
 
 ifeq ($(OS), SunOS)

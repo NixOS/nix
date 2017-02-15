@@ -57,6 +57,11 @@ Settings::Settings()
     lockCPU = getEnv("NIX_AFFINITY_HACK", "1") == "1";
     showTrace = false;
     enableImportNative = false;
+
+    ipfsAPIHost = "localhost";
+    ipfsAPIPort = 5001;
+    useIpfsGateway = false;
+    ipfsGatewayURL = "https://ipfs.io";
 }
 
 
@@ -183,6 +188,10 @@ void Settings::update()
     _get(preBuildHook, "pre-build-hook");
     _get(keepGoing, "keep-going");
     _get(keepFailed, "keep-failed");
+    _get(ipfsAPIHost, "ipfs-api-host");
+    _get(ipfsAPIPort, "ipfs-api-port");
+    _get(useIpfsGateway, "use-ipfs-gateway");
+    _get(ipfsGatewayURL, "ipfs-gateway-url");
 }
 
 

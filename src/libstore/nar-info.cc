@@ -41,6 +41,8 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
             compression = value;
         else if (name == "FileHash")
             fileHash = parseHashField(value);
+        else if (name == "IPFSHash")
+            ipfsHash = value;
         else if (name == "FileSize") {
             if (!string2Int(value, fileSize)) corrupt();
         }
@@ -107,6 +109,9 @@ std::string NarInfo::to_string() const
 
     if (!ca.empty())
         res += "CA: " + ca + "\n";
+
+    if (!ipfsHash.empty())
+        res += "IPFSHash: " + ipfsHash + "\n";
 
     return res;
 }

@@ -13,6 +13,7 @@ struct NarInfo : ValidPathInfo
     Hash fileHash;
     uint64_t fileSize = 0;
     std::string system;
+    std::string ipfsHash;
 
     NarInfo() { }
     NarInfo(const ValidPathInfo & info) : ValidPathInfo(info) { }
