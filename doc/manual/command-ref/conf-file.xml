@@ -437,10 +437,18 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
     trying to download from a remote host through HTTP or HTTPS. Defaults to
     <filename>$NIX_CONF_DIR/netrc</filename>.</para>
 
-    <para>The <filename>netrc</filename> file consists of zero or more lines
-    like: <literal>machine <replaceable>my-machine</replaceable> login
-    <replaceable>my-username</replaceable> password
-    <replaceable>my-password</replaceable></literal>.</para></listitem>
+    <para>The <filename>netrc</filename> file consists of a list of
+    accounts in the following format:
+
+<screen>
+machine <replaceable>my-machine</replaceable>
+login <replaceable>my-username</replaceable>
+password <replaceable>my-password</replaceable>
+</screen>
+
+    For the exact syntax, see <link
+    xlink:href="https://ec.haxx.se/usingcurl-netrc.html">the
+    <literal>curl</literal> documentation.</link></para></listitem>
 
   </varlistentry>
 
