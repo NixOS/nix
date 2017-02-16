@@ -26,7 +26,6 @@ static ref<Store> store()
     if (!_store) {
         try {
             logger = makeDefaultLogger();
-            settings.processEnvironment();
             settings.loadConfFile();
             settings.update();
             settings.lockCPU = false;

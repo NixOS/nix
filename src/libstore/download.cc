@@ -232,11 +232,8 @@ struct CurlDownloader : public Downloader
             }
 
             /* If no file exist in the specified path, curl continues to work
-             * anyway as if netrc support was disabled. */
-            Path netrcFile = settings.get("netrc-file",
-               (format("%1%/%2%") % settings.nixConfDir % "netrc").str());
-            /* Curl copies the given C string, so the following call is safe. */
-            curl_easy_setopt(req, CURLOPT_NETRC_FILE, netrcFile.c_str());
+               anyway as if netrc support was disabled. */
+            curl_easy_setopt(req, CURLOPT_NETRC_FILE, settings.netrcFile.c_str());
             curl_easy_setopt(req, CURLOPT_NETRC, CURL_NETRC_OPTIONAL);
 
             result.data = std::make_shared<std::string>();

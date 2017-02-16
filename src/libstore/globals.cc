@@ -23,6 +23,21 @@ Settings settings;
 
 Settings::Settings()
 {
+    nixPrefix = NIX_PREFIX;
+    nixStore = canonPath(getEnv("NIX_STORE_DIR", getEnv("NIX_STORE", NIX_STORE_DIR)));
+    nixDataDir = canonPath(getEnv("NIX_DATA_DIR", NIX_DATA_DIR));
+    nixLogDir = canonPath(getEnv("NIX_LOG_DIR", NIX_LOG_DIR));
+    nixStateDir = canonPath(getEnv("NIX_STATE_DIR", NIX_STATE_DIR));
+    nixConfDir = canonPath(getEnv("NIX_CONF_DIR", NIX_CONF_DIR));
+    nixLibexecDir = canonPath(getEnv("NIX_LIBEXEC_DIR", NIX_LIBEXEC_DIR));
+    nixBinDir = canonPath(getEnv("NIX_BIN_DIR", NIX_BIN_DIR));
+    nixDaemonSocketFile = canonPath(nixStateDir + DEFAULT_SOCKET_PATH);
+
+    // should be set with the other config options, but depends on nixLibexecDir
+#ifdef __APPLE__
+    preBuildHook = nixLibexecDir + "/nix/resolve-system-dependencies";
+#endif
+
     keepFailed = false;
     keepGoing = false;
     tryFallback = false;
@@ -57,25 +72,7 @@ Settings::Settings()
     lockCPU = getEnv("NIX_AFFINITY_HACK", "1") == "1";
     showTrace = false;
     enableImportNative = false;
-}
-
-
-void Settings::processEnvironment()
-{
-    nixPrefix = NIX_PREFIX;
-    nixStore = canonPath(getEnv("NIX_STORE_DIR", getEnv("NIX_STORE", NIX_STORE_DIR)));
-    nixDataDir = canonPath(getEnv("NIX_DATA_DIR", NIX_DATA_DIR));
-    nixLogDir = canonPath(getEnv("NIX_LOG_DIR", NIX_LOG_DIR));
-    nixStateDir = canonPath(getEnv("NIX_STATE_DIR", NIX_STATE_DIR));
-    nixConfDir = canonPath(getEnv("NIX_CONF_DIR", NIX_CONF_DIR));
-    nixLibexecDir = canonPath(getEnv("NIX_LIBEXEC_DIR", NIX_LIBEXEC_DIR));
-    nixBinDir = canonPath(getEnv("NIX_BIN_DIR", NIX_BIN_DIR));
-    nixDaemonSocketFile = canonPath(nixStateDir + DEFAULT_SOCKET_PATH);
-
-    // should be set with the other config options, but depends on nixLibexecDir
-#ifdef __APPLE__
-    preBuildHook = nixLibexecDir + "/nix/resolve-system-dependencies";
-#endif
+    netrcFile = fmt("%s/%s", nixConfDir, "netrc");
 }
 
 
@@ -183,6 +180,7 @@ void Settings::update()
     _get(preBuildHook, "pre-build-hook");
     _get(keepGoing, "keep-going");
     _get(keepFailed, "keep-failed");
+    _get(netrcFile, "netrc-file");
 }
 
 

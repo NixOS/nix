@@ -16,8 +16,6 @@ struct Settings {
 
     Settings();
 
-    void processEnvironment();
-
     void loadConfFile();
 
     void set(const string & name, const string & value);
@@ -192,6 +190,10 @@ struct Settings {
     /* The hook to run just before a build to set derivation-specific
        build settings */
     Path preBuildHook;
+
+    /* Path to the netrc file used to obtain usernames/passwords for
+       downloads. */
+    Path netrcFile;
 
 private:
     SettingsMap settings, overrides;
