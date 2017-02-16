@@ -2307,6 +2307,14 @@ void DerivationGoal::runChild()
 
         bool setUser = true;
 
+        /* Make the contents of netrc available to builtin:fetchurl
+           (which may run under a different uid and/or in a sandbox). */
+        std::string netrcData;
+        try {
+            if (drv->isBuiltin() && drv->builder == "builtin:fetchurl")
+                netrcData = readFile(settings.netrcFile);
+        } catch (SysError &) { }
+
 #if __linux__
         if (useChroot) {
 
@@ -2675,7 +2683,7 @@ void DerivationGoal::runChild()
         if (drv->isBuiltin()) {
             try {
                 if (drv->builder == "builtin:fetchurl")
-                    builtinFetchurl(*drv);
+                    builtinFetchurl(*drv, netrcData);
                 else
                     throw Error(format("unsupported builtin function ‘%1%’") % string(drv->builder, 8));
                 _exit(0);
@@ -3072,7 +3080,9 @@ void DerivationGoal::closeLogFile()
 void DerivationGoal::deleteTmpDir(bool force)
 {
     if (tmpDir != "") {
-        if (settings.keepFailed && !force) {
+        /* Don't keep temporary directories for builtins because they
+           might have privileged stuff (like a copy of netrc). */
+        if (settings.keepFailed && !force && !drv->isBuiltin()) {
             printError(
                 format("note: keeping build directory ‘%2%’")
                 % drvPath % tmpDir);

@@ -288,9 +288,9 @@ string readFile(const Path & path, bool drain)
 }
 
 
-void writeFile(const Path & path, const string & s)
+void writeFile(const Path & path, const string & s, mode_t mode)
 {
-    AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, 0666);
+    AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
         throw SysError(format("opening file ‘%1%’") % path);
     writeFull(fd.get(), s);
