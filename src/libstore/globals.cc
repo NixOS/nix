@@ -57,6 +57,7 @@ Settings::Settings()
     lockCPU = getEnv("NIX_AFFINITY_HACK", "1") == "1";
     showTrace = false;
     enableImportNative = false;
+    buildHookUseSubstitutes = false;
 }
 
 
@@ -181,6 +182,7 @@ void Settings::update()
     _get(enableImportNative, "allow-unsafe-native-code-during-evaluation");
     _get(useCaseHack, "use-case-hack");
     _get(preBuildHook, "pre-build-hook");
+    _get(buildHookUseSubstitutes, "build-hook-use-substitutes");
     _get(keepGoing, "keep-going");
     _get(keepFailed, "keep-failed");
 }

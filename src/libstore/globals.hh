@@ -193,6 +193,9 @@ struct Settings {
        build settings */
     Path preBuildHook;
 
+    /* Whether the build hook should be instructed to use substitutes. */
+    bool buildHookUseSubstitutes;
+
 private:
     SettingsMap settings, overrides;
 
