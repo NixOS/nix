@@ -1,24 +1,20 @@
 { system ? builtins.currentSystem
 , url
-, outputHash ? ""
-, outputHashAlgo ? ""
 , md5 ? "", sha1 ? "", sha256 ? ""
+, outputHash ?
+    if sha1 != "" then sha1 else if md5 != "" then md5 else sha256
+, outputHashAlgo ?
+    if sha1 != "" then "sha1" else if md5 != "" then "md5" else "sha256"
 , executable ? false
 , unpack ? false
 , name ? baseNameOf (toString url)
 }:
 
-assert (outputHash != "" && outputHashAlgo != "")
-    || md5 != "" || sha1 != "" || sha256 != "";
-
 derivation {
   builder = "builtin:fetchurl";
 
   # New-style output content requirements.
-  outputHashAlgo = if outputHashAlgo != "" then outputHashAlgo else
-      if sha256 != "" then "sha256" else if sha1 != "" then "sha1" else "md5";
-  outputHash = if outputHash != "" then outputHash else
-      if sha256 != "" then sha256 else if sha1 != "" then sha1 else md5;
+  inherit outputHashAlgo outputHash;
   outputHashMode = if unpack || executable then "recursive" else "flat";
 
   inherit name system url executable unpack;
