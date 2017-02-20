@@ -1023,10 +1023,18 @@ in foo</programlisting>
 
     <listitem><para>Convert the expression
     <replaceable>e</replaceable> to a string.
-    <replaceable>e</replaceable> can be a string (in which case
-    <function>toString</function> is a no-op), a path (e.g.,
-    <literal>toString /foo/bar</literal> yields
-    <literal>"/foo/bar"</literal> or a set containing <literal>{ __toString = self: ...; }</literal>.</para></listitem>
+    <replaceable>e</replaceable> can be:
+    <itemizedlist>
+        <listitem>a string (in which case the string is returned unmodified)</listitem>
+        <listitem>a path (e.g., <literal>toString /foo/bar</literal> yields <literal>"/foo/bar"</literal></listitem>
+        <listitem>a set containing <literal>{ __toString = self: ...; }</literal></listitem>
+        <listitem>an integer</listitem>
+        <listitem>a list, in which case the string representations of its elements are joined with spaces</listitem>
+        <listitem>a boolean (<literal>false</literal> yields <literal>""</literal>, <literal>true</literal> yields <literal>"1"</literal></listitem>
+        <listitem><literal>null</literal>, which yields the empty string.</listitem>
+    </itemizedlist>
+    </para>
+    </listitem>
 
   </varlistentry>
 
