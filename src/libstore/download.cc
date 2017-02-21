@@ -489,7 +489,7 @@ struct CurlDownloader : public Downloader
         /* Ugly hack to support s3:// URIs. */
         if (hasPrefix(request.uri, "s3://")) {
             // FIXME: do this on a worker thread
-            sync2async<DownloadResult>(success, failure, [&]() {
+            sync2async<DownloadResult>(success, failure, [&]() -> DownloadResult {
 #ifdef ENABLE_S3
                 S3Helper s3Helper;
                 auto slash = request.uri.find('/', 5);

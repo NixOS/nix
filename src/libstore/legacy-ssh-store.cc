@@ -225,7 +225,7 @@ struct LegacySSHStore : public Store
     void collectGarbage(const GCOptions & options, GCResults & results) override
     { unsupported(); }
 
-    ref<FSAccessor> getFSAccessor()
+    ref<FSAccessor> getFSAccessor() override
     { unsupported(); }
 
     void addSignatures(const Path & storePath, const StringSet & sigs) override
