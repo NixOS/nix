@@ -1,3 +1,5 @@
+%undefine _hardened_build
+
 %global nixbld_user "nix-builder-"
 %global nixbld_group "nixbld"
 
