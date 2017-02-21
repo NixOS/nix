@@ -8,6 +8,7 @@
 
 #include <aws/core/Aws.h>
 #include <aws/core/client/ClientConfiguration.h>
+#include <aws/core/client/DefaultRetryStrategy.h>
 #include <aws/s3/S3Client.h>
 #include <aws/s3/model/CreateBucketRequest.h>
 #include <aws/s3/model/GetBucketLocationRequest.h>
@@ -57,12 +58,25 @@ S3Helper::S3Helper()
 {
 }
 
+/* Log AWS retries. */
+class RetryStrategy : public Aws::Client::DefaultRetryStrategy
+{
+    long CalculateDelayBeforeNextRetry(const Aws::Client::AWSError<Aws::Client::CoreErrors>& error, long attemptedRetries) const override
+    {
+        auto res = Aws::Client::DefaultRetryStrategy::CalculateDelayBeforeNextRetry(error, attemptedRetries);
+        printError("AWS error '%s' (%s), will retry in %d ms",
+            error.GetExceptionName(), error.GetMessage(), res);
+        return res;
+    }
+};
+
 ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig()
 {
     initAWS();
     auto res = make_ref<Aws::Client::ClientConfiguration>();
     res->region = Aws::Region::US_EAST_1; // FIXME: make configurable
     res->requestTimeoutMs = 600 * 1000;
+    res->retryStrategy = std::make_shared<RetryStrategy>();
     return res;
 }
 
