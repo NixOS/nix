@@ -273,7 +273,7 @@ struct CurlDownloader : public Downloader
                     httpStatus == 403 ? Forbidden :
                     (httpStatus == 408 || httpStatus == 500 || httpStatus == 503
                         || httpStatus == 504  || httpStatus == 522 || httpStatus == 524
-                        || code == CURLE_COULDNT_RESOLVE_HOST) ? Transient :
+                        || code == CURLE_COULDNT_RESOLVE_HOST || code == CURLE_RECV_ERROR) ? Transient :
                     Misc;
 
                 attempt++;
