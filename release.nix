@@ -284,9 +284,10 @@ let
         { extraPackages =
             [ "perl-DBD-SQLite" "perl-devel" "sqlite" "sqlite-devel" "bzip2-devel" "emacs" "libcurl-devel" "openssl-devel" "xz-devel" ]
             ++ extraPackages; };
-      memSize = 1024;
+      memSize = 8192;
       meta.schedulingPriority = 50;
       postRPMInstall = "cd /tmp/rpmout/BUILD/nix-* && make installcheck";
+      enableParallelBuilding = true;
     };
 
 

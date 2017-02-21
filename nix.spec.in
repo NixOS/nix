@@ -107,7 +107,7 @@ extraFlags=
 %configure --localstatedir=/nix/var \
            --docdir=%{_defaultdocdir}/%{name}-doc-%{version} \
            $extraFlags
-make %{?_smp_flags}
+make -j$NIX_BUILD_CORES -l$NIX_BUILD_CORES
 %{_emacs_bytecompile} misc/emacs/nix-mode.el
 
 
