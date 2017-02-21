@@ -7,7 +7,7 @@ let
 
   pkgs = import <nixpkgs> {};
 
-  systems = [ "x86_64-linux" "i686-linux" "x86_64-darwin" /* "x86_64-freebsd" "i686-freebsd" */ ];
+  systems = [ "x86_64-linux" "i686-linux" "x86_64-darwin" ];
 
 
   jobs = rec {
@@ -180,10 +180,6 @@ let
 
     deb_ubuntu1410i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1410i386) [] [];
     deb_ubuntu1410x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1410x86_64) [] [];
-    deb_ubuntu1504i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1504i386) [ "libsodium-dev" ] [ "libsodium13" ];
-    deb_ubuntu1504x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1504x86_64) [ "libsodium-dev" ] [ "libsodium13" ];
-    deb_ubuntu1510i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1510i386) [ "libsodium-dev" ] [ "libsodium13"];
-    deb_ubuntu1510x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1510x86_64) [ "libsodium-dev" ] [ "libsodium13" ];
     deb_ubuntu1604i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1604i386) [ "libsodium-dev" ] [ "libsodium18" ];
     deb_ubuntu1604x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1604x86_64) [ "libsodium-dev" ] [ "libsodium18" ];
     deb_ubuntu1610i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1610i386) [ "libsodium-dev" ] [ "libsodium18" ];
@@ -244,20 +240,16 @@ let
       meta.description = "Release-critical builds";
       constituents =
         [ tarball
-          #build.i686-freebsd
           build.i686-linux
           build.x86_64-darwin
-          #build.x86_64-freebsd
           build.x86_64-linux
-          #binaryTarball.i686-freebsd
           binaryTarball.i686-linux
           binaryTarball.x86_64-darwin
-          #binaryTarball.x86_64-freebsd
           binaryTarball.x86_64-linux
           deb_debian8i386
           deb_debian8x86_64
-          deb_ubuntu1504i386
-          deb_ubuntu1504x86_64
+          deb_ubuntu1604i386
+          deb_ubuntu1604x86_64
           rpm_fedora25i386
           rpm_fedora25x86_64
           tests.remoteBuilds
