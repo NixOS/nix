@@ -16,7 +16,7 @@ $caBundle = $ENV{"NIX_SSL_CERT_FILE"} // $ENV{"SSL_CERT_FILE"} // $ENV{"CURL_CA_
 $caBundle = "/etc/ssl/certs/ca-bundle.crt" if !$caBundle && -f "/etc/ssl/certs/ca-bundle.crt";
 $caBundle = "/etc/ssl/certs/ca-certificates.crt" if !$caBundle && -f "/etc/ssl/certs/ca-certificates.crt";
 
-$curlCaFlag = defined $caBundle ? "--capath $caBundle" : "";
+$curlCaFlag = defined $caBundle ? "--cacert $caBundle" : "";
 
 $bzip2 = "@bzip2@";
 $xz = "@xz@";
