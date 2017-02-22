@@ -20,14 +20,6 @@ struct Settings {
 
     void set(const string & name, const string & value);
 
-    string get(const string & name, const string & def);
-
-    Strings get(const string & name, const Strings & def);
-
-    bool get(const string & name, bool def);
-
-    int get(const string & name, int def);
-
     void update();
 
     string pack();
@@ -35,6 +27,10 @@ struct Settings {
     void unpack(const string & pack);
 
     SettingsMap getOverrides();
+
+    /* TODO: the comments below should be strings and exposed via a nice command-line UI or similar.
+       We should probably replace it with some sort of magic template or macro to minimize the amount
+       of duplication and pain here. */
 
     /* The directory where we store sources and derived files. */
     Path nixStore;
@@ -187,6 +183,75 @@ struct Settings {
     /* Whether the importNative primop should be enabled */
     bool enableImportNative;
 
+    /* Whether to enable sandboxed builds (string until we get an enum for true/false/relaxed) */
+    string useSandbox;
+
+    /* The basic set of paths to expose in a sandbox */
+    PathSet sandboxPaths;
+
+    /* Any extra sandbox paths to expose */
+    PathSet extraSandboxPaths;
+
+    /* Whether to allow certain questionable operations (like fetching) during evaluation */
+    bool restrictEval;
+
+    /* The number of times to repeat a build to check for determinism */
+    int buildRepeat;
+
+    /* Which prefixes to allow derivations to ask for access to (primarily for Darwin) */
+    PathSet allowedImpureHostPrefixes;
+
+    /* The size of /dev/shm in the build sandbox (for Linux) */
+    string sandboxShmSize;
+
+    /* Whether to log Darwin sandbox access violations to the system log */
+    bool darwinLogSandboxViolations;
+
+    /* ??? */
+    bool runDiffHook;
+
+    /* ??? */
+    string diffHook;
+
+    /* Whether to fail if repeated builds produce different output */
+    bool enforceDeterminism;
+
+    /* The known public keys for a binary cache */
+    Strings binaryCachePublicKeys;
+
+    /* Secret keys to use for build output signing */
+    Strings secretKeyFiles;
+
+    /* Number of parallel connections to hit a binary cache with when finding out if it contains hashes */
+    int binaryCachesParallelConnections;
+
+    /* Whether to enable HTTP2 */
+    bool enableHttp2;
+
+    /* How soon to expire tarballs like builtins.fetchTarball and (ugh, bad name) builtins.fetchurl */
+    int tarballTtl;
+
+    /* ??? */
+    string signedBinaryCaches;
+
+    /* ??? */
+    Strings substituters;
+
+    /* ??? */
+    Strings binaryCaches;
+
+    /* ??? */
+    Strings extraBinaryCaches;
+
+    /* Who we trust to ask the daemon to do unsafe things */
+    Strings trustedUsers;
+
+    /* ?Who we trust to use the daemon in safe ways */
+    Strings allowedUsers;
+
+    /* ??? */
+    bool printMissing;
+
     /* The hook to run just before a build to set derivation-specific
        build settings */
     Path preBuildHook;
@@ -196,11 +261,16 @@ struct Settings {
     Path netrcFile;
 
 private:
+    StringSet deprecatedOptions;
     SettingsMap settings, overrides;
 
+    void checkDeprecated(const string & name);
+
     void _get(string & res, const string & name);
+    void _get(string & res, const string & name1, const string & name2);
     void _get(bool & res, const string & name);
     void _get(StringSet & res, const string & name);
+    void _get(StringSet & res, const string & name1, const string & name2);
     void _get(Strings & res, const string & name);
     template<class N> void _get(N & res, const string & name);
 };

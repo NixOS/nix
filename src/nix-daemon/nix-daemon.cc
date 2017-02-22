@@ -865,8 +865,8 @@ static void daemonLoop(char * * argv)
             struct group * gr = peer.gidKnown ? getgrgid(peer.gid) : 0;
             string group = gr ? gr->gr_name : std::to_string(peer.gid);
 
-            Strings trustedUsers = settings.get("trusted-users", Strings({"root"}));
-            Strings allowedUsers = settings.get("allowed-users", Strings({"*"}));
+            Strings trustedUsers = settings.trustedUsers;
+            Strings allowedUsers = settings.allowedUsers;
 
             if (matchUser(user, group, trustedUsers))
                 trusted = true;

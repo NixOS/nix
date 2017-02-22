@@ -17,12 +17,23 @@ namespace nix {
    must be deleted and recreated on startup.) */
 #define DEFAULT_SOCKET_PATH "/daemon-socket/socket"
 
+/* chroot-like behavior from Apple's sandbox */
+#if __APPLE__
+    #define DEFAULT_ALLOWED_IMPURE_PREFIXES "/System/Library /usr/lib /dev /bin/sh"
+#else
+    #define DEFAULT_ALLOWED_IMPURE_PREFIXES ""
+#endif
 
 Settings settings;
 
 
 Settings::Settings()
 {
+    deprecatedOptions = StringSet({
+        "build-use-chroot", "build-chroot-dirs", "build-extra-chroot-dirs",
+        "this-option-never-existed-but-who-will-know"
+    });
+
     nixPrefix = NIX_PREFIX;
     nixStore = canonPath(getEnv("NIX_STORE_DIR", getEnv("NIX_STORE", NIX_STORE_DIR)));
     nixDataDir = canonPath(getEnv("NIX_DATA_DIR", NIX_DATA_DIR));
@@ -73,6 +84,32 @@ Settings::Settings()
     showTrace = false;
     enableImportNative = false;
     netrcFile = fmt("%s/%s", nixConfDir, "netrc");
+    useSandbox = "false"; // TODO: make into an enum
+
+#if __linux__
+    sandboxPaths = tokenizeString<StringSet>("/bin/sh=" BASH_PATH);
+#endif
+
+    restrictEval = false;
+    buildRepeat = 0;
+    allowedImpureHostPrefixes = tokenizeString<StringSet>(DEFAULT_ALLOWED_IMPURE_PREFIXES);
+    sandboxShmSize = "50%";
+    darwinLogSandboxViolations = false;
+    runDiffHook = false;
+    diffHook = "";
+    enforceDeterminism = true;
+    binaryCachePublicKeys = Strings();
+    secretKeyFiles = Strings();
+    binaryCachesParallelConnections = 25;
+    enableHttp2 = true;
+    tarballTtl = 60 * 60;
+    signedBinaryCaches = "";
+    substituters = Strings();
+    binaryCaches = Strings();
+    extraBinaryCaches = Strings();
+    trustedUsers = Strings({"root"});
+    allowedUsers = Strings({"*"});
+    printMissing = true;
 }
 
 
@@ -115,39 +152,6 @@ void Settings::set(const string & name, const string & value)
     overrides[name] = value;
 }
 
-
-string Settings::get(const string & name, const string & def)
-{
-    auto i = settings.find(name);
-    if (i == settings.end()) return def;
-    return i->second;
-}
-
-
-Strings Settings::get(const string & name, const Strings & def)
-{
-    auto i = settings.find(name);
-    if (i == settings.end()) return def;
-    return tokenizeString<Strings>(i->second);
-}
-
-
-bool Settings::get(const string & name, bool def)
-{
-    bool res = def;
-    _get(res, name);
-    return res;
-}
-
-
-int Settings::get(const string & name, int def)
-{
-    int res = def;
-    _get(res, name);
-    return res;
-}
-
-
 void Settings::update()
 {
     _get(tryFallback, "build-fallback");
@@ -181,13 +185,71 @@ void Settings::update()
     _get(keepGoing, "keep-going");
     _get(keepFailed, "keep-failed");
     _get(netrcFile, "netrc-file");
+    _get(useSandbox, "build-use-sandbox", "build-use-chroot");
+    _get(sandboxPaths, "build-sandbox-paths", "build-chroot-dirs");
+    _get(extraSandboxPaths, "build-extra-sandbox-paths", "build-extra-chroot-dirs");
+    _get(restrictEval, "restrict-eval");
+    _get(buildRepeat, "build-repeat");
+    _get(allowedImpureHostPrefixes, "allowed-impure-host-deps");
+    _get(sandboxShmSize, "sandbox-dev-shm-size");
+    _get(darwinLogSandboxViolations, "darwin-log-sandbox-violations");
+    _get(runDiffHook, "run-diff-hook");
+    _get(diffHook, "diff-hook");
+    _get(enforceDeterminism, "enforce-determinism");
+    _get(binaryCachePublicKeys, "binary-cache-public-keys");
+    _get(secretKeyFiles, "secret-key-files");
+    _get(binaryCachesParallelConnections, "binary-caches-parallel-connections");
+    _get(enableHttp2, "enable-http2");
+    _get(tarballTtl, "tarball-ttl");
+    _get(signedBinaryCaches, "signed-binary-caches");
+    _get(substituters, "substituters");
+    _get(binaryCaches, "binary-caches");
+    _get(extraBinaryCaches, "extra-binary-caches");
+    _get(trustedUsers, "trusted-users");
+    _get(allowedUsers, "allowed-users");
+    _get(printMissing, "print-missing");
+
+    /* Clear out any deprecated options that might be left, so users know we recognize the option
+       but aren't processing it anymore */
+    for (auto &i : deprecatedOptions) {
+        if (settings.find(i) != settings.end()) {
+            printError(format("warning: deprecated option '%1%' is no longer supported and will be ignored") % i);
+            settings.erase(i);
+        }
+    }
+
+    if (settings.size() != 0) {
+        string bad;
+        for (auto &i : settings)
+            bad += "'" + i.first + "', ";
+        bad.pop_back();
+        bad.pop_back();
+        throw Error(format("unrecognized options: %s") % bad);
+    }
 }
 
+void Settings::checkDeprecated(const string & name)
+{
+    if (deprecatedOptions.find(name) != deprecatedOptions.end())
+        printError(format("warning: deprecated option '%1%' will soon be unsupported") % name);
+}
 
 void Settings::_get(string & res, const string & name)
 {
     SettingsMap::iterator i = settings.find(name);
     if (i == settings.end()) return;
+    checkDeprecated(i->first);
+    settings.erase(i);
+    res = i->second;
+}
+
+void Settings::_get(string & res, const string & name1, const string & name2)
+{
+    SettingsMap::iterator i = settings.find(name1);
+    if (i == settings.end()) i = settings.find(name2);
+    if (i == settings.end()) return;
+    checkDeprecated(i->first);
+    settings.erase(i);
     res = i->second;
 }
 
@@ -196,6 +258,8 @@ void Settings::_get(bool & res, const string & name)
 {
     SettingsMap::iterator i = settings.find(name);
     if (i == settings.end()) return;
+    checkDeprecated(i->first);
+    settings.erase(i);
     if (i->second == "true") res = true;
     else if (i->second == "false") res = false;
     else throw Error(format("configuration option ‘%1%’ should be either ‘true’ or ‘false’, not ‘%2%’")
@@ -207,6 +271,20 @@ void Settings::_get(StringSet & res, const string & name)
 {
     SettingsMap::iterator i = settings.find(name);
     if (i == settings.end()) return;
+    checkDeprecated(i->first);
+    settings.erase(i);
+    res.clear();
+    Strings ss = tokenizeString<Strings>(i->second);
+    res.insert(ss.begin(), ss.end());
+}
+
+void Settings::_get(StringSet & res, const string & name1, const string & name2)
+{
+    SettingsMap::iterator i = settings.find(name1);
+    if (i == settings.end()) i = settings.find(name2);
+    if (i == settings.end()) return;
+    checkDeprecated(i->first);
+    settings.erase(i);
     res.clear();
     Strings ss = tokenizeString<Strings>(i->second);
     res.insert(ss.begin(), ss.end());
@@ -216,6 +294,8 @@ void Settings::_get(Strings & res, const string & name)
 {
     SettingsMap::iterator i = settings.find(name);
     if (i == settings.end()) return;
+    checkDeprecated(i->first);
+    settings.erase(i);
     res = tokenizeString<Strings>(i->second);
 }
 
@@ -224,6 +304,8 @@ template<class N> void Settings::_get(N & res, const string & name)
 {
     SettingsMap::iterator i = settings.find(name);
     if (i == settings.end()) return;
+    checkDeprecated(i->first);
+    settings.erase(i);
     if (!string2Int(i->second, res))
         throw Error(format("configuration setting ‘%1%’ should have an integer value") % name);
 }

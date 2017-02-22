@@ -766,13 +766,13 @@ std::list<ref<Store>> getDefaultSubstituters()
         state->stores.push_back(openStore(uri));
     };
 
-    for (auto uri : settings.get("substituters", Strings()))
+    for (auto uri : settings.substituters)
         addStore(uri);
 
-    for (auto uri : settings.get("binary-caches", Strings()))
+    for (auto uri : settings.binaryCaches)
         addStore(uri);
 
-    for (auto uri : settings.get("extra-binary-caches", Strings()))
+    for (auto uri : settings.extraBinaryCaches)
         addStore(uri);
 
     state->done = true;

@@ -331,9 +331,9 @@ struct CurlDownloader : public Downloader
         curl_multi_setopt(curlm, CURLMOPT_PIPELINING, CURLPIPE_MULTIPLEX);
         #endif
         curl_multi_setopt(curlm, CURLMOPT_MAX_TOTAL_CONNECTIONS,
-            settings.get("binary-caches-parallel-connections", 25));
+            settings.binaryCachesParallelConnections);
 
-        enableHttp2 = settings.get("enable-http2", true);
+        enableHttp2 = settings.enableHttp2;
 
         wakeupPipe.create();
         fcntl(wakeupPipe.readSide.get(), F_SETFL, O_NONBLOCK);
@@ -573,7 +573,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
 
     string expectedETag;
 
-    int ttl = settings.get("tarball-ttl", 60 * 60);
+    int ttl = settings.tarballTtl;
     bool skip = false;
 
     if (pathExists(fileLink) && pathExists(dataFile)) {
