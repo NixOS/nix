@@ -12,6 +12,12 @@ $logDir = $ENV{"NIX_LOG_DIR"} || "@localstatedir@/log/nix";
 $confDir = $ENV{"NIX_CONF_DIR"} || "@sysconfdir@/nix";
 $storeDir = $ENV{"NIX_STORE_DIR"} || "@storedir@";
 
+$caBundle = $ENV{"NIX_SSL_CERT_FILE"} // $ENV{"SSL_CERT_FILE"} // $ENV{"CURL_CA_BUNDLE"} // $ENV{"OPENSSL_X509_CERT_FILE"};
+$caBundle = "/etc/ssl/certs/ca-bundle.crt" if !$caBundle && -f "/etc/ssl/certs/ca-bundle.crt";
+$caBundle = "/etc/ssl/certs/ca-certificates.crt" if !$caBundle && -f "/etc/ssl/certs/ca-certificates.crt";
+
+$curlCaFlag = defined $caBundle ? "--capath $caBundle" : "";
+
 $bzip2 = "@bzip2@";
 $xz = "@xz@";
 $curl = "@curl@";

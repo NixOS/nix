@@ -17,7 +17,7 @@ my $logFile = "$Nix::Config::logDir/downloads";
 # estimating the expected download size.
 my $fast = 1;
 
-my $curl = "$Nix::Config::curl --fail --location";
+my $curl = "$Nix::Config::curl $Nix::Config::curlCaFlag --fail --location";
 
 
 # Open the manifest cache and update it if necessary.

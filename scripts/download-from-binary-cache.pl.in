@@ -41,9 +41,6 @@ my $activeRequests = 0;
 my $curlIdCount = 1;
 my %requests;
 my %scheduled;
-my $caBundle = $ENV{"NIX_SSL_CERT_FILE"} // $ENV{"SSL_CERT_FILE"} // $ENV{"CURL_CA_BUNDLE"} // $ENV{"OPENSSL_X509_CERT_FILE"};
-$caBundle = "/etc/ssl/certs/ca-bundle.crt" if !$caBundle && -f "/etc/ssl/certs/ca-bundle.crt";
-$caBundle = "/etc/ssl/certs/ca-certificates.crt" if !$caBundle && -f "/etc/ssl/certs/ca-certificates.crt";
 
 my $userName = getpwuid($<) || $ENV{"USER"} or die "cannot figure out user name";
 
@@ -79,7 +76,7 @@ sub addRequest {
     open (my $fh, ">", \$requests{$curlId}->{content});
     $curl->setopt(CURLOPT_WRITEDATA, $fh);
     $curl->setopt(CURLOPT_FOLLOWLOCATION, 1);
-    $curl->setopt(CURLOPT_CAINFO, $caBundle) if defined $caBundle;
+    $curl->setopt(CURLOPT_CAINFO, $Nix::Config::caBundle) if defined $Nix::Config::caBundle;
 
     unless (isTrue($Nix::Config::config{"verify-https-binary-caches"} // "1")) {
         $curl->setopt(CURLOPT_SSL_VERIFYPEER, 0);
@@ -566,7 +563,7 @@ sub downloadBinary {
         die if $requireSignedBinaryCaches && !defined $info->{signedBy};
         print STDERR "\n*** Downloading ‘$url’ ", ($requireSignedBinaryCaches ? "(signed by ‘$info->{signedBy}’) " : ""), "to ‘$storePath’...\n";
         checkURL $url;
-        if (system("$Nix::Config::curl --fail --location --connect-timeout $curlConnectTimeout -A '$userAgent' '$url' $decompressor | $Nix::Config::binDir/nix-store --restore $destPath") != 0) {
+        if (system("$Nix::Config::curl --fail --location --connect-timeout $curlConnectTimeout -A '$userAgent' $Nix::Config::curlCaFlag '$url' $decompressor | $Nix::Config::binDir/nix-store --restore $destPath") != 0) {
             warn "download of ‘$url’ failed" . ($! ? ": $!" : "") . "\n";
             next;
         }
