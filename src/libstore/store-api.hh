@@ -128,7 +128,7 @@ struct ValidPathInfo
        of an output path of a derivation were actually produced by
        that derivation. In the intensional model, we have to trust
        that a particular output path was produced by a derivation; the
-       path name then implies the contents.)
+       path then implies the contents.)
 
        Ideally, the content-addressability assertion would just be a
        Boolean, and the store path would be computed from
@@ -685,6 +685,11 @@ string showPaths(const PathSet & paths);
 
 ValidPathInfo decodeValidPathInfo(std::istream & str,
     bool hashGiven = false);
+
+
+/* Compute the content-addressability assertion (ValidPathInfo::ca)
+   for paths created by makeFixedOutputPath() / addToStore(). */
+std::string makeFixedOutputCA(bool recursive, const Hash & hash);
 
 
 MakeError(SubstError, Error)

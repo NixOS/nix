@@ -582,6 +582,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         info.narSize = readLongLong(from);
         info.ultimate = readLongLong(from);
         info.sigs = readStrings<StringSet>(from);
+        info.ca = readString(from);
         auto nar = make_ref<std::string>(readString(from));
         auto repair = readInt(from) ? true : false;
         auto dontCheckSigs = readInt(from) ? true : false;

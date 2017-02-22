@@ -612,6 +612,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
                 Hash hash = hashString(expectedHash ? expectedHash.type : htSHA256, *res.data);
                 info.path = store->makeFixedOutputPath(false, hash, name);
                 info.narHash = hashString(htSHA256, *sink.s);
+                info.ca = makeFixedOutputCA(false, hash);
                 store->addToStore(info, sink.s, false, true);
                 storePath = info.path;
             }

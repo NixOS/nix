@@ -1002,7 +1002,7 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
             info.narHash = hash.first;
             info.narSize = hash.second;
             info.ultimate = true;
-            info.ca = "fixed:" + (recursive ? (std::string) "r:" : "") + h.to_string();
+            info.ca = makeFixedOutputCA(recursive, h);
             registerValidPath(info);
         }
 

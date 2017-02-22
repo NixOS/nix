@@ -676,6 +676,12 @@ Strings ValidPathInfo::shortRefs() const
 }
 
 
+std::string makeFixedOutputCA(bool recursive, const Hash & hash)
+{
+    return "fixed:" + (recursive ? (std::string) "r:" : "") + hash.to_string();
+}
+
+
 }
 
 
