@@ -88,6 +88,8 @@ private:
 
     Path linksDir;
 
+    int curSchema = 0;
+
 public:
 
     /* Initialise the local store, upgrading the schema if

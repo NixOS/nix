@@ -320,8 +320,8 @@ LocalStore::LocalStore(bool reserveSpace)
 
     /* Check the current database schema and if necessary do an
        upgrade.  */
-    int curSchema = getSchema();
-    if (curSchema > nixSchemaVersion)
+    curSchema = getSchema();
+    if (curSchema >= 0x100)
         throw Error(format("current Nix store schema is version %1%, but I only support %2%")
             % curSchema % nixSchemaVersion);
 
@@ -470,16 +470,18 @@ void LocalStore::openDB(bool create)
         "select path from Refs join ValidPaths on referrer = id where reference = (select id from ValidPaths where path = ?);");
     stmtInvalidatePath.create(db,
         "delete from ValidPaths where path = ?;");
-    stmtRegisterFailedPath.create(db,
-        "insert or ignore into FailedPaths (path, time) values (?, ?);");
-    stmtHasPathFailed.create(db,
-        "select time from FailedPaths where path = ?;");
-    stmtQueryFailedPaths.create(db,
-        "select path from FailedPaths;");
-    // If the path is a derivation, then clear its outputs.
-    stmtClearFailedPath.create(db,
-        "delete from FailedPaths where ?1 = '*' or path = ?1 "
-        "or path in (select d.path from DerivationOutputs d join ValidPaths v on d.drv = v.id where v.path = ?1);");
+    if (curSchema < 9) {
+        stmtRegisterFailedPath.create(db,
+            "insert or ignore into FailedPaths (path, time) values (?, ?);");
+        stmtHasPathFailed.create(db,
+            "select time from FailedPaths where path = ?;");
+        stmtQueryFailedPaths.create(db,
+            "select path from FailedPaths;");
+        // If the path is a derivation, then clear its outputs.
+        stmtClearFailedPath.create(db,
+            "delete from FailedPaths where ?1 = '*' or path = ?1 "
+            "or path in (select d.path from DerivationOutputs d join ValidPaths v on d.drv = v.id where v.path = ?1);");
+    }
     stmtAddDerivationOutput.create(db,
         "insert or replace into DerivationOutputs (drv, id, path) values (?, ?, ?);");
     stmtQueryValidDerivers.create(db,
@@ -742,6 +744,7 @@ void LocalStore::addReference(unsigned long long referrer, unsigned long long re
 
 void LocalStore::registerFailedPath(const Path & path)
 {
+    if (curSchema >= 9) return;
     retry_sqlite {
         SQLiteStmtUse use(stmtRegisterFailedPath);
         stmtRegisterFailedPath.bind(path);
@@ -754,6 +757,7 @@ void LocalStore::registerFailedPath(const Path & path)
 
 bool LocalStore::hasPathFailed(const Path & path)
 {
+    if (curSchema >= 9) return false;
     retry_sqlite {
         SQLiteStmtUse use(stmtHasPathFailed);
         stmtHasPathFailed.bind(path);
@@ -767,6 +771,8 @@ bool LocalStore::hasPathFailed(const Path & path)
 
 PathSet LocalStore::queryFailedPaths()
 {
+    if (curSchema >= 9) return {};
+
     retry_sqlite {
         SQLiteStmtUse use(stmtQueryFailedPaths);
 
@@ -788,6 +794,8 @@ PathSet LocalStore::queryFailedPaths()
 
 void LocalStore::clearFailedPaths(const PathSet & paths)
 {
+    if (curSchema >= 9) return;
+
     retry_sqlite {
         SQLiteTxn txn(db);
 
