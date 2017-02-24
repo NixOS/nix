@@ -408,7 +408,7 @@ int main(int argc, char ** argv)
                 env["NIX_STORE"] = store->storeDir;
 
                 for (auto & var : drv.env)
-                    env.emplace(var);
+                    env[var.first] = var.second;
 
                 restoreAffinity();
 
