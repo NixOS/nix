@@ -66,6 +66,9 @@ struct BasicDerivation
     /* Return true iff this is a fixed-output derivation. */
     bool isFixedOutput() const;
 
+    /* Return true iff this is an impure derivation. */
+    bool isImpure() const;
+
     /* Return the output paths of a derivation. */
     PathSet outputPaths() const;
 

@@ -245,6 +245,10 @@ private:
     /* Cache for pathContentsGood(). */
     std::map<Path, bool> pathContentsGoodCache;
 
+    /* A mapping from the virtual output paths in impure derivations
+       to the actual (content-addressed) resulting store paths. */
+    std::map<Path, Path> impureRemapping;
+
 public:
 
     /* Set if at least one derivation had a BuildError (i.e. permanent
@@ -316,6 +320,17 @@ public:
     bool pathContentsGood(const Path & path);
 
     void markContentsGood(const Path & path);
+
+    void remapImpureOutput(const Path & virtualOutput, const Path & actualOutput)
+    {
+        assert(virtualOutput.size() == actualOutput.size());
+        impureRemapping[virtualOutput] = actualOutput;
+    }
+
+    std::string remappedPath(const Path & path)
+    {
+        return get(impureRemapping, path, path);
+    }
 };
 
 
@@ -760,8 +775,16 @@ private:
     /* Whether this is a fixed-output derivation. */
     bool fixedOutput;
 
+    /* Whether this is an impure derivation. */
+    bool isImpure = false;
+
     /* Whether to run the build in a private network namespace. */
     bool privateNetwork = false;
+
+    bool allowNetwork()
+    {
+        return fixedOutput || isImpure;
+    }
 
     typedef void (DerivationGoal::*GoalState)();
     GoalState state;
@@ -1061,11 +1084,20 @@ void DerivationGoal::haveDerivation()
 {
     trace("have derivation");
 
+    isImpure = drv->isImpure();
+    fixedOutput = drv->isFixedOutput();
+
+    if (isImpure && fixedOutput)
+        throw Error("derivation ‘%s’ cannot be both impure and fixed-output", drvPath);
+
     for (auto & i : drv->outputs)
         worker.store.addTempRoot(i.second.path);
 
     /* Check what outputs paths are not already valid. */
     PathSet invalidOutputs = checkPathValidity(false, buildMode == bmRepair);
+
+    if (isImpure && invalidOutputs.size() != wantedOutputs.size())
+        throw Error("derivation ‘%s’ is impure but some of its virtual outputs are valid", drvPath);
 
     /* If they are all valid, then we're done. */
     if (invalidOutputs.size() == 0 && buildMode == bmNormal) {
@@ -1085,7 +1117,7 @@ void DerivationGoal::haveDerivation()
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
-    if (settings.useSubstitutes && drv->substitutesAllowed())
+    if (settings.useSubstitutes && drv->substitutesAllowed() && !isImpure)
         for (auto & i : invalidOutputs)
             addWaitee(worker.makeSubstitutionGoal(i, buildMode == bmRepair));
 
@@ -1256,13 +1288,20 @@ void DerivationGoal::inputsRealised()
                that are specified as inputs. */
             assert(worker.store.isValidPath(i.first));
             Derivation inDrv = worker.store.derivationFromPath(i.first);
-            for (auto & j : i.second)
+            for (auto & j : i.second) {
+                auto j2 = worker.remappedPath(inDrv.outputs[j].path);
+                if (j2 != inDrv.outputs[j].path)
+                    inputRewrites[inDrv.outputs[j].path] = j2;
                 if (inDrv.outputs.find(j) != inDrv.outputs.end())
-                    worker.store.computeFSClosure(inDrv.outputs[j].path, inputPaths);
+                    worker.store.computeFSClosure(j2, inputPaths);
                 else
                     throw Error(
                         format("derivation ‘%1%’ requires non-existent output ‘%2%’ from input derivation ‘%3%’")
                         % drvPath % j % i.first);
+            }
+
+            if (!isImpure && !fixedOutput && inDrv.isImpure())
+                throw Error("pure derivation ‘%s’ depends on impure derivation ‘%s’", drvPath, i.first);
         }
 
     /* Second, the input sources. */
@@ -1272,14 +1311,10 @@ void DerivationGoal::inputsRealised()
 
     allPaths.insert(inputPaths.begin(), inputPaths.end());
 
-    /* Is this a fixed-output derivation? */
-    fixedOutput = true;
-    for (auto & i : drv->outputs)
-        if (i.second.hash == "") fixedOutput = false;
-
     /* Don't repeat fixed-output derivations since they're already
-       verified by their output hash.*/
-    nrRounds = fixedOutput ? 1 : settings.get("build-repeat", 0) + 1;
+       verified by their output hash. Similarly, don't repeat impure
+       derivations because by their nature they're not repeatable. */
+    nrRounds = fixedOutput || isImpure ? 1 : settings.get("build-repeat", 0) + 1;
 
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
@@ -1331,6 +1366,7 @@ void DerivationGoal::tryToBuild()
        build this derivation, so no further checks are necessary. */
     validPaths = checkPathValidity(true, buildMode == bmRepair);
     if (buildMode != bmCheck && validPaths.size() == drv->outputs.size()) {
+        assert(!isImpure);
         debug(format("skipping build of derivation ‘%1%’, someone beat us to it") % drvPath);
         outputLocks.setDeletion(true);
         done(BuildResult::AlreadyValid);
@@ -1345,7 +1381,10 @@ void DerivationGoal::tryToBuild()
        them. */
     for (auto & i : drv->outputs) {
         Path path = i.second.path;
-        if (worker.store.isValidPath(path)) continue;
+        if (worker.store.isValidPath(path)) {
+            assert(!isImpure);
+            continue;
+        }
         debug(format("removing invalid path ‘%1%’") % path);
         deletePath(worker.store.toRealPath(path));
     }
@@ -1561,7 +1600,7 @@ void DerivationGoal::buildDone()
             st =
                 dynamic_cast<NotDeterministic*>(&e) ? BuildResult::NotDeterministic :
                 statusOk(status) ? BuildResult::OutputRejected :
-                fixedOutput || diskFull ? BuildResult::TransientFailure :
+                fixedOutput || isImpure || diskFull ? BuildResult::TransientFailure :
                 BuildResult::PermanentFailure;
         }
 
@@ -1575,7 +1614,7 @@ void DerivationGoal::buildDone()
 
 HookReply DerivationGoal::tryBuildHook()
 {
-    if (!settings.useBuildHook || getEnv("NIX_BUILD_HOOK") == "" || !useDerivation) return rpDecline;
+    if (!settings.useBuildHook || getEnv("NIX_BUILD_HOOK") == "" || !useDerivation || isImpure) return rpDecline;
 
     if (!worker.hook)
         worker.hook = std::make_unique<HookInstance>();
@@ -1704,7 +1743,7 @@ void DerivationGoal::startBuilder()
         else if (x == "false")
             useChroot = false;
         else if (x == "relaxed")
-            useChroot = !fixedOutput && get(drv->env, "__noChroot") != "1";
+            useChroot = !allowNetwork() && get(drv->env, "__noChroot") != "1";
     }
 
     if (worker.store.storeDir != worker.store.realStoreDir)
@@ -1862,7 +1901,7 @@ void DerivationGoal::startBuilder()
                 "nogroup:x:65534:\n") % sandboxGid).str());
 
         /* Create /etc/hosts with localhost entry. */
-        if (!fixedOutput)
+        if (!allowNetwork())
             writeFile(chrootRootDir + "/etc/hosts", "127.0.0.1 localhost\n");
 
         /* Make the closure of the inputs available in the chroot,
@@ -2034,7 +2073,7 @@ void DerivationGoal::startBuilder()
            us.
         */
 
-        if (!fixedOutput)
+        if (!allowNetwork())
             privateNetwork = true;
 
         userNamespaceSync.create();
@@ -2207,7 +2246,7 @@ void DerivationGoal::initEnv()
        to the builder is generally impure, but the output of
        fixed-output derivations is by definition pure (since we
        already know the cryptographic hash of the output). */
-    if (fixedOutput) {
+    if (allowNetwork()) {
         Strings varNames = tokenizeString<Strings>(get(drv->env, "impureEnvVars"));
         for (auto & i : varNames) env[i] = getEnv(i);
     }
@@ -2390,7 +2429,7 @@ void DerivationGoal::runChild()
             /* Fixed-output derivations typically need to access the
                network, so give them access to /etc/resolv.conf and so
                on. */
-            if (fixedOutput) {
+            if (allowNetwork()) {
                 ss.push_back("/etc/resolv.conf");
                 ss.push_back("/etc/nsswitch.conf");
                 ss.push_back("/etc/services");
@@ -2725,10 +2764,13 @@ PathSet parseReferenceSpecifiers(Store & store, const BasicDerivation & drv, str
 
 void DerivationGoal::registerOutputs()
 {
+    // FIXME: This function is way to complicated.
+
     /* When using a build hook, the build hook can register the output
        as valid (by doing `nix-store --import').  If so we don't have
        to do anything here. */
     if (hook) {
+        assert(!isImpure);
         bool allValid = true;
         for (auto & i : drv->outputs)
             if (!worker.store.isValidPath(i.second.path)) allValid = false;
@@ -2820,7 +2862,8 @@ void DerivationGoal::registerOutputs()
         /* Check that fixed-output derivations produced the right
            outputs (i.e., the content hash should match the specified
            hash). */
-        if (i.second.hash != "") {
+        if (fixedOutput) {
+            assert(i.second.hash != "");
 
             bool recursive; Hash h;
             i.second.parseHashInfo(recursive, h);
@@ -2841,7 +2884,7 @@ void DerivationGoal::registerOutputs()
                 printError(format("build produced path ‘%1%’ with %2% hash ‘%3%’")
                     % dest % printHashType(h.type) % printHash16or32(h2));
                 if (worker.store.isValidPath(dest))
-                    return;
+                    continue;
                 Path actualDest = worker.store.toRealPath(dest);
                 if (actualPath != actualDest) {
                     PathLocks outputLocks({actualDest});
@@ -2901,16 +2944,6 @@ void DerivationGoal::registerOutputs()
             continue;
         }
 
-        /* For debugging, print out the referenced and unreferenced
-           paths. */
-        for (auto & i : inputPaths) {
-            PathSet::iterator j = references.find(i);
-            if (j == references.end())
-                debug(format("unreferenced input: ‘%1%’") % i);
-            else
-                debug(format("referenced input: ‘%1%’") % i);
-        }
-
         /* Enforce `allowedReferences' and friends. */
         auto checkRefs = [&](const string & attrName, bool allowed, bool recursive) {
             if (drv->env.find(attrName) == drv->env.end()) return;
@@ -2952,6 +2985,33 @@ void DerivationGoal::registerOutputs()
         checkRefs("allowedRequisites", true, true);
         checkRefs("disallowedReferences", false, false);
         checkRefs("disallowedRequisites", false, true);
+
+        if (isImpure) {
+
+            /* Currently impure derivations cannot have any references. */
+            if (!references.empty())
+                throw BuildError("impure derivation output ‘%s’ has a reference to ‘%s’",
+                    path, *references.begin());
+
+            /* Move the output to its content-addressed location. */
+            auto caPath = worker.store.makeFixedOutputPath(true, hash.first, storePathToName(path));
+            debug("moving impure output ‘%s’ to content-addressed ‘%s’", path, caPath);
+
+            worker.remapImpureOutput(path, caPath);
+
+            if (worker.store.isValidPath(caPath))
+                continue;
+
+            actualPath = worker.store.toRealPath(caPath);
+            deletePath(actualPath);
+
+            if (rename(path.c_str(), actualPath.c_str()))
+                throw SysError("moving ‘%s’ to ‘%s’", path, caPath);
+
+            path = caPath;
+
+            info.ca = makeFixedOutputCA(true, hash.first);
+        }
 
         if (curRound == nrRounds) {
             worker.store.optimisePath(actualPath); // FIXME: combine with scanForReferences()

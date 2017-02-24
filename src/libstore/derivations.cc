@@ -309,6 +309,15 @@ bool BasicDerivation::isFixedOutput() const
 }
 
 
+bool BasicDerivation::isImpure() const
+{
+    // FIXME: drop single output restriction
+    return outputs.size() == 1 &&
+        outputs.begin()->first == "out" &&
+        get(env, "__impure", "") == "1";
+}
+
+
 DrvHashes drvHashes;
 
 
