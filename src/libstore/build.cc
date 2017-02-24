@@ -2753,6 +2753,8 @@ void DerivationGoal::registerOutputs()
         Path path = i.second.path;
         if (missingPaths.find(path) == missingPaths.end()) continue;
 
+        ValidPathInfo info;
+
         Path actualPath = path;
         if (useChroot) {
             actualPath = chrootRootDir + path;
@@ -2855,6 +2857,8 @@ void DerivationGoal::registerOutputs()
                         format("output path ‘%1%’ has %2% hash ‘%3%’ when ‘%4%’ was expected")
                         % path % i.second.hashAlgo % printHash16or32(h2) % printHash16or32(h));
             }
+
+            info.ca = makeFixedOutputCA(recursive, h2);
         }
 
         /* Get rid of all weird permissions.  This also checks that
@@ -2954,7 +2958,6 @@ void DerivationGoal::registerOutputs()
             worker.markContentsGood(path);
         }
 
-        ValidPathInfo info;
         info.path = path;
         info.narHash = hash.first;
         info.narSize = hash.second;
