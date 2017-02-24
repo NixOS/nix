@@ -34,6 +34,7 @@ rec {
     mkdir -p $out/bin
     echo 'echo foo' > $out/bin/foo
     chmod a+rx $out/bin/foo
+    ln -s ${shell} $out/bin/bash
   '';
 
   bar = runCommand "bar" {} ''
