@@ -2,9 +2,9 @@
 #include "util.hh"
 #include "archive.hh"
 
-#include <map>
 #include <algorithm>
-#include <unistd.h>
+#include <map>
+#include <thread>
 
 
 namespace nix {
@@ -42,11 +42,7 @@ Settings::Settings()
     keepGoing = false;
     tryFallback = false;
     maxBuildJobs = 1;
-    buildCores = 1;
-#ifdef _SC_NPROCESSORS_ONLN
-    long res = sysconf(_SC_NPROCESSORS_ONLN);
-    if (res > 0) buildCores = res;
-#endif
+    buildCores = std::max(1U, std::thread::hardware_concurrency());
     readOnlyMode = false;
     thisSystem = SYSTEM;
     maxSilentTime = 0;
