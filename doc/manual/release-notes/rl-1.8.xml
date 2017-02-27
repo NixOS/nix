@@ -83,8 +83,8 @@ $ nix-store -l $(which xterm)
   caches).</para></listitem>
 
   <listitem><para>The configuration option
-  <option>build-max-jobs</option> now defaults to the number of
-  available CPU cores.</para></listitem>
+  <option>build-cores</option> now defaults to the number of available
+  CPU cores.</para></listitem>
 
   <listitem><para>Build users are now used by default when Nix is
   invoked as root. This prevents builds from accidentally running as
