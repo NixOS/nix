@@ -275,7 +275,10 @@ struct CurlDownloader : public Downloader
                         || httpStatus == 504  || httpStatus == 522 || httpStatus == 524
                         || code == CURLE_COULDNT_RESOLVE_HOST
                         || code == CURLE_RECV_ERROR
-                        || code == CURLE_HTTP2_STREAM) ? Transient :
+#if LIBCURL_VERSION_NUM >= 0x073200
+                        || code == CURLE_HTTP2_STREAM
+#endif
+                        ) ? Transient :
                     Misc;
 
                 attempt++;
