@@ -8,13 +8,17 @@ namespace nix {
 [[noreturn]] void throwSQLiteError(sqlite3 * db, const format & f)
 {
     int err = sqlite3_errcode(db);
+
+    auto path = sqlite3_db_filename(db, nullptr);
+    if (!path) path = "(in-memory)";
+
     if (err == SQLITE_BUSY || err == SQLITE_PROTOCOL) {
         if (err == SQLITE_PROTOCOL)
-            printError("warning: SQLite database is busy (SQLITE_PROTOCOL)");
+            printError("warning: SQLite database ‘%s’ is busy (SQLITE_PROTOCOL)", path);
         else {
             static bool warned = false;
             if (!warned) {
-                printError("warning: SQLite database is busy");
+                printError("warning: SQLite database ‘%s’ is busy", path);
                 warned = true;
             }
         }
@@ -29,10 +33,10 @@ namespace nix {
 #else
         sleep(1);
 #endif
-        throw SQLiteBusy(format("%1%: %2%") % f.str() % sqlite3_errmsg(db));
+        throw SQLiteBusy("%s: %s (in ‘%s’)", f.str(), sqlite3_errstr(err), path);
     }
     else
-        throw SQLiteError(format("%1%: %2%") % f.str() % sqlite3_errmsg(db));
+        throw SQLiteError("%s: %s (in ‘%s’)", f.str(), sqlite3_errstr(err), path);
 }
 
 SQLite::SQLite(const Path & path)
