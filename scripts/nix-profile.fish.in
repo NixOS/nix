@@ -67,19 +67,19 @@ if [ -n $HOME -a -n $USER ]
         end
     end
 
-    # Set $SSL_CERT_FILE so that Nixpkgs applications like curl work.
+    # Set $NIX_SSL_CERT_FILE so that Nixpkgs applications like curl work.
     if [ -e /etc/ssl/certs/ca-certificates.crt ] # NixOS, Ubuntu, Debian, Gentoo, Arch
-        set -xg SSL_CERT_FILE /etc/ssl/certs/ca-certificates.crt
+        set -xg NIX_SSL_CERT_FILE /etc/ssl/certs/ca-certificates.crt
     else if [ -e /etc/ssl/ca-bundle.pem ] # openSUSE Tumbleweed
-        set -xg SSL_CERT_FILE /etc/ssl/ca-bundle.pem
+        set -xg NIX_SSL_CERT_FILE /etc/ssl/ca-bundle.pem
     else if [ -e /etc/ssl/certs/ca-bundle.crt ] # Old NixOS
-        set -xg SSL_CERT_FILE /etc/ssl/certs/ca-bundle.crt
+        set -xg NIX_SSL_CERT_FILE /etc/ssl/certs/ca-bundle.crt
     else if [ -e /etc/pki/tls/certs/ca-bundle.crt ] # Fedora, CentOS
-        set -xg SSL_CERT_FILE /etc/pki/tls/certs/ca-bundle.crt
+        set -xg NIX_SSL_CERT_FILE /etc/pki/tls/certs/ca-bundle.crt
     else if [ -e "$NIX_LINK/etc/ssl/certs/ca-bundle.crt" ] # fall back to cacert in Nix profile
-        set -xg SSL_CERT_FILE "$NIX_LINK/etc/ssl/certs/ca-bundle.crt"
+        set -xg NIX_SSL_CERT_FILE "$NIX_LINK/etc/ssl/certs/ca-bundle.crt"
     else if [ -e "$NIX_LINK/etc/ca-bundle.crt" ] # old cacert in Nix profile
-        set -xg SSL_CERT_FILE "$NIX_LINK/etc/ca-bundle.crt"
+        set -xg NIX_SSL_CERT_FILE "$NIX_LINK/etc/ca-bundle.crt"
     end
 
     if [ -n "$MANPATH" ]
