@@ -101,9 +101,9 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
 
     <listitem><para>This option defines the maximum number of jobs
     that Nix will try to build in parallel.  The default is
-    <literal>1</literal>.  You should generally set it to the number
-    of CPUs in your system (e.g., <literal>2</literal> on an Athlon 64
-    X2).  It can be overridden using the <option
+    <literal>1</literal>. The special value <literal>auto</literal>
+    causes Nix to use the number of CPUs in your system.  It can be
+    overridden using the <option
     linkend='opt-max-jobs'>--max-jobs</option> (<option>-j</option>)
     command line switch.</para></listitem>
 

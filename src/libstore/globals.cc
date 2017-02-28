@@ -147,7 +147,14 @@ int Settings::get(const string & name, int def)
 void Settings::update()
 {
     _get(tryFallback, "build-fallback");
-    _get(maxBuildJobs, "build-max-jobs");
+
+    auto s = get("build-max-jobs", std::string("1"));
+    if (s == "auto")
+        maxBuildJobs = std::max(1U, std::thread::hardware_concurrency());
+    else
+        if (!string2Int(s, maxBuildJobs))
+            throw Error("configuration setting ‘build-max-jobs’ should be ‘auto’ or an integer");
+
     _get(buildCores, "build-cores");
     _get(thisSystem, "system");
     _get(maxSilentTime, "build-max-silent-time");

@@ -167,6 +167,10 @@ struct LegacyArgs : public MixCommonArgs
             settings.set("build-fallback", "true");
         });
 
+        mkFlag1('j', "max-jobs", "jobs", "maximum number of parallel builds", [=](std::string s) {
+            settings.set("build-max-jobs", s);
+        });
+
         auto intSettingAlias = [&](char shortName, const std::string & longName,
             const std::string & description, const std::string & dest) {
             mkFlag<unsigned int>(shortName, longName, description, [=](unsigned int n) {
@@ -174,7 +178,6 @@ struct LegacyArgs : public MixCommonArgs
             });
         };
 
-        intSettingAlias('j', "max-jobs", "maximum number of parallel builds", "build-max-jobs");
         intSettingAlias(0, "cores", "maximum number of CPU cores to use inside a build", "build-cores");
         intSettingAlias(0, "max-silent-time", "number of seconds of silence before a build is killed", "build-max-silent-time");
         intSettingAlias(0, "timeout", "number of seconds before a build is killed", "build-timeout");
