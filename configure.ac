@@ -265,7 +265,7 @@ AC_CHECK_FUNCS([setresuid setreuid lchown])
 
 
 # Nice to have, but not essential.
-AC_CHECK_FUNCS([strsignal posix_fallocate nanosleep sysconf])
+AC_CHECK_FUNCS([strsignal posix_fallocate sysconf])
 
 
 # This is needed if bzip2 is a static library, and the Nix libraries
