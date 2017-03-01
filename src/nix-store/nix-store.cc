@@ -708,6 +708,9 @@ static void opExport(Strings opFlags, Strings opArgs)
     for (auto & i : opFlags)
         throw UsageError(format("unknown flag ‘%1%’") % i);
 
+    for (auto & i : opArgs)
+        i = store->followLinksToStorePath(i);
+
     FdSink sink(STDOUT_FILENO);
     store->exportPaths(opArgs, sink);
 }
