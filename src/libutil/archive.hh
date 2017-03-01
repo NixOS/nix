@@ -70,6 +70,19 @@ struct ParseSink
     virtual void createSymlink(const Path & path, const string & target) { };
 };
 
+struct TeeSink : ParseSink
+{
+    TeeSource source;
+
+    TeeSink(Source & source) : source(source) { }
+
+    void preallocateContents(unsigned long long size) override
+    {
+        source.data->reserve(source.data->size() + size + 1024);
+    };
+
+};
+
 void parseDump(ParseSink & sink, Source & source);
 
 void restorePath(const Path & path, Source & source);

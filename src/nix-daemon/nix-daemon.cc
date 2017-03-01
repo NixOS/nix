@@ -583,12 +583,11 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         if (!trusted && dontCheckSigs)
             dontCheckSigs = false;
 
-        TeeSource tee(from);
-        ParseSink sink;
-        parseDump(sink, tee);
+        TeeSink tee(from);
+        parseDump(tee, tee.source);
 
         startWork();
-        store->addToStore(info, tee.data, repair, dontCheckSigs, nullptr);
+        store->addToStore(info, tee.source.data, repair, dontCheckSigs, nullptr);
         stopWork();
         break;
     }

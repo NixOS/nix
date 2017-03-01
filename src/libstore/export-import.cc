@@ -70,9 +70,8 @@ Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, 
         if (n != 1) throw Error("input doesn't look like something created by ‘nix-store --export’");
 
         /* Extract the NAR from the source. */
-        TeeSource tee(source);
-        ParseSink sink;
-        parseDump(sink, tee);
+        TeeSink tee(source);
+        parseDump(tee, tee.source);
 
         uint32_t magic = readInt(source);
         if (magic != exportMagic)
@@ -89,14 +88,14 @@ Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, 
         info.deriver = readString(source);
         if (info.deriver != "") assertStorePath(info.deriver);
 
-        info.narHash = hashString(htSHA256, *tee.data);
-        info.narSize = tee.data->size();
+        info.narHash = hashString(htSHA256, *tee.source.data);
+        info.narSize = tee.source.data->size();
 
         // Ignore optional legacy signature.
         if (readInt(source) == 1)
             readString(source);
 
-        addToStore(info, tee.data, false, dontCheckSigs, accessor);
+        addToStore(info, tee.source.data, false, dontCheckSigs, accessor);
 
         res.push_back(info.path);
     }
