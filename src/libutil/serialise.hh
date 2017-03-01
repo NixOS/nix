@@ -140,15 +140,16 @@ struct StringSource : Source
 
 
 /* Adapter class of a Source that saves all data read to `s'. */
-struct SavingSourceAdapter : Source
+struct TeeSource : Source
 {
     Source & orig;
-    string s;
-    SavingSourceAdapter(Source & orig) : orig(orig) { }
+    ref<std::string> data;
+    TeeSource(Source & orig)
+        : orig(orig), data(make_ref<std::string>()) { }
     size_t read(unsigned char * data, size_t len)
     {
         size_t n = orig.read(data, len);
-        s.append((const char *) data, n);
+        this->data->append((const char *) data, n);
         return n;
     }
 };

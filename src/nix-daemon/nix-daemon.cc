@@ -283,7 +283,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         }
         HashType hashAlgo = parseHashType(s);
 
-        SavingSourceAdapter savedNAR(from);
+        TeeSource savedNAR(from);
         RetrieveRegularNARSink savedRegular;
 
         if (recursive) {
@@ -297,7 +297,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
 
         startWork();
         if (!savedRegular.regular) throw Error("regular file expected");
-        Path path = store->addToStoreFromDump(recursive ? savedNAR.s : savedRegular.s, baseName, recursive, hashAlgo);
+        Path path = store->addToStoreFromDump(recursive ? *savedNAR.data : savedRegular.s, baseName, recursive, hashAlgo);
         stopWork();
 
         to << path;
@@ -569,6 +569,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     }
 
     case wopAddToStoreNar: {
+        bool repair, dontCheckSigs;
         ValidPathInfo info;
         info.path = readStorePath(*store, from);
         from >> info.deriver;
@@ -578,14 +579,16 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         info.references = readStorePaths<PathSet>(*store, from);
         from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);
-        from >> info.ca;
-        auto nar = make_ref<std::string>(readString(from));
-        bool repair, dontCheckSigs;
-        from >> repair >> dontCheckSigs;
+        from >> info.ca >> repair >> dontCheckSigs;
         if (!trusted && dontCheckSigs)
             dontCheckSigs = false;
+
+        TeeSource tee(from);
+        ParseSink sink;
+        parseDump(sink, tee);
+
         startWork();
-        store->addToStore(info, nar, repair, dontCheckSigs, nullptr);
+        store->addToStore(info, tee.data, repair, dontCheckSigs, nullptr);
         stopWork();
         break;
     }

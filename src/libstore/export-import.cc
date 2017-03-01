@@ -61,27 +61,6 @@ void Store::exportPath(const Path & path, Sink & sink)
     hashAndWriteSink << exportMagic << path << info->references << info->deriver << 0;
 }
 
-struct TeeSource : Source
-{
-    Source & readSource;
-    ref<std::string> data;
-    TeeSource(Source & readSource)
-        : readSource(readSource)
-        , data(make_ref<std::string>())
-    {
-    }
-    size_t read(unsigned char * data, size_t len)
-    {
-        size_t n = readSource.read(data, len);
-        this->data->append((char *) data, n);
-        return n;
-    }
-};
-
-struct NopSink : ParseSink
-{
-};
-
 Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, bool dontCheckSigs)
 {
     Paths res;
@@ -92,7 +71,7 @@ Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, 
 
         /* Extract the NAR from the source. */
         TeeSource tee(source);
-        NopSink sink;
+        ParseSink sink;
         parseDump(sink, tee);
 
         uint32_t magic = readInt(source);

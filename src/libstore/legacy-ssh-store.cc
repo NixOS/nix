@@ -169,9 +169,9 @@ struct LegacySSHStore : public Store
 
         /* FIXME: inefficient. */
         ParseSink parseSink; /* null sink; just parse the NAR */
-        SavingSourceAdapter savedNAR(conn->from);
+        TeeSource savedNAR(conn->from);
         parseDump(parseSink, savedNAR);
-        sink(savedNAR.s);
+        sink(*savedNAR.data);
     }
 
     /* Unsupported methods. */

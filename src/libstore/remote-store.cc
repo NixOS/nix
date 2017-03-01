@@ -378,8 +378,9 @@ void RemoteStore::addToStore(const ValidPathInfo & info, const ref<std::string> 
         conn->to << wopAddToStoreNar
                  << info.path << info.deriver << printHash(info.narHash)
                  << info.references << info.registrationTime << info.narSize
-                 << info.ultimate << info.sigs << info.ca << *nar << repair << dontCheckSigs;
-        // FIXME: don't send nar as a string
+                 << info.ultimate << info.sigs << info.ca
+                 << repair << dontCheckSigs;
+        conn->to(*nar);
         conn->processStderr();
     }
 }
