@@ -724,7 +724,7 @@ static void opImport(Strings opFlags, Strings opArgs)
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
     FdSource source(STDIN_FILENO);
-    Paths paths = store->importPaths(source, 0);
+    Paths paths = store->importPaths(source, nullptr, true);
 
     for (auto & i : paths)
         cout << format("%1%\n") % i << std::flush;
