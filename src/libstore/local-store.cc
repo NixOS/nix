@@ -920,7 +920,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, const ref<std::string> &
             info.path % info.narHash.to_string() % h.to_string());
 
     if (requireSigs && !dontCheckSigs && !info.checkSignatures(*this, publicKeys))
-        throw Error(format("cannot import path ‘%s’ because it lacks a valid signature") % info.path);
+        throw Error("cannot add path ‘%s’ because it lacks a valid signature", info.path);
 
     addTempRoot(info.path);
 
