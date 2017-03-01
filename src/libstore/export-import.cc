@@ -86,7 +86,7 @@ Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, 
 {
     Paths res;
     while (true) {
-        unsigned long long n = readLongLong(source);
+        auto n = readNum<uint64_t>(source);
         if (n == 0) break;
         if (n != 1) throw Error("input doesn't look like something created by ‘nix-store --export’");
 

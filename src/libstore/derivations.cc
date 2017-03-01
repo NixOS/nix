@@ -397,8 +397,8 @@ PathSet BasicDerivation::outputPaths() const
 Source & readDerivation(Source & in, Store & store, BasicDerivation & drv)
 {
     drv.outputs.clear();
-    auto nr = readInt(in);
-    for (unsigned int n = 0; n < nr; n++) {
+    auto nr = readNum<size_t>(in);
+    for (size_t n = 0; n < nr; n++) {
         auto name = readString(in);
         DerivationOutput o;
         in >> o.path >> o.hashAlgo >> o.hash;
@@ -410,8 +410,8 @@ Source & readDerivation(Source & in, Store & store, BasicDerivation & drv)
     in >> drv.platform >> drv.builder;
     drv.args = readStrings<Strings>(in);
 
-    nr = readInt(in);
-    for (unsigned int n = 0; n < nr; n++) {
+    nr = readNum<size_t>(in);
+    for (size_t n = 0; n < nr; n++) {
         auto key = readString(in);
         auto value = readString(in);
         drv.env[key] = value;

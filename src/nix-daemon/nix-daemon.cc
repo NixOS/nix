@@ -273,10 +273,9 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     }
 
     case wopAddToStore: {
-        string baseName = readString(from);
-        bool fixed = readInt(from) == 1; /* obsolete */
-        bool recursive = readInt(from) == 1;
-        string s = readString(from);
+        bool fixed, recursive;
+        std::string s, baseName;
+        from >> baseName >> fixed /* obsolete */ >> recursive >> s;
         /* Compatibility hack. */
         if (!fixed) {
             s = "sha256";
@@ -340,7 +339,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         PathSet drvs = readStorePaths<PathSet>(*store, from);
         BuildMode mode = bmNormal;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 15) {
-            mode = (BuildMode)readInt(from);
+            mode = (BuildMode) readInt(from);
 
             /* Repairing is not atomic, so disallowed for "untrusted"
                clients.  */
@@ -417,8 +416,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         GCOptions options;
         options.action = (GCOptions::GCAction) readInt(from);
         options.pathsToDelete = readStorePaths<PathSet>(*store, from);
-        options.ignoreLiveness = readInt(from);
-        options.maxFreed = readLongLong(from);
+        from >> options.ignoreLiveness >> options.maxFreed;
         // obsolete fields
         readInt(from);
         readInt(from);
@@ -438,8 +436,8 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     }
 
     case wopSetOptions: {
-        settings.keepFailed = readInt(from) != 0;
-        settings.keepGoing = readInt(from) != 0;
+        from >> settings.keepFailed;
+        from >> settings.keepGoing;
         settings.set("build-fallback", readInt(from) ? "true" : "false");
         verbosity = (Verbosity) readInt(from);
         settings.set("build-max-jobs", std::to_string(readInt(from)));
@@ -539,8 +537,8 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         break;
 
     case wopVerifyStore: {
-        bool checkContents = readInt(from) != 0;
-        bool repair = readInt(from) != 0;
+        bool checkContents, repair;
+        from >> checkContents >> repair;
         startWork();
         if (repair && !trusted)
             throw Error("you are not privileged to repair paths");
@@ -573,19 +571,17 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     case wopAddToStoreNar: {
         ValidPathInfo info;
         info.path = readStorePath(*store, from);
-        info.deriver = readString(from);
+        from >> info.deriver;
         if (!info.deriver.empty())
             store->assertStorePath(info.deriver);
         info.narHash = parseHash(htSHA256, readString(from));
         info.references = readStorePaths<PathSet>(*store, from);
-        info.registrationTime = readInt(from);
-        info.narSize = readLongLong(from);
-        info.ultimate = readLongLong(from);
+        from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);
-        info.ca = readString(from);
+        from >> info.ca;
         auto nar = make_ref<std::string>(readString(from));
-        auto repair = readInt(from) ? true : false;
-        auto dontCheckSigs = readInt(from) ? true : false;
+        bool repair, dontCheckSigs;
+        from >> repair >> dontCheckSigs;
         if (!trusted && dontCheckSigs)
             dontCheckSigs = false;
         startWork();

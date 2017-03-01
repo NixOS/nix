@@ -194,39 +194,9 @@ void readPadding(size_t len, Source & source)
 }
 
 
-unsigned int readInt(Source & source)
-{
-    unsigned char buf[8];
-    source(buf, sizeof(buf));
-    if (buf[4] || buf[5] || buf[6] || buf[7])
-        throw SerialisationError("implementation cannot deal with > 32-bit integers");
-    return
-        buf[0] |
-        (buf[1] << 8) |
-        (buf[2] << 16) |
-        (buf[3] << 24);
-}
-
-
-unsigned long long readLongLong(Source & source)
-{
-    unsigned char buf[8];
-    source(buf, sizeof(buf));
-    return
-        ((unsigned long long) buf[0]) |
-        ((unsigned long long) buf[1] << 8) |
-        ((unsigned long long) buf[2] << 16) |
-        ((unsigned long long) buf[3] << 24) |
-        ((unsigned long long) buf[4] << 32) |
-        ((unsigned long long) buf[5] << 40) |
-        ((unsigned long long) buf[6] << 48) |
-        ((unsigned long long) buf[7] << 56);
-}
-
-
 size_t readString(unsigned char * buf, size_t max, Source & source)
 {
-    size_t len = readInt(source);
+    auto len = readNum<size_t>(source);
     if (len > max) throw Error("string is too long");
     source(buf, len);
     readPadding(len, source);
@@ -236,7 +206,7 @@ size_t readString(unsigned char * buf, size_t max, Source & source)
 
 string readString(Source & source)
 {
-    size_t len = readInt(source);
+    auto len = readNum<size_t>(source);
     auto buf = std::make_unique<unsigned char[]>(len);
     source(buf.get(), len);
     readPadding(len, source);
@@ -250,16 +220,9 @@ Source & operator >> (Source & in, string & s)
 }
 
 
-Source & operator >> (Source & in, unsigned int & n)
-{
-    n = readInt(in);
-    return in;
-}
-
-
 template<class T> T readStrings(Source & source)
 {
-    unsigned int count = readInt(source);
+    auto count = readNum<size_t>(source);
     T ss;
     while (count--)
         ss.insert(ss.end(), readString(source));
