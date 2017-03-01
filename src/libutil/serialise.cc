@@ -207,10 +207,10 @@ size_t readString(unsigned char * buf, size_t max, Source & source)
 string readString(Source & source)
 {
     auto len = readNum<size_t>(source);
-    auto buf = std::make_unique<unsigned char[]>(len);
-    source(buf.get(), len);
+    std::string res(len, 0);
+    source((unsigned char*) res.data(), len);
     readPadding(len, source);
-    return string((char *) buf.get(), len);
+    return res;
 }
 
 Source & operator >> (Source & in, string & s)
