@@ -63,7 +63,7 @@ static void prim_fetchgit(EvalState & state, const Pos & pos, Value * * args, Va
             else if (name == "rev")
                 rev = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
-                throw EvalError(format("unsupported argument ‘%1%’ to ‘fetchgit’, at %3%") % attr.name % attr.pos);
+                throw EvalError("unsupported argument ‘%s’ to ‘fetchgit’, at %s", attr.name, *attr.pos);
         }
 
         if (url.empty())
