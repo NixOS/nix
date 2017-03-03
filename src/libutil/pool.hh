@@ -141,10 +141,15 @@ public:
         }
     }
 
-    unsigned int count()
+    size_t count()
     {
         auto state_(state.lock());
         return state_->idle.size() + state_->inUse;
+    }
+
+    size_t capacity()
+    {
+        return state.lock()->max;
     }
 };
 

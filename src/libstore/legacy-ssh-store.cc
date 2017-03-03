@@ -4,6 +4,7 @@
 #include "serve-protocol.hh"
 #include "store-api.hh"
 #include "worker-protocol.hh"
+#include "ssh.hh"
 
 namespace nix {
 
@@ -11,73 +12,42 @@ static std::string uriScheme = "legacy-ssh://";
 
 struct LegacySSHStore : public Store
 {
-    string host;
-
     struct Connection
     {
-        Pid sshPid;
-        AutoCloseFD out;
-        AutoCloseFD in;
+        std::unique_ptr<SSHMaster::Connection> sshConn;
         FdSink to;
         FdSource from;
     };
 
-    AutoDelete tmpDir;
-
-    Path socketPath;
-
-    Pid sshMaster;
+    std::string host;
 
     ref<Pool<Connection>> connections;
 
-    Path key;
+    SSHMaster master;
 
-    LegacySSHStore(const string & host, const Params & params,
-        size_t maxConnections = std::numeric_limits<size_t>::max())
+    LegacySSHStore(const string & host, const Params & params)
         : Store(params)
         , host(host)
-        , tmpDir(createTempDir("", "nix", true, true, 0700))
-        , socketPath((Path) tmpDir + "/ssh.sock")
         , connections(make_ref<Pool<Connection>>(
-            maxConnections,
+            std::max(1, std::stoi(get(params, "max-connections", "1"))),
             [this]() { return openConnection(); },
             [](const ref<Connection> & r) { return true; }
             ))
-        , key(get(params, "ssh-key", ""))
+        , master(
+            host,
+            get(params, "ssh-key", ""),
+            // Use SSH master only if using more than 1 connection.
+            connections->capacity() > 1,
+            get(params, "compress", "") == "true")
     {
     }
 
     ref<Connection> openConnection()
     {
-        if ((pid_t) sshMaster == -1) {
-            sshMaster = startProcess([&]() {
-                restoreSignals();
-                Strings args{ "ssh", "-M", "-S", socketPath, "-N", "-x", "-a", host };
-                if (!key.empty())
-                    args.insert(args.end(), {"-i", key});
-                execvp("ssh", stringsToCharPtrs(args).data());
-                throw SysError("starting SSH master connection to host ‘%s’", host);
-            });
-        }
-
         auto conn = make_ref<Connection>();
-        Pipe in, out;
-        in.create();
-        out.create();
-        conn->sshPid = startProcess([&]() {
-            if (dup2(in.readSide.get(), STDIN_FILENO) == -1)
-                throw SysError("duping over STDIN");
-            if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
-                throw SysError("duping over STDOUT");
-            execlp("ssh", "ssh", "-S", socketPath.c_str(), host.c_str(), "nix-store", "--serve", "--write", nullptr);
-            throw SysError("executing ‘nix-store --serve’ on remote host ‘%s’", host);
-        });
-        in.readSide = -1;
-        out.writeSide = -1;
-        conn->out = std::move(out.readSide);
-        conn->in = std::move(in.writeSide);
-        conn->to = FdSink(conn->in.get());
-        conn->from = FdSource(conn->out.get());
+        conn->sshConn = master.startCommand("nix-store --serve");
+        conn->to = FdSink(conn->sshConn->in.get());
+        conn->from = FdSource(conn->sshConn->out.get());
 
         int remoteVersion;
 

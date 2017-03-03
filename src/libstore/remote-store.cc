@@ -40,10 +40,10 @@ template PathSet readStorePaths(Store & store, Source & from);
 template Paths readStorePaths(Store & store, Source & from);
 
 /* TODO: Separate these store impls into different files, give them better names */
-RemoteStore::RemoteStore(const Params & params, size_t maxConnections)
+RemoteStore::RemoteStore(const Params & params)
     : Store(params)
     , connections(make_ref<Pool<Connection>>(
-            maxConnections,
+            std::max(1, std::stoi(get(params, "max-connections", "1"))),
             [this]() { return openConnection(); },
             [](const ref<Connection> & r) { return r->to.good() && r->from.good(); }
             ))
@@ -51,10 +51,10 @@ RemoteStore::RemoteStore(const Params & params, size_t maxConnections)
 }
 
 
-UDSRemoteStore::UDSRemoteStore(const Params & params, size_t maxConnections)
+UDSRemoteStore::UDSRemoteStore(const Params & params)
     : Store(params)
     , LocalFSStore(params)
-    , RemoteStore(params, maxConnections)
+    , RemoteStore(params)
 {
 }
 
@@ -129,7 +129,7 @@ void RemoteStore::initConnection(Connection & conn)
         conn.processStderr();
     }
     catch (Error & e) {
-        throw Error(format("cannot start daemon worker: %1%") % e.msg());
+        throw Error("cannot open connection to remote store ‘%s’: %s", getUri(), e.what());
     }
 
     setOptions(conn);
