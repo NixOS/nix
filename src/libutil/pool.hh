@@ -137,6 +137,7 @@ public:
         } catch (...) {
             auto state_(state.lock());
             state_->inUse--;
+            wakeup.notify_one();
             throw;
         }
     }
