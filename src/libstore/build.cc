@@ -1580,36 +1580,48 @@ HookReply DerivationGoal::tryBuildHook()
     if (!worker.hook)
         worker.hook = std::make_unique<HookInstance>();
 
-    /* Tell the hook about system features (beyond the system type)
-       required from the build machine.  (The hook could parse the
-       drv file itself, but this is easier.) */
-    Strings features = tokenizeString<Strings>(get(drv->env, "requiredSystemFeatures"));
-    for (auto & i : features) checkStoreName(i); /* !!! abuse */
+    try {
 
-    /* Send the request to the hook. */
-    writeLine(worker.hook->toHook.writeSide.get(), (format("%1% %2% %3% %4%")
-        % (worker.getNrLocalBuilds() < settings.maxBuildJobs ? "1" : "0")
-        % drv->platform % drvPath % concatStringsSep(",", features)).str());
+        /* Tell the hook about system features (beyond the system type)
+           required from the build machine.  (The hook could parse the
+           drv file itself, but this is easier.) */
+        Strings features = tokenizeString<Strings>(get(drv->env, "requiredSystemFeatures"));
+        for (auto & i : features) checkStoreName(i); /* !!! abuse */
 
-    /* Read the first line of input, which should be a word indicating
-       whether the hook wishes to perform the build. */
-    string reply;
-    while (true) {
-        string s = readLine(worker.hook->fromHook.readSide.get());
-        if (string(s, 0, 2) == "# ") {
-            reply = string(s, 2);
-            break;
+        /* Send the request to the hook. */
+        writeLine(worker.hook->toHook.writeSide.get(), (format("%1% %2% %3% %4%")
+                % (worker.getNrLocalBuilds() < settings.maxBuildJobs ? "1" : "0")
+                % drv->platform % drvPath % concatStringsSep(",", features)).str());
+
+        /* Read the first line of input, which should be a word indicating
+           whether the hook wishes to perform the build. */
+        string reply;
+        while (true) {
+            string s = readLine(worker.hook->fromHook.readSide.get());
+            if (string(s, 0, 2) == "# ") {
+                reply = string(s, 2);
+                break;
+            }
+            s += "\n";
+            writeToStderr(s);
         }
-        s += "\n";
-        writeToStderr(s);
+
+        debug(format("hook reply is ‘%1%’") % reply);
+
+        if (reply == "decline" || reply == "postpone")
+            return reply == "decline" ? rpDecline : rpPostpone;
+        else if (reply != "accept")
+            throw Error(format("bad hook reply ‘%1%’") % reply);
+
+    } catch (SysError & e) {
+        if (e.errNo == EPIPE) {
+            printError("build hook died unexpectedly: %s",
+                chomp(drainFD(worker.hook->fromHook.readSide.get())));
+            worker.hook = 0;
+            return rpDecline;
+        } else
+            throw;
     }
-
-    debug(format("hook reply is ‘%1%’") % reply);
-
-    if (reply == "decline" || reply == "postpone")
-        return reply == "decline" ? rpDecline : rpPostpone;
-    else if (reply != "accept")
-        throw Error(format("bad hook reply ‘%1%’") % reply);
 
     printMsg(lvlTalkative, format("using hook to build path(s) %1%") % showPaths(missingPaths));
 
