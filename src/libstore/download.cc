@@ -114,6 +114,10 @@ struct Curl
         curl_easy_setopt(curl, CURLOPT_PROGRESSFUNCTION, progressCallback_);
         curl_easy_setopt(curl, CURLOPT_PROGRESSDATA, (void *) &curl);
         curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0);
+        /* If no file exist in the specified path, curl continues to work
+         * anyway as if netrc support was disabled. */
+        curl_easy_setopt(curl, CURLOPT_NETRC_FILE, settings.netrcFile.c_str());
+        curl_easy_setopt(curl, CURLOPT_NETRC, CURL_NETRC_OPTIONAL);
     }
 
     ~Curl()
