@@ -44,10 +44,23 @@ RemoteStore::RemoteStore(const Params & params)
     : Store(params)
     , connections(make_ref<Pool<Connection>>(
             std::max(1, std::stoi(get(params, "max-connections", "1"))),
-            [this]() { return openConnection(); },
+            [this]() { return openConnectionWrapper(); },
             [](const ref<Connection> & r) { return r->to.good() && r->from.good(); }
             ))
 {
+}
+
+
+ref<RemoteStore::Connection> RemoteStore::openConnectionWrapper()
+{
+    if (failed)
+        throw Error("opening a connection to remote store ‘%s’ previously failed", getUri());
+    try {
+        return openConnection();
+    } catch (...) {
+        failed = true;
+        throw;
+    }
 }
 
 

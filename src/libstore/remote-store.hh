@@ -98,6 +98,8 @@ protected:
         void processStderr(Sink * sink = 0, Source * source = 0);
     };
 
+    ref<Connection> openConnectionWrapper();
+
     virtual ref<Connection> openConnection() = 0;
 
     void initConnection(Connection & conn);
@@ -105,6 +107,8 @@ protected:
     ref<Pool<Connection>> connections;
 
 private:
+
+    std::atomic_bool failed{false};
 
     void setOptions(Connection & conn);
 };
