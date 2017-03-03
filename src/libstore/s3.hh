@@ -14,9 +14,9 @@ struct S3Helper
     ref<Aws::Client::ClientConfiguration> config;
     ref<Aws::S3::S3Client> client;
 
-    S3Helper();
+    S3Helper(const std::string & region);
 
-    ref<Aws::Client::ClientConfiguration> makeConfig();
+    ref<Aws::Client::ClientConfiguration> makeConfig(const std::string & region);
 
     struct DownloadResult
     {
