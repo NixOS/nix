@@ -642,6 +642,8 @@ void removeTempRoots();
    set to true *unless* you're going to collect garbage. */
 ref<Store> openStore(const std::string & uri = getEnv("NIX_REMOTE"));
 
+ref<Store> openStore(const std::string & uri, const Store::Params & params);
+
 
 void copyPaths(ref<Store> from, ref<Store> to, const Paths & storePaths, bool substitute = false);
 

@@ -233,7 +233,9 @@ int main (int argc, char * * argv)
                 lock = -1;
 
                 try {
-                    sshStore = openStore("ssh://" + bestMachine->hostName + "?ssh-key=" + bestMachine->sshKey);
+                    sshStore = openStore("ssh://" + bestMachine->hostName,
+                        { {"ssh-key", bestMachine->sshKey },
+                          {"max-connections", "1" } });
                     hostName = bestMachine->hostName;
                 } catch (std::exception & e) {
                     printError("unable to open SSH connection to ‘%s’: %s; trying other available machines...",
