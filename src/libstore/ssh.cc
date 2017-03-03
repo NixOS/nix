@@ -4,7 +4,7 @@ namespace nix {
 
 std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string & command)
 {
-    startMaster();
+    Path socketPath = startMaster();
 
     Pipe in, out;
     in.create();
@@ -27,7 +27,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
             args.insert(args.end(), {"-i", keyFile});
         if (compress)
             args.push_back("-C");
-        if (useMaster)
+        if (socketPath != "")
             args.insert(args.end(), {"-S", socketPath});
         args.push_back(command);
         execvp(args.begin()->c_str(), stringsToCharPtrs(args).data());
@@ -45,18 +45,22 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
     return conn;
 }
 
-void SSHMaster::startMaster()
+Path SSHMaster::startMaster()
 {
-    if (!useMaster || sshMaster != -1) return;
+    if (!useMaster) return "";
 
-    tmpDir = std::make_unique<AutoDelete>(createTempDir("", "nix", true, true, 0700));
+    auto state(state_.lock());
 
-    socketPath = (Path) *tmpDir + "/ssh.sock";
+    if (state->sshMaster != -1) return state->socketPath;
+
+    state->tmpDir = std::make_unique<AutoDelete>(createTempDir("", "nix", true, true, 0700));
+
+    state->socketPath = (Path) *state->tmpDir + "/ssh.sock";
 
     Pipe out;
     out.create();
 
-    sshMaster = startProcess([&]() {
+    state->sshMaster = startProcess([&]() {
         restoreSignals();
 
         close(out.readSide.get());
@@ -65,7 +69,7 @@ void SSHMaster::startMaster()
             throw SysError("duping over stdout");
 
         Strings args =
-            { "ssh", host.c_str(), "-M", "-N", "-S", socketPath
+            { "ssh", host.c_str(), "-M", "-N", "-S", state->socketPath
             , "-o", "LocalCommand=echo started"
             , "-o", "PermitLocalCommand=yes"
             };
@@ -88,6 +92,8 @@ void SSHMaster::startMaster()
 
     if (reply != "started")
         throw Error("failed to start SSH master connection to ‘%s’", host);
+
+    return state->socketPath;
 }
 
 }

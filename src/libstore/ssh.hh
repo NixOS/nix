@@ -1,6 +1,7 @@
 #pragma once
 
 #include "util.hh"
+#include "sync.hh"
 
 namespace nix {
 
@@ -8,13 +9,19 @@ class SSHMaster
 {
 private:
 
-    std::string host;
-    std::string keyFile;
-    bool useMaster;
-    bool compress;
-    Pid sshMaster;
-    std::unique_ptr<AutoDelete> tmpDir;
-    Path socketPath;
+    const std::string host;
+    const std::string keyFile;
+    const bool useMaster;
+    const bool compress;
+
+    struct State
+    {
+        Pid sshMaster;
+        std::unique_ptr<AutoDelete> tmpDir;
+        Path socketPath;
+    };
+
+    Sync<State> state_;
 
 public:
 
@@ -34,8 +41,7 @@ public:
 
     std::unique_ptr<Connection> startCommand(const std::string & command);
 
-    void startMaster();
-
+    Path startMaster();
 };
 
 }
