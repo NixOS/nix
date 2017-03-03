@@ -17,13 +17,12 @@
 #include "derivations.hh"
 
 using namespace nix;
-using std::cerr;
 using std::cin;
 
-static void handle_alarm(int sig) {
+static void handleAlarm(int sig) {
 }
 
-class machine {
+class Machine {
     const std::set<string> supportedFeatures;
     const std::set<string> mandatoryFeatures;
 
@@ -31,8 +30,8 @@ public:
     const string hostName;
     const std::vector<string> systemTypes;
     const string sshKey;
-    const unsigned long long maxJobs;
-    const unsigned long long speedFactor;
+    const unsigned int maxJobs;
+    const unsigned int speedFactor;
     bool enabled;
 
     bool allSupported(const std::set<string> & features) const {
@@ -50,28 +49,29 @@ public:
             });
     }
 
-    machine(decltype(hostName) hostName,
+    Machine(decltype(hostName) hostName,
         decltype(systemTypes) systemTypes,
         decltype(sshKey) sshKey,
         decltype(maxJobs) maxJobs,
         decltype(speedFactor) speedFactor,
         decltype(supportedFeatures) supportedFeatures,
         decltype(mandatoryFeatures) mandatoryFeatures) :
-        supportedFeatures{std::move(supportedFeatures)},
-        mandatoryFeatures{std::move(mandatoryFeatures)},
-        hostName{std::move(hostName)},
-        systemTypes{std::move(systemTypes)},
-        sshKey{std::move(sshKey)},
-        maxJobs{std::move(maxJobs)},
-        speedFactor{speedFactor == 0 ? 1 : std::move(speedFactor)},
-        enabled{true} {};
+        supportedFeatures(supportedFeatures),
+        mandatoryFeatures(mandatoryFeatures),
+        hostName(hostName),
+        systemTypes(systemTypes),
+        sshKey(sshKey),
+        maxJobs(maxJobs),
+        speedFactor(std::max(1U, speedFactor)),
+        enabled(true)
+    {};
 };;
 
-static std::vector<machine> read_conf()
+static std::vector<Machine> readConf()
 {
     auto conf = getEnv("NIX_REMOTE_SYSTEMS", SYSCONFDIR "/nix/machines");
 
-    auto machines = std::vector<machine>{};
+    auto machines = std::vector<Machine>{};
     auto lines = std::vector<string>{};
     try {
         lines = tokenizeString<std::vector<string>>(readFile(conf), "\n");
@@ -87,10 +87,8 @@ static std::vector<machine> read_conf()
         }
         auto tokens = tokenizeString<std::vector<string>>(line);
         auto sz = tokens.size();
-        if (sz < 4) {
-            throw new FormatError(format("Bad machines.conf file %1%")
-                % conf);
-        }
+        if (sz < 4)
+            throw FormatError("bad machines.conf file ‘%1%’", conf);
         machines.emplace_back(tokens[0],
             tokenizeString<std::vector<string>>(tokens[1], ","),
             tokens[2],
@@ -108,7 +106,7 @@ static std::vector<machine> read_conf()
 
 static string currentLoad;
 
-static AutoCloseFD openSlotLock(const machine & m, unsigned long long slot)
+static AutoCloseFD openSlotLock(const Machine & m, unsigned long long slot)
 {
     std::ostringstream fn_stream(currentLoad, std::ios_base::ate | std::ios_base::out);
     fn_stream << "/";
@@ -126,15 +124,14 @@ int main (int argc, char * * argv)
 {
     return handleExceptions(argv[0], [&]() {
         initNix();
+
         /* Ensure we don't get any SSH passphrase or host key popups. */
         if (putenv(display_env) == -1 ||
-            putenv(ssh_env) == -1) {
-            throw SysError("Setting SSH env vars");
-        }
+            putenv(ssh_env) == -1)
+            throw SysError("setting SSH env vars");
 
-        if (argc != 4) {
+        if (argc != 4)
             throw UsageError("called without required arguments");
-        }
 
         auto store = openStore();
 
@@ -147,15 +144,14 @@ int main (int argc, char * * argv)
         std::shared_ptr<Store> sshStore;
         AutoCloseFD bestSlotLock;
 
-        auto machines = read_conf();
+        auto machines = readConf();
         string drvPath;
         string hostName;
         for (string line; getline(cin, line);) {
             auto tokens = tokenizeString<std::vector<string>>(line);
             auto sz = tokens.size();
-            if (sz != 3 && sz != 4) {
-                throw Error(format("invalid build hook line %1%") % line);
-            }
+            if (sz != 3 && sz != 4)
+                throw Error("invalid build hook line ‘%1%’", line);
             auto amWilling = tokens[0] == "1";
             auto neededSystem = tokens[1];
             drvPath = tokens[2];
@@ -174,7 +170,7 @@ int main (int argc, char * * argv)
 
                 bool rightType = false;
 
-                machine * bestMachine = nullptr;
+                Machine * bestMachine = nullptr;
                 unsigned long long bestLoad = 0;
                 for (auto & m : machines) {
                     if (m.enabled && std::find(m.systemTypes.begin(),
@@ -221,11 +217,10 @@ int main (int argc, char * * argv)
                 }
 
                 if (!bestSlotLock) {
-                    if (rightType && !canBuildLocally) {
-                        cerr << "# postpone\n";
-                    } else {
-                        cerr << "# decline\n";
-                    }
+                    if (rightType && !canBuildLocally)
+                        std::cerr << "# postpone\n";
+                    else
+                        std::cerr << "# decline\n";
                     break;
                 }
 
@@ -241,37 +236,35 @@ int main (int argc, char * * argv)
                     sshStore = openStore("ssh://" + bestMachine->hostName + "?key=" + bestMachine->sshKey);
                     hostName = bestMachine->hostName;
                 } catch (std::exception & e) {
-                    cerr << e.what() << '\n';
-                    cerr << "unable to open SSH connection to ‘" << bestMachine->hostName << "’, trying other available machines...\n";
+                    printError("unable to open SSH connection to ‘%s’: %s; trying other available machines...",
+                        bestMachine->hostName, e.what());
                     bestMachine->enabled = false;
                     continue;
                 }
                 goto connected;
             }
         }
+
 connected:
-        cerr << "# accept\n";
+        std::cerr << "# accept\n";
         string line;
-        if (!getline(cin, line)) {
+        if (!getline(cin, line))
             throw Error("hook caller didn't send inputs");
-        }
         auto inputs = tokenizeString<std::list<string>>(line);
-        if (!getline(cin, line)) {
+        if (!getline(cin, line))
             throw Error("hook caller didn't send outputs");
-        }
         auto outputs = tokenizeString<Strings>(line);
         AutoCloseFD uploadLock = openLockFile(currentLoad + "/" + hostName + ".upload-lock", true);
-        auto old = signal(SIGALRM, handle_alarm);
+        auto old = signal(SIGALRM, handleAlarm);
         alarm(15 * 60);
-        if (!lockFile(uploadLock.get(), ltWrite, true)) {
-            cerr << "somebody is hogging the upload lock for " << hostName << ", continuing...\n";
-        }
+        if (!lockFile(uploadLock.get(), ltWrite, true))
+            printError("somebody is hogging the upload lock for ‘%s’, continuing...");
         alarm(0);
         signal(SIGALRM, old);
         copyPaths(store, ref<Store>(sshStore), inputs);
         uploadLock = -1;
 
-        cerr << "building ‘" << drvPath << "’ on ‘" << hostName << "’\n";
+        printError("building ‘%s’ on ‘%s’", drvPath, hostName);
         sshStore->buildDerivation(drvPath, readDerivation(drvPath));
 
         std::remove_if(outputs.begin(), outputs.end(), [=](const Path & path) { return store->isValidPath(path); });
