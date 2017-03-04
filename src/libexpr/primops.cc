@@ -589,7 +589,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
-            if (key == "args") {
+            if (i->name == state.sArgs) {
                 state.forceList(*i->value, pos);
                 for (unsigned int n = 0; n < i->value->listSize(); ++n) {
                     string s = state.coerceToString(posDrvName, *i->value->listElems()[n], context, true);
@@ -614,13 +614,13 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                         drv.platform = state.forceStringNoCtx(*i->value, posDrvName);
                     else if (i->name == state.sName)
                         drvName = state.forceStringNoCtx(*i->value, posDrvName);
-                    else if (key == "outputHash")
+                    else if (i->name == state.sOutputHash)
                         outputHash = state.forceStringNoCtx(*i->value, posDrvName);
-                    else if (key == "outputHashAlgo")
+                    else if (i->name == state.sOutputHashAlgo)
                         outputHashAlgo = state.forceStringNoCtx(*i->value, posDrvName);
-                    else if (key == "outputHashMode")
+                    else if (i->name == state.sOutputHashMode)
                         handleHashMode(state.forceStringNoCtx(*i->value, posDrvName));
-                    else if (key == "outputs") {
+                    else if (i->name == state.sOutputs) {
                         /* Require ‘outputs’ to be a list of strings. */
                         state.forceList(*i->value, posDrvName);
                         Strings ss;
@@ -638,10 +638,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                         drvName = s;
                         printMsg(lvlVomit, format("derivation name is '%1%'") % drvName);
                     }
-                    else if (key == "outputHash") outputHash = s;
-                    else if (key == "outputHashAlgo") outputHashAlgo = s;
-                    else if (key == "outputHashMode") handleHashMode(s);
-                    else if (key == "outputs")
+                    else if (i->name == state.sOutputHash) outputHash = s;
+                    else if (i->name == state.sOutputHashAlgo) outputHashAlgo = s;
+                    else if (i->name == state.sOutputHashMode) handleHashMode(s);
+                    else if (i->name == state.sOutputs)
                         handleOutputs(tokenizeString<Strings>(s));
                 }
 
