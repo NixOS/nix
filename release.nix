@@ -74,8 +74,8 @@ let
 
         buildInputs =
           [ curl perl bzip2 xz openssl pkgconfig sqlite boehmgc ]
-          ++ lib.optional stdenv.isLinux libsodium
-          ++ lib.optional stdenv.isLinux
+          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
+          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin)
             (aws-sdk-cpp.override {
               apis = ["s3"];
               customMemoryManagement = false;
