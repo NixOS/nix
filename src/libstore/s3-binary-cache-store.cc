@@ -77,6 +77,7 @@ ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig()
     res->region = Aws::Region::US_EAST_1; // FIXME: make configurable
     res->requestTimeoutMs = 600 * 1000;
     res->retryStrategy = std::make_shared<RetryStrategy>();
+    res->caFile = settings.caFile;
     return res;
 }
 

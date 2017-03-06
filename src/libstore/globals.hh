@@ -195,6 +195,9 @@ struct Settings {
        downloads. */
     Path netrcFile;
 
+    /* Path to the SSL CA file used */
+    Path caFile;
+
 private:
     SettingsMap settings, overrides;
 

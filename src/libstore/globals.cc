@@ -69,6 +69,7 @@ Settings::Settings()
     showTrace = false;
     enableImportNative = false;
     netrcFile = fmt("%s/%s", nixConfDir, "netrc");
+    caFile = getEnv("NIX_SSL_CERT_FILE", getEnv("SSL_CERT_FILE", "/etc/ssl/certs/ca-certificates.crt"));
 }
 
 
