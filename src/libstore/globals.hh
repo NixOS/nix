@@ -210,6 +210,9 @@ struct Settings {
        build settings */
     Path preBuildHook;
 
+    /* Whether we allow import-from-derivation */
+    bool enableImportFromDerivation;
+
 private:
     SettingsMap settings, overrides;
 
