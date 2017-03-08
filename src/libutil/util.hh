@@ -13,6 +13,7 @@
 #include <limits>
 #include <cstdio>
 #include <map>
+#include <sstream>
 
 #ifndef HAVE_STRUCT_DIRENT_D_TYPE
 #define DT_UNKNOWN 0
