@@ -644,6 +644,16 @@ password <replaceable>my-password</replaceable>
   </varlistentry>
 
 
+  <varlistentry xml:id="conf-allow-import-from-derivation"><term><literal>allow-import-from-derivation</literal></term>
+
+    <listitem><para>By default, nix allows you to <function>import</function> from a derivation,
+    allowing building at evaluation time. With this option set to false, nix will throw an error
+    when evaluating an expression that uses this feature, allowing users to ensure their evaluation
+    will not require any builds to take place.</para></listitem>
+
+  </varlistentry>
+
+
 </variablelist>
 
 </para>
