@@ -59,6 +59,8 @@ void EvalState::realiseContext(const PathSet & context)
             drvs.insert(decoded.first + "!" + decoded.second);
     }
     if (!drvs.empty()) {
+        if (!settings.enableImportFromDerivation)
+            throw EvalError(format("attempted to realize ‘%1%’ during evaluation but 'allow-import-from-derivation' is false") % *(drvs.begin()));
         /* For performance, prefetch all substitute info. */
         PathSet willBuild, willSubstitute, unknown;
         unsigned long long downloadSize, narSize;

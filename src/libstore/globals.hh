@@ -198,6 +198,9 @@ struct Settings {
     /* Path to the SSL CA file used */
     Path caFile;
 
+    /* Whether we allow import-from-derivation */
+    bool enableImportFromDerivation;
+
 private:
     SettingsMap settings, overrides;
 
