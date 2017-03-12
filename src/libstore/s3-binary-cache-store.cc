@@ -52,8 +52,8 @@ static void initAWS()
     });
 }
 
-S3Helper::S3Helper()
-    : config(makeConfig())
+S3Helper::S3Helper(const string & region)
+    : config(makeConfig(region))
     , client(make_ref<Aws::S3::S3Client>(*config))
 {
 }
@@ -70,11 +70,11 @@ class RetryStrategy : public Aws::Client::DefaultRetryStrategy
     }
 };
 
-ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig()
+ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig(const string & region)
 {
     initAWS();
     auto res = make_ref<Aws::Client::ClientConfiguration>();
-    res->region = Aws::Region::US_EAST_1; // FIXME: make configurable
+    res->region = region;
     res->requestTimeoutMs = 600 * 1000;
     res->retryStrategy = std::make_shared<RetryStrategy>();
     res->caFile = settings.caFile;
@@ -141,6 +141,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         const Params & params, const std::string & bucketName)
         : S3BinaryCacheStore(params)
         , bucketName(bucketName)
+        , s3Helper(get(params, "aws-region", Aws::Region::US_EAST_1))
     {
         diskCache = getNarInfoDiskCache();
     }
