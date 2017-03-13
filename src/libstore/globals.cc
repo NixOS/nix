@@ -179,7 +179,6 @@ void Settings::update()
     _get(envKeepDerivations, "env-keep-derivations");
     _get(sshSubstituterHosts, "ssh-substituter-hosts");
     _get(useSshSubstituter, "use-ssh-substituter");
-    _get(logServers, "log-servers");
     _get(enableImportNative, "allow-unsafe-native-code-during-evaluation");
     _get(useCaseHack, "use-case-hack");
     _get(preBuildHook, "pre-build-hook");

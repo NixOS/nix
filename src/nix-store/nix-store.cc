@@ -9,7 +9,6 @@
 #include "util.hh"
 #include "worker-protocol.hh"
 #include "xmlgraph.hh"
-#include "compression.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -482,58 +481,12 @@ static void opReadLog(Strings opFlags, Strings opArgs)
 
     RunPager pager;
 
-    // FIXME: move getting logs into Store.
-    auto store2 = std::dynamic_pointer_cast<LocalFSStore>(store);
-    if (!store2) throw Error(format("store ‘%s’ does not support reading logs") % store->getUri());
-
     for (auto & i : opArgs) {
-        Path path = useDeriver(store->followLinksToStorePath(i));
-
-        string baseName = baseNameOf(path);
-        bool found = false;
-
-        for (int j = 0; j < 2; j++) {
-
-            Path logPath =
-                j == 0
-                ? (format("%1%/%2%/%3%/%4%") % store2->logDir % drvsLogDir % string(baseName, 0, 2) % string(baseName, 2)).str()
-                : (format("%1%/%2%/%3%") % store2->logDir % drvsLogDir % baseName).str();
-            Path logBz2Path = logPath + ".bz2";
-
-            if (pathExists(logPath)) {
-                /* !!! Make this run in O(1) memory. */
-                string log = readFile(logPath);
-                writeFull(STDOUT_FILENO, log);
-                found = true;
-                break;
-            }
-
-            else if (pathExists(logBz2Path)) {
-                std::cout << *decompress("bzip2", readFile(logBz2Path));
-                found = true;
-                break;
-            }
-        }
-
-        if (!found) {
-            for (auto & i : settings.logServers) {
-                string prefix = i;
-                if (!prefix.empty() && prefix.back() != '/') prefix += '/';
-                string url = prefix + baseName;
-                try {
-                    string log = runProgram(CURL, true, {"--fail", "--location", "--silent", "--", url});
-                    std::cout << "(using build log from " << url << ")" << std::endl;
-                    std::cout << log;
-                    found = true;
-                    break;
-                } catch (ExecError & e) {
-                    /* Ignore errors from curl. FIXME: actually, might be
-                       nice to print a warning on HTTP status != 404. */
-                }
-            }
-        }
-
-        if (!found) throw Error(format("build log of derivation ‘%1%’ is not available") % path);
+        auto path = store->followLinksToStorePath(i);
+        auto log = store->getBuildLog(path);
+        if (!log)
+            throw Error("build log of derivation ‘%s’ is not available", path);
+        std::cout << *log;
     }
 }
 

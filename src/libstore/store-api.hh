@@ -566,6 +566,11 @@ public:
        if they lack a signature. */
     virtual bool isTrusted() { return false; }
 
+    /* Return the build log of the specified store path, if available,
+       or null otherwise. */
+    virtual std::shared_ptr<std::string> getBuildLog(const Path & path)
+    { return nullptr; }
+
 protected:
 
     Stats stats;
@@ -579,6 +584,7 @@ public:
     const Path rootDir;
     const Path stateDir;
     const Path logDir;
+    const static string drvsLogDir;
 
     LocalFSStore(const Params & params);
 
@@ -595,6 +601,8 @@ public:
     {
         return getRealStoreDir() + "/" + baseNameOf(storePath);
     }
+
+    std::shared_ptr<std::string> getBuildLog(const Path & path) override;
 };
 
 

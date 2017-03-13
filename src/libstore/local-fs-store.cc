@@ -2,6 +2,8 @@
 #include "fs-accessor.hh"
 #include "store-api.hh"
 #include "globals.hh"
+#include "compression.hh"
+#include "derivations.hh"
 
 namespace nix {
 
@@ -82,6 +84,39 @@ void LocalFSStore::narFromPath(const Path & path, Sink & sink)
     if (!isValidPath(path))
         throw Error(format("path ‘%s’ is not valid") % path);
     dumpPath(getRealStoreDir() + std::string(path, storeDir.size()), sink);
+}
+
+const string LocalFSStore::drvsLogDir = "drvs";
+
+std::shared_ptr<std::string> LocalFSStore::getBuildLog(const Path & path_)
+{
+    auto path(path_);
+
+    assertStorePath(path);
+
+    if (!isDerivation(path)) {
+        path = queryPathInfo(path)->deriver;
+        if (path == "") return nullptr;
+    }
+
+    string baseName = baseNameOf(path);
+
+    for (int j = 0; j < 2; j++) {
+
+        Path logPath =
+            j == 0
+            ? (format("%1%/%2%/%3%/%4%") % logDir % drvsLogDir % string(baseName, 0, 2) % string(baseName, 2)).str()
+            : (format("%1%/%2%/%3%") % logDir % drvsLogDir % baseName).str();
+        Path logBz2Path = logPath + ".bz2";
+
+        if (pathExists(logPath))
+            return std::make_shared<std::string>(readFile(logPath));
+
+        else if (pathExists(logBz2Path))
+            return decompress("bzip2", readFile(logBz2Path));
+    }
+
+    return nullptr;
 }
 
 }

@@ -1236,12 +1236,7 @@ the store path is used.</para>
 <filename>/nix/var/log/nix/drvs</filename>.  However, there is no
 guarantee that a build log is available for any particular store path.
 For instance, if the path was downloaded as a pre-built binary through
-a substitute, then the log is unavailable. If the log is not available
-locally, then <command>nix-store</command> will try to download the
-log from the servers specified in the Nix option
-<option>log-servers</option>. For example, if it’s set to
-<literal>http://hydra.nixos.org/log</literal>, then Nix will check
-<literal>http://hydra.nixos.org/log/<replaceable>base-name</replaceable></literal>.</para>
+a substitute, then the log is unavailable.</para>
 
 </refsection>
 

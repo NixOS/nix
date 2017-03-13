@@ -21,9 +21,6 @@ namespace nix {
 const int nixSchemaVersion = 10;
 
 
-extern string drvsLogDir;
-
-
 struct Derivation;
 
 

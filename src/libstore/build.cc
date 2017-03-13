@@ -3048,9 +3048,6 @@ void DerivationGoal::registerOutputs()
 }
 
 
-string drvsLogDir = "drvs";
-
-
 Path DerivationGoal::openLogFile()
 {
     logSize = 0;
@@ -3060,7 +3057,7 @@ Path DerivationGoal::openLogFile()
     string baseName = baseNameOf(drvPath);
 
     /* Create a log file. */
-    Path dir = (format("%1%/%2%/%3%/") % worker.store.logDir % drvsLogDir % string(baseName, 0, 2)).str();
+    Path dir = (format("%1%/%2%/%3%/") % worker.store.logDir % worker.store.drvsLogDir % string(baseName, 0, 2)).str();
     createDirs(dir);
 
     Path logFileName = (format("%1%/%2%%3%")
