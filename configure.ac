@@ -114,7 +114,6 @@ if test -z "$$1"; then
 fi
 ])
 
-NEED_PROG(curl, curl)
 NEED_PROG(bash, bash)
 NEED_PROG(patch, patch)
 AC_PATH_PROG(xmllint, xmllint, false)
