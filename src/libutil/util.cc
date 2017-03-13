@@ -870,11 +870,14 @@ string runProgram(Path program, bool searchPath, const Strings & args,
 
     out.writeSide = -1;
 
-    /* FIXME: This can deadlock if the input is too long. */
+    std::thread writerThread;
+
     if (!input.empty()) {
         in.readSide = -1;
-        writeFull(in.writeSide.get(), input);
-        in.writeSide = -1;
+        writerThread = std::thread([&]() {
+            writeFull(in.writeSide.get(), input);
+            in.writeSide = -1;
+        });
     }
 
     string result = drainFD(out.readSide.get());
@@ -884,6 +887,9 @@ string runProgram(Path program, bool searchPath, const Strings & args,
     if (!statusOk(status))
         throw ExecError(status, format("program ‘%1%’ %2%")
             % program % statusToString(status));
+
+    if (!input.empty())
+        writerThread.join();
 
     return result;
 }
