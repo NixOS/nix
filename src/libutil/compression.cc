@@ -89,6 +89,11 @@ static ref<std::string> decompressBzip2(const std::string & in)
     }
 }
 
+static ref<std::string> decompressBrotli(const std::string & in)
+{
+    return make_ref<std::string>(runProgram(BRO, true, {"-d"}, in));
+}
+
 ref<std::string> compress(const std::string & method, const std::string & in)
 {
     StringSink ssink;
@@ -106,6 +111,8 @@ ref<std::string> decompress(const std::string & method, const std::string & in)
         return decompressXZ(in);
     else if (method == "bzip2")
         return decompressBzip2(in);
+    else if (method == "br")
+        return decompressBrotli(in);
     else
         throw UnknownCompressionMethod(format("unknown compression method ‘%s’") % method);
 }

@@ -9,3 +9,5 @@ libutil_SOURCES := $(wildcard $(d)/*.cc)
 libutil_LDFLAGS = $(LIBLZMA_LIBS) -lbz2 -pthread $(OPENSSL_LIBS)
 
 libutil_LIBS = libformat
+
+libutil_CXXFLAGS = -DBRO=\"$(bro)\"

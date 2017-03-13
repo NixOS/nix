@@ -5,6 +5,8 @@
 #include "store-api.hh"
 #include "archive.hh"
 #include "s3.hh"
+#include "compression.hh"
+
 #ifdef ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
 #endif
@@ -70,6 +72,8 @@ struct CurlDownloader : public Downloader
 
         struct curl_slist * requestHeaders = 0;
 
+        std::string encoding;
+
         DownloadItem(CurlDownloader & downloader, const DownloadRequest & request)
             : downloader(downloader), request(request)
         {
@@ -127,6 +131,7 @@ struct CurlDownloader : public Downloader
                 auto ss = tokenizeString<vector<string>>(line, " ");
                 status = ss.size() >= 2 ? ss[1] : "";
                 result.data = std::make_shared<std::string>();
+                encoding = "";
             } else {
                 auto i = line.find(':');
                 if (i != string::npos) {
@@ -142,7 +147,8 @@ struct CurlDownloader : public Downloader
                             debug(format("shutting down on 200 HTTP response with expected ETag"));
                             return 0;
                         }
-                    }
+                    } else if (name == "content-encoding")
+                        encoding = trim(string(line, i + 1));;
                 }
             }
             return realSize;
@@ -268,7 +274,18 @@ struct CurlDownloader : public Downloader
             {
                 result.cached = httpStatus == 304;
                 done = true;
-                callSuccess(success, failure, const_cast<const DownloadResult &>(result));
+
+                /* Ad hoc support for brotli, since curl doesn't do
+                   this yet. */
+                try {
+                    if (encoding == "br")
+                        result.data = decompress("br", *result.data);
+
+                    callSuccess(success, failure, const_cast<const DownloadResult &>(result));
+                } catch (...) {
+                    done = true;
+                    callFailure(failure, std::current_exception());
+                }
             } else {
                 Error err =
                     (httpStatus == 404 || code == CURLE_FILE_COULDNT_READ_FILE) ? NotFound :

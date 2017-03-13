@@ -6,7 +6,8 @@ with import <nixpkgs> {};
   name = "nix";
 
   buildInputs =
-    [ curl bison flex perl libxml2 libxslt bzip2 xz
+    [ curl bison flex perl libxml2 libxslt
+      bzip2 xz brotli
       pkgconfig sqlite libsodium boehmgc
       docbook5 docbook5_xsl
       autoconf-archive

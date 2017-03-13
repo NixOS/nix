@@ -128,6 +128,7 @@ NEED_PROG(gzip, gzip)
 NEED_PROG(xz, xz)
 AC_PATH_PROG(dot, dot)
 AC_PATH_PROG(pv, pv, pv)
+NEED_PROG(bro, bro)
 
 
 # Test that Perl has the open/fork feature (Perl 5.8.0 and beyond).

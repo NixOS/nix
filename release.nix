@@ -24,7 +24,8 @@ let
         inherit officialRelease;
 
         buildInputs =
-          [ curl bison flex perl libxml2 libxslt bzip2 xz
+          [ curl bison flex perl libxml2 libxslt
+            bzip2 xz brotli
             pkgconfig sqlite libsodium boehmgc
             docbook5 docbook5_xsl
             autoconf-archive
@@ -73,7 +74,10 @@ let
         src = tarball;
 
         buildInputs =
-          [ curl perl bzip2 xz openssl pkgconfig sqlite boehmgc ]
+          [ curl perl
+            bzip2 xz brotli
+            openssl pkgconfig sqlite boehmgc
+          ]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin)
             (aws-sdk-cpp.override {
