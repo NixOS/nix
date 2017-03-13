@@ -122,6 +122,8 @@ public:
     void addSignatures(const Path & storePath, const StringSet & sigs) override
     { notImpl(); }
 
+    std::shared_ptr<std::string> getBuildLog(const Path & path) override;
+
 };
 
 }

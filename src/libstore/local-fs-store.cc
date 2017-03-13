@@ -95,7 +95,11 @@ std::shared_ptr<std::string> LocalFSStore::getBuildLog(const Path & path_)
     assertStorePath(path);
 
     if (!isDerivation(path)) {
-        path = queryPathInfo(path)->deriver;
+        try {
+            path = queryPathInfo(path)->deriver;
+        } catch (InvalidPath &) {
+            return nullptr;
+        }
         if (path == "") return nullptr;
     }
 

@@ -382,4 +382,28 @@ ref<FSAccessor> BinaryCacheStore::getFSAccessor()
     return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()));
 }
 
+std::shared_ptr<std::string> BinaryCacheStore::getBuildLog(const Path & path)
+{
+    Path drvPath;
+
+    if (isDerivation(path))
+        drvPath = path;
+    else {
+        try {
+            auto info = queryPathInfo(path);
+            // FIXME: add a "Log" field to .narinfo
+            if (info->deriver == "") return nullptr;
+            drvPath = info->deriver;
+        } catch (InvalidPath &) {
+            return nullptr;
+        }
+    }
+
+    auto logPath = "log/" + baseNameOf(drvPath);
+
+    debug("fetching build log from binary cache ‘%s/%s’", getUri(), logPath);
+
+    return getFile(logPath);
+}
+
 }
