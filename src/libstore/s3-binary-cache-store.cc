@@ -267,9 +267,9 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
     void upsertFile(const std::string & path, const std::string & data,
         const std::string & mimeType) override
     {
-        if (path.find(".narinfo") != std::string::npos)
+        if (textCompression != "" && (hasSuffix(path, ".narinfo") || hasSuffix(path, ".ls")))
             uploadFile(path, *compress(textCompression, data), mimeType, textCompression);
-        else if (path.find("/log") != std::string::npos)
+        else if (logCompression != "" && hasPrefix(path, "log/"))
             uploadFile(path, *compress(logCompression, data), mimeType, logCompression);
         else
             uploadFile(path, data, mimeType, "");

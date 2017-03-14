@@ -224,7 +224,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
             }
         }
 
-        upsertFile(storePathToHash(info.path) + ".ls.xz", *compress("xz", jsonOut.str()), "application/x-nix-nar-listing");
+        upsertFile(storePathToHash(info.path) + ".ls", jsonOut.str(), "application/json");
     }
 
     else {
