@@ -64,7 +64,9 @@ protected:
         }
     }
 
-    void upsertFile(const std::string & path, const std::string & data) override
+    void upsertFile(const std::string & path,
+        const std::string & data,
+        const std::string & mimeType) override
     {
         throw UploadToHTTP("uploading to an HTTP binary cache is not supported");
     }

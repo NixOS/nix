@@ -97,7 +97,7 @@ void BinaryCacheStore::init()
 
     auto cacheInfo = getFile(cacheInfoFile);
     if (!cacheInfo) {
-        upsertFile(cacheInfoFile, "StoreDir: " + storeDir + "\n");
+        upsertFile(cacheInfoFile, "StoreDir: " + storeDir + "\n", "text/x-nix-cache-info");
     } else {
         for (auto & line : tokenizeString<Strings>(*cacheInfo, "\n")) {
             size_t colon = line.find(':');
@@ -224,7 +224,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
             }
         }
 
-        upsertFile(storePathToHash(info.path) + ".ls.xz", *compress("xz", jsonOut.str()));
+        upsertFile(storePathToHash(info.path) + ".ls.xz", *compress("xz", jsonOut.str()), "application/x-nix-nar-listing");
     }
 
     else {
@@ -254,7 +254,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
            "");
     if (repair || !fileExists(narInfo->url)) {
         stats.narWrite++;
-        upsertFile(narInfo->url, *narCompressed);
+        upsertFile(narInfo->url, *narCompressed, "application/x-nix-nar");
     } else
         stats.narWriteAverted++;
 
@@ -265,7 +265,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
     /* Atomically write the NAR info file.*/
     if (secretKey) narInfo->sign(*secretKey);
 
-    upsertFile(narInfoFile, narInfo->to_string());
+    upsertFile(narInfoFile, narInfo->to_string(), "text/x-nix-narinfo");
 
     auto hashPart = storePathToHash(narInfo->path);
 

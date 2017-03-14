@@ -148,7 +148,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         : S3BinaryCacheStore(params)
         , bucketName(bucketName)
         , s3Helper(get(params, "aws-region", Aws::Region::US_EAST_1))
-        , textCompression(get(params, "text-compression", "gzip"))
+        , textCompression(get(params, "text-compression", ""))
         , logCompression(get(params, "log-compression", textCompression))
     {
         diskCache = getNarInfoDiskCache();
@@ -229,12 +229,15 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
     }
 
     void uploadFile(const std::string & path, const std::string & data,
+        const std::string & mimeType,
         const std::string & contentEncoding)
     {
         auto request =
             Aws::S3::Model::PutObjectRequest()
             .WithBucket(bucketName)
             .WithKey(path);
+
+        request.SetContentType(mimeType);
 
         if (contentEncoding != "")
             request.SetContentEncoding(contentEncoding);
@@ -261,14 +264,15 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         stats.putTimeMs += duration;
     }
 
-    void upsertFile(const std::string & path, const std::string & data) override
+    void upsertFile(const std::string & path, const std::string & data,
+        const std::string & mimeType) override
     {
         if (path.find(".narinfo") != std::string::npos)
-            uploadFile(path, *compress(textCompression, data), textCompression);
+            uploadFile(path, *compress(textCompression, data), mimeType, textCompression);
         else if (path.find("/log") != std::string::npos)
-            uploadFile(path, *compress(logCompression, data), logCompression);
+            uploadFile(path, *compress(logCompression, data), mimeType, logCompression);
         else
-            uploadFile(path, data, "");
+            uploadFile(path, data, mimeType, "");
     }
 
     void getFile(const std::string & path,

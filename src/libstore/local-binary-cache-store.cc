@@ -30,7 +30,9 @@ protected:
 
     bool fileExists(const std::string & path) override;
 
-    void upsertFile(const std::string & path, const std::string & data) override;
+    void upsertFile(const std::string & path,
+        const std::string & data,
+        const std::string & mimeType) override;
 
     void getFile(const std::string & path,
         std::function<void(std::shared_ptr<std::string>)> success,
@@ -83,7 +85,9 @@ bool LocalBinaryCacheStore::fileExists(const std::string & path)
     return pathExists(binaryCacheDir + "/" + path);
 }
 
-void LocalBinaryCacheStore::upsertFile(const std::string & path, const std::string & data)
+void LocalBinaryCacheStore::upsertFile(const std::string & path,
+    const std::string & data,
+    const std::string & mimeType)
 {
     atomicWrite(binaryCacheDir + "/" + path, data);
 }

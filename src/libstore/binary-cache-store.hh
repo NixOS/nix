@@ -31,7 +31,9 @@ public:
 
     virtual bool fileExists(const std::string & path) = 0;
 
-    virtual void upsertFile(const std::string & path, const std::string & data) = 0;
+    virtual void upsertFile(const std::string & path,
+        const std::string & data,
+        const std::string & mimeType) = 0;
 
     /* Return the contents of the specified file, or null if it
        doesn't exist. */
