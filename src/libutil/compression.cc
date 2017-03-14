@@ -91,6 +91,7 @@ static ref<std::string> decompressBzip2(const std::string & in)
 
 static ref<std::string> decompressBrotli(const std::string & in)
 {
+    // FIXME: use libbrotli
     return make_ref<std::string>(runProgram(BRO, true, {"-d"}, in));
 }
 
@@ -266,6 +267,34 @@ struct BzipSink : CompressionSink
     }
 };
 
+struct BrotliSink : CompressionSink
+{
+    Sink & nextSink;
+    std::string data;
+
+    BrotliSink(Sink & nextSink) : nextSink(nextSink)
+    {
+    }
+
+    ~BrotliSink()
+    {
+    }
+
+    // FIXME: use libbrotli
+
+    void finish() override
+    {
+        flush();
+        nextSink(runProgram(BRO, true, {}, data));
+    }
+
+    void write(const unsigned char * data, size_t len) override
+    {
+        checkInterrupt();
+        this->data.append((const char *) data, len);
+    }
+};
+
 ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink)
 {
     if (method == "none")
@@ -274,6 +303,8 @@ ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & next
         return make_ref<XzSink>(nextSink);
     else if (method == "bzip2")
         return make_ref<BzipSink>(nextSink);
+    else if (method == "br")
+        return make_ref<BrotliSink>(nextSink);
     else
         throw UnknownCompressionMethod(format("unknown compression method ‘%s’") % method);
 }

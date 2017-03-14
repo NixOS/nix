@@ -250,6 +250,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
     narInfo->url = "nar/" + printHash32(narInfo->fileHash) + ".nar"
         + (compression == "xz" ? ".xz" :
            compression == "bzip2" ? ".bz2" :
+           compression == "br" ? ".br" :
            "");
     if (repair || !fileExists(narInfo->url)) {
         stats.narWrite++;

@@ -39,6 +39,16 @@ std::string resolveUri(const std::string & uri)
         return uri;
 }
 
+ref<std::string> decodeContent(const std::string & encoding, ref<std::string> data)
+{
+    if (encoding == "")
+        return data;
+    else if (encoding == "br")
+        return decompress(encoding, *data);
+    else
+        throw Error("unsupported Content-Encoding ‘%s’", encoding);
+}
+
 struct CurlDownloader : public Downloader
 {
     CURLM * curlm = 0;
@@ -275,12 +285,8 @@ struct CurlDownloader : public Downloader
                 result.cached = httpStatus == 304;
                 done = true;
 
-                /* Ad hoc support for brotli, since curl doesn't do
-                   this yet. */
                 try {
-                    if (encoding == "br")
-                        result.data = decompress("br", *result.data);
-
+                    result.data = decodeContent(encoding, ref<std::string>(result.data));
                     callSuccess(success, failure, const_cast<const DownloadResult &>(result));
                 } catch (...) {
                     done = true;

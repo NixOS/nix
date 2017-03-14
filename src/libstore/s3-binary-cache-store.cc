@@ -5,6 +5,8 @@
 #include "nar-info.hh"
 #include "nar-info-disk-cache.hh"
 #include "globals.hh"
+#include "compression.hh"
+#include "download.hh"
 
 #include <aws/core/Aws.h>
 #include <aws/core/client/ClientConfiguration.h>
@@ -104,8 +106,10 @@ S3Helper::DownloadResult S3Helper::getObject(
         auto result = checkAws(fmt("AWS error fetching ‘%s’", key),
             client->GetObject(request));
 
-        res.data = std::make_shared<std::string>(
-            dynamic_cast<std::stringstream &>(result.GetBody()).str());
+        res.data = decodeContent(
+            result.GetContentEncoding(),
+            make_ref<std::string>(
+                dynamic_cast<std::stringstream &>(result.GetBody()).str()));
 
     } catch (S3Error & e) {
         if (e.err != Aws::S3::S3Errors::NO_SUCH_KEY) throw;
@@ -137,11 +141,15 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
     S3Helper s3Helper;
 
+    std::string textCompression, logCompression;
+
     S3BinaryCacheStoreImpl(
         const Params & params, const std::string & bucketName)
         : S3BinaryCacheStore(params)
         , bucketName(bucketName)
         , s3Helper(get(params, "aws-region", Aws::Region::US_EAST_1))
+        , textCompression(get(params, "text-compression", "gzip"))
+        , logCompression(get(params, "log-compression", textCompression))
     {
         diskCache = getNarInfoDiskCache();
     }
@@ -220,12 +228,16 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         return true;
     }
 
-    void upsertFile(const std::string & path, const std::string & data) override
+    void uploadFile(const std::string & path, const std::string & data,
+        const std::string & contentEncoding)
     {
         auto request =
             Aws::S3::Model::PutObjectRequest()
             .WithBucket(bucketName)
             .WithKey(path);
+
+        if (contentEncoding != "")
+            request.SetContentEncoding(contentEncoding);
 
         auto stream = std::make_shared<istringstream_nocopy>(data);
 
@@ -247,6 +259,16 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
             % bucketName % path % data.size() % duration);
 
         stats.putTimeMs += duration;
+    }
+
+    void upsertFile(const std::string & path, const std::string & data) override
+    {
+        if (path.find(".narinfo") != std::string::npos)
+            uploadFile(path, *compress(textCompression, data), textCompression);
+        else if (path.find("/log") != std::string::npos)
+            uploadFile(path, *compress(logCompression, data), logCompression);
+        else
+            uploadFile(path, data, "");
     }
 
     void getFile(const std::string & path,
