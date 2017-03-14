@@ -146,7 +146,6 @@ struct XzSink : CompressionSink
 
     ~XzSink()
     {
-        assert(finished);
         lzma_end(&strm);
     }
 
@@ -217,7 +216,6 @@ struct BzipSink : CompressionSink
 
     ~BzipSink()
     {
-        assert(finished);
         BZ2_bzCompressEnd(&strm);
     }
 
