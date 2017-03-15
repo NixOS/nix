@@ -6,7 +6,41 @@ dest="/nix"
 self="$(dirname "$0")"
 nix="@nix@"
 cacert="@cacert@"
+default_channel_url="https://nixos.org/channels/nixpkgs-unstable"
+channel_url="$default_channel_url"
+default_channel_name="nixpkgs"
+channel_name="$default_channel_name"
 
+for arg in "$@"; do
+    case "$arg" in
+        --help)
+            echo "Nix install script"
+            echo ""
+            echo "Usage: $(basename "$0") [options]"
+            echo ""
+            echo "Options:"
+            echo "  --channel=URL"
+            echo "          The Nix channel to get expressions from."
+            echo "          If URL is empty, no channel will be registered."
+            echo "          Default: $default_channel_url"
+            echo ""
+            echo "  --channel-name=NAME"
+            echo "          Optional name to give the Nix channel."
+            echo "          Default: $default_channel_name"
+            exit 0
+            ;;
+        --channel=*)
+            channel_url=$(echo "$arg" | cut -d= -f2)
+            ;;
+        --channel-name=*)
+            channel_name=$(echo "$arg" | cut -d= -f2)
+            ;;
+        *) echo "Unsupported argument: $arg"
+           echo "Try --help"
+           exit 1
+           ;;
+    esac
+done
 
 if ! [ -e "$self/.reginfo" ]; then
     echo "$0: incomplete installer (.reginfo is missing)" >&2
@@ -101,12 +135,14 @@ if [ -z "$NIX_SSL_CERT_FILE" ] || ! [ -f "$NIX_SSL_CERT_FILE" ]; then
     export NIX_SSL_CERT_FILE="$HOME/.nix-profile/etc/ssl/certs/ca-bundle.crt"
 fi
 
-# Subscribe the user to the Nixpkgs channel and fetch it.
-if ! "$nix/bin/nix-channel" --list | grep -q "^nixpkgs "; then
-    "$nix/bin/nix-channel" --add https://nixos.org/channels/nixpkgs-unstable
-fi
-if [ -z "$_NIX_INSTALLER_TEST" ]; then
-    "$nix/bin/nix-channel" --update nixpkgs
+if [ -n "$channel_url" ]; then
+    # Subscribe the user to the Nixpkgs channel and fetch it.
+    if ! "$nix/bin/nix-channel" --list | grep -q "^$channel_name "; then
+        "$nix/bin/nix-channel" --add "$channel_url" "$channel_name"
+    fi
+    if [ -z "$_NIX_INSTALLER_TEST" ]; then
+        "$nix/bin/nix-channel" --update "$channel_name"
+    fi
 fi
 
 added=
