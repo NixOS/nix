@@ -28,11 +28,6 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
             fi
         fi
 
-        # Subscribe the user to the unstable Nixpkgs channel by default.
-        if [ ! -e "$HOME/.nix-channels" ]; then
-            echo "https://nixos.org/channels/nixpkgs-unstable nixpkgs" > "$HOME/.nix-channels"
-        fi
-
         # Create the per-user garbage collector roots directory.
         __user_gcroots=@localstatedir@/nix/gcroots/per-user/"$USER"
         mkdir -m 0755 -p "$__user_gcroots"
