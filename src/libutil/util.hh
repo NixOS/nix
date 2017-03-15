@@ -14,6 +14,7 @@
 #include <cstdio>
 #include <map>
 #include <sstream>
+#include <experimental/optional>
 
 #ifndef HAVE_STRUCT_DIRENT_D_TYPE
 #define DT_UNKNOWN 0
@@ -232,7 +233,8 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = P
 /* Run a program and return its stdout in a string (i.e., like the
    shell backtick operator). */
 string runProgram(Path program, bool searchPath = false,
-    const Strings & args = Strings(), const string & input = "");
+    const Strings & args = Strings(),
+    const std::experimental::optional<std::string> & input = {});
 
 class ExecError : public Error
 {

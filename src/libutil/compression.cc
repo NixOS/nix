@@ -92,7 +92,7 @@ static ref<std::string> decompressBzip2(const std::string & in)
 static ref<std::string> decompressBrotli(const std::string & in)
 {
     // FIXME: use libbrotli
-    return make_ref<std::string>(runProgram(BRO, true, {"-d"}, in));
+    return make_ref<std::string>(runProgram(BRO, true, {"-d"}, {in}));
 }
 
 ref<std::string> compress(const std::string & method, const std::string & in)

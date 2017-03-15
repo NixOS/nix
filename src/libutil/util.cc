@@ -1,6 +1,7 @@
 #include "util.hh"
 #include "affinity.hh"
 #include "sync.hh"
+#include "finally.hh"
 
 #include <cctype>
 #include <cerrno>
@@ -10,6 +11,7 @@
 #include <iostream>
 #include <sstream>
 #include <thread>
+#include <future>
 
 #include <sys/wait.h>
 #include <unistd.h>
@@ -837,23 +839,21 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
 
 
 string runProgram(Path program, bool searchPath, const Strings & args,
-    const string & input)
+    const std::experimental::optional<std::string> & input)
 {
     checkInterrupt();
 
     /* Create a pipe. */
     Pipe out, in;
     out.create();
-    if (!input.empty()) in.create();
+    if (input) in.create();
 
     /* Fork. */
     Pid pid = startProcess([&]() {
         if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
             throw SysError("dupping stdout");
-        if (!input.empty()) {
-            if (dup2(in.readSide.get(), STDIN_FILENO) == -1)
-                throw SysError("dupping stdin");
-        }
+        if (input && dup2(in.readSide.get(), STDIN_FILENO) == -1)
+            throw SysError("dupping stdin");
 
         Strings args_(args);
         args_.push_front(program);
@@ -872,10 +872,23 @@ string runProgram(Path program, bool searchPath, const Strings & args,
 
     std::thread writerThread;
 
-    if (!input.empty()) {
+    std::promise<void> promise;
+
+    Finally doJoin([&]() {
+        if (writerThread.joinable())
+            writerThread.join();
+    });
+
+
+    if (input) {
         in.readSide = -1;
         writerThread = std::thread([&]() {
-            writeFull(in.writeSide.get(), input);
+            try {
+                writeFull(in.writeSide.get(), *input);
+                promise.set_value();
+            } catch (...) {
+                promise.set_exception(std::current_exception());
+            }
             in.writeSide = -1;
         });
     }
@@ -888,8 +901,8 @@ string runProgram(Path program, bool searchPath, const Strings & args,
         throw ExecError(status, format("program ‘%1%’ %2%")
             % program % statusToString(status));
 
-    if (!input.empty())
-        writerThread.join();
+    /* Wait for the writer thread to finish. */
+    if (input) promise.get_future().get();
 
     return result;
 }

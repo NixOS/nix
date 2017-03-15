@@ -170,10 +170,10 @@ int main(int argc, char * * argv)
                 Path unpacked = (Path) tmpDir + "/unpacked";
                 createDirs(unpacked);
                 if (hasSuffix(baseNameOf(uri), ".zip"))
-                    runProgram("unzip", true, {"-qq", tmpFile, "-d", unpacked}, "");
+                    runProgram("unzip", true, {"-qq", tmpFile, "-d", unpacked});
                 else
                     // FIXME: this requires GNU tar for decompression.
-                    runProgram("tar", true, {"xf", tmpFile, "-C", unpacked}, "");
+                    runProgram("tar", true, {"xf", tmpFile, "-C", unpacked});
 
                 /* If the archive unpacks to a single file/directory, then use
                    that as the top-level. */
