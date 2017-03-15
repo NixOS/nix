@@ -141,15 +141,16 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
     S3Helper s3Helper;
 
-    std::string textCompression, logCompression;
+    std::string narinfoCompression, lsCompression, logCompression;
 
     S3BinaryCacheStoreImpl(
         const Params & params, const std::string & bucketName)
         : S3BinaryCacheStore(params)
         , bucketName(bucketName)
         , s3Helper(get(params, "aws-region", Aws::Region::US_EAST_1))
-        , textCompression(get(params, "text-compression", ""))
-        , logCompression(get(params, "log-compression", textCompression))
+        , narinfoCompression(get(params, "narinfo-compression", ""))
+        , lsCompression(get(params, "ls-compression", ""))
+        , logCompression(get(params, "log-compression", ""))
     {
         diskCache = getNarInfoDiskCache();
     }
@@ -267,8 +268,10 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
     void upsertFile(const std::string & path, const std::string & data,
         const std::string & mimeType) override
     {
-        if (textCompression != "" && (hasSuffix(path, ".narinfo") || hasSuffix(path, ".ls")))
-            uploadFile(path, *compress(textCompression, data), mimeType, textCompression);
+        if (narinfoCompression != "" && hasSuffix(path, ".narinfo"))
+            uploadFile(path, *compress(narinfoCompression, data), mimeType, narinfoCompression);
+        else if (lsCompression != "" && hasSuffix(path, ".ls"))
+            uploadFile(path, *compress(lsCompression, data), mimeType, lsCompression);
         else if (logCompression != "" && hasPrefix(path, "log/"))
             uploadFile(path, *compress(logCompression, data), mimeType, logCompression);
         else
