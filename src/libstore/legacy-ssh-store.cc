@@ -45,7 +45,7 @@ struct LegacySSHStore : public Store
     ref<Connection> openConnection()
     {
         auto conn = make_ref<Connection>();
-        conn->sshConn = master.startCommand("nix-store --serve");
+        conn->sshConn = master.startCommand("nix-store --serve --write");
         conn->to = FdSink(conn->sshConn->in.get());
         conn->from = FdSource(conn->sshConn->out.get());
 
