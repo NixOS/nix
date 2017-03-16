@@ -822,6 +822,7 @@ void copyPaths(ref<Store> from, ref<Store> to, const Paths & storePaths, bool su
         PathSet(storePaths.begin(), storePaths.end()),
 
         [&](const Path & storePath) {
+            if (to->isValidPath(storePath)) return PathSet();
             return from->queryPathInfo(storePath)->references;
         },
 
