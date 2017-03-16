@@ -204,6 +204,28 @@ struct LegacySSHStore : public Store
     bool isTrusted() override
     { return true; }
 
+    void computeFSClosure(const PathSet & paths,
+        PathSet & out, bool flipDirection = false,
+        bool includeOutputs = false, bool includeDerivers = false) override
+    {
+        if (flipDirection || includeDerivers) {
+            Store::computeFSClosure(paths, out, flipDirection, includeOutputs, includeDerivers);
+            return;
+        }
+
+        auto conn(connections->get());
+
+        conn->to
+            << cmdQueryClosure
+            << includeOutputs
+            << paths;
+        conn->to.flush();
+
+        auto res = readStorePaths<PathSet>(*this, conn->from);
+
+        out.insert(res.begin(), res.end());
+    }
+
 };
 
 static RegisterStoreImplementation regStore([](

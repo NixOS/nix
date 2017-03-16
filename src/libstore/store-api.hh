@@ -511,7 +511,7 @@ public:
        `storePath' is returned; that is, the closures under the
        `referrers' relation instead of the `references' relation is
        returned. */
-    void computeFSClosure(const PathSet & paths,
+    virtual void computeFSClosure(const PathSet & paths,
         PathSet & out, bool flipDirection = false,
         bool includeOutputs = false, bool includeDerivers = false);
 
