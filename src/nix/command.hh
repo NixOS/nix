@@ -33,6 +33,7 @@ struct StoreCommand : virtual Command
     std::string storeUri;
     StoreCommand();
     void run() override;
+    virtual ref<Store> createStore();
     virtual void run(ref<Store>) = 0;
 };
 
