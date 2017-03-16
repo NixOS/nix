@@ -233,7 +233,7 @@ int main (int argc, char * * argv)
                 lock = -1;
 
                 try {
-                    sshStore = openStore("ssh://" + bestMachine->hostName,
+                    sshStore = openStore("ssh-ng://" + bestMachine->hostName,
                         { {"ssh-key", bestMachine->sshKey },
                           {"max-connections", "1" } });
                     hostName = bestMachine->hostName;

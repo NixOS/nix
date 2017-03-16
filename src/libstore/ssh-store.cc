@@ -8,7 +8,7 @@
 
 namespace nix {
 
-static std::string uriScheme = "ssh://";
+static std::string uriScheme = "ssh-ng://";
 
 class SSHStore : public RemoteStore
 {

@@ -8,7 +8,7 @@
 
 namespace nix {
 
-static std::string uriScheme = "legacy-ssh://";
+static std::string uriScheme = "ssh://";
 
 struct LegacySSHStore : public Store
 {

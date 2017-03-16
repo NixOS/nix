@@ -47,7 +47,7 @@ int main(int argc, char ** argv)
         if (sshHost.empty())
             throw UsageError("no host name specified");
 
-        auto remoteUri = "legacy-ssh://" + sshHost + (gzip ? "?compress=true" : "");
+        auto remoteUri = "ssh://" + sshHost + (gzip ? "?compress=true" : "");
         auto to = toMode ? openStore(remoteUri) : openStore();
         auto from = toMode ? openStore() : openStore(remoteUri);
 
