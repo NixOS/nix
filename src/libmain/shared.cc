@@ -332,11 +332,7 @@ RunPager::~RunPager()
             pid.wait();
         }
     } catch (...) {
-        try {
-            pid.kill(true);
-        } catch (...) {
-            ignoreException();
-        }
+        ignoreException();
     }
 }
 

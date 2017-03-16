@@ -642,7 +642,7 @@ HookInstance::~HookInstance()
 {
     try {
         toHook.writeSide = -1;
-        if (pid != -1) pid.kill(true);
+        if (pid != -1) pid.kill();
     } catch (...) {
         ignoreException();
     }
@@ -1437,7 +1437,7 @@ void DerivationGoal::buildDone()
        to have terminated.  In fact, the builder could also have
        simply have closed its end of the pipe, so just to be sure,
        kill it. */
-    int status = hook ? hook->pid.kill(true) : pid.kill(true);
+    int status = hook ? hook->pid.kill() : pid.kill();
 
     debug(format("builder process for ‘%1%’ finished") % drvPath);
 

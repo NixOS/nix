@@ -203,7 +203,7 @@ public:
     ~Pid();
     void operator =(pid_t pid);
     operator pid_t();
-    int kill(bool quiet = false);
+    int kill();
     int wait();
 
     void setSeparatePG(bool separatePG);

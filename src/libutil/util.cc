@@ -678,12 +678,11 @@ Pid::operator pid_t()
 }
 
 
-int Pid::kill(bool quiet)
+int Pid::kill()
 {
     assert(pid != -1);
 
-    if (!quiet)
-        printError(format("killing process %1%") % pid);
+    debug(format("killing process %1%") % pid);
 
     /* Send the requested signal to the child.  If it has its own
        process group, send the signal to every process in the child
