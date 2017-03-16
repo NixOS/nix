@@ -377,7 +377,7 @@ void Store::queryPathInfo(const Path & storePath,
 }
 
 
-PathSet Store::queryValidPaths(const PathSet & paths)
+PathSet Store::queryValidPaths(const PathSet & paths, bool maybeSubstitute)
 {
     struct State
     {
@@ -549,6 +549,8 @@ void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
     PathSet closure;
     for (auto & path : storePaths)
         srcStore->computeFSClosure(path, closure);
+
+    // FIXME: use copyStorePaths()
 
     PathSet valid = dstStore->queryValidPaths(closure);
 
@@ -791,35 +793,22 @@ std::list<ref<Store>> getDefaultSubstituters()
 }
 
 
-void copyPaths(ref<Store> from, ref<Store> to, const Paths & storePaths, bool substitute)
+void copyPaths(ref<Store> from, ref<Store> to, const PathSet & storePaths, bool substitute)
 {
-    if (substitute) {
-        /* Filter out .drv files (we don't want to build anything). */
-        PathSet paths2;
-        for (auto & path : storePaths)
-            if (!isDerivation(path)) paths2.insert(path);
-        unsigned long long downloadSize, narSize;
-        PathSet willBuild, willSubstitute, unknown;
-        to->queryMissing(PathSet(paths2.begin(), paths2.end()),
-            willBuild, willSubstitute, unknown, downloadSize, narSize);
-        /* FIXME: should use ensurePath(), but it only
-           does one path at a time. */
-        if (!willSubstitute.empty())
-            try {
-                to->buildPaths(willSubstitute);
-            } catch (Error & e) {
-                printMsg(lvlError, format("warning: %1%") % e.msg());
-            }
-    }
+    PathSet valid = to->queryValidPaths(storePaths, substitute);
+
+    PathSet missing;
+    for (auto & path : storePaths)
+        if (!valid.count(path)) missing.insert(path);
 
     std::string copiedLabel = "copied";
 
-    logger->setExpected(copiedLabel, storePaths.size());
+    logger->setExpected(copiedLabel, missing.size());
 
     ThreadPool pool;
 
     processGraph<Path>(pool,
-        PathSet(storePaths.begin(), storePaths.end()),
+        PathSet(missing.begin(), missing.end()),
 
         [&](const Path & storePath) {
             if (to->isValidPath(storePath)) return PathSet();

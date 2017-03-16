@@ -669,7 +669,7 @@ bool LocalStore::isValidPathUncached(const Path & path)
 }
 
 
-PathSet LocalStore::queryValidPaths(const PathSet & paths)
+PathSet LocalStore::queryValidPaths(const PathSet & paths, bool maybeSubstitute)
 {
     PathSet res;
     for (auto & i : paths)

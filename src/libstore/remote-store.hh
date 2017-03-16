@@ -28,7 +28,7 @@ public:
 
     bool isValidPathUncached(const Path & path) override;
 
-    PathSet queryValidPaths(const PathSet & paths) override;
+    PathSet queryValidPaths(const PathSet & paths, bool maybeSubstitute = false) override;
 
     PathSet queryAllValidPaths() override;
 

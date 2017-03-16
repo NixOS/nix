@@ -187,7 +187,7 @@ bool RemoteStore::isValidPathUncached(const Path & path)
 }
 
 
-PathSet RemoteStore::queryValidPaths(const PathSet & paths)
+PathSet RemoteStore::queryValidPaths(const PathSet & paths, bool maybeSubstitute)
 {
     auto conn(connections->get());
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {

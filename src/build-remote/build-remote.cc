@@ -252,10 +252,10 @@ connected:
         string line;
         if (!getline(cin, line))
             throw Error("hook caller didn't send inputs");
-        auto inputs = tokenizeString<std::list<string>>(line);
+        auto inputs = tokenizeString<PathSet>(line);
         if (!getline(cin, line))
             throw Error("hook caller didn't send outputs");
-        auto outputs = tokenizeString<Strings>(line);
+        auto outputs = tokenizeString<PathSet>(line);
         AutoCloseFD uploadLock = openLockFile(currentLoad + "/" + hostName + ".upload-lock", true);
         auto old = signal(SIGALRM, handleAlarm);
         alarm(15 * 60);
@@ -269,11 +269,15 @@ connected:
         printError("building ‘%s’ on ‘%s’", drvPath, hostName);
         sshStore->buildDerivation(drvPath, readDerivation(drvPath));
 
-        std::remove_if(outputs.begin(), outputs.end(), [=](const Path & path) { return store->isValidPath(path); });
-        if (!outputs.empty()) {
-            setenv("NIX_HELD_LOCKS", concatStringsSep(" ", outputs).c_str(), 1); /* FIXME: ugly */
-            copyPaths(ref<Store>(sshStore), store, outputs);
+        PathSet missing;
+        for (auto & path : outputs)
+            if (!store->isValidPath(path)) missing.insert(path);
+
+        if (!missing.empty()) {
+            setenv("NIX_HELD_LOCKS", concatStringsSep(" ", missing).c_str(), 1); /* FIXME: ugly */
+            copyPaths(ref<Store>(sshStore), store, missing);
         }
+
         return;
     });
 }

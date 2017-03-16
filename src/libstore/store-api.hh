@@ -324,8 +324,10 @@ protected:
 
 public:
 
-    /* Query which of the given paths is valid. */
-    virtual PathSet queryValidPaths(const PathSet & paths);
+    /* Query which of the given paths is valid. Optionally, try to
+       substitute missing paths. */
+    virtual PathSet queryValidPaths(const PathSet & paths,
+        bool maybeSubstitute = false);
 
     /* Query the set of all valid paths. Note that for some store
        backends, the name part of store paths may be omitted
@@ -653,7 +655,7 @@ ref<Store> openStore(const std::string & uri = getEnv("NIX_REMOTE"));
 ref<Store> openStore(const std::string & uri, const Store::Params & params);
 
 
-void copyPaths(ref<Store> from, ref<Store> to, const Paths & storePaths, bool substitute = false);
+void copyPaths(ref<Store> from, ref<Store> to, const PathSet & storePaths, bool substitute = false);
 
 enum StoreType {
     tDaemon,

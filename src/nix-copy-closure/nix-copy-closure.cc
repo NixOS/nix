@@ -58,6 +58,6 @@ int main(int argc, char ** argv)
         PathSet closure;
         from->computeFSClosure(storePaths2, closure, false, includeOutputs);
 
-        copyPaths(from, to, Paths(closure.begin(), closure.end()), useSubstitutes);
+        copyPaths(from, to, closure, useSubstitutes);
     });
 }

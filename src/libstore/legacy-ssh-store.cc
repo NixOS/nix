@@ -226,6 +226,19 @@ struct LegacySSHStore : public Store
         out.insert(res.begin(), res.end());
     }
 
+    PathSet queryValidPaths(const PathSet & paths, bool maybeSubstitute = false) override
+    {
+        auto conn(connections->get());
+
+        conn->to
+            << cmdQueryValidPaths
+            << false // lock
+            << maybeSubstitute
+            << paths;
+        conn->to.flush();
+
+        return readStorePaths<PathSet>(*this, conn->from);
+    }
 };
 
 static RegisterStoreImplementation regStore([](

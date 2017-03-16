@@ -46,7 +46,7 @@ struct CmdCopy : StorePathsCommand
         ref<Store> srcStore = srcUri.empty() ? store : openStore(srcUri);
         ref<Store> dstStore = dstUri.empty() ? store : openStore(dstUri);
 
-        copyPaths(srcStore, dstStore, storePaths);
+        copyPaths(srcStore, dstStore, PathSet(storePaths.begin(), storePaths.end()));
     }
 };
 
