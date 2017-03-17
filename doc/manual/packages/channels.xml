@@ -49,7 +49,7 @@ default to <command>nix-env</command> operations (via the symlink
 then say
 
 <screen>
-$ nix-env -u</screen>
+$ nix-env --upgrade</screen>
 
 to upgrade all packages in your profile to the latest versions
 available in the subscribed channels.</para>

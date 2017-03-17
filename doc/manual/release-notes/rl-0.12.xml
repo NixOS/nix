@@ -74,14 +74,14 @@ $ rm __db* log.* derivers references referrers reserved validpaths DB_CONFIG</sc
   be deleted.  For instance,
 
     <screen>
-    $ nix-store --gc -v --max-atime $(date +%s -d "2 months ago")</screen>
+    $ nix-store --gc --verbose --max-atime $(date +%s -d "2 months ago")</screen>
 
   deletes everything that hasn’t been accessed in two months.</para></listitem>
 
   <listitem><para><command>nix-env</command> now uses optimistic
   profile locking when performing an operation like installing or
   upgrading, instead of setting an exclusive lock on the profile.
-  This allows multiple <command>nix-env -i / -u / -e</command>
+  This allows multiple <command>nix-env --install / --upgrade / --uninstall</command>
   operations on the same profile in parallel.  If a
   <command>nix-env</command> operation sees at the end that the profile
   was changed in the meantime by another process, it will just
@@ -89,13 +89,13 @@ $ rm __db* log.* derivers references referrers reserved validpaths DB_CONFIG</sc
   still in the Nix store.</para></listitem>
 
   <listitem><para>The option <option>--dry-run</option> is now
-  supported by <command>nix-store -r</command> and
+  supported by <command>nix-store --realise</command> and
   <command>nix-build</command>.</para></listitem>
 
   <listitem><para>The information previously shown by
   <option>--dry-run</option> (i.e., which derivations will be built
   and which paths will be substituted) is now always shown by
-  <command>nix-env</command>, <command>nix-store -r</command> and
+  <command>nix-env</command>, <command>nix-store --realise</command> and
   <command>nix-build</command>.  The total download size of
   substitutable paths is now also shown.  For instance, a build will
   show something like
@@ -163,7 +163,7 @@ the following paths will be downloaded/copied (30.02 MiB):
   <command>nix-pack-closure</command> and
   <command>nix-unpack-closure</command>.   You can do almost the same
   thing but much more efficiently by doing <literal>nix-store --export
-  $(nix-store -qR <replaceable>paths</replaceable>) > closure</literal> and
+  $(nix-store --query --requisites <replaceable>paths</replaceable>) > closure</literal> and
   <literal>nix-store --import &lt;
   closure</literal>.</para></listitem>
 

@@ -21,7 +21,7 @@
   expressions. For instance, you can do
 
 <screen>
-$ nix-env -qa '.*zip.*'
+$ nix-env --query --available '.*zip.*'
 </screen>
 
   to query all packages with a name containing
@@ -29,7 +29,7 @@ $ nix-env -qa '.*zip.*'
 
   <listitem><para><command>nix-store --read-log</command> can now
   fetch remote build logs. If a build log is not available locally,
-  then ‘nix-store -l’ will now try to download it from the servers
+  then ‘nix-store --read-log ’ will now try to download it from the servers
   listed in the ‘log-servers’ option in nix.conf. For instance, if you
   have the configuration option
 
@@ -42,7 +42,7 @@ then it will try to get logs from
 store path</replaceable></literal>. This allows you to do things like:
 
 <screen>
-$ nix-store -l $(which xterm)
+$ nix-store --read-log $(which xterm)
 </screen>
 
   and get a log even if <command>xterm</command> wasn't built

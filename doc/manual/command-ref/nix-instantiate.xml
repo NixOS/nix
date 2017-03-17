@@ -178,7 +178,7 @@ building them using <command>nix-store</command>:
 $ nix-instantiate test.nix <lineannotation>(instantiate)</lineannotation>
 /nix/store/cigxbmvy6dzix98dxxh9b6shg7ar5bvs-perl-BerkeleyDB-0.26.drv
 
-$ nix-store -r $(nix-instantiate test.nix) <lineannotation>(build)</lineannotation>
+$ nix-store --realise $(nix-instantiate test.nix) nix-instantiate test.nix) <lineannotation>(build)</lineannotation>
 <replaceable>...</replaceable>
 /nix/store/qhqk4n8ci095g3sdp93x7rgwyh9rdvgk-perl-BerkeleyDB-0.26 <lineannotation>(output path)</lineannotation>
 
@@ -191,14 +191,14 @@ dr-xr-xr-x    2 eelco    users        4096 1970-01-01 01:00 lib
 <para>You can also give a Nix expression on the command line:
 
 <screen>
-$ nix-instantiate -E 'with import &lt;nixpkgs> { }; hello'
+$ nix-instantiate --expr 'with import &lt;nixpkgs> { }; hello'
 /nix/store/j8s4zyv75a724q38cb0r87rlczaiag4y-hello-2.8.drv
 </screen>
 
 This is equivalent to:
 
 <screen>
-$ nix-instantiate '&lt;nixpkgs>' -A hello
+$ nix-instantiate '&lt;nixpkgs>' --attr hello
 </screen>
 
 </para>
@@ -206,13 +206,13 @@ $ nix-instantiate '&lt;nixpkgs>' -A hello
 <para>Parsing and evaluating Nix expressions:
 
 <screen>
-$ nix-instantiate --parse -E '1 + 2'
+$ nix-instantiate --parse --expr '1 + 2'
 1 + 2
 
-$ nix-instantiate --eval -E '1 + 2'
+$ nix-instantiate --eval --expr '1 + 2'
 3
 
-$ nix-instantiate --eval --xml -E '1 + 2'
+$ nix-instantiate --eval --xml --expr '1 + 2'
 <![CDATA[<?xml version='1.0' encoding='utf-8'?>
 <expr>
   <int value="3" />
@@ -223,7 +223,7 @@ $ nix-instantiate --eval --xml -E '1 + 2'
 <para>The difference between non-strict and strict evaluation:
 
 <screen>
-$ nix-instantiate --eval --xml -E 'rec { x = "foo"; y = x; }'
+$ nix-instantiate --eval --xml --expr 'rec { x = "foo"; y = x; }'
 <replaceable>...</replaceable><![CDATA[
   <attr name="x">
     <string value="foo" />
@@ -237,7 +237,7 @@ Note that <varname>y</varname> is left unevaluated (the XML
 representation doesn’t attempt to show non-normal forms).
 
 <screen>
-$ nix-instantiate --eval --xml --strict -E 'rec { x = "foo"; y = x; }'
+$ nix-instantiate --eval --xml --strict --expr 'rec { x = "foo"; y = x; }'
 <replaceable>...</replaceable><![CDATA[
   <attr name="x">
     <string value="foo" />

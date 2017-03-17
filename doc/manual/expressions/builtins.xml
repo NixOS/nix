@@ -909,7 +909,7 @@ builtins.substring 0 3 "nixos"
 
     <listitem><para>Throw an error message
     <replaceable>s</replaceable>.  This usually aborts Nix expression
-    evaluation, but in <command>nix-env -qa</command> and other
+    evaluation, but in <command>nix-env --query --available</command> and other
     commands that try to evaluate a set of derivations to get
     information about those derivations, a derivation that throws an
     error is silently skipped (which is not the case for

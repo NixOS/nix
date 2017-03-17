@@ -43,7 +43,7 @@ on Nix.  Here is an (incomplete) list:</para>
   <listitem><para><command>nix-env</command> <option>--set</option>
   modifies the current generation of a profile so that it contains
   exactly the specified derivation, and nothing else.  For example,
-  <literal>nix-env -p /nix/var/nix/profiles/browser --set
+  <literal>nix-env --profile /nix/var/nix/profiles/browser --set
   firefox</literal> lets the profile named
   <filename>browser</filename> contain just Firefox.</para></listitem>
 
@@ -52,7 +52,7 @@ on Nix.  Here is an (incomplete) list:</para>
   meta-information about installed packages in profiles.  The
   meta-information is the contents of the <varname>meta</varname>
   attribute of derivations, such as <varname>description</varname> or
-  <varname>homepage</varname>.  The command <literal>nix-env -q --xml
+  <varname>homepage</varname>.  The command <literal>nix-env --query --xml
   --meta</literal> shows all meta-information.</para></listitem>
 
 
@@ -68,7 +68,7 @@ on Nix.  Here is an (incomplete) list:</para>
   environment.</para></listitem>
 
 
-  <listitem><para><command>nix-env -i / -u</command>: instead of
+  <listitem><para><command>nix-env --install / --upgrade</command>: instead of
   breaking package ties by version, break them by priority and version
   number.  That is, if there are multiple packages with the same name,
   then pick the package with the highest priority, and only use the
@@ -80,7 +80,7 @@ on Nix.  Here is an (incomplete) list:</para>
   be a beta version of some package (e.g.,
   <literal>gcc-4.2.0rc1</literal>) which should not be installed even
   though it is the highest version, except when it is explicitly
-  selected (e.g., <literal>nix-env -i
+  selected (e.g., <literal>nix-env --install
   gcc-4.2.0rc1</literal>).</para></listitem>
 
 
@@ -112,14 +112,14 @@ on Nix.  Here is an (incomplete) list:</para>
   </para></listitem>
 
 
-  <listitem><para><command>nix-env -q</command> now has a flag
+  <listitem><para><command>nix-env --query</command> now has a flag
   <option>--prebuilt-only</option> (<option>-b</option>) that causes
   <command>nix-env</command> to show only those derivations whose
   output is already in the Nix store or that can be substituted (i.e.,
   downloaded from somewhere).  In other words, it shows the packages
   that can be installed “quickly”, i.e., don’t need to be built from
   source.  The <option>-b</option> flag is also available in
-  <command>nix-env -i</command> and <command>nix-env -u</command> to
+  <command>nix-env --install</command> and <command>nix-env --upgrade</command> to
   filter out derivations for which no pre-built binary is
   available.</para></listitem>
 
@@ -152,7 +152,7 @@ on Nix.  Here is an (incomplete) list:</para>
 
   <!-- foo
   <listitem><para>TODO: option <option>- -reregister</option> in
-  <command>nix-store - -register-validity</command>.</para></listitem>
+  <command>nix-store - --realise egister-validity</command>.</para></listitem>
   -->
 
 

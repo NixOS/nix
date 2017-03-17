@@ -149,7 +149,7 @@ also <xref linkend="sec-common-options" />.</phrase></para>
     <listitem><para>Set up an environment in which the specified
     packages are present.  The command line arguments are interpreted
     as attribute names inside the Nix Packages collection.  Thus,
-    <literal>nix-shell -p libjpeg openjdk</literal> will start a shell
+    <literal>nix-shell --packages libjpeg openjdk</literal> will start a shell
     in which the packages denoted by the attribute names
     <varname>libjpeg</varname> and <varname>openjdk</varname> are
     present.</para></listitem>
@@ -198,7 +198,7 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 interactive shell in which to build it:
 
 <screen>
-$ nix-shell '&lt;nixpkgs>' -A pan
+$ nix-shell '&lt;nixpkgs>' --attr pan
 [nix-shell]$ unpackPhase
 [nix-shell]$ cd pan-*
 [nix-shell]$ configurePhase
@@ -210,7 +210,7 @@ To clear the environment first, and do some additional automatic
 initialisation of the interactive shell:
 
 <screen>
-$ nix-shell '&lt;nixpkgs>' -A pan --pure \
+$ nix-shell '&lt;nixpkgs>' --attr pan --pure \
     --command 'export NIX_DEBUG=1; export NIX_CORES=8; return'
 </screen>
 
@@ -219,13 +219,13 @@ the following starts a shell containing the packages
 <literal>sqlite</literal> and <literal>libX11</literal>:
 
 <screen>
-$ nix-shell -E 'with import &lt;nixpkgs> { }; runCommand "dummy" { buildInputs = [ sqlite xorg.libX11 ]; } ""'
+$ nix-shell --expr 'with import &lt;nixpkgs> { }; runCommand "dummy" { buildInputs = [ sqlite xorg.libX11 ]; } ""'
 </screen>
 
 A shorter way to do the same is:
 
 <screen>
-$ nix-shell -p sqlite xorg.libX11
+$ nix-shell --packages sqlite xorg.libX11
 [nix-shell]$ echo $NIX_LDFLAGS
 … -L/nix/store/j1zg5v…-sqlite-3.8.0.2/lib -L/nix/store/0gmcz9…-libX11-1.6.1/lib …
 </screen>
@@ -236,7 +236,7 @@ path. You can override it by passing <option>-I</option> or setting
 containing the Pan package from a specific revision of Nixpkgs:
 
 <screen>
-$ nix-shell -p pan -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/8a3eea054838b55aca962c3fbde9c83c102b8bf2.tar.gz
+$ nix-shell --packages pan -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/8a3eea054838b55aca962c3fbde9c83c102b8bf2.tar.gz
 
 [nix-shell:~]$ pan --version
 Pan 0.139
@@ -276,7 +276,7 @@ the <literal>prettytable</literal> package:
 
 <programlisting>
 #! /usr/bin/env nix-shell
-#! nix-shell -i python -p python pythonPackages.prettytable
+#! nix-shell -i python --packages python pythonPackages.prettytable
 
 import prettytable
 
@@ -294,7 +294,7 @@ requires Perl and the <literal>HTML::TokeParser::Simple</literal> and
 
 <programlisting>
 #! /usr/bin/env nix-shell
-#! nix-shell -i perl -p perl perlPackages.HTMLTokeParserSimple perlPackages.LWP
+#! nix-shell -i perl --packages perl perlPackages.HTMLTokeParserSimple perlPackages.LWP
 
 use HTML::TokeParser::Simple;
 
@@ -314,7 +314,7 @@ Nixpkgs/NixOS (the 14.12 stable branch):
 
 <programlisting><![CDATA[
 #! /usr/bin/env nix-shell
-#! nix-shell -i runghc -p haskellPackages.ghc haskellPackages.HTTP haskellPackages.tagsoup
+#! nix-shell -i runghc --packages haskellPackages.ghc haskellPackages.HTTP haskellPackages.tagsoup
 #! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/nixos-14.12.tar.gz
 
 import Network.HTTP

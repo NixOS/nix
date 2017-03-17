@@ -42,7 +42,7 @@
   </listitem>
 
   <listitem>
-    <para><command>nix-store -q</command> now supports XML output
+    <para><command>nix-store --query</command> now supports XML output
     through the <option>--xml</option> flag.</para>
   </listitem>
 

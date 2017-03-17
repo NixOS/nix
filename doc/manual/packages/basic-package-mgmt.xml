@@ -57,7 +57,7 @@ succeed.</para></note>
 <para>You can view the set of available packages in Nixpkgs:
 
 <screen>
-$ nix-env -qa
+$ nix-env --query --available
 aterm-2.2
 bash-3.0
 binutils-2.15
@@ -74,7 +74,7 @@ then you need to pass the path to your Nixpkgs tree using the
 <option>-f</option> flag:
 
 <screen>
-$ nix-env -qaf <replaceable>/path/to/nixpkgs</replaceable>
+$ nix-env --query --available --file <replaceable>/path/to/nixpkgs</replaceable>
 </screen>
 
 where <replaceable>/path/to/nixpkgs</replaceable> is where you’ve
@@ -83,7 +83,7 @@ unpacked or checked out Nixpkgs.</para>
 <para>You can select specific packages by name:
 
 <screen>
-$ nix-env -qa firefox
+$ nix-env --query --available firefox
 firefox-34.0.5
 firefox-with-plugins-34.0.5
 </screen>
@@ -91,7 +91,7 @@ firefox-with-plugins-34.0.5
 and using regular expressions:
 
 <screen>
-$ nix-env -qa 'firefox.*'
+$ nix-env --query --available 'firefox.*'
 </screen>
 
 </para>
@@ -101,7 +101,7 @@ available packages, i.e., whether they are installed into the user
 environment and/or present in the system:
 
 <screen>
-$ nix-env -qas
+$ nix-env --query --available --status
 …
 -PS bash-3.0
 --S binutils-2.15
@@ -119,11 +119,11 @@ just means that Nix knows that it can fetch a pre-built package from
 somewhere (typically a network server) instead of building it
 locally.</para>
 
-<para>You can install a package using <literal>nix-env -i</literal>.
+<para>You can install a package using <literal>nix-env --install</literal>.
 For instance,
 
 <screen>
-$ nix-env -i subversion</screen>
+$ nix-env --install subversion</screen>
 
 will install the package called <literal>subversion</literal> (which
 is, of course, the <link
@@ -150,7 +150,7 @@ Nixpkgs tree), you will get binaries for most packages.</para></note>
 <para>Naturally, packages can also be uninstalled:
 
 <screen>
-$ nix-env -e subversion</screen>
+$ nix-env --uninstall subversion</screen>
 
 </para>
 
@@ -158,7 +158,7 @@ $ nix-env -e subversion</screen>
 release of Nix Packages, you can do:
 
 <screen>
-$ nix-env -u subversion</screen>
+$ nix-env --upgrade subversion</screen>
 
 This will <emphasis>only</emphasis> upgrade Subversion if there is a
 “newer” version in the new set of Nix expressions, as
@@ -173,17 +173,17 @@ whatever version is already installed.</para>
 versions:
 
 <screen>
-$ nix-env -u</screen>
+$ nix-env --upgrade</screen>
 
 </para>
 
 <para>Sometimes it’s useful to be able to ask what
 <command>nix-env</command> would do, without actually doing it.  For
 instance, to find out what packages would be upgraded by
-<literal>nix-env -u</literal>, you can do
+<literal>nix-env --upgrade</literal>, you can do
 
 <screen>
-$ nix-env -u --dry-run
+$ nix-env --upgrade --dry-run
 (dry run; not doing anything)
 upgrading `libxslt-1.1.0' to `libxslt-1.1.10'
 upgrading `graphviz-1.10' to `graphviz-1.12'

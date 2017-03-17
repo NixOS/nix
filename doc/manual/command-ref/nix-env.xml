@@ -70,8 +70,8 @@ be performed.  These are documented below.</para>
 
 <refsection><title>Selectors</title>
 
-<para>Several commands, such as <command>nix-env -q</command> and
-<command>nix-env -i</command>, take a list of arguments that specify
+<para>Several commands, such as <command>nix-env --query</command> and
+<command>nix-env --install</command>, take a list of arguments that specify
 the packages on which to operate. These are extended regular
 expressions that must match the entire name of the package. (For
 details on regular expressions, see
@@ -329,7 +329,7 @@ number of possible ways:
 
   <para>You can force the installation of multiple derivations with
   the same name by being specific about the versions.  For instance,
-  <literal>nix-env -i gcc-3.3.6 gcc-4.1.1</literal> will install both
+  <literal>nix-env --install gcc-3.3.6 gcc-4.1.1</literal> will install both
   version of GCC (and will probably cause a user environment
   conflict!).</para></listitem>
 
@@ -339,7 +339,7 @@ number of possible ways:
   <emphasis>attribute paths</emphasis> that select attributes from the
   top-level Nix expression.  This is faster than using derivation
   names and unambiguous.  To find out the attribute paths of available
-  packages, use <literal>nix-env -qaP</literal>.</para></listitem>
+  packages, use <literal>nix-env --query --available --attr-path</literal>.</para></listitem>
 
   <listitem><para>If <option>--from-profile</option>
   <replaceable>path</replaceable> is given,
@@ -407,7 +407,7 @@ number of possible ways:
     <term><option>-r</option></term>
 
     <listitem><para>Remove all previously installed packages first.
-    This is equivalent to running <literal>nix-env -e '.*'</literal>
+    This is equivalent to running <literal>nix-env --uninstall '.*'</literal>
     first, except that everything happens in a single
     transaction.</para></listitem>
 
@@ -442,15 +442,15 @@ installing `gcc-3.3.2'</screen>
 <para>To install using a specific attribute:
 
 <screen>
-$ nix-env -i -A gcc40mips
-$ nix-env -i -A xorg.xorgserver</screen>
+$ nix-env --install --attr gcc40mips
+$ nix-env --install --attr xorg.xorgserver</screen>
 
 </para>
 
 <para>To install all derivations in the Nix expression <filename>foo.nix</filename>:
 
 <screen>
-$ nix-env -f ~/foo.nix -i '.*'</screen>
+$ nix-env --file ~/foo.nix --install '.*'</screen>
 
 </para>
 
@@ -458,7 +458,7 @@ $ nix-env -f ~/foo.nix -i '.*'</screen>
 from another profile:
 
 <screen>
-$ nix-env -i --from-profile /nix/var/nix/profiles/foo -i gcc</screen>
+$ nix-env --install --from-profile /nix/var/nix/profiles/foo --install gcc</screen>
 
 </para>
 
@@ -466,21 +466,21 @@ $ nix-env -i --from-profile /nix/var/nix/profiles/foo -i gcc</screen>
 <command>nix-instantiate</command>):
 
 <screen>
-$ nix-env -i /nix/store/fibjb1bfbpm5mrsxc4mh2d8n37sxh91i-gcc-3.4.3.drv</screen>
+$ nix-env --install /nix/store/fibjb1bfbpm5mrsxc4mh2d8n37sxh91i-gcc-3.4.3.drv</screen>
 
 </para>
 
 <para>To install a specific output path:
 
 <screen>
-$ nix-env -i /nix/store/y3cgx0xj1p4iv9x0pnnmdhr8iyg741vk-gcc-3.4.3</screen>
+$ nix-env --install /nix/store/y3cgx0xj1p4iv9x0pnnmdhr8iyg741vk-gcc-3.4.3</screen>
 
 </para>
 
 <para>To install from a Nix expression specified on the command-line:
 
 <screen>
-$ nix-env -f ./foo.nix -i -E \
+$ nix-env --file ./foo.nix --install --expr \
     'f: (f {system = "i686-linux";}).subversionWithJava'</screen>
 
 I.e., this evaluates to <literal>(f: (f {system =
@@ -493,7 +493,7 @@ set returned by calling the function defined in
 source:
 
 <screen>
-$ nix-env -f '&lt;nixpkgs>' -iA hello --dry-run
+$ nix-env --file '&lt;nixpkgs>' --install --attr hello --dry-run
 (dry run; not doing anything)
 installing ‘hello-2.10’
 these paths will be fetched (0.04 MiB download, 0.19 MiB unpacked):
@@ -506,7 +506,7 @@ these paths will be fetched (0.04 MiB download, 0.19 MiB unpacked):
 14.12 channel:
 
 <screen>
-$ nix-env -f https://github.com/NixOS/nixpkgs-channels/archive/nixos-14.12.tar.gz -iA firefox
+$ nix-env --file https://github.com/NixOS/nixpkgs-channels/archive/nixos-14.12.tar.gz --install --attr firefox
 </screen>
 
 (The GitHub repository <literal>nixpkgs-channels</literal> is updated
@@ -618,13 +618,13 @@ linkend="rsec-nix-env-install">--install</option>.</para>
 $ nix-env --upgrade gcc
 upgrading `gcc-3.3.1' to `gcc-3.4'
 
-$ nix-env -u gcc-3.3.2 --always <lineannotation>(switch to a specific version)</lineannotation>
+$ nix-env --upgrade gcc-3.3.2 --always <lineannotation>(switch to a specific version)</lineannotation>
 upgrading `gcc-3.4' to `gcc-3.3.2'
 
 $ nix-env --upgrade pan
 <lineannotation>(no upgrades available, so nothing happens)</lineannotation>
 
-$ nix-env -u <lineannotation>(try to upgrade everything)</lineannotation>
+$ nix-env --upgrade <lineannotation>(try to upgrade everything)</lineannotation>
 upgrading `hello-2.1.2' to `hello-2.1.3'
 upgrading `mozilla-1.2' to `mozilla-1.4'</screen>
 
@@ -711,7 +711,7 @@ paths designated by the symbolic names
 
 <screen>
 $ nix-env --uninstall gcc
-$ nix-env -e '.*' <lineannotation>(remove everything)</lineannotation></screen>
+$ nix-env --uninstall '.*' <lineannotation>(remove everything)</lineannotation></screen>
 
 </refsection>
 
@@ -747,7 +747,7 @@ The following updates a profile such that its current generation will contain
 just Firefox:
 
 <screen>
-$ nix-env -p /nix/var/nix/profiles/browser --set firefox</screen>
+$ nix-env --profile /nix/var/nix/profiles/browser --set firefox</screen>
 
 </para>
 
@@ -819,16 +819,16 @@ script:
 <screen>
 $ nix-env --set-flag keep true firefox</screen>
 
-After this, <command>nix-env -u</command> will ignore Firefox.</para>
+After this, <command>nix-env --upgrade</command> will ignore Firefox.</para>
 
 <para>To disable the currently installed Firefox, then install a new
 Firefox while the old remains part of the profile:
 
 <screen>
-$ nix-env -q
+$ nix-env --query
 firefox-2.0.0.9 <lineannotation>(the current one)</lineannotation>
 
-$ nix-env --preserve-installed -i firefox-2.0.0.11
+$ nix-env --preserve-installed --install firefox-2.0.0.11
 installing `firefox-2.0.0.11'
 building path(s) `/nix/store/myy0y59q3ig70dgq37jqwg1j0rsapzsl-user-environment'
 collision between `/nix/store/<replaceable>...</replaceable>-firefox-2.0.0.11/bin/firefox'
@@ -838,10 +838,10 @@ collision between `/nix/store/<replaceable>...</replaceable>-firefox-2.0.0.11/bi
 $ nix-env --set-flag active false firefox
 setting flag on `firefox-2.0.0.9'
 
-$ nix-env --preserve-installed -i firefox-2.0.0.11
+$ nix-env --preserve-installed --install firefox-2.0.0.11
 installing `firefox-2.0.0.11'
 
-$ nix-env -q
+$ nix-env --query
 firefox-2.0.0.11 <lineannotation>(the enabled one)</lineannotation>
 firefox-2.0.0.9 <lineannotation>(the disabled one)</lineannotation></screen>
 
@@ -1150,7 +1150,7 @@ user environment elements, etc. -->
 <para>To show installed packages:
 
 <screen>
-$ nix-env -q
+$ nix-env --query
 bison-1.875c
 docbook-xml-4.2
 firefox-1.0.4
@@ -1164,7 +1164,7 @@ ORBit2-2.8.3
 <para>To show available packages:
 
 <screen>
-$ nix-env -qa
+$ nix-env --query --available
 firefox-1.0.7
 GConf-2.4.0.1
 MPlayer-1.0pre7
@@ -1177,7 +1177,7 @@ ORBit2-2.8.3
 <para>To show the status of available packages:
 
 <screen>
-$ nix-env -qas
+$ nix-env --query --available --status
 -P- firefox-1.0.7   <lineannotation>(not installed but present)</lineannotation>
 --S GConf-2.4.0.1   <lineannotation>(not present, but there is a substitute for fast installation)</lineannotation>
 --S MPlayer-1.0pre3 <lineannotation>(i.e., this is not the installed MPlayer, even though the version is the same!)</lineannotation>
@@ -1190,7 +1190,7 @@ IP- ORBit2-2.8.3    <lineannotation>(installed and by definition present)</linea
 <para>To show available packages in the Nix expression <filename>foo.nix</filename>:
 
 <screen>
-$ nix-env -f ./foo.nix -qa
+$ nix-env --file ./foo.nix --query --available
 foo-1.2.3
 </screen>
 
@@ -1199,7 +1199,7 @@ foo-1.2.3
 <para>To compare installed versions to what’s available:
 
 <screen>
-$ nix-env -qc
+$ nix-env --query --compare-versions
 <replaceable>...</replaceable>
 acrobat-reader-7.0 - ?      <lineannotation>(package is not available at all)</lineannotation>
 autoconf-2.59      = 2.59   <lineannotation>(same version)</lineannotation>
@@ -1212,7 +1212,7 @@ firefox-1.0.4      &lt; 1.0.7  <lineannotation>(a more recent version is availab
 <para>To show all packages with “<literal>zip</literal>” in the name:
 
 <screen>
-$ nix-env -qa '.*zip.*'
+$ nix-env --query --available '.*zip.*'
 bzip2-1.0.6
 gzip-1.6
 zip-3.0
@@ -1225,7 +1225,7 @@ zip-3.0
 “<literal>chromium</literal>” in the name:
 
 <screen>
-$ nix-env -qa '.*(firefox|chromium).*'
+$ nix-env --query --available '.*(firefox|chromium).*'
 chromium-37.0.2062.94
 chromium-beta-38.0.2125.24
 firefox-32.0.3
@@ -1239,7 +1239,7 @@ firefox-with-plugins-13.0.1
 repository:
 
 <screen>
-$ nix-env -f https://github.com/NixOS/nixpkgs/archive/master.tar.gz -qa
+$ nix-env --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz --query --available
 </screen>
 
 </para>
@@ -1280,7 +1280,7 @@ profile for the user.  That is, the symlink
 <refsection><title>Examples</title>
 
 <screen>
-$ nix-env -S ~/my-profile</screen>
+$ nix-env --switch-profile ~/my-profile</screen>
 
 </refsection>
 
@@ -1363,7 +1363,7 @@ $ nix-env --delete-generations 3 4 8
 
 $ nix-env --delete-generations 30d
 
-$ nix-env -p other_profile --delete-generations old</screen>
+$ nix-env --profile other_profile --delete-generations old</screen>
 
 </refsection>
 
@@ -1410,7 +1410,7 @@ store.</para>
 <refsection><title>Examples</title>
 
 <screen>
-$ nix-env -G 42
+$ nix-env --switch-generation 42
 switching from generation 50 to 42</screen>
 
 </refsection>

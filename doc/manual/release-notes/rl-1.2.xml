@@ -19,7 +19,7 @@
     configuration setting <option>binary-caches</option> contains a
     list of URLs of binary caches.  For instance, doing
 <screen>
-$ nix-env -i thunderbird --option binary-caches http://cache.nixos.org
+$ nix-env --install thunderbird --option binary-caches http://cache.nixos.org
 </screen>
     will install Thunderbird and its dependencies, using the available
     pre-built binaries in <uri>http://cache.nixos.org</uri>.

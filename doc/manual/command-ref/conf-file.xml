@@ -318,7 +318,7 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
     Nix will write the build log of a derivation (i.e. the standard
     output and error of its builder) to the directory
     <filename>/nix/var/log/nix/drvs</filename>.  The build log can be
-    retrieved using the command <command>nix-store -l
+    retrieved using the command <command>nix-store --read-log
     <replaceable>path</replaceable></command>.</para></listitem>
 
   </varlistentry>

@@ -40,7 +40,7 @@ following new features:</para>
   </listitem>
 
   <listitem>
-    <para><command>nix-store -r</command> and
+    <para><command>nix-store --realise</command> and
     <command>nix-build</command> have a new flag,
     <option>--check</option>, that builds a previously built
     derivation again, and prints an error message if the output is not
@@ -48,9 +48,9 @@ following new features:</para>
     truly deterministic.  For example:
 
 <screen>
-$ nix-build '&lt;nixpkgs>' -A patchelf
+$ nix-build '&lt;nixpkgs>' --attr patchelf
 <replaceable>…</replaceable>
-$ nix-build '&lt;nixpkgs>' -A patchelf --check
+$ nix-build '&lt;nixpkgs>' --attr patchelf --check
 <replaceable>…</replaceable>
 error: derivation `/nix/store/1ipvxs…-patchelf-0.6' may not be deterministic:
   hash mismatch in output `/nix/store/4pc1dm…-patchelf-0.6.drv'
@@ -72,7 +72,7 @@ error: derivation `/nix/store/1ipvxs…-patchelf-0.6' may not be deterministic:
     <command>nix-build</command> and <command>nix-shell</command> now
     have a flag <option>--expr</option> (or <option>-E</option>) that
     allows you to specify the expression to be evaluated as a command
-    line argument.  For instance, <literal>nix-instantiate --eval -E
+    line argument.  For instance, <literal>nix-instantiate --eval --expr
     '1 + 2'</literal> will print <literal>3</literal>.</para>
   </listitem>
 
@@ -88,7 +88,7 @@ error: derivation `/nix/store/1ipvxs…-patchelf-0.6' may not be deterministic:
         the command
 
 <screen>
-$ nix-shell -p sqlite xorg.libX11 hello
+$ nix-shell --packages sqlite xorg.libX11 hello
 </screen>
 
         will start a shell in which the given packages are
@@ -142,7 +142,7 @@ $ nix-shell -p sqlite xorg.libX11 hello
   </listitem>
 
   <listitem>
-    <para><command>nix-env -q</command> has a new flag
+    <para><command>nix-env --query</command> has a new flag
     <option>--json</option> to print a JSON representation of the
     installed or available packages.</para>
   </listitem>
@@ -157,7 +157,7 @@ $ nix-shell -p sqlite xorg.libX11 hello
     dots in them, e.g.
 
 <screen>
-$ nix-instantiate --eval '&lt;nixos>' -A 'config.systemd.units."nscd.service".text'
+$ nix-instantiate --eval '&lt;nixos>' --attr 'config.systemd.units."nscd.service".text'
 </screen>
 
     </para>
@@ -198,7 +198,7 @@ $ nix-instantiate --eval '&lt;nixos>' -A 'config.systemd.units."nscd.service".te
     information in error messages, e.g.
 
 <screen>
-$ nix-build '&lt;nixpkgs>' -A libreoffice --argstr system x86_64-darwin
+$ nix-build '&lt;nixpkgs>' --attr libreoffice --argstr system x86_64-darwin
 error: the package ‘libreoffice-4.0.5.2’ in ‘.../applications/office/libreoffice/default.nix:263’
   is not supported on ‘x86_64-darwin’
 </screen>

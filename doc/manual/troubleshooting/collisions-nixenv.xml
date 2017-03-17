@@ -9,7 +9,7 @@
 <para>Symptom: when installing or upgrading, you get an error message such as
 
 <screen>
-$ nix-env -i docbook-xml
+$ nix-env --install docbook-xml
 ...
 adding /nix/store/s5hyxgm62gk2...-docbook-xml-4.2
 collision between `/nix/store/s5hyxgm62gk2...-docbook-xml-4.2/xml/dtd/docbook/calstblx.dtd'
@@ -24,14 +24,14 @@ have overlapping filenames (e.g.,
 happens when you accidentally try to install two versions of the same
 package.  For instance, in the example above, the Nix Packages
 collection contains two versions of <literal>docbook-xml</literal>, so
-<command>nix-env -i</command> will try to install both.  The default
+<command>nix-env --install</command> will try to install both.  The default
 user environment builder has no way to way to resolve such conflicts,
 so it just gives up.</para>
 
 <para>Solution: remove one of the offending packages from the user
 environment (if already installed) using <command>nix-env
 -e</command>, or specify exactly which version should be installed
-(e.g., <literal>nix-env -i docbook-xml-4.2</literal>).</para>
+(e.g., <literal>nix-env --install docbook-xml-4.2</literal>).</para>
 
 <!-- FIXME: describe priorities -->
 
