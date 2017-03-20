@@ -62,6 +62,7 @@ Settings::Settings()
     lockCPU = getEnv("NIX_AFFINITY_HACK", "1") == "1";
     showTrace = false;
     enableImportNative = false;
+    netrcFile = (format("%1%/%2%") % nixConfDir % "netrc").str();
 }
 
 
@@ -190,6 +191,7 @@ void Settings::update()
     _get(preBuildHook, "pre-build-hook");
     _get(keepGoing, "keep-going");
     _get(keepFailed, "keep-failed");
+    _get(netrcFile, "netrc-file");
 
     string subs = getEnv("NIX_SUBSTITUTERS", "default");
     if (subs == "default") {

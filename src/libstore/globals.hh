@@ -210,6 +210,10 @@ struct Settings {
        build settings */
     Path preBuildHook;
 
+    /* Path to the netrc file used to obtain usernames/passwords for
+       downloads. */
+    Path netrcFile;
+
 private:
     SettingsMap settings, overrides;
 

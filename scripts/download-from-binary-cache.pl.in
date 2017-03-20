@@ -62,6 +62,8 @@ my $curlConnectTimeout = int(
     $Nix::Config::config{"connect-timeout"} //
     $ENV{"NIX_CONNECT_TIMEOUT"} // 0);
 
+my $netrcFile = $Nix::Config::config{"netrc-file"} //
+    "$Nix::Config::confDir/netrc";
 
 sub addRequest {
     my ($storePath, $url, $head) = @_;
@@ -88,6 +90,8 @@ sub addRequest {
     $curl->setopt(CURLOPT_FAILONERROR, 1);
     $curl->setopt(CURLOPT_CONNECTTIMEOUT, $curlConnectTimeout);
     $curl->setopt(CURLOPT_TIMEOUT, 20 * 60);
+    $curl->setopt(CURLOPT_NETRC_FILE, $netrcFile);
+    $curl->setopt(CURLOPT_NETRC, CURL_NETRC_OPTIONAL);
 
     if ($activeRequests >= $maxParallelRequests) {
         $scheduled{$curlId} = 1;
@@ -563,7 +567,7 @@ sub downloadBinary {
         die if $requireSignedBinaryCaches && !defined $info->{signedBy};
         print STDERR "\n*** Downloading ‘$url’ ", ($requireSignedBinaryCaches ? "(signed by ‘$info->{signedBy}’) " : ""), "to ‘$storePath’...\n";
         checkURL $url;
-        if (system("$Nix::Config::curl --fail --location --connect-timeout $curlConnectTimeout -A '$userAgent' $Nix::Config::curlCaFlag '$url' $decompressor | $Nix::Config::binDir/nix-store --restore $destPath") != 0) {
+        if (system("$Nix::Config::curl --fail --location --netrc-file $netrcFile --netrc-optional --connect-timeout $curlConnectTimeout -A '$userAgent' $Nix::Config::curlCaFlag '$url' $decompressor | $Nix::Config::binDir/nix-store --restore $destPath") != 0) {
             warn "download of ‘$url’ failed" . ($! ? ": $!" : "") . "\n";
             next;
         }
