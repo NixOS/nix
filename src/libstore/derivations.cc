@@ -152,7 +152,7 @@ static StringSet parseStrings(std::istream & str, bool arePaths)
 static Derivation parseDerivation(const string & s)
 {
     Derivation drv;
-    std::istringstream str(s);
+    istringstream_nocopy str(s);
     expect(str, "Derive([");
 
     /* Parse the list of outputs. */

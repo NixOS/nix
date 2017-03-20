@@ -122,17 +122,6 @@ S3Helper::DownloadResult S3Helper::getObject(
     return res;
 }
 
-#if __linux__
-
-struct istringstream_nocopy : public std::stringstream
-{
-    istringstream_nocopy(const std::string & s)
-    {
-        rdbuf()->pubsetbuf(
-            (char *) s.data(), s.size());
-    }
-};
-
 struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 {
     std::string bucketName;
@@ -343,8 +332,6 @@ static RegisterStoreImplementation regStore([](
     store->init();
     return store;
 });
-
-#endif
 
 }
 
