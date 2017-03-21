@@ -778,7 +778,11 @@ std::list<ref<Store>> getDefaultSubstituters()
         state->stores.push_back(openStore(uri));
     };
 
-    for (auto uri : settings.get("substituters", settings.get("binary-caches", Strings{"https://cache.nixos.org/"})))
+    Strings defaultSubstituters;
+    if (settings.nixStore == "/nix/store")
+        defaultSubstituters.push_back("https://cache.nixos.org/");
+
+    for (auto uri : settings.get("substituters", settings.get("binary-caches", defaultSubstituters)))
         addStore(uri);
 
     for (auto uri : settings.get("extra-binary-caches", Strings()))
