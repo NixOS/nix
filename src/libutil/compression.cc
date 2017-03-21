@@ -49,6 +49,9 @@ static ref<std::string> decompressXZ(const std::string & in)
 
         if (ret != LZMA_OK)
             throw Error("error while decompressing xz file");
+
+        if (strm.avail_in == 0)
+            throw Error("xz data ends prematurely");
     }
 }
 
@@ -86,6 +89,9 @@ static ref<std::string> decompressBzip2(const std::string & in)
 
         if (ret != BZ_OK)
             throw Error("error while decompressing bzip2 file");
+
+        if (strm.avail_in == 0)
+            throw Error("bzip2 data ends prematurely");
     }
 }
 
