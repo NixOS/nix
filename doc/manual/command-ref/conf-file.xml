@@ -394,9 +394,10 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
 
   <varlistentry><term><literal>signed-binary-caches</literal></term>
 
-    <listitem><para>If set to <literal>*</literal>, Nix will only
-    download binaries if they are signed using one of the keys listed
-    in <option>binary-cache-public-keys</option>.</para></listitem>
+    <listitem><para>If set to <literal>*</literal> (the default), Nix
+    will only download binaries if they are signed using one of the
+    keys listed in <option>binary-cache-public-keys</option>. Set to
+    the empty string to disable signature checking.</para></listitem>
 
   </varlistentry>
 

@@ -18,7 +18,7 @@ basicTests() {
 
     nix-env --option binary-caches "file://$cacheDir" -f dependencies.nix -qas \* | grep -- "---"
 
-    nix-store --option binary-caches "file://$cacheDir" -r $outPath
+    nix-store --option binary-caches "file://$cacheDir" --option signed-binary-caches '' -r $outPath
 
     [ -x $outPath/program ]
 
@@ -34,7 +34,7 @@ basicTests() {
     x=$(nix-env -f dependencies.nix -qas \* --prebuilt-only)
     [ -z "$x" ]
 
-    nix-store --option binary-caches "file://$cacheDir" -r $outPath
+    nix-store --option binary-caches "file://$cacheDir" --option signed-binary-caches '' -r $outPath
 
     nix-store --check-validity $outPath
     nix-store -qR $outPath | grep input-2
@@ -63,7 +63,7 @@ mv $nar $nar.good
 mkdir -p $TEST_ROOT/empty
 nix-store --dump $TEST_ROOT/empty | xz > $nar
 
-nix-build --option binary-caches "file://$cacheDir" dependencies.nix -o $TEST_ROOT/result 2>&1 | tee $TEST_ROOT/log
+nix-build --option binary-caches "file://$cacheDir" --option signed-binary-caches '' dependencies.nix -o $TEST_ROOT/result 2>&1 | tee $TEST_ROOT/log
 grep -q "hash mismatch" $TEST_ROOT/log
 
 mv $nar.good $nar
@@ -73,7 +73,7 @@ mv $nar.good $nar
 clearStore
 clearCacheCache
 
-if nix-store --option binary-caches "file://$cacheDir" --option signed-binary-caches '*' -r $outPath; then
+if nix-store --option binary-caches "file://$cacheDir" -r $outPath; then
     echo "unsigned binary cache incorrectly accepted"
     exit 1
 fi
@@ -99,7 +99,7 @@ clearStore
 
 rm $(grep -l "StorePath:.*dependencies-input-2" $cacheDir/*.narinfo)
 
-nix-build --option binary-caches "file://$cacheDir" dependencies.nix -o $TEST_ROOT/result 2>&1 | tee $TEST_ROOT/log
+nix-build --option binary-caches "file://$cacheDir" --option signed-binary-caches '' dependencies.nix -o $TEST_ROOT/result 2>&1 | tee $TEST_ROOT/log
 grep -q "fetching path" $TEST_ROOT/log
 
 
