@@ -7,11 +7,11 @@
 #include "hash.hh"
 #include "archive.hh"
 #include "util.hh"
+#include "istringstream_nocopy.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-
 
 namespace nix {
 

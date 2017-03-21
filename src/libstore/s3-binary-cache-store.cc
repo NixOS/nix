@@ -7,6 +7,7 @@
 #include "globals.hh"
 #include "compression.hh"
 #include "download.hh"
+#include "istringstream_nocopy.hh"
 
 #include <aws/core/Aws.h>
 #include <aws/core/client/ClientConfiguration.h>

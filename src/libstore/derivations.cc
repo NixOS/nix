@@ -4,7 +4,7 @@
 #include "util.hh"
 #include "worker-protocol.hh"
 #include "fs-accessor.hh"
-
+#include "istringstream_nocopy.hh"
 
 namespace nix {
 
