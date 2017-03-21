@@ -19,10 +19,6 @@ $useBindings = "@perlbindings@" eq "yes";
 
 %config = ();
 
-%binaryCachePublicKeys = ();
-
-$defaultPublicKeys = "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=";
-
 sub readConfig {
     if (defined $ENV{'_NIX_OPTIONS'}) {
         foreach my $s (split '\n', $ENV{'_NIX_OPTIONS'}) {
@@ -39,12 +35,6 @@ sub readConfig {
             $config{$1} = $2;
         }
         close CONFIG;
-    }
-
-    foreach my $s (split(/ /, $config{"binary-cache-public-keys"} // $defaultPublicKeys)) {
-        my ($keyName, $publicKey) = split ":", $s;
-        next unless defined $keyName && defined $publicKey;
-        $binaryCachePublicKeys{$keyName} = decode_base64($publicKey);
     }
 }
 

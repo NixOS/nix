@@ -105,7 +105,9 @@ PublicKeys getDefaultPublicKeys()
 
     // FIXME: filter duplicates
 
-    for (auto s : settings.get("binary-cache-public-keys", Strings())) {
+    for (auto s : settings.get("binary-cache-public-keys",
+            Strings{"cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="}))
+    {
         PublicKey key(s);
         publicKeys.emplace(key.name, key);
     }
