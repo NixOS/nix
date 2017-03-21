@@ -23,6 +23,8 @@ private:
 
     Sync<State> state_;
 
+    void addCommonSSHOpts(Strings & args);
+
 public:
 
     SSHMaster(const std::string & host, const std::string & keyFile, bool useMaster, bool compress)

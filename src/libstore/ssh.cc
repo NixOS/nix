@@ -2,6 +2,16 @@
 
 namespace nix {
 
+void SSHMaster::addCommonSSHOpts(Strings & args)
+{
+    for (auto & i : tokenizeString<Strings>(getEnv("NIX_SSHOPTS")))
+        args.push_back(i);
+    if (!keyFile.empty())
+        args.insert(args.end(), {"-i", keyFile});
+    if (compress)
+        args.push_back("-C");
+}
+
 std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string & command)
 {
     Path socketPath = startMaster();
@@ -23,10 +33,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
             throw SysError("duping over stdout");
 
         Strings args = { "ssh", host.c_str(), "-x", "-a" };
-        if (!keyFile.empty())
-            args.insert(args.end(), {"-i", keyFile});
-        if (compress)
-            args.push_back("-C");
+        addCommonSSHOpts(args);
         if (socketPath != "")
             args.insert(args.end(), {"-S", socketPath});
         args.push_back(command);
@@ -73,11 +80,7 @@ Path SSHMaster::startMaster()
             , "-o", "LocalCommand=echo started"
             , "-o", "PermitLocalCommand=yes"
             };
-        if (!keyFile.empty())
-            args.insert(args.end(), {"-i", keyFile});
-        if (compress)
-            args.push_back("-C");
-
+        addCommonSSHOpts(args);
         execvp(args.begin()->c_str(), stringsToCharPtrs(args).data());
 
         throw SysError("starting SSH master");
