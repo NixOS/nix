@@ -44,7 +44,7 @@ LocalStore::LocalStore(const Params & params)
     , reservedPath(dbDir + "/reserved")
     , schemaPath(dbDir + "/schema")
     , trashDir(realStoreDir + "/trash")
-    , requireSigs(trim(settings.get("signed-binary-caches", std::string(""))) != "") // FIXME: rename option
+    , requireSigs(trim(settings.get("signed-binary-caches", std::string("*"))) != "") // FIXME: rename option
     , publicKeys(getDefaultPublicKeys())
 {
     auto state(_state.lock());
