@@ -18,7 +18,7 @@ static ref<std::string> decompressXZ(const std::string & in)
     lzma_ret ret = lzma_stream_decoder(
         &strm, UINT64_MAX, LZMA_CONCATENATED);
     if (ret != LZMA_OK)
-        throw Error("unable to initialise lzma decoder");
+        throw CompressionError("unable to initialise lzma decoder");
 
     Finally free([&]() { lzma_end(&strm); });
 
@@ -48,10 +48,10 @@ static ref<std::string> decompressXZ(const std::string & in)
             return res;
 
         if (ret != LZMA_OK)
-            throw Error("error while decompressing xz file");
+            throw CompressionError("error while decompressing xz file");
 
         if (strm.avail_in == 0)
-            throw Error("xz data ends prematurely");
+            throw CompressionError("xz data ends prematurely");
     }
 }
 
@@ -62,7 +62,7 @@ static ref<std::string> decompressBzip2(const std::string & in)
 
     int ret = BZ2_bzDecompressInit(&strm, 0, 0);
     if (ret != BZ_OK)
-        throw Error("unable to initialise bzip2 decoder");
+        throw CompressionError("unable to initialise bzip2 decoder");
 
     Finally free([&]() { BZ2_bzDecompressEnd(&strm); });
 
@@ -88,10 +88,10 @@ static ref<std::string> decompressBzip2(const std::string & in)
             return res;
 
         if (ret != BZ_OK)
-            throw Error("error while decompressing bzip2 file");
+            throw CompressionError("error while decompressing bzip2 file");
 
         if (strm.avail_in == 0)
-            throw Error("bzip2 data ends prematurely");
+            throw CompressionError("bzip2 data ends prematurely");
     }
 }
 
@@ -144,7 +144,7 @@ struct XzSink : CompressionSink
         lzma_ret ret = lzma_easy_encoder(
             &strm, 6, LZMA_CHECK_CRC64);
         if (ret != LZMA_OK)
-            throw Error("unable to initialise lzma encoder");
+            throw CompressionError("unable to initialise lzma encoder");
         // FIXME: apply the x86 BCJ filter?
 
         strm.next_out = outbuf;
@@ -168,7 +168,7 @@ struct XzSink : CompressionSink
 
             lzma_ret ret = lzma_code(&strm, LZMA_FINISH);
             if (ret != LZMA_OK && ret != LZMA_STREAM_END)
-                throw Error("error while flushing xz file");
+                throw CompressionError("error while flushing xz file");
 
             if (strm.avail_out == 0 || ret == LZMA_STREAM_END) {
                 nextSink(outbuf, sizeof(outbuf) - strm.avail_out);
@@ -192,7 +192,7 @@ struct XzSink : CompressionSink
 
             lzma_ret ret = lzma_code(&strm, LZMA_RUN);
             if (ret != LZMA_OK)
-                throw Error("error while compressing xz file");
+                throw CompressionError("error while compressing xz file");
 
             if (strm.avail_out == 0) {
                 nextSink(outbuf, sizeof(outbuf));
@@ -215,7 +215,7 @@ struct BzipSink : CompressionSink
         memset(&strm, 0, sizeof(strm));
         int ret = BZ2_bzCompressInit(&strm, 9, 0, 30);
         if (ret != BZ_OK)
-            throw Error("unable to initialise bzip2 encoder");
+            throw CompressionError("unable to initialise bzip2 encoder");
 
         strm.next_out = outbuf;
         strm.avail_out = sizeof(outbuf);
@@ -238,7 +238,7 @@ struct BzipSink : CompressionSink
 
             int ret = BZ2_bzCompress(&strm, BZ_FINISH);
             if (ret != BZ_FINISH_OK && ret != BZ_STREAM_END)
-                throw Error("error while flushing bzip2 file");
+                throw CompressionError("error while flushing bzip2 file");
 
             if (strm.avail_out == 0 || ret == BZ_STREAM_END) {
                 nextSink((unsigned char *) outbuf, sizeof(outbuf) - strm.avail_out);
@@ -262,7 +262,7 @@ struct BzipSink : CompressionSink
 
             int ret = BZ2_bzCompress(&strm, BZ_RUN);
             if (ret != BZ_OK)
-                Error("error while compressing bzip2 file");
+                CompressionError("error while compressing bzip2 file");
 
             if (strm.avail_out == 0) {
                 nextSink((unsigned char *) outbuf, sizeof(outbuf));

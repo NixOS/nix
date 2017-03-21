@@ -21,4 +21,6 @@ ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & next
 
 MakeError(UnknownCompressionMethod, Error);
 
+MakeError(CompressionError, Error);
+
 }

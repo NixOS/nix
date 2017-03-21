@@ -94,6 +94,7 @@ std::shared_ptr<std::string> LocalFSStore::getBuildLog(const Path & path_)
 
     assertStorePath(path);
 
+
     if (!isDerivation(path)) {
         try {
             path = queryPathInfo(path)->deriver;
@@ -116,8 +117,12 @@ std::shared_ptr<std::string> LocalFSStore::getBuildLog(const Path & path_)
         if (pathExists(logPath))
             return std::make_shared<std::string>(readFile(logPath));
 
-        else if (pathExists(logBz2Path))
-            return decompress("bzip2", readFile(logBz2Path));
+        else if (pathExists(logBz2Path)) {
+            try {
+                return decompress("bzip2", readFile(logBz2Path));
+            } catch (Error &) { }
+        }
+
     }
 
     return nullptr;
