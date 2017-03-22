@@ -48,10 +48,7 @@ static ref<std::string> decompressXZ(const std::string & in)
             return res;
 
         if (ret != LZMA_OK)
-            throw CompressionError("error while decompressing xz file");
-
-        if (strm.avail_in == 0)
-            throw CompressionError("xz data ends prematurely");
+            throw CompressionError("error %d while decompressing xz file", ret);
     }
 }
 
