@@ -14,7 +14,7 @@ static void skipWhitespace(const char * & s)
 
 #if HAVE_BOEHMGC
 typedef std::vector<Value *, gc_allocator<Value *> > ValueVector;
-typedef std::map<Symbol, Value *, std::less<Symbol>, gc_allocator<Value *> > ValueMap;
+typedef std::map<Symbol, Value *, std::less<Symbol>, gc_allocator<std::pair<const Symbol, Value *> > > ValueMap;
 #else
 typedef std::vector<Value *> ValueVector;
 typedef std::map<Symbol, Value *> ValueMap;
