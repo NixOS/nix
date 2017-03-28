@@ -59,9 +59,11 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
             }
         }
         else if (name == "Deriver") {
-            auto p = store.storeDir + "/" + value;
-            if (!store.isStorePath(p)) corrupt();
-            deriver = p;
+            if (value != "unknown-deriver") {
+                auto p = store.storeDir + "/" + value;
+                if (!store.isStorePath(p)) corrupt();
+                deriver = p;
+            }
         }
         else if (name == "System")
             system = value;
