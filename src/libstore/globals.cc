@@ -61,7 +61,7 @@ Settings::Settings()
     envKeepDerivations = false;
     lockCPU = getEnv("NIX_AFFINITY_HACK", "1") == "1";
     showTrace = false;
-    enableImportNative = false;
+    enableNativeCode = false;
     netrcFile = (format("%1%/%2%") % nixConfDir % "netrc").str();
 }
 
@@ -186,7 +186,7 @@ void Settings::update()
     _get(sshSubstituterHosts, "ssh-substituter-hosts");
     _get(useSshSubstituter, "use-ssh-substituter");
     _get(logServers, "log-servers");
-    _get(enableImportNative, "allow-unsafe-native-code-during-evaluation");
+    _get(enableNativeCode, "allow-unsafe-native-code-during-evaluation");
     _get(useCaseHack, "use-case-hack");
     _get(preBuildHook, "pre-build-hook");
     _get(keepGoing, "keep-going");

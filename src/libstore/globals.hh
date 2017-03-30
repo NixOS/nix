@@ -203,8 +203,8 @@ struct Settings {
     /* A list of URL prefixes that can return Nix build logs. */
     Strings logServers;
 
-    /* Whether the importNative primop should be enabled */
-    bool enableImportNative;
+    /* Whether native-code enabling primops should be enabled */
+    bool enableNativeCode;
 
     /* The hook to run just before a build to set derivation-specific
        build settings */

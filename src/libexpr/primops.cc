@@ -176,6 +176,58 @@ static void prim_importNative(EvalState & state, const Pos & pos, Value * * args
 }
 
 
+/* Execute a program and parse its output */
+static void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceAttrs(*args[0], pos);
+    auto sProgram = state.symbols.create("program");
+    auto sArguments = state.symbols.create("arguments");
+    PathSet context;
+    string program;
+    bool programSet = false;
+    Strings commandArgs;
+    for (auto & attr : *args[0]->attrs) {
+        if (attr.name == sProgram) {
+            program = state.coerceToString(*attr.pos, *attr.value, context, false, false);
+            programSet = true;
+        } else if (attr.name == sArguments) {
+            state.forceList(*attr.value, *attr.pos);
+            auto elems = attr.value->listElems();
+            for (unsigned int i = 0; i < attr.value->listSize(); ++i) {
+                commandArgs.emplace_back(state.coerceToString(*attr.pos, *elems[i], context, false, false));
+            }
+        } else {
+            throw EvalError(format("unexpected attribute ‘%1%’ in argument to builtins.exec, at %2%")
+                % attr.name % pos);
+        }
+    }
+    if (!programSet) {
+        throw EvalError(format("attribute ‘programSet’ required, at %1%") % pos);
+    }
+    try {
+        realiseContext(context);
+    } catch (InvalidPathError & e) {
+        throw EvalError(format("cannot execute ‘%1%’, since path ‘%2%’ is not valid, at %3%")
+            % program % e.path % pos);
+    }
+
+    auto output = runProgram(program, true, commandArgs);
+    Expr * parsed;
+    try {
+        parsed = state.parseExprFromString(output, pos.file);
+    } catch (Error & e) {
+        e.addPrefix(format("While parsing the output from ‘%1%’, at %2%\n") % program % pos);
+        throw;
+    }
+    try {
+        state.eval(parsed, v);
+    } catch (Error & e) {
+        e.addPrefix(format("While evaluating the output from ‘%1%’, at %2%\n") % program % pos);
+        throw;
+    }
+}
+
+
 /* Return a string representing the type of the expression. */
 static void prim_typeOf(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -1750,8 +1802,10 @@ void EvalState::createBaseEnv()
     mkApp(v, *baseEnv.values[baseEnvDispl - 1], *v2);
     forceValue(v);
     addConstant("import", v);
-    if (settings.enableImportNative)
+    if (settings.enableNativeCode) {
         addPrimOp("__importNative", 2, prim_importNative);
+        addPrimOp("__exec", 1, prim_exec);
+    }
     addPrimOp("__typeOf", 1, prim_typeOf);
     addPrimOp("isNull", 1, prim_isNull);
     addPrimOp("__isFunction", 1, prim_isFunction);
