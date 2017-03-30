@@ -31,7 +31,7 @@ let
             git
           ];
 
-	configureFlags = "--enable-gc";
+        configureFlags = "--enable-gc";
 
         postUnpack = ''
           # Clean up when building from a working tree.
@@ -109,7 +109,7 @@ let
           [ (builtins.getAttr system jobs.build) curl bzip2 xz pkgconfig pkgs.perl ]
           ++ lib.optional stdenv.isLinux libsodium;
 
-	configureFlags = ''
+        configureFlags = ''
           --with-dbi=${perlPackages.DBI}/${pkgs.perl.libPrefix}
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/${pkgs.perl.libPrefix}
           --with-www-curl=${perlPackages.WWWCurl}/${pkgs.perl.libPrefix}
@@ -117,7 +117,7 @@ let
 
         enableParallelBuilding = true;
 
-	postUnpack = "sourceRoot=$sourceRoot/perl";
+        postUnpack = "sourceRoot=$sourceRoot/perl";
 
         preBuild = "unset NIX_INDENT_MAKE";
       });
