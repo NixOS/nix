@@ -16,4 +16,3 @@ perl = @perl@
 perllibdir = @perllibdir@
 nixstoredir = @nixstoredir@
 nixsysconfdir = @nixsysconfdir@
-perlbindings = @perlbindings@

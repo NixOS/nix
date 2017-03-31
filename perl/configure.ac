@@ -99,8 +99,6 @@ AC_SUBST(nixlocalstatedir)
 AC_SUBST(nixsysconfdir)
 AC_SUBST(nixstoredir)
 
-AC_SUBST(perlbindings, "yes")
-
 # Expand all variables in config.status.
 test "$prefix" = NONE && prefix=$ac_default_prefix
 test "$exec_prefix" = NONE && exec_prefix='${prefix}'
