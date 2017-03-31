@@ -39,7 +39,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
         args.push_back(command);
         execvp(args.begin()->c_str(), stringsToCharPtrs(args).data());
 
-        throw SysError("executing ‘%s’ on ‘%s’", command, host);
+        throw SysError("executing '%s' on '%s'", command, host);
     });
 
 
@@ -94,7 +94,7 @@ Path SSHMaster::startMaster()
     } catch (EndOfFile & e) { }
 
     if (reply != "started")
-        throw Error("failed to start SSH master connection to ‘%s’", host);
+        throw Error("failed to start SSH master connection to '%s'", host);
 
     return state->socketPath;
 }

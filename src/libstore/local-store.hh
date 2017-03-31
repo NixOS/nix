@@ -258,7 +258,7 @@ private:
     void queryReferrers(State & state, const Path & path, PathSet & referrers);
 
     /* Add signatures to a ValidPathInfo using the secret keys
-       specified by the ‘secret-key-files’ option. */
+       specified by the 'secret-key-files' option. */
     void signPathInfo(ValidPathInfo & info);
 
     Path getRealStoreDir() override { return realStoreDir; }

@@ -319,7 +319,7 @@ int main(int argc, char ** argv)
         }
 
         if (packages && fromArgs) {
-            throw UsageError("‘-p’ and ‘-E’ are mutually exclusive");
+            throw UsageError("'-p' and '-E' are mutually exclusive");
         }
 
         if (packages) {
@@ -458,7 +458,7 @@ int main(int argc, char ** argv)
 
                 execvp(shell.c_str(), argPtrs.data());
 
-                throw SysError("executing shell ‘%s’", shell);
+                throw SysError("executing shell '%s'", shell);
             }
 
             // Ugly hackery to make "nix-build -A foo.all" produce symlinks

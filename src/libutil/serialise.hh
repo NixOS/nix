@@ -50,12 +50,12 @@ struct Source
 {
     virtual ~Source() { }
 
-    /* Store exactly ‘len’ bytes in the buffer pointed to by ‘data’.
+    /* Store exactly 'len' bytes in the buffer pointed to by 'data'.
        It blocks until all the requested data is available, or throws
        an error if it is not going to be available.   */
     void operator () (unsigned char * data, size_t len);
 
-    /* Store up to ‘len’ in the buffer pointed to by ‘data’, and
+    /* Store up to 'len' in the buffer pointed to by 'data', and
        return the number of bytes stored.  If blocks until at least
        one byte is available. */
     virtual size_t read(unsigned char * data, size_t len) = 0;
@@ -198,7 +198,7 @@ T readNum(Source & source)
         ((unsigned long long) buf[7] << 56);
 
     if (n > std::numeric_limits<T>::max())
-        throw SerialisationError("serialised integer %d is too large for type ‘%s’", n, typeid(T).name());
+        throw SerialisationError("serialised integer %d is too large for type '%s'", n, typeid(T).name());
 
     return n;
 }

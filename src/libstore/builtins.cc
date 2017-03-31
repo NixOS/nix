@@ -18,7 +18,7 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
 
     auto getAttr = [&](const string & name) {
         auto i = drv.env.find(name);
-        if (i == drv.env.end()) throw Error(format("attribute ‘%s’ missing") % name);
+        if (i == drv.env.end()) throw Error(format("attribute '%s' missing") % name);
         return i->second;
     };
 
@@ -64,7 +64,7 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
     auto executable = drv.env.find("executable");
     if (executable != drv.env.end() && executable->second == "1") {
         if (chmod(storePath.c_str(), 0755) == -1)
-            throw SysError(format("making ‘%1%’ executable") % storePath);
+            throw SysError(format("making '%1%' executable") % storePath);
     }
 }
 

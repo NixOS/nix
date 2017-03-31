@@ -118,7 +118,7 @@ ref<std::string> decompress(const std::string & method, const std::string & in)
     else if (method == "br")
         return decompressBrotli(in);
     else
-        throw UnknownCompressionMethod(format("unknown compression method ‘%s’") % method);
+        throw UnknownCompressionMethod(format("unknown compression method '%s'") % method);
 }
 
 struct NoneSink : CompressionSink
@@ -309,7 +309,7 @@ ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & next
     else if (method == "br")
         return make_ref<BrotliSink>(nextSink);
     else
-        throw UnknownCompressionMethod(format("unknown compression method ‘%s’") % method);
+        throw UnknownCompressionMethod(format("unknown compression method '%s'") % method);
 }
 
 }

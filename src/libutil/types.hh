@@ -40,9 +40,9 @@ struct FormatOrString
 };
 
 
-/* A helper for formatting strings. ‘fmt(format, a_0, ..., a_n)’ is
-   equivalent to ‘boost::format(format) % a_0 % ... %
-   ... a_n’. However, ‘fmt(s)’ is equivalent to ‘s’ (so no %-expansion
+/* A helper for formatting strings. 'fmt(format, a_0, ..., a_n)' is
+   equivalent to 'boost::format(format) % a_0 % ... %
+   ... a_n'. However, 'fmt(s)' is equivalent to 's' (so no %-expansion
    takes place). */
 
 inline void formatHelper(boost::format & f)

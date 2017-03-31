@@ -74,7 +74,7 @@ UserEnvElems MixInstallables::evalInstallables(ref<Store> store)
             }
 
             else
-                throw UsageError(format("don't know what to do with ‘%1%’") % installable);
+                throw UsageError(format("don't know what to do with '%1%'") % installable);
         }
 
         else {

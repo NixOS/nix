@@ -65,14 +65,14 @@ namespace nix {
 
 static void dupAttr(const AttrPath & attrPath, const Pos & pos, const Pos & prevPos)
 {
-    throw ParseError(format("attribute ‘%1%’ at %2% already defined at %3%")
+    throw ParseError(format("attribute '%1%' at %2% already defined at %3%")
         % showAttrPath(attrPath) % pos % prevPos);
 }
 
 
 static void dupAttr(Symbol attr, const Pos & pos, const Pos & prevPos)
 {
-    throw ParseError(format("attribute ‘%1%’ at %2% already defined at %3%")
+    throw ParseError(format("attribute '%1%' at %2% already defined at %3%")
         % attr % pos % prevPos);
 }
 
@@ -121,7 +121,7 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
 static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
 {
     if (formals->argNames.find(formal.name) != formals->argNames.end())
-        throw ParseError(format("duplicate formal function argument ‘%1%’ at %2%")
+        throw ParseError(format("duplicate formal function argument '%1%' at %2%")
             % formal.name % pos);
     formals->formals.push_front(formal);
     formals->argNames.insert(formal.name);
@@ -356,7 +356,7 @@ expr_select
   | expr_simple '.' attrpath OR_KW expr_select
     { $$ = new ExprSelect(CUR_POS, $1, *$3, $5); }
   | /* Backwards compatibility: because Nixpkgs has a rarely used
-       function named ‘or’, allow stuff like ‘map or [...]’. */
+       function named 'or', allow stuff like 'map or [...]'. */
     expr_simple OR_KW
     { $$ = new ExprApp(CUR_POS, $1, new ExprVar(CUR_POS, data->symbols.create("or"))); }
   | expr_simple { $$ = $1; }
@@ -564,7 +564,7 @@ Path resolveExprPath(Path path)
     struct stat st;
     while (true) {
         if (lstat(path.c_str(), &st))
-            throw SysError(format("getting status of ‘%1%’") % path);
+            throw SysError(format("getting status of '%1%'") % path);
         if (!S_ISLNK(st.st_mode)) break;
         path = absPath(readLink(path), dirOf(path));
     }
@@ -642,7 +642,7 @@ Path EvalState::findFile(SearchPath & searchPath, const string & path, const Pos
         if (pathExists(res)) return canonPath(res);
     }
     format f = format(
-        "file ‘%1%’ was not found in the Nix search path (add it using $NIX_PATH or -I)"
+        "file '%1%' was not found in the Nix search path (add it using $NIX_PATH or -I)"
         + string(pos ? ", at %2%" : ""));
     f.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
     throw ThrownError(f % path % pos);
@@ -664,7 +664,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
             else
                 res = { true, getDownloader()->downloadCached(store, elem.second, true) };
         } catch (DownloadError & e) {
-            printError(format("warning: Nix search path entry ‘%1%’ cannot be downloaded, ignoring") % elem.second);
+            printError(format("warning: Nix search path entry '%1%' cannot be downloaded, ignoring") % elem.second);
             res = { false, "" };
         }
     } else {
@@ -672,12 +672,12 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
         if (pathExists(path))
             res = { true, path };
         else {
-            printError(format("warning: Nix search path entry ‘%1%’ does not exist, ignoring") % elem.second);
+            printError(format("warning: Nix search path entry '%1%' does not exist, ignoring") % elem.second);
             res = { false, "" };
         }
     }
 
-    debug(format("resolved search path element ‘%s’ to ‘%s’") % elem.second % res.second);
+    debug(format("resolved search path element '%s' to '%s'") % elem.second % res.second);
 
     searchPathResolved[elem.second] = res;
     return res;

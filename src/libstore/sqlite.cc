@@ -17,18 +17,18 @@ namespace nix {
     if (err == SQLITE_BUSY || err == SQLITE_PROTOCOL) {
         throw SQLiteBusy(
             err == SQLITE_PROTOCOL
-            ? fmt("SQLite database ‘%s’ is busy (SQLITE_PROTOCOL)", path)
-            : fmt("SQLite database ‘%s’ is busy", path));
+            ? fmt("SQLite database '%s' is busy (SQLITE_PROTOCOL)", path)
+            : fmt("SQLite database '%s' is busy", path));
     }
     else
-        throw SQLiteError("%s: %s (in ‘%s’)", f.str(), sqlite3_errstr(err), path);
+        throw SQLiteError("%s: %s (in '%s')", f.str(), sqlite3_errstr(err), path);
 }
 
 SQLite::SQLite(const Path & path)
 {
     if (sqlite3_open_v2(path.c_str(), &db,
             SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, 0) != SQLITE_OK)
-        throw Error(format("cannot open SQLite database ‘%s’") % path);
+        throw Error(format("cannot open SQLite database '%s'") % path);
 }
 
 SQLite::~SQLite()
@@ -45,7 +45,7 @@ void SQLite::exec(const std::string & stmt)
 {
     retrySQLite<void>([&]() {
         if (sqlite3_exec(db, stmt.c_str(), 0, 0, 0) != SQLITE_OK)
-            throwSQLiteError(db, format("executing SQLite statement ‘%s’") % stmt);
+            throwSQLiteError(db, format("executing SQLite statement '%s'") % stmt);
     });
 }
 
@@ -54,7 +54,7 @@ void SQLiteStmt::create(sqlite3 * db, const string & sql)
     checkInterrupt();
     assert(!stmt);
     if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, 0) != SQLITE_OK)
-        throwSQLiteError(db, fmt("creating statement ‘%s’", sql));
+        throwSQLiteError(db, fmt("creating statement '%s'", sql));
     this->db = db;
     this->sql = sql;
 }
@@ -63,7 +63,7 @@ SQLiteStmt::~SQLiteStmt()
 {
     try {
         if (stmt && sqlite3_finalize(stmt) != SQLITE_OK)
-            throwSQLiteError(db, fmt("finalizing statement ‘%s’", sql));
+            throwSQLiteError(db, fmt("finalizing statement '%s'", sql));
     } catch (...) {
         ignoreException();
     }
@@ -120,14 +120,14 @@ void SQLiteStmt::Use::exec()
     int r = step();
     assert(r != SQLITE_ROW);
     if (r != SQLITE_DONE)
-        throwSQLiteError(stmt.db, fmt("executing SQLite statement ‘%s’", stmt.sql));
+        throwSQLiteError(stmt.db, fmt("executing SQLite statement '%s'", stmt.sql));
 }
 
 bool SQLiteStmt::Use::next()
 {
     int r = step();
     if (r != SQLITE_DONE && r != SQLITE_ROW)
-        throwSQLiteError(stmt.db, fmt("executing SQLite query ‘%s’", stmt.sql));
+        throwSQLiteError(stmt.db, fmt("executing SQLite query '%s'", stmt.sql));
     return r == SQLITE_ROW;
 }
 

@@ -70,7 +70,7 @@ static string needArg(Strings::iterator & i,
     Strings & args, const string & arg)
 {
     if (i == args.end()) throw UsageError(
-        format("‘%1%’ requires an argument") % arg);
+        format("'%1%' requires an argument") % arg);
     return *i++;
 }
 
@@ -124,7 +124,7 @@ static void getAllExprs(EvalState & state,
             if (hasSuffix(attrName, ".nix"))
                 attrName = string(attrName, 0, attrName.size() - 4);
             if (attrs.find(attrName) != attrs.end()) {
-                printError(format("warning: name collision in input Nix expressions, skipping ‘%1%’") % path2);
+                printError(format("warning: name collision in input Nix expressions, skipping '%1%'") % path2);
                 continue;
             }
             attrs.insert(attrName);
@@ -133,7 +133,7 @@ static void getAllExprs(EvalState & state,
             Value & vArg(*state.allocValue());
             mkString(vArg, path2);
             if (v.attrs->size() == v.attrs->capacity())
-                throw Error(format("too many Nix expressions in directory ‘%1%’") % path);
+                throw Error(format("too many Nix expressions in directory '%1%'") % path);
             mkApp(*state.allocAttr(v, state.symbols.create(attrName)), vFun, vArg);
         }
         else if (S_ISDIR(st.st_mode))
@@ -148,7 +148,7 @@ static void loadSourceExpr(EvalState & state, const Path & path, Value & v)
 {
     struct stat st;
     if (stat(path.c_str(), &st) == -1)
-        throw SysError(format("getting information about ‘%1%’") % path);
+        throw SysError(format("getting information about '%1%'") % path);
 
     if (isNixExpr(path, st)) {
         state.evalFile(path, v);
@@ -234,7 +234,7 @@ static void checkSelectorUse(DrvNames & selectors)
     /* Check that all selectors have been used. */
     for (auto & i : selectors)
         if (i.hits == 0 && i.fullName != "*")
-            throw Error(format("selector ‘%1%’ matches no derivations") % i.fullName);
+            throw Error(format("selector '%1%' matches no derivations") % i.fullName);
 }
 
 
@@ -305,7 +305,7 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
             for (auto & j : newest) {
                 if (multiple.find(j.second.first.name) != multiple.end())
                     printInfo(
-                        format("warning: there are multiple derivations named ‘%1%’; using the first one")
+                        format("warning: there are multiple derivations named '%1%'; using the first one")
                         % j.second.first.name);
                 matches.push_back(j.second);
             }
@@ -496,13 +496,13 @@ static void installDerivations(Globals & globals,
                 if (!globals.preserveInstalled &&
                     newNames.find(drvName.name) != newNames.end() &&
                     !keep(i))
-                    printInfo(format("replacing old ‘%1%’") % i.name);
+                    printInfo(format("replacing old '%1%'") % i.name);
                 else
                     allElems.push_back(i);
             }
 
             for (auto & i : newElems)
-                printInfo(format("installing ‘%1%’") % i.name);
+                printInfo(format("installing '%1%'") % i.name);
         }
 
         printMissing(*globals.state, newElems);
@@ -524,7 +524,7 @@ static void opInstall(Globals & globals, Strings opFlags, Strings opArgs)
             globals.preserveInstalled = true;
         else if (arg == "--remove-all" || arg == "-r")
             globals.removeAll = true;
-        else throw UsageError(format("unknown flag ‘%1%’") % arg);
+        else throw UsageError(format("unknown flag '%1%'") % arg);
     }
 
     installDerivations(globals, opArgs, globals.profile);
@@ -605,13 +605,13 @@ static void upgradeDerivations(Globals & globals,
                     const char * action = compareVersions(drvName.version, bestVersion) <= 0
                         ? "upgrading" : "downgrading";
                     printInfo(
-                        format("%1% ‘%2%’ to ‘%3%’")
+                        format("%1% '%2%' to '%3%'")
                         % action % i.name % bestElem->name);
                     newElems.push_back(*bestElem);
                 } else newElems.push_back(i);
 
             } catch (Error & e) {
-                e.addPrefix(format("while trying to find an upgrade for ‘%1%’:\n") % i.name);
+                e.addPrefix(format("while trying to find an upgrade for '%1%':\n") % i.name);
                 throw;
             }
         }
@@ -636,7 +636,7 @@ static void opUpgrade(Globals & globals, Strings opFlags, Strings opArgs)
         else if (arg == "--leq") upgradeType = utLeq;
         else if (arg == "--eq") upgradeType = utEq;
         else if (arg == "--always") upgradeType = utAlways;
-        else throw UsageError(format("unknown flag ‘%1%’") % arg);
+        else throw UsageError(format("unknown flag '%1%'") % arg);
     }
 
     upgradeDerivations(globals, opArgs, upgradeType);
@@ -655,9 +655,9 @@ static void setMetaFlag(EvalState & state, DrvInfo & drv,
 static void opSetFlag(Globals & globals, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
-        throw UsageError(format("unknown flag ‘%1%’") % opFlags.front());
+        throw UsageError(format("unknown flag '%1%'") % opFlags.front());
     if (opArgs.size() < 2)
-        throw UsageError("not enough arguments to ‘--set-flag’");
+        throw UsageError("not enough arguments to '--set-flag'");
 
     Strings::iterator arg = opArgs.begin();
     string flagName = *arg++;
@@ -674,7 +674,7 @@ static void opSetFlag(Globals & globals, Strings opFlags, Strings opArgs)
             DrvName drvName(i.name);
             for (auto & j : selectors)
                 if (j.matches(drvName)) {
-                    printInfo(format("setting flag on ‘%1%’") % i.name);
+                    printInfo(format("setting flag on '%1%'") % i.name);
                     j.hits++;
                     setMetaFlag(*globals.state, i, flagName, flagValue);
                     break;
@@ -698,7 +698,7 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
     for (Strings::iterator i = opFlags.begin(); i != opFlags.end(); ) {
         string arg = *i++;
         if (parseInstallSourceOptions(globals, i, opFlags, arg)) ;
-        else throw UsageError(format("unknown flag ‘%1%’") % arg);
+        else throw UsageError(format("unknown flag '%1%'") % arg);
     }
 
     DrvInfos elems;
@@ -748,7 +748,7 @@ static void uninstallDerivations(Globals & globals, Strings & selectors,
                 if ((isPath(j) && i.queryOutPath() == globals.state->store->followLinksToStorePath(j))
                     || DrvName(j).matches(drvName))
                 {
-                    printInfo(format("uninstalling ‘%1%’") % i.name);
+                    printInfo(format("uninstalling '%1%'") % i.name);
                     found = true;
                     break;
                 }
@@ -766,7 +766,7 @@ static void uninstallDerivations(Globals & globals, Strings & selectors,
 static void opUninstall(Globals & globals, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
-        throw UsageError(format("unknown flag ‘%1%’") % opFlags.front());
+        throw UsageError(format("unknown flag '%1%'") % opFlags.front());
     uninstallDerivations(globals, opArgs, globals.profile);
 }
 
@@ -874,7 +874,7 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
             auto placeholder = metaObj.placeholder(j);
             Value * v = i.queryMeta(j);
             if (!v) {
-                printError(format("derivation ‘%1%’ has invalid meta attribute ‘%2%’") % i.name % j);
+                printError(format("derivation '%1%' has invalid meta attribute '%2%'") % i.name % j);
                 placeholder.write(nullptr);
             } else {
                 PathSet context;
@@ -924,7 +924,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         else if (arg == "--attr" || arg == "-A")
             attrPath = needArg(i, opFlags, arg);
         else
-            throw UsageError(format("unknown flag ‘%1%’") % arg);
+            throw UsageError(format("unknown flag '%1%'") % arg);
     }
 
 
@@ -971,7 +971,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             try {
                 paths.insert(i.queryOutPath());
             } catch (AssertionError & e) {
-                printMsg(lvlTalkative, format("skipping derivation named ‘%1%’ which gives an assertion failure") % i.name);
+                printMsg(lvlTalkative, format("skipping derivation named '%1%' which gives an assertion failure") % i.name);
                 i.setFailed();
             }
         validPaths = globals.state->store->queryValidPaths(paths);
@@ -997,7 +997,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         try {
             if (i.hasFailed()) continue;
 
-            Activity act(*logger, lvlDebug, format("outputting query result ‘%1%’") % i.attrPath);
+            Activity act(*logger, lvlDebug, format("outputting query result '%1%'") % i.attrPath);
 
             if (globals.prebuiltOnly &&
                 validPaths.find(i.queryOutPath()) == validPaths.end() &&
@@ -1118,7 +1118,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                             attrs2["name"] = j;
                             Value * v = i.queryMeta(j);
                             if (!v)
-                                printError(format("derivation ‘%1%’ has invalid meta attribute ‘%2%’") % i.name % j);
+                                printError(format("derivation '%1%' has invalid meta attribute '%2%'") % i.name % j);
                             else {
                                 if (v->type == tString) {
                                     attrs2["type"] = "string";
@@ -1169,9 +1169,9 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             cout.flush();
 
         } catch (AssertionError & e) {
-            printMsg(lvlTalkative, format("skipping derivation named ‘%1%’ which gives an assertion failure") % i.name);
+            printMsg(lvlTalkative, format("skipping derivation named '%1%' which gives an assertion failure") % i.name);
         } catch (Error & e) {
-            e.addPrefix(format("while querying the derivation named ‘%1%’:\n") % i.name);
+            e.addPrefix(format("while querying the derivation named '%1%':\n") % i.name);
             throw;
         }
     }
@@ -1183,7 +1183,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 static void opSwitchProfile(Globals & globals, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
-        throw UsageError(format("unknown flag ‘%1%’") % opFlags.front());
+        throw UsageError(format("unknown flag '%1%'") % opFlags.front());
     if (opArgs.size() != 1)
         throw UsageError(format("exactly one argument expected"));
 
@@ -1231,7 +1231,7 @@ static void switchGeneration(Globals & globals, int dstGen)
 static void opSwitchGeneration(Globals & globals, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
-        throw UsageError(format("unknown flag ‘%1%’") % opFlags.front());
+        throw UsageError(format("unknown flag '%1%'") % opFlags.front());
     if (opArgs.size() != 1)
         throw UsageError(format("exactly one argument expected"));
 
@@ -1246,7 +1246,7 @@ static void opSwitchGeneration(Globals & globals, Strings opFlags, Strings opArg
 static void opRollback(Globals & globals, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
-        throw UsageError(format("unknown flag ‘%1%’") % opFlags.front());
+        throw UsageError(format("unknown flag '%1%'") % opFlags.front());
     if (opArgs.size() != 0)
         throw UsageError(format("no arguments expected"));
 
@@ -1257,7 +1257,7 @@ static void opRollback(Globals & globals, Strings opFlags, Strings opArgs)
 static void opListGenerations(Globals & globals, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
-        throw UsageError(format("unknown flag ‘%1%’") % opFlags.front());
+        throw UsageError(format("unknown flag '%1%'") % opFlags.front());
     if (opArgs.size() != 0)
         throw UsageError(format("no arguments expected"));
 
@@ -1284,7 +1284,7 @@ static void opListGenerations(Globals & globals, Strings opFlags, Strings opArgs
 static void opDeleteGenerations(Globals & globals, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
-        throw UsageError(format("unknown flag ‘%1%’") % opFlags.front());
+        throw UsageError(format("unknown flag '%1%'") % opFlags.front());
 
     if (opArgs.size() == 1 && opArgs.front() == "old") {
         deleteOldGenerations(globals.profile, globals.dryRun);
@@ -1295,7 +1295,7 @@ static void opDeleteGenerations(Globals & globals, Strings opFlags, Strings opAr
         for (auto & i : opArgs) {
             unsigned int n;
             if (!string2Int(i, n))
-                throw UsageError(format("invalid generation number ‘%1%’") % i);
+                throw UsageError(format("invalid generation number '%1%'") % i);
             gens.insert(n);
         }
         deleteGenerations(globals.profile, gens, globals.dryRun);

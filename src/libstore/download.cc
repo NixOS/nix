@@ -46,7 +46,7 @@ ref<std::string> decodeContent(const std::string & encoding, ref<std::string> da
     else if (encoding == "br")
         return decompress(encoding, *data);
     else
-        throw Error("unsupported Content-Encoding ‘%s’", encoding);
+        throw Error("unsupported Content-Encoding '%s'", encoding);
 }
 
 struct CurlDownloader : public Downloader
@@ -105,7 +105,7 @@ struct CurlDownloader : public Downloader
             if (requestHeaders) curl_slist_free_all(requestHeaders);
             try {
                 if (!done)
-                    fail(DownloadError(Interrupted, format("download of ‘%s’ was interrupted") % request.uri));
+                    fail(DownloadError(Interrupted, format("download of '%s' was interrupted") % request.uri));
             } catch (...) {
                 ignoreException();
             }
@@ -135,7 +135,7 @@ struct CurlDownloader : public Downloader
         {
             size_t realSize = size * nmemb;
             std::string line((char *) contents, realSize);
-            printMsg(lvlVomit, format("got header for ‘%s’: %s") % request.uri % trim(line));
+            printMsg(lvlVomit, format("got header for '%s': %s") % request.uri % trim(line));
             if (line.compare(0, 5, "HTTP/") == 0) { // new response starts
                 result.etag = "";
                 auto ss = tokenizeString<vector<string>>(line, " ");
@@ -203,7 +203,7 @@ struct CurlDownloader : public Downloader
         {
             // FIXME: handle parallel downloads.
             if (showProgress) {
-                std::cerr << (format("downloading ‘%1%’... ") % request.uri);
+                std::cerr << (format("downloading '%1%'... ") % request.uri);
                 std::cerr.flush();
                 startTime = getTime();
             }
@@ -271,7 +271,7 @@ struct CurlDownloader : public Downloader
             if (effectiveUrlCStr)
                 result.effectiveUrl = effectiveUrlCStr;
 
-            debug(format("finished download of ‘%s’; curl status = %d, HTTP status = %d, body = %d bytes")
+            debug(format("finished download of '%s'; curl status = %d, HTTP status = %d, body = %d bytes")
                 % request.uri % code % httpStatus % (result.data ? result.data->size() : 0));
 
             if (code == CURLE_WRITE_ERROR && result.etag == request.expectedETag) {
@@ -311,10 +311,10 @@ struct CurlDownloader : public Downloader
 
                 auto exc =
                     code == CURLE_ABORTED_BY_CALLBACK && _isInterrupted
-                    ? DownloadError(Interrupted, format("download of ‘%s’ was interrupted") % request.uri)
+                    ? DownloadError(Interrupted, format("download of '%s' was interrupted") % request.uri)
                     : httpStatus != 0
-                      ? DownloadError(err, format("unable to download ‘%s’: HTTP error %d (curl error: %s)") % request.uri % httpStatus % curl_easy_strerror(code))
-                      : DownloadError(err, format("unable to download ‘%s’: %s (%d)") % request.uri % curl_easy_strerror(code) % code);
+                      ? DownloadError(err, format("unable to download '%s': HTTP error %d (curl error: %s)") % request.uri % httpStatus % curl_easy_strerror(code))
+                      : DownloadError(err, format("unable to download '%s': %s (%d)") % request.uri % curl_easy_strerror(code) % code);
 
                 /* If this is a transient error, then maybe retry the
                    download after a while. */
@@ -525,18 +525,18 @@ struct CurlDownloader : public Downloader
                 S3Helper s3Helper(Aws::Region::US_EAST_1); // FIXME: make configurable
                 auto slash = request.uri.find('/', 5);
                 if (slash == std::string::npos)
-                    throw nix::Error("bad S3 URI ‘%s’", request.uri);
+                    throw nix::Error("bad S3 URI '%s'", request.uri);
                 std::string bucketName(request.uri, 5, slash - 5);
                 std::string key(request.uri, slash + 1);
                 // FIXME: implement ETag
                 auto s3Res = s3Helper.getObject(bucketName, key);
                 DownloadResult res;
                 if (!s3Res.data)
-                    throw DownloadError(NotFound, fmt("S3 object ‘%s’ does not exist", request.uri));
+                    throw DownloadError(NotFound, fmt("S3 object '%s' does not exist", request.uri));
                 res.data = s3Res.data;
                 return res;
 #else
-                throw nix::Error("cannot download ‘%s’ because Nix is not built with S3 support", request.uri);
+                throw nix::Error("cannot download '%s' because Nix is not built with S3 support", request.uri);
 #endif
             });
             return;
@@ -619,7 +619,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
                     if (effectiveUrl)
                         *effectiveUrl = url_;
                 } else if (!ss[1].empty()) {
-                    debug(format("verifying previous ETag ‘%1%’") % ss[1]);
+                    debug(format("verifying previous ETag '%1%'") % ss[1]);
                     expectedETag = ss[1];
                 }
             }
@@ -668,7 +668,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
                 unpackedStorePath = "";
         }
         if (unpackedStorePath.empty()) {
-            printInfo(format("unpacking ‘%1%’...") % url);
+            printInfo(format("unpacking '%1%'...") % url);
             Path tmpDir = createTempDir();
             AutoDelete autoDelete(tmpDir, true);
             // FIXME: this requires GNU tar for decompression.
@@ -680,7 +680,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
     }
 
     if (expectedStorePath != "" && storePath != expectedStorePath)
-        throw nix::Error(format("hash mismatch in file downloaded from ‘%s’") % url);
+        throw nix::Error(format("hash mismatch in file downloaded from '%s'") % url);
 
     return storePath;
 }
