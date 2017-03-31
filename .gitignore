@@ -1,4 +1,5 @@
 Makefile.config
+perl/Makefile.config
 
 # /
 /aclocal.m4

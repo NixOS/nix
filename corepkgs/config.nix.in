@@ -14,6 +14,9 @@ in rec {
   nixBinDir = fromEnv "NIX_BIN_DIR" "@bindir@";
   nixPrefix = "@prefix@";
   nixLibexecDir = fromEnv "NIX_LIBEXEC_DIR" "@libexecdir@";
+  nixLocalstateDir = "@localstatedir@";
+  nixSysconfDir = "@sysconfdir@";
+  nixStoreDir = fromEnv "NIX_STORE_DIR" "@storedir@";
 
   # If Nix is installed in the Nix store, then automatically add it as
   # a dependency to the core packages. This ensures that they work
