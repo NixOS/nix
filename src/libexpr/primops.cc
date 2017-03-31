@@ -179,30 +179,17 @@ static void prim_importNative(EvalState & state, const Pos & pos, Value * * args
 /* Execute a program and parse its output */
 static void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceAttrs(*args[0], pos);
-    auto sProgram = state.symbols.create("program");
-    auto sArguments = state.symbols.create("arguments");
-    PathSet context;
-    string program;
-    bool programSet = false;
-    Strings commandArgs;
-    for (auto & attr : *args[0]->attrs) {
-        if (attr.name == sProgram) {
-            program = state.coerceToString(*attr.pos, *attr.value, context, false, false);
-            programSet = true;
-        } else if (attr.name == sArguments) {
-            state.forceList(*attr.value, *attr.pos);
-            auto elems = attr.value->listElems();
-            for (unsigned int i = 0; i < attr.value->listSize(); ++i) {
-                commandArgs.emplace_back(state.coerceToString(*attr.pos, *elems[i], context, false, false));
-            }
-        } else {
-            throw EvalError(format("unexpected attribute ‘%1%’ in argument to builtins.exec, at %2%")
-                % attr.name % pos);
-        }
+    state.forceList(*args[0], pos);
+    auto elems = args[0]->listElems();
+    auto count = args[0]->listSize();
+    if (count == 0) {
+        throw EvalError(format("at least one argument to 'exec' required, at %1%") % pos);
     }
-    if (!programSet) {
-        throw EvalError(format("attribute ‘programSet’ required, at %1%") % pos);
+    PathSet context;
+    auto program = state.coerceToString(pos, *elems[0], context, false, false);
+    Strings commandArgs;
+    for (unsigned int i = 1; i < args[0]->listSize(); ++i) {
+        commandArgs.emplace_back(state.coerceToString(pos, *elems[i], context, false, false));
     }
     try {
         realiseContext(context);
