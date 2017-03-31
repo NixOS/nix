@@ -67,7 +67,7 @@ Settings::Settings()
     envKeepDerivations = false;
     lockCPU = getEnv("NIX_AFFINITY_HACK", "1") == "1";
     showTrace = false;
-    enableImportNative = false;
+    enableNativeCode = false;
     netrcFile = fmt("%s/%s", nixConfDir, "netrc");
     caFile = getEnv("NIX_SSL_CERT_FILE", getEnv("SSL_CERT_FILE", "/etc/ssl/certs/ca-certificates.crt"));
     enableImportFromDerivation = true;
@@ -179,7 +179,7 @@ void Settings::update()
     _get(envKeepDerivations, "env-keep-derivations");
     _get(sshSubstituterHosts, "ssh-substituter-hosts");
     _get(useSshSubstituter, "use-ssh-substituter");
-    _get(enableImportNative, "allow-unsafe-native-code-during-evaluation");
+    _get(enableNativeCode, "allow-unsafe-native-code-during-evaluation");
     _get(useCaseHack, "use-case-hack");
     _get(preBuildHook, "pre-build-hook");
     _get(keepGoing, "keep-going");

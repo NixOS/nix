@@ -181,8 +181,8 @@ struct Settings {
     /* Whether to show a stack trace if Nix evaluation fails. */
     bool showTrace;
 
-    /* Whether the importNative primop should be enabled */
-    bool enableImportNative;
+    /* Whether native-code enabling primops should be enabled */
+    bool enableNativeCode;
 
     /* The hook to run just before a build to set derivation-specific
        build settings */
