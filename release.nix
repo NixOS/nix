@@ -101,7 +101,7 @@ let
       });
 
 
-    perl = pkgs.lib.genAttrs systems (system:
+    perlBindings = pkgs.lib.genAttrs systems (system:
 
       let pkgs = import <nixpkgs> { inherit system; }; in with pkgs;
 
