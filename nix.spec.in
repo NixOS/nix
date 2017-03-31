@@ -16,12 +16,7 @@ Source0: %{name}-%{version}.tar.bz2
 %if 0%{?el5}
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 %endif
-BuildRequires: perl(DBD::SQLite)
-BuildRequires: perl(DBI)
-BuildRequires: perl(ExtUtils::ParseXS)
-Requires: /usr/bin/perl
 Requires: curl
-Requires: perl-DBD-SQLite
 Requires: bzip2
 Requires: gzip
 Requires: xz
