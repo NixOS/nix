@@ -301,6 +301,7 @@ struct CurlDownloader : public Downloader
                         || code == CURLE_COULDNT_RESOLVE_HOST
                         || code == CURLE_RECV_ERROR
 #if LIBCURL_VERSION_NUM >= 0x073200
+                        || code == CURLE_HTTP2
                         || code == CURLE_HTTP2_STREAM
 #endif
                         ) ? Transient :
