@@ -87,11 +87,6 @@ the emacs-%{name} package to edit Nix expressions with GNU Emacs.
 
 %prep
 %setup -q
-# Install Perl modules to vendor_perl
-# configure.ac need to be changed to make this global; however, this will
-# also affect NixOS. Use discretion.
-%{__sed} -i 's|perl5/site_perl/$perlversion/$perlarchname|perl5/vendor_perl|' \
-  configure
 
 
 %build
@@ -164,8 +159,6 @@ systemctl start  nix-daemon.socket
 %files
 %{_bindir}/nix*
 %{_libdir}/*.so
-%{perl_vendorarch}/*
-%exclude %dir %{perl_vendorarch}/auto/
 %{_prefix}/libexec/*
 %if ! 0%{?rhel} || 0%{?rhel} >= 7
 %{_prefix}/lib/systemd/system/nix-daemon.socket
