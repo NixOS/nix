@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <map>
 #include <algorithm>
 #include <cstring>
 #include <regex>
@@ -1881,6 +1882,28 @@ static void prim_fetchTarball(EvalState & state, const Pos & pos, Value * * args
 }
 
 
+/* Return a unique port number (int) per identifier string */
+static void prim_port(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    // dynamic port-range start offset
+    static int p = 50000;
+    
+    static std::map<string, int> identifierMap;
+    
+    if (args[0]->type == tString) {
+      string identifier = state.forceStringNoCtx(*args[0], pos);
+      if (identifierMap.find(identifier) == identifierMap.end()) {
+        identifierMap[identifier] = p++;
+      }
+      
+      if (identifierMap[identifier] > 65535)
+        throw EvalError(format("‘port’ maximum of 65535 exceeded, at %1%") % pos);
+      
+      mkInt(v, identifierMap[identifier]);    
+    }
+}
+
+
 /*************************************************************
  * Primop registration
  *************************************************************/
@@ -2044,6 +2067,7 @@ void EvalState::createBaseEnv()
     // Networking
     addPrimOp("__fetchurl", 1, prim_fetchurl);
     addPrimOp("fetchTarball", 1, prim_fetchTarball);
+    addPrimOp("port", 1, prim_port);
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
