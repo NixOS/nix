@@ -2405,7 +2405,8 @@ void DerivationGoal::runChild()
                 ss.push_back("/etc/nsswitch.conf");
                 ss.push_back("/etc/services");
                 ss.push_back("/etc/hosts");
-                ss.push_back("/var/run/nscd/socket");
+                if (pathExists("/var/run/nscd/socket"))
+                    ss.push_back("/var/run/nscd/socket");
             }
 
             for (auto & i : ss) dirsInChroot[i] = i;
