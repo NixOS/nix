@@ -2409,7 +2409,7 @@ void DerivationGoal::runChild()
                     ss.push_back("/var/run/nscd/socket");
             }
 
-            for (auto & i : ss) dirsInChroot[i] = i;
+            for (auto & i : ss) dirsInChroot.emplace(i, i);
 
             /* Bind-mount all the directories from the "host"
                filesystem that we want in the chroot
