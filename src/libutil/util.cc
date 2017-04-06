@@ -487,6 +487,7 @@ void readFull(int fd, unsigned char * buf, size_t count)
 void writeFull(int fd, const unsigned char * buf, size_t count, bool allowInterrupts)
 {
     while (count) {
+        if (allowInterrupts) checkInterrupt();
         ssize_t res = write(fd, (char *) buf, count);
         if (res == -1 && errno != EINTR)
             throw SysError("writing to file");
@@ -494,7 +495,6 @@ void writeFull(int fd, const unsigned char * buf, size_t count, bool allowInterr
             count -= res;
             buf += res;
         }
-        if (allowInterrupts) checkInterrupt();
     }
 }
 
@@ -1212,7 +1212,7 @@ static void signalHandlerThread(sigset_t set)
 
 void triggerInterrupt()
 {
-    _isInterrupted = 1;
+    _isInterrupted = true;
 
     {
         auto interruptCallbacks(_interruptCallbacks.lock());
