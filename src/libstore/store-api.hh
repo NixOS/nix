@@ -252,11 +252,6 @@ protected:
 
 public:
 
-    size_t getCacheSize()
-    {
-        return state.lock()->pathInfoCache.size();
-    }
-
     virtual ~Store() { }
 
     virtual std::string getUri() = 0;
@@ -577,6 +572,13 @@ public:
        or null otherwise. */
     virtual std::shared_ptr<std::string> getBuildLog(const Path & path)
     { return nullptr; }
+
+    /* Hack to allow long-running processes like hydra-queue-runner to
+       occasionally flush their path info cache. */
+    void clearPathInfoCache()
+    {
+        state.lock()->pathInfoCache.clear();
+    }
 
 protected:
 
