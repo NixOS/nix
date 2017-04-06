@@ -637,7 +637,10 @@ static void processConnection(bool trusted)
 #endif
 
         /* Open the store. */
-        auto store = make_ref<LocalStore>(Store::Params()); // FIXME: get params from somewhere
+        Store::Params params; // FIXME: get params from somewhere
+        // Disable caching since the client already does that.
+        params["path-info-cache-size"] = "0";
+        auto store = make_ref<LocalStore>(params);
 
         stopWork();
         to.flush();

@@ -33,6 +33,7 @@ public:
 
     Sync() { }
     Sync(const T & data) : data(data) { }
+    Sync(T && data) noexcept : data(std::move(data)) { }
 
     class Lock
     {

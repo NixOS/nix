@@ -241,7 +241,7 @@ protected:
 
     struct State
     {
-        LRUCache<std::string, std::shared_ptr<ValidPathInfo>> pathInfoCache{64 * 1024};
+        LRUCache<std::string, std::shared_ptr<ValidPathInfo>> pathInfoCache;
     };
 
     Sync<State> state;
@@ -251,6 +251,11 @@ protected:
     Store(const Params & params);
 
 public:
+
+    size_t getCacheSize()
+    {
+        return state.lock()->pathInfoCache.size();
+    }
 
     virtual ~Store() { }
 

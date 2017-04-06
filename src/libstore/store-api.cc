@@ -242,6 +242,7 @@ Path Store::computeStorePathForText(const string & name, const string & s,
 
 Store::Store(const Params & params)
     : storeDir(get(params, "store", settings.nixStore))
+    , state({std::stoi(get(params, "path-info-cache-size", "65536"))})
 {
 }
 
