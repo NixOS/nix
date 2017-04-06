@@ -592,6 +592,17 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         break;
     }
 
+    case wopQueryMissing: {
+        PathSet targets = readStorePaths<PathSet>(*store, from);
+        startWork();
+        PathSet willBuild, willSubstitute, unknown;
+        unsigned long long downloadSize, narSize;
+        store->queryMissing(targets, willBuild, willSubstitute, unknown, downloadSize, narSize);
+        stopWork();
+        to << willBuild << willSubstitute << unknown << downloadSize << narSize;
+        break;
+    }
+
     default:
         throw Error(format("invalid operation %1%") % op);
     }

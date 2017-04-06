@@ -524,7 +524,7 @@ public:
     /* Given a set of paths that are to be built, return the set of
        derivations that will be built, and the set of output paths
        that will be substituted. */
-    void queryMissing(const PathSet & targets,
+    virtual void queryMissing(const PathSet & targets,
         PathSet & willBuild, PathSet & willSubstitute, PathSet & unknown,
         unsigned long long & downloadSize, unsigned long long & narSize);
 

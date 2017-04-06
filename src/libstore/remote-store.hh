@@ -85,6 +85,10 @@ public:
 
     void addSignatures(const Path & storePath, const StringSet & sigs) override;
 
+    void queryMissing(const PathSet & targets,
+        PathSet & willBuild, PathSet & willSubstitute, PathSet & unknown,
+        unsigned long long & downloadSize, unsigned long long & narSize) override;
+
 protected:
 
     struct Connection

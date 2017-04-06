@@ -588,6 +588,31 @@ void RemoteStore::addSignatures(const Path & storePath, const StringSet & sigs)
 }
 
 
+void RemoteStore::queryMissing(const PathSet & targets,
+    PathSet & willBuild, PathSet & willSubstitute, PathSet & unknown,
+    unsigned long long & downloadSize, unsigned long long & narSize)
+{
+    {
+        auto conn(connections->get());
+        if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 19)
+            // Don't hold the connection handle in the fallback case
+            // to prevent a deadlock.
+            goto fallback;
+        conn->to << wopQueryMissing << targets;
+        conn->processStderr();
+        willBuild = readStorePaths<PathSet>(*this, conn->from);
+        willSubstitute = readStorePaths<PathSet>(*this, conn->from);
+        unknown = readStorePaths<PathSet>(*this, conn->from);
+        conn->from >> downloadSize >> narSize;
+        return;
+    }
+
+ fallback:
+    return Store::queryMissing(targets, willBuild, willSubstitute,
+        unknown, downloadSize, narSize);
+}
+
+
 RemoteStore::Connection::~Connection()
 {
     try {
