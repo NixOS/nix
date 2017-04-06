@@ -300,6 +300,8 @@ struct CurlDownloader : public Downloader
                         || httpStatus == 504  || httpStatus == 522 || httpStatus == 524
                         || code == CURLE_COULDNT_RESOLVE_HOST
                         || code == CURLE_RECV_ERROR
+                        // this is a generic SSL failure that in some cases (e.g., certificate error) is permanent but also appears in transient cases, so we consider it retryable
+                        || code == CURLE_SSL_CONNECT_ERROR
 #if LIBCURL_VERSION_NUM >= 0x073200
                         || code == CURLE_HTTP2
                         || code == CURLE_HTTP2_STREAM
