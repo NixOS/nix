@@ -1886,11 +1886,12 @@ static void prim_fetchTarball(EvalState & state, const Pos & pos, Value * * args
 /* Return a unique ID number (unsigned int) per identifier string */
 static void prim_uniqueID(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-  static idPool pool("/tmp/port-history.json");
 
-  if (args[0]->type == tString) {
-    string identifier = state.forceStringNoCtx(*args[0], pos);
-    mkInt(v, pool.resolve(identifier));
+  if (args[0]->type == tString && args[1]->type == tString) {
+    string pool = state.forceStringNoCtx(*args[0], pos);
+    string identifier = state.forceStringNoCtx(*args[1], pos);
+    static idPool id;
+    mkInt(v, id.resolve(pool, identifier));
   }
 }
 
@@ -2058,7 +2059,7 @@ void EvalState::createBaseEnv()
     // Networking
     addPrimOp("__fetchurl", 1, prim_fetchurl);
     addPrimOp("fetchTarball", 1, prim_fetchTarball);
-    addPrimOp("uniqueID", 1, prim_uniqueID);
+    addPrimOp("uniqueID", 2, prim_uniqueID);
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */

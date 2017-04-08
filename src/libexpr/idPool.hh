@@ -2,34 +2,45 @@
  * 
  *  motivation:
  *    say you want to connect two inet services, which are using port numbers. this abstraction handles the ID number management.
- *    one can easily write a library function: `lib.getUniquePort "identifier"` and it will return a integer `50000`
+ *    one can easily write a library function: `lib.port "identifier"` and it will return a integer `50000`
  * 
  *  example:
- *    given nix code:                                               after evaluation
- *      port1 = ${lib.getUniquePort "myNginxInstance"}                port1 = 50000
- *      port2 = ${lib.getUniquePort "myNginxInstance"}                port2 = 50000
- *      port3 = ${lib.getUniquePort "bar"}                            port3 = 50001
+ *    given nix code:                                      after evaluation
+ *      port1 = ${lib.port "myNginxInstance"}                port1 = 50000
+ *      port2 = ${lib.port "myNginxInstance"}                port2 = 50000
+ *      port3 = ${lib.port "bar"}                            port3 = 50001
  * 
  *  http://rapidjson.org/classrapidjson_1_1_generic_value.html#ad290f179591025e871bedbbac89ac276
  */
 
-// nix-instantiate --eval --strict z.nix 
+// nix-instantiate --eval --strict z.nix
+//   { a = { bar = 50000; foo = 50003; foo1 = 50003; foo3 = 50003; foo4 = 50005; foo5 = 50000; foo6 = 50001; foo7 = 50000; }; }
 
 // z.nix
-//
 // let
 //   lib = {
-//     port = builtins.uniqueID;
+//     uniqueID = {
+//       port = builtins.uniqueID "port";
+//       uid = builtins.uniqueID "uid";
+//       gid = builtins.uniqueID "gid";
+//     };
 //   };
 // in
 // {
 //   a = { 
-//     bar=(lib.port "aa12");
-//     foo=(lib.port "aa14"); 
-//     foo1=(lib.port "aa14"); 
-//     foo12=(lib.port "aa141");
+//     bar=(lib.uniqueID.port "aa12");
+//     foo=(lib.uniqueID.port "aa14"); 
+//     foo1=(lib.uniqueID.port "aa14"); 
+//     foo3=(lib.uniqueID.port "aa14"); 
+//     foo4=(lib.uniqueID.port "aa141");
+//     
+//     foo5=(lib.uniqueID.uid "hannes");
+//     foo6=(lib.uniqueID.uid "eelco");
+//     
+//     foo7=(lib.uniqueID.gid "myGroup");
 //   };
 // }
+
     
 #include <algorithm>
 #include <string>
@@ -54,20 +65,20 @@
 #include "rapidjson/istreamwrapper.h"
 #include "rapidjson/prettywriter.h"
 
-// FIXME: check how to get rid of old entries
+#define STORAGE_PREFIX "/tmp/"
 
 using namespace std;
 using namespace rapidjson;
 
-class idPool {
+class Pool {
   public:
-    idPool(string fileName) {
+    Pool(string fileName) {
       start = 50000;
       range = 1000;
       this->fileName = fileName;
       loadFile();
     };
-    ~idPool() {
+    ~Pool() {
       saveFile();
     };
     
@@ -94,7 +105,7 @@ class idPool {
   private:
     std::vector<string> order;
     std::vector<string> activeIdentifiers;
-    std::vector<string> inactiveIdentifiers;
+//     std::vector<string> inactiveIdentifiers;
     std::map<string, unsigned int> store;
     string fileName;
     unsigned int start;
@@ -102,6 +113,7 @@ class idPool {
     
     // FIXME: filter invalid ID mappings (out of range or duplicated use)
     void loadFile() {
+      // FIXME: create file if it does not exist
       ifstream ifs(fileName.c_str());
       IStreamWrapper isw(ifs);
       
@@ -111,7 +123,8 @@ class idPool {
       //static const char* kTypeNames[] = { "Null", "False", "True", "Object", "Array", "String", "Number" };
       //FIXME: check types
       for (Value::ConstMemberIterator itr = document.MemberBegin(); itr != document.MemberEnd(); ++itr) {
-        if (itr->value.GetInt() >= start && itr->value.GetInt() < start + range) {
+        //FIXME chekc cast correctness
+        if ((unsigned int)itr->value.GetInt() >= start && (unsigned int)itr->value.GetInt() < start + range) {
           store[itr->name.GetString()] = itr->value.GetInt();
           std::string a = itr->name.GetString();
           order.push_back(a);
@@ -162,4 +175,26 @@ class idPool {
       if (!of.good())
         throw nix::EvalError(nix::format("Can't write the idPool JSON data to the file: `%1%`!") % fileName);
     }
+};
+
+class idPool {
+private:
+  std::map<string, Pool*> instances;
+public:
+  ~idPool() {
+    for (auto const& i : instances) {
+      delete i.second;
+    }
+  };
+  int resolve(string pool, string serviceName) {
+    Pool* p = NULL;
+    try {
+      p = instances.at(pool);
+    }
+    catch (const std::out_of_range& oor) {
+      p = new Pool(STORAGE_PREFIX + pool + "-history.json");
+      instances[pool]=p;
+    }
+    return p->resolve(serviceName);
+  };
 };
