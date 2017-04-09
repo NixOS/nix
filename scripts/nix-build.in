@@ -11,6 +11,8 @@ use Cwd;
 
 binmode STDERR, ":encoding(utf8)";
 
+Nix::Config::readConfig;
+
 my $dryRun = 0;
 my $verbose = 0;
 my $runEnv = $0 =~ /nix-shell$/;
@@ -279,6 +281,9 @@ foreach my $expr (@exprs) {
         }
         $ENV{'NIX_BUILD_TOP'} = $ENV{'TMPDIR'} = $ENV{'TEMPDIR'} = $ENV{'TMP'} = $ENV{'TEMP'} = $tmp;
         $ENV{'NIX_STORE'} = $Nix::Config::storeDir;
+        if (defined $Nix::Config::config{"build-cores"}) {
+            $ENV{'NIX_BUILD_CORES'} = $Nix::Config::config{"build-cores"};
+        }
         $ENV{$_} = $drv->{env}->{$_} foreach keys %{$drv->{env}};
 
         # Run a shell using the derivation's environment.  For
