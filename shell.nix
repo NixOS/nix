@@ -6,7 +6,7 @@ with import <nixpkgs> {};
   name = "nix";
 
   buildInputs =
-    [ curl bison flex perl libxml2 libxslt
+    [ curl bison flex libxml2 libxslt
       bzip2 xz brotli
       pkgconfig sqlite libsodium boehmgc
       docbook5 docbook5_xsl
@@ -16,7 +16,6 @@ with import <nixpkgs> {};
         customMemoryManagement = false;
       })
       autoreconfHook
-      perlPackages.DBDSQLite
     ];
 
   configureFlags =
