@@ -15,7 +15,7 @@ struct DownloadRequest
     bool verifyTLS = true;
     enum { yes, no, automatic } showProgress = yes;
     bool head = false;
-    size_t tries = 1;
+    size_t tries = 5;
     unsigned int baseRetryTimeMs = 250;
 
     DownloadRequest(const std::string & uri) : uri(uri) { }
