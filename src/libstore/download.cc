@@ -300,6 +300,11 @@ struct CurlDownloader : public Downloader
                         || httpStatus == 504  || httpStatus == 522 || httpStatus == 524
                         || code == CURLE_COULDNT_RESOLVE_HOST
                         || code == CURLE_RECV_ERROR
+
+                        // this seems to occur occasionally for retriable reasons, and shows up in an error like this:
+                        //   curl: (23) Failed writing body (315 != 16366)
+                        || code == CURLE_WRITE_ERROR
+
                         // this is a generic SSL failure that in some cases (e.g., certificate error) is permanent but also appears in transient cases, so we consider it retryable
                         || code == CURLE_SSL_CONNECT_ERROR
 #if LIBCURL_VERSION_NUM >= 0x073200
