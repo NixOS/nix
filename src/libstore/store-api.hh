@@ -81,12 +81,7 @@ struct GCResults
 
     /* For `gcReturnDead', `gcDeleteDead' and `gcDeleteSpecific', the
        number of bytes that would be or was freed. */
-    unsigned long long bytesFreed;
-
-    GCResults()
-    {
-        bytesFreed = 0;
-    }
+    unsigned long long bytesFreed = 0;
 };
 
 

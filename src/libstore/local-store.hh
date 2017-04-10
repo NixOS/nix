@@ -26,14 +26,9 @@ struct Derivation;
 
 struct OptimiseStats
 {
-    unsigned long filesLinked;
-    unsigned long long bytesFreed;
-    unsigned long long blocksFreed;
-    OptimiseStats()
-    {
-        filesLinked = 0;
-        bytesFreed = blocksFreed = 0;
-    }
+    unsigned long filesLinked = 0;
+    unsigned long long bytesFreed = 0;
+    unsigned long long blocksFreed = 0;
 };
 
 

@@ -679,7 +679,7 @@ void LocalStore::removeUnusedLinks(const GCState & state)
         if (unlink(path.c_str()) == -1)
             throw SysError(format("deleting ‘%1%’") % path);
 
-        state.results.bytesFreed += st.st_blocks * 512;
+        state.results.bytesFreed += st.st_blocks * 512ULL;
     }
 
     struct stat st;
