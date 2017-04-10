@@ -22,8 +22,6 @@ with import <nixpkgs> {};
   configureFlags =
     [ "--disable-init-state"
       "--enable-gc"
-      "--with-dbi=${perlPackages.DBI}/${perl.libPrefix}"
-      "--with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}"
     ];
 
   enableParallelBuilding = true;
