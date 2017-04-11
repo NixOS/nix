@@ -116,7 +116,6 @@ let
         configureFlags = ''
           --with-dbi=${perlPackages.DBI}/${pkgs.perl.libPrefix}
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/${pkgs.perl.libPrefix}
-          --with-www-curl=${perlPackages.WWWCurl}/${pkgs.perl.libPrefix}
         '';
 
         enableParallelBuilding = true;
