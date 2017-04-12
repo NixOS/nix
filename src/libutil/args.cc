@@ -35,7 +35,7 @@ void Args::parseCmdline(const Strings & _cmdline)
         }
         else if (!dashDash && std::string(arg, 0, 1) == "-") {
             if (!processFlag(pos, cmdline.end()))
-                throw UsageError(format("unrecognised flag ‘%1%’") % arg);
+                throw UsageError(format("unrecognised flag '%1%'") % arg);
         }
         else {
             pendingArgs.push_back(*pos++);
@@ -88,7 +88,7 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
         Strings args;
         for (size_t n = 0 ; n < flag.arity; ++n) {
             if (pos == end)
-                throw UsageError(format("flag ‘%1%’ requires %2% argument(s)")
+                throw UsageError(format("flag '%1%' requires %2% argument(s)")
                     % name % flag.arity);
             args.push_back(*pos++);
         }
@@ -116,7 +116,7 @@ bool Args::processArgs(const Strings & args, bool finish)
 {
     if (expectedArgs.empty()) {
         if (!args.empty())
-            throw UsageError(format("unexpected argument ‘%1%’") % args.front());
+            throw UsageError(format("unexpected argument '%1%'") % args.front());
         return true;
     }
 
@@ -140,10 +140,10 @@ bool Args::processArgs(const Strings & args, bool finish)
 
 void Args::mkHashTypeFlag(const std::string & name, HashType * ht)
 {
-    mkFlag1(0, name, "TYPE", "hash algorithm (‘md5’, ‘sha1’, ‘sha256’, or ‘sha512’)", [=](std::string s) {
+    mkFlag1(0, name, "TYPE", "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512')", [=](std::string s) {
         *ht = parseHashType(s);
         if (*ht == htUnknown)
-            throw UsageError(format("unknown hash type ‘%1%’") % s);
+            throw UsageError(format("unknown hash type '%1%'") % s);
     });
 }
 

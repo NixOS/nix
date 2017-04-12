@@ -127,16 +127,16 @@ struct ValidPathInfo
 
        Ideally, the content-addressability assertion would just be a
        Boolean, and the store path would be computed from
-       ‘storePathToName(path)’, ‘narHash’ and ‘references’. However,
+       'storePathToName(path)', 'narHash' and 'references'. However,
        1) we've accumulated several types of content-addressed paths
        over the years; and 2) fixed-output derivations support
        multiple hash algorithms and serialisation methods (flat file
-       vs NAR). Thus, ‘ca’ has one of the following forms:
+       vs NAR). Thus, 'ca' has one of the following forms:
 
-       * ‘text:sha256:<sha256 hash of file contents>’: For paths
+       * 'text:sha256:<sha256 hash of file contents>': For paths
          computed by makeTextPath() / addTextToStore().
 
-       * ‘fixed:<r?>:<ht>:<h>’: For paths computed by
+       * 'fixed:<r?>:<ht>:<h>': For paths computed by
          makeFixedOutputPath() / addToStore().
     */
     std::string ca;
@@ -251,15 +251,15 @@ public:
 
     virtual std::string getUri() = 0;
 
-    /* Return true if ‘path’ is in the Nix store (but not the Nix
+    /* Return true if 'path' is in the Nix store (but not the Nix
        store itself). */
     bool isInStore(const Path & path) const;
 
-    /* Return true if ‘path’ is a store path, i.e. a direct child of
+    /* Return true if 'path' is a store path, i.e. a direct child of
        the Nix store. */
     bool isStorePath(const Path & path) const;
 
-    /* Throw an exception if ‘path’ is not a store path. */
+    /* Throw an exception if 'path' is not a store path. */
     void assertStorePath(const Path & path) const;
 
     /* Chop off the parts after the top-level store name, e.g.,
@@ -374,7 +374,7 @@ public:
 
     /* Query substitute info (i.e. references, derivers and download
        sizes) of a set of paths.  If a path does not have substitute
-       info, it's omitted from the resulting ‘infos’ map. */
+       info, it's omitted from the resulting 'infos' map. */
     virtual void querySubstitutablePathInfos(const PathSet & paths,
         SubstitutablePathInfos & infos) { return; };
 
@@ -412,7 +412,7 @@ public:
     virtual void buildPaths(const PathSet & paths, BuildMode buildMode = bmNormal) = 0;
 
     /* Build a single non-materialized derivation (i.e. not from an
-       on-disk .drv file). Note that ‘drvPath’ is only used for
+       on-disk .drv file). Note that 'drvPath' is only used for
        informational purposes. */
     virtual BuildResult buildDerivation(const Path & drvPath, const BasicDerivation & drv,
         BuildMode buildMode = bmNormal) = 0;
@@ -468,9 +468,9 @@ public:
         bool showDerivers, bool showHash);
 
     /* Write a JSON representation of store path metadata, such as the
-       hash and the references. If ‘includeImpureInfo’ is true,
+       hash and the references. If 'includeImpureInfo' is true,
        variable elements such as the registration time are
-       included. If ‘showClosureSize’ is true, the closure size of
+       included. If 'showClosureSize' is true, the closure size of
        each path is included. */
     void pathInfoToJSON(JSONPlaceholder & jsonOut, const PathSet & storePaths,
         bool includeImpureInfo, bool showClosureSize);
@@ -527,8 +527,8 @@ public:
        relation.  If p refers to q, then p preceeds q in this list. */
     Paths topoSortPaths(const PathSet & paths);
 
-    /* Export multiple paths in the format expected by ‘nix-store
-       --import’. */
+    /* Export multiple paths in the format expected by 'nix-store
+       --import'. */
     void exportPaths(const Paths & paths, Sink & sink);
 
     void exportPath(const Path & path, Sink & sink);
@@ -616,7 +616,7 @@ string storePathToName(const Path & path);
 /* Extract the hash part of the given store path. */
 string storePathToHash(const Path & path);
 
-/* Check whether ‘name’ is a valid store path name part, i.e. contains
+/* Check whether 'name' is a valid store path name part, i.e. contains
    only the characters [a-zA-Z0-9\+\-\.\_\?\=] and doesn't start with
    a dot. */
 void checkStoreName(const string & name);
@@ -639,17 +639,17 @@ void removeTempRoots();
 
 
 /* Return a Store object to access the Nix store denoted by
-   ‘uri’ (slight misnomer...). Supported values are:
+   'uri' (slight misnomer...). Supported values are:
 
-   * ‘direct’: The Nix store in /nix/store and database in
+   * 'direct': The Nix store in /nix/store and database in
      /nix/var/nix/db, accessed directly.
 
-   * ‘daemon’: The Nix store accessed via a Unix domain socket
+   * 'daemon': The Nix store accessed via a Unix domain socket
      connection to nix-daemon.
 
-   * ‘file://<path>’: A binary cache stored in <path>.
+   * 'file://<path>': A binary cache stored in <path>.
 
-   If ‘uri’ is empty, it defaults to ‘direct’ or ‘daemon’ depending on
+   If 'uri' is empty, it defaults to 'direct' or 'daemon' depending on
    whether the user has write access to the local Nix store/database.
    set to true *unless* you're going to collect garbage. */
 ref<Store> openStore(const std::string & uri = getEnv("NIX_REMOTE"));
@@ -669,8 +669,8 @@ enum StoreType {
 StoreType getStoreType(const std::string & uri = getEnv("NIX_REMOTE"), const std::string & stateDir = settings.nixStateDir);
 
 /* Return the default substituter stores, defined by the
-   ‘substituters’ option and various legacy options like
-   ‘binary-caches’. */
+   'substituters' option and various legacy options like
+   'binary-caches'. */
 std::list<ref<Store>> getDefaultSubstituters();
 
 

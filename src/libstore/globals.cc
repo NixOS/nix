@@ -96,7 +96,7 @@ void Settings::loadConfFile()
         if (tokens.empty()) continue;
 
         if (tokens.size() < 2 || tokens[1] != "=")
-            throw Error(format("illegal configuration line ‘%1%’ in ‘%2%’") % line % settingsFile);
+            throw Error(format("illegal configuration line '%1%' in '%2%'") % line % settingsFile);
 
         string name = tokens[0];
 
@@ -155,7 +155,7 @@ void Settings::update()
         maxBuildJobs = std::max(1U, std::thread::hardware_concurrency());
     else
         if (!string2Int(s, maxBuildJobs))
-            throw Error("configuration setting ‘build-max-jobs’ should be ‘auto’ or an integer");
+            throw Error("configuration setting 'build-max-jobs' should be 'auto' or an integer");
 
     _get(buildCores, "build-cores");
     _get(thisSystem, "system");
@@ -203,7 +203,7 @@ void Settings::_get(bool & res, const string & name)
     if (i == settings.end()) return;
     if (i->second == "true") res = true;
     else if (i->second == "false") res = false;
-    else throw Error(format("configuration option ‘%1%’ should be either ‘true’ or ‘false’, not ‘%2%’")
+    else throw Error(format("configuration option '%1%' should be either 'true' or 'false', not '%2%'")
         % name % i->second);
 }
 
@@ -230,7 +230,7 @@ template<class N> void Settings::_get(N & res, const string & name)
     SettingsMap::iterator i = settings.find(name);
     if (i == settings.end()) return;
     if (!string2Int(i->second, res))
-        throw Error(format("configuration setting ‘%1%’ should have an integer value") % name);
+        throw Error(format("configuration setting '%1%' should have an integer value") % name);
 }
 
 

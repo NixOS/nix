@@ -88,7 +88,7 @@ static std::vector<Machine> readConf()
         auto tokens = tokenizeString<std::vector<string>>(line);
         auto sz = tokens.size();
         if (sz < 4)
-            throw FormatError("bad machines.conf file ‘%1%’", conf);
+            throw FormatError("bad machines.conf file '%1%'", conf);
         machines.emplace_back(tokens[0],
             tokenizeString<std::vector<string>>(tokens[1], ","),
             tokens[2],
@@ -151,7 +151,7 @@ int main (int argc, char * * argv)
             auto tokens = tokenizeString<std::vector<string>>(line);
             auto sz = tokens.size();
             if (sz != 3 && sz != 4)
-                throw Error("invalid build hook line ‘%1%’", line);
+                throw Error("invalid build hook line '%1%'", line);
             auto amWilling = tokens[0] == "1";
             auto neededSystem = tokens[1];
             drvPath = tokens[2];
@@ -238,7 +238,7 @@ int main (int argc, char * * argv)
                           {"max-connections", "1" } });
                     hostName = bestMachine->hostName;
                 } catch (std::exception & e) {
-                    printError("unable to open SSH connection to ‘%s’: %s; trying other available machines...",
+                    printError("unable to open SSH connection to '%s': %s; trying other available machines...",
                         bestMachine->hostName, e.what());
                     bestMachine->enabled = false;
                     continue;
@@ -260,13 +260,13 @@ connected:
         auto old = signal(SIGALRM, handleAlarm);
         alarm(15 * 60);
         if (!lockFile(uploadLock.get(), ltWrite, true))
-            printError("somebody is hogging the upload lock for ‘%s’, continuing...");
+            printError("somebody is hogging the upload lock for '%s', continuing...");
         alarm(0);
         signal(SIGALRM, old);
         copyPaths(store, ref<Store>(sshStore), inputs);
         uploadLock = -1;
 
-        printError("building ‘%s’ on ‘%s’", drvPath, hostName);
+        printError("building '%s' on '%s'", drvPath, hostName);
         sshStore->buildDerivation(drvPath, readDerivation(drvPath));
 
         PathSet missing;

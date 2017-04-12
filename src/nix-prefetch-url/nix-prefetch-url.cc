@@ -12,7 +12,7 @@
 using namespace nix;
 
 
-/* If ‘uri’ starts with ‘mirror://’, then resolve it using the list of
+/* If 'uri' starts with 'mirror://', then resolve it using the list of
    mirrors defined in Nixpkgs. */
 string resolveMirrorUri(EvalState & state, string uri)
 {
@@ -29,11 +29,11 @@ string resolveMirrorUri(EvalState & state, string uri)
 
     auto mirrorList = vMirrors.attrs->find(state.symbols.create(mirrorName));
     if (mirrorList == vMirrors.attrs->end())
-        throw Error(format("unknown mirror name ‘%1%’") % mirrorName);
+        throw Error(format("unknown mirror name '%1%'") % mirrorName);
     state.forceList(*mirrorList->value);
 
     if (mirrorList->value->listSize() < 1)
-        throw Error(format("mirror URI ‘%1%’ did not expand to anything") % uri);
+        throw Error(format("mirror URI '%1%' did not expand to anything") % uri);
 
     string mirror = state.forceString(*mirrorList->value->listElems()[0]);
     return mirror + (hasSuffix(mirror, "/") ? "" : "/") + string(s, p + 1);
@@ -65,7 +65,7 @@ int main(int argc, char * * argv)
                 string s = getArg(*arg, arg, end);
                 ht = parseHashType(s);
                 if (ht == htUnknown)
-                    throw UsageError(format("unknown hash type ‘%1%’") % s);
+                    throw UsageError(format("unknown hash type '%1%'") % s);
             }
             else if (*arg == "--print-path")
                 printPath = true;
@@ -113,10 +113,10 @@ int main(int argc, char * * argv)
             /* Extract the URI. */
             auto attr = v.attrs->find(state.symbols.create("urls"));
             if (attr == v.attrs->end())
-                throw Error("attribute set does not contain a ‘urls’ attribute");
+                throw Error("attribute set does not contain a 'urls' attribute");
             state.forceList(*attr->value);
             if (attr->value->listSize() < 1)
-                throw Error("‘urls’ list is empty");
+                throw Error("'urls' list is empty");
             uri = state.forceString(*attr->value->listElems()[0]);
 
             /* Extract the hash mode. */
@@ -138,7 +138,7 @@ int main(int argc, char * * argv)
         if (name.empty())
             name = baseNameOf(uri);
         if (name.empty())
-            throw Error(format("cannot figure out file name for ‘%1%’") % uri);
+            throw Error(format("cannot figure out file name for '%1%'") % uri);
 
         /* If an expected hash is given, the file may already exist in
            the store. */
@@ -189,7 +189,7 @@ int main(int argc, char * * argv)
             hash = unpack ? hashPath(ht, tmpFile).first : hashString(ht, *result.data);
 
             if (expectedHash != Hash(ht) && expectedHash != hash)
-                throw Error(format("hash mismatch for ‘%1%’") % uri);
+                throw Error(format("hash mismatch for '%1%'") % uri);
 
             /* Copy the file to the Nix store. FIXME: if RemoteStore
                implemented addToStoreFromDump() and downloadFile()
@@ -201,7 +201,7 @@ int main(int argc, char * * argv)
         }
 
         if (!printPath)
-            printInfo(format("path is ‘%1%’") % storePath);
+            printInfo(format("path is '%1%'") % storePath);
 
         std::cout << printHash16or32(hash) << std::endl;
         if (printPath)
