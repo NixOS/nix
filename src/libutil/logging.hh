@@ -30,6 +30,8 @@ public:
         log(lvlInfo, fs);
     }
 
+    virtual void warn(const std::string & msg);
+
     virtual void setExpected(const std::string & label, uint64_t value = 1) { }
     virtual void setProgress(const std::string & label, uint64_t value = 1) { }
     virtual void incExpected(const std::string & label, uint64_t value = 1) { }
@@ -81,6 +83,14 @@ extern Verbosity verbosity; /* suppress msgs > this */
 #define printTalkative(args...) printMsg(lvlTalkative, args)
 #define debug(args...) printMsg(lvlDebug, args)
 #define vomit(args...) printMsg(lvlVomit, args)
+
+template<typename... Args>
+inline void warn(const std::string & fs, Args... args)
+{
+    boost::format f(fs);
+    formatHelper(f, args...);
+    logger->warn(f.str());
+}
 
 void warnOnce(bool & haveWarned, const FormatOrString & fs);
 

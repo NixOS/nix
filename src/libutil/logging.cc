@@ -5,6 +5,11 @@ namespace nix {
 
 Logger * logger = makeDefaultLogger();
 
+void Logger::warn(const std::string & msg)
+{
+    log(lvlInfo, ANSI_RED "warning:" ANSI_NORMAL " " + msg);
+}
+
 class SimpleLogger : public Logger
 {
 public:
@@ -52,7 +57,7 @@ Verbosity verbosity = lvlInfo;
 void warnOnce(bool & haveWarned, const FormatOrString & fs)
 {
     if (!haveWarned) {
-        printError(format("warning: %1%") % fs.s);
+        warn(fs.s);
         haveWarned = true;
     }
 }
