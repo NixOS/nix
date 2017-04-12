@@ -39,7 +39,7 @@ Settings::Settings()
 #endif
 
     keepFailed = false;
-    keepGoing = false;
+    keepGoing = true;
     tryFallback = false;
     maxBuildJobs = 1;
     buildCores = std::max(1U, std::thread::hardware_concurrency());
