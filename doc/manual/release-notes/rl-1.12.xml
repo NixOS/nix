@@ -17,6 +17,13 @@
     have write access to the Nix database.</para>
   </listitem>
 
+  <listitem>
+    <para>The Nix language now supports floating point numbers. They are
+    based on regular C++ <literal>float</literal> and compatible with
+    existing integers and number-related operations. Export and import to and
+    from JSON and XML works, too.
+  </para>
+  </listitem>
 </itemizedlist>
 
 <para>This release has contributions from TBD.</para>
