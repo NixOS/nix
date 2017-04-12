@@ -3,7 +3,7 @@
 
 namespace nix {
 
-Logger * logger = 0;
+Logger * logger = makeDefaultLogger();
 
 class SimpleLogger : public Logger
 {

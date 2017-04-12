@@ -25,7 +25,6 @@ static ref<Store> store()
     static std::shared_ptr<Store> _store;
     if (!_store) {
         try {
-            logger = makeDefaultLogger();
             settings.loadConfFile();
             settings.update();
             settings.lockCPU = false;
