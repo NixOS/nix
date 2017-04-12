@@ -29,3 +29,8 @@ if nix-build timeout.nix -A closeLog; then
     echo "build should have failed"
     exit 1
 fi
+
+if nix build -f timeout.nix silent --option build-max-silent-time 2; then
+    echo "build should have failed"
+    exit 1
+fi

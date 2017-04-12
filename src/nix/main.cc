@@ -42,6 +42,7 @@ void mainWrapped(int argc, char * * argv)
     NixArgs args;
 
     args.parseCmdline(argvToStrings(argc, argv));
+    settings.update();
 
     assert(args.command);
 
