@@ -74,17 +74,25 @@ template<> std::string Setting<std::string>::to_string()
     return value;
 }
 
-template<> void Setting<int>::set(const std::string & str)
+template<typename T>
+void Setting<T>::set(const std::string & str)
 {
+    static_assert(std::is_integral<T>::value, "Integer required.");
     try {
-        value = std::stoi(str);
-    } catch (...) {
+        auto i = std::stoll(str);
+        if (i < std::numeric_limits<T>::min() ||
+            i > std::numeric_limits<T>::max())
+            throw UsageError("setting '%s' has out-of-range value %d", name, i);
+        value = i;
+    } catch (std::logic_error&) {
         throw UsageError("setting '%s' has invalid value '%s'", name, str);
     }
 }
 
-template<> std::string Setting<int>::to_string()
+template<typename T>
+std::string Setting<T>::to_string()
 {
+    static_assert(std::is_integral<T>::value, "Integer required.");
     return std::to_string(value);
 }
 
@@ -102,6 +110,11 @@ template<> std::string Setting<bool>::to_string()
 {
     return value ? "true" : "false";
 }
+
+template class Setting<int>;
+template class Setting<unsigned int>;
+template class Setting<long>;
+template class Setting<size_t>;
 
 void PathSetting::set(const std::string & str)
 {
