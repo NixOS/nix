@@ -38,13 +38,14 @@ namespace nix {
 LocalStore::LocalStore(const Params & params)
     : Store(params)
     , LocalFSStore(params)
-    , realStoreDir(get(params, "real", rootDir != "" ? rootDir + "/nix/store" : storeDir))
+    , realStoreDir_{this, false, rootDir != "" ? rootDir + "/nix/store" : storeDir, "real",
+        "physical path to the Nix store"}
+    , realStoreDir(realStoreDir_)
     , dbDir(stateDir + "/db")
     , linksDir(realStoreDir + "/.links")
     , reservedPath(dbDir + "/reserved")
     , schemaPath(dbDir + "/schema")
     , trashDir(realStoreDir + "/trash")
-    , requireSigs(trim(settings.get("signed-binary-caches", std::string("*"))) != "") // FIXME: rename option
     , publicKeys(getDefaultPublicKeys())
 {
     auto state(_state.lock());

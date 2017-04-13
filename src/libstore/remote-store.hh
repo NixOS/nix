@@ -22,6 +22,9 @@ class RemoteStore : public virtual Store
 {
 public:
 
+    const Setting<int> maxConnections{(Store*) this, 1,
+            "max-connections", "maximum number of concurrent connections to the Nix daemon"};
+
     RemoteStore(const Params & params);
 
     /* Implementations of abstract store API methods. */

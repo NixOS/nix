@@ -9,9 +9,6 @@ namespace nix {
 
 LocalFSStore::LocalFSStore(const Params & params)
     : Store(params)
-    , rootDir(get(params, "root"))
-    , stateDir(canonPath(get(params, "state", rootDir != "" ? rootDir + "/nix/var/nix" : settings.nixStateDir)))
-    , logDir(canonPath(get(params, "log", rootDir != "" ? rootDir + "/nix/var/log/nix" : settings.nixLogDir)))
 {
 }
 
@@ -88,6 +85,8 @@ void LocalFSStore::narFromPath(const Path & path, Sink & sink)
 
 const string LocalFSStore::drvsLogDir = "drvs";
 
+
+
 std::shared_ptr<std::string> LocalFSStore::getBuildLog(const Path & path_)
 {
     auto path(path_);
@@ -110,8 +109,8 @@ std::shared_ptr<std::string> LocalFSStore::getBuildLog(const Path & path_)
 
         Path logPath =
             j == 0
-            ? (format("%1%/%2%/%3%/%4%") % logDir % drvsLogDir % string(baseName, 0, 2) % string(baseName, 2)).str()
-            : (format("%1%/%2%/%3%") % logDir % drvsLogDir % baseName).str();
+            ? fmt("%s/%s/%s/%s", logDir, drvsLogDir, string(baseName, 0, 2), string(baseName, 2))
+            : fmt("%s/%s/%s", logDir, drvsLogDir, baseName);
         Path logBz2Path = logPath + ".bz2";
 
         if (pathExists(logPath))

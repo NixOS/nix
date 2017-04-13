@@ -14,16 +14,19 @@ class SSHStore : public RemoteStore
 {
 public:
 
+    const Setting<Path> sshKey{(Store*) this, "", "ssh-key", "path to an SSH private key"};
+    const Setting<bool> compress{(Store*) this, false, "compress", "whether to compress the connection"};
+
     SSHStore(const std::string & host, const Params & params)
         : Store(params)
         , RemoteStore(params)
         , host(host)
         , master(
             host,
-            get(params, "ssh-key", ""),
+            sshKey,
             // Use SSH master only if using more than 1 connection.
             connections->capacity() > 1,
-            get(params, "compress", "") == "true")
+            compress)
     {
     }
 

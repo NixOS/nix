@@ -125,22 +125,22 @@ S3Helper::DownloadResult S3Helper::getObject(
 
 struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 {
+    const Setting<std::string> region{this, Aws::Region::US_EAST_1, "region", {"aws-region"}};
+    const Setting<std::string> narinfoCompression{this, "", "narinfo-compression", "compression method for .narinfo files"};
+    const Setting<std::string> lsCompression{this, "", "ls-compression", "compression method for .ls files"};
+    const Setting<std::string> logCompression{this, "", "log-compression", "compression method for log/* files"};
+
     std::string bucketName;
 
     Stats stats;
 
     S3Helper s3Helper;
 
-    std::string narinfoCompression, lsCompression, logCompression;
-
     S3BinaryCacheStoreImpl(
         const Params & params, const std::string & bucketName)
         : S3BinaryCacheStore(params)
         , bucketName(bucketName)
-        , s3Helper(get(params, "aws-region", Aws::Region::US_EAST_1))
-        , narinfoCompression(get(params, "narinfo-compression", ""))
-        , lsCompression(get(params, "ls-compression", ""))
-        , logCompression(get(params, "log-compression", ""))
+        , s3Helper(region)
     {
         diskCache = getNarInfoDiskCache();
     }

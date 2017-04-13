@@ -3051,13 +3051,11 @@ Path DerivationGoal::openLogFile()
     string baseName = baseNameOf(drvPath);
 
     /* Create a log file. */
-    Path dir = (format("%1%/%2%/%3%/") % worker.store.logDir % worker.store.drvsLogDir % string(baseName, 0, 2)).str();
+    Path dir = fmt("%s/%s/%s/", worker.store.logDir, worker.store.drvsLogDir, string(baseName, 0, 2));
     createDirs(dir);
 
-    Path logFileName = (format("%1%/%2%%3%")
-        % dir
-        % string(baseName, 2)
-        % (settings.compressLog ? ".bz2" : "")).str();
+    Path logFileName = fmt("%s/%s%s", dir, string(baseName, 2),
+        settings.compressLog ? ".bz2" : "");
 
     fdLogFile = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0666);
     if (!fdLogFile) throw SysError(format("creating log file ‘%1%’") % logFileName);

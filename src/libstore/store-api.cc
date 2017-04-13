@@ -241,8 +241,8 @@ Path Store::computeStorePathForText(const string & name, const string & s,
 
 
 Store::Store(const Params & params)
-    : storeDir(get(params, "store", settings.nixStore))
-    , state({std::stoi(get(params, "path-info-cache-size", "65536"))})
+    : Config(params)
+    , state({(size_t) pathInfoCacheSize})
 {
 }
 
@@ -718,7 +718,10 @@ ref<Store> openStore(const std::string & uri, const Store::Params & params)
 {
     for (auto fun : *RegisterStoreImplementation::implementations) {
         auto store = fun(uri, params);
-        if (store) return ref<Store>(store);
+        if (store) {
+            store->warnUnused();
+            return ref<Store>(store);
+        }
     }
 
     throw Error(format("don't know how to open Nix store ‘%s’") % uri);

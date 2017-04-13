@@ -7,6 +7,7 @@
 #include <list>
 #include <set>
 #include <memory>
+#include <map>
 
 #include <boost/format.hpp>
 
@@ -141,6 +142,7 @@ private:
 
 typedef list<string> Strings;
 typedef set<string> StringSet;
+typedef std::map<std::string, std::string> StringMap;
 
 
 /* Paths are just strings. */

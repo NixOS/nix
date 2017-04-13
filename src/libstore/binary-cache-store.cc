@@ -79,10 +79,7 @@ struct BinaryCacheStoreAccessor : public FSAccessor
 
 BinaryCacheStore::BinaryCacheStore(const Params & params)
     : Store(params)
-    , compression(get(params, "compression", "xz"))
-    , writeNARListing(get(params, "write-nar-listing", "0") == "1")
 {
-    auto secretKeyFile = get(params, "secret-key", "");
     if (secretKeyFile != "")
         secretKey = std::unique_ptr<SecretKey>(new SecretKey(readFile(secretKeyFile)));
 

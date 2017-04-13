@@ -67,6 +67,8 @@ private:
 
 public:
 
+    PathSetting realStoreDir_;
+
     const Path realStoreDir;
     const Path dbDir;
     const Path linksDir;
@@ -76,7 +78,9 @@ public:
 
 private:
 
-    bool requireSigs;
+    Setting<bool> requireSigs{(Store*) this,
+        trim(settings.get("signed-binary-caches", std::string("*"))) != "",
+        "require-sigs", "whether store paths should have a trusted signature on import"};
 
     PublicKeys publicKeys;
 

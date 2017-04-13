@@ -12,6 +12,10 @@ static std::string uriScheme = "ssh://";
 
 struct LegacySSHStore : public Store
 {
+    const Setting<int> maxConnections{this, 1, "max-connections", "maximum number of concurrent SSH connections"};
+    const Setting<Path> sshKey{this, "", "ssh-key", "path to an SSH private key"};
+    const Setting<bool> compress{this, false, "compress", "whether to compress the connection"};
+
     struct Connection
     {
         std::unique_ptr<SSHMaster::Connection> sshConn;
@@ -29,16 +33,16 @@ struct LegacySSHStore : public Store
         : Store(params)
         , host(host)
         , connections(make_ref<Pool<Connection>>(
-            std::max(1, std::stoi(get(params, "max-connections", "1"))),
+            std::max(1, (int) maxConnections),
             [this]() { return openConnection(); },
             [](const ref<Connection> & r) { return true; }
             ))
         , master(
             host,
-            get(params, "ssh-key", ""),
+            sshKey,
             // Use SSH master only if using more than 1 connection.
             connections->capacity() > 1,
-            get(params, "compress", "") == "true")
+            compress)
     {
     }
 
