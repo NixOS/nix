@@ -79,7 +79,7 @@ public:
 private:
 
     Setting<bool> requireSigs{(Store*) this,
-        trim(settings.get("signed-binary-caches", std::string("*"))) != "",
+        settings.signedBinaryCaches != "", // FIXME
         "require-sigs", "whether store paths should have a trusted signature on import"};
 
     PublicKeys publicKeys;

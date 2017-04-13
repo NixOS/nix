@@ -1333,7 +1333,7 @@ void LocalStore::signPathInfo(ValidPathInfo & info)
 {
     // FIXME: keep secret keys in memory.
 
-    auto secretKeyFiles = settings.get("secret-key-files", Strings());
+    auto secretKeyFiles = settings.secretKeyFiles;
 
     for (auto & secretKeyFile : secretKeyFiles) {
         SecretKey secretKey(readFile(secretKeyFile));

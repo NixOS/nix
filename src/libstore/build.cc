@@ -34,13 +34,6 @@
 #include <pwd.h>
 #include <grp.h>
 
-/* chroot-like behavior from Apple's sandbox */
-#if __APPLE__
-    #define DEFAULT_ALLOWED_IMPURE_PREFIXES "/System/Library /usr/lib /dev /bin/sh"
-#else
-    #define DEFAULT_ALLOWED_IMPURE_PREFIXES ""
-#endif
-
 /* Includes required for chroot support. */
 #if __linux__
 #include <sys/socket.h>
@@ -1279,7 +1272,7 @@ void DerivationGoal::inputsRealised()
 
     /* Don't repeat fixed-output derivations since they're already
        verified by their output hash.*/
-    nrRounds = fixedOutput ? 1 : settings.get("build-repeat", 0) + 1;
+    nrRounds = fixedOutput ? 1 : settings.buildRepeat + 1;
 
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
@@ -1697,9 +1690,7 @@ void DerivationGoal::startBuilder()
 
     /* Are we doing a chroot build? */
     {
-        string x = settings.get("build-use-sandbox",
-            /* deprecated alias */
-            settings.get("build-use-chroot", string("false")));
+        string x = settings.useSandbox;
         if (x != "true" && x != "false" && x != "relaxed")
             throw Error("option ‘build-use-sandbox’ must be set to one of ‘true’, ‘false’ or ‘relaxed’");
         if (x == "true") {
@@ -1756,21 +1747,10 @@ void DerivationGoal::startBuilder()
 
     if (useChroot) {
 
-        string defaultChrootDirs;
-#if __linux__
-        if (worker.store.isInStore(BASH_PATH))
-            defaultChrootDirs = "/bin/sh=" BASH_PATH;
-#endif
-
         /* Allow a user-configurable set of directories from the
            host file system. */
-        PathSet dirs = tokenizeString<StringSet>(
-            settings.get("build-sandbox-paths",
-                /* deprecated alias with lower priority */
-                settings.get("build-chroot-dirs", defaultChrootDirs)));
-        PathSet dirs2 = tokenizeString<StringSet>(
-            settings.get("build-extra-chroot-dirs",
-                settings.get("build-extra-sandbox-paths", string(""))));
+        PathSet dirs = settings.sandboxPaths;
+        PathSet dirs2 = settings.extraSandboxPaths;
         dirs.insert(dirs2.begin(), dirs2.end());
 
         dirsInChroot.clear();
@@ -1802,8 +1782,7 @@ void DerivationGoal::startBuilder()
         for (auto & i : closure)
             dirsInChroot[i] = i;
 
-        string allowed = settings.get("allowed-impure-host-deps", string(DEFAULT_ALLOWED_IMPURE_PREFIXES));
-        PathSet allowedPaths = tokenizeString<StringSet>(allowed);
+        PathSet allowedPaths = settings.allowedImpureHostPrefixes;
 
         /* This works like the above, except on a per-derivation level */
         Strings impurePaths = tokenizeString<Strings>(get(drv->env, "__impureHostDeps"));
@@ -1823,7 +1802,7 @@ void DerivationGoal::startBuilder()
                 }
             }
             if (!found)
-                throw Error(format("derivation ‘%1%’ requested impure path ‘%2%’, but it was not in allowed-impure-host-deps (‘%3%’)") % drvPath % i % allowed);
+                throw Error(format("derivation ‘%1%’ requested impure path ‘%2%’, but it was not in allowed-impure-host-deps") % drvPath % i);
 
             dirsInChroot[i] = i;
         }
@@ -2444,7 +2423,7 @@ void DerivationGoal::runChild()
             /* Mount a new tmpfs on /dev/shm to ensure that whatever
                the builder puts in /dev/shm is cleaned up automatically. */
             if (pathExists("/dev/shm") && mount("none", (chrootRootDir + "/dev/shm").c_str(), "tmpfs", 0,
-                    fmt("size=%s", settings.get("sandbox-dev-shm-size", std::string("50%"))).c_str()) == -1)
+                    fmt("size=%s", settings.sandboxShmSize).c_str()) == -1)
                 throw SysError("mounting /dev/shm");
 
             /* Mount a new devpts on /dev/pts.  Note that this
@@ -2602,7 +2581,7 @@ void DerivationGoal::runChild()
             sandboxProfile += "(version 1)\n";
 
             /* Violations will go to the syslog if you set this. Unfortunately the destination does not appear to be configurable */
-            if (settings.get("darwin-log-sandbox-violations", false)) {
+            if (settings.darwinLogSandboxViolations) {
                 sandboxProfile += "(deny default)\n";
             } else {
                 sandboxProfile += "(deny default (with no-log))\n";
@@ -2749,7 +2728,7 @@ void DerivationGoal::registerOutputs()
     InodesSeen inodesSeen;
 
     Path checkSuffix = ".check";
-    bool runDiffHook = settings.get("run-diff-hook", false);
+    bool runDiffHook = settings.runDiffHook;
     bool keepPreviousRound = settings.keepFailed || runDiffHook;
 
     /* Check whether the output paths were created, and grep each
@@ -2990,7 +2969,7 @@ void DerivationGoal::registerOutputs()
                     ? fmt("output ‘%1%’ of ‘%2%’ differs from ‘%3%’ from previous round", i->path, drvPath, prev)
                     : fmt("output ‘%1%’ of ‘%2%’ differs from previous round", i->path, drvPath);
 
-                auto diffHook = settings.get("diff-hook", std::string(""));
+                auto diffHook = settings.diffHook;
                 if (prevExists && diffHook != "" && runDiffHook) {
                     try {
                         auto diff = runProgram(diffHook, true, {prev, i->path});
@@ -3001,7 +2980,7 @@ void DerivationGoal::registerOutputs()
                     }
                 }
 
-                if (settings.get("enforce-determinism", true))
+                if (settings.enforceDeterminism)
                     throw NotDeterministic(msg);
 
                 printError(msg);

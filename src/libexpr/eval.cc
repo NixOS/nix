@@ -299,7 +299,7 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
 {
     countCalls = getEnv("NIX_COUNT_CALLS", "0") != "0";
 
-    restricted = settings.get("restrict-eval", false);
+    restricted = settings.restrictEval;
 
     assert(gcInitialised);
 
