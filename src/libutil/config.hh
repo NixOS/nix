@@ -47,11 +47,13 @@ public:
 
     void set(const std::string & name, const std::string & value);
 
-    void add(AbstractSetting * setting);
+    void addSetting(AbstractSetting * setting);
 
-    void warnUnused();
+    void warnUnknownSettings();
 
-    std::string dump();
+    StringMap getSettings();
+
+    void applyConfigFile(const Path & path, bool fatal = false);
 };
 
 class AbstractSetting
@@ -83,10 +85,15 @@ protected:
     virtual void set(const std::string & value) = 0;
 
     virtual std::string to_string() = 0;
+
+    bool parseBool(const std::string & str);
+    std::string printBool(bool b);
 };
 
+struct DefaultSettingTag { };
+
 /* A setting of type T. */
-template<typename T>
+template<typename T, typename Tag = DefaultSettingTag>
 class Setting : public AbstractSetting
 {
 protected:
@@ -103,10 +110,12 @@ public:
         : AbstractSetting(name, description, aliases)
         , value(def)
     {
-        options->add(this);
+        options->addSetting(this);
     }
 
     operator const T &() const { return value; }
+    operator T &() { return value; }
+    const T & get() const { return value; }
     bool operator ==(const T & v2) const { return value == v2; }
     bool operator !=(const T & v2) const { return value != v2; }
     void operator =(const T & v) { value = v; }
@@ -122,6 +131,9 @@ std::ostream & operator <<(std::ostream & str, const Setting<T> & opt)
     str << (const T &) opt;
     return str;
 }
+
+template<typename T>
+bool operator ==(const T & v1, const Setting<T> & v2) { return v1 == (const T &) v2; }
 
 /* A special setting for Paths. These are automatically canonicalised
    (e.g. "/foo//bar/" becomes "/foo/bar"). */

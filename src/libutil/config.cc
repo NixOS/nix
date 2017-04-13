@@ -11,7 +11,7 @@ void Config::set(const std::string & name, const std::string & value)
     i->second.setting->set(value);
 }
 
-void Config::add(AbstractSetting * setting)
+void Config::addSetting(AbstractSetting * setting)
 {
     _settings.emplace(setting->name, Config::SettingData{false, setting});
     for (auto & alias : setting->aliases)
@@ -41,19 +41,57 @@ void Config::add(AbstractSetting * setting)
     }
 }
 
-void Config::warnUnused()
+void Config::warnUnknownSettings()
 {
     for (auto & i : initials)
         warn("unknown setting '%s'", i.first);
 }
 
-std::string Config::dump()
+StringMap Config::getSettings()
 {
-    std::string res;
+    StringMap res;
     for (auto & opt : _settings)
         if (!opt.second.isAlias)
-            res += opt.first + " = " + opt.second.setting->to_string() + "\n";
+            res.emplace(opt.first, opt.second.setting->to_string());
     return res;
+}
+
+void Config::applyConfigFile(const Path & path, bool fatal)
+{
+    try {
+        string contents = readFile(path);
+
+        unsigned int pos = 0;
+
+        while (pos < contents.size()) {
+            string line;
+            while (pos < contents.size() && contents[pos] != '\n')
+                line += contents[pos++];
+            pos++;
+
+            string::size_type hash = line.find('#');
+            if (hash != string::npos)
+                line = string(line, 0, hash);
+
+            vector<string> tokens = tokenizeString<vector<string> >(line);
+            if (tokens.empty()) continue;
+
+            if (tokens.size() < 2 || tokens[1] != "=")
+                throw UsageError("illegal configuration line ‘%1%’ in ‘%2%’", line, path);
+
+            string name = tokens[0];
+
+            vector<string>::iterator i = tokens.begin();
+            advance(i, 2);
+
+            try {
+                set(name, concatStringsSep(" ", Strings(i, tokens.end()))); // FIXME: slow
+            } catch (UsageError & e) {
+                if (fatal) throw;
+                warn("in configuration file '%s': %s", path, e.what());
+            }
+        };
+    } catch (SysError &) { }
 }
 
 AbstractSetting::AbstractSetting(
@@ -74,41 +112,65 @@ template<> std::string Setting<std::string>::to_string()
     return value;
 }
 
-template<typename T>
-void Setting<T>::set(const std::string & str)
+template<typename T, typename Tag>
+void Setting<T, Tag>::set(const std::string & str)
 {
     static_assert(std::is_integral<T>::value, "Integer required.");
-    try {
-        auto i = std::stoll(str);
-        if (i < std::numeric_limits<T>::min() ||
-            i > std::numeric_limits<T>::max())
-            throw UsageError("setting '%s' has out-of-range value %d", name, i);
-        value = i;
-    } catch (std::logic_error&) {
+    if (!string2Int(str, value))
         throw UsageError("setting '%s' has invalid value '%s'", name, str);
-    }
 }
 
-template<typename T>
-std::string Setting<T>::to_string()
+template<typename T, typename Tag>
+std::string Setting<T, Tag>::to_string()
 {
     static_assert(std::is_integral<T>::value, "Integer required.");
     return std::to_string(value);
 }
 
-template<> void Setting<bool>::set(const std::string & str)
+bool AbstractSetting::parseBool(const std::string & str)
 {
     if (str == "true" || str == "yes" || str == "1")
-        value = true;
+        return true;
     else if (str == "false" || str == "no" || str == "0")
-        value = false;
+        return false;
     else
         throw UsageError("Boolean setting '%s' has invalid value '%s'", name, str);
 }
 
+template<> void Setting<bool>::set(const std::string & str)
+{
+    value = parseBool(str);
+}
+
+std::string AbstractSetting::printBool(bool b)
+{
+    return b ? "true" : "false";
+}
+
+
 template<> std::string Setting<bool>::to_string()
 {
-    return value ? "true" : "false";
+    return printBool(value);
+}
+
+template<> void Setting<Strings>::set(const std::string & str)
+{
+    value = tokenizeString<Strings>(str);
+}
+
+template<> std::string Setting<Strings>::to_string()
+{
+    return concatStringsSep(" ", value);
+}
+
+template<> void Setting<StringSet>::set(const std::string & str)
+{
+    value = tokenizeString<StringSet>(str);
+}
+
+template<> std::string Setting<StringSet>::to_string()
+{
+    return concatStringsSep(" ", value);
 }
 
 template class Setting<int>;

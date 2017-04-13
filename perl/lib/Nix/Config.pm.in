@@ -20,22 +20,15 @@ $useBindings = 1;
 %config = ();
 
 sub readConfig {
-    if (defined $ENV{'_NIX_OPTIONS'}) {
-        foreach my $s (split '\n', $ENV{'_NIX_OPTIONS'}) {
-            my ($n, $v) = split '=', $s, 2;
-            $config{$n} = $v;
-        }
-    } else {
-        my $config = "$confDir/nix.conf";
-        return unless -f $config;
+    my $config = "$confDir/nix.conf";
+    return unless -f $config;
 
-        open CONFIG, "<$config" or die "cannot open ‘$config’";
-        while (<CONFIG>) {
-            /^\s*([\w\-\.]+)\s*=\s*(.*)$/ or next;
-            $config{$1} = $2;
-        }
-        close CONFIG;
+    open CONFIG, "<$config" or die "cannot open ‘$config’";
+    while (<CONFIG>) {
+        /^\s*([\w\-\.]+)\s*=\s*(.*)$/ or next;
+        $config{$1} = $2;
     }
+    close CONFIG;
 }
 
 return 1;

@@ -462,7 +462,7 @@ UserLock::UserLock()
     assert(settings.buildUsersGroup != "");
 
     /* Get the members of the build-users-group. */
-    struct group * gr = getgrnam(settings.buildUsersGroup.c_str());
+    struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
     if (!gr)
         throw Error(format("the group ‘%1%’ specified in ‘build-users-group’ does not exist")
             % settings.buildUsersGroup);
@@ -1690,10 +1690,7 @@ void DerivationGoal::startBuilder()
 
     /* Are we doing a chroot build? */
     {
-        string x = settings.useSandbox;
-        if (x != "true" && x != "false" && x != "relaxed")
-            throw Error("option ‘build-use-sandbox’ must be set to one of ‘true’, ‘false’ or ‘relaxed’");
-        if (x == "true") {
+        if (settings.sandboxMode == smEnabled) {
             if (get(drv->env, "__noChroot") == "1")
                 throw Error(format("derivation ‘%1%’ has ‘__noChroot’ set, "
                     "but that's not allowed when ‘build-use-sandbox’ is ‘true’") % drvPath);
@@ -1704,9 +1701,9 @@ void DerivationGoal::startBuilder()
 #endif
             useChroot = true;
         }
-        else if (x == "false")
+        else if (settings.sandboxMode == smDisabled)
             useChroot = false;
-        else if (x == "relaxed")
+        else if (settings.sandboxMode == smRelaxed)
             useChroot = !fixedOutput && get(drv->env, "__noChroot") != "1";
     }
 

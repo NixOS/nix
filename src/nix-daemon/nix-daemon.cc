@@ -436,30 +436,29 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     }
 
     case wopSetOptions: {
-        from >> settings.keepFailed;
-        from >> settings.keepGoing;
-        settings.set("build-fallback", readInt(from) ? "true" : "false");
+        settings.keepFailed = readInt(from);
+        settings.keepGoing = readInt(from);
+        settings.tryFallback = readInt(from);
         verbosity = (Verbosity) readInt(from);
         settings.set("build-max-jobs", std::to_string(readInt(from)));
-        settings.set("build-max-silent-time", std::to_string(readInt(from)));
+        settings.maxSilentTime = readInt(from);
         settings.useBuildHook = readInt(from) != 0;
         settings.verboseBuild = lvlError == (Verbosity) readInt(from);
         readInt(from); // obsolete logType
         readInt(from); // obsolete printBuildTrace
         settings.set("build-cores", std::to_string(readInt(from)));
-        settings.set("build-use-substitutes", readInt(from) ? "true" : "false");
+        settings.useSubstitutes  = readInt(from);
         if (GET_PROTOCOL_MINOR(clientVersion) >= 12) {
             unsigned int n = readInt(from);
             for (unsigned int i = 0; i < n; i++) {
                 string name = readString(from);
                 string value = readString(from);
-                if (name == "build-timeout" || name == "use-ssh-substituter")
+                if (name == "build-timeout")
                     settings.set(name, value);
                 else
                     settings.set(trusted ? name : "untrusted-" + name, value);
             }
         }
-        settings.update();
         startWork();
         stopWork();
         break;

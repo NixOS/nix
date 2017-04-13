@@ -719,7 +719,7 @@ ref<Store> openStore(const std::string & uri, const Store::Params & params)
     for (auto fun : *RegisterStoreImplementation::implementations) {
         auto store = fun(uri, params);
         if (store) {
-            store->warnUnused();
+            store->warnUnknownSettings();
             return ref<Store>(store);
         }
     }
@@ -782,13 +782,10 @@ std::list<ref<Store>> getDefaultSubstituters()
         state->stores.push_back(openStore(uri));
     };
 
-    for (auto uri : settings.substituters)
+    for (auto uri : settings.substituters.get())
         addStore(uri);
 
-    for (auto uri : settings.binaryCaches)
-        addStore(uri);
-
-    for (auto uri : settings.extraBinaryCaches)
+    for (auto uri : settings.extraSubstituters.get())
         addStore(uri);
 
     state->done = true;

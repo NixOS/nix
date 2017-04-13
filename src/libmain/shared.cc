@@ -138,9 +138,6 @@ void initNix()
     struct timeval tv;
     gettimeofday(&tv, 0);
     srandom(tv.tv_usec);
-
-    if (char *pack = getenv("_NIX_OPTIONS"))
-        settings.unpack(pack);
 }
 
 
@@ -156,10 +153,10 @@ struct LegacyArgs : public MixCommonArgs
             &settings.verboseBuild, false);
 
         mkFlag('K', "keep-failed", "keep temporary directories of failed builds",
-            &settings.keepFailed);
+            &(bool&) settings.keepFailed);
 
         mkFlag('k', "keep-going", "keep going after a build fails",
-            &settings.keepGoing);
+            &(bool&) settings.keepGoing);
 
         mkFlag(0, "fallback", "build from source if substitution fails", []() {
             settings.set("build-fallback", "true");
@@ -184,7 +181,7 @@ struct LegacyArgs : public MixCommonArgs
             &settings.readOnlyMode);
 
         mkFlag(0, "no-build-hook", "disable use of the build hook mechanism",
-            &settings.useBuildHook, false);
+            &(bool&) settings.useBuildHook, false);
 
         mkFlag(0, "show-trace", "show Nix expression stack trace in evaluation errors",
             &settings.showTrace);
@@ -218,7 +215,6 @@ void parseCmdLine(int argc, char * * argv,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
 {
     LegacyArgs(baseNameOf(argv[0]), parseArg).parseCmdline(argvToStrings(argc, argv));
-    settings.update();
 }
 
 

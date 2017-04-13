@@ -1,7 +1,7 @@
 #pragma once
 
 #include "types.hh"
-#include "logging.hh"
+#include "config.hh"
 
 #include <map>
 #include <sys/types.h>
@@ -9,10 +9,17 @@
 
 namespace nix {
 
+typedef enum { smEnabled, smRelaxed, smDisabled } SandboxMode;
 
-struct Settings {
+extern bool useCaseHack; // FIXME
 
-    typedef std::map<string, string> SettingsMap;
+class Settings : public Config {
+
+    StringMap overrides;
+
+    unsigned int getDefaultCores();
+
+public:
 
     Settings();
 
@@ -20,24 +27,14 @@ struct Settings {
 
     void set(const string & name, const string & value);
 
-    void update();
+    StringMap getOverrides();
 
-    string pack();
-
-    void unpack(const string & pack);
-
-    SettingsMap getOverrides();
-
-    /* TODO: the comments below should be strings and exposed via a nice command-line UI or similar.
-       We should probably replace it with some sort of magic template or macro to minimize the amount
-       of duplication and pain here. */
+    Path nixPrefix;
 
     /* The directory where we store sources and derived files. */
     Path nixStore;
 
     Path nixDataDir; /* !!! fix */
-
-    Path nixPrefix;
 
     /* The directory where we log various operations. */
     Path nixLogDir;
@@ -57,17 +54,14 @@ struct Settings {
     /* File name of the socket the daemon listens to.  */
     Path nixDaemonSocketFile;
 
-    /* Whether to keep temporary directories of failed builds. */
-    bool keepFailed;
+    Setting<bool> keepFailed{this, false, "keep-failed",
+        "Whether to keep temporary directories of failed builds."};
 
-    /* Whether to keep building subgoals when a sibling (another
-       subgoal of the same goal) fails. */
-    bool keepGoing;
+    Setting<bool> keepGoing{this, false, "keep-going",
+        "Whether to keep building derivations when another build fails."};
 
-    /* Whether, if we cannot realise the known closure corresponding
-       to a derivation, we should try to normalise the derivation
-       instead. */
-    bool tryFallback;
+    Setting<bool> tryFallback{this, tryFallback, "build-fallback",
+        "Whether to fall back to building when substitution fails."};
 
     /* Whether to show build log output in real time. */
     bool verboseBuild = true;
@@ -76,206 +70,206 @@ struct Settings {
        the log to show if a build fails. */
     size_t logLines = 10;
 
-    /* Maximum number of parallel build jobs.  0 means unlimited. */
-    unsigned int maxBuildJobs;
+    struct MaxBuildJobsTag { };
+    Setting<unsigned int, MaxBuildJobsTag> maxBuildJobs{this, 1, "build-max-jobs",
+        "Maximum number of parallel build jobs. \"auto\" means use number of cores."};
 
-    /* Number of CPU cores to utilize in parallel within a build,
-       i.e. by passing this number to Make via '-j'. 0 means that the
-       number of actual CPU cores on the local host ought to be
-       auto-detected. */
-    unsigned int buildCores;
+    Setting<unsigned int> buildCores{this, getDefaultCores(), "build-cores",
+        "Number of CPU cores to utilize in parallel within a build, "
+        "i.e. by passing this number to Make via '-j'. 0 means that the "
+        "number of actual CPU cores on the local host ought to be "
+        "auto-detected."};
 
     /* Read-only mode.  Don't copy stuff to the store, don't change
        the database. */
-    bool readOnlyMode;
+    bool readOnlyMode = false;
 
-    /* The canonical system name, as returned by config.guess. */
-    string thisSystem;
+    Setting<std::string> thisSystem{this, SYSTEM, "system",
+        "The canonical Nix system name."};
 
-    /* The maximum time in seconds that a builer can go without
-       producing any output on stdout/stderr before it is killed.  0
-       means infinity. */
-    time_t maxSilentTime;
+    Setting<time_t> maxSilentTime{this, 0, "build-max-silent-time",
+        "The maximum time in seconds that a builer can go without "
+        "producing any output on stdout/stderr before it is killed. "
+        "0 means infinity."};
 
-    /* The maximum duration in seconds that a builder can run.  0
-       means infinity.  */
-    time_t buildTimeout;
+    Setting<time_t> buildTimeout{this, 0, "build-timeout",
+        "The maximum duration in seconds that a builder can run. "
+        "0 means infinity."};
 
-    /* Whether to use build hooks (for distributed builds).  Sometimes
-       users want to disable this from the command-line. */
-    bool useBuildHook;
+    Setting<bool> useBuildHook{this, true, "remote-builds",
+        "Whether to use build hooks (for distributed builds)."};
 
-    /* Amount of reserved space for the garbage collector
-       (/nix/var/nix/db/reserved). */
-    off_t reservedSize;
+    Setting<off_t> reservedSize{this, 8 * 1024 * 1024, "gc-reserved-space",
+        "Amount of reserved disk space for the garbage collector."};
 
-    /* Whether SQLite should use fsync. */
-    bool fsyncMetadata;
+    Setting<bool> fsyncMetadata{this, true, "fsync-metadata",
+        "Whether SQLite should use fsync()."};
 
-    /* Whether SQLite should use WAL mode. */
-    bool useSQLiteWAL;
+    Setting<bool> useSQLiteWAL{this, true, "use-sqlite-wal",
+        "Whether SQLite should use WAL mode."};
 
-    /* Whether to call sync() before registering a path as valid. */
-    bool syncBeforeRegistering;
+    Setting<bool> syncBeforeRegistering{this, false, "sync-before-registering",
+        "Whether to call sync() before registering a path as valid."};
 
-    /* Whether to use substitutes. */
-    bool useSubstitutes;
+    Setting<bool> useSubstitutes{this, true, "build-use-substitutes",
+        "Whether to use substitutes."};
 
-    /* The Unix group that contains the build users. */
-    string buildUsersGroup;
+    Setting<std::string> buildUsersGroup{this, "", "build-users-group",
+        "The Unix group that contains the build users."};
 
-    /* Set of ssh connection strings for the ssh substituter */
-    Strings sshSubstituterHosts;
+    Setting<bool> impersonateLinux26{this, false, "build-impersonate-linux-26",
+        "Whether to impersonate a Linux 2.6 machine on newer kernels."};
 
-    /* Whether to use the ssh substituter at all */
-    bool useSshSubstituter;
+    Setting<bool> keepLog{this, true, "build-keep-log",
+        "Whether to store build logs."};
 
-    /* Whether to impersonate a Linux 2.6 machine on newer kernels. */
-    bool impersonateLinux26;
+    Setting<bool> compressLog{this, true, "build-compress-log",
+        "Whether to compress logs."};
 
-    /* Whether to store build logs. */
-    bool keepLog;
-
-    /* Whether to compress logs. */
-    bool compressLog;
-
-    /* Maximum number of bytes a builder can write to stdout/stderr
-       before being killed (0 means no limit). */
-    unsigned long maxLogSize;
+    Setting<unsigned long> maxLogSize{this, 0, "build-max-log-size",
+        "Maximum number of bytes a builder can write to stdout/stderr "
+        "before being killed (0 means no limit)."};
 
     /* When build-repeat > 0 and verboseBuild == true, whether to
        print repeated builds (i.e. builds other than the first one) to
        stderr. Hack to prevent Hydra logs from being polluted. */
     bool printRepeatedBuilds = true;
 
-    /* How often (in seconds) to poll for locks. */
-    unsigned int pollInterval;
+    Setting<unsigned int> pollInterval{this, 5, "build-poll-interval",
+        "How often (in seconds) to poll for locks."};
 
-    /* Whether to check if new GC roots can in fact be found by the
-       garbage collector. */
-    bool checkRootReachability;
+    Setting<bool> checkRootReachability{this, false, "gc-check-reachability",
+        "Whether to check if new GC roots can in fact be found by the "
+        "garbage collector."};
 
-    /* Whether the garbage collector should keep outputs of live
-       derivations. */
-    bool gcKeepOutputs;
+    Setting<bool> gcKeepOutputs{this, false, "gc-keep-outputs",
+        "Whether the garbage collector should keep outputs of live derivations."};
 
-    /* Whether the garbage collector should keep derivers of live
-       paths. */
-    bool gcKeepDerivations;
+    Setting<bool> gcKeepDerivations{this, true, "gc-keep-derivations",
+        "Whether the garbage collector should keep derivers of live paths."};
 
-    /* Whether to automatically replace files with identical contents
-       with hard links. */
-    bool autoOptimiseStore;
+    Setting<bool> autoOptimiseStore{this, false, "auto-optimise-store",
+        "Whether to automatically replace files with identical contents with hard links."};
 
-    /* Whether to add derivations as a dependency of user environments
-       (to prevent them from being GCed). */
-    bool envKeepDerivations;
+    Setting<bool> envKeepDerivations{this, false, "env-keep-derivations",
+        "Whether to add derivations as a dependency of user environments "
+        "(to prevent them from being GCed)."};
 
     /* Whether to lock the Nix client and worker to the same CPU. */
     bool lockCPU;
 
     /* Whether to show a stack trace if Nix evaluation fails. */
-    bool showTrace;
+    bool showTrace = false;
 
-    /* Whether native-code enabling primops should be enabled */
-    bool enableNativeCode;
+    Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation",
+        "Whether builtin functions that allow executing native code should be enabled."};
 
-    /* Whether to enable sandboxed builds (string until we get an enum for true/false/relaxed) */
-    string useSandbox;
+    Setting<SandboxMode> sandboxMode{this, smDisabled, "build-use-sandbox",
+        "Whether to enable sandboxed builds. Can be \"true\", \"false\" or \"relaxed\".",
+        {"build-use-chroot"}};
 
-    /* The basic set of paths to expose in a sandbox */
-    PathSet sandboxPaths;
+    Setting<PathSet> sandboxPaths{this, {}, "build-sandbox-paths",
+        "The paths to make available inside the build sandbox.",
+        {"build-chroot-dirs"}};
 
-    /* Any extra sandbox paths to expose */
-    PathSet extraSandboxPaths;
+    Setting<PathSet> extraSandboxPaths{this, {}, "build-extra-sandbox-paths",
+        "Additional paths to make available inside the build sandbox.",
+        {"build-extra-chroot-dirs"}};
 
-    /* Whether to allow certain questionable operations (like fetching) during evaluation */
-    bool restrictEval;
+    Setting<bool> restrictEval{this, false, "restrict-eval",
+        "Whether to restrict file system access to paths in $NIX_PATH, "
+        "and to disallow fetching files from the network."};
 
-    /* The number of times to repeat a build to check for determinism */
-    int buildRepeat;
+    Setting<size_t> buildRepeat{this, 0, "build-repeat",
+        "The number of times to repeat a build in order to verify determinism."};
 
-    /* Which prefixes to allow derivations to ask for access to (primarily for Darwin) */
-    PathSet allowedImpureHostPrefixes;
+#if __linux__
+    Setting<std::string> sandboxShmSize{this, "50%", "sandbox-dev-shm-size",
+        "The size of /dev/shm in the build sandbox."};
+#endif
 
-    /* The size of /dev/shm in the build sandbox (for Linux) */
-    string sandboxShmSize;
+    Setting<PathSet> allowedImpureHostPrefixes{this, {}, "allowed-impure-host-deps",
+        "Which prefixes to allow derivations to ask for access to (primarily for Darwin)."};
 
-    /* Whether to log Darwin sandbox access violations to the system log */
-    bool darwinLogSandboxViolations;
+#if __APPLE__
+    Setting<bool> darwinLogSandboxViolations{this, false, "darwin-log-sandbox-violations",
+        "Whether to log Darwin sandbox access violations to the system log."};
+#endif
 
-    /* ??? */
-    bool runDiffHook;
+    Setting<bool> runDiffHook{this, false, "run-diff-hook",
+        "Whether to run the program specified by the diff-hook setting "
+        "repeated builds produce a different result. Typically used to "
+        "plug in diffoscope."};
 
-    /* ??? */
-    string diffHook;
+    PathSetting diffHook{this, true, "", "diff-hook",
+        "A program that prints out the differences between the two paths "
+        "specified on its command line."};
 
-    /* Whether to fail if repeated builds produce different output */
-    bool enforceDeterminism;
+    Setting<bool> enforceDeterminism{this, true, "enforce-determinism",
+        "Whether to fail if repeated builds produce different output."};
 
-    /* The known public keys for a binary cache */
-    Strings binaryCachePublicKeys;
+    Setting<Strings> binaryCachePublicKeys{this,
+        {"cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="},
+        "binary-cache-public-keys",
+        "Trusted public keys for secure substitution."};
 
-    /* Secret keys to use for build output signing */
-    Strings secretKeyFiles;
+    Setting<Strings> secretKeyFiles{this, {}, "secret-key-files",
+        "Secret keys with which to sign local builds."};
 
-    /* Number of parallel connections to hit a binary cache with when finding out if it contains hashes */
-    int binaryCachesParallelConnections;
+    Setting<size_t> binaryCachesParallelConnections{this, 25, "binary-caches-parallel-connections",
+        "Number of parallel connections to binary caches."};
 
-    /* Whether to enable HTTP2 */
-    bool enableHttp2;
+    Setting<bool> enableHttp2{this, true, "enable-http2",
+        "Whether to enable HTTP/2 support."};
 
-    /* How soon to expire tarballs like builtins.fetchTarball and (ugh, bad name) builtins.fetchurl */
-    int tarballTtl;
+    Setting<unsigned int> tarballTtl{this, 60 * 60, "tarball-ttl",
+        "How soon to expire files fetched by builtins.fetchTarball and builtins.fetchurl."};
 
-    /* ??? */
-    string signedBinaryCaches;
+    Setting<std::string> signedBinaryCaches{this, "*", "signed-binary-caches",
+        "Obsolete."};
 
-    /* ??? */
-    Strings substituters;
+    Setting<Strings> substituters{this,
+        nixStore == "/nix/store" ? Strings{"https://cache.nixos.org/"} : Strings(),
+        "substituters",
+        "The URIs of substituters (such as https://cache.nixos.org/).",
+        {"binary-caches"}};
 
-    /* ??? */
-    Strings binaryCaches;
+    // FIXME: provide a way to add to option values.
+    Setting<Strings> extraSubstituters{this, {}, "extra-substituters",
+        "Additional URIs of substituters.",
+        {"extra-binary-caches"}};
 
-    /* ??? */
-    Strings extraBinaryCaches;
-
-    /* Who we trust to ask the daemon to do unsafe things */
-    Strings trustedUsers;
+    Setting<Strings> trustedUsers{this, {"root"}, "trusted-users",
+        "Which users or groups are trusted to ask the daemon to do unsafe things."};
 
     /* ?Who we trust to use the daemon in safe ways */
-    Strings allowedUsers;
+    Setting<Strings> allowedUsers{this, {"*"}, "allowed-users",
+        "Which users or groups are allowed to connect to the daemon."};
 
-    /* ??? */
-    bool printMissing;
+    Setting<bool> printMissing{this, true, "print-missing",
+        "Whether to print what paths need to be built or downloaded."};
 
-    /* The hook to run just before a build to set derivation-specific
-       build settings */
-    Path preBuildHook;
+    Setting<std::string> preBuildHook{this,
+#if __APPLE__
+        nixLibexecDir + "/nix/resolve-system-dependencies",
+#else
+        "",
+#endif
+        "pre-build-hook",
+        "A program to run just before a build to set derivation-specific build settings."};
 
-    /* Path to the netrc file used to obtain usernames/passwords for
-       downloads. */
-    Path netrcFile;
+    Setting<std::string> netrcFile{this, fmt("%s/%s", nixConfDir, "netrc"), "netrc-file",
+        "Path to the netrc file used to obtain usernames/passwords for downloads."};
 
     /* Path to the SSL CA file used */
     Path caFile;
 
-    /* Whether we allow import-from-derivation */
-    bool enableImportFromDerivation;
+    Setting<bool> enableImportFromDerivation{this, true, "allow-import-from-derivation",
+        "Whether the evaluator allows importing the result of a derivation."};
 
-private:
-    StringSet deprecatedOptions;
-    SettingsMap settings, overrides;
-
-    void checkDeprecated(const string & name);
-
-    void _get(string & res, const string & name);
-    void _get(string & res, const string & name1, const string & name2);
-    void _get(bool & res, const string & name);
-    void _get(StringSet & res, const string & name);
-    void _get(StringSet & res, const string & name1, const string & name2);
-    void _get(Strings & res, const string & name);
-    template<class N> void _get(N & res, const string & name);
+    struct CaseHackTag { };
+    Setting<bool, CaseHackTag> useCaseHack{this, nix::useCaseHack, "use-case-hack",
+        "Whether to enable a Darwin-specific hack for dealing with file name collisions."};
 };
 
 

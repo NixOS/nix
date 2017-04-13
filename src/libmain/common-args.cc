@@ -22,7 +22,11 @@ MixCommonArgs::MixCommonArgs(const string & programName)
         [](Strings ss) {
             auto name = ss.front(); ss.pop_front();
             auto value = ss.front();
-            settings.set(name, value);
+            try {
+                settings.set(name, value);
+            } catch (UsageError & e) {
+                warn(e.what());
+            }
         });
 }
 

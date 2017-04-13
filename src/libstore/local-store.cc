@@ -75,7 +75,7 @@ LocalStore::LocalStore(const Params & params)
 
         mode_t perm = 01775;
 
-        struct group * gr = getgrnam(settings.buildUsersGroup.c_str());
+        struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
         if (!gr)
             printError(format("warning: the group ‘%1%’ specified in ‘build-users-group’ does not exist")
                 % settings.buildUsersGroup);
@@ -1335,7 +1335,7 @@ void LocalStore::signPathInfo(ValidPathInfo & info)
 
     auto secretKeyFiles = settings.secretKeyFiles;
 
-    for (auto & secretKeyFile : secretKeyFiles) {
+    for (auto & secretKeyFile : secretKeyFiles.get()) {
         SecretKey secretKey(readFile(secretKeyFile));
         info.sign(secretKey);
     }
