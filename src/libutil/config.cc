@@ -90,7 +90,12 @@ template<> std::string Setting<int>::to_string()
 
 template<> void Setting<bool>::set(const std::string & str)
 {
-    value = str == "true" || str == "1";
+    if (str == "true" || str == "yes" || str == "1")
+        value = true;
+    else if (str == "false" || str == "no" || str == "0")
+        value = false;
+    else
+        throw UsageError("Boolean setting '%s' has invalid value '%s'", name, str);
 }
 
 template<> std::string Setting<bool>::to_string()
