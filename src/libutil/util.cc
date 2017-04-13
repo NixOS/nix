@@ -96,6 +96,8 @@ Path absPath(Path path, Path dir)
 
 Path canonPath(const Path & path, bool resolveSymlinks)
 {
+    assert(path != "");
+
     string s;
 
     if (path[0] != '/')
