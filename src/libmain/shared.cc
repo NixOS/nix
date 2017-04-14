@@ -159,7 +159,7 @@ struct LegacyArgs : public MixCommonArgs
             &(bool&) settings.keepGoing);
 
         mkFlag(0, "fallback", "build from source if substitution fails", []() {
-            settings.set("build-fallback", "true");
+            settings.tryFallback = true;
         });
 
         mkFlag1('j', "max-jobs", "jobs", "maximum number of parallel builds", [=](std::string s) {

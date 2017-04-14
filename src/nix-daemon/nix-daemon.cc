@@ -440,13 +440,13 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         settings.keepGoing = readInt(from);
         settings.tryFallback = readInt(from);
         verbosity = (Verbosity) readInt(from);
-        settings.set("build-max-jobs", std::to_string(readInt(from)));
+        settings.maxBuildJobs = readInt(from);
         settings.maxSilentTime = readInt(from);
         settings.useBuildHook = readInt(from) != 0;
         settings.verboseBuild = lvlError == (Verbosity) readInt(from);
         readInt(from); // obsolete logType
         readInt(from); // obsolete printBuildTrace
-        settings.set("build-cores", std::to_string(readInt(from)));
+        settings.buildCores = readInt(from);
         settings.useSubstitutes  = readInt(from);
         if (GET_PROTOCOL_MINOR(clientVersion) >= 12) {
             unsigned int n = readInt(from);
