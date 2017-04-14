@@ -225,6 +225,7 @@ LocalStore::LocalStore(bool reserveSpace)
     schemaPath = settings.nixDBPath + "/schema";
 
     if (settings.readOnlyMode) {
+        curSchema = getSchema();
         openDB(false);
         return;
     }
@@ -309,6 +310,7 @@ LocalStore::LocalStore(bool reserveSpace)
     } catch (SysError & e) {
         if (e.errNo != EACCES) throw;
         settings.readOnlyMode = true;
+        curSchema = getSchema();
         openDB(false);
         return;
     }
