@@ -202,7 +202,7 @@ void initGC()
 
     GC_INIT();
 
-    GC_oom_fn = oomHandler;
+    GC_set_oom_fn(oomHandler);
 
     /* Set the initial heap size to something fairly big (25% of
        physical RAM, up to a maximum of 384 MiB) so that in most cases

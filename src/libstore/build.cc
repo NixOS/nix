@@ -3376,10 +3376,10 @@ void SubstitutionGoal::tryToRun()
     trace("trying to run");
 
     /* Make sure that we are allowed to start a build.  Note that even
-       is maxBuildJobs == 0 (no local builds allowed), we still allow
+       if maxBuildJobs == 0 (no local builds allowed), we still allow
        a substituter to run.  This is because substitutions cannot be
        distributed to another machine via the build hook. */
-    if (worker.getNrLocalBuilds() >= (settings.maxBuildJobs == 0 ? 1 : settings.maxBuildJobs)) {
+    if (worker.getNrLocalBuilds() >= std::min(1U, (unsigned int) settings.maxBuildJobs)) {
         worker.waitForBuildSlot(shared_from_this());
         return;
     }
@@ -3660,7 +3660,7 @@ void Worker::run(const Goals & _topGoals)
         if (!children.empty() || !waitingForAWhile.empty())
             waitForInput();
         else {
-            if (awake.empty() && settings.maxBuildJobs == 0) throw Error(
+            if (awake.empty() && 0 == settings.maxBuildJobs) throw Error(
                 "unable to start any build; either increase ‘--max-jobs’ "
                 "or enable distributed builds");
             assert(!awake.empty());
@@ -3697,9 +3697,9 @@ void Worker::waitForInput()
     auto nearest = steady_time_point::max(); // nearest deadline
     for (auto & i : children) {
         if (!i.respectTimeouts) continue;
-        if (settings.maxSilentTime != 0)
+        if (0 != settings.maxSilentTime)
             nearest = std::min(nearest, i.lastOutput + std::chrono::seconds(settings.maxSilentTime));
-        if (settings.buildTimeout != 0)
+        if (0 != settings.buildTimeout)
             nearest = std::min(nearest, i.timeStarted + std::chrono::seconds(settings.buildTimeout));
     }
     if (nearest != steady_time_point::max()) {
@@ -3777,7 +3777,7 @@ void Worker::waitForInput()
         }
 
         if (goal->getExitCode() == Goal::ecBusy &&
-            settings.maxSilentTime != 0 &&
+            0 != settings.maxSilentTime &&
             j->respectTimeouts &&
             after - j->lastOutput >= std::chrono::seconds(settings.maxSilentTime))
         {
@@ -3788,7 +3788,7 @@ void Worker::waitForInput()
         }
 
         else if (goal->getExitCode() == Goal::ecBusy &&
-            settings.buildTimeout != 0 &&
+            0 != settings.buildTimeout &&
             j->respectTimeouts &&
             after - j->timeStarted >= std::chrono::seconds(settings.buildTimeout))
         {

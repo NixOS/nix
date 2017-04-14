@@ -369,7 +369,7 @@ struct CurlDownloader : public Downloader
         curl_multi_setopt(curlm, CURLMOPT_PIPELINING, CURLPIPE_MULTIPLEX);
         #endif
         curl_multi_setopt(curlm, CURLMOPT_MAX_TOTAL_CONNECTIONS,
-            settings.binaryCachesParallelConnections);
+            settings.binaryCachesParallelConnections.get());
 
         enableHttp2 = settings.enableHttp2;
 
