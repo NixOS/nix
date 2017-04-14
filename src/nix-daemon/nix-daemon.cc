@@ -453,10 +453,14 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
             for (unsigned int i = 0; i < n; i++) {
                 string name = readString(from);
                 string value = readString(from);
-                if (name == "build-timeout")
-                    settings.set(name, value);
-                else
-                    settings.set(trusted ? name : "untrusted-" + name, value);
+                try {
+                    if (name == "build-timeout")
+                        settings.set(name, value);
+                    else
+                        settings.set(trusted ? name : "untrusted-" + name, value);
+                } catch (UsageError & e) {
+                    warn(e.what());
+                }
             }
         }
         startWork();
