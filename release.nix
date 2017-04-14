@@ -7,7 +7,7 @@ let
 
   pkgs = import <nixpkgs> {};
 
-  systems = [ "x86_64-linux" "i686-linux" "x86_64-darwin" ];
+  systems = [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ];
 
 
   jobs = rec {
