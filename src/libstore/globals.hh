@@ -60,7 +60,7 @@ public:
     Setting<bool> keepGoing{this, false, "keep-going",
         "Whether to keep building derivations when another build fails."};
 
-    Setting<bool> tryFallback{this, tryFallback, "build-fallback",
+    Setting<bool> tryFallback{this, false, "build-fallback",
         "Whether to fall back to building when substitution fails."};
 
     /* Whether to show build log output in real time. */
