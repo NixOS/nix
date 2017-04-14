@@ -176,7 +176,9 @@ template<> std::string Setting<StringSet>::to_string()
 template class Setting<int>;
 template class Setting<unsigned int>;
 template class Setting<long>;
-template class Setting<size_t>;
+template class Setting<unsigned long>;
+template class Setting<long long>;
+template class Setting<unsigned long long>;
 
 void PathSetting::set(const std::string & str)
 {
