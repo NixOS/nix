@@ -26,7 +26,6 @@ static ref<Store> store()
     if (!_store) {
         try {
             settings.loadConfFile();
-            settings.update();
             settings.lockCPU = false;
             _store = openStore();
         } catch (Error & e) {
