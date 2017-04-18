@@ -1163,6 +1163,19 @@ stdenv.mkDerivation (rec {
 
   </varlistentry>
 
+  <varlistentry><term><function>builtins.tryEval</function>
+  <replaceable>e</replaceable></term>
+
+    <listitem><para>Try to evaluate <replaceable>e</replaceable>.
+    Return a set containing the attributes <literal>success</literal>
+    (<literal>true</literal> if <replaceable>e</replaceable> evaluated
+    successfully, <literal>false</literal> if an error was thrown) and
+    <literal>value</literal>, equalling <replaceable>e</replaceable>
+    if successful and <literal>false</literal> otherwise.
+    </para></listitem>
+
+  </varlistentry>
+
 
   <varlistentry><term><function>builtins.typeOf</function>
   <replaceable>e</replaceable></term>
