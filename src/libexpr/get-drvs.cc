@@ -3,6 +3,7 @@
 #include "eval-inline.hh"
 
 #include <cstring>
+#include <regex>
 
 
 namespace nix {
@@ -262,6 +263,9 @@ static string addToPath(const string & s1, const string & s2)
 }
 
 
+static std::regex attrRegex("[A-Za-z_][A-Za-z0-9-_+]*");
+
+
 static void getDerivations(EvalState & state, Value & vIn,
     const string & pathPrefix, Bindings & autoArgs,
     DrvInfos & drvs, Done & done,
@@ -286,6 +290,8 @@ static void getDerivations(EvalState & state, Value & vIn,
            precedence). */
         for (auto & i : v.attrs->lexicographicOrder()) {
             Activity act(*logger, lvlDebug, format("evaluating attribute ‘%1%’") % i->name);
+            if (!std::regex_match(std::string(i->name), attrRegex))
+                continue;
             string pathPrefix2 = addToPath(pathPrefix, i->name);
             if (combineChannels)
                 getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
