@@ -1136,7 +1136,7 @@ user environment elements, etc. -->
 
     <listitem><para>Print all of the meta-attributes of the
     derivation.  This option is only available with
-    <option>--xml</option>.</para></listitem>
+    <option>--xml</option> or <option>--json</option>.</para></listitem>
 
   </varlistentry>
 
