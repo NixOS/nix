@@ -11,6 +11,7 @@ with import <nixpkgs> {};
       pkgconfig sqlite libsodium boehmgc
       docbook5 docbook5_xsl
       autoconf-archive
+      lsof # Used by the garbage collector to determine what's in use
       (aws-sdk-cpp.override {
         apis = ["s3"];
         customMemoryManagement = false;

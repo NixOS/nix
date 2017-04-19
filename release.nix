@@ -74,6 +74,7 @@ let
           [ curl
             bzip2 xz brotli
             openssl pkgconfig sqlite boehmgc
+            lsof # Used by the garbage collector to determine what's in use
           ]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin)

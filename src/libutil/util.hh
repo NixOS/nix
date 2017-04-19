@@ -234,6 +234,10 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = P
    shell backtick operator). */
 string runProgram(Path program, bool searchPath = false,
     const Strings & args = Strings(),
+    const std::experimental::optional<std::string> & input = {},
+    const std::experimental::optional<Strings> & environment = {});
+
+string runTar(const Strings & args = Strings(),
     const std::experimental::optional<std::string> & input = {});
 
 class ExecError : public Error

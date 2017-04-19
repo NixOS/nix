@@ -840,7 +840,8 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
 
 
 string runProgram(Path program, bool searchPath, const Strings & args,
-    const std::experimental::optional<std::string> & input)
+    const std::experimental::optional<std::string> & input,
+    const std::experimental::optional<Strings> & environment)
 {
     checkInterrupt();
 
@@ -860,6 +861,16 @@ string runProgram(Path program, bool searchPath, const Strings & args,
         args_.push_front(program);
 
         restoreSignals();
+
+        if (environment) {
+            /* No need to delete because execv never returns and this is in a fork */
+            environ = new char*[environment->size() + 1]();
+            int i = 0;
+            for (auto & str : *environment) {
+                environ[i] = (char *) str.c_str();
+                ++i;
+            }
+        }
 
         if (searchPath)
             execvp(program.c_str(), stringsToCharPtrs(args_).data());
@@ -908,6 +919,11 @@ string runProgram(Path program, bool searchPath, const Strings & args,
     return result;
 }
 
+string runTar(const Strings & args, const std::experimental::optional<std::string> & input) {
+    /* If only tar let us pass in the tools we want it to use, rather than searching PATH... */
+    Strings env = { "PATH=" XZ_PATH ":" GZIP_PATH ":" BZIP2_PATH };
+    return runProgram(TAR_PATH, false, args, input, { env });
+}
 
 void closeMostFDs(const set<int> & exceptions)
 {
