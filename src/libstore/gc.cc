@@ -429,7 +429,7 @@ void LocalStore::findRuntimeRoots(PathSet & roots)
     try {
         auto lsofRegex = std::regex(R"(^n(/.*)$)");
         auto lsofLines =
-            tokenizeString<std::vector<string>>(runProgram("lsof", true, { "-n", "-w", "-F", "n" }), "\n");
+            tokenizeString<std::vector<string>>(runProgram(LSOF_PATH, false, { "-n", "-w", "-F", "n" }), "\n");
         for (const auto & line : lsofLines) {
             auto match = std::smatch{};
             if (std::regex_match(line, match, lsofRegex))

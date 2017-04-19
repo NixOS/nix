@@ -121,13 +121,30 @@ AC_PATH_PROG(xsltproc, xsltproc, false)
 AC_PATH_PROG(flex, flex, false)
 AC_PATH_PROG(bison, bison, false)
 NEED_PROG(sed, sed)
-NEED_PROG(tar, tar)
-NEED_PROG(bzip2, bzip2)
-NEED_PROG(gzip, gzip)
-NEED_PROG(xz, xz)
+AC_PATH_PROG(xz)
 AC_PATH_PROG(dot, dot)
 AC_PATH_PROG(pv, pv, pv)
 AC_PATH_PROG(bro, bro, bro)
+
+NEED_PROG(tar, tar)
+AC_SUBST(tar)
+AC_DEFINE_UNQUOTED(TAR_PATH, ["$tar"], [tar path])
+
+NEED_PROG(bzip2, bzip2)
+AC_SUBST(bzip2)
+AC_DEFINE_UNQUOTED(BZIP2_PATH, ["$(dirname $bzip2)"], [bzip2 path])
+
+NEED_PROG(gzip, gzip)
+AC_SUBST(gzip)
+AC_DEFINE_UNQUOTED(GZIP_PATH, ["$(dirname $gzip)"], [gzip path])
+
+NEED_PROG(xz, xz)
+AC_SUBST(xz)
+AC_DEFINE_UNQUOTED(XZ_PATH, ["$(dirname $xz)"], [xz path])
+
+NEED_PROG(lsof, lsof)
+AC_SUBST(lsof)
+AC_DEFINE_UNQUOTED(LSOF_PATH, ["$lsof"], [lsof path])
 
 
 NEED_PROG(cat, cat)

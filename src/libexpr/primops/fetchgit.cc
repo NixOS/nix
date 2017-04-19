@@ -32,12 +32,14 @@ Path exportGit(ref<Store> store, const std::string & uri, const std::string & re
 
     // FIXME: should pipe this, or find some better way to extract a
     // revision.
+    // FIXME: this is an implicit dependency on git. Not necessarily a bad thing, but
+    // could cause unpleasant user experience if it's missing.
     auto tar = runProgram("git", true, { "-C", cacheDir, "archive", commitHash });
 
     Path tmpDir = createTempDir();
     AutoDelete delTmpDir(tmpDir, true);
 
-    runProgram("tar", true, { "x", "-C", tmpDir }, tar);
+    runTar({ "x", "-C", tmpDir }, tar);
 
     return store->addToStore("git-export", tmpDir);
 }
