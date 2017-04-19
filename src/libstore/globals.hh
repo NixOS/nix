@@ -270,6 +270,9 @@ public:
     struct CaseHackTag { };
     Setting<bool, CaseHackTag> useCaseHack{this, nix::useCaseHack, "use-case-hack",
         "Whether to enable a Darwin-specific hack for dealing with file name collisions."};
+
+    Setting<unsigned long> connectTimeout{this, 0, "connect-timeout",
+        "Timeout for connecting to servers during downloads. 0 means use curl's builtin default."};
 };
 
 

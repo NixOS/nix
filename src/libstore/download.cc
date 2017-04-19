@@ -249,6 +249,8 @@ struct CurlDownloader : public Downloader
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYHOST, 0);
             }
 
+            curl_easy_setopt(req, CURLOPT_CONNECTTIMEOUT, settings.connectTimeout.get());
+
             /* If no file exist in the specified path, curl continues to work
                anyway as if netrc support was disabled. */
             curl_easy_setopt(req, CURLOPT_NETRC_FILE, settings.netrcFile.get().c_str());
