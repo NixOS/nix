@@ -111,83 +111,72 @@ AbstractSetting::AbstractSetting(
 {
 }
 
-template<> void Setting<std::string>::set(const std::string & str)
+template<> void BaseSetting<std::string>::set(const std::string & str)
 {
     value = str;
 }
 
-template<> std::string Setting<std::string>::to_string()
+template<> std::string BaseSetting<std::string>::to_string()
 {
     return value;
 }
 
-template<typename T, typename Tag>
-void Setting<T, Tag>::set(const std::string & str)
+template<typename T>
+void BaseSetting<T>::set(const std::string & str)
 {
     static_assert(std::is_integral<T>::value, "Integer required.");
     if (!string2Int(str, value))
         throw UsageError("setting '%s' has invalid value '%s'", name, str);
 }
 
-template<typename T, typename Tag>
-std::string Setting<T, Tag>::to_string()
+template<typename T>
+std::string BaseSetting<T>::to_string()
 {
     static_assert(std::is_integral<T>::value, "Integer required.");
     return std::to_string(value);
 }
 
-bool AbstractSetting::parseBool(const std::string & str)
+template<> void BaseSetting<bool>::set(const std::string & str)
 {
     if (str == "true" || str == "yes" || str == "1")
-        return true;
+        value = true;
     else if (str == "false" || str == "no" || str == "0")
-        return false;
+        value = false;
     else
         throw UsageError("Boolean setting '%s' has invalid value '%s'", name, str);
 }
 
-template<> void Setting<bool>::set(const std::string & str)
+template<> std::string BaseSetting<bool>::to_string()
 {
-    value = parseBool(str);
+    return value ? "true" : "false";
 }
 
-std::string AbstractSetting::printBool(bool b)
-{
-    return b ? "true" : "false";
-}
-
-
-template<> std::string Setting<bool>::to_string()
-{
-    return printBool(value);
-}
-
-template<> void Setting<Strings>::set(const std::string & str)
+template<> void BaseSetting<Strings>::set(const std::string & str)
 {
     value = tokenizeString<Strings>(str);
 }
 
-template<> std::string Setting<Strings>::to_string()
+template<> std::string BaseSetting<Strings>::to_string()
 {
     return concatStringsSep(" ", value);
 }
 
-template<> void Setting<StringSet>::set(const std::string & str)
+template<> void BaseSetting<StringSet>::set(const std::string & str)
 {
     value = tokenizeString<StringSet>(str);
 }
 
-template<> std::string Setting<StringSet>::to_string()
+template<> std::string BaseSetting<StringSet>::to_string()
 {
     return concatStringsSep(" ", value);
 }
 
-template class Setting<int>;
-template class Setting<unsigned int>;
-template class Setting<long>;
-template class Setting<unsigned long>;
-template class Setting<long long>;
-template class Setting<unsigned long long>;
+template class BaseSetting<int>;
+template class BaseSetting<unsigned int>;
+template class BaseSetting<long>;
+template class BaseSetting<unsigned long>;
+template class BaseSetting<long long>;
+template class BaseSetting<unsigned long long>;
 
 void PathSetting::set(const std::string & str)
 {

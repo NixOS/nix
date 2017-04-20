@@ -13,6 +13,39 @@ typedef enum { smEnabled, smRelaxed, smDisabled } SandboxMode;
 
 extern bool useCaseHack; // FIXME
 
+struct CaseHackSetting : public BaseSetting<bool>
+{
+    CaseHackSetting(Config * options,
+        const std::string & name,
+        const std::string & description,
+        const std::set<std::string> & aliases = {})
+        : BaseSetting<bool>(useCaseHack, name, description, aliases)
+    {
+        options->addSetting(this);
+    }
+
+    void set(const std::string & str) override
+    {
+        BaseSetting<bool>::set(str);
+        nix::useCaseHack = true;
+    }
+};
+
+struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
+{
+    MaxBuildJobsSetting(Config * options,
+        unsigned int def,
+        const std::string & name,
+        const std::string & description,
+        const std::set<std::string> & aliases = {})
+        : BaseSetting<unsigned int>(def, name, description, aliases)
+    {
+        options->addSetting(this);
+    }
+
+    void set(const std::string & str) override;
+};
+
 class Settings : public Config {
 
     unsigned int getDefaultCores();
@@ -66,8 +99,7 @@ public:
        the log to show if a build fails. */
     size_t logLines = 10;
 
-    struct MaxBuildJobsTag { };
-    Setting<unsigned int, MaxBuildJobsTag> maxBuildJobs{this, 1, "build-max-jobs",
+    MaxBuildJobsSetting maxBuildJobs{this, 1, "build-max-jobs",
         "Maximum number of parallel build jobs. \"auto\" means use number of cores."};
 
     Setting<unsigned int> buildCores{this, getDefaultCores(), "build-cores",
@@ -268,8 +300,7 @@ public:
     Setting<bool> enableImportFromDerivation{this, true, "allow-import-from-derivation",
         "Whether the evaluator allows importing the result of a derivation."};
 
-    struct CaseHackTag { };
-    Setting<bool, CaseHackTag> useCaseHack{this, nix::useCaseHack, "use-case-hack",
+    CaseHackSetting useCaseHack{this, "use-case-hack",
         "Whether to enable a Darwin-specific hack for dealing with file name collisions."};
 
     Setting<unsigned long> connectTimeout{this, 0, "connect-timeout",

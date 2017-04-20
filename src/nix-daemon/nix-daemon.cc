@@ -440,7 +440,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         settings.keepGoing = readInt(from);
         settings.tryFallback = readInt(from);
         verbosity = (Verbosity) readInt(from);
-        settings.maxBuildJobs = readInt(from);
+        settings.maxBuildJobs.assign(readInt(from));
         settings.maxSilentTime = readInt(from);
         settings.useBuildHook = readInt(from) != 0;
         settings.verboseBuild = lvlError == (Verbosity) readInt(from);

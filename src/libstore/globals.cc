@@ -73,7 +73,7 @@ unsigned int Settings::getDefaultCores()
 
 const string nixVersion = PACKAGE_VERSION;
 
-template<> void Setting<SandboxMode>::set(const std::string & str)
+template<> void BaseSetting<SandboxMode>::set(const std::string & str)
 {
     if (str == "true") value = smEnabled;
     else if (str == "relaxed") value = smRelaxed;
@@ -81,7 +81,7 @@ template<> void Setting<SandboxMode>::set(const std::string & str)
     else throw UsageError("option '%s' has invalid value '%s'", name, str);
 }
 
-template<> std::string Setting<SandboxMode>::to_string()
+template<> std::string BaseSetting<SandboxMode>::to_string()
 {
     if (value == smEnabled) return "true";
     else if (value == smRelaxed) return "relaxed";
@@ -89,27 +89,11 @@ template<> std::string Setting<SandboxMode>::to_string()
     else abort();
 }
 
-template<> void Setting<unsigned int, Settings::MaxBuildJobsTag>::set(const std::string & str)
+void MaxBuildJobsSetting::set(const std::string & str)
 {
     if (str == "auto") value = std::max(1U, std::thread::hardware_concurrency());
     else if (!string2Int(str, value))
         throw UsageError("configuration setting ‘%s’ should be ‘auto’ or an integer", name);
-}
-
-template<> std::string Setting<unsigned int, Settings::MaxBuildJobsTag>::to_string()
-{
-    return std::to_string(value);
-}
-
-template<> void Setting<bool, Settings::CaseHackTag>::set(const std::string & str)
-{
-    value = parseBool(str);
-    nix::useCaseHack = true;
-}
-
-template<> std::string Setting<bool, Settings::CaseHackTag>::to_string()
-{
-    return printBool(value);
 }
 
 }
