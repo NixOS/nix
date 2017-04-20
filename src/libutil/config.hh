@@ -51,9 +51,11 @@ public:
 
     void warnUnknownSettings();
 
-    StringMap getSettings();
+    StringMap getSettings(bool overridenOnly = false);
 
     void applyConfigFile(const Path & path, bool fatal = false);
+
+    void resetOverriden();
 };
 
 class AbstractSetting
@@ -68,6 +70,8 @@ public:
 
     int created = 123;
 
+    bool overriden = false;
+
 protected:
 
     AbstractSetting(
@@ -78,7 +82,7 @@ protected:
     virtual ~AbstractSetting()
     {
         // Check against a gcc miscompilation causing our constructor
-        // not to run.
+        // not to run (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80431).
         assert(created == 123);
     }
 
@@ -88,6 +92,8 @@ protected:
 
     bool parseBool(const std::string & str);
     std::string printBool(bool b);
+
+    bool isOverriden() { return overriden; }
 };
 
 struct DefaultSettingTag { };

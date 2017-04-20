@@ -110,8 +110,11 @@ void deletePath(const Path & path, unsigned long long & bytesFreed);
 Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
     bool includePid = true, bool useGlobalCounter = true, mode_t mode = 0755);
 
-/* Return the path to $XDG_CACHE_HOME/.cache. */
+/* Return $XDG_CACHE_HOME or $HOME/.cache. */
 Path getCacheDir();
+
+/* Return $XDG_CONFIG_HOME or $HOME/.config. */
+Path getConfigDir();
 
 /* Create a directory and all its parents, if necessary.  Returns the
    list of created directories, in order of creation. */

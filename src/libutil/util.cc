@@ -429,6 +429,18 @@ Path getCacheDir()
 }
 
 
+Path getConfigDir()
+{
+    Path configDir = getEnv("XDG_CONFIG_HOME");
+    if (configDir.empty()) {
+        Path homeDir = getEnv("HOME");
+        if (homeDir.empty()) throw Error("$XDG_CONFIG_HOME and $HOME are not set");
+        configDir = homeDir + "/.config";
+    }
+    return configDir;
+}
+
+
 Paths createDirs(const Path & path)
 {
     Paths created;

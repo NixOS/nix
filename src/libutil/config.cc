@@ -9,6 +9,7 @@ void Config::set(const std::string & name, const std::string & value)
     if (i == _settings.end())
         throw UsageError("unknown setting '%s'", name);
     i->second.setting->set(value);
+    i->second.setting->overriden = true;
 }
 
 void Config::addSetting(AbstractSetting * setting)
@@ -22,6 +23,7 @@ void Config::addSetting(AbstractSetting * setting)
     auto i = initials.find(setting->name);
     if (i != initials.end()) {
         setting->set(i->second);
+        setting->overriden = true;
         initials.erase(i);
         set = true;
     }
@@ -34,6 +36,7 @@ void Config::addSetting(AbstractSetting * setting)
                     alias, setting->name);
             else {
                 setting->set(i->second);
+                setting->overriden = true;
                 initials.erase(i);
                 set = true;
             }
@@ -47,11 +50,11 @@ void Config::warnUnknownSettings()
         warn("unknown setting '%s'", i.first);
 }
 
-StringMap Config::getSettings()
+StringMap Config::getSettings(bool overridenOnly)
 {
     StringMap res;
     for (auto & opt : _settings)
-        if (!opt.second.isAlias)
+        if (!opt.second.isAlias && (!overridenOnly || opt.second.setting->overriden))
             res.emplace(opt.first, opt.second.setting->to_string());
     return res;
 }
@@ -92,6 +95,12 @@ void Config::applyConfigFile(const Path & path, bool fatal)
             }
         };
     } catch (SysError &) { }
+}
+
+void Config::resetOverriden()
+{
+    for (auto & s : _settings)
+        s.second.setting->overriden = false;
 }
 
 AbstractSetting::AbstractSetting(

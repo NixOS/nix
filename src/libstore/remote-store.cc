@@ -166,7 +166,7 @@ void RemoteStore::setOptions(Connection & conn)
        << settings.useSubstitutes;
 
     if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 12) {
-        StringMap overrides = settings.getOverrides();
+        auto overrides = settings.getSettings(true);
         conn.to << overrides.size();
         for (auto & i : overrides)
             conn.to << i.first << i.second;

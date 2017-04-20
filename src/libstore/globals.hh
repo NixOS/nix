@@ -15,8 +15,6 @@ extern bool useCaseHack; // FIXME
 
 class Settings : public Config {
 
-    StringMap overrides;
-
     unsigned int getDefaultCores();
 
 public:
@@ -26,8 +24,6 @@ public:
     void loadConfFile();
 
     void set(const string & name, const string & value);
-
-    StringMap getOverrides();
 
     Path nixPrefix;
 

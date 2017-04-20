@@ -17,13 +17,32 @@
 
 <refsection><title>Description</title>
 
-<para>A number of persistent settings of Nix are stored in the file
-<filename><replaceable>sysconfdir</replaceable>/nix/nix.conf</filename> or
-<filename>$NIX_CONF_DIR/nix.conf</filename> if <envar>NIX_CONF_DIR</envar> is set.
-This file is a list of <literal><replaceable>name</replaceable> =
+<para>Nix reads settings from two configuration files:</para>
+
+<itemizedlist>
+
+  <listitem>
+    <para>The system-wide configuration file
+    <filename><replaceable>sysconfdir</replaceable>/nix/nix.conf</filename>
+    (i.e. <filename>/etc/nix/nix.conf</filename> on most systems), or
+    <filename>$NIX_CONF_DIR/nix.conf</filename> if
+    <envar>NIX_CONF_DIR</envar> is set.</para>
+  </listitem>
+
+  <listitem>
+    <para>The user configuration file
+    <filename>$XDG_CONFIG_HOME/nix/nix.conf</filename>, or
+    <filename>~/.config/nix/nix.conf</filename> if
+    <envar>XDG_CONFIG_HOME</envar> is not set.</para>
+  </listitem>
+
+</itemizedlist>
+
+<para>The configuration files consist of
+<literal><replaceable>name</replaceable> =
 <replaceable>value</replaceable></literal> pairs, one per line.
-Comments start with a <literal>#</literal> character.  Here is an example
-configuration file:</para>
+Comments start with a <literal>#</literal> character.  Here is an
+example configuration file:</para>
 
 <programlisting>
 gc-keep-outputs = true       # Nice for developers
@@ -31,8 +50,9 @@ gc-keep-derivations = true   # Idem
 env-keep-derivations = false
 </programlisting>
 
-<para>You can override settings using the <option>--option</option>
-flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
+<para>You can override settings on the command line using the
+<option>--option</option> flag, e.g. <literal>--option gc-keep-outputs
+false</literal>.</para>
 
 <para>The following settings are currently available:
 

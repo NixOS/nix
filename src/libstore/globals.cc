@@ -53,17 +53,17 @@ Settings::Settings()
 void Settings::loadConfFile()
 {
     applyConfigFile(nixConfDir + "/nix.conf");
+
+    /* We only want to send overrides to the daemon, i.e. stuff from
+       ~/.nix/nix.conf or the command line. */
+    resetOverriden();
+
+    applyConfigFile(getConfigDir() + "/nix/nix.conf");
 }
 
 void Settings::set(const string & name, const string & value)
 {
-    overrides[name] = value;
     Config::set(name, value);
-}
-
-StringMap Settings::getOverrides()
-{
-    return overrides;
 }
 
 unsigned int Settings::getDefaultCores()
