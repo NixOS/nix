@@ -15,6 +15,7 @@ SQLITE3_LIBS = @SQLITE3_LIBS@
 bash = @bash@
 bindir = @bindir@
 bro = @bro@
+lsof = @lsof@
 datadir = @datadir@
 datarootdir = @datarootdir@
 docdir = @docdir@

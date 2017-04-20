@@ -426,22 +426,27 @@ void LocalStore::findRuntimeRoots(PathSet & roots)
             throw SysError("iterating /proc");
     }
 
+#if !defined(__linux__)
     try {
-        auto lsofRegex = std::regex(R"(^n(/.*)$)");
+        printError("RUN LSOF %s", LSOF);
+        std::regex lsofRegex(R"(^n(/.*)$)");
         auto lsofLines =
-            tokenizeString<std::vector<string>>(runProgram("lsof", true, { "-n", "-w", "-F", "n" }), "\n");
+            tokenizeString<std::vector<string>>(runProgram(LSOF, true, { "-n", "-w", "-F", "n" }), "\n");
         for (const auto & line : lsofLines) {
-            auto match = std::smatch{};
+            std::smatch match;
             if (std::regex_match(line, match, lsofRegex))
                 paths.emplace(match[1]);
         }
     } catch (ExecError & e) {
         /* lsof not installed, lsof failed */
     }
+#endif
 
+#if defined(__linux__)
     readFileRoots("/proc/sys/kernel/modprobe", paths);
     readFileRoots("/proc/sys/kernel/fbsplash", paths);
     readFileRoots("/proc/sys/kernel/poweroff_cmd", paths);
+#endif
 
     for (auto & i : paths)
         if (isInStore(i)) {

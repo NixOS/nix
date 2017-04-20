@@ -128,6 +128,7 @@ NEED_PROG(xz, xz)
 AC_PATH_PROG(dot, dot)
 AC_PATH_PROG(pv, pv, pv)
 AC_PATH_PROG(bro, bro, bro)
+AC_PATH_PROG(lsof, lsof, lsof)
 
 
 NEED_PROG(cat, cat)
