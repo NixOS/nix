@@ -448,20 +448,56 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         readInt(from); // obsolete printBuildTrace
         settings.buildCores = readInt(from);
         settings.useSubstitutes  = readInt(from);
+
+        StringMap overrides;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 12) {
             unsigned int n = readInt(from);
             for (unsigned int i = 0; i < n; i++) {
                 string name = readString(from);
                 string value = readString(from);
-                try {
-                    if (trusted || name == "build-timeout")
-                        settings.set(name, value);
-                } catch (UsageError & e) {
-                    warn(e.what());
-                }
+                overrides.emplace(name, value);
             }
         }
+
         startWork();
+
+        for (auto & i : overrides) {
+            auto & name(i.first);
+            auto & value(i.second);
+
+            auto setSubstituters = [&](Setting<Strings> & res) {
+                if (name != res.name && res.aliases.count(name) == 0)
+                    return false;
+                StringSet trusted = settings.trustedSubstituters;
+                for (auto & s : settings.substituters.get())
+                    trusted.insert(s);
+                Strings subs;
+                auto ss = tokenizeString<Strings>(value);
+                for (auto & s : ss)
+                    if (trusted.count(s))
+                        subs.push_back(s);
+                    else
+                        warn("ignoring untrusted substituter '%s'", s);
+                res = subs;
+                return true;
+            };
+
+            try {
+                if (trusted
+                    || name == settings.buildTimeout.name
+                    || name == settings.connectTimeout.name)
+                    settings.set(name, value);
+                else if (setSubstituters(settings.substituters))
+                    ;
+                else if (setSubstituters(settings.extraSubstituters))
+                    ;
+                else
+                    debug("ignoring untrusted setting '%s'", name);
+            } catch (UsageError & e) {
+                warn(e.what());
+            }
+        }
+
         stopWork();
         break;
     }

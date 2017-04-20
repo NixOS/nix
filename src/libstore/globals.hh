@@ -239,6 +239,10 @@ public:
         "Additional URIs of substituters.",
         {"extra-binary-caches"}};
 
+    Setting<StringSet> trustedSubstituters{this, {}, "trusted-substituters",
+        "Disabled substituters that may be enabled via the substituters option by untrusted users.",
+        {"trusted-binary-caches"}};
+
     Setting<Strings> trustedUsers{this, {"root"}, "trusted-users",
         "Which users or groups are trusted to ask the daemon to do unsafe things."};
 
