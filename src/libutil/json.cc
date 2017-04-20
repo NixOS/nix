@@ -19,49 +19,32 @@ void toJSON(std::ostream & str, const char * start, const char * end)
     str << '"';
 }
 
-void toJSON(std::ostream & str, const std::string & s)
-{
-    toJSON(str, s.c_str(), s.c_str() + s.size());
-}
-
 void toJSON(std::ostream & str, const char * s)
 {
     if (!s) str << "null"; else toJSON(str, s, s + strlen(s));
 }
 
-void toJSON(std::ostream & str, unsigned long long n)
+template<> void toJSON<int>(std::ostream & str, const int & n) { str << n; }
+template<> void toJSON<unsigned int>(std::ostream & str, const unsigned int & n) { str << n; }
+template<> void toJSON<long>(std::ostream & str, const long & n) { str << n; }
+template<> void toJSON<unsigned long>(std::ostream & str, const unsigned long & n) { str << n; }
+template<> void toJSON<long long>(std::ostream & str, const long long & n) { str << n; }
+template<> void toJSON<unsigned long long>(std::ostream & str, const unsigned long long & n) { str << n; }
+template<> void toJSON<float>(std::ostream & str, const float & n) { str << n; }
+
+template<> void toJSON<std::string>(std::ostream & str, const std::string & s)
 {
-    str << n;
+    toJSON(str, s.c_str(), s.c_str() + s.size());
 }
 
-void toJSON(std::ostream & str, unsigned long n)
-{
-    str << n;
-}
-
-void toJSON(std::ostream & str, long n)
-{
-    str << n;
-}
-
-void toJSON(std::ostream & str, unsigned int n)
-{
-    str << n;
-}
-
-void toJSON(std::ostream & str, int n)
-{
-    str << n;
-}
-
-void toJSON(std::ostream & str, double f)
-{
-    str << f;
-}
-
-void toJSON(std::ostream & str, bool b)
+template<> void toJSON<bool>(std::ostream & str, const bool & b)
 {
     str << (b ? "true" : "false");
+}
+
+template<> void toJSON<std::nullptr_t>(std::ostream & str, const std::nullptr_t & b)
+{
+    str << "null";
 }
 
 JSONWriter::JSONWriter(std::ostream & str, bool indent)

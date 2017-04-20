@@ -7,15 +7,10 @@
 namespace nix {
 
 void toJSON(std::ostream & str, const char * start, const char * end);
-void toJSON(std::ostream & str, const std::string & s);
 void toJSON(std::ostream & str, const char * s);
-void toJSON(std::ostream & str, unsigned long long n);
-void toJSON(std::ostream & str, unsigned long n);
-void toJSON(std::ostream & str, long n);
-void toJSON(std::ostream & str, unsigned int n);
-void toJSON(std::ostream & str, int n);
-void toJSON(std::ostream & str, double f);
-void toJSON(std::ostream & str, bool b);
+
+template<typename T>
+void toJSON(std::ostream & str, const T & n);
 
 class JSONWriter
 {

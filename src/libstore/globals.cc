@@ -89,6 +89,11 @@ template<> std::string BaseSetting<SandboxMode>::to_string()
     else abort();
 }
 
+template<> void BaseSetting<SandboxMode>::toJSON(JSONPlaceholder & out)
+{
+    AbstractSetting::toJSON(out);
+}
+
 void MaxBuildJobsSetting::set(const std::string & str)
 {
     if (str == "auto") value = std::max(1U, std::thread::hardware_concurrency());

@@ -1,5 +1,6 @@
 #include "config.hh"
 #include "args.hh"
+#include "json.hh"
 
 namespace nix {
 
@@ -103,12 +104,34 @@ void Config::resetOverriden()
         s.second.setting->overriden = false;
 }
 
+void Config::toJSON(JSONObject & out)
+{
+    for (auto & s : _settings)
+        if (!s.second.isAlias) {
+            JSONObject out2(out.object(s.first));
+            out2.attr("description", s.second.setting->description);
+            JSONPlaceholder out3(out2.placeholder("value"));
+            s.second.setting->toJSON(out3);
+        }
+}
+
 AbstractSetting::AbstractSetting(
     const std::string & name,
     const std::string & description,
     const std::set<std::string> & aliases)
     : name(name), description(description), aliases(aliases)
 {
+}
+
+void AbstractSetting::toJSON(JSONPlaceholder & out)
+{
+    out.write(to_string());
+}
+
+template<typename T>
+void BaseSetting<T>::toJSON(JSONPlaceholder & out)
+{
+    out.write(value);
 }
 
 template<> void BaseSetting<std::string>::set(const std::string & str)
@@ -161,6 +184,13 @@ template<> std::string BaseSetting<Strings>::to_string()
     return concatStringsSep(" ", value);
 }
 
+template<> void BaseSetting<Strings>::toJSON(JSONPlaceholder & out)
+{
+    JSONList list(out.list());
+    for (auto & s : value)
+        list.elem(s);
+}
+
 template<> void BaseSetting<StringSet>::set(const std::string & str)
 {
     value = tokenizeString<StringSet>(str);
@@ -171,12 +201,20 @@ template<> std::string BaseSetting<StringSet>::to_string()
     return concatStringsSep(" ", value);
 }
 
+template<> void BaseSetting<StringSet>::toJSON(JSONPlaceholder & out)
+{
+    JSONList list(out.list());
+    for (auto & s : value)
+        list.elem(s);
+}
+
 template class BaseSetting<int>;
 template class BaseSetting<unsigned int>;
 template class BaseSetting<long>;
 template class BaseSetting<unsigned long>;
 template class BaseSetting<long long>;
 template class BaseSetting<unsigned long long>;
+template class BaseSetting<bool>;
 
 void PathSetting::set(const std::string & str)
 {

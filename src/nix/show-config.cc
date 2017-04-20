@@ -31,8 +31,7 @@ struct CmdShowConfig : Command
         if (json) {
             // FIXME: use appropriate JSON types (bool, ints, etc).
             JSONObject jsonObj(std::cout, true);
-            for (auto & s : settings.getSettings())
-                jsonObj.attr(s.first, s.second);
+            settings.toJSON(jsonObj);
         } else {
             for (auto & s : settings.getSettings())
                 std::cout << s.first + " = " + s.second + "\n";

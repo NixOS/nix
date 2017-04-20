@@ -9,6 +9,8 @@ namespace nix {
 
 class Args;
 class AbstractSetting;
+class JSONPlaceholder;
+class JSONObject;
 
 /* A class to simplify providing configuration settings. The typical
    use is to inherit Config and add Setting<T> members:
@@ -56,6 +58,8 @@ public:
     void applyConfigFile(const Path & path, bool fatal = false);
 
     void resetOverriden();
+
+    void toJSON(JSONObject & out);
 };
 
 class AbstractSetting
@@ -90,6 +94,8 @@ protected:
 
     virtual std::string to_string() = 0;
 
+    virtual void toJSON(JSONPlaceholder & out);
+
     bool isOverriden() { return overriden; }
 };
 
@@ -122,6 +128,8 @@ public:
     void set(const std::string & str) override;
 
     std::string to_string() override;
+
+    void toJSON(JSONPlaceholder & out) override;
 };
 
 template<typename T>
