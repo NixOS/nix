@@ -404,7 +404,7 @@ flag, e.g. <literal>--option gc-keep-outputs false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry><term><literal>binary-caches-parallel-connections</literal></term>
+  <varlistentry><term><literal>http-connections</literal></term>
 
     <listitem><para>The maximum number of parallel TCP connections
     used to fetch files from binary caches and by other downloads. It

@@ -216,8 +216,9 @@ public:
     Setting<Strings> secretKeyFiles{this, {}, "secret-key-files",
         "Secret keys with which to sign local builds."};
 
-    Setting<size_t> binaryCachesParallelConnections{this, 25, "binary-caches-parallel-connections",
-        "Number of parallel connections to binary caches."};
+    Setting<size_t> binaryCachesParallelConnections{this, 25, "http-connections",
+        "Number of parallel HTTP connections.",
+        {"binary-caches-parallel-connections"}};
 
     Setting<bool> enableHttp2{this, true, "enable-http2",
         "Whether to enable HTTP/2 support."};
