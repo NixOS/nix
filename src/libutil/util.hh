@@ -267,7 +267,7 @@ void closeOnExec(int fd);
 
 extern bool _isInterrupted;
 
-extern thread_local bool interruptThrown;
+void setInterruptThrown();
 
 void _interrupted();
 
