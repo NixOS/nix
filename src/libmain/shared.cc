@@ -259,7 +259,7 @@ int handleExceptions(const string & programName, std::function<void()> fun)
                condition is discharged before we reach printMsg()
                below, since otherwise it will throw an (uncaught)
                exception. */
-            interruptThrown = true;
+            setInterruptThrown();
             throw;
         }
     } catch (Exit & e) {

@@ -946,7 +946,12 @@ void closeOnExec(int fd)
 
 bool _isInterrupted = false;
 
-thread_local bool interruptThrown = false;
+static thread_local bool interruptThrown = false;
+
+void setInterruptThrown()
+{
+    interruptThrown = true;
+}
 
 void _interrupted()
 {
