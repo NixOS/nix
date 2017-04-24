@@ -2,25 +2,24 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "json.hh"
+#include "common-args.hh"
 
 #include <iomanip>
 #include <algorithm>
 
 using namespace nix;
 
-struct CmdPathInfo : StorePathsCommand
+struct CmdPathInfo : StorePathsCommand, MixJSON
 {
     bool showSize = false;
     bool showClosureSize = false;
     bool showSigs = false;
-    bool json = false;
 
     CmdPathInfo()
     {
         mkFlag('s', "size", "print size of the NAR dump of each path", &showSize);
         mkFlag('S', "closure-size", "print sum size of the NAR dumps of the closure of each path", &showClosureSize);
         mkFlag(0, "sigs", "show signatures", &showSigs);
-        mkFlag(0, "json", "produce JSON output", &json);
     }
 
     std::string name() override

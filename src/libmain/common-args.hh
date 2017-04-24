@@ -12,11 +12,21 @@ struct MixCommonArgs : virtual Args
 
 struct MixDryRun : virtual Args
 {
-    bool dryRun;
+    bool dryRun = false;
 
     MixDryRun()
     {
         mkFlag(0, "dry-run", "show what this command would do without doing it", &dryRun);
+    }
+};
+
+struct MixJSON : virtual Args
+{
+    bool json = false;
+
+    MixJSON()
+    {
+        mkFlag(0, "json", "produce JSON output", &json);
     }
 };
 

@@ -7,13 +7,10 @@
 
 using namespace nix;
 
-struct CmdShowConfig : Command
+struct CmdShowConfig : Command, MixJSON
 {
-    bool json = false;
-
     CmdShowConfig()
     {
-        mkFlag(0, "json", "produce JSON output", &json);
     }
 
     std::string name() override
