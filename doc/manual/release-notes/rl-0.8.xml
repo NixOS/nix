@@ -59,25 +59,25 @@ xlink:href='http://catamaran.labs.cs.uu.nl/dist/nix/channels-v3/nixpkgs-unstable
   <para>For instance, given any store path, you can query its closure:
 
   <screen>
-$ nix-store -qR $(which firefox)
+$ nix-store --query --requisites $(which firefox)
 ... lots of paths ...</screen>
 
   Also, Nix now remembers for each store path the derivation that
   built it (the “deriver”):
 
   <screen>
-$ nix-store -qR $(which firefox)
+$ nix-store --query --requisites $(which firefox)
 /nix/store/4b0jx7vq80l9aqcnkszxhymsf1ffa5jd-firefox-1.0.1.drv</screen>
 
   So to see the build-time dependencies, you can do
 
   <screen>
-$ nix-store -qR $(nix-store -qd $(which firefox))</screen>
+$ nix-store --query --requisites $(nix-store --query d $(which firefox))nix-store --query d $(which firefox))</screen>
 
   or, in a nicer format:
 
   <screen>
-$ nix-store -q --tree $(nix-store -qd $(which firefox))</screen>
+$ nix-store --query --tree $(nix-store --query d $(which firefox))nix-store --query d $(which firefox))</screen>
 
   </para>
 
@@ -86,7 +86,7 @@ $ nix-store -q --tree $(nix-store -qd $(which firefox))</screen>
   certain Glibc:
 
   <screen>
-$ nix-store -q --referrers-closure \
+$ nix-store --query --referrers-closure \
     /nix/store/8lz9yc6zgmc0vlqmn2ipcpkjlmbi51vv-glibc-2.3.4</screen>
 
   </para>
@@ -117,7 +117,7 @@ $ nix-store -q --referrers-closure \
   just want to install some specific application, this is easier than
   subscribing to a channel.</para></listitem>
 
-  <listitem><para><command>nix-store -r
+  <listitem><para><command>nix-store --realise
   <replaceable>PATHS</replaceable></command> now builds all the
   derivations PATHS in parallel.  Previously it did them sequentially
   (though exploiting possible parallelism between subderivations).
@@ -135,7 +135,7 @@ $ nix-store -q --referrers-closure \
     <listitem><para>Copy from another user environment:
 
     <screen>
-$ nix-env -i --from-profile .../other-profile firefox</screen>
+$ nix-env --install --from-profile .../other-profile firefox</screen>
 
     </para></listitem>
 
@@ -143,7 +143,7 @@ $ nix-env -i --from-profile .../other-profile firefox</screen>
     Nix expression language entirely):
 
     <screen>
-$ nix-env -i /nix/store/z58v41v21xd3...-aterm-2.3.1.drv</screen>
+$ nix-env --install /nix/store/z58v41v21xd3...-aterm-2.3.1.drv</screen>
 
     (This is used to implement <command>nix-install-package</command>,
     which is therefore immune to evolution in the Nix expression
@@ -152,7 +152,7 @@ $ nix-env -i /nix/store/z58v41v21xd3...-aterm-2.3.1.drv</screen>
     <listitem><para>Install an already built store path directly:
 
     <screen>
-$ nix-env -i /nix/store/hsyj5pbn0d9i...-aterm-2.3.1</screen>
+$ nix-env --install /nix/store/hsyj5pbn0d9i...-aterm-2.3.1</screen>
 
     </para></listitem>
 
@@ -160,7 +160,7 @@ $ nix-env -i /nix/store/hsyj5pbn0d9i...-aterm-2.3.1</screen>
     as a command-line argument:
 
     <screen>
-$ nix-env -f .../i686-linux.nix -i -E 'x: x.firefoxWrapper'</screen>
+$ nix-env --file .../i686-linux.nix --install --expr 'x: x.firefoxWrapper'</screen>
 
     The difference with the normal installation mode is that
     <option>-E</option> does not use the <varname>name</varname>

@@ -17,7 +17,7 @@ mechanism that Nix usually uses to fetch pre-built binaries from
 you can install it from Nixpkgs:
 
 <screen>
-$ nix-env -i nix-serve
+$ nix-env --install nix-serve
 </screen>
 
 You can then start the server, listening for HTTP connections on
@@ -47,7 +47,7 @@ Priority: 30
 using <option>--option extra-binary-caches</option>, e.g.:
 
 <screen>
-$ nix-env -i firefox --option extra-binary-caches http://avalon:8080/
+$ nix-env --install firefox --option extra-binary-caches http://avalon:8080/
 </screen>
 
 The option <option>extra-binary-caches</option> tells Nix to use this

@@ -44,8 +44,8 @@ attrs // {
   where <function>derivation!</function> is a primop that does the
   actual derivation instantiation (i.e., it does what
   <function>derivation</function> used to do).  The advantage is that
-  it allows commands such as <command>nix-env -qa</command> and
-  <command>nix-env -i</command> to be much faster since they no longer
+  it allows commands such as <command>nix-env --query --available</command> and
+  <command>nix-env --install</command> to be much faster since they no longer
   need to instantiate all derivations, just the
   <varname>name</varname> attribute.</para>
 

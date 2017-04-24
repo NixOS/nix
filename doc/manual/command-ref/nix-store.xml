@@ -92,7 +92,7 @@ options.</phrase></para>
     <filename>/nix/var/nix/gcroots/auto/</filename>.  For instance,
 
     <screen>
-$ nix-store --add-root /home/eelco/bla/result --indirect -r <replaceable>...</replaceable>
+$ nix-store --add-root /home/eelco/bla/result --indirect --realise <replaceable>...</replaceable>
 
 $ ls -l /nix/var/nix/gcroots/auto
 lrwxrwxrwx    1 ... 2005-03-13 21:10 dn54lcypm8f8... -> /home/eelco/bla/result
@@ -225,7 +225,7 @@ produced by <link
 linkend="sec-nix-instantiate"><command>nix-instantiate</command></link>:
 
 <screen>
-$ nix-store -r $(nix-instantiate ./test.nix)
+$ nix-store --realise $(nix-instantiate ./test.nix)nix-instantiate ./test.nix)
 /nix/store/31axcgrlbfsxzmfff1gyj1bf62hvkby2-aterm-2.3.1</screen>
 
 This is essentially what <link
@@ -234,7 +234,7 @@ linkend="sec-nix-build"><command>nix-build</command></link> does.</para>
 <para>To test whether a previously-built derivation is deterministic:
 
 <screen>
-$ nix-build -r '&lt;nixpkgs>' -A hello --check -K
+$ nix-build -r '&lt;nixpkgs>' --attr hello --check --keep-failed
 </screen>
 
 </para>
@@ -727,7 +727,7 @@ query is applied to the target of the symlink.</para>
 <command>svn</command> program in the current user environment:
 
 <screen>
-$ nix-store -qR $(which svn)
+$ nix-store --query --requisites $(which svn)
 /nix/store/5mbglq5ldqld8sj57273aljwkfvj22mc-subversion-1.1.4
 /nix/store/9lz9yc6zgmc0vlqmn2ipcpkjlmbi51vv-glibc-2.3.4
 <replaceable>...</replaceable></screen>
@@ -737,7 +737,7 @@ $ nix-store -qR $(which svn)
 <para>Print the build-time dependencies of <command>svn</command>:
 
 <screen>
-$ nix-store -qR $(nix-store -qd $(which svn))
+$ nix-store --query --requisites $(nix-store --query d $(which svn))nix-store --query d $(which svn))
 /nix/store/02iizgn86m42q905rddvg4ja975bk2i4-grep-2.5.1.tar.bz2.drv
 /nix/store/07a2bzxmzwz5hp58nf03pahrv2ygwgs3-gcc-wrapper.sh
 /nix/store/0ma7c9wsbaxahwwl04gbw3fcd806ski4-glibc-2.3.4.drv
@@ -750,7 +750,7 @@ path that contains <command>svn</command>.</para>
 <para>Show the build-time dependencies as a tree:
 
 <screen>
-$ nix-store -q --tree $(nix-store -qd $(which svn))
+$ nix-store --query --tree $(nix-store --query d $(which svn))nix-store --query d $(which svn))
 /nix/store/7i5082kfb6yjbqdbiwdhhza0am2xvh6c-subversion-1.1.4.drv
 +---/nix/store/d8afh10z72n8l1cr5w42366abiblgn54-builder.sh
 +---/nix/store/fmzxmpjx2lh849ph0l36snfj9zdibw67-bash-3.0.drv
@@ -764,7 +764,7 @@ $ nix-store -q --tree $(nix-store -qd $(which svn))
 <command>svn</command>:
 
 <screen>
-$ nix-store -q --referrers $(nix-store -q --binding openssl $(nix-store -qd $(which svn)))
+$ nix-store --query --referrers $(nix-store --query --binding openssl $(nix-store --query d $(which svn)))nix-store --query --binding openssl $(nix-store --query d $(which svn)))nix-store --query d $(which svn)))
 /nix/store/23ny9l9wixx21632y2wi4p585qhva1q8-sylpheed-1.0.0
 /nix/store/5mbglq5ldqld8sj57273aljwkfvj22mc-subversion-1.1.4
 /nix/store/dpmvp969yhdqs7lm2r1a3gng7pyq6vy4-subversion-1.1.3
@@ -776,7 +776,7 @@ $ nix-store -q --referrers $(nix-store -q --binding openssl $(nix-store -qd $(wh
 (C library) used by <command>svn</command>:
 
 <screen>
-$ nix-store -q --referrers-closure $(ldd $(which svn) | grep /libc.so | awk '{print $3}')
+$ nix-store --query --referrers-closure $(ldd $(which svn) | grep /libc.so | awk '{print $3}')
 /nix/store/034a6h4vpz9kds5r6kzb9lhh81mscw43-libgnomeprintui-2.8.2
 /nix/store/15l3yi0d45prm7a82pcrknxdh6nzmxza-gawk-3.1.4
 <replaceable>...</replaceable></screen>
@@ -788,7 +788,7 @@ dynamic libraries used by an ELF executable.</para>
 user environment:
 
 <screen>
-$ nix-store -q --graph ~/.nix-profile | dot -Tps > graph.ps
+$ nix-store --query --graph ~/.nix-profile | dot -Tps > graph.ps
 $ gv graph.ps</screen>
 
 </para>
@@ -797,7 +797,7 @@ $ gv graph.ps</screen>
 that depends on <command>svn</command>:
 
 <screen>
-$ nix-store -q --roots $(which svn)
+$ nix-store --query --roots $(which svn)
 /nix/var/nix/profiles/default-81-link
 /nix/var/nix/profiles/default-82-link
 /nix/var/nix/profiles/per-user/eelco/profile-97-link
@@ -956,7 +956,7 @@ otherwise.</para>
 <para>To verify the integrity of the <command>svn</command> command and all its dependencies:
 
 <screen>
-$ nix-store --verify-path $(nix-store -qR $(which svn))
+$ nix-store --verify-path $(nix-store --query --requisites $(which svn))nix-store --query --requisites $(which svn))
 </screen>
 
 </para>
@@ -1045,7 +1045,7 @@ directory entries are always sorted so that the actual on-disk order
 doesn’t influence the result.  This means that the cryptographic hash
 of a NAR dump of a path is usable as a fingerprint of the contents of
 the path.  Indeed, the hashes of store paths stored in Nix’s database
-(see <link linkend="refsec-nix-store-query"><literal>nix-store -q
+(see <link linkend="refsec-nix-store-query"><literal>nix-store --query
 --hash</literal></link>) are SHA-256 hashes of the NAR dump of each
 store path.</para>
 
@@ -1118,7 +1118,7 @@ that are missing in the target Nix store, the import will fail.  To
 copy a whole closure, do something like:
 
 <screen>
-$ nix-store --export $(nix-store -qR <replaceable>paths</replaceable>) > out</screen>
+$ nix-store --export $(nix-store --query --requisites nix-store --query --requisites <replaceable>paths</replaceable>) > out</screen>
 
 To import the whole closure again, run:
 
@@ -1243,7 +1243,7 @@ a substitute, then the log is unavailable.</para>
 <refsection><title>Example</title>
 
 <screen>
-$ nix-store -l $(which ktorrent)
+$ nix-store --read-log $(which ktorrent)
 building /nix/store/dhc73pvzpnzxhdgpimsd9sw39di66ph1-ktorrent-2.2.1
 unpacking sources
 unpacking source archive /nix/store/p8n1jpqs27mgkjw07pb5269717nzf5f8-ktorrent-2.2.1.tar.gz
@@ -1330,7 +1330,7 @@ variable <envar>_args</envar>.</para>
 <refsection><title>Example</title>
 
 <screen>
-$ nix-store --print-env $(nix-instantiate '&lt;nixpkgs>' -A firefox)
+$ nix-store --print-env $(nix-instantiate '&lt;nixpkgs>' --attr firefox)nix-instantiate '&lt;nixpkgs>' --attr firefox)
 <replaceable>…</replaceable>
 export src; src='/nix/store/plpj7qrwcz94z2psh6fchsi7s8yihc7k-firefox-12.0.source.tar.bz2'
 export stdenv; stdenv='/nix/store/7c8asx3yfrg5dg1gzhzyq2236zfgibnn-stdenv'

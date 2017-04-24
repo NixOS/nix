@@ -27,7 +27,7 @@ methods, see <xref linkend="chap-installation"/>.)</para></step>
 in the channel:
 
 <screen>
-$ nix-env -qa
+$ nix-env --query --available
 docbook-xml-4.3
 docbook-xml-4.5
 firefox-33.0.2
@@ -40,7 +40,7 @@ libxslt-1.1.28
 <step><para>Install some packages from the channel:
 
 <screen>
-$ nix-env -i hello <replaceable>...</replaceable> </screen>
+$ nix-env --install hello <replaceable>...</replaceable> </screen>
 
 This should download pre-built packages; it should not build them
 locally (if it does, something went wrong).</para></step>
@@ -59,14 +59,14 @@ Hello, world!
 <step><para>Uninstall a package:
 
 <screen>
-$ nix-env -e hello</screen>
+$ nix-env --uninstall hello</screen>
 
 </para></step>
 
 <step><para>You can also test a package without installing it:
 
 <screen>
-$ nix-shell -p hello
+$ nix-shell --packages hello
 </screen>
 
 This builds or downloads GNU Hello and its dependencies, then drops
@@ -89,7 +89,7 @@ hello: command not found
 
 <screen>
 $ nix-channel --update nixpkgs
-$ nix-env -u '*'</screen>
+$ nix-env --upgrade '*'</screen>
 
 The latter command will upgrade each installed package for which there
 is a “newer” version (as determined by comparing the version

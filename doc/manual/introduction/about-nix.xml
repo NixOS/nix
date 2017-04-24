@@ -211,7 +211,7 @@ xlink:href="https://github.com/NixOS/nixpkgs/blob/master/pkgs/applications/netwo
 Nix expression</link>:</para>
 
 <screen>
-$ nix-shell '&lt;nixpkgs>' -A pan
+$ nix-shell '&lt;nixpkgs>' --attr pan
 </screen>
 
 <para>You’re then dropped into a shell where you can edit, build and test

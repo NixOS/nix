@@ -16,7 +16,7 @@ can go to the output directory and <quote>switch</quote> to the
 environment of the builder:
 
 <screen>
-$ nix-build -K ./foo.nix
+$ nix-build --keep-failed ./foo.nix
 ... fails, keeping build directory `/tmp/nix-1234-0'
 
 $ cd /tmp/nix-1234-0

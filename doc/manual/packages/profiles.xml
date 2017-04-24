@@ -56,7 +56,7 @@ contains a symlink to just Subversion 1.1.2 (arrows in the figure
 indicate symlinks).  This would be what we would obtain if we had done
 
 <screen>
-$ nix-env -i subversion</screen>
+$ nix-env --install subversion</screen>
 
 on a set of Nix expressions that contained Subversion 1.1.2.</para>
 
@@ -73,7 +73,7 @@ generated based on the current one.  For instance, generation 43 was
 created from generation 42 when we did
 
 <screen>
-$ nix-env -i subversion firefox</screen>
+$ nix-env --install subversion firefox</screen>
 
 on a set of Nix expressions that contained Firefox and a new version
 of Subversion.</para>
@@ -150,7 +150,7 @@ this using the <option>--profile</option> option (abbreviation
 <option>-p</option>):
 
 <screen>
-$ nix-env -p /nix/var/nix/profiles/other-profile -i subversion</screen>
+$ nix-env --profile /nix/var/nix/profiles/other-profile --install subversion</screen>
 
 This will <emphasis>not</emphasis> change the
 <command>~/.nix-profile</command> symlink.</para>

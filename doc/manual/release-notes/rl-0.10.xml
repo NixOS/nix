@@ -36,16 +36,16 @@ irreversible.</para></warning>
       --query</command> to allow you to compare installed versions of
       packages to available versions, or vice versa.  An easy way to
       see if you are up to date with what’s in your subscribed
-      channels is <literal>nix-env -qc \*</literal>.</para></listitem>
+      channels is <literal>nix-env --query --compare-versions \*</literal>.</para></listitem>
 
       <listitem><para><literal>nix-env --query</literal> now takes as
       arguments a list of package names about which to show
       information, just like <option>--install</option>, etc.: for
-      example, <literal>nix-env -q gcc</literal>.  Note that to show
+      example, <literal>nix-env --query gcc</literal>.  Note that to show
       all derivations, you need to specify
       <literal>\*</literal>.</para></listitem>
 
-      <listitem><para><literal>nix-env -i
+      <listitem><para><literal>nix-env --install
       <replaceable>pkgname</replaceable></literal> will now install
       the highest available version of
       <replaceable>pkgname</replaceable>, rather than installing all
@@ -56,7 +56,7 @@ irreversible.</para></warning>
       shows exactly which missing paths will be built or
       substituted.</para></listitem>
 
-      <listitem><para><literal>nix-env -qa --description</literal>
+      <listitem><para><literal>nix-env --query --available --description</literal>
       shows human-readable descriptions of packages, provided that
       they have a <literal>meta.description</literal> attribute (which
       most packages in Nixpkgs don’t have yet).</para></listitem>
@@ -134,7 +134,7 @@ irreversible.</para></warning>
 
     <itemizedlist>
 
-      <listitem><para><literal>nix-env -q --xml</literal> prints the
+      <listitem><para><literal>nix-env --query --xml</literal> prints the
       installed or available packages in an XML representation for
       easy processing by other tools.</para></listitem>
 
@@ -163,7 +163,7 @@ irreversible.</para></warning>
   attribute set are unique.)  For instance, a quick way to perform a
   test build of a package in Nixpkgs is <literal>nix-build
   pkgs/top-level/all-packages.nix -A
-  <replaceable>foo</replaceable></literal>.  <literal>nix-env -q
+  <replaceable>foo</replaceable></literal>.  <literal>nix-env --query
   --attr</literal> shows the attribute names corresponding to each
   derivation.</para></listitem>
 
@@ -191,7 +191,7 @@ irreversible.</para></warning>
   variables.</para></listitem>
 
 
-  <listitem><para><literal>nix-build -o
+  <listitem><para><literal>nix-build --out-link
   <replaceable>symlink</replaceable></literal> allows the symlink to
   the build result to be named something other than
   <literal>result</literal>.</para></listitem>
@@ -284,7 +284,7 @@ irreversible.</para></warning>
   4.3.</para></listitem>
 
   <listitem><para>Substantial performance improvements in expression
-  evaluation and <literal>nix-env -qa</literal>, all thanks to <link
+  evaluation and <literal>nix-env --query --available</literal>, all thanks to <link
   xlink:href="http://valgrind.org/">Valgrind</link>.  Memory use has
   been reduced by a factor 8 or so.  Big speedup by memoisation of
   path hashing.</para></listitem>
@@ -303,7 +303,7 @@ irreversible.</para></warning>
       (<literal>NIX-7</literal>).</para></listitem>
 
       <listitem><para>Removed misleading messages from
-      <literal>nix-env -i</literal> (e.g., <literal>installing
+      <literal>nix-env --install</literal> (e.g., <literal>installing
       `foo'</literal> followed by <literal>uninstalling
       `foo'</literal>) (<literal>NIX-17</literal>).</para></listitem>
 

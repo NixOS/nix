@@ -45,7 +45,7 @@ binary-cache-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFG
       <listitem><para>In <command>nix-env</command>:
 
 <screen>
-$ nix-env -f https://github.com/NixOS/nixpkgs-channels/archive/nixos-14.12.tar.gz -iA firefox
+$ nix-env --file https://github.com/NixOS/nixpkgs-channels/archive/nixos-14.12.tar.gz --install --attr firefox
 </screen>
 
       This installs Firefox from the latest tested and built revision
@@ -55,7 +55,7 @@ $ nix-env -f https://github.com/NixOS/nixpkgs-channels/archive/nixos-14.12.tar.g
       <command>nix-shell</command>:
 
 <screen>
-$ nix-build https://github.com/NixOS/nixpkgs/archive/master.tar.gz -A hello
+$ nix-build https://github.com/NixOS/nixpkgs/archive/master.tar.gz --attr hello
 </screen>
 
       This builds GNU Hello from the latest revision of the Nixpkgs
@@ -67,7 +67,7 @@ $ nix-build https://github.com/NixOS/nixpkgs/archive/master.tar.gz -A hello
       of Nixpkgs:
 
 <screen>
-$ nix-shell -p pan -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/8a3eea054838b55aca962c3fbde9c83c102b8bf2.tar.gz
+$ nix-shell --packages pan -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/8a3eea054838b55aca962c3fbde9c83c102b8bf2.tar.gz
 </screen>
 
       </para></listitem>
@@ -114,7 +114,7 @@ with import (fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixo
 
 <programlisting>
 #! /usr/bin/env nix-shell
-#! nix-shell -i runghc -p haskellPackages.ghc haskellPackages.HTTP
+#! nix-shell -i runghc --packages haskellPackages.ghc haskellPackages.HTTP
 
 import Network.HTTP
 

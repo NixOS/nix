@@ -142,7 +142,7 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 <refsection><title>Examples</title>
 
 <screen>
-$ nix-build '&lt;nixpkgs>' -A firefox
+$ nix-build '&lt;nixpkgs>' --attr firefox
 store derivation is /nix/store/qybprl8sz2lc...-firefox-1.5.0.7.drv
 /nix/store/d18hyl92g30l...-firefox-1.5.0.7
 
@@ -156,7 +156,7 @@ firefox  firefox-config</screen>
 <command>nix-build</command> will build the default (first) output.
 You can also build all outputs:
 <screen>
-$ nix-build '&lt;nixpkgs>' -A openssl.all
+$ nix-build '&lt;nixpkgs>' --attr openssl.all
 </screen>
 This will create a symlink for each output named
 <filename>result-<replaceable>outputname</replaceable></filename>.
@@ -168,14 +168,14 @@ So if <literal>openssl</literal> has outputs <literal>out</literal>,
 <literal>result-man</literal>.  It’s also possible to build a specific
 output:
 <screen>
-$ nix-build '&lt;nixpkgs>' -A openssl.man
+$ nix-build '&lt;nixpkgs>' --attr openssl.man
 </screen>
 This will create a symlink <literal>result-man</literal>.</para>
 
 <para>Build a Nix expression given on the command line:
 
 <screen>
-$ nix-build -E 'with import &lt;nixpkgs> { }; runCommand "foo" { } "echo bar > $out"'
+$ nix-build --expr 'with import &lt;nixpkgs> { }; runCommand "foo" { } "echo bar > $out"'
 $ cat ./result
 bar
 </screen>
@@ -186,7 +186,7 @@ bar
 master branch of Nixpkgs:
 
 <screen>
-$ nix-build https://github.com/NixOS/nixpkgs/archive/master.tar.gz -A hello
+$ nix-build https://github.com/NixOS/nixpkgs/archive/master.tar.gz --attr hello
 </screen>
 
 </para>

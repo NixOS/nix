@@ -92,7 +92,7 @@
 
   <listitem>
     <para>When using the Nix daemon, the <option>-s</option> flag in
-    <command>nix-env -qa</command> is now much faster.</para>
+    <command>nix-env --query --available</command> is now much faster.</para>
   </listitem>
 
 </itemizedlist>

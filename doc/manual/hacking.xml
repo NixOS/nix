@@ -14,7 +14,7 @@ $ cd nix
 
 <para>To build it and its dependencies:
 <screen>
-$ nix-build release.nix -A build.x86_64-linux
+$ nix-build release.nix --attr build.x86_64-linux
 </screen>
 </para>
 

@@ -40,12 +40,12 @@ features:</para>
   <listitem>
     <para><command>nix-env</command> no longer requires a
     <literal>*</literal> argument to match all packages, so
-    <literal>nix-env -qa</literal> is equivalent to <literal>nix-env
+    <literal>nix-env --query --available</literal> is equivalent to <literal>nix-env
     -qa '*'</literal>.</para>
   </listitem>
 
   <listitem>
-    <para><command>nix-env -i</command> has a new flag
+    <para><command>nix-env --install</command> has a new flag
     <option>--remove-all</option> (<option>-r</option>) to remove all
     previous packages from the profile.  This makes it easier to do
     declarative package management similar to NixOS’s
@@ -63,7 +63,7 @@ with import &lt;nixpkgs> {};
     then after any change to this file, you can run:
 
 <screen>
-$ nix-env -f my-packages.nix -ir
+$ nix-env --file my-packages.nix --install --remove-all
 </screen>
 
     to update your profile to match the specification.</para>

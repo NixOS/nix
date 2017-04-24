@@ -246,11 +246,11 @@
 }: <replaceable>...</replaceable></programlisting>
 
   So if you call this Nix expression (e.g., when you do
-  <literal>nix-env -i <replaceable>pkgname</replaceable></literal>),
+  <literal>nix-env --install <replaceable>pkgname</replaceable></literal>),
   the function will be called automatically using the value <link
   linkend='builtin-currentSystem'><literal>builtins.currentSystem</literal></link>
   for the <literal>system</literal> argument.  You can override this
-  using <option>--arg</option>, e.g., <literal>nix-env -i
+  using <option>--arg</option>, e.g., <literal>nix-env --install
   <replaceable>pkgname</replaceable> --arg system
   \"i686-freebsd\"</literal>.  (Note that since the argument is a Nix
   string literal, you have to escape the quotes.)</para></listitem>
