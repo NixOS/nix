@@ -325,7 +325,7 @@ int main(int argc, char ** argv)
         if (packages) {
             instArgs.push_back("--expr");
             std::ostringstream joined;
-            joined << "with import <nixpkgs> { }; runCommand \"shell\" { buildInputs = [ ";
+            joined << "with import <nixpkgs> { }; (pkgs.runCommandCC or pkgs.runCommand) \"shell\" { buildInputs = [ ";
             for (const auto & i : exprs)
                 joined << '(' << i << ") ";
             joined << "]; } \"\"";
