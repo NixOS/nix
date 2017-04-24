@@ -93,7 +93,7 @@ time window in which the package has some files from the old version
 and some files from the new version — which would be bad because a
 program might well crash if it’s started during that period.</para>
 
-<para>And since package aren’t overwritten, the old versions are still
+<para>And since packages aren’t overwritten, the old versions are still
 there after an upgrade.  This means that you can <emphasis>roll
 back</emphasis> to the old version:</para>
 
