@@ -4,13 +4,13 @@ with import nixpkgs { inherit system; };
 
 let nix = nixUnstable; in
 
-runCommand "nix-repl"
-  { buildInputs = [ readline nix boehmgc ]; }
+runCommandCC "nix-repl"
+  { buildInputs = [ pkgconfig readline nix boehmgc ]; }
   ''
     mkdir -p $out/bin
-    g++ -O3 -Wall -std=c++0x \
+    g++ -O3 -Wall -std=c++14 \
       -o $out/bin/nix-repl ${./nix-repl.cc} \
-      -I${nix}/include/nix \
+      $(pkg-config --cflags nix-main) \
       -lnixformat -lnixutil -lnixstore -lnixexpr -lnixmain -lreadline -lgc \
       -DNIX_VERSION=\"${(builtins.parseDrvName nix.name).version}\"
   ''

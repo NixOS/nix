@@ -1,3 +1,5 @@
+#include <nix/config.h>
+
 #include <iostream>
 #include <cstdlib>
 
@@ -291,7 +293,7 @@ static int runProgram(const string & program, const Strings & args)
         _exit(1);
     }
 
-    return pid.wait(true);
+    return pid.wait();
 }
 
 
