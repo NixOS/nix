@@ -183,20 +183,16 @@ std::vector<std::shared_ptr<Installable>> InstallablesCommand::parseInstallables
 
     for (auto & installable : installables) {
 
-        if (std::string(installable, 0, 1) == "/") {
+        if (installable.find("/") != std::string::npos) {
 
-            if (store->isStorePath(installable)) {
-                if (isDerivation(installable))
-                    result.push_back(std::make_shared<InstallableStoreDrv>(installable));
+            auto path = store->toStorePath(store->followLinksToStore(installable));
+
+            if (store->isStorePath(path)) {
+                if (isDerivation(path))
+                    result.push_back(std::make_shared<InstallableStoreDrv>(path));
                 else
-                    result.push_back(std::make_shared<InstallableStorePath>(installable));
+                    result.push_back(std::make_shared<InstallableStorePath>(path));
             }
-
-            else {
-                result.push_back(std::make_shared<InstallableStorePath>(
-                        store->toStorePath(store->followLinksToStore(installable))));
-            }
-
         }
 
         else if (installable.compare(0, 1, "(") == 0)
