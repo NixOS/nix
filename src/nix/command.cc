@@ -115,16 +115,8 @@ void StorePathsCommand::run(ref<Store> store)
     }
 
     else {
-        for (auto & i : installables) {
-            for (auto & path : i->toBuildable()) {
-                if (isDerivation(path)) {
-                    Derivation drv = store->derivationFromPath(path);
-                    for (auto & output : drv.outputs)
-                        storePaths.push_back(output.second.path);
-                } else
-                    storePaths.push_back(path);
-            }
-        }
+        for (auto & p : buildInstallables(store, false))
+            storePaths.push_back(p);
 
         if (recursive) {
             PathSet closure;

@@ -30,7 +30,7 @@ struct CmdRun : InstallablesCommand
 
     void run(ref<Store> store) override
     {
-        auto paths = buildInstallables(store, false);
+        auto outPaths = buildInstallables(store, false);
 
         auto store2 = store.dynamic_pointer_cast<LocalStore>();
 
@@ -89,14 +89,6 @@ struct CmdRun : InstallablesCommand
 #endif
         }
 
-        PathSet outPaths;
-        for (auto & path : paths)
-            if (isDerivation(path)) {
-                Derivation drv = store->derivationFromPath(path);
-                for (auto & output : drv.outputs)
-                    outPaths.insert(output.second.path);
-            } else
-                outPaths.insert(path);
 
         auto unixPath = tokenizeString<Strings>(getEnv("PATH"), ":");
         for (auto & path : outPaths)

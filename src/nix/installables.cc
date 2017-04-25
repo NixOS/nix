@@ -228,7 +228,16 @@ PathSet InstallablesCommand::buildInstallables(ref<Store> store, bool dryRun)
     if (!dryRun)
         store->buildPaths(buildables);
 
-    return buildables;
+    PathSet outPaths;
+    for (auto & path : buildables)
+        if (isDerivation(path)) {
+            Derivation drv = store->derivationFromPath(path);
+            for (auto & output : drv.outputs)
+                outPaths.insert(output.second.path);
+        } else
+            outPaths.insert(path);
+
+    return outPaths;
 }
 
 ref<EvalState> InstallablesCommand::getEvalState()
