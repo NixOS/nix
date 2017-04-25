@@ -29,9 +29,6 @@ using namespace std;
 #define ESC_CYA "\033[36m"
 #define ESC_END "\033[0m"
 
-string programId = "nix-repl";
-const string historyFile = string(getenv("HOME")) + "/.nix-repl-history";
-
 struct NixRepl
 {
     string curDir;
@@ -44,6 +41,8 @@ struct NixRepl
     Env * env;
     int displ;
     StringSet varNames;
+
+    const Path historyFile;
 
     StringSet completions;
     StringSet::iterator curCompletion;
@@ -115,6 +114,7 @@ string removeWhitespace(string s)
 NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store)
     : state(searchPath, store)
     , staticEnv(false, &state.staticBaseEnv)
+    , historyFile(getDataDir() + "/nix/repl-history")
 {
     curDir = absPath(".");
 }
@@ -140,6 +140,7 @@ void NixRepl::mainLoop(const Strings & files)
     // Allow nix-repl specific settings in .inputrc
     rl_readline_name = "nix-repl";
     using_history();
+    createDirs(dirOf(historyFile));
     read_history(historyFile.c_str());
 
     string input;

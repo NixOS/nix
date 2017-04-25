@@ -441,6 +441,18 @@ Path getConfigDir()
 }
 
 
+Path getDataDir()
+{
+    Path dataDir = getEnv("XDG_DATA_HOME");
+    if (dataDir.empty()) {
+        Path homeDir = getEnv("HOME");
+        if (homeDir.empty()) throw Error("$XDG_DATA_HOME and $HOME are not set");
+        dataDir = homeDir + "/.local/share";
+    }
+    return dataDir;
+}
+
+
 Paths createDirs(const Path & path)
 {
     Paths created;

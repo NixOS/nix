@@ -116,6 +116,9 @@ Path getCacheDir();
 /* Return $XDG_CONFIG_HOME or $HOME/.config. */
 Path getConfigDir();
 
+/* Return $XDG_DATA_HOME or $HOME/.local/share. */
+Path getDataDir();
+
 /* Create a directory and all its parents, if necessary.  Returns the
    list of created directories, in order of creation. */
 Paths createDirs(const Path & path);
