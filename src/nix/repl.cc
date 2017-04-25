@@ -289,18 +289,15 @@ void NixRepl::completePrefix(string prefix)
 
 static int runProgram(const string & program, const Strings & args)
 {
-    std::vector<const char *> cargs; /* careful with c_str()! */
-    cargs.push_back(program.c_str());
-    for (Strings::const_iterator i = args.begin(); i != args.end(); ++i)
-        cargs.push_back(i->c_str());
-    cargs.push_back(0);
+    Strings args2(args);
+    args2.push_front(program);
 
     Pid pid;
     pid = fork();
     if (pid == -1) throw SysError("forking");
     if (pid == 0) {
         restoreAffinity();
-        execvp(program.c_str(), (char * *) &cargs[0]);
+        execvp(program.c_str(), stringsToCharPtrs(args2).data());
         _exit(1);
     }
 
@@ -394,7 +391,7 @@ bool NixRepl::processLine(string line)
         state.callFunction(f, v, result, Pos());
 
         Path drvPath = getDerivationPath(result);
-        runProgram("nix-shell", Strings{drvPath});
+        runProgram(settings.nixBinDir + "/nix-shell", Strings{drvPath});
     }
 
     else if (command == ":b" || command == ":i" || command == ":s") {
@@ -406,16 +403,16 @@ bool NixRepl::processLine(string line)
             /* We could do the build in this process using buildPaths(),
                but doing it in a child makes it easier to recover from
                problems / SIGINT. */
-            if (runProgram("nix-store", Strings{"-r", drvPath}) == 0) {
+            if (runProgram(settings.nixBinDir + "/nix-store", Strings{"-r", drvPath}) == 0) {
                 Derivation drv = readDerivation(drvPath);
                 std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
                 for (auto & i : drv.outputs)
                     std::cout << format("  %1% -> %2%") % i.first % i.second.path << std::endl;
             }
         } else if (command == ":i") {
-            runProgram("nix-env", Strings{"-i", drvPath});
+            runProgram(settings.nixBinDir + "/nix-env", Strings{"-i", drvPath});
         } else {
-            runProgram("nix-shell", Strings{drvPath});
+            runProgram(settings.nixBinDir + "/nix-shell", Strings{drvPath});
         }
     }
 
