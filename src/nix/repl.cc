@@ -1,5 +1,3 @@
-#include <nix/config.h>
-
 #include <iostream>
 #include <cstdlib>
 
@@ -17,9 +15,11 @@
 #include "derivations.hh"
 #include "affinity.hh"
 #include "globals.hh"
+#include "command.hh"
+
+namespace nix {
 
 using namespace std;
-using namespace nix;
 
 #define ESC_RED "\033[31m"
 #define ESC_GRE "\033[32m"
@@ -49,6 +49,7 @@ struct NixRepl
     StringSet::iterator curCompletion;
 
     NixRepl(const Strings & searchPath, nix::ref<Store> store);
+    ~NixRepl();
     void mainLoop(const Strings & files);
     void completePrefix(string prefix);
     bool getLine(string & input, const char * prompt);
@@ -119,10 +120,16 @@ NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store)
 }
 
 
+NixRepl::~NixRepl()
+{
+    write_history(historyFile.c_str());
+}
+
+
 void NixRepl::mainLoop(const Strings & files)
 {
     string error = ANSI_RED "error:" ANSI_NORMAL " ";
-    std::cout << "Welcome to Nix version " << NIX_VERSION << ". Type :? for help." << std::endl << std::endl;
+    std::cout << "Welcome to Nix version " << nixVersion << ". Type :? for help." << std::endl << std::endl;
 
     for (auto & i : files)
         loadedFiles.push_back(i);
@@ -685,35 +692,30 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     return str;
 }
 
-
-int main(int argc, char * * argv)
+struct CmdRepl : StoreCommand
 {
-    return handleExceptions(argv[0], [&]() {
-        initNix();
-        initGC();
+    Strings files;
 
-        Strings files, searchPath;
+    CmdRepl()
+    {
+        expectArgs("files", &files);
+    }
 
-        parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
-            if (*arg == "--version")
-                printVersion("nix-repl");
-            else if (*arg == "--help") {
-                printHelp();
-                // exit with 0 since user asked for help
-                _exit(0);
-            }
-            else if (parseSearchPathArg(arg, end, searchPath))
-                ;
-            else if (*arg != "" && arg->at(0) == '-')
-                return false;
-            else
-                files.push_back(*arg);
-            return true;
-        });
+    std::string name() override { return "repl"; }
 
-        NixRepl repl(searchPath, openStore());
+    std::string description() override
+    {
+        return "start an interactive environment for evaluating Nix expressions";
+    }
+
+    void run(ref<Store> store) override
+    {
+        // FIXME: pass searchPath
+        NixRepl repl({}, openStore());
         repl.mainLoop(files);
+    }
+};
 
-        write_history(historyFile.c_str());
-    });
+static RegisterCommand r1(make_ref<CmdRepl>());
+
 }

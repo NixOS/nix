@@ -16,6 +16,7 @@ with import <nixpkgs> {};
         customMemoryManagement = false;
       })
       autoreconfHook
+      readline
     ];
 
   configureFlags =

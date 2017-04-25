@@ -73,7 +73,8 @@ let
         buildInputs =
           [ curl
             bzip2 xz brotli
-            openssl pkgconfig sqlite boehmgc
+            openssl pkgconfig sqlite boehmgc readline
+
           ]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin)
