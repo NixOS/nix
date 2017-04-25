@@ -19,8 +19,6 @@
 
 namespace nix {
 
-using namespace std;
-
 #define ESC_RED "\033[31m"
 #define ESC_GRE "\033[32m"
 #define ESC_YEL "\033[33m"
@@ -70,7 +68,8 @@ struct NixRepl
 
 void printHelp()
 {
-    cout << "Usage: nix-repl [--help] [--version] [-I path] paths...\n"
+    std::cout
+         << "Usage: nix-repl [--help] [--version] [-I path] paths...\n"
          << "\n"
          << "nix-repl is a simple read-eval-print loop (REPL) for the Nix package manager.\n"
          << "\n"
@@ -97,8 +96,7 @@ void printHelp()
          << "        If an element of paths starts with http:// or https://, it is interpreted\n"
          << "        as the URL of a tarball that will be downloaded and unpacked to a temporary\n"
          << "        location. The tarball must include a single top-level directory containing\n"
-         << "        at least a file named default.nix.\n"
-         << flush;
+         << "        at least a file named default.nix.\n";
 }
 
 
@@ -351,7 +349,8 @@ bool NixRepl::processLine(string line)
     }
 
     if (command == ":?" || command == ":help") {
-        cout << "The following commands are available:\n"
+        std::cout
+             << "The following commands are available:\n"
              << "\n"
              << "  <expr>        Evaluate and print expression\n"
              << "  <x> = <expr>  Bind expression to variable\n"
