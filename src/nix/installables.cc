@@ -181,6 +181,12 @@ std::vector<std::shared_ptr<Installable>> InstallablesCommand::parseInstallables
 {
     std::vector<std::shared_ptr<Installable>> result;
 
+    if (installables.empty()) {
+        if (file == "")
+            file = ".";
+        installables = Strings{""};
+    }
+
     for (auto & installable : installables) {
 
         if (installable.find("/") != std::string::npos) {
@@ -198,7 +204,7 @@ std::vector<std::shared_ptr<Installable>> InstallablesCommand::parseInstallables
         else if (installable.compare(0, 1, "(") == 0)
             result.push_back(std::make_shared<InstallableExpr>(*this, installable));
 
-        else if (std::regex_match(installable, attrPathRegex))
+        else if (installable == "" || std::regex_match(installable, attrPathRegex))
             result.push_back(std::make_shared<InstallableAttrPath>(*this, installable));
 
         else
