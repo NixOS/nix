@@ -1,6 +1,5 @@
 #include "command.hh"
 #include "common-args.hh"
-#include "installables.hh"
 #include "shared.hh"
 #include "store-api.hh"
 #include "eval.hh"
@@ -9,7 +8,7 @@
 
 using namespace nix;
 
-struct CmdEval : MixJSON, MixInstallables
+struct CmdEval : MixJSON, InstallablesCommand
 {
     std::string name() override
     {

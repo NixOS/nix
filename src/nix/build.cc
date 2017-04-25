@@ -1,12 +1,11 @@
 #include "command.hh"
 #include "common-args.hh"
-#include "installables.hh"
 #include "shared.hh"
 #include "store-api.hh"
 
 using namespace nix;
 
-struct CmdBuild : MixDryRun, MixInstallables
+struct CmdBuild : MixDryRun, InstallablesCommand
 {
     CmdBuild()
     {

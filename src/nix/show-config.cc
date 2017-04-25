@@ -1,6 +1,5 @@
 #include "command.hh"
 #include "common-args.hh"
-#include "installables.hh"
 #include "shared.hh"
 #include "store-api.hh"
 #include "json.hh"

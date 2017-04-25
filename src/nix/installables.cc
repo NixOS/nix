@@ -1,10 +1,10 @@
+#include "command.hh"
 #include "attr-path.hh"
 #include "common-opts.hh"
 #include "derivations.hh"
 #include "eval-inline.hh"
 #include "eval.hh"
 #include "get-drvs.hh"
-#include "installables.hh"
 #include "store-api.hh"
 #include "shared.hh"
 
@@ -12,7 +12,7 @@
 
 namespace nix {
 
-Value * MixInstallables::getSourceExpr(EvalState & state)
+Value * InstallablesCommand::getSourceExpr(EvalState & state)
 {
     if (vSourceExpr) return vSourceExpr;
 
@@ -89,10 +89,10 @@ struct InstallableStorePath : Installable
 
 struct InstallableExpr : Installable
 {
-    MixInstallables & installables;
+    InstallablesCommand & installables;
     std::string text;
 
-    InstallableExpr(MixInstallables & installables, const std::string & text)
+    InstallableExpr(InstallablesCommand & installables, const std::string & text)
          : installables(installables), text(text) { }
 
     std::string what() override { return text; }
@@ -128,10 +128,10 @@ struct InstallableExpr : Installable
 
 struct InstallableAttrPath : Installable
 {
-    MixInstallables & installables;
+    InstallablesCommand & installables;
     std::string attrPath;
 
-    InstallableAttrPath(MixInstallables & installables, const std::string & attrPath)
+    InstallableAttrPath(InstallablesCommand & installables, const std::string & attrPath)
         : installables(installables), attrPath(attrPath)
     { }
 
@@ -177,7 +177,7 @@ struct InstallableAttrPath : Installable
 std::string attrRegex = R"([A-Za-z_][A-Za-z0-9-_+]*)";
 static std::regex attrPathRegex(fmt(R"(%1%(\.%1%)*)", attrRegex));
 
-std::vector<std::shared_ptr<Installable>> MixInstallables::parseInstallables(ref<Store> store, Strings installables)
+std::vector<std::shared_ptr<Installable>> InstallablesCommand::parseInstallables(ref<Store> store, Strings installables)
 {
     std::vector<std::shared_ptr<Installable>> result;
 
@@ -212,7 +212,7 @@ std::vector<std::shared_ptr<Installable>> MixInstallables::parseInstallables(ref
     return result;
 }
 
-PathSet MixInstallables::buildInstallables(ref<Store> store, bool dryRun)
+PathSet InstallablesCommand::buildInstallables(ref<Store> store, bool dryRun)
 {
     PathSet buildables;
 
@@ -229,14 +229,14 @@ PathSet MixInstallables::buildInstallables(ref<Store> store, bool dryRun)
     return buildables;
 }
 
-ref<EvalState> MixInstallables::getEvalState()
+ref<EvalState> InstallablesCommand::getEvalState()
 {
     if (!evalState)
         evalState = std::make_shared<EvalState>(Strings{}, getStore());
     return ref<EvalState>(evalState);
 }
 
-void MixInstallables::prepare()
+void InstallablesCommand::prepare()
 {
     installables = parseInstallables(getStore(), _installables);
 }

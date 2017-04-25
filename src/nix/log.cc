@@ -1,12 +1,11 @@
 #include "command.hh"
 #include "common-args.hh"
-#include "installables.hh"
 #include "shared.hh"
 #include "store-api.hh"
 
 using namespace nix;
 
-struct CmdLog : MixInstallables
+struct CmdLog : InstallablesCommand
 {
     CmdLog()
     {
