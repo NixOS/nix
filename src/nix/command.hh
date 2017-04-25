@@ -44,26 +44,6 @@ private:
     std::shared_ptr<Store> _store;
 };
 
-/* A command that operates on zero or more store paths. */
-struct StorePathsCommand : public StoreCommand
-{
-private:
-
-    Paths storePaths;
-    bool recursive = false;
-    bool all = false;
-
-public:
-
-    StorePathsCommand();
-
-    using StoreCommand::run;
-
-    virtual void run(ref<Store> store, Paths storePaths) = 0;
-
-    void run(ref<Store> store) override;
-};
-
 struct Installable
 {
     virtual std::string what() = 0;
@@ -113,6 +93,25 @@ private:
     std::shared_ptr<EvalState> evalState;
 
     Value * vSourceExpr = 0;
+};
+
+/* A command that operates on zero or more store paths. */
+struct StorePathsCommand : public InstallablesCommand
+{
+private:
+
+    bool recursive = false;
+    bool all = false;
+
+public:
+
+    StorePathsCommand();
+
+    using StoreCommand::run;
+
+    virtual void run(ref<Store> store, Paths storePaths) = 0;
+
+    void run(ref<Store> store) override;
 };
 
 typedef std::map<std::string, ref<Command>> Commands;

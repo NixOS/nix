@@ -1,5 +1,6 @@
 #include "command.hh"
 #include "store-api.hh"
+#include "derivations.hh"
 
 namespace nix {
 
@@ -98,23 +99,32 @@ void StoreCommand::run()
 
 StorePathsCommand::StorePathsCommand()
 {
-    expectArgs("paths", &storePaths);
     mkFlag('r', "recursive", "apply operation to closure of the specified paths", &recursive);
     mkFlag(0, "all", "apply operation to the entire store", &all);
 }
 
 void StorePathsCommand::run(ref<Store> store)
 {
+    Paths storePaths;
+
     if (all) {
-        if (storePaths.size())
+        if (installables.size())
             throw UsageError("‘--all’ does not expect arguments");
         for (auto & p : store->queryAllValidPaths())
             storePaths.push_back(p);
     }
 
     else {
-        for (auto & storePath : storePaths)
-            storePath = store->followLinksToStorePath(storePath);
+        for (auto & i : installables) {
+            for (auto & path : i->toBuildable()) {
+                if (isDerivation(path)) {
+                    Derivation drv = store->derivationFromPath(path);
+                    for (auto & output : drv.outputs)
+                        storePaths.push_back(output.second.path);
+                } else
+                    storePaths.push_back(path);
+            }
+        }
 
         if (recursive) {
             PathSet closure;
