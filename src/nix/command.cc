@@ -79,6 +79,13 @@ StoreCommand::StoreCommand()
     mkFlag(0, "store", "store-uri", "URI of the Nix store to use", &storeUri);
 }
 
+ref<Store> StoreCommand::getStore()
+{
+    if (!_store)
+        _store = createStore();
+    return ref<Store>(_store);
+}
+
 ref<Store> StoreCommand::createStore()
 {
     return openStore(storeUri);

@@ -13,7 +13,7 @@
 
 using namespace nix;
 
-struct CmdRun : StoreCommand, MixInstallables
+struct CmdRun : MixInstallables
 {
     CmdRun()
     {
@@ -31,20 +31,7 @@ struct CmdRun : StoreCommand, MixInstallables
 
     void run(ref<Store> store) override
     {
-        auto elems = evalInstallables(store);
-
-        PathSet pathsToBuild;
-
-        for (auto & elem : elems) {
-            if (elem.isDrv)
-                pathsToBuild.insert(elem.drvPath);
-            else
-                pathsToBuild.insert(elem.outPaths.begin(), elem.outPaths.end());
-        }
-
-        printMissing(store, pathsToBuild);
-
-        store->buildPaths(pathsToBuild);
+        auto paths = buildInstallables(store, false);
 
         auto store2 = store.dynamic_pointer_cast<LocalStore>();
 
@@ -104,7 +91,7 @@ struct CmdRun : StoreCommand, MixInstallables
         }
 
         PathSet outPaths;
-        for (auto & path : pathsToBuild)
+        for (auto & path : paths)
             if (isDerivation(path)) {
                 Derivation drv = store->derivationFromPath(path);
                 for (auto & output : drv.outputs)

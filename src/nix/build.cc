@@ -6,7 +6,7 @@
 
 using namespace nix;
 
-struct CmdBuild : StoreCommand, MixDryRun, MixInstallables
+struct CmdBuild : MixDryRun, MixInstallables
 {
     CmdBuild()
     {
@@ -24,22 +24,9 @@ struct CmdBuild : StoreCommand, MixDryRun, MixInstallables
 
     void run(ref<Store> store) override
     {
-        auto elems = evalInstallables(store);
+        auto paths = buildInstallables(store, dryRun);
 
-        PathSet pathsToBuild;
-
-        for (auto & elem : elems) {
-            if (elem.isDrv)
-                pathsToBuild.insert(elem.drvPath);
-            else
-                pathsToBuild.insert(elem.outPaths.begin(), elem.outPaths.end());
-        }
-
-        printMissing(store, pathsToBuild);
-
-        if (dryRun) return;
-
-        store->buildPaths(pathsToBuild);
+        printInfo("build result: %s", showPaths(paths));
     }
 };
 

@@ -99,7 +99,6 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             }
 
         }
-
     }
 };
 

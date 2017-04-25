@@ -220,6 +220,14 @@ static inline void mkApp(Value & v, Value & left, Value & right)
 }
 
 
+static inline void mkPrimOpApp(Value & v, Value & left, Value & right)
+{
+    v.type = tPrimOpApp;
+    v.app.left = &left;
+    v.app.right = &right;
+}
+
+
 static inline void mkStringNoCopy(Value & v, const char * s)
 {
     v.type = tString;

@@ -33,8 +33,12 @@ struct StoreCommand : virtual Command
     std::string storeUri;
     StoreCommand();
     void run() override;
+    ref<Store> getStore();
     virtual ref<Store> createStore();
     virtual void run(ref<Store>) = 0;
+
+private:
+    std::shared_ptr<Store> _store;
 };
 
 /* A command that operates on zero or more store paths. */
