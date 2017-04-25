@@ -217,6 +217,13 @@ bool NixRepl::getLine(string & input, const char * prompt)
     if (sigaction(SIGINT, &act, &old))
         throw SysError("installing handler for SIGINT");
 
+    static sigset_t savedSignalMask, set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGINT);
+
+    if (sigprocmask(SIG_UNBLOCK, &set, &savedSignalMask))
+        throw SysError("unblocking SIGINT");
+
     if (sigsetjmp(sigintJmpBuf, 1)) {
         input.clear();
     } else {
@@ -235,6 +242,9 @@ bool NixRepl::getLine(string & input, const char * prompt)
     }
 
     _isInterrupted = 0;
+
+    if (sigprocmask(SIG_SETMASK, &savedSignalMask, nullptr))
+        throw SysError("restoring signals");
 
     if (sigaction(SIGINT, &old, 0))
         throw SysError("restoring handler for SIGINT");
