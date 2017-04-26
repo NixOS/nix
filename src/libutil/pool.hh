@@ -68,6 +68,22 @@ public:
         state_->max = max;
     }
 
+    void incCapacity()
+    {
+        auto state_(state.lock());
+        state_->max++;
+        /* we could wakeup here, but this is only used when we're
+         * about to nest Pool usages, and we want to save the slot for
+         * the nested use if we can
+         */
+    }
+
+    void decCapacity()
+    {
+        auto state_(state.lock());
+        state_->max--;
+    }
+
     ~Pool()
     {
         auto state_(state.lock());

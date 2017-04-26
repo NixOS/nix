@@ -414,7 +414,9 @@ Path RemoteStore::addToStore(const string & name, const Path & _srcPath,
     try {
         conn->to.written = 0;
         conn->to.warn = true;
+        connections->incCapacity();
         dumpPath(srcPath, conn->to, filter);
+        connections->decCapacity();
         conn->to.warn = false;
         conn->processStderr();
     } catch (SysError & e) {
