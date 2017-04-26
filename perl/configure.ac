@@ -98,7 +98,7 @@ for name in $ac_subst_vars; do
 done
 
 rm -f Makefile.config
-ln -s ../mk mk
+ln -sfn ../mk mk
 
 AC_CONFIG_FILES([])
 AC_OUTPUT

@@ -20,11 +20,11 @@ Store_DIR := lib/Nix
 Store_SOURCES := $(Store_DIR)/Store.cc
 
 Store_CXXFLAGS = \
-  -I$(shell $(perl) -e 'use Config; print $$Config{archlibexp};')/CORE \
+  $(NIX_CFLAGS) \
+  -I$(shell perl -e 'use Config; print $$Config{archlibexp};')/CORE \
   -D_FILE_OFFSET_BITS=64 \
   -Wno-unknown-warning-option -Wno-unused-variable -Wno-literal-suffix \
-  -Wno-reserved-user-defined-literal -Wno-duplicate-decl-specifier -Wno-pointer-bool-conversion \
-  $(NIX_CFLAGS)
+  -Wno-reserved-user-defined-literal -Wno-duplicate-decl-specifier -Wno-pointer-bool-conversion
 
 Store_LDFLAGS := $(SODIUM_LIBS) $(NIX_LIBS)
 

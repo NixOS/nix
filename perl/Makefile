@@ -1,6 +1,6 @@
 makefiles = local.mk
 
-GLOBAL_CXXFLAGS += -std=c++14 -g -Wall -include nix/config.h
+GLOBAL_CXXFLAGS += -std=c++14 -g -Wall
 
 -include Makefile.config
 

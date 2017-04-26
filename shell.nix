@@ -17,6 +17,10 @@ with import <nixpkgs> {};
       })
       autoreconfHook
       readline
+
+      # For nix-perl
+      perl
+      perlPackages.DBDSQLite
     ];
 
   configureFlags =
@@ -30,6 +34,9 @@ with import <nixpkgs> {};
 
   shellHook =
     ''
-      configureFlags+=" --prefix=$(pwd)/inst"
+      export prefix=$(pwd)/inst
+      configureFlags+=" --prefix=prefix"
+      PKG_CONFIG_PATH=$prefix/lib/pkgconfig:$PKG_CONFIG_PATH
+      PATH=$prefix/bin:$PATH
     '';
 }
