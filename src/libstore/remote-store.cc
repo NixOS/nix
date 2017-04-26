@@ -579,6 +579,25 @@ bool RemoteStore::verifyStore(bool checkContents, bool repair)
     return readInt(from) != 0;
 }
 
+void RemoteStore::nest()
+{
+  nested_states.emplace(*this);
+  to = FdSink();
+  from = FdSource();
+  initialised = false;
+}
+
+void RemoteStore::unNest() noexcept
+{
+  auto & state = nested_states.top();
+  fdSocket = state.fdSocket.borrow();
+  to = std::move(state.to);
+  from = std::move(state.from);
+  daemonVersion = state.daemonVersion;
+  initialised = true;
+  nested_states.pop();
+}
+
 void RemoteStore::processStderr(Sink * sink, Source * source)
 {
     to.flush();

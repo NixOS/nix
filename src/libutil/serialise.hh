@@ -23,6 +23,14 @@ struct BufferedSink : Sink
 
     BufferedSink(size_t bufSize = 32 * 1024)
         : bufSize(bufSize), bufPos(0), buffer(0) { }
+    BufferedSink(const BufferedSink&) = delete;
+    BufferedSink(BufferedSink&& that)
+      : bufSize(that.bufSize), bufPos(that.bufPos), buffer(that.buffer)
+    {
+        that.buffer = nullptr;
+    }
+    BufferedSink & operator=(const BufferedSink&) = delete;
+    BufferedSink & operator=(BufferedSink&&);
     ~BufferedSink();
 
     void operator () (const unsigned char * data, size_t len);
@@ -58,6 +66,14 @@ struct BufferedSource : Source
 
     BufferedSource(size_t bufSize = 32 * 1024)
         : bufSize(bufSize), bufPosIn(0), bufPosOut(0), buffer(0) { }
+    BufferedSource(const BufferedSource&) = delete;
+    BufferedSource(BufferedSource&& that)
+      : bufSize(that.bufSize), bufPosIn(that.bufPosIn), bufPosOut(that.bufPosOut), buffer(that.buffer)
+    {
+        that.buffer = nullptr;
+    }
+    BufferedSource & operator=(const BufferedSource&) = delete;
+    BufferedSource & operator=(BufferedSource&&);
     ~BufferedSource();
 
     size_t read(unsigned char * data, size_t len);
@@ -78,6 +94,8 @@ struct FdSink : BufferedSink
 
     FdSink() : fd(-1), warn(false), written(0) { }
     FdSink(int fd) : fd(fd), warn(false), written(0) { }
+    FdSink(FdSink&&) = default;
+    FdSink & operator=(FdSink&&) = default;
     ~FdSink();
 
     void write(const unsigned char * data, size_t len);

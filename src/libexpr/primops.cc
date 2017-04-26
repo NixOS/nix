@@ -956,6 +956,7 @@ struct FilterFromExpr : PathFilter
         Value arg1;
         mkString(arg1, path);
 
+        auto nestStore = store->scopedNest();
         Value fun2;
         state.callFunction(filter, arg1, fun2, noPos);
 
