@@ -799,7 +799,7 @@ static void opServe(Strings opFlags, Strings opArgs)
         if (GET_PROTOCOL_MINOR(clientVersion) >= 3) {
             settings.buildRepeat = readInt(in);
             settings.enforceDeterminism = readInt(in);
-            settings.runDiffHook = readInt(in);
+            settings.runDiffHook = true;
         }
         settings.printRepeatedBuilds = false;
     };
