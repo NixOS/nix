@@ -1099,20 +1099,24 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
         }
     }
 
-    if (fun.type != tLambda || !fun.lambda.fun->matchAttrs) {
+    if (fun.type != tLambda) {
         res = fun;
         return;
     }
 
     Value * actualArgs = allocValue();
-    mkAttrs(*actualArgs, fun.lambda.fun->formals->formals.size());
+    mkAttrs(*actualArgs, args.size());
 
-    for (auto & i : fun.lambda.fun->formals->formals) {
+    for (auto & i : args) {
+        actualArgs->attrs->push_back(i);
+    }
+
+    if (fun.lambda.fun->matchAttrs) {
+      for (auto & i : fun.lambda.fun->formals->formals) {
         Bindings::iterator j = args.find(i.name);
-        if (j != args.end())
-            actualArgs->attrs->push_back(*j);
-        else if (!i.def)
-            throwTypeError("cannot auto-call a function that has an argument without a default value (‘%1%’)", i.name);
+        if (j == args.end() && !i.def)
+          throwTypeError("cannot auto-call a function that has an argument without a default value (‘%1%’)", i.name);
+      }
     }
 
     actualArgs->attrs->sort();
