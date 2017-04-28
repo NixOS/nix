@@ -483,7 +483,9 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
             };
 
             try {
-                if (trusted
+                if (name == "ssh-auth-sock") // obsolete
+                    ;
+                else if (trusted
                     || name == settings.buildTimeout.name
                     || name == settings.connectTimeout.name)
                     settings.set(name, value);
