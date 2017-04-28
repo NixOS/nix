@@ -35,7 +35,7 @@ with import <nixpkgs> {};
   shellHook =
     ''
       export prefix=$(pwd)/inst
-      configureFlags+=" --prefix=prefix"
+      configureFlags+=" --prefix=$prefix"
       PKG_CONFIG_PATH=$prefix/lib/pkgconfig:$PKG_CONFIG_PATH
       PATH=$prefix/bin:$PATH
     '';

@@ -1,3 +1,5 @@
+#if HAVE_LIBREADLINE
+
 #include <iostream>
 #include <cstdlib>
 
@@ -726,3 +728,5 @@ struct CmdRepl : StoreCommand
 static RegisterCommand r1(make_ref<CmdRepl>());
 
 }
+
+#endif

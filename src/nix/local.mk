@@ -6,6 +6,8 @@ nix_SOURCES := $(wildcard $(d)/*.cc)
 
 nix_LIBS = libexpr libmain libstore libutil libformat
 
-nix_LDFLAGS = -lreadline
+ifeq ($(HAVE_READLINE), 1)
+  nix_LDFLAGS += -lreadline
+endif
 
 $(eval $(call install-symlink, nix, $(bindir)/nix-hash))
