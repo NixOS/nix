@@ -224,7 +224,7 @@ static void start(HashType ht, Ctx & ctx)
 
 
 static void update(HashType ht, Ctx & ctx,
-    const unsigned char * bytes, unsigned int len)
+    const unsigned char * bytes, size_t len)
 {
     if (ht == htMD5) MD5_Update(&ctx.md5, bytes, len);
     else if (ht == htSHA1) SHA1_Update(&ctx.sha1, bytes, len);
