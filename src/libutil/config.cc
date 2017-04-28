@@ -215,6 +215,7 @@ template class BaseSetting<unsigned long>;
 template class BaseSetting<long long>;
 template class BaseSetting<unsigned long long>;
 template class BaseSetting<bool>;
+template class BaseSetting<std::string>;
 
 void PathSetting::set(const std::string & str)
 {
