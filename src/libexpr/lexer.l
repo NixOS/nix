@@ -160,7 +160,8 @@ or          { return OR_KW; }
                    yylval->e = new ExprIndStr(yytext);
                    return IND_STR;
                  }
-<IND_STRING>\'\'\$ {
+<IND_STRING>\'\'\$ |
+<IND_STRING>\$   {
                    yylval->e = new ExprIndStr("$");
                    return IND_STR;
                  }
