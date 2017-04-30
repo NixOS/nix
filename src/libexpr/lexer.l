@@ -135,18 +135,26 @@ or          { return OR_KW; }
 \{                           { return '{'; }
 <INSIDE_DOLLAR_CURLY>\{      { PUSH_STATE(INSIDE_DOLLAR_CURLY); return '{'; }
 
-<INITIAL,INSIDE_DOLLAR_CURLY>\"          { PUSH_STATE(STRING); return '"'; }
+<INITIAL,INSIDE_DOLLAR_CURLY>\" {
+                PUSH_STATE(STRING); return '"';
+              }
 <STRING>([^\$\"\\]|\$[^\{\"\\]|\\.|\$\\.)*\$/\" |
 <STRING>([^\$\"\\]|\$[^\{\"\\]|\\.|\$\\.)+ {
-              /* It is impossible to match strings ending with '$' with one
-                 regex because trailing contexts are only valid at the end
-                 of a rule. (A sane but undocumented limitation.) */
-              yylval->e = unescapeStr(data->symbols, yytext);
-              return STR;
-            }
+                /* It is impossible to match strings ending with '$' with one
+                   regex because trailing contexts are only valid at the end
+                   of a rule. (A sane but undocumented limitation.) */
+                yylval->e = unescapeStr(data->symbols, yytext);
+                return STR;
+              }
 <STRING>\$\{  { PUSH_STATE(INSIDE_DOLLAR_CURLY); return DOLLAR_CURLY; }
-<STRING>\"  { POP_STATE(); return '"'; }
-<STRING>.   return yytext[0]; /* just in case: shouldn't be reached */
+<STRING>\"    { POP_STATE(); return '"'; }
+<STRING>\$|\\|\$\\ {
+                /* This can only occur when we reach EOF, otherwise the above
+                   (...|\$[^\{\"\\]|\\.|\$\\.)+ would have triggered.
+                   This is technically invalid, but we leave the problem to the
+                   parser who fails with exact location. */
+                return STR;
+              }
 
 <INITIAL,INSIDE_DOLLAR_CURLY>\'\'(\ *\n)?     { PUSH_STATE(IND_STRING); return IND_STRING_OPEN; }
 <IND_STRING>([^\$\']|\$[^\{\']|\'[^\'\$])+ {
@@ -172,7 +180,6 @@ or          { return OR_KW; }
                    yylval->e = new ExprIndStr("'");
                    return IND_STR;
                  }
-<IND_STRING>.    return yytext[0]; /* just in case: shouldn't be reached */
 
 <INITIAL,INSIDE_DOLLAR_CURLY>{
 
