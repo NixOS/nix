@@ -27,12 +27,12 @@ class Machine {
     const std::set<string> mandatoryFeatures;
 
 public:
-    const string hostName;
+    const string storeUri;
     const std::vector<string> systemTypes;
     const string sshKey;
     const unsigned int maxJobs;
     const unsigned int speedFactor;
-    bool enabled;
+    bool enabled = true;
 
     bool allSupported(const std::set<string> & features) const {
         return std::all_of(features.begin(), features.end(),
@@ -49,7 +49,7 @@ public:
             });
     }
 
-    Machine(decltype(hostName) hostName,
+    Machine(decltype(storeUri) storeUri,
         decltype(systemTypes) systemTypes,
         decltype(sshKey) sshKey,
         decltype(maxJobs) maxJobs,
@@ -58,14 +58,18 @@ public:
         decltype(mandatoryFeatures) mandatoryFeatures) :
         supportedFeatures(supportedFeatures),
         mandatoryFeatures(mandatoryFeatures),
-        hostName(hostName),
+        storeUri(
+            // Backwards compatibility: if the URI is a hostname,
+            // prepend ssh://.
+            storeUri.find("://") != std::string::npos || hasPrefix(storeUri, "local") || hasPrefix(storeUri, "remote") || hasPrefix(storeUri, "auto")
+            ? storeUri
+            : "ssh://" + storeUri),
         systemTypes(systemTypes),
         sshKey(sshKey),
         maxJobs(maxJobs),
-        speedFactor(std::max(1U, speedFactor)),
-        enabled(true)
-    {};
-};;
+        speedFactor(std::max(1U, speedFactor))
+    {}
+};
 
 static std::vector<Machine> readConf()
 {
@@ -87,13 +91,13 @@ static std::vector<Machine> readConf()
         }
         auto tokens = tokenizeString<std::vector<string>>(line);
         auto sz = tokens.size();
-        if (sz < 4)
+        if (sz < 1)
             throw FormatError("bad machines.conf file ‘%1%’", conf);
         machines.emplace_back(tokens[0],
-            tokenizeString<std::vector<string>>(tokens[1], ","),
-            tokens[2],
-            stoull(tokens[3]),
-            sz >= 5 ? stoull(tokens[4]) : 1LL,
+            sz >= 2 ? tokenizeString<std::vector<string>>(tokens[1], ",") : std::vector<string>{settings.thisSystem},
+            sz >= 3 ? tokens[2] : "",
+            sz >= 4 ? std::stoull(tokens[3]) : 1LL,
+            sz >= 5 ? std::stoull(tokens[4]) : 1LL,
             sz >= 6 ?
             tokenizeString<std::set<string>>(tokens[5], ",") :
             std::set<string>{},
@@ -104,21 +108,18 @@ static std::vector<Machine> readConf()
     return machines;
 }
 
+std::string escapeUri(std::string uri)
+{
+    std::replace(uri.begin(), uri.end(), '/', '_');
+    return uri;
+}
+
 static string currentLoad;
 
 static AutoCloseFD openSlotLock(const Machine & m, unsigned long long slot)
 {
-    std::ostringstream fn_stream(currentLoad, std::ios_base::ate | std::ios_base::out);
-    fn_stream << "/";
-    for (auto t : m.systemTypes) {
-        fn_stream << t << "-";
-    }
-    fn_stream << m.hostName << "-" << slot;
-    return openLockFile(fn_stream.str(), true);
+    return openLockFile(fmt("%s/%s-%d", currentLoad, escapeUri(m.storeUri), slot), true);
 }
-
-static char display_env[] = "DISPLAY=";
-static char ssh_env[] = "SSH_ASKPASS=";
 
 int main (int argc, char * * argv)
 {
@@ -126,9 +127,8 @@ int main (int argc, char * * argv)
         initNix();
 
         /* Ensure we don't get any SSH passphrase or host key popups. */
-        if (putenv(display_env) == -1 ||
-            putenv(ssh_env) == -1)
-            throw SysError("setting SSH env vars");
+        unsetenv("DISPLAY");
+        unsetenv("SSH_ASKPASS");
 
         if (argc != 5)
             throw UsageError("called without required arguments");
@@ -151,7 +151,7 @@ int main (int argc, char * * argv)
         debug("got %d remote builders", machines.size());
 
         string drvPath;
-        string hostName;
+        string storeUri;
         for (string line; getline(cin, line);) {
             auto tokens = tokenizeString<std::vector<string>>(line);
             auto sz = tokens.size();
@@ -178,6 +178,8 @@ int main (int argc, char * * argv)
                 Machine * bestMachine = nullptr;
                 unsigned long long bestLoad = 0;
                 for (auto & m : machines) {
+                    debug("considering building on ‘%s’", m.storeUri);
+
                     if (m.enabled && std::find(m.systemTypes.begin(),
                             m.systemTypes.end(),
                             neededSystem) != m.systemTypes.end() &&
@@ -238,16 +240,21 @@ int main (int argc, char * * argv)
                 lock = -1;
 
                 try {
-                    sshStore = openStore("ssh-ng://" + bestMachine->hostName,
-                        { {"ssh-key", bestMachine->sshKey },
-                          {"max-connections", "1" } });
-                    hostName = bestMachine->hostName;
+
+                    Store::Params storeParams{{"max-connections", "1"}};
+                    if (bestMachine->sshKey != "")
+                        storeParams["ssh-key"] = bestMachine->sshKey;
+
+                    sshStore = openStore(bestMachine->storeUri, storeParams);
+                    storeUri = bestMachine->storeUri;
+
                 } catch (std::exception & e) {
                     printError("unable to open SSH connection to ‘%s’: %s; trying other available machines...",
-                        bestMachine->hostName, e.what());
+                        bestMachine->storeUri, e.what());
                     bestMachine->enabled = false;
                     continue;
                 }
+
                 goto connected;
             }
         }
@@ -257,11 +264,15 @@ connected:
         string line;
         if (!getline(cin, line))
             throw Error("hook caller didn't send inputs");
+
         auto inputs = tokenizeString<PathSet>(line);
         if (!getline(cin, line))
             throw Error("hook caller didn't send outputs");
+
         auto outputs = tokenizeString<PathSet>(line);
-        AutoCloseFD uploadLock = openLockFile(currentLoad + "/" + hostName + ".upload-lock", true);
+
+        AutoCloseFD uploadLock = openLockFile(currentLoad + "/" + escapeUri(storeUri) + ".upload-lock", true);
+
         auto old = signal(SIGALRM, handleAlarm);
         alarm(15 * 60);
         if (!lockFile(uploadLock.get(), ltWrite, true))

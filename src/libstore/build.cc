@@ -1862,6 +1862,7 @@ void DerivationGoal::startBuilder()
                 dirsInChroot[i] = r;
             else {
                 Path p = chrootRootDir + i;
+                debug("linking ‘%1%’ to ‘%2%’", p, r);
                 if (link(r.c_str(), p.c_str()) == -1) {
                     /* Hard-linking fails if we exceed the maximum
                        link count on a file (e.g. 32000 of ext3),

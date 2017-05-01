@@ -709,10 +709,11 @@ namespace nix {
 RegisterStoreImplementation::Implementations * RegisterStoreImplementation::implementations = 0;
 
 
-ref<Store> openStore(const std::string & uri_)
+ref<Store> openStore(const std::string & uri_,
+    const Store::Params & extraParams)
 {
     auto uri(uri_);
-    Store::Params params;
+    Store::Params params(extraParams);
     auto q = uri.find('?');
     if (q != std::string::npos) {
         for (auto s : tokenizeString<Strings>(uri.substr(q + 1), "&")) {
@@ -722,11 +723,7 @@ ref<Store> openStore(const std::string & uri_)
         }
         uri = uri_.substr(0, q);
     }
-    return openStore(uri, params);
-}
 
-ref<Store> openStore(const std::string & uri, const Store::Params & params)
-{
     for (auto fun : *RegisterStoreImplementation::implementations) {
         auto store = fun(uri, params);
         if (store) {
@@ -735,7 +732,7 @@ ref<Store> openStore(const std::string & uri, const Store::Params & params)
         }
     }
 
-    throw Error(format("don't know how to open Nix store ‘%s’") % uri);
+    throw Error("don't know how to open Nix store ‘%s’", uri);
 }
 
 
