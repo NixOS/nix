@@ -27,8 +27,6 @@ protected:
 
     BinaryCacheStore(const Params & params);
 
-    [[noreturn]] void notImpl();
-
 public:
 
     virtual bool fileExists(const std::string & path) = 0;
@@ -65,7 +63,7 @@ public:
     bool isValidPathUncached(const Path & path) override;
 
     PathSet queryAllValidPaths() override
-    { notImpl(); }
+    { unsupported(); }
 
     void queryPathInfoUncached(const Path & path,
         std::function<void(std::shared_ptr<ValidPathInfo>)> success,
@@ -73,16 +71,16 @@ public:
 
     void queryReferrers(const Path & path,
         PathSet & referrers) override
-    { notImpl(); }
+    { unsupported(); }
 
     PathSet queryDerivationOutputs(const Path & path) override
-    { notImpl(); }
+    { unsupported(); }
 
     StringSet queryDerivationOutputNames(const Path & path) override
-    { notImpl(); }
+    { unsupported(); }
 
     Path queryPathFromHashPart(const string & hashPart) override
-    { notImpl(); }
+    { unsupported(); }
 
     bool wantMassQuery() override { return wantMassQuery_; }
 
@@ -99,32 +97,29 @@ public:
 
     void narFromPath(const Path & path, Sink & sink) override;
 
-    void buildPaths(const PathSet & paths, BuildMode buildMode) override
-    { notImpl(); }
-
     BuildResult buildDerivation(const Path & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override
-    { notImpl(); }
+    { unsupported(); }
 
     void ensurePath(const Path & path) override
-    { notImpl(); }
+    { unsupported(); }
 
     void addTempRoot(const Path & path) override
-    { notImpl(); }
+    { unsupported(); }
 
     void addIndirectRoot(const Path & path) override
-    { notImpl(); }
+    { unsupported(); }
 
     Roots findRoots() override
-    { notImpl(); }
+    { unsupported(); }
 
     void collectGarbage(const GCOptions & options, GCResults & results) override
-    { notImpl(); }
+    { unsupported(); }
 
     ref<FSAccessor> getFSAccessor() override;
 
     void addSignatures(const Path & storePath, const StringSet & sigs) override
-    { notImpl(); }
+    { unsupported(); }
 
     std::shared_ptr<std::string> getBuildLog(const Path & path) override;
 

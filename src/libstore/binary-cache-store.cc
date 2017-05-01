@@ -114,11 +114,6 @@ void BinaryCacheStore::init()
     }
 }
 
-void BinaryCacheStore::notImpl()
-{
-    throw Error("operation not implemented for binary cache stores");
-}
-
 std::shared_ptr<std::string> BinaryCacheStore::getFile(const std::string & path)
 {
     std::promise<std::shared_ptr<std::string>> promise;

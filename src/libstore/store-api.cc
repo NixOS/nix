@@ -523,6 +523,17 @@ const Store::Stats & Store::getStats()
 }
 
 
+void Store::buildPaths(const PathSet & paths, BuildMode buildMode)
+{
+    for (auto & path : paths)
+        if (isDerivation(path))
+            unsupported();
+
+    if (queryValidPaths(paths).size() != paths.size())
+        unsupported();
+}
+
+
 void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     const Path & storePath, bool repair, bool dontCheckSigs)
 {

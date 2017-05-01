@@ -18,6 +18,12 @@
 namespace nix {
 
 
+MakeError(SubstError, Error)
+MakeError(BuildError, Error) /* denotes a permanent build failure */
+MakeError(InvalidPath, Error)
+MakeError(Unsupported, Error)
+
+
 struct BasicDerivation;
 struct Derivation;
 class FSAccessor;
@@ -414,7 +420,7 @@ public:
        output paths can be created by running the builder, after
        recursively building any sub-derivations. For inputs that are
        not derivations, substitute them. */
-    virtual void buildPaths(const PathSet & paths, BuildMode buildMode = bmNormal) = 0;
+    virtual void buildPaths(const PathSet & paths, BuildMode buildMode = bmNormal);
 
     /* Build a single non-materialized derivation (i.e. not from an
        on-disk .drv file). Note that ‘drvPath’ is only used for
@@ -584,6 +590,12 @@ protected:
 
     Stats stats;
 
+    /* Unsupported methods. */
+    [[noreturn]] void unsupported()
+    {
+        throw Unsupported("requested operation is not supported by store ‘%s’", getUri());
+    }
+
 };
 
 
@@ -719,11 +731,5 @@ ValidPathInfo decodeValidPathInfo(std::istream & str,
 /* Compute the content-addressability assertion (ValidPathInfo::ca)
    for paths created by makeFixedOutputPath() / addToStore(). */
 std::string makeFixedOutputCA(bool recursive, const Hash & hash);
-
-
-MakeError(SubstError, Error)
-MakeError(BuildError, Error) /* denotes a permanent build failure */
-MakeError(InvalidPath, Error)
-
 
 }

@@ -148,12 +148,6 @@ struct LegacySSHStore : public Store
         sink(*savedNAR.data);
     }
 
-    /* Unsupported methods. */
-    [[noreturn]] void unsupported()
-    {
-        throw Error("operation not supported on SSH stores");
-    }
-
     PathSet queryAllValidPaths() override { unsupported(); }
 
     void queryReferrers(const Path & path, PathSet & referrers) override
@@ -175,9 +169,6 @@ struct LegacySSHStore : public Store
 
     Path addTextToStore(const string & name, const string & s,
         const PathSet & references, bool repair) override
-    { unsupported(); }
-
-    void buildPaths(const PathSet & paths, BuildMode buildMode) override
     { unsupported(); }
 
     BuildResult buildDerivation(const Path & drvPath, const BasicDerivation & drv,
