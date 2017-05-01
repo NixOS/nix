@@ -1078,9 +1078,9 @@ bool statusOk(int status)
 }
 
 
-bool hasPrefix(const string & s, const string & suffix)
+bool hasPrefix(const string & s, const string & prefix)
 {
-    return s.compare(0, suffix.size(), suffix) == 0;
+    return s.compare(0, prefix.size(), prefix) == 0;
 }
 
 
