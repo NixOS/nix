@@ -220,8 +220,7 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
                rather than on the original link.  (Probably it
                temporarily increases the st_nlink field before
                decreasing it again.) */
-            if (st.st_size)
-                printInfo(format("‘%1%’ has maximum number of links") % linkPath);
+            debug("‘%s’ has reached maximum number of links", linkPath);
             return;
         }
         throw SysError(format("cannot rename ‘%1%’ to ‘%2%’") % tempLink % path);
