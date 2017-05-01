@@ -583,11 +583,7 @@ struct HookInstance
 
 HookInstance::HookInstance()
 {
-    debug("starting build hook");
-
-    Path buildHook = getEnv("NIX_BUILD_HOOK");
-    if (string(buildHook, 0, 1) != "/") buildHook = settings.nixLibexecDir + "/nix/" + buildHook;
-    buildHook = canonPath(buildHook);
+    debug("starting build hook ‘%s’", settings.buildHook);
 
     /* Create a pipe to get the output of the child. */
     fromHook.create();
@@ -621,9 +617,9 @@ HookInstance::HookInstance()
             std::to_string(verbosity)
         };
 
-        execv(buildHook.c_str(), stringsToCharPtrs(args).data());
+        execv(settings.buildHook.get().c_str(), stringsToCharPtrs(args).data());
 
-        throw SysError(format("executing ‘%1%’") % buildHook);
+        throw SysError("executing ‘%s’", settings.buildHook);
     });
 
     pid.setSeparatePG(true);
@@ -1569,7 +1565,7 @@ void DerivationGoal::buildDone()
 
 HookReply DerivationGoal::tryBuildHook()
 {
-    if (!settings.useBuildHook || getEnv("NIX_BUILD_HOOK") == "" || !useDerivation) return rpDecline;
+    if (!settings.useBuildHook || !useDerivation) return rpDecline;
 
     if (!worker.hook)
         worker.hook = std::make_unique<HookInstance>();

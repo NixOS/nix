@@ -22,10 +22,7 @@ will call whenever it wants to build a derivation.  The build hook
 will perform it in the usual way if possible, or it can accept it, in
 which case it is responsible for somehow getting the inputs of the
 build to another machine, doing the build there, and getting the
-results back.  The details of the build hook protocol are described in
-the documentation of the <link
-linkend="envar-build-hook"><envar>NIX_BUILD_HOOK</envar>
-variable</link>.</para>
+results back.</para>
 
 <example xml:id='ex-remote-systems'><title>Remote machine configuration:
 <filename>remote-systems.conf</filename></title>
@@ -103,14 +100,6 @@ requiredSystemFeatures = [ "kvm" ];
 
 </orderedlist>
 
-You should also set up the environment variable
-<envar>NIX_CURRENT_LOAD</envar> to point at a directory (e.g.,
-<filename>/var/run/nix/current-load</filename>) that
-<filename>build-remote</filename> uses to remember how many builds
-it is currently executing remotely.  It doesn't look at the actual
-load on the remote machine, so if you have multiple instances of Nix
-running, they should use the same <envar>NIX_CURRENT_LOAD</envar>
-file.  Maybe in the future <filename>build-remote</filename> will
-look at the actual remote load.</para>
+</para>
 
 </chapter>

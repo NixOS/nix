@@ -127,6 +127,9 @@ public:
     Setting<bool> useBuildHook{this, true, "remote-builds",
         "Whether to use build hooks (for distributed builds)."};
 
+    PathSetting buildHook{this, true, nixLibexecDir + "/nix/build-remote", "build-hook",
+        "The path of the helper program that executes builds to remote machines."};
+
     Setting<off_t> reservedSize{this, 8 * 1024 * 1024, "gc-reserved-space",
         "Amount of reserved disk space for the garbage collector."};
 

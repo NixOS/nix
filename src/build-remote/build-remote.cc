@@ -140,7 +140,9 @@ int main (int argc, char * * argv)
         settings.buildTimeout = std::stoll(argv[3]);
         verbosity = (Verbosity) std::stoll(argv[4]);
 
-        currentLoad = getEnv("NIX_CURRENT_LOAD", "/run/nix/current-load");
+        /* It would be more appropriate to use $XDG_RUNTIME_DIR, since
+           that gets cleared on reboot, but it wouldn't work on OS X. */
+        currentLoad = settings.nixStateDir + "/current-load";
 
         std::shared_ptr<Store> sshStore;
         AutoCloseFD bestSlotLock;
