@@ -5,6 +5,7 @@
 #include "store-api.hh"
 #include "worker-protocol.hh"
 #include "ssh.hh"
+#include "derivations.hh"
 
 namespace nix {
 
@@ -21,6 +22,7 @@ struct LegacySSHStore : public Store
         std::unique_ptr<SSHMaster::Connection> sshConn;
         FdSink to;
         FdSource from;
+        int remoteVersion;
     };
 
     std::string host;
@@ -53,8 +55,6 @@ struct LegacySSHStore : public Store
         conn->to = FdSink(conn->sshConn->in.get());
         conn->from = FdSource(conn->sshConn->out.get());
 
-        int remoteVersion;
-
         try {
             conn->to << SERVE_MAGIC_1 << SERVE_PROTOCOL_VERSION;
             conn->to.flush();
@@ -62,8 +62,8 @@ struct LegacySSHStore : public Store
             unsigned int magic = readInt(conn->from);
             if (magic != SERVE_MAGIC_2)
                 throw Error("protocol mismatch with ‘nix-store --serve’ on ‘%s’", host);
-            remoteVersion = readInt(conn->from);
-            if (GET_PROTOCOL_MAJOR(remoteVersion) != 0x200)
+            conn->remoteVersion = readInt(conn->from);
+            if (GET_PROTOCOL_MAJOR(conn->remoteVersion) != 0x200)
                 throw Error("unsupported ‘nix-store --serve’ protocol version on ‘%s’", host);
 
         } catch (EndOfFile & e) {
@@ -173,7 +173,34 @@ struct LegacySSHStore : public Store
 
     BuildResult buildDerivation(const Path & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override
-    { unsupported(); }
+    {
+        auto conn(connections->get());
+
+        conn->to
+            << cmdBuildDerivation
+            << drvPath
+            << drv
+            << settings.maxSilentTime
+            << settings.buildTimeout;
+        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 2)
+            conn->to
+                << settings.maxLogSize;
+        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
+            conn->to
+                << settings.buildRepeat
+                << settings.enforceDeterminism;
+
+        conn->to.flush();
+
+        BuildResult status;
+        status.status = (BuildResult::Status) readInt(conn->from);
+        conn->from >> status.errorMsg;
+
+        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
+            conn->from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
+
+        return status;
+    }
 
     void ensurePath(const Path & path) override
     { unsupported(); }
