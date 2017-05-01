@@ -130,14 +130,15 @@ int main (int argc, char * * argv)
             putenv(ssh_env) == -1)
             throw SysError("setting SSH env vars");
 
-        if (argc != 4)
+        if (argc != 5)
             throw UsageError("called without required arguments");
 
         auto store = openStore();
 
         auto localSystem = argv[1];
-        settings.maxSilentTime = stoull(string(argv[2]));
-        settings.buildTimeout = stoull(string(argv[3]));
+        settings.maxSilentTime = std::stoll(argv[2]);
+        settings.buildTimeout = std::stoll(argv[3]);
+        verbosity = (Verbosity) std::stoll(argv[4]);
 
         currentLoad = getEnv("NIX_CURRENT_LOAD", "/run/nix/current-load");
 
@@ -145,6 +146,8 @@ int main (int argc, char * * argv)
         AutoCloseFD bestSlotLock;
 
         auto machines = readConf();
+        debug("got %d remote builders", machines.size());
+
         string drvPath;
         string hostName;
         for (string line; getline(cin, line);) {

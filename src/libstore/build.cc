@@ -614,10 +614,11 @@ HookInstance::HookInstance()
             throw SysError("dupping builder's stdout/stderr");
 
         Strings args = {
-            baseNameOf(buildHook),
+            baseNameOf(settings.buildHook),
             settings.thisSystem,
-            (format("%1%") % settings.maxSilentTime).str(),
-            (format("%1%") % settings.buildTimeout).str()
+            std::to_string(settings.maxSilentTime),
+            std::to_string(settings.buildTimeout),
+            std::to_string(verbosity)
         };
 
         execv(buildHook.c_str(), stringsToCharPtrs(args).data());
