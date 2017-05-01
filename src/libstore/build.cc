@@ -1622,23 +1622,12 @@ HookReply DerivationGoal::tryBuildHook()
     hook = std::move(worker.hook);
 
     /* Tell the hook all the inputs that have to be copied to the
-       remote system.  This unfortunately has to contain the entire
-       derivation closure to ensure that the validity invariant holds
-       on the remote system.  (I.e., it's unfortunate that we have to
-       list it since the remote system *probably* already has it.) */
-    PathSet allInputs;
-    allInputs.insert(inputPaths.begin(), inputPaths.end());
-    worker.store.computeFSClosure(drvPath, allInputs);
-
-    string s;
-    for (auto & i : allInputs) { s += i; s += ' '; }
-    writeLine(hook->toHook.writeSide.get(), s);
+       remote system. */
+    writeLine(hook->toHook.writeSide.get(), concatStringsSep(" ", inputPaths));
 
     /* Tell the hooks the missing outputs that have to be copied back
        from the remote system. */
-    s = "";
-    for (auto & i : missingPaths) { s += i; s += ' '; }
-    writeLine(hook->toHook.writeSide.get(), s);
+    writeLine(hook->toHook.writeSide.get(), concatStringsSep(" ", missingPaths));
 
     hook->toHook.writeSide = -1;
 

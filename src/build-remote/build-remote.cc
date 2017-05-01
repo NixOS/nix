@@ -269,8 +269,11 @@ connected:
         copyPaths(store, ref<Store>(sshStore), inputs);
         uploadLock = -1;
 
-        printError("building ‘%s’ on ‘%s’", drvPath, hostName);
-        sshStore->buildDerivation(drvPath, readDerivation(drvPath));
+        BasicDerivation drv(readDerivation(drvPath));
+        drv.inputSrcs = inputs;
+
+        printError("building ‘%s’ on ‘%s’", drvPath, storeUri);
+        sshStore->buildDerivation(drvPath, drv);
 
         PathSet missing;
         for (auto & path : outputs)
