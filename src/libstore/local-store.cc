@@ -915,6 +915,8 @@ void LocalStore::invalidatePath(State & state, const Path & path)
 void LocalStore::addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
     bool repair, bool dontCheckSigs, std::shared_ptr<FSAccessor> accessor)
 {
+    assert(info.narHash);
+
     Hash h = hashString(htSHA256, *nar);
     if (h != info.narHash)
         throw Error(format("hash mismatch importing path ‘%s’; expected hash ‘%s’, got ‘%s’") %

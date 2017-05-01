@@ -542,14 +542,21 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     StringSink sink;
     srcStore->narFromPath({storePath}, sink);
 
-    if (srcStore->isTrusted())
-        dontCheckSigs = true;
-
     if (!info->narHash && dontCheckSigs) {
         auto info2 = make_ref<ValidPathInfo>(*info);
         info2->narHash = hashString(htSHA256, *sink.s);
         info = info2;
     }
+
+    assert(info->narHash);
+
+    if (info->ultimate) {
+        auto info2 = make_ref<ValidPathInfo>(*info);
+        info2->ultimate = false;
+        info = info2;
+    }
+
+    assert(info->narHash);
 
     dstStore->addToStore(*info, sink.s, repair, dontCheckSigs);
 }
@@ -802,7 +809,8 @@ std::list<ref<Store>> getDefaultSubstituters()
 }
 
 
-void copyPaths(ref<Store> from, ref<Store> to, const PathSet & storePaths, bool substitute)
+void copyPaths(ref<Store> from, ref<Store> to, const PathSet & storePaths,
+    bool substitute, bool dontCheckSigs)
 {
     PathSet valid = to->queryValidPaths(storePaths, substitute);
 
@@ -830,7 +838,7 @@ void copyPaths(ref<Store> from, ref<Store> to, const PathSet & storePaths, bool 
             if (!to->isValidPath(storePath)) {
                 Activity act(*logger, lvlInfo, format("copying ‘%s’...") % storePath);
 
-                copyStorePath(from, to, storePath);
+                copyStorePath(from, to, storePath, false, dontCheckSigs);
 
                 logger->incProgress(copiedLabel);
             } else

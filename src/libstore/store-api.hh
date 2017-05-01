@@ -570,10 +570,6 @@ public:
 
     const Stats & getStats();
 
-    /* Whether this store paths from this store can be imported even
-       if they lack a signature. */
-    virtual bool isTrusted() { return false; }
-
     /* Return the build log of the specified store path, if available,
        or null otherwise. */
     virtual std::shared_ptr<std::string> getBuildLog(const Path & path)
@@ -695,7 +691,8 @@ ref<Store> openStore(const std::string & uri = getEnv("NIX_REMOTE"),
     const Store::Params & extraParams = Store::Params());
 
 
-void copyPaths(ref<Store> from, ref<Store> to, const PathSet & storePaths, bool substitute = false);
+void copyPaths(ref<Store> from, ref<Store> to, const PathSet & storePaths,
+    bool substitute = false, bool dontCheckSigs = false);
 
 enum StoreType {
     tDaemon,

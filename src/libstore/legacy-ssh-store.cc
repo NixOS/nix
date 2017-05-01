@@ -223,9 +223,6 @@ struct LegacySSHStore : public Store
     void addSignatures(const Path & storePath, const StringSet & sigs) override
     { unsupported(); }
 
-    bool isTrusted() override
-    { return true; }
-
     void computeFSClosure(const PathSet & paths,
         PathSet & out, bool flipDirection = false,
         bool includeOutputs = false, bool includeDerivers = false) override
