@@ -3091,7 +3091,7 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
     }
 
     if (hook && fd == hook->fromHook.readSide.get())
-        printError(data); // FIXME?
+        printError(chomp(data));
 }
 
 
