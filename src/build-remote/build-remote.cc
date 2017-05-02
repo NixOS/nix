@@ -241,7 +241,7 @@ int main (int argc, char * * argv)
 
                 try {
 
-                    Store::Params storeParams{{"max-connections", "1"}};
+                    Store::Params storeParams{{"max-connections", "1"}, {"log-fd", "4"}};
                     if (bestMachine->sshKey != "")
                         storeParams["ssh-key"] = bestMachine->sshKey;
 

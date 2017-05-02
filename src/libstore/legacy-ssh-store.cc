@@ -17,6 +17,9 @@ struct LegacySSHStore : public Store
     const Setting<Path> sshKey{this, "", "ssh-key", "path to an SSH private key"};
     const Setting<bool> compress{this, false, "compress", "whether to compress the connection"};
 
+    // Hack for getting remote build log output.
+    const Setting<int> logFD{this, -1, "log-fd", "file descriptor to which SSH's stderr is connected"};
+
     struct Connection
     {
         std::unique_ptr<SSHMaster::Connection> sshConn;
@@ -44,7 +47,8 @@ struct LegacySSHStore : public Store
             sshKey,
             // Use SSH master only if using more than 1 connection.
             connections->capacity() > 1,
-            compress)
+            compress,
+            logFD)
     {
     }
 

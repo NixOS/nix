@@ -31,6 +31,8 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
             throw SysError("duping over stdin");
         if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
             throw SysError("duping over stdout");
+        if (logFD != -1 && dup2(logFD, STDERR_FILENO) == -1)
+            throw SysError("duping over stderr");
 
         Strings args = { "ssh", host.c_str(), "-x", "-a" };
         addCommonSSHOpts(args);

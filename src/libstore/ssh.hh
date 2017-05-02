@@ -13,6 +13,7 @@ private:
     const std::string keyFile;
     const bool useMaster;
     const bool compress;
+    const int logFD;
 
     struct State
     {
@@ -27,11 +28,12 @@ private:
 
 public:
 
-    SSHMaster(const std::string & host, const std::string & keyFile, bool useMaster, bool compress)
+    SSHMaster(const std::string & host, const std::string & keyFile, bool useMaster, bool compress, int logFD = -1)
         : host(host)
         , keyFile(keyFile)
         , useMaster(useMaster)
         , compress(compress)
+        , logFD(logFD)
     {
     }
 
