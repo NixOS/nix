@@ -78,13 +78,15 @@ struct InstallablesCommand : virtual Args, StoreCommand
        = import ...; bla = import ...; }’. */
     Value * getSourceExpr(EvalState & state);
 
-    std::vector<std::shared_ptr<Installable>> parseInstallables(ref<Store> store, Strings installables);
+    std::vector<std::shared_ptr<Installable>> parseInstallables(ref<Store> store, Strings ss);
 
     PathSet buildInstallables(ref<Store> store, bool dryRun);
 
     ref<EvalState> getEvalState();
 
     void prepare() override;
+
+    virtual bool useDefaultInstallables() { return true; }
 
 private:
 
@@ -112,6 +114,8 @@ public:
     virtual void run(ref<Store> store, Paths storePaths) = 0;
 
     void run(ref<Store> store) override;
+
+    bool useDefaultInstallables() override { return !all; }
 };
 
 typedef std::map<std::string, ref<Command>> Commands;

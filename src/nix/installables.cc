@@ -177,21 +177,21 @@ struct InstallableAttrPath : Installable
 std::string attrRegex = R"([A-Za-z_][A-Za-z0-9-_+]*)";
 static std::regex attrPathRegex(fmt(R"(%1%(\.%1%)*)", attrRegex));
 
-std::vector<std::shared_ptr<Installable>> InstallablesCommand::parseInstallables(ref<Store> store, Strings installables)
+std::vector<std::shared_ptr<Installable>> InstallablesCommand::parseInstallables(ref<Store> store, Strings ss)
 {
     std::vector<std::shared_ptr<Installable>> result;
 
-    if (installables.empty()) {
+    if (ss.empty() && useDefaultInstallables()) {
         if (file == "")
             file = ".";
-        installables = Strings{""};
+        ss = Strings{""};
     }
 
-    for (auto & installable : installables) {
+    for (auto & s : ss) {
 
-        if (installable.find("/") != std::string::npos) {
+        if (s.find("/") != std::string::npos) {
 
-            auto path = store->toStorePath(store->followLinksToStore(installable));
+            auto path = store->toStorePath(store->followLinksToStore(s));
 
             if (store->isStorePath(path)) {
                 if (isDerivation(path))
@@ -201,14 +201,14 @@ std::vector<std::shared_ptr<Installable>> InstallablesCommand::parseInstallables
             }
         }
 
-        else if (installable.compare(0, 1, "(") == 0)
-            result.push_back(std::make_shared<InstallableExpr>(*this, installable));
+        else if (s.compare(0, 1, "(") == 0)
+            result.push_back(std::make_shared<InstallableExpr>(*this, s));
 
-        else if (installable == "" || std::regex_match(installable, attrPathRegex))
-            result.push_back(std::make_shared<InstallableAttrPath>(*this, installable));
+        else if (s == "" || std::regex_match(s, attrPathRegex))
+            result.push_back(std::make_shared<InstallableAttrPath>(*this, s));
 
         else
-            throw UsageError("don't know what to do with argument ‘%s’", installable);
+            throw UsageError("don't know what to do with argument ‘%s’", s);
     }
 
     return result;
