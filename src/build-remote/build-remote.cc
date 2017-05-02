@@ -45,7 +45,7 @@ int main (int argc, char * * argv)
         unsetenv("DISPLAY");
         unsetenv("SSH_ASKPASS");
 
-        if (argc != 5)
+        if (argc != 6)
             throw UsageError("called without required arguments");
 
         auto store = openStore();
@@ -54,6 +54,7 @@ int main (int argc, char * * argv)
         settings.maxSilentTime = std::stoll(argv[2]);
         settings.buildTimeout = std::stoll(argv[3]);
         verbosity = (Verbosity) std::stoll(argv[4]);
+        settings.builders = argv[5];
 
         /* It would be more appropriate to use $XDG_RUNTIME_DIR, since
            that gets cleared on reboot, but it wouldn't work on OS X. */
@@ -62,13 +63,7 @@ int main (int argc, char * * argv)
         std::shared_ptr<Store> sshStore;
         AutoCloseFD bestSlotLock;
 
-        Machines machines;
-        try {
-            parseMachines(readFile(getEnv("NIX_REMOTE_SYSTEMS", SYSCONFDIR "/nix/machines")), machines);
-        } catch (const SysError & e) {
-            if (e.errNo != ENOENT)
-                throw;
-        }
+        auto machines = getMachines();
         debug("got %d remote builders", machines.size());
 
         if (machines.empty()) {

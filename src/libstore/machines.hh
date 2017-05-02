@@ -32,4 +32,6 @@ typedef std::vector<Machine> Machines;
 
 void parseMachines(const std::string & s, Machines & machines);
 
+Machines getMachines();
+
 }

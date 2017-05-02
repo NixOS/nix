@@ -44,7 +44,7 @@ bool Machine::mandatoryMet(const std::set<string> & features) const {
 
 void parseMachines(const std::string & s, Machines & machines)
 {
-    for (auto line : tokenizeString<std::vector<string>>(s, "\n")) {
+    for (auto line : tokenizeString<std::vector<string>>(s, "\n;")) {
         chomp(line);
         line.erase(std::find(line.begin(), line.end(), '#'), line.end());
         if (line.empty()) continue;
@@ -60,6 +60,22 @@ void parseMachines(const std::string & s, Machines & machines)
             sz >= 6 ? tokenizeString<std::set<string>>(tokens[5], ",") : std::set<string>{},
             sz >= 7 ? tokenizeString<std::set<string>>(tokens[6], ",") : std::set<string>{});
     }
+}
+
+Machines getMachines()
+{
+    Machines machines;
+
+    try {
+        parseMachines(readFile(getEnv("NIX_REMOTE_SYSTEMS", settings.nixConfDir + "/machines")), machines);
+    } catch (const SysError & e) {
+        if (e.errNo != ENOENT)
+            throw;
+    }
+
+    parseMachines(settings.builders, machines);
+
+    return machines;
 }
 
 }

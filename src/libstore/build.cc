@@ -614,7 +614,8 @@ HookInstance::HookInstance()
             settings.thisSystem,
             std::to_string(settings.maxSilentTime),
             std::to_string(settings.buildTimeout),
-            std::to_string(verbosity)
+            std::to_string(verbosity),
+            settings.builders
         };
 
         execv(settings.buildHook.get().c_str(), stringsToCharPtrs(args).data());
