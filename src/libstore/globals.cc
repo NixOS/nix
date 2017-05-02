@@ -43,6 +43,10 @@ Settings::Settings()
     lockCPU = getEnv("NIX_AFFINITY_HACK", "1") == "1";
     caFile = getEnv("NIX_SSL_CERT_FILE", getEnv("SSL_CERT_FILE", "/etc/ssl/certs/ca-certificates.crt"));
 
+    /* Backwards compatibility. */
+    auto s = getEnv("NIX_REMOTE_SYSTEMS");
+    if (s != "") builderFiles = tokenizeString<Strings>(s, ":");
+
 #if __linux__
     sandboxPaths = tokenizeString<StringSet>("/bin/sh=" BASH_PATH);
 #endif

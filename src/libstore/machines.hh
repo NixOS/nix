@@ -13,6 +13,7 @@ struct Machine {
     const unsigned int speedFactor;
     const std::set<string> supportedFeatures;
     const std::set<string> mandatoryFeatures;
+    const std::string sshPublicHostKey;
     bool enabled = true;
 
     bool allSupported(const std::set<string> & features) const;
@@ -25,7 +26,8 @@ struct Machine {
         decltype(maxJobs) maxJobs,
         decltype(speedFactor) speedFactor,
         decltype(supportedFeatures) supportedFeatures,
-        decltype(mandatoryFeatures) mandatoryFeatures);
+        decltype(mandatoryFeatures) mandatoryFeatures,
+        decltype(sshPublicHostKey) sshPublicHostKey);
 };
 
 typedef std::vector<Machine> Machines;

@@ -12,7 +12,8 @@ Machine::Machine(decltype(storeUri) storeUri,
     decltype(maxJobs) maxJobs,
     decltype(speedFactor) speedFactor,
     decltype(supportedFeatures) supportedFeatures,
-    decltype(mandatoryFeatures) mandatoryFeatures) :
+    decltype(mandatoryFeatures) mandatoryFeatures,
+    decltype(sshPublicHostKey) sshPublicHostKey) :
     storeUri(
         // Backwards compatibility: if the URI is a hostname,
         // prepend ssh://.
@@ -24,7 +25,8 @@ Machine::Machine(decltype(storeUri) storeUri,
     maxJobs(maxJobs),
     speedFactor(std::max(1U, speedFactor)),
     supportedFeatures(supportedFeatures),
-    mandatoryFeatures(mandatoryFeatures)
+    mandatoryFeatures(mandatoryFeatures),
+    sshPublicHostKey(sshPublicHostKey)
 {}
 
 bool Machine::allSupported(const std::set<string> & features) const {
@@ -52,13 +54,19 @@ void parseMachines(const std::string & s, Machines & machines)
         auto sz = tokens.size();
         if (sz < 1)
             throw FormatError("bad machine specification ‘%s’", line);
+
+        auto isSet = [&](int n) {
+            return tokens.size() > n && tokens[n] != "" && tokens[n] != "-";
+        };
+
         machines.emplace_back(tokens[0],
-            sz >= 2 ? tokenizeString<std::vector<string>>(tokens[1], ",") : std::vector<string>{settings.thisSystem},
-            sz >= 3 ? tokens[2] : "",
-            sz >= 4 ? std::stoull(tokens[3]) : 1LL,
-            sz >= 5 ? std::stoull(tokens[4]) : 1LL,
-            sz >= 6 ? tokenizeString<std::set<string>>(tokens[5], ",") : std::set<string>{},
-            sz >= 7 ? tokenizeString<std::set<string>>(tokens[6], ",") : std::set<string>{});
+            isSet(1) ? tokenizeString<std::vector<string>>(tokens[1], ",") : std::vector<string>{settings.thisSystem},
+            isSet(2) ? tokens[2] : "",
+            isSet(3) ? std::stoull(tokens[3]) : 1LL,
+            isSet(4) ? std::stoull(tokens[4]) : 1LL,
+            isSet(5) ? tokenizeString<std::set<string>>(tokens[5], ",") : std::set<string>{},
+            isSet(6) ? tokenizeString<std::set<string>>(tokens[6], ",") : std::set<string>{},
+            isSet(7) ? tokens[7] : "");
     }
 }
 
@@ -66,11 +74,13 @@ Machines getMachines()
 {
     Machines machines;
 
-    try {
-        parseMachines(readFile(getEnv("NIX_REMOTE_SYSTEMS", settings.nixConfDir + "/machines")), machines);
-    } catch (const SysError & e) {
-        if (e.errNo != ENOENT)
-            throw;
+    for (auto & file : settings.builderFiles.get()) {
+        try {
+            parseMachines(readFile(file), machines);
+        } catch (const SysError & e) {
+            if (e.errNo != ENOENT)
+                throw;
+        }
     }
 
     parseMachines(settings.builders, machines);
