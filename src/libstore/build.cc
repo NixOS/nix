@@ -1598,8 +1598,15 @@ HookReply DerivationGoal::tryBuildHook()
 
         debug(format("hook reply is ‘%1%’") % reply);
 
-        if (reply == "decline" || reply == "postpone")
-            return reply == "decline" ? rpDecline : rpPostpone;
+        if (reply == "decline")
+            return rpDecline;
+        else if (reply == "decline-permanently") {
+            settings.useBuildHook = false;
+            worker.hook = 0;
+            return rpDecline;
+        }
+        else if (reply == "postpone")
+            return rpPostpone;
         else if (reply != "accept")
             throw Error(format("bad hook reply ‘%1%’") % reply);
 

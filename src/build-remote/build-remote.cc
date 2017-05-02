@@ -150,6 +150,11 @@ int main (int argc, char * * argv)
         auto machines = readConf();
         debug("got %d remote builders", machines.size());
 
+        if (machines.empty()) {
+            std::cerr << "# decline-permanently\n";
+            return;
+        }
+
         string drvPath;
         string storeUri;
         for (string line; getline(cin, line);) {
