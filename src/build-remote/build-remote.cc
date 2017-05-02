@@ -9,6 +9,7 @@
 #include <sys/time.h>
 #endif
 
+#include "machines.hh"
 #include "shared.hh"
 #include "pathlocks.hh"
 #include "globals.hh"
@@ -20,92 +21,6 @@ using namespace nix;
 using std::cin;
 
 static void handleAlarm(int sig) {
-}
-
-class Machine {
-    const std::set<string> supportedFeatures;
-    const std::set<string> mandatoryFeatures;
-
-public:
-    const string storeUri;
-    const std::vector<string> systemTypes;
-    const string sshKey;
-    const unsigned int maxJobs;
-    const unsigned int speedFactor;
-    bool enabled = true;
-
-    bool allSupported(const std::set<string> & features) const {
-        return std::all_of(features.begin(), features.end(),
-            [&](const string & feature) {
-                return supportedFeatures.count(feature) ||
-                    mandatoryFeatures.count(feature);
-            });
-    }
-
-    bool mandatoryMet(const std::set<string> & features) const {
-        return std::all_of(mandatoryFeatures.begin(), mandatoryFeatures.end(),
-            [&](const string & feature) {
-                return features.count(feature);
-            });
-    }
-
-    Machine(decltype(storeUri) storeUri,
-        decltype(systemTypes) systemTypes,
-        decltype(sshKey) sshKey,
-        decltype(maxJobs) maxJobs,
-        decltype(speedFactor) speedFactor,
-        decltype(supportedFeatures) supportedFeatures,
-        decltype(mandatoryFeatures) mandatoryFeatures) :
-        supportedFeatures(supportedFeatures),
-        mandatoryFeatures(mandatoryFeatures),
-        storeUri(
-            // Backwards compatibility: if the URI is a hostname,
-            // prepend ssh://.
-            storeUri.find("://") != std::string::npos || hasPrefix(storeUri, "local") || hasPrefix(storeUri, "remote") || hasPrefix(storeUri, "auto")
-            ? storeUri
-            : "ssh://" + storeUri),
-        systemTypes(systemTypes),
-        sshKey(sshKey),
-        maxJobs(maxJobs),
-        speedFactor(std::max(1U, speedFactor))
-    {}
-};
-
-static std::vector<Machine> readConf()
-{
-    auto conf = getEnv("NIX_REMOTE_SYSTEMS", SYSCONFDIR "/nix/machines");
-
-    auto machines = std::vector<Machine>{};
-    auto lines = std::vector<string>{};
-    try {
-        lines = tokenizeString<std::vector<string>>(readFile(conf), "\n");
-    } catch (const SysError & e) {
-        if (e.errNo != ENOENT)
-            throw;
-    }
-    for (auto line : lines) {
-        chomp(line);
-        line.erase(std::find(line.begin(), line.end(), '#'), line.end());
-        if (line.empty()) {
-            continue;
-        }
-        auto tokens = tokenizeString<std::vector<string>>(line);
-        auto sz = tokens.size();
-        if (sz < 1)
-            throw FormatError("bad machines.conf file ‘%1%’", conf);
-        machines.emplace_back(tokens[0],
-            sz >= 2 ? tokenizeString<std::vector<string>>(tokens[1], ",") : std::vector<string>{settings.thisSystem},
-            sz >= 3 ? tokens[2] : "",
-            sz >= 4 ? std::stoull(tokens[3]) : 1LL,
-            sz >= 5 ? std::stoull(tokens[4]) : 1LL,
-            sz >= 6 ?
-            tokenizeString<std::set<string>>(tokens[5], ",") :
-            std::set<string>{},
-            sz >= 7 ?
-            tokenizeString<std::set<string>>(tokens[6], ",") :
-            std::set<string>{});
-    }
-    return machines;
 }
 
 std::string escapeUri(std::string uri)
@@ -147,7 +62,13 @@ int main (int argc, char * * argv)
         std::shared_ptr<Store> sshStore;
         AutoCloseFD bestSlotLock;
 
-        auto machines = readConf();
+        Machines machines;
+        try {
+            parseMachines(readFile(getEnv("NIX_REMOTE_SYSTEMS", SYSCONFDIR "/nix/machines")), machines);
+        } catch (const SysError & e) {
+            if (e.errNo != ENOENT)
+                throw;
+        }
         debug("got %d remote builders", machines.size());
 
         if (machines.empty()) {
