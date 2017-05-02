@@ -11,7 +11,8 @@ nix_tests = \
   multiple-outputs.sh import-derivation.sh fetchurl.sh optimise-store.sh \
   binary-cache.sh nix-profile.sh repair.sh dump-db.sh case-hack.sh \
   check-reqs.sh pass-as-file.sh tarball.sh restricted.sh \
-  placeholders.sh nix-shell.sh
+  placeholders.sh nix-shell.sh \
+  linux-sandbox.sh
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
