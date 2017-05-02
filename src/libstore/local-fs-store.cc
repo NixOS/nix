@@ -31,7 +31,7 @@ struct LocalStoreAccessor : public FSAccessor
         auto realPath = toRealPath(path);
 
         struct stat st;
-        if (lstat(path.c_str(), &st)) {
+        if (lstat(realPath.c_str(), &st)) {
             if (errno == ENOENT || errno == ENOTDIR) return {Type::tMissing, 0, false};
             throw SysError(format("getting status of ‘%1%’") % path);
         }
@@ -51,7 +51,7 @@ struct LocalStoreAccessor : public FSAccessor
     {
         auto realPath = toRealPath(path);
 
-        auto entries = nix::readDirectory(path);
+        auto entries = nix::readDirectory(realPath);
 
         StringSet res;
         for (auto & entry : entries)
@@ -73,7 +73,8 @@ struct LocalStoreAccessor : public FSAccessor
 
 ref<FSAccessor> LocalFSStore::getFSAccessor()
 {
-    return make_ref<LocalStoreAccessor>(ref<LocalFSStore>(std::dynamic_pointer_cast<LocalFSStore>(shared_from_this())));
+    return make_ref<LocalStoreAccessor>(ref<LocalFSStore>(
+            std::dynamic_pointer_cast<LocalFSStore>(shared_from_this())));
 }
 
 void LocalFSStore::narFromPath(const Path & path, Sink & sink)
