@@ -92,6 +92,8 @@ public:
         PathSet & willBuild, PathSet & willSubstitute, PathSet & unknown,
         unsigned long long & downloadSize, unsigned long long & narSize) override;
 
+    void connect() override;
+
 protected:
 
     struct Connection

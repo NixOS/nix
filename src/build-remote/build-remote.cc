@@ -167,6 +167,7 @@ int main (int argc, char * * argv)
                         storeParams["ssh-key"] = bestMachine->sshKey;
 
                     sshStore = openStore(bestMachine->storeUri, storeParams);
+                    sshStore->connect();
                     storeUri = bestMachine->storeUri;
 
                 } catch (std::exception & e) {

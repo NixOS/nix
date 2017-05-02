@@ -100,7 +100,7 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
         throw Error(format("socket path ‘%1%’ is too long") % socketPath);
     strcpy(addr.sun_path, socketPath.c_str());
 
-    if (connect(conn->fd.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
+    if (::connect(conn->fd.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
         throw SysError(format("cannot connect to daemon at ‘%1%’") % socketPath);
 
     conn->from.fd = conn->fd.get();
@@ -610,6 +610,12 @@ void RemoteStore::queryMissing(const PathSet & targets,
  fallback:
     return Store::queryMissing(targets, willBuild, willSubstitute,
         unknown, downloadSize, narSize);
+}
+
+
+void RemoteStore::connect()
+{
+    auto conn(connections->get());
 }
 
 

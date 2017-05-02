@@ -262,6 +262,11 @@ struct LegacySSHStore : public Store
 
         return readStorePaths<PathSet>(*this, conn->from);
     }
+
+    void connect() override
+    {
+        auto conn(connections->get());
+    }
 };
 
 static RegisterStoreImplementation regStore([](
