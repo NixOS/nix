@@ -10,6 +10,13 @@ using namespace nix;
 
 struct CmdEval : MixJSON, InstallablesCommand
 {
+    bool raw = false;
+
+    CmdEval()
+    {
+        mkFlag(0, "raw", "print strings unquoted", &raw);
+    }
+
     std::string name() override
     {
         return "eval";
@@ -22,13 +29,18 @@ struct CmdEval : MixJSON, InstallablesCommand
 
     void run(ref<Store> store) override
     {
+        if (raw && json)
+            throw UsageError("--raw and --json are mutually exclusive");
+
         auto state = getEvalState();
 
         auto jsonOut = json ? std::make_unique<JSONList>(std::cout) : nullptr;
 
         for (auto & i : installables) {
             auto v = i->toValue(*state);
-            if (json) {
+            if (raw) {
+                std::cout << state->forceString(*v);
+            } else if (json) {
                 PathSet context;
                 auto jsonElem = jsonOut->placeholder();
                 printValueAsJSON(*state, true, *v, jsonElem, context);
