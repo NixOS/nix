@@ -40,11 +40,6 @@ perlarchname=$($perl -e 'use Config; print $Config{archname};')
 AC_SUBST(perllibdir, [${libdir}/perl5/site_perl/$perlversion/$perlarchname])
 AC_MSG_RESULT($perllibdir)
 
-AC_ARG_WITH(store-dir, AC_HELP_STRING([--with-store-dir=PATH],
-  [path of the Nix store (defaults to /nix/store)]),
-  storedir=$withval, storedir='/nix/store')
-AC_SUBST(storedir)
-
 # Look for libsodium, an optional dependency.
 PKG_CHECK_MODULES([SODIUM], [libsodium],
   [AC_DEFINE([HAVE_SODIUM], [1], [Whether to use libsodium for cryptography.])
