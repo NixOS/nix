@@ -117,21 +117,19 @@ input.</para>
 
   <varlistentry><term><option>--xml</option></term>
 
-    <listitem><para>When used with <option>--parse</option> and
-    <option>--eval</option>, print the resulting expression as an
-    XML representation of the abstract syntax tree rather than as an
-    ATerm.  The schema is the same as that used by the <link
-    linkend="builtin-toXML"><function>toXML</function>
-    built-in</link>.</para></listitem>
+    <listitem><para>When used with <option>--eval</option>, print the resulting
+    value as an XML representation of the abstract syntax tree rather than as
+    an ATerm. The schema is the same as that used by the <link
+    linkend="builtin-toXML"><function>toXML</function> built-in</link>.
+    </para></listitem>
 
   </varlistentry>
 
   <varlistentry><term><option>--json</option></term>
 
-    <listitem><para>When used with <option>--parse</option> and
-    <option>--eval</option>, print the resulting expression as an
-    JSON representation of the abstract syntax tree rather than as an
-    ATerm.</para></listitem>
+    <listitem><para>When used with <option>--eval</option>, print the resulting
+    value as an JSON representation of the abstract syntax tree rather
+    than as an ATerm.</para></listitem>
 
   </varlistentry>
 
