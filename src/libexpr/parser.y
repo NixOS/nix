@@ -235,6 +235,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
         % error % makeCurPos(*loc, data)).str();
 }
 
+static bool haveWarnedAboutOrVar = false;
 
 %}
 
@@ -358,7 +359,13 @@ expr_select
   | /* Backwards compatibility: because Nixpkgs has a rarely used
        function named ‘or’, allow stuff like ‘map or [...]’. */
     expr_simple OR_KW
-    { $$ = new ExprApp(CUR_POS, $1, new ExprVar(CUR_POS, data->symbols.create("or"))); }
+    {
+      warnOnce(
+        haveWarnedAboutOrVar,
+        format("using \"or\" as a variable is deprecated at %1%")
+          % makeCurPos(@2, data));
+      $$ = new ExprApp(CUR_POS, $1, new ExprVar(CUR_POS, data->symbols.create("or")));
+    }
   | expr_simple { $$ = $1; }
   ;
 
@@ -483,7 +490,13 @@ attrpath
 
 attr
   : ID { $$ = $1; }
-  | OR_KW { $$ = "or"; }
+  | OR_KW {
+    warnOnce(
+      haveWarnedAboutOrVar,
+      format("using \"or\" as an attribute name is deprecated at %1%")
+        % makeCurPos(@1, data));
+    $$ = "or";
+    }
   ;
 
 string_attr
