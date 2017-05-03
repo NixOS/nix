@@ -112,7 +112,7 @@ let
 
         buildInputs =
           [ (builtins.getAttr system jobs.build) curl bzip2 xz pkgconfig pkgs.perl ]
-          ++ lib.optional stdenv.isLinux libsodium;
+          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
 
         configureFlags = ''
           --with-dbi=${perlPackages.DBI}/${pkgs.perl.libPrefix}
