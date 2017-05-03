@@ -15,6 +15,7 @@
 #include "shared.hh"
 
 using namespace nix;
+using namespace std::string_literals;
 
 extern char * * environ;
 
@@ -407,8 +408,20 @@ int main(int argc, char ** argv)
                 env["NIX_BUILD_TOP"] = env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmp;
                 env["NIX_STORE"] = store->storeDir;
 
+                auto passAsFile = tokenizeString<StringSet>(get(drv.env, "passAsFile", ""));
+
+                bool keepTmp = false;
+                int fileNr = 0;
+
                 for (auto & var : drv.env)
-                    env[var.first] = var.second;
+                    if (passAsFile.count(var.first)) {
+                        keepTmp = true;
+                        string fn = ".attr-" + std::to_string(fileNr++);
+                        Path p = (Path) tmpDir + "/" + fn;
+                        writeFile(p, var.second);
+                        env[var.first + "Path"] = p;
+                    } else
+                        env[var.first] = var.second;
 
                 restoreAffinity();
 
@@ -418,7 +431,7 @@ int main(int argc, char ** argv)
                 // the current $PATH directories.
                 auto rcfile = (Path) tmpDir + "/rc";
                 writeFile(rcfile, fmt(
-                        "rm -rf '%1%'; "
+                        (keepTmp ? "" : "rm -rf '%1%'; "s) +
                         "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc; "
                         "%2%"
                         "dontAddDisableDepTrack=1; "
