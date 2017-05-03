@@ -15,9 +15,9 @@ void Config::set(const std::string & name, const std::string & value)
 
 void Config::addSetting(AbstractSetting * setting)
 {
-    _settings.emplace(setting->name, Config::SettingData{false, setting});
+    _settings.emplace(setting->name, Config::SettingData(false, setting));
     for (auto & alias : setting->aliases)
-        _settings.emplace(alias, Config::SettingData{true, setting});
+        _settings.emplace(alias, Config::SettingData(true, setting));
 
     bool set = false;
 

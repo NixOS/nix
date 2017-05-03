@@ -33,8 +33,11 @@ class Config
 
     struct SettingData
     {
-        bool isAlias = false;
+        bool isAlias;
         AbstractSetting * setting;
+        SettingData(bool isAlias, AbstractSetting * setting)
+            : isAlias(isAlias), setting(setting)
+        { }
     };
 
     std::map<std::string, SettingData> _settings;
