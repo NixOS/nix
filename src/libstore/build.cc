@@ -1661,6 +1661,9 @@ int childEntry(void * arg)
 }
 
 
+const std::string buildDir = "/build";
+
+
 void DerivationGoal::startBuilder()
 {
     auto f = format(
@@ -1721,7 +1724,14 @@ void DerivationGoal::startBuilder()
 
     /* In a sandbox, for determinism, always use the same temporary
        directory. */
+#if __linux__
+    tmpDirInSandbox = useChroot ? buildDir : tmpDir;
+#elif __APPLE__
+    // On Darwin, we canonize /tmp because its probably a symlink to /private/tmp.
     tmpDirInSandbox = useChroot ? canonPath("/tmp", true) + "/nix-build-" + drvName + "-0" : tmpDir;
+#else
+    tmpDirInSandbox = tmpDir;
+#endif
     chownToBuilder(tmpDir);
 
     /* Substitute output placeholders with the actual output paths. */
@@ -1829,11 +1839,11 @@ void DerivationGoal::startBuilder()
            Samba-in-QEMU. */
         createDirs(chrootRootDir + "/etc");
 
-        writeFile(chrootRootDir + "/etc/passwd",
-            (format(
-                "root:x:0:0:Nix build user:/:/noshell\n"
-                "nixbld:x:%1%:%2%:Nix build user:/:/noshell\n"
-                "nobody:x:65534:65534:Nobody:/:/noshell\n") % sandboxUid % sandboxGid).str());
+        writeFile(chrootRootDir + "/etc/passwd", fmt(
+                "root:x:0:0:Nix build user:%3%:/noshell\n"
+                "nixbld:x:%1%:%2%:Nix build user:%3%:/noshell\n"
+                "nobody:x:65534:65534:Nobody:/:/noshell\n",
+                sandboxUid, sandboxGid, buildDir));
 
         /* Declare the build user's group so that programs get a consistent
            view of the system (e.g., "id -gn"). */
