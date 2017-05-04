@@ -129,4 +129,14 @@ void StorePathsCommand::run(ref<Store> store)
     run(store, storePaths);
 }
 
+void StorePathCommand::run(ref<Store> store)
+{
+    auto storePaths = buildInstallables(store, false);
+
+    if (storePaths.size() != 1)
+        throw UsageError("this command requires exactly one store path");
+
+    run(store, *storePaths.begin());
+}
+
 }

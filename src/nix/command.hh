@@ -118,6 +118,16 @@ public:
     bool useDefaultInstallables() override { return !all; }
 };
 
+/* A command that operates on exactly one store path. */
+struct StorePathCommand : public InstallablesCommand
+{
+    using StoreCommand::run;
+
+    virtual void run(ref<Store> store, const Path & storePath) = 0;
+
+    void run(ref<Store> store) override;
+};
+
 typedef std::map<std::string, ref<Command>> Commands;
 
 /* An argument parser that supports multiple subcommands,
