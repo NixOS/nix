@@ -1,3 +1,4 @@
+#include "lazy.hh"
 #include "util.hh"
 #include "affinity.hh"
 #include "sync.hh"
@@ -13,10 +14,12 @@
 #include <thread>
 #include <future>
 
-#include <sys/wait.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <pwd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #ifdef __APPLE__
 #include <sys/syscall.h>
@@ -417,14 +420,28 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
 }
 
 
+static Lazy<Path> getHome2([]() {
+    Path homeDir = getEnv("HOME");
+    if (homeDir.empty()) {
+        char buf[16384];
+        struct passwd pwbuf;
+        struct passwd * pw;
+        if (getpwuid_r(getuid(), &pwbuf, buf, sizeof(buf), &pw) != 0
+            || !pw || !pw->pw_dir || !pw->pw_dir[0])
+            throw Error("cannot determine user's home directory");
+        homeDir = pw->pw_dir;
+    }
+    return homeDir;
+});
+
+Path getHome() { return getHome2(); }
+
+
 Path getCacheDir()
 {
     Path cacheDir = getEnv("XDG_CACHE_HOME");
-    if (cacheDir.empty()) {
-        Path homeDir = getEnv("HOME");
-        if (homeDir.empty()) throw Error("$XDG_CACHE_HOME and $HOME are not set");
-        cacheDir = homeDir + "/.cache";
-    }
+    if (cacheDir.empty())
+        cacheDir = getHome() + "/.cache";
     return cacheDir;
 }
 
@@ -432,11 +449,8 @@ Path getCacheDir()
 Path getConfigDir()
 {
     Path configDir = getEnv("XDG_CONFIG_HOME");
-    if (configDir.empty()) {
-        Path homeDir = getEnv("HOME");
-        if (homeDir.empty()) throw Error("$XDG_CONFIG_HOME and $HOME are not set");
-        configDir = homeDir + "/.config";
-    }
+    if (configDir.empty())
+        configDir = getHome() + "/.config";
     return configDir;
 }
 
@@ -444,11 +458,8 @@ Path getConfigDir()
 Path getDataDir()
 {
     Path dataDir = getEnv("XDG_DATA_HOME");
-    if (dataDir.empty()) {
-        Path homeDir = getEnv("HOME");
-        if (homeDir.empty()) throw Error("$XDG_DATA_HOME and $HOME are not set");
-        dataDir = homeDir + "/.local/share";
-    }
+    if (dataDir.empty())
+        dataDir = getHome() + "/.local/share";
     return dataDir;
 }
 

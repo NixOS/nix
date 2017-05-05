@@ -192,17 +192,9 @@ static void loadDerivations(EvalState & state, Path nixExprPath,
 }
 
 
-static Path getHomeDir()
-{
-    Path homeDir(getEnv("HOME", ""));
-    if (homeDir == "") throw Error("HOME environment variable not set");
-    return homeDir;
-}
-
-
 static Path getDefNixExprPath()
 {
-    return getHomeDir() + "/.nix-defexpr";
+    return getHome() + "/.nix-defexpr";
 }
 
 
@@ -1188,7 +1180,7 @@ static void opSwitchProfile(Globals & globals, Strings opFlags, Strings opArgs)
         throw UsageError(format("exactly one argument expected"));
 
     Path profile = absPath(opArgs.front());
-    Path profileLink = getHomeDir() + "/.nix-profile";
+    Path profileLink = getHome() + "/.nix-profile";
 
     switchLink(profileLink, profile);
 }
@@ -1413,7 +1405,7 @@ int main(int argc, char * * argv)
             globals.profile = getEnv("NIX_PROFILE", "");
 
         if (globals.profile == "") {
-            Path profileLink = getHomeDir() + "/.nix-profile";
+            Path profileLink = getHome() + "/.nix-profile";
             globals.profile = pathExists(profileLink)
                 ? absPath(readLink(profileLink), dirOf(profileLink))
                 : canonPath(settings.nixStateDir + "/profiles/default");

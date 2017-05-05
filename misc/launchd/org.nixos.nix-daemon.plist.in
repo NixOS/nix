@@ -16,8 +16,6 @@
     <dict>
       <key>NIX_SSL_CERT_FILE</key>
       <string>/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt</string>
-      <key>XDG_CACHE_HOME</key>
-      <string>/root/.cache</string>
     </dict>
   </dict>
 </plist>

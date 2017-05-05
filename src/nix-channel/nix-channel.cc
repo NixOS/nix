@@ -169,9 +169,7 @@ int main(int argc, char ** argv)
         setenv("NIX_DOWNLOAD_CACHE", channelCache.c_str(), 1);
 
         // Figure out the name of the `.nix-channels' file to use
-        auto home = getEnv("HOME");
-        if (home.empty())
-            throw Error("$HOME not set");
+        auto home = getHome();
         channelsList = home + "/.nix-channels";
         nixDefExpr = home + "/.nix-defexpr";
 
