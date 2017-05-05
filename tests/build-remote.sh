@@ -12,9 +12,13 @@ rm -rf $TEST_ROOT/store0 $TEST_ROOT/store1
 # FIXME: --option is not passed to build-remote, so have to create a config file.
 export NIX_CONF_DIR=$TEST_ROOT/etc2
 mkdir -p $NIX_CONF_DIR
-echo "build-sandbox-paths = /nix/store" > $NIX_CONF_DIR/nix.conf
+echo "
+build-sandbox-paths = /nix/store
+sandbox-build-dir = /build-tmp
+" > $NIX_CONF_DIR/nix.conf
 
-outPath=$(nix-build build-hook.nix --no-out-link -j0 --option builders "local?root=$TEST_ROOT/store0; local?root=$TEST_ROOT/store1 - - 1 1 foo" --option build-sandbox-paths /nix/store)
+outPath=$(nix-build build-hook.nix --no-out-link -j0 \
+  --option builders "local?root=$TEST_ROOT/store0; local?root=$TEST_ROOT/store1 - - 1 1 foo")
 
 cat $outPath/foobar | grep FOOBAR
 

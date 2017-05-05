@@ -55,7 +55,7 @@ void parseMachines(const std::string & s, Machines & machines)
         if (sz < 1)
             throw FormatError("bad machine specification ‘%s’", line);
 
-        auto isSet = [&](int n) {
+        auto isSet = [&](size_t n) {
             return tokens.size() > n && tokens[n] != "" && tokens[n] != "-";
         };
 

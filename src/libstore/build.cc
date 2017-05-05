@@ -1661,9 +1661,6 @@ int childEntry(void * arg)
 }
 
 
-const std::string buildDir = "/build";
-
-
 void DerivationGoal::startBuilder()
 {
     auto f = format(
@@ -1725,7 +1722,7 @@ void DerivationGoal::startBuilder()
     /* In a sandbox, for determinism, always use the same temporary
        directory. */
 #if __linux__
-    tmpDirInSandbox = useChroot ? buildDir : tmpDir;
+    tmpDirInSandbox = useChroot ? settings.sandboxBuildDir : tmpDir;
 #elif __APPLE__
     // On Darwin, we canonize /tmp because its probably a symlink to /private/tmp.
     tmpDirInSandbox = useChroot ? canonPath("/tmp", true) + "/nix-build-" + drvName + "-0" : tmpDir;
@@ -1843,7 +1840,7 @@ void DerivationGoal::startBuilder()
                 "root:x:0:0:Nix build user:%3%:/noshell\n"
                 "nixbld:x:%1%:%2%:Nix build user:%3%:/noshell\n"
                 "nobody:x:65534:65534:Nobody:/:/noshell\n",
-                sandboxUid, sandboxGid, buildDir));
+                sandboxUid, sandboxGid, settings.sandboxBuildDir));
 
         /* Declare the build user's group so that programs get a consistent
            view of the system (e.g., "id -gn"). */

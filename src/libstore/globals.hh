@@ -224,6 +224,9 @@ public:
 #if __linux__
     Setting<std::string> sandboxShmSize{this, "50%", "sandbox-dev-shm-size",
         "The size of /dev/shm in the build sandbox."};
+
+    Setting<Path> sandboxBuildDir{this, "/build", "sandbox-build-dir",
+        "The build directory inside the sandbox."};
 #endif
 
     Setting<PathSet> allowedImpureHostPrefixes{this, {}, "allowed-impure-host-deps",
