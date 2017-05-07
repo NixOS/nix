@@ -85,6 +85,6 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
         export MANPATH="$NIX_LINK/share/man:$MANPATH"
     fi
 
-    export PATH="$NIX_LINK/bin:$NIX_LINK/sbin:$__savedpath"
+    export PATH="$NIX_LINK/bin:$__savedpath"
     unset __savedpath NIX_LINK NIX_USER_PROFILE_DIR NIX_PROFILES
 fi
