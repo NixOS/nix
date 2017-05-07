@@ -208,7 +208,7 @@ std::vector<std::shared_ptr<Installable>> InstallablesCommand::parseInstallables
             result.push_back(std::make_shared<InstallableAttrPath>(*this, s));
 
         else
-            throw UsageError("don't know what to do with argument ‘%s’", s);
+            throw UsageError("don't know what to do with argument '%s'", s);
     }
 
     return result;

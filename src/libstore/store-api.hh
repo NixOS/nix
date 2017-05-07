@@ -593,7 +593,7 @@ protected:
     /* Unsupported methods. */
     [[noreturn]] void unsupported()
     {
-        throw Unsupported("requested operation is not supported by store ‘%s’", getUri());
+        throw Unsupported("requested operation is not supported by store '%s'", getUri());
     }
 
 };

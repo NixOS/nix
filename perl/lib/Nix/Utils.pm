@@ -10,7 +10,7 @@ $urlRE = "(?: [a-zA-Z][a-zA-Z0-9\+\-\.]*\:[a-zA-Z0-9\%\/\?\:\@\&\=\+\$\,\-\_\.\!
 
 sub checkURL {
     my ($url) = @_;
-    die "invalid URL ‘$url’\n" unless $url =~ /^ $urlRE $ /x;
+    die "invalid URL '$url'\n" unless $url =~ /^ $urlRE $ /x;
 }
 
 sub uniq {
@@ -26,7 +26,7 @@ sub uniq {
 
 sub writeFile {
     my ($fn, $s) = @_;
-    open TMP, ">$fn" or die "cannot create file ‘$fn’: $!";
+    open TMP, ">$fn" or die "cannot create file '$fn': $!";
     print TMP "$s" or die;
     close TMP or die;
 }
@@ -34,7 +34,7 @@ sub writeFile {
 sub readFile {
     local $/ = undef;
     my ($fn) = @_;
-    open TMP, "<$fn" or die "cannot open file ‘$fn’: $!";
+    open TMP, "<$fn" or die "cannot open file '$fn': $!";
     my $s = <TMP>;
     close TMP or die;
     return $s;

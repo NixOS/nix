@@ -328,7 +328,7 @@ Path EvalState::checkSourcePath(const Path & path_)
     if (!restricted) return path_;
 
     /* Resolve symlinks. */
-    debug(format("checking access to ‘%s’") % path_);
+    debug(format("checking access to '%s'") % path_);
     Path path = canonPath(path_, true);
 
     for (auto & i : searchPath) {
@@ -350,7 +350,7 @@ Path EvalState::checkSourcePath(const Path & path_)
         return path;
 #endif
 
-    throw RestrictedPathError(format("access to path ‘%1%’ is forbidden in restricted mode") % path_);
+    throw RestrictedPathError(format("access to path '%1%' is forbidden in restricted mode") % path_);
 }
 
 
@@ -503,7 +503,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             return j->value;
         }
         if (!env->prevWith)
-            throwUndefinedVarError("undefined variable ‘%1%’ at %2%", var.name, var.pos);
+            throwUndefinedVarError("undefined variable '%1%' at %2%", var.name, var.pos);
         for (unsigned int l = env->prevWith; l; --l, env = env->up) ;
     }
 }
@@ -642,12 +642,12 @@ void EvalState::evalFile(const Path & path, Value & v)
         return;
     }
 
-    Activity act(*logger, lvlTalkative, format("evaluating file ‘%1%’") % path2);
+    Activity act(*logger, lvlTalkative, format("evaluating file '%1%'") % path2);
     Expr * e = parseExprFromFile(checkSourcePath(path2));
     try {
         eval(e, v);
     } catch (Error & e) {
-        addErrorPrefix(e, "while evaluating the file ‘%1%’:\n", path2);
+        addErrorPrefix(e, "while evaluating the file '%1%':\n", path2);
         throw;
     }
 
@@ -797,7 +797,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         Symbol nameSym = state.symbols.create(nameVal.string.s);
         Bindings::iterator j = v.attrs->find(nameSym);
         if (j != v.attrs->end())
-            throwEvalError("dynamic attribute ‘%1%’ at %2% already defined at %3%", nameSym, i.pos, *j->pos);
+            throwEvalError("dynamic attribute '%1%' at %2% already defined at %3%", nameSym, i.pos, *j->pos);
 
         i.valueExpr->setName(nameSym);
         /* Keep sorted order so find can catch duplicates */
@@ -885,7 +885,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             } else {
                 state.forceAttrs(*vAttrs, pos);
                 if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
-                    throwEvalError("attribute ‘%1%’ missing, at %2%", name, pos);
+                    throwEvalError("attribute '%1%' missing, at %2%", name, pos);
             }
             vAttrs = j->value;
             pos2 = j->pos;
@@ -896,7 +896,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 
     } catch (Error & e) {
         if (pos2 && pos2->file != state.sDerivationNix)
-            addErrorPrefix(e, "while evaluating the attribute ‘%1%’ at %2%:\n",
+            addErrorPrefix(e, "while evaluating the attribute '%1%' at %2%:\n",
                 showAttrPath(state, env, attrPath), *pos2);
         throw;
     }
@@ -1038,7 +1038,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         for (auto & i : lambda.formals->formals) {
             Bindings::iterator j = arg.attrs->find(i.name);
             if (j == arg.attrs->end()) {
-                if (!i.def) throwTypeError("%1% called without required argument ‘%2%’, at %3%",
+                if (!i.def) throwTypeError("%1% called without required argument '%2%', at %3%",
                     lambda, i.name, pos);
                 env2.values[displ++] = i.def->maybeThunk(*this, env2);
             } else {
@@ -1054,7 +1054,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
                user. */
             for (auto & i : *arg.attrs)
                 if (lambda.formals->argNames.find(i.name) == lambda.formals->argNames.end())
-                    throwTypeError("%1% called with unexpected argument ‘%2%’, at %3%", lambda, i.name, pos);
+                    throwTypeError("%1% called with unexpected argument '%2%', at %3%", lambda, i.name, pos);
             abort(); // can't happen
         }
     }
@@ -1112,7 +1112,7 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
         if (j != args.end())
             actualArgs->attrs->push_back(*j);
         else if (!i.def)
-            throwTypeError("cannot auto-call a function that has an argument without a default value (‘%1%’)", i.name);
+            throwTypeError("cannot auto-call a function that has an argument without a default value ('%1%')", i.name);
     }
 
     actualArgs->attrs->sort();
@@ -1341,7 +1341,7 @@ void EvalState::forceValueDeep(Value & v)
                 try {
                     recurse(*i.value);
                 } catch (Error & e) {
-                    addErrorPrefix(e, "while evaluating the attribute ‘%1%’ at %2%:\n", i.name, *i.pos);
+                    addErrorPrefix(e, "while evaluating the attribute '%1%' at %2%:\n", i.name, *i.pos);
                     throw;
                 }
         }
@@ -1433,10 +1433,10 @@ string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
     string s = forceString(v, pos);
     if (v.string.context) {
         if (pos)
-            throwEvalError("the string ‘%1%’ is not allowed to refer to a store path (such as ‘%2%’), at %3%",
+            throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%'), at %3%",
                 v.string.s, v.string.context[0], pos);
         else
-            throwEvalError("the string ‘%1%’ is not allowed to refer to a store path (such as ‘%2%’)",
+            throwEvalError("the string '%1%' is not allowed to refer to a store path (such as '%2%')",
                 v.string.s, v.string.context[0]);
     }
     return s;
@@ -1518,7 +1518,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
 string EvalState::copyPathToStore(PathSet & context, const Path & path)
 {
     if (nix::isDerivation(path))
-        throwEvalError("file names are not allowed to end in ‘%1%’", drvExtension);
+        throwEvalError("file names are not allowed to end in '%1%'", drvExtension);
 
     Path dstPath;
     if (srcToStore[path] != "")
@@ -1528,7 +1528,7 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
             ? store->computeStorePathForPath(checkSourcePath(path)).first
             : store->addToStore(baseNameOf(path), checkSourcePath(path), true, htSHA256, defaultPathFilter, repair);
         srcToStore[path] = dstPath;
-        printMsg(lvlChatty, format("copied source ‘%1%’ -> ‘%2%’")
+        printMsg(lvlChatty, format("copied source '%1%' -> '%2%'")
             % path % dstPath);
     }
 
@@ -1541,7 +1541,7 @@ Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
 {
     string path = coerceToString(pos, v, context, false, false);
     if (path == "" || path[0] != '/')
-        throwEvalError("string ‘%1%’ doesn't represent an absolute path, at %2%", path, pos);
+        throwEvalError("string '%1%' doesn't represent an absolute path, at %2%", path, pos);
     return path;
 }
 

@@ -34,13 +34,13 @@ if ! [ -e $dest ]; then
     cmd="mkdir -m 0755 $dest && chown $USER $dest"
     echo "directory $dest does not exist; creating it by running '$cmd' using sudo" >&2
     if ! sudo sh -c "$cmd"; then
-        echo "$0: please manually run ‘$cmd’ as root to create $dest" >&2
+        echo "$0: please manually run '$cmd' as root to create $dest" >&2
         exit 1
     fi
 fi
 
 if ! [ -w $dest ]; then
-    echo "$0: directory $dest exists, but is not writable by you. This could indicate that another user has already performed a single-user installation of Nix on this system. If you wish to enable multi-user support see http://nixos.org/nix/manual/#ssec-multi-user. If you wish to continue with a single-user install for $USER please run ‘chown -R $USER $dest’ as root." >&2
+    echo "$0: directory $dest exists, but is not writable by you. This could indicate that another user has already performed a single-user installation of Nix on this system. If you wish to enable multi-user support see http://nixos.org/nix/manual/#ssec-multi-user. If you wish to continue with a single-user install for $USER please run 'chown -R $USER $dest' as root." >&2
     exit 1
 fi
 

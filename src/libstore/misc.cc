@@ -245,7 +245,7 @@ Paths Store::topoSortPaths(const PathSet & paths)
 
     dfsVisit = [&](const Path & path, const Path * parent) {
         if (parents.find(path) != parents.end())
-            throw BuildError(format("cycle detected in the references of ‘%1%’ from ‘%2%’") % path % *parent);
+            throw BuildError(format("cycle detected in the references of '%1%' from '%2%'") % path % *parent);
 
         if (visited.find(path) != visited.end()) return;
         visited.insert(path);

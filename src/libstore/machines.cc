@@ -53,7 +53,7 @@ void parseMachines(const std::string & s, Machines & machines)
         auto tokens = tokenizeString<std::vector<string>>(line);
         auto sz = tokens.size();
         if (sz < 1)
-            throw FormatError("bad machine specification ‘%s’", line);
+            throw FormatError("bad machine specification '%s'", line);
 
         auto isSet = [&](size_t n) {
             return tokens.size() > n && tokens[n] != "" && tokens[n] != "-";

@@ -438,7 +438,7 @@ bool NixRepl::processLine(string line)
         return false;
 
     else if (command != "")
-        throw Error(format("unknown command ‘%1%’") % command);
+        throw Error(format("unknown command '%1%'") % command);
 
     else {
         size_t p = line.find('=');
@@ -501,7 +501,7 @@ void NixRepl::reloadFiles()
     for (auto & i : old) {
         if (!first) std::cout << std::endl;
         first = false;
-        std::cout << format("Loading ‘%1%’...") % i << std::endl;
+        std::cout << format("Loading '%1%'...") % i << std::endl;
         loadFile(i);
     }
 }

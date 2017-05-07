@@ -38,7 +38,7 @@ static void dumpContents(const Path & path, size_t size,
     sink << "contents" << size;
 
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
-    if (!fd) throw SysError(format("opening file ‘%1%’") % path);
+    if (!fd) throw SysError(format("opening file '%1%'") % path);
 
     unsigned char buf[65536];
     size_t left = size;
@@ -58,7 +58,7 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
 {
     struct stat st;
     if (lstat(path.c_str(), &st))
-        throw SysError(format("getting attributes of path ‘%1%’") % path);
+        throw SysError(format("getting attributes of path '%1%'") % path);
 
     sink << "(";
 
@@ -80,11 +80,11 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
                 string name(i.name);
                 size_t pos = i.name.find(caseHackSuffix);
                 if (pos != string::npos) {
-                    debug(format("removing case hack suffix from ‘%1%’") % (path + "/" + i.name));
+                    debug(format("removing case hack suffix from '%1%'") % (path + "/" + i.name));
                     name.erase(pos);
                 }
                 if (unhacked.find(name) != unhacked.end())
-                    throw Error(format("file name collision in between ‘%1%’ and ‘%2%’")
+                    throw Error(format("file name collision in between '%1%' and '%2%'")
                         % (path + "/" + unhacked[name]) % (path + "/" + i.name));
                 unhacked[name] = i.name;
             } else
@@ -101,7 +101,7 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
     else if (S_ISLNK(st.st_mode))
         sink << "type" << "symlink" << "target" << readLink(path);
 
-    else throw Error(format("file ‘%1%’ has an unsupported type") % path);
+    else throw Error(format("file '%1%' has an unsupported type") % path);
 
     sink << ")";
 }
@@ -237,14 +237,14 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
                 } else if (s == "name") {
                     name = readString(source);
                     if (name.empty() || name == "." || name == ".." || name.find('/') != string::npos || name.find((char) 0) != string::npos)
-                        throw Error(format("NAR contains invalid file name ‘%1%’") % name);
+                        throw Error(format("NAR contains invalid file name '%1%'") % name);
                     if (name <= prevName)
                         throw Error("NAR directory is not sorted");
                     prevName = name;
                     if (useCaseHack) {
                         auto i = names.find(name);
                         if (i != names.end()) {
-                            debug(format("case collision between ‘%1%’ and ‘%2%’") % i->first % name);
+                            debug(format("case collision between '%1%' and '%2%'") % i->first % name);
                             name += caseHackSuffix;
                             name += std::to_string(++i->second);
                         } else
@@ -293,14 +293,14 @@ struct RestoreSink : ParseSink
     {
         Path p = dstPath + path;
         if (mkdir(p.c_str(), 0777) == -1)
-            throw SysError(format("creating directory ‘%1%’") % p);
+            throw SysError(format("creating directory '%1%'") % p);
     };
 
     void createRegularFile(const Path & path)
     {
         Path p = dstPath + path;
         fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666);
-        if (!fd) throw SysError(format("creating file ‘%1%’") % p);
+        if (!fd) throw SysError(format("creating file '%1%'") % p);
     }
 
     void isExecutable()

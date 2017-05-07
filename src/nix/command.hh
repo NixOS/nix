@@ -50,12 +50,12 @@ struct Installable
 
     virtual PathSet toBuildable()
     {
-        throw Error("argument ‘%s’ cannot be built", what());
+        throw Error("argument '%s' cannot be built", what());
     }
 
     virtual Value * toValue(EvalState & state)
     {
-        throw Error("argument ‘%s’ cannot be evaluated", what());
+        throw Error("argument '%s' cannot be evaluated", what());
     }
 };
 
