@@ -54,7 +54,7 @@ RemoteStore::RemoteStore(const Params & params)
 ref<RemoteStore::Connection> RemoteStore::openConnectionWrapper()
 {
     if (failed)
-        throw Error("opening a connection to remote store ‘%s’ previously failed", getUri());
+        throw Error("opening a connection to remote store '%s' previously failed", getUri());
     try {
         return openConnection();
     } catch (...) {
@@ -97,11 +97,11 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
     if (socketPath.size() + 1 >= sizeof(addr.sun_path))
-        throw Error(format("socket path ‘%1%’ is too long") % socketPath);
+        throw Error(format("socket path '%1%' is too long") % socketPath);
     strcpy(addr.sun_path, socketPath.c_str());
 
     if (::connect(conn->fd.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
-        throw SysError(format("cannot connect to daemon at ‘%1%’") % socketPath);
+        throw SysError(format("cannot connect to daemon at '%1%'") % socketPath);
 
     conn->from.fd = conn->fd.get();
     conn->to.fd = conn->fd.get();
@@ -142,7 +142,7 @@ void RemoteStore::initConnection(Connection & conn)
         conn.processStderr();
     }
     catch (Error & e) {
-        throw Error("cannot open connection to remote store ‘%s’: %s", getUri(), e.what());
+        throw Error("cannot open connection to remote store '%s': %s", getUri(), e.what());
     }
 
     setOptions(conn);
@@ -288,7 +288,7 @@ void RemoteStore::queryPathInfoUncached(const Path & path,
         }
         if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 17) {
             bool valid; conn->from >> valid;
-            if (!valid) throw InvalidPath(format("path ‘%s’ is not valid") % path);
+            if (!valid) throw InvalidPath(format("path '%s' is not valid") % path);
         }
         auto info = std::make_shared<ValidPathInfo>();
         info->path = path;
