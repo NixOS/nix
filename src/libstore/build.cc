@@ -2390,17 +2390,14 @@ void DerivationGoal::runChild()
             /* Bind-mount all the directories from the "host"
                filesystem that we want in the chroot
                environment. */
-            for (auto & i : dirsInChroot) {
-                struct stat st;
-                Path source = i.second.source;
-                Path target = chrootRootDir + i.first;
-                if (source == "/proc") continue; // backwards compatibility
+            auto doBind = [&](const Path & source, const Path & target, bool optional = false) {
                 debug(format("bind mounting ‘%1%’ to ‘%2%’") % source % target);
+                struct stat st;
                 if (stat(source.c_str(), &st) == -1) {
-                    if (i.second.optional && errno == ENOENT)
-                        continue;
+                    if (optional && errno == ENOENT)
+                        return;
                     else
-                        throw SysError(format("getting attributes of path ‘%1%’") % source);
+                        throw SysError("getting attributes of path ‘%1%’", source);
                 }
                 if (S_ISDIR(st.st_mode))
                     createDirs(target);
@@ -2409,7 +2406,12 @@ void DerivationGoal::runChild()
                     writeFile(target, "");
                 }
                 if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
-                    throw SysError(format("bind mount from ‘%1%’ to ‘%2%’ failed") % source % target);
+                    throw SysError("bind mount from ‘%1%’ to ‘%2%’ failed", source, target);
+            };
+
+            for (auto & i : dirsInChroot) {
+                if (i.second.source == "/proc") continue; // backwards compatibility
+                doBind(i.second.source, chrootRootDir + i.first, i.second.optional);
             }
 
             /* Bind a new instance of procfs on /proc. */
@@ -2431,13 +2433,19 @@ void DerivationGoal::runChild()
                 !pathExists(chrootRootDir + "/dev/ptmx")
                 && !dirsInChroot.count("/dev/pts"))
             {
-                if (mount("none", (chrootRootDir + "/dev/pts").c_str(), "devpts", 0, "newinstance,mode=0620") == -1)
-                    throw SysError("mounting /dev/pts");
-                createSymlink("/dev/pts/ptmx", chrootRootDir + "/dev/ptmx");
+                if (mount("none", (chrootRootDir + "/dev/pts").c_str(), "devpts", 0, "newinstance,mode=0620") == 0)
+                {
+                    createSymlink("/dev/pts/ptmx", chrootRootDir + "/dev/ptmx");
 
-                /* Make sure /dev/pts/ptmx is world-writable.  With some
-                   Linux versions, it is created with permissions 0.  */
-                chmod_(chrootRootDir + "/dev/pts/ptmx", 0666);
+                    /* Make sure /dev/pts/ptmx is world-writable.  With some
+                       Linux versions, it is created with permissions 0.  */
+                    chmod_(chrootRootDir + "/dev/pts/ptmx", 0666);
+                } else {
+                    if (errno != EINVAL)
+                        throw SysError("mounting /dev/pts");
+                    doBind("/dev/pts", "/dev/pts");
+                    doBind("/dev/ptmx", "/dev/ptmx");
+                }
             }
 
             /* Do the chroot(). */
