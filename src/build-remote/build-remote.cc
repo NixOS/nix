@@ -208,7 +208,10 @@ connected:
         drv.inputSrcs = inputs;
 
         printError("building ‘%s’ on ‘%s’", drvPath, storeUri);
-        sshStore->buildDerivation(drvPath, drv);
+        auto result = sshStore->buildDerivation(drvPath, drv);
+
+        if (!result.success())
+            throw Error("build of ‘%s’ on ‘%s’ failed: %s", drvPath, storeUri, result.errorMsg);
 
         PathSet missing;
         for (auto & path : outputs)
