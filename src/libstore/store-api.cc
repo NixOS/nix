@@ -482,21 +482,23 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const PathSet & storePaths
         if (showClosureSize)
             jsonPath.attr("closureSize", getClosureSize(storePath));
 
-        if (!includeImpureInfo) continue;
+        if (includeImpureInfo) {
 
-        if (info->deriver != "")
-            jsonPath.attr("deriver", info->deriver);
+            if (info->deriver != "")
+                jsonPath.attr("deriver", info->deriver);
 
-        if (info->registrationTime)
-            jsonPath.attr("registrationTime", info->registrationTime);
+            if (info->registrationTime)
+                jsonPath.attr("registrationTime", info->registrationTime);
 
-        if (info->ultimate)
-            jsonPath.attr("ultimate", info->ultimate);
+            if (info->ultimate)
+                jsonPath.attr("ultimate", info->ultimate);
 
-        if (!info->sigs.empty()) {
-            auto jsonSigs = jsonPath.list("signatures");
-            for (auto & sig : info->sigs)
-                jsonSigs.elem(sig);
+            if (!info->sigs.empty()) {
+                auto jsonSigs = jsonPath.list("signatures");
+                for (auto & sig : info->sigs)
+                    jsonSigs.elem(sig);
+            }
+
         }
     }
 }
