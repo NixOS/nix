@@ -2360,10 +2360,8 @@ void DerivationGoal::runChild()
                 createDirs(chrootRootDir + "/dev/shm");
                 createDirs(chrootRootDir + "/dev/pts");
                 ss.push_back("/dev/full");
-#ifdef __linux__
                 if (pathExists("/dev/kvm"))
                     ss.push_back("/dev/kvm");
-#endif
                 ss.push_back("/dev/null");
                 ss.push_back("/dev/random");
                 ss.push_back("/dev/tty");
