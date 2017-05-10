@@ -301,4 +301,13 @@ struct InvalidPathError : EvalError
 #endif
 };
 
+class ThrownError : public AssertionError
+{
+public:
+    Value * v;
+    ThrownError(EvalState & state, const Pos & pos, Value * v, unsigned int status = 1, /* ugh */ PathSet s = PathSet())
+        : AssertionError(state.coerceToString(pos, *v, s, true, false), status)
+        , v(v) {}
+};
+
 }

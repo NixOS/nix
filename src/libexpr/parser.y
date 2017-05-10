@@ -645,7 +645,9 @@ Path EvalState::findFile(SearchPath & searchPath, const string & path, const Pos
         "file ‘%1%’ was not found in the Nix search path (add it using $NIX_PATH or -I)"
         + string(pos ? ", at %2%" : ""));
     f.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
-    throw ThrownError(f % path % pos);
+    auto v = allocValue();
+    mkString(*v, (f % path % pos).str());
+    throw ThrownError(*this, pos, v);
 }
 
 
