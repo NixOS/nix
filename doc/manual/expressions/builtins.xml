@@ -65,7 +65,7 @@ available as <function>builtins.derivation</function>.</para>
   <replaceable>set</replaceable></term>
 
     <listitem><para>Return the names of the attributes in the set
-    <replaceable>set</replaceable> in a sorted list.  For instance,
+    <replaceable>set</replaceable> in alphabetically sorted list.  For instance,
     <literal>builtins.attrNames { y = 1; x = "foo"; }</literal>
     evaluates to <literal>[ "x" "y" ]</literal>.</para></listitem>
 
