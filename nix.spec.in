@@ -20,11 +20,9 @@ Requires: curl
 Requires: bzip2
 Requires: gzip
 Requires: xz
-Requires: readline
 BuildRequires: bzip2-devel
 BuildRequires: sqlite-devel
 BuildRequires: libcurl-devel
-BuildRequires: readline-devel
 
 # Hack to make that shitty RPM scanning hack shut up.
 Provides: perl(Nix::SSH)

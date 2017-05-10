@@ -1,12 +1,7 @@
-#if HAVE_LIBREADLINE
-
 #include <iostream>
 #include <cstdlib>
 
 #include <setjmp.h>
-
-#include <readline/readline.h>
-#include <readline/history.h>
 
 #include "shared.hh"
 #include "eval.hh"
@@ -18,6 +13,9 @@
 #include "affinity.hh"
 #include "globals.hh"
 #include "command.hh"
+#include "finally.hh"
+
+#include "src/linenoise/linenoise.h"
 
 namespace nix {
 
@@ -44,14 +42,11 @@ struct NixRepl
 
     const Path historyFile;
 
-    StringSet completions;
-    StringSet::iterator curCompletion;
-
     NixRepl(const Strings & searchPath, nix::ref<Store> store);
     ~NixRepl();
     void mainLoop(const Strings & files);
-    void completePrefix(string prefix);
-    bool getLine(string & input, const char * prompt);
+    StringSet completePrefix(string prefix);
+    bool getLine(string & input, const std::string &prompt);
     Path getDerivationPath(Value & v);
     bool processLine(string line);
     void loadFile(const Path & path);
@@ -122,7 +117,17 @@ NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store)
 
 NixRepl::~NixRepl()
 {
-    write_history(historyFile.c_str());
+    linenoiseHistorySave(historyFile.c_str());
+}
+
+
+static NixRepl * curRepl; // ugly
+
+static void completionCallback(const char * s, linenoiseCompletions *lc)
+{
+    /* Otherwise, return all symbols that start with the prefix. */
+    for (auto & c : curRepl->completePrefix(s))
+        linenoiseAddCompletion(lc, c.c_str());
 }
 
 
@@ -137,22 +142,20 @@ void NixRepl::mainLoop(const Strings & files)
     reloadFiles();
     if (!loadedFiles.empty()) std::cout << std::endl;
 
-    // Allow nix-repl specific settings in .inputrc
-    rl_readline_name = "nix-repl";
-    using_history();
     createDirs(dirOf(historyFile));
-    read_history(historyFile.c_str());
+    linenoiseHistorySetMaxLen(1000);
+    linenoiseHistoryLoad(historyFile.c_str());
 
-    string input;
+    curRepl = this;
+    linenoiseSetCompletionCallback(completionCallback);
+
+    std::string input;
 
     while (true) {
         // When continuing input from previous lines, don't print a prompt, just align to the same
         // number of chars as the prompt.
-        const char * prompt = input.empty() ? "nix-repl> " : "          ";
-        if (!getLine(input, prompt)) {
-            std::cout << std::endl;
+        if (!getLine(input, input.empty() ? "nix-repl> " : "          "))
             break;
-        }
 
         try {
             if (!removeWhitespace(input).empty() && !processLine(input)) return;
@@ -170,103 +173,57 @@ void NixRepl::mainLoop(const Strings & files)
             printMsg(lvlError, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
         }
 
-        // We handled the current input fully, so we should clear it and read brand new input.
+        // We handled the current input fully, so we should clear it
+        // and read brand new input.
+        linenoiseHistoryAdd(input.c_str());
         input.clear();
         std::cout << std::endl;
     }
 }
 
 
-/* Apparently, the only way to get readline() to return on Ctrl-C
-   (SIGINT) is to use siglongjmp().  That's fucked up... */
-static sigjmp_buf sigintJmpBuf;
-
-
-static void sigintHandler(int signo)
+bool NixRepl::getLine(string & input, const std::string &prompt)
 {
-    siglongjmp(sigintJmpBuf, 1);
-}
-
-
-/* Oh, if only g++ had nested functions... */
-NixRepl * curRepl;
-
-char * completerThunk(const char * s, int state)
-{
-    string prefix(s);
-
-    /* If the prefix has a slash in it, use readline's builtin filename
-       completer. */
-    if (prefix.find('/') != string::npos)
-        return rl_filename_completion_function(s, state);
-
-    /* Otherwise, return all symbols that start with the prefix. */
-    if (state == 0) {
-        curRepl->completePrefix(s);
-        curRepl->curCompletion = curRepl->completions.begin();
-    }
-    if (curRepl->curCompletion == curRepl->completions.end()) return 0;
-    return strdup((curRepl->curCompletion++)->c_str());
-}
-
-
-bool NixRepl::getLine(string & input, const char * prompt)
-{
-    struct sigaction act, old;
-    act.sa_handler = sigintHandler;
-    sigfillset(&act.sa_mask);
-    act.sa_flags = 0;
-    if (sigaction(SIGINT, &act, &old))
-        throw SysError("installing handler for SIGINT");
-
-    static sigset_t savedSignalMask, set;
-    sigemptyset(&set);
-    sigaddset(&set, SIGINT);
-
-    if (sigprocmask(SIG_UNBLOCK, &set, &savedSignalMask))
-        throw SysError("unblocking SIGINT");
-
-    if (sigsetjmp(sigintJmpBuf, 1)) {
-        input.clear();
-    } else {
-        curRepl = this;
-        rl_completion_entry_function = completerThunk;
-
-        char * s = readline(prompt);
-        if (!s) return false;
-        input.append(s);
-        input.push_back('\n');
-        if (!removeWhitespace(s).empty()) {
-            add_history(s);
-            append_history(1, 0);
-        }
-        free(s);
-    }
-
-    _isInterrupted = 0;
-
-    if (sigprocmask(SIG_SETMASK, &savedSignalMask, nullptr))
-        throw SysError("restoring signals");
-
-    if (sigaction(SIGINT, &old, 0))
-        throw SysError("restoring handler for SIGINT");
-
+    char * s = linenoise(prompt.c_str());
+    Finally doFree([&]() { linenoiseFree(s); });
+    if (!s) return false;
+    input += s;
     return true;
 }
 
 
-void NixRepl::completePrefix(string prefix)
+StringSet NixRepl::completePrefix(string prefix)
 {
-    completions.clear();
+    StringSet completions;
 
-    size_t dot = prefix.rfind('.');
+    size_t start = prefix.find_last_of(" \n\r\t(){}[]");
+    std::string prev, cur;
+    if (start == std::string::npos) {
+        prev = "";
+        cur = prefix;
+    } else {
+        prev = std::string(prefix, 0, start + 1);
+        cur = std::string(prefix, start + 1);
+    }
 
-    if (dot == string::npos) {
+    size_t slash, dot;
+
+    if ((slash = cur.rfind('/')) != string::npos) {
+        try {
+            auto dir = std::string(cur, 0, slash);
+            auto prefix2 = std::string(cur, slash + 1);
+            for (auto & entry : readDirectory(dir == "" ? "/" : dir)) {
+                if (entry.name[0] != '.' && hasPrefix(entry.name, prefix2))
+                    completions.insert(prev + dir + "/" + entry.name);
+            }
+        } catch (Error &) {
+        }
+    } else if ((dot = cur.rfind('.')) == string::npos) {
         /* This is a variable name; look it up in the current scope. */
-        StringSet::iterator i = varNames.lower_bound(prefix);
+        StringSet::iterator i = varNames.lower_bound(cur);
         while (i != varNames.end()) {
-            if (string(*i, 0, prefix.size()) != prefix) break;
-            completions.insert(*i);
+            if (string(*i, 0, cur.size()) != cur) break;
+            completions.insert(prev + *i);
             i++;
         }
     } else {
@@ -274,8 +231,8 @@ void NixRepl::completePrefix(string prefix)
             /* This is an expression that should evaluate to an
                attribute set.  Evaluate it to get the names of the
                attributes. */
-            string expr(prefix, 0, dot);
-            string prefix2 = string(prefix, dot + 1);
+            string expr(cur, 0, dot);
+            string cur2 = string(cur, dot + 1);
 
             Expr * e = parseString(expr);
             Value v;
@@ -284,8 +241,8 @@ void NixRepl::completePrefix(string prefix)
 
             for (auto & i : *v.attrs) {
                 string name = i.name;
-                if (string(name, 0, prefix2.size()) != prefix2) continue;
-                completions.insert(expr + "." + name);
+                if (string(name, 0, cur2.size()) != cur2) continue;
+                completions.insert(prev + expr + "." + name);
             }
 
         } catch (ParseError & e) {
@@ -296,6 +253,8 @@ void NixRepl::completePrefix(string prefix)
             // Quietly ignore undefined variable errors.
         }
     }
+
+    return completions;
 }
 
 
@@ -728,5 +687,3 @@ struct CmdRepl : StoreCommand
 static RegisterCommand r1(make_ref<CmdRepl>());
 
 }
-
-#endif

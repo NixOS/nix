@@ -16,7 +16,6 @@ with import <nixpkgs> {};
         customMemoryManagement = false;
       })
       autoreconfHook
-      readline
 
       # For nix-perl
       perl

@@ -73,7 +73,7 @@ let
         buildInputs =
           [ curl
             bzip2 xz brotli
-            openssl pkgconfig sqlite boehmgc readline
+            openssl pkgconfig sqlite boehmgc
 
           ]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
@@ -198,15 +198,15 @@ let
     rpm_fedora25x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora25x86_64) [ "libsodium-devel" ];
 
 
-    deb_debian8i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian8i386) [ "libsodium-dev" ] [ "libsodium13" "libreadline6" ];
-    deb_debian8x86_64 = makeDeb_x86_64 (diskImageFunsFun: diskImageFunsFun.debian8x86_64) [ "libsodium-dev" ] [ "libsodium13" "libreadline6" ];
+    deb_debian8i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian8i386) [ "libsodium-dev" ] [ "libsodium13" ];
+    deb_debian8x86_64 = makeDeb_x86_64 (diskImageFunsFun: diskImageFunsFun.debian8x86_64) [ "libsodium-dev" ] [ "libsodium13" ];
 
-    deb_ubuntu1410i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1410i386) [] [ "libreadline6" ];
-    deb_ubuntu1410x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1410x86_64) [] [ "libreadline6" ];
-    deb_ubuntu1604i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1604i386) [ "libsodium-dev" ] [ "libsodium18" "libreadline6" ];
-    deb_ubuntu1604x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1604x86_64) [ "libsodium-dev" ] [ "libsodium18" "libreadline6" ];
-    deb_ubuntu1610i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1610i386) [ "libsodium-dev" ] [ "libsodium18" "libreadline7" ];
-    deb_ubuntu1610x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1610x86_64) [ "libsodium-dev" ] [ "libsodium18" "libreadline7" ];
+    deb_ubuntu1410i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1410i386) [] [];
+    deb_ubuntu1410x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1410x86_64) [] [];
+    deb_ubuntu1604i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1604i386) [ "libsodium-dev" ] [ "libsodium18" ];
+    deb_ubuntu1604x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1604x86_64) [ "libsodium-dev" ] [ "libsodium18" ];
+    deb_ubuntu1610i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1610i386) [ "libsodium-dev" ] [ "libsodium18" ];
+    deb_ubuntu1610x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1610x86_64) [ "libsodium-dev" ] [ "libsodium18" ];
 
 
     # System tests.
@@ -299,7 +299,7 @@ let
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages =
-            [ "sqlite" "sqlite-devel" "bzip2-devel" "emacs" "libcurl-devel" "openssl-devel" "xz-devel" "readline-devel" ]
+            [ "sqlite" "sqlite-devel" "bzip2-devel" "emacs" "libcurl-devel" "openssl-devel" "xz-devel" ]
             ++ extraPackages; };
       memSize = 1024;
       meta.schedulingPriority = 50;
@@ -321,7 +321,7 @@ let
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages =
-            [ "libsqlite3-dev" "libbz2-dev" "libcurl-dev" "libcurl3-nss" "libssl-dev" "liblzma-dev" "libreadline-dev" ]
+            [ "libsqlite3-dev" "libbz2-dev" "libcurl-dev" "libcurl3-nss" "libssl-dev" "liblzma-dev" ]
             ++ extraPackages; };
       memSize = 1024;
       meta.schedulingPriority = 50;

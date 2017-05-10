@@ -196,14 +196,6 @@ if test "$gc" = yes; then
 fi
 
 
-# Check for readline, needed by "nix repl".
-AX_LIB_READLINE
-if test "$ax_cv_lib_readline" != "no"; then
-  have_readline=1
-fi
-AC_SUBST(HAVE_READLINE, [$have_readline])
-
-
 AC_ARG_ENABLE(init-state, AC_HELP_STRING([--disable-init-state],
   [do not initialise DB etc. in `make install']),
   init_state=$enableval, init_state=yes)
