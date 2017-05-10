@@ -8,7 +8,7 @@
 %parse-param { nix::ParseData * data }
 %lex-param { void * scanner }
 %lex-param { nix::ParseData * data }
-%expect 1
+%expect 2
 %expect-rr 1
 
 %code requires {
@@ -292,7 +292,12 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 
 start: expr { data->result = $1; };
 
-expr: expr_function;
+expr
+  : expr_function optional_semicolon;
+
+optional_semicolon
+  :
+  | ';';
 
 expr_function
   : ID ':' expr_function
