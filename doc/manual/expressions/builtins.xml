@@ -292,6 +292,24 @@ with import (fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixo
 stdenv.mkDerivation { … }
 </programlisting>
 
+    Note that when obtaining the hash with <varname>nix-prefetch-url
+    </varname> the option <varname>--unpack</varname> is required.
+    </para> 
+      
+    <para>This function can also verify the contents against a hash. 
+    In that case, the function takes a set instead of a URL. The set 
+    requires the attribute <varname>url</varname> and the attribute
+    <varname>sha256</varname>, e.g.
+      
+<programlisting>
+with import (fetchTarball {
+  url = https://github.com/NixOS/nixpkgs-channels/archive/nixos-14.12.tar.gz;
+  sha256 = "1jppksrfvbk5ypiqdz4cddxdl8z6zyzdb2srq8fcffr327ld5jj2";
+}) {};
+
+stdenv.mkDerivation { … }
+</programlisting>
+      
     </para>
 
     <para>This function is not available if <link
