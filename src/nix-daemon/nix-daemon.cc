@@ -621,6 +621,8 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         from >> info.ca >> repair >> dontCheckSigs;
         if (!trusted && dontCheckSigs)
             dontCheckSigs = false;
+        if (!trusted)
+            info.ultimate = false;
 
         TeeSink tee(from);
         parseDump(tee, tee.source);
