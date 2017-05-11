@@ -318,6 +318,9 @@ public:
 
     Setting<unsigned long> connectTimeout{this, 0, "connect-timeout",
         "Timeout for connecting to servers during downloads. 0 means use curl's builtin default."};
+
+    Setting<std::string> userAgentSuffix{this, "", "user-agent-suffix",
+        "String appended to the user agent in HTTP requests."};
 };
 
 
