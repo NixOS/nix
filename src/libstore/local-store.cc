@@ -919,8 +919,12 @@ void LocalStore::addToStore(const ValidPathInfo & info, const ref<std::string> &
 
     Hash h = hashString(htSHA256, *nar);
     if (h != info.narHash)
-        throw Error(format("hash mismatch importing path ‘%s’; expected hash ‘%s’, got ‘%s’") %
-            info.path % info.narHash.to_string() % h.to_string());
+        throw Error("hash mismatch importing path ‘%s’; expected hash ‘%s’, got ‘%s’",
+            info.path, info.narHash.to_string(), h.to_string());
+
+    if (nar->size() != info.narSize)
+        throw Error("szie mismatch importing path ‘%s’; expected %s, got %s",
+            info.path, info.narSize, nar->size());
 
     if (requireSigs && !dontCheckSigs && !info.checkSignatures(*this, publicKeys))
         throw Error("cannot add path ‘%s’ because it lacks a valid signature", info.path);
