@@ -1010,7 +1010,6 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
             info.path = dstPath;
             info.narHash = hash.first;
             info.narSize = hash.second;
-            info.ultimate = true;
             info.ca = makeFixedOutputCA(recursive, h);
             registerValidPath(info);
         }
@@ -1073,7 +1072,6 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
             info.narHash = narHash;
             info.narSize = sink.s->size();
             info.references = references;
-            info.ultimate = true;
             info.ca = "text:" + hash.to_string();
             registerValidPath(info);
         }

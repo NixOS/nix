@@ -113,9 +113,8 @@ struct ValidPathInfo
     uint64_t narSize = 0; // 0 = unknown
     uint64_t id; // internal use only
 
-    /* Whether the path is ultimately trusted, that is, it was built
-       locally or is content-addressable (e.g. added via addToStore()
-       or the result of a fixed-output derivation). */
+    /* Whether the path is ultimately trusted, that is, it's a
+       derivation output that was built locally. */
     bool ultimate = false;
 
     StringSet sigs; // note: not necessarily verified
