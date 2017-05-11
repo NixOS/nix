@@ -167,7 +167,7 @@ void checkStoreName(const string & name)
    collisions (for security).  For instance, it shouldn't be feasible
    to come up with a derivation whose output path collides with the
    path for a copied source.  The former would have a <s> starting with
-   "output:out:", while the latter would have a <2> starting with
+   "output:out:", while the latter would have a <s> starting with
    "source:".
 */
 
