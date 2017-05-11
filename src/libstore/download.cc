@@ -690,7 +690,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
     }
 
     if (expectedStorePath != "" && storePath != expectedStorePath)
-        throw nix::Error(format("hash mismatch in file downloaded from ‘%s’") % url);
+        throw nix::Error("store path mismatch in file downloaded from ‘%s’", url);
 
     return storePath;
 }
