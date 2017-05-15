@@ -21,25 +21,6 @@ struct NarMember
 
     /* If this is a directory, all the children of the directory. */
     std::map<std::string, NarMember> children;
-
-    NarMember* find(const Path & path)
-    {
-        if(path == "") return this;
-
-        if(type != FSAccessor::Type::tDirectory) {
-            return nullptr;
-        }
-
-        auto split = std::find(path.begin() + 1, path.end(), '/');
-        std::string child_name(path.begin() + 1, split);
-        std::string remaining(split, path.end());
-
-        auto child = children.find(child_name);
-        if(child == children.end()) return nullptr;
-
-        return child->second.find(remaining);
-    }
-
 };
 
 struct NarIndexer : ParseSink, StringSource
@@ -114,8 +95,27 @@ struct NarIndexer : ParseSink, StringSource
     NarMember* find(const Path & path)
     {
         Path canon = path == "" ? "" : canonPath(path);
-        NarMember* result = root.find(canon);
-        return result;
+        NarMember* current = &root;
+        auto end = path.end();
+        for(auto it = path.begin(); it != end; ) {
+            // because it != end, the remaining component is non-empty so we need
+            // a directory
+            if(current->type != FSAccessor::Type::tDirectory) return nullptr;
+
+            // skip slash (canonPath above ensures that this is always a slash)
+            assert(*it == '/');
+            it += 1;
+
+            // lookup current component
+            auto next = std::find(it, end, '/');
+            auto child = current->children.find(std::string(it, next));
+            if(child == current->children.end()) return nullptr;
+            current = &child->second;
+
+            it = next;
+        }
+
+        return current;
     }
 
     NarMember& at(const Path & path) {
