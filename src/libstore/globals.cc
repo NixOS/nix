@@ -47,8 +47,8 @@ Settings::Settings()
     auto s = getEnv("NIX_REMOTE_SYSTEMS");
     if (s != "") builderFiles = tokenizeString<Strings>(s, ":");
 
-#if __linux__
-    sandboxPaths = tokenizeString<StringSet>("/bin/sh=" BASH_PATH);
+#if defined(__linux__) && defined(SANDBOX_SHELL)
+    sandboxPaths = tokenizeString<StringSet>("/bin/sh=" SANDBOX_SHELL);
 #endif
 
     allowedImpureHostPrefixes = tokenizeString<StringSet>(DEFAULT_ALLOWED_IMPURE_PREFIXES);

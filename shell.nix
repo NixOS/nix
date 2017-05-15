@@ -2,6 +2,8 @@
 
 with import <nixpkgs> {};
 
+with import ./release-common.nix { inherit pkgs; };
+
 (if useClang then clangStdenv else stdenv).mkDerivation {
   name = "nix";
 
@@ -22,10 +24,7 @@ with import <nixpkgs> {};
       perlPackages.DBDSQLite
     ];
 
-  configureFlags =
-    [ "--disable-init-state"
-      "--enable-gc"
-    ];
+  inherit configureFlags;
 
   enableParallelBuilding = true;
 

@@ -28,6 +28,7 @@ localstatedir = @localstatedir@
 mandir = @mandir@
 pkglibdir = $(libdir)/$(PACKAGE_NAME)
 prefix = @prefix@
+sandbox_shell = @sandbox_shell@
 storedir = @storedir@
 sysconfdir = @sysconfdir@
 doc_generate = @doc_generate@

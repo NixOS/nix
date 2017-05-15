@@ -27,7 +27,7 @@ libstore_CXXFLAGS = \
  -DNIX_CONF_DIR=\"$(sysconfdir)/nix\" \
  -DNIX_LIBEXEC_DIR=\"$(libexecdir)\" \
  -DNIX_BIN_DIR=\"$(bindir)\" \
- -DBASH_PATH="\"$(bash)\"" \
+ -DSANDBOX_SHELL="\"$(sandbox_shell)\"" \
  -DLSOF=\"$(lsof)\"
 
 $(d)/local-store.cc: $(d)/schema.sql.hh

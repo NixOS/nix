@@ -66,6 +66,8 @@ let
 
       with import <nixpkgs> { inherit system; };
 
+      with import ./release-common.nix { inherit pkgs; };
+
       releaseTools.nixBuild {
         name = "nix";
         src = tarball;
@@ -83,11 +85,8 @@ let
               customMemoryManagement = false;
             });
 
-        configureFlags = ''
-          --disable-init-state
-          --enable-gc
-          --sysconfdir=/etc
-        '';
+        configureFlags = configureFlags ++
+          [ "--sysconfdir=/etc" ];
 
         enableParallelBuilding = true;
 

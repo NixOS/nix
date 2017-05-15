@@ -240,6 +240,12 @@ fi
 AC_SUBST(tarFlags)
 
 
+AC_ARG_WITH(sandbox-shell, AC_HELP_STRING([--with-sandbox-shell=PATH],
+  [path of a statically-linked shell to use as /bin/sh in sandboxes]),
+  sandbox_shell=$withval)
+AC_SUBST(sandbox_shell)
+
+
 # Expand all variables in config.status.
 test "$prefix" = NONE && prefix=$ac_default_prefix
 test "$exec_prefix" = NONE && exec_prefix='${prefix}'
