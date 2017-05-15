@@ -534,7 +534,8 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     PathSet context;
 
-    string outputHash, outputHashAlgo;
+    std::experimental::optional<std::string> outputHash;
+    std::string outputHashAlgo;
     bool outputHashRecursive = false;
 
     StringSet outputs;
@@ -703,7 +704,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         throw EvalError(format("derivation names are not allowed to end in ‘%1%’, at %2%")
             % drvExtension % posDrvName);
 
-    if (outputHash != "") {
+    if (outputHash) {
         /* Handle fixed-output derivations. */
         if (outputs.size() != 1 || *(outputs.begin()) != "out")
             throw Error(format("multiple outputs are not supported in fixed-output derivations, at %1%") % posDrvName);
@@ -711,13 +712,13 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         HashType ht = parseHashType(outputHashAlgo);
         if (ht == htUnknown)
             throw EvalError(format("unknown hash algorithm ‘%1%’, at %2%") % outputHashAlgo % posDrvName);
-        Hash h = parseHash16or32(ht, outputHash);
+        Hash h = parseHash16or32(ht, *outputHash);
         outputHash = printHash(h);
         if (outputHashRecursive) outputHashAlgo = "r:" + outputHashAlgo;
 
         Path outPath = state.store->makeFixedOutputPath(outputHashRecursive, h, drvName);
         drv.env["out"] = outPath;
-        drv.outputs["out"] = DerivationOutput(outPath, outputHashAlgo, outputHash);
+        drv.outputs["out"] = DerivationOutput(outPath, outputHashAlgo, *outputHash);
     }
 
     else {
