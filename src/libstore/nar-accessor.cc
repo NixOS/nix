@@ -2,6 +2,8 @@
 #include "archive.hh"
 
 #include <map>
+#include <stack>
+#include <algorithm>
 
 namespace nix {
 
@@ -16,16 +18,36 @@ struct NarMember
     size_t start, size;
 
     std::string target;
+
+    /* If this is a directory, all the children of the directory. */
+    std::map<std::string, NarMember> children;
+
+    NarMember* find(const Path & path)
+    {
+        if(path == "") return this;
+
+        if(type != FSAccessor::Type::tDirectory) {
+            return nullptr;
+        }
+
+        auto split = std::find(path.begin() + 1, path.end(), '/');
+        std::string child_name(path.begin() + 1, split);
+        std::string remaining(split, path.end());
+
+        auto child = children.find(child_name);
+        if(child == children.end()) return nullptr;
+
+        return child->second.find(remaining);
+    }
+
 };
 
 struct NarIndexer : ParseSink, StringSource
 {
-    // FIXME: should store this as a tree. Now we're vulnerable to
-    // O(nm) memory consumption (e.g. for x_0/.../x_n/{y_0..y_m}).
-    typedef std::map<Path, NarMember> Members;
-    Members members;
+    NarMember root;
+    std::stack<NarMember*> parents;
 
-    Path currentPath;
+    std::string currentName;
     std::string currentStart;
     bool isExec = false;
 
@@ -33,28 +55,45 @@ struct NarIndexer : ParseSink, StringSource
     {
     }
 
+    void createMember(const Path & path, NarMember member) {
+        size_t level = std::count(path.begin(), path.end(), '/');
+        while(parents.size() > level) {
+            parents.pop();
+        }
+
+        if(parents.empty()) {
+            root = std::move(member);
+            parents.push(&root);
+        } else {
+            if(parents.top()->type != FSAccessor::Type::tDirectory) {
+                throw Error(format("NAR file missing parent directory of path ‘%1%’") % path);
+            }
+            auto result = parents.top()->children.emplace(baseNameOf(path), std::move(member));
+            parents.push(&result.first->second);
+        }
+    }
+
     void createDirectory(const Path & path) override
     {
-        members.emplace(path,
-            NarMember{FSAccessor::Type::tDirectory, false, 0, 0});
+        createMember(path, {FSAccessor::Type::tDirectory, false, 0, 0 }); 
     }
 
     void createRegularFile(const Path & path) override
     {
-        currentPath = path;
+        createMember(path, {FSAccessor::Type::tRegular, false, 0, 0 });
     }
 
     void isExecutable() override
     {
-        isExec = true;
+        parents.top()->isExecutable = true;
     }
 
     void preallocateContents(unsigned long long size) override
     {
         currentStart = string(s, pos, 16);
         assert(size <= std::numeric_limits<size_t>::max());
-        members.emplace(currentPath,
-            NarMember{FSAccessor::Type::tRegular, isExec, pos, (size_t) size});
+        parents.top()->size = (size_t)size;
+        parents.top()->start = pos;
     }
 
     void receiveContents(unsigned char * data, unsigned int len) override
@@ -68,16 +107,23 @@ struct NarIndexer : ParseSink, StringSource
 
     void createSymlink(const Path & path, const string & target) override
     {
-        members.emplace(path,
+        createMember(path,
             NarMember{FSAccessor::Type::tSymlink, false, 0, 0, target});
     }
 
-    Members::iterator find(const Path & path)
+    NarMember* find(const Path & path)
     {
-        auto i = members.find(path);
-        if (i == members.end())
+        Path canon = path == "" ? "" : canonPath(path);
+        NarMember* result = root.find(canon);
+        return result;
+    }
+
+    NarMember& at(const Path & path) {
+        auto result = find(path);
+        if(result == nullptr) {
             throw Error(format("NAR file does not contain path ‘%1%’") % path);
-        return i;
+        }
+        return *result;
     }
 };
 
@@ -93,44 +139,41 @@ struct NarAccessor : public FSAccessor
 
     Stat stat(const Path & path) override
     {
-        auto i = indexer.members.find(path);
-        if (i == indexer.members.end())
+        auto i = indexer.find(path);
+        if (i == nullptr)
             return {FSAccessor::Type::tMissing, 0, false};
-        return {i->second.type, i->second.size, i->second.isExecutable};
+        return {i->type, i->size, i->isExecutable};
     }
 
     StringSet readDirectory(const Path & path) override
     {
-        auto i = indexer.find(path);
+        auto i = indexer.at(path);
 
-        if (i->second.type != FSAccessor::Type::tDirectory)
+        if (i.type != FSAccessor::Type::tDirectory)
             throw Error(format("path ‘%1%’ inside NAR file is not a directory") % path);
 
-        ++i;
         StringSet res;
-        while (i != indexer.members.end() && isInDir(i->first, path)) {
-            // FIXME: really bad performance.
-            if (i->first.find('/', path.size() + 1) == std::string::npos)
-                res.insert(std::string(i->first, path.size() + 1));
-            ++i;
+        for(auto&& child : i.children) {
+            res.insert(child.first);
+
         }
         return res;
     }
 
     std::string readFile(const Path & path) override
     {
-        auto i = indexer.find(path);
-        if (i->second.type != FSAccessor::Type::tRegular)
+        auto i = indexer.at(path);
+        if (i.type != FSAccessor::Type::tRegular)
             throw Error(format("path ‘%1%’ inside NAR file is not a regular file") % path);
-        return std::string(*nar, i->second.start, i->second.size);
+        return std::string(*nar, i.start, i.size);
     }
 
     std::string readLink(const Path & path) override
     {
-        auto i = indexer.find(path);
-        if (i->second.type != FSAccessor::Type::tSymlink)
+        auto i = indexer.at(path);
+        if (i.type != FSAccessor::Type::tSymlink)
             throw Error(format("path ‘%1%’ inside NAR file is not a symlink") % path);
-        return i->second.target;
+        return i.target;
     }
 };
 
