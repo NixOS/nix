@@ -13,7 +13,8 @@ nix_tests = \
   check-reqs.sh pass-as-file.sh tarball.sh restricted.sh \
   placeholders.sh nix-shell.sh \
   linux-sandbox.sh \
-  build-remote.sh
+  build-remote.sh \
+  nar-index.sh
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
