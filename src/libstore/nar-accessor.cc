@@ -28,7 +28,6 @@ struct NarIndexer : ParseSink, StringSource
     NarMember root;
     std::stack<NarMember*> parents;
 
-    std::string currentName;
     std::string currentStart;
     bool isExec = false;
 
@@ -56,7 +55,7 @@ struct NarIndexer : ParseSink, StringSource
 
     void createDirectory(const Path & path) override
     {
-        createMember(path, {FSAccessor::Type::tDirectory, false, 0, 0 }); 
+        createMember(path, {FSAccessor::Type::tDirectory, false, 0, 0 });
     }
 
     void createRegularFile(const Path & path) override
