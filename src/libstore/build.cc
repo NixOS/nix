@@ -1066,12 +1066,8 @@ void DerivationGoal::haveDerivation()
 
     /* Reject doing a hash build of anything other than a fixed-output
        derivation. */
-    if (buildMode == bmHash) {
-        if (drv->outputs.size() != 1 ||
-            drv->outputs.find("out") == drv->outputs.end() ||
-            drv->outputs["out"].hashAlgo == "")
-            throw Error(format("cannot do a hash build of non-fixed-output derivation ‘%1%’") % drvPath);
-    }
+    if (buildMode == bmHash && !drv->isFixedOutput())
+        throw Error("cannot do a hash build of non-fixed-output derivation ‘%1%’", drvPath);
 
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
