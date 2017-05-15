@@ -1774,6 +1774,7 @@ void DerivationGoal::startBuilder()
             try {
                 if (worker.store.isInStore(i.second.source))
                     worker.store.computeFSClosure(worker.store.toStorePath(i.second.source), closure);
+            } catch (InvalidPath & e) {
             } catch (Error & e) {
                 throw Error(format("while processing ‘build-sandbox-paths’: %s") % e.what());
             }
