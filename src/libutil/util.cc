@@ -372,7 +372,7 @@ void deletePath(const Path & path)
 
 void deletePath(const Path & path, unsigned long long & bytesFreed)
 {
-    Activity act(*logger, lvlDebug, format("recursively deleting path ‘%1%’") % path);
+    //Activity act(*logger, lvlDebug, format("recursively deleting path ‘%1%’") % path);
     bytesFreed = 0;
     _deletePath(path, bytesFreed);
 }

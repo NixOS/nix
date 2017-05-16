@@ -289,7 +289,7 @@ static void getDerivations(EvalState & state, Value & vIn,
            bound to the attribute with the "lower" name should take
            precedence). */
         for (auto & i : v.attrs->lexicographicOrder()) {
-            Activity act(*logger, lvlDebug, format("evaluating attribute ‘%1%’") % i->name);
+            debug("evaluating attribute ‘%1%’", i->name);
             if (!std::regex_match(std::string(i->name), attrRegex))
                 continue;
             string pathPrefix2 = addToPath(pathPrefix, i->name);
@@ -310,7 +310,6 @@ static void getDerivations(EvalState & state, Value & vIn,
 
     else if (v.isList()) {
         for (unsigned int n = 0; n < v.listSize(); ++n) {
-            Activity act(*logger, lvlDebug, "evaluating list element");
             string pathPrefix2 = addToPath(pathPrefix, (format("%1%") % n).str());
             if (getDerivation(state, *v.listElems()[n], pathPrefix2, drvs, done, ignoreAssertionFailures))
                 getDerivations(state, *v.listElems()[n], pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);

@@ -13,7 +13,6 @@ struct DownloadRequest
     std::string uri;
     std::string expectedETag;
     bool verifyTLS = true;
-    enum { yes, no, automatic } showProgress = yes;
     bool head = false;
     size_t tries = 5;
     unsigned int baseRetryTimeMs = 250;

@@ -364,6 +364,8 @@ void ignoreException();
 #define ANSI_NORMAL "\e[0m"
 #define ANSI_BOLD "\e[1m"
 #define ANSI_RED "\e[31;1m"
+#define ANSI_GREEN "\e[32;1m"
+#define ANSI_BLUE "\e[34;1m"
 
 
 /* Filter out ANSI escape codes from the given string. If ‘nixOnly’ is

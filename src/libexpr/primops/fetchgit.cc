@@ -17,7 +17,7 @@ Path exportGit(ref<Store> store, const std::string & uri, const std::string & re
         runProgram("git", true, { "init", "--bare", cacheDir });
     }
 
-    Activity act(*logger, lvlInfo, format("fetching Git repository ‘%s’") % uri);
+    //Activity act(*logger, lvlInfo, format("fetching Git repository ‘%s’") % uri);
 
     std::string localRef = "pid-" + std::to_string(getpid());
     Path localRefFile = cacheDir + "/refs/heads/" + localRef;

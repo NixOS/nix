@@ -19,7 +19,7 @@ using namespace nix;
 
 static Expr * parseStdin(EvalState & state)
 {
-    Activity act(*logger, lvlTalkative, format("parsing standard input"));
+    //Activity act(*logger, lvlTalkative, format("parsing standard input"));
     return state.parseExprFromString(drainFD(0), absPath("."));
 }
 

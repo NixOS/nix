@@ -30,13 +30,13 @@ void Store::exportPaths(const Paths & paths, Sink & sink)
     std::reverse(sorted.begin(), sorted.end());
 
     std::string doneLabel("paths exported");
-    logger->incExpected(doneLabel, sorted.size());
+    //logger->incExpected(doneLabel, sorted.size());
 
     for (auto & path : sorted) {
-        Activity act(*logger, lvlInfo, format("exporting path ‘%s’") % path);
+        //Activity act(*logger, lvlInfo, format("exporting path ‘%s’") % path);
         sink << 1;
         exportPath(path, sink);
-        logger->incProgress(doneLabel);
+        //logger->incProgress(doneLabel);
     }
 
     sink << 0;
@@ -81,7 +81,7 @@ Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, 
 
         info.path = readStorePath(*this, source);
 
-        Activity act(*logger, lvlInfo, format("importing path ‘%s’") % info.path);
+        //Activity act(*logger, lvlInfo, format("importing path ‘%s’") % info.path);
 
         info.references = readStorePaths<PathSet>(*this, source);
 

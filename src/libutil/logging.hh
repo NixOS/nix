@@ -13,7 +13,64 @@ typedef enum {
     lvlVomit
 } Verbosity;
 
-class Activity;
+class Activity
+{
+    static std::atomic<uint64_t> nextId;
+public:
+    typedef uint64_t t;
+    const t id;
+    Activity();
+    Activity(const Activity & act) : id(act.id) { };
+    Activity(uint64_t id) : id(id) { };
+};
+
+typedef enum {
+    evBuildCreated = 0,
+    evBuildStarted = 1,
+    evBuildOutput = 2,
+    evBuildFinished = 3,
+    evDownloadCreated = 4,
+    evDownloadDestroyed = 5,
+    evDownloadProgress = 6,
+    evDownloadSucceeded = 7,
+    evSubstitutionCreated = 8,
+    evSubstitutionStarted = 9,
+    evSubstitutionFinished = 10,
+} EventType;
+
+struct Event
+{
+    struct Field
+    {
+        // FIXME: use std::variant.
+        enum { tInt, tString } type;
+        uint64_t i = 0;
+        std::string s;
+        Field(const std::string & s) : type(tString), s(s) { }
+        Field(const char * s) : type(tString), s(s) { }
+        Field(const uint64_t & i) : type(tInt), i(i) { }
+        Field(const Activity & act) : type(tInt), i(act.id) { }
+    };
+
+    typedef std::vector<Field> Fields;
+
+    EventType type;
+    Fields fields;
+
+    std::string getS(size_t n) const
+    {
+        assert(n < fields.size());
+        assert(fields[n].type == Field::tString);
+        return fields[n].s;
+    }
+
+    uint64_t getI(size_t n) const
+    {
+        assert(n < fields.size());
+        assert(fields[n].type == Field::tInt);
+        return fields[n].i;
+    }
+};
 
 class Logger
 {
@@ -32,34 +89,16 @@ public:
 
     virtual void warn(const std::string & msg);
 
-    virtual void setExpected(const std::string & label, uint64_t value = 1) { }
-    virtual void setProgress(const std::string & label, uint64_t value = 1) { }
-    virtual void incExpected(const std::string & label, uint64_t value = 1) { }
-    virtual void incProgress(const std::string & label, uint64_t value = 1) { }
-
-private:
-
-    virtual void startActivity(Activity & activity, Verbosity lvl, const FormatOrString & fs) = 0;
-
-    virtual void stopActivity(Activity & activity) = 0;
-
-};
-
-class Activity
-{
-public:
-    Logger & logger;
-
-    Activity(Logger & logger, Verbosity lvl, const FormatOrString & fs)
-        : logger(logger)
+    template<typename... Args>
+    void event(EventType type, const Args & ... args)
     {
-        logger.startActivity(*this, lvl, fs);
+        Event ev;
+        ev.type = type;
+        nop{(ev.fields.emplace_back(Event::Field(args)), 1)...};
+        event(ev);
     }
 
-    ~Activity()
-    {
-        logger.stopActivity(*this);
-    }
+    virtual void event(const Event & ev) = 0;
 };
 
 extern Logger * logger;

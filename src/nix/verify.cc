@@ -65,7 +65,7 @@ struct CmdVerify : StorePathsCommand
         std::string untrustedLabel("untrusted");
         std::string corruptedLabel("corrupted");
         std::string failedLabel("failed");
-        logger->setExpected(doneLabel, storePaths.size());
+        //logger->setExpected(doneLabel, storePaths.size());
 
         ThreadPool pool;
 
@@ -73,7 +73,7 @@ struct CmdVerify : StorePathsCommand
             try {
                 checkInterrupt();
 
-                Activity act(*logger, lvlInfo, format("checking ‘%s’") % storePath);
+                //Activity act(*logger, lvlInfo, format("checking ‘%s’") % storePath);
 
                 auto info = store->queryPathInfo(storePath);
 
@@ -85,7 +85,7 @@ struct CmdVerify : StorePathsCommand
                     auto hash = sink.finish();
 
                     if (hash.first != info->narHash) {
-                        logger->incProgress(corruptedLabel);
+                        //logger->incProgress(corruptedLabel);
                         corrupted = 1;
                         printError(
                             format("path ‘%s’ was modified! expected hash ‘%s’, got ‘%s’")
@@ -137,19 +137,19 @@ struct CmdVerify : StorePathsCommand
                     }
 
                     if (!good) {
-                        logger->incProgress(untrustedLabel);
+                        //logger->incProgress(untrustedLabel);
                         untrusted++;
                         printError(format("path ‘%s’ is untrusted") % info->path);
                     }
 
                 }
 
-                logger->incProgress(doneLabel);
+                //logger->incProgress(doneLabel);
                 done++;
 
             } catch (Error & e) {
                 printError(format(ANSI_RED "error:" ANSI_NORMAL " %s") % e.what());
-                logger->incProgress(failedLabel);
+                //logger->incProgress(failedLabel);
                 failed++;
             }
         };

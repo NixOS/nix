@@ -27,6 +27,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 
 void mainWrapped(int argc, char * * argv)
 {
+    verbosity = lvlError;
     settings.verboseBuild = false;
 
     initNix();

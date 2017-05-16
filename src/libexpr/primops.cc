@@ -127,7 +127,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
                 env->values[displ++] = attr.value;
             }
 
-            Activity act(*logger, lvlTalkative, format("evaluating file ‘%1%’") % path);
+            printTalkative("evaluating file ‘%1%’", path);
             Expr * e = state.parseExprFromFile(resolveExprPath(path), staticEnv);
 
             e->eval(state, *env, v);
@@ -326,8 +326,6 @@ typedef list<Value *> ValueList;
 
 static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    Activity act(*logger, lvlDebug, "finding dependencies");
-
     state.forceAttrs(*args[0], pos);
 
     /* Get the start set. */
@@ -499,8 +497,6 @@ void prim_valueSize(EvalState & state, const Pos & pos, Value * * args, Value & 
    derivation. */
 static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    Activity act(*logger, lvlVomit, "evaluating derivation");
-
     state.forceAttrs(*args[0], pos);
 
     /* Figure out the name first (for stack backtraces). */
@@ -544,7 +540,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     for (auto & i : args[0]->attrs->lexicographicOrder()) {
         if (i->name == state.sIgnoreNulls) continue;
         string key = i->name;
-        Activity act(*logger, lvlVomit, format("processing attribute ‘%1%’") % key);
+        vomit("processing attribute ‘%1%’", key);
 
         auto handleHashMode = [&](const std::string & s) {
             if (s == "recursive") outputHashRecursive = true;

@@ -1,6 +1,8 @@
 #include "logging.hh"
 #include "util.hh"
 
+#include <atomic>
+
 namespace nix {
 
 Logger * logger = makeDefaultLogger();
@@ -42,12 +44,7 @@ public:
         writeToStderr(prefix + (tty ? fs.s : filterANSIEscapes(fs.s)) + "\n");
     }
 
-    void startActivity(Activity & activity, Verbosity lvl, const FormatOrString & fs) override
-    {
-        log(lvl, fs);
-    }
-
-    void stopActivity(Activity & activity) override
+    void event(const Event & ev) override
     {
     }
 };
@@ -78,5 +75,9 @@ Logger * makeDefaultLogger()
 {
     return new SimpleLogger();
 }
+
+std::atomic<uint64_t> Activity::nextId{(uint64_t) getpid() << 32};
+
+Activity::Activity() : id(nextId++) { };
 
 }

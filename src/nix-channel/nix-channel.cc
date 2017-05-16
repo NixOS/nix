@@ -112,7 +112,6 @@ static void update(const StringSet & channelNames)
             // The URL doesn't unpack directly, so let's try treating it like a full channel folder with files in it
             // Check if the channel advertises a binary cache.
             DownloadRequest request(url + "/binary-cache-url");
-            request.showProgress = DownloadRequest::no;
             try {
                 auto dlRes = dl->download(request);
                 extraAttrs = "binaryCacheURL = \"" + *dlRes.data + "\";";

@@ -822,7 +822,7 @@ void copyPaths(ref<Store> from, ref<Store> to, const PathSet & storePaths,
 
     std::string copiedLabel = "copied";
 
-    logger->setExpected(copiedLabel, missing.size());
+    //logger->setExpected(copiedLabel, missing.size());
 
     ThreadPool pool;
 
@@ -838,13 +838,14 @@ void copyPaths(ref<Store> from, ref<Store> to, const PathSet & storePaths,
             checkInterrupt();
 
             if (!to->isValidPath(storePath)) {
-                Activity act(*logger, lvlInfo, format("copying ‘%s’...") % storePath);
+                //Activity act(*logger, lvlInfo, format("copying ‘%s’...") % storePath);
 
                 copyStorePath(from, to, storePath, false, dontCheckSigs);
 
-                logger->incProgress(copiedLabel);
+                //logger->incProgress(copiedLabel);
             } else
-                logger->incExpected(copiedLabel, -1);
+                ;
+                //logger->incExpected(copiedLabel, -1);
         });
 
     pool.process();

@@ -615,7 +615,7 @@ void LocalStore::tryToDelete(GCState & state, const Path & path)
     auto realPath = realStoreDir + "/" + baseNameOf(path);
     if (realPath == linksDir || realPath == trashDir) return;
 
-    Activity act(*logger, lvlDebug, format("considering whether to delete ‘%1%’") % path);
+    //Activity act(*logger, lvlDebug, format("considering whether to delete ‘%1%’") % path);
 
     if (!isStorePath(path) || !isValidPath(path)) {
         /* A lock file belonging to a path that we're building right

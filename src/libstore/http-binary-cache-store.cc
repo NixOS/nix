@@ -50,7 +50,6 @@ protected:
     {
         try {
             DownloadRequest request(cacheUri + "/" + path);
-            request.showProgress = DownloadRequest::no;
             request.head = true;
             request.tries = 5;
             getDownloader()->download(request);
@@ -76,7 +75,6 @@ protected:
         std::function<void(std::exception_ptr exc)> failure) override
     {
         DownloadRequest request(cacheUri + "/" + path);
-        request.showProgress = DownloadRequest::no;
         request.tries = 8;
 
         getDownloader()->enqueueDownload(request,

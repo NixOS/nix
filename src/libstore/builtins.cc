@@ -28,9 +28,6 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
         DownloadRequest request(url);
         request.verifyTLS = false;
 
-        /* Show a progress indicator, even though stderr is not a tty. */
-        request.showProgress = DownloadRequest::yes;
-
         /* Note: have to use a fresh downloader here because we're in
            a forked process. */
         auto data = makeDownloader()->download(request);

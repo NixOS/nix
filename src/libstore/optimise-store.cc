@@ -240,7 +240,7 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
     for (auto & i : paths) {
         addTempRoot(i);
         if (!isValidPath(i)) continue; /* path was GC'ed, probably */
-        Activity act(*logger, lvlChatty, format("hashing files in ‘%1%’") % i);
+        //Activity act(*logger, lvlChatty, format("hashing files in ‘%1%’") % i);
         optimisePath_(stats, realStoreDir + "/" + baseNameOf(i), inodeHash);
     }
 }

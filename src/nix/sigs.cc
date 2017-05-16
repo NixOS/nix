@@ -42,10 +42,10 @@ struct CmdCopySigs : StorePathsCommand
         std::string doneLabel = "done";
         std::atomic<size_t> added{0};
 
-        logger->setExpected(doneLabel, storePaths.size());
+        //logger->setExpected(doneLabel, storePaths.size());
 
         auto doPath = [&](const Path & storePath) {
-            Activity act(*logger, lvlInfo, format("getting signatures for ‘%s’") % storePath);
+            //Activity act(*logger, lvlInfo, format("getting signatures for ‘%s’") % storePath);
 
             checkInterrupt();
 
@@ -76,7 +76,7 @@ struct CmdCopySigs : StorePathsCommand
                 added += newSigs.size();
             }
 
-            logger->incProgress(doneLabel);
+            //logger->incProgress(doneLabel);
         };
 
         for (auto & storePath : storePaths)

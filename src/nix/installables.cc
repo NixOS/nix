@@ -223,9 +223,9 @@ PathSet InstallablesCommand::buildInstallables(ref<Store> store, bool dryRun)
         buildables.insert(b.begin(), b.end());
     }
 
-    printMissing(store, buildables);
-
-    if (!dryRun)
+    if (dryRun)
+        printMissing(store, buildables);
+    else
         store->buildPaths(buildables);
 
     PathSet outPaths;

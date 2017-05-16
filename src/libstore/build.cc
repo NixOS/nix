@@ -120,6 +120,8 @@ protected:
     /* Whether the goal is finished. */
     ExitCode exitCode;
 
+    Activity act;
+
     Goal(Worker & worker) : worker(worker)
     {
         nrFailed = nrNoSubstituters = nrIncompleteClosure = 0;
@@ -168,7 +170,8 @@ public:
     virtual string key() = 0;
 
 protected:
-    void amDone(ExitCode result);
+
+    virtual void amDone(ExitCode result);
 };
 
 
@@ -902,6 +905,12 @@ private:
 
     void repairClosure();
 
+    void amDone(ExitCode result)
+    {
+        logger->event(evBuildFinished, act, result == ecSuccess);
+        Goal::amDone(result);
+    }
+
     void done(BuildResult::Status status, const string & msg = "");
 };
 
@@ -920,6 +929,8 @@ DerivationGoal::DerivationGoal(const Path & drvPath, const StringSet & wantedOut
     state = &DerivationGoal::getDerivation;
     name = (format("building of ‘%1%’") % drvPath).str();
     trace("created");
+
+    logger->event(evBuildCreated, act, drvPath);
 }
 
 
@@ -934,6 +945,8 @@ DerivationGoal::DerivationGoal(const Path & drvPath, const BasicDerivation & drv
     state = &DerivationGoal::haveDerivation;
     name = (format("building of %1%") % showPaths(drv.outputPaths())).str();
     trace("created");
+
+    logger->event(evBuildCreated, act, drvPath);
 
     /* Prevent the .chroot directory from being
        garbage-collected. (See isActiveTempFile() in gc.cc.) */
@@ -2112,6 +2125,8 @@ void DerivationGoal::startBuilder()
         }
         debug(msg);
     }
+
+    logger->event(evBuildStarted, act);
 }
 
 
@@ -2857,7 +2872,7 @@ void DerivationGoal::registerOutputs()
            contained in it.  Compute the SHA-256 NAR hash at the same
            time.  The hash is stored in the database so that we can
            verify later on whether nobody has messed with the store. */
-        Activity act(*logger, lvlTalkative, format("scanning for references inside ‘%1%’") % path);
+        debug("scanning for references inside ‘%1%’", path);
         HashResult hash;
         PathSet references = scanForReferences(actualPath, allPaths, hash);
 
@@ -3130,6 +3145,7 @@ void DerivationGoal::flushLine()
         logTail.push_back(currentLogLine);
         if (logTail.size() > settings.logLines) logTail.pop_front();
     }
+    logger->event(evBuildOutput, act, currentLogLine);
     currentLogLine = "";
     currentLogLinePos = 0;
 }
@@ -3244,6 +3260,12 @@ public:
     void handleEOF(int fd);
 
     Path getStorePath() { return storePath; }
+
+    void amDone(ExitCode result)
+    {
+        logger->event(evSubstitutionFinished, act, result == ecSuccess);
+        Goal::amDone(result);
+    }
 };
 
 
@@ -3256,6 +3278,7 @@ SubstitutionGoal::SubstitutionGoal(const Path & storePath, Worker & worker, bool
     state = &SubstitutionGoal::init;
     name = (format("substitution of ‘%1%’") % storePath).str();
     trace("created");
+    logger->event(evSubstitutionCreated, act, storePath);
 }
 
 
@@ -3390,6 +3413,8 @@ void SubstitutionGoal::tryToRun()
     }
 
     printInfo(format("fetching path ‘%1%’...") % storePath);
+
+    logger->event(evSubstitutionStarted, act);
 
     outPipe.create();
 
@@ -3637,7 +3662,7 @@ void Worker::run(const Goals & _topGoals)
 {
     for (auto & i : _topGoals) topGoals.insert(i);
 
-    Activity act(*logger, lvlDebug, "entered goal loop");
+    debug("entered goal loop");
 
     while (1) {
 

@@ -63,16 +63,13 @@ struct CurlDownloader : public Downloader
         CurlDownloader & downloader;
         DownloadRequest request;
         DownloadResult result;
+        Activity act;
         bool done = false; // whether either the success or failure function has been called
         std::function<void(const DownloadResult &)> success;
         std::function<void(std::exception_ptr exc)> failure;
         CURL * req = 0;
         bool active = false; // whether the handle has been added to the multi object
         std::string status;
-
-        bool showProgress = false;
-        double prevProgressTime{0}, startTime{0};
-        unsigned int moveBack{1};
 
         unsigned int attempt = 0;
 
@@ -87,12 +84,10 @@ struct CurlDownloader : public Downloader
         DownloadItem(CurlDownloader & downloader, const DownloadRequest & request)
             : downloader(downloader), request(request)
         {
-            showProgress =
-                request.showProgress == DownloadRequest::yes ||
-                (request.showProgress == DownloadRequest::automatic && isatty(STDERR_FILENO));
-
             if (!request.expectedETag.empty())
                 requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + request.expectedETag).c_str());
+
+            logger->event(evDownloadCreated, act, request.uri);
         }
 
         ~DownloadItem()
@@ -109,6 +104,7 @@ struct CurlDownloader : public Downloader
             } catch (...) {
                 ignoreException();
             }
+            logger->event(evDownloadDestroyed, act);
         }
 
         template<class T>
@@ -171,19 +167,7 @@ struct CurlDownloader : public Downloader
 
         int progressCallback(double dltotal, double dlnow)
         {
-            if (showProgress) {
-                double now = getTime();
-                if (prevProgressTime <= now - 1) {
-                    string s = (format(" [%1$.0f/%2$.0f KiB, %3$.1f KiB/s]")
-                        % (dlnow / 1024.0)
-                        % (dltotal / 1024.0)
-                        % (now == startTime ? 0 : dlnow / 1024.0 / (now - startTime))).str();
-                    std::cerr << "\e[" << moveBack << "D" << s;
-                    moveBack = s.size();
-                    std::cerr.flush();
-                    prevProgressTime = now;
-                }
-            }
+            logger->event(evDownloadProgress, act, dltotal, dlnow);
             return _isInterrupted;
         }
 
@@ -201,13 +185,6 @@ struct CurlDownloader : public Downloader
 
         void init()
         {
-            // FIXME: handle parallel downloads.
-            if (showProgress) {
-                std::cerr << (format("downloading ‘%1%’... ") % request.uri);
-                std::cerr.flush();
-                startTime = getTime();
-            }
-
             if (!req) req = curl_easy_init();
 
             curl_easy_reset(req);
@@ -263,10 +240,6 @@ struct CurlDownloader : public Downloader
 
         void finish(CURLcode code)
         {
-            if (showProgress)
-                //std::cerr << "\e[" << moveBack << "D\e[K\n";
-                std::cerr << "\n";
-
             long httpStatus = 0;
             curl_easy_getinfo(req, CURLINFO_RESPONSE_CODE, &httpStatus);
 
@@ -292,6 +265,7 @@ struct CurlDownloader : public Downloader
                 try {
                     result.data = decodeContent(encoding, ref<std::string>(result.data));
                     callSuccess(success, failure, const_cast<const DownloadResult &>(result));
+                    logger->event(evDownloadSucceeded, act, result.data->size());
                 } catch (...) {
                     done = true;
                     callFailure(failure, std::current_exception());

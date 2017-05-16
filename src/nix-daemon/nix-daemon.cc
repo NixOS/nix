@@ -82,12 +82,7 @@ class TunnelLogger : public Logger
             defaultLogger->log(lvl, fs);
     }
 
-    void startActivity(Activity & activity, Verbosity lvl, const FormatOrString & fs) override
-    {
-        log(lvl, fs);
-    }
-
-    void stopActivity(Activity & activity) override
+    void event(const Event & ev) override
     {
     }
 };
