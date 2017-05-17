@@ -213,10 +213,11 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
   <varlistentry><term><function>builtins.match</function>
   <replaceable>regex</replaceable> <replaceable>str</replaceable></term>
 
-  <listitem><para>Returns a list if
-    <replaceable>regex</replaceable> matches
-    <replaceable>str</replaceable> precisely, otherwise returns <literal>null</literal>.
-    Each item in the list is a regex group.
+  <listitem><para>Returns a list if the <link
+  xlink:href="http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap09.html#tag_09_04">extended
+  POSIX regular expression</link> <replaceable>regex</replaceable>
+  matches <replaceable>str</replaceable> precisely, otherwise returns
+  <literal>null</literal>.  Each item in the list is a regex group.
 
 <programlisting>
 builtins.match "ab" "abc"
@@ -236,6 +237,11 @@ builtins.match "a(b)(c)" "abc"
 
 Evaluates to <literal>[ "b" "c" ]</literal>.
 
+<programlisting>
+builtins.match "[[:space:]]+([[:upper:]]+)[[:space:]]+" "  FOO   "
+</programlisting>
+
+Evaluates to <literal>[ "foo" ]</literal>.
 
   </para></listitem>
   </varlistentry>
