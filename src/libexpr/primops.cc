@@ -1709,26 +1709,33 @@ static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, 
    ‘null’ or a list containing substring matches. */
 static void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    std::regex regex(state.forceStringNoCtx(*args[0], pos), std::regex::extended);
+    auto re = state.forceStringNoCtx(*args[0], pos);
 
-    PathSet context;
-    const std::string str = state.forceString(*args[1], context, pos);
+    try {
 
+        std::regex regex(re, std::regex::extended);
 
-    std::smatch match;
-    if (!std::regex_match(str, match, regex)) {
-        mkNull(v);
-        return;
-    }
+        PathSet context;
+        const std::string str = state.forceString(*args[1], context, pos);
 
-    // the first match is the whole string
-    const size_t len = match.size() - 1;
-    state.mkList(v, len);
-    for (size_t i = 0; i < len; ++i) {
-        if (!match[i+1].matched)
-            mkNull(*(v.listElems()[i] = state.allocValue()));
-        else
-            mkString(*(v.listElems()[i] = state.allocValue()), match[i + 1].str().c_str());
+        std::smatch match;
+        if (!std::regex_match(str, match, regex)) {
+            mkNull(v);
+            return;
+        }
+
+        // the first match is the whole string
+        const size_t len = match.size() - 1;
+        state.mkList(v, len);
+        for (size_t i = 0; i < len; ++i) {
+            if (!match[i+1].matched)
+                mkNull(*(v.listElems()[i] = state.allocValue()));
+            else
+                mkString(*(v.listElems()[i] = state.allocValue()), match[i + 1].str().c_str());
+        }
+
+    } catch (std::regex_error &) {
+        throw EvalError("invalid regular expression ‘%s’, at %s", re, pos);
     }
 }
 
