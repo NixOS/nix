@@ -8,10 +8,17 @@
 
 ;;; Code:
 
+;; Emacs 24.2 compatability
+(unless (fboundp 'setq-local)
+  (defmacro setq-local (var val)
+    "Set variable VAR to value VAL in current buffer."
+    `(set (make-local-variable ',var) ,val)))
+
 (defun nix-syntax-match-antiquote (limit)
+  "Find antiquote within a Nix expression up to LIMIT."
   (let ((pos (next-single-char-property-change (point) 'nix-syntax-antiquote
                                                nil limit)))
-    (when (and pos (> pos (point)))
+    (when (and pos (> pos (point)) (< pos (point-max)))
       (goto-char pos)
       (let ((char (char-after pos)))
         (pcase char
@@ -22,25 +29,49 @@
         (set-match-data (list pos (point)))
         t))))
 
+(defconst nix-keywords
+  '("if" "then"
+    "else" "with"
+    "let" "in"
+    "rec" "inherit"
+    "or"
+    ))
+
+(defconst nix-builtins
+  '("builtins" "baseNameOf"
+    "derivation" "dirOf"
+    "false" "fetchTarball"
+    "import" "isNull"
+    "map" "removeAttrs"
+    "toString" "true"))
+
+(defconst nix-warning-keywords
+  '("assert" "abort" "throw"))
+
+(defconst nix-re-file-path
+  "[a-zA-Z0-9._\\+-]*\\(/[a-zA-Z0-9._\\+-]+\\)+")
+
+(defconst nix-re-url
+  "[a-zA-Z][a-zA-Z0-9\\+-\\.]*:[a-zA-Z0-9%/\\?:@&=\\+\\$,_\\.!~\\*'-]+")
+
+(defconst nix-re-bracket-path
+  "<[a-zA-Z0-9._\\+-]+\\(/[a-zA-Z0-9._\\+-]+\\)*>")
+
+(defconst nix-re-variable-assign
+  "\\<\\([a-zA-Z_][a-zA-Z0-9_'\-\.]*\\)[ \t]*=")
+
 (defconst nix-font-lock-keywords
-  '("\\_<if\\_>" "\\_<then\\_>" "\\_<else\\_>" "\\_<assert\\_>" "\\_<with\\_>"
-    "\\_<let\\_>" "\\_<in\\_>" "\\_<rec\\_>" "\\_<inherit\\_>" "\\_<or\\_>"
-    ("\\_<true\\_>" . font-lock-builtin-face)
-    ("\\_<false\\_>" . font-lock-builtin-face)
-    ("\\_<null\\_>" . font-lock-builtin-face)
-    ("\\_<import\\_>" . font-lock-builtin-face)
-    ("\\_<derivation\\_>" . font-lock-builtin-face)
-    ("\\_<baseNameOf\\_>" . font-lock-builtin-face)
-    ("\\_<toString\\_>" . font-lock-builtin-face)
-    ("\\_<isNull\\_>" . font-lock-builtin-face)
-    ("[a-zA-Z][a-zA-Z0-9\\+-\\.]*:[a-zA-Z0-9%/\\?:@&=\\+\\$,_\\.!~\\*'-]+"
-     . font-lock-constant-face)
-    ("\\<\\([a-zA-Z_][a-zA-Z0-9_'\-\.]*\\)[ \t]*="
-     (1 font-lock-variable-name-face nil nil))
-    ("<[a-zA-Z0-9._\\+-]+\\(/[a-zA-Z0-9._\\+-]+\\)*>"
-     . font-lock-constant-face)
-    ("[a-zA-Z0-9._\\+-]*\\(/[a-zA-Z0-9._\\+-]+\\)+"
-     . font-lock-constant-face)
+  `(
+    (,(regexp-opt nix-keywords 'symbols) . font-lock-keyword-face)
+
+    (,(regexp-opt nix-warning-keywords 'symbols) . font-lock-warning-face)
+
+    (,(regexp-opt nix-builtins 'symbols) . font-lock-builtin-face)
+
+    (,nix-re-url . font-lock-constant-face)
+    (,nix-re-file-path . font-lock-constant-face)
+    (,nix-re-variable-assign 1 font-lock-variable-name-face)
+    (,nix-re-bracket-path . font-lock-constant-face)
     (nix-syntax-match-antiquote 0 font-lock-preprocessor-face t))
   "Font lock keywords for nix.")
 
@@ -54,20 +85,36 @@
   "Syntax table for Nix mode.")
 
 (defun nix-syntax-propertize-escaped-antiquote ()
-  "Set syntax properies for escaped antiquote marks."
-  nil)
+  "Set syntax properties for escaped antiquote."
+  (let* ((start (match-beginning 0))
+         (context (save-excursion (save-match-data (syntax-ppss start))))
+         (string-type (nth 3 context)))
+
+    ;; treat like multiline when not already in string
+    ;; else ignore
+    (when (not string-type)
+      (put-text-property start (1+ start)
+       'syntax-table (string-to-syntax "|"))
+
+      (when (string= (buffer-substring (+ 2 start) (+ 4 start)) "${")
+        (put-text-property (+ 2 start) (+ 3 start)
+                           'syntax-table (string-to-syntax "|"))
+        (put-text-property (+ 2 start) (+ 4 start)
+                           'nix-syntax-antiquote t))
+      )
+    ))
 
 (defun nix-syntax-propertize-multiline-string ()
   "Set syntax properies for multiline string delimiters."
   (let* ((start (match-beginning 0))
-         (end (match-end 0))
          (context (save-excursion (save-match-data (syntax-ppss start))))
          (string-type (nth 3 context)))
+
     (pcase string-type
       (`t
        ;; inside a multiline string
        ;; ending multi-line string delimiter
-       (put-text-property (1- end) end
+       (put-text-property (1+ start) (+ 2 start)
                           'syntax-table (string-to-syntax "|")))
       (`nil
        ;; beginning multi-line string delimiter
@@ -75,7 +122,7 @@
                           'syntax-table (string-to-syntax "|"))))))
 
 (defun nix-syntax-propertize-antiquote ()
-  "Set syntax properties for antiquote marks."
+  "Set syntax properties for an antiquote mark."
   (let* ((start (match-beginning 0)))
     (put-text-property start (1+ start)
                        'syntax-table (string-to-syntax "|"))
@@ -86,7 +133,6 @@
   "Set syntax properties for close braces.
 If a close brace `}' ends an antiquote, the next character begins a string."
   (let* ((start (match-beginning 0))
-         (end (match-end 0))
          (context (save-excursion (save-match-data (syntax-ppss start))))
          (open (nth 1 context)))
     (when open ;; a corresponding open-brace was found
@@ -98,13 +144,13 @@ If a close brace `}' ends an antiquote, the next character begins a string."
                              'nix-syntax-antiquote t))))))
 
 (defun nix-syntax-propertize (start end)
-  "Special syntax properties for Nix."
+  "Special syntax properties for Nix from START to END."
   ;; search for multi-line string delimiters
   (goto-char start)
   (remove-text-properties start end '(syntax-table nil nix-syntax-antiquote nil))
   (funcall
    (syntax-propertize-rules
-    ("''\\${"
+    ("''['\\$\]" ;; ignore ''* characters
      (0 (ignore (nix-syntax-propertize-escaped-antiquote))))
     ("''"
      (0 (ignore (nix-syntax-propertize-multiline-string))))
@@ -144,6 +190,11 @@ The hook `nix-mode-hook' is run when Nix mode is started.
 "
   (set-syntax-table nix-mode-syntax-table)
 
+  ;; Disable hard tabs and set tab to 2 spaces
+  ;; Recommended by nixpkgs manual: https://nixos.org/nixpkgs/manual/#sec-syntax
+  (setq-local indent-tabs-mode nil)
+  (setq-local tab-width 2)
+
   ;; Font lock support.
   (setq-local font-lock-defaults '(nix-font-lock-keywords nil nil nil nil))
 
@@ -154,17 +205,17 @@ The hook `nix-mode-hook' is run when Nix mode is started.
   (setq-local parse-sexp-lookup-properties t)
 
   ;; Automatic indentation [C-j].
-  (set (make-local-variable 'indent-line-function) 'nix-indent-line)
+  (setq-local indent-line-function 'nix-indent-line)
 
   ;; Indenting of comments.
-  (set (make-local-variable 'comment-start) "# ")
-  (set (make-local-variable 'comment-end) "")
-  (set (make-local-variable 'comment-start-skip) "\\(^\\|\\s-\\);?#+ *")
+  (setq-local comment-start "# ")
+  (setq-local comment-end "")
+  (setq-local comment-start-skip "\\(^\\|\\s-\\);?#+ *")
 
   ;; Filling of comments.
-  (set (make-local-variable 'adaptive-fill-mode) t)
-  (set (make-local-variable 'paragraph-start) "[ \t]*\\(#+[ \t]*\\)?$")
-  (set (make-local-variable 'paragraph-separate) paragraph-start))
+  (setq-local adaptive-fill-mode t)
+  (setq-local paragraph-start "[ \t]*\\(#+[ \t]*\\)?$")
+  (setq-local paragraph-separate paragraph-start))
 
 
 ;;;###autoload
