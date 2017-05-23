@@ -47,7 +47,6 @@
 (defvar nix-mode-syntax-table
   (let ((table (make-syntax-table)))
     (modify-syntax-entry ?/ ". 14" table)
-    (modify-syntax-entry ?* ". 23" table)
     (modify-syntax-entry ?# "< b" table)
     (modify-syntax-entry ?\n "> b" table)
     table)
