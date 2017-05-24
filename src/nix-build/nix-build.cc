@@ -196,6 +196,7 @@ int main(int argc, char ** argv)
                 buildArgs.push_back(arg);
                 buildArgs.push_back(args[n + 1]);
                 buildArgs.push_back(args[n + 2]);
+                settings.set(args[n + 1], args[n + 2]);
                 n += 2;
             }
 
@@ -407,7 +408,7 @@ int main(int argc, char ** argv)
 
                 env["NIX_BUILD_TOP"] = env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmp;
                 env["NIX_STORE"] = store->storeDir;
-                env["NIX_BUILD_CORES"] = settings.buildCores;
+                env["NIX_BUILD_CORES"] = std::to_string(settings.buildCores);
 
                 auto passAsFile = tokenizeString<StringSet>(get(drv.env, "passAsFile", ""));
 
