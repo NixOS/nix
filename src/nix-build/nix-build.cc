@@ -407,6 +407,7 @@ int main(int argc, char ** argv)
 
                 env["NIX_BUILD_TOP"] = env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmp;
                 env["NIX_STORE"] = store->storeDir;
+                env["NIX_BUILD_CORES"] = settings.buildCores;
 
                 auto passAsFile = tokenizeString<StringSet>(get(drv.env, "passAsFile", ""));
 
