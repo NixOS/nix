@@ -12,11 +12,13 @@
 #include "value-to-json.hh"
 #include "value-to-xml.hh"
 #include "primops.hh"
+#include "idPool.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <map>
 #include <algorithm>
 #include <cstring>
 #include <regex>
@@ -1885,6 +1887,19 @@ static void prim_fetchTarball(EvalState & state, const Pos & pos, Value * * args
 }
 
 
+/* Return a unique ID number (unsigned int) per identifier string */
+static void prim_uniqueID(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+
+  if (args[0]->type == tString && args[1]->type == tString) {
+    string pool = state.forceStringNoCtx(*args[0], pos);
+    string identifier = state.forceStringNoCtx(*args[1], pos);
+    static idPool id;
+    mkInt(v, id.resolve(pool, identifier));
+  }
+}
+
+
 /*************************************************************
  * Primop registration
  *************************************************************/
@@ -2048,6 +2063,7 @@ void EvalState::createBaseEnv()
     // Networking
     addPrimOp("__fetchurl", 1, prim_fetchurl);
     addPrimOp("fetchTarball", 1, prim_fetchTarball);
+    addPrimOp("uniqueID", 2, prim_uniqueID);
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
