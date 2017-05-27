@@ -12,6 +12,27 @@ another machine already has some or all of those packages or their
 dependencies.  In that case there are mechanisms to quickly copy
 packages between machines.</para>
 
+<para>For the following to work you need to create a pair of RSA
+keys on the involved computers. These keys can be generated with
+openssl (or libressl) via
+
+<screen>
+$ openssl genrsa -out /etc/nix/signing-key.sec 4096
+$ openssl rsa -in /etc/nix/signing-key.sec -pubout > /etc/nix/signing-key.pub
+</screen>
+
+The keys should be owned by root and have the following
+permissions
+
+<screen>
+-rw-r--r--  1 root root  800 Mar 11 11:09 signing-key.pub
+-r--------  1 root root 3.2K Mar 11 11:09 signing-key.sec 
+</screen>
+
+Make sure to copy these keys, once generated, to the other computer
+and set the correct owner / permissions.
+</para>
+
 <xi:include href="binary-cache-substituter.xml" />
 <xi:include href="copy-closure.xml" />
 <xi:include href="ssh-substituter.xml" />
