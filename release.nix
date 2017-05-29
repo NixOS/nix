@@ -27,6 +27,7 @@ let
           [ curl bison flex perl libxml2 libxslt bzip2 xz
             dblatex (dblatex.tex or tetex) nukeReferences pkgconfig sqlite libsodium
             docbook5 docbook5_xsl
+            libseccomp
           ] ++ lib.optional (!lib.inNixShell) git;
 
         configureFlags = ''
@@ -85,6 +86,7 @@ let
 
         buildInputs =
           [ curl perl bzip2 xz openssl pkgconfig sqlite boehmgc ]
+          ++ lib.optional stdenv.isLinux libseccomp
           ++ lib.optional stdenv.isLinux libsodium;
 
         configureFlags = ''

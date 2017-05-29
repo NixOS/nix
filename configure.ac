@@ -200,6 +200,13 @@ AC_SUBST(HAVE_SODIUM, [$have_sodium])
 PKG_CHECK_MODULES([LIBLZMA], [liblzma], [CXXFLAGS="$LIBLZMA_CFLAGS $CXXFLAGS"])
 
 
+# Look for libseccomp, required for Linux sandboxing.
+if test "$sys_name" = linux; then
+  PKG_CHECK_MODULES([LIBSECCOMP], [libseccomp],
+                    [CXXFLAGS="$LIBSECCOMP_CFLAGS $CXXFLAGS"])
+fi
+
+
 # Whether to use the Boehm garbage collector.
 AC_ARG_ENABLE(gc, AC_HELP_STRING([--enable-gc],
   [enable garbage collection in the Nix expression evaluator (requires Boehm GC) [default=no]]),
