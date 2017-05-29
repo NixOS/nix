@@ -24,6 +24,7 @@ private:
         std::string uri;
         uint64_t current = 0;
         uint64_t expected = 0;
+        DownloadInfo(const std::string & uri) : uri(uri) { }
     };
 
     struct State

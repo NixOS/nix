@@ -15,7 +15,6 @@ typedef enum {
 
 class Activity
 {
-    static std::atomic<uint64_t> nextId;
 public:
     typedef uint64_t t;
     const t id;

@@ -76,7 +76,7 @@ Logger * makeDefaultLogger()
     return new SimpleLogger();
 }
 
-std::atomic<uint64_t> Activity::nextId{(uint64_t) getpid() << 32};
+std::atomic<uint64_t> nextId{(uint64_t) getpid() << 32};
 
 Activity::Activity() : id(nextId++) { };
 
