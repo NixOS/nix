@@ -18,6 +18,10 @@ ifeq ($(OS), SunOS)
 	libstore_LDFLAGS += -lsocket
 endif
 
+ifeq ($(OS), Linux)
+	libstore_LDFLAGS += -lseccomp
+endif
+
 libstore_CXXFLAGS = \
  -DNIX_PREFIX=\"$(prefix)\" \
  -DNIX_STORE_DIR=\"$(storedir)\" \

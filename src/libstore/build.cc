@@ -46,6 +46,7 @@
 #include <sys/param.h>
 #include <sys/mount.h>
 #include <sys/syscall.h>
+#include <seccomp.h>
 #define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
 #endif
 
@@ -2298,6 +2299,42 @@ void DerivationGoal::doExportReferencesGraph()
 }
 
 
+void setupSeccomp()
+{
+#if __linux__
+    scmp_filter_ctx ctx;
+
+    if (!(ctx = seccomp_init(SCMP_ACT_ALLOW)))
+        throw SysError("unable to initialize seccomp mode 2");
+
+    Finally cleanup([&]() {
+        seccomp_release(ctx);
+    });
+
+    if (seccomp_arch_add(ctx, SCMP_ARCH_X86) != 0)
+        throw SysError("unable to add 32-bit seccomp architecture");
+
+    for (int perm : { S_ISUID, S_ISGID }) {
+        // TODO: test chmod and fchmod.
+        if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(chmod), 1,
+                SCMP_A1(SCMP_CMP_MASKED_EQ, perm, perm)) != 0)
+            throw SysError("unable to add seccomp rule");
+
+        if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(fchmod), 1,
+                SCMP_A1(SCMP_CMP_MASKED_EQ, perm, perm)) != 0)
+            throw SysError("unable to add seccomp rule");
+
+        if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(fchmodat), 1,
+                SCMP_A2(SCMP_CMP_MASKED_EQ, perm, perm)) != 0)
+            throw SysError("unable to add seccomp rule");
+    }
+
+    if (seccomp_load(ctx) != 0)
+        throw SysError("unable to load seccomp BPF program");
+#endif
+}
+
+
 void DerivationGoal::runChild()
 {
     /* Warning: in the child we should absolutely not make any SQLite
@@ -2306,6 +2343,8 @@ void DerivationGoal::runChild()
     try { /* child */
 
         commonChildInit(builderOut);
+
+        setupSeccomp();
 
         bool setUser = true;
 

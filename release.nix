@@ -30,6 +30,7 @@ let
             docbook5 docbook5_xsl
             autoconf-archive
             git
+            libseccomp
           ];
 
         configureFlags = "--enable-gc";
@@ -78,6 +79,7 @@ let
             openssl pkgconfig sqlite boehmgc
 
           ]
+          ++ lib.optional stdenv.isLinux libseccomp
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin)
             (aws-sdk-cpp.override {

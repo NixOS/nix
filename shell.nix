@@ -22,7 +22,8 @@ with import ./release-common.nix { inherit pkgs; };
       # For nix-perl
       perl
       perlPackages.DBDSQLite
-    ];
+    ]
+    ++ lib.optional stdenv.isLinux libseccomp;
 
   inherit configureFlags;
 
