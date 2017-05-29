@@ -923,7 +923,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, const ref<std::string> &
             info.path, info.narHash.to_string(), h.to_string());
 
     if (nar->size() != info.narSize)
-        throw Error("szie mismatch importing path ‘%s’; expected %s, got %s",
+        throw Error("size mismatch importing path ‘%s’; expected %s, got %s",
             info.path, info.narSize, nar->size());
 
     if (requireSigs && !dontCheckSigs && !info.checkSignatures(*this, publicKeys))
