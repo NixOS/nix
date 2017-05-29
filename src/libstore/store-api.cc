@@ -547,6 +547,7 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     if (!info->narHash && dontCheckSigs) {
         auto info2 = make_ref<ValidPathInfo>(*info);
         info2->narHash = hashString(htSHA256, *sink.s);
+        if (!info->narSize) info2->narSize = sink.s->size();
         info = info2;
     }
 
