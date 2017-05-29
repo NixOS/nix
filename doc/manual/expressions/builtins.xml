@@ -440,7 +440,7 @@ builtins.fromJSON ''{"x": [1, 2, 3], "y": null}''
 
     <listitem><para>Generate list of size
     <replaceable>length</replaceable>, with each element
-    <replaceable>i></replaceable> equal to the value returned by
+    <replaceable>i</replaceable> equal to the value returned by
     <replaceable>generator</replaceable> <literal>i</literal>. For
     example,
 
