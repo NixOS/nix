@@ -2265,7 +2265,8 @@ void setupSeccomp()
         seccomp_release(ctx);
     });
 
-    if (seccomp_arch_add(ctx, SCMP_ARCH_X86) != 0)
+    if (settings.thisSystem == "x86_64-linux" &&
+        seccomp_arch_add(ctx, SCMP_ARCH_X86) != 0)
         throw SysError("unable to add 32-bit seccomp architecture");
 
     for (int perm : { S_ISUID, S_ISGID }) {
