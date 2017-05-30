@@ -2272,15 +2272,15 @@ void setupSeccomp()
     /* Prevent builders from creating setuid/setgid binaries. */
     for (int perm : { S_ISUID, S_ISGID }) {
         if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(chmod), 1,
-                SCMP_A1(SCMP_CMP_MASKED_EQ, perm, perm)) != 0)
+                SCMP_A1(SCMP_CMP_MASKED_EQ, (scmp_datum_t) perm, (scmp_datum_t) perm)) != 0)
             throw SysError("unable to add seccomp rule");
 
         if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(fchmod), 1,
-                SCMP_A1(SCMP_CMP_MASKED_EQ, perm, perm)) != 0)
+                SCMP_A1(SCMP_CMP_MASKED_EQ, (scmp_datum_t) perm, (scmp_datum_t) perm)) != 0)
             throw SysError("unable to add seccomp rule");
 
         if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(fchmodat), 1,
-                SCMP_A2(SCMP_CMP_MASKED_EQ, perm, perm)) != 0)
+                SCMP_A2(SCMP_CMP_MASKED_EQ, (scmp_datum_t) perm, (scmp_datum_t) perm)) != 0)
             throw SysError("unable to add seccomp rule");
     }
 
