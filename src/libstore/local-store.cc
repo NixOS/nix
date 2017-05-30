@@ -27,6 +27,7 @@
 #include <sys/statvfs.h>
 #include <sys/mount.h>
 #include <sys/ioctl.h>
+#include <sys/xattr.h>
 #endif
 
 #include <sqlite3.h>
@@ -406,6 +407,27 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
     /* Really make sure that the path is of a supported type. */
     if (!(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode)))
         throw Error(format("file ‘%1%’ has an unsupported type") % path);
+
+#if __linux__
+    /* Remove extended attributes / ACLs. */
+    ssize_t eaSize = llistxattr(path.c_str(), nullptr, 0);
+
+    if (eaSize < 0) {
+        if (errno != ENOTSUP)
+            throw SysError("querying extended attributes of ‘%s’", path);
+    } else if (eaSize > 0) {
+        std::vector<char> eaBuf(eaSize);
+
+        if ((eaSize = llistxattr(path.c_str(), eaBuf.data(), eaBuf.size())) < 0)
+            throw SysError("querying extended attributes of ‘%s’", path);
+
+        for (auto & eaName: tokenizeString<Strings>(std::string(eaBuf.data(), eaSize), std::string("\000", 1)))
+            if (lremovexattr(path.c_str(), eaName.c_str()) == -1)
+                throw SysError("removing extended attribute ‘%s’ from ‘%s’", eaName, path);
+
+        assert(llistxattr(path.c_str(), nullptr, 0) == 0);
+    }
+#endif
 
     /* Fail if the file is not owned by the build user.  This prevents
        us from messing up the ownership/permissions of files
