@@ -2301,7 +2301,11 @@ void DerivationGoal::runChild()
 
         commonChildInit(builderOut);
 
-        setupSeccomp();
+        try {
+            setupSeccomp();
+        } catch (...) {
+            if (buildUser) throw;
+        }
 
 #if __linux__
         if (useChroot) {
