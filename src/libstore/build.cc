@@ -2345,7 +2345,11 @@ void DerivationGoal::runChild()
 
         commonChildInit(builderOut);
 
-        setupSeccomp();
+        try {
+            setupSeccomp();
+        } catch (...) {
+            if (buildUser) throw;
+        }
 
         bool setUser = true;
 
