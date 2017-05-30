@@ -2656,6 +2656,10 @@ void DerivationGoal::runChild()
                 sandboxProfile += "(deny default (with no-log))\n";
             }
 
+            /* Disallow creating setuid/setgid binaries, since that
+               would allow breaking build user isolation. */
+            sandboxProfile += "(deny file-write-setugid)\n";
+
             /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different mechanisms
                to find temporary directories, so we want to open up a broader place for them to dump their files, if needed. */
             Path globalTmpDir = canonPath(getEnv("TMPDIR", "/tmp"), true);
