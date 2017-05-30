@@ -2315,8 +2315,8 @@ void setupSeccomp()
         seccomp_arch_add(ctx, SCMP_ARCH_X86) != 0)
         throw SysError("unable to add 32-bit seccomp architecture");
 
+    /* Prevent builders from creating setuid/setgid binaries. */
     for (int perm : { S_ISUID, S_ISGID }) {
-        // TODO: test chmod and fchmod.
         if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(chmod), 1,
                 SCMP_A1(SCMP_CMP_MASKED_EQ, perm, perm)) != 0)
             throw SysError("unable to add seccomp rule");
@@ -2329,6 +2329,14 @@ void setupSeccomp()
                 SCMP_A2(SCMP_CMP_MASKED_EQ, perm, perm)) != 0)
             throw SysError("unable to add seccomp rule");
     }
+
+    /* Prevent builders from creating EAs or ACLs. Not all filesystems
+       support these, and they're not allowed in the Nix store because
+       they're not representable in the NAR serialisation. */
+    if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(setxattr), 0) != 0 ||
+        seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(lsetxattr), 0) != 0 ||
+        seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(fsetxattr), 0) != 0)
+        throw SysError("unable to add seccomp rule");
 
     if (seccomp_load(ctx) != 0)
         throw SysError("unable to load seccomp BPF program");
