@@ -16,6 +16,7 @@ rec {
   configureFlags =
     [ "--disable-init-state"
       "--enable-gc"
+    ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
       "--with-sandbox-shell=${sh}/bin/busybox"
     ];
 }
