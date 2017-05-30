@@ -906,7 +906,7 @@ private:
 
     void repairClosure();
 
-    void amDone(ExitCode result)
+    void amDone(ExitCode result) override
     {
         logger->event(evBuildFinished, act, result == ecSuccess);
         Goal::amDone(result);
@@ -3288,16 +3288,16 @@ public:
     SubstitutionGoal(const Path & storePath, Worker & worker, bool repair = false);
     ~SubstitutionGoal();
 
-    void timedOut() { abort(); };
+    void timedOut() override { abort(); };
 
-    string key()
+    string key() override
     {
         /* "a$" ensures substitution goals happen before derivation
            goals. */
         return "a$" + storePathToName(storePath) + "$" + storePath;
     }
 
-    void work();
+    void work() override;
 
     /* The states. */
     void init();
@@ -3308,12 +3308,12 @@ public:
     void finished();
 
     /* Callback used by the worker to write to the log. */
-    void handleChildOutput(int fd, const string & data);
-    void handleEOF(int fd);
+    void handleChildOutput(int fd, const string & data) override;
+    void handleEOF(int fd) override;
 
     Path getStorePath() { return storePath; }
 
-    void amDone(ExitCode result)
+    void amDone(ExitCode result) override
     {
         logger->event(evSubstitutionFinished, act, result == ecSuccess);
         Goal::amDone(result);
