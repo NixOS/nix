@@ -53,6 +53,11 @@ std::set<std::string> runResolver(const Path & filename)
     if (fstat(fd.get(), &st))
         throw SysError("statting ‘%s’", filename);
 
+    if (!S_ISREG(st.st_mode)) {
+        printError("file ‘%s’ is not a regular file", filename);
+        return {};
+    }
+
     if (st.st_size < sizeof(mach_header_64)) {
         printError("file ‘%s’ is too short for a MACH binary", filename);
         return {};
