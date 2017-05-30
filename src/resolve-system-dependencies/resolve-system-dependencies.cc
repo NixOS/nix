@@ -17,59 +17,75 @@ using namespace nix;
 
 static auto cacheDir = Path{};
 
-Path resolveCacheFile(Path lib) {
+Path resolveCacheFile(Path lib)
+{
     std::replace(lib.begin(), lib.end(), '/', '%');
     return cacheDir + "/" + lib;
 }
 
-std::set<string> readCacheFile(const Path & file) {
+std::set<string> readCacheFile(const Path & file)
+{
     return tokenizeString<set<string>>(readFile(file), "\n");
 }
 
-void writeCacheFile(const Path & file, std::set<string> & deps) {
+void writeCacheFile(const Path & file, std::set<string> & deps)
+{
     std::ofstream fp;
     fp.open(file);
-    for (auto & d : deps) {
+    for (auto & d : deps)
         fp << d << "\n";
-    }
     fp.close();
 }
 
-std::string findDylibName(bool should_swap, ptrdiff_t dylib_command_start) {
+std::string findDylibName(bool should_swap, ptrdiff_t dylib_command_start)
+{
     struct dylib_command *dylc = (struct dylib_command*)dylib_command_start;
     return std::string((char*)(dylib_command_start + DO_SWAP(should_swap, dylc->dylib.name.offset)));
 }
 
-std::set<std::string> runResolver(const Path & filename) {
-    int fd = open(filename.c_str(), O_RDONLY);
-    struct stat s;
-    fstat(fd, &s);
-    void *obj = mmap(NULL, s.st_size, PROT_READ, MAP_SHARED, fd, 0);
+std::set<std::string> runResolver(const Path & filename)
+{
+    AutoCloseFD fd = open(filename.c_str(), O_RDONLY);
+    if (!fd)
+        throw SysError("opening ‘%s’", filename);
+
+    struct stat st;
+    if (fstat(fd.get(), &st))
+        throw SysError("statting ‘%s’", filename);
+
+    if (st.st_size < sizeof(mach_header_64)) {
+        printError("file ‘%s’ is too short for a MACH binary", filename);
+        return {};
+    }
+
+    void *obj = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED, fd.get(), 0);
+    if (!obj)
+        throw SysError("mmapping ‘%s’", filename);
 
     ptrdiff_t mach64_offset = 0;
 
-    uint32_t magic = ((struct mach_header_64*)obj)->magic;
-    if(magic == FAT_CIGAM || magic == FAT_MAGIC) {
+    uint32_t magic = ((struct mach_header_64*) obj)->magic;
+    if (magic == FAT_CIGAM || magic == FAT_MAGIC) {
         bool should_swap = magic == FAT_CIGAM;
         uint32_t narches = DO_SWAP(should_swap, ((struct fat_header*)obj)->nfat_arch);
 
-        for(uint32_t iter = 0; iter < narches; iter++) {
+        for (uint32_t iter = 0; iter < narches; iter++) {
             ptrdiff_t header_offset = (ptrdiff_t)obj + sizeof(struct fat_header) * (iter + 1);
             struct fat_arch* arch = (struct fat_arch*)header_offset;
-            if(DO_SWAP(should_swap, arch->cputype) == CPU_TYPE_X86_64) {
+            if (DO_SWAP(should_swap, arch->cputype) == CPU_TYPE_X86_64) {
                 mach64_offset = (ptrdiff_t)DO_SWAP(should_swap, arch->offset);
                 break;
             }
         }
         if (mach64_offset == 0) {
             printError(format("Could not find any mach64 blobs in file ‘%1%’, continuing...") % filename);
-            return std::set<string>();
+            return {};
         }
     } else if (magic == MH_MAGIC_64 || magic == MH_CIGAM_64) {
         mach64_offset = 0;
     } else {
         printError(format("Object file has unknown magic number ‘%1%’, skipping it...") % magic);
-        return std::set<string>();
+        return {};
     }
 
     ptrdiff_t mach_header_offset = (ptrdiff_t)obj + mach64_offset;
@@ -94,30 +110,28 @@ std::set<std::string> runResolver(const Path & filename) {
     return libs;
 }
 
-bool isSymlink(const Path & path) {
+bool isSymlink(const Path & path)
+{
     struct stat st;
-    if(lstat(path.c_str(), &st))
-        throw SysError(format("getting attributes of path ‘%1%’") % path);
+    if (lstat(path.c_str(), &st) == -1)
+        throw SysError("getting attributes of path ‘%1%’", path);
 
     return S_ISLNK(st.st_mode);
 }
 
-Path resolveSymlink(const Path & path) {
-    char buf[PATH_MAX];
-    ssize_t len = readlink(path.c_str(), buf, sizeof(buf) - 1);
-    if(len != -1) {
-        buf[len] = 0;
-        return Path(buf);
-    } else {
-        throw SysError(format("readlink('%1%')") % path);
-    }
+Path resolveSymlink(const Path & path)
+{
+    auto target = readLink(path);
+    return hasPrefix(target, "/")
+        ? target
+        : dirOf(path) + "/" + target;
 }
 
-std::set<string> resolveTree(const Path & path, PathSet & deps) {
+std::set<string> resolveTree(const Path & path, PathSet & deps)
+{
     std::set<string> results;
-    if(deps.find(path) != deps.end()) {
-        return std::set<string>();
-    }
+    if (deps.count(path))
+        return {};
     deps.insert(path);
     for (auto & lib : runResolver(path)) {
         results.insert(lib);
@@ -128,32 +142,33 @@ std::set<string> resolveTree(const Path & path, PathSet & deps) {
     return results;
 }
 
-std::set<string> getPath(const Path & path) {
-    Path cacheFile = resolveCacheFile(path);
-    if(pathExists(cacheFile)) {
-        return readCacheFile(cacheFile);
-    }
+std::set<string> getPath(const Path & path)
+{
+    if (hasPrefix(path, "/dev")) return {};
 
-    std::set<string> deps;
-    std::set<string> paths;
+    Path cacheFile = resolveCacheFile(path);
+    if (pathExists(cacheFile))
+        return readCacheFile(cacheFile);
+
+    std::set<string> deps, paths;
     paths.insert(path);
 
-    Path next_path = Path(path);
-    while(isSymlink(next_path)) {
-        next_path = resolveSymlink(next_path);
-        paths.insert(next_path);
+    Path nextPath(path);
+    while (isSymlink(nextPath)) {
+        nextPath = resolveSymlink(nextPath);
+        paths.insert(nextPath);
     }
 
-    for(auto & t : resolveTree(next_path, deps)) {
+    for (auto & t : resolveTree(nextPath, deps))
         paths.insert(t);
-    }
 
     writeCacheFile(cacheFile, paths);
 
     return paths;
 }
 
-int main(int argc, char ** argv) {
+int main(int argc, char ** argv)
+{
     return handleExceptions(argv[0], [&]() {
         initNix();
 
@@ -177,18 +192,15 @@ int main(int argc, char ** argv) {
         auto drv = store->derivationFromPath(Path(argv[1]));
         Strings impurePaths = tokenizeString<Strings>(get(drv.env, "__impureHostDeps"));
 
-        std::set<string> all_paths;
+        std::set<string> allPaths;
 
-        for (auto & path : impurePaths) {
-            for(auto & p : getPath(path)) {
-                all_paths.insert(p);
-            }
-        }
+        for (auto & path : impurePaths)
+            for (auto & p : getPath(path))
+                allPaths.insert(p);
 
         std::cout << "extra-chroot-dirs" << std::endl;
-        for(auto & path : all_paths) {
+        for (auto & path : allPaths)
             std::cout << path << std::endl;
-        }
         std::cout << std::endl;
     });
 }
