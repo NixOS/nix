@@ -48,8 +48,8 @@ perl/Makefile.config
 /src/libexpr/nix.tbl
 
 # /src/libstore/
-/src/libstore/schema.sql.hh
-/src/libstore/sandbox-defaults.sb
+/src/libstore/schema.sql.gen.hh
+/src/libstore/sandbox-defaults.sb.gen.hh
 
 /src/nix/nix
 

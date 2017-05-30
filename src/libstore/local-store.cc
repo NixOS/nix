@@ -320,7 +320,7 @@ void LocalStore::openDB(State & state, bool create)
     /* Initialise the database schema, if necessary. */
     if (create) {
         const char * schema =
-#include "schema.sql.hh"
+#include "schema.sql.gen.hh"
             ;
         db.exec(schema);
     }

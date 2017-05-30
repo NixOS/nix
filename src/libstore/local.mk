@@ -34,12 +34,16 @@ libstore_CXXFLAGS = \
  -DSANDBOX_SHELL="\"$(sandbox_shell)\"" \
  -DLSOF=\"$(lsof)\"
 
-$(d)/local-store.cc: $(d)/schema.sql.hh
+$(d)/local-store.cc: $(d)/schema.sql.gen.hh
 
-%.sql.hh: %.sql
-	$(trace-gen) sed -e 's/"/\\"/g' -e 's/\(.*\)/"\1\\n"/' < $< > $@ || (rm $@ && exit 1)
+$(d)/build.cc: $(d)/sandbox-defaults.sb.gen.hh
 
-clean-files += $(d)/schema.sql.hh
+%.gen.hh: %
+	echo 'R"foo(' >> $@.tmp
+	cat $< >> $@.tmp
+	echo ')foo"' >> $@.tmp
+	mv $@.tmp $@
+
+clean-files += $(d)/schema.sql.gen.hh $(d)/sandbox-defaults.sb.gen.hh
 
 $(eval $(call install-file-in, $(d)/nix-store.pc, $(prefix)/lib/pkgconfig, 0644))
-$(eval $(call install-file-in, $(d)/sandbox-defaults.sb, $(datadir)/nix, 0644))

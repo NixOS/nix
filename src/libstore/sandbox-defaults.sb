@@ -28,15 +28,10 @@
 (allow file-read-metadata
        (literal "/var")
        (literal "/tmp")
-       ; symlinks
-       (literal "@sysconfdir@")
-       (literal "@sysconfdir@/nix")
-       (literal "@sysconfdir@/nix/nix.conf")
        (literal "/etc/resolv.conf")
        (literal "/private/etc/resolv.conf"))
 
 (allow file-read*
-       (literal "/private@sysconfdir@/nix/nix.conf")
        (literal "/private/var/run/resolv.conf"))
 
 ; some builders use filehandles other than stdin/stdout
@@ -61,3 +56,7 @@
 
 ; allow local networking
 (allow network* (local ip) (remote unix-socket))
+
+; Disallow creating setuid/setgid binaries, since that
+; would allow breaking build user isolation.
+(deny file-write-setugid)
