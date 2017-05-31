@@ -1732,9 +1732,6 @@ void DerivationGoal::startBuilder()
        directory. */
 #if __linux__
     tmpDirInSandbox = useChroot ? settings.sandboxBuildDir : tmpDir;
-#elif __APPLE__
-    // On Darwin, we canonize /tmp because its probably a symlink to /private/tmp.
-    tmpDirInSandbox = useChroot ? canonPath("/tmp", true) + "/nix-build-" + drvName + "-0" : tmpDir;
 #else
     tmpDirInSandbox = tmpDir;
 #endif
