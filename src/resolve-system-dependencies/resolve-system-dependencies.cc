@@ -28,15 +28,6 @@ std::set<string> readCacheFile(const Path & file)
     return tokenizeString<set<string>>(readFile(file), "\n");
 }
 
-void writeCacheFile(const Path & file, std::set<string> & deps)
-{
-    std::ofstream fp;
-    fp.open(file);
-    for (auto & d : deps)
-        fp << d << "\n";
-    fp.close();
-}
-
 std::string findDylibName(bool should_swap, ptrdiff_t dylib_command_start)
 {
     struct dylib_command *dylc = (struct dylib_command*)dylib_command_start;
@@ -167,7 +158,7 @@ std::set<string> getPath(const Path & path)
     for (auto & t : resolveTree(nextPath, deps))
         paths.insert(t);
 
-    writeCacheFile(cacheFile, paths);
+    writeFile(cacheFile, concatStringsSep("\n", paths));
 
     return paths;
 }
