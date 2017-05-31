@@ -50,6 +50,7 @@ perl/Makefile.config
 # /src/libstore/
 /src/libstore/schema.sql.gen.hh
 /src/libstore/sandbox-defaults.sb.gen.hh
+/src/libstore/sandbox-network.sb.gen.hh
 
 /src/nix/nix
 

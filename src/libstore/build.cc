@@ -2614,8 +2614,9 @@ void DerivationGoal::runChild()
         string sandboxProfile;
         if (drv->isBuiltin()) {
             ;
+        }
 #if __APPLE__
-        } else if (useChroot) {
+        else if (useChroot) {
             /* Lots and lots and lots of file functions freak out if they can't stat their full ancestry */
             PathSet ancestry;
 
@@ -2653,8 +2654,13 @@ void DerivationGoal::runChild()
             }
 
             sandboxProfile +=
-#include "sandbox-defaults.sb.gen.hh"
+                #include "sandbox-defaults.sb.gen.hh"
                 ;
+
+            if (fixedOutput)
+                sandboxProfile +=
+                    #include "sandbox-network.sb.gen.hh"
+                    ;
 
             /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different mechanisms
                to find temporary directories, so we want to open up a broader place for them to dump their files, if needed. */
@@ -2718,8 +2724,9 @@ void DerivationGoal::runChild()
             args.push_back("-D");
             args.push_back("_GLOBAL_TMP_DIR=" + globalTmpDir);
             args.push_back(drv->builder);
+        }
 #endif
-        } else {
+        else {
             builder = drv->builder.c_str();
             string builderBasename = baseNameOf(drv->builder);
             args.push_back(builderBasename);

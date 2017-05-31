@@ -1,0 +1,16 @@
+; Allow local and remote network traffic.
+(allow network* (local ip) (remote ip))
+
+; Allow access to /etc/resolv.conf (which is a symlink to
+; /private/var/run/resolv.conf).
+(allow file-read-metadata
+       (literal "/var")
+       (literal "/etc")
+       (literal "/etc/resolv.conf")
+       (literal "/private/etc/resolv.conf"))
+
+(allow file-read*
+       (literal "/private/var/run/resolv.conf"))
+
+; Allow DNS lookups.
+(allow network-outbound (remote unix-socket (path-literal "/private/var/run/mDNSResponder")))

@@ -36,14 +36,14 @@ libstore_CXXFLAGS = \
 
 $(d)/local-store.cc: $(d)/schema.sql.gen.hh
 
-$(d)/build.cc: $(d)/sandbox-defaults.sb.gen.hh
+$(d)/build.cc: $(d)/sandbox-defaults.sb.gen.hh $(d)/sandbox-network.sb.gen.hh
 
 %.gen.hh: %
-	echo 'R"foo(' >> $@.tmp
-	cat $< >> $@.tmp
-	echo ')foo"' >> $@.tmp
-	mv $@.tmp $@
+	@echo 'R"foo(' >> $@.tmp
+	$(trace-gen) cat $< >> $@.tmp
+	@echo ')foo"' >> $@.tmp
+	@mv $@.tmp $@
 
-clean-files += $(d)/schema.sql.gen.hh $(d)/sandbox-defaults.sb.gen.hh
+clean-files += $(d)/schema.sql.gen.hh $(d)/sandbox-defaults.sb.gen.hh $(d)/sandbox-network.sb.gen.hh
 
 $(eval $(call install-file-in, $(d)/nix-store.pc, $(prefix)/lib/pkgconfig, 0644))
