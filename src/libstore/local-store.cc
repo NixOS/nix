@@ -595,8 +595,6 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
         for (auto & eaName: tokenizeString<Strings>(std::string(eaBuf.data(), eaSize), std::string("\000", 1)))
             if (lremovexattr(path.c_str(), eaName.c_str()) == -1)
                 throw SysError("removing extended attribute ‘%s’ from ‘%s’", eaName, path);
-
-        assert(llistxattr(path.c_str(), nullptr, 0) == 0);
     }
 #endif
 
