@@ -28,12 +28,6 @@ std::set<string> readCacheFile(const Path & file)
     return tokenizeString<set<string>>(readFile(file), "\n");
 }
 
-std::string findDylibName(bool should_swap, ptrdiff_t dylib_command_start)
-{
-    struct dylib_command *dylc = (struct dylib_command*)dylib_command_start;
-    return std::string((char*)(dylib_command_start + DO_SWAP(should_swap, dylc->dylib.name.offset)));
-}
-
 std::set<std::string> runResolver(const Path & filename)
 {
     AutoCloseFD fd = open(filename.c_str(), O_RDONLY);
@@ -54,22 +48,20 @@ std::set<std::string> runResolver(const Path & filename)
         return {};
     }
 
-    void *obj = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED, fd.get(), 0);
+    char* obj = (char*) mmap(NULL, st.st_size, PROT_READ, MAP_SHARED, fd.get(), 0);
     if (!obj)
         throw SysError("mmapping ‘%s’", filename);
 
     ptrdiff_t mach64_offset = 0;
 
-    uint32_t magic = ((struct mach_header_64*) obj)->magic;
+    uint32_t magic = ((mach_header_64*) obj)->magic;
     if (magic == FAT_CIGAM || magic == FAT_MAGIC) {
         bool should_swap = magic == FAT_CIGAM;
-        uint32_t narches = DO_SWAP(should_swap, ((struct fat_header*)obj)->nfat_arch);
-
-        for (uint32_t iter = 0; iter < narches; iter++) {
-            ptrdiff_t header_offset = (ptrdiff_t)obj + sizeof(struct fat_header) * (iter + 1);
-            struct fat_arch* arch = (struct fat_arch*)header_offset;
+        uint32_t narches = DO_SWAP(should_swap, ((fat_header *) obj)->nfat_arch);
+        for (uint32_t i = 0; i < narches; i++) {
+            fat_arch* arch = (fat_arch*) (obj + sizeof(fat_header) + sizeof(fat_arch) * i);
             if (DO_SWAP(should_swap, arch->cputype) == CPU_TYPE_X86_64) {
-                mach64_offset = (ptrdiff_t)DO_SWAP(should_swap, arch->offset);
+                mach64_offset = (ptrdiff_t) DO_SWAP(should_swap, arch->offset);
                 break;
             }
         }
@@ -84,20 +76,19 @@ std::set<std::string> runResolver(const Path & filename)
         return {};
     }
 
-    ptrdiff_t mach_header_offset = (ptrdiff_t)obj + mach64_offset;
-    struct mach_header_64 *m_header = (struct mach_header_64 *)mach_header_offset;
+    mach_header_64 * m_header = (mach_header_64 *) (obj + mach64_offset);
 
     bool should_swap = magic == MH_CIGAM_64;
-    ptrdiff_t cmd_offset = mach_header_offset + sizeof(struct mach_header_64);
+    ptrdiff_t cmd_offset = mach64_offset + sizeof(mach_header_64);
 
     std::set<string> libs;
-    for(uint32_t i = 0; i < DO_SWAP(should_swap, m_header->ncmds); i++) {
-        struct load_command *cmd = (struct load_command*)cmd_offset;
+    for (uint32_t i = 0; i < DO_SWAP(should_swap, m_header->ncmds); i++) {
+        load_command * cmd = (load_command *) (obj + cmd_offset);
         switch(DO_SWAP(should_swap, cmd->cmd)) {
             case LC_LOAD_UPWARD_DYLIB:
             case LC_LOAD_DYLIB:
             case LC_REEXPORT_DYLIB:
-                libs.insert(findDylibName(should_swap, cmd_offset));
+                libs.insert(std::string((char *) cmd + ((dylib_command*) cmd)->dylib.name.offset));
                 break;
         }
         cmd_offset += DO_SWAP(should_swap, cmd->cmdsize);
@@ -185,8 +176,15 @@ int main(int argc, char ** argv)
 
         auto store = openStore();
 
-        auto drv = store->derivationFromPath(Path(argv[1]));
-        Strings impurePaths = tokenizeString<Strings>(get(drv.env, "__impureHostDeps"));
+        StringSet impurePaths;
+
+        if (std::string(argv[1]) == "--test")
+            impurePaths.insert(argv[2]);
+        else {
+            auto drv = store->derivationFromPath(Path(argv[1]));
+            impurePaths = tokenizeString<StringSet>(get(drv.env, "__impureHostDeps"));
+            impurePaths.insert("/usr/lib/libSystem.dylib");
+        }
 
         std::set<string> allPaths;
 
