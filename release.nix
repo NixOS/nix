@@ -156,7 +156,7 @@ let
         src = tarball;
 
         buildInputs =
-          [ curl perl bzip2 openssl pkgconfig sqlite xz libsodium
+          [ curl perl bzip2 openssl pkgconfig sqlite xz libsodium libseccomp
             # These are for "make check" only:
             graphviz libxml2 libxslt
           ];
