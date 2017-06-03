@@ -1,0 +1,4 @@
+sudo: required
+before_install: ./travis-test.sh nix
+install: ./travis-test.sh install
+script: ./travis-test.sh check
