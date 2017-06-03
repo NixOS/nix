@@ -298,6 +298,46 @@ public:
     /* Check the integrity of the Nix store.  Returns true if errors
        remain. */
     virtual bool verifyStore(bool checkContents, bool repair) = 0;
+
+    /* In rare circumstances, such as addToStore with a PathFilter
+     * that does an import-from-derivation, the execution of a store
+     * command may execute an unrelated store command on the way to
+     * completing the outer command. Some stores, such as DaemonStores,
+     * need special treatment to do this kind of nesting safely.
+     */
+    virtual void nest() {}
+    virtual void unNest() noexcept {}
+    class NestStore {
+        StoreAPI * store;
+        void cleanup () noexcept
+        {
+            if (store)
+                store->unNest();
+        }
+    public:
+        NestStore(StoreAPI * store) : store{store}
+        {
+            if (store)
+                store->nest();
+        }
+        NestStore(const NestStore &) = delete;
+        NestStore(NestStore&& that) : store{that.store}
+        {
+            that.store = nullptr;
+        }
+        NestStore & operator=(const NestStore &) = delete;
+        NestStore & operator=(NestStore&& that)
+        {
+            cleanup();
+            store = that.store;
+            that.store = nullptr;
+            return *this;
+        }
+        ~NestStore() { cleanup(); }
+    };
+    /* RAII nesting */
+    NestStore scopedNest() { return NestStore(this); }
+
 };
 
 

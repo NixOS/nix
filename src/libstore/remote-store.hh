@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <stack>
 
 #include "store-api.hh"
 
@@ -90,12 +91,25 @@ public:
 
     bool verifyStore(bool checkContents, bool repair) override;
 
+    void nest() override;
+    void unNest() noexcept override;
+
+
 private:
     AutoCloseFD fdSocket;
     FdSink to;
     FdSource from;
     unsigned int daemonVersion;
     bool initialised;
+    struct State {
+        AutoCloseFD fdSocket;
+        FdSink to;
+        FdSource from;
+        unsigned int daemonVersion;
+        State(RemoteStore & st) :
+	  fdSocket{st.fdSocket.borrow()}, to{std::move(st.to)}, from{std::move(st.from)}, daemonVersion{st.daemonVersion} {}
+    };
+    std::stack<State> nested_states;
 
     void openConnection(bool reserveSpace = true);
 

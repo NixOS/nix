@@ -17,6 +17,18 @@ BufferedSink::~BufferedSink()
 }
 
 
+BufferedSink & BufferedSink::operator=(BufferedSink && that)
+{
+    delete[] buffer;
+    bufSize = that.bufSize;
+    bufPos = that.bufPos;
+    buffer = that.buffer;
+    that.buffer = nullptr;
+    that.bufPos = 0;
+    return *this;
+}
+
+
 void BufferedSink::operator () (const unsigned char * data, size_t len)
 {
     if (!buffer) buffer = new unsigned char[bufSize];
@@ -88,6 +100,18 @@ void Source::operator () (unsigned char * data, size_t len)
 BufferedSource::~BufferedSource()
 {
     delete[] buffer;
+}
+
+
+BufferedSource & BufferedSource::operator=(BufferedSource && that)
+{
+    delete[] buffer;
+    bufSize = that.bufSize;
+    bufPosIn = that.bufPosIn;
+    bufPosOut = that.bufPosOut;
+    buffer = that.buffer;
+    that.buffer = nullptr;
+    return *this;
 }
 
 
