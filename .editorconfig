@@ -1,0 +1,26 @@
+# EditorConfig configuration for nix
+# http://EditorConfig.org
+
+# Top-most EditorConfig file
+root = true
+
+# Unix-style newlines with a newline ending every file, utf-8 charset
+[*]
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+charset = utf-8
+
+# Match nix files, set indent to spaces with width of two
+[*.nix]
+indent_style = space
+indent_size = 2
+
+# Match c++/shell/perl, set indent to spaces with width of four
+[*.{hpp,cc,hh,sh,pl}]
+indent_style = space
+indent_size = 4
+
+# Match diffs, avoid to trim trailing whitespace
+[*.{diff,patch}]
+trim_trailing_whitespace = false
