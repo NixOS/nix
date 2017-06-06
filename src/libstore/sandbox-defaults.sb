@@ -1,5 +1,7 @@
 (define TMPDIR (param "_GLOBAL_TMP_DIR"))
 
+(deny default)
+
 ; Disallow creating setuid/setgid binaries, since that
 ; would allow breaking build user isolation.
 (deny file-write-setugid)

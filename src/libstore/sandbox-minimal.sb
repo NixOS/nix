@@ -1,0 +1,5 @@
+(allow default)
+
+; Disallow creating setuid/setgid binaries, since that
+; would allow breaking build user isolation.
+(deny file-write-setugid)

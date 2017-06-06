@@ -2611,104 +2611,102 @@ void DerivationGoal::runChild()
 
         const char *builder = "invalid";
 
-        string sandboxProfile;
         if (drv->isBuiltin()) {
             ;
         }
 #if __APPLE__
-        else if (useChroot) {
-            /* Lots and lots and lots of file functions freak out if they can't stat their full ancestry */
-            PathSet ancestry;
+        else {
+            /* This has to appear before import statements. */
+            std::string sandboxProfile = "(version 1)\n";
 
-            /* We build the ancestry before adding all inputPaths to the store because we know they'll
-               all have the same parents (the store), and there might be lots of inputs. This isn't
-               particularly efficient... I doubt it'll be a bottleneck in practice */
-            for (auto & i : dirsInChroot) {
-                Path cur = i.first;
-                while (cur.compare("/") != 0) {
-                    cur = dirOf(cur);
-                    ancestry.insert(cur);
+            if (useChroot) {
+
+                /* Lots and lots and lots of file functions freak out if they can't stat their full ancestry */
+                PathSet ancestry;
+
+                /* We build the ancestry before adding all inputPaths to the store because we know they'll
+                   all have the same parents (the store), and there might be lots of inputs. This isn't
+                   particularly efficient... I doubt it'll be a bottleneck in practice */
+                for (auto & i : dirsInChroot) {
+                    Path cur = i.first;
+                    while (cur.compare("/") != 0) {
+                        cur = dirOf(cur);
+                        ancestry.insert(cur);
+                    }
                 }
-            }
 
-            /* And we want the store in there regardless of how empty dirsInChroot. We include the innermost
-               path component this time, since it's typically /nix/store and we care about that. */
-            Path cur = worker.store.storeDir;
-            while (cur.compare("/") != 0) {
-                ancestry.insert(cur);
-                cur = dirOf(cur);
-            }
+                /* And we want the store in there regardless of how empty dirsInChroot. We include the innermost
+                   path component this time, since it's typically /nix/store and we care about that. */
+                Path cur = worker.store.storeDir;
+                while (cur.compare("/") != 0) {
+                    ancestry.insert(cur);
+                    cur = dirOf(cur);
+                }
 
-            /* Add all our input paths to the chroot */
-            for (auto & i : inputPaths)
-                dirsInChroot[i] = i;
+                /* Add all our input paths to the chroot */
+                for (auto & i : inputPaths)
+                    dirsInChroot[i] = i;
 
-            /* This has to appear before import statements */
-            sandboxProfile += "(version 1)\n";
+                /* Violations will go to the syslog if you set this. Unfortunately the destination does not appear to be configurable */
+                if (settings.darwinLogSandboxViolations) {
+                    sandboxProfile += "(deny default)\n";
+                } else {
+                    sandboxProfile += "(deny default (with no-log))\n";
+                }
 
-            /* Violations will go to the syslog if you set this. Unfortunately the destination does not appear to be configurable */
-            if (settings.darwinLogSandboxViolations) {
-                sandboxProfile += "(deny default)\n";
-            } else {
-                sandboxProfile += "(deny default (with no-log))\n";
-            }
-
-            sandboxProfile +=
-                #include "sandbox-defaults.sb.gen.hh"
-                ;
-
-            if (fixedOutput)
                 sandboxProfile +=
-                    #include "sandbox-network.sb.gen.hh"
+                    #include "sandbox-defaults.sb.gen.hh"
                     ;
 
-            /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different mechanisms
-               to find temporary directories, so we want to open up a broader place for them to dump their files, if needed. */
-            Path globalTmpDir = canonPath(getEnv("TMPDIR", "/tmp"), true);
+                if (fixedOutput)
+                    sandboxProfile +=
+                        #include "sandbox-network.sb.gen.hh"
+                        ;
 
-            /* They don't like trailing slashes on subpath directives */
-            if (globalTmpDir.back() == '/') globalTmpDir.pop_back();
-
-            /* Our rwx outputs */
-            sandboxProfile += "(allow file-read* file-write* process-exec\n";
-            for (auto & i : missingPaths) {
-                sandboxProfile += (format("\t(subpath \"%1%\")\n") % i.c_str()).str();
-            }
-            sandboxProfile += ")\n";
-
-            /* Our inputs (transitive dependencies and any impurities computed above)
-
-               without file-write* allowed, access() incorrectly returns EPERM
-             */
-            sandboxProfile += "(allow file-read* file-write* process-exec\n";
-            for (auto & i : dirsInChroot) {
-                if (i.first != i.second.source)
-                    throw Error(format(
-                        "can't map '%1%' to '%2%': mismatched impure paths not supported on Darwin")
-                        % i.first % i.second.source);
-
-                string path = i.first;
-                struct stat st;
-                if (lstat(path.c_str(), &st)) {
-                    if (i.second.optional && errno == ENOENT)
-                        continue;
-                    throw SysError(format("getting attributes of path ‘%1%’") % path);
+                /* Our rwx outputs */
+                sandboxProfile += "(allow file-read* file-write* process-exec\n";
+                for (auto & i : missingPaths) {
+                    sandboxProfile += (format("\t(subpath \"%1%\")\n") % i.c_str()).str();
                 }
-                if (S_ISDIR(st.st_mode))
-                    sandboxProfile += (format("\t(subpath \"%1%\")\n") % path).str();
-                else
-                    sandboxProfile += (format("\t(literal \"%1%\")\n") % path).str();
-            }
-            sandboxProfile += ")\n";
+                sandboxProfile += ")\n";
 
-            /* Allow file-read* on full directory hierarchy to self. Allows realpath() */
-            sandboxProfile += "(allow file-read*\n";
-            for (auto & i : ancestry) {
-                sandboxProfile += (format("\t(literal \"%1%\")\n") % i.c_str()).str();
-            }
-            sandboxProfile += ")\n";
+                /* Our inputs (transitive dependencies and any impurities computed above)
 
-            sandboxProfile += additionalSandboxProfile;
+                   without file-write* allowed, access() incorrectly returns EPERM
+                 */
+                sandboxProfile += "(allow file-read* file-write* process-exec\n";
+                for (auto & i : dirsInChroot) {
+                    if (i.first != i.second.source)
+                        throw Error(format(
+                            "can't map '%1%' to '%2%': mismatched impure paths not supported on Darwin")
+                            % i.first % i.second.source);
+
+                    string path = i.first;
+                    struct stat st;
+                    if (lstat(path.c_str(), &st)) {
+                        if (i.second.optional && errno == ENOENT)
+                            continue;
+                        throw SysError(format("getting attributes of path ‘%1%’") % path);
+                    }
+                    if (S_ISDIR(st.st_mode))
+                        sandboxProfile += (format("\t(subpath \"%1%\")\n") % path).str();
+                    else
+                        sandboxProfile += (format("\t(literal \"%1%\")\n") % path).str();
+                }
+                sandboxProfile += ")\n";
+
+                /* Allow file-read* on full directory hierarchy to self. Allows realpath() */
+                sandboxProfile += "(allow file-read*\n";
+                for (auto & i : ancestry) {
+                    sandboxProfile += (format("\t(literal \"%1%\")\n") % i.c_str()).str();
+                }
+                sandboxProfile += ")\n";
+
+                sandboxProfile += additionalSandboxProfile;
+            } else
+                sandboxProfile +=
+                    #include "sandbox-minimal.sb.gen.hh"
+                    ;
 
             debug("Generated sandbox profile:");
             debug(sandboxProfile);
@@ -2716,6 +2714,13 @@ void DerivationGoal::runChild()
             Path sandboxFile = tmpDir + "/.sandbox.sb";
 
             writeFile(sandboxFile, sandboxProfile);
+
+            /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different mechanisms
+               to find temporary directories, so we want to open up a broader place for them to dump their files, if needed. */
+            Path globalTmpDir = canonPath(getEnv("TMPDIR", "/tmp"), true);
+
+            /* They don't like trailing slashes on subpath directives */
+            if (globalTmpDir.back() == '/') globalTmpDir.pop_back();
 
             builder = "/usr/bin/sandbox-exec";
             args.push_back("sandbox-exec");
@@ -2725,12 +2730,13 @@ void DerivationGoal::runChild()
             args.push_back("_GLOBAL_TMP_DIR=" + globalTmpDir);
             args.push_back(drv->builder);
         }
-#endif
+#else
         else {
             builder = drv->builder.c_str();
             string builderBasename = baseNameOf(drv->builder);
             args.push_back(builderBasename);
         }
+#endif
 
         for (auto & i : drv->args)
             args.push_back(rewriteStrings(i, inputRewrites));
