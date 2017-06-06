@@ -1895,7 +1895,13 @@ void DerivationGoal::startBuilder()
     /* If `build-users-group' is not empty, then we have to build as
        one of the members of that group. */
     if (settings.buildUsersGroup != "") {
+#if defined(__linux__) || defined(__APPLE__)
         buildUser.acquire();
+#else
+        /* Don't know how to block the creation of setuid/setgid
+           binaries on this platform. */
+        throw Error("build users are not supported on this platform for security reasons");
+#endif
         assert(buildUser.getUID() != 0);
         assert(buildUser.getGID() != 0);
 
