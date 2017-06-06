@@ -2318,7 +2318,7 @@ void DerivationGoal::runChild()
         try {
             setupSeccomp();
         } catch (...) {
-            if (buildUser) throw;
+            if (buildUser.enabled()) throw;
         }
 
 #if __linux__
