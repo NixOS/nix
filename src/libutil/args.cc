@@ -3,6 +3,18 @@
 
 namespace nix {
 
+Args::FlagMaker Args::mkFlag()
+{
+    return FlagMaker(*this);
+}
+
+Args::FlagMaker::~FlagMaker()
+{
+    assert(flag->longName != "");
+    args.longFlags[flag->longName] = flag;
+    if (flag->shortName) args.shortFlags[flag->shortName] = flag;
+}
+
 void Args::parseCmdline(const Strings & _cmdline)
 {
     Strings pendingArgs;
@@ -71,11 +83,13 @@ void Args::printHelp(const string & programName, std::ostream & out)
 void Args::printFlags(std::ostream & out)
 {
     Table2 table;
-    for (auto & flag : longFlags)
+    for (auto & flag : longFlags) {
+        if (hiddenCategories.count(flag.second->category)) continue;
         table.push_back(std::make_pair(
-                (flag.second.shortName ? std::string("-") + flag.second.shortName + ", " : "    ")
-                + "--" + flag.first + renderLabels(flag.second.labels),
-                flag.second.description));
+                (flag.second->shortName ? std::string("-") + flag.second->shortName + ", " : "    ")
+                + "--" + flag.first + renderLabels(flag.second->labels),
+                flag.second->description));
+    }
     printTable(out, table);
 }
 
@@ -99,14 +113,14 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
     if (string(*pos, 0, 2) == "--") {
         auto i = longFlags.find(string(*pos, 2));
         if (i == longFlags.end()) return false;
-        return process("--" + i->first, i->second);
+        return process("--" + i->first, *i->second);
     }
 
     if (string(*pos, 0, 1) == "-" && pos->size() == 2) {
         auto c = (*pos)[1];
         auto i = shortFlags.find(c);
         if (i == shortFlags.end()) return false;
-        return process(std::string("-") + c, i->second);
+        return process(std::string("-") + c, *i->second);
     }
 
     return false;

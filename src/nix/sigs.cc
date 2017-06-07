@@ -13,8 +13,13 @@ struct CmdCopySigs : StorePathsCommand
 
     CmdCopySigs()
     {
-        mkFlag('s', "substituter", {"store-uri"}, "use signatures from specified store", 1,
-            [&](Strings ss) { substituterUris.push_back(ss.front()); });
+        mkFlag()
+            .longName("substituter")
+            .shortName('s')
+            .labels({"store-uri"})
+            .description("use signatures from specified store")
+            .arity(1)
+            .handler([&](Strings ss) { substituterUris.push_back(ss.front()); });
     }
 
     std::string name() override

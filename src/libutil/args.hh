@@ -29,15 +29,18 @@ protected:
     /* Flags. */
     struct Flag
     {
-        char shortName;
+        typedef std::shared_ptr<Flag> ptr;
+        std::string longName;
+        char shortName = 0;
         std::string description;
         Strings labels;
-        size_t arity;
+        size_t arity = 0;
         std::function<void(Strings)> handler;
+        std::string category;
     };
 
-    std::map<std::string, Flag> longFlags;
-    std::map<char, Flag> shortFlags;
+    std::map<std::string, Flag::ptr> longFlags;
+    std::map<char, Flag::ptr> shortFlags;
 
     virtual bool processFlag(Strings::iterator & pos, Strings::iterator end);
 
@@ -55,33 +58,53 @@ protected:
 
     virtual bool processArgs(const Strings & args, bool finish);
 
+    std::set<std::string> hiddenCategories;
+
 public:
+
+    class FlagMaker
+    {
+        Args & args;
+        Flag::ptr flag;
+        friend class Args;
+        FlagMaker(Args & args) : args(args), flag(std::make_shared<Flag>()) { };
+    public:
+        ~FlagMaker();
+        FlagMaker & longName(const std::string & s) { flag->longName = s; return *this; };
+        FlagMaker & shortName(char s) { flag->shortName = s; return *this; };
+        FlagMaker & description(const std::string & s) { flag->description = s; return *this; };
+        FlagMaker & labels(const Strings & ls) { flag->labels = ls; return *this; };
+        FlagMaker & arity(size_t arity) { flag->arity = arity; return *this; };
+        FlagMaker & handler(std::function<void(Strings)> handler) { flag->handler = handler; return *this; };
+        FlagMaker & category(const std::string & s) { flag->category = s; return *this; };
+    };
+
+    FlagMaker mkFlag();
 
     /* Helper functions for constructing flags / positional
        arguments. */
 
     void mkFlag(char shortName, const std::string & longName,
-        const Strings & labels, const std::string & description,
-        size_t arity, std::function<void(Strings)> handler)
-    {
-        auto flag = Flag{shortName, description, labels, arity, handler};
-        if (shortName) shortFlags[shortName] = flag;
-        longFlags[longName] = flag;
-    }
-
-    void mkFlag(char shortName, const std::string & longName,
         const std::string & description, std::function<void()> fun)
     {
-        mkFlag(shortName, longName, {}, description, 0, std::bind(fun));
+        mkFlag()
+            .shortName(shortName)
+            .longName(longName)
+            .description(description)
+            .handler(std::bind(fun));
     }
 
     void mkFlag1(char shortName, const std::string & longName,
         const std::string & label, const std::string & description,
         std::function<void(std::string)> fun)
     {
-        mkFlag(shortName, longName, {label}, description, 1, [=](Strings ss) {
-            fun(ss.front());
-        });
+        mkFlag()
+            .shortName(shortName)
+            .longName(longName)
+            .labels({label})
+            .description(description)
+            .arity(1)
+            .handler([=](Strings ss) { fun(ss.front()); });
     }
 
     void mkFlag(char shortName, const std::string & name,
@@ -105,9 +128,11 @@ public:
     void mkFlag(char shortName, const std::string & longName, const std::string & description,
         T * dest, const T & value)
     {
-        mkFlag(shortName, longName, {}, description, 0, [=](Strings ss) {
-            *dest = value;
-        });
+        mkFlag()
+            .shortName(shortName)
+            .longName(longName)
+            .description(description)
+            .handler([=](Strings ss) { *dest = value; });
     }
 
     template<class I>
@@ -123,12 +148,18 @@ public:
     void mkFlag(char shortName, const std::string & longName,
         const std::string & description, std::function<void(I)> fun)
     {
-        mkFlag(shortName, longName, {"N"}, description, 1, [=](Strings ss) {
-            I n;
-            if (!string2Int(ss.front(), n))
-                throw UsageError(format("flag ‘--%1%’ requires a integer argument") % longName);
-            fun(n);
-        });
+        mkFlag()
+            .shortName(shortName)
+            .longName(longName)
+            .labels({"N"})
+            .description(description)
+            .arity(1)
+            .handler([=](Strings ss) {
+                I n;
+                if (!string2Int(ss.front(), n))
+                    throw UsageError(format("flag ‘--%1%’ requires a integer argument") % longName);
+                fun(n);
+            });
     }
 
     /* Expect a string argument. */

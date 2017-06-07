@@ -115,11 +115,11 @@ void Config::toJSON(JSONObject & out)
         }
 }
 
-void Config::convertToArgs(Args & args)
+void Config::convertToArgs(Args & args, const std::string & category)
 {
     for (auto & s : _settings)
         if (!s.second.isAlias)
-            s.second.setting->convertToArg(args);
+            s.second.setting->convertToArg(args, category);
 }
 
 AbstractSetting::AbstractSetting(
@@ -135,7 +135,7 @@ void AbstractSetting::toJSON(JSONPlaceholder & out)
     out.write(to_string());
 }
 
-void AbstractSetting::convertToArg(Args & args)
+void AbstractSetting::convertToArg(Args & args, const std::string & category)
 {
 }
 
@@ -146,9 +146,14 @@ void BaseSetting<T>::toJSON(JSONPlaceholder & out)
 }
 
 template<typename T>
-void BaseSetting<T>::convertToArg(Args & args)
+void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
 {
-    args.mkFlag(0, name, {}, description, 1, [=](Strings ss) { set(*ss.begin()); });
+    args.mkFlag()
+        .longName(name)
+        .description(description)
+        .arity(1)
+        .handler([=](Strings ss) { set(*ss.begin()); })
+        .category(category);
 }
 
 template<> void BaseSetting<std::string>::set(const std::string & str)
@@ -191,10 +196,18 @@ template<> std::string BaseSetting<bool>::to_string()
     return value ? "true" : "false";
 }
 
-template<> void BaseSetting<bool>::convertToArg(Args & args)
+template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string & category)
 {
-    args.mkFlag(0, name, {}, description, 0, [=](Strings ss) { value = true; });
-    args.mkFlag(0, "no-" + name, {}, description, 0, [=](Strings ss) { value = false; });
+    args.mkFlag()
+        .longName(name)
+        .description(description)
+        .handler([=](Strings ss) { value = true; })
+        .category(category);
+    args.mkFlag()
+        .longName("no-" + name)
+        .description(description)
+        .handler([=](Strings ss) { value = false; })
+        .category(category);
 }
 
 template<> void BaseSetting<Strings>::set(const std::string & str)

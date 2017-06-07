@@ -98,11 +98,23 @@ template<> void BaseSetting<SandboxMode>::toJSON(JSONPlaceholder & out)
     AbstractSetting::toJSON(out);
 }
 
-template<> void BaseSetting<SandboxMode>::convertToArg(Args & args)
+template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & category)
 {
-    args.mkFlag(0, name, {}, "Enable sandboxing.", 0, [=](Strings ss) { value = smEnabled; });
-    args.mkFlag(0, "no-" + name, {}, "Disable sandboxing.", 0, [=](Strings ss) { value = smDisabled; });
-    args.mkFlag(0, "relaxed-" + name, {}, "Enable sandboxing, but allow builds to disable it.", 0, [=](Strings ss) { value = smRelaxed; });
+    args.mkFlag()
+        .longName(name)
+        .description("Enable sandboxing.")
+        .handler([=](Strings ss) { value = smEnabled; })
+        .category(category);
+    args.mkFlag()
+        .longName("no-" + name)
+        .description("Disable sandboxing.")
+        .handler([=](Strings ss) { value = smDisabled; })
+        .category(category);
+    args.mkFlag()
+        .longName("relaxed-" + name)
+        .description("Enable sandboxing, but allow builds to disable it.")
+        .handler([=](Strings ss) { value = smRelaxed; })
+        .category(category);
 }
 
 void MaxBuildJobsSetting::set(const std::string & str)

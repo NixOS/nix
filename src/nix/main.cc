@@ -33,7 +33,9 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 
         mkFlag(0, "version", "show version information", std::bind(printVersion, programName));
 
-        settings.convertToArgs(*this);
+        std::string cat = "config";
+        settings.convertToArgs(*this, cat);
+        hiddenCategories.insert(cat);
     }
 
     void printFlags(std::ostream & out) override

@@ -18,8 +18,12 @@ MixCommonArgs::MixCommonArgs(const string & programName)
         verbosity = lvlDebug;
     });
 
-    mkFlag(0, "option", {"name", "value"}, "set a Nix configuration option (overriding nix.conf)", 2,
-        [](Strings ss) {
+    mkFlag()
+        .longName("option")
+        .labels({"name", "value"})
+        .description("set a Nix configuration option (overriding nix.conf)")
+        .arity(2)
+        .handler([](Strings ss) {
             auto name = ss.front(); ss.pop_front();
             auto value = ss.front();
             try {
