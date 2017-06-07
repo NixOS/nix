@@ -21,9 +21,29 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             throw Exit();
         });
 
+        mkFlag(0, "help-config", "show configuration options", [=]() {
+            std::cout << "The following configuration options are available:\n\n";
+            Table2 tbl;
+            for (const auto & s : settings._getSettings())
+                if (!s.second.isAlias)
+                    tbl.emplace_back(s.first, s.second.setting->description);
+            printTable(std::cout, tbl);
+            throw Exit();
+        });
+
         mkFlag(0, "version", "show version information", std::bind(printVersion, programName));
 
         settings.convertToArgs(*this);
+    }
+
+    void printFlags(std::ostream & out) override
+    {
+        Args::printFlags(out);
+        std::cout <<
+            "\n"
+            "In addition, most configuration settings can be overriden using ‘--<name> <value>’.\n"
+            "Boolean settings can be overriden using ‘--<name>’ or ‘--no-<name>’. See ‘nix\n"
+            "--help-config’ for a list of configuration settings.\n";
     }
 };
 

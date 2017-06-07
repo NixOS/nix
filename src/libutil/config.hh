@@ -31,6 +31,8 @@ class Config
 {
     friend class AbstractSetting;
 
+public:
+
     struct SettingData
     {
         bool isAlias;
@@ -40,7 +42,11 @@ class Config
         { }
     };
 
-    std::map<std::string, SettingData> _settings;
+    typedef std::map<std::string, SettingData> Settings;
+
+private:
+
+    Settings _settings;
 
     StringMap initials;
 
@@ -57,6 +63,8 @@ public:
     void warnUnknownSettings();
 
     StringMap getSettings(bool overridenOnly = false);
+
+    const Settings & _getSettings() { return _settings; }
 
     void applyConfigFile(const Path & path, bool fatal = false);
 

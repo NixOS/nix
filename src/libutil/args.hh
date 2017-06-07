@@ -41,7 +41,7 @@ protected:
 
     virtual bool processFlag(Strings::iterator & pos, Strings::iterator end);
 
-    void printFlags(std::ostream & out);
+    virtual void printFlags(std::ostream & out);
 
     /* Positional arguments. */
     struct ExpectedArg
