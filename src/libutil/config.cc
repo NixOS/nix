@@ -115,6 +115,13 @@ void Config::toJSON(JSONObject & out)
         }
 }
 
+void Config::convertToArgs(Args & args)
+{
+    for (auto & s : _settings)
+        if (!s.second.isAlias)
+            s.second.setting->convertToArg(args);
+}
+
 AbstractSetting::AbstractSetting(
     const std::string & name,
     const std::string & description,
@@ -128,10 +135,20 @@ void AbstractSetting::toJSON(JSONPlaceholder & out)
     out.write(to_string());
 }
 
+void AbstractSetting::convertToArg(Args & args)
+{
+}
+
 template<typename T>
 void BaseSetting<T>::toJSON(JSONPlaceholder & out)
 {
     out.write(value);
+}
+
+template<typename T>
+void BaseSetting<T>::convertToArg(Args & args)
+{
+    args.mkFlag(0, name, {}, description, 1, [=](Strings ss) { set(*ss.begin()); });
 }
 
 template<> void BaseSetting<std::string>::set(const std::string & str)
@@ -172,6 +189,12 @@ template<> void BaseSetting<bool>::set(const std::string & str)
 template<> std::string BaseSetting<bool>::to_string()
 {
     return value ? "true" : "false";
+}
+
+template<> void BaseSetting<bool>::convertToArg(Args & args)
+{
+    args.mkFlag(0, name, {}, description, 0, [=](Strings ss) { value = true; });
+    args.mkFlag(0, "no-" + name, {}, description, 0, [=](Strings ss) { value = false; });
 }
 
 template<> void BaseSetting<Strings>::set(const std::string & str)
@@ -216,6 +239,8 @@ template class BaseSetting<long long>;
 template class BaseSetting<unsigned long long>;
 template class BaseSetting<bool>;
 template class BaseSetting<std::string>;
+template class BaseSetting<Strings>;
+template class BaseSetting<StringSet>;
 
 void PathSetting::set(const std::string & str)
 {

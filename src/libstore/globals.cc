@@ -98,6 +98,13 @@ template<> void BaseSetting<SandboxMode>::toJSON(JSONPlaceholder & out)
     AbstractSetting::toJSON(out);
 }
 
+template<> void BaseSetting<SandboxMode>::convertToArg(Args & args)
+{
+    args.mkFlag(0, name, {}, "Enable sandboxing.", 0, [=](Strings ss) { value = smEnabled; });
+    args.mkFlag(0, "no-" + name, {}, "Disable sandboxing.", 0, [=](Strings ss) { value = smDisabled; });
+    args.mkFlag(0, "relaxed-" + name, {}, "Enable sandboxing, but allow builds to disable it.", 0, [=](Strings ss) { value = smRelaxed; });
+}
+
 void MaxBuildJobsSetting::set(const std::string & str)
 {
     if (str == "auto") value = std::max(1U, std::thread::hardware_concurrency());

@@ -63,6 +63,8 @@ public:
     void resetOverriden();
 
     void toJSON(JSONObject & out);
+
+    void convertToArgs(Args & args);
 };
 
 class AbstractSetting
@@ -99,6 +101,8 @@ protected:
 
     virtual void toJSON(JSONPlaceholder & out);
 
+    virtual void convertToArg(Args & args);
+
     bool isOverriden() { return overriden; }
 };
 
@@ -131,6 +135,8 @@ public:
     void set(const std::string & str) override;
 
     std::string to_string() override;
+
+    void convertToArg(Args & args) override;
 
     void toJSON(JSONPlaceholder & out) override;
 };

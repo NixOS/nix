@@ -22,6 +22,8 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         });
 
         mkFlag(0, "version", "show version information", std::bind(printVersion, programName));
+
+        settings.convertToArgs(*this);
     }
 };
 
