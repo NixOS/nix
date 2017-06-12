@@ -221,9 +221,10 @@ struct CurlDownloader : public Downloader
             if (request.head)
                 curl_easy_setopt(req, CURLOPT_NOBODY, 1);
 
-            if (request.verifyTLS)
-                curl_easy_setopt(req, CURLOPT_CAINFO, settings.caFile.c_str());
-            else {
+            if (request.verifyTLS) {
+                if (settings.caFile != "")
+                    curl_easy_setopt(req, CURLOPT_CAINFO, settings.caFile.c_str());
+            } else {
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYPEER, 0);
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYHOST, 0);
             }
