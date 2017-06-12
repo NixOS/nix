@@ -1950,7 +1950,7 @@ void DerivationGoal::startBuilder()
                 }
     }
 
-    if (settings.preBuildHook != "") {
+    if (useChroot && settings.preBuildHook != "" && dynamic_cast<Derivation *>(drv.get())) {
         printMsg(lvlChatty, format("executing pre-build hook ‘%1%’")
             % settings.preBuildHook);
         auto args = useChroot ? Strings({drvPath, chrootRootDir}) :
