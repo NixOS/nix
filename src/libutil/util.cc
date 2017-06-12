@@ -1171,6 +1171,12 @@ bool statusOk(int status)
 }
 
 
+bool hasPrefix(const string & s, const string & suffix)
+{
+    return s.compare(0, suffix.size(), suffix) == 0;
+}
+
+
 bool hasSuffix(const string & s, const string & suffix)
 {
     return s.size() >= suffix.size() && string(s, s.size() - suffix.size()) == suffix;

@@ -365,6 +365,10 @@ template<class N> bool string2Int(const string & s, N & n)
 }
 
 
+/* Return true iff `s' starts with `prefix'. */
+bool hasPrefix(const string & s, const string & prefix);
+
+
 /* Return true iff `s' ends in `suffix'. */
 bool hasSuffix(const string & s, const string & suffix);
 
