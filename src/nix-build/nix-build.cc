@@ -440,7 +440,7 @@ int main(int argc, char ** argv)
                         "[ -e $stdenv/setup ] && source $stdenv/setup; "
                         "%3%"
                         "set +e; "
-                        R"s([ -n "$PS1" ] && PS1='\n\[\033[1;32m\][nix-shell:\w]\$\[\033[0m\] '; )s"
+                        R"s([ -z "$PS1" ] && PS1='\n\[\033[1;32m\][nix-shell:\w]\$\[\033[0m\] '; )s"
                         "if [ \"$(type -t runHook)\" = function ]; then runHook shellHook; fi; "
                         "unset NIX_ENFORCE_PURITY; "
                         "unset NIX_INDENT_MAKE; "
