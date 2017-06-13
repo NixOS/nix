@@ -8,7 +8,8 @@ use Nix::Manifest;
 binmode STDERR, ":encoding(utf8)";
 
 my $manifestDir = $Nix::Config::manifestDir;
-
+my $netrcFile = $Nix::Config::config{"netrc-file"} //
+    "$Nix::Config::confDir/netrc";
 
 # Prevent access problems in shared-stored installations.
 umask 0022;
@@ -51,7 +52,7 @@ sub processURL {
     my $origUrl = $ENV{'NIX_ORIG_URL'} || $url;
 
     # First see if a bzipped manifest is available.
-    if (system("$Nix::Config::curl $Nix::Config::curlCaFlag --fail --silent --location --head '$url'.bz2 > /dev/null") == 0) {
+    if (system("$Nix::Config::curl $Nix::Config::curlCaFlag --netrc-file $netrcFile --netrc-optional --fail --silent --location --head '$url'.bz2 > /dev/null") == 0) {
         print "fetching list of Nix archives at ‘$url.bz2’...\n";
         $manifest = downloadFile "$url.bz2";
     }

@@ -32,6 +32,9 @@ mkpath(dirname $profile, 0, 0755);
 
 my %channels;
 
+my $netrcFile = $Nix::Config::config{"netrc-file"} //
+    "$Nix::Config::confDir/netrc";
+
 
 # Reads the list of channels.
 sub readChannels {
@@ -104,7 +107,7 @@ sub update {
         # definition from a consistent location if the redirect changes mid-download.
         my $tmpdir = tempdir( CLEANUP => 1 );
         my $filename;
-        ($url, $filename) = `cd $tmpdir && $Nix::Config::curl $Nix::Config::curlCaFlag --silent --write-out '%{url_effective}\n%{filename_effective}' -L '$url' -O`;
+        ($url, $filename) = `cd $tmpdir && $Nix::Config::curl $Nix::Config::curlCaFlag --netrc-file $netrcFile --netrc-optional --silent --write-out '%{url_effective}\n%{filename_effective}' -L '$url' -O`;
         chomp $url;
         die "$0: unable to check ‘$url’\n" if $? != 0;
 
@@ -131,7 +134,7 @@ sub update {
         my $extraAttrs = "";
         if ($ret != 0) {
             # Check if the channel advertises a binary cache.
-            my $binaryCacheURL = `$Nix::Config::curl $Nix::Config::curlCaFlag --silent '$url'/binary-cache-url`;
+            my $binaryCacheURL = `$Nix::Config::curl $Nix::Config::curlCaFlag --netrc-file $netrcFile --netrc-optional  --silent '$url'/binary-cache-url`;
             my $getManifest = ($Nix::Config::config{"force-manifest"} // "false") eq "true";
             if ($? == 0 && $binaryCacheURL ne "") {
                 $extraAttrs .= "binaryCacheURL = \"$binaryCacheURL\"; ";
@@ -151,7 +154,7 @@ sub update {
 
             # Download the channel tarball.
             my $fullURL = "$url/nixexprs.tar.xz";
-            system("$Nix::Config::curl $Nix::Config::curlCaFlag --fail --silent --head '$fullURL' > /dev/null") == 0 or
+            system("$Nix::Config::curl $Nix::Config::curlCaFlag --netrc-file $netrcFile --netrc-optional  --fail --silent --head '$fullURL' > /dev/null") == 0 or
                 $fullURL = "$url/nixexprs.tar.bz2";
             print STDERR "downloading Nix expressions from ‘$fullURL’...\n";
             (my $hash, $path) = `PRINT_PATH=1 QUIET=1 $Nix::Config::binDir/nix-prefetch-url '$fullURL'`;
