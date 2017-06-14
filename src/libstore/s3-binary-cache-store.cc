@@ -273,8 +273,6 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         std::function<void(std::exception_ptr exc)> failure) override
     {
         sync2async<std::shared_ptr<std::string>>(success, failure, [&]() {
-            debug(format("fetching ‘s3://%1%/%2%’...") % bucketName % path);
-
             stats.get++;
 
             auto res = s3Helper.getObject(bucketName, path);
