@@ -1,14 +1,12 @@
 { nix ? { outPath = ./.; revCount = 1234; shortRev = "abcdef"; }
 , nixpkgs ? { outPath = <nixpkgs>; revCount = 1234; shortRev = "abcdef"; }
 , officialRelease ? false
+, systems ? [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
 }:
 
 let
 
   pkgs = import <nixpkgs> {};
-
-  systems = [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ];
-
 
   jobs = rec {
 
