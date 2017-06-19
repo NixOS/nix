@@ -233,8 +233,10 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
         if (!res.IsSuccess()) {
             auto & error = res.GetError();
-            if (error.GetErrorType() == Aws::S3::S3Errors::UNKNOWN // FIXME
-                && error.GetMessage().find("404") != std::string::npos)
+            if (error.GetErrorType() == Aws::S3::S3Errors::RESOURCE_NOT_FOUND
+                || error.GetErrorType() == Aws::S3::S3Errors::NO_SUCH_KEY
+                || (error.GetErrorType() == Aws::S3::S3Errors::UNKNOWN // FIXME
+                    && error.GetMessage().find("404") != std::string::npos))
                 return false;
             throw Error(format("AWS error fetching ‘%s’: %s") % path % error.GetMessage());
         }
