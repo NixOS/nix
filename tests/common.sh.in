@@ -16,6 +16,10 @@ export NIX_DB_DIR=$TEST_ROOT/db
 export NIX_CONF_DIR=$TEST_ROOT/etc
 export NIX_MANIFESTS_DIR=$TEST_ROOT/var/nix/manifests
 export _NIX_TEST_SHARED=$TEST_ROOT/shared
+if [[ -n $NIX_STORE ]]; then
+    export _NIX_TEST_NO_SANDBOX=1
+fi
+export _NIX_IN_TEST=$TEST_ROOT/shared
 export NIX_REMOTE=$NIX_REMOTE_
 
 export PATH=@bindir@:$PATH

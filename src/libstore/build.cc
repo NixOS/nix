@@ -2542,7 +2542,7 @@ void DerivationGoal::runChild()
             ;
         }
 #if __APPLE__
-        else {
+        else if (getEnv("_NIX_TEST_NO_SANDBOX") == "") {
             /* This has to appear before import statements. */
             std::string sandboxProfile = "(version 1)\n";
 
@@ -2650,13 +2650,12 @@ void DerivationGoal::runChild()
             args.push_back("_GLOBAL_TMP_DIR=" + globalTmpDir);
             args.push_back(drv->builder);
         }
-#else
+#endif
         else {
             builder = drv->builder.c_str();
             string builderBasename = baseNameOf(drv->builder);
             args.push_back(builderBasename);
         }
-#endif
 
         for (auto & i : drv->args)
             args.push_back(rewriteHashes(i, rewritesToTmp));
