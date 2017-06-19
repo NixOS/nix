@@ -79,7 +79,7 @@ static void initAWS()
 
 S3Helper::S3Helper(const string & region)
     : config(makeConfig(region))
-    , client(make_ref<Aws::S3::S3Client>(*config))
+    , client(make_ref<Aws::S3::S3Client>(*config, true, false))
 {
 }
 
