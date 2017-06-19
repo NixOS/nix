@@ -12,6 +12,8 @@
 #include <aws/core/Aws.h>
 #include <aws/core/client/ClientConfiguration.h>
 #include <aws/core/client/DefaultRetryStrategy.h>
+#include <aws/core/utils/logging/FormattedLogSystem.h>
+#include <aws/core/utils/logging/LogMacros.h>
 #include <aws/s3/S3Client.h>
 #include <aws/s3/model/CreateBucketRequest.h>
 #include <aws/s3/model/GetBucketLocationRequest.h>
@@ -41,6 +43,16 @@ R && checkAws(const FormatOrString & fs, Aws::Utils::Outcome<R, E> && outcome)
     return outcome.GetResultWithOwnership();
 }
 
+class AwsLogger : public Aws::Utils::Logging::FormattedLogSystem
+{
+    using Aws::Utils::Logging::FormattedLogSystem::FormattedLogSystem;
+
+    void ProcessFormattedStatement(Aws::String && statement) override
+    {
+        debug("AWS: %s", chomp(statement));
+    }
+};
+
 static void initAWS()
 {
     static std::once_flag flag;
@@ -50,6 +62,16 @@ static void initAWS()
         /* We install our own OpenSSL locking function (see
            shared.cc), so don't let aws-sdk-cpp override it. */
         options.cryptoOptions.initAndCleanupOpenSSL = false;
+
+        if (verbosity >= lvlDebug) {
+            options.loggingOptions.logLevel =
+                verbosity == lvlDebug
+                ? Aws::Utils::Logging::LogLevel::Debug
+                : Aws::Utils::Logging::LogLevel::Trace;
+            options.loggingOptions.logger_create_fn = [options]() {
+                return std::make_shared<AwsLogger>(options.loggingOptions.logLevel);
+            };
+        }
 
         Aws::InitAPI(options);
     });
