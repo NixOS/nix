@@ -86,12 +86,13 @@ S3Helper::S3Helper(const string & region)
 /* Log AWS retries. */
 class RetryStrategy : public Aws::Client::DefaultRetryStrategy
 {
-    long CalculateDelayBeforeNextRetry(const Aws::Client::AWSError<Aws::Client::CoreErrors>& error, long attemptedRetries) const override
+    bool ShouldRetry(const Aws::Client::AWSError<Aws::Client::CoreErrors>& error, long attemptedRetries) const override
     {
-        auto res = Aws::Client::DefaultRetryStrategy::CalculateDelayBeforeNextRetry(error, attemptedRetries);
-        printError("AWS error '%s' (%s), will retry in %d ms",
-            error.GetExceptionName(), error.GetMessage(), res);
-        return res;
+        auto retry = Aws::Client::DefaultRetryStrategy::ShouldRetry(error, attemptedRetries);
+        if (retry)
+            printError("AWS error '%s' (%s), will retry in %d ms",
+                error.GetExceptionName(), error.GetMessage(), CalculateDelayBeforeNextRetry(error, attemptedRetries));
+        return retry;
     }
 };
 
