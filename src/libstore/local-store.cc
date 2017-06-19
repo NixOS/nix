@@ -400,6 +400,16 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
 {
     checkInterrupt();
 
+#if __APPLE__
+    /* Remove flags, in particular UF_IMMUTABLE which would prevent
+       the file from being garbage-collected. FIXME: Use
+       setattrlist() to remove other attributes as well. */
+    if (lchflags(path.c_str(), 0)) {
+        if (errno != ENOTSUP)
+            throw SysError(format("clearing flags of path ‘%1%’") % path);
+    }
+#endif
+
     struct stat st;
     if (lstat(path.c_str(), &st))
         throw SysError(format("getting attributes of path ‘%1%’") % path);
