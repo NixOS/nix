@@ -187,14 +187,20 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
                 if (res.GetError().GetErrorType() != Aws::S3::S3Errors::NO_SUCH_BUCKET)
                     throw Error(format("AWS error checking bucket ‘%s’: %s") % bucketName % res.GetError().GetMessage());
 
+                printInfo("creating S3 bucket ‘%s’...", bucketName);
+
+                // Stupid S3 bucket locations.
+                auto bucketConfig = Aws::S3::Model::CreateBucketConfiguration();
+                if (s3Helper.config->region != "us-east-1")
+                    bucketConfig.SetLocationConstraint(
+                        Aws::S3::Model::BucketLocationConstraintMapper::GetBucketLocationConstraintForName(
+                            s3Helper.config->region));
+
                 checkAws(format("AWS error creating bucket ‘%s’") % bucketName,
                     s3Helper.client->CreateBucket(
                         Aws::S3::Model::CreateBucketRequest()
                         .WithBucket(bucketName)
-                        .WithCreateBucketConfiguration(
-                            Aws::S3::Model::CreateBucketConfiguration()
-                            /* .WithLocationConstraint(
-                               Aws::S3::Model::BucketLocationConstraint::US) */ )));
+                        .WithCreateBucketConfiguration(bucketConfig)));
             }
 
             BinaryCacheStore::init();
