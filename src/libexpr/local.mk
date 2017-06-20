@@ -26,8 +26,6 @@ $(d)/parser-tab.cc $(d)/parser-tab.hh: $(d)/parser.y
 $(d)/lexer-tab.cc $(d)/lexer-tab.hh: $(d)/lexer.l
 	$(trace-gen) flex --outfile $(libexpr_DIR)/lexer-tab.cc --header-file=$(libexpr_DIR)/lexer-tab.hh $<
 
-clean-files += $(d)/parser-tab.cc $(d)/parser-tab.hh $(d)/lexer-tab.cc $(d)/lexer-tab.hh
-
 dist-files += $(d)/parser-tab.cc $(d)/parser-tab.hh $(d)/lexer-tab.cc $(d)/lexer-tab.hh
 
 $(eval $(call install-file-in, $(d)/nix-expr.pc, $(prefix)/lib/pkgconfig, 0644))
