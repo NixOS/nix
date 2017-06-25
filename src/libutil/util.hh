@@ -10,6 +10,7 @@
 #include <functional>
 
 #include <cstdio>
+#include <sstream>
 
 #ifndef HAVE_STRUCT_DIRENT_D_TYPE
 #define DT_UNKNOWN 0

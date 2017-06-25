@@ -1,95 +1,35 @@
 Makefile.config
 
 # /
-/aclocal.m4
-/autom4te.cache
-/config.*
-/configure
-/nix.spec
-/stamp-h1
-/svn-revision
-/libtool
-
-/corepkgs/config.nix
-
-# /corepkgs/buildenv/
-/corepkgs/buildenv/builder.pl
-
-# /corepkgs/channels/
-/corepkgs/channels/unpack.sh
-
-# /corepkgs/nar/
-/corepkgs/nar/nar.sh
-/corepkgs/nar/unnar.sh
+#/aclocal.m4
+#/autom4te.cache
+#/config.*
+#/configure
+#/nix.spec
+#/stamp-h1
+#/svn-revision
+#/libtool
 
 # /doc/manual/
-/doc/manual/manual.html
-/doc/manual/manual.xmli
-/doc/manual/manual.pdf
-/doc/manual/manual.is-valid
-/doc/manual/*.1
-/doc/manual/*.5
-/doc/manual/*.8
+#/doc/manual/manual.html
+#/doc/manual/manual.xmli
+#/doc/manual/manual.pdf
+#/doc/manual/manual.is-valid
+#/doc/manual/*.1
+#/doc/manual/*.5
+#/doc/manual/*.8
 /doc/manual/version.txt
-
-# /scripts/
-/scripts/nix-profile.sh
-/scripts/nix-pull
-/scripts/nix-push
-/scripts/nix-switch
-/scripts/nix-collect-garbage
-/scripts/nix-prefetch-url
-/scripts/nix-install-package
-/scripts/nix-channel
-/scripts/nix-build
-/scripts/nix-copy-closure
-/scripts/nix-generate-patches
-/scripts/NixConfig.pm
-/scripts/NixManifest.pm
-/scripts/GeneratePatches.pm
-/scripts/download-using-manifests.pl
-/scripts/copy-from-other-stores.pl
-/scripts/download-from-binary-cache.pl
-/scripts/find-runtime-roots.pl
-/scripts/build-remote.pl
-/scripts/nix-reduce-build
-/scripts/nix-http-export.cgi
-
-# /src/bsdiff-4.3/
-/src/bsdiff-4.3/bsdiff
-/src/bsdiff-4.3/bspatch
 
 # /src/libexpr/
 /src/libexpr/lexer-tab.cc
 /src/libexpr/lexer-tab.hh
 /src/libexpr/parser-tab.cc
 /src/libexpr/parser-tab.hh
-/src/libexpr/parser-tab.output
-/src/libexpr/nix.tbl
+#/src/libexpr/parser-tab.output
+#/src/libexpr/nix.tbl
 
 # /src/libstore/
 /src/libstore/schema.sql.hh
-
-# /src/nix-env/
-/src/nix-env/nix-env
-
-# /src/nix-hash/
-/src/nix-hash/nix-hash
-
-# /src/nix-instantiate/
-/src/nix-instantiate/nix-instantiate
-
-# /src/nix-log2xml/
-/src/nix-log2xml/nix-log2xml
-
-# /src/nix-store/
-/src/nix-store/nix-store
-
-# /src/nix-daemon/
-/src/nix-daemon/nix-daemon
-
-# /src/download-via-ssh/
-/src/download-via-ssh/download-via-ssh
 
 # /tests/
 /tests/test-tmp
@@ -102,24 +42,11 @@ Makefile.config
 /tests/lang/*.out.xml
 /tests/lang/*.ast
 
-/perl/lib/Nix/Config.pm
-/perl/lib/Nix/Store.cc
-
-/misc/systemd/nix-daemon.service
-/misc/systemd/nix-daemon.socket
-/misc/upstart/nix-daemon.conf
-
-*.a
-*.o
-*.so
-*.dll
-*.exe
-*.dep
-*~
-*.pc
-
 # GNU Global
-GPATH
-GRTAGS
-GSYMS
-GTAGS
+# GPATH
+# GRTAGS
+# GSYMS
+# GTAGS
+
+# Out-of-source builds
+/build*/
