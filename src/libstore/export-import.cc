@@ -61,7 +61,7 @@ void Store::exportPath(const Path & path, Sink & sink)
     hashAndWriteSink << exportMagic << path << info->references << info->deriver << 0;
 }
 
-Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, bool dontCheckSigs)
+Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, CheckSigsFlag checkSigs)
 {
     Paths res;
     while (true) {
@@ -95,7 +95,7 @@ Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, 
         if (readInt(source) == 1)
             readString(source);
 
-        addToStore(info, tee.source.data, false, dontCheckSigs, accessor);
+        addToStore(info, tee.source.data, NoRepair, checkSigs, accessor);
 
         res.push_back(info.path);
     }

@@ -32,6 +32,11 @@ class Store;
 class JSONPlaceholder;
 
 
+enum RepairFlag : bool { NoRepair = false, Repair = true };
+enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
+enum SubstituteFlag : bool { NoSubstitute = false, Substitute = true };
+
+
 /* Size of the hash part of store paths, in base-32 characters. */
 const size_t storePathHashLen = 32; // i.e. 160 bits
 
@@ -332,7 +337,7 @@ public:
     /* Query which of the given paths is valid. Optionally, try to
        substitute missing paths. */
     virtual PathSet queryValidPaths(const PathSet & paths,
-        bool maybeSubstitute = false);
+        SubstituteFlag maybeSubstitute = NoSubstitute);
 
     /* Query the set of all valid paths. Note that for some store
        backends, the name part of store paths may be omitted
@@ -392,7 +397,7 @@ public:
 
     /* Import a path into the store. */
     virtual void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-        bool repair = false, bool dontCheckSigs = false,
+        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs,
         std::shared_ptr<FSAccessor> accessor = 0) = 0;
 
     /* Copy the contents of a path to the store and register the
@@ -401,12 +406,12 @@ public:
        libutil/archive.hh). */
     virtual Path addToStore(const string & name, const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter, bool repair = false) = 0;
+        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) = 0;
 
     /* Like addToStore, but the contents written to the output path is
        a regular file containing the given string. */
     virtual Path addTextToStore(const string & name, const string & s,
-        const PathSet & references, bool repair = false) = 0;
+        const PathSet & references, RepairFlag repair = NoRepair) = 0;
 
     /* Write a NAR dump of a store path. */
     virtual void narFromPath(const Path & path, Sink & sink) = 0;
@@ -496,7 +501,7 @@ public:
 
     /* Check the integrity of the Nix store.  Returns true if errors
        remain. */
-    virtual bool verifyStore(bool checkContents, bool repair) { return false; };
+    virtual bool verifyStore(bool checkContents, RepairFlag repair = NoRepair) { return false; };
 
     /* Return an object to access files in the Nix store. */
     virtual ref<FSAccessor> getFSAccessor() = 0;
@@ -548,7 +553,7 @@ public:
        preloaded into the specified FS accessor to speed up subsequent
        access. */
     Paths importPaths(Source & source, std::shared_ptr<FSAccessor> accessor,
-        bool dontCheckSigs = false);
+        CheckSigsFlag checkSigs = CheckSigs);
 
     struct Stats
     {
@@ -650,12 +655,26 @@ void checkStoreName(const string & name);
 
 /* Copy a path from one store to another. */
 void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
-    const Path & storePath, bool repair = false, bool dontCheckSigs = false);
+    const Path & storePath, RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs);
+
+
+/* Copy store paths from one store to another. The paths may be copied
+   in parallel. They are copied in a topologically sorted order
+   (i.e. if A is a reference of B, then A is copied before B), but
+   the set of store paths is not automatically closed; use
+   copyClosure() for that. */
+void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const PathSet & storePaths,
+    RepairFlag repair = NoRepair,
+    CheckSigsFlag checkSigs = CheckSigs,
+    SubstituteFlag substitute = NoSubstitute);
 
 
 /* Copy the closure of the specified paths from one store to another. */
 void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
-    const PathSet & storePaths, bool repair = false, bool dontCheckSigs = false);
+    const PathSet & storePaths,
+    RepairFlag repair = NoRepair,
+    CheckSigsFlag checkSigs = CheckSigs,
+    SubstituteFlag substitute = NoSubstitute);
 
 
 /* Remove the temporary roots file for this process.  Any temporary
@@ -693,9 +712,6 @@ void removeTempRoots();
 ref<Store> openStore(const std::string & uri = getEnv("NIX_REMOTE"),
     const Store::Params & extraParams = Store::Params());
 
-
-void copyPaths(ref<Store> from, ref<Store> to, const PathSet & storePaths,
-    bool substitute = false, bool dontCheckSigs = false);
 
 enum StoreType {
     tDaemon,

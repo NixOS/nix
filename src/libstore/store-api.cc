@@ -378,7 +378,7 @@ void Store::queryPathInfo(const Path & storePath,
 }
 
 
-PathSet Store::queryValidPaths(const PathSet & paths, bool maybeSubstitute)
+PathSet Store::queryValidPaths(const PathSet & paths, SubstituteFlag maybeSubstitute)
 {
     struct State
     {
@@ -537,14 +537,14 @@ void Store::buildPaths(const PathSet & paths, BuildMode buildMode)
 
 
 void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
-    const Path & storePath, bool repair, bool dontCheckSigs)
+    const Path & storePath, RepairFlag repair, CheckSigsFlag checkSigs)
 {
     auto info = srcStore->queryPathInfo(storePath);
 
     StringSink sink;
     srcStore->narFromPath({storePath}, sink);
 
-    if (!info->narHash && dontCheckSigs) {
+    if (!info->narHash && !checkSigs) {
         auto info2 = make_ref<ValidPathInfo>(*info);
         info2->narHash = hashString(htSHA256, *sink.s);
         if (!info->narSize) info2->narSize = sink.s->size();
@@ -561,33 +561,47 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
 
     assert(info->narHash);
 
-    dstStore->addToStore(*info, sink.s, repair, dontCheckSigs);
+    dstStore->addToStore(*info, sink.s, repair, checkSigs);
+}
+
+
+void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const PathSet & storePaths,
+    RepairFlag repair, CheckSigsFlag checkSigs, SubstituteFlag substitute)
+{
+    PathSet valid = dstStore->queryValidPaths(storePaths, substitute);
+
+    PathSet missing;
+    for (auto & path : storePaths)
+        if (!valid.count(path)) missing.insert(path);
+
+    ThreadPool pool;
+
+    processGraph<Path>(pool,
+        PathSet(missing.begin(), missing.end()),
+
+        [&](const Path & storePath) {
+            if (dstStore->isValidPath(storePath)) return PathSet();
+            return srcStore->queryPathInfo(storePath)->references;
+        },
+
+        [&](const Path & storePath) {
+            checkInterrupt();
+
+            if (!dstStore->isValidPath(storePath)) {
+                printError("copying ‘%s’...", storePath);
+                copyStorePath(srcStore, dstStore, storePath, repair, checkSigs);
+            }
+        });
 }
 
 
 void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
-    const PathSet & storePaths, bool repair, bool dontCheckSigs)
+    const PathSet & storePaths, RepairFlag repair, CheckSigsFlag checkSigs,
+    SubstituteFlag substitute)
 {
     PathSet closure;
-    for (auto & path : storePaths)
-        srcStore->computeFSClosure(path, closure);
-
-    // FIXME: use copyStorePaths()
-
-    PathSet valid = dstStore->queryValidPaths(closure);
-
-    if (valid.size() == closure.size()) return;
-
-    Paths sorted = srcStore->topoSortPaths(closure);
-
-    Paths missing;
-    for (auto i = sorted.rbegin(); i != sorted.rend(); ++i)
-        if (!valid.count(*i)) missing.push_back(*i);
-
-    printMsg(lvlDebug, format("copying %1% missing paths") % missing.size());
-
-    for (auto & i : missing)
-        copyStorePath(srcStore, dstStore, i, repair, dontCheckSigs);
+    srcStore->computeFSClosure({storePaths}, closure);
+    copyPaths(srcStore, dstStore, closure, repair, checkSigs, substitute);
 }
 
 
@@ -809,47 +823,6 @@ std::list<ref<Store>> getDefaultSubstituters()
     state->done = true;
 
     return state->stores;
-}
-
-
-void copyPaths(ref<Store> from, ref<Store> to, const PathSet & storePaths,
-    bool substitute, bool dontCheckSigs)
-{
-    PathSet valid = to->queryValidPaths(storePaths, substitute);
-
-    PathSet missing;
-    for (auto & path : storePaths)
-        if (!valid.count(path)) missing.insert(path);
-
-    std::string copiedLabel = "copied";
-
-    //logger->setExpected(copiedLabel, missing.size());
-
-    ThreadPool pool;
-
-    processGraph<Path>(pool,
-        PathSet(missing.begin(), missing.end()),
-
-        [&](const Path & storePath) {
-            if (to->isValidPath(storePath)) return PathSet();
-            return from->queryPathInfo(storePath)->references;
-        },
-
-        [&](const Path & storePath) {
-            checkInterrupt();
-
-            if (!to->isValidPath(storePath)) {
-                //Activity act(*logger, lvlInfo, format("copying ‘%s’...") % storePath);
-
-                copyStorePath(from, to, storePath, false, dontCheckSigs);
-
-                //logger->incProgress(copiedLabel);
-            } else
-                ;
-                //logger->incExpected(copiedLabel, -1);
-        });
-
-    pool.process();
 }
 
 

@@ -134,7 +134,7 @@ Path BinaryCacheStore::narInfoFileFor(const Path & storePath)
 }
 
 void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-    bool repair, bool dontCheckSigs, std::shared_ptr<FSAccessor> accessor)
+    RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
 {
     if (!repair && isValidPath(info.path)) return;
 
@@ -328,7 +328,7 @@ void BinaryCacheStore::queryPathInfoUncached(const Path & storePath,
 }
 
 Path BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
-    bool recursive, HashType hashAlgo, PathFilter & filter, bool repair)
+    bool recursive, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
 {
     // FIXME: some cut&paste from LocalStore::addToStore().
 
@@ -349,13 +349,13 @@ Path BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
     ValidPathInfo info;
     info.path = makeFixedOutputPath(recursive, h, name);
 
-    addToStore(info, sink.s, repair, false, 0);
+    addToStore(info, sink.s, repair, CheckSigs, nullptr);
 
     return info.path;
 }
 
 Path BinaryCacheStore::addTextToStore(const string & name, const string & s,
-    const PathSet & references, bool repair)
+    const PathSet & references, RepairFlag repair)
 {
     ValidPathInfo info;
     info.path = computeStorePathForText(name, s, references);
@@ -364,7 +364,7 @@ Path BinaryCacheStore::addTextToStore(const string & name, const string & s,
     if (repair || !isValidPath(info.path)) {
         StringSink sink;
         dumpString(s, sink);
-        addToStore(info, sink.s, repair, false, 0);
+        addToStore(info, sink.s, repair, CheckSigs, nullptr);
     }
 
     return info.path;

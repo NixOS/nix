@@ -304,7 +304,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         string s = readString(from);
         PathSet refs = readStorePaths<PathSet>(*store, from);
         startWork();
-        Path path = store->addTextToStore(suffix, s, refs, false);
+        Path path = store->addTextToStore(suffix, s, refs, NoRepair);
         stopWork();
         to << path;
         break;
@@ -324,7 +324,8 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
     case wopImportPaths: {
         startWork();
         TunnelSource source(from);
-        Paths paths = store->importPaths(source, 0, trusted);
+        Paths paths = store->importPaths(source, nullptr,
+            trusted ? NoCheckSigs : CheckSigs);
         stopWork();
         to << paths;
         break;
@@ -576,7 +577,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         startWork();
         if (repair && !trusted)
             throw Error("you are not privileged to repair paths");
-        bool errors = store->verifyStore(checkContents, repair);
+        bool errors = store->verifyStore(checkContents, (RepairFlag) repair);
         stopWork();
         to << errors;
         break;
@@ -623,7 +624,8 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         parseDump(tee, tee.source);
 
         startWork();
-        store->addToStore(info, tee.source.data, repair, dontCheckSigs, nullptr);
+        store->addToStore(info, tee.source.data, (RepairFlag) repair,
+            dontCheckSigs ? NoCheckSigs : CheckSigs, nullptr);
         stopWork();
         break;
     }

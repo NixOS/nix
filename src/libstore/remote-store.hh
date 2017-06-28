@@ -31,7 +31,8 @@ public:
 
     bool isValidPathUncached(const Path & path) override;
 
-    PathSet queryValidPaths(const PathSet & paths, bool maybeSubstitute = false) override;
+    PathSet queryValidPaths(const PathSet & paths,
+        SubstituteFlag maybeSubstitute = NoSubstitute) override;
 
     PathSet queryAllValidPaths() override;
 
@@ -55,15 +56,15 @@ public:
         SubstitutablePathInfos & infos) override;
 
     void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-        bool repair, bool dontCheckSigs,
+        RepairFlag repair, CheckSigsFlag checkSigs,
         std::shared_ptr<FSAccessor> accessor) override;
 
     Path addToStore(const string & name, const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter, bool repair = false) override;
+        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) override;
 
     Path addTextToStore(const string & name, const string & s,
-        const PathSet & references, bool repair = false) override;
+        const PathSet & references, RepairFlag repair) override;
 
     void buildPaths(const PathSet & paths, BuildMode buildMode) override;
 
@@ -84,7 +85,7 @@ public:
 
     void optimiseStore() override;
 
-    bool verifyStore(bool checkContents, bool repair) override;
+    bool verifyStore(bool checkContents, RepairFlag repair) override;
 
     void addSignatures(const Path & storePath, const StringSet & sigs) override;
 

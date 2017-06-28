@@ -262,7 +262,7 @@ public:
     GoalPtr makeDerivationGoal(const Path & drvPath, const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
     std::shared_ptr<DerivationGoal> makeBasicDerivationGoal(const Path & drvPath,
         const BasicDerivation & drv, BuildMode buildMode = bmNormal);
-    GoalPtr makeSubstitutionGoal(const Path & storePath, bool repair = false);
+    GoalPtr makeSubstitutionGoal(const Path & storePath, RepairFlag repair = NoRepair);
 
     /* Remove a dead goal. */
     void removeGoal(GoalPtr goal);
@@ -1087,7 +1087,7 @@ void DerivationGoal::haveDerivation()
        them. */
     if (settings.useSubstitutes && drv->substitutesAllowed())
         for (auto & i : invalidOutputs)
-            addWaitee(worker.makeSubstitutionGoal(i, buildMode == bmRepair));
+            addWaitee(worker.makeSubstitutionGoal(i, buildMode == bmRepair ? Repair : NoRepair));
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
         outputsSubstituted();
@@ -1195,7 +1195,7 @@ void DerivationGoal::repairClosure()
         printError(format("found corrupted or missing path ‘%1%’ in the output closure of ‘%2%’") % i % drvPath);
         Path drvPath2 = outputsToDrv[i];
         if (drvPath2 == "")
-            addWaitee(worker.makeSubstitutionGoal(i, true));
+            addWaitee(worker.makeSubstitutionGoal(i, Repair));
         else
             addWaitee(worker.makeDerivationGoal(drvPath2, PathSet(), bmRepair));
     }
@@ -3291,7 +3291,7 @@ private:
     std::promise<void> promise;
 
     /* Whether to try to repair a valid path. */
-    bool repair;
+    RepairFlag repair;
 
     /* Location where we're downloading the substitute.  Differs from
        storePath when doing a repair. */
@@ -3301,7 +3301,7 @@ private:
     GoalState state;
 
 public:
-    SubstitutionGoal(const Path & storePath, Worker & worker, bool repair = false);
+    SubstitutionGoal(const Path & storePath, Worker & worker, RepairFlag repair = NoRepair);
     ~SubstitutionGoal();
 
     void timedOut() override { abort(); };
@@ -3337,7 +3337,7 @@ public:
 };
 
 
-SubstitutionGoal::SubstitutionGoal(const Path & storePath, Worker & worker, bool repair)
+SubstitutionGoal::SubstitutionGoal(const Path & storePath, Worker & worker, RepairFlag repair)
     : Goal(worker)
     , hasSubstitute(false)
     , repair(repair)
@@ -3600,7 +3600,7 @@ std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const Path & drv
 }
 
 
-GoalPtr Worker::makeSubstitutionGoal(const Path & path, bool repair)
+GoalPtr Worker::makeSubstitutionGoal(const Path & path, RepairFlag repair)
 {
     GoalPtr goal = substitutionGoals[path].lock();
     if (!goal) {
@@ -3953,7 +3953,7 @@ void LocalStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
         if (isDerivation(i2.first))
             goals.insert(worker.makeDerivationGoal(i2.first, i2.second, buildMode));
         else
-            goals.insert(worker.makeSubstitutionGoal(i, buildMode));
+            goals.insert(worker.makeSubstitutionGoal(i, buildMode == bmRepair ? Repair : NoRepair));
     }
 
     worker.run(goals);
@@ -4011,7 +4011,7 @@ void LocalStore::ensurePath(const Path & path)
 void LocalStore::repairPath(const Path & path)
 {
     Worker worker(*this);
-    GoalPtr goal = worker.makeSubstitutionGoal(path, true);
+    GoalPtr goal = worker.makeSubstitutionGoal(path, Repair);
     Goals goals = {goal};
 
     worker.run(goals);

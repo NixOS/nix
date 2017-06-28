@@ -718,7 +718,7 @@ bool LocalStore::isValidPathUncached(const Path & path)
 }
 
 
-PathSet LocalStore::queryValidPaths(const PathSet & paths, bool maybeSubstitute)
+PathSet LocalStore::queryValidPaths(const PathSet & paths, SubstituteFlag maybeSubstitute)
 {
     PathSet res;
     for (auto & i : paths)
@@ -961,7 +961,7 @@ void LocalStore::invalidatePath(State & state, const Path & path)
 
 
 void LocalStore::addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-    bool repair, bool dontCheckSigs, std::shared_ptr<FSAccessor> accessor)
+    RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
 {
     assert(info.narHash);
 
@@ -974,7 +974,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, const ref<std::string> &
         throw Error("size mismatch importing path ‘%s’; expected %s, got %s",
             info.path, info.narSize, nar->size());
 
-    if (requireSigs && !dontCheckSigs && !info.checkSignatures(*this, publicKeys))
+    if (requireSigs && checkSigs && !info.checkSignatures(*this, publicKeys))
         throw Error("cannot add path ‘%s’ because it lacks a valid signature", info.path);
 
     addTempRoot(info.path);
@@ -1012,7 +1012,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, const ref<std::string> &
 
 
 Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
-    bool recursive, HashType hashAlgo, bool repair)
+    bool recursive, HashType hashAlgo, RepairFlag repair)
 {
     Hash h = hashString(hashAlgo, dump);
 
@@ -1070,7 +1070,7 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
 
 
 Path LocalStore::addToStore(const string & name, const Path & _srcPath,
-    bool recursive, HashType hashAlgo, PathFilter & filter, bool repair)
+    bool recursive, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
 {
     Path srcPath(absPath(_srcPath));
 
@@ -1088,7 +1088,7 @@ Path LocalStore::addToStore(const string & name, const Path & _srcPath,
 
 
 Path LocalStore::addTextToStore(const string & name, const string & s,
-    const PathSet & references, bool repair)
+    const PathSet & references, RepairFlag repair)
 {
     auto hash = hashString(htSHA256, s);
     auto dstPath = makeTextPath(name, hash, references);
@@ -1170,7 +1170,7 @@ void LocalStore::invalidatePathChecked(const Path & path)
 }
 
 
-bool LocalStore::verifyStore(bool checkContents, bool repair)
+bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 {
     printError(format("reading the Nix store..."));
 
@@ -1255,7 +1255,7 @@ bool LocalStore::verifyStore(bool checkContents, bool repair)
 
 
 void LocalStore::verifyPath(const Path & path, const PathSet & store,
-    PathSet & done, PathSet & validPaths, bool repair, bool & errors)
+    PathSet & done, PathSet & validPaths, RepairFlag repair, bool & errors)
 {
     checkInterrupt();
 

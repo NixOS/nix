@@ -677,7 +677,7 @@ static void opImport(Strings opFlags, Strings opArgs)
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
     FdSource source(STDIN_FILENO);
-    Paths paths = store->importPaths(source, nullptr, true);
+    Paths paths = store->importPaths(source, nullptr, NoCheckSigs);
 
     for (auto & i : paths)
         cout << format("%1%\n") % i << std::flush;
@@ -702,11 +702,11 @@ static void opVerify(Strings opFlags, Strings opArgs)
         throw UsageError("no arguments expected");
 
     bool checkContents = false;
-    bool repair = false;
+    RepairFlag repair = NoRepair;
 
     for (auto & i : opFlags)
         if (i == "--check-contents") checkContents = true;
-        else if (i == "--repair") repair = true;
+        else if (i == "--repair") repair = Repair;
         else throw UsageError(format("unknown flag ‘%1%’") % i);
 
     if (store->verifyStore(checkContents, repair)) {
@@ -871,7 +871,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             case cmdImportPaths: {
                 if (!writeAllowed) throw Error("importing paths is not allowed");
-                store->importPaths(in, 0, true); // FIXME: should we skip sig checking?
+                store->importPaths(in, nullptr, NoCheckSigs); // FIXME: should we skip sig checking?
                 out << 1; // indicate success
                 break;
             }

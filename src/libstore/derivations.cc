@@ -71,7 +71,7 @@ bool BasicDerivation::canBuildLocally() const
 
 
 Path writeDerivation(ref<Store> store,
-    const Derivation & drv, const string & name, bool repair)
+    const Derivation & drv, const string & name, RepairFlag repair)
 {
     PathSet references;
     references.insert(drv.inputSrcs.begin(), drv.inputSrcs.end());

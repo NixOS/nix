@@ -14,6 +14,7 @@ namespace nix {
 
 class Store;
 class EvalState;
+enum RepairFlag : bool;
 
 
 typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, Value & v);
@@ -73,7 +74,7 @@ public:
 
     /* If set, force copying files to the Nix store even if they
        already exist there. */
-    bool repair = false;
+    RepairFlag repair;
 
     /* If set, don't allow access to files outside of the Nix search
        path or to environment variables. */

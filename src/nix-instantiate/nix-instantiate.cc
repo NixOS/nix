@@ -108,7 +108,7 @@ int main(int argc, char * * argv)
         Strings attrPaths;
         bool wantsReadWrite = false;
         std::map<string, string> autoArgs_;
-        bool repair = false;
+        RepairFlag repair = NoRepair;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--help")
@@ -146,7 +146,7 @@ int main(int argc, char * * argv)
             else if (*arg == "--strict")
                 strict = true;
             else if (*arg == "--repair")
-                repair = true;
+                repair = Repair;
             else if (*arg == "--dry-run")
                 settings.readOnlyMode = true;
             else if (*arg != "" && arg->at(0) == '-')

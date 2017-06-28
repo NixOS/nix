@@ -85,15 +85,15 @@ public:
     bool wantMassQuery() override { return wantMassQuery_; }
 
     void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-        bool repair, bool dontCheckSigs,
+        RepairFlag repair, CheckSigsFlag checkSigs,
         std::shared_ptr<FSAccessor> accessor) override;
 
     Path addToStore(const string & name, const Path & srcPath,
         bool recursive, HashType hashAlgo,
-        PathFilter & filter, bool repair) override;
+        PathFilter & filter, RepairFlag repair) override;
 
     Path addTextToStore(const string & name, const string & s,
-        const PathSet & references, bool repair) override;
+        const PathSet & references, RepairFlag repair) override;
 
     void narFromPath(const Path & path, Sink & sink) override;
 

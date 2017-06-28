@@ -201,7 +201,7 @@ connected:
             printError("somebody is hogging the upload lock for ‘%s’, continuing...");
         alarm(0);
         signal(SIGALRM, old);
-        copyPaths(store, ref<Store>(sshStore), inputs, false, true);
+        copyPaths(store, ref<Store>(sshStore), inputs, NoRepair, NoCheckSigs);
         uploadLock = -1;
 
         BasicDerivation drv(readDerivation(drvPath));
@@ -219,7 +219,7 @@ connected:
 
         if (!missing.empty()) {
             setenv("NIX_HELD_LOCKS", concatStringsSep(" ", missing).c_str(), 1); /* FIXME: ugly */
-            copyPaths(ref<Store>(sshStore), store, missing, false, true);
+            copyPaths(ref<Store>(sshStore), store, missing, NoRepair, NoCheckSigs);
         }
 
         return;

@@ -12,7 +12,7 @@ int main(int argc, char ** argv)
         auto toMode = true;
         auto includeOutputs = false;
         auto dryRun = false;
-        auto useSubstitutes = false;
+        auto useSubstitutes = NoSubstitute;
         std::string sshHost;
         PathSet storePaths;
 
@@ -36,7 +36,7 @@ int main(int argc, char ** argv)
             else if (*arg == "--dry-run")
                 dryRun = true;
             else if (*arg == "--use-substitutes" || *arg == "-s")
-                useSubstitutes = true;
+                useSubstitutes = Substitute;
             else if (sshHost.empty())
                 sshHost = *arg;
             else
@@ -58,6 +58,6 @@ int main(int argc, char ** argv)
         PathSet closure;
         from->computeFSClosure(storePaths2, closure, false, includeOutputs);
 
-        copyPaths(from, to, closure, useSubstitutes, true);
+        copyPaths(from, to, closure, NoRepair, NoCheckSigs, useSubstitutes);
     });
 }

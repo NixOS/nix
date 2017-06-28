@@ -113,7 +113,7 @@ struct LegacySSHStore : public Store
     }
 
     void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-        bool repair, bool dontCheckSigs,
+        RepairFlag repair, CheckSigsFlag checkSigs,
         std::shared_ptr<FSAccessor> accessor) override
     {
         debug("adding path ‘%s’ to remote host ‘%s’", info.path, host);
@@ -168,11 +168,11 @@ struct LegacySSHStore : public Store
 
     Path addToStore(const string & name, const Path & srcPath,
         bool recursive, HashType hashAlgo,
-        PathFilter & filter, bool repair) override
+        PathFilter & filter, RepairFlag repair) override
     { unsupported(); }
 
     Path addTextToStore(const string & name, const string & s,
-        const PathSet & references, bool repair) override
+        const PathSet & references, RepairFlag repair) override
     { unsupported(); }
 
     BuildResult buildDerivation(const Path & drvPath, const BasicDerivation & drv,
@@ -249,7 +249,8 @@ struct LegacySSHStore : public Store
         out.insert(res.begin(), res.end());
     }
 
-    PathSet queryValidPaths(const PathSet & paths, bool maybeSubstitute = false) override
+    PathSet queryValidPaths(const PathSet & paths,
+        SubstituteFlag maybeSubstitute = NoSubstitute) override
     {
         auto conn(connections->get());
 

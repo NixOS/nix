@@ -185,7 +185,7 @@ bool RemoteStore::isValidPathUncached(const Path & path)
 }
 
 
-PathSet RemoteStore::queryValidPaths(const PathSet & paths, bool maybeSubstitute)
+PathSet RemoteStore::queryValidPaths(const PathSet & paths, SubstituteFlag maybeSubstitute)
 {
     auto conn(connections->get());
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {
@@ -357,7 +357,7 @@ Path RemoteStore::queryPathFromHashPart(const string & hashPart)
 
 
 void RemoteStore::addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-    bool repair, bool dontCheckSigs, std::shared_ptr<FSAccessor> accessor)
+    RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
 {
     auto conn(connections->get());
 
@@ -390,7 +390,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, const ref<std::string> 
                  << info.path << info.deriver << printHash(info.narHash)
                  << info.references << info.registrationTime << info.narSize
                  << info.ultimate << info.sigs << info.ca
-                 << repair << dontCheckSigs;
+                 << repair << !checkSigs;
         conn->to(*nar);
         conn->processStderr();
     }
@@ -398,7 +398,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, const ref<std::string> 
 
 
 Path RemoteStore::addToStore(const string & name, const Path & _srcPath,
-    bool recursive, HashType hashAlgo, PathFilter & filter, bool repair)
+    bool recursive, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
 {
     if (repair) throw Error("repairing is not supported when building through the Nix daemon");
 
@@ -434,7 +434,7 @@ Path RemoteStore::addToStore(const string & name, const Path & _srcPath,
 
 
 Path RemoteStore::addTextToStore(const string & name, const string & s,
-    const PathSet & references, bool repair)
+    const PathSet & references, RepairFlag repair)
 {
     if (repair) throw Error("repairing is not supported when building through the Nix daemon");
 
@@ -570,7 +570,7 @@ void RemoteStore::optimiseStore()
 }
 
 
-bool RemoteStore::verifyStore(bool checkContents, bool repair)
+bool RemoteStore::verifyStore(bool checkContents, RepairFlag repair)
 {
     auto conn(connections->get());
     conn->to << wopVerifyStore << checkContents << repair;

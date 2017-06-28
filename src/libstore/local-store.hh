@@ -98,7 +98,8 @@ public:
 
     bool isValidPathUncached(const Path & path) override;
 
-    PathSet queryValidPaths(const PathSet & paths, bool maybeSubstitute = false) override;
+    PathSet queryValidPaths(const PathSet & paths,
+        SubstituteFlag maybeSubstitute = NoSubstitute) override;
 
     PathSet queryAllValidPaths() override;
 
@@ -122,22 +123,22 @@ public:
         SubstitutablePathInfos & infos) override;
 
     void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-        bool repair, bool dontCheckSigs,
+        RepairFlag repair, CheckSigsFlag checkSigs,
         std::shared_ptr<FSAccessor> accessor) override;
 
     Path addToStore(const string & name, const Path & srcPath,
         bool recursive, HashType hashAlgo,
-        PathFilter & filter, bool repair) override;
+        PathFilter & filter, RepairFlag repair) override;
 
     /* Like addToStore(), but the contents of the path are contained
        in `dump', which is either a NAR serialisation (if recursive ==
        true) or simply the contents of a regular file (if recursive ==
        false). */
     Path addToStoreFromDump(const string & dump, const string & name,
-        bool recursive = true, HashType hashAlgo = htSHA256, bool repair = false);
+        bool recursive = true, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair);
 
     Path addTextToStore(const string & name, const string & s,
-        const PathSet & references, bool repair) override;
+        const PathSet & references, RepairFlag repair) override;
 
     void buildPaths(const PathSet & paths, BuildMode buildMode) override;
 
@@ -174,7 +175,7 @@ public:
     /* Optimise a single store path. */
     void optimisePath(const Path & path);
 
-    bool verifyStore(bool checkContents, bool repair) override;
+    bool verifyStore(bool checkContents, RepairFlag repair) override;
 
     /* Register the validity of a path, i.e., that `path' exists, that
        the paths referenced by it exists, and in the case of an output
@@ -212,7 +213,7 @@ private:
     void invalidatePathChecked(const Path & path);
 
     void verifyPath(const Path & path, const PathSet & store,
-        PathSet & done, PathSet & validPaths, bool repair, bool & errors);
+        PathSet & done, PathSet & validPaths, RepairFlag repair, bool & errors);
 
     void updatePathInfo(State & state, const ValidPathInfo & info);
 

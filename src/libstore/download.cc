@@ -631,7 +631,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
                 info.narHash = hashString(htSHA256, *sink.s);
                 info.narSize = sink.s->size();
                 info.ca = makeFixedOutputCA(false, hash);
-                store->addToStore(info, sink.s, false, true);
+                store->addToStore(info, sink.s, NoRepair, NoCheckSigs);
                 storePath = info.path;
             }
 
@@ -660,7 +660,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
             AutoDelete autoDelete(tmpDir, true);
             // FIXME: this requires GNU tar for decompression.
             runProgram("tar", true, {"xf", storePath, "-C", tmpDir, "--strip-components", "1"});
-            unpackedStorePath = store->addToStore(name, tmpDir, true, htSHA256, defaultPathFilter, false);
+            unpackedStorePath = store->addToStore(name, tmpDir, true, htSHA256, defaultPathFilter, NoRepair);
         }
         replaceSymlink(unpackedStorePath, unpackedLink);
         storePath = unpackedStorePath;

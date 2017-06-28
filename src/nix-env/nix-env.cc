@@ -1310,7 +1310,7 @@ int main(int argc, char * * argv)
         Strings opFlags, opArgs, searchPath;
         std::map<string, string> autoArgs_;
         Operation op = 0;
-        bool repair = false;
+        RepairFlag repair = NoRepair;
         string file;
 
         Globals globals;
@@ -1372,7 +1372,7 @@ int main(int argc, char * * argv)
             else if (*arg == "--prebuilt-only" || *arg == "-b")
                 globals.prebuiltOnly = true;
             else if (*arg == "--repair")
-                repair = true;
+                repair = Repair;
             else if (*arg != "" && arg->at(0) == '-') {
                 opFlags.push_back(*arg);
                 /* FIXME: hacky */
