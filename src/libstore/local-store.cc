@@ -30,6 +30,10 @@
 #include <sys/xattr.h>
 #endif
 
+#ifdef __CYGWIN__
+#include <windows.h>
+#endif
+
 #include <sqlite3.h>
 
 
@@ -280,6 +284,16 @@ void LocalStore::openDB(State & state, bool create)
     if (sqlite3_open_v2(dbPath.c_str(), &db.db,
             SQLITE_OPEN_READWRITE | (create ? SQLITE_OPEN_CREATE : 0), 0) != SQLITE_OK)
         throw Error(format("cannot open Nix database ‘%1%’") % dbPath);
+
+#ifdef __CYGWIN__
+    /* The cygwin version of sqlite3 has a patch which calls
+       SetDllDirectory("/usr/bin") on init. It was intended to fix extension
+       loading, which we don't use, and the effect of SetDllDirectory is
+       inherited by child processes, and causes libraries to be loaded from
+       /usr/bin instead of $PATH. This breaks quite a few things (e.g.
+       checkPhase on openssh), so we set it back to default behaviour. */
+    SetDllDirectoryW(L"");
+#endif
 
     if (sqlite3_busy_timeout(db, 60 * 60 * 1000) != SQLITE_OK)
         throwSQLiteError(db, "setting timeout");
