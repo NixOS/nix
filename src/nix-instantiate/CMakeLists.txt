@@ -2,4 +2,4 @@ nix_add_executable(nix-instantiate nix-instantiate.cc)
 target_link_libraries(nix-instantiate
 	nixexpr nixmain nixstore nixutil nixformat
 )
-nix_install(TARGETS nix-instantiate DESTINATION bin)
+nix_install(TARGETS nix-instantiate DESTINATION ${CMAKE_INSTALL_BINDIR})

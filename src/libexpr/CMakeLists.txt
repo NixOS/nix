@@ -45,6 +45,7 @@ nix_add_library(nixexpr SHARED
 
 target_link_libraries(nixexpr
     nixutil nixstore nixformat
+    ${BDW_GC_LIBRARIES} # TODO: propagate??
     dl
 )
 

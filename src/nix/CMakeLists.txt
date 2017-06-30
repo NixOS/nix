@@ -24,6 +24,6 @@ nix_add_executable(nix
 target_link_libraries(nix
 	nixexpr nixmain nixstore nixutil nixformat
 )
-nix_install(TARGETS nix DESTINATION bin)
+nix_install(TARGETS nix DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 nix_target_alias(nix nix-hash DESTINATION ${CMAKE_INSTALL_BINDIR})

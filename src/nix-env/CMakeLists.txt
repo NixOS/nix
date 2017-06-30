@@ -5,4 +5,4 @@ nix_add_executable(nix-env
 target_link_libraries(nix-env
 	nixexpr nixmain nixstore nixutil nixformat
 )
-nix_install(TARGETS nix-env DESTINATION bin)
+nix_install(TARGETS nix-env DESTINATION ${CMAKE_INSTALL_BINDIR})

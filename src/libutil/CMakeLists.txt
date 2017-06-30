@@ -19,8 +19,8 @@ target_compile_definitions(nixutil PRIVATE BRO="${bro}")
 target_link_libraries(nixutil
 	nixformat
 	${OPENSSL_LIBRARIES}
-	lzma
-	bz2
+	${LIBLZMA_LIBRARIES}
+	${LIBBZ2}
 	pthread
 )
 

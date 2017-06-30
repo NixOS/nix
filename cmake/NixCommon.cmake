@@ -50,6 +50,7 @@ function(nix_externalize_debuginfo name)
             COMMAND objcopy --only-keep-debug $<TARGET_FILE:${name}> 
                 $<TARGET_FILE:${name}>.debug
                 ${strip_command} -R .gnu_debuglink
+            COMMAND chmod -x $<TARGET_FILE:${name}>.debug
             COMMAND objcopy --add-gnu-debuglink=$<TARGET_FILE:${name}>.debug 
                 $<TARGET_FILE:${name}>
         )
@@ -87,7 +88,7 @@ function(nix_target_alias _target _alias)
     add_custom_command( OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${_alias}
         DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${_target}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        COMMAND ln -s ${_target} ${_alias}
+        COMMAND ln -f -s ${_target} ${_alias}
     )
     add_custom_target( dummy_target_${_alias} ALL 
         DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${_alias}

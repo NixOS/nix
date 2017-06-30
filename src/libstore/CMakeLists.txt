@@ -33,11 +33,11 @@ add_library(nixstore SHARED
 
 target_link_libraries(nixstore
     nixutil nixformat
-    seccomp
+    ${LIBSECCOMP_LIBRARIES}
     ${LIBSODIUM_LIBRARIES}
     ${CURL_LIBRARIES}
-    sqlite3
-    bz2
+    ${SQLITE3_LIBRARIES}
+    ${LIBBZ2}
 )
 
 target_compile_definitions(nixstore PRIVATE
@@ -49,7 +49,7 @@ target_compile_definitions(nixstore PRIVATE
     NIX_CONF_DIR="${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_SYSCONFDIR}/nix"
     NIX_LIBEXEC_DIR="${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBEXECDIR}"
     NIX_BIN_DIR="${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}"
-    SANDBOX_SHELL="${sandbox_shell}"
+    SANDBOX_SHELL="${NIX_SANDBOX_SHELL}"
     LSOF="${lsof}"
 )
 

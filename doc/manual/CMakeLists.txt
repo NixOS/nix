@@ -1,6 +1,7 @@
-set(doc_generate_nonet YES CACHE BOOL "")
-message(STATUS "doc_generate_nonet: ${doc_generate_nonet}")
-if(${doc_generate_nonet} STREQUAL YES)
+if(NIX_DOC_GENERATE)
+
+set(NIX_DOC_GENERATE_NONET YES CACHE BOOL "Don't download docbook-xsl from sourceforge")
+if(NIX_DOC_GENERATE_NONET)
     set(nonet_flag "--nonet")
     set(docbookxsl /usr/share/xml/docbook/stylesheet/docbook-xsl)
     set(docbookrng  ${docbookxsl}/slides/schema/relaxng/docbook.rng)
@@ -8,15 +9,10 @@ else()
     set(docbookrng "http://docbook.org/xml/5.0/rng/docbook.rng")
     set(docbookxsl "http://docbook.sourceforge.net/release/xsl-ns/current")
 endif()
+
 set(profile_xsl ${docbookxsl}/profiling/profile.xsl)
 set(docbook_xsl ${docbookxsl}/manpages/docbook.xsl)
 set(manpages_xsl ${docbookxsl}/xhtml/docbook.xsl)
-
-message(STATUS "docbookrng: ${docbookrng}")
-message(STATUS "docbookxsl: ${docbookxsl}")
-message(STATUS "profile_xsl: ${profile_xsl}")
-message(STATUS "docbook_xsl: ${docbook_xsl}")
-
 
 set(docdir ${CMAKE_INSTALL_DOCDIR})
 set(mandir ${CMAKE_INSTALL_MANDIR})
@@ -45,14 +41,10 @@ set(MANUAL_SRCS # ensure manual.xml first
 )
 prepend_path(${CMAKE_CURRENT_SOURCE_DIR} MANUAL_SRCS)
 
-#message(STATUS "xmllint: ${xmllint}")
-#message(STATUS "XSLTPROC: ${XSLTPROC}")
-#message(STATUS "docbookrng: ${docbookrng}")
 list(GET MANUAL_SRCS 0 MANUAL_SRC)
 
 function(nix_generate_manual_xmli _target _depends _version)
     set(_fullname ${CMAKE_CURRENT_BINARY_DIR}/${_target})
-    #message(STATUS "nix_generate_manual_xmli: ${_target}\n${_depends}")
     add_custom_command(
         OUTPUT ${_fullname}
         COMMAND ${xmllint} ${nonet_flag} --noblanks --xinclude ${_depends} --output ${_fullname}
@@ -209,3 +201,5 @@ function(nix_generate_manual_pdf _target _depends)
 endfunction()
 nix_generate_manual_pdf(manual.pdf ${MANUAL_SRCS} ${CMAKE_CURRENT_BINARY_DIR}/manual.is-valid)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/manual.pdf DESTINATION ${docdir}/manual)
+
+endif()

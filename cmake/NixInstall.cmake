@@ -5,15 +5,11 @@ macro(InstallSymlink _filepath _installdir)
 
     install(CODE "
         if (\"\$ENV{DESTDIR}\" STREQUAL \"\")
-            execute_process(COMMAND \"${CMAKE_COMMAND}\" -E create_symlink
-                            ${_filepath}
+            execute_process(COMMAND ln -s ${_filepath}
                             ${_installdir}/${_symname})
-            message(\"-- Created symlink: ${_filepath} -> ${_installdir}/${_symname}\")
         else ()
-            execute_process(COMMAND \"${CMAKE_COMMAND}\" -E create_symlink
-                            ${_filepath}
+            execute_process(COMMAND ln -s ${_filepath}
                             \$ENV{DESTDIR}/${_installdir}/${_symname})
-            message(\"-- Created symlink: ${_filepath} -> \$ENV{DESTDIR}/${_installdir}/${_symname}\")
         endif ()
     ")
     install(CODE "")

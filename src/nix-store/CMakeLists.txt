@@ -11,4 +11,4 @@ if(${LIBSODIUM_FOUND})
 endif()
 
 target_compile_definitions(nix-store PRIVATE CURL="${CURL}")
-nix_install(TARGETS nix-store DESTINATION bin)
+nix_install(TARGETS nix-store DESTINATION ${CMAKE_INSTALL_BINDIR})
