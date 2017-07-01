@@ -1,4 +1,7 @@
-source common.sh
+export NIX_TEST_ROOT="$(cd -P -- "$(dirname -- "$0")" && pwd -P)"
+source "$NIX_TEST_ROOT/common.sh"
+
+setupTest
 
 clearStore
 
@@ -16,7 +19,7 @@ rm -rf $TEST_ROOT/store0
 export NIX_STORE_DIR=/my/store
 export NIX_REMOTE="local?root=$TEST_ROOT/store0"
 
-outPath=$(nix-build dependencies.nix --no-out-link --option build-sandbox-paths /nix/store)
+outPath=$(nix-build $NIX_TEST_ROOT/dependencies.nix --no-out-link --option build-sandbox-paths /nix/store)
 
 [[ $outPath =~ /my/store/.*-dependencies ]]
 

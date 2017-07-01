@@ -1,7 +1,9 @@
-source common.sh
+export NIX_TEST_ROOT="$(cd -P -- "$(dirname -- "$0")" && pwd -P)"
+source "$NIX_TEST_ROOT/common.sh"
+
+setupTest
 
 clearStore
-clearProfiles
 
 checkRef() {
     nix-store -q --references $TEST_ROOT/result | grep -q "$1" || fail "missing reference $1"
@@ -9,7 +11,7 @@ checkRef() {
 
 # Test the export of the runtime dependency graph.
 
-outPath=$(nix-build ./export-graph.nix -A 'foo."bar.runtimeGraph"' -o $TEST_ROOT/result)
+outPath=$(nix-build "$NIX_TEST_ROOT/export-graph.nix" -A 'foo."bar.runtimeGraph"' -o $TEST_ROOT/result)
 
 test $(nix-store -q --references $TEST_ROOT/result | wc -l) = 2 || fail "bad nr of references"
 
@@ -20,7 +22,7 @@ for i in $(cat $outPath); do checkRef $i; done
 
 nix-store --gc # should force rebuild of input-1
 
-outPath=$(nix-build ./export-graph.nix -A 'foo."bar.buildGraph"' -o $TEST_ROOT/result)
+outPath=$(nix-build "$NIX_TEST_ROOT/export-graph.nix" -A 'foo."bar.buildGraph"' -o $TEST_ROOT/result)
 
 checkRef input-1
 checkRef input-1.drv

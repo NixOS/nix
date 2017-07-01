@@ -1,9 +1,27 @@
-source common.sh
+export NIX_TEST_ROOT="$(cd -P -- "$(dirname -- "$0")" && pwd -P)"
+source "$NIX_TEST_ROOT/common.sh"
+
+setupTest
 
 clearStore
 
-outPath1=$(echo 'with import ./config.nix; mkDerivation { name = "foo1"; builder = builtins.toFile "builder" "mkdir $out; echo hello > $out/foo"; }' | nix-build - --no-out-link --option auto-optimise-store true)
-outPath2=$(echo 'with import ./config.nix; mkDerivation { name = "foo2"; builder = builtins.toFile "builder" "mkdir $out; echo hello > $out/foo"; }' | nix-build - --no-out-link --option auto-optimise-store true)
+read -r -d '' scr1 <<EOF || true
+with import $NIX_TEST_ROOT/config.nix;
+mkDerivation {
+    name = "foo1";
+    builder = builtins.toFile "builder" "mkdir \$out; echo hello > \$out/foo";
+}
+EOF
+outPath1=$(echo "$scr1" | nix-build - --no-out-link --option auto-optimise-store true)
+
+read -r -d '' scr2 <<EOF || true
+with import $NIX_TEST_ROOT/config.nix;
+mkDerivation {
+    name = "foo2";
+    builder = builtins.toFile "builder" "mkdir \$out; echo hello >  \$out/foo";
+}
+EOF
+outPath2=$(echo "$scr2" | nix-build - --no-out-link --option auto-optimise-store true)
 
 inode1="$(stat --format=%i $outPath1/foo)"
 inode2="$(stat --format=%i $outPath2/foo)"
@@ -18,7 +36,14 @@ if [ "$nlink" != 3 ]; then
     exit 1
 fi
 
-outPath3=$(echo 'with import ./config.nix; mkDerivation { name = "foo3"; builder = builtins.toFile "builder" "mkdir $out; echo hello > $out/foo"; }' | nix-build - --no-out-link)
+read -r -d '' scr3 <<EOF || true
+with import $NIX_TEST_ROOT/config.nix;
+mkDerivation {
+    name = "foo3"; builder = builtins.toFile "builder" "mkdir \$out;
+    echo hello > \$out/foo";
+}
+EOF
+outPath3=$(echo "$scr3" | nix-build - --no-out-link)
 
 inode3="$(stat --format=%i $outPath3/foo)"
 if [ "$inode1" = "$inode3" ]; then

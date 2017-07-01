@@ -1,4 +1,7 @@
-source common.sh
+export NIX_TEST_ROOT="$(cd -P -- "$(dirname -- "$0")" && pwd -P)"
+source "$NIX_TEST_ROOT/common.sh"
+
+setupTest
 
 clearStore
 
@@ -17,7 +20,7 @@ build-sandbox-paths = /nix/store
 sandbox-build-dir = /build-tmp
 " > $NIX_CONF_DIR/nix.conf
 
-outPath=$(nix-build build-hook.nix --no-out-link -j0 \
+outPath=$(nix-build $NIX_TEST_ROOT/build-hook.nix --no-out-link -j0 \
   --option builders "local?root=$TEST_ROOT/store0; local?root=$TEST_ROOT/store1 - - 1 1 foo")
 
 cat $outPath/foobar | grep FOOBAR

@@ -1,14 +1,18 @@
-source common.sh
+export NIX_TEST_ROOT="$(cd -P -- "$(dirname -- "$0")" && pwd -P)"
+source "$NIX_TEST_ROOT/common.sh"
 
-sed -e "s|@localstatedir@|$TEST_ROOT/profile-var|g" -e "s|@coreutils@|$coreutils|g" < ../scripts/nix-profile.sh.in > $TEST_ROOT/nix-profile.sh
+setupTest
 
 user=$(whoami)
-rm -rf $TEST_HOME $TEST_ROOT/profile-var
-mkdir -p $TEST_HOME
-USER=$user $SHELL -e -c ". $TEST_ROOT/nix-profile.sh; set"
-USER=$user $SHELL -e -c ". $TEST_ROOT/nix-profile.sh" # test idempotency
+export NIX_USER_PROFILE_DIR="$TEST_ROOT/profile-var/nix/profiles/per-user/$user"
 
-[ -L $TEST_HOME/.nix-profile ]
-[ -e $TEST_HOME/.nix-channels ]
-[ -e $TEST_ROOT/profile-var/nix/gcroots/per-user/$user ]
-[ -e $TEST_ROOT/profile-var/nix/profiles/per-user/$user ]
+rm -rf "$TEST_HOME" "$TEST_ROOT/profile-var"
+mkdir -p "$TEST_HOME"
+
+source ./nix-profile.sh
+source ./nix-profile.sh # test idempotency
+
+[ -L $TEST_HOME/.nix-profile ] 
+[ -e $TEST_HOME/.nix-channels ] 
+[ -e $NIX_STATE_DIR/gcroots/per-user/$user ] 
+[ -e $TEST_ROOT/profile-var/nix/profiles/per-user/$user ] 
