@@ -3,6 +3,8 @@ source "$NIX_TEST_ROOT/common.sh"
 
 setupTest
 
+touch dummy
+
 path1=$(nix-store --add ./dummy)
 echo $path1
 

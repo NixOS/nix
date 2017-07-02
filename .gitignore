@@ -82,8 +82,8 @@ perl/Makefile.config
 /src/build-remote/build-remote
 
 # /tests/
-/tests/test-tmp
-/tests/common.sh
+#/tests/test-tmp
+#/tests/common.sh
 /tests/dummy
 /tests/result*
 
