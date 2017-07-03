@@ -1,6 +1,7 @@
 programs += nix-prefetch-url
 
 nix-prefetch-url_DIR := $(d)
+nix-prefetch-url_RELDIR := $(reldir)
 
 nix-prefetch-url_SOURCES := $(d)/nix-prefetch-url.cc
 

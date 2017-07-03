@@ -1,6 +1,7 @@
 programs += nix-daemon
 
 nix-daemon_DIR := $(d)
+nix-daemon_RELDIR := $(reldir)
 
 nix-daemon_SOURCES := $(d)/nix-daemon.cc
 

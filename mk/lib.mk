@@ -42,7 +42,7 @@ mandir ?= $(prefix)/share/man
 builddir ?=
 
 ifdef builddir
-  buildprefix = $(builddir)/
+  buildprefix = $(builddir)
 else
   buildprefix =
 endif
@@ -79,30 +79,47 @@ ifeq ($(BUILD_DEBUG), 1)
 endif
 
 
-include mk/functions.mk
-include mk/tracing.mk
-include mk/clean.mk
-include mk/install.mk
-include mk/libraries.mk
-include mk/programs.mk
-include mk/jars.mk
-include mk/patterns.mk
-include mk/templates.mk
-include mk/tests.mk
+include $(TOP)/mk/functions.mk
+include $(TOP)/mk/tracing.mk
+include $(TOP)/mk/clean.mk
+include $(TOP)/mk/install.mk
+include $(TOP)/mk/libraries.mk
+include $(TOP)/mk/programs.mk
+include $(TOP)/mk/jars.mk
+include $(TOP)/mk/patterns.mk
+include $(TOP)/mk/templates.mk
+include $(TOP)/mk/tests.mk
 
 
 # Include all sub-Makefiles.
 define include-sub-makefile
-  d := $$(patsubst %/,%,$$(dir $(1)))
-  include $(1)
+d := $$(patsubst %/,%,$(TOP)/$$(dir $(1)))
+reldir := $$(patsubst %/,%,$$(dir $(1)))
+$(1)_DIR := $(d)
+$(1)_RELDIR := $(reldir)
+include $(TOP)/$(1)
+undefine d
+undefine reldir
 endef
 
-$(foreach mf, $(makefiles), $(eval $(call include-sub-makefile, $(mf))))
+$(foreach mf, $(makefiles), $(eval $(call include-sub-makefile,$(mf))))
 
+define print-target-vars
+$(1)_NAME    = $($(1)_NAME)
+$(1)_DIR     = $($(1)_DIR)
+$(1)_RELDIR  = $($(1)_RELDIR)
+$(1)_OUT     = $($(1)_OUT)
+$(1)_OBJS    = $($(1)_OBJS)
+
+endef
 
 # Instantiate stuff.
 $(foreach lib, $(libraries), $(eval $(call build-library,$(lib))))
+#$(foreach lib, $(libraries), $(info $(call print-target-vars,$(lib))))
+
 $(foreach prog, $(programs), $(eval $(call build-program,$(prog))))
+#$(foreach prog, $(programs), $(info $(call print-target-vars,$(prog))))
+
 $(foreach jar, $(jars), $(eval $(call build-jar,$(jar))))
 $(foreach script, $(bin-scripts), $(eval $(call install-program-in,$(script),$(bindir))))
 $(foreach script, $(bin-scripts), $(eval programs-list += $(script)))
@@ -112,7 +129,7 @@ $(foreach test, $(install-tests), $(eval $(call run-install-test,$(test))))
 $(foreach file, $(man-pages), $(eval $(call install-data-in, $(file), $(mandir)/man$(patsubst .%,%,$(suffix $(file))))))
 
 
-include mk/dist.mk
+include $(TOP)/mk/dist.mk
 
 
 .PHONY: default all man help
@@ -134,19 +151,19 @@ ifdef programs-list
 	@echo ""
 	@echo "The following programs can be built:"
 	@echo ""
-	@for i in $(programs-list); do echo "  $$i"; done
+	@for i in $(programs-list-no-path); do echo "  $$i"; done
 endif
 ifdef libs-list
 	@echo ""
 	@echo "The following libraries can be built:"
 	@echo ""
-	@for i in $(libs-list); do echo "  $$i"; done
+	@for i in $(libs-list-no-path); do echo "  $$i"; done
 endif
 ifdef jars-list
 	@echo ""
 	@echo "The following JARs can be built:"
 	@echo ""
-	@for i in $(jars-list); do echo "  $$i"; done
+	@for i in $(jars-list-no-path); do echo "  $$i"; done
 endif
 	@echo ""
 	@echo "The following variables control the build:"

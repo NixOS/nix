@@ -1,6 +1,7 @@
 programs += nix-build
 
 nix-build_DIR := $(d)
+nix-build_RELDIR := $(reldir)
 
 nix-build_SOURCES := $(d)/nix-build.cc
 

@@ -3,6 +3,7 @@ libraries += libmain
 libmain_NAME = libnixmain
 
 libmain_DIR := $(d)
+libmain_RELDIR := $(reldir)
 
 libmain_SOURCES := $(wildcard $(d)/*.cc)
 

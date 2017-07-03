@@ -1,6 +1,7 @@
 programs += buildenv
 
 buildenv_DIR := $(d)
+buildenv_RELDIR := $(reldir)
 
 buildenv_INSTALL_DIR := $(libexecdir)/nix
 

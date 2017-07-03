@@ -1,6 +1,7 @@
 programs += nix-env
 
 nix-env_DIR := $(d)
+nix-env_RELDIR := $(reldir)
 
 nix-env_SOURCES := $(wildcard $(d)/*.cc)
 

@@ -3,6 +3,7 @@ libraries += libutil
 libutil_NAME = libnixutil
 
 libutil_DIR := $(d)
+libutil_RELDIR := $(reldir)
 
 libutil_SOURCES := $(wildcard $(d)/*.cc)
 

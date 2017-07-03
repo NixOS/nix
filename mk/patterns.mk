@@ -8,4 +8,4 @@ $(buildprefix)%.o: %.cpp
 
 $(buildprefix)%.o: %.c
 	@mkdir -p "$(dir $@)"
-	$(trace-cc) $(CC) -o $@ -c $< $(GLOBAL_CFLAGS) $(CFLAGS) $($@_CFLAGS) -MMD -MF $(call filename-to-dep, $@) -MP
+	$(trace-cc)   $(CC) -o $@ -c $< $(GLOBAL_CFLAGS) $(CFLAGS) $($@_CFLAGS) -MMD -MF $(call filename-to-dep, $@) -MP

@@ -1,7 +1,11 @@
 
 ifeq ($(doc_generate),yes)
 
-XSLTPROC = $(xsltproc) --nonet $(xmlflags) \
+NONET ?= 0
+NONET_FLAGS_1 = --nonet
+NONET_FLAGS = $(NONET_FLAGS_$(NONET))
+
+XSLTPROC = $(xsltproc) $(NONET_flag) $(xmlflags) \
   --param section.autolabel 1 \
   --param section.label.includes.component.label 1 \
   --param html.stylesheet \'style.css\' \
@@ -13,15 +17,24 @@ XSLTPROC = $(xsltproc) --nonet $(xmlflags) \
   --stringparam generate.toc "book toc" \
   --param keep.relative.image.uris 0
 
-docbookxsl = http://docbook.sourceforge.net/release/xsl-ns/current
-docbookrng = http://docbook.org/xml/5.0/rng/docbook.rng
+ifeq ($(NONET),0)
+    docbookxsl = /usr/share/xml/docbook/stylesheet/docbook-xsl
+    docbookrng = $(docbookxsl)/slides/schema/relaxng/docbook.rng
+    profile_xsl= $(docbookxsl)/profiling/profile.xsl
+    docbook_xsl= $(docbookxsl)/manpages/profile-docbook.xsl
+else
+    docbookrng = "http://docbook.org/xml/5.0/rng/docbook.rng"
+    docbookxsl = "http://docbook.sourceforge.net/release/xsl-ns/current"
+    profile_xsl= $(docbookxsl)/profiling/profile.xsl
+    docbook_xsl= $(docbookxsl)/manpages/docbook.xsl
+endif
 
 MANUAL_SRCS := $(call rwildcard, $(d), *.xml)
 
 
 # Do XInclude processing / RelaxNG validation
 $(d)/manual.xmli: $(d)/manual.xml $(MANUAL_SRCS) $(d)/version.txt
-	$(trace-gen) $(xmllint) --nonet --xinclude $< -o $@.tmp
+	$(trace-gen) $(xmllint) $(NONET_FLAGS) --xinclude $< -o $@.tmp
 	@mv $@.tmp $@
 
 $(d)/version.txt:
@@ -31,7 +44,7 @@ $(d)/version.txt:
 $(d)/manual.is-valid: $(d)/manual.xmli
 	$(trace-gen) $(XSLTPROC) --novalid --stringparam profile.condition manual \
 	  $(docbookxsl)/profiling/profile.xsl $< 2> /dev/null | \
-	  $(xmllint) --nonet --noout --relaxng $(docbookrng) -
+	  $(xmllint) $(NONET_FLAGS) --noout --relaxng $(docbookrng) -
 	@touch $@
 
 clean-files += $(d)/manual.xmli $(d)/version.txt $(d)/manual.is-valid

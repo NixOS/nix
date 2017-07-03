@@ -1,6 +1,7 @@
 programs += nix-channel
 
 nix-channel_DIR := $(d)
+nix-channel_RELDIR := $(reldir)
 
 nix-channel_LIBS = libmain libutil libformat libstore
 
