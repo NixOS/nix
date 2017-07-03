@@ -390,6 +390,8 @@ int main(int argc, char ** argv)
                     maybePrintExecError(e);
                 }
 
+                if (dryRun) return;
+
                 // Set the environment.
                 auto env = getEnv();
 
