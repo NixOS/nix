@@ -5,7 +5,7 @@ libmain_NAME = libnixmain
 libmain_DIR := $(d)
 libmain_RELDIR := $(reldir)
 
-libmain_SOURCES := $(wildcard $(d)/*.cc)
+libmain_SOURCES := $(subst $(d)/,,$(wildcard $(d)/*.cc))
 
 libmain_LDFLAGS = $(OPENSSL_LIBS)
 

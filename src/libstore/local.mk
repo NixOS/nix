@@ -5,7 +5,7 @@ libstore_NAME = libnixstore
 libstore_DIR := $(d)
 libstore_RELDIR := $(reldir)
 
-libstore_SOURCES := $(wildcard $(d)/*.cc)
+libstore_SOURCES := $(subst $(d)/,,$(wildcard $(d)/*.cc))
 
 libstore_LIBS = libutil libformat
 

@@ -5,4 +5,4 @@ libformat_NAME = libnixformat
 libformat_DIR := $(d)
 libformat_RELDIR := $(reldir)
 
-libformat_SOURCES := $(wildcard $(d)/*.cc)
+libformat_SOURCES := $(subst $(d)/,,$(wildcard $(d)/*.cc))

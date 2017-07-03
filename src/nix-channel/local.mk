@@ -5,4 +5,4 @@ nix-channel_RELDIR := $(reldir)
 
 nix-channel_LIBS = libmain libutil libformat libstore
 
-nix-channel_SOURCES := $(d)/nix-channel.cc
+nix-channel_SOURCES := nix-channel.cc

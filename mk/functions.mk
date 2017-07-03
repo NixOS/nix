@@ -6,7 +6,8 @@ rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst 
 # (e.g. ‘foo/bar.o’ becomes ‘foo/.bar.o.dep’).
 filename-to-dep = $(dir $1).$(notdir $1).dep
 
-src-to-obj = $(addsuffix .o,/$(notdir $(basename $1)))
+# src-to-obj doesn't use $(notdir ...), to preserve relative directory prefix
+src-to-obj = $(addsuffix .o,/$(basename $1))
 srcs-to-objs = $(sort $(foreach src,$1,$(call src-to-obj,$(src))))
 
 # Return the full path to a program by looking it up in $PATH, or the

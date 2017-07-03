@@ -28,7 +28,11 @@ makefiles += misc/emacs/local.mk
 makefiles += doc/manual/local.mk
 makefiles += tests/local.mk
 
-GLOBAL_CXXFLAGS += -std=c++14 -g -Wall -include config.h
+GLOBAL_CXXFLAGS += -std=c++14 -Wall -include config.h
+ifeq ($(BUILD_DEBUG), 1)
+  GLOBAL_CXXFLAGS += -g
+endif
+
 
 -include $(TOP)/Makefile.config
 

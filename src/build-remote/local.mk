@@ -7,4 +7,4 @@ build-remote_INSTALL_DIR := $(libexecdir)/nix
 
 build-remote_LIBS = libmain libutil libformat libstore
 
-build-remote_SOURCES := $(d)/build-remote.cc
+build-remote_SOURCES := build-remote.cc

@@ -52,7 +52,7 @@ define build-library
   $(1)_NAME ?= $(1)
   _d := $$(buildprefix)$$($(1)_RELDIR)
   $(1)_OUT := $$(_d)/
-  _objs := $$(foreach src, $$($(1)_SOURCES),$$(call src-to-obj,$$(src)))
+  _objs := $$(call srcs-to-objs,$$($(1)_SOURCES))
   $(1)_OBJS := $$(addprefix $$(_d),$$(_objs))
   _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_PATH))
 
@@ -88,7 +88,7 @@ define build-library
     $(1)_PATH := $$(_d)/$$($(1)_NAME).$(SO_EXT)
 
     $$($(1)_PATH): $$($(1)_OBJS) $$(_libs) | $$(_d)/
-	$$(trace-ld) $(CXX) -o $$(abspath $$@) \
+	$$(trace-ld) $(CXX) -o $$@ \
 	    -shared $$(GLOBAL_LDFLAGS) \
 	    $$($(1)_OBJS) \
 	    $$($(1)_LDFLAGS) \

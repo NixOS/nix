@@ -14,8 +14,9 @@ GLOBAL_CXXFLAGS += -I $(TOP)/src/libstore
 GLOBAL_CXXFLAGS += -I $(TOP)/src/libmain
 GLOBAL_CXXFLAGS += -I $(TOP)/src/libexpr
 
-$(foreach i, config.h $(call rwildcard, src/lib*, *.hh), \
+$(foreach i, config.h $(call rwildcard, $(TOP)/src/lib*, *.hh), \
   $(eval $(call install-file-in, $(i), $(includedir)/nix, 0644)))
 
-$(foreach i, $(call rwildcard, src/boost, *.hpp), \
-  $(eval $(call install-file-in, $(i), $(includedir)/nix/$(patsubst src/%/,%,$(dir $(i))), 0644)))
+$(foreach i, $(call rwildcard, $(TOP)/src/boost, *.hpp), \
+  $(eval $(call install-file-in, $(i), \
+  	$(includedir)/nix/$(subst $(TOP)/src,,$(dir $(i))), 0644)))

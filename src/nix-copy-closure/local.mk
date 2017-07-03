@@ -5,4 +5,4 @@ nix-copy-closure_RELDIR := $(reldir)
 
 nix-copy-closure_LIBS = libmain libutil libformat libstore
 
-nix-copy-closure_SOURCES := $(d)/nix-copy-closure.cc
+nix-copy-closure_SOURCES := nix-copy-closure.cc

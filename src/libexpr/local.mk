@@ -5,7 +5,11 @@ libexpr_NAME = libnixexpr
 libexpr_DIR := $(d)
 libexpr_RELDIR := $(reldir)
 
-libexpr_SOURCES := $(wildcard $(libexpr_DIR)/*.cc) $(wildcard $(libexpr_DIR)/primops/*.cc) $(libexpr_DIR)/lexer-tab.cc $(libexpr_DIR)/parser-tab.cc
+srcs = $(subst $(d)/,,$(wildcard $(d)/*.cc))
+srcs += $(subst $(d)/,,$(wildcard $(d)/primops/*.cc))
+srcs += lexer-tab.cc
+srcs += parser-tab.cc
+libexpr_SOURCES := $(sort $(srcs)) # remove possible duplicate
 
 libexpr_LIBS = libutil libstore libformat
 

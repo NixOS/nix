@@ -47,7 +47,6 @@ else
   buildprefix =
 endif
 
-
 # Pass -fPIC if we're building dynamic libraries.
 BUILD_SHARED_LIBS ?= 1
 
@@ -95,8 +94,8 @@ include $(TOP)/mk/tests.mk
 define include-sub-makefile
 d := $$(patsubst %/,%,$(TOP)/$$(dir $(1)))
 reldir := $$(patsubst %/,%,$$(dir $(1)))
-$(1)_DIR := $(d)
-$(1)_RELDIR := $(reldir)
+#$(1)_DIR := $(d)
+#$(1)_RELDIR := $(reldir)
 include $(TOP)/$(1)
 undefine d
 undefine reldir
