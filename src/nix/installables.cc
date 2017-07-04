@@ -189,7 +189,10 @@ std::vector<std::shared_ptr<Installable>> InstallablesCommand::parseInstallables
 
     for (auto & s : ss) {
 
-        if (s.find("/") != std::string::npos) {
+        if (s.compare(0, 1, "(") == 0)
+            result.push_back(std::make_shared<InstallableExpr>(*this, s));
+
+        else if (s.find("/") != std::string::npos) {
 
             auto path = store->toStorePath(store->followLinksToStore(s));
 
@@ -200,9 +203,6 @@ std::vector<std::shared_ptr<Installable>> InstallablesCommand::parseInstallables
                     result.push_back(std::make_shared<InstallableStorePath>(path));
             }
         }
-
-        else if (s.compare(0, 1, "(") == 0)
-            result.push_back(std::make_shared<InstallableExpr>(*this, s));
 
         else if (s == "" || std::regex_match(s, attrPathRegex))
             result.push_back(std::make_shared<InstallableAttrPath>(*this, s));
