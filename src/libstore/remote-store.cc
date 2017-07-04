@@ -294,7 +294,7 @@ void RemoteStore::queryPathInfoUncached(const Path & path,
         info->path = path;
         info->deriver = readString(conn->from);
         if (info->deriver != "") assertStorePath(info->deriver);
-        info->narHash = parseHash(htSHA256, readString(conn->from));
+        info->narHash = Hash(readString(conn->from), htSHA256);
         info->references = readStorePaths<PathSet>(*this, conn->from);
         conn->from >> info->registrationTime >> info->narSize;
         if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
@@ -387,7 +387,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, const ref<std::string> 
 
     else {
         conn->to << wopAddToStoreNar
-                 << info.path << info.deriver << printHash(info.narHash)
+                 << info.path << info.deriver << info.narHash.to_string(Base16, false)
                  << info.references << info.registrationTime << info.narSize
                  << info.ultimate << info.sigs << info.ca
                  << repair << !checkSigs;

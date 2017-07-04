@@ -176,13 +176,12 @@ Path Store::makeStorePath(const string & type,
     const Hash & hash, const string & name) const
 {
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
-    string s = type + ":sha256:" + printHash(hash) + ":"
-        + storeDir + ":" + name;
+    string s = type + ":" + hash.to_string(Base16) + ":" + storeDir + ":" + name;
 
     checkStoreName(name);
 
     return storeDir + "/"
-        + printHash32(compressHash(hashString(htSHA256, s), 20))
+        + compressHash(hashString(htSHA256, s), 20).to_string(Base32, false)
         + "-" + name;
 }
 
@@ -202,7 +201,7 @@ Path Store::makeFixedOutputPath(bool recursive,
         ? makeStorePath("source", hash, name)
         : makeStorePath("output:out", hashString(htSHA256,
                 "fixed:out:" + (recursive ? (string) "r:" : "") +
-                printHashType(hash.type) + ":" + printHash(hash) + ":"),
+                hash.to_string(Base16) + ":"),
             name);
 }
 
@@ -438,7 +437,7 @@ string Store::makeValidityRegistration(const PathSet & paths,
         auto info = queryPathInfo(i);
 
         if (showHash) {
-            s += printHash(info->narHash) + "\n";
+            s += info->narHash.to_string(Base16, false) + "\n";
             s += (format("%1%\n") % info->narSize).str();
         }
 
@@ -613,7 +612,7 @@ ValidPathInfo decodeValidPathInfo(std::istream & str, bool hashGiven)
     if (hashGiven) {
         string s;
         getline(str, s);
-        info.narHash = parseHash(htSHA256, s);
+        info.narHash = Hash(s, htSHA256);
         getline(str, s);
         if (!string2Int(s, info.narSize)) throw Error("number expected");
     }
@@ -648,7 +647,7 @@ std::string ValidPathInfo::fingerprint() const
             % path);
     return
         "1;" + path + ";"
-        + printHashType(narHash.type) + ":" + printHash32(narHash) + ";"
+        + narHash.to_string(Base32) + ";"
         + std::to_string(narSize) + ";"
         + concatStringsSep(",", references);
 }
@@ -667,7 +666,7 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
     };
 
     if (hasPrefix(ca, "text:")) {
-        auto hash = parseHash(std::string(ca, 5));
+        Hash hash(std::string(ca, 5));
         if (store.makeTextPath(storePathToName(path), hash, references) == path)
             return true;
         else
@@ -676,7 +675,7 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
 
     else if (hasPrefix(ca, "fixed:")) {
         bool recursive = ca.compare(6, 2, "r:") == 0;
-        auto hash = parseHash(std::string(ca, recursive ? 8 : 6));
+        Hash hash(std::string(ca, recursive ? 8 : 6));
         if (store.makeFixedOutputPath(recursive, hash, storePathToName(path)) == path)
             return true;
         else

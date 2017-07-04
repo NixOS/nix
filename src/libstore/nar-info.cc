@@ -11,7 +11,7 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
 
     auto parseHashField = [&](const string & s) {
         try {
-            return parseHash(s);
+            return Hash(s);
         } catch (BadHash &) {
             corrupt();
             return Hash(); // never reached
@@ -90,10 +90,10 @@ std::string NarInfo::to_string() const
     assert(compression != "");
     res += "Compression: " + compression + "\n";
     assert(fileHash.type == htSHA256);
-    res += "FileHash: sha256:" + printHash32(fileHash) + "\n";
+    res += "FileHash: " + fileHash.to_string(Base32) + "\n";
     res += "FileSize: " + std::to_string(fileSize) + "\n";
     assert(narHash.type == htSHA256);
-    res += "NarHash: sha256:" + printHash32(narHash) + "\n";
+    res += "NarHash: " + narHash.to_string(Base32) + "\n";
     res += "NarSize: " + std::to_string(narSize) + "\n";
 
     res += "References: " + concatStringsSep(" ", shortRefs()) + "\n";

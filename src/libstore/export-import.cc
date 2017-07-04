@@ -56,7 +56,7 @@ void Store::exportPath(const Path & path, Sink & sink)
     Hash hash = hashAndWriteSink.currentHash();
     if (hash != info->narHash && info->narHash != Hash(info->narHash.type))
         throw Error(format("hash of path ‘%1%’ has changed from ‘%2%’ to ‘%3%’!") % path
-            % printHash(info->narHash) % printHash(hash));
+            % info->narHash.to_string() % hash.to_string());
 
     hashAndWriteSink << exportMagic << path << info->references << info->deriver << 0;
 }

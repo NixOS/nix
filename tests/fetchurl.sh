@@ -9,6 +9,15 @@ outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh 
 
 cmp $outPath fetchurl.sh
 
+# Now using a base-64 hash.
+clearStore
+
+hash=$(nix hash-file --type sha512 --base64 ./fetchurl.sh)
+
+outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr sha512 $hash --no-out-link)
+
+cmp $outPath fetchurl.sh
+
 # Test unpacking a NAR.
 rm -rf $TEST_ROOT/archive
 mkdir -p $TEST_ROOT/archive

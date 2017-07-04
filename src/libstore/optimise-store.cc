@@ -135,10 +135,10 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
        contents of the symlink (i.e. the result of readlink()), not
        the contents of the target (which may not even exist). */
     Hash hash = hashPath(htSHA256, path).first;
-    debug(format("‘%1%’ has hash ‘%2%’") % path % printHash(hash));
+    debug(format("‘%1%’ has hash ‘%2%’") % path % hash.to_string());
 
     /* Check if this is a known hash. */
-    Path linkPath = linksDir + "/" + printHash32(hash);
+    Path linkPath = linksDir + "/" + hash.to_string(Base32, false);
 
  retry:
     if (!pathExists(linkPath)) {

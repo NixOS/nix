@@ -20,20 +20,30 @@ const int sha512HashSize = 64;
 
 extern const string base32Chars;
 
+enum Base : int { Base64, Base32, Base16 };
+
 
 struct Hash
 {
     static const unsigned int maxHashSize = 64;
-    unsigned int hashSize;
-    unsigned char hash[maxHashSize];
+    unsigned int hashSize = 0;
+    unsigned char hash[maxHashSize] = {};
 
-    HashType type;
+    HashType type = htUnknown;
 
     /* Create an unset hash object. */
-    Hash();
+    Hash() { };
 
     /* Create a zero-filled hash object. */
-    Hash(HashType type);
+    Hash(HashType type) : type(type) { init(); };
+
+    /* Initialize the hash from a string representation, in the format
+       "[<type>:]<base16|base32|base64>". If the ‘type’ argument is
+       htUnknown, then the hash type must be specified in the
+       string. */
+    Hash(const std::string & s, HashType type = htUnknown);
+
+    void init();
 
     /* Check whether a hash is set. */
     operator bool () const { return type != htUnknown; }
@@ -59,32 +69,21 @@ struct Hash
         return (hashSize * 8 - 1) / 5 + 1;
     }
 
-    std::string to_string(bool base32 = true) const;
+    /* Returns the length of a base-64 representation of this hash. */
+    size_t base64Len() const
+    {
+        return ((4 * hashSize / 3) + 3) & ~3;
+    }
+
+    /* Return a string representation of the hash, in base-16, base-32
+       or base-64. By default, this is prefixed by the hash type
+       (e.g. "sha256:"). */
+    std::string to_string(Base base = Base32, bool includeType = true) const;
 };
 
 
-/* Convert a hash to a hexadecimal representation. */
-string printHash(const Hash & hash);
-
-Hash parseHash(const string & s);
-
-/* Parse a hexadecimal representation of a hash code. */
-Hash parseHash(HashType ht, const string & s);
-
-/* Convert a hash to a base-32 representation. */
-string printHash32(const Hash & hash);
-
 /* Print a hash in base-16 if it's MD5, or base-32 otherwise. */
 string printHash16or32(const Hash & hash);
-
-/* Parse a base-32 representation of a hash code. */
-Hash parseHash32(HashType ht, const string & s);
-
-/* Parse a base-16 or base-32 representation of a hash code. */
-Hash parseHash16or32(HashType ht, const string & s);
-
-/* Verify that the given string is a valid hash code. */
-bool isHash(const string & s);
 
 /* Compute the hash of the given string. */
 Hash hashString(HashType ht, const string & s);

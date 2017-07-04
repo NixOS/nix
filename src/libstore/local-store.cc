@@ -572,7 +572,7 @@ uint64_t LocalStore::addValidPath(State & state,
 
     state.stmtRegisterValidPath.use()
         (info.path)
-        ("sha256:" + printHash(info.narHash))
+        (info.narHash.to_string(Base16))
         (info.registrationTime == 0 ? time(0) : info.registrationTime)
         (info.deriver, info.deriver != "")
         (info.narSize, info.narSize != 0)
@@ -614,20 +614,6 @@ uint64_t LocalStore::addValidPath(State & state,
 }
 
 
-Hash parseHashField(const Path & path, const string & s)
-{
-    string::size_type colon = s.find(':');
-    if (colon == string::npos)
-        throw Error(format("corrupt hash ‘%1%’ in valid-path entry for ‘%2%’")
-            % s % path);
-    HashType ht = parseHashType(string(s, 0, colon));
-    if (ht == htUnknown)
-        throw Error(format("unknown hash type ‘%1%’ in valid-path entry for ‘%2%’")
-            % string(s, 0, colon) % path);
-    return parseHash(ht, string(s, colon + 1));
-}
-
-
 void LocalStore::queryPathInfoUncached(const Path & path,
     std::function<void(std::shared_ptr<ValidPathInfo>)> success,
     std::function<void(std::exception_ptr exc)> failure)
@@ -650,7 +636,11 @@ void LocalStore::queryPathInfoUncached(const Path & path,
 
             info->id = useQueryPathInfo.getInt(0);
 
-            info->narHash = parseHashField(path, useQueryPathInfo.getStr(1));
+            try {
+                info->narHash = Hash(useQueryPathInfo.getStr(1));
+            } catch (BadHash & e) {
+                throw Error("in valid-path entry for ‘%s’: %s", path, e.what());
+            }
 
             info->registrationTime = useQueryPathInfo.getInt(2);
 
@@ -685,7 +675,7 @@ void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
 {
     state.stmtUpdatePathInfo.use()
         (info.narSize, info.narSize != 0)
-        ("sha256:" + printHash(info.narHash))
+        (info.narHash.to_string(Base16))
         (info.ultimate ? 1 : 0, info.ultimate)
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
         (info.ca, !info.ca.empty())
@@ -1211,7 +1201,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 if (info->narHash != nullHash && info->narHash != current.first) {
                     printError(format("path ‘%1%’ was modified! "
                             "expected hash ‘%2%’, got ‘%3%’")
-                        % i % printHash(info->narHash) % printHash(current.first));
+                        % i % info->narHash.to_string() % current.first.to_string());
                     if (repair) repairPath(i); else errors = true;
                 } else {
 

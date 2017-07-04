@@ -581,7 +581,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
     Path cacheDir = getCacheDir() + "/nix/tarballs";
     createDirs(cacheDir);
 
-    string urlHash = printHash32(hashString(htSHA256, url));
+    string urlHash = hashString(htSHA256, url).to_string(Base32, false);
 
     Path dataFile = cacheDir + "/" + urlHash + ".info";
     Path fileLink = cacheDir + "/" + urlHash + "-file";

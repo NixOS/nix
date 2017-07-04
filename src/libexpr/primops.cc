@@ -708,8 +708,8 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         HashType ht = parseHashType(outputHashAlgo);
         if (ht == htUnknown)
             throw EvalError(format("unknown hash algorithm ‘%1%’, at %2%") % outputHashAlgo % posDrvName);
-        Hash h = parseHash16or32(ht, *outputHash);
-        outputHash = printHash(h);
+        Hash h(*outputHash, ht);
+        outputHash = h.to_string(Base16, false);
         if (outputHashRecursive) outputHashAlgo = "r:" + outputHashAlgo;
 
         Path outPath = state.store->makeFixedOutputPath(outputHashRecursive, h, drvName);
@@ -1701,7 +1701,7 @@ static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, 
     PathSet context; // discarded
     string s = state.forceString(*args[1], context, pos);
 
-    mkString(v, printHash(hashString(ht, s)), context);
+    mkString(v, hashString(ht, s).to_string(Base16, false), context);
 }
 
 
@@ -1852,7 +1852,7 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
             if (n == "url")
                 url = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "sha256")
-                expectedHash = parseHash16or32(htSHA256, state.forceStringNoCtx(*attr.value, *attr.pos));
+                expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else

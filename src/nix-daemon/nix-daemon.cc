@@ -216,7 +216,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         startWork();
         auto hash = store->queryPathInfo(path)->narHash;
         stopWork();
-        to << printHash(hash);
+        to << hash.to_string(Base16, false);
         break;
     }
 
@@ -550,7 +550,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         if (info) {
             if (GET_PROTOCOL_MINOR(clientVersion) >= 17)
                 to << 1;
-            to << info->deriver << printHash(info->narHash) << info->references
+            to << info->deriver << info->narHash.to_string(Base16, false) << info->references
                << info->registrationTime << info->narSize;
             if (GET_PROTOCOL_MINOR(clientVersion) >= 16) {
                 to << info->ultimate
@@ -610,7 +610,7 @@ static void performOp(ref<LocalStore> store, bool trusted, unsigned int clientVe
         from >> info.deriver;
         if (!info.deriver.empty())
             store->assertStorePath(info.deriver);
-        info.narHash = parseHash(htSHA256, readString(from));
+        info.narHash = Hash(readString(from), htSHA256);
         info.references = readStorePaths<PathSet>(*store, from);
         from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);

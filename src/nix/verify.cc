@@ -94,7 +94,7 @@ struct CmdVerify : StorePathsCommand
                         corrupted = 1;
                         printError(
                             format("path ‘%s’ was modified! expected hash ‘%s’, got ‘%s’")
-                            % info->path % printHash(info->narHash) % printHash(hash.first));
+                            % info->path % info->narHash.to_string() % hash.first.to_string());
                     }
 
                 }

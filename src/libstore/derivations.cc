@@ -23,7 +23,7 @@ void DerivationOutput::parseHashInfo(bool & recursive, Hash & hash) const
     if (hashType == htUnknown)
         throw Error(format("unknown hash algorithm ‘%1%’") % algo);
 
-    hash = parseHash(hashType, this->hash);
+    hash = Hash(this->hash, hashType);
 }
 
 
@@ -354,7 +354,7 @@ Hash hashDerivationModulo(Store & store, Derivation drv)
             h = hashDerivationModulo(store, drv2);
             drvHashes[i.first] = h;
         }
-        inputs2[printHash(h)] = i.second;
+        inputs2[h.to_string(Base16, false)] = i.second;
     }
     drv.inputDrvs = inputs2;
 
@@ -437,7 +437,7 @@ Sink & operator << (Sink & out, const BasicDerivation & drv)
 std::string hashPlaceholder(const std::string & outputName)
 {
     // FIXME: memoize?
-    return "/" + printHash32(hashString(htSHA256, "nix-output:" + outputName));
+    return "/" + hashString(htSHA256, "nix-output:" + outputName).to_string(Base32, false);
 }
 
 

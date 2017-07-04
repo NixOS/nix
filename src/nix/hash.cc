@@ -9,15 +9,16 @@ struct CmdHash : Command
 {
     enum Mode { mFile, mPath };
     Mode mode;
-    bool base32 = false;
+    Base base = Base16;
     bool truncate = false;
     HashType ht = htSHA512;
     Strings paths;
 
     CmdHash(Mode mode) : mode(mode)
     {
-        mkFlag(0, "base32", "print hash in base-32", &base32);
-        mkFlag(0, "base16", "print hash in base-16", &base32, false);
+        mkFlag(0, "base64", "print hash in base-64", &base, Base64);
+        mkFlag(0, "base32", "print hash in base-32 (Nix-specific)", &base, Base32);
+        mkFlag(0, "base16", "print hash in base-16", &base, Base16);
         mkHashTypeFlag("type", &ht);
         expectArgs("paths", &paths);
     }
@@ -40,7 +41,7 @@ struct CmdHash : Command
             Hash h = mode == mFile ? hashFile(ht, path) : hashPath(ht, path).first;
             if (truncate && h.hashSize > 20) h = compressHash(h, 20);
             std::cout << format("%1%\n") %
-                (base32 ? printHash32(h) : printHash(h));
+                h.to_string(base, false);
         }
     }
 };
@@ -50,11 +51,11 @@ static RegisterCommand r2(make_ref<CmdHash>(CmdHash::mPath));
 
 struct CmdToBase : Command
 {
-    bool toBase32;
+    Base base;
     HashType ht = htSHA512;
     Strings args;
 
-    CmdToBase(bool toBase32) : toBase32(toBase32)
+    CmdToBase(Base base) : base(base)
     {
         mkHashTypeFlag("type", &ht);
         expectArgs("strings", &args);
@@ -62,28 +63,29 @@ struct CmdToBase : Command
 
     std::string name() override
     {
-        return toBase32 ? "to-base32" : "to-base16";
+        return
+            base == Base16 ? "to-base16" :
+            base == Base32 ? "to-base32" :
+            "to-base64";
     }
 
     std::string description() override
     {
-        return toBase32
-            ? "convert a hash to base-32 representation"
-            : "convert a hash to base-16 representation";
+        return fmt("convert a hash to base-%d representation",
+            base == Base16 ? 16 :
+            base == Base32 ? 32 : 64);
     }
 
     void run() override
     {
-        for (auto s : args) {
-            Hash h = parseHash16or32(ht, s);
-            std::cout << format("%1%\n") %
-                (toBase32 ? printHash32(h) : printHash(h));
-        }
+        for (auto s : args)
+            std::cout << fmt("%s\n", Hash(s, ht).to_string(base, false));
     }
 };
 
-static RegisterCommand r3(make_ref<CmdToBase>(false));
-static RegisterCommand r4(make_ref<CmdToBase>(true));
+static RegisterCommand r3(make_ref<CmdToBase>(Base16));
+static RegisterCommand r4(make_ref<CmdToBase>(Base32));
+static RegisterCommand r5(make_ref<CmdToBase>(Base64));
 
 /* Legacy nix-hash command. */
 static int compatNixHash(int argc, char * * argv)
@@ -121,14 +123,14 @@ static int compatNixHash(int argc, char * * argv)
     if (op == opHash) {
         CmdHash cmd(flat ? CmdHash::mFile : CmdHash::mPath);
         cmd.ht = ht;
-        cmd.base32 = base32;
+        cmd.base = base32 ? Base32 : Base16;
         cmd.truncate = truncate;
         cmd.paths = ss;
         cmd.run();
     }
 
     else {
-        CmdToBase cmd(op == opTo32);
+        CmdToBase cmd(op == opTo32 ? Base32 : Base16);
         cmd.args = ss;
         cmd.ht = ht;
         cmd.run();

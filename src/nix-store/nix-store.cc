@@ -212,7 +212,7 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
     string name = *i++;
 
     cout << format("%1%\n") %
-        store->makeFixedOutputPath(recursive, parseHash16or32(hashAlgo, hash), name);
+        store->makeFixedOutputPath(recursive, Hash(hash, hashAlgo), name);
 }
 
 
@@ -380,9 +380,9 @@ static void opQuery(Strings opFlags, Strings opArgs)
                     auto info = store->queryPathInfo(j);
                     if (query == qHash) {
                         assert(info->narHash.type == htSHA256);
-                        cout << format("sha256:%1%\n") % printHash32(info->narHash);
+                        cout << fmt("%s\n", info->narHash.to_string(Base32));
                     } else if (query == qSize)
-                        cout << format("%1%\n") % info->narSize;
+                        cout << fmt("%d\n", info->narSize);
                 }
             }
             break;
@@ -734,7 +734,7 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         if (current.first != info->narHash) {
             printError(
                 format("path ‘%1%’ was modified! expected hash ‘%2%’, got ‘%3%’")
-                % path % printHash(info->narHash) % printHash(current.first));
+                % path % info->narHash.to_string() % current.first.to_string());
             status = 1;
         }
     }

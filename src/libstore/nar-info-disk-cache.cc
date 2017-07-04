@@ -203,9 +203,9 @@ public:
             narInfo->url = queryNAR.getStr(3);
             narInfo->compression = queryNAR.getStr(4);
             if (!queryNAR.isNull(5))
-                narInfo->fileHash = parseHash(queryNAR.getStr(5));
+                narInfo->fileHash = Hash(queryNAR.getStr(5));
             narInfo->fileSize = queryNAR.getInt(6);
-            narInfo->narHash = parseHash(queryNAR.getStr(7));
+            narInfo->narHash = Hash(queryNAR.getStr(7));
             narInfo->narSize = queryNAR.getInt(8);
             for (auto & r : tokenizeString<Strings>(queryNAR.getStr(9), " "))
                 narInfo->references.insert(cache.storeDir + "/" + r);

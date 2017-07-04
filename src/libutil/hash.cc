@@ -16,17 +16,8 @@
 namespace nix {
 
 
-Hash::Hash()
+void Hash::init()
 {
-    type = htUnknown;
-    hashSize = 0;
-    memset(hash, 0, maxHashSize);
-}
-
-
-Hash::Hash(HashType type)
-{
-    this->type = type;
     if (type == htMD5) hashSize = md5HashSize;
     else if (type == htSHA1) hashSize = sha1HashSize;
     else if (type == htSHA256) hashSize = sha256HashSize;
@@ -62,16 +53,10 @@ bool Hash::operator < (const Hash & h) const
 }
 
 
-std::string Hash::to_string(bool base32) const
-{
-    return printHashType(type) + ":" + (base32 ? printHash32(*this) : printHash(*this));
-}
-
-
 const string base16Chars = "0123456789abcdef";
 
 
-string printHash(const Hash & hash)
+static string printHash16(const Hash & hash)
 {
     char buf[hash.hashSize * 2];
     for (unsigned int i = 0; i < hash.hashSize; i++) {
@@ -82,42 +67,11 @@ string printHash(const Hash & hash)
 }
 
 
-Hash parseHash(const string & s)
-{
-    string::size_type colon = s.find(':');
-    if (colon == string::npos)
-        throw BadHash(format("invalid hash ‘%s’") % s);
-    string hts = string(s, 0, colon);
-    HashType ht = parseHashType(hts);
-    if (ht == htUnknown)
-        throw BadHash(format("unknown hash type ‘%s’") % hts);
-    return parseHash16or32(ht, string(s, colon + 1));
-}
-
-
-Hash parseHash(HashType ht, const string & s)
-{
-    Hash hash(ht);
-    if (s.length() != hash.hashSize * 2)
-        throw BadHash(format("invalid hash ‘%1%’") % s);
-    for (unsigned int i = 0; i < hash.hashSize; i++) {
-        string s2(s, i * 2, 2);
-        if (!isxdigit(s2[0]) || !isxdigit(s2[1]))
-            throw BadHash(format("invalid hash ‘%1%’") % s);
-        istringstream_nocopy str(s2);
-        int n;
-        str >> std::hex >> n;
-        hash.hash[i] = n;
-    }
-    return hash;
-}
-
-
 // omitted: E O U T
 const string base32Chars = "0123456789abcdfghijklmnpqrsvwxyz";
 
 
-string printHash32(const Hash & hash)
+static string printHash32(const Hash & hash)
 {
     assert(hash.hashSize);
     size_t len = hash.base32Len();
@@ -142,66 +96,103 @@ string printHash32(const Hash & hash)
 
 string printHash16or32(const Hash & hash)
 {
-    return hash.type == htMD5 ? printHash(hash) : printHash32(hash);
+    return hash.to_string(hash.type == htMD5 ? Base16 : Base32);
 }
 
 
-Hash parseHash32(HashType ht, const string & s)
+std::string Hash::to_string(Base base, bool includeType) const
 {
-    Hash hash(ht);
-    size_t len = hash.base32Len();
-    assert(s.size() == len);
+    std::string s;
+    if (includeType) {
+        s += printHashType(type);
+        s += ':';
+    }
+    switch (base) {
+    case Base16:
+        s += printHash16(*this);
+        break;
+    case Base32:
+        s += printHash32(*this);
+        break;
+    case Base64:
+        s += base64Encode(std::string((const char *) hash, hashSize));
+        break;
+    }
+    return s;
+}
 
-    for (unsigned int n = 0; n < len; ++n) {
-        char c = s[len - n - 1];
-        unsigned char digit;
-        for (digit = 0; digit < base32Chars.size(); ++digit) /* !!! slow */
-            if (base32Chars[digit] == c) break;
-        if (digit >= 32)
-            throw BadHash(format("invalid base-32 hash ‘%1%’") % s);
-        unsigned int b = n * 5;
-        unsigned int i = b / 8;
-        unsigned int j = b % 8;
-        hash.hash[i] |= digit << j;
 
-        if (i < hash.hashSize - 1) {
-            hash.hash[i + 1] |= digit >> (8 - j);
-        } else {
-            if (digit >> (8 - j))
-                throw BadHash(format("invalid base-32 hash ‘%1%’") % s);
+Hash::Hash(const std::string & s, HashType type)
+    : type(type)
+{
+    auto colon = s.find(':');
+
+    size_t pos = 0;
+
+    if (colon == string::npos) {
+        if (type == htUnknown)
+            throw BadHash("hash ‘%s’ does not include a type", s);
+    } else {
+        string hts = string(s, 0, colon);
+        this->type = parseHashType(hts);
+        if (this->type == htUnknown)
+            throw BadHash("unknown hash type ‘%s’", hts);
+        if (type != htUnknown && type != this->type)
+            throw BadHash("hash ‘%s’ should have type ‘%s’", s, printHashType(type));
+        pos = colon + 1;
+    }
+
+    init();
+
+    size_t size = s.size() - pos;
+
+    if (size == base16Len()) {
+
+        auto parseHexDigit = [&](char c) {
+            if (c >= '0' && c <= '9') return c - '0';
+            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+            throw BadHash("invalid base-16 hash ‘%s’", s);
+        };
+
+        for (unsigned int i = 0; i < hashSize; i++) {
+            hash[i] =
+                parseHexDigit(s[pos + i * 2]) << 4
+                | parseHexDigit(s[pos + i * 2 + 1]);
         }
     }
 
-    return hash;
-}
+    else if (size == base32Len()) {
 
+        for (unsigned int n = 0; n < size; ++n) {
+            char c = s[pos + size - n - 1];
+            unsigned char digit;
+            for (digit = 0; digit < base32Chars.size(); ++digit) /* !!! slow */
+                if (base32Chars[digit] == c) break;
+            if (digit >= 32)
+                throw BadHash("invalid base-32 hash ‘%s’", s);
+            unsigned int b = n * 5;
+            unsigned int i = b / 8;
+            unsigned int j = b % 8;
+            hash[i] |= digit << j;
 
-Hash parseHash16or32(HashType ht, const string & s)
-{
-    Hash hash(ht);
-    if (s.size() == hash.hashSize * 2)
-        /* hexadecimal representation */
-        hash = parseHash(ht, s);
-    else if (s.size() == hash.base32Len())
-        /* base-32 representation */
-        hash = parseHash32(ht, s);
-    else
-        throw BadHash(format("hash ‘%1%’ has wrong length for hash type ‘%2%’")
-            % s % printHashType(ht));
-    return hash;
-}
-
-
-bool isHash(const string & s)
-{
-    if (s.length() != 32) return false;
-    for (int i = 0; i < 32; i++) {
-        char c = s[i];
-        if (!((c >= '0' && c <= '9') ||
-              (c >= 'a' && c <= 'f')))
-            return false;
+            if (i < hashSize - 1) {
+                hash[i + 1] |= digit >> (8 - j);
+            } else {
+                if (digit >> (8 - j))
+                    throw BadHash("invalid base-32 hash ‘%s’", s);
+            }
+        }
     }
-    return true;
+
+    else if (size == base64Len()) {
+        auto d = base64Decode(std::string(s, pos));
+        assert(d.size() == hashSize);
+        memcpy(hash, d.data(), hashSize);
+    }
+
+    else
+        throw BadHash("hash ‘%s’ has wrong length for hash type ‘%s’", s, printHashType(type));
 }
 
 

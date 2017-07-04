@@ -145,7 +145,7 @@ int main(int argc, char * * argv)
         Hash hash, expectedHash(ht);
         Path storePath;
         if (args.size() == 2) {
-            expectedHash = parseHash16or32(ht, args[1]);
+            expectedHash = Hash(args[1], ht);
             storePath = store->makeFixedOutputPath(unpack, expectedHash, name);
             if (store->isValidPath(storePath))
                 hash = expectedHash;

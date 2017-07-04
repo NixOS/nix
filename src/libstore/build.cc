@@ -3236,7 +3236,7 @@ PathSet DerivationGoal::checkPathValidity(bool returnValid, bool checkHash)
 Path DerivationGoal::addHashRewrite(const Path & path)
 {
     string h1 = string(path, worker.store.storeDir.size() + 1, 32);
-    string h2 = string(printHash32(hashString(htSHA256, "rewrite:" + drvPath + ":" + path)), 0, 32);
+    string h2 = string(hashString(htSHA256, "rewrite:" + drvPath + ":" + path).to_string(Base32, false), 0, 32);
     Path p = worker.store.storeDir + "/" + h2 + string(path, worker.store.storeDir.size() + 33);
     deletePath(p);
     assert(path.size() == p.size());
