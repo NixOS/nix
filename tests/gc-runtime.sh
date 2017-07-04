@@ -1,18 +1,16 @@
-source common.sh
+export NIX_TEST_ROOT="$(cd -P -- "$(dirname -- "$0")" && pwd -P)"
+source "$NIX_TEST_ROOT/common.sh"
 
-case $system in
-    *linux*)
-        ;;
-    *)
-        exit 0;
-esac
+setupTest
+
+if [[ $(uname) != Linux ]]; then exit; fi
 
 set -m # enable job control, needed for kill
 
 profiles="$NIX_STATE_DIR"/profiles
 rm -rf $profiles
 
-nix-env -p $profiles/test -f ./gc-runtime.nix -i gc-runtime
+nix-env -p $profiles/test -f "$NIX_TEST_ROOT/gc-runtime.nix" -i gc-runtime
 
 outPath=$(nix-env -p $profiles/test -q --no-name --out-path gc-runtime)
 echo $outPath

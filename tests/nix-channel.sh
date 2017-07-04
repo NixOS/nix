@@ -1,4 +1,7 @@
-source common.sh
+export NIX_TEST_ROOT="$(cd -P -- "$(dirname -- "$0")" && pwd -P)"
+source "$NIX_TEST_ROOT/common.sh"
+
+setupTest
 
 clearProfiles
 
@@ -15,10 +18,10 @@ nix-channel --remove xyzzy
 # Create a channel.
 rm -rf $TEST_ROOT/foo
 mkdir -p $TEST_ROOT/foo
-nix copy --recursive --to file://$TEST_ROOT/foo?compression="bzip2" $(nix-store -r $(nix-instantiate dependencies.nix))
+nix copy --recursive --to file://$TEST_ROOT/foo?compression="bzip2" $(nix-store -r $(nix-instantiate $NIX_TEST_ROOT/dependencies.nix))
 rm -rf $TEST_ROOT/nixexprs
 mkdir -p $TEST_ROOT/nixexprs
-cp config.nix dependencies.nix dependencies.builder*.sh $TEST_ROOT/nixexprs/
+cp $NIX_TEST_ROOT/config.nix $NIX_TEST_ROOT/dependencies.nix $NIX_TEST_ROOT/dependencies.builder*.sh $TEST_ROOT/nixexprs/
 ln -s dependencies.nix $TEST_ROOT/nixexprs/default.nix
 (cd $TEST_ROOT && tar cvf - nixexprs) | bzip2 > $TEST_ROOT/foo/nixexprs.tar.bz2
 
@@ -28,9 +31,12 @@ nix-channel --update
 
 # Do a query.
 nix-env -qa \* --meta --xml --out-path > $TEST_ROOT/meta.xml
-if [ "$xmllint" != false ]; then
+
+xmllint=$(which xmllint)
+if [ -x "$xmllint" ] ; then
     $xmllint --noout $TEST_ROOT/meta.xml || fail "malformed XML"
 fi
+
 grep -q 'meta.*description.*Random test package' $TEST_ROOT/meta.xml
 grep -q 'item.*attrPath="foo".*name="dependencies"' $TEST_ROOT/meta.xml
 
@@ -47,7 +53,7 @@ nix-channel --update
 
 # Do a query.
 nix-env -qa \* --meta --xml --out-path > $TEST_ROOT/meta.xml
-if [ "$xmllint" != false ]; then
+if [ -x "$xmllint" ] ; then
     $xmllint --noout $TEST_ROOT/meta.xml || fail "malformed XML"
 fi
 grep -q 'meta.*description.*Random test package' $TEST_ROOT/meta.xml

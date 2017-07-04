@@ -1,14 +1,17 @@
-source common.sh
+export NIX_TEST_ROOT="$(cd -P -- "$(dirname -- "$0")" && pwd -P)"
+source "$NIX_TEST_ROOT/common.sh"
+
+setupTest
 
 clearStore
 
-drvPath1=$(nix-instantiate gc-concurrent.nix -A test1)
+drvPath1=$(nix-instantiate $NIX_TEST_ROOT/gc-concurrent.nix -A test1)
 outPath1=$(nix-store -q $drvPath1)
 
-drvPath2=$(nix-instantiate gc-concurrent.nix -A test2)
+drvPath2=$(nix-instantiate $NIX_TEST_ROOT/gc-concurrent.nix -A test2)
 outPath2=$(nix-store -q $drvPath2)
 
-drvPath3=$(nix-instantiate simple.nix)
+drvPath3=$(nix-instantiate $NIX_TEST_ROOT/simple.nix)
 outPath3=$(nix-store -r $drvPath3)
 
 (! test -e $outPath3.lock)

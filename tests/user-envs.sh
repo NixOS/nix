@@ -1,4 +1,7 @@
-source common.sh
+export NIX_TEST_ROOT="$(cd -P -- "$(dirname -- "$0")" && pwd -P)"
+source "$NIX_TEST_ROOT/common.sh"
+
+setupTest
 
 if [ -z "$storeCleared" ]; then
     clearStore
@@ -7,21 +10,32 @@ fi
 clearProfiles
 
 # Query installed: should be empty.
+profiles="$NIX_STATE_DIR"/profiles
 test "$(nix-env -p $profiles/test -q '*' | wc -l)" -eq 0
 
-mkdir -p $TEST_HOME
-nix-env --switch-profile $profiles/test
+overrideHome(){
+    export HOME=$1
+    [ ! -d "$1" ] && mkdir -p $HOME
+}
+overrideHome "$TEST_ROOT/home"
+
+nix-env --switch-profile "$profiles/test"
 
 # Query available: should contain several.
-test "$(nix-env -f ./user-envs.nix -qa '*' | wc -l)" -eq 6
-outPath10=$(nix-env -f ./user-envs.nix -qa --out-path --no-name '*' | grep foo-1.0)
-drvPath10=$(nix-env -f ./user-envs.nix -qa --drv-path --no-name '*' | grep foo-1.0)
+test     "$(nix-env -f $NIX_TEST_ROOT/user-envs.nix -qa '*' | wc -l)" -eq 6
+outPath10=$(nix-env -f $NIX_TEST_ROOT/user-envs.nix -qa --out-path --no-name '*' | grep foo-1.0)
+drvPath10=$(nix-env -f $NIX_TEST_ROOT/user-envs.nix -qa --drv-path --no-name '*' | grep foo-1.0)
 [ -n "$outPath10" -a -n "$drvPath10" ]
 
 # Query descriptions.
-nix-env -f ./user-envs.nix -qa '*' --description | grep -q silly
-rm -f $HOME/.nix-defexpr
-ln -s $(pwd)/user-envs.nix $HOME/.nix-defexpr
+nix-env -f "$NIX_TEST_ROOT/user-envs.nix" -qa '*' --description | grep -q silly
+
+setDefaultExpr()
+{
+    rm -f $HOME/.nix-defexpr
+    ln -s $1 $HOME/.nix-defexpr
+}
+setDefaultExpr "$NIX_TEST_ROOT/user-envs.nix" 
 nix-env -qa '*' --description | grep -q silly
 
 # Install "foo-1.0".
@@ -66,7 +80,7 @@ nix-env -q '*' | grep -q foo-2.0pre1
 test "$($profiles/test/bin/foo)" = "foo-2.0pre1"
 
 # Upgrade "foo": should install foo-2.0.
-NIX_PATH=nixpkgs=./user-envs.nix:$NIX_PATH nix-env -f '<nixpkgs>' -u foo
+NIX_PATH="nixpkgs=$NIX_TEST_ROOT/user-envs.nix:$NIX_PATH" nix-env -f '<nixpkgs>' -u foo
 
 # Query installed: should contain foo-2.0 now.
 test "$(nix-env -q '*' | wc -l)" -eq 1

@@ -1,4 +1,7 @@
-source common.sh
+export NIX_TEST_ROOT="$(cd -P -- "$(dirname -- "$0")" && pwd -P)"
+source "$NIX_TEST_ROOT/common.sh"
+
+setupTest
 
 rm -rf $TEST_ROOT/filterin
 mkdir $TEST_ROOT/filterin
@@ -10,7 +13,7 @@ touch $TEST_ROOT/filterin/bak
 touch $TEST_ROOT/filterin/bla.c.bak
 ln -s xyzzy $TEST_ROOT/filterin/link
 
-nix-build ./filter-source.nix -o $TEST_ROOT/filterout
+nix-build $NIX_TEST_ROOT/filter-source.nix -o $TEST_ROOT/filterout
 
 test ! -e $TEST_ROOT/filterout/foo/bar
 test -e $TEST_ROOT/filterout/xyzzy

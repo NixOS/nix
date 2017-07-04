@@ -1,5 +1,7 @@
-source common.sh
+export NIX_TEST_ROOT="$(cd -P -- "$(dirname -- "$0")" && pwd -P)"
+source "$NIX_TEST_ROOT/common.sh"
 
+setupTest
 
 # First, test that -jN performs builds in parallel.
 echo "testing nix-build -j..."
@@ -8,7 +10,7 @@ clearStore
 
 rm -f $_NIX_TEST_SHARED.cur $_NIX_TEST_SHARED.max
 
-outPath=$(nix-build -j10000 parallel.nix --no-out-link)
+outPath=$(nix-build -j10000 $NIX_TEST_ROOT/parallel.nix --no-out-link)
 
 echo "output path is $outPath"
 
@@ -27,7 +29,7 @@ clearStore
 
 rm -f $_NIX_TEST_SHARED.cur $_NIX_TEST_SHARED.max
 
-drvPath=$(nix-instantiate parallel.nix --argstr sleepTime 15)
+drvPath=$(nix-instantiate $NIX_TEST_ROOT/parallel.nix --argstr sleepTime 15)
 
 cmd="nix-store -j1 -r $drvPath"
 

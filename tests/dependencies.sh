@@ -1,8 +1,11 @@
-source common.sh
+export NIX_TEST_ROOT="$(cd -P -- "$(dirname -- "$0")" && pwd -P)"
+source "$NIX_TEST_ROOT/common.sh"
+
+setupTest
 
 clearStore
 
-drvPath=$(nix-instantiate dependencies.nix)
+drvPath=$(nix-instantiate $NIX_TEST_ROOT/dependencies.nix)
 
 echo "derivation is $drvPath"
 
@@ -10,6 +13,7 @@ nix-store -q --tree "$drvPath" | grep '   +---.*builder1.sh'
 
 # Test Graphviz graph generation.
 nix-store -q --graph "$drvPath" > $TEST_ROOT/graph
+dot=$(which dot)
 if test -n "$dot"; then
     # Does it parse?
     $dot < $TEST_ROOT/graph

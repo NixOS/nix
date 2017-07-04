@@ -1,8 +1,11 @@
-source common.sh
+export NIX_TEST_ROOT="$(cd -P -- "$(dirname -- "$0")" && pwd -P)"
+source "$NIX_TEST_ROOT/common.sh"
+
+setupTest
 
 clearStore
 
-path=$(nix-build dependencies.nix -o $TEST_ROOT/result)
+path=$(nix-build $NIX_TEST_ROOT/dependencies.nix -o $TEST_ROOT/result)
 
 deps="$(nix-store -qR $TEST_ROOT/result)"
 

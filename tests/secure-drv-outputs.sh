@@ -2,17 +2,20 @@
 # produce output paths belonging to other derivations.  This could be
 # used to inject malware into the store.
 
-source common.sh
+export NIX_TEST_ROOT="$(cd -P -- "$(dirname -- "$0")" && pwd -P)"
+source "$NIX_TEST_ROOT/common.sh"
+
+setupTest
 
 clearStore
 
 startDaemon
 
 # Determine the output path of the "good" derivation.
-goodOut=$(nix-store -q $(nix-instantiate ./secure-drv-outputs.nix -A good))
+goodOut=$(nix-store -q $(nix-instantiate $NIX_TEST_ROOT/secure-drv-outputs.nix -A good))
 
 # Instantiate the "bad" derivation.
-badDrv=$(nix-instantiate ./secure-drv-outputs.nix -A bad)
+badDrv=$(nix-instantiate $NIX_TEST_ROOT/secure-drv-outputs.nix -A bad)
 badOut=$(nix-store -q $badDrv)
 
 # Rewrite the bad derivation to produce the output path of the good
@@ -27,7 +30,7 @@ if badDrv2=$(nix-store --add $TEST_ROOT/bad.drv); then
 fi
 
 # Now build the good derivation.
-goodOut2=$(nix-build ./secure-drv-outputs.nix -A good --no-out-link)
+goodOut2=$(nix-build $NIX_TEST_ROOT/secure-drv-outputs.nix -A good --no-out-link)
 test "$goodOut" = "$goodOut2"
 
 if ! test -e "$goodOut"/good; then
