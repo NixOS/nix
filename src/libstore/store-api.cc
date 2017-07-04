@@ -812,6 +812,10 @@ std::list<ref<Store>> getDefaultSubstituters()
         for (auto uri : settings.extraSubstituters.get())
             addStore(uri);
 
+        stores.sort([](ref<Store> & a, ref<Store> & b) {
+            return a->getPriority() < b->getPriority();
+        });
+
         return stores;
     } ());
 

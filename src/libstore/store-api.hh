@@ -590,6 +590,11 @@ public:
        a notion of connection. Otherwise this is a no-op. */
     virtual void connect() { };
 
+    /* Get the priority of the store, used to order substituters. In
+       particular, binary caches can specify a priority field in their
+       "nix-cache-info" file. Lower value means higher priority. */
+    virtual int getPriority() { return 0; }
+
 protected:
 
     Stats stats;

@@ -123,6 +123,8 @@ public:
 
     std::shared_ptr<std::string> getBuildLog(const Path & path) override;
 
+    int getPriority() override { return priority; }
+
 };
 
 }
