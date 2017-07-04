@@ -1,10 +1,10 @@
 { system ? builtins.currentSystem
 , url
-, md5 ? "", sha1 ? "", sha256 ? ""
+, md5 ? "", sha1 ? "", sha256 ? "", sha512 ? ""
 , outputHash ?
-    if sha1 != "" then sha1 else if md5 != "" then md5 else sha256
+    if sha512 != "" then sha512 else if sha1 != "" then sha1 else if md5 != "" then md5 else sha256
 , outputHashAlgo ?
-    if sha1 != "" then "sha1" else if md5 != "" then "md5" else "sha256"
+    if sha512 != "" then "sha512" else if sha1 != "" then "sha1" else if md5 != "" then "md5" else "sha256"
 , executable ? false
 , unpack ? false
 , name ? baseNameOf (toString url)
