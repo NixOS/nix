@@ -321,6 +321,12 @@ public:
 
     Setting<std::string> userAgentSuffix{this, "", "user-agent-suffix",
         "String appended to the user agent in HTTP requests."};
+
+#if __linux__
+    Setting<bool> allowNewPrivileges{this, false, "allow-new-privileges",
+        "Whether builders can acquire new privileges by calling programs with "
+        "setuid/setgid bits or with file capabilities."};
+#endif
 };
 
 

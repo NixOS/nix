@@ -2340,6 +2340,9 @@ void setupSeccomp()
         seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(fsetxattr), 0) != 0)
         throw SysError("unable to add seccomp rule");
 
+    if (seccomp_attr_set(ctx, SCMP_FLTATR_CTL_NNP, settings.allowNewPrivileges ? 0 : 1) != 0)
+        throw SysError("unable to set 'no new privileges' seccomp attribute");
+
     if (seccomp_load(ctx) != 0)
         throw SysError("unable to load seccomp BPF program");
 #endif

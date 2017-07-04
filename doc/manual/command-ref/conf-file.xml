@@ -643,6 +643,23 @@ password <replaceable>my-password</replaceable>
   </varlistentry>
 
 
+  <varlistentry xml:id="conf-allow-new-privileges"><term><literal>allow-new-privileges</literal></term>
+
+    <listitem><para>(Linux-specific.) By default, builders on Linux
+    cannot acquire new privileges by calling setuid/setgid programs or
+    programs that have file capabilities. For example, programs such
+    as <command>sudo</command> or <command>ping</command> will
+    fail. (Note that in sandbox builds, no such programs are available
+    unless you bind-mount them into the sandbox via the
+    <option>build-sandbox-paths</option> option.) You can allow the
+    use of such programs by enabling this option. This is impure and
+    usually undesirable, but may be useful in certain scenarios
+    (e.g. to spin up containers or set up userspace network interfaces
+    in tests).</para></listitem>
+
+  </varlistentry>
+
+
 </variablelist>
 
 </para>
