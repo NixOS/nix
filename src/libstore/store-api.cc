@@ -795,33 +795,27 @@ static RegisterStoreImplementation regStore([](
 
 std::list<ref<Store>> getDefaultSubstituters()
 {
-    struct State {
-        bool done = false;
+    static auto stores([]() {
         std::list<ref<Store>> stores;
-    };
-    static Sync<State> state_;
 
-    auto state(state_.lock());
+        StringSet done;
 
-    if (state->done) return state->stores;
+        auto addStore = [&](const std::string & uri) {
+            if (done.count(uri)) return;
+            done.insert(uri);
+            stores.push_back(openStore(uri));
+        };
 
-    StringSet done;
+        for (auto uri : settings.substituters.get())
+            addStore(uri);
 
-    auto addStore = [&](const std::string & uri) {
-        if (done.count(uri)) return;
-        done.insert(uri);
-        state->stores.push_back(openStore(uri));
-    };
+        for (auto uri : settings.extraSubstituters.get())
+            addStore(uri);
 
-    for (auto uri : settings.substituters.get())
-        addStore(uri);
+        return stores;
+    } ());
 
-    for (auto uri : settings.extraSubstituters.get())
-        addStore(uri);
-
-    state->done = true;
-
-    return state->stores;
+    return stores;
 }
 
 
