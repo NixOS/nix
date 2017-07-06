@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdio.h>
+#include <regex>
 
 
 namespace nix {
@@ -95,6 +96,19 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
     struct stat st;
     if (lstat(path.c_str(), &st))
         throw SysError(format("getting attributes of path ‘%1%’") % path);
+
+#if __APPLE__
+    /* HFS/OS X has some undocumented security feature disabling hardlinking for
+       special files within .app dirs. *.app/Contents/PkgInfo and
+       *.app/Contents/Resources/\*.lproj seem to be the only paths affected. See
+       https://github.com/NixOS/nix/issues/1443 for more discussion. */
+
+    if (std::regex_search(path, std::regex("\\.app/Contents/PkgInfo$")) ||
+        std::regex_search(path, std::regex("\\.app/Contents/Resources/.+\\.lproj$"))) {
+        debug(format("‘%1%’ is not allowed to be linked in OS X") % path);
+        return;
+    }
+#endif
 
     if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectoryIgnoringInodes(path, inodeHash);
