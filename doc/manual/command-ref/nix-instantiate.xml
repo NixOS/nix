@@ -43,7 +43,8 @@
       <arg choice='plain'><option>-E</option></arg>
     </group>
     <arg choice='plain' rep='repeat'><replaceable>files</replaceable></arg>
-    <sbr/>
+  </cmdsynopsis>
+  <cmdsynopsis>
     <command>nix-instantiate</command>
     <arg choice='plain'><option>--find-file</option></arg>
     <arg choice='plain' rep='repeat'><replaceable>files</replaceable></arg>
