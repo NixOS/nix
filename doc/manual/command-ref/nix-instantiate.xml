@@ -39,7 +39,7 @@
     </arg>
     <arg><option>--add-root</option> <replaceable>path</replaceable></arg>
     <arg><option>--indirect</option></arg>
-    <group choice='req'>
+    <group>
       <arg choice='plain'><option>--expr</option></arg>
       <arg choice='plain'><option>-E</option></arg>
     </group>
