@@ -27,8 +27,10 @@
     <arg><option>- -show-progress</option></arg>
     -->
     <arg><option>--include-outputs</option></arg>
-    <arg><option>--use-substitutes</option></arg>
-    <arg><option>-s</option></arg>
+    <group>
+      <arg choice='plain'><option>--use-substitutes</option></arg>
+      <arg choice='plain'><option>-s</option></arg>
+    </group>
     <arg><option>-v</option></arg>
     <arg choice='plain'>
       <replaceable>user@</replaceable><replaceable>machine</replaceable>
