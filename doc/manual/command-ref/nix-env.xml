@@ -146,8 +146,7 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 
 <variablelist>
 
-  <varlistentry><term><option>--file</option></term>
-    <term><option>-f</option></term>
+  <varlistentry><term><option>--file</option> / <option>-f</option> <replaceable>path</replaceable></term>
 
     <listitem><para>Specifies the Nix expression (designated below as
     the <emphasis>active Nix expression</emphasis>) used by the
@@ -166,8 +165,7 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 
   </varlistentry>
 
-  <varlistentry><term><option>--profile</option></term>
-    <term><option>-p</option></term>
+  <varlistentry><term><option>--profile</option> / <option>-p</option> <replaceable>path</replaceable></term>
 
     <listitem><para>Specifies the profile to be used by those
     operations that operate on a profile (designated below as the
