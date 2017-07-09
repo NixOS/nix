@@ -123,7 +123,7 @@ let
 
       runCommand "nix-binary-tarball-${version}"
         { exportReferencesGraph = [ "closure1" toplevel "closure2" cacert ];
-          buildInputs = [ perl ];
+          buildInputs = [ perl shellcheck ];
           meta.description = "Distribution-independent Nix bootstrap binaries for ${system}";
         }
         ''
@@ -132,6 +132,9 @@ let
           substitute ${./scripts/install-nix-from-closure.sh} $TMPDIR/install \
             --subst-var-by nix ${toplevel} \
             --subst-var-by cacert ${cacert}
+
+          shellcheck -e SC1090 $TMPDIR/install
+
           chmod +x $TMPDIR/install
           dir=nix-${version}-${system}
           fn=$out/$dir.tar.bz2
