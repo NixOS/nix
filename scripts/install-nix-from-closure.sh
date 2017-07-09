@@ -12,12 +12,6 @@ if ! [ -e "$self/.reginfo" ]; then
     exit 1
 fi
 
-# macOS support for 10.10 or higher
-if [[ "$(uname -s)" = "Darwin" && $(($(sw_vers -productVersion | cut -d '.' -f 2))) -lt 10 ]]; then
-    echo "$0: macOS $(sw_vers -productVersion) is not supported, upgrade to 10.10 or higher"
-    exit 1
-fi
-
 if [ -z "$USER" ]; then
     echo "$0: \$USER is not set" >&2
     exit 1
@@ -26,6 +20,18 @@ fi
 if [ -z "$HOME" ]; then
     echo "$0: \$HOME is not set" >&2
     exit 1
+fi
+
+# macOS support for 10.10 or higher
+if [[ "$(uname -s)" = "Darwin" ]]; then
+    if [[ $(($(sw_vers -productVersion | cut -d '.' -f 2))) -lt 10 ]]; then
+        echo "$0: macOS $(sw_vers -productVersion) is not supported, upgrade to 10.10 or higher"
+        exit 1
+    fi
+
+    printf '\e[1;31mSwitching to the Multi-User Darwin Installer\e[0m\n'
+    "$self/install-darwin-multi-user"
+    exit 0
 fi
 
 if [ "$(id -u)" -eq 0 ]; then
