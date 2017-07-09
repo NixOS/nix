@@ -146,10 +146,15 @@ let
           substitute ${./scripts/install-nix-from-closure.sh} $TMPDIR/install \
             --subst-var-by nix ${toplevel} \
             --subst-var-by cacert ${cacert}
+          substitute ${./scripts/install-darwin-multi-user.sh} $TMPDIR/install-darwin-multi-user \
+            --subst-var-by nix ${toplevel} \
+            --subst-var-by cacert ${cacert}
 
           shellcheck -e SC1090 $TMPDIR/install
+          shellcheck -e SC1091,SC2002 $TMPDIR/install-darwin-multi-user
 
           chmod +x $TMPDIR/install
+          chmod +x $TMPDIR/install-darwin-multi-user
           dir=nix-${version}-${system}
           fn=$out/$dir.tar.bz2
           mkdir -p $out/nix-support
@@ -161,7 +166,7 @@ let
             --transform "s,$TMPDIR/install,$dir/install," \
             --transform "s,$TMPDIR/reginfo,$dir/.reginfo," \
             --transform "s,$NIX_STORE,$dir/store,S" \
-            $TMPDIR/install $TMPDIR/reginfo $storePaths
+            $TMPDIR/install $TMPDIR/install-darwin-multi-user $TMPDIR/reginfo $storePaths
         '');
 
 
