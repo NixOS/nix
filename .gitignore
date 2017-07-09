@@ -34,6 +34,7 @@ Makefile.config
 
 # /scripts/
 /scripts/nix-profile.sh
+/scripts/nix-profile-daemon.sh
 /scripts/nix-pull
 /scripts/nix-push
 /scripts/nix-switch

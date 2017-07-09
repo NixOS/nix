@@ -20,6 +20,7 @@ nix_noinst_scripts := \
   $(d)/resolve-system-dependencies.pl \
   $(d)/nix-http-export.cgi \
   $(d)/nix-profile.sh \
+  $(d)/nix-profile-daemon.sh \
   $(d)/nix-reduce-build \
   $(nix_substituters)
 
@@ -28,6 +29,7 @@ noinst-scripts += $(nix_noinst_scripts)
 profiledir = $(sysconfdir)/profile.d
 
 $(eval $(call install-file-as, $(d)/nix-profile.sh, $(profiledir)/nix.sh, 0644))
+$(eval $(call install-file-as, $(d)/nix-profile-daemon.sh, $(profiledir)/nix-daemon.sh, 0644))
 $(eval $(call install-program-in, $(d)/find-runtime-roots.pl, $(libexecdir)/nix))
 $(eval $(call install-program-in, $(d)/build-remote.pl, $(libexecdir)/nix))
 $(eval $(call install-program-in, $(d)/resolve-system-dependencies.pl, $(libexecdir)/nix))
