@@ -35,11 +35,7 @@ readonly PLIST_DEST=/Library/LaunchDaemons/org.nixos.nix-daemon.plist
 
 readonly PROFILE_TARGETS=("/etc/profile" "/etc/bashrc" "/etc/zshrc")
 readonly PROFILE_BACKUP_SUFFIX=".backup-before-nix"
-readonly PROFILE_NIX_FILE_DIR="/etc/"
-readonly PROFILE_NIX_FILE_NAME="profile-nix.sh"
-readonly PROFILE_NIX_FILE="$PROFILE_NIX_FILE_DIR$PROFILE_NIX_FILE_NAME"
-
-
+readonly PROFILE_NIX_FILE="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
 
 readonly NIX_INSTALLED_NIX="@nix@"
 readonly NIX_INSTALLED_CACERT="@cacert@"
@@ -576,7 +572,6 @@ We're going to use sudo to set up Nix:
  - create a configuration file in /etc/nix
  - set up the "default profile" by creating some Nix-related files in
    $ROOT_HOME
- - create $PROFILE_NIX_FILE
 EOF
     for profile_target in "${PROFILE_TARGETS[@]}"; do
         if [ -e "$profile_target" ]; then
@@ -646,68 +641,6 @@ fi
 EOF
 }
 configure_shell_profile() {
-    cat <<'EOF' > "$SCRATCH/$PROFILE_NIX_FILE_NAME"
-# Only execute this file once per shell.
-if [ -n "$__ETC_PROFILE_NIX_SOURCED" ]; then return; fi
-__ETC_PROFILE_NIX_SOURCED=1
-
-# Set up secure multi-user builds: non-root users build through the
-# Nix daemon.
-if [ "$USER" != root -o ! -w /nix/var/nix/db ]; then
-    export NIX_REMOTE=daemon
-fi
-
-export NIX_USER_PROFILE_DIR="/nix/var/nix/profiles/per-user/$USER"
-export NIX_PROFILES="/run/current-system/sw /nix/var/nix/profiles/default $HOME/.nix-profile"
-
-# Set up the per-user profile.
-mkdir -m 0755 -p $NIX_USER_PROFILE_DIR
-if test "$(stat -f '%u' $NIX_USER_PROFILE_DIR)" != "$(id -u)"; then
-    echo "WARNING: bad ownership on $NIX_USER_PROFILE_DIR" >&2
-fi
-
-if test -w $HOME; then
-  if ! test -L $HOME/.nix-profile; then
-      if test "$USER" != root; then
-          ln -s $NIX_USER_PROFILE_DIR/profile $HOME/.nix-profile
-      else
-          # Root installs in the system-wide profile by default.
-          ln -s /nix/var/nix/profiles/default $HOME/.nix-profile
-      fi
-  fi
-
-  # Subscribe the root user to the NixOS channel by default.
-  if [ "$USER" = root -a ! -e $HOME/.nix-channels ]; then
-      echo "https://nixos.org/channels/nixpkgs-unstable nixpkgs" > $HOME/.nix-channels
-  fi
-
-  # Create the per-user garbage collector roots directory.
-  NIX_USER_GCROOTS_DIR=/nix/var/nix/gcroots/per-user/$USER
-  mkdir -m 0755 -p $NIX_USER_GCROOTS_DIR
-  if test "$(stat -f '%u' $NIX_USER_GCROOTS_DIR)" != "$(id -u)"; then
-      echo "WARNING: bad ownership on $NIX_USER_GCROOTS_DIR" >&2
-  fi
-
-  # Set up a default Nix expression from which to install stuff.
-  if [ ! -e $HOME/.nix-defexpr -o -L $HOME/.nix-defexpr ]; then
-      rm -f $HOME/.nix-defexpr
-      mkdir -p $HOME/.nix-defexpr
-      if [ "$USER" != root ]; then
-          ln -s /nix/var/nix/profiles/per-user/root/channels $HOME/.nix-defexpr/channels_root
-      fi
-  fi
-fi
-
-export NIX_SSL_CERT_FILE="/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"
-export NIX_PATH="/nix/var/nix/profiles/per-user/root/channels"
-export PATH="$HOME/.nix-profile/bin:$HOME/.nix-profile/sbin:$HOME/.nix-profile/lib/kde4/libexec:/nix/var/nix/profiles/default/bin:/nix/var/nix/profiles/default/sbin:/nix/var/nix/profiles/default/lib/kde4/libexec:$PATH"
-
-EOF
-
-    _sudo "put our custom profile code at $PROFILE_NIX_FILE with nix-daemon settings" \
-          install -m 0444 "$SCRATCH/$PROFILE_NIX_FILE_NAME" "$PROFILE_NIX_FILE_DIR"
-
-
     for profile_target in "${PROFILE_TARGETS[@]}"; do
         if [ -e "$profile_target" ]; then
             _sudo "to back up your current $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX" \
