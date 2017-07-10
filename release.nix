@@ -87,7 +87,7 @@ let
         buildInputs =
           [ curl perl bzip2 xz openssl pkgconfig sqlite boehmgc ]
           ++ lib.optional stdenv.isLinux libseccomp
-          ++ lib.optional stdenv.isLinux libsodium;
+          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
 
         configureFlags = ''
           --disable-init-state
