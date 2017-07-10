@@ -1734,8 +1734,13 @@ static void prim_match(EvalState & state, const Pos & pos, Value * * args, Value
                 mkString(*(v.listElems()[i] = state.allocValue()), match[i + 1].str().c_str());
         }
 
-    } catch (std::regex_error &) {
-        throw EvalError("invalid regular expression ‘%s’, at %s", re, pos);
+    } catch (std::regex_error &e) {
+        if (e.code() == std::regex_constants::error_space) {
+          // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
+          throw EvalError("memory limit exceeded by regular expression ‘%s’, at %s", re, pos);
+        } else {
+          throw EvalError("invalid regular expression ‘%s’, at %s", re, pos);
+        }
     }
 }
 
