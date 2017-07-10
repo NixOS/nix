@@ -24,6 +24,7 @@
       <arg choice='plain'>
         <option>--eval</option>
         <arg><option>--strict</option></arg>
+        <arg><option>--json</option></arg>
         <arg><option>--xml</option></arg>
       </arg>
     </group>
@@ -38,7 +39,7 @@
     </arg>
     <arg><option>--add-root</option> <replaceable>path</replaceable></arg>
     <arg><option>--indirect</option></arg>
-    <group choice='req'>
+    <group>
       <arg choice='plain'><option>--expr</option></arg>
       <arg choice='plain'><option>-E</option></arg>
     </group>
@@ -116,24 +117,6 @@ input.</para>
 
   </varlistentry>
 
-  <varlistentry><term><option>--xml</option></term>
-
-    <listitem><para>When used with <option>--eval</option>, print the resulting
-    value as an XML representation of the abstract syntax tree rather than as
-    an ATerm. The schema is the same as that used by the <link
-    linkend="builtin-toXML"><function>toXML</function> built-in</link>.
-    </para></listitem>
-
-  </varlistentry>
-
-  <varlistentry><term><option>--json</option></term>
-
-    <listitem><para>When used with <option>--eval</option>, print the resulting
-    value as an JSON representation of the abstract syntax tree rather
-    than as an ATerm.</para></listitem>
-
-  </varlistentry>
-
   <varlistentry><term><option>--strict</option></term>
 
     <listitem><para>When used with <option>--eval</option>,
@@ -145,6 +128,24 @@ input.</para>
     data structures can be infinitely large.</para></warning>
 
     </listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--json</option></term>
+
+    <listitem><para>When used with <option>--eval</option>, print the resulting
+    value as an JSON representation of the abstract syntax tree rather
+    than as an ATerm.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--xml</option></term>
+
+    <listitem><para>When used with <option>--eval</option>, print the resulting
+    value as an XML representation of the abstract syntax tree rather than as
+    an ATerm. The schema is the same as that used by the <link
+    linkend="builtin-toXML"><function>toXML</function> built-in</link>.
+    </para></listitem>
 
   </varlistentry>
 

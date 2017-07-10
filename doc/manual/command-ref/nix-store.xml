@@ -234,7 +234,7 @@ linkend="sec-nix-build"><command>nix-build</command></link> does.</para>
 <para>To test whether a previously-built derivation is deterministic:
 
 <screen>
-$ nix-build -r '&lt;nixpkgs>' -A hello --check -K
+$ nix-build '&lt;nixpkgs>' -A hello --check -K
 </screen>
 
 </para>

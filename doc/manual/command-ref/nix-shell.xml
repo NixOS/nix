@@ -33,13 +33,13 @@
     <arg><option>--exclude</option> <replaceable>regexp</replaceable></arg>
     <arg><option>--pure</option></arg>
     <group choice='req'>
-      <group choice='plain'>
-        <group>
+      <arg choice='plain'>
+        <group choice='req'>
           <arg choice='plain'><option>--packages</option></arg>
           <arg choice='plain'><option>-p</option></arg>
         </group>
-        <replaceable>packages</replaceable>
-      </group>
+        <arg choice='plain' rep='repeat'><replaceable>packages</replaceable></arg>
+      </arg>
       <arg><replaceable>path</replaceable></arg>
     </group>
   </cmdsynopsis>
@@ -144,7 +144,7 @@ also <xref linkend="sec-common-options" />.</phrase></para>
 
   </varlistentry>
 
-  <varlistentry><term><option>--packages</option> / <option>-p</option></term>
+  <varlistentry><term><option>--packages</option> / <option>-p</option> <replaceable>packages</replaceable>…</term>
 
     <listitem><para>Set up an environment in which the specified
     packages are present.  The command line arguments are interpreted
