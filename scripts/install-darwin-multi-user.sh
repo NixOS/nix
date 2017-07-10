@@ -366,30 +366,15 @@ EOF
         fi
     done
 
-    warning <<EOF
-I strongly recommend deleting all the following files, which are
-relics of a previous installation. You can check by running (yourself):
-
-  $ sudo find / -name .nix-profile  -o -name .nix-defexpr -o -name .nix-channels -o -name '*nix-daemon.plist'
-
-In particular, the following files and directories MUST NOT EXIST!
-
- - $ROOT_HOME/.nix-profile
- - $ROOT_HOME/.nix-defexpr
- - $ROOT_HOME/.nix-channels
-
-If some relics are found and you want to keep them, it might be okay.
-If you're not sure, don't hesitate to ask for help.
-
-$(contactme)
+    danger_paths=("$ROOT_HOME/.nix-defexpr" "$ROOT_HOME/.nix-channels" "$ROOT_HOME/.nix-profile")
+    for danger_path in "${danger_paths[@]}"; do
+        if _sudo "foo"; then
+            failure <<EOF
+I found a file at $danger_path, which is a relic of a previous
+installation. You must first delete this file before continuing.
 EOF
-
-    if ui_confirm "Does $ROOT_HOME/.nix-defexpr or $ROOT_HOME/.nix-channels or $ROOT_HOME/.nix-profile exist?"; then
-        failure <<EOF
-You must delete $ROOT_HOME/.nix-defexpr and $ROOT_HOME/.nix-channels
-before continuing.
-EOF
-    fi
+        fi
+    done
 }
 
 setup_report() {
@@ -566,6 +551,8 @@ EOF
 
 We're going to use sudo to set up Nix:
 
+ - make sure your computer doesn't already have Nix files
+   (if it does, I  will tell you how to clean them up.)
  - create local users (see the list above for the users we'll make)
  - create a local group ($NIX_BUILD_GROUP_NAME)
  - install Nix in to $NIX_ROOT
@@ -703,6 +690,9 @@ configure_nix_daemon_plist() {
 
 
 main() {
+
+    chat_about_sudo
+
     if [ "${PINCH_ME_IM_SILLY:-}" = "" ]; then
         validate_starting_assumptions
     fi
@@ -715,8 +705,6 @@ main() {
         trap finish_cleanup EXIT
         exit 1
     fi
-
-    chat_about_sudo
 
     create_build_group
     create_build_users
