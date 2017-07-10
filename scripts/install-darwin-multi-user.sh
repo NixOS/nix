@@ -55,19 +55,24 @@ contactme() {
 
 uninstall_directions() {
     subheader "Uninstalling nix:"
-    local step=1
-    cat <<EOF
-$step. If $PLIST_DEST exists:
+    local step=0
+
+    if [ -e "$PLIST_DEST" ]; then
+        step=$((step + 1))
+        cat <<EOF
+$step. Delete $PLIST_DEST
 
   sudo launchctl unload $PLIST_DEST
   sudo rm $PLIST_DEST
 
 EOF
+    fi
+
     for profile_target in "${PROFILE_TARGETS[@]}"; do
-        if [ -e "$profile_target" ]; then
+        if [ -e "$profile_target" ] && [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
             step=$((step + 1))
             cat <<EOF
-$step. If $profile_target$PROFILE_BACKUP_SUFFIX exists:
+$step. Restore $profile_target$PROFILE_BACKUP_SUFFIX back to $profile_target
 
   sudo mv $profile_target$PROFILE_BACKUP_SUFFIX $profile_target
 
@@ -77,8 +82,8 @@ opened while it existed.)
 EOF
         fi
     done
-    step=$((step + 1))
 
+    step=$((step + 1))
     cat <<EOF
 $step. Delete the files Nix added to your system:
 
@@ -307,6 +312,8 @@ also look for similar references in:
  - ~/.profile
 
 or other shell init files that you may have.
+
+$(uninstall_directions)
 EOF
             fi
         fi
@@ -368,10 +375,13 @@ EOF
 
     danger_paths=("$ROOT_HOME/.nix-defexpr" "$ROOT_HOME/.nix-channels" "$ROOT_HOME/.nix-profile")
     for danger_path in "${danger_paths[@]}"; do
-        if _sudo "foo"; then
+        if _sudo "making sure that $danger_path doesn't exist" \
+           test -e "$danger_path"; then
             failure <<EOF
 I found a file at $danger_path, which is a relic of a previous
 installation. You must first delete this file before continuing.
+
+$(uninstall_directions)
 EOF
         fi
     done
@@ -533,23 +543,36 @@ place_channel_configuration() {
           install -m 0664 "$SCRATCH/.nix-channels" "$ROOT_HOME/.nix-channels"
 }
 
-chat_about_sudo() {
-    header "let's talk about sudo"
+welcome_to_nix() {
+    ok "Welcome to the Multi-User Nix Installation"
 
     cat <<EOF
-This script is going to call sudo a lot. Every time we do, it'll
-output exactly what it'll do, and why.
 
-Just like this:
+This installation tool will set up your computer with the Nix package
+manager. This will happen in a few stages:
+
+1. Make sure your computer doesn't already have Nix. If it does, I
+   will show you instructions on how to clean up your old one.
+
+2. Show you what we are going to install and where. Then we will ask
+   if you are ready to continue.
+
+3. Create the system users and groups that the Nix daemon uses to run
+   builds.
+
+4. Perform the basic installation of the Nix files daemon.
+
+5. Configure your shell to import special Nix Profile files, so you
+   can use Nix.
+
+6. Start the Nix daemon.
 
 EOF
 
-    __sudo "to demonstrate how our sudo prompts look" \
-           echo "this is a sudo prompt"
+    if ui_confirm "Would you like to see a more detailed list of what we will do?"; then
+        cat <<EOF
 
-    cat <<EOF
-
-We're going to use sudo to set up Nix:
+We will:
 
  - make sure your computer doesn't already have Nix files
    (if it does, I  will tell you how to clean them up.)
@@ -560,24 +583,44 @@ We're going to use sudo to set up Nix:
  - set up the "default profile" by creating some Nix-related files in
    $ROOT_HOME
 EOF
-    for profile_target in "${PROFILE_TARGETS[@]}"; do
-        if [ -e "$profile_target" ]; then
-            cat <<EOF
+        for profile_target in "${PROFILE_TARGETS[@]}"; do
+            if [ -e "$profile_target" ]; then
+                cat <<EOF
  - back up $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX
- - update $ to include some Nix configuration
+ - update $profile_target to include some Nix configuration
 EOF
-        fi
-    done
-    cat <<EOF
+            fi
+        done
+        cat <<EOF
  - load and start a LaunchDaemon (at $PLIST_DEST) for nix-daemon
 
+EOF
+        if ! ui_confirm "Ready to continue?"; then
+            failure <<EOF
+Okay, maybe you would like to talk to the team.
+EOF
+        fi
+    fi
+}
+
+chat_about_sudo() {
+    header "let's talk about sudo"
+
+    cat <<EOF
+This script is going to call sudo a lot. Every time we do, it'll
+output exactly what it'll do, and why.
+
+Just like this:
+EOF
+
+    __sudo "to demonstrate how our sudo prompts look" \
+           echo "this is a sudo prompt"
+
+    cat <<EOF
+
 This might look scary, but everything can be undone by running just a
-few commands.
-
-$(uninstall_directions)
-
-We used to ask you to confirm each time sudo ran, but it was too many
-times. Instead, I'll just ask you this one time:
+few commands. We used to ask you to confirm each time sudo ran, but it
+was too many times. Instead, I'll just ask you this one time:
 
 EOF
     if ui_confirm "Can we use sudo?"; then
@@ -690,7 +733,7 @@ configure_nix_daemon_plist() {
 
 
 main() {
-
+    welcome_to_nix
     chat_about_sudo
 
     if [ "${PINCH_ME_IM_SILLY:-}" = "" ]; then
@@ -705,6 +748,11 @@ main() {
         trap finish_cleanup EXIT
         exit 1
     fi
+
+    if [ "${PINCH_ME_IM_SILLY:-}" != "" ]; then
+        exit 1
+    fi
+
 
     create_build_group
     create_build_users
