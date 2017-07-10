@@ -39,7 +39,7 @@
           <arg choice='plain'><option>-p</option></arg>
         </group>
         <arg choice='plain' rep='repeat'><replaceable>packages</replaceable></arg>
-      </group>
+      </arg>
       <arg><replaceable>path</replaceable></arg>
     </group>
   </cmdsynopsis>
