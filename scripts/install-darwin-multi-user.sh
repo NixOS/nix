@@ -637,7 +637,7 @@ install_from_extracted_nix() {
         cd "$EXTRACTED_NIX_PATH"
 
         _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
-              rsync -a "$(pwd)/store/" "$NIX_ROOT/store/"
+              rsync -rlpt "$(pwd)/store/" "$NIX_ROOT/store/"
 
         if [ -d "$NIX_INSTALLED_NIX" ]; then
             echo "      Alright! We have our first nix at $NIX_INSTALLED_NIX"
@@ -693,9 +693,6 @@ setup_default_profile() {
 
     _sudo "to update the default channel in the default profile" \
           -i NIX_SSL_CERT_FILE=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt "$NIX_INSTALLED_NIX/bin/nix-channel" --update nixpkgs
-
-    _sudo "to replace the bootstrapping Nix with a real Nix" \
-          -i NIX_SSL_CERT_FILE=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt "$NIX_INSTALLED_NIX/bin/nix-env" -iA nixpkgs.nix
 }
 
 
