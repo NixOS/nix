@@ -3,6 +3,7 @@
 #include "globals.hh"
 #include "hash.hh"
 #include "store-api.hh"
+#include "pathlocks.hh"
 
 #include <curl/curl.h>
 
@@ -203,6 +204,8 @@ Path downloadFileCached(const string & url, bool unpack, string name)
     Path dataFile = cacheDir + "/" + urlHash + ".info";
     Path fileLink = cacheDir + "/" + urlHash + "-file";
 
+    PathLocks lock({fileLink}, fmt("waiting for lock on ‘%1%’...", fileLink));
+
     Path storePath;
 
     string expectedETag;
@@ -255,6 +258,7 @@ Path downloadFileCached(const string & url, bool unpack, string name)
 
     if (unpack) {
         Path unpackedLink = cacheDir + "/" + baseNameOf(storePath) + "-unpacked";
+        PathLocks lock2({unpackedLink}, fmt("waiting for lock on ‘%1%’...", unpackedLink));
         Path unpackedStorePath;
         if (pathExists(unpackedLink)) {
             unpackedStorePath = readLink(unpackedLink);
