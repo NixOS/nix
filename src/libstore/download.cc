@@ -6,6 +6,7 @@
 #include "archive.hh"
 #include "s3.hh"
 #include "compression.hh"
+#include "pathlocks.hh"
 
 #ifdef ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
@@ -586,6 +587,8 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
     Path dataFile = cacheDir + "/" + urlHash + ".info";
     Path fileLink = cacheDir + "/" + urlHash + "-file";
 
+    PathLocks lock({fileLink}, fmt("waiting for lock on ‘%1%’...", fileLink));
+
     Path storePath;
 
     string expectedETag;
@@ -647,6 +650,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
 
     if (unpack) {
         Path unpackedLink = cacheDir + "/" + baseNameOf(storePath) + "-unpacked";
+        PathLocks lock2({unpackedLink}, fmt("waiting for lock on ‘%1%’...", unpackedLink));
         Path unpackedStorePath;
         if (pathExists(unpackedLink)) {
             unpackedStorePath = readLink(unpackedLink);
