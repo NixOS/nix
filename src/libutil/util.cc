@@ -496,12 +496,21 @@ void createSymlink(const Path & target, const Path & link)
 
 void replaceSymlink(const Path & target, const Path & link)
 {
-    Path tmp = canonPath(dirOf(link) + "/.new_" + baseNameOf(link));
+    for (unsigned int n = 0; true; n++) {
+        Path tmp = canonPath(fmt("%s/.%d_%s", dirOf(link), n, baseNameOf(link)));
 
-    createSymlink(target, tmp);
+        try {
+            createSymlink(target, tmp);
+        } catch (SysError & e) {
+            if (e.errNo == EEXIST) continue;
+            throw;
+        }
 
-    if (rename(tmp.c_str(), link.c_str()) != 0)
-        throw SysError(format("renaming ‘%1%’ to ‘%2%’") % tmp % link);
+        if (rename(tmp.c_str(), link.c_str()) != 0)
+            throw SysError(format("renaming ‘%1%’ to ‘%2%’") % tmp % link);
+
+        break;
+    }
 }
 
 
