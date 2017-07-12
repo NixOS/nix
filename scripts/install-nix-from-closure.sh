@@ -30,7 +30,7 @@ if [ "$(uname -s)" = "Darwin" ]; then
     fi
 
     printf '\e[1;31mSwitching to the Multi-User Darwin Installer\e[0m\n'
-    "$self/install-darwin-multi-user"
+    exec "$self/install-darwin-multi-user"
     exit 0
 fi
 
