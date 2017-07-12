@@ -52,7 +52,8 @@ void detectStackOverflow()
        delivered when we're out of stack space. */
     stack_t stack;
     stack.ss_size = 4096 * 4 + MINSIGSTKSZ;
-    stack.ss_sp = new char[stack.ss_size];
+    static auto stackBuf = std::make_unique<std::vector<char>>(stack.ss_size);
+    stack.ss_sp = stackBuf->data();
     if (!stack.ss_sp) throw Error("cannot allocate alternative stack");
     stack.ss_flags = 0;
     if (sigaltstack(&stack, 0) == -1) throw SysError("cannot set alternative stack");
