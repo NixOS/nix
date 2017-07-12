@@ -199,7 +199,7 @@ __sudo() {
 
     echo "I am executing:"
     echo ""
-    echo "    $ sudo $cmd"
+    printf "    $ sudo %s\n" "$cmd"
     echo ""
     echo "$expl"
     echo ""
