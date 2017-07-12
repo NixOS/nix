@@ -204,7 +204,7 @@ Path downloadFileCached(const string & url, bool unpack, string name)
     Path dataFile = cacheDir + "/" + urlHash + ".info";
     Path fileLink = cacheDir + "/" + urlHash + "-file";
 
-    PathLocks lock({fileLink}, fmt("waiting for lock on ‘%1%’...", fileLink));
+    PathLocks lock({fileLink}, (format("waiting for lock on ‘%1%’...") % fileLink).str());
 
     Path storePath;
 
@@ -258,7 +258,7 @@ Path downloadFileCached(const string & url, bool unpack, string name)
 
     if (unpack) {
         Path unpackedLink = cacheDir + "/" + baseNameOf(storePath) + "-unpacked";
-        PathLocks lock2({unpackedLink}, fmt("waiting for lock on ‘%1%’...", unpackedLink));
+        PathLocks lock({unpackedLink}, (format("waiting for lock on ‘%1%’...") % unpackedLink).str());
         Path unpackedStorePath;
         if (pathExists(unpackedLink)) {
             unpackedStorePath = readLink(unpackedLink);

@@ -432,7 +432,7 @@ void createSymlink(const Path & target, const Path & link)
 void replaceSymlink(const Path & target, const Path & link)
 {
     for (unsigned int n = 0; true; n++) {
-        Path tmp = canonPath(fmt("%s/.%d_%s", dirOf(link), n, baseNameOf(link)));
+        Path tmp = canonPath((format("%s/.%d_%s") % dirOf(link) % n % baseNameOf(link)).str());
 
         try {
             createSymlink(target, tmp);
