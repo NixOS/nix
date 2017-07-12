@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -eux
+
 cleanup() {
     PLIST="/Library/LaunchDaemons/org.nixos.nix-daemon.plist"
     if sudo launchctl list | grep -q nix-daemon; then
@@ -47,7 +49,10 @@ verify
 
 
 (
-    nix-build ./release.nix -A binaryTarball.x86_64-darwin
+    (
+        echo "cd $(pwd)"
+        echo nix-build ./release.nix -A binaryTarball.x86_64-darwin
+    ) | bash -l
     cp ./result/nix-*.tar.bz2 $scratch/nix.tar.bz2
 )
 
