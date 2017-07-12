@@ -13,8 +13,8 @@ let
   jobs = rec {
 
 
-    tarball =
-      with pkgs;
+    tarball = pkgs.lib.genAttrs systems (system:
+      with import <nixpkgs> { inherit system; };
 
       releaseTools.sourceTarball {
         name = "nix-tarball";
@@ -30,8 +30,7 @@ let
             docbook5 docbook5_xsl
             autoconf-archive
             git
-            libseccomp
-          ];
+          ] ++ lib.optional stdenv.isLinux libseccomp;
 
         configureFlags = "--enable-gc";
 
@@ -60,7 +59,8 @@ let
           make install docdir=$out/share/doc/nix makefiles=doc/manual/local.mk
           echo "doc manual $out/share/doc/nix/manual" >> $out/nix-support/hydra-build-products
         '';
-      };
+      }
+    );
 
 
     build = pkgs.lib.genAttrs systems (system:
@@ -71,7 +71,7 @@ let
 
       releaseTools.nixBuild {
         name = "nix";
-        src = tarball;
+        src = tarball.${system};
 
         buildInputs =
           [ curl
@@ -109,7 +109,7 @@ let
 
       releaseTools.nixBuild {
         name = "nix-perl";
-        src = tarball;
+        src = tarball.${system};
 
         buildInputs =
           [ (builtins.getAttr system jobs.build) curl bzip2 xz pkgconfig pkgs.perl ]
@@ -170,7 +170,7 @@ let
 
       releaseTools.coverageAnalysis {
         name = "nix-build";
-        src = tarball;
+        src = tarball.${system};
 
         buildInputs =
           [ curl bzip2 openssl pkgconfig sqlite xz libsodium libseccomp
@@ -265,7 +265,7 @@ let
 
     # Aggregate job containing the release-critical jobs.
     release = pkgs.releaseTools.aggregate {
-      name = "nix-${tarball.version}";
+      name = "nix-${tarball."x86_64-linux".version}";
       meta.description = "Release-critical builds";
       constituents =
         [ tarball
@@ -302,7 +302,7 @@ let
 
     releaseTools.rpmBuild rec {
       name = "nix-rpm";
-      src = jobs.tarball;
+      src = jobs.tarball.${system};
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages =
             [ "sqlite" "sqlite-devel" "bzip2-devel" "emacs" "libcurl-devel" "openssl-devel" "xz-devel" "libseccomp-devel" ]
@@ -324,7 +324,7 @@ let
 
     releaseTools.debBuild {
       name = "nix-deb";
-      src = jobs.tarball;
+      src = jobs.tarball.${system};
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages =
             [ "libsqlite3-dev" "libbz2-dev" "libcurl-dev" "libcurl3-nss" "libssl-dev" "liblzma-dev" "libseccomp-dev" ]
