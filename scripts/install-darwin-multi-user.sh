@@ -43,6 +43,12 @@ readonly EXTRACTED_NIX_PATH="$(dirname "$0")"
 
 readonly ROOT_HOME="/var/root"
 
+if [ -t 0 ]; then
+    readonly IS_HEADLESS='no'
+else
+    readonly IS_HEADLESS='yes'
+fi
+
 contactme() {
     echo "We'd love to help if you need it."
     echo ""
@@ -172,6 +178,11 @@ failure() {
 
 ui_confirm() {
     _textout "$GREEN$GREEN_UL" "$1"
+
+    if [ "$IS_HEADLESS" = "yes" ]; then
+        echo "No TTY, assuming you would say yes :)"
+        return 0
+    fi
 
     local prompt="[y/n] "
     echo -n "$prompt"

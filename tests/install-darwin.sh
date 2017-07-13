@@ -53,7 +53,8 @@ trap finish EXIT
 
 # First setup Nix
 cleanup
-curl https://nixos.org/nix/install | bash
+curl -o install https://nixos.org/nix/install
+yes | bash ./install
 verify
 
 
@@ -82,7 +83,7 @@ verify
 
     cleanup
 
-    yes | ./install
+    echo -n "" | ./install
     verify
 
     cleanup
