@@ -268,7 +268,9 @@ let
       name = "nix-${tarball."x86_64-linux".version}";
       meta.description = "Release-critical builds";
       constituents =
-        [ tarball
+        [ tarball.x86_64-linux
+          tarball.x86_64-darwin
+          tarball.i686-linux
           build.i686-linux
           build.x86_64-darwin
           build.x86_64-linux
