@@ -408,6 +408,9 @@ setup_report() {
     row "     Build Users" "$NIX_USER_COUNT"
     row "  Build Group ID" "$NIX_BUILD_GROUP_ID"
     row "Build Group Name" "$NIX_BUILD_GROUP_NAME"
+    if [ "${PINCH_ME_IM_SILLY:-}" != "" ]; then
+        row "       Silliness" "Very Silly"
+    fi
 
     subheader "build users:"
 
@@ -756,11 +759,6 @@ main() {
         trap finish_cleanup EXIT
         exit 1
     fi
-
-    if [ "${PINCH_ME_IM_SILLY:-}" != "" ]; then
-        exit 1
-    fi
-
 
     create_build_group
     create_build_users

@@ -80,11 +80,16 @@ verify
 
     yes | ./install
     verify
-
     cleanup
 
     echo -n "" | ./install
     verify
+    cleanup
 
+    sudo mkdir -p /nix/store
+    sudo touch /nix/store/.silly-hint
+    echo -n "" | PINCH_ME_IM_SILLY=true ./install
+    verify
+    test -e /nix/store/.silly-hint
     cleanup
 )
