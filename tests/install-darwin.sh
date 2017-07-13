@@ -20,8 +20,10 @@ cleanup() {
     done
 
     for file in ~/.bash_profile ~/.bash_login ~/.profile ~/.zshenv ~/.zprofile ~/.zshrc ~/.zlogin; do
-        cat "$file" | grep -v nix-profile > "$file.next"
-        mv "$file.next" "$file"
+        if [ -e "$file" ]; then
+            cat "$file" | grep -v nix-profile > "$file.next"
+            mv "$file.next" "$file"
+        fi
     done
 
 
