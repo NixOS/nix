@@ -27,8 +27,8 @@ let
           [ curl bison flex perl libxml2 libxslt bzip2 xz
             dblatex (dblatex.tex or tetex) nukeReferences pkgconfig sqlite libsodium
             docbook5 docbook5_xsl
-            libseccomp
-          ] ++ lib.optional (!lib.inNixShell) git;
+          ] ++ lib.optional stdenv.isLinux libseccomp
+          ++ lib.optional (!lib.inNixShell) git;
 
         configureFlags = ''
           --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
@@ -87,7 +87,7 @@ let
         buildInputs =
           [ curl perl bzip2 xz openssl pkgconfig sqlite boehmgc ]
           ++ lib.optional stdenv.isLinux libseccomp
-          ++ lib.optional stdenv.isLinux libsodium;
+          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
 
         configureFlags = ''
           --disable-init-state
@@ -123,7 +123,7 @@ let
 
       runCommand "nix-binary-tarball-${version}"
         { exportReferencesGraph = [ "closure1" toplevel "closure2" cacert ];
-          buildInputs = [ perl ];
+          buildInputs = [ perl shellcheck ];
           meta.description = "Distribution-independent Nix bootstrap binaries for ${system}";
         }
         ''
@@ -132,7 +132,15 @@ let
           substitute ${./scripts/install-nix-from-closure.sh} $TMPDIR/install \
             --subst-var-by nix ${toplevel} \
             --subst-var-by cacert ${cacert}
+          substitute ${./scripts/install-darwin-multi-user.sh} $TMPDIR/install-darwin-multi-user \
+            --subst-var-by nix ${toplevel} \
+            --subst-var-by cacert ${cacert}
+
+          shellcheck -e SC1090 $TMPDIR/install
+          shellcheck -e SC1091,SC2002 $TMPDIR/install-darwin-multi-user
+
           chmod +x $TMPDIR/install
+          chmod +x $TMPDIR/install-darwin-multi-user
           dir=nix-${version}-${system}
           fn=$out/$dir.tar.bz2
           mkdir -p $out/nix-support
@@ -144,7 +152,7 @@ let
             --transform "s,$TMPDIR/install,$dir/install," \
             --transform "s,$TMPDIR/reginfo,$dir/.reginfo," \
             --transform "s,$NIX_STORE,$dir/store,S" \
-            $TMPDIR/install $TMPDIR/reginfo $storePaths
+            $TMPDIR/install $TMPDIR/install-darwin-multi-user $TMPDIR/reginfo $storePaths
         '');
 
 

@@ -7,20 +7,31 @@ self="$(dirname "$0")"
 nix="@nix@"
 cacert="@cacert@"
 
-if ! [ -e $self/.reginfo ]; then
+if ! [ -e "$self/.reginfo" ]; then
     echo "$0: incomplete installer (.reginfo is missing)" >&2
-    exit 1
-fi
-
-# macOS support for 10.10 or higher
-if [[ "$(uname -s)" = "Darwin" && $(($(sw_vers -productVersion | cut -d '.' -f 2))) -lt 10 ]]; then
-    echo "$0: macOS $(sw_vers -productVersion) is not supported, upgrade to 10.10 or higher"
     exit 1
 fi
 
 if [ -z "$USER" ]; then
     echo "$0: \$USER is not set" >&2
     exit 1
+fi
+
+if [ -z "$HOME" ]; then
+    echo "$0: \$HOME is not set" >&2
+    exit 1
+fi
+
+# macOS support for 10.10 or higher
+if [[ "$(uname -s)" = "Darwin" ]]; then
+    if [[ $(($(sw_vers -productVersion | cut -d '.' -f 2))) -lt 10 ]]; then
+        echo "$0: macOS $(sw_vers -productVersion) is not supported, upgrade to 10.10 or higher"
+        exit 1
+    fi
+
+    printf '\e[1;31mSwitching to the Multi-User Darwin Installer\e[0m\n'
+    exec "$self/install-darwin-multi-user"
+    exit 0
 fi
 
 if [ "$(id -u)" -eq 0 ]; then
@@ -47,7 +58,7 @@ mkdir -p $dest/store
 
 echo -n "copying Nix to $dest/store..." >&2
 
-for i in $(cd $self/store >/dev/null && echo *); do
+for i in $(cd "$self/store" >/dev/null && echo ./*); do
     echo -n "." >&2
     i_tmp="$dest/store/$i.$$"
     if [ -e "$i_tmp" ]; then
@@ -61,39 +72,39 @@ done
 echo "" >&2
 
 echo "initialising Nix database..." >&2
-if ! $nix/bin/nix-store --init; then
+if ! "$nix/bin/nix-store" --init; then
     echo "$0: failed to initialize the Nix database" >&2
     exit 1
 fi
 
-if ! $nix/bin/nix-store --load-db < $self/.reginfo; then
+if ! "$nix/bin/nix-store" --load-db < "$self/.reginfo"; then
     echo "$0: unable to register valid paths" >&2
     exit 1
 fi
 
-. $nix/etc/profile.d/nix.sh
+. "$nix/etc/profile.d/nix.sh"
 
-if ! $nix/bin/nix-env -i "$nix"; then
+if ! "$nix/bin/nix-env" -i "$nix"; then
     echo "$0: unable to install Nix into your default profile" >&2
     exit 1
 fi
 
 # Install an SSL certificate bundle.
-if [ -z "$NIX_SSL_CERT_FILE" -o ! -f "$NIX_SSL_CERT_FILE" ]; then
-    $nix/bin/nix-env -i "$cacert"
+if [ -z "$NIX_SSL_CERT_FILE" ] || [ ! -f "$NIX_SSL_CERT_FILE" ]; then
+    "$nix/bin/nix-env" -i "$cacert"
     export NIX_SSL_CERT_FILE="$HOME/.nix-profile/etc/ssl/certs/ca-bundle.crt"
 fi
 
 # Subscribe the user to the Nixpkgs channel and fetch it.
-if ! $nix/bin/nix-channel --list | grep -q "^nixpkgs "; then
-    $nix/bin/nix-channel --add https://nixos.org/channels/nixpkgs-unstable
+if ! "$nix/bin/nix-channel" --list | grep -q "^nixpkgs "; then
+    "$nix/bin/nix-channel" --add https://nixos.org/channels/nixpkgs-unstable
 fi
 if [ -z "$_NIX_INSTALLER_TEST" ]; then
-    $nix/bin/nix-channel --update nixpkgs
+    "$nix/bin/nix-channel" --update nixpkgs
 fi
 
 # Make the shell source nix.sh during login.
-p=$NIX_LINK/etc/profile.d/nix.sh
+p="$NIX_LINK/etc/profile.d/nix.sh"
 
 added=
 for i in .bash_profile .bash_login .profile; do
@@ -101,7 +112,7 @@ for i in .bash_profile .bash_login .profile; do
     if [ -w "$fn" ]; then
         if ! grep -q "$p" "$fn"; then
             echo "modifying $fn..." >&2
-            echo "if [ -e $p ]; then . $p; fi # added by Nix installer" >> $fn
+            echo "if [ -e $p ]; then . $p; fi # added by Nix installer" >> "$fn"
         fi
         added=1
         break
