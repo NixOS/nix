@@ -91,5 +91,6 @@ verify
     echo -n "" | PINCH_ME_IM_SILLY=true ./install
     verify
     test -e /nix/store/.silly-hint
+
     cleanup
 )
