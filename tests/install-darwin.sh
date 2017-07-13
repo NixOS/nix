@@ -26,13 +26,10 @@ cleanup() {
         fi
     done
 
-
-
     for i in $(seq 1 $(sysctl -n hw.ncpu)); do
         sudo /usr/bin/dscl . -delete "/Users/nixbld$i" || true
     done
     sudo /usr/bin/dscl . -delete "/Groups/nixbld" || true
-
 
     sudo rm -rf /etc/nix \
          /nix \
@@ -41,7 +38,10 @@ cleanup() {
 }
 
 verify() {
+    set +e
     output=$(echo "nix-shell -p bash --run 'echo toow | rev'" | bash -l)
+    set -e
+
     test "$output" = "woot"
 }
 
@@ -58,10 +58,12 @@ verify
 
 
 (
+    set +e
     (
         echo "cd $(pwd)"
         echo nix-build ./release.nix -A binaryTarball.x86_64-darwin
     ) | bash -l
+    set -e
     cp ./result/nix-*.tar.bz2 $scratch/nix.tar.bz2
 )
 
