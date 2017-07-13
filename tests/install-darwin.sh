@@ -19,6 +19,13 @@ cleanup() {
         fi
     done
 
+    for file in ~/.bash_profile ~/.bash_login ~/.profile ~/.zshenv ~/.zprofile ~/.zshrc ~/.zlogin; do
+        cat "$file" | grep -v nix-profile > "$file.next"
+        mv "$file.next" "$file"
+    done
+
+
+
     for i in $(seq 1 $(sysctl -n hw.ncpu)); do
         sudo /usr/bin/dscl . -delete "/Users/nixbld$i" || true
     done
@@ -63,9 +70,6 @@ verify
     cd nix-*
 
     set -eux
-
-    cat ~/.profile | grep -v nix-profile > ~/.profile-next
-    mv ~/.profile-next ~/.profile
 
     cleanup
 
