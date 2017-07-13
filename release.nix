@@ -71,7 +71,7 @@ let
 
       releaseTools.nixBuild {
         name = "nix";
-        src = tarball.${system};
+        src = tarball."x86_64-linux";
 
         buildInputs =
           [ curl
@@ -109,7 +109,7 @@ let
 
       releaseTools.nixBuild {
         name = "nix-perl";
-        src = tarball.${system};
+        src = tarball."x86_64-linux";
 
         buildInputs =
           [ (builtins.getAttr system jobs.build) curl bzip2 xz pkgconfig pkgs.perl ]
@@ -170,7 +170,7 @@ let
 
       releaseTools.coverageAnalysis {
         name = "nix-build";
-        src = tarball.${system};
+        src = tarball."x86_64-linux";
 
         buildInputs =
           [ curl bzip2 openssl pkgconfig sqlite xz libsodium libseccomp
@@ -302,7 +302,7 @@ let
 
     releaseTools.rpmBuild rec {
       name = "nix-rpm";
-      src = jobs.tarball.${system};
+      src = jobs.tarball."x86_64-linux";
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages =
             [ "sqlite" "sqlite-devel" "bzip2-devel" "emacs" "libcurl-devel" "openssl-devel" "xz-devel" "libseccomp-devel" ]
@@ -324,7 +324,7 @@ let
 
     releaseTools.debBuild {
       name = "nix-deb";
-      src = jobs.tarball.${system};
+      src = jobs.tarball."x86_64-linux";
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages =
             [ "libsqlite3-dev" "libbz2-dev" "libcurl-dev" "libcurl3-nss" "libssl-dev" "liblzma-dev" "libseccomp-dev" ]
