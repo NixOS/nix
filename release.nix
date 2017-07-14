@@ -28,8 +28,7 @@ let
             docbook5 docbook5_xsl
             autoconf-archive
             git
-            libseccomp
-          ];
+          ] ++ lib.optional stdenv.isLinux libseccomp;
 
         configureFlags = "--enable-gc";
 
