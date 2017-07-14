@@ -15,11 +15,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
     NixArgs() : MultiCommand(*RegisterCommand::commands), MixCommonArgs("nix")
     {
-        mkFlag('h', "help", "show usage information", [=]() {
-            printHelp(programName, std::cout);
-            std::cout << "\nNote: this program is EXPERIMENTAL and subject to change.\n";
-            throw Exit();
-        });
+        mkFlag('h', "help", "show usage information", [&]() { showHelpAndExit(); });
 
         mkFlag(0, "help-config", "show configuration options", [=]() {
             std::cout << "The following configuration options are available:\n\n";
@@ -47,6 +43,13 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             "Boolean settings can be overriden using ‘--<name>’ or ‘--no-<name>’. See ‘nix\n"
             "--help-config’ for a list of configuration settings.\n";
     }
+
+    void showHelpAndExit()
+    {
+        printHelp(programName, std::cout);
+        std::cout << "\nNote: this program is EXPERIMENTAL and subject to change.\n";
+        throw Exit();
+    }
 };
 
 void mainWrapped(int argc, char * * argv)
@@ -68,7 +71,7 @@ void mainWrapped(int argc, char * * argv)
 
     args.parseCmdline(argvToStrings(argc, argv));
 
-    assert(args.command);
+    if (!args.command) args.showHelpAndExit();
 
     StartProgressBar bar;
 

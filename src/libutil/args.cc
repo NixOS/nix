@@ -146,7 +146,7 @@ bool Args::processArgs(const Strings & args, bool finish)
         res = true;
     }
 
-    if (finish && !expectedArgs.empty())
+    if (finish && !expectedArgs.empty() && !expectedArgs.front().optional)
         throw UsageError("more arguments are required");
 
     return res;

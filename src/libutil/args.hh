@@ -51,6 +51,7 @@ protected:
     {
         std::string label;
         size_t arity; // 0 = any
+        bool optional;
         std::function<void(Strings)> handler;
     };
 
@@ -165,7 +166,7 @@ public:
     /* Expect a string argument. */
     void expectArg(const std::string & label, string * dest)
     {
-        expectedArgs.push_back(ExpectedArg{label, 1, [=](Strings ss) {
+        expectedArgs.push_back(ExpectedArg{label, 1, false, [=](Strings ss) {
             *dest = ss.front();
         }});
     }
@@ -173,7 +174,7 @@ public:
     /* Expect 0 or more arguments. */
     void expectArgs(const std::string & label, Strings * dest)
     {
-        expectedArgs.push_back(ExpectedArg{label, 0, [=](Strings ss) {
+        expectedArgs.push_back(ExpectedArg{label, 0, false, [=](Strings ss) {
             *dest = ss;
         }});
     }

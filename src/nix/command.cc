@@ -24,7 +24,7 @@ void Command::printHelp(const string & programName, std::ostream & out)
 MultiCommand::MultiCommand(const Commands & _commands)
     : commands(_commands)
 {
-    expectedArgs.push_back(ExpectedArg{"command", 1, [=](Strings ss) {
+    expectedArgs.push_back(ExpectedArg{"command", 1, true, [=](Strings ss) {
         assert(!command);
         auto i = commands.find(ss.front());
         if (i == commands.end())
