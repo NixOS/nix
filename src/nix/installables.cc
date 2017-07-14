@@ -214,7 +214,7 @@ std::vector<std::shared_ptr<Installable>> InstallablesCommand::parseInstallables
     return result;
 }
 
-PathSet InstallablesCommand::buildInstallables(ref<Store> store, bool dryRun)
+PathSet InstallablesCommand::toStorePaths(ref<Store> store, ToStorePathsMode mode)
 {
     PathSet buildables;
 
@@ -223,9 +223,9 @@ PathSet InstallablesCommand::buildInstallables(ref<Store> store, bool dryRun)
         buildables.insert(b.begin(), b.end());
     }
 
-    if (dryRun)
+    if (mode == DryRun)
         printMissing(store, buildables);
-    else
+    else if (mode == Build)
         store->buildPaths(buildables);
 
     PathSet outPaths;

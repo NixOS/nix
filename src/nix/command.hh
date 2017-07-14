@@ -80,7 +80,9 @@ struct InstallablesCommand : virtual Args, StoreCommand
 
     std::vector<std::shared_ptr<Installable>> parseInstallables(ref<Store> store, Strings ss);
 
-    PathSet buildInstallables(ref<Store> store, bool dryRun);
+    enum ToStorePathsMode { Build, NoBuild, DryRun };
+
+    PathSet toStorePaths(ref<Store> store, ToStorePathsMode mode);
 
     ref<EvalState> getEvalState();
 

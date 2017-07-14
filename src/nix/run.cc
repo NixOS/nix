@@ -30,7 +30,7 @@ struct CmdRun : InstallablesCommand
 
     void run(ref<Store> store) override
     {
-        auto outPaths = buildInstallables(store, false);
+        auto outPaths = toStorePaths(store, Build);
 
         auto store2 = store.dynamic_pointer_cast<LocalStore>();
 

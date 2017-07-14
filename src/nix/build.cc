@@ -23,7 +23,7 @@ struct CmdBuild : MixDryRun, InstallablesCommand
 
     void run(ref<Store> store) override
     {
-        auto paths = buildInstallables(store, dryRun);
+        auto paths = toStorePaths(store, dryRun ? DryRun : Build);
 
         printInfo("build result: %s", showPaths(paths));
     }
