@@ -480,8 +480,12 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const PathSet & storePaths
             if (info->ca != "")
                 jsonPath.attr("ca", info->ca);
 
-            if (showClosureSize)
-                jsonPath.attr("closureSize", getClosureSize(storePath));
+            std::pair<uint64_t, uint64_t> closureSizes;
+
+            if (showClosureSize) {
+                closureSizes = getClosureSize(storePath);
+                jsonPath.attr("closureSize", closureSizes.first);
+            }
 
             if (includeImpureInfo) {
 
@@ -500,6 +504,17 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const PathSet & storePaths
                         jsonSigs.elem(sig);
                 }
 
+                auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
+                    std::shared_ptr<const ValidPathInfo>(info));
+
+                if (narInfo) {
+                    if (narInfo->fileHash)
+                        jsonPath.attr("downloadHash", narInfo->fileHash.to_string());
+                    if (narInfo->fileSize)
+                        jsonPath.attr("downloadSize", narInfo->fileSize);
+                    if (showClosureSize)
+                        jsonPath.attr("closureDownloadSize", closureSizes.second);
+                }
             }
 
         } catch (InvalidPath &) {
@@ -509,14 +524,20 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const PathSet & storePaths
 }
 
 
-unsigned long long Store::getClosureSize(const Path & storePath)
+std::pair<uint64_t, uint64_t> Store::getClosureSize(const Path & storePath)
 {
-    unsigned long long totalSize = 0;
+    uint64_t totalNarSize = 0, totalDownloadSize = 0;
     PathSet closure;
     computeFSClosure(storePath, closure, false, false);
-    for (auto & p : closure)
-        totalSize += queryPathInfo(p)->narSize;
-    return totalSize;
+    for (auto & p : closure) {
+        auto info = queryPathInfo(p);
+        totalNarSize += info->narSize;
+        auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
+            std::shared_ptr<const ValidPathInfo>(info));
+        if (narInfo)
+            totalDownloadSize += narInfo->fileSize;
+    }
+    return {totalNarSize, totalDownloadSize};
 }
 
 

@@ -495,7 +495,7 @@ public:
     /* Return the size of the closure of the specified path, that is,
        the sum of the size of the NAR serialisation of each path in
        the closure. */
-    unsigned long long getClosureSize(const Path & storePath);
+    std::pair<uint64_t, uint64_t> getClosureSize(const Path & storePath);
 
     /* Optimise the disk space usage of the Nix store by hard-linking files
        with the same contents. */
