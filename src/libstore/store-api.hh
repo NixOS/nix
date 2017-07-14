@@ -35,6 +35,7 @@ class JSONPlaceholder;
 enum RepairFlag : bool { NoRepair = false, Repair = true };
 enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
 enum SubstituteFlag : bool { NoSubstitute = false, Substitute = true };
+enum AllowInvalidFlag : bool { DisallowInvalid = false, AllowInvalid = true };
 
 
 /* Size of the hash part of store paths, in base-32 characters. */
@@ -488,7 +489,8 @@ public:
        included. If ‘showClosureSize’ is true, the closure size of
        each path is included. */
     void pathInfoToJSON(JSONPlaceholder & jsonOut, const PathSet & storePaths,
-        bool includeImpureInfo, bool showClosureSize);
+        bool includeImpureInfo, bool showClosureSize,
+        AllowInvalidFlag allowInvalid = DisallowInvalid);
 
     /* Return the size of the closure of the specified path, that is,
        the sum of the size of the NAR serialisation of each path in

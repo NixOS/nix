@@ -455,49 +455,55 @@ string Store::makeValidityRegistration(const PathSet & paths,
 
 
 void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const PathSet & storePaths,
-    bool includeImpureInfo, bool showClosureSize)
+    bool includeImpureInfo, bool showClosureSize, AllowInvalidFlag allowInvalid)
 {
     auto jsonList = jsonOut.list();
 
     for (auto storePath : storePaths) {
-        auto info = queryPathInfo(storePath);
-        storePath = info->path;
-
         auto jsonPath = jsonList.object();
-        jsonPath
-            .attr("path", storePath)
-            .attr("narHash", info->narHash.to_string())
-            .attr("narSize", info->narSize);
+        jsonPath.attr("path", storePath);
 
-        {
-            auto jsonRefs = jsonPath.list("references");
-            for (auto & ref : info->references)
-                jsonRefs.elem(ref);
-        }
+        try {
+            auto info = queryPathInfo(storePath);
+            storePath = info->path;
 
-        if (info->ca != "")
-            jsonPath.attr("ca", info->ca);
+            jsonPath
+                .attr("narHash", info->narHash.to_string())
+                .attr("narSize", info->narSize);
 
-        if (showClosureSize)
-            jsonPath.attr("closureSize", getClosureSize(storePath));
-
-        if (includeImpureInfo) {
-
-            if (info->deriver != "")
-                jsonPath.attr("deriver", info->deriver);
-
-            if (info->registrationTime)
-                jsonPath.attr("registrationTime", info->registrationTime);
-
-            if (info->ultimate)
-                jsonPath.attr("ultimate", info->ultimate);
-
-            if (!info->sigs.empty()) {
-                auto jsonSigs = jsonPath.list("signatures");
-                for (auto & sig : info->sigs)
-                    jsonSigs.elem(sig);
+            {
+                auto jsonRefs = jsonPath.list("references");
+                for (auto & ref : info->references)
+                    jsonRefs.elem(ref);
             }
 
+            if (info->ca != "")
+                jsonPath.attr("ca", info->ca);
+
+            if (showClosureSize)
+                jsonPath.attr("closureSize", getClosureSize(storePath));
+
+            if (includeImpureInfo) {
+
+                if (info->deriver != "")
+                    jsonPath.attr("deriver", info->deriver);
+
+                if (info->registrationTime)
+                    jsonPath.attr("registrationTime", info->registrationTime);
+
+                if (info->ultimate)
+                    jsonPath.attr("ultimate", info->ultimate);
+
+                if (!info->sigs.empty()) {
+                    auto jsonSigs = jsonPath.list("signatures");
+                    for (auto & sig : info->sigs)
+                        jsonSigs.elem(sig);
+                }
+
+            }
+
+        } catch (InvalidPath &) {
+            jsonPath.attr("valid", false);
         }
     }
 }
