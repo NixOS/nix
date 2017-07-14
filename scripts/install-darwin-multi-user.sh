@@ -43,6 +43,20 @@ readonly EXTRACTED_NIX_PATH="$(dirname "$0")"
 
 readonly ROOT_HOME="/var/root"
 
+if [ -t 0 ]; then
+    readonly IS_HEADLESS='no'
+else
+    readonly IS_HEADLESS='yes'
+fi
+
+headless() {
+    if [ "$IS_HEADLESS" = "yes" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 contactme() {
     echo "We'd love to help if you need it."
     echo ""
@@ -173,6 +187,11 @@ failure() {
 ui_confirm() {
     _textout "$GREEN$GREEN_UL" "$1"
 
+    if headless; then
+        echo "No TTY, assuming you would say yes :)"
+        return 0
+    fi
+
     local prompt="[y/n] "
     echo -n "$prompt"
     while read -r y; do
@@ -210,9 +229,10 @@ __sudo() {
 _sudo() {
     local expl="$1"
     shift
-    if __sudo "$expl" "$*"; then
-        sudo "$@"
+    if ! headless; then
+        __sudo "$expl" "$*"
     fi
+    sudo "$@"
 }
 
 
@@ -397,6 +417,9 @@ setup_report() {
     row "     Build Users" "$NIX_USER_COUNT"
     row "  Build Group ID" "$NIX_BUILD_GROUP_ID"
     row "Build Group Name" "$NIX_BUILD_GROUP_NAME"
+    if [ "${ALLOW_PREEXISTING_INSTALLATION:-}" != "" ]; then
+        row "Preexisting Install" "Allowed"
+    fi
 
     subheader "build users:"
 
@@ -606,6 +629,27 @@ EOF
 chat_about_sudo() {
     header "let's talk about sudo"
 
+    if headless; then
+        cat <<EOF
+This script is going to call sudo a lot. Normally, it would show you
+exactly what commands it is running and why. However, the script is
+run in  a headless fashion, like this:
+
+  $ curl https://nixos.org/nix/install | sh
+
+or maybe in a CI pipeline. Because of that, we're going to skip the
+verbose output in the interest of brevity.
+
+If you would like to
+see the output, try like this:
+
+  $ curl -o install-nix https://nixos.org/nix/install
+  $ sh ./install-nix
+
+EOF
+        return 0
+    fi
+
     cat <<EOF
 This script is going to call sudo a lot. Every time we do, it'll
 output exactly what it'll do, and why.
@@ -733,7 +777,7 @@ main() {
     welcome_to_nix
     chat_about_sudo
 
-    if [ "${PINCH_ME_IM_SILLY:-}" = "" ]; then
+    if [ "${ALLOW_PREEXISTING_INSTALLATION:-}" = "" ]; then
         validate_starting_assumptions
     fi
 
@@ -745,11 +789,6 @@ main() {
         trap finish_cleanup EXIT
         exit 1
     fi
-
-    if [ "${PINCH_ME_IM_SILLY:-}" != "" ]; then
-        exit 1
-    fi
-
 
     create_build_group
     create_build_users

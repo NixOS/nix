@@ -53,7 +53,8 @@ trap finish EXIT
 
 # First setup Nix
 cleanup
-curl https://nixos.org/nix/install | bash
+curl -o install https://nixos.org/nix/install
+yes | bash ./install
 verify
 
 
@@ -79,11 +80,17 @@ verify
 
     yes | ./install
     verify
-
     cleanup
 
-    yes | ./install
+    echo -n "" | ./install
     verify
+    cleanup
+
+    sudo mkdir -p /nix/store
+    sudo touch /nix/store/.silly-hint
+    echo -n "" | ALLOW_PREEXISTING_INSTALLATION=true ./install
+    verify
+    test -e /nix/store/.silly-hint
 
     cleanup
 )
