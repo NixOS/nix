@@ -44,11 +44,14 @@ private:
     std::shared_ptr<Store> _store;
 };
 
+struct Whence { std::string outputName; Path drvPath; };
+typedef std::map<Path, Whence> Buildables;
+
 struct Installable
 {
     virtual std::string what() = 0;
 
-    virtual PathSet toBuildable()
+    virtual Buildables toBuildable()
     {
         throw Error("argument ‘%s’ cannot be built", what());
     }

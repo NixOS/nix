@@ -28,7 +28,8 @@ struct CmdLog : InstallablesCommand
         subs.push_front(store);
 
         for (auto & inst : installables) {
-            for (auto & path : inst->toBuildable()) {
+            for (auto & b : inst->toBuildable()) {
+                auto path = b.second.drvPath != "" ? b.second.drvPath : b.first;
                 bool found = false;
                 for (auto & sub : subs) {
                     auto log = sub->getBuildLog(path);

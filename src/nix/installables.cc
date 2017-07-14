@@ -67,9 +67,9 @@ struct InstallableStoreDrv : Installable
 
     std::string what() override { return storePath; }
 
-    PathSet toBuildable() override
+    Buildables toBuildable() override
     {
-        return {storePath};
+        return {{storePath, {}}};
     }
 };
 
@@ -81,9 +81,9 @@ struct InstallableStorePath : Installable
 
     std::string what() override { return storePath; }
 
-    PathSet toBuildable() override
+    Buildables toBuildable() override
     {
-        return {storePath};
+        return {{storePath, {}}};
     }
 };
 
@@ -97,7 +97,7 @@ struct InstallableExpr : Installable
 
     std::string what() override { return text; }
 
-    PathSet toBuildable() override
+    Buildables toBuildable() override
     {
         auto state = installables.getEvalState();
 
@@ -110,10 +110,11 @@ struct InstallableExpr : Installable
         DrvInfos drvs;
         getDerivations(*state, *v, "", autoArgs, drvs, false);
 
-        PathSet res;
+        Buildables res;
 
-        for (auto & i : drvs)
-            res.insert(i.queryDrvPath());
+        for (auto & drv : drvs)
+            for (auto & output : drv.queryOutputs())
+                res.emplace(output.second, Whence{output.first, drv.queryDrvPath()});
 
         return res;
     }
@@ -137,7 +138,7 @@ struct InstallableAttrPath : Installable
 
     std::string what() override { return attrPath; }
 
-    PathSet toBuildable() override
+    Buildables toBuildable() override
     {
         auto state = installables.getEvalState();
 
@@ -150,10 +151,11 @@ struct InstallableAttrPath : Installable
         DrvInfos drvs;
         getDerivations(*state, *v, "", autoArgs, drvs, false);
 
-        PathSet res;
+        Buildables res;
 
-        for (auto & i : drvs)
-            res.insert(i.queryDrvPath());
+        for (auto & drv : drvs)
+            for (auto & output : drv.queryOutputs())
+                res.emplace(output.second, Whence{output.first, drv.queryDrvPath()});
 
         return res;
     }
@@ -216,26 +218,21 @@ std::vector<std::shared_ptr<Installable>> InstallablesCommand::parseInstallables
 
 PathSet InstallablesCommand::toStorePaths(ref<Store> store, ToStorePathsMode mode)
 {
-    PathSet buildables;
+    if (mode != DryRun)
+        settings.readOnlyMode = true;
 
-    for (auto & i : installables) {
-        auto b = i->toBuildable();
-        buildables.insert(b.begin(), b.end());
-    }
+    PathSet outPaths, buildables;
+
+    for (auto & i : installables)
+        for (auto & b : i->toBuildable()) {
+            outPaths.insert(b.first);
+            buildables.insert(b.second.drvPath != "" ? b.second.drvPath : b.first);
+        }
 
     if (mode == DryRun)
         printMissing(store, buildables);
     else if (mode == Build)
         store->buildPaths(buildables);
-
-    PathSet outPaths;
-    for (auto & path : buildables)
-        if (isDerivation(path)) {
-            Derivation drv = store->derivationFromPath(path);
-            for (auto & output : drv.outputs)
-                outPaths.insert(output.second.path);
-        } else
-            outPaths.insert(path);
 
     return outPaths;
 }
