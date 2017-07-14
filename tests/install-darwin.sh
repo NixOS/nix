@@ -88,7 +88,7 @@ verify
 
     sudo mkdir -p /nix/store
     sudo touch /nix/store/.silly-hint
-    echo -n "" | PINCH_ME_IM_SILLY=true ./install
+    echo -n "" | ALLOW_PREEXISTING_INSTALLATION=true ./install
     verify
     test -e /nix/store/.silly-hint
 
