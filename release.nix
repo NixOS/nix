@@ -6,13 +6,13 @@
 
 let
 
-  pkgs = import <nixpkgs> {};
+  pkgs = import nixpkgs {};
 
   jobs = rec {
 
 
-    tarball =
-      with pkgs;
+    tarball = pkgs.lib.genAttrs systems (system:
+      with import nixpkgs { inherit system; };
 
       releaseTools.sourceTarball {
         name = "nix-tarball";
@@ -57,18 +57,19 @@ let
           make install docdir=$out/share/doc/nix makefiles=doc/manual/local.mk
           echo "doc manual $out/share/doc/nix/manual" >> $out/nix-support/hydra-build-products
         '';
-      };
+      }
+    );
 
 
     build = pkgs.lib.genAttrs systems (system:
 
-      with import <nixpkgs> { inherit system; };
+      with import nixpkgs { inherit system; };
 
       with import ./release-common.nix { inherit pkgs; };
 
       releaseTools.nixBuild {
         name = "nix";
-        src = tarball;
+        src = tarball."x86_64-linux";
 
         buildInputs =
           [ curl
@@ -102,11 +103,11 @@ let
 
     perlBindings = pkgs.lib.genAttrs systems (system:
 
-      let pkgs = import <nixpkgs> { inherit system; }; in with pkgs;
+      let pkgs = import nixpkgs { inherit system; }; in with pkgs;
 
       releaseTools.nixBuild {
         name = "nix-perl";
-        src = tarball;
+        src = tarball."x86_64-linux";
 
         buildInputs =
           [ (builtins.getAttr system jobs.build) curl bzip2 xz pkgconfig pkgs.perl ]
@@ -128,7 +129,7 @@ let
     binaryTarball = pkgs.lib.genAttrs systems (system:
 
       # FIXME: temporarily use a different branch for the Darwin build.
-      with import <nixpkgs> { inherit system; };
+      with import nixpkgs { inherit system; };
 
       let
         toplevel = builtins.getAttr system jobs.build;
@@ -163,11 +164,11 @@ let
 
 
     coverage =
-      with import <nixpkgs> { system = "x86_64-linux"; };
+      with import nixpkgs { system = "x86_64-linux"; };
 
       releaseTools.coverageAnalysis {
         name = "nix-build";
-        src = tarball;
+        src = tarball."x86_64-linux";
 
         buildInputs =
           [ curl bzip2 openssl pkgconfig sqlite xz libsodium libseccomp
@@ -222,7 +223,7 @@ let
       });
 
     tests.binaryTarball =
-      with import <nixpkgs> { system = "x86_64-linux"; };
+      with import nixpkgs { system = "x86_64-linux"; };
       vmTools.runInLinuxImage (runCommand "nix-binary-tarball-test"
         { diskImage = vmTools.diskImages.ubuntu1204x86_64;
         }
@@ -262,10 +263,12 @@ let
 
     # Aggregate job containing the release-critical jobs.
     release = pkgs.releaseTools.aggregate {
-      name = "nix-${tarball.version}";
+      name = "nix-${tarball."x86_64-linux".version}";
       meta.description = "Release-critical builds";
       constituents =
-        [ tarball
+        [ tarball.x86_64-linux
+          tarball.x86_64-darwin
+          tarball.i686-linux
           build.i686-linux
           build.x86_64-darwin
           build.x86_64-linux
@@ -295,11 +298,11 @@ let
   makeRPM =
     system: diskImageFun: extraPackages:
 
-    with import <nixpkgs> { inherit system; };
+    with import nixpkgs { inherit system; };
 
     releaseTools.rpmBuild rec {
       name = "nix-rpm";
-      src = jobs.tarball;
+      src = jobs.tarball."x86_64-linux";
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages =
             [ "sqlite" "sqlite-devel" "bzip2-devel" "emacs" "libcurl-devel" "openssl-devel" "xz-devel" "libseccomp-devel" ]
@@ -317,11 +320,11 @@ let
   makeDeb =
     system: diskImageFun: extraPackages: extraDebPackages:
 
-    with import <nixpkgs> { inherit system; };
+    with import nixpkgs { inherit system; };
 
     releaseTools.debBuild {
       name = "nix-deb";
-      src = jobs.tarball;
+      src = jobs.tarball."x86_64-linux";
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages =
             [ "libsqlite3-dev" "libbz2-dev" "libcurl-dev" "libcurl3-nss" "libssl-dev" "liblzma-dev" "libseccomp-dev" ]
