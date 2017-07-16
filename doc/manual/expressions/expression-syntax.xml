@@ -16,7 +16,7 @@ stdenv.mkDerivation { <co xml:id='ex-hello-nix-co-2' />
   builder = ./builder.sh; <co xml:id='ex-hello-nix-co-4' />
   src = fetchurl { <co xml:id='ex-hello-nix-co-5' />
     url = ftp://ftp.nluug.nl/pub/gnu/hello/hello-2.1.1.tar.gz;
-    md5 = "70c9ccf9fac07f762c24f2df2290784d";
+    sha256 = "1md7jsfd8pa45z73bz1kszpp01yw6x5ljkjk2hx7wl800any6465";
   };
   inherit perl; <co xml:id='ex-hello-nix-co-6' />
 }</programlisting>
