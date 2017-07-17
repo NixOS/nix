@@ -38,12 +38,15 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
 
     std::shared_ptr<std::string> data;
 
-    try {
-        if (getAttr("outputHashMode") == "flat")
-            data = fetch("http://tarballs.nixos.org/" + getAttr("outputHashAlgo") + "/" + getAttr("outputHash"));
-    } catch (Error & e) {
-        debug(e.what());
-    }
+    if (getAttr("outputHashMode") == "flat")
+        for (auto hashedMirror : settings.hashedMirrors.get())
+            try {
+                if (!hasSuffix(hashedMirror, "/")) hashedMirror += '/';
+                data = fetch(hashedMirror + getAttr("outputHashAlgo") + "/" + getAttr("outputHash"));
+                break;
+            } catch (Error & e) {
+                debug(e.what());
+            }
 
     if (!data) data = fetch(getAttr("url"));
 

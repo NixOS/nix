@@ -327,6 +327,9 @@ public:
         "Whether builders can acquire new privileges by calling programs with "
         "setuid/setgid bits or with file capabilities."};
 #endif
+
+    Setting<Strings> hashedMirrors{this, {"http://tarballs.nixos.org/"}, "hashed-mirrors",
+        "A list of servers used by builtins.fetchurl to fetch files by hash."};
 };
 
 
