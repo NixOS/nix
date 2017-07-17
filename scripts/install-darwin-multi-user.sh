@@ -259,8 +259,13 @@ function finish_success {
     ok "Alright! We're done!"
     cat <<EOF
 
-Before Nix will work in your existing shells, you'll need to close
-them and open them again. Other than that, you should be ready to go.
+Before Nix will work in your existing shells, you'll need to either
+run:
+
+  $ source $PROFILE_NIX_FILE
+
+or close them and open them again. Other than that, you should be
+ready to go.
 
 Try it! Open a new terminal, and type:
 
