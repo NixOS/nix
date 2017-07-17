@@ -614,7 +614,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const PathSet & storePa
             checkInterrupt();
 
             if (!dstStore->isValidPath(storePath)) {
-                printError("copying ‘%s’...", storePath);
+                printInfo("copying ‘%s’...", storePath);
                 copyStorePath(srcStore, dstStore, storePath, repair, checkSigs);
             }
         });
