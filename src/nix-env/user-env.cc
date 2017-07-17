@@ -56,9 +56,10 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         state.mkAttrs(v, 16);
 
         mkString(*state.allocAttr(v, state.sType), "derivation");
-        mkString(*state.allocAttr(v, state.sName), i.name);
-        if (!i.system.empty())
-            mkString(*state.allocAttr(v, state.sSystem), i.system);
+        mkString(*state.allocAttr(v, state.sName), i.queryName());
+        auto system = i.querySystem();
+        if (!system.empty())
+            mkString(*state.allocAttr(v, state.sSystem), system);
         mkString(*state.allocAttr(v, state.sOutPath), i.queryOutPath());
         if (drvPath != "")
             mkString(*state.allocAttr(v, state.sDrvPath), i.queryDrvPath());

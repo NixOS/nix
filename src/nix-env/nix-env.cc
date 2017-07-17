@@ -186,7 +186,7 @@ static void loadDerivations(EvalState & state, Path nixExprPath,
        system. */
     for (DrvInfos::iterator i = elems.begin(), j; i != elems.end(); i = j) {
         j = i; j++;
-        if (systemFilter != "*" && i->system != systemFilter)
+        if (systemFilter != "*" && i->querySystem() != systemFilter)
             elems.erase(i);
     }
 }
@@ -247,7 +247,7 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
         for (DrvInfos::const_iterator j = allElems.begin();
              j != allElems.end(); ++j, ++n)
         {
-            DrvName drvName(j->name);
+            DrvName drvName(j->queryName());
             if (i.matches(drvName)) {
                 i.hits++;
                 matches.push_back(std::pair<DrvInfo, unsigned int>(*j, n));
@@ -269,36 +269,36 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
             StringSet multiple;
 
             for (auto & j : matches) {
-                DrvName drvName(j.first.name);
+                DrvName drvName(j.first.queryName());
                 int d = 1;
 
                 Newest::iterator k = newest.find(drvName.name);
 
                 if (k != newest.end()) {
-                    d = j.first.system == k->second.first.system ? 0 :
-                        j.first.system == settings.thisSystem ? 1 :
-                        k->second.first.system == settings.thisSystem ? -1 : 0;
+                    d = j.first.querySystem() == k->second.first.querySystem() ? 0 :
+                        j.first.querySystem() == settings.thisSystem ? 1 :
+                        k->second.first.querySystem() == settings.thisSystem ? -1 : 0;
                     if (d == 0)
                         d = comparePriorities(state, j.first, k->second.first);
                     if (d == 0)
-                        d = compareVersions(drvName.version, DrvName(k->second.first.name).version);
+                        d = compareVersions(drvName.version, DrvName(k->second.first.queryName()).version);
                 }
 
                 if (d > 0) {
                     newest.erase(drvName.name);
                     newest.insert(Newest::value_type(drvName.name, j));
-                    multiple.erase(j.first.name);
+                    multiple.erase(j.first.queryName());
                 } else if (d == 0) {
-                    multiple.insert(j.first.name);
+                    multiple.insert(j.first.queryName());
                 }
             }
 
             matches.clear();
             for (auto & j : newest) {
-                if (multiple.find(j.second.first.name) != multiple.end())
+                if (multiple.find(j.second.first.queryName()) != multiple.end())
                     printInfo(
-                        format("warning: there are multiple derivations named ‘%1%’; using the first one")
-                        % j.second.first.name);
+                        "warning: there are multiple derivations named ‘%1%’; using the first one",
+                        j.second.first.queryName());
                 matches.push_back(j.second);
             }
         }
@@ -386,7 +386,8 @@ static void queryInstSources(EvalState & state,
                 if (dash != string::npos)
                     name = string(name, dash + 1);
 
-                DrvInfo elem(state, name, "", "", 0);
+                DrvInfo elem(state, "", nullptr);
+                elem.setName(name);
 
                 if (isDerivation(path)) {
                     elem.setDrvPath(path);
@@ -468,8 +469,8 @@ static void installDerivations(Globals & globals,
            path is not the one we want (e.g., `java-front' versus
            `java-front-0.9pre15899'). */
         if (globals.forceName != "")
-            i.name = globals.forceName;
-        newNames.insert(DrvName(i.name).name);
+            i.setName(globals.forceName);
+        newNames.insert(DrvName(i.queryName()).name);
     }
 
 
@@ -484,17 +485,17 @@ static void installDerivations(Globals & globals,
             DrvInfos installedElems = queryInstalled(*globals.state, profile);
 
             for (auto & i : installedElems) {
-                DrvName drvName(i.name);
+                DrvName drvName(i.queryName());
                 if (!globals.preserveInstalled &&
                     newNames.find(drvName.name) != newNames.end() &&
                     !keep(i))
-                    printInfo(format("replacing old ‘%1%’") % i.name);
+                    printInfo("replacing old ‘%s’", i.queryName());
                 else
                     allElems.push_back(i);
             }
 
             for (auto & i : newElems)
-                printInfo(format("installing ‘%1%’") % i.name);
+                printInfo("installing ‘%s’", i.queryName());
         }
 
         printMissing(*globals.state, newElems);
@@ -548,7 +549,7 @@ static void upgradeDerivations(Globals & globals,
         /* Go through all installed derivations. */
         DrvInfos newElems;
         for (auto & i : installedElems) {
-            DrvName drvName(i.name);
+            DrvName drvName(i.queryName());
 
             try {
 
@@ -569,7 +570,7 @@ static void upgradeDerivations(Globals & globals,
                 for (auto j = availElems.begin(); j != availElems.end(); ++j) {
                     if (comparePriorities(*globals.state, i, *j) > 0)
                         continue;
-                    DrvName newName(j->name);
+                    DrvName newName(j->queryName());
                     if (newName.name == drvName.name) {
                         int d = compareVersions(drvName.version, newName.version);
                         if ((upgradeType == utLt && d < 0) ||
@@ -596,14 +597,13 @@ static void upgradeDerivations(Globals & globals,
                 {
                     const char * action = compareVersions(drvName.version, bestVersion) <= 0
                         ? "upgrading" : "downgrading";
-                    printInfo(
-                        format("%1% ‘%2%’ to ‘%3%’")
-                        % action % i.name % bestElem->name);
+                    printInfo("%1% ‘%2%’ to ‘%3%’",
+                        action, i.queryName(), bestElem->queryName());
                     newElems.push_back(*bestElem);
                 } else newElems.push_back(i);
 
             } catch (Error & e) {
-                e.addPrefix(format("while trying to find an upgrade for ‘%1%’:\n") % i.name);
+                e.addPrefix(fmt("while trying to find an upgrade for ‘%s’:\n", i.queryName()));
                 throw;
             }
         }
@@ -663,10 +663,10 @@ static void opSetFlag(Globals & globals, Strings opFlags, Strings opArgs)
 
         /* Update all matching derivations. */
         for (auto & i : installedElems) {
-            DrvName drvName(i.name);
+            DrvName drvName(i.queryName());
             for (auto & j : selectors)
                 if (j.matches(drvName)) {
-                    printInfo(format("setting flag on ‘%1%’") % i.name);
+                    printInfo("setting flag on ‘%1%’", i.queryName());
                     j.hits++;
                     setMetaFlag(*globals.state, i, flagName, flagValue);
                     break;
@@ -702,7 +702,7 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
     DrvInfo & drv(elems.front());
 
     if (globals.forceName != "")
-        drv.name = globals.forceName;
+        drv.setName(globals.forceName);
 
     if (drv.queryDrvPath() != "") {
         PathSet paths = {drv.queryDrvPath()};
@@ -732,7 +732,7 @@ static void uninstallDerivations(Globals & globals, Strings & selectors,
         DrvInfos newElems;
 
         for (auto & i : installedElems) {
-            DrvName drvName(i.name);
+            DrvName drvName(i.queryName());
             bool found = false;
             for (auto & j : selectors)
                 /* !!! the repeated calls to followLinksToStorePath()
@@ -740,7 +740,7 @@ static void uninstallDerivations(Globals & globals, Strings & selectors,
                 if ((isPath(j) && i.queryOutPath() == globals.state->store->followLinksToStorePath(j))
                     || DrvName(j).matches(drvName))
                 {
-                    printInfo(format("uninstalling ‘%1%’") % i.name);
+                    printInfo("uninstalling ‘%s’", i.queryName());
                     found = true;
                     break;
                 }
@@ -771,9 +771,11 @@ static bool cmpChars(char a, char b)
 
 static bool cmpElemByName(const DrvInfo & a, const DrvInfo & b)
 {
+    auto a_name = a.queryName();
+    auto b_name = b.queryName();
     return lexicographical_compare(
-        a.name.begin(), a.name.end(),
-        b.name.begin(), b.name.end(), cmpChars);
+        a_name.begin(), a_name.end(),
+        b_name.begin(), b_name.end(), cmpChars);
 }
 
 
@@ -822,13 +824,13 @@ typedef enum { cvLess, cvEqual, cvGreater, cvUnavail } VersionDiff;
 static VersionDiff compareVersionAgainstSet(
     const DrvInfo & elem, const DrvInfos & elems, string & version)
 {
-    DrvName name(elem.name);
+    DrvName name(elem.queryName());
 
     VersionDiff diff = cvUnavail;
     version = "?";
 
     for (auto & i : elems) {
-        DrvName name2(i.name);
+        DrvName name2(i.queryName());
         if (name.name == name2.name) {
             int d = compareVersions(name.version, name2.version);
             if (d < 0) {
@@ -857,8 +859,8 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
     for (auto & i : elems) {
         JSONObject pkgObj = topObj.object(i.attrPath);
 
-        pkgObj.attr("name", i.name);
-        pkgObj.attr("system", i.system);
+        pkgObj.attr("name", i.queryName());
+        pkgObj.attr("system", i.querySystem());
 
         JSONObject metaObj = pkgObj.object("meta");
         StringSet metaNames = i.queryMetaNames();
@@ -866,7 +868,7 @@ static void queryJSON(Globals & globals, vector<DrvInfo> & elems)
             auto placeholder = metaObj.placeholder(j);
             Value * v = i.queryMeta(j);
             if (!v) {
-                printError(format("derivation ‘%1%’ has invalid meta attribute ‘%2%’") % i.name % j);
+                printError("derivation ‘%s’ has invalid meta attribute ‘%s’", i.queryName(), j);
                 placeholder.write(nullptr);
             } else {
                 PathSet context;
@@ -963,7 +965,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             try {
                 paths.insert(i.queryOutPath());
             } catch (AssertionError & e) {
-                printMsg(lvlTalkative, format("skipping derivation named ‘%1%’ which gives an assertion failure") % i.name);
+                printMsg(lvlTalkative, "skipping derivation named ‘%s’ which gives an assertion failure", i.queryName());
                 i.setFailed();
             }
         validPaths = globals.state->store->queryValidPaths(paths);
@@ -1024,9 +1026,9 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                 columns.push_back(i.attrPath);
 
             if (xmlOutput)
-                attrs["name"] = i.name;
+                attrs["name"] = i.queryName();
             else if (printName)
-                columns.push_back(i.name);
+                columns.push_back(i.queryName());
 
             if (compareVersions) {
                 /* Compare this element against the versions of the
@@ -1059,10 +1061,10 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             }
 
             if (xmlOutput) {
-                if (i.system != "") attrs["system"] = i.system;
+                if (i.querySystem() != "") attrs["system"] = i.querySystem();
             }
             else if (printSystem)
-                columns.push_back(i.system);
+                columns.push_back(i.querySystem());
 
             if (printDrvPath) {
                 string drvPath = i.queryDrvPath();
@@ -1110,7 +1112,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                             attrs2["name"] = j;
                             Value * v = i.queryMeta(j);
                             if (!v)
-                                printError(format("derivation ‘%1%’ has invalid meta attribute ‘%2%’") % i.name % j);
+                                printError("derivation ‘%s’ has invalid meta attribute ‘%s’", i.queryName(), j);
                             else {
                                 if (v->type == tString) {
                                     attrs2["type"] = "string";
@@ -1161,9 +1163,9 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             cout.flush();
 
         } catch (AssertionError & e) {
-            printMsg(lvlTalkative, format("skipping derivation named ‘%1%’ which gives an assertion failure") % i.name);
+            printMsg(lvlTalkative, "skipping derivation named ‘%1%’ which gives an assertion failure", i.queryName());
         } catch (Error & e) {
-            e.addPrefix(format("while querying the derivation named ‘%1%’:\n") % i.name);
+            e.addPrefix(fmt("while querying the derivation named ‘%1%’:\n", i.queryName()));
             throw;
         }
     }

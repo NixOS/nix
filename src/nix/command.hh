@@ -62,17 +62,13 @@ struct Installable
     }
 };
 
-/* A command that operates on a list of "installables", which can be
-   store paths, attribute paths, Nix expressions, etc. */
-struct InstallablesCommand : virtual Args, StoreCommand
+struct SourceExprCommand : virtual Args, StoreCommand
 {
-    std::vector<std::shared_ptr<Installable>> installables;
     Path file;
 
-    InstallablesCommand()
+    SourceExprCommand()
     {
         mkFlag('f', "file", "file", "evaluate FILE rather than the default", &file);
-        expectArgs("installables", &_installables);
     }
 
     /* Return a value representing the Nix expression from which we
@@ -81,13 +77,31 @@ struct InstallablesCommand : virtual Args, StoreCommand
        = import ...; bla = import ...; }’. */
     Value * getSourceExpr(EvalState & state);
 
+    ref<EvalState> getEvalState();
+
+private:
+
+    std::shared_ptr<EvalState> evalState;
+
+    Value * vSourceExpr = 0;
+};
+
+/* A command that operates on a list of "installables", which can be
+   store paths, attribute paths, Nix expressions, etc. */
+struct InstallablesCommand : virtual Args, SourceExprCommand
+{
+    std::vector<std::shared_ptr<Installable>> installables;
+
+    InstallablesCommand()
+    {
+        expectArgs("installables", &_installables);
+    }
+
     std::vector<std::shared_ptr<Installable>> parseInstallables(ref<Store> store, Strings ss);
 
     enum ToStorePathsMode { Build, NoBuild, DryRun };
 
     PathSet toStorePaths(ref<Store> store, ToStorePathsMode mode);
-
-    ref<EvalState> getEvalState();
 
     void prepare() override;
 
@@ -96,10 +110,6 @@ struct InstallablesCommand : virtual Args, StoreCommand
 private:
 
     Strings _installables;
-
-    std::shared_ptr<EvalState> evalState;
-
-    Value * vSourceExpr = 0;
 };
 
 /* A command that operates on zero or more store paths. */

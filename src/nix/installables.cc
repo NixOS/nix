@@ -12,7 +12,7 @@
 
 namespace nix {
 
-Value * InstallablesCommand::getSourceExpr(EvalState & state)
+Value * SourceExprCommand::getSourceExpr(EvalState & state)
 {
     if (vSourceExpr) return vSourceExpr;
 
@@ -57,6 +57,13 @@ Value * InstallablesCommand::getSourceExpr(EvalState & state)
     }
 
     return vSourceExpr;
+}
+
+ref<EvalState> SourceExprCommand::getEvalState()
+{
+    if (!evalState)
+        evalState = std::make_shared<EvalState>(Strings{}, getStore());
+    return ref<EvalState>(evalState);
 }
 
 struct InstallableStoreDrv : Installable
@@ -235,13 +242,6 @@ PathSet InstallablesCommand::toStorePaths(ref<Store> store, ToStorePathsMode mod
         store->buildPaths(buildables);
 
     return outPaths;
-}
-
-ref<EvalState> InstallablesCommand::getEvalState()
-{
-    if (!evalState)
-        evalState = std::make_shared<EvalState>(Strings{}, getStore());
-    return ref<EvalState>(evalState);
 }
 
 void InstallablesCommand::prepare()

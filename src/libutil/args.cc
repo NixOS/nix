@@ -66,6 +66,7 @@ void Args::printHelp(const string & programName, std::ostream & out)
         std::cout << renderLabels({exp.label});
         // FIXME: handle arity > 1
         if (exp.arity == 0) std::cout << "...";
+        if (exp.optional) std::cout << "?";
     }
     std::cout << "\n";
 

@@ -164,9 +164,9 @@ public:
     }
 
     /* Expect a string argument. */
-    void expectArg(const std::string & label, string * dest)
+    void expectArg(const std::string & label, string * dest, bool optional = false)
     {
-        expectedArgs.push_back(ExpectedArg{label, 1, false, [=](Strings ss) {
+        expectedArgs.push_back(ExpectedArg{label, 1, optional, [=](Strings ss) {
             *dest = ss.front();
         }});
     }

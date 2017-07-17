@@ -9,7 +9,34 @@
 namespace nix {
 
 
-string DrvInfo::queryDrvPath()
+DrvInfo::DrvInfo(EvalState & state, const string & attrPath, Bindings * attrs)
+    : state(&state), attrs(attrs), attrPath(attrPath)
+{
+}
+
+
+string DrvInfo::queryName() const
+{
+    if (name == "" && attrs) {
+        auto i = attrs->find(state->sName);
+        if (i == attrs->end()) throw TypeError("derivation name missing");
+        name = state->forceStringNoCtx(*i->value);
+    }
+    return name;
+}
+
+
+string DrvInfo::querySystem() const
+{
+    if (system == "" && attrs) {
+        auto i = attrs->find(state->sSystem);
+        system = i == attrs->end() ? "unknown" : state->forceStringNoCtx(*i->value, *i->pos);
+    }
+    return system;
+}
+
+
+string DrvInfo::queryDrvPath() const
 {
     if (drvPath == "" && attrs) {
         Bindings::iterator i = attrs->find(state->sDrvPath);
@@ -20,7 +47,7 @@ string DrvInfo::queryDrvPath()
 }
 
 
-string DrvInfo::queryOutPath()
+string DrvInfo::queryOutPath() const
 {
     if (outPath == "" && attrs) {
         Bindings::iterator i = attrs->find(state->sOutPath);
@@ -76,7 +103,7 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
 }
 
 
-string DrvInfo::queryOutputName()
+string DrvInfo::queryOutputName() const
 {
     if (outputName == "" && attrs) {
         Bindings::iterator i = attrs->find(state->sOutputName);
@@ -225,17 +252,12 @@ static bool getDerivation(EvalState & state, Value & v,
         if (done.find(v.attrs) != done.end()) return false;
         done.insert(v.attrs);
 
-        Bindings::iterator i = v.attrs->find(state.sName);
-        /* !!! We really would like to have a decent back trace here. */
-        if (i == v.attrs->end()) throw TypeError("derivation name missing");
+        DrvInfo drv(state, attrPath, v.attrs);
 
-        Bindings::iterator i2 = v.attrs->find(state.sSystem);
-
-        DrvInfo drv(state, state.forceStringNoCtx(*i->value), attrPath,
-            i2 == v.attrs->end() ? "unknown" : state.forceStringNoCtx(*i2->value, *i2->pos),
-            v.attrs);
+        drv.queryName();
 
         drvs.push_back(drv);
+
         return false;
 
     } catch (AssertionError & e) {
