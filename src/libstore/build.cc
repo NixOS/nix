@@ -3835,6 +3835,9 @@ void Worker::waitForInput()
     int fdMax = 0;
     for (auto & i : children) {
         for (auto & j : i.fds) {
+            if (j >= FD_SETSIZE) {
+                throw BuildError("reached FD_SETSIZE limit");
+            }
             FD_SET(j, &fds);
             if (j >= fdMax) fdMax = j + 1;
         }
