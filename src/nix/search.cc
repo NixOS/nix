@@ -4,6 +4,8 @@
 #include "eval-inline.hh"
 #include "names.hh"
 #include "get-drvs.hh"
+#include "common-args.hh"
+#include "json.hh"
 
 #include <regex>
 
@@ -19,7 +21,7 @@ std::string hilite(const std::string & s, const std::smatch & m)
           + std::string(m.suffix());
 }
 
-struct CmdSearch : SourceExprCommand
+struct CmdSearch : SourceExprCommand, MixJSON
 {
     std::string re;
 
@@ -49,6 +51,8 @@ struct CmdSearch : SourceExprCommand
         std::function<void(Value *, std::string, bool)> doExpr;
 
         bool first = true;
+
+        auto jsonOut = json ? std::make_unique<JSONObject>(std::cout, true) : nullptr;
 
         doExpr = [&](Value * v, std::string attrPath, bool toplevel) {
             debug("at attribute ‘%s’", attrPath);
@@ -86,18 +90,28 @@ struct CmdSearch : SourceExprCommand
                         || !nameMatch.empty()
                         || !descriptionMatch.empty())
                     {
-                        if (!first) std::cout << "\n";
-                        first = false;
+                        if (json) {
 
-                        std::cout << fmt(
-                            "Attribute name: %s\n"
-                            "Package name: %s\n"
-                            "Version: %s\n"
-                            "Description: %s\n",
-                            hilite(attrPath, attrPathMatch),
-                            hilite(name, nameMatch),
-                            parsed.version,
-                            hilite(description, descriptionMatch));
+                            auto jsonElem = jsonOut->object(attrPath);
+
+                            jsonElem.attr("pkgName", parsed.name);
+                            jsonElem.attr("version", parsed.version);
+                            jsonElem.attr("description", description);
+
+                        } else {
+                            if (!first) std::cout << "\n";
+                            first = false;
+
+                            std::cout << fmt(
+                                "Attribute name: %s\n"
+                                "Package name: %s\n"
+                                "Version: %s\n"
+                                "Description: %s\n",
+                                hilite(attrPath, attrPathMatch),
+                                hilite(name, nameMatch),
+                                parsed.version,
+                                hilite(description, descriptionMatch));
+                        }
                     }
                 }
 
