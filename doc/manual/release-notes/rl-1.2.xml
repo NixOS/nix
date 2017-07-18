@@ -40,7 +40,7 @@ $ nix-env -i thunderbird --option binary-caches http://cache.nixos.org
     <para>Binary caches are created using <command>nix-push</command>.
     For details on the operation and format of binary caches, see the
     <command>nix-push</command> manpage.  More details are provided in
-    <link xlink:href="http://lists.science.uu.nl/pipermail/nix-dev/2012-September/009826.html">this
+    <link xlink:href="https://nixos.org/nix-dev/2012-September/009826.html">this
     nix-dev posting</link>.</para>
   </listitem>
 
