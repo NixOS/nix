@@ -54,6 +54,8 @@ struct CmdSearch : SourceExprCommand, MixJSON
 
         auto jsonOut = json ? std::make_unique<JSONObject>(std::cout, true) : nullptr;
 
+        auto sToplevel = state->symbols.create("_toplevel");
+
         doExpr = [&](Value * v, std::string attrPath, bool toplevel) {
             debug("at attribute ‘%s’", attrPath);
 
@@ -123,7 +125,7 @@ struct CmdSearch : SourceExprCommand, MixJSON
                         if (j == attrs->end() || !state->forceBool(*j->value, *j->pos)) return;
                     }
 
-                    Bindings::iterator j = v->attrs->find(state->symbols.create("_toplevel"));
+                    Bindings::iterator j = v->attrs->find(sToplevel);
                     bool toplevel2 = j != v->attrs->end() && state->forceBool(*j->value, *j->pos);
 
                     for (auto & i : *v->attrs) {
@@ -134,6 +136,11 @@ struct CmdSearch : SourceExprCommand, MixJSON
                 }
 
             } catch (AssertionError & e) {
+            } catch (Error & e) {
+                if (!toplevel) {
+                    e.addPrefix(fmt("While evaluating the attribute ‘%s’:\n", attrPath));
+                    throw;
+                }
             }
         };
 

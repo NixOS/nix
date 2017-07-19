@@ -16,6 +16,8 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
 {
     if (vSourceExpr) return vSourceExpr;
 
+    auto sToplevel = state.symbols.create("_toplevel");
+
     vSourceExpr = state.allocValue();
 
     if (file != "") {
@@ -29,7 +31,9 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
 
         auto searchPath = state.getSearchPath();
 
-        state.mkAttrs(*vSourceExpr, searchPath.size());
+        state.mkAttrs(*vSourceExpr, searchPath.size() + 1);
+
+        mkBool(*state.allocAttr(*vSourceExpr, sToplevel), true);
 
         std::unordered_set<std::string> seen;
 
