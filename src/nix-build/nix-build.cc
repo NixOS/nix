@@ -13,6 +13,8 @@
 #include "affinity.hh"
 #include "util.hh"
 #include "shared.hh"
+#include "eval.hh"
+#include "get-drvs.hh"
 
 using namespace nix;
 using namespace std::string_literals;
@@ -75,6 +77,8 @@ int main(int argc, char ** argv)
 {
     return handleExceptions(argv[0], [&]() {
         initNix();
+        initGC();
+
         auto store = openStore();
         auto dryRun = false;
         auto verbose = false;
@@ -88,6 +92,7 @@ int main(int argc, char ** argv)
         Strings instArgs;
         Strings buildArgs;
         Strings exprs;
+        Strings searchPath;
 
         auto shell = getEnv("SHELL", "/bin/sh");
         std::string envCommand; // interactive shell
@@ -320,6 +325,8 @@ int main(int argc, char ** argv)
             }
         }
 
+        EvalState state(searchPath, store);
+
         if (packages && fromArgs) {
             throw UsageError("‘-p’ and ‘-E’ are mutually exclusive");
         }
@@ -465,7 +472,42 @@ int main(int argc, char ** argv)
 
                 auto envPtrs = stringsToCharPtrs(envStrs);
 
-                auto shell = getEnv("NIX_BUILD_SHELL", "bash");
+                auto shell = getEnv("NIX_BUILD_SHELL", "");
+
+                if (shell == "") {
+
+                    try {
+
+                        auto expr = state.parseExprFromString("(import <nixpkgs> {}).bashInteractive", absPath("."));
+
+                        Value v;
+                        state.eval(expr, v);
+
+                        auto drv = getDerivation(state, v, false);
+                        if (!drv)
+                            throw Error("the ‘bashInteractive’ attribute in <nixpkgs> did not evaluate to a derivation");
+
+                        auto drvPath = drv->queryDrvPath();
+
+                        unsigned long long downloadSize, narSize;
+                        PathSet willBuild, willSubstitute, unknown;
+                        store->queryMissing({drvPath},
+                            willBuild, willSubstitute, unknown, downloadSize, narSize);
+
+                        if (settings.printMissing)
+                            printMissing(ref<Store>(store), willBuild, willSubstitute, unknown, downloadSize, narSize);
+
+                        store->buildPaths({drvPath});
+
+                        shell = drv->queryOutPath() + "/bin/bash";
+                        if (!pathExists(shell))
+                            throw Error("expected shell ‘%s’ to exist, but it doesn't", shell);
+
+                    } catch (Error & e) {
+                        printError("warning: %s; will use bash from your environment", e.what());
+                        shell = "bash";
+                    }
+                }
 
                 environ = envPtrs.data();
 

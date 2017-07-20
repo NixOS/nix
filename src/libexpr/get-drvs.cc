@@ -267,15 +267,14 @@ static bool getDerivation(EvalState & state, Value & v,
 }
 
 
-bool getDerivation(EvalState & state, Value & v, DrvInfo & drv,
+std::experimental::optional<DrvInfo> getDerivation(EvalState & state, Value & v,
     bool ignoreAssertionFailures)
 {
     Done done;
     DrvInfos drvs;
     getDerivation(state, v, "", drvs, done, ignoreAssertionFailures);
-    if (drvs.size() != 1) return false;
-    drv = drvs.front();
-    return true;
+    if (drvs.size() != 1) return {};
+    return std::move(drvs.front());
 }
 
 

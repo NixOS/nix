@@ -292,10 +292,10 @@ bool isVarName(const string & s)
 
 
 Path NixRepl::getDerivationPath(Value & v) {
-    DrvInfo drvInfo(state);
-    if (!getDerivation(state, v, drvInfo, false))
+    auto drvInfo = getDerivation(state, v, false);
+    if (!drvInfo)
         throw Error("expression does not evaluate to a derivation, so I can't build it");
-    Path drvPath = drvInfo.queryDrvPath();
+    Path drvPath = drvInfo->queryDrvPath();
     if (drvPath == "" || !state.store->isValidPath(drvPath))
         throw Error("expression did not evaluate to a valid derivation");
     return drvPath;
