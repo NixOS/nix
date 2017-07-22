@@ -114,9 +114,9 @@ static void addPkg(const Path & pkgDir, int priority)
                 return;
             throw SysError(format("opening ‘%1%’") % propagatedFN);
         }
-        propagated = readLine(fd.get());
+        propagated = readFile(fd.get());
     }
-    for (const auto & p : tokenizeString<std::vector<string>>(propagated, " "))
+    for (const auto & p : tokenizeString<std::vector<string>>(propagated, " \n"))
         if (done.find(p) == done.end())
             postponed.insert(p);
 }
