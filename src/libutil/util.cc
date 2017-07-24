@@ -364,7 +364,7 @@ void writeFile(const Path & path, Source & source, mode_t mode)
     }
 }
 
-std::string readLine(int fd)
+std::optional<std::string> tryReadLine(const int fd)
 {
     std::string s;
     while (1) {
@@ -375,13 +375,27 @@ std::string readLine(int fd)
         if (rd == -1) {
             if (errno != EINTR)
                 throw SysError("reading a line");
-        } else if (rd == 0)
-            throw EndOfFile("unexpected EOF reading a line");
-        else {
+        } else if (rd == 0) {
+            // All lines should end with \n, including the last line
+            if (s == "")
+                return std::nullopt;
+            else
+                throw EndOfFile("unexpected end-of-file while reading line");
+        } else {
             if (ch == '\n') return s;
             s += ch;
         }
     }
+}
+
+
+std::string readLine(const int fd)
+{
+    std::optional res = tryReadLine(fd);
+    if (res)
+        return *std::move(res);
+    else
+        throw EndOfFile("no more lines left");
 }
 
 
