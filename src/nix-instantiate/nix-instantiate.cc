@@ -17,13 +17,6 @@
 using namespace nix;
 
 
-static Expr * parseStdin(EvalState & state)
-{
-    //Activity act(*logger, lvlTalkative, format("parsing standard input"));
-    return state.parseExprFromString(drainFD(0), absPath("."));
-}
-
-
 static Path gcRoot;
 static int rootNr = 0;
 static bool indirectRoot = false;
@@ -166,7 +159,7 @@ int main(int argc, char * * argv)
 
         Bindings & autoArgs(*evalAutoArgs(state, autoArgs_));
 
-        if (attrPaths.empty()) attrPaths.push_back("");
+        if (attrPaths.empty()) attrPaths = {""};
 
         if (findFile) {
             for (auto & i : files) {
@@ -178,7 +171,7 @@ int main(int argc, char * * argv)
         }
 
         if (readStdin) {
-            Expr * e = parseStdin(state);
+            Expr * e = state.parseStdin();
             processExpr(state, attrPaths, parseOnly, strict, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         } else if (files.empty() && !fromArgs)

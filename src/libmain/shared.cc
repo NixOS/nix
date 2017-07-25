@@ -222,7 +222,14 @@ struct LegacyArgs : public MixCommonArgs
 void parseCmdLine(int argc, char * * argv,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
 {
-    LegacyArgs(baseNameOf(argv[0]), parseArg).parseCmdline(argvToStrings(argc, argv));
+    parseCmdLine(baseNameOf(argv[0]), argvToStrings(argc, argv), parseArg);
+}
+
+
+void parseCmdLine(const string & programName, const Strings & args,
+    std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
+{
+    LegacyArgs(programName, parseArg).parseCmdline(args);
 }
 
 

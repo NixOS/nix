@@ -118,6 +118,8 @@ public:
     Expr * parseExprFromString(const string & s, const Path & basePath, StaticEnv & staticEnv);
     Expr * parseExprFromString(const string & s, const Path & basePath);
 
+    Expr * parseStdin();
+
     /* Evaluate an expression read from the given file to normal
        form. */
     void evalFile(const Path & path, Value & v);

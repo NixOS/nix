@@ -25,6 +25,9 @@ void initNix();
 void parseCmdLine(int argc, char * * argv,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg);
 
+void parseCmdLine(const string & programName, const Strings & args,
+    std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg);
+
 void printVersion(const string & programName);
 
 /* Ugh.  No better place to put this. */

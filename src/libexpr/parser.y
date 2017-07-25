@@ -601,6 +601,13 @@ Expr * EvalState::parseExprFromString(const string & s, const Path & basePath)
 }
 
 
+Expr * EvalState::parseStdin()
+{
+    //Activity act(*logger, lvlTalkative, format("parsing standard input"));
+    return parseExprFromString(drainFD(0), absPath("."));
+}
+
+
 void EvalState::addToSearchPath(const string & s)
 {
     size_t pos = s.find('=');
