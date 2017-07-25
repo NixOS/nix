@@ -300,6 +300,19 @@ $(uninstall_directions)
 EOF
     fi
 
+    if pgrep nix-daemon 2> /dev/null >&2; then
+        failure <<EOF
+Nix seems to be partially installed, because the nix-daemon is
+currently running. It may be in a launchd service. Please stop the
+the old nix-daemon, and try again.
+
+If you have an existing launchd plist for nix-daemon, please delete
+it.
+
+$(uninstall_directions)
+EOF
+    fi
+
     if [ "${NIX_REMOTE:-}" != "" ]; then
         failure <<EOF
 For some reason, \$NIX_REMOTE is set. It really should not be set
