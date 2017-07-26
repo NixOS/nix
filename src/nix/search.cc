@@ -6,8 +6,10 @@
 #include "get-drvs.hh"
 #include "common-args.hh"
 #include "json.hh"
+#include "json-to-value.hh"
 
 #include <regex>
+#include <fstream>
 
 using namespace nix;
 
@@ -25,9 +27,23 @@ struct CmdSearch : SourceExprCommand, MixJSON
 {
     std::string re;
 
+    bool writeCache = true;
+    bool useCache = true;
+
     CmdSearch()
     {
         expectArg("regex", &re, true);
+
+        mkFlag()
+            .longName("update-cache")
+            .shortName('u')
+            .description("update the package search cache")
+            .handler([&](Strings ss) { writeCache = true; useCache = false; });
+
+        mkFlag()
+            .longName("no-cache")
+            .description("do not use or update the package search cache")
+            .handler([&](Strings ss) { writeCache = false; useCache = false; });
     }
 
     std::string name() override
@@ -48,15 +64,18 @@ struct CmdSearch : SourceExprCommand, MixJSON
 
         auto state = getEvalState();
 
-        std::function<void(Value *, std::string, bool)> doExpr;
-
         bool first = true;
 
         auto jsonOut = json ? std::make_unique<JSONObject>(std::cout, true) : nullptr;
 
         auto sToplevel = state->symbols.create("_toplevel");
+        auto sRecurse = state->symbols.create("recurseForDerivations");
 
-        doExpr = [&](Value * v, std::string attrPath, bool toplevel) {
+        bool fromCache = false;
+
+        std::function<void(Value *, std::string, bool, JSONObject *)> doExpr;
+
+        doExpr = [&](Value * v, std::string attrPath, bool toplevel, JSONObject * cache) {
             debug("at attribute ‘%s’", attrPath);
 
             try {
@@ -115,23 +134,41 @@ struct CmdSearch : SourceExprCommand, MixJSON
                                 hilite(description, descriptionMatch));
                         }
                     }
+
+                    if (cache) {
+                        cache->attr("type", "derivation");
+                        cache->attr("name", drv.queryName());
+                        cache->attr("system", drv.querySystem());
+                        if (description != "") {
+                            auto meta(cache->object("meta"));
+                            meta.attr("description", description);
+                        }
+                    }
                 }
 
                 else if (v->type == tAttrs) {
 
                     if (!toplevel) {
                         auto attrs = v->attrs;
-                        Bindings::iterator j = attrs->find(state->symbols.create("recurseForDerivations"));
-                        if (j == attrs->end() || !state->forceBool(*j->value, *j->pos)) return;
+                        Bindings::iterator j = attrs->find(sRecurse);
+                        if (j == attrs->end() || !state->forceBool(*j->value, *j->pos)) {
+                            debug("skip attribute ‘%s’", attrPath);
+                            return;
+                        }
                     }
 
-                    Bindings::iterator j = v->attrs->find(sToplevel);
-                    bool toplevel2 = j != v->attrs->end() && state->forceBool(*j->value, *j->pos);
+                    bool toplevel2 = false;
+                    if (!fromCache) {
+                        Bindings::iterator j = v->attrs->find(sToplevel);
+                        toplevel2 = j != v->attrs->end() && state->forceBool(*j->value, *j->pos);
+                    }
 
                     for (auto & i : *v->attrs) {
+                        auto cache2 =
+                            cache ? std::make_unique<JSONObject>(cache->object(i.name)) : nullptr;
                         doExpr(i.value,
                             attrPath == "" ? (std::string) i.name : attrPath + "." + (std::string) i.name,
-                            toplevel2);
+                            toplevel2 || fromCache, cache2 ? cache2.get() : nullptr);
                     }
                 }
 
@@ -144,7 +181,30 @@ struct CmdSearch : SourceExprCommand, MixJSON
             }
         };
 
-        doExpr(getSourceExpr(*state), "", true);
+        Path jsonCacheFileName = getCacheDir() + "/nix/package-search.json";
+
+        if (useCache && pathExists(jsonCacheFileName)) {
+
+            Value vRoot;
+            parseJSON(*state, readFile(jsonCacheFileName), vRoot);
+
+            fromCache = true;
+
+            doExpr(&vRoot, "", true, nullptr);
+        }
+
+        else {
+            Path tmpFile = fmt("%s.tmp.%d", jsonCacheFileName, getpid());
+
+            std::ofstream jsonCacheFile(tmpFile);
+
+            auto cache = writeCache ? std::make_unique<JSONObject>(jsonCacheFile, false) : nullptr;
+
+            doExpr(getSourceExpr(*state), "", true, cache.get());
+
+            if (rename(tmpFile.c_str(), jsonCacheFileName.c_str()) == -1)
+                throw SysError("cannot rename ‘%s’ to ‘%s’", tmpFile, jsonCacheFileName);
+        }
     }
 };
 
