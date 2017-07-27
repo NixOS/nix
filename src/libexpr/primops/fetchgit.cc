@@ -4,6 +4,8 @@
 #include "store-api.hh"
 #include "pathlocks.hh"
 
+#include <sys/time.h>
+
 namespace nix {
 
 Path exportGit(ref<Store> store, const std::string & uri, const std::string & rev)
@@ -24,7 +26,23 @@ Path exportGit(ref<Store> store, const std::string & uri, const std::string & re
 
     Path localRefFile = cacheDir + "/refs/heads/" + localRef;
 
-    runProgram("git", true, { "-C", cacheDir, "fetch", "--force", uri, rev + ":" + localRef });
+    /* If the local ref is older than ‘tarball-ttl’ seconds, do a git
+       fetch to update the local ref to the remote ref. */
+    time_t now = time(0);
+    struct stat st;
+    if (stat(localRefFile.c_str(), &st) != 0 ||
+        st.st_mtime < now - settings.tarballTtl)
+    {
+        runProgram("git", true, { "-C", cacheDir, "fetch", "--force", uri, rev + ":" + localRef });
+
+        struct timeval times[2];
+        times[0].tv_sec = now;
+        times[0].tv_usec = 0;
+        times[1].tv_sec = now;
+        times[1].tv_usec = 0;
+
+        utimes(localRefFile.c_str(), times);
+    }
 
     std::string commitHash = chomp(readFile(localRefFile));
 
