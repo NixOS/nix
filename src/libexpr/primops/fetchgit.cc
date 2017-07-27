@@ -20,14 +20,13 @@ Path exportGit(ref<Store> store, const std::string & uri, const std::string & re
 
     //Activity act(*logger, lvlInfo, format("fetching Git repository ‘%s’") % uri);
 
-    std::string localRef = "pid-" + std::to_string(getpid());
+    std::string localRef = hashString(htSHA256, fmt("%s-%s", uri, rev)).to_string(Base32, false);
+
     Path localRefFile = cacheDir + "/refs/heads/" + localRef;
 
-    runProgram("git", true, { "-C", cacheDir, "fetch", uri, rev + ":" + localRef });
+    runProgram("git", true, { "-C", cacheDir, "fetch", "--force", uri, rev + ":" + localRef });
 
     std::string commitHash = chomp(readFile(localRefFile));
-
-    unlink(localRefFile.c_str());
 
     printTalkative("using revision %s of repo ‘%s’", uri, commitHash);
 
