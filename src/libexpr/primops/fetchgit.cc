@@ -2,6 +2,7 @@
 #include "eval-inline.hh"
 #include "download.hh"
 #include "store-api.hh"
+#include "pathlocks.hh"
 
 namespace nix {
 
@@ -28,7 +29,18 @@ Path exportGit(ref<Store> store, const std::string & uri, const std::string & re
 
     unlink(localRefFile.c_str());
 
-    debug(format("got revision ‘%s’") % commitHash);
+    printTalkative("using revision %s of repo ‘%s’", uri, commitHash);
+
+    Path storeLink = cacheDir + "/" + commitHash + ".link";
+    PathLocks storeLinkLock({storeLink}, fmt("waiting for lock on ‘%1%’...", storeLink));
+
+    if (pathExists(storeLink)) {
+        auto storePath = readLink(storeLink);
+        store->addTempRoot(storePath);
+        if (store->isValidPath(storePath)) {
+            return storePath;
+        }
+    }
 
     // FIXME: should pipe this, or find some better way to extract a
     // revision.
@@ -39,7 +51,11 @@ Path exportGit(ref<Store> store, const std::string & uri, const std::string & re
 
     runProgram("tar", true, { "x", "-C", tmpDir }, tar);
 
-    return store->addToStore("git-export", tmpDir);
+    auto storePath = store->addToStore("git-export", tmpDir);
+
+    replaceSymlink(storePath, storeLink);
+
+    return storePath;
 }
 
 static void prim_fetchgit(EvalState & state, const Pos & pos, Value * * args, Value & v)
