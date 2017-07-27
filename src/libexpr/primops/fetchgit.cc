@@ -6,12 +6,26 @@
 
 #include <sys/time.h>
 
+#include <regex>
+
 namespace nix {
 
-Path exportGit(ref<Store> store, const std::string & uri, const std::string & rev)
+Path exportGit(ref<Store> store, const std::string & uri,
+    const std::string & ref, const std::string & rev)
 {
     if (!isUri(uri))
         throw EvalError(format("‘%s’ is not a valid URI") % uri);
+
+    if (rev != "") {
+        std::regex revRegex("^[0-9a-fA-F]{40}$");
+        if (!std::regex_match(rev, revRegex))
+            throw Error("invalid Git revision ‘%s’", rev);
+    }
+
+    // FIXME: too restrictive, but better safe than sorry.
+    std::regex refRegex("^[0-9a-zA-Z][0-9a-zA-Z.-]+$");
+    if (!std::regex_match(ref, refRegex))
+        throw Error("invalid Git ref ‘%s’", ref);
 
     Path cacheDir = getCacheDir() + "/nix/git";
 
@@ -22,7 +36,7 @@ Path exportGit(ref<Store> store, const std::string & uri, const std::string & re
 
     //Activity act(*logger, lvlInfo, format("fetching Git repository ‘%s’") % uri);
 
-    std::string localRef = hashString(htSHA256, fmt("%s-%s", uri, rev)).to_string(Base32, false);
+    std::string localRef = hashString(htSHA256, fmt("%s-%s", uri, ref)).to_string(Base32, false);
 
     Path localRefFile = cacheDir + "/refs/heads/" + localRef;
 
@@ -33,7 +47,7 @@ Path exportGit(ref<Store> store, const std::string & uri, const std::string & re
     if (stat(localRefFile.c_str(), &st) != 0 ||
         st.st_mtime < now - settings.tarballTtl)
     {
-        runProgram("git", true, { "-C", cacheDir, "fetch", "--force", uri, rev + ":" + localRef });
+        runProgram("git", true, { "-C", cacheDir, "fetch", "--force", uri, ref + ":" + localRef });
 
         struct timeval times[2];
         times[0].tv_sec = now;
@@ -44,7 +58,9 @@ Path exportGit(ref<Store> store, const std::string & uri, const std::string & re
         utimes(localRefFile.c_str(), times);
     }
 
-    std::string commitHash = chomp(readFile(localRefFile));
+    // FIXME: check whether rev is an ancestor of ref.
+    std::string commitHash =
+        rev != "" ? rev : chomp(readFile(localRefFile));
 
     printTalkative("using revision %s of repo ‘%s’", uri, commitHash);
 
@@ -81,7 +97,8 @@ static void prim_fetchgit(EvalState & state, const Pos & pos, Value * * args, Va
     if (state.restricted) throw Error("‘fetchgit’ is not allowed in restricted mode");
 
     std::string url;
-    std::string rev = "master";
+    std::string ref = "master";
+    std::string rev;
 
     state.forceValue(*args[0]);
 
@@ -95,7 +112,10 @@ static void prim_fetchgit(EvalState & state, const Pos & pos, Value * * args, Va
                 PathSet context;
                 url = state.coerceToString(*attr.pos, *attr.value, context, false, false);
                 if (hasPrefix(url, "/")) url = "file://" + url;
-            } else if (name == "rev")
+            }
+            else if (name == "ref")
+                ref = state.forceStringNoCtx(*attr.value, *attr.pos);
+            else if (name == "rev")
                 rev = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
                 throw EvalError("unsupported argument ‘%s’ to ‘fetchgit’, at %s", attr.name, *attr.pos);
@@ -107,7 +127,7 @@ static void prim_fetchgit(EvalState & state, const Pos & pos, Value * * args, Va
     } else
         url = state.forceStringNoCtx(*args[0], pos);
 
-    Path storePath = exportGit(state.store, url, rev);
+    Path storePath = exportGit(state.store, url, ref, rev);
 
     mkString(v, storePath, PathSet({storePath}));
 }

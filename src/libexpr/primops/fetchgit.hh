@@ -8,7 +8,7 @@ namespace nix {
 
 class Store;
 
-Path exportGit(ref<Store> store,
-    const std::string & uri, const std::string & rev);
+Path exportGit(ref<Store> store, const std::string & uri,
+    const std::string & ref, const std::string & rev = "");
 
 }
