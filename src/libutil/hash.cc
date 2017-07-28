@@ -98,7 +98,7 @@ static string printHash32(const Hash & hash)
 
 string printHash16or32(const Hash & hash)
 {
-    return hash.to_string(hash.type == htMD5 ? Base16 : Base32);
+    return hash.to_string(hash.type == htMD5 ? Base16 : Base32, false);
 }
 
 
