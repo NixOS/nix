@@ -453,13 +453,13 @@ void mainWrapped(int argc, char * * argv)
 
         for (auto & drvInfo : drvs) {
             auto drvPath = drvInfo.queryDrvPath();
-            pathsToBuild.insert(drvPath);
+            auto outPath = drvInfo.queryOutPath();
 
             auto outputName = drvInfo.queryOutputName();
             if (outputName == "")
                 throw Error("derivation ‘%s’ lacks an ‘outputName’ attribute", drvPath);
 
-            pathsToBuild.insert(drvPath + (outputName != "out" ? "!" + outputName : ""));
+            pathsToBuild.insert(drvPath + "!" + outputName);
 
             std::string drvPrefix;
             auto i = drvPrefixes.find(drvPath);
@@ -475,8 +475,8 @@ void mainWrapped(int argc, char * * argv)
             std::string symlink = drvPrefix;
             if (outputName != "out") symlink += "-" + outputName;
 
-            resultSymlinks[symlink] = drvInfo.queryOutPath();
-            outPaths.push_back(drvInfo.queryOutPath());
+            resultSymlinks[symlink] = outPath;
+            outPaths.push_back(outPath);
         }
 
         buildPaths(pathsToBuild);
