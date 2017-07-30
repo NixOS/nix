@@ -72,7 +72,7 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
     else if (S_ISDIR(st.st_mode)) {
         sink << "type" << "directory";
 
-        /* If we're on a case-insensitive system like Mac OS X, undo
+        /* If we're on a case-insensitive system like macOS, undo
            the case hack applied by restorePath(). */
         std::map<string, string> unhacked;
         for (auto & i : readDirectory(path))

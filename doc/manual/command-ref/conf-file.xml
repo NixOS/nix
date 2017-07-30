@@ -262,7 +262,7 @@ false</literal>.</para>
     system (except that fixed-output derivations do not run in private
     network namespace to ensure they can access the network).</para>
 
-    <para>Currently, sandboxing only work on Linux and Mac OS X. The use
+    <para>Currently, sandboxing only work on Linux and macOS. The use
     of a sandbox requires that Nix is run as root (so you should use
     the <link linkend='conf-build-users-group'>“build users”
     feature</link> to perform the actual builds under different users

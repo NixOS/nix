@@ -236,7 +236,7 @@ href="[%root%]hydra">a continuous build system</a>.</para>
 
 <simplesect><title>Portability</title>
 
-<para>Nix runs on Linux and Mac OS X.</para>
+<para>Nix runs on Linux and macOS.</para>
 
 </simplesect>
 
