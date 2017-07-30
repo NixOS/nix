@@ -110,7 +110,7 @@ ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig(const string & region
 S3Helper::DownloadResult S3Helper::getObject(
     const std::string & bucketName, const std::string & key)
 {
-    debug("fetching ‘s3://%s/%s’...", bucketName, key);
+    debug("fetching 's3://%s/%s'...", bucketName, key);
 
     auto request =
         Aws::S3::Model::GetObjectRequest()
@@ -127,7 +127,7 @@ S3Helper::DownloadResult S3Helper::getObject(
 
     try {
 
-        auto result = checkAws(fmt("AWS error fetching ‘%s’", key),
+        auto result = checkAws(fmt("AWS error fetching '%s'", key),
             client->GetObject(request));
 
         res.data = decodeContent(
@@ -185,9 +185,9 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
             if (!res.IsSuccess()) {
                 if (res.GetError().GetErrorType() != Aws::S3::S3Errors::NO_SUCH_BUCKET)
-                    throw Error(format("AWS error checking bucket ‘%s’: %s") % bucketName % res.GetError().GetMessage());
+                    throw Error(format("AWS error checking bucket '%s': %s") % bucketName % res.GetError().GetMessage());
 
-                printInfo("creating S3 bucket ‘%s’...", bucketName);
+                printInfo("creating S3 bucket '%s'...", bucketName);
 
                 // Stupid S3 bucket locations.
                 auto bucketConfig = Aws::S3::Model::CreateBucketConfiguration();
@@ -196,7 +196,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
                         Aws::S3::Model::BucketLocationConstraintMapper::GetBucketLocationConstraintForName(
                             s3Helper.config->region));
 
-                checkAws(format("AWS error creating bucket ‘%s’") % bucketName,
+                checkAws(format("AWS error creating bucket '%s'") % bucketName,
                     s3Helper.client->CreateBucket(
                         Aws::S3::Model::CreateBucketRequest()
                         .WithBucket(bucketName)
@@ -244,7 +244,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
                 || (error.GetErrorType() == Aws::S3::S3Errors::UNKNOWN // FIXME
                     && error.GetMessage().find("404") != std::string::npos))
                 return false;
-            throw Error(format("AWS error fetching ‘%s’: %s") % path % error.GetMessage());
+            throw Error(format("AWS error fetching '%s': %s") % path % error.GetMessage());
         }
 
         return true;
@@ -273,14 +273,14 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
         auto now1 = std::chrono::steady_clock::now();
 
-        auto result = checkAws(format("AWS error uploading ‘%s’") % path,
+        auto result = checkAws(format("AWS error uploading '%s'") % path,
             s3Helper.client->PutObject(request));
 
         auto now2 = std::chrono::steady_clock::now();
 
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
 
-        printInfo(format("uploaded ‘s3://%1%/%2%’ (%3% bytes) in %4% ms")
+        printInfo(format("uploaded 's3://%1%/%2%' (%3% bytes) in %4% ms")
             % bucketName % path % data.size() % duration);
 
         stats.putTimeMs += duration;
@@ -312,7 +312,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
             stats.getTimeMs += res.durationMs;
 
             if (res.data)
-                printTalkative("downloaded ‘s3://%s/%s’ (%d bytes) in %d ms",
+                printTalkative("downloaded 's3://%s/%s' (%d bytes) in %d ms",
                     bucketName, path, res.data->size(), res.durationMs);
 
             return res.data;
@@ -325,9 +325,9 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         std::string marker;
 
         do {
-            debug(format("listing bucket ‘s3://%s’ from key ‘%s’...") % bucketName % marker);
+            debug(format("listing bucket 's3://%s' from key '%s'...") % bucketName % marker);
 
-            auto res = checkAws(format("AWS error listing bucket ‘%s’") % bucketName,
+            auto res = checkAws(format("AWS error listing bucket '%s'") % bucketName,
                 s3Helper.client->ListObjects(
                     Aws::S3::Model::ListObjectsRequest()
                     .WithBucket(bucketName)
@@ -336,7 +336,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
             auto & contents = res.GetContents();
 
-            debug(format("got %d keys, next marker ‘%s’")
+            debug(format("got %d keys, next marker '%s'")
                 % contents.size() % res.GetNextMarker());
 
             for (auto object : contents) {

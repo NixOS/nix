@@ -341,7 +341,7 @@ void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
     assert(waitees.find(waitee) != waitees.end());
     waitees.erase(waitee);
 
-    trace(format("waitee ‘%1%’ done; %2% left") %
+    trace(format("waitee '%1%' done; %2% left") %
         waitee->name % waitees.size());
 
     if (result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure) ++nrFailed;
@@ -415,7 +415,7 @@ static void commonChildInit(Pipe & logPipe)
     /* Reroute stdin to /dev/null. */
     int fdDevNull = open(pathNullDevice.c_str(), O_RDWR);
     if (fdDevNull == -1)
-        throw SysError(format("cannot open ‘%1%’") % pathNullDevice);
+        throw SysError(format("cannot open '%1%'") % pathNullDevice);
     if (dup2(fdDevNull, STDIN_FILENO) == -1)
         throw SysError("cannot dup null device into stdin");
     close(fdDevNull);
@@ -468,29 +468,29 @@ UserLock::UserLock()
     /* Get the members of the build-users-group. */
     struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
     if (!gr)
-        throw Error(format("the group ‘%1%’ specified in ‘build-users-group’ does not exist")
+        throw Error(format("the group '%1%' specified in 'build-users-group' does not exist")
             % settings.buildUsersGroup);
     gid = gr->gr_gid;
 
     /* Copy the result of getgrnam. */
     Strings users;
     for (char * * p = gr->gr_mem; *p; ++p) {
-        debug(format("found build user ‘%1%’") % *p);
+        debug(format("found build user '%1%'") % *p);
         users.push_back(*p);
     }
 
     if (users.empty())
-        throw Error(format("the build users group ‘%1%’ has no members")
+        throw Error(format("the build users group '%1%' has no members")
             % settings.buildUsersGroup);
 
     /* Find a user account that isn't currently in use for another
        build. */
     for (auto & i : users) {
-        debug(format("trying user ‘%1%’") % i);
+        debug(format("trying user '%1%'") % i);
 
         struct passwd * pw = getpwnam(i.c_str());
         if (!pw)
-            throw Error(format("the user ‘%1%’ in the group ‘%2%’ does not exist")
+            throw Error(format("the user '%1%' in the group '%2%' does not exist")
                 % i % settings.buildUsersGroup);
 
         createDirs(settings.nixStateDir + "/userpool");
@@ -509,7 +509,7 @@ UserLock::UserLock()
 
             AutoCloseFD fd = open(fnUserLock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
             if (!fd)
-                throw SysError(format("opening user lock ‘%1%’") % fnUserLock);
+                throw SysError(format("opening user lock '%1%'") % fnUserLock);
 
             if (lockFile(fd.get(), ltWrite, false)) {
                 fdUserLock = std::move(fd);
@@ -518,7 +518,7 @@ UserLock::UserLock()
 
                 /* Sanity check... */
                 if (uid == getuid() || uid == geteuid())
-                    throw Error(format("the Nix user should not be a member of ‘%1%’")
+                    throw Error(format("the Nix user should not be a member of '%1%'")
                         % settings.buildUsersGroup);
 
 #if __linux__
@@ -529,7 +529,7 @@ UserLock::UserLock()
                 int err = getgrouplist(pw->pw_name, pw->pw_gid,
                     supplementaryGIDs.data(), &ngroups);
                 if (err == -1)
-                    throw Error(format("failed to get list of supplementary groups for ‘%1%’") % pw->pw_name);
+                    throw Error(format("failed to get list of supplementary groups for '%1%'") % pw->pw_name);
 
                 supplementaryGIDs.resize(ngroups);
 #endif
@@ -543,7 +543,7 @@ UserLock::UserLock()
     }
 
     throw Error(format("all build users are currently in use; "
-        "consider creating additional users and adding them to the ‘%1%’ group")
+        "consider creating additional users and adding them to the '%1%' group")
         % settings.buildUsersGroup);
 }
 
@@ -587,7 +587,7 @@ struct HookInstance
 
 HookInstance::HookInstance()
 {
-    debug("starting build hook ‘%s’", settings.buildHook);
+    debug("starting build hook '%s'", settings.buildHook);
 
     /* Create a pipe to get the output of the child. */
     fromHook.create();
@@ -624,7 +624,7 @@ HookInstance::HookInstance()
 
         execv(settings.buildHook.get().c_str(), stringsToCharPtrs(args).data());
 
-        throw SysError("executing ‘%s’", settings.buildHook);
+        throw SysError("executing '%s'", settings.buildHook);
     });
 
     pid.setSeparatePG(true);
@@ -927,7 +927,7 @@ DerivationGoal::DerivationGoal(const Path & drvPath, const StringSet & wantedOut
     , buildMode(buildMode)
 {
     state = &DerivationGoal::getDerivation;
-    name = (format("building of ‘%1%’") % drvPath).str();
+    name = (format("building of '%1%'") % drvPath).str();
     trace("created");
 
     logger->event(evBuildCreated, act, drvPath);
@@ -1042,7 +1042,7 @@ void DerivationGoal::loadDerivation()
     trace("loading derivation");
 
     if (nrFailed != 0) {
-        printError(format("cannot build missing derivation ‘%1%’") % drvPath);
+        printError(format("cannot build missing derivation '%1%'") % drvPath);
         done(BuildResult::MiscFailure);
         return;
     }
@@ -1080,7 +1080,7 @@ void DerivationGoal::haveDerivation()
     /* Reject doing a hash build of anything other than a fixed-output
        derivation. */
     if (buildMode == bmHash && !drv->isFixedOutput())
-        throw Error("cannot do a hash build of non-fixed-output derivation ‘%1%’", drvPath);
+        throw Error("cannot do a hash build of non-fixed-output derivation '%1%'", drvPath);
 
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
@@ -1101,7 +1101,7 @@ void DerivationGoal::outputsSubstituted()
     trace("all outputs substituted (maybe)");
 
     if (nrFailed > 0 && nrFailed > nrNoSubstituters + nrIncompleteClosure && !settings.tryFallback) {
-        done(BuildResult::TransientFailure, (format("some substitutes for the outputs of derivation ‘%1%’ failed (usually happens due to networking issues); try ‘--fallback’ to build derivation from source ") % drvPath).str());
+        done(BuildResult::TransientFailure, (format("some substitutes for the outputs of derivation '%1%' failed (usually happens due to networking issues); try '--fallback' to build derivation from source ") % drvPath).str());
         return;
     }
 
@@ -1128,7 +1128,7 @@ void DerivationGoal::outputsSubstituted()
         return;
     }
     if (buildMode == bmCheck && nrInvalid > 0)
-        throw Error(format("some outputs of ‘%1%’ are not valid, so checking is not possible") % drvPath);
+        throw Error(format("some outputs of '%1%' are not valid, so checking is not possible") % drvPath);
 
     /* Otherwise, at least one of the output paths could not be
        produced using a substitute.  So we have to build instead. */
@@ -1145,7 +1145,7 @@ void DerivationGoal::outputsSubstituted()
     for (auto & i : drv->inputSrcs) {
         if (worker.store.isValidPath(i)) continue;
         if (!settings.useSubstitutes)
-            throw Error(format("dependency of ‘%1%’ of ‘%2%’ does not exist, and substitution is disabled")
+            throw Error(format("dependency of '%1%' of '%2%' does not exist, and substitution is disabled")
                 % i % drvPath);
         addWaitee(worker.makeSubstitutionGoal(i));
     }
@@ -1192,7 +1192,7 @@ void DerivationGoal::repairClosure()
     PathSet broken;
     for (auto & i : outputClosure) {
         if (worker.pathContentsGood(i)) continue;
-        printError(format("found corrupted or missing path ‘%1%’ in the output closure of ‘%2%’") % i % drvPath);
+        printError(format("found corrupted or missing path '%1%' in the output closure of '%2%'") % i % drvPath);
         Path drvPath2 = outputsToDrv[i];
         if (drvPath2 == "")
             addWaitee(worker.makeSubstitutionGoal(i, Repair));
@@ -1213,7 +1213,7 @@ void DerivationGoal::closureRepaired()
 {
     trace("closure repaired");
     if (nrFailed > 0)
-        throw Error(format("some paths in the output closure of derivation ‘%1%’ could not be repaired") % drvPath);
+        throw Error(format("some paths in the output closure of derivation '%1%' could not be repaired") % drvPath);
     done(BuildResult::AlreadyValid);
 }
 
@@ -1224,9 +1224,9 @@ void DerivationGoal::inputsRealised()
 
     if (nrFailed != 0) {
         if (!useDerivation)
-            throw Error(format("some dependencies of ‘%1%’ are missing") % drvPath);
+            throw Error(format("some dependencies of '%1%' are missing") % drvPath);
         printError(
-            format("cannot build derivation ‘%1%’: %2% dependencies couldn't be built")
+            format("cannot build derivation '%1%': %2% dependencies couldn't be built")
             % drvPath % nrFailed);
         done(BuildResult::DependencyFailed);
         return;
@@ -1242,7 +1242,7 @@ void DerivationGoal::inputsRealised()
 
     /* The outputs are referenceable paths. */
     for (auto & i : drv->outputs) {
-        debug(format("building path ‘%1%’") % i.second.path);
+        debug(format("building path '%1%'") % i.second.path);
         allPaths.insert(i.second.path);
     }
 
@@ -1261,7 +1261,7 @@ void DerivationGoal::inputsRealised()
                     worker.store.computeFSClosure(inDrv.outputs[j].path, inputPaths);
                 else
                     throw Error(
-                        format("derivation ‘%1%’ requires non-existent output ‘%2%’ from input derivation ‘%3%’")
+                        format("derivation '%1%' requires non-existent output '%2%' from input derivation '%3%'")
                         % drvPath % j % i.first);
         }
 
@@ -1302,7 +1302,7 @@ void DerivationGoal::tryToBuild()
        goal to sleep until another goal finishes, then try again. */
     for (auto & i : drv->outputs)
         if (pathIsLockedByMe(worker.store.toRealPath(i.second.path))) {
-            debug(format("putting derivation ‘%1%’ to sleep because ‘%2%’ is locked by another goal")
+            debug(format("putting derivation '%1%' to sleep because '%2%' is locked by another goal")
                 % drvPath % i.second.path);
             worker.waitForAnyGoal(shared_from_this());
             return;
@@ -1331,7 +1331,7 @@ void DerivationGoal::tryToBuild()
        build this derivation, so no further checks are necessary. */
     validPaths = checkPathValidity(true, buildMode == bmRepair);
     if (buildMode != bmCheck && validPaths.size() == drv->outputs.size()) {
-        debug(format("skipping build of derivation ‘%1%’, someone beat us to it") % drvPath);
+        debug(format("skipping build of derivation '%1%', someone beat us to it") % drvPath);
         outputLocks.setDeletion(true);
         done(BuildResult::AlreadyValid);
         return;
@@ -1346,7 +1346,7 @@ void DerivationGoal::tryToBuild()
     for (auto & i : drv->outputs) {
         Path path = i.second.path;
         if (worker.store.isValidPath(path)) continue;
-        debug(format("removing invalid path ‘%1%’") % path);
+        debug(format("removing invalid path '%1%'") % path);
         deletePath(worker.store.toRealPath(path));
     }
 
@@ -1416,7 +1416,7 @@ void replaceValidPath(const Path & storePath, const Path tmpPath)
     if (pathExists(storePath))
         rename(storePath.c_str(), oldPath.c_str());
     if (rename(tmpPath.c_str(), storePath.c_str()) == -1)
-        throw SysError(format("moving ‘%1%’ to ‘%2%’") % tmpPath % storePath);
+        throw SysError(format("moving '%1%' to '%2%'") % tmpPath % storePath);
     deletePath(oldPath);
 }
 
@@ -1439,7 +1439,7 @@ void DerivationGoal::buildDone()
        kill it. */
     int status = hook ? hook->pid.kill() : pid.kill();
 
-    debug(format("builder process for ‘%1%’ finished") % drvPath);
+    debug(format("builder process for '%1%' finished") % drvPath);
 
     result.timesBuilt++;
     result.stopTime = time(0);
@@ -1496,7 +1496,7 @@ void DerivationGoal::buildDone()
                     if (pathExists(chrootRootDir + i))
                         rename((chrootRootDir + i).c_str(), i.c_str());
 
-            std::string msg = (format("builder for ‘%1%’ %2%")
+            std::string msg = (format("builder for '%1%' %2%")
                 % drvPath % statusToString(status)).str();
 
             if (!settings.verboseBuild && !logTail.empty()) {
@@ -1606,7 +1606,7 @@ HookReply DerivationGoal::tryBuildHook()
             writeToStderr(s);
         }
 
-        debug(format("hook reply is ‘%1%’") % reply);
+        debug(format("hook reply is '%1%'") % reply);
 
         if (reply == "decline")
             return rpDecline;
@@ -1618,7 +1618,7 @@ HookReply DerivationGoal::tryBuildHook()
         else if (reply == "postpone")
             return rpPostpone;
         else if (reply != "accept")
-            throw Error(format("bad hook reply ‘%1%’") % reply);
+            throw Error(format("bad hook reply '%1%'") % reply);
 
     } catch (SysError & e) {
         if (e.errNo == EPIPE) {
@@ -1659,7 +1659,7 @@ HookReply DerivationGoal::tryBuildHook()
 void chmod_(const Path & path, mode_t mode)
 {
     if (chmod(path.c_str(), mode) == -1)
-        throw SysError(format("setting permissions on ‘%1%’") % path);
+        throw SysError(format("setting permissions on '%1%'") % path);
 }
 
 
@@ -1683,7 +1683,7 @@ void DerivationGoal::startBuilder()
     /* Right platform? */
     if (!drv->canBuildLocally()) {
         throw Error(
-            format("a ‘%1%’ is required to build ‘%3%’, but I am a ‘%2%’")
+            format("a '%1%' is required to build '%3%', but I am a '%2%'")
             % drv->platform % settings.thisSystem % drvPath);
     }
 
@@ -1695,12 +1695,12 @@ void DerivationGoal::startBuilder()
     {
         if (settings.sandboxMode == smEnabled) {
             if (get(drv->env, "__noChroot") == "1")
-                throw Error(format("derivation ‘%1%’ has ‘__noChroot’ set, "
-                    "but that's not allowed when ‘build-use-sandbox’ is ‘true’") % drvPath);
+                throw Error(format("derivation '%1%' has '__noChroot' set, "
+                    "but that's not allowed when 'build-use-sandbox' is 'true'") % drvPath);
 #if __APPLE__
             if (additionalSandboxProfile != "")
-                throw Error(format("derivation ‘%1%’ specifies a sandbox profile, "
-                    "but this is only allowed when ‘build-use-sandbox’ is ‘relaxed’") % drvPath);
+                throw Error(format("derivation '%1%' specifies a sandbox profile, "
+                    "but this is only allowed when 'build-use-sandbox' is 'relaxed'") % drvPath);
 #endif
             useChroot = true;
         }
@@ -1788,7 +1788,7 @@ void DerivationGoal::startBuilder()
                     worker.store.computeFSClosure(worker.store.toStorePath(i.second.source), closure);
             } catch (InvalidPath & e) {
             } catch (Error & e) {
-                throw Error(format("while processing ‘build-sandbox-paths’: %s") % e.what());
+                throw Error(format("while processing 'build-sandbox-paths': %s") % e.what());
             }
         for (auto & i : closure)
             dirsInChroot[i] = i;
@@ -1813,7 +1813,7 @@ void DerivationGoal::startBuilder()
                 }
             }
             if (!found)
-                throw Error(format("derivation ‘%1%’ requested impure path ‘%2%’, but it was not in allowed-impure-host-deps") % drvPath % i);
+                throw Error(format("derivation '%1%' requested impure path '%2%', but it was not in allowed-impure-host-deps") % drvPath % i);
 
             dirsInChroot[i] = i;
         }
@@ -1829,13 +1829,13 @@ void DerivationGoal::startBuilder()
         /* Clean up the chroot directory automatically. */
         autoDelChroot = std::make_shared<AutoDelete>(chrootRootDir);
 
-        printMsg(lvlChatty, format("setting up chroot environment in ‘%1%’") % chrootRootDir);
+        printMsg(lvlChatty, format("setting up chroot environment in '%1%'") % chrootRootDir);
 
         if (mkdir(chrootRootDir.c_str(), 0750) == -1)
-            throw SysError(format("cannot create ‘%1%’") % chrootRootDir);
+            throw SysError(format("cannot create '%1%'") % chrootRootDir);
 
         if (buildUser && chown(chrootRootDir.c_str(), 0, buildUser->getGID()) == -1)
-            throw SysError(format("cannot change ownership of ‘%1%’") % chrootRootDir);
+            throw SysError(format("cannot change ownership of '%1%'") % chrootRootDir);
 
         /* Create a writable /tmp in the chroot.  Many builders need
            this.  (Of course they should really respect $TMPDIR
@@ -1879,25 +1879,25 @@ void DerivationGoal::startBuilder()
         chmod_(chrootStoreDir, 01775);
 
         if (buildUser && chown(chrootStoreDir.c_str(), 0, buildUser->getGID()) == -1)
-            throw SysError(format("cannot change ownership of ‘%1%’") % chrootStoreDir);
+            throw SysError(format("cannot change ownership of '%1%'") % chrootStoreDir);
 
         for (auto & i : inputPaths) {
             Path r = worker.store.toRealPath(i);
             struct stat st;
             if (lstat(r.c_str(), &st))
-                throw SysError(format("getting attributes of path ‘%1%’") % i);
+                throw SysError(format("getting attributes of path '%1%'") % i);
             if (S_ISDIR(st.st_mode))
                 dirsInChroot[i] = r;
             else {
                 Path p = chrootRootDir + i;
-                debug("linking ‘%1%’ to ‘%2%’", p, r);
+                debug("linking '%1%' to '%2%'", p, r);
                 if (link(r.c_str(), p.c_str()) == -1) {
                     /* Hard-linking fails if we exceed the maximum
                        link count on a file (e.g. 32000 of ext3),
                        which is quite possible after a `nix-store
                        --optimise'. */
                     if (errno != EMLINK)
-                        throw SysError(format("linking ‘%1%’ to ‘%2%’") % p % i);
+                        throw SysError(format("linking '%1%' to '%2%'") % p % i);
                     StringSink sink;
                     dumpPath(r, sink);
                     StringSource source(*sink.s);
@@ -1925,7 +1925,7 @@ void DerivationGoal::startBuilder()
     else {
 
         if (pathExists(homeDir))
-            throw Error(format("directory ‘%1%’ exists; please remove it") % homeDir);
+            throw Error(format("directory '%1%' exists; please remove it") % homeDir);
 
         /* We're not doing a chroot build, but we have some valid
            output paths.  Since we can't just overwrite or delete
@@ -1951,7 +1951,7 @@ void DerivationGoal::startBuilder()
     }
 
     if (useChroot && settings.preBuildHook != "" && dynamic_cast<Derivation *>(drv.get())) {
-        printMsg(lvlChatty, format("executing pre-build hook ‘%1%’")
+        printMsg(lvlChatty, format("executing pre-build hook '%1%'")
             % settings.preBuildHook);
         auto args = useChroot ? Strings({drvPath, chrootRootDir}) :
             Strings({ drvPath });
@@ -1970,7 +1970,7 @@ void DerivationGoal::startBuilder()
                 if (line == "extra-sandbox-paths" || line == "extra-chroot-dirs") {
                     state = stExtraChrootDirs;
                 } else {
-                    throw Error(format("unknown pre-build hook command ‘%1%’")
+                    throw Error(format("unknown pre-build hook command '%1%'")
                         % line);
                 }
             } else if (state == stExtraChrootDirs) {
@@ -1988,7 +1988,7 @@ void DerivationGoal::startBuilder()
     }
 
     /* Run the builder. */
-    printMsg(lvlChatty, format("executing builder ‘%1%’") % drv->builder);
+    printMsg(lvlChatty, format("executing builder '%1%'") % drv->builder);
 
     /* Create the log file. */
     Path logFile = openLogFile();
@@ -2232,7 +2232,7 @@ void DerivationGoal::chownToBuilder(const Path & path)
 {
     if (!buildUser) return;
     if (chown(path.c_str(), buildUser->getUID(), buildUser->getGID()) == -1)
-        throw SysError(format("cannot change ownership of ‘%1%’") % path);
+        throw SysError(format("cannot change ownership of '%1%'") % path);
 }
 
 
@@ -2248,7 +2248,7 @@ void DerivationGoal::doExportReferencesGraph()
     string s = get(drv->env, "exportReferencesGraph");
     Strings ss = tokenizeString<Strings>(s);
     if (ss.size() % 2 != 0)
-        throw BuildError(format("odd number of tokens in ‘exportReferencesGraph’: ‘%1%’") % s);
+        throw BuildError(format("odd number of tokens in 'exportReferencesGraph': '%1%'") % s);
     for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
         string fileName = *i++;
         checkStoreName(fileName); /* !!! abuse of this function */
@@ -2256,11 +2256,11 @@ void DerivationGoal::doExportReferencesGraph()
         /* Check that the store path is valid. */
         Path storePath = *i++;
         if (!worker.store.isInStore(storePath))
-            throw BuildError(format("‘exportReferencesGraph’ contains a non-store path ‘%1%’")
+            throw BuildError(format("'exportReferencesGraph' contains a non-store path '%1%'")
                 % storePath);
         storePath = worker.store.toStorePath(storePath);
         if (!worker.store.isValidPath(storePath))
-            throw BuildError(format("‘exportReferencesGraph’ contains an invalid path ‘%1%’")
+            throw BuildError(format("'exportReferencesGraph' contains an invalid path '%1%'")
                 % storePath);
 
         /* If there are derivations in the graph, then include their
@@ -2418,13 +2418,13 @@ void DerivationGoal::runChild()
                local to the namespace, though, so setting MS_PRIVATE
                does not affect the outside world. */
             if (mount(0, "/", 0, MS_REC|MS_PRIVATE, 0) == -1) {
-                throw SysError("unable to make ‘/’ private mount");
+                throw SysError("unable to make '/' private mount");
             }
 
             /* Bind-mount chroot directory to itself, to treat it as a
                different filesystem from /, as needed for pivot_root. */
             if (mount(chrootRootDir.c_str(), chrootRootDir.c_str(), 0, MS_BIND, 0) == -1)
-                throw SysError(format("unable to bind mount ‘%1%’") % chrootRootDir);
+                throw SysError(format("unable to bind mount '%1%'") % chrootRootDir);
 
             /* Set up a nearly empty /dev, unless the user asked to
                bind-mount the host /dev. */
@@ -2464,13 +2464,13 @@ void DerivationGoal::runChild()
                filesystem that we want in the chroot
                environment. */
             auto doBind = [&](const Path & source, const Path & target, bool optional = false) {
-                debug(format("bind mounting ‘%1%’ to ‘%2%’") % source % target);
+                debug(format("bind mounting '%1%' to '%2%'") % source % target);
                 struct stat st;
                 if (stat(source.c_str(), &st) == -1) {
                     if (optional && errno == ENOENT)
                         return;
                     else
-                        throw SysError("getting attributes of path ‘%1%’", source);
+                        throw SysError("getting attributes of path '%1%'", source);
                 }
                 if (S_ISDIR(st.st_mode))
                     createDirs(target);
@@ -2479,7 +2479,7 @@ void DerivationGoal::runChild()
                     writeFile(target, "");
                 }
                 if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
-                    throw SysError("bind mount from ‘%1%’ to ‘%2%’ failed", source, target);
+                    throw SysError("bind mount from '%1%' to '%2%' failed", source, target);
             };
 
             for (auto & i : dirsInChroot) {
@@ -2523,16 +2523,16 @@ void DerivationGoal::runChild()
 
             /* Do the chroot(). */
             if (chdir(chrootRootDir.c_str()) == -1)
-                throw SysError(format("cannot change directory to ‘%1%’") % chrootRootDir);
+                throw SysError(format("cannot change directory to '%1%'") % chrootRootDir);
 
             if (mkdir("real-root", 0) == -1)
                 throw SysError("cannot create real-root directory");
 
             if (pivot_root(".", "real-root") == -1)
-                throw SysError(format("cannot pivot old root directory onto ‘%1%’") % (chrootRootDir + "/real-root"));
+                throw SysError(format("cannot pivot old root directory onto '%1%'") % (chrootRootDir + "/real-root"));
 
             if (chroot(".") == -1)
-                throw SysError(format("cannot change root directory to ‘%1%’") % chrootRootDir);
+                throw SysError(format("cannot change root directory to '%1%'") % chrootRootDir);
 
             if (umount2("real-root", MNT_DETACH) == -1)
                 throw SysError("cannot unmount real root filesystem");
@@ -2553,7 +2553,7 @@ void DerivationGoal::runChild()
 #endif
 
         if (chdir(tmpDirInSandbox.c_str()) == -1)
-            throw SysError(format("changing into ‘%1%’") % tmpDir);
+            throw SysError(format("changing into '%1%'") % tmpDir);
 
         /* Close all other file descriptors. */
         closeMostFDs(set<int>());
@@ -2699,7 +2699,7 @@ void DerivationGoal::runChild()
                     if (lstat(path.c_str(), &st)) {
                         if (i.second.optional && errno == ENOENT)
                             continue;
-                        throw SysError(format("getting attributes of path ‘%1%’") % path);
+                        throw SysError(format("getting attributes of path '%1%'") % path);
                     }
                     if (S_ISDIR(st.st_mode))
                         sandboxProfile += (format("\t(subpath \"%1%\")\n") % path).str();
@@ -2762,7 +2762,7 @@ void DerivationGoal::runChild()
                 if (drv->builder == "builtin:fetchurl")
                     builtinFetchurl(*drv, netrcData);
                 else
-                    throw Error(format("unsupported builtin function ‘%1%’") % string(drv->builder, 8));
+                    throw Error(format("unsupported builtin function '%1%'") % string(drv->builder, 8));
                 _exit(0);
             } catch (std::exception & e) {
                 writeFull(STDERR_FILENO, "error: " + string(e.what()) + "\n");
@@ -2772,7 +2772,7 @@ void DerivationGoal::runChild()
 
         execve(builder, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
 
-        throw SysError(format("executing ‘%1%’") % drv->builder);
+        throw SysError(format("executing '%1%'") % drv->builder);
 
     } catch (std::exception & e) {
         writeFull(STDERR_FILENO, "\1while setting up the build environment: " + string(e.what()) + "\n");
@@ -2794,7 +2794,7 @@ PathSet parseReferenceSpecifiers(Store & store, const BasicDerivation & drv, str
         else if (drv.outputs.find(i) != drv.outputs.end())
             result.insert(drv.outputs.find(i)->second.path);
         else throw BuildError(
-            format("derivation contains an illegal reference specifier ‘%1%’") % i);
+            format("derivation contains an illegal reference specifier '%1%'") % i);
     }
     return result;
 }
@@ -2841,7 +2841,7 @@ void DerivationGoal::registerOutputs()
                     replaceValidPath(path, actualPath);
                 else
                     if (buildMode != bmCheck && rename(actualPath.c_str(), worker.store.toRealPath(path).c_str()) == -1)
-                        throw SysError(format("moving build output ‘%1%’ from the sandbox to the Nix store") % path);
+                        throw SysError(format("moving build output '%1%' from the sandbox to the Nix store") % path);
             }
             if (buildMode != bmCheck) actualPath = worker.store.toRealPath(path);
         } else {
@@ -2858,9 +2858,9 @@ void DerivationGoal::registerOutputs()
         if (lstat(actualPath.c_str(), &st) == -1) {
             if (errno == ENOENT)
                 throw BuildError(
-                    format("builder for ‘%1%’ failed to produce output path ‘%2%’")
+                    format("builder for '%1%' failed to produce output path '%2%'")
                     % drvPath % path);
-            throw SysError(format("getting attributes of path ‘%1%’") % actualPath);
+            throw SysError(format("getting attributes of path '%1%'") % actualPath);
         }
 
 #ifndef __CYGWIN__
@@ -2870,13 +2870,13 @@ void DerivationGoal::registerOutputs()
            user. */
         if ((!S_ISLNK(st.st_mode) && (st.st_mode & (S_IWGRP | S_IWOTH))) ||
             (buildUser && st.st_uid != buildUser->getUID()))
-            throw BuildError(format("suspicious ownership or permission on ‘%1%’; rejecting this build output") % path);
+            throw BuildError(format("suspicious ownership or permission on '%1%'; rejecting this build output") % path);
 #endif
 
         /* Apply hash rewriting if necessary. */
         bool rewritten = false;
         if (!outputRewrites.empty()) {
-            printError(format("warning: rewriting hashes in ‘%1%’; cross fingers") % path);
+            printError(format("warning: rewriting hashes in '%1%'; cross fingers") % path);
 
             /* Canonicalise first.  This ensures that the path we're
                rewriting doesn't contain a hard link to /etc/shadow or
@@ -2907,7 +2907,7 @@ void DerivationGoal::registerOutputs()
                    execute permission. */
                 if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
                     throw BuildError(
-                        format("output path ‘%1%’ should be a non-executable regular file") % path);
+                        format("output path '%1%' should be a non-executable regular file") % path);
             }
 
             /* Check the hash. In hash mode, move the path produced by
@@ -2915,7 +2915,7 @@ void DerivationGoal::registerOutputs()
             Hash h2 = recursive ? hashPath(h.type, actualPath).first : hashFile(h.type, actualPath);
             if (buildMode == bmHash) {
                 Path dest = worker.store.makeFixedOutputPath(recursive, h2, drv->env["name"]);
-                printError(format("build produced path ‘%1%’ with %2% hash ‘%3%’")
+                printError(format("build produced path '%1%' with %2% hash '%3%'")
                     % dest % printHashType(h.type) % printHash16or32(h2));
                 if (worker.store.isValidPath(dest))
                     return;
@@ -2924,14 +2924,14 @@ void DerivationGoal::registerOutputs()
                     PathLocks outputLocks({actualDest});
                     deletePath(actualDest);
                     if (rename(actualPath.c_str(), actualDest.c_str()) == -1)
-                        throw SysError(format("moving ‘%1%’ to ‘%2%’") % actualPath % dest);
+                        throw SysError(format("moving '%1%' to '%2%'") % actualPath % dest);
                 }
                 path = dest;
                 actualPath = actualDest;
             } else {
                 if (h != h2)
                     throw BuildError(
-                        format("output path ‘%1%’ has %2% hash ‘%3%’ when ‘%4%’ was expected")
+                        format("output path '%1%' has %2% hash '%3%' when '%4%' was expected")
                         % path % i.second.hashAlgo % printHash16or32(h2) % printHash16or32(h));
             }
 
@@ -2947,7 +2947,7 @@ void DerivationGoal::registerOutputs()
            contained in it.  Compute the SHA-256 NAR hash at the same
            time.  The hash is stored in the database so that we can
            verify later on whether nobody has messed with the store. */
-        debug("scanning for references inside ‘%1%’", path);
+        debug("scanning for references inside '%1%'", path);
         HashResult hash;
         PathSet references = scanForReferences(actualPath, allPaths, hash);
 
@@ -2959,11 +2959,11 @@ void DerivationGoal::registerOutputs()
                     Path dst = worker.store.toRealPath(path + checkSuffix);
                     deletePath(dst);
                     if (rename(actualPath.c_str(), dst.c_str()))
-                        throw SysError(format("renaming ‘%1%’ to ‘%2%’") % actualPath % dst);
-                    throw Error(format("derivation ‘%1%’ may not be deterministic: output ‘%2%’ differs from ‘%3%’")
+                        throw SysError(format("renaming '%1%' to '%2%'") % actualPath % dst);
+                    throw Error(format("derivation '%1%' may not be deterministic: output '%2%' differs from '%3%'")
                         % drvPath % path % dst);
                 } else
-                    throw Error(format("derivation ‘%1%’ may not be deterministic: output ‘%2%’ differs")
+                    throw Error(format("derivation '%1%' may not be deterministic: output '%2%' differs")
                         % drvPath % path);
             }
 
@@ -2983,9 +2983,9 @@ void DerivationGoal::registerOutputs()
         for (auto & i : inputPaths) {
             PathSet::iterator j = references.find(i);
             if (j == references.end())
-                debug(format("unreferenced input: ‘%1%’") % i);
+                debug(format("unreferenced input: '%1%'") % i);
             else
-                debug(format("referenced input: ‘%1%’") % i);
+                debug(format("referenced input: '%1%'") % i);
         }
 
         /* Enforce `allowedReferences' and friends. */
@@ -3021,7 +3021,7 @@ void DerivationGoal::registerOutputs()
                     badPathsStr += "\n\t";
                     badPathsStr += i;
                 }
-                throw BuildError(format("output ‘%1%’ is not allowed to refer to the following paths:%2%") % actualPath % badPathsStr);
+                throw BuildError(format("output '%1%' is not allowed to refer to the following paths:%2%") % actualPath % badPathsStr);
             }
         };
 
@@ -3058,8 +3058,8 @@ void DerivationGoal::registerOutputs()
                 Path prev = i->path + checkSuffix;
                 bool prevExists = keepPreviousRound && pathExists(prev);
                 auto msg = prevExists
-                    ? fmt("output ‘%1%’ of ‘%2%’ differs from ‘%3%’ from previous round", i->path, drvPath, prev)
-                    : fmt("output ‘%1%’ of ‘%2%’ differs from previous round", i->path, drvPath);
+                    ? fmt("output '%1%' of '%2%' differs from '%3%' from previous round", i->path, drvPath, prev)
+                    : fmt("output '%1%' of '%2%' differs from previous round", i->path, drvPath);
 
                 auto diffHook = settings.diffHook;
                 if (prevExists && diffHook != "" && runDiffHook) {
@@ -3088,7 +3088,7 @@ void DerivationGoal::registerOutputs()
             deletePath(prev);
             Path dst = i.second.path + checkSuffix;
             if (rename(i.second.path.c_str(), dst.c_str()))
-                throw SysError(format("renaming ‘%1%’ to ‘%2%’") % i.second.path % dst);
+                throw SysError(format("renaming '%1%' to '%2%'") % i.second.path % dst);
         }
     }
 
@@ -3129,7 +3129,7 @@ Path DerivationGoal::openLogFile()
         settings.compressLog ? ".bz2" : "");
 
     fdLogFile = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0666);
-    if (!fdLogFile) throw SysError(format("creating log file ‘%1%’") % logFileName);
+    if (!fdLogFile) throw SysError(format("creating log file '%1%'") % logFileName);
 
     logFileSink = std::make_shared<FdSink>(fdLogFile.get());
 
@@ -3159,7 +3159,7 @@ void DerivationGoal::deleteTmpDir(bool force)
            might have privileged stuff (like a copy of netrc). */
         if (settings.keepFailed && !force && !drv->isBuiltin()) {
             printError(
-                format("note: keeping build directory ‘%2%’")
+                format("note: keeping build directory '%2%'")
                 % drvPath % tmpDir);
             chmod(tmpDir.c_str(), 0755);
         }
@@ -3351,7 +3351,7 @@ SubstitutionGoal::SubstitutionGoal(const Path & storePath, Worker & worker, Repa
 {
     this->storePath = storePath;
     state = &SubstitutionGoal::init;
-    name = (format("substitution of ‘%1%’") % storePath).str();
+    name = (format("substitution of '%1%'") % storePath).str();
     trace("created");
     logger->event(evSubstitutionCreated, act, storePath);
 }
@@ -3390,7 +3390,7 @@ void SubstitutionGoal::init()
     }
 
     if (settings.readOnlyMode)
-        throw Error(format("cannot substitute path ‘%1%’ - no write access to the Nix store") % storePath);
+        throw Error(format("cannot substitute path '%1%' - no write access to the Nix store") % storePath);
 
     subs = settings.useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>();
 
@@ -3405,7 +3405,7 @@ void SubstitutionGoal::tryNext()
     if (subs.size() == 0) {
         /* None left.  Terminate this goal and let someone else deal
            with it. */
-        debug(format("path ‘%1%’ is required, but there is no substituter that can build it") % storePath);
+        debug(format("path '%1%' is required, but there is no substituter that can build it") % storePath);
 
         /* Hack: don't indicate failure if there were no substituters.
            In that case the calling derivation should just do a
@@ -3436,7 +3436,7 @@ void SubstitutionGoal::tryNext()
        signature. LocalStore::addToStore() also checks for this, but
        only after we've downloaded the path. */
     if (worker.store.requireSigs && !info->checkSignatures(worker.store, worker.store.publicKeys)) {
-        printInfo(format("warning: substituter ‘%s’ does not have a valid signature for path ‘%s’")
+        printInfo(format("warning: substituter '%s' does not have a valid signature for path '%s'")
             % sub->getUri() % storePath);
         tryNext();
         return;
@@ -3460,7 +3460,7 @@ void SubstitutionGoal::referencesValid()
     trace("all references realised");
 
     if (nrFailed > 0) {
-        debug(format("some references of path ‘%1%’ could not be realised") % storePath);
+        debug(format("some references of path '%1%' could not be realised") % storePath);
         amDone(nrNoSubstituters > 0 || nrIncompleteClosure > 0 ? ecIncompleteClosure : ecFailed);
         return;
     }
@@ -3487,7 +3487,7 @@ void SubstitutionGoal::tryToRun()
         return;
     }
 
-    printInfo(format("fetching path ‘%1%’...") % storePath);
+    printInfo(format("fetching path '%1%'...") % storePath);
 
     logger->event(evSubstitutionStarted, act);
 
@@ -3536,7 +3536,7 @@ void SubstitutionGoal::finished()
     worker.markContentsGood(storePath);
 
     printMsg(lvlChatty,
-        format("substitution of path ‘%1%’ succeeded") % storePath);
+        format("substitution of path '%1%' succeeded") % storePath);
 
     amDone(ecSuccess);
 }
@@ -3766,7 +3766,7 @@ void Worker::run(const Goals & _topGoals)
             waitForInput();
         else {
             if (awake.empty() && 0 == settings.maxBuildJobs) throw Error(
-                "unable to start any build; either increase ‘--max-jobs’ "
+                "unable to start any build; either increase '--max-jobs' "
                 "or enable distributed builds");
             assert(!awake.empty());
         }
@@ -3927,7 +3927,7 @@ bool Worker::pathContentsGood(const Path & path)
 {
     std::map<Path, bool>::iterator i = pathContentsGoodCache.find(path);
     if (i != pathContentsGoodCache.end()) return i->second;
-    printInfo(format("checking path ‘%1%’...") % path);
+    printInfo(format("checking path '%1%'...") % path);
     auto info = store.queryPathInfo(path);
     bool res;
     if (!pathExists(path))
@@ -3938,7 +3938,7 @@ bool Worker::pathContentsGood(const Path & path)
         res = info->narHash == nullHash || info->narHash == current.first;
     }
     pathContentsGoodCache[path] = res;
-    if (!res) printError(format("path ‘%1%’ is corrupted or missing!") % path);
+    if (!res) printError(format("path '%1%' is corrupted or missing!") % path);
     return res;
 }
 
@@ -4013,7 +4013,7 @@ void LocalStore::ensurePath(const Path & path)
     worker.run(goals);
 
     if (goal->getExitCode() != Goal::ecSuccess)
-        throw Error(worker.exitStatus(), "path ‘%s’ does not exist and cannot be created", path);
+        throw Error(worker.exitStatus(), "path '%s' does not exist and cannot be created", path);
 }
 
 
@@ -4034,7 +4034,7 @@ void LocalStore::repairPath(const Path & path)
             goals.insert(worker.makeDerivationGoal(deriver, StringSet(), bmRepair));
             worker.run(goals);
         } else
-            throw Error(worker.exitStatus(), "cannot repair path ‘%s’", path);
+            throw Error(worker.exitStatus(), "cannot repair path '%s'", path);
     }
 }
 

@@ -39,9 +39,9 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         Args::printFlags(out);
         std::cout <<
             "\n"
-            "In addition, most configuration settings can be overriden using ‘--<name> <value>’.\n"
-            "Boolean settings can be overriden using ‘--<name>’ or ‘--no-<name>’. See ‘nix\n"
-            "--help-config’ for a list of configuration settings.\n";
+            "In addition, most configuration settings can be overriden using '--<name> <value>'.\n"
+            "Boolean settings can be overriden using '--<name>' or '--no-<name>'. See 'nix\n"
+            "--help-config' for a list of configuration settings.\n";
     }
 
     void showHelpAndExit()

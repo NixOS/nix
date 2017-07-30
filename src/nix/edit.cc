@@ -41,7 +41,7 @@ struct CmdEdit : InstallablesCommand
                 auto dummyArgs = state->allocBindings(0);
                 v2 = findAlongAttrPath(*state, "meta.position", *dummyArgs, *v);
             } catch (Error &) {
-                throw Error("package ‘%s’ has no source location information", i->what());
+                throw Error("package '%s' has no source location information", i->what());
             }
 
             auto pos = state->forceString(*v2);
@@ -49,7 +49,7 @@ struct CmdEdit : InstallablesCommand
 
             auto colon = pos.rfind(':');
             if (colon == std::string::npos)
-                throw Error("cannot parse meta.position attribute ‘%s’", pos);
+                throw Error("cannot parse meta.position attribute '%s'", pos);
 
             std::string filename(pos, 0, colon);
             int lineno = std::stoi(std::string(pos, colon + 1));
@@ -67,7 +67,7 @@ struct CmdEdit : InstallablesCommand
 
             execvp(editor.c_str(), stringsToCharPtrs(args).data());
 
-            throw SysError("cannot run editor ‘%s’", editor);
+            throw SysError("cannot run editor '%s'", editor);
         }
     }
 };

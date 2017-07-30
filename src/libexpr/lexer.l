@@ -124,13 +124,13 @@ or          { return OR_KW; }
 {INT}       { errno = 0;
               yylval->n = strtol(yytext, 0, 10);
               if (errno != 0)
-                  throw ParseError(format("invalid integer ‘%1%’") % yytext);
+                  throw ParseError(format("invalid integer '%1%'") % yytext);
               return INT;
             }
 {FLOAT}     { errno = 0;
               yylval->nf = strtod(yytext, 0);
               if (errno != 0)
-                  throw ParseError(format("invalid float ‘%1%’") % yytext);
+                  throw ParseError(format("invalid float '%1%'") % yytext);
               return FLOAT;
             }
 
@@ -191,12 +191,12 @@ or          { return OR_KW; }
 <INITIAL,INSIDE_DOLLAR_CURLY>{
 
 {PATH}      { if (yytext[yyleng-1] == '/')
-                  throw ParseError("path ‘%s’ has a trailing slash", yytext);
+                  throw ParseError("path '%s' has a trailing slash", yytext);
               yylval->path = strdup(yytext);
               return PATH;
             }
 {HPATH}     { if (yytext[yyleng-1] == '/')
-                  throw ParseError("path ‘%s’ has a trailing slash", yytext);
+                  throw ParseError("path '%s' has a trailing slash", yytext);
               yylval->path = strdup(yytext);
               return HPATH;
             }

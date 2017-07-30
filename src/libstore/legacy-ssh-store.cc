@@ -65,13 +65,13 @@ struct LegacySSHStore : public Store
 
             unsigned int magic = readInt(conn->from);
             if (magic != SERVE_MAGIC_2)
-                throw Error("protocol mismatch with ‘nix-store --serve’ on ‘%s’", host);
+                throw Error("protocol mismatch with 'nix-store --serve' on '%s'", host);
             conn->remoteVersion = readInt(conn->from);
             if (GET_PROTOCOL_MAJOR(conn->remoteVersion) != 0x200)
-                throw Error("unsupported ‘nix-store --serve’ protocol version on ‘%s’", host);
+                throw Error("unsupported 'nix-store --serve' protocol version on '%s'", host);
 
         } catch (EndOfFile & e) {
-            throw Error("cannot connect to ‘%1%’", host);
+            throw Error("cannot connect to '%1%'", host);
         }
 
         return conn;
@@ -89,7 +89,7 @@ struct LegacySSHStore : public Store
         sync2async<std::shared_ptr<ValidPathInfo>>(success, failure, [&]() -> std::shared_ptr<ValidPathInfo> {
             auto conn(connections->get());
 
-            debug("querying remote host ‘%s’ for info on ‘%s’", host, path);
+            debug("querying remote host '%s' for info on '%s'", host, path);
 
             conn->to << cmdQueryPathInfos << PathSet{path};
             conn->to.flush();
@@ -116,7 +116,7 @@ struct LegacySSHStore : public Store
         RepairFlag repair, CheckSigsFlag checkSigs,
         std::shared_ptr<FSAccessor> accessor) override
     {
-        debug("adding path ‘%s’ to remote host ‘%s’", info.path, host);
+        debug("adding path '%s' to remote host '%s'", info.path, host);
 
         auto conn(connections->get());
 
@@ -134,7 +134,7 @@ struct LegacySSHStore : public Store
         conn->to.flush();
 
         if (readInt(conn->from) != 1)
-            throw Error("failed to add path ‘%s’ to remote host ‘%s’, info.path, host");
+            throw Error("failed to add path '%s' to remote host '%s', info.path, host");
 
     }
 

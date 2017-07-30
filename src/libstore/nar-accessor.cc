@@ -46,7 +46,7 @@ struct NarIndexer : ParseSink, StringSource
             parents.push(&root);
         } else {
             if(parents.top()->type != FSAccessor::Type::tDirectory) {
-                throw Error(format("NAR file missing parent directory of path ‘%1%’") % path);
+                throw Error(format("NAR file missing parent directory of path '%1%'") % path);
             }
             auto result = parents.top()->children.emplace(baseNameOf(path), std::move(member));
             parents.push(&result.first->second);
@@ -120,7 +120,7 @@ struct NarIndexer : ParseSink, StringSource
     NarMember& at(const Path & path) {
         auto result = find(path);
         if(result == nullptr) {
-            throw Error(format("NAR file does not contain path ‘%1%’") % path);
+            throw Error(format("NAR file does not contain path '%1%'") % path);
         }
         return *result;
     }
@@ -149,7 +149,7 @@ struct NarAccessor : public FSAccessor
         auto i = indexer.at(path);
 
         if (i.type != FSAccessor::Type::tDirectory)
-            throw Error(format("path ‘%1%’ inside NAR file is not a directory") % path);
+            throw Error(format("path '%1%' inside NAR file is not a directory") % path);
 
         StringSet res;
         for(auto&& child : i.children) {
@@ -163,7 +163,7 @@ struct NarAccessor : public FSAccessor
     {
         auto i = indexer.at(path);
         if (i.type != FSAccessor::Type::tRegular)
-            throw Error(format("path ‘%1%’ inside NAR file is not a regular file") % path);
+            throw Error(format("path '%1%' inside NAR file is not a regular file") % path);
         return std::string(*nar, i.start, i.size);
     }
 
@@ -171,7 +171,7 @@ struct NarAccessor : public FSAccessor
     {
         auto i = indexer.at(path);
         if (i.type != FSAccessor::Type::tSymlink)
-            throw Error(format("path ‘%1%’ inside NAR file is not a symlink") % path);
+            throw Error(format("path '%1%' inside NAR file is not a symlink") % path);
         return i.target;
     }
 };

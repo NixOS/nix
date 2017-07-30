@@ -38,7 +38,7 @@ struct Hash
     Hash(HashType type) : type(type) { init(); };
 
     /* Initialize the hash from a string representation, in the format
-       "[<type>:]<base16|base32|base64>". If the ‘type’ argument is
+       "[<type>:]<base16|base32|base64>". If the 'type' argument is
        htUnknown, then the hash type must be specified in the
        string. */
     Hash(const std::string & s, HashType type = htUnknown);

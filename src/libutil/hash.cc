@@ -133,14 +133,14 @@ Hash::Hash(const std::string & s, HashType type)
 
     if (colon == string::npos) {
         if (type == htUnknown)
-            throw BadHash("hash ‘%s’ does not include a type", s);
+            throw BadHash("hash '%s' does not include a type", s);
     } else {
         string hts = string(s, 0, colon);
         this->type = parseHashType(hts);
         if (this->type == htUnknown)
-            throw BadHash("unknown hash type ‘%s’", hts);
+            throw BadHash("unknown hash type '%s'", hts);
         if (type != htUnknown && type != this->type)
-            throw BadHash("hash ‘%s’ should have type ‘%s’", s, printHashType(type));
+            throw BadHash("hash '%s' should have type '%s'", s, printHashType(type));
         pos = colon + 1;
     }
 
@@ -154,7 +154,7 @@ Hash::Hash(const std::string & s, HashType type)
             if (c >= '0' && c <= '9') return c - '0';
             if (c >= 'A' && c <= 'F') return c - 'A' + 10;
             if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-            throw BadHash("invalid base-16 hash ‘%s’", s);
+            throw BadHash("invalid base-16 hash '%s'", s);
         };
 
         for (unsigned int i = 0; i < hashSize; i++) {
@@ -172,7 +172,7 @@ Hash::Hash(const std::string & s, HashType type)
             for (digit = 0; digit < base32Chars.size(); ++digit) /* !!! slow */
                 if (base32Chars[digit] == c) break;
             if (digit >= 32)
-                throw BadHash("invalid base-32 hash ‘%s’", s);
+                throw BadHash("invalid base-32 hash '%s'", s);
             unsigned int b = n * 5;
             unsigned int i = b / 8;
             unsigned int j = b % 8;
@@ -182,7 +182,7 @@ Hash::Hash(const std::string & s, HashType type)
                 hash[i + 1] |= digit >> (8 - j);
             } else {
                 if (digit >> (8 - j))
-                    throw BadHash("invalid base-32 hash ‘%s’", s);
+                    throw BadHash("invalid base-32 hash '%s'", s);
             }
         }
     }
@@ -194,7 +194,7 @@ Hash::Hash(const std::string & s, HashType type)
     }
 
     else
-        throw BadHash("hash ‘%s’ has wrong length for hash type ‘%s’", s, printHashType(type));
+        throw BadHash("hash '%s' has wrong length for hash type '%s'", s, printHashType(type));
 }
 
 
@@ -253,13 +253,13 @@ Hash hashFile(HashType ht, const Path & path)
     start(ht, ctx);
 
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
-    if (!fd) throw SysError(format("opening file ‘%1%’") % path);
+    if (!fd) throw SysError(format("opening file '%1%'") % path);
 
     unsigned char buf[8192];
     ssize_t n;
     while ((n = read(fd.get(), buf, sizeof(buf)))) {
         checkInterrupt();
-        if (n == -1) throw SysError(format("reading file ‘%1%’") % path);
+        if (n == -1) throw SysError(format("reading file '%1%'") % path);
         update(ht, ctx, buf, n);
     }
 
