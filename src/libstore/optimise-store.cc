@@ -98,14 +98,14 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
         throw SysError(format("getting attributes of path ‘%1%’") % path);
 
 #if __APPLE__
-    /* HFS/OS X has some undocumented security feature disabling hardlinking for
+    /* HFS/macOS has some undocumented security feature disabling hardlinking for
        special files within .app dirs. *.app/Contents/PkgInfo and
        *.app/Contents/Resources/\*.lproj seem to be the only paths affected. See
        https://github.com/NixOS/nix/issues/1443 for more discussion. */
 
     if (std::regex_search(path, std::regex("\\.app/Contents/PkgInfo$")) ||
         std::regex_search(path, std::regex("\\.app/Contents/Resources/.+\\.lproj$"))) {
-        debug(format("‘%1%’ is not allowed to be linked in OS X") % path);
+        debug(format("‘%1%’ is not allowed to be linked in macOS") % path);
         return;
     }
 #endif
