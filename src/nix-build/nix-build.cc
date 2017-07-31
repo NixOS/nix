@@ -238,7 +238,7 @@ void mainWrapped(int argc, char * * argv)
     });
 
     if (packages && fromArgs)
-        throw UsageError("‘-p’ and ‘-E’ are mutually exclusive");
+        throw UsageError("'-p' and '-E' are mutually exclusive");
 
     auto store = openStore();
 
@@ -336,7 +336,7 @@ void mainWrapped(int argc, char * * argv)
 
                 auto drv = getDerivation(state, v, false);
                 if (!drv)
-                    throw Error("the ‘bashInteractive’ attribute in <nixpkgs> did not evaluate to a derivation");
+                    throw Error("the 'bashInteractive' attribute in <nixpkgs> did not evaluate to a derivation");
 
                 pathsToBuild.insert(drv->queryDrvPath());
 
@@ -440,7 +440,7 @@ void mainWrapped(int argc, char * * argv)
 
         execvp(shell.c_str(), argPtrs.data());
 
-        throw SysError("executing shell ‘%s’", shell);
+        throw SysError("executing shell '%s'", shell);
     }
 
     else {
@@ -457,7 +457,7 @@ void mainWrapped(int argc, char * * argv)
 
             auto outputName = drvInfo.queryOutputName();
             if (outputName == "")
-                throw Error("derivation ‘%s’ lacks an ‘outputName’ attribute", drvPath);
+                throw Error("derivation '%s' lacks an 'outputName' attribute", drvPath);
 
             pathsToBuild.insert(drvPath + "!" + outputName);
 

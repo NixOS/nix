@@ -19,7 +19,7 @@ AutoCloseFD openLockFile(const Path & path, bool create)
 
     fd = open(path.c_str(), O_CLOEXEC | O_RDWR | (create ? O_CREAT : 0), 0600);
     if (!fd && (create || errno != ENOENT))
-        throw SysError(format("opening lock file ‘%1%’") % path);
+        throw SysError(format("opening lock file '%1%'") % path);
 
     return fd;
 }
@@ -109,12 +109,12 @@ bool PathLocks::lockPaths(const PathSet & _paths,
         checkInterrupt();
         Path lockPath = path + ".lock";
 
-        debug(format("locking path ‘%1%’") % path);
+        debug(format("locking path '%1%'") % path);
 
         {
             auto lockedPaths(lockedPaths_.lock());
             if (lockedPaths->count(lockPath))
-                throw Error("deadlock: trying to re-acquire self-held lock ‘%s’", lockPath);
+                throw Error("deadlock: trying to re-acquire self-held lock '%s'", lockPath);
             lockedPaths->insert(lockPath);
         }
 
@@ -141,19 +141,19 @@ bool PathLocks::lockPaths(const PathSet & _paths,
                     }
                 }
 
-                debug(format("lock acquired on ‘%1%’") % lockPath);
+                debug(format("lock acquired on '%1%'") % lockPath);
 
                 /* Check that the lock file hasn't become stale (i.e.,
                    hasn't been unlinked). */
                 struct stat st;
                 if (fstat(fd.get(), &st) == -1)
-                    throw SysError(format("statting lock file ‘%1%’") % lockPath);
+                    throw SysError(format("statting lock file '%1%'") % lockPath);
                 if (st.st_size != 0)
                     /* This lock file has been unlinked, so we're holding
                        a lock on a deleted file.  This means that other
                        processes may create and acquire a lock on
                        `lockPath', and proceed.  So we must retry. */
-                    debug(format("open lock file ‘%1%’ has become stale") % lockPath);
+                    debug(format("open lock file '%1%' has become stale") % lockPath);
                 else
                     break;
             }
@@ -191,9 +191,9 @@ void PathLocks::unlock()
 
         if (close(i.first) == -1)
             printError(
-                format("error (ignored): cannot close lock file on ‘%1%’") % i.second);
+                format("error (ignored): cannot close lock file on '%1%'") % i.second);
 
-        debug(format("lock released on ‘%1%’") % i.second);
+        debug(format("lock released on '%1%'") % i.second);
     }
 
     fds.clear();

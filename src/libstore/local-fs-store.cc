@@ -22,7 +22,7 @@ struct LocalStoreAccessor : public FSAccessor
     {
         Path storePath = store->toStorePath(path);
         if (!store->isValidPath(storePath))
-            throw InvalidPath(format("path ‘%1%’ is not a valid store path") % storePath);
+            throw InvalidPath(format("path '%1%' is not a valid store path") % storePath);
         return store->getRealStoreDir() + std::string(path, store->storeDir.size());
     }
 
@@ -33,11 +33,11 @@ struct LocalStoreAccessor : public FSAccessor
         struct stat st;
         if (lstat(realPath.c_str(), &st)) {
             if (errno == ENOENT || errno == ENOTDIR) return {Type::tMissing, 0, false};
-            throw SysError(format("getting status of ‘%1%’") % path);
+            throw SysError(format("getting status of '%1%'") % path);
         }
 
         if (!S_ISREG(st.st_mode) && !S_ISDIR(st.st_mode) && !S_ISLNK(st.st_mode))
-            throw Error(format("file ‘%1%’ has unsupported type") % path);
+            throw Error(format("file '%1%' has unsupported type") % path);
 
         return {
             S_ISREG(st.st_mode) ? Type::tRegular :
@@ -80,7 +80,7 @@ ref<FSAccessor> LocalFSStore::getFSAccessor()
 void LocalFSStore::narFromPath(const Path & path, Sink & sink)
 {
     if (!isValidPath(path))
-        throw Error(format("path ‘%s’ is not valid") % path);
+        throw Error(format("path '%s' is not valid") % path);
     dumpPath(getRealStoreDir() + std::string(path, storeDir.size()), sink);
 }
 

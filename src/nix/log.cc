@@ -39,7 +39,7 @@ struct CmdLog : InstallablesCommand
                     break;
                 }
                 if (!found)
-                    throw Error("build log of path ‘%s’ is not available", path);
+                    throw Error("build log of path '%s' is not available", path);
             }
         }
     }

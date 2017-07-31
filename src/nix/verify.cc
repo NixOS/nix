@@ -78,7 +78,7 @@ struct CmdVerify : StorePathsCommand
             try {
                 checkInterrupt();
 
-                //Activity act(*logger, lvlInfo, format("checking ‘%s’") % storePath);
+                //Activity act(*logger, lvlInfo, format("checking '%s'") % storePath);
 
                 auto info = store->queryPathInfo(storePath);
 
@@ -93,7 +93,7 @@ struct CmdVerify : StorePathsCommand
                         //logger->incProgress(corruptedLabel);
                         corrupted = 1;
                         printError(
-                            format("path ‘%s’ was modified! expected hash ‘%s’, got ‘%s’")
+                            format("path '%s' was modified! expected hash '%s', got '%s'")
                             % info->path % info->narHash.to_string() % hash.first.to_string());
                     }
 
@@ -144,7 +144,7 @@ struct CmdVerify : StorePathsCommand
                     if (!good) {
                         //logger->incProgress(untrustedLabel);
                         untrusted++;
-                        printError(format("path ‘%s’ is untrusted") % info->path);
+                        printError(format("path '%s' is untrusted") % info->path);
                     }
 
                 }

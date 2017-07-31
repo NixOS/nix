@@ -81,7 +81,7 @@ void Config::applyConfigFile(const Path & path, bool fatal)
             if (tokens.empty()) continue;
 
             if (tokens.size() < 2 || tokens[1] != "=")
-                throw UsageError("illegal configuration line ‘%1%’ in ‘%2%’", line, path);
+                throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
 
             string name = tokens[0];
 

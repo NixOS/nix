@@ -38,7 +38,7 @@ public:
             try {
                 BinaryCacheStore::init();
             } catch (UploadToHTTP &) {
-                throw Error(format("‘%s’ does not appear to be a binary cache") % cacheUri);
+                throw Error(format("'%s' does not appear to be a binary cache") % cacheUri);
             }
             diskCache->createCache(cacheUri, storeDir, wantMassQuery_, priority);
         }

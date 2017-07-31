@@ -158,7 +158,7 @@ public:
             .handler([=](Strings ss) {
                 I n;
                 if (!string2Int(ss.front(), n))
-                    throw UsageError(format("flag ‘--%1%’ requires a integer argument") % longName);
+                    throw UsageError(format("flag '--%1%' requires a integer argument") % longName);
                 fun(n);
             });
     }

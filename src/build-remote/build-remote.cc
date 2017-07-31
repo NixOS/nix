@@ -77,7 +77,7 @@ int main (int argc, char * * argv)
             auto tokens = tokenizeString<std::vector<string>>(line);
             auto sz = tokens.size();
             if (sz != 3 && sz != 4)
-                throw Error("invalid build hook line ‘%1%’", line);
+                throw Error("invalid build hook line '%1%'", line);
             auto amWilling = tokens[0] == "1";
             auto neededSystem = tokens[1];
             drvPath = tokens[2];
@@ -99,7 +99,7 @@ int main (int argc, char * * argv)
                 Machine * bestMachine = nullptr;
                 unsigned long long bestLoad = 0;
                 for (auto & m : machines) {
-                    debug("considering building on ‘%s’", m.storeUri);
+                    debug("considering building on '%s'", m.storeUri);
 
                     if (m.enabled && std::find(m.systemTypes.begin(),
                             m.systemTypes.end(),
@@ -171,7 +171,7 @@ int main (int argc, char * * argv)
                     storeUri = bestMachine->storeUri;
 
                 } catch (std::exception & e) {
-                    printError("unable to open SSH connection to ‘%s’: %s; trying other available machines...",
+                    printError("unable to open SSH connection to '%s': %s; trying other available machines...",
                         bestMachine->storeUri, e.what());
                     bestMachine->enabled = false;
                     continue;
@@ -198,7 +198,7 @@ connected:
         auto old = signal(SIGALRM, handleAlarm);
         alarm(15 * 60);
         if (!lockFile(uploadLock.get(), ltWrite, true))
-            printError("somebody is hogging the upload lock for ‘%s’, continuing...");
+            printError("somebody is hogging the upload lock for '%s', continuing...");
         alarm(0);
         signal(SIGALRM, old);
         copyPaths(store, ref<Store>(sshStore), inputs, NoRepair, NoCheckSigs);
@@ -207,11 +207,11 @@ connected:
         BasicDerivation drv(readDerivation(drvPath));
         drv.inputSrcs = inputs;
 
-        printError("building ‘%s’ on ‘%s’", drvPath, storeUri);
+        printError("building '%s' on '%s'", drvPath, storeUri);
         auto result = sshStore->buildDerivation(drvPath, drv);
 
         if (!result.success())
-            throw Error("build of ‘%s’ on ‘%s’ failed: %s", drvPath, storeUri, result.errorMsg);
+            throw Error("build of '%s' on '%s' failed: %s", drvPath, storeUri, result.errorMsg);
 
         PathSet missing;
         for (auto & path : outputs)

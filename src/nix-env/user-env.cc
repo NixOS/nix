@@ -140,7 +140,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
         Path lockTokenCur = optimisticLockProfile(profile);
         if (lockToken != lockTokenCur) {
-            printError(format("profile ‘%1%’ changed while we were busy; restarting") % profile);
+            printError(format("profile '%1%' changed while we were busy; restarting") % profile);
             return false;
         }
 

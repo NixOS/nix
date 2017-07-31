@@ -50,7 +50,7 @@ Generations findGenerations(Path profile, int & curGen)
             gen.number = n;
             struct stat st;
             if (lstat(gen.path.c_str(), &st) != 0)
-                throw SysError(format("statting ‘%1%’") % gen.path);
+                throw SysError(format("statting '%1%'") % gen.path);
             gen.creationTime = st.st_mtime;
             gens.push_back(gen);
         }
@@ -117,7 +117,7 @@ Path createGeneration(ref<LocalFSStore> store, Path profile, Path outPath)
 static void removeFile(const Path & path)
 {
     if (remove(path.c_str()) == -1)
-        throw SysError(format("cannot unlink ‘%1%’") % path);
+        throw SysError(format("cannot unlink '%1%'") % path);
 }
 
 
@@ -149,7 +149,7 @@ void deleteGenerations(const Path & profile, const std::set<unsigned int> & gens
     Generations gens = findGenerations(profile, curGen);
 
     if (gensToDelete.find(curGen) != gensToDelete.end())
-        throw Error(format("cannot delete current generation of profile %1%’") % profile);
+        throw Error(format("cannot delete current generation of profile %1%'") % profile);
 
     for (auto & i : gens) {
         if (gensToDelete.find(i.number) == gensToDelete.end()) continue;
@@ -203,7 +203,7 @@ void deleteGenerationsOlderThan(const Path & profile, const string & timeSpec, b
     int days;
 
     if (!string2Int(strDays, days) || days < 1)
-        throw Error(format("invalid number of days specifier ‘%1%’") % timeSpec);
+        throw Error(format("invalid number of days specifier '%1%'") % timeSpec);
 
     time_t oldTime = curTime - days * 24 * 3600;
 
@@ -222,7 +222,7 @@ void switchLink(Path link, Path target)
 
 void lockProfile(PathLocks & lock, const Path & profile)
 {
-    lock.lockPaths({profile}, (format("waiting for lock on profile ‘%1%’") % profile).str());
+    lock.lockPaths({profile}, (format("waiting for lock on profile '%1%'") % profile).str());
     lock.setDeletion(true);
 }
 

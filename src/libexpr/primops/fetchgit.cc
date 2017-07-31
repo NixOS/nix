@@ -14,18 +14,18 @@ Path exportGit(ref<Store> store, const std::string & uri,
     const std::string & ref, const std::string & rev)
 {
     if (!isUri(uri))
-        throw EvalError(format("‘%s’ is not a valid URI") % uri);
+        throw EvalError(format("'%s' is not a valid URI") % uri);
 
     if (rev != "") {
         std::regex revRegex("^[0-9a-fA-F]{40}$");
         if (!std::regex_match(rev, revRegex))
-            throw Error("invalid Git revision ‘%s’", rev);
+            throw Error("invalid Git revision '%s'", rev);
     }
 
     // FIXME: too restrictive, but better safe than sorry.
     std::regex refRegex("^[0-9a-zA-Z][0-9a-zA-Z.-]+$");
     if (!std::regex_match(ref, refRegex))
-        throw Error("invalid Git ref ‘%s’", ref);
+        throw Error("invalid Git ref '%s'", ref);
 
     Path cacheDir = getCacheDir() + "/nix/git";
 
@@ -34,7 +34,7 @@ Path exportGit(ref<Store> store, const std::string & uri,
         runProgram("git", true, { "init", "--bare", cacheDir });
     }
 
-    //Activity act(*logger, lvlInfo, format("fetching Git repository ‘%s’") % uri);
+    //Activity act(*logger, lvlInfo, format("fetching Git repository '%s'") % uri);
 
     std::string localRef = hashString(htSHA256, fmt("%s-%s", uri, ref)).to_string(Base32, false);
 
@@ -62,10 +62,10 @@ Path exportGit(ref<Store> store, const std::string & uri,
     std::string commitHash =
         rev != "" ? rev : chomp(readFile(localRefFile));
 
-    printTalkative("using revision %s of repo ‘%s’", uri, commitHash);
+    printTalkative("using revision %s of repo '%s'", uri, commitHash);
 
     Path storeLink = cacheDir + "/" + commitHash + ".link";
-    PathLocks storeLinkLock({storeLink}, fmt("waiting for lock on ‘%1%’...", storeLink));
+    PathLocks storeLinkLock({storeLink}, fmt("waiting for lock on '%1%'...", storeLink));
 
     if (pathExists(storeLink)) {
         auto storePath = readLink(storeLink);
@@ -94,7 +94,7 @@ Path exportGit(ref<Store> store, const std::string & uri,
 static void prim_fetchgit(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     // FIXME: cut&paste from fetch().
-    if (state.restricted) throw Error("‘fetchgit’ is not allowed in restricted mode");
+    if (state.restricted) throw Error("'fetchgit' is not allowed in restricted mode");
 
     std::string url;
     std::string ref = "master";
@@ -118,11 +118,11 @@ static void prim_fetchgit(EvalState & state, const Pos & pos, Value * * args, Va
             else if (name == "rev")
                 rev = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
-                throw EvalError("unsupported argument ‘%s’ to ‘fetchgit’, at %s", attr.name, *attr.pos);
+                throw EvalError("unsupported argument '%s' to 'fetchgit', at %s", attr.name, *attr.pos);
         }
 
         if (url.empty())
-            throw EvalError(format("‘url’ argument required, at %1%") % pos);
+            throw EvalError(format("'url' argument required, at %1%") % pos);
 
     } else
         url = state.forceStringNoCtx(*args[0], pos);

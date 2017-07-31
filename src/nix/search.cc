@@ -76,7 +76,7 @@ struct CmdSearch : SourceExprCommand, MixJSON
         std::function<void(Value *, std::string, bool, JSONObject *)> doExpr;
 
         doExpr = [&](Value * v, std::string attrPath, bool toplevel, JSONObject * cache) {
-            debug("at attribute ‘%s’", attrPath);
+            debug("at attribute '%s'", attrPath);
 
             try {
 
@@ -152,7 +152,7 @@ struct CmdSearch : SourceExprCommand, MixJSON
                         auto attrs = v->attrs;
                         Bindings::iterator j = attrs->find(sRecurse);
                         if (j == attrs->end() || !state->forceBool(*j->value, *j->pos)) {
-                            debug("skip attribute ‘%s’", attrPath);
+                            debug("skip attribute '%s'", attrPath);
                             return;
                         }
                     }
@@ -175,7 +175,7 @@ struct CmdSearch : SourceExprCommand, MixJSON
             } catch (AssertionError & e) {
             } catch (Error & e) {
                 if (!toplevel) {
-                    e.addPrefix(fmt("While evaluating the attribute ‘%s’:\n", attrPath));
+                    e.addPrefix(fmt("While evaluating the attribute '%s':\n", attrPath));
                     throw;
                 }
             }
@@ -203,7 +203,7 @@ struct CmdSearch : SourceExprCommand, MixJSON
             doExpr(getSourceExpr(*state), "", true, cache.get());
 
             if (rename(tmpFile.c_str(), jsonCacheFileName.c_str()) == -1)
-                throw SysError("cannot rename ‘%s’ to ‘%s’", tmpFile, jsonCacheFileName);
+                throw SysError("cannot rename '%s' to '%s'", tmpFile, jsonCacheFileName);
         }
     }
 };

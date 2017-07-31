@@ -129,7 +129,7 @@ void MaxBuildJobsSetting::set(const std::string & str)
 {
     if (str == "auto") value = std::max(1U, std::thread::hardware_concurrency());
     else if (!string2Int(str, value))
-        throw UsageError("configuration setting ‘%s’ should be ‘auto’ or an integer", name);
+        throw UsageError("configuration setting '%s' should be 'auto' or an integer", name);
 }
 
 }

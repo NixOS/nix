@@ -682,7 +682,7 @@ static void processConnection(bool trusted)
         /* Prevent users from doing something very dangerous. */
         if (geteuid() == 0 &&
             querySetting("build-users-group", "") == "")
-            throw Error("if you run ‘nix-daemon’ as root, then you MUST set ‘build-users-group’!");
+            throw Error("if you run 'nix-daemon' as root, then you MUST set 'build-users-group'!");
 #endif
 
         /* Open the store. */
@@ -866,7 +866,7 @@ static void daemonLoop(char * * argv)
         struct sockaddr_un addr;
         addr.sun_family = AF_UNIX;
         if (socketPathRel.size() >= sizeof(addr.sun_path))
-            throw Error(format("socket path ‘%1%’ is too long") % socketPathRel);
+            throw Error(format("socket path '%1%' is too long") % socketPathRel);
         strcpy(addr.sun_path, socketPathRel.c_str());
 
         unlink(socketPath.c_str());
@@ -878,13 +878,13 @@ static void daemonLoop(char * * argv)
         int res = bind(fdSocket.get(), (struct sockaddr *) &addr, sizeof(addr));
         umask(oldMode);
         if (res == -1)
-            throw SysError(format("cannot bind to socket ‘%1%’") % socketPath);
+            throw SysError(format("cannot bind to socket '%1%'") % socketPath);
 
         if (chdir("/") == -1) /* back to the root */
             throw SysError("cannot change current directory");
 
         if (listen(fdSocket.get(), 5) == -1)
-            throw SysError(format("cannot listen on socket ‘%1%’") % socketPath);
+            throw SysError(format("cannot listen on socket '%1%'") % socketPath);
     }
 
     closeOnExec(fdSocket.get());
@@ -923,7 +923,7 @@ static void daemonLoop(char * * argv)
                 trusted = true;
 
             if (!trusted && !matchUser(user, group, allowedUsers))
-                throw Error(format("user ‘%1%’ is not allowed to connect to the Nix daemon") % user);
+                throw Error(format("user '%1%' is not allowed to connect to the Nix daemon") % user);
 
             printInfo(format((string) "accepted connection from pid %1%, user %2%" + (trusted ? " (trusted)" : ""))
                 % (peer.pidKnown ? std::to_string(peer.pid) : "<unknown>")
@@ -998,7 +998,7 @@ int main(int argc, char * * argv)
 
                 auto socketDir = dirOf(socketPath);
                 if (chdir(socketDir.c_str()) == -1)
-                    throw SysError(format("changing to socket directory ‘%1%’") % socketDir);
+                    throw SysError(format("changing to socket directory '%1%'") % socketDir);
 
                 auto socketName = baseNameOf(socketPath);
                 auto addr = sockaddr_un{};

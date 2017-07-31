@@ -39,7 +39,7 @@ struct BinaryCacheStoreAccessor : public FSAccessor
         std::string restPath = std::string(path, storePath.size());
 
         if (!store->isValidPath(storePath))
-            throw InvalidPath(format("path ‘%1%’ is not a valid store path") % storePath);
+            throw InvalidPath(format("path '%1%' is not a valid store path") % storePath);
 
         auto i = nars.find(storePath);
         if (i != nars.end()) return {i->second, restPath};
@@ -103,7 +103,7 @@ void BinaryCacheStore::init()
             auto value = trim(line.substr(colon + 1, std::string::npos));
             if (name == "StoreDir") {
                 if (value != storeDir)
-                    throw Error(format("binary cache ‘%s’ is for Nix stores with prefix ‘%s’, not ‘%s’")
+                    throw Error(format("binary cache '%s' is for Nix stores with prefix '%s', not '%s'")
                         % getUri() % value % storeDir);
             } else if (name == "WantMassQuery") {
                 wantMassQuery_ = value == "1";
@@ -145,7 +145,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
             if (ref != info.path)
                 queryPathInfo(ref);
         } catch (InvalidPath &) {
-            throw Error(format("cannot add ‘%s’ to the binary cache because the reference ‘%s’ is not valid")
+            throw Error(format("cannot add '%s' to the binary cache because the reference '%s' is not valid")
                 % info.path % ref);
         }
 
@@ -159,7 +159,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
     narInfo->narHash = hashString(htSHA256, *nar);
 
     if (info.narHash && info.narHash != narInfo->narHash)
-        throw Error(format("refusing to copy corrupted path ‘%1%’ to binary cache") % info.path);
+        throw Error(format("refusing to copy corrupted path '%1%' to binary cache") % info.path);
 
     auto accessor_ = std::dynamic_pointer_cast<BinaryCacheStoreAccessor>(accessor);
 
@@ -233,7 +233,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
     narInfo->fileSize = narCompressed->size();
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
-    printMsg(lvlTalkative, format("copying path ‘%1%’ (%2% bytes, compressed %3$.1f%% in %4% ms) to binary cache")
+    printMsg(lvlTalkative, format("copying path '%1%' (%2% bytes, compressed %3$.1f%% in %4% ms) to binary cache")
         % narInfo->path % narInfo->narSize
         % ((1.0 - (double) narCompressed->size() / nar->size()) * 100.0)
         % duration);
@@ -286,7 +286,7 @@ void BinaryCacheStore::narFromPath(const Path & storePath, Sink & sink)
 
     auto nar = getFile(info->url);
 
-    if (!nar) throw Error(format("file ‘%s’ missing from binary cache") % info->url);
+    if (!nar) throw Error(format("file '%s' missing from binary cache") % info->url);
 
     stats.narRead++;
     stats.narReadCompressedBytes += nar->size();
@@ -296,13 +296,13 @@ void BinaryCacheStore::narFromPath(const Path & storePath, Sink & sink)
     try {
         nar = decompress(info->compression, *nar);
     } catch (UnknownCompressionMethod &) {
-        throw Error(format("binary cache path ‘%s’ uses unknown compression method ‘%s’")
+        throw Error(format("binary cache path '%s' uses unknown compression method '%s'")
             % storePath % info->compression);
     }
 
     stats.narReadBytes += nar->size();
 
-    printMsg(lvlTalkative, format("exporting path ‘%1%’ (%2% bytes)") % storePath % nar->size());
+    printMsg(lvlTalkative, format("exporting path '%1%' (%2% bytes)") % storePath % nar->size());
 
     assert(nar->size() % 8 == 0);
 
@@ -394,7 +394,7 @@ std::shared_ptr<std::string> BinaryCacheStore::getBuildLog(const Path & path)
 
     auto logPath = "log/" + baseNameOf(drvPath);
 
-    debug("fetching build log from binary cache ‘%s/%s’", getUri(), logPath);
+    debug("fetching build log from binary cache '%s/%s'", getUri(), logPath);
 
     return getFile(logPath);
 }

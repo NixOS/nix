@@ -104,7 +104,7 @@ Path canonPath(const Path & path, bool resolveSymlinks)
     string s;
 
     if (path[0] != '/')
-        throw Error(format("not an absolute path: ‘%1%’") % path);
+        throw Error(format("not an absolute path: '%1%'") % path);
 
     string::const_iterator i = path.begin(), end = path.end();
     string temp;
@@ -140,7 +140,7 @@ Path canonPath(const Path & path, bool resolveSymlinks)
                the symlink target might contain new symlinks). */
             if (resolveSymlinks && isLink(s)) {
                 if (++followCount >= maxFollow)
-                    throw Error(format("infinite symlink recursion in path ‘%1%’") % path);
+                    throw Error(format("infinite symlink recursion in path '%1%'") % path);
                 temp = absPath(readLink(s), dirOf(s))
                     + string(i, end);
                 i = temp.begin(); /* restart */
@@ -158,7 +158,7 @@ Path dirOf(const Path & path)
 {
     Path::size_type pos = path.rfind('/');
     if (pos == string::npos)
-        throw Error(format("invalid file name ‘%1%’") % path);
+        throw Error(format("invalid file name '%1%'") % path);
     return pos == 0 ? "/" : Path(path, 0, pos);
 }
 
@@ -195,7 +195,7 @@ struct stat lstat(const Path & path)
 {
     struct stat st;
     if (lstat(path.c_str(), &st))
-        throw SysError(format("getting status of ‘%1%’") % path);
+        throw SysError(format("getting status of '%1%'") % path);
     return st;
 }
 
@@ -217,13 +217,13 @@ Path readLink(const Path & path)
     checkInterrupt();
     struct stat st = lstat(path);
     if (!S_ISLNK(st.st_mode))
-        throw Error(format("‘%1%’ is not a symlink") % path);
+        throw Error(format("'%1%' is not a symlink") % path);
     char buf[st.st_size];
     ssize_t rlsize = readlink(path.c_str(), buf, st.st_size);
     if (rlsize == -1)
-        throw SysError(format("reading symbolic link ‘%1%’") % path);
+        throw SysError(format("reading symbolic link '%1%'") % path);
     else if (rlsize > st.st_size)
-        throw Error(format("symbolic link ‘%1%’ size overflow %2% > %3%")
+        throw Error(format("symbolic link '%1%' size overflow %2% > %3%")
             % path % rlsize % st.st_size);
     return string(buf, rlsize);
 }
@@ -242,7 +242,7 @@ DirEntries readDirectory(const Path & path)
     entries.reserve(64);
 
     AutoCloseDir dir(opendir(path.c_str()));
-    if (!dir) throw SysError(format("opening directory ‘%1%’") % path);
+    if (!dir) throw SysError(format("opening directory '%1%'") % path);
 
     struct dirent * dirent;
     while (errno = 0, dirent = readdir(dir.get())) { /* sic */
@@ -257,7 +257,7 @@ DirEntries readDirectory(const Path & path)
 #endif
         );
     }
-    if (errno) throw SysError(format("reading directory ‘%1%’") % path);
+    if (errno) throw SysError(format("reading directory '%1%'") % path);
 
     return entries;
 }
@@ -290,7 +290,7 @@ string readFile(const Path & path, bool drain)
 {
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
     if (!fd)
-        throw SysError(format("opening file ‘%1%’") % path);
+        throw SysError(format("opening file '%1%'") % path);
     return drain ? drainFD(fd.get()) : readFile(fd.get());
 }
 
@@ -299,7 +299,7 @@ void writeFile(const Path & path, const string & s, mode_t mode)
 {
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
-        throw SysError(format("opening file ‘%1%’") % path);
+        throw SysError(format("opening file '%1%'") % path);
     writeFull(fd.get(), s);
 }
 
@@ -338,7 +338,7 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
     struct stat st;
     if (lstat(path.c_str(), &st) == -1) {
         if (errno == ENOENT) return;
-        throw SysError(format("getting status of ‘%1%’") % path);
+        throw SysError(format("getting status of '%1%'") % path);
     }
 
     if (!S_ISDIR(st.st_mode) && st.st_nlink == 1)
@@ -349,7 +349,7 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
         const auto PERM_MASK = S_IRUSR | S_IWUSR | S_IXUSR;
         if ((st.st_mode & PERM_MASK) != PERM_MASK) {
             if (chmod(path.c_str(), st.st_mode | PERM_MASK) == -1)
-                throw SysError(format("chmod ‘%1%’") % path);
+                throw SysError(format("chmod '%1%'") % path);
         }
 
         for (auto & i : readDirectory(path))
@@ -358,7 +358,7 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
 
     if (remove(path.c_str()) == -1) {
         if (errno == ENOENT) return;
-        throw SysError(format("cannot unlink ‘%1%’") % path);
+        throw SysError(format("cannot unlink '%1%'") % path);
     }
 }
 
@@ -372,7 +372,7 @@ void deletePath(const Path & path)
 
 void deletePath(const Path & path, unsigned long long & bytesFreed)
 {
-    //Activity act(*logger, lvlDebug, format("recursively deleting path ‘%1%’") % path);
+    //Activity act(*logger, lvlDebug, format("recursively deleting path '%1%'") % path);
     bytesFreed = 0;
     _deletePath(path, bytesFreed);
 }
@@ -410,12 +410,12 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
                "wheel", then "tar" will fail to unpack archives that
                have the setgid bit set on directories. */
             if (chown(tmpDir.c_str(), (uid_t) -1, getegid()) != 0)
-                throw SysError(format("setting group of directory ‘%1%’") % tmpDir);
+                throw SysError(format("setting group of directory '%1%'") % tmpDir);
 #endif
             return tmpDir;
         }
         if (errno != EEXIST)
-            throw SysError(format("creating directory ‘%1%’") % tmpDir);
+            throw SysError(format("creating directory '%1%'") % tmpDir);
     }
 }
 
@@ -473,15 +473,15 @@ Paths createDirs(const Path & path)
     if (lstat(path.c_str(), &st) == -1) {
         created = createDirs(dirOf(path));
         if (mkdir(path.c_str(), 0777) == -1 && errno != EEXIST)
-            throw SysError(format("creating directory ‘%1%’") % path);
+            throw SysError(format("creating directory '%1%'") % path);
         st = lstat(path);
         created.push_back(path);
     }
 
     if (S_ISLNK(st.st_mode) && stat(path.c_str(), &st) == -1)
-        throw SysError(format("statting symlink ‘%1%’") % path);
+        throw SysError(format("statting symlink '%1%'") % path);
 
-    if (!S_ISDIR(st.st_mode)) throw Error(format("‘%1%’ is not a directory") % path);
+    if (!S_ISDIR(st.st_mode)) throw Error(format("'%1%' is not a directory") % path);
 
     return created;
 }
@@ -490,7 +490,7 @@ Paths createDirs(const Path & path)
 void createSymlink(const Path & target, const Path & link)
 {
     if (symlink(target.c_str(), link.c_str()))
-        throw SysError(format("creating symlink from ‘%1%’ to ‘%2%’") % link % target);
+        throw SysError(format("creating symlink from '%1%' to '%2%'") % link % target);
 }
 
 
@@ -507,7 +507,7 @@ void replaceSymlink(const Path & target, const Path & link)
         }
 
         if (rename(tmp.c_str(), link.c_str()) != 0)
-            throw SysError(format("renaming ‘%1%’ to ‘%2%’") % tmp % link);
+            throw SysError(format("renaming '%1%' to '%2%'") % tmp % link);
 
         break;
     }
@@ -589,7 +589,7 @@ AutoDelete::~AutoDelete()
                 deletePath(path);
             else {
                 if (remove(path.c_str()) == -1)
-                    throw SysError(format("cannot unlink ‘%1%’") % path);
+                    throw SysError(format("cannot unlink '%1%'") % path);
             }
         }
     } catch (...) {
@@ -786,7 +786,7 @@ pid_t Pid::release()
 
 void killUser(uid_t uid)
 {
-    debug(format("killing all processes running under uid ‘%1%’") % uid);
+    debug(format("killing all processes running under uid '%1%'") % uid);
 
     assert(uid != 0); /* just to be safe... */
 
@@ -815,7 +815,7 @@ void killUser(uid_t uid)
 #endif
             if (errno == ESRCH) break; /* no more processes */
             if (errno != EINTR)
-                throw SysError(format("cannot kill processes for uid ‘%1%’") % uid);
+                throw SysError(format("cannot kill processes for uid '%1%'") % uid);
         }
 
         _exit(0);
@@ -823,7 +823,7 @@ void killUser(uid_t uid)
 
     int status = pid.wait();
     if (status != 0)
-        throw Error(format("cannot kill processes for uid ‘%1%’: %2%") % uid % statusToString(status));
+        throw Error(format("cannot kill processes for uid '%1%': %2%") % uid % statusToString(status));
 
     /* !!! We should really do some check to make sure that there are
        no processes left running under `uid', but there is no portable
@@ -917,7 +917,7 @@ string runProgram(Path program, bool searchPath, const Strings & args,
         else
             execv(program.c_str(), stringsToCharPtrs(args_).data());
 
-        throw SysError(format("executing ‘%1%’") % program);
+        throw SysError(format("executing '%1%'") % program);
     });
 
     out.writeSide = -1;
@@ -950,7 +950,7 @@ string runProgram(Path program, bool searchPath, const Strings & args,
     /* Wait for the child to finish. */
     int status = pid.wait();
     if (!statusOk(status))
-        throw ExecError(status, format("program ‘%1%’ %2%")
+        throw ExecError(status, format("program '%1%' %2%")
             % program % statusToString(status));
 
     /* Wait for the writer thread to finish. */
