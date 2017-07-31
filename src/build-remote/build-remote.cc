@@ -57,7 +57,7 @@ int main (int argc, char * * argv)
         settings.builders = argv[5];
 
         /* It would be more appropriate to use $XDG_RUNTIME_DIR, since
-           that gets cleared on reboot, but it wouldn't work on OS X. */
+           that gets cleared on reboot, but it wouldn't work on macOS. */
         currentLoad = settings.nixStateDir + "/current-load";
 
         std::shared_ptr<Store> sshStore;

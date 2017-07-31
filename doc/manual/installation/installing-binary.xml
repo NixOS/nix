@@ -6,7 +6,7 @@
 
 <title>Installing a Binary Distribution</title>
 
-<para>If you are using Linux or Mac OS X, the easiest way to install
+<para>If you are using Linux or macOS, the easiest way to install
 Nix is to run the following command:
 
 <screen>
@@ -39,7 +39,7 @@ behaviour.
 <!--
 <para>You can also manually download and install a binary package.
 Binary packages of the latest stable release are available for Fedora,
-Debian, Ubuntu, Mac OS X and various other systems from the <link
+Debian, Ubuntu, macOS and various other systems from the <link
 xlink:href="http://nixos.org/nix/download.html">Nix homepage</link>.
 You can also get builds of the latest development release from our
 <link
