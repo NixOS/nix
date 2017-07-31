@@ -652,6 +652,10 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         str << ESC_BLU "«primop-app»" ESC_END;
         break;
 
+    case tFloat:
+        str << v.fpoint;
+        break;
+
     default:
         str << ESC_RED "«unknown»" ESC_END;
         break;
