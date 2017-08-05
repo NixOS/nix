@@ -1009,6 +1009,37 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
 }
 
 
+/* Intern the given path into the store as a fixed-output derivation. This is
+   like a dynamic version of the built-in Nix functionality that allows one to
+   copy a local path into the Nix store simply by referencing it in a string.
+
+   ‘builtins.intern path’ should roughly be the same as
+   ‘with builtins; toFile (basename path) (readFile path)’, unless the file
+   located at ‘path’ is not text; ‘readFile’ cannot, in general, be used on
+   binary files.
+ */
+static void prim_intern(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    PathSet context;
+    PathFilter& filter = defaultPathFilter;
+
+    Path path = state.coerceToPath(pos, *args[1], context);
+
+    Path dstPath
+        = settings.readOnlyMode
+        ? computeStorePathForPath(path, true, htSHA256, filter).first
+        : store->addToStore(baseNameOf(path), path, true, htSHA256, filter, state.repair);
+
+    try {
+        realiseContext(context);
+        mkString(v, dstPath, {dstPath});
+    } catch (InvalidPathError & e) {
+        throw EvalError(format("cannot intern ‘%1%’, since path ‘%2%’ is not valid, at %3%")
+            % path % e.path % pos);
+    }
+}
+
+
 struct FilterFromExpr : PathFilter
 {
     EvalState & state;
@@ -1992,6 +2023,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__toJSON", 1, prim_toJSON);
     addPrimOp("__fromJSON", 1, prim_fromJSON);
     addPrimOp("__toFile", 2, prim_toFile);
+    addPrimOp("__intern", 1, prim_intern);
     addPrimOp("__filterSource", 2, prim_filterSource);
 
     // Sets
