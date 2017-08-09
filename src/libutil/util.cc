@@ -310,6 +310,7 @@ string readLine(int fd)
     while (1) {
         checkInterrupt();
         char ch;
+        // FIXME: inefficient
         ssize_t rd = read(fd, &ch, 1);
         if (rd == -1) {
             if (errno != EINTR)
@@ -962,11 +963,24 @@ string runProgram(Path program, bool searchPath, const Strings & args,
 
 void closeMostFDs(const set<int> & exceptions)
 {
+#if __linux__
+    try {
+        for (auto & s : readDirectory("/proc/self/fd")) {
+            auto fd = std::stoi(s.name);
+            if (!exceptions.count(fd)) {
+                debug("closing leaked FD %d", fd);
+                close(fd);
+            }
+        }
+        return;
+    } catch (SysError &) {
+    }
+#endif
+
     int maxFD = 0;
     maxFD = sysconf(_SC_OPEN_MAX);
     for (int fd = 0; fd < maxFD; ++fd)
-        if (fd != STDIN_FILENO && fd != STDOUT_FILENO && fd != STDERR_FILENO
-            && exceptions.find(fd) == exceptions.end())
+        if (!exceptions.count(fd))
             close(fd); /* ignore result */
 }
 

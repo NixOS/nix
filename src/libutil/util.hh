@@ -261,8 +261,8 @@ public:
    list of strings. */
 std::vector<char *> stringsToCharPtrs(const Strings & ss);
 
-/* Close all file descriptors except stdin, stdout, stderr, and those
-   listed in the given set.  Good practice in child processes. */
+/* Close all file descriptors except those listed in the given set.
+   Good practice in child processes. */
 void closeMostFDs(const set<int> & exceptions);
 
 /* Set the close-on-exec flag for the given file descriptor. */

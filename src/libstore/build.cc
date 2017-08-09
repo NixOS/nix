@@ -2556,7 +2556,7 @@ void DerivationGoal::runChild()
             throw SysError(format("changing into '%1%'") % tmpDir);
 
         /* Close all other file descriptors. */
-        closeMostFDs(set<int>());
+        closeMostFDs({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO});
 
 #if __linux__
         /* Change the personality to 32-bit if we're doing an
