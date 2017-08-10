@@ -104,7 +104,8 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
        https://github.com/NixOS/nix/issues/1443 for more discussion. */
 
     if (std::regex_search(path, std::regex("\\.app/Contents/PkgInfo$")) ||
-        std::regex_search(path, std::regex("\\.app/Contents/Resources/.+\\.lproj$"))) {
+        std::regex_search(path, std::regex("\\.app/Contents/Resources/.+\\.lproj$")))
+    {
         debug(format("'%1%' is not allowed to be linked in macOS") % path);
         return;
     }
