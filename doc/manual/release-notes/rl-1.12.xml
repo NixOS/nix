@@ -11,6 +11,91 @@
 <itemizedlist>
 
   <listitem>
+    <para>Start of new <command>nix</command> command line
+    interface. This is a work in progress and the interface is subject
+    to change.</para>
+
+    <itemizedlist>
+
+      <listitem><para>Self-documenting: <option>--help</option> shows
+      all available command-line arguments.</para></listitem>
+
+      <listitem><para><option>--help-config</option> shows all
+      configuration options.</para></listitem>
+
+      <listitem><para><command>nix build</command>: Replacement for
+      <command>nix-build</command>.</para></listitem>
+
+      <listitem><para><command>nix ls-store</command> and <command>nix
+      ls-nar</command> allow listing the contents of a store path or
+      NAR file.</para></listitem>
+
+      <listitem><para><command>nix cat-store</command> and
+      <command>nix cat-nar</command> allow extracting a file from a
+      store path or NAR file.</para></listitem>
+
+      <listitem><para><command>nix verify</command> checks whether a
+      store path is unmodified and/or is trusted.</para></listitem>
+
+      <listitem><para><command>nix copy-sigs</command> copies
+      signatures from one store to another.</para></listitem>
+
+      <listitem><para><command>nix sign-paths</command> signs store
+      paths.</para></listitem>
+
+      <listitem><para><command>nix copy</command> copies paths between
+      arbitrary Nix stores, generalising
+      <command>nix-copy-closure</command> and
+      <command>nix-push</command>.</para></listitem>
+
+      <listitem><para><command>nix path-info</command> shows
+      information about store paths.</para></listitem>
+
+      <listitem><para><command>nix run</command> starts a shell in
+      which the specified packages are available. (TODO: currently
+      broken in chroot mode)</para></listitem>
+
+      <listitem><para><command>nix log</command> shows the build log
+      of a package or path. If the build log is not available locally,
+      it will try to obtain it from a binary cache.</para></listitem>
+
+      <listitem><para><command>nix eval</command> replaces
+      <command>nix-instantiate --eval</command>.</para></listitem>
+
+      <listitem><para><command>nix dump-path</command> to get a NAR
+      from a store path.</para></listitem>
+
+      <listitem><para><command>nix edit</command> opens the source
+      code of a package in an editor.</para></listitem>
+
+      <listitem><para><command>nix search</command> replaces
+      <command>nix-env -qa</command>. It searches the available
+      packages for occurences of a search string in the attribute
+      name, package name or description. It caches available packages
+      to speed up searches.</para></listitem>
+
+    </itemizedlist>
+
+  </listitem>
+
+  <listitem>
+    <para>The external program <command>nix-repl</command> has been
+    integrated into Nix as <command>nix repl</command>.</para>
+  </listitem>
+
+  <listitem>
+    <para>Nix now supports floating-point numbers.</para>
+  </listitem>
+
+  <listitem>
+    <para>New build mode <command>nix-build --hash</command> that
+    builds a derivation, computes the hash of the output, and moves
+    the output to the store path corresponding to what a fixed-output
+    derivation with that hash would produce.
+    (Add docs and examples; see d367b8e7875161e655deaa96bf8a5dd0bcf8229e)</para>
+  </listitem>
+
+  <listitem>
     <para>It is no longer necessary to set the
     <envar>NIX_REMOTE</envar> environment variable if you need to use
     the Nix daemon. Nix will use the daemon automatically if you don’t
@@ -21,9 +106,282 @@
     <para>The Nix language now supports floating point numbers. They are
     based on regular C++ <literal>float</literal> and compatible with
     existing integers and number-related operations. Export and import to and
-    from JSON and XML works, too.
-  </para>
+    from JSON and XML works, too.</para>
   </listitem>
+
+  <listitem>
+    <para><command>nix-shell</command> now sets the
+    <varname>IN_NIX_SHELL</varname> environment variable during
+    evaluation and in the shell itself. This can be used to perform
+    different actions depending on whether you’re in a Nix shell or in
+    a regular build. Nixpkgs provides
+    <varname>lib.inNixShell</varname> to check this variable during
+    evaluation. (bb36a1a3cf3fbe6bc9d0afcc5fa0f928bed03170)</para>
+  </listitem>
+
+  <listitem>
+    <para>Internal: all <classname>Store</classname> classes are now
+    thread-safe. <classname>RemoteStore</classname> supports multiple
+    concurrent connections to the daemon. This is primarily useful in
+    multi-threaded programs such as
+    <command>hydra-queue-runner</command>.</para>
+  </listitem>
+
+  <listitem>
+    <para>The dependency on Perl has been removed. As a result, some
+    (obsolete) programs have been removed: <command>nix-push</command>
+    (replaced by <command>nix copy</command>),
+    <command>nix-pull</command> (obsoleted by binary caches),
+    <command>nix-generate-patches</command>,
+    <command>bsdiff</command>, <command>bspatch</command>.</para>
+  </listitem>
+
+  <listitem>
+    <para>Improved store abstraction. Substituters
+    eliminated. BinaryCacheStore, LocalBinaryCacheStore,
+    HttpBinaryCacheStore, S3BinaryCacheStore (compile-time
+    optional), SSHStore. Add docs + examples?
+    </para>
+  </listitem>
+
+  <listitem>
+    <para>Nix now stores signatures for local store
+    paths. Locally-built paths are now signed automatically using the
+    secret keys specified by the <option>secret-key-files</option>
+    store option.</para>
+
+    <para>In addition, store paths that have been built locally are
+    marked as “ultimately trusted”, and content-addressable store
+    paths carry a “content-addressability assertion” that allow them
+    to be trusted without any signatures.</para>
+  </listitem>
+
+  <listitem>
+    <para><envar>NIX_PATH</envar> is now lazy, so URIs in the path are
+    only downloaded if they are needed for evaluation.</para>
+  </listitem>
+
+  <listitem>
+    <para>You can now use
+    <uri>channel:<replaceable>channel-name</replaceable></uri> as a
+    short-hand for
+    <uri>https://nixos.org/channels/<replaceable>channel-name</replaceable>/nixexprs.tar.xz</uri>. For
+    example, <literal>nix-build channel:nixos-15.09 -A hello</literal>
+    will build the GNU Hello package from the
+    <literal>nixos-15.09</literal> channel.</para>
+  </listitem>
+
+  <listitem>
+    <para>“Nested” log output was removed. As a result,
+    <command>nix-log2xml</command> was also removed.</para>
+  </listitem>
+
+  <listitem>
+    <para>When <option>--no-build-output</option> is given, the last
+    10 lines of the build log will be shown if a build
+    fails.</para>
+  </listitem>
+
+  <listitem>
+    <para><function>builtins.fetchgit</function>.
+    (38539b943a060d9cdfc24d6e5d997c0885b8aa2f)</para>
+  </listitem>
+
+  <listitem>
+    <para>Git repositories can now be specified in the Nix search
+    path,
+    e.g. <literal>nixpkgs=git://github.com/NixOS/nixpkgs</literal>.
+    (d8bf0d4859e28ddd23401fbe89f4e528aa09ddb3)</para>
+  </listitem>
+
+  <listitem>
+    <para>Removed OpenSSL-based signing. (f435f8247553656774dd1b2c88e9de5d59cab203)</para>
+  </listitem>
+
+  <listitem>
+    <para><literal>&lt;nix/fetchurl.nix&gt;</literal> now uses the
+    content-addressable tarball cache at
+    <uri>http://tarballs.nixos.org/</uri>, just like
+    <function>fetchurl</function> in
+    Nixpkgs. (f2682e6e18a76ecbfb8a12c17e3a0ca15c084197)</para>
+  </listitem>
+
+  <listitem>
+    <para>Chroot Nix stores: allow the “physical” location of the Nix
+    store (e.g. <filename>/home/alice/nix/store</filename>) to differ
+    from its “logical” location (typically
+    <filename>/nix/store</filename>). This allows non-root users to
+    use Nix while still getting the benefits from prebuilt binaries
+    from
+    <uri>cache.nixos.org</uri>. (4494000e04122f24558e1436e66d20d89028b4bd,
+    3eb621750848e0e6b30e5a79f76afbb096bb6c8a)</para>
+  </listitem>
+
+  <listitem>
+    <para>On Linux, builds are now executed in a user
+    namespace with uid 1000 and gid 100.</para>
+  </listitem>
+
+  <listitem>
+    <para><function>builtins.fetchurl</function> and
+    <function>builtins.fetchTarball</function> now support
+    <varname>sha256</varname> and <varname>name</varname>
+    attributes. Using these functions is now allowed in restricted
+    mode if a hash is supplied.</para>
+  </listitem>
+
+  <listitem>
+    <para><literal>HttpBinaryCacheStore</literal> (the replacement of
+    <command>download-from-binary-cache</command>) now retries
+    automatically on certain HTTP error codes.</para>
+  </listitem>
+
+  <listitem>
+    <para>Derivation attributes can now reference the outputs of the
+    derivation using the <function>placeholder</function> builtin
+    function. For example, the attribute
+
+<programlisting>
+configureFlags = "--prefix=${placeholder "out"} --includedir=${placeholder "dev"}";
+</programlisting>
+
+    will cause the <envar>configureFlags</envar> environment variable
+    to contain the actual store paths corresponding to the
+    <literal>out</literal> and <literal>dev</literal> outputs. TODO:
+    add docs.</para>
+  </listitem>
+
+  <listitem>
+    <para>Added builtin function
+    <varname>builtins.partition</varname>.</para>
+  </listitem>
+
+  <listitem>
+    <para>Support for HTTP/2. This makes binary cache lookups much
+    more efficient. (90ad02bf626b885a5dd8967894e2eafc953bdf92)</para>
+  </listitem>
+
+  <listitem>
+    <para>Caching of failed builds has been
+    removed. (8cffec84859cec8b610a2a22ab0c4d462a9351ff)</para>
+  </listitem>
+
+  <listitem>
+    <para>The <option>build-sandbox-paths</option> configuration
+    option can now specify optional paths by appending a
+    <literal>?</literal>, e.g. <literal>/dev/nvidiactl?</literal> will
+    bind-mount <varname>/dev/nvidiactl</varname> only if it
+    exists.</para>
+  </listitem>
+
+  <listitem>
+    <para>More support for testing build reproducibility: when
+    <option>enforce-determinism</option> is set to
+    <literal>false</literal>, it’s no longer a fatal error build
+    rounds produce different output
+    (8bdf83f936adae6f2c907a6d2541e80d4120f051); add a hook to run
+    diffoscope when build rounds produce different output
+    (9a313469a4bdea2d1e8df24d16289dc2a172a169w).</para>
+  </listitem>
+
+  <listitem>
+    <para>Kill builds as soon as stdout/stderr is closed. This fixes a
+    bug that allowed builds to hang Nix indefinitely (regardless of
+    timeouts). (21948deed99a3295e4d5666e027a6ca42dc00b40)</para>
+  </listitem>
+
+  <listitem>
+    <para>Add support for passing structured data to builders. TODO:
+    document. (6de33a9c675b187437a2e1abbcb290981a89ecb1)</para>
+  </listitem>
+
+  <listitem>
+    <para><varname>exportReferencesGraph</varname>: Export more
+    complete info in JSON
+    format. (c2b0d8749f7e77afc1c4b3e8dd36b7ee9720af4a)</para>
+  </listitem>
+
+  <listitem>
+    <para>Support for
+    netrc. (e6e74f987f0fa284d220432d426eb965269a97d6,
+    302386f775eea309679654e5ea7c972fb6e7b9af)</para>
+  </listitem>
+
+  <listitem>
+    <para>Support <uri>s3://</uri> URIs in all places where Nix allows
+    URIs. (9ff9c3f2f80ba4108e9c945bbfda2c64735f987b)</para>
+  </listitem>
+
+  <listitem>
+    <para>The <option>build-max-jobs</option> option can be set to
+    <literal>auto</literal> to use the number of CPUs in the
+    system. (7251d048fa812d2551b7003bc9f13a8f5d4c95a5)</para>
+  </listitem>
+
+  <listitem>
+    <para>Add support for Brotli compression.
+    <uri>cache.nixos.org</uri> compresses build logs using
+    Brotli.</para>
+  </listitem>
+
+  <listitem>
+    <para>Substitutions from binary caches now require signatures by
+    default. This was already the case on
+    NixOS. (ecbc3fedd3d5bdc5a0e1a0a51b29062f2874ac8b)</para>
+  </listitem>
+
+  <listitem>
+    <para><command>nix-env</command> now ignores packages with bad
+    derivation names (in particular those starting with a digit or
+    containing a
+    dot). (b0cb11722626e906a73f10dd9a0c9eea29faf43a)</para>
+  </listitem>
+
+  <listitem>
+    <para>Renamed various configuration options. (TODO: in progress)</para>
+  </listitem>
+
+  <listitem>
+    <para>Remote machines can now be specified on the command
+    line. TODO:
+    document. (1a68710d4dff609bbaf61db3e17a2573f0aadf17)</para>
+  </listitem>
+
+  <listitem>
+    <para>In Linux sandbox builds, we now use
+    <filename>/build</filename> instead of <filename>/tmp</filename>
+    as the temporary build directory. This fixes potential security
+    problems when a build accidentally stores its
+    <envar>TMPDIR</envar> in some critical place, such as an
+    RPATH. (eba840c8a13b465ace90172ff76a0db2899ab11b)</para>
+  </listitem>
+
+  <listitem>
+    <para>In Linux sandbox builds, we now provide a default
+    <filename>/bin/sh</filename> (namely <filename>ash</filename> from
+    BusyBox). (a2d92bb20e82a0957067ede60e91fab256948b41)</para>
+  </listitem>
+
+  <listitem>
+    <para>Make all configuration options available as command line
+    flags (b8283773bd64d7da6859ed520ee19867742a03ba).</para>
+  </listitem>
+
+  <listitem>
+    <para>Support base-64
+    hashes. (c0015e87af70f539f24d2aa2bc224a9d8b84276b)</para>
+  </listitem>
+
+  <listitem>
+    <para><command>nix-shell</command> now used
+    <varname>bashInteractive</varname> from Nixpkgs, rather than the
+    <command>bash</command> command that happens to be in the caller’s
+    <envar>PATH</envar>. This is especially important on macOS where
+    the <command>bash</command> provided by the system is seriously
+    outdated and cannot execute <literal>stdenv</literal>’s setup
+    script.</para>
+  </listitem>
+
 </itemizedlist>
 
 <para>This release has contributions from TBD.</para>
