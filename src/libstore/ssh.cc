@@ -2,6 +2,17 @@
 
 namespace nix {
 
+SSHMaster::SSHMaster(const std::string & host, const std::string & keyFile, bool useMaster, bool compress, int logFD)
+    : host(host)
+    , keyFile(keyFile)
+    , useMaster(useMaster)
+    , compress(compress)
+    , logFD(logFD)
+{
+    if (host == "" || hasPrefix(host, "-"))
+        throw Error("invalid SSH host name '%s'", host);
+}
+
 void SSHMaster::addCommonSSHOpts(Strings & args)
 {
     for (auto & i : tokenizeString<Strings>(getEnv("NIX_SSHOPTS")))
