@@ -12,10 +12,17 @@ struct CmdCopy : StorePathsCommand
 {
     std::string srcUri, dstUri;
 
+    CheckSigsFlag checkSigs = CheckSigs;
+
     CmdCopy()
     {
         mkFlag(0, "from", "store-uri", "URI of the source Nix store", &srcUri);
         mkFlag(0, "to", "store-uri", "URI of the destination Nix store", &dstUri);
+
+        mkFlag()
+            .longName("no-check-sigs")
+            .description("do not require that paths are signed by trusted keys")
+            .handler([&](Strings ss) { checkSigs = NoCheckSigs; });
     }
 
     std::string name() override
@@ -50,7 +57,8 @@ struct CmdCopy : StorePathsCommand
 
         ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
 
-        copyPaths(srcStore, dstStore, PathSet(storePaths.begin(), storePaths.end()));
+        copyPaths(srcStore, dstStore, PathSet(storePaths.begin(), storePaths.end()),
+            NoRepair, checkSigs);
     }
 };
 
