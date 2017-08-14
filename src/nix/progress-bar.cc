@@ -25,14 +25,6 @@ private:
         std::map<ActivityType, uint64_t> expectedByType;
     };
 
-    struct DownloadInfo
-    {
-        std::string uri;
-        uint64_t current = 0;
-        uint64_t expected = 0;
-        DownloadInfo(const std::string & uri) : uri(uri) { }
-    };
-
     struct CopyInfo
     {
         uint64_t expected = 0;
@@ -57,9 +49,6 @@ private:
         std::map<Activity::t, Path> substitutions;
         std::set<Activity::t> runningSubstitutions;
         uint64_t succeededSubstitutions = 0;
-
-        uint64_t downloadedBytes = 0; // finished downloads
-        std::map<Activity::t, DownloadInfo> downloads;
 
         std::map<Activity::t, CopyInfo> runningCopies;
 
@@ -155,10 +144,16 @@ public:
         if (!state.activities.empty()) {
             if (!status.empty()) line += " ";
             auto i = state.activities.rbegin();
-            line += i->s;
-            if (!i->s2.empty()) {
-                line += ": ";
-                line += i->s2;
+
+            while (i != state.activities.rend() && i->s.empty() && i->s2.empty())
+                ++i;
+
+            if (i != state.activities.rend()) {
+                line += i->s;
+                if (!i->s2.empty()) {
+                    line += ": ";
+                    line += i->s2;
+                }
             }
         }
 
@@ -172,9 +167,13 @@ public:
 
         std::string res;
 
-        if (state.failedBuilds) {
+        auto add = [&](const std::string & s) {
             if (!res.empty()) res += ", ";
-            res += fmt(ANSI_RED "%d failed" ANSI_NORMAL, state.failedBuilds);
+            res += s;
+        };
+
+        if (state.failedBuilds) {
+            add(fmt(ANSI_RED "%d failed" ANSI_NORMAL, state.failedBuilds));
         }
 
         if (!state.builds.empty() || state.succeededBuilds)
@@ -195,39 +194,31 @@ public:
                 state.succeededSubstitutions + state.substitutions.size());
         }
 
-        if (!state.downloads.empty() || state.downloadedBytes) {
-            if (!res.empty()) res += ", ";
-            uint64_t expected = state.downloadedBytes, current = state.downloadedBytes;
-            for (auto & i : state.downloads) {
-                expected += i.second.expected;
-                current += i.second.current;
-            }
-            res += fmt("%1$.0f/%2$.0f KiB", current / 1024.0, expected / 1024.0);
-        }
-
         if (!state.runningCopies.empty()) {
-            if (!res.empty()) res += ", ";
             uint64_t copied = 0, expected = 0;
             for (auto & i : state.runningCopies) {
                 copied += i.second.copied;
                 expected += i.second.expected - (i.second.done - i.second.copied);
             }
-            res += fmt("%d/%d copied", copied, expected);
+            add(fmt("%d/%d copied", copied, expected));
         }
 
-        auto & act = state.activitiesByType[actCopyPath];
-        uint64_t done = act.done, expected = act.done;
-        for (auto & j : act.its) {
-            done += j.second->done;
-            expected += j.second->expected;
-        }
+        auto showActivity = [&](ActivityType type, const std::string & f) {
+            auto & act = state.activitiesByType[type];
+            uint64_t done = act.done, expected = act.done;
+            for (auto & j : act.its) {
+                done += j.second->done;
+                expected += j.second->expected;
+            }
 
-        expected = std::max(expected, act.expected);
+            expected = std::max(expected, act.expected);
 
-        if (done || expected) {
-            if (!res.empty()) res += ", ";
-            res += fmt("%1$.1f/%2$.1f MiB copied", done / MiB, expected / MiB);
-        }
+            if (done || expected)
+                add(fmt(f, done / MiB, expected / MiB));
+        };
+
+        showActivity(actDownload, "%1$.1f/%2$.1f MiB DL");
+        showActivity(actCopyPath, "%1$.1f/%2$.1f MiB copied");
 
         return res;
     }
@@ -316,40 +307,6 @@ public:
             state->runningSubstitutions.erase(act);
             state->substitutions.erase(act);
             deleteActivity(*state, act);
-        }
-
-        if (ev.type == evDownloadCreated) {
-            Activity::t act = ev.getI(0);
-            std::string uri = ev.getS(1);
-            state->downloads.emplace(act, DownloadInfo{uri});
-            if (state->runningSubstitutions.empty()) // FIXME: hack
-                createActivity(*state, act, fmt("downloading " ANSI_BOLD "%s" ANSI_NORMAL "", uri));
-        }
-
-        if (ev.type == evDownloadProgress) {
-            Activity::t act = ev.getI(0);
-            auto i = state->downloads.find(act);
-            assert(i != state->downloads.end());
-            i->second.expected = ev.getI(1);
-            i->second.current = ev.getI(2);
-        }
-
-        if (ev.type == evDownloadSucceeded) {
-            Activity::t act = ev.getI(0);
-            auto i = state->downloads.find(act);
-            assert(i != state->downloads.end());
-            state->downloadedBytes += ev.getI(1);
-            state->downloads.erase(i);
-            deleteActivity(*state, act);
-        }
-
-        if (ev.type == evDownloadDestroyed) {
-            Activity::t act = ev.getI(0);
-            auto i = state->downloads.find(act);
-            if (i != state->downloads.end()) {
-                state->downloads.erase(i);
-                deleteActivity(*state, act);
-            }
         }
 
         if (ev.type == evCopyProgress) {

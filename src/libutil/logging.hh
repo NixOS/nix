@@ -16,6 +16,8 @@ typedef enum {
 typedef enum {
     actUnknown = 0,
     actCopyPath = 100,
+    actDownload = 101,
+    actRealise = 102,
 } ActivityType;
 
 class Activity
@@ -38,10 +40,6 @@ typedef enum {
     evBuildStarted = 1,
     evBuildOutput = 2,
     evBuildFinished = 3,
-    evDownloadCreated = 4,
-    evDownloadDestroyed = 5,
-    evDownloadProgress = 6,
-    evDownloadSucceeded = 7,
     evSubstitutionCreated = 8,
     evSubstitutionStarted = 9,
     evSubstitutionFinished = 10,

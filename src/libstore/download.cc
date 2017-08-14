@@ -83,12 +83,12 @@ struct CurlDownloader : public Downloader
         std::string encoding;
 
         DownloadItem(CurlDownloader & downloader, const DownloadRequest & request)
-            : downloader(downloader), request(request)
+            : downloader(downloader)
+            , request(request)
+            , act(actDownload, fmt("downloading '%s'", request.uri))
         {
             if (!request.expectedETag.empty())
                 requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + request.expectedETag).c_str());
-
-            logger->event(evDownloadCreated, act, request.uri);
         }
 
         ~DownloadItem()
@@ -105,7 +105,6 @@ struct CurlDownloader : public Downloader
             } catch (...) {
                 ignoreException();
             }
-            logger->event(evDownloadDestroyed, act);
         }
 
         template<class T>
@@ -168,7 +167,7 @@ struct CurlDownloader : public Downloader
 
         int progressCallback(double dltotal, double dlnow)
         {
-            logger->event(evDownloadProgress, act, dltotal, dlnow);
+            act.progress(dlnow, dltotal);
             return _isInterrupted;
         }
 
@@ -267,7 +266,7 @@ struct CurlDownloader : public Downloader
                 try {
                     result.data = decodeContent(encoding, ref<std::string>(result.data));
                     callSuccess(success, failure, const_cast<const DownloadResult &>(result));
-                    logger->event(evDownloadSucceeded, act, result.data->size());
+                    act.progress(result.data->size(), result.data->size());
                 } catch (...) {
                     done = true;
                     callFailure(failure, std::current_exception());

@@ -9,6 +9,7 @@
 #include "finally.hh"
 #include "compression.hh"
 #include "json.hh"
+#include "nar-info.hh"
 
 #include <algorithm>
 #include <iostream>
@@ -201,6 +202,16 @@ struct Child
 };
 
 
+template<typename T>
+struct MaintainCount
+{
+    T & counter;
+    T delta;
+    MaintainCount(T & counter, T delta) : counter(counter), delta(delta) { counter += delta; }
+    ~MaintainCount() { counter -= delta; }
+};
+
+
 /* The worker class. */
 class Worker
 {
@@ -244,6 +255,8 @@ private:
 
 public:
 
+    const Activity act;
+
     /* Set if at least one derivation had a BuildError (i.e. permanent
        failure). */
     bool permanentFailure;
@@ -254,6 +267,11 @@ public:
     LocalStore & store;
 
     std::unique_ptr<HookInstance> hook;
+
+    uint64_t expectedDownloadSize = 0;
+    uint64_t doneDownloadSize = 0;
+    uint64_t expectedNarSize = 0;
+    uint64_t doneNarSize = 0;
 
     Worker(LocalStore & store);
     ~Worker();
@@ -313,6 +331,12 @@ public:
     bool pathContentsGood(const Path & path);
 
     void markContentsGood(const Path & path);
+
+    void updateProgress()
+    {
+        logger->event(evSetExpected, act, actDownload, expectedDownloadSize + doneDownloadSize);
+        logger->event(evSetExpected, act, actCopyPath, expectedNarSize + doneNarSize);
+    }
 };
 
 
@@ -3304,6 +3328,8 @@ private:
        storePath when doing a repair. */
     Path destPath;
 
+    std::unique_ptr<MaintainCount<uint64_t>> maintainExpectedNar, maintainExpectedDownload;
+
     typedef void (SubstitutionGoal::*GoalState)();
     GoalState state;
 
@@ -3430,6 +3456,18 @@ void SubstitutionGoal::tryNext()
         return;
     }
 
+    /* Update the total expected download size. */
+    auto narInfo = std::dynamic_pointer_cast<const NarInfo>(info);
+
+    maintainExpectedNar = std::make_unique<MaintainCount<uint64_t>>(worker.expectedNarSize, narInfo->narSize);
+
+    maintainExpectedDownload =
+        narInfo && narInfo->fileSize
+        ? std::make_unique<MaintainCount<uint64_t>>(worker.expectedDownloadSize, narInfo->fileSize)
+        : nullptr;
+
+    worker.updateProgress();
+
     hasSubstitute = true;
 
     /* Bail out early if this substituter lacks a valid
@@ -3538,6 +3576,17 @@ void SubstitutionGoal::finished()
     printMsg(lvlChatty,
         format("substitution of path '%1%' succeeded") % storePath);
 
+    if (maintainExpectedDownload) {
+        auto fileSize = maintainExpectedDownload->delta;
+        maintainExpectedDownload.reset();
+        worker.doneDownloadSize += fileSize;
+    }
+
+    worker.doneNarSize += maintainExpectedNar->delta;
+    maintainExpectedNar.reset();
+
+    worker.updateProgress();
+
     amDone(ecSuccess);
 }
 
@@ -3560,7 +3609,8 @@ static bool working = false;
 
 
 Worker::Worker(LocalStore & store)
-    : store(store)
+    : act(actRealise)
+    , store(store)
 {
     /* Debugging: prevent recursive workers. */
     if (working) abort();
@@ -3581,6 +3631,9 @@ Worker::~Worker()
        are in trouble, since goals may call childTerminated() etc. in
        their destructors). */
     topGoals.clear();
+
+    assert(expectedDownloadSize == 0);
+    assert(expectedNarSize == 0);
 }
 
 

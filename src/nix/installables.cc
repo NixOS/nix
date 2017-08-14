@@ -229,7 +229,7 @@ std::vector<std::shared_ptr<Installable>> InstallablesCommand::parseInstallables
 
 PathSet InstallablesCommand::toStorePaths(ref<Store> store, ToStorePathsMode mode)
 {
-    if (mode != DryRun)
+    if (mode != Build)
         settings.readOnlyMode = true;
 
     PathSet outPaths, buildables;
