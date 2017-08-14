@@ -91,4 +91,9 @@ Activity::~Activity()
     logger->event(evStopActivity, id);
 }
 
+void Activity::progress(uint64_t done, uint64_t expected, uint64_t running, uint64_t failed) const
+{
+    logger->event(evProgress, id, done, expected, running, failed);
+}
+
 }

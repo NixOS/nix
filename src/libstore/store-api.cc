@@ -625,9 +625,10 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const PathSet & storePa
 
     std::atomic<size_t> nrDone{0};
     std::atomic<uint64_t> bytesExpected{0};
+    std::atomic<uint64_t> nrRunning{0};
 
     auto showProgress = [&]() {
-        act.progress(nrDone, missing.size());
+        act.progress(nrDone, missing.size(), nrRunning);
     };
 
     ThreadPool pool;
@@ -655,6 +656,8 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const PathSet & storePa
 
             if (!dstStore->isValidPath(storePath)) {
                 printInfo("copying '%s'...", storePath);
+                MaintainCount<decltype(nrRunning)> mc(nrRunning);
+                showProgress();
                 copyStorePath(srcStore, dstStore, storePath, repair, checkSigs);
             }
 

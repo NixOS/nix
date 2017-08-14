@@ -462,4 +462,18 @@ struct ReceiveInterrupts
     { }
 };
 
+
+
+/* A RAII helper that increments a counter on construction and
+   decrements it on destruction. */
+template<typename T>
+struct MaintainCount
+{
+    T & counter;
+    long delta;
+    MaintainCount(T & counter, long delta = 1) : counter(counter), delta(delta) { counter += delta; }
+    ~MaintainCount() { counter -= delta; }
+};
+
+
 }

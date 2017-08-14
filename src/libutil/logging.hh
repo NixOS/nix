@@ -32,8 +32,7 @@ public:
     Activity(ActivityType type, std::string msg = "");
     ~Activity();
 
-    template<typename... Args>
-    void progress(const Args & ... args) const;
+    void progress(uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) const;
 };
 
 typedef enum {
@@ -145,15 +144,5 @@ inline void warn(const std::string & fs, Args... args)
 void warnOnce(bool & haveWarned, const FormatOrString & fs);
 
 void writeToStderr(const string & s);
-
-template<typename... Args>
-void Activity::progress(const Args & ... args) const
-{
-    Event ev;
-    ev.type = evProgress;
-    ev.fields.emplace_back(id);
-    nop{(ev.fields.emplace_back(Event::Field(args)), 1)...};
-    logger->event(ev);
-}
 
 }

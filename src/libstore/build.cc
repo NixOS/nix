@@ -202,16 +202,6 @@ struct Child
 };
 
 
-template<typename T>
-struct MaintainCount
-{
-    T & counter;
-    T delta;
-    MaintainCount(T & counter, T delta = 1) : counter(counter), delta(delta) { counter += delta; }
-    ~MaintainCount() { counter -= delta; }
-};
-
-
 /* The worker class. */
 class Worker
 {
@@ -271,6 +261,7 @@ public:
 
     uint64_t expectedSubstitutions = 0;
     uint64_t doneSubstitutions = 0;
+    uint64_t runningSubstitutions = 0;
     uint64_t expectedDownloadSize = 0;
     uint64_t doneDownloadSize = 0;
     uint64_t expectedNarSize = 0;
@@ -337,7 +328,7 @@ public:
 
     void updateProgress()
     {
-        actSubstitutions.progress(doneSubstitutions, expectedSubstitutions + doneSubstitutions);
+        actSubstitutions.progress(doneSubstitutions, expectedSubstitutions + doneSubstitutions, runningSubstitutions);
         logger->event(evSetExpected, act, actDownload, expectedDownloadSize + doneDownloadSize);
         logger->event(evSetExpected, act, actCopyPath, expectedNarSize + doneNarSize);
     }
@@ -3333,7 +3324,7 @@ private:
     Path destPath;
 
     std::unique_ptr<MaintainCount<uint64_t>> maintainExpectedSubstitutions,
-        maintainExpectedNar, maintainExpectedDownload;
+        maintainRunningSubstitutions, maintainExpectedNar, maintainExpectedDownload;
 
     typedef void (SubstitutionGoal::*GoalState)();
     GoalState state;
@@ -3531,6 +3522,9 @@ void SubstitutionGoal::tryToRun()
 
     printInfo(format("fetching path '%1%'...") % storePath);
 
+    maintainRunningSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.runningSubstitutions);
+    worker.updateProgress();
+
     outPipe.create();
 
     promise = std::promise<void>();
@@ -3577,6 +3571,8 @@ void SubstitutionGoal::finished()
 
     printMsg(lvlChatty,
         format("substitution of path '%1%' succeeded") % storePath);
+
+    maintainRunningSubstitutions.reset();
 
     maintainExpectedSubstitutions.reset();
     worker.doneSubstitutions++;

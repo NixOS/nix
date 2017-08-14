@@ -70,6 +70,7 @@ template<typename... Args>
 inline std::string fmt(const std::string & fs, Args... args)
 {
     boost::format f(fs);
+    f.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
     nop{boost::io::detail::feed(f, args)...};
     return f.str();
 }

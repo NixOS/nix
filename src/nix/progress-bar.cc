@@ -22,6 +22,7 @@ private:
         ActivityType type = actUnknown;
         uint64_t done = 0;
         uint64_t expected = 0;
+        uint64_t running = 0;
         std::map<ActivityType, uint64_t> expectedByType;
     };
 
@@ -174,19 +175,20 @@ public:
 
         auto showActivity = [&](ActivityType type, const std::string & f, double unit) {
             auto & act = state.activitiesByType[type];
-            uint64_t done = act.done, expected = act.done;
+            uint64_t done = act.done, expected = act.done, running = 0;
             for (auto & j : act.its) {
                 done += j.second->done;
                 expected += j.second->expected;
+                running += j.second->running;
             }
 
             expected = std::max(expected, act.expected);
 
             if (done || expected)
-                add(fmt(f, done / unit, expected / unit));
+                add(fmt(f, done / unit, expected / unit, running));
         };
 
-        showActivity(actCopyPaths, ANSI_GREEN "%d" ANSI_NORMAL "/%d copied", 1);
+        showActivity(actCopyPaths, ANSI_BLUE "%3$d" ANSI_NORMAL "/" ANSI_GREEN "%1$d" ANSI_NORMAL "/%2$d copied", 1);
         showActivity(actDownload, "%1$.1f/%2$.1f MiB DL", MiB);
         showActivity(actCopyPath, "%1$.1f/%2$.1f MiB copied", MiB);
 
@@ -213,6 +215,7 @@ public:
             ActInfo & actInfo = *i->second;
             actInfo.done = ev.getI(1);
             actInfo.expected = ev.getI(2);
+            actInfo.running = ev.getI(3);
         }
 
         if (ev.type == evSetExpected) {
