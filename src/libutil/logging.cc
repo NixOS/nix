@@ -83,7 +83,7 @@ Activity::Activity() : id(nextId++) { };
 Activity::Activity(ActivityType type, std::string msg)
     : Activity()
 {
-    logger->event(evStartActivity, id, msg);
+    logger->event(evStartActivity, id, type, msg);
 }
 
 Activity::~Activity()

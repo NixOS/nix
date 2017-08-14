@@ -8,6 +8,8 @@
 
 #include <sys/ioctl.h>
 
+#include <iostream>
+
 namespace nix {
 
 class ProgressBar : public Logger
@@ -17,6 +19,10 @@ private:
     struct ActInfo
     {
         std::string s, s2;
+        ActivityType type = actUnknown;
+        uint64_t done = 0;
+        uint64_t expected = 0;
+        std::map<ActivityType, uint64_t> expectedByType;
     };
 
     struct DownloadInfo
@@ -32,6 +38,13 @@ private:
         uint64_t expected = 0;
         uint64_t copied = 0;
         uint64_t done = 0;
+    };
+
+    struct ActivitiesByType
+    {
+        std::map<Activity::t, std::list<ActInfo>::iterator> its;
+        uint64_t done = 0;
+        uint64_t expected = 0;
     };
 
     struct State
@@ -52,6 +65,8 @@ private:
 
         std::list<ActInfo> activities;
         std::map<Activity::t, std::list<ActInfo>::iterator> its;
+
+        std::map<ActivityType, ActivitiesByType> activitiesByType;
     };
 
     Sync<State> state_;
@@ -85,16 +100,25 @@ public:
         update(state);
     }
 
-    void createActivity(State & state, Activity::t activity, const std::string & s)
+    void createActivity(State & state, Activity::t activity, const std::string & s, ActivityType type = actUnknown)
     {
-        state.activities.emplace_back(ActInfo{s});
-        state.its.emplace(activity, std::prev(state.activities.end()));
+        state.activities.emplace_back(ActInfo{s, "", type});
+        auto i = std::prev(state.activities.end());
+        state.its.emplace(activity, i);
+        state.activitiesByType[type].its.emplace(activity, i);
     }
 
     void deleteActivity(State & state, Activity::t activity)
     {
         auto i = state.its.find(activity);
         if (i != state.its.end()) {
+            auto & act = state.activitiesByType[i->second->type];
+            act.done += i->second->done;
+
+            for (auto & j : i->second->expectedByType)
+                state.activitiesByType[j.first].expected -= j.second;
+
+            act.its.erase(activity);
             state.activities.erase(i->second);
             state.its.erase(i);
         }
@@ -144,6 +168,8 @@ public:
 
     std::string getStatus(State & state)
     {
+        auto MiB = 1024.0 * 1024.0;
+
         std::string res;
 
         if (state.failedBuilds) {
@@ -189,44 +215,70 @@ public:
             res += fmt("%d/%d copied", copied, expected);
         }
 
+        auto & act = state.activitiesByType[actCopyPath];
+        uint64_t done = act.done, expected = act.done;
+        for (auto & j : act.its) {
+            done += j.second->done;
+            expected += j.second->expected;
+        }
+
+        expected = std::max(expected, act.expected);
+
+        if (done || expected) {
+            if (!res.empty()) res += ", ";
+            res += fmt("%1$.1f/%2$.1f MiB copied", done / MiB, expected / MiB);
+        }
+
         return res;
     }
 
     void event(const Event & ev) override
     {
+        auto state(state_.lock());
+
         if (ev.type == evStartActivity) {
-            auto state(state_.lock());
             Activity::t act = ev.getI(0);
-            createActivity(*state, act, ev.getS(1));
-            update(*state);
+            createActivity(*state, act, ev.getS(2), (ActivityType) ev.getI(1));
         }
 
         if (ev.type == evStopActivity) {
-            auto state(state_.lock());
             Activity::t act = ev.getI(0);
             deleteActivity(*state, act);
-            update(*state);
+        }
+
+        if (ev.type == evProgress) {
+            auto i = state->its.find(ev.getI(0));
+            assert(i != state->its.end());
+            ActInfo & actInfo = *i->second;
+            actInfo.done = ev.getI(1);
+            actInfo.expected = ev.getI(2);
+        }
+
+        if (ev.type == evSetExpected) {
+            auto i = state->its.find(ev.getI(0));
+            assert(i != state->its.end());
+            ActInfo & actInfo = *i->second;
+            auto type = (ActivityType) ev.getI(1);
+            auto & j = actInfo.expectedByType[type];
+            state->activitiesByType[type].expected -= j;
+            j = ev.getI(2);
+            state->activitiesByType[type].expected += j;
         }
 
         if (ev.type == evBuildCreated) {
-            auto state(state_.lock());
             state->builds[ev.getI(0)] = ev.getS(1);
-            update(*state);
         }
 
         if (ev.type == evBuildStarted) {
-            auto state(state_.lock());
             Activity::t act = ev.getI(0);
             state->runningBuilds.insert(act);
             auto name = storePathToName(state->builds[act]);
             if (hasSuffix(name, ".drv"))
                 name.resize(name.size() - 4);
             createActivity(*state, act, fmt("building " ANSI_BOLD "%s" ANSI_NORMAL, name));
-            update(*state);
         }
 
         if (ev.type == evBuildFinished) {
-            auto state(state_.lock());
             Activity::t act = ev.getI(0);
             if (ev.getI(1)) {
                 if (state->runningBuilds.count(act))
@@ -236,34 +288,26 @@ public:
             state->runningBuilds.erase(act);
             state->builds.erase(act);
             deleteActivity(*state, act);
-            update(*state);
         }
 
         if (ev.type == evBuildOutput) {
-            auto state(state_.lock());
             Activity::t act = ev.getI(0);
             assert(state->runningBuilds.count(act));
             updateActivity(*state, act, ev.getS(1));
-            update(*state);
         }
 
         if (ev.type == evSubstitutionCreated) {
-            auto state(state_.lock());
             state->substitutions[ev.getI(0)] = ev.getS(1);
-            update(*state);
         }
 
         if (ev.type == evSubstitutionStarted) {
-            auto state(state_.lock());
             Activity::t act = ev.getI(0);
             state->runningSubstitutions.insert(act);
             auto name = storePathToName(state->substitutions[act]);
             createActivity(*state, act, fmt("fetching " ANSI_BOLD "%s" ANSI_NORMAL, name));
-            update(*state);
         }
 
         if (ev.type == evSubstitutionFinished) {
-            auto state(state_.lock());
             Activity::t act = ev.getI(0);
             if (ev.getI(1)) {
                 if (state->runningSubstitutions.count(act))
@@ -272,60 +316,51 @@ public:
             state->runningSubstitutions.erase(act);
             state->substitutions.erase(act);
             deleteActivity(*state, act);
-            update(*state);
         }
 
         if (ev.type == evDownloadCreated) {
-            auto state(state_.lock());
             Activity::t act = ev.getI(0);
             std::string uri = ev.getS(1);
             state->downloads.emplace(act, DownloadInfo{uri});
             if (state->runningSubstitutions.empty()) // FIXME: hack
                 createActivity(*state, act, fmt("downloading " ANSI_BOLD "%s" ANSI_NORMAL "", uri));
-            update(*state);
         }
 
         if (ev.type == evDownloadProgress) {
-            auto state(state_.lock());
             Activity::t act = ev.getI(0);
             auto i = state->downloads.find(act);
             assert(i != state->downloads.end());
             i->second.expected = ev.getI(1);
             i->second.current = ev.getI(2);
-            update(*state);
         }
 
         if (ev.type == evDownloadSucceeded) {
-            auto state(state_.lock());
             Activity::t act = ev.getI(0);
             auto i = state->downloads.find(act);
             assert(i != state->downloads.end());
             state->downloadedBytes += ev.getI(1);
             state->downloads.erase(i);
             deleteActivity(*state, act);
-            update(*state);
         }
 
         if (ev.type == evDownloadDestroyed) {
-            auto state(state_.lock());
             Activity::t act = ev.getI(0);
             auto i = state->downloads.find(act);
             if (i != state->downloads.end()) {
                 state->downloads.erase(i);
                 deleteActivity(*state, act);
-                update(*state);
             }
         }
 
         if (ev.type == evCopyProgress) {
-            auto state(state_.lock());
             Activity::t act = ev.getI(0);
             auto & i = state->runningCopies[act];
             i.expected = ev.getI(1);
             i.copied = ev.getI(2);
             i.done = ev.getI(3);
-            update(*state);
         }
+
+        update(*state);
     }
 };
 

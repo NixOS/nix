@@ -14,6 +14,7 @@ typedef enum {
 } Verbosity;
 
 typedef enum {
+    actUnknown = 0,
     actCopyPath = 100,
 } ActivityType;
 
@@ -28,7 +29,8 @@ public:
     Activity(ActivityType type, std::string msg = "");
     ~Activity();
 
-    //void progress(...);
+    template<typename... Args>
+    void progress(const Args & ... args);
 };
 
 typedef enum {
@@ -49,6 +51,8 @@ typedef enum {
 
     evStartActivity = 1000,
     evStopActivity = 1001,
+    evProgress = 1002,
+    evSetExpected = 1003,
 
 } EventType;
 
@@ -148,5 +152,15 @@ inline void warn(const std::string & fs, Args... args)
 void warnOnce(bool & haveWarned, const FormatOrString & fs);
 
 void writeToStderr(const string & s);
+
+template<typename... Args>
+void Activity::progress(const Args & ... args)
+{
+    Event ev;
+    ev.type = evProgress;
+    ev.fields.emplace_back(id);
+    nop{(ev.fields.emplace_back(Event::Field(args)), 1)...};
+    logger->event(ev);
+}
 
 }

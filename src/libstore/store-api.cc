@@ -569,9 +569,26 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
 
     auto info = srcStore->queryPathInfo(storePath);
 
-    //act->progress(0, info->size());
+    uint64_t total = 0;
 
-    StringSink sink;
+    auto progress = [&](size_t len) {
+        total += len;
+        act.progress(total, info->narSize);
+    };
+
+    struct MyStringSink : StringSink
+    {
+        typedef std::function<void(size_t)> Callback;
+        Callback callback;
+        MyStringSink(Callback callback) : callback(callback) { }
+        void operator () (const unsigned char * data, size_t len) override
+        {
+            StringSink::operator ()(data, len);
+            callback(len);
+        };
+    };
+
+    MyStringSink sink(progress);
     srcStore->narFromPath({storePath}, sink);
 
     if (!info->narHash && !checkSigs) {
@@ -604,12 +621,13 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const PathSet & storePa
     for (auto & path : storePaths)
         if (!valid.count(path)) missing.insert(path);
 
-    Activity act;
+    Activity act(actUnknown);
 
     logger->event(evCopyStarted, act);
 
     std::atomic<size_t> nrCopied{0};
     std::atomic<size_t> nrDone{storePaths.size() - missing.size()};
+    std::atomic<uint64_t> bytesExpected{0};
 
     auto showProgress = [&]() {
         logger->event(evCopyProgress, act, storePaths.size(), nrCopied, nrDone);
@@ -626,7 +644,13 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const PathSet & storePa
                 showProgress();
                 return PathSet();
             }
-            return srcStore->queryPathInfo(storePath)->references;
+
+            auto info = srcStore->queryPathInfo(storePath);
+
+            bytesExpected += info->narSize;
+            logger->event(evSetExpected, act, actCopyPath, bytesExpected);
+
+            return info->references;
         },
 
         [&](const Path & storePath) {
