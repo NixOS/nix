@@ -565,7 +565,11 @@ void Store::buildPaths(const PathSet & paths, BuildMode buildMode)
 void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     const Path & storePath, RepairFlag repair, CheckSigsFlag checkSigs)
 {
+    Activity act(actCopyPath, fmt("copying path '%s'", storePath));
+
     auto info = srcStore->queryPathInfo(storePath);
+
+    //act->progress(0, info->size());
 
     StringSink sink;
     srcStore->narFromPath({storePath}, sink);
@@ -600,13 +604,28 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const PathSet & storePa
     for (auto & path : storePaths)
         if (!valid.count(path)) missing.insert(path);
 
+    Activity act;
+
+    logger->event(evCopyStarted, act);
+
+    std::atomic<size_t> nrCopied{0};
+    std::atomic<size_t> nrDone{storePaths.size() - missing.size()};
+
+    auto showProgress = [&]() {
+        logger->event(evCopyProgress, act, storePaths.size(), nrCopied, nrDone);
+    };
+
     ThreadPool pool;
 
     processGraph<Path>(pool,
         PathSet(missing.begin(), missing.end()),
 
         [&](const Path & storePath) {
-            if (dstStore->isValidPath(storePath)) return PathSet();
+            if (dstStore->isValidPath(storePath)) {
+                nrDone++;
+                showProgress();
+                return PathSet();
+            }
             return srcStore->queryPathInfo(storePath)->references;
         },
 
@@ -616,7 +635,12 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const PathSet & storePa
             if (!dstStore->isValidPath(storePath)) {
                 printInfo("copying '%s'...", storePath);
                 copyStorePath(srcStore, dstStore, storePath, repair, checkSigs);
+                nrCopied++;
             }
+
+            nrDone++;
+
+            showProgress();
         });
 }
 

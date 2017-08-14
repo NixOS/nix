@@ -80,4 +80,15 @@ std::atomic<uint64_t> nextId{(uint64_t) getpid() << 32};
 
 Activity::Activity() : id(nextId++) { };
 
+Activity::Activity(ActivityType type, std::string msg)
+    : Activity()
+{
+    logger->event(evStartActivity, id, msg);
+}
+
+Activity::~Activity()
+{
+    logger->event(evStopActivity, id);
+}
+
 }

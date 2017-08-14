@@ -135,7 +135,6 @@ struct LegacySSHStore : public Store
 
         if (readInt(conn->from) != 1)
             throw Error("failed to add path '%s' to remote host '%s', info.path, host");
-
     }
 
     void narFromPath(const Path & path, Sink & sink) override

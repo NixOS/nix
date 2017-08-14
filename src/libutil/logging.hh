@@ -13,6 +13,10 @@ typedef enum {
     lvlVomit
 } Verbosity;
 
+typedef enum {
+    actCopyPath = 100,
+} ActivityType;
+
 class Activity
 {
 public:
@@ -21,6 +25,10 @@ public:
     Activity();
     Activity(const Activity & act) : id(act.id) { };
     Activity(uint64_t id) : id(id) { };
+    Activity(ActivityType type, std::string msg = "");
+    ~Activity();
+
+    //void progress(...);
 };
 
 typedef enum {
@@ -35,6 +43,13 @@ typedef enum {
     evSubstitutionCreated = 8,
     evSubstitutionStarted = 9,
     evSubstitutionFinished = 10,
+
+    evCopyStarted = 100,
+    evCopyProgress = 101,
+
+    evStartActivity = 1000,
+    evStopActivity = 1001,
+
 } EventType;
 
 struct Event

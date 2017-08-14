@@ -27,17 +27,29 @@ private:
         DownloadInfo(const std::string & uri) : uri(uri) { }
     };
 
+    struct CopyInfo
+    {
+        uint64_t expected = 0;
+        uint64_t copied = 0;
+        uint64_t done = 0;
+    };
+
     struct State
     {
         std::map<Activity::t, Path> builds;
         std::set<Activity::t> runningBuilds;
         uint64_t succeededBuilds = 0;
         uint64_t failedBuilds = 0;
+
         std::map<Activity::t, Path> substitutions;
         std::set<Activity::t> runningSubstitutions;
         uint64_t succeededSubstitutions = 0;
+
         uint64_t downloadedBytes = 0; // finished downloads
         std::map<Activity::t, DownloadInfo> downloads;
+
+        std::map<Activity::t, CopyInfo> runningCopies;
+
         std::list<ActInfo> activities;
         std::map<Activity::t, std::list<ActInfo>::iterator> its;
     };
@@ -167,11 +179,35 @@ public:
             res += fmt("%1$.0f/%2$.0f KiB", current / 1024.0, expected / 1024.0);
         }
 
+        if (!state.runningCopies.empty()) {
+            if (!res.empty()) res += ", ";
+            uint64_t copied = 0, expected = 0;
+            for (auto & i : state.runningCopies) {
+                copied += i.second.copied;
+                expected += i.second.expected - (i.second.done - i.second.copied);
+            }
+            res += fmt("%d/%d copied", copied, expected);
+        }
+
         return res;
     }
 
     void event(const Event & ev) override
     {
+        if (ev.type == evStartActivity) {
+            auto state(state_.lock());
+            Activity::t act = ev.getI(0);
+            createActivity(*state, act, ev.getS(1));
+            update(*state);
+        }
+
+        if (ev.type == evStopActivity) {
+            auto state(state_.lock());
+            Activity::t act = ev.getI(0);
+            deleteActivity(*state, act);
+            update(*state);
+        }
+
         if (ev.type == evBuildCreated) {
             auto state(state_.lock());
             state->builds[ev.getI(0)] = ev.getS(1);
@@ -279,6 +315,16 @@ public:
                 deleteActivity(*state, act);
                 update(*state);
             }
+        }
+
+        if (ev.type == evCopyProgress) {
+            auto state(state_.lock());
+            Activity::t act = ev.getI(0);
+            auto & i = state->runningCopies[act];
+            i.expected = ev.getI(1);
+            i.copied = ev.getI(2);
+            i.done = ev.getI(3);
+            update(*state);
         }
     }
 };

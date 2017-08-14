@@ -56,6 +56,8 @@ static void dumpContents(const Path & path, size_t size,
 
 static void dump(const Path & path, Sink & sink, PathFilter & filter)
 {
+    checkInterrupt();
+
     struct stat st;
     if (lstat(path.c_str(), &st))
         throw SysError(format("getting attributes of path '%1%'") % path);
