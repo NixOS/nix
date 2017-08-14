@@ -25,13 +25,6 @@ private:
         std::map<ActivityType, uint64_t> expectedByType;
     };
 
-    struct CopyInfo
-    {
-        uint64_t expected = 0;
-        uint64_t copied = 0;
-        uint64_t done = 0;
-    };
-
     struct ActivitiesByType
     {
         std::map<Activity::t, std::list<ActInfo>::iterator> its;
@@ -45,12 +38,6 @@ private:
         std::set<Activity::t> runningBuilds;
         uint64_t succeededBuilds = 0;
         uint64_t failedBuilds = 0;
-
-        std::map<Activity::t, Path> substitutions;
-        std::set<Activity::t> runningSubstitutions;
-        uint64_t succeededSubstitutions = 0;
-
-        std::map<Activity::t, CopyInfo> runningCopies;
 
         std::list<ActInfo> activities;
         std::map<Activity::t, std::list<ActInfo>::iterator> its;
@@ -185,25 +172,7 @@ public:
                 state.succeededBuilds, state.succeededBuilds + state.builds.size());
         }
 
-        if (!state.substitutions.empty() || state.succeededSubstitutions) {
-            if (!res.empty()) res += ", ";
-            if (!state.runningSubstitutions.empty())
-                res += fmt(ANSI_BLUE "%d" "/" ANSI_NORMAL, state.runningSubstitutions.size());
-            res += fmt(ANSI_GREEN "%d/%d fetched" ANSI_NORMAL,
-                state.succeededSubstitutions,
-                state.succeededSubstitutions + state.substitutions.size());
-        }
-
-        if (!state.runningCopies.empty()) {
-            uint64_t copied = 0, expected = 0;
-            for (auto & i : state.runningCopies) {
-                copied += i.second.copied;
-                expected += i.second.expected - (i.second.done - i.second.copied);
-            }
-            add(fmt("%d/%d copied", copied, expected));
-        }
-
-        auto showActivity = [&](ActivityType type, const std::string & f) {
+        auto showActivity = [&](ActivityType type, const std::string & f, double unit) {
             auto & act = state.activitiesByType[type];
             uint64_t done = act.done, expected = act.done;
             for (auto & j : act.its) {
@@ -214,11 +183,12 @@ public:
             expected = std::max(expected, act.expected);
 
             if (done || expected)
-                add(fmt(f, done / MiB, expected / MiB));
+                add(fmt(f, done / unit, expected / unit));
         };
 
-        showActivity(actDownload, "%1$.1f/%2$.1f MiB DL");
-        showActivity(actCopyPath, "%1$.1f/%2$.1f MiB copied");
+        showActivity(actCopyPaths, ANSI_GREEN "%d" ANSI_NORMAL "/%d copied", 1);
+        showActivity(actDownload, "%1$.1f/%2$.1f MiB DL", MiB);
+        showActivity(actCopyPath, "%1$.1f/%2$.1f MiB copied", MiB);
 
         return res;
     }
@@ -285,36 +255,6 @@ public:
             Activity::t act = ev.getI(0);
             assert(state->runningBuilds.count(act));
             updateActivity(*state, act, ev.getS(1));
-        }
-
-        if (ev.type == evSubstitutionCreated) {
-            state->substitutions[ev.getI(0)] = ev.getS(1);
-        }
-
-        if (ev.type == evSubstitutionStarted) {
-            Activity::t act = ev.getI(0);
-            state->runningSubstitutions.insert(act);
-            auto name = storePathToName(state->substitutions[act]);
-            createActivity(*state, act, fmt("fetching " ANSI_BOLD "%s" ANSI_NORMAL, name));
-        }
-
-        if (ev.type == evSubstitutionFinished) {
-            Activity::t act = ev.getI(0);
-            if (ev.getI(1)) {
-                if (state->runningSubstitutions.count(act))
-                    state->succeededSubstitutions++;
-            }
-            state->runningSubstitutions.erase(act);
-            state->substitutions.erase(act);
-            deleteActivity(*state, act);
-        }
-
-        if (ev.type == evCopyProgress) {
-            Activity::t act = ev.getI(0);
-            auto & i = state->runningCopies[act];
-            i.expected = ev.getI(1);
-            i.copied = ev.getI(2);
-            i.done = ev.getI(3);
         }
 
         update(*state);

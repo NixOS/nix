@@ -18,6 +18,7 @@ typedef enum {
     actCopyPath = 100,
     actDownload = 101,
     actRealise = 102,
+    actCopyPaths = 103,
 } ActivityType;
 
 class Activity
@@ -32,7 +33,7 @@ public:
     ~Activity();
 
     template<typename... Args>
-    void progress(const Args & ... args);
+    void progress(const Args & ... args) const;
 };
 
 typedef enum {
@@ -40,12 +41,6 @@ typedef enum {
     evBuildStarted = 1,
     evBuildOutput = 2,
     evBuildFinished = 3,
-    evSubstitutionCreated = 8,
-    evSubstitutionStarted = 9,
-    evSubstitutionFinished = 10,
-
-    evCopyStarted = 100,
-    evCopyProgress = 101,
 
     evStartActivity = 1000,
     evStopActivity = 1001,
@@ -152,7 +147,7 @@ void warnOnce(bool & haveWarned, const FormatOrString & fs);
 void writeToStderr(const string & s);
 
 template<typename... Args>
-void Activity::progress(const Args & ... args)
+void Activity::progress(const Args & ... args) const
 {
     Event ev;
     ev.type = evProgress;

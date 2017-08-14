@@ -207,7 +207,7 @@ struct MaintainCount
 {
     T & counter;
     T delta;
-    MaintainCount(T & counter, T delta) : counter(counter), delta(delta) { counter += delta; }
+    MaintainCount(T & counter, T delta = 1) : counter(counter), delta(delta) { counter += delta; }
     ~MaintainCount() { counter -= delta; }
 };
 
@@ -256,6 +256,7 @@ private:
 public:
 
     const Activity act;
+    const Activity actSubstitutions;
 
     /* Set if at least one derivation had a BuildError (i.e. permanent
        failure). */
@@ -268,6 +269,8 @@ public:
 
     std::unique_ptr<HookInstance> hook;
 
+    uint64_t expectedSubstitutions = 0;
+    uint64_t doneSubstitutions = 0;
     uint64_t expectedDownloadSize = 0;
     uint64_t doneDownloadSize = 0;
     uint64_t expectedNarSize = 0;
@@ -334,6 +337,7 @@ public:
 
     void updateProgress()
     {
+        actSubstitutions.progress(doneSubstitutions, expectedSubstitutions + doneSubstitutions);
         logger->event(evSetExpected, act, actDownload, expectedDownloadSize + doneDownloadSize);
         logger->event(evSetExpected, act, actCopyPath, expectedNarSize + doneNarSize);
     }
@@ -3328,7 +3332,8 @@ private:
        storePath when doing a repair. */
     Path destPath;
 
-    std::unique_ptr<MaintainCount<uint64_t>> maintainExpectedNar, maintainExpectedDownload;
+    std::unique_ptr<MaintainCount<uint64_t>> maintainExpectedSubstitutions,
+        maintainExpectedNar, maintainExpectedDownload;
 
     typedef void (SubstitutionGoal::*GoalState)();
     GoalState state;
@@ -3364,7 +3369,6 @@ public:
 
     void amDone(ExitCode result) override
     {
-        logger->event(evSubstitutionFinished, act, result == ecSuccess);
         Goal::amDone(result);
     }
 };
@@ -3379,7 +3383,7 @@ SubstitutionGoal::SubstitutionGoal(const Path & storePath, Worker & worker, Repa
     state = &SubstitutionGoal::init;
     name = (format("substitution of '%1%'") % storePath).str();
     trace("created");
-    logger->event(evSubstitutionCreated, act, storePath);
+    maintainExpectedSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.expectedSubstitutions);
 }
 
 
@@ -3527,8 +3531,6 @@ void SubstitutionGoal::tryToRun()
 
     printInfo(format("fetching path '%1%'...") % storePath);
 
-    logger->event(evSubstitutionStarted, act);
-
     outPipe.create();
 
     promise = std::promise<void>();
@@ -3576,6 +3578,9 @@ void SubstitutionGoal::finished()
     printMsg(lvlChatty,
         format("substitution of path '%1%' succeeded") % storePath);
 
+    maintainExpectedSubstitutions.reset();
+    worker.doneSubstitutions++;
+
     if (maintainExpectedDownload) {
         auto fileSize = maintainExpectedDownload->delta;
         maintainExpectedDownload.reset();
@@ -3610,6 +3615,7 @@ static bool working = false;
 
 Worker::Worker(LocalStore & store)
     : act(actRealise)
+    , actSubstitutions(actCopyPaths)
     , store(store)
 {
     /* Debugging: prevent recursive workers. */
@@ -3632,6 +3638,7 @@ Worker::~Worker()
        their destructors). */
     topGoals.clear();
 
+    assert(expectedSubstitutions == 0);
     assert(expectedDownloadSize == 0);
     assert(expectedNarSize == 0);
 }

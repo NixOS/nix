@@ -621,16 +621,13 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const PathSet & storePa
     for (auto & path : storePaths)
         if (!valid.count(path)) missing.insert(path);
 
-    Activity act(actUnknown);
+    Activity act(actCopyPaths, fmt("copying %d paths", missing.size()));
 
-    logger->event(evCopyStarted, act);
-
-    std::atomic<size_t> nrCopied{0};
-    std::atomic<size_t> nrDone{storePaths.size() - missing.size()};
+    std::atomic<size_t> nrDone{0};
     std::atomic<uint64_t> bytesExpected{0};
 
     auto showProgress = [&]() {
-        logger->event(evCopyProgress, act, storePaths.size(), nrCopied, nrDone);
+        act.progress(nrDone, missing.size());
     };
 
     ThreadPool pool;
@@ -659,11 +656,9 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const PathSet & storePa
             if (!dstStore->isValidPath(storePath)) {
                 printInfo("copying '%s'...", storePath);
                 copyStorePath(srcStore, dstStore, storePath, repair, checkSigs);
-                nrCopied++;
             }
 
             nrDone++;
-
             showProgress();
         });
 }
