@@ -19,6 +19,8 @@ typedef enum {
     actDownload = 101,
     actRealise = 102,
     actCopyPaths = 103,
+    actBuilds = 104,
+    actBuild = 105,
 } ActivityType;
 
 class Activity
@@ -36,10 +38,7 @@ public:
 };
 
 typedef enum {
-    evBuildCreated = 0,
-    evBuildStarted = 1,
     evBuildOutput = 2,
-    evBuildFinished = 3,
 
     evStartActivity = 1000,
     evStopActivity = 1001,

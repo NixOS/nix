@@ -122,8 +122,6 @@ protected:
     /* Whether the goal is finished. */
     ExitCode exitCode;
 
-    Activity act;
-
     Goal(Worker & worker) : worker(worker)
     {
         nrFailed = nrNoSubstituters = nrIncompleteClosure = 0;
@@ -246,6 +244,7 @@ private:
 public:
 
     const Activity act;
+    const Activity actDerivations;
     const Activity actSubstitutions;
 
     /* Set if at least one derivation had a BuildError (i.e. permanent
@@ -259,8 +258,14 @@ public:
 
     std::unique_ptr<HookInstance> hook;
 
+    uint64_t expectedBuilds = 0;
+    uint64_t doneBuilds = 0;
+    uint64_t failedBuilds = 0;
+    uint64_t runningBuilds = 0;
+
     uint64_t expectedSubstitutions = 0;
     uint64_t doneSubstitutions = 0;
+    uint64_t failedSubstitutions = 0;
     uint64_t runningSubstitutions = 0;
     uint64_t expectedDownloadSize = 0;
     uint64_t doneDownloadSize = 0;
@@ -328,7 +333,8 @@ public:
 
     void updateProgress()
     {
-        actSubstitutions.progress(doneSubstitutions, expectedSubstitutions + doneSubstitutions, runningSubstitutions);
+        actDerivations.progress(doneBuilds, expectedBuilds + doneBuilds, runningBuilds, failedBuilds);
+        actSubstitutions.progress(doneSubstitutions, expectedSubstitutions + doneSubstitutions, runningSubstitutions, failedSubstitutions);
         logger->event(evSetExpected, act, actDownload, expectedDownloadSize + doneDownloadSize);
         logger->event(evSetExpected, act, actCopyPath, expectedNarSize + doneNarSize);
     }
@@ -829,6 +835,10 @@ private:
 
     const static Path homeDir;
 
+    std::unique_ptr<MaintainCount<uint64_t>> mcExpectedBuilds, mcRunningBuilds;
+
+    std::unique_ptr<Activity> act;
+
 public:
     DerivationGoal(const Path & drvPath, const StringSet & wantedOutputs,
         Worker & worker, BuildMode buildMode = bmNormal);
@@ -926,7 +936,6 @@ private:
 
     void amDone(ExitCode result) override
     {
-        logger->event(evBuildFinished, act, result == ecSuccess);
         Goal::amDone(result);
     }
 
@@ -949,7 +958,8 @@ DerivationGoal::DerivationGoal(const Path & drvPath, const StringSet & wantedOut
     name = (format("building of '%1%'") % drvPath).str();
     trace("created");
 
-    logger->event(evBuildCreated, act, drvPath);
+    mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);
+    worker.updateProgress();
 }
 
 
@@ -965,7 +975,8 @@ DerivationGoal::DerivationGoal(const Path & drvPath, const BasicDerivation & drv
     name = (format("building of %1%") % showPaths(drv.outputPaths())).str();
     trace("created");
 
-    logger->event(evBuildCreated, act, drvPath);
+    mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);
+    worker.updateProgress();
 
     /* Prevent the .chroot directory from being
        garbage-collected. (See isActiveTempFile() in gc.cc.) */
@@ -1374,6 +1385,12 @@ void DerivationGoal::tryToBuild()
        supported for local builds. */
     bool buildLocally = buildMode != bmNormal || drv->willBuildLocally();
 
+    auto started = [&]() {
+        act = std::make_unique<Activity>(actBuild, fmt("building '%s'", drvPath));
+        mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
+        worker.updateProgress();
+    };
+
     /* Is the build hook willing to accept this job? */
     if (!buildLocally) {
         switch (tryBuildHook()) {
@@ -1382,6 +1399,7 @@ void DerivationGoal::tryToBuild()
                    EOF from the hook. */
                 result.startTime = time(0); // inexact
                 state = &DerivationGoal::buildDone;
+                started();
                 return;
             case rpPostpone:
                 /* Not now; wait until at least one child finishes or
@@ -1422,6 +1440,8 @@ void DerivationGoal::tryToBuild()
     /* This state will be reached when we get EOF on the child's
        log pipe. */
     state = &DerivationGoal::buildDone;
+
+    started();
 }
 
 
@@ -2147,8 +2167,6 @@ void DerivationGoal::startBuilder()
         }
         debug(msg);
     }
-
-    logger->event(evBuildStarted, act);
 }
 
 
@@ -3239,7 +3257,7 @@ void DerivationGoal::flushLine()
         logTail.push_back(currentLogLine);
         if (logTail.size() > settings.logLines) logTail.pop_front();
     }
-    logger->event(evBuildOutput, act, currentLogLine);
+    logger->event(evBuildOutput, *act, currentLogLine);
     currentLogLine = "";
     currentLogLinePos = 0;
 }
@@ -3282,6 +3300,19 @@ void DerivationGoal::done(BuildResult::Status status, const string & msg)
         worker.timedOut = true;
     if (result.status == BuildResult::PermanentFailure)
         worker.permanentFailure = true;
+
+    mcExpectedBuilds.reset();
+    mcRunningBuilds.reset();
+
+    if (result.success()) {
+        if (status == BuildResult::Built)
+            worker.doneBuilds++;
+    } else {
+        if (status != BuildResult::DependencyFailed)
+            worker.failedBuilds++;
+    }
+
+    worker.updateProgress();
 }
 
 
@@ -3432,6 +3463,12 @@ void SubstitutionGoal::tryNext()
            In that case the calling derivation should just do a
            build. */
         amDone(hasSubstitute ? ecFailed : ecNoSubstituters);
+
+        if (hasSubstitute) {
+            worker.failedSubstitutions++;
+            worker.updateProgress();
+        }
+
         return;
     }
 
@@ -3611,6 +3648,7 @@ static bool working = false;
 
 Worker::Worker(LocalStore & store)
     : act(actRealise)
+    , actDerivations(actBuilds)
     , actSubstitutions(actCopyPaths)
     , store(store)
 {

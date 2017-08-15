@@ -23,6 +23,7 @@ private:
         uint64_t done = 0;
         uint64_t expected = 0;
         uint64_t running = 0;
+        uint64_t failed = 0;
         std::map<ActivityType, uint64_t> expectedByType;
     };
 
@@ -31,15 +32,11 @@ private:
         std::map<Activity::t, std::list<ActInfo>::iterator> its;
         uint64_t done = 0;
         uint64_t expected = 0;
+        uint64_t failed = 0;
     };
 
     struct State
     {
-        std::map<Activity::t, Path> builds;
-        std::set<Activity::t> runningBuilds;
-        uint64_t succeededBuilds = 0;
-        uint64_t failedBuilds = 0;
-
         std::list<ActInfo> activities;
         std::map<Activity::t, std::list<ActInfo>::iterator> its;
 
@@ -62,7 +59,10 @@ public:
     ~ProgressBar()
     {
         auto state(state_.lock());
+        std::string status = getStatus(*state);
         writeToStderr("\r\e[K");
+        if (status != "")
+            writeToStderr("[" + status + "]\n");
     }
 
     void log(Verbosity lvl, const FormatOrString & fs) override
@@ -91,6 +91,7 @@ public:
         if (i != state.its.end()) {
             auto & act = state.activitiesByType[i->second->type];
             act.done += i->second->done;
+            act.failed += i->second->failed;
 
             for (auto & j : i->second->expectedByType)
                 state.activitiesByType[j.first].expected -= j.second;
@@ -139,7 +140,7 @@ public:
             if (i != state.activities.rend()) {
                 line += i->s;
                 if (!i->s2.empty()) {
-                    line += ": ";
+                    if (!i->s.empty()) line += ": ";
                     line += i->s2;
                 }
             }
@@ -155,42 +156,57 @@ public:
 
         std::string res;
 
-        auto add = [&](const std::string & s) {
-            if (!res.empty()) res += ", ";
-            res += s;
-        };
-
-        if (state.failedBuilds) {
-            add(fmt(ANSI_RED "%d failed" ANSI_NORMAL, state.failedBuilds));
-        }
-
-        if (!state.builds.empty() || state.succeededBuilds)
-        {
-            if (!res.empty()) res += ", ";
-            if (!state.runningBuilds.empty())
-                res += fmt(ANSI_BLUE "%d" "/" ANSI_NORMAL, state.runningBuilds.size());
-            res += fmt(ANSI_GREEN "%d/%d built" ANSI_NORMAL,
-                state.succeededBuilds, state.succeededBuilds + state.builds.size());
-        }
-
-        auto showActivity = [&](ActivityType type, const std::string & f, double unit) {
+        auto renderActivity = [&](ActivityType type, const std::string & itemFmt, const std::string & numberFmt, double unit) {
             auto & act = state.activitiesByType[type];
-            uint64_t done = act.done, expected = act.done, running = 0;
+            uint64_t done = act.done, expected = act.done, running = 0, failed = act.failed;
             for (auto & j : act.its) {
                 done += j.second->done;
                 expected += j.second->expected;
                 running += j.second->running;
+                failed += j.second->failed;
             }
 
             expected = std::max(expected, act.expected);
 
-            if (done || expected)
-                add(fmt(f, done / unit, expected / unit, running));
+            std::string s;
+
+            if (running || done || expected || failed) {
+                if (running)
+                    s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
+                        running / unit, done / unit, expected / unit);
+                else if (expected != done)
+                    s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
+                        done / unit, expected / unit);
+                else
+                    s = fmt(done ? ANSI_GREEN + numberFmt + ANSI_NORMAL : numberFmt, done / unit);
+                s = fmt(itemFmt, s);
+
+                if (failed)
+                    s += fmt(" (" ANSI_RED "%d failed" ANSI_NORMAL ")", failed / unit);
+            }
+
+            return s;
         };
 
-        showActivity(actCopyPaths, ANSI_BLUE "%3$d" ANSI_NORMAL "/" ANSI_GREEN "%1$d" ANSI_NORMAL "/%2$d copied", 1);
-        showActivity(actDownload, "%1$.1f/%2$.1f MiB DL", MiB);
-        showActivity(actCopyPath, "%1$.1f/%2$.1f MiB copied", MiB);
+        auto showActivity = [&](ActivityType type, const std::string & itemFmt, const std::string & numberFmt, double unit) {
+            auto s = renderActivity(type, itemFmt, numberFmt, unit);
+            if (s.empty()) return;
+            if (!res.empty()) res += ", ";
+            res += s;
+        };
+
+        showActivity(actBuilds, "%s built", "%d", 1);
+
+        auto s1 = renderActivity(actCopyPaths, "%s copied", "%d", 1);
+        auto s2 = renderActivity(actCopyPath, "%s MiB", "%.1f", MiB);
+
+        if (!s1.empty() || !s2.empty()) {
+            if (!res.empty()) res += ", ";
+            if (s1.empty()) res += "0 copied"; else res += s1;
+            if (!s2.empty()) { res += " ("; res += s2; res += ')'; }
+        }
+
+        showActivity(actDownload, "%s MiB DL", "%.1f", MiB);
 
         return res;
     }
@@ -216,6 +232,7 @@ public:
             actInfo.done = ev.getI(1);
             actInfo.expected = ev.getI(2);
             actInfo.running = ev.getI(3);
+            actInfo.failed = ev.getI(4);
         }
 
         if (ev.type == evSetExpected) {
@@ -229,35 +246,11 @@ public:
             state->activitiesByType[type].expected += j;
         }
 
-        if (ev.type == evBuildCreated) {
-            state->builds[ev.getI(0)] = ev.getS(1);
-        }
-
-        if (ev.type == evBuildStarted) {
-            Activity::t act = ev.getI(0);
-            state->runningBuilds.insert(act);
-            auto name = storePathToName(state->builds[act]);
-            if (hasSuffix(name, ".drv"))
-                name.resize(name.size() - 4);
-            createActivity(*state, act, fmt("building " ANSI_BOLD "%s" ANSI_NORMAL, name));
-        }
-
-        if (ev.type == evBuildFinished) {
-            Activity::t act = ev.getI(0);
-            if (ev.getI(1)) {
-                if (state->runningBuilds.count(act))
-                    state->succeededBuilds++;
-            } else
-                state->failedBuilds++;
-            state->runningBuilds.erase(act);
-            state->builds.erase(act);
-            deleteActivity(*state, act);
-        }
-
         if (ev.type == evBuildOutput) {
             Activity::t act = ev.getI(0);
-            assert(state->runningBuilds.count(act));
-            updateActivity(*state, act, ev.getS(1));
+            auto s = trim(ev.getS(1));
+            if (!s.empty())
+                updateActivity(*state, act, s);
         }
 
         update(*state);
