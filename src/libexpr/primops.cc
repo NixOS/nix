@@ -1745,6 +1745,73 @@ static void prim_match(EvalState & state, const Pos & pos, Value * * args, Value
 }
 
 
+/* Split a string with a regular expression, and return a list of the
+   non-matching parts interleaved by the lists of the matching groups. */
+static void prim_split(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    auto re = state.forceStringNoCtx(*args[0], pos);
+
+    try {
+
+        std::regex regex(re, std::regex::extended);
+
+        PathSet context;
+        const std::string str = state.forceString(*args[1], context, pos);
+
+        auto begin = std::sregex_iterator(str.begin(), str.end(), regex);
+        auto end = std::sregex_iterator();
+
+        // Any matches results are surrounded by non-matching results.
+        const size_t len = std::distance(begin, end);
+        state.mkList(v, 2 * len + 1);
+        size_t idx = 0;
+        Value * elem;
+
+        if (len == 0) {
+            v.listElems()[idx++] = args[1];
+            return;
+        }
+
+        for (std::sregex_iterator i = begin; i != end; ++i) {
+            assert(idx <= 2 * len + 1 - 3);
+            std::smatch match = *i;
+
+            // Add a string for non-matched characters.
+            elem = v.listElems()[idx++] = state.allocValue();
+            mkString(*elem, match.prefix().str().c_str());
+
+            // Add a list for matched substrings.
+            const size_t slen = match.size() - 1;
+            elem = v.listElems()[idx++] = state.allocValue();
+
+            // Start at 1, beacause the first match is the whole string.
+            state.mkList(*elem, slen);
+            for (size_t si = 0; si < slen; ++si) {
+                if (!match[si + 1].matched)
+                    mkNull(*(elem->listElems()[si] = state.allocValue()));
+                else
+                    mkString(*(elem->listElems()[si] = state.allocValue()), match[si + 1].str().c_str());
+            }
+
+            // Add a string for non-matched suffix characters.
+            if (idx == 2 * len) {
+                elem = v.listElems()[idx++] = state.allocValue();
+                mkString(*elem, match.suffix().str().c_str());
+            }
+        }
+        assert(idx == 2 * len + 1);
+
+    } catch (std::regex_error &e) {
+        if (e.code() == std::regex_constants::error_space) {
+          // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
+          throw EvalError("memory limit exceeded by regular expression '%s', at %s", re, pos);
+        } else {
+          throw EvalError("invalid regular expression '%s', at %s", re, pos);
+        }
+    }
+}
+
+
 static void prim_concatStringSep(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
@@ -2039,6 +2106,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__unsafeDiscardOutputDependency", 1, prim_unsafeDiscardOutputDependency);
     addPrimOp("__hashString", 2, prim_hashString);
     addPrimOp("__match", 2, prim_match);
+    addPrimOp("__split", 2, prim_split);
     addPrimOp("__concatStringsSep", 2, prim_concatStringSep);
     addPrimOp("__replaceStrings", 3, prim_replaceStrings);
 
