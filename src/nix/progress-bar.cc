@@ -29,7 +29,7 @@ private:
 
     struct ActivitiesByType
     {
-        std::map<Activity::t, std::list<ActInfo>::iterator> its;
+        std::map<ActivityId, std::list<ActInfo>::iterator> its;
         uint64_t done = 0;
         uint64_t expected = 0;
         uint64_t failed = 0;
@@ -38,7 +38,7 @@ private:
     struct State
     {
         std::list<ActInfo> activities;
-        std::map<Activity::t, std::list<ActInfo>::iterator> its;
+        std::map<ActivityId, std::list<ActInfo>::iterator> its;
 
         std::map<ActivityType, ActivitiesByType> activitiesByType;
     };
@@ -77,7 +77,61 @@ public:
         update(state);
     }
 
-    void createActivity(State & state, Activity::t activity, const std::string & s, ActivityType type = actUnknown)
+    void startActivity(ActivityId act, ActivityType type, const std::string & s) override
+    {
+        auto state(state_.lock());
+        createActivity(*state, act, s, type);
+        update(*state);
+    }
+
+    void stopActivity(ActivityId act) override
+    {
+        auto state(state_.lock());
+        deleteActivity(*state, act);
+        update(*state);
+    }
+
+    void progress(ActivityId act, uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) override
+    {
+        auto state(state_.lock());
+
+        auto i = state->its.find(act);
+        assert(i != state->its.end());
+        ActInfo & actInfo = *i->second;
+        actInfo.done = done;
+        actInfo.expected = expected;
+        actInfo.running = running;
+        actInfo.failed = failed;
+
+        update(*state);
+    }
+
+    void progress(ActivityId act, const std::string & s) override
+    {
+        auto state(state_.lock());
+        auto s2 = trim(s);
+        if (!s2.empty()) {
+            updateActivity(*state, act, s2);
+            update(*state);
+        }
+    }
+
+    void setExpected(ActivityId act, ActivityType type, uint64_t expected) override
+    {
+        auto state(state_.lock());
+
+        auto i = state->its.find(act);
+        assert(i != state->its.end());
+        ActInfo & actInfo = *i->second;
+        auto & j = actInfo.expectedByType[type];
+        state->activitiesByType[type].expected -= j;
+        j = expected;
+        state->activitiesByType[type].expected += j;
+
+        update(*state);
+    }
+
+    void createActivity(State & state, ActivityId activity, const std::string & s, ActivityType type = actUnknown)
     {
         state.activities.emplace_back(ActInfo{s, "", type});
         auto i = std::prev(state.activities.end());
@@ -85,7 +139,7 @@ public:
         state.activitiesByType[type].its.emplace(activity, i);
     }
 
-    void deleteActivity(State & state, Activity::t activity)
+    void deleteActivity(State & state, ActivityId activity)
     {
         auto i = state.its.find(activity);
         if (i != state.its.end()) {
@@ -102,7 +156,7 @@ public:
         }
     }
 
-    void updateActivity(State & state, Activity::t activity, const std::string & s2)
+    void updateActivity(State & state, ActivityId activity, const std::string & s2)
     {
         auto i = state.its.find(activity);
         assert(i != state.its.end());
@@ -209,51 +263,6 @@ public:
         showActivity(actDownload, "%s MiB DL", "%.1f", MiB);
 
         return res;
-    }
-
-    void event(const Event & ev) override
-    {
-        auto state(state_.lock());
-
-        if (ev.type == evStartActivity) {
-            Activity::t act = ev.getI(0);
-            createActivity(*state, act, ev.getS(2), (ActivityType) ev.getI(1));
-        }
-
-        if (ev.type == evStopActivity) {
-            Activity::t act = ev.getI(0);
-            deleteActivity(*state, act);
-        }
-
-        if (ev.type == evProgress) {
-            auto i = state->its.find(ev.getI(0));
-            assert(i != state->its.end());
-            ActInfo & actInfo = *i->second;
-            actInfo.done = ev.getI(1);
-            actInfo.expected = ev.getI(2);
-            actInfo.running = ev.getI(3);
-            actInfo.failed = ev.getI(4);
-        }
-
-        if (ev.type == evSetExpected) {
-            auto i = state->its.find(ev.getI(0));
-            assert(i != state->its.end());
-            ActInfo & actInfo = *i->second;
-            auto type = (ActivityType) ev.getI(1);
-            auto & j = actInfo.expectedByType[type];
-            state->activitiesByType[type].expected -= j;
-            j = ev.getI(2);
-            state->activitiesByType[type].expected += j;
-        }
-
-        if (ev.type == evBuildOutput) {
-            Activity::t act = ev.getI(0);
-            auto s = trim(ev.getS(1));
-            if (!s.empty())
-                updateActivity(*state, act, s);
-        }
-
-        update(*state);
     }
 };
 

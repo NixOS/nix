@@ -81,10 +81,6 @@ class TunnelLogger : public Logger
         } else
             defaultLogger->log(lvl, fs);
     }
-
-    void event(const Event & ev) override
-    {
-    }
 };
 
 

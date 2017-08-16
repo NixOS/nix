@@ -43,10 +43,6 @@ public:
 
         writeToStderr(prefix + (tty ? fs.s : filterANSIEscapes(fs.s)) + "\n");
     }
-
-    void event(const Event & ev) override
-    {
-    }
 };
 
 Verbosity verbosity = lvlInfo;
@@ -78,22 +74,10 @@ Logger * makeDefaultLogger()
 
 std::atomic<uint64_t> nextId{(uint64_t) getpid() << 32};
 
-Activity::Activity() : id(nextId++) { };
-
-Activity::Activity(ActivityType type, std::string msg)
-    : Activity()
+Activity::Activity(Logger & logger, ActivityType type, const std::string & s)
+    : logger(logger), id(nextId++)
 {
-    logger->event(evStartActivity, id, type, msg);
-}
-
-Activity::~Activity()
-{
-    logger->event(evStopActivity, id);
-}
-
-void Activity::progress(uint64_t done, uint64_t expected, uint64_t running, uint64_t failed) const
-{
-    logger->event(evProgress, id, done, expected, running, failed);
+    logger.startActivity(id, type, s);
 }
 
 }

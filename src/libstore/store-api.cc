@@ -565,7 +565,7 @@ void Store::buildPaths(const PathSet & paths, BuildMode buildMode)
 void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     const Path & storePath, RepairFlag repair, CheckSigsFlag checkSigs)
 {
-    Activity act(actCopyPath, fmt("copying path '%s'", storePath));
+    Activity act(*logger, actCopyPath, fmt("copying path '%s'", storePath));
 
     auto info = srcStore->queryPathInfo(storePath);
 
@@ -621,7 +621,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const PathSet & storePa
     for (auto & path : storePaths)
         if (!valid.count(path)) missing.insert(path);
 
-    Activity act(actCopyPaths, fmt("copying %d paths", missing.size()));
+    Activity act(*logger, actCopyPaths, fmt("copying %d paths", missing.size()));
 
     std::atomic<size_t> nrDone{0};
     std::atomic<uint64_t> bytesExpected{0};
@@ -646,7 +646,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const PathSet & storePa
             auto info = srcStore->queryPathInfo(storePath);
 
             bytesExpected += info->narSize;
-            logger->event(evSetExpected, act, actCopyPath, bytesExpected);
+            act.setExpected(actCopyPath, bytesExpected);
 
             return info->references;
         },
@@ -655,7 +655,6 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const PathSet & storePa
             checkInterrupt();
 
             if (!dstStore->isValidPath(storePath)) {
-                printInfo("copying '%s'...", storePath);
                 MaintainCount<decltype(nrRunning)> mc(nrRunning);
                 showProgress();
                 copyStorePath(srcStore, dstStore, storePath, repair, checkSigs);

@@ -335,8 +335,8 @@ public:
     {
         actDerivations.progress(doneBuilds, expectedBuilds + doneBuilds, runningBuilds, failedBuilds);
         actSubstitutions.progress(doneSubstitutions, expectedSubstitutions + doneSubstitutions, runningSubstitutions, failedSubstitutions);
-        logger->event(evSetExpected, act, actDownload, expectedDownloadSize + doneDownloadSize);
-        logger->event(evSetExpected, act, actCopyPath, expectedNarSize + doneNarSize);
+        act.setExpected(actDownload, expectedDownloadSize + doneDownloadSize);
+        act.setExpected(actCopyPath, expectedNarSize + doneNarSize);
     }
 };
 
@@ -1386,7 +1386,7 @@ void DerivationGoal::tryToBuild()
     bool buildLocally = buildMode != bmNormal || drv->willBuildLocally();
 
     auto started = [&]() {
-        act = std::make_unique<Activity>(actBuild, fmt("building '%s'", drvPath));
+        act = std::make_unique<Activity>(*logger, actBuild, fmt("building '%s'", drvPath));
         mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
         worker.updateProgress();
     };
@@ -3257,7 +3257,7 @@ void DerivationGoal::flushLine()
         logTail.push_back(currentLogLine);
         if (logTail.size() > settings.logLines) logTail.pop_front();
     }
-    logger->event(evBuildOutput, *act, currentLogLine);
+    act->progress(currentLogLine);
     currentLogLine = "";
     currentLogLinePos = 0;
 }
@@ -3647,9 +3647,9 @@ static bool working = false;
 
 
 Worker::Worker(LocalStore & store)
-    : act(actRealise)
-    , actDerivations(actBuilds)
-    , actSubstitutions(actCopyPaths)
+    : act(*logger, actRealise)
+    , actDerivations(*logger, actBuilds)
+    , actSubstitutions(*logger, actCopyPaths)
     , store(store)
 {
     /* Debugging: prevent recursive workers. */

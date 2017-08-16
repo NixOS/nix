@@ -23,63 +23,7 @@ typedef enum {
     actBuild = 105,
 } ActivityType;
 
-class Activity
-{
-public:
-    typedef uint64_t t;
-    const t id;
-    Activity();
-    Activity(const Activity & act) : id(act.id) { };
-    Activity(uint64_t id) : id(id) { };
-    Activity(ActivityType type, std::string msg = "");
-    ~Activity();
-
-    void progress(uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) const;
-};
-
-typedef enum {
-    evBuildOutput = 2,
-
-    evStartActivity = 1000,
-    evStopActivity = 1001,
-    evProgress = 1002,
-    evSetExpected = 1003,
-
-} EventType;
-
-struct Event
-{
-    struct Field
-    {
-        // FIXME: use std::variant.
-        enum { tInt, tString } type;
-        uint64_t i = 0;
-        std::string s;
-        Field(const std::string & s) : type(tString), s(s) { }
-        Field(const char * s) : type(tString), s(s) { }
-        Field(const uint64_t & i) : type(tInt), i(i) { }
-        Field(const Activity & act) : type(tInt), i(act.id) { }
-    };
-
-    typedef std::vector<Field> Fields;
-
-    EventType type;
-    Fields fields;
-
-    std::string getS(size_t n) const
-    {
-        assert(n < fields.size());
-        assert(fields[n].type == Field::tString);
-        return fields[n].s;
-    }
-
-    uint64_t getI(size_t n) const
-    {
-        assert(n < fields.size());
-        assert(fields[n].type == Field::tInt);
-        return fields[n].i;
-    }
-};
+typedef uint64_t ActivityId;
 
 class Logger
 {
@@ -98,16 +42,38 @@ public:
 
     virtual void warn(const std::string & msg);
 
-    template<typename... Args>
-    void event(EventType type, const Args & ... args)
-    {
-        Event ev;
-        ev.type = type;
-        nop{(ev.fields.emplace_back(Event::Field(args)), 1)...};
-        event(ev);
-    }
+    virtual void startActivity(ActivityId act, ActivityType type, const std::string & s) { };
 
-    virtual void event(const Event & ev) = 0;
+    virtual void stopActivity(ActivityId act) { };
+
+    virtual void progress(ActivityId act, uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) { };
+
+    virtual void progress(ActivityId act, const std::string & s) { };
+
+    virtual void setExpected(ActivityId act, ActivityType type, uint64_t expected) { };
+};
+
+struct Activity
+{
+    Logger & logger;
+
+    const ActivityId id;
+
+    Activity(Logger & logger, ActivityType type, const std::string & s = "");
+
+    ~Activity()
+    { logger.stopActivity(id); }
+
+    void progress(uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) const
+    { logger.progress(id, done, expected, running, failed); }
+
+    void progress(const std::string & s) const
+    { logger.progress(id, s); }
+
+    void setExpected(ActivityType type2, uint64_t expected) const
+    { logger.setExpected(id, type2, expected); }
+
+    friend class Logger;
 };
 
 extern Logger * logger;
