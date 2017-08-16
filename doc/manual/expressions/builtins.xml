@@ -873,6 +873,43 @@ builtins.sort builtins.lessThan [ 483 249 526 147 42 77 ]
   </varlistentry>
 
 
+  <varlistentry><term><function>builtins.split</function>
+  <replaceable>regex</replaceable> <replaceable>str</replaceable></term>
+
+  <listitem><para>Returns a list composed of non matched strings interleaved
+  with the lists of the <link
+  xlink:href="http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap09.html#tag_09_04">extended
+  POSIX regular expression</link> <replaceable>regex</replaceable> matches
+  of <replaceable>str</replaceable>. Each item in the lists of matched
+  sequences is a regex group.
+
+<programlisting>
+builtins.split "(a)b" "abc"
+</programlisting>
+
+Evaluates to <literal>[ "" [ "a" ] "c" ]</literal>.
+
+<programlisting>
+builtins.split "([ac])" "abc"
+</programlisting>
+
+Evaluates to <literal>[ "" [ "a" ] "b" [ "c" ] "" ]</literal>.
+
+<programlisting>
+builtins.split "(a)|(c)" "abc"
+</programlisting>
+
+Evaluates to <literal>[ "" [ "a" null ] "b" [ null "c" ] "" ]</literal>.
+
+<programlisting>
+builtins.split "([[:upper:]]+)" "  FOO   "
+</programlisting>
+
+Evaluates to <literal>[ "  " [ "FOO" ] "   " ]</literal>.
+
+  </para></listitem>
+  </varlistentry>
+
   <varlistentry><term><function>builtins.stringLength</function>
   <replaceable>e</replaceable></term>
 
