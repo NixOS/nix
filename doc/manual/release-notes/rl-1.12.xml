@@ -382,6 +382,11 @@ configureFlags = "--prefix=${placeholder "out"} --includedir=${placeholder "dev"
     script.</para>
   </listitem>
 
+  <listitem>
+    <para><function>builtins.split</function>.
+    (b8867a0239b1930a16f9ef3f7f3e864b01416dff))</para>
+  </listitem>
+
 </itemizedlist>
 
 <para>This release has contributions from TBD.</para>
