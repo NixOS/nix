@@ -210,7 +210,7 @@ public:
 
         std::string res;
 
-        auto renderActivity = [&](ActivityType type, const std::string & itemFmt, const std::string & numberFmt, double unit) {
+        auto renderActivity = [&](ActivityType type, const std::string & itemFmt, const std::string & numberFmt = "%d", double unit = 1) {
             auto & act = state.activitiesByType[type];
             uint64_t done = act.done, expected = act.done, running = 0, failed = act.failed;
             for (auto & j : act.its) {
@@ -242,16 +242,16 @@ public:
             return s;
         };
 
-        auto showActivity = [&](ActivityType type, const std::string & itemFmt, const std::string & numberFmt, double unit) {
+        auto showActivity = [&](ActivityType type, const std::string & itemFmt, const std::string & numberFmt = "%d", double unit = 1) {
             auto s = renderActivity(type, itemFmt, numberFmt, unit);
             if (s.empty()) return;
             if (!res.empty()) res += ", ";
             res += s;
         };
 
-        showActivity(actBuilds, "%s built", "%d", 1);
+        showActivity(actBuilds, "%s built");
 
-        auto s1 = renderActivity(actCopyPaths, "%s copied", "%d", 1);
+        auto s1 = renderActivity(actCopyPaths, "%s copied");
         auto s2 = renderActivity(actCopyPath, "%s MiB", "%.1f", MiB);
 
         if (!s1.empty() || !s2.empty()) {
@@ -261,6 +261,8 @@ public:
         }
 
         showActivity(actDownload, "%s MiB DL", "%.1f", MiB);
+
+        showActivity(actOptimiseStore, "%s paths optimised");
 
         return res;
     }

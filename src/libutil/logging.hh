@@ -21,6 +21,7 @@ typedef enum {
     actCopyPaths = 103,
     actBuilds = 104,
     actBuild = 105,
+    actOptimiseStore = 106,
 } ActivityType;
 
 typedef uint64_t ActivityId;

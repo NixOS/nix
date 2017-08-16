@@ -249,14 +249,24 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
 
 void LocalStore::optimiseStore(OptimiseStats & stats)
 {
+    Activity act(*logger, actOptimiseStore);
+
     PathSet paths = queryAllValidPaths();
     InodeHash inodeHash = loadInodeHash();
+
+    act.progress(0, paths.size());
+
+    uint64_t done = 0;
 
     for (auto & i : paths) {
         addTempRoot(i);
         if (!isValidPath(i)) continue; /* path was GC'ed, probably */
-        //Activity act(*logger, lvlChatty, format("hashing files in '%1%'") % i);
-        optimisePath_(stats, realStoreDir + "/" + baseNameOf(i), inodeHash);
+        {
+            Activity act(*logger, actUnknown, fmt("optimising path '%s'", i));
+            optimisePath_(stats, realStoreDir + "/" + baseNameOf(i), inodeHash);
+        }
+        done++;
+        act.progress(done, paths.size());
     }
 }
 
