@@ -24,6 +24,11 @@ typedef enum {
     actOptimiseStore = 106,
 } ActivityType;
 
+typedef enum {
+    resFileLinked = 100,
+    resBuildLogLine = 101,
+} ResultType;
+
 typedef uint64_t ActivityId;
 
 class Logger
@@ -49,9 +54,20 @@ public:
 
     virtual void progress(ActivityId act, uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) { };
 
-    virtual void progress(ActivityId act, const std::string & s) { };
-
     virtual void setExpected(ActivityId act, ActivityType type, uint64_t expected) { };
+
+    struct Field
+    {
+        // FIXME: use std::variant.
+        enum { tInt, tString } type;
+        uint64_t i = 0;
+        std::string s;
+        Field(const std::string & s) : type(tString), s(s) { }
+        Field(const char * s) : type(tString), s(s) { }
+        Field(const uint64_t & i) : type(tInt), i(i) { }
+    };
+
+    virtual void result(ActivityId act, ResultType type, const std::vector<Field> & fields) { };
 };
 
 struct Activity
@@ -68,11 +84,16 @@ struct Activity
     void progress(uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) const
     { logger.progress(id, done, expected, running, failed); }
 
-    void progress(const std::string & s) const
-    { logger.progress(id, s); }
-
     void setExpected(ActivityType type2, uint64_t expected) const
     { logger.setExpected(id, type2, expected); }
+
+    template<typename... Args>
+    void result(ResultType type, const Args & ... args)
+    {
+        std::vector<Logger::Field> fields;
+        nop{(fields.emplace_back(Logger::Field(args)), 1)...};
+        logger.result(id, type, fields);
+    }
 
     friend class Logger;
 };

@@ -3257,7 +3257,7 @@ void DerivationGoal::flushLine()
         logTail.push_back(currentLogLine);
         if (logTail.size() > settings.logLines) logTail.pop_front();
     }
-    act->progress(currentLogLine);
+    act->result(resBuildLogLine, currentLogLine);
     currentLogLine = "";
     currentLogLinePos = 0;
 }

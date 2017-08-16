@@ -89,7 +89,8 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
 }
 
 
-void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHash & inodeHash)
+void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
+    const Path & path, InodeHash & inodeHash)
 {
     checkInterrupt();
 
@@ -114,7 +115,7 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
     if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectoryIgnoringInodes(path, inodeHash);
         for (auto & i : names)
-            optimisePath_(stats, path + "/" + i, inodeHash);
+            optimisePath_(act, stats, path + "/" + i, inodeHash);
         return;
     }
 
@@ -244,6 +245,9 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
     stats.filesLinked++;
     stats.bytesFreed += st.st_size;
     stats.blocksFreed += st.st_blocks;
+
+    if (act)
+        act->result(resFileLinked, st.st_size, st.st_blocks);
 }
 
 
@@ -263,7 +267,7 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
         if (!isValidPath(i)) continue; /* path was GC'ed, probably */
         {
             Activity act(*logger, actUnknown, fmt("optimising path '%s'", i));
-            optimisePath_(stats, realStoreDir + "/" + baseNameOf(i), inodeHash);
+            optimisePath_(&act, stats, realStoreDir + "/" + baseNameOf(i), inodeHash);
         }
         done++;
         act.progress(done, paths.size());
@@ -281,7 +285,7 @@ void LocalStore::optimiseStore()
 
     optimiseStore(stats);
 
-    printError(
+    printInfo(
         format("%1% freed by hard-linking %2% files")
         % showBytes(stats.bytesFreed)
         % stats.filesLinked);
@@ -292,7 +296,7 @@ void LocalStore::optimisePath(const Path & path)
     OptimiseStats stats;
     InodeHash inodeHash;
 
-    if (settings.autoOptimiseStore) optimisePath_(stats, path, inodeHash);
+    if (settings.autoOptimiseStore) optimisePath_(nullptr, stats, path, inodeHash);
 }
 
 

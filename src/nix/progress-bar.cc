@@ -12,6 +12,20 @@
 
 namespace nix {
 
+static std::string getS(const std::vector<Logger::Field> & fields, size_t n)
+{
+    assert(n < fields.size());
+    assert(fields[n].type == Logger::Field::tString);
+    return fields[n].s;
+}
+
+static uint64_t getI(const std::vector<Logger::Field> & fields, size_t n)
+{
+    assert(n < fields.size());
+    assert(fields[n].type == Logger::Field::tInt);
+    return fields[n].i;
+}
+
 class ProgressBar : public Logger
 {
 private:
@@ -41,6 +55,8 @@ private:
         std::map<ActivityId, std::list<ActInfo>::iterator> its;
 
         std::map<ActivityType, ActivitiesByType> activitiesByType;
+
+        uint64_t filesLinked = 0, bytesLinked = 0;
     };
 
     Sync<State> state_;
@@ -80,14 +96,33 @@ public:
     void startActivity(ActivityId act, ActivityType type, const std::string & s) override
     {
         auto state(state_.lock());
-        createActivity(*state, act, s, type);
+
+        state->activities.emplace_back(ActInfo{s, "", type});
+        auto i = std::prev(state->activities.end());
+        state->its.emplace(act, i);
+        state->activitiesByType[type].its.emplace(act, i);
+
         update(*state);
     }
 
     void stopActivity(ActivityId act) override
     {
         auto state(state_.lock());
-        deleteActivity(*state, act);
+
+        auto i = state->its.find(act);
+        if (i != state->its.end()) {
+            auto & actByType = state->activitiesByType[i->second->type];
+            actByType.done += i->second->done;
+            actByType.failed += i->second->failed;
+
+            for (auto & j : i->second->expectedByType)
+                state->activitiesByType[j.first].expected -= j.second;
+
+            actByType.its.erase(act);
+            state->activities.erase(i->second);
+            state->its.erase(i);
+        }
+
         update(*state);
     }
 
@@ -106,16 +141,6 @@ public:
         update(*state);
     }
 
-    void progress(ActivityId act, const std::string & s) override
-    {
-        auto state(state_.lock());
-        auto s2 = trim(s);
-        if (!s2.empty()) {
-            updateActivity(*state, act, s2);
-            update(*state);
-        }
-    }
-
     void setExpected(ActivityId act, ActivityType type, uint64_t expected) override
     {
         auto state(state_.lock());
@@ -131,40 +156,29 @@ public:
         update(*state);
     }
 
-    void createActivity(State & state, ActivityId activity, const std::string & s, ActivityType type = actUnknown)
+    void result(ActivityId act, ResultType type, const std::vector<Field> & fields) override
     {
-        state.activities.emplace_back(ActInfo{s, "", type});
-        auto i = std::prev(state.activities.end());
-        state.its.emplace(activity, i);
-        state.activitiesByType[type].its.emplace(activity, i);
-    }
+        auto state(state_.lock());
 
-    void deleteActivity(State & state, ActivityId activity)
-    {
-        auto i = state.its.find(activity);
-        if (i != state.its.end()) {
-            auto & act = state.activitiesByType[i->second->type];
-            act.done += i->second->done;
-            act.failed += i->second->failed;
-
-            for (auto & j : i->second->expectedByType)
-                state.activitiesByType[j.first].expected -= j.second;
-
-            act.its.erase(activity);
-            state.activities.erase(i->second);
-            state.its.erase(i);
+        if (type == resFileLinked) {
+            state->filesLinked++;
+            state->bytesLinked += getI(fields, 0);
+            update(*state);
         }
-    }
 
-    void updateActivity(State & state, ActivityId activity, const std::string & s2)
-    {
-        auto i = state.its.find(activity);
-        assert(i != state.its.end());
-        ActInfo info = *i->second;
-        state.activities.erase(i->second);
-        info.s2 = s2;
-        state.activities.emplace_back(info);
-        i->second = std::prev(state.activities.end());
+        else if (type == resBuildLogLine) {
+            auto s2 = trim(getS(fields, 0));
+            if (!s2.empty()) {
+                auto i = state->its.find(act);
+                assert(i != state->its.end());
+                ActInfo info = *i->second;
+                state->activities.erase(i->second);
+                info.s2 = s2;
+                state->activities.emplace_back(info);
+                i->second = std::prev(state->activities.end());
+                update(*state);
+            }
+        }
     }
 
     void update()
@@ -262,7 +276,14 @@ public:
 
         showActivity(actDownload, "%s MiB DL", "%.1f", MiB);
 
-        showActivity(actOptimiseStore, "%s paths optimised");
+        {
+            auto s = renderActivity(actOptimiseStore, "%s paths optimised");
+            if (s != "") {
+                s += fmt(", %.1f MiB / %d inodes freed", state.bytesLinked / MiB, state.filesLinked);
+                if (!res.empty()) res += ", ";
+                res += s;
+            }
+        }
 
         return res;
     }
