@@ -57,6 +57,8 @@ private:
         std::map<ActivityType, ActivitiesByType> activitiesByType;
 
         uint64_t filesLinked = 0, bytesLinked = 0;
+
+        uint64_t corruptedPaths = 0, untrustedPaths = 0;
     };
 
     Sync<State> state_;
@@ -179,6 +181,16 @@ public:
                 update(*state);
             }
         }
+
+        else if (type == resUntrustedPath) {
+            state->untrustedPaths++;
+            update(*state);
+        }
+
+        else if (type == resCorruptedPath) {
+            state->corruptedPaths++;
+            update(*state);
+        }
     }
 
     void update()
@@ -283,6 +295,19 @@ public:
                 if (!res.empty()) res += ", ";
                 res += s;
             }
+        }
+
+        // FIXME: don't show "done" paths in green.
+        showActivity(actVerifyPaths, "%s paths verified");
+
+        if (state.corruptedPaths) {
+            if (!res.empty()) res += ", ";
+            res += fmt(ANSI_RED "%d corrupted" ANSI_NORMAL, state.corruptedPaths);
+        }
+
+        if (state.untrustedPaths) {
+            if (!res.empty()) res += ", ";
+            res += fmt(ANSI_RED "%d untrusted" ANSI_NORMAL, state.untrustedPaths);
         }
 
         return res;

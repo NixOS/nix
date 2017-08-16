@@ -22,11 +22,14 @@ typedef enum {
     actBuilds = 104,
     actBuild = 105,
     actOptimiseStore = 106,
+    actVerifyPaths = 107,
 } ActivityType;
 
 typedef enum {
     resFileLinked = 100,
     resBuildLogLine = 101,
+    resUntrustedPath = 102,
+    resCorruptedPath = 103,
 } ResultType;
 
 typedef uint64_t ActivityId;
