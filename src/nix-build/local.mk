@@ -1,8 +1,9 @@
 programs += nix-build
 
 nix-build_DIR := $(d)
+nix-build_RELDIR := $(reldir)
 
-nix-build_SOURCES := $(d)/nix-build.cc
+nix-build_SOURCES := nix-build.cc
 
 nix-build_LIBS = libmain libexpr libstore libutil libformat
 

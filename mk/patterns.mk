@@ -1,3 +1,8 @@
+vpath
+vpath %.cc  $(TOP)
+vpath %.cpp $(TOP)
+vpath %.c   $(TOP)
+
 $(buildprefix)%.o: %.cc
 	@mkdir -p "$(dir $@)"
 	$(trace-cxx) $(CXX) -o $@ -c $< $(GLOBAL_CXXFLAGS) $(GLOBAL_CXXFLAGS_PCH) $(CXXFLAGS) $($@_CXXFLAGS) -MMD -MF $(call filename-to-dep, $@) -MP
@@ -8,4 +13,4 @@ $(buildprefix)%.o: %.cpp
 
 $(buildprefix)%.o: %.c
 	@mkdir -p "$(dir $@)"
-	$(trace-cc) $(CC) -o $@ -c $< $(GLOBAL_CFLAGS) $(CFLAGS) $($@_CFLAGS) -MMD -MF $(call filename-to-dep, $@) -MP
+	$(trace-cc)   $(CC) -o $@ -c $< $(GLOBAL_CFLAGS) $(CFLAGS) $($@_CFLAGS) -MMD -MF $(call filename-to-dep, $@) -MP

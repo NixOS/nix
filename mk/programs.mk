@@ -1,4 +1,5 @@
 programs-list :=
+programs-list-no-path :=
 
 # Build a program with symbolic name $(1).  The program is defined by
 # various variables prefixed by ‘$(1)_’:
@@ -23,9 +24,10 @@ programs-list :=
 # - $(1)_INSTALL_DIR: the directory where the program will be
 #   installed; defaults to $(bindir).
 define build-program
-  _d := $(buildprefix)$$($(1)_DIR)
-  _srcs := $$(sort $$(foreach src, $$($(1)_SOURCES), $$(src)))
-  $(1)_OBJS := $$(addprefix $(buildprefix), $$(addsuffix .o, $$(basename $$(_srcs))))
+  _d := $$(buildprefix)$$($(1)_RELDIR)
+  $(1)_OUT := $$(_d)/
+  _objs := $$(call srcs-to-objs,$$($(1)_SOURCES))
+  $(1)_OBJS := $$(addprefix $$(_d), $$(_objs))
   _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_PATH))
   $(1)_PATH := $$(_d)/$(1)
 
@@ -73,6 +75,7 @@ define build-program
   $(1)_DEPS := $$(foreach fn, $$($(1)_OBJS), $$(call filename-to-dep, $$(fn)))
   -include $$($(1)_DEPS)
 
+  programs-list-no-path += $(1)
   programs-list += $$($(1)_PATH)
   clean-files += $$($(1)_PATH) $$(_d)/*.o $$(_d)/.*.dep $$($(1)_DEPS) $$($(1)_OBJS)
   dist-files += $$(_srcs)

@@ -3,8 +3,13 @@ libraries += libexpr
 libexpr_NAME = libnixexpr
 
 libexpr_DIR := $(d)
+libexpr_RELDIR := $(reldir)
 
-libexpr_SOURCES := $(wildcard $(d)/*.cc) $(wildcard $(d)/primops/*.cc) $(d)/lexer-tab.cc $(d)/parser-tab.cc
+srcs = $(subst $(d)/,,$(wildcard $(d)/*.cc))
+srcs += $(subst $(d)/,,$(wildcard $(d)/primops/*.cc))
+srcs += lexer-tab.cc
+srcs += parser-tab.cc
+libexpr_SOURCES := $(sort $(srcs)) # remove possible duplicate
 
 libexpr_LIBS = libutil libstore libformat
 
@@ -18,16 +23,16 @@ endif
 # because inline functions in libexpr's header files call libgc.
 libexpr_LDFLAGS_PROPAGATED = $(BDW_GC_LIBS)
 
-libexpr_ORDER_AFTER := $(d)/parser-tab.cc $(d)/parser-tab.hh $(d)/lexer-tab.cc $(d)/lexer-tab.hh
+libexpr_ORDER_AFTER := $(addprefix $(libexpr_DIR)/,parser-tab.cc parser-tab.hh lexer-tab.cc lexer-tab.hh)
 
-$(d)/parser-tab.cc $(d)/parser-tab.hh: $(d)/parser.y
-	$(trace-gen) bison -v -o $(libexpr_DIR)/parser-tab.cc $< -d
+$(libexpr_DIR)/parser-tab.cc $(libexpr_DIR)/parser-tab.hh: $(libexpr_DIR)/parser.y
+	$(trace-gen) cd $(libexpr_DIR) && bison -o parser-tab.cc $< -d
 
-$(d)/lexer-tab.cc $(d)/lexer-tab.hh: $(d)/lexer.l
-	$(trace-gen) flex --outfile $(libexpr_DIR)/lexer-tab.cc --header-file=$(libexpr_DIR)/lexer-tab.hh $<
+$(libexpr_DIR)/lexer-tab.cc $(libexpr_DIR)/lexer-tab.hh: $(libexpr_DIR)/lexer.l
+	$(trace-gen) cd $(libexpr_DIR)/ && flex --outfile lexer-tab.cc --header-file=lexer-tab.hh $<
 
-clean-files += $(d)/parser-tab.cc $(d)/parser-tab.hh $(d)/lexer-tab.cc $(d)/lexer-tab.hh
+clean-files += $(addprefix $(libexpr_DIR)/,parser-tab.cc parser-tab.hh lexer-tab.cc lexer-tab.hh)
 
-dist-files += $(d)/parser-tab.cc $(d)/parser-tab.hh $(d)/lexer-tab.cc $(d)/lexer-tab.hh
+dist-files += $(addprefix $(libexpr_DIR)/,parser-tab.cc parser-tab.hh lexer-tab.cc lexer-tab.hh)
 
-$(eval $(call install-file-in, $(d)/nix-expr.pc, $(prefix)/lib/pkgconfig, 0644))
+$(eval $(call install-file-in, $(libexpr_DIR)/nix-expr.pc, $(prefix)/lib/pkgconfig, 0644))

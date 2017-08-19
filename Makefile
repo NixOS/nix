@@ -1,35 +1,40 @@
-makefiles = \
-  local.mk \
-  src/boost/format/local.mk \
-  src/libutil/local.mk \
-  src/libstore/local.mk \
-  src/libmain/local.mk \
-  src/libexpr/local.mk \
-  src/nix/local.mk \
-  src/nix-store/local.mk \
-  src/nix-instantiate/local.mk \
-  src/nix-env/local.mk \
-  src/nix-daemon/local.mk \
-  src/nix-collect-garbage/local.mk \
-  src/nix-copy-closure/local.mk \
-  src/nix-prefetch-url/local.mk \
-  src/buildenv/local.mk \
-  src/resolve-system-dependencies/local.mk \
-  src/nix-channel/local.mk \
-  src/nix-build/local.mk \
-  src/build-remote/local.mk \
-  scripts/local.mk \
-  corepkgs/local.mk \
-  misc/systemd/local.mk \
-  misc/launchd/local.mk \
-  misc/upstart/local.mk \
-  misc/emacs/local.mk \
-  doc/manual/local.mk \
-  tests/local.mk
+TOP := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
-GLOBAL_CXXFLAGS += -std=c++14 -g -Wall -include config.h
+makefiles += local.mk
+makefiles += src/boost/format/local.mk
+makefiles += src/libutil/local.mk
+makefiles += src/libstore/local.mk
+makefiles += src/libmain/local.mk
+makefiles += src/libexpr/local.mk
+makefiles += src/nix/local.mk
+makefiles += src/nix-store/local.mk
+makefiles += src/nix-instantiate/local.mk
+makefiles += src/nix-env/local.mk
+makefiles += src/nix-daemon/local.mk
+makefiles += src/nix-collect-garbage/local.mk
+makefiles += src/nix-copy-closure/local.mk
+makefiles += src/nix-prefetch-url/local.mk
+makefiles += src/buildenv/local.mk
+makefiles += src/resolve-system-dependencies/local.mk
+makefiles += src/nix-channel/local.mk
+makefiles += src/nix-build/local.mk
+makefiles += src/build-remote/local.mk
+makefiles += scripts/local.mk
+makefiles += corepkgs/local.mk
+makefiles += misc/systemd/local.mk
+makefiles += misc/launchd/local.mk
+makefiles += misc/upstart/local.mk
+makefiles += misc/emacs/local.mk
+makefiles += doc/manual/local.mk
+makefiles += tests/local.mk
 
--include Makefile.config
+GLOBAL_CXXFLAGS += -std=c++14 -Wall -include config.h
+ifeq ($(BUILD_DEBUG), 1)
+  GLOBAL_CXXFLAGS += -g
+endif
+
+
+-include $(TOP)/Makefile.config
 
 OPTIMIZE = 1
 
@@ -38,4 +43,4 @@ ifeq ($(OPTIMIZE), 1)
   GLOBAL_CXXFLAGS += -O3
 endif
 
-include mk/lib.mk
+include $(TOP)/mk/lib.mk

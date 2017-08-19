@@ -10,6 +10,8 @@ define build-jar
 
   _jars := $$(foreach jar, $$($(1)_JARS), $$($$(jar)_PATH))
 
+  .PHONY: $(1)
+  $(1) : $$($(1)_PATH)
   $$($(1)_PATH): $$($(1)_SOURCES) $$(_jars) $$($(1)_EXTRA_DEPS)| $$($(1)_ORDER_AFTER)
 	@rm -rf $$($(1)_TMPDIR)
 	@mkdir -p $$($(1)_TMPDIR)
@@ -29,6 +31,7 @@ define build-jar
 
   install: $$($(1)_INSTALL_PATH)
 
+  jars-list-no_path += $(1)
   jars-list += $$($(1)_PATH)
 
   clean-files += $$($(1)_PATH)

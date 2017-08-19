@@ -17,7 +17,7 @@ libraries += Store
 
 Store_DIR := lib/Nix
 
-Store_SOURCES := $(Store_DIR)/Store.cc
+Store_SOURCES := Store.cc
 
 Store_CXXFLAGS = \
   $(NIX_CFLAGS) \

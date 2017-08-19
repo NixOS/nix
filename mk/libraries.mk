@@ -1,4 +1,5 @@
 libs-list :=
+libs-list-no-path :=
 
 ifeq ($(OS), Darwin)
   SO_EXT = dylib
@@ -49,9 +50,10 @@ endif
 #   built, otherwise a static library.
 define build-library
   $(1)_NAME ?= $(1)
-  _d := $(buildprefix)$$(strip $$($(1)_DIR))
-  _srcs := $$(sort $$(foreach src, $$($(1)_SOURCES), $$(src)))
-  $(1)_OBJS := $$(addprefix $(buildprefix), $$(addsuffix .o, $$(basename $$(_srcs))))
+  _d := $$(buildprefix)$$($(1)_RELDIR)
+  $(1)_OUT := $$(_d)/
+  _objs := $$(call srcs-to-objs,$$($(1)_SOURCES))
+  $(1)_OBJS := $$(addprefix $$(_d),$$(_objs))
   _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_PATH))
 
   ifeq (CYGWIN,$(findstring CYGWIN,$(OS)))
@@ -86,7 +88,13 @@ define build-library
     $(1)_PATH := $$(_d)/$$($(1)_NAME).$(SO_EXT)
 
     $$($(1)_PATH): $$($(1)_OBJS) $$(_libs) | $$(_d)/
-	$$(trace-ld) $(CXX) -o $$(abspath $$@) -shared $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE)) $$($(1)_LDFLAGS_UNINSTALLED)
+	$$(trace-ld) $(CXX) -o $$@ \
+	    -shared $$(GLOBAL_LDFLAGS) \
+	    $$($(1)_OBJS) \
+	    $$($(1)_LDFLAGS) \
+	    $$($(1)_LDFLAGS_PROPAGATED) \
+	    $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE)) \
+	    $$($(1)_LDFLAGS_UNINSTALLED)
 
     ifneq ($(OS), Darwin)
       $(1)_LDFLAGS_USE += -Wl,-rpath,$$(abspath $$(_d))
@@ -100,7 +108,12 @@ define build-library
     $$(eval $$(call create-dir, $$($(1)_INSTALL_DIR)))
 
     $$($(1)_INSTALL_PATH): $$($(1)_OBJS) $$(_libs_final) | $(DESTDIR)$$($(1)_INSTALL_DIR)/
-	$$(trace-ld) $(CXX) -o $$@ -shared $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
+	$$(trace-ld) $(CXX) -o $$@ \
+	    -shared $$(GLOBAL_LDFLAGS) \
+	    $$($(1)_OBJS) \
+	    $$($(1)_LDFLAGS) \
+	    $$($(1)_LDFLAGS_PROPAGATED) \
+	    $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
 
     $(1)_LDFLAGS_USE_INSTALLED += -L$$(DESTDIR)$$($(1)_INSTALL_DIR) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
     ifneq ($(OS), Darwin)
@@ -149,6 +162,7 @@ define build-library
   $(1)_DEPS := $$(foreach fn, $$($(1)_OBJS), $$(call filename-to-dep, $$(fn)))
   -include $$($(1)_DEPS)
 
+  libs-list-no-path += $(1)
   libs-list += $$($(1)_PATH)
   clean-files += $$(_d)/*.a $$(_d)/*.$(SO_EXT) $$(_d)/*.o $$(_d)/.*.dep $$($(1)_DEPS) $$($(1)_OBJS)
   dist-files += $$(_srcs)
