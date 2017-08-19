@@ -108,7 +108,7 @@ the single Nix expression in that directory
     <para>The builder has to know what the sources of the package
     are.  Here, the attribute <varname>src</varname> is bound to the
     result of a call to the <command>fetchurl</command> function.
-    Given a URL and an MD5 hash of the expected contents of the file
+    Given a URL and a SHA-256 hash of the expected contents of the file
     at that URL, this function builds a derivation that downloads the
     file and checks its hash.  So the sources are a dependency that
     like all other dependencies is built before Hello itself is
