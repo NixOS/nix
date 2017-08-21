@@ -81,6 +81,8 @@ struct Activity
 
     Activity(Logger & logger, ActivityType type, const std::string & s = "");
 
+    Activity(const Activity & act) = delete;
+
     ~Activity()
     { logger.stopActivity(id); }
 
