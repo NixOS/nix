@@ -387,6 +387,12 @@ configureFlags = "--prefix=${placeholder "out"} --includedir=${placeholder "dev"
     (b8867a0239b1930a16f9ef3f7f3e864b01416dff))</para>
   </listitem>
 
+  <listitem>
+    <para><filename>nix-mode.el</filename> has been removed from Nix. It is now a separate repository
+    in <uri>https://github.com/NixOS/nix-mode</uri> and can be installed through the MELPA
+    package repository.</para>
+  </listitem>
+
 </itemizedlist>
 
 <para>This release has contributions from TBD.</para>

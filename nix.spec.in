@@ -60,33 +60,6 @@ Requires:       %{name} = %{version}-%{release}
 %description   doc
 The %{name}-doc package contains documentation files for %{name}.
 
-
-%package -n emacs-%{name}
-Summary:        Nix mode for Emacs
-%if 0%{?rhel} && 0%{?rhel} < 7
-Group:          Applications/Editors
-%endif
-BuildArch:      noarch
-BuildRequires:  emacs
-Requires:       emacs(bin) >= %{_emacs_version}
-
-%description -n emacs-%{name}
-This package provides a major mode for editing Nix expressions.
-
-%package -n emacs-%{name}-el
-Summary:        Elisp source files for emacs-%{name}
-%if 0%{?rhel} && 0%{?rhel} < 7
-Group:          Applications/Editors
-%endif
-BuildArch:      noarch
-Requires:       emacs-%{name} = %{version}-%{release}
-
-%description -n emacs-%{name}-el
-This package contains the elisp source file for the Nix major mode for
-GNU Emacs. You do not need to install this package to run Nix. Install
-the emacs-%{name} package to edit Nix expressions with GNU Emacs.
-
-
 %prep
 %setup -q
 
@@ -100,7 +73,6 @@ extraFlags=
            --docdir=%{_defaultdocdir}/%{name}-doc-%{version} \
            $extraFlags
 make -j$NIX_BUILD_CORES -l$NIX_BUILD_CORES
-%{_emacs_bytecompile} misc/emacs/nix-mode.el
 
 
 %install
@@ -125,9 +97,6 @@ done
 # fix permission of nix profile
 # (until this is fixed in the relevant Makefile)
 chmod -x $RPM_BUILD_ROOT%{_sysconfdir}/profile.d/nix.sh
-
-# Copy the byte-compiled mode file by hand
-cp -p misc/emacs/nix-mode.elc $RPM_BUILD_ROOT%{_emacs_sitelispdir}/
 
 # we ship this file in the base package
 rm -f $RPM_BUILD_ROOT%{_defaultdocdir}/%{name}-doc-%{version}/README
@@ -166,7 +135,6 @@ systemctl start  nix-daemon.socket
 %{_prefix}/lib/systemd/system/nix-daemon.socket
 %{_prefix}/lib/systemd/system/nix-daemon.service
 %endif
-%{_datadir}/emacs/site-lisp/nix-mode.el
 %{_datadir}/nix
 %{_mandir}/man1/*.1*
 %{_mandir}/man5/*.5*
@@ -181,10 +149,3 @@ systemctl start  nix-daemon.socket
 %files doc
 %docdir %{_defaultdocdir}/%{name}-doc-%{version}
 %{_defaultdocdir}/%{name}-doc-%{version}
-
-%files -n emacs-%{name}
-%{_emacs_sitelispdir}/*.elc
-#{_emacs_sitestartdir}/*.el
-
-%files -n emacs-%{name}-el
-%{_emacs_sitelispdir}/*.el
