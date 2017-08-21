@@ -55,6 +55,8 @@
 #include <sys/statvfs.h>
 #endif
 
+#include <nlohmann/json.hpp>
+
 
 namespace nix {
 
@@ -838,6 +840,8 @@ private:
     std::unique_ptr<MaintainCount<uint64_t>> mcExpectedBuilds, mcRunningBuilds;
 
     std::unique_ptr<Activity> act;
+
+    std::map<ActivityId, Activity> builderActivities;
 
 public:
     DerivationGoal(const Path & drvPath, const StringSet & wantedOutputs,
@@ -2390,6 +2394,34 @@ void setupSeccomp()
 }
 
 
+struct BuilderLogger : Logger
+{
+    Logger & prevLogger;
+
+    BuilderLogger(Logger & prevLogger) : prevLogger(prevLogger) { }
+
+    void log(Verbosity lvl, const FormatOrString & fs) override
+    {
+        prevLogger.log(lvl, fs);
+    }
+
+    void startActivity(ActivityId act, ActivityType type, const std::string & s) override
+    {
+        log(lvlError, fmt("@nix {\"action\": \"start\", \"id\": %d, \"type\": %d, \"text\": \"%s\"}", act, type, s));
+    }
+
+    void stopActivity(ActivityId act) override
+    {
+        log(lvlError, fmt("@nix {\"action\": \"stop\", \"id\": %d}", act));
+    }
+
+    void progress(ActivityId act, uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) override
+    {
+        log(lvlError, fmt("@nix {\"action\": \"progress\", \"id\": %d, \"done\": %d, \"expected\": %d, \"running\": %d, \"failed\": %d}", act, done, expected, running, failed));
+    }
+};
+
+
 void DerivationGoal::runChild()
 {
     /* Warning: in the child we should absolutely not make any SQLite
@@ -2796,6 +2828,7 @@ void DerivationGoal::runChild()
         /* Execute the program.  This should not return. */
         if (drv->isBuiltin()) {
             try {
+                logger = new BuilderLogger(*logger);
                 if (drv->builder == "builtin:fetchurl")
                     builtinFetchurl(*drv, netrcData);
                 else
@@ -3250,14 +3283,47 @@ void DerivationGoal::handleEOF(int fd)
 
 void DerivationGoal::flushLine()
 {
-    if (settings.verboseBuild &&
-        (settings.printRepeatedBuilds || curRound == 1))
-        printError(filterANSIEscapes(currentLogLine, true));
-    else {
-        logTail.push_back(currentLogLine);
-        if (logTail.size() > settings.logLines) logTail.pop_front();
+    if (hasPrefix(currentLogLine, "@nix ")) {
+
+        try {
+            auto json = nlohmann::json::parse(std::string(currentLogLine, 5));
+
+            std::string action = json["action"];
+
+            if (action == "start") {
+                auto type = (ActivityType) json["type"];
+                if (type == actDownload)
+                    builderActivities.emplace(std::piecewise_construct,
+                        std::forward_as_tuple(json["id"]),
+                        std::forward_as_tuple(*logger, type, json["text"]));
+            }
+
+            else if (action == "stop")
+                builderActivities.erase((ActivityId) json["id"]);
+
+            else if (action == "progress") {
+                auto i = builderActivities.find((ActivityId) json["id"]);
+                if (i != builderActivities.end())
+                    i->second.progress(json.value("done", 0), json.value("expected", 0), json.value("running", 0), json.value("failed", 0));
+            }
+
+        } catch (std::exception & e) {
+            printError("bad log message from builder: %s", e.what());
+        }
     }
-    act->result(resBuildLogLine, currentLogLine);
+
+    else {
+        if (settings.verboseBuild &&
+            (settings.printRepeatedBuilds || curRound == 1))
+            printError(filterANSIEscapes(currentLogLine, true));
+        else {
+            logTail.push_back(currentLogLine);
+            if (logTail.size() > settings.logLines) logTail.pop_front();
+        }
+
+        act->result(resBuildLogLine, currentLogLine);
+    }
+
     currentLogLine = "";
     currentLogLinePos = 0;
 }

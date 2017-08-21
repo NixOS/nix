@@ -18,6 +18,7 @@ with import ./release-common.nix { inherit pkgs; };
         customMemoryManagement = false;
       })
       autoreconfHook
+      nlohmann_json
 
       # For nix-perl
       perl
