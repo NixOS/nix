@@ -8,8 +8,6 @@
 
 #include <sys/ioctl.h>
 
-#include <iostream>
-
 namespace nix {
 
 static std::string getS(const std::vector<Logger::Field> & fields, size_t n)
