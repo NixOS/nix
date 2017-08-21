@@ -2407,17 +2407,32 @@ struct BuilderLogger : Logger
 
     void startActivity(ActivityId act, ActivityType type, const std::string & s) override
     {
-        log(lvlError, fmt("@nix {\"action\": \"start\", \"id\": %d, \"type\": %d, \"text\": \"%s\"}", act, type, s));
+        nlohmann::json json;
+        json["action"] = "start";
+        json["id"] = act;
+        json["type"] = type;
+        json["text"] = s;
+        log(lvlError, "@nix " + json.dump());
     }
 
     void stopActivity(ActivityId act) override
     {
-        log(lvlError, fmt("@nix {\"action\": \"stop\", \"id\": %d}", act));
+        nlohmann::json json;
+        json["action"] = "stop";
+        json["id"] = act;
+        log(lvlError, "@nix " + json.dump());
     }
 
     void progress(ActivityId act, uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) override
     {
-        log(lvlError, fmt("@nix {\"action\": \"progress\", \"id\": %d, \"done\": %d, \"expected\": %d, \"running\": %d, \"failed\": %d}", act, done, expected, running, failed));
+        nlohmann::json json;
+        json["action"] = "progress";
+        json["id"] = act;
+        json["done"] = done;
+        json["expected"] = expected;
+        json["running"] = running;
+        json["failed"] = failed;
+        log(lvlError, "@nix " + json.dump());
     }
 };
 
