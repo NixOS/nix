@@ -1,85 +1,37 @@
-Makefile.config
-perl/Makefile.config
+#Makefile.config
+#perl/Makefile.config
 
 # /
-/aclocal.m4
-/autom4te.cache
-/config.*
-/configure
-/nix.spec
-/stamp-h1
-/svn-revision
-/libtool
-
-/corepkgs/config.nix
-
-# /corepkgs/buildenv/
-/corepkgs/buildenv/builder.pl
-
-# /corepkgs/channels/
-/corepkgs/channels/unpack.sh
-
-# /corepkgs/nar/
-/corepkgs/nar/nar.sh
-/corepkgs/nar/unnar.sh
+#/aclocal.m4
+#/autom4te.cache
+#/config.*
+#/configure
+#/nix.spec
+#/stamp-h1
+#/svn-revision
+#/libtool
 
 # /doc/manual/
-/doc/manual/manual.html
-/doc/manual/manual.xmli
-/doc/manual/manual.pdf
-/doc/manual/manual.is-valid
-/doc/manual/*.1
-/doc/manual/*.5
-/doc/manual/*.8
+#/doc/manual/manual.html
+#/doc/manual/manual.xmli
+#/doc/manual/manual.pdf
+#/doc/manual/manual.is-valid
+#/doc/manual/*.1
+#/doc/manual/*.5
+#/doc/manual/*.8
 /doc/manual/version.txt
-
-# /scripts/
-/scripts/nix-profile.sh
-/scripts/nix-copy-closure
-/scripts/nix-reduce-build
-/scripts/nix-http-export.cgi
 
 # /src/libexpr/
 /src/libexpr/lexer-tab.cc
 /src/libexpr/lexer-tab.hh
 /src/libexpr/parser-tab.cc
 /src/libexpr/parser-tab.hh
-/src/libexpr/parser-tab.output
-/src/libexpr/nix.tbl
+#/src/libexpr/parser-tab.output
+#/src/libexpr/nix.tbl
 
 # /src/libstore/
 /src/libstore/*.gen.hh
 
-/src/nix/nix
-
-# /src/nix-env/
-/src/nix-env/nix-env
-
-# /src/nix-instantiate/
-/src/nix-instantiate/nix-instantiate
-
-# /src/nix-store/
-/src/nix-store/nix-store
-
-/src/nix-prefetch-url/nix-prefetch-url
-
-# /src/nix-daemon/
-/src/nix-daemon/nix-daemon
-
-/src/nix-collect-garbage/nix-collect-garbage
-
-# /src/nix-channel/
-/src/nix-channel/nix-channel
-
-# /src/buildenv/
-/src/buildenv/buildenv
-
-# /src/nix-build/
-/src/nix-build/nix-build
-
-/src/nix-copy-closure/nix-copy-closure
-
-/src/build-remote/build-remote
 
 # /tests/
 /tests/test-tmp
@@ -92,26 +44,11 @@ perl/Makefile.config
 /tests/lang/*.out.xml
 /tests/lang/*.ast
 
-/perl/lib/Nix/Config.pm
-/perl/lib/Nix/Store.cc
-
-/misc/systemd/nix-daemon.service
-/misc/systemd/nix-daemon.socket
-/misc/upstart/nix-daemon.conf
-
-inst/
-
-*.a
-*.o
-*.so
-*.dll
-*.exe
-*.dep
-*~
-*.pc
-
 # GNU Global
-GPATH
-GRTAGS
-GSYMS
-GTAGS
+# GPATH
+# GRTAGS
+# GSYMS
+# GTAGS
+
+# Out-of-source builds
+/build*/

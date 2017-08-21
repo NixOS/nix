@@ -15,7 +15,7 @@
 #include "command.hh"
 #include "finally.hh"
 
-#include "src/linenoise/linenoise.h"
+#include "linenoise/linenoise.h"
 
 namespace nix {
 

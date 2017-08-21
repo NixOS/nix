@@ -1,18 +1,24 @@
-if [ -n "$HOME" ] && [ -n "$USER" ]; then
-    __savedpath="$PATH"
+function configureNix()
+{
+    local __savedpath="$PATH"
     export PATH=@coreutils@
 
     # Set up the per-user profile.
     # This part should be kept in sync with nixpkgs:nixos/modules/programs/shell.nix
 
-    NIX_LINK=$HOME/.nix-profile
+    local NIX_LINK=$HOME/.nix-profile
 
-    NIX_USER_PROFILE_DIR=@localstatedir@/nix/profiles/per-user/$USER
-
+    if [ -z "$NIX_STATE_DIR" ]; then
+        local NIX_STATE_DIR=@localstatedir@
+    fi
+    local profiles="$NIX_STATE_DIR/profiles"
+    if [ -z "$NIX_USER_PROFILE_DIR" ]; then
+        local NIX_USER_PROFILE_DIR="$profiles/per-user/$USER"
+    fi
     mkdir -m 0755 -p "$NIX_USER_PROFILE_DIR"
 
     if [ "$(stat --printf '%u' "$NIX_USER_PROFILE_DIR")" != "$(id -u)" ]; then
-        echo "Nix: WARNING: bad ownership on "$NIX_USER_PROFILE_DIR", should be $(id -u)" >&2
+        echo "Nix: WARNING: bad ownership on $NIX_USER_PROFILE_DIR, should be $(id -u)" >&2
     fi
 
     if [ -w "$HOME" ]; then
@@ -24,7 +30,7 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
                 fi
             else
                 # Root installs in the system-wide profile by default.
-                ln -s @localstatedir@/nix/profiles/default "$NIX_LINK"
+                ln -s $profiles/default "$NIX_LINK"
             fi
         fi
 
@@ -34,21 +40,19 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
         fi
 
         # Create the per-user garbage collector roots directory.
-        __user_gcroots=@localstatedir@/nix/gcroots/per-user/"$USER"
+        local __user_gcroots="$NIX_STATE_DIR/gcroots/per-user/$USER"
         mkdir -m 0755 -p "$__user_gcroots"
         if [ "$(stat --printf '%u' "$__user_gcroots")" != "$(id -u)" ]; then
             echo "Nix: WARNING: bad ownership on $__user_gcroots, should be $(id -u)" >&2
         fi
-        unset __user_gcroots
 
         # Set up a default Nix expression from which to install stuff.
-        __nix_defexpr="$HOME"/.nix-defexpr
+        local __nix_defexpr="$HOME"/.nix-defexpr
         [ -L "$__nix_defexpr" ] && rm -f "$__nix_defexpr"
         mkdir -m 0755 -p "$__nix_defexpr"
         if [ "$USER" != root ] && [ ! -L "$__nix_defexpr"/channels_root ]; then
-            ln -s @localstatedir@/nix/profiles/per-user/root/channels "$__nix_defexpr"/channels_root
+            ln -s $profiles/per-user/root/channels "$__nix_defexpr"/channels_root
         fi
-        unset __nix_defexpr
     fi
 
     # Append ~/.nix-defexpr/channels/nixpkgs to $NIX_PATH so that
@@ -58,7 +62,7 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
 
     # Set up environment.
     # This part should be kept in sync with nixpkgs:nixos/modules/programs/environment.nix
-    NIX_PROFILES="@localstatedir@/nix/profiles/default $NIX_USER_PROFILE_DIR"
+    local NIX_PROFILES="$profiles/default $NIX_USER_PROFILE_DIR"
 
     for i in $NIX_PROFILES; do
         if [ -d "$i/lib/aspell" ]; then
@@ -81,10 +85,13 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
         export NIX_SSL_CERT_FILE="$NIX_LINK/etc/ca-bundle.crt"
     fi
 
-    if [ -n ${MANPATH} ]; then
+    if [ -n "${MANPATH}" ]; then
         export MANPATH="$NIX_LINK/share/man:$MANPATH"
     fi
 
     export PATH="$NIX_LINK/bin:$__savedpath"
-    unset __savedpath NIX_LINK NIX_USER_PROFILE_DIR NIX_PROFILES
+}
+
+if [ -n "$HOME" ] && [ -n "$USER" ]; then
+    configureNix
 fi
