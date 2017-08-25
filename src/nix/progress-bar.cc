@@ -6,8 +6,6 @@
 #include <map>
 #include <atomic>
 
-#include <sys/ioctl.h>
-
 namespace nix {
 
 static std::string getS(const std::vector<Logger::Field> & fields, size_t n)
@@ -99,15 +97,10 @@ private:
 
     Sync<State> state_;
 
-    int width = 0;
-
 public:
 
     ProgressBar()
     {
-        struct winsize ws;
-        if (ioctl(1, TIOCGWINSZ, &ws) == 0)
-            width = ws.ws_col;
     }
 
     ~ProgressBar()
@@ -270,7 +263,7 @@ public:
             }
         }
 
-        writeToStderr("\r" + ansiTruncate(line, width) + "\e[K");
+        writeToStderr("\r" + ansiTruncate(line, getWindowSize().second) + "\e[K");
     }
 
     std::string getStatus(State & state)

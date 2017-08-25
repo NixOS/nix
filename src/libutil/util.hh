@@ -349,6 +349,12 @@ bool hasSuffix(const string & s, const string & suffix);
 std::string toLower(const std::string & s);
 
 
+/* Escape a string that contains octal-encoded escape codes such as
+   used in /etc/fstab and /proc/mounts (e.g. "foo\040bar" decodes to
+   "foo bar"). */
+string decodeOctalEscaped(const string & s);
+
+
 /* Exception handling in destructors: print an error message, then
    ignore the exception. */
 void ignoreException();
@@ -468,6 +474,10 @@ struct MaintainCount
     MaintainCount(T & counter, long delta = 1) : counter(counter), delta(delta) { counter += delta; }
     ~MaintainCount() { counter -= delta; }
 };
+
+
+/* Return the number of rows and columns of the terminal. */
+std::pair<unsigned short, unsigned short> getWindowSize();
 
 
 }

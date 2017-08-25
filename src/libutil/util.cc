@@ -17,6 +17,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <pwd.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -1254,6 +1255,26 @@ void callFailure(const std::function<void(std::exception_ptr exc)> & failure, st
 }
 
 
+static Sync<std::pair<unsigned short, unsigned short>> windowSize{{0, 0}};
+
+
+static void updateWindowSize()
+{
+    struct winsize ws;
+    if (ioctl(1, TIOCGWINSZ, &ws) == 0) {
+        auto windowSize_(windowSize.lock());
+        windowSize_->first = ws.ws_row;
+        windowSize_->second = ws.ws_col;
+    }
+}
+
+
+std::pair<unsigned short, unsigned short> getWindowSize()
+{
+    return *windowSize.lock();
+}
+
+
 static Sync<std::list<std::function<void()>>> _interruptCallbacks;
 
 static void signalHandlerThread(sigset_t set)
@@ -1264,6 +1285,10 @@ static void signalHandlerThread(sigset_t set)
 
         if (signal == SIGINT || signal == SIGTERM || signal == SIGHUP)
             triggerInterrupt();
+
+        else if (signal == SIGWINCH) {
+            updateWindowSize();
+        }
     }
 }
 
@@ -1287,6 +1312,8 @@ static sigset_t savedSignalMask;
 
 void startSignalHandlerThread()
 {
+    updateWindowSize();
+
     if (sigprocmask(SIG_BLOCK, nullptr, &savedSignalMask))
         throw SysError("quering signal mask");
 
@@ -1296,6 +1323,7 @@ void startSignalHandlerThread()
     sigaddset(&set, SIGTERM);
     sigaddset(&set, SIGHUP);
     sigaddset(&set, SIGPIPE);
+    sigaddset(&set, SIGWINCH);
     if (pthread_sigmask(SIG_BLOCK, &set, nullptr))
         throw SysError("blocking signals");
 
