@@ -24,6 +24,44 @@ static uint64_t getI(const std::vector<Logger::Field> & fields, size_t n)
     return fields[n].i;
 }
 
+/* Truncate a string to 'width' printable characters. ANSI escape
+   sequences are copied but not included in the character count. Also,
+   tabs are expanded to spaces. */
+static std::string ansiTruncate(const std::string & s, int width)
+{
+    if (width <= 0) return s;
+
+    std::string t;
+    size_t w = 0;
+    auto i = s.begin();
+
+    while (w < (size_t) width && i != s.end()) {
+        if (*i == '\e') {
+            t += *i++;
+            if (i != s.end() && *i == '[') {
+                t += *i++;
+                while (i != s.end() && (*i < 0x40 || *i > 0x7e)) {
+                    t += *i++;
+                }
+                if (i != s.end()) t += *i++;
+            }
+        }
+
+        else if (*i == '\t') {
+            t += ' '; w++;
+            while (w < (size_t) width && w & 8) {
+                t += ' '; w++;
+            }
+        }
+
+        else {
+            t += *i++; w++;
+        }
+    }
+
+    return t;
+}
+
 class ProgressBar : public Logger
 {
 private:
@@ -89,7 +127,7 @@ public:
 
     void log(State & state, Verbosity lvl, const std::string & s)
     {
-        writeToStderr("\r\e[K" + s + "\n");
+        writeToStderr("\r\e[K" + s + ANSI_NORMAL "\n");
         update(state);
     }
 
@@ -207,7 +245,7 @@ public:
 
     void update(State & state)
     {
-        std::string line = "\r";
+        std::string line;
 
         std::string status = getStatus(state);
         if (!status.empty()) {
@@ -232,8 +270,7 @@ public:
             }
         }
 
-        line += "\e[K";
-        writeToStderr(std::string(line, 0, width - 1));
+        writeToStderr("\r" + ansiTruncate(line, width) + "\e[K");
     }
 
     std::string getStatus(State & state)
