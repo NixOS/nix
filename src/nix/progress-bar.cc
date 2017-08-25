@@ -66,7 +66,7 @@ private:
 
     struct ActInfo
     {
-        std::string s, s2;
+        std::string s, lastLine, phase;
         ActivityType type = actUnknown;
         uint64_t done = 0;
         uint64_t expected = 0;
@@ -232,13 +232,13 @@ public:
         }
 
         else if (type == resBuildLogLine) {
-            auto s2 = trim(getS(fields, 0));
-            if (!s2.empty()) {
+            auto lastLine = trim(getS(fields, 0));
+            if (!lastLine.empty()) {
                 auto i = state->its.find(act);
                 assert(i != state->its.end());
                 ActInfo info = *i->second;
                 state->activities.erase(i->second);
-                info.s2 = s2;
+                info.lastLine = lastLine;
                 state->activities.emplace_back(info);
                 i->second = std::prev(state->activities.end());
                 update(*state);
@@ -253,6 +253,12 @@ public:
         else if (type == resCorruptedPath) {
             state->corruptedPaths++;
             update(*state);
+        }
+
+        else if (type == resSetPhase) {
+            auto i = state->its.find(act);
+            assert(i != state->its.end());
+            i->second->phase = getS(fields, 0);
         }
     }
 
@@ -277,14 +283,19 @@ public:
             if (!status.empty()) line += " ";
             auto i = state.activities.rbegin();
 
-            while (i != state.activities.rend() && (!i->visible || (i->s.empty() && i->s2.empty())))
+            while (i != state.activities.rend() && (!i->visible || (i->s.empty() && i->lastLine.empty())))
                 ++i;
 
             if (i != state.activities.rend()) {
                 line += i->s;
-                if (!i->s2.empty()) {
+                if (!i->phase.empty()) {
+                    line += " (";
+                    line += i->phase;
+                    line += ")";
+                }
+                if (!i->lastLine.empty()) {
                     if (!i->s.empty()) line += ": ";
-                    line += i->s2;
+                    line += i->lastLine;
                 }
             }
         }

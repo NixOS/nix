@@ -3325,6 +3325,11 @@ void DerivationGoal::flushLine()
                     i->second.progress(json.value("done", 0), json.value("expected", 0), json.value("running", 0), json.value("failed", 0));
             }
 
+            else if (action == "setPhase") {
+                std::string phase = json["phase"];
+                act->result(resSetPhase, phase);
+            }
+
         } catch (std::exception & e) {
             printError("bad log message from builder: %s", e.what());
         }

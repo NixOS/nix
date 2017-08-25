@@ -31,6 +31,7 @@ typedef enum {
     resBuildLogLine = 101,
     resUntrustedPath = 102,
     resCorruptedPath = 103,
+    resSetPhase = 104,
 } ResultType;
 
 typedef uint64_t ActivityId;
