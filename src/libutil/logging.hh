@@ -23,6 +23,7 @@ typedef enum {
     actBuild = 105,
     actOptimiseStore = 106,
     actVerifyPaths = 107,
+    actSubstitute = 108,
 } ActivityType;
 
 typedef enum {
@@ -65,7 +66,7 @@ public:
     virtual void warn(const std::string & msg);
 
     virtual void startActivity(ActivityId act, ActivityType type,
-        const std::string & s, const Fields & fields) { };
+        const std::string & s, const Fields & fields, ActivityId parent) { };
 
     virtual void stopActivity(ActivityId act) { };
 
@@ -76,6 +77,8 @@ public:
     virtual void result(ActivityId act, ResultType type, const Fields & fields) { };
 };
 
+extern thread_local ActivityId curActivity;
+
 struct Activity
 {
     Logger & logger;
@@ -83,7 +86,7 @@ struct Activity
     const ActivityId id;
 
     Activity(Logger & logger, ActivityType type, const std::string & s = "",
-        const Logger::Fields & fields = {});
+        const Logger::Fields & fields = {}, ActivityId parent = curActivity);
 
     Activity(const Activity & act) = delete;
 
@@ -105,6 +108,13 @@ struct Activity
     }
 
     friend class Logger;
+};
+
+struct PushActivity
+{
+    const ActivityId prevAct;
+    PushActivity(ActivityId act) : prevAct(curActivity) { curActivity = act; }
+    ~PushActivity() { curActivity = prevAct; }
 };
 
 extern Logger * logger;

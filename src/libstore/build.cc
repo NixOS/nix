@@ -2407,14 +2407,14 @@ struct BuilderLogger : Logger
     }
 
     void startActivity(ActivityId act, ActivityType type,
-        const std::string & s, const Fields & fields) override
+        const std::string & s, const Fields & fields, ActivityId parent) override
     {
         nlohmann::json json;
         json["action"] = "start";
         json["id"] = act;
         json["type"] = type;
         json["text"] = s;
-        // FIXME: handle fields
+        // FIXME: handle fields, parent
         log(lvlError, "@nix " + json.dump());
     }
 
@@ -3313,7 +3313,7 @@ void DerivationGoal::flushLine()
                 if (type == actDownload)
                     builderActivities.emplace(std::piecewise_construct,
                         std::forward_as_tuple(json["id"]),
-                        std::forward_as_tuple(*logger, type, json["text"]));
+                        std::forward_as_tuple(*logger, type, json["text"], Logger::Fields{}, act->id));
             }
 
             else if (action == "stop")
@@ -3654,6 +3654,9 @@ void SubstitutionGoal::tryToRun()
         try {
             /* Wake up the worker loop when we're done. */
             Finally updateStats([this]() { outPipe.writeSide = -1; });
+
+            Activity act(*logger, actSubstitute, "", Logger::Fields{storePath, sub->getUri()});
+            PushActivity pact(act.id);
 
             copyStorePath(ref<Store>(sub), ref<Store>(worker.store.shared_from_this()),
                 storePath, repair);

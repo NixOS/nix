@@ -16,8 +16,10 @@ struct DownloadRequest
     bool head = false;
     size_t tries = 5;
     unsigned int baseRetryTimeMs = 250;
+    ActivityId parentAct;
 
-    DownloadRequest(const std::string & uri) : uri(uri) { }
+    DownloadRequest(const std::string & uri)
+        : uri(uri), parentAct(curActivity) { }
 };
 
 struct DownloadResult

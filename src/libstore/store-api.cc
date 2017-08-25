@@ -565,7 +565,9 @@ void Store::buildPaths(const PathSet & paths, BuildMode buildMode)
 void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     const Path & storePath, RepairFlag repair, CheckSigsFlag checkSigs)
 {
-    Activity act(*logger, actCopyPath, fmt("copying path '%s'", storePath));
+    Activity act(*logger, actCopyPath, fmt("copying path '%s'", storePath),
+        {storePath, srcStore->getUri(), dstStore->getUri()});
+    PushActivity pact(act.id);
 
     auto info = srcStore->queryPathInfo(storePath);
 

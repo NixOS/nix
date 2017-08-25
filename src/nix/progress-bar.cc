@@ -73,6 +73,8 @@ private:
         uint64_t running = 0;
         uint64_t failed = 0;
         std::map<ActivityType, uint64_t> expectedByType;
+        bool visible = true;
+        ActivityId parent;
     };
 
     struct ActivitiesByType
@@ -125,7 +127,7 @@ public:
     }
 
     void startActivity(ActivityId act, ActivityType type, const std::string & s,
-        const Fields & fields) override
+        const Fields & fields, ActivityId parent) override
     {
         auto state(state_.lock());
 
@@ -133,6 +135,7 @@ public:
         auto i = std::prev(state->activities.end());
         i->s = s;
         i->type = type;
+        i->parent = parent;
         state->its.emplace(act, i);
         state->activitiesByType[type].its.emplace(act, i);
 
@@ -143,7 +146,28 @@ public:
             i->s = fmt("building " ANSI_BOLD "%s" ANSI_NORMAL, name);
         }
 
+        if (type == actSubstitute) {
+            auto name = storePathToName(getS(fields, 0));
+            i->s = fmt("fetching " ANSI_BOLD "%s" ANSI_NORMAL " from %s", name, getS(fields, 1));
+        }
+
+        if ((type == actDownload && hasAncestor(*state, actCopyPath, parent))
+            || (type == actCopyPath && hasAncestor(*state, actSubstitute, parent)))
+            i->visible = false;
+
         update(*state);
+    }
+
+    /* Check whether an activity has an ancestore with the specified
+       type. */
+    bool hasAncestor(State & state, ActivityType type, ActivityId act)
+    {
+        while (act != 0) {
+            auto i = state.its.find(act);
+            if (i == state.its.end()) break;
+            if (i->second->type == type) return true;
+        }
+        return false;
     }
 
     void stopActivity(ActivityId act) override
@@ -253,7 +277,7 @@ public:
             if (!status.empty()) line += " ";
             auto i = state.activities.rbegin();
 
-            while (i != state.activities.rend() && i->s.empty() && i->s2.empty())
+            while (i != state.activities.rend() && (!i->visible || (i->s.empty() && i->s2.empty())))
                 ++i;
 
             if (i != state.activities.rend()) {

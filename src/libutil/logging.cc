@@ -5,6 +5,8 @@
 
 namespace nix {
 
+thread_local ActivityId curActivity = 0;
+
 Logger * logger = makeDefaultLogger();
 
 void Logger::warn(const std::string & msg)
@@ -75,10 +77,10 @@ Logger * makeDefaultLogger()
 std::atomic<uint64_t> nextId{(uint64_t) getpid() << 32};
 
 Activity::Activity(Logger & logger, ActivityType type,
-    const std::string & s, const Logger::Fields & fields)
+    const std::string & s, const Logger::Fields & fields, ActivityId parent)
     : logger(logger), id(nextId++)
 {
-    logger.startActivity(id, type, s, fields);
+    logger.startActivity(id, type, s, fields, parent);
 }
 
 }
