@@ -129,8 +129,10 @@ public:
     {
         auto state(state_.lock());
 
-        state->activities.emplace_back(ActInfo{s, "", type});
+        state->activities.emplace_back(ActInfo());
         auto i = std::prev(state->activities.end());
+        i->s = s;
+        i->type = type;
         state->its.emplace(act, i);
         state->activitiesByType[type].its.emplace(act, i);
 
