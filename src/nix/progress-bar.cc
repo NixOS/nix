@@ -166,6 +166,7 @@ public:
             auto i = state.its.find(act);
             if (i == state.its.end()) break;
             if (i->second->type == type) return true;
+            act = i->second->parent;
         }
         return false;
     }
