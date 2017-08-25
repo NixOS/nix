@@ -2401,6 +2401,19 @@ struct BuilderLogger : Logger
 
     BuilderLogger(Logger & prevLogger) : prevLogger(prevLogger) { }
 
+    void addFields(nlohmann::json & json, const Fields & fields)
+    {
+        if (fields.empty()) return;
+        auto & arr = json["fields"] = nlohmann::json::array();
+        for (auto & f : fields)
+            if (f.type == Logger::Field::tInt)
+                arr.push_back(f.i);
+            else if (f.type == Logger::Field::tString)
+                arr.push_back(f.s);
+            else
+                abort();
+    }
+
     void log(Verbosity lvl, const FormatOrString & fs) override
     {
         prevLogger.log(lvl, fs);
@@ -2414,7 +2427,8 @@ struct BuilderLogger : Logger
         json["id"] = act;
         json["type"] = type;
         json["text"] = s;
-        // FIXME: handle fields, parent
+        addFields(json, fields);
+        // FIXME: handle parent
         log(lvlError, "@nix " + json.dump());
     }
 
@@ -2426,15 +2440,13 @@ struct BuilderLogger : Logger
         log(lvlError, "@nix " + json.dump());
     }
 
-    void progress(ActivityId act, uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) override
+    void result(ActivityId act, ResultType type, const Fields & fields) override
     {
         nlohmann::json json;
-        json["action"] = "progress";
+        json["action"] = "result";
         json["id"] = act;
-        json["done"] = done;
-        json["expected"] = expected;
-        json["running"] = running;
-        json["failed"] = failed;
+        json["type"] = type;
+        addFields(json, fields);
         log(lvlError, "@nix " + json.dump());
     }
 };
@@ -3299,6 +3311,20 @@ void DerivationGoal::handleEOF(int fd)
 }
 
 
+static Logger::Fields getFields(nlohmann::json & json)
+{
+    Logger::Fields fields;
+    for (auto & f : json) {
+        if (f.type() == nlohmann::json::value_t::number_unsigned)
+            fields.emplace_back(Logger::Field(f.get<uint64_t>()));
+        else if (f.type() == nlohmann::json::value_t::string)
+            fields.emplace_back(Logger::Field(f.get<std::string>()));
+        else throw Error("unsupported JSON type %d", (int) f.type());
+    }
+    return fields;
+}
+
+
 void DerivationGoal::flushLine()
 {
     if (hasPrefix(currentLogLine, "@nix ")) {
@@ -3313,16 +3339,16 @@ void DerivationGoal::flushLine()
                 if (type == actDownload)
                     builderActivities.emplace(std::piecewise_construct,
                         std::forward_as_tuple(json["id"]),
-                        std::forward_as_tuple(*logger, type, json["text"], Logger::Fields{}, act->id));
+                        std::forward_as_tuple(*logger, type, json["text"], getFields(json["fields"]), act->id));
             }
 
             else if (action == "stop")
                 builderActivities.erase((ActivityId) json["id"]);
 
-            else if (action == "progress") {
+            else if (action == "result") {
                 auto i = builderActivities.find((ActivityId) json["id"]);
                 if (i != builderActivities.end())
-                    i->second.progress(json.value("done", 0), json.value("expected", 0), json.value("running", 0), json.value("failed", 0));
+                    i->second.result((ResultType) json["type"], getFields(json["fields"]));
             }
 
             else if (action == "setPhase") {

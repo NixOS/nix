@@ -32,6 +32,7 @@ typedef enum {
     resUntrustedPath = 102,
     resCorruptedPath = 103,
     resSetPhase = 104,
+    resProgress = 105,
 } ResultType;
 
 typedef uint64_t ActivityId;
@@ -71,8 +72,6 @@ public:
 
     virtual void stopActivity(ActivityId act) { };
 
-    virtual void progress(ActivityId act, uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) { };
-
     virtual void setExpected(ActivityId act, ActivityType type, uint64_t expected) { };
 
     virtual void result(ActivityId act, ResultType type, const Fields & fields) { };
@@ -95,16 +94,21 @@ struct Activity
     { logger.stopActivity(id); }
 
     void progress(uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) const
-    { logger.progress(id, done, expected, running, failed); }
+    { result(resProgress, done, expected, running, failed); }
 
     void setExpected(ActivityType type2, uint64_t expected) const
     { logger.setExpected(id, type2, expected); }
 
     template<typename... Args>
-    void result(ResultType type, const Args & ... args)
+    void result(ResultType type, const Args & ... args) const
     {
         Logger::Fields fields;
         nop{(fields.emplace_back(Logger::Field(args)), 1)...};
+        result(type, fields);
+    }
+
+    void result(ResultType type, const Logger::Fields & fields) const
+    {
         logger.result(id, type, fields);
     }
 

@@ -192,21 +192,6 @@ public:
         update(*state);
     }
 
-    void progress(ActivityId act, uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) override
-    {
-        auto state(state_.lock());
-
-        auto i = state->its.find(act);
-        assert(i != state->its.end());
-        ActInfo & actInfo = *i->second;
-        actInfo.done = done;
-        actInfo.expected = expected;
-        actInfo.running = running;
-        actInfo.failed = failed;
-
-        update(*state);
-    }
-
     void setExpected(ActivityId act, ActivityType type, uint64_t expected) override
     {
         auto state(state_.lock());
@@ -260,6 +245,18 @@ public:
             auto i = state->its.find(act);
             assert(i != state->its.end());
             i->second->phase = getS(fields, 0);
+            update(*state);
+        }
+
+        else if (type == resProgress) {
+            auto i = state->its.find(act);
+            assert(i != state->its.end());
+            ActInfo & actInfo = *i->second;
+            actInfo.done = getI(fields, 0);
+            actInfo.expected = getI(fields, 1);
+            actInfo.running = getI(fields, 2);
+            actInfo.failed = getI(fields, 3);
+            update(*state);
         }
     }
 
