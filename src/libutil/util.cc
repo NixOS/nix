@@ -1171,7 +1171,7 @@ string filterANSIEscapes(const string & s, bool nixOnly)
             }
         } else {
             r += c;
-            if (c >= 0x40 && c != 0x7e) {
+            if (c >= 0x40 && c <= 0x7e) {
                 if (nixOnly && (c != 'p' && c != 'q' && c != 's' && c != 'a' && c != 'b'))
                     t += r;
                 state = stTop;
