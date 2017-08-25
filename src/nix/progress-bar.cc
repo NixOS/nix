@@ -93,7 +93,8 @@ public:
         update(state);
     }
 
-    void startActivity(ActivityId act, ActivityType type, const std::string & s) override
+    void startActivity(ActivityId act, ActivityType type, const std::string & s,
+        const Fields & fields) override
     {
         auto state(state_.lock());
 
@@ -101,6 +102,13 @@ public:
         auto i = std::prev(state->activities.end());
         state->its.emplace(act, i);
         state->activitiesByType[type].its.emplace(act, i);
+
+        if (type == actBuild) {
+            auto name = storePathToName(getS(fields, 0));
+            if (hasSuffix(name, ".drv"))
+                name.resize(name.size() - 4);
+            i->s = fmt("building " ANSI_BOLD "%s" ANSI_NORMAL, name);
+        }
 
         update(*state);
     }

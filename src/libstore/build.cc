@@ -1390,7 +1390,8 @@ void DerivationGoal::tryToBuild()
     bool buildLocally = buildMode != bmNormal || drv->willBuildLocally();
 
     auto started = [&]() {
-        act = std::make_unique<Activity>(*logger, actBuild, fmt("building '%s'", drvPath));
+        act = std::make_unique<Activity>(*logger, actBuild,
+            fmt("building '%s'", drvPath), Logger::Fields{drvPath});
         mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
         worker.updateProgress();
     };
@@ -2405,13 +2406,15 @@ struct BuilderLogger : Logger
         prevLogger.log(lvl, fs);
     }
 
-    void startActivity(ActivityId act, ActivityType type, const std::string & s) override
+    void startActivity(ActivityId act, ActivityType type,
+        const std::string & s, const Fields & fields) override
     {
         nlohmann::json json;
         json["action"] = "start";
         json["id"] = act;
         json["type"] = type;
         json["text"] = s;
+        // FIXME: handle fields
         log(lvlError, "@nix " + json.dump());
     }
 

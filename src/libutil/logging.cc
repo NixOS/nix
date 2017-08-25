@@ -74,10 +74,11 @@ Logger * makeDefaultLogger()
 
 std::atomic<uint64_t> nextId{(uint64_t) getpid() << 32};
 
-Activity::Activity(Logger & logger, ActivityType type, const std::string & s)
+Activity::Activity(Logger & logger, ActivityType type,
+    const std::string & s, const Logger::Fields & fields)
     : logger(logger), id(nextId++)
 {
-    logger.startActivity(id, type, s);
+    logger.startActivity(id, type, s, fields);
 }
 
 }

@@ -40,25 +40,6 @@ class Logger
 
 public:
 
-    virtual ~Logger() { }
-
-    virtual void log(Verbosity lvl, const FormatOrString & fs) = 0;
-
-    void log(const FormatOrString & fs)
-    {
-        log(lvlInfo, fs);
-    }
-
-    virtual void warn(const std::string & msg);
-
-    virtual void startActivity(ActivityId act, ActivityType type, const std::string & s) { };
-
-    virtual void stopActivity(ActivityId act) { };
-
-    virtual void progress(ActivityId act, uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) { };
-
-    virtual void setExpected(ActivityId act, ActivityType type, uint64_t expected) { };
-
     struct Field
     {
         // FIXME: use std::variant.
@@ -70,7 +51,29 @@ public:
         Field(const uint64_t & i) : type(tInt), i(i) { }
     };
 
-    virtual void result(ActivityId act, ResultType type, const std::vector<Field> & fields) { };
+    typedef std::vector<Field> Fields;
+
+    virtual ~Logger() { }
+
+    virtual void log(Verbosity lvl, const FormatOrString & fs) = 0;
+
+    void log(const FormatOrString & fs)
+    {
+        log(lvlInfo, fs);
+    }
+
+    virtual void warn(const std::string & msg);
+
+    virtual void startActivity(ActivityId act, ActivityType type,
+        const std::string & s, const Fields & fields) { };
+
+    virtual void stopActivity(ActivityId act) { };
+
+    virtual void progress(ActivityId act, uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) { };
+
+    virtual void setExpected(ActivityId act, ActivityType type, uint64_t expected) { };
+
+    virtual void result(ActivityId act, ResultType type, const Fields & fields) { };
 };
 
 struct Activity
@@ -79,7 +82,8 @@ struct Activity
 
     const ActivityId id;
 
-    Activity(Logger & logger, ActivityType type, const std::string & s = "");
+    Activity(Logger & logger, ActivityType type, const std::string & s = "",
+        const Logger::Fields & fields = {});
 
     Activity(const Activity & act) = delete;
 
@@ -95,7 +99,7 @@ struct Activity
     template<typename... Args>
     void result(ResultType type, const Args & ... args)
     {
-        std::vector<Logger::Field> fields;
+        Logger::Fields fields;
         nop{(fields.emplace_back(Logger::Field(args)), 1)...};
         logger.result(id, type, fields);
     }
