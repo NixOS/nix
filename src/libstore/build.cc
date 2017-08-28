@@ -1390,7 +1390,7 @@ void DerivationGoal::tryToBuild()
     bool buildLocally = buildMode != bmNormal || drv->willBuildLocally();
 
     auto started = [&]() {
-        act = std::make_unique<Activity>(*logger, actBuild,
+        act = std::make_unique<Activity>(*logger, lvlInfo, actBuild,
             fmt("building '%s'", drvPath), Logger::Fields{drvPath});
         mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
         worker.updateProgress();
@@ -2419,12 +2419,13 @@ struct BuilderLogger : Logger
         prevLogger.log(lvl, fs);
     }
 
-    void startActivity(ActivityId act, ActivityType type,
+    void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
         const std::string & s, const Fields & fields, ActivityId parent) override
     {
         nlohmann::json json;
         json["action"] = "start";
         json["id"] = act;
+        json["level"] = lvl;
         json["type"] = type;
         json["text"] = s;
         addFields(json, fields);
@@ -3339,7 +3340,8 @@ void DerivationGoal::flushLine()
                 if (type == actDownload)
                     builderActivities.emplace(std::piecewise_construct,
                         std::forward_as_tuple(json["id"]),
-                        std::forward_as_tuple(*logger, type, json["text"], getFields(json["fields"]), act->id));
+                        std::forward_as_tuple(*logger, (Verbosity) json["level"], type,
+                            json["text"], getFields(json["fields"]), act->id));
             }
 
             else if (action == "stop")
@@ -3686,7 +3688,7 @@ void SubstitutionGoal::tryToRun()
             /* Wake up the worker loop when we're done. */
             Finally updateStats([this]() { outPipe.writeSide = -1; });
 
-            Activity act(*logger, actSubstitute, "", Logger::Fields{storePath, sub->getUri()});
+            Activity act(*logger, actSubstitute, Logger::Fields{storePath, sub->getUri()});
             PushActivity pact(act.id);
 
             copyStorePath(ref<Store>(sub), ref<Store>(worker.store.shared_from_this()),

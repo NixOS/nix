@@ -126,9 +126,12 @@ public:
         update(state);
     }
 
-    void startActivity(ActivityId act, ActivityType type, const std::string & s,
-        const Fields & fields, ActivityId parent) override
+    void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
+        const std::string & s, const Fields & fields, ActivityId parent) override
     {
+        if (lvl <= verbosity && !s.empty())
+            log(lvl, s + "...");
+
         auto state(state_.lock());
 
         state->activities.emplace_back(ActInfo());

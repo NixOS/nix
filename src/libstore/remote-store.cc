@@ -679,11 +679,12 @@ void RemoteStore::Connection::processStderr(Sink * sink, Source * source)
 
         else if (msg == STDERR_START_ACTIVITY) {
             auto act = readNum<ActivityId>(from);
+            auto lvl = (Verbosity) readInt(from);
             auto type = (ActivityType) readInt(from);
             auto s = readString(from);
             auto fields = readFields(from);
             auto parent = readNum<ActivityId>(from);
-            logger->startActivity(act, type, s, fields, parent);
+            logger->startActivity(act, lvl, type, s, fields, parent);
         }
 
         else if (msg == STDERR_STOP_ACTIVITY) {

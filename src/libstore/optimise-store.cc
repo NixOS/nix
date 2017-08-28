@@ -266,7 +266,7 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
         addTempRoot(i);
         if (!isValidPath(i)) continue; /* path was GC'ed, probably */
         {
-            Activity act(*logger, actUnknown, fmt("optimising path '%s'", i));
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", i));
             optimisePath_(&act, stats, realStoreDir + "/" + baseNameOf(i), inodeHash);
         }
         done++;

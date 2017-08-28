@@ -565,7 +565,7 @@ void Store::buildPaths(const PathSet & paths, BuildMode buildMode)
 void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     const Path & storePath, RepairFlag repair, CheckSigsFlag checkSigs)
 {
-    Activity act(*logger, actCopyPath, fmt("copying path '%s'", storePath),
+    Activity act(*logger, lvlInfo, actCopyPath, fmt("copying path '%s'", storePath),
         {storePath, srcStore->getUri(), dstStore->getUri()});
     PushActivity pact(act.id);
 
@@ -623,7 +623,7 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const PathSet & storePa
     for (auto & path : storePaths)
         if (!valid.count(path)) missing.insert(path);
 
-    Activity act(*logger, actCopyPaths, fmt("copying %d paths", missing.size()));
+    Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
 
     std::atomic<size_t> nrDone{0};
     std::atomic<uint64_t> bytesExpected{0};

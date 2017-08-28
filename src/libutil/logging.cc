@@ -45,6 +45,13 @@ public:
 
         writeToStderr(prefix + (tty ? fs.s : filterANSIEscapes(fs.s)) + "\n");
     }
+
+    void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
+        const std::string & s, const Fields & fields, ActivityId parent)
+    {
+        if (lvl <= verbosity && !s.empty())
+            log(lvl, s + "...");
+    }
 };
 
 Verbosity verbosity = lvlInfo;
@@ -76,11 +83,11 @@ Logger * makeDefaultLogger()
 
 std::atomic<uint64_t> nextId{(uint64_t) getpid() << 32};
 
-Activity::Activity(Logger & logger, ActivityType type,
+Activity::Activity(Logger & logger, Verbosity lvl, ActivityType type,
     const std::string & s, const Logger::Fields & fields, ActivityId parent)
     : logger(logger), id(nextId++)
 {
-    logger.startActivity(id, type, s, fields, parent);
+    logger.startActivity(id, lvl, type, s, fields, parent);
 }
 
 }

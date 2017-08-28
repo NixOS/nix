@@ -149,12 +149,17 @@ struct TunnelLogger : public Logger
         }
     }
 
-    void startActivity(ActivityId act, ActivityType type,
+    void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
         const std::string & s, const Fields & fields, ActivityId parent) override
     {
-        if (GET_PROTOCOL_MINOR(clientVersion) < 20) return;
+        if (GET_PROTOCOL_MINOR(clientVersion) < 20) {
+            if (!s.empty())
+                log(lvl, s + "...");
+            return;
+        }
+
         StringSink buf;
-        buf << STDERR_START_ACTIVITY << act << type << s << fields << parent;
+        buf << STDERR_START_ACTIVITY << act << lvl << type << s << fields << parent;
         enqueueMsg(*buf.s);
     }
 

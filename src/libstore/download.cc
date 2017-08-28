@@ -85,7 +85,7 @@ struct CurlDownloader : public Downloader
         DownloadItem(CurlDownloader & downloader, const DownloadRequest & request)
             : downloader(downloader)
             , request(request)
-            , act(*logger, actDownload, fmt("downloading '%s'", request.uri), {}, request.parentAct)
+            , act(*logger, lvlTalkative, actDownload, fmt("downloading '%s'", request.uri), {}, request.parentAct)
         {
             if (!request.expectedETag.empty())
                 requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + request.expectedETag).c_str());

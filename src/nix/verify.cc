@@ -79,7 +79,7 @@ struct CmdVerify : StorePathsCommand
             try {
                 checkInterrupt();
 
-                Activity act2(*logger, actUnknown, fmt("checking '%s'", storePath));
+                Activity act2(*logger, lvlInfo, actUnknown, fmt("checking '%s'", storePath));
 
                 MaintainCount<std::atomic<size_t>> mcActive(active);
                 update();

@@ -68,7 +68,7 @@ public:
 
     virtual void warn(const std::string & msg);
 
-    virtual void startActivity(ActivityId act, ActivityType type,
+    virtual void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
         const std::string & s, const Fields & fields, ActivityId parent) { };
 
     virtual void stopActivity(ActivityId act) { };
@@ -84,8 +84,12 @@ struct Activity
 
     const ActivityId id;
 
-    Activity(Logger & logger, ActivityType type, const std::string & s = "",
+    Activity(Logger & logger, Verbosity lvl, ActivityType type, const std::string & s = "",
         const Logger::Fields & fields = {}, ActivityId parent = curActivity);
+
+    Activity(Logger & logger, ActivityType type,
+        const Logger::Fields & fields = {}, ActivityId parent = curActivity)
+        : Activity(logger, lvlError, type, "", fields, parent) { };
 
     Activity(const Activity & act) = delete;
 
