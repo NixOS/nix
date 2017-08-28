@@ -84,6 +84,10 @@ struct TunnelLogger : public Logger
 
     Sync<State> state_;
 
+    unsigned int clientVersion;
+
+    TunnelLogger(unsigned int clientVersion) : clientVersion(clientVersion) { }
+
     void enqueueMsg(const std::string & s)
     {
         auto state(state_.lock());
@@ -148,6 +152,7 @@ struct TunnelLogger : public Logger
     void startActivity(ActivityId act, ActivityType type,
         const std::string & s, const Fields & fields, ActivityId parent) override
     {
+        if (GET_PROTOCOL_MINOR(clientVersion) < 20) return;
         StringSink buf;
         buf << STDERR_START_ACTIVITY << act << type << s << fields << parent;
         enqueueMsg(*buf.s);
@@ -155,6 +160,7 @@ struct TunnelLogger : public Logger
 
     void stopActivity(ActivityId act) override
     {
+        if (GET_PROTOCOL_MINOR(clientVersion) < 20) return;
         StringSink buf;
         buf << STDERR_STOP_ACTIVITY << act;
         enqueueMsg(*buf.s);
@@ -162,6 +168,7 @@ struct TunnelLogger : public Logger
 
     void result(ActivityId act, ResultType type, const Fields & fields) override
     {
+        if (GET_PROTOCOL_MINOR(clientVersion) < 20) return;
         StringSink buf;
         buf << STDERR_RESULT << act << type << fields;
         enqueueMsg(*buf.s);
@@ -710,17 +717,6 @@ static void processConnection(bool trusted)
 {
     MonitorFdHup monitor(from.fd);
 
-    auto tunnelLogger = new TunnelLogger();
-    auto prevLogger = nix::logger;
-    logger = tunnelLogger;
-
-    unsigned int opCount = 0;
-
-    Finally finally([&]() {
-        _isInterrupted = false;
-        prevLogger->log(lvlDebug, fmt("%d operations", opCount));
-    });
-
     /* Exchange the greeting. */
     unsigned int magic = readInt(from);
     if (magic != WORKER_MAGIC_1) throw Error("protocol mismatch");
@@ -730,6 +726,17 @@ static void processConnection(bool trusted)
 
     if (clientVersion < 0x10a)
         throw Error("the Nix client version is too old");
+
+    auto tunnelLogger = new TunnelLogger(clientVersion);
+    auto prevLogger = nix::logger;
+    logger = tunnelLogger;
+
+    unsigned int opCount = 0;
+
+    Finally finally([&]() {
+        _isInterrupted = false;
+        prevLogger->log(lvlDebug, fmt("%d operations", opCount));
+    });
 
     if (GET_PROTOCOL_MINOR(clientVersion) >= 14 && readInt(from))
         setAffinityTo(readInt(from));
