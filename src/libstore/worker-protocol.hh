@@ -57,6 +57,9 @@ typedef enum {
 #define STDERR_WRITE 0x64617416 // data for sink
 #define STDERR_LAST  0x616c7473
 #define STDERR_ERROR 0x63787470
+#define STDERR_START_ACTIVITY 0x53545254
+#define STDERR_STOP_ACTIVITY  0x53544f50
+#define STDERR_RESULT         0x52534c54
 
 
 Path readStorePath(Store & store, Source & from);

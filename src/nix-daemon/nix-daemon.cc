@@ -56,6 +56,21 @@ static FdSource from(STDIN_FILENO);
 static FdSink to(STDOUT_FILENO);
 
 
+Sink & operator << (Sink & sink, const Logger::Fields & fields)
+{
+    sink << fields.size();
+    for (auto & f : fields) {
+        sink << f.type;
+        if (f.type == Logger::Field::tInt)
+            sink << f.i;
+        else if (f.type == Logger::Field::tString)
+            sink << f.s;
+        else abort();
+    }
+    return sink;
+}
+
+
 /* Logger that forwards log messages to the client, *if* we're in a
    state where the protocol allows it (i.e., when canSendStderr is
    true). */
@@ -69,15 +84,14 @@ struct TunnelLogger : public Logger
 
     Sync<State> state_;
 
-    void log(Verbosity lvl, const FormatOrString & fs) override
+    void enqueueMsg(const std::string & s)
     {
-        if (lvl > verbosity) return;
-
         auto state(state_.lock());
 
         if (state->canSendStderr) {
+            assert(state->pendingMsgs.empty());
             try {
-                to << STDERR_NEXT << (fs.s + "\n");
+                to(s);
                 to.flush();
             } catch (...) {
                 /* Write failed; that means that the other side is
@@ -86,7 +100,16 @@ struct TunnelLogger : public Logger
                 throw;
             }
         } else
-            state->pendingMsgs.push_back(fs.s);
+            state->pendingMsgs.push_back(s);
+    }
+
+    void log(Verbosity lvl, const FormatOrString & fs) override
+    {
+        if (lvl > verbosity) return;
+
+        StringSink buf;
+        buf << STDERR_NEXT << (fs.s + "\n");
+        enqueueMsg(*buf.s);
     }
 
     /* startWork() means that we're starting an operation for which we
@@ -99,7 +122,7 @@ struct TunnelLogger : public Logger
         state->canSendStderr = true;
 
         for (auto & msg : state->pendingMsgs)
-            to << STDERR_NEXT << (msg + "\n");
+            to(msg);
 
         state->pendingMsgs.clear();
 
@@ -120,6 +143,28 @@ struct TunnelLogger : public Logger
             to << STDERR_ERROR << msg;
             if (status != 0) to << status;
         }
+    }
+
+    void startActivity(ActivityId act, ActivityType type,
+        const std::string & s, const Fields & fields, ActivityId parent) override
+    {
+        StringSink buf;
+        buf << STDERR_START_ACTIVITY << act << type << s << fields << parent;
+        enqueueMsg(*buf.s);
+    }
+
+    void stopActivity(ActivityId act) override
+    {
+        StringSink buf;
+        buf << STDERR_STOP_ACTIVITY << act;
+        enqueueMsg(*buf.s);
+    }
+
+    void result(ActivityId act, ResultType type, const Fields & fields) override
+    {
+        StringSink buf;
+        buf << STDERR_RESULT << act << type << fields;
+        enqueueMsg(*buf.s);
     }
 };
 
@@ -665,16 +710,15 @@ static void processConnection(bool trusted)
 {
     MonitorFdHup monitor(from.fd);
 
-    TunnelLogger tunnelLogger;
+    auto tunnelLogger = new TunnelLogger();
     auto prevLogger = nix::logger;
-    logger = &tunnelLogger;
+    logger = tunnelLogger;
 
     unsigned int opCount = 0;
 
     Finally finally([&]() {
-        logger = prevLogger;
         _isInterrupted = false;
-        debug("%d operations", opCount);
+        prevLogger->log(lvlDebug, fmt("%d operations", opCount));
     });
 
     /* Exchange the greeting. */
@@ -693,7 +737,7 @@ static void processConnection(bool trusted)
     readInt(from); // obsolete reserveSpace
 
     /* Send startup error messages to the client. */
-    tunnelLogger.startWork();
+    tunnelLogger->startWork();
 
     try {
 
@@ -713,7 +757,7 @@ static void processConnection(bool trusted)
         params["path-info-cache-size"] = "0";
         auto store = make_ref<LocalStore>(params);
 
-        tunnelLogger.stopWork();
+        tunnelLogger->stopWork();
         to.flush();
 
         /* Process client requests. */
@@ -730,28 +774,28 @@ static void processConnection(bool trusted)
             opCount++;
 
             try {
-                performOp(&tunnelLogger, store, trusted, clientVersion, from, to, op);
+                performOp(tunnelLogger, store, trusted, clientVersion, from, to, op);
             } catch (Error & e) {
                 /* If we're not in a state where we can send replies, then
                    something went wrong processing the input of the
                    client.  This can happen especially if I/O errors occur
                    during addTextToStore() / importPath().  If that
                    happens, just send the error message and exit. */
-                bool errorAllowed = tunnelLogger.state_.lock()->canSendStderr;
-                tunnelLogger.stopWork(false, e.msg(), e.status);
+                bool errorAllowed = tunnelLogger->state_.lock()->canSendStderr;
+                tunnelLogger->stopWork(false, e.msg(), e.status);
                 if (!errorAllowed) throw;
             } catch (std::bad_alloc & e) {
-                tunnelLogger.stopWork(false, "Nix daemon out of memory", 1);
+                tunnelLogger->stopWork(false, "Nix daemon out of memory", 1);
                 throw;
             }
 
             to.flush();
 
-            assert(!tunnelLogger.state_.lock()->canSendStderr);
+            assert(!tunnelLogger->state_.lock()->canSendStderr);
         };
 
     } catch (std::exception & e) {
-        tunnelLogger.stopWork(false, e.what(), 1);
+        tunnelLogger->stopWork(false, e.what(), 1);
         to.flush();
         return;
     }

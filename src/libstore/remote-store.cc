@@ -629,17 +629,37 @@ RemoteStore::Connection::~Connection()
 }
 
 
+static Logger::Fields readFields(Source & from)
+{
+    Logger::Fields fields;
+    size_t size = readInt(from);
+    for (size_t n = 0; n < size; n++) {
+        auto type = (decltype(Logger::Field::type)) readInt(from);
+        if (type == Logger::Field::tInt)
+            fields.push_back(readNum<uint64_t>(from));
+        else if (type == Logger::Field::tString)
+            fields.push_back(readString(from));
+        else
+            throw Error("got unsupported field type %x from Nix daemon", (int) type);
+    }
+    return fields;
+}
+
+
 void RemoteStore::Connection::processStderr(Sink * sink, Source * source)
 {
     to.flush();
-    unsigned int msg;
-    while ((msg = readInt(from)) == STDERR_NEXT
-        || msg == STDERR_READ || msg == STDERR_WRITE) {
+
+    while (true) {
+
+        auto msg = readNum<uint64_t>(from);
+
         if (msg == STDERR_WRITE) {
             string s = readString(from);
             if (!sink) throw Error("no sink");
             (*sink)(s);
         }
+
         else if (msg == STDERR_READ) {
             if (!source) throw Error("no source");
             size_t len = readNum<size_t>(from);
@@ -647,16 +667,43 @@ void RemoteStore::Connection::processStderr(Sink * sink, Source * source)
             writeString(buf.get(), source->read(buf.get(), len), to);
             to.flush();
         }
-        else
+
+        else if (msg == STDERR_ERROR) {
+            string error = readString(from);
+            unsigned int status = readInt(from);
+            throw Error(status, error);
+        }
+
+        else if (msg == STDERR_NEXT)
             printError(chomp(readString(from)));
+
+        else if (msg == STDERR_START_ACTIVITY) {
+            auto act = readNum<ActivityId>(from);
+            auto type = (ActivityType) readInt(from);
+            auto s = readString(from);
+            auto fields = readFields(from);
+            auto parent = readNum<ActivityId>(from);
+            logger->startActivity(act, type, s, fields, parent);
+        }
+
+        else if (msg == STDERR_STOP_ACTIVITY) {
+            auto act = readNum<ActivityId>(from);
+            logger->stopActivity(act);
+        }
+
+        else if (msg == STDERR_RESULT) {
+            auto act = readNum<ActivityId>(from);
+            auto type = (ResultType) readInt(from);
+            auto fields = readFields(from);
+            logger->result(act, type, fields);
+        }
+
+        else if (msg == STDERR_LAST)
+            break;
+
+        else
+            throw Error("got unknown message type %x from Nix daemon", msg);
     }
-    if (msg == STDERR_ERROR) {
-        string error = readString(from);
-        unsigned int status = readInt(from);
-        throw Error(status, error);
-    }
-    else if (msg != STDERR_LAST)
-        throw Error("protocol error processing standard error");
 }
 
 
