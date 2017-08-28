@@ -192,21 +192,6 @@ public:
         update(*state);
     }
 
-    void setExpected(ActivityId act, ActivityType type, uint64_t expected) override
-    {
-        auto state(state_.lock());
-
-        auto i = state->its.find(act);
-        assert(i != state->its.end());
-        ActInfo & actInfo = *i->second;
-        auto & j = actInfo.expectedByType[type];
-        state->activitiesByType[type].expected -= j;
-        j = expected;
-        state->activitiesByType[type].expected += j;
-
-        update(*state);
-    }
-
     void result(ActivityId act, ResultType type, const std::vector<Field> & fields) override
     {
         auto state(state_.lock());
@@ -256,6 +241,18 @@ public:
             actInfo.expected = getI(fields, 1);
             actInfo.running = getI(fields, 2);
             actInfo.failed = getI(fields, 3);
+            update(*state);
+        }
+
+        else if (type == resSetExpected) {
+            auto i = state->its.find(act);
+            assert(i != state->its.end());
+            ActInfo & actInfo = *i->second;
+            auto type = (ActivityType) getI(fields, 0);
+            auto & j = actInfo.expectedByType[type];
+            state->activitiesByType[type].expected -= j;
+            j = getI(fields, 1);
+            state->activitiesByType[type].expected += j;
             update(*state);
         }
     }

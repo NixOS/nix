@@ -33,6 +33,7 @@ typedef enum {
     resCorruptedPath = 103,
     resSetPhase = 104,
     resProgress = 105,
+    resSetExpected = 106,
 } ResultType;
 
 typedef uint64_t ActivityId;
@@ -72,8 +73,6 @@ public:
 
     virtual void stopActivity(ActivityId act) { };
 
-    virtual void setExpected(ActivityId act, ActivityType type, uint64_t expected) { };
-
     virtual void result(ActivityId act, ResultType type, const Fields & fields) { };
 };
 
@@ -97,7 +96,7 @@ struct Activity
     { result(resProgress, done, expected, running, failed); }
 
     void setExpected(ActivityType type2, uint64_t expected) const
-    { logger.setExpected(id, type2, expected); }
+    { result(resSetExpected, type2, expected); }
 
     template<typename... Args>
     void result(ResultType type, const Args & ... args) const
