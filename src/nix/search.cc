@@ -185,6 +185,8 @@ struct CmdSearch : SourceExprCommand, MixJSON
 
         if (useCache && pathExists(jsonCacheFileName)) {
 
+            warn("using cached results; pass '-u' to update the cache");
+
             Value vRoot;
             parseJSON(*state, readFile(jsonCacheFileName), vRoot);
 
