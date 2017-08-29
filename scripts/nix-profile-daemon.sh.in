@@ -13,7 +13,7 @@ export NIX_PROFILES="@localstatedir@/nix/profiles/default $HOME/.nix-profile"
 
 # Set up the per-user profile.
 mkdir -m 0755 -p $NIX_USER_PROFILE_DIR
-if test "$(stat -f '%u' $NIX_USER_PROFILE_DIR)" != "$(id -u)"; then
+if ! test -O "$NIX_USER_PROFILE_DIR"; then
     echo "WARNING: bad ownership on $NIX_USER_PROFILE_DIR" >&2
 fi
 
@@ -35,7 +35,7 @@ if test -w $HOME; then
   # Create the per-user garbage collector roots directory.
   NIX_USER_GCROOTS_DIR=@localstatedir@/nix/gcroots/per-user/$USER
   mkdir -m 0755 -p $NIX_USER_GCROOTS_DIR
-  if test "$(stat -f '%u' $NIX_USER_GCROOTS_DIR)" != "$(id -u)"; then
+  if ! test -O "$NIX_USER_GCROOTS_DIR"; then
       echo "WARNING: bad ownership on $NIX_USER_GCROOTS_DIR" >&2
   fi
 
