@@ -102,9 +102,11 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
         ++pos;
         Strings args;
         for (size_t n = 0 ; n < flag.arity; ++n) {
-            if (pos == end)
+            if (pos == end) {
+                if (flag.arity == ArityAny) break;
                 throw UsageError(format("flag '%1%' requires %2% argument(s)")
                     % name % flag.arity);
+            }
             args.push_back(*pos++);
         }
         flag.handler(args);

@@ -17,8 +17,20 @@ std::string chrootHelperName = "__run_in_chroot";
 
 struct CmdRun : InstallablesCommand
 {
+    Strings command = { "bash" };
+
     CmdRun()
     {
+        mkFlag()
+            .longName("command")
+            .shortName('c')
+            .description("command and arguments to be executed; defaults to 'bash'")
+            .arity(ArityAny)
+            .labels({"command", "args"})
+            .handler([&](Strings ss) {
+                if (ss.empty()) throw UsageError("--command requires at least one argument");
+                command = ss;
+            });
     }
 
     std::string name() override
@@ -43,8 +55,8 @@ struct CmdRun : InstallablesCommand
                 unixPath.push_front(path + "/bin");
         setenv("PATH", concatStringsSep(":", unixPath).c_str(), 1);
 
-        std::string cmd = "bash";
-        Strings args = { cmd };
+        std::string cmd = *command.begin();
+        Strings args = command;
 
         /* If this is a diverted store (i.e. its "logical" location
            (typically /nix/store) differs from its "physical" location

@@ -26,6 +26,8 @@ public:
 
 protected:
 
+    static const size_t ArityAny = std::numeric_limits<size_t>::max();
+
     /* Flags. */
     struct Flag
     {
