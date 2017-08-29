@@ -18,6 +18,8 @@ std::string chrootHelperName = "__run_in_chroot";
 struct CmdRun : InstallablesCommand
 {
     Strings command = { "bash" };
+    StringSet keep, unset;
+    bool ignoreEnvironment = false;
 
     CmdRun()
     {
@@ -31,6 +33,28 @@ struct CmdRun : InstallablesCommand
                 if (ss.empty()) throw UsageError("--command requires at least one argument");
                 command = ss;
             });
+
+        mkFlag()
+            .longName("ignore-environment")
+            .shortName('i')
+            .description("clear the entire environment (except those specified with --keep)")
+            .handler([&](Strings ss) { ignoreEnvironment = true; });
+
+        mkFlag()
+            .longName("keep")
+            .shortName('k')
+            .description("keep specified environment variable")
+            .arity(1)
+            .labels({"name"})
+            .handler([&](Strings ss) { keep.insert(ss.front()); });
+
+        mkFlag()
+            .longName("unset")
+            .shortName('u')
+            .description("unset specified environment variable")
+            .arity(1)
+            .labels({"name"})
+            .handler([&](Strings ss) { unset.insert(ss.front()); });
     }
 
     std::string name() override
@@ -48,6 +72,31 @@ struct CmdRun : InstallablesCommand
         auto outPaths = toStorePaths(store, Build);
 
         auto accessor = store->getFSAccessor();
+
+        if (ignoreEnvironment) {
+
+            if (!unset.empty())
+                throw UsageError("--unset does not make sense with --ignore-environment");
+
+            std::map<std::string, std::string> kept;
+            for (auto & var : keep) {
+                auto s = getenv(var.c_str());
+                if (s) kept[var] = s;
+            }
+
+            clearenv();
+
+            for (auto & var : kept)
+                setenv(var.first.c_str(), var.second.c_str(), 1);
+
+        } else {
+
+            if (!keep.empty())
+                throw UsageError("--keep does not make sense without --ignore-environment");
+
+            for (auto & var : unset)
+                unsetenv(var.c_str());
+        }
 
         auto unixPath = tokenizeString<Strings>(getEnv("PATH"), ":");
         for (auto & path : outPaths)
