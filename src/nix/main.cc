@@ -9,6 +9,10 @@
 #include "store-api.hh"
 #include "progress-bar.hh"
 
+extern std::string chrootHelperName;
+
+void chrootHelper(int argc, char * * argv);
+
 namespace nix {
 
 struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
@@ -56,6 +60,13 @@ void mainWrapped(int argc, char * * argv)
 {
     verbosity = lvlError;
     settings.verboseBuild = false;
+
+    /* The chroot helper needs to be run before any threads have been
+       started. */
+    if (argc > 0 && argv[0] == chrootHelperName) {
+        chrootHelper(argc, argv);
+        return;
+    }
 
     initNix();
     initGC();
