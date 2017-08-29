@@ -1709,6 +1709,8 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
             string n(attr.name);
             if (n == "url")
                 url = state.forceStringNoCtx(*attr.value, *attr.pos);
+            else if (n == "sha256")
+                // noop, added for forward-compatiblity
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
