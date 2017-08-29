@@ -6,6 +6,7 @@
 #include "local-store.hh"
 #include "finally.hh"
 #include "fs-accessor.hh"
+#include "progress-bar.hh"
 
 #if __linux__
 #include <sys/mount.h>
@@ -106,6 +107,8 @@ struct CmdRun : InstallablesCommand
 
         std::string cmd = *command.begin();
         Strings args = command;
+
+        stopProgressBar();
 
         /* If this is a diverted store (i.e. its "logical" location
            (typically /nix/store) differs from its "physical" location

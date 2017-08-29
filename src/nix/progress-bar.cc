@@ -95,6 +95,8 @@ private:
         uint64_t filesLinked = 0, bytesLinked = 0;
 
         uint64_t corruptedPaths = 0, untrustedPaths = 0;
+
+        bool active = true;
     };
 
     Sync<State> state_;
@@ -107,7 +109,14 @@ public:
 
     ~ProgressBar()
     {
+        stop();
+    }
+
+    void stop()
+    {
         auto state(state_.lock());
+        if (!state->active) return;
+        state->active = true;
         std::string status = getStatus(*state);
         writeToStderr("\r\e[K");
         if (status != "")
@@ -268,6 +277,8 @@ public:
 
     void update(State & state)
     {
+        if (!state.active) return;
+
         std::string line;
 
         std::string status = getStatus(state);
@@ -385,21 +396,16 @@ public:
     }
 };
 
-StartProgressBar::StartProgressBar()
+void startProgressBar()
 {
-    if (isatty(STDERR_FILENO)) {
-        prev = logger;
-        logger = new ProgressBar();
-    }
+    logger = new ProgressBar();
 }
 
-StartProgressBar::~StartProgressBar()
+void stopProgressBar()
 {
-    if (prev) {
-        auto bar = logger;
-        logger = prev;
-        delete bar;
-    }
+    auto progressBar = dynamic_cast<ProgressBar *>(logger);
+    if (progressBar) progressBar->stop();
+
 }
 
 }

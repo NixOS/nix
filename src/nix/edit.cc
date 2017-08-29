@@ -2,6 +2,7 @@
 #include "shared.hh"
 #include "eval.hh"
 #include "attr-path.hh"
+#include "progress-bar.hh"
 
 #include <unistd.h>
 
@@ -64,6 +65,8 @@ struct CmdEdit : InstallablesCommand
                 args.push_back(fmt("+%d", lineno));
 
             args.push_back(filename);
+
+            stopProgressBar();
 
             execvp(editor.c_str(), stringsToCharPtrs(args).data());
 

@@ -84,7 +84,8 @@ void mainWrapped(int argc, char * * argv)
 
     if (!args.command) args.showHelpAndExit();
 
-    StartProgressBar bar;
+    if (isatty(STDERR_FILENO))
+        startProgressBar();
 
     args.command->prepare();
     args.command->run();
