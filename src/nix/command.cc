@@ -50,8 +50,11 @@ void MultiCommand::printHelp(const string & programName, std::ostream & out)
     out << "Available commands:\n";
 
     Table2 table;
-    for (auto & command : commands)
-        table.push_back(std::make_pair(command.second->name(), command.second->description()));
+    for (auto & command : commands) {
+        auto descr = command.second->description();
+        if (!descr.empty())
+            table.push_back(std::make_pair(command.second->name(), descr));
+    }
     printTable(out, table);
 
     out << "\n";
