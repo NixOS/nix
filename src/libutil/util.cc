@@ -219,13 +219,14 @@ Path readLink(const Path & path)
     struct stat st = lstat(path);
     if (!S_ISLNK(st.st_mode))
         throw Error(format("'%1%' is not a symlink") % path);
-    char buf[st.st_size];
-    ssize_t rlsize = readlink(path.c_str(), buf, st.st_size);
+    auto bufSize = std::max(st.st_size, (off_t) PATH_MAX + 1);
+    char buf[bufSize];
+    ssize_t rlsize = readlink(path.c_str(), buf, bufSize);
     if (rlsize == -1)
         throw SysError(format("reading symbolic link '%1%'") % path);
-    else if (rlsize > st.st_size)
+    else if (rlsize > bufSize)
         throw Error(format("symbolic link '%1%' size overflow %2% > %3%")
-            % path % rlsize % st.st_size);
+            % path % rlsize % bufSize);
     return string(buf, rlsize);
 }
 
