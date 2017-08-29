@@ -116,7 +116,7 @@ public:
     {
         auto state(state_.lock());
         if (!state->active) return;
-        state->active = true;
+        state->active = false;
         std::string status = getStatus(*state);
         writeToStderr("\r\e[K");
         if (status != "")

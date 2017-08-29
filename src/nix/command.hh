@@ -51,7 +51,7 @@ struct Installable
 {
     virtual std::string what() = 0;
 
-    virtual Buildables toBuildable()
+    virtual Buildables toBuildable(bool singular = false)
     {
         throw Error("argument '%s' cannot be built", what());
     }
@@ -97,8 +97,6 @@ struct InstallablesCommand : virtual Args, SourceExprCommand
         expectArgs("installables", &_installables);
     }
 
-    std::vector<std::shared_ptr<Installable>> parseInstallables(ref<Store> store, Strings ss);
-
     enum ToStorePathsMode { Build, NoBuild, DryRun };
 
     PathSet toStorePaths(ref<Store> store, ToStorePathsMode mode);
@@ -110,6 +108,22 @@ struct InstallablesCommand : virtual Args, SourceExprCommand
 private:
 
     Strings _installables;
+};
+
+struct InstallableCommand : virtual Args, SourceExprCommand
+{
+    std::shared_ptr<Installable> installable;
+
+    InstallableCommand()
+    {
+        expectArg("installable", &_installable);
+    }
+
+    void prepare() override;
+
+private:
+
+    std::string _installable;
 };
 
 /* A command that operates on zero or more store paths. */

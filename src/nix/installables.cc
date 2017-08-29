@@ -78,7 +78,7 @@ struct InstallableStoreDrv : Installable
 
     std::string what() override { return storePath; }
 
-    Buildables toBuildable() override
+    Buildables toBuildable(bool singular) override
     {
         return {{storePath, {}}};
     }
@@ -92,25 +92,21 @@ struct InstallableStorePath : Installable
 
     std::string what() override { return storePath; }
 
-    Buildables toBuildable() override
+    Buildables toBuildable(bool singular) override
     {
         return {{storePath, {}}};
     }
 };
 
-struct InstallableExpr : Installable
+struct InstallableValue : Installable
 {
-    InstallablesCommand & installables;
-    std::string text;
+    SourceExprCommand & cmd;
 
-    InstallableExpr(InstallablesCommand & installables, const std::string & text)
-         : installables(installables), text(text) { }
+    InstallableValue(SourceExprCommand & cmd) : cmd(cmd) { }
 
-    std::string what() override { return text; }
-
-    Buildables toBuildable() override
+    Buildables toBuildable(bool singular) override
     {
-        auto state = installables.getEvalState();
+        auto state = cmd.getEvalState();
 
         auto v = toValue(*state);
 
@@ -121,6 +117,9 @@ struct InstallableExpr : Installable
         DrvInfos drvs;
         getDerivations(*state, *v, "", autoArgs, drvs, false);
 
+        if (singular && drvs.size() != 1)
+            throw Error("installable '%s' evaluates to %d derivations, where only one is expected", what(), drvs.size());
+
         Buildables res;
 
         for (auto & drv : drvs)
@@ -129,6 +128,16 @@ struct InstallableExpr : Installable
 
         return res;
     }
+};
+
+struct InstallableExpr : InstallableValue
+{
+    std::string text;
+
+    InstallableExpr(SourceExprCommand & cmd, const std::string & text)
+         : InstallableValue(cmd), text(text) { }
+
+    std::string what() override { return text; }
 
     Value * toValue(EvalState & state) override
     {
@@ -138,42 +147,19 @@ struct InstallableExpr : Installable
     }
 };
 
-struct InstallableAttrPath : Installable
+struct InstallableAttrPath : InstallableValue
 {
-    InstallablesCommand & installables;
     std::string attrPath;
 
-    InstallableAttrPath(InstallablesCommand & installables, const std::string & attrPath)
-        : installables(installables), attrPath(attrPath)
+    InstallableAttrPath(SourceExprCommand & cmd, const std::string & attrPath)
+        : InstallableValue(cmd), attrPath(attrPath)
     { }
 
     std::string what() override { return attrPath; }
 
-    Buildables toBuildable() override
-    {
-        auto state = installables.getEvalState();
-
-        auto v = toValue(*state);
-
-        // FIXME
-        std::map<string, string> autoArgs_;
-        Bindings & autoArgs(*evalAutoArgs(*state, autoArgs_));
-
-        DrvInfos drvs;
-        getDerivations(*state, *v, "", autoArgs, drvs, false);
-
-        Buildables res;
-
-        for (auto & drv : drvs)
-            for (auto & output : drv.queryOutputs())
-                res.emplace(output.second, Whence{output.first, drv.queryDrvPath()});
-
-        return res;
-    }
-
     Value * toValue(EvalState & state) override
     {
-        auto source = installables.getSourceExpr(state);
+        auto source = cmd.getSourceExpr(state);
 
         // FIXME
         std::map<string, string> autoArgs_;
@@ -190,20 +176,21 @@ struct InstallableAttrPath : Installable
 std::string attrRegex = R"([A-Za-z_][A-Za-z0-9-_+]*)";
 static std::regex attrPathRegex(fmt(R"(%1%(\.%1%)*)", attrRegex));
 
-std::vector<std::shared_ptr<Installable>> InstallablesCommand::parseInstallables(ref<Store> store, Strings ss)
+static std::vector<std::shared_ptr<Installable>> parseInstallables(
+    SourceExprCommand & cmd, ref<Store> store, Strings ss, bool useDefaultInstallables)
 {
     std::vector<std::shared_ptr<Installable>> result;
 
-    if (ss.empty() && useDefaultInstallables()) {
-        if (file == "")
-            file = ".";
+    if (ss.empty() && useDefaultInstallables) {
+        if (cmd.file == "")
+            cmd.file = ".";
         ss = Strings{""};
     }
 
     for (auto & s : ss) {
 
         if (s.compare(0, 1, "(") == 0)
-            result.push_back(std::make_shared<InstallableExpr>(*this, s));
+            result.push_back(std::make_shared<InstallableExpr>(cmd, s));
 
         else if (s.find("/") != std::string::npos) {
 
@@ -218,7 +205,7 @@ std::vector<std::shared_ptr<Installable>> InstallablesCommand::parseInstallables
         }
 
         else if (s == "" || std::regex_match(s, attrPathRegex))
-            result.push_back(std::make_shared<InstallableAttrPath>(*this, s));
+            result.push_back(std::make_shared<InstallableAttrPath>(cmd, s));
 
         else
             throw UsageError("don't know what to do with argument '%s'", s);
@@ -250,7 +237,14 @@ PathSet InstallablesCommand::toStorePaths(ref<Store> store, ToStorePathsMode mod
 
 void InstallablesCommand::prepare()
 {
-    installables = parseInstallables(getStore(), _installables);
+    installables = parseInstallables(*this, getStore(), _installables, useDefaultInstallables());
+}
+
+void InstallableCommand::prepare()
+{
+    auto installables = parseInstallables(*this, getStore(), {_installable}, false);
+    assert(installables.size() == 1);
+    installable = installables.front();
 }
 
 }
