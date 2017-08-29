@@ -1709,6 +1709,10 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
             string n(attr.name);
             if (n == "url")
                 url = state.forceStringNoCtx(*attr.value, *attr.pos);
+            else if (n == "sha256")
+                // noop, added for forward-compatiblity
+                static bool haveWarned = false;
+                warnOnce(haveWarned, "the fetchurl/fetchTarball sha256 argument is currently ignored. Upgrade to Nix 1.12 to support this feature.");
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
