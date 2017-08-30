@@ -778,7 +778,6 @@ private:
 #if __APPLE__
     typedef string SandboxProfile;
     SandboxProfile additionalSandboxProfile;
-    AutoDelete autoDelSandbox;
 #endif
 
     /* Hash rewriting. */
@@ -2633,9 +2632,7 @@ void DerivationGoal::runChild()
             debug("Generated sandbox profile:");
             debug(sandboxProfile);
 
-            Path sandboxFile = drvPath + ".sb";
-            if (pathExists(sandboxFile)) deletePath(sandboxFile);
-            autoDelSandbox.reset(sandboxFile, false);
+            Path sandboxFile = tmpDir + "/.sandbox.sb";
 
             writeFile(sandboxFile, sandboxProfile);
 
