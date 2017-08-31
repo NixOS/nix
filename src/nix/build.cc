@@ -25,7 +25,7 @@ struct CmdBuild : MixDryRun, InstallablesCommand
     {
         auto paths = toStorePaths(store, dryRun ? DryRun : Build);
 
-        printInfo("build result: %s", showPaths(paths));
+        printError("build result: %s", showPaths(paths));
     }
 };
 

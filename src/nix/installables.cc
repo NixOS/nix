@@ -228,7 +228,7 @@ PathSet InstallablesCommand::toStorePaths(ref<Store> store, ToStorePathsMode mod
         }
 
     if (mode == DryRun)
-        printMissing(store, buildables);
+        printMissing(store, buildables, lvlError);
     else if (mode == Build)
         store->buildPaths(buildables);
 

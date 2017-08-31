@@ -35,11 +35,11 @@ void printGCWarning();
 
 class Store;
 
-void printMissing(ref<Store> store, const PathSet & paths);
+void printMissing(ref<Store> store, const PathSet & paths, Verbosity lvl = lvlInfo);
 
 void printMissing(ref<Store> store, const PathSet & willBuild,
     const PathSet & willSubstitute, const PathSet & unknown,
-    unsigned long long downloadSize, unsigned long long narSize);
+    unsigned long long downloadSize, unsigned long long narSize, Verbosity lvl = lvlInfo);
 
 string getArg(const string & opt,
     Strings::iterator & i, const Strings::iterator & end);
