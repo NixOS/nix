@@ -4166,9 +4166,19 @@ void Worker::markContentsGood(const Path & path)
 //////////////////////////////////////////////////////////////////////
 
 
+static void primeCache(Store & store, const PathSet & paths)
+{
+    PathSet willBuild, willSubstitute, unknown;
+    unsigned long long downloadSize, narSize;
+    store.queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
+}
+
+
 void LocalStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
 {
     Worker worker(*this);
+
+    primeCache(*this, drvPaths);
 
     Goals goals;
     for (auto & i : drvPaths) {
@@ -4219,6 +4229,8 @@ void LocalStore::ensurePath(const Path & path)
 {
     /* If the path is already valid, we're done. */
     if (isValidPath(path)) return;
+
+    primeCache(*this, {path});
 
     Worker worker(*this);
     GoalPtr goal = worker.makeSubstitutionGoal(path);
