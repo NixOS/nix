@@ -138,10 +138,10 @@ public:
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
         const std::string & s, const Fields & fields, ActivityId parent) override
     {
-        if (lvl <= verbosity && !s.empty())
-            log(lvl, s + "...");
-
         auto state(state_.lock());
+
+        if (lvl <= verbosity && !s.empty())
+            log(*state, lvl, s + "...");
 
         state->activities.emplace_back(ActInfo());
         auto i = std::prev(state->activities.end());
@@ -163,7 +163,13 @@ public:
             i->s = fmt("fetching " ANSI_BOLD "%s" ANSI_NORMAL " from %s", name, getS(fields, 1));
         }
 
+        if (type == actQueryPathInfo) {
+            auto name = storePathToName(getS(fields, 0));
+            i->s = fmt("querying about " ANSI_BOLD "%s" ANSI_NORMAL " on %s", name, getS(fields, 1));
+        }
+
         if ((type == actDownload && hasAncestor(*state, actCopyPath, parent))
+            || (type == actDownload && hasAncestor(*state, actQueryPathInfo, parent))
             || (type == actCopyPath && hasAncestor(*state, actSubstitute, parent)))
             i->visible = false;
 
@@ -189,6 +195,7 @@ public:
 
         auto i = state->its.find(act);
         if (i != state->its.end()) {
+
             auto & actByType = state->activitiesByType[i->second->type];
             actByType.done += i->second->done;
             actByType.failed += i->second->failed;

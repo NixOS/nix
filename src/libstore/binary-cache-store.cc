@@ -313,6 +313,11 @@ void BinaryCacheStore::queryPathInfoUncached(const Path & storePath,
         std::function<void(std::shared_ptr<ValidPathInfo>)> success,
         std::function<void(std::exception_ptr exc)> failure)
 {
+    auto uri = getUri();
+    auto act = std::make_shared<Activity>(*logger, lvlTalkative, actQueryPathInfo,
+        fmt("querying info about '%s' on '%s'", storePath, uri), Logger::Fields{storePath, uri});
+    PushActivity pact(act->id);
+
     auto narInfoFile = narInfoFileFor(storePath);
 
     getFile(narInfoFile,
@@ -323,6 +328,8 @@ void BinaryCacheStore::queryPathInfoUncached(const Path & storePath,
 
             callSuccess(success, failure, (std::shared_ptr<ValidPathInfo>)
                 std::make_shared<NarInfo>(*this, *data, narInfoFile));
+
+            (void) act; // force Activity into this lambda to ensure it stays alive
         },
         failure);
 }
