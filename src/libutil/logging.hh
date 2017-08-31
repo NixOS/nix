@@ -40,7 +40,7 @@ typedef uint64_t ActivityId;
 
 class Logger
 {
-    friend class Activity;
+    friend struct Activity;
 
 public:
 
