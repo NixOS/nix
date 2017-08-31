@@ -202,6 +202,6 @@ void chrootHelper(int argc, char * * argv)
     throw SysError("unable to exec '%s'", cmd);
 
 #else
-    throw Error("mounting the Nix store on '%s' is not supported on this platform", >storeDir);
+    throw Error("mounting the Nix store on '%s' is not supported on this platform", storeDir);
 #endif
 }
