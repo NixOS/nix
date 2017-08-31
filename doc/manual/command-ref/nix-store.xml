@@ -397,9 +397,9 @@ options control what gets deleted and in what order:
 </para>
 
 <para>The behaviour of the collector is also influenced by the <link
-linkend="conf-gc-keep-outputs"><literal>gc-keep-outputs</literal></link>
+linkend="conf-keep-outputs"><literal>keep-outputs</literal></link>
 and <link
-linkend="conf-gc-keep-derivations"><literal>gc-keep-derivations</literal></link>
+linkend="conf-keep-derivations"><literal>keep-derivations</literal></link>
 variables in the Nix configuration file.</para>
 
 <para>With <option>--delete</option>, the collector prints the total

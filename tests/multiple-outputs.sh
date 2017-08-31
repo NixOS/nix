@@ -59,5 +59,5 @@ fi
 
 echo "collecting garbage..."
 rm $TEST_ROOT/result*
-nix-store --gc --option gc-keep-derivations true --option gc-keep-outputs true
+nix-store --gc --option keep-derivations true --option keep-outputs true
 nix-store --gc --print-roots

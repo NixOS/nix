@@ -94,7 +94,7 @@
   perform in parallel to the specified number.  Specify
   <literal>auto</literal> to use the number of CPUs in the system.
   The default is specified by the <link
-  linkend='conf-build-max-jobs'><literal>build-max-jobs</literal></link>
+  linkend='conf-max-jobs'><literal>max-jobs</literal></link>
   configuration setting, which itself defaults to
   <literal>1</literal>.  A higher value is useful on SMP systems or to
   exploit I/O latency.</para></listitem>
@@ -112,7 +112,7 @@
   <literal>true</literal>, the builder passes the
   <option>-j<replaceable>N</replaceable></option> flag to GNU Make.
   It defaults to the value of the <link
-  linkend='conf-build-cores'><literal>build-cores</literal></link>
+  linkend='conf-cores'><literal>cores</literal></link>
   configuration setting, if set, or <literal>1</literal> otherwise.
   The value <literal>0</literal> means that the builder should use all
   available CPU cores in the system.</para></listitem>
@@ -125,7 +125,7 @@
   <listitem><para>Sets the maximum number of seconds that a builder
   can go without producing any data on standard output or standard
   error.  The default is specified by the <link
-  linkend='conf-build-max-silent-time'><literal>build-max-silent-time</literal></link>
+  linkend='conf-max-silent-time'><literal>max-silent-time</literal></link>
   configuration setting.  <literal>0</literal> means no
   time-out.</para></listitem>
 
@@ -135,7 +135,7 @@
 
   <listitem><para>Sets the maximum number of seconds that a builder
   can run.  The default is specified by the <link
-  linkend='conf-build-timeout'><literal>build-timeout</literal></link>
+  linkend='conf-timeout'><literal>timeout</literal></link>
   configuration setting.  <literal>0</literal> means no
   timeout.</para></listitem>
 

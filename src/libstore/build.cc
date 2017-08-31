@@ -1740,11 +1740,11 @@ void DerivationGoal::startBuilder()
         if (settings.sandboxMode == smEnabled) {
             if (get(drv->env, "__noChroot") == "1")
                 throw Error(format("derivation '%1%' has '__noChroot' set, "
-                    "but that's not allowed when 'build-use-sandbox' is 'true'") % drvPath);
+                    "but that's not allowed when 'sandbox' is 'true'") % drvPath);
 #if __APPLE__
             if (additionalSandboxProfile != "")
                 throw Error(format("derivation '%1%' specifies a sandbox profile, "
-                    "but this is only allowed when 'build-use-sandbox' is 'relaxed'") % drvPath);
+                    "but this is only allowed when 'sandbox' is 'relaxed'") % drvPath);
 #endif
             useChroot = true;
         }
@@ -1832,7 +1832,7 @@ void DerivationGoal::startBuilder()
                     worker.store.computeFSClosure(worker.store.toStorePath(i.second.source), closure);
             } catch (InvalidPath & e) {
             } catch (Error & e) {
-                throw Error(format("while processing 'build-sandbox-paths': %s") % e.what());
+                throw Error(format("while processing 'sandbox-paths': %s") % e.what());
             }
         for (auto & i : closure)
             dirsInChroot[i] = i;

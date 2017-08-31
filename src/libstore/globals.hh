@@ -89,8 +89,9 @@ public:
     Setting<bool> keepGoing{this, false, "keep-going",
         "Whether to keep building derivations when another build fails."};
 
-    Setting<bool> tryFallback{this, false, "build-fallback",
-        "Whether to fall back to building when substitution fails."};
+    Setting<bool> tryFallback{this, false, "fallback",
+        "Whether to fall back to building when substitution fails.",
+        {"build-fallback"}};
 
     /* Whether to show build log output in real time. */
     bool verboseBuild = true;
@@ -99,14 +100,15 @@ public:
        the log to show if a build fails. */
     size_t logLines = 10;
 
-    MaxBuildJobsSetting maxBuildJobs{this, 1, "build-max-jobs",
-        "Maximum number of parallel build jobs. \"auto\" means use number of cores."};
+    MaxBuildJobsSetting maxBuildJobs{this, 1, "max-jobs",
+        "Maximum number of parallel build jobs. \"auto\" means use number of cores.",
+        {"build-max-jobs"}};
 
-    Setting<unsigned int> buildCores{this, getDefaultCores(), "build-cores",
+    Setting<unsigned int> buildCores{this, getDefaultCores(), "cores",
         "Number of CPU cores to utilize in parallel within a build, "
         "i.e. by passing this number to Make via '-j'. 0 means that the "
         "number of actual CPU cores on the local host ought to be "
-        "auto-detected."};
+        "auto-detected.", {"build-cores"}};
 
     /* Read-only mode.  Don't copy stuff to the store, don't change
        the database. */
@@ -115,14 +117,15 @@ public:
     Setting<std::string> thisSystem{this, SYSTEM, "system",
         "The canonical Nix system name."};
 
-    Setting<time_t> maxSilentTime{this, 0, "build-max-silent-time",
+    Setting<time_t> maxSilentTime{this, 0, "max-silent-time",
         "The maximum time in seconds that a builer can go without "
         "producing any output on stdout/stderr before it is killed. "
-        "0 means infinity."};
+        "0 means infinity.",
+        {"build-max-silent-time"}};
 
-    Setting<time_t> buildTimeout{this, 0, "build-timeout",
+    Setting<time_t> buildTimeout{this, 0, "timeout",
         "The maximum duration in seconds that a builder can run. "
-        "0 means infinity."};
+        "0 means infinity.", {"build-timeout"}};
 
     Setting<bool> useBuildHook{this, true, "remote-builds",
         "Whether to use build hooks (for distributed builds)."};
@@ -149,27 +152,32 @@ public:
     Setting<bool> syncBeforeRegistering{this, false, "sync-before-registering",
         "Whether to call sync() before registering a path as valid."};
 
-    Setting<bool> useSubstitutes{this, true, "build-use-substitutes",
-        "Whether to use substitutes."};
+    Setting<bool> useSubstitutes{this, true, "use-substitutes",
+        "Whether to use substitutes.",
+        {"build-use-substitutes"}};
 
     Setting<std::string> buildUsersGroup{this, "", "build-users-group",
         "The Unix group that contains the build users."};
 
-    Setting<bool> impersonateLinux26{this, false, "build-impersonate-linux-26",
-        "Whether to impersonate a Linux 2.6 machine on newer kernels."};
+    Setting<bool> impersonateLinux26{this, false, "impersonate-linux-26",
+        "Whether to impersonate a Linux 2.6 machine on newer kernels.",
+        {"build-impersonate-linux-26"}};
 
-    Setting<bool> keepLog{this, true, "build-keep-log",
-        "Whether to store build logs."};
+    Setting<bool> keepLog{this, true, "keep-build-log",
+        "Whether to store build logs.",
+        {"build-keep-log"}};
 
-    Setting<bool> compressLog{this, true, "build-compress-log",
-        "Whether to compress logs."};
+    Setting<bool> compressLog{this, true, "compress-build-log",
+        "Whether to compress logs.",
+        {"build-compress-log"}};
 
-    Setting<unsigned long> maxLogSize{this, 0, "build-max-log-size",
+    Setting<unsigned long> maxLogSize{this, 0, "max-build-log-size",
         "Maximum number of bytes a builder can write to stdout/stderr "
-        "before being killed (0 means no limit)."};
+        "before being killed (0 means no limit).",
+        {"build-max-log-size"}};
 
-    /* When build-repeat > 0 and verboseBuild == true, whether to
-       print repeated builds (i.e. builds other than the first one) to
+    /* When buildRepeat > 0 and verboseBuild == true, whether to print
+       repeated builds (i.e. builds other than the first one) to
        stderr. Hack to prevent Hydra logs from being polluted. */
     bool printRepeatedBuilds = true;
 
@@ -180,18 +188,21 @@ public:
         "Whether to check if new GC roots can in fact be found by the "
         "garbage collector."};
 
-    Setting<bool> gcKeepOutputs{this, false, "gc-keep-outputs",
-        "Whether the garbage collector should keep outputs of live derivations."};
+    Setting<bool> gcKeepOutputs{this, false, "keep-outputs",
+        "Whether the garbage collector should keep outputs of live derivations.",
+        {"gc-keep-outputs"}};
 
-    Setting<bool> gcKeepDerivations{this, true, "gc-keep-derivations",
-        "Whether the garbage collector should keep derivers of live paths."};
+    Setting<bool> gcKeepDerivations{this, true, "keep-derivations",
+        "Whether the garbage collector should keep derivers of live paths.",
+        {"gc-keep-derivations"}};
 
     Setting<bool> autoOptimiseStore{this, false, "auto-optimise-store",
         "Whether to automatically replace files with identical contents with hard links."};
 
-    Setting<bool> envKeepDerivations{this, false, "env-keep-derivations",
+    Setting<bool> envKeepDerivations{this, false, "keep-env-derivations",
         "Whether to add derivations as a dependency of user environments "
-        "(to prevent them from being GCed)."};
+        "(to prevent them from being GCed).",
+        {"env-keep-derivations"}};
 
     /* Whether to lock the Nix client and worker to the same CPU. */
     bool lockCPU;
@@ -202,24 +213,25 @@ public:
     Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation",
         "Whether builtin functions that allow executing native code should be enabled."};
 
-    Setting<SandboxMode> sandboxMode{this, smDisabled, "build-use-sandbox",
+    Setting<SandboxMode> sandboxMode{this, smDisabled, "sandbox",
         "Whether to enable sandboxed builds. Can be \"true\", \"false\" or \"relaxed\".",
-        {"build-use-chroot"}};
+        {"build-use-chroot", "build-use-sandbox"}};
 
-    Setting<PathSet> sandboxPaths{this, {}, "build-sandbox-paths",
+    Setting<PathSet> sandboxPaths{this, {}, "sandbox-paths",
         "The paths to make available inside the build sandbox.",
-        {"build-chroot-dirs"}};
+        {"build-chroot-dirs", "build-sandbox-paths"}};
 
-    Setting<PathSet> extraSandboxPaths{this, {}, "build-extra-sandbox-paths",
+    Setting<PathSet> extraSandboxPaths{this, {}, "extra-sandbox-paths",
         "Additional paths to make available inside the build sandbox.",
-        {"build-extra-chroot-dirs"}};
+        {"build-extra-chroot-dirs", "build-extra-sandbox-paths"}};
 
     Setting<bool> restrictEval{this, false, "restrict-eval",
         "Whether to restrict file system access to paths in $NIX_PATH, "
         "and to disallow fetching files from the network."};
 
-    Setting<size_t> buildRepeat{this, 0, "build-repeat",
-        "The number of times to repeat a build in order to verify determinism."};
+    Setting<size_t> buildRepeat{this, 0, "repeat",
+        "The number of times to repeat a build in order to verify determinism.",
+        {"build-repeat"}};
 
 #if __linux__
     Setting<std::string> sandboxShmSize{this, "50%", "sandbox-dev-shm-size",
