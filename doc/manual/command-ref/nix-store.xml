@@ -1123,7 +1123,7 @@ $ nix-store --export $(nix-store -qR <replaceable>paths</replaceable>) > out</sc
 To import the whole closure again, run:
 
 <screen>
-$ nix-store --import &lt; out</screen>
+# nix-store --import &lt; out</screen>
 
 </para>
 
@@ -1154,6 +1154,11 @@ standard input and adds those store paths to the Nix store.  Paths
 that already exist in the Nix store are ignored.  If a path refers to
 another path that doesn’t exist in the Nix store, the import
 fails.</para>
+
+<para>
+Note: this needs to be either run as root, or on a seralization with
+signatures from a trusted cache.
+</para>
 
 </refsection>
 
