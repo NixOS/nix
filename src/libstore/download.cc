@@ -183,6 +183,8 @@ struct CurlDownloader : public Downloader
             return 0;
         }
 
+        long lowSpeedTimeout = 300;
+
         void init()
         {
             if (!req) req = curl_easy_init();
@@ -230,6 +232,9 @@ struct CurlDownloader : public Downloader
             }
 
             curl_easy_setopt(req, CURLOPT_CONNECTTIMEOUT, settings.connectTimeout.get());
+
+            curl_easy_setopt(req, CURLOPT_LOW_SPEED_LIMIT, 1L);
+            curl_easy_setopt(req, CURLOPT_LOW_SPEED_TIME, lowSpeedTimeout);
 
             /* If no file exist in the specified path, curl continues to work
                anyway as if netrc support was disabled. */
@@ -422,7 +427,7 @@ struct CurlDownloader : public Downloader
             auto sleepTimeMs =
                 nextWakeup != std::chrono::steady_clock::time_point()
                 ? std::max(0, (int) std::chrono::duration_cast<std::chrono::milliseconds>(nextWakeup - std::chrono::steady_clock::now()).count())
-                : 1000000000;
+                : 10000;
             vomit("download thread waiting for %d ms", sleepTimeMs);
             mc = curl_multi_wait(curlm, extraFDs, 1, sleepTimeMs, &numfds);
             if (mc != CURLM_OK)
