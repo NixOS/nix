@@ -20,13 +20,9 @@ fi
 # in case if USER not set
 if [ -z "$userID" ]; then
     echo "$0: Environment variable USER is not set" >&2
-    echo "$0: Detecting userID from UID=$(id -u)" >&2
-    userID="$(getent passwd | cut -d: -f1,3 | grep "$(id -u)" | cut -d: -f1)"    # Taking username from  UID requires some reverse-engineering.
-    if [ "$(id -u "$userID")" -ne "$(id -u)" ]; then
-        echo "$0: test: Detected userID is wrong."  >&2
-        echo "$0: Please set proper USER environment variable. Exiting..." >&2
-        exit 1
-    fi
+    echo "$0: Detecting username from UID=$(id -u)" >&2
+    userID="$(id -u -n)"    # Taking username from  UID
+    echo "$0: Username: $userID" >&2
 fi
 
 if [ -z "$HOME" ]; then
