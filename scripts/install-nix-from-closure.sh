@@ -15,9 +15,8 @@ fi
 # in case if USER not set
 if [ -z "$USER" ]; then
     echo "$0: Environment variable USER is not set" >&2
-    echo "$0: Detected username from UID=$(id -u)" >&2
     USER="$(whoami)"    # Taking username from  UID
-    echo "$0: Username: $USER" >&2
+    echo "$0: Detected username: $USER" >&2
 fi
 
 if [ -z "$HOME" ]; then
