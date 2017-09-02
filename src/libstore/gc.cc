@@ -580,7 +580,7 @@ bool LocalStore::canReachRoot(GCState & state, PathSet & visited, const Path & p
     /* Don't delete this path if any of its referrers are alive. */
     queryReferrers(path, incoming);
 
-    /* If gc-keep-derivations is set and this is a derivation, then
+    /* If keep-derivations is set and this is a derivation, then
        don't delete the derivation if any of the outputs are alive. */
     if (state.gcKeepDerivations && isDerivation(path)) {
         PathSet outputs = queryDerivationOutputs(path);
@@ -589,7 +589,7 @@ bool LocalStore::canReachRoot(GCState & state, PathSet & visited, const Path & p
                 incoming.insert(i);
     }
 
-    /* If gc-keep-outputs is set, then don't delete this path if there
+    /* If keep-outputs is set, then don't delete this path if there
        are derivers of this path that are not garbage. */
     if (state.gcKeepOutputs) {
         PathSet derivers = queryValidDerivers(path);
@@ -704,9 +704,9 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     state.gcKeepDerivations = settings.gcKeepDerivations;
 
     /* Using `--ignore-liveness' with `--delete' can have unintended
-       consequences if `gc-keep-outputs' or `gc-keep-derivations' are
-       true (the garbage collector will recurse into deleting the
-       outputs or derivers, respectively).  So disable them. */
+       consequences if `keep-outputs' or `keep-derivations' are true
+       (the garbage collector will recurse into deleting the outputs
+       or derivers, respectively).  So disable them. */
     if (options.action == GCOptions::gcDeleteSpecific && options.ignoreLiveness) {
         state.gcKeepOutputs = false;
         state.gcKeepDerivations = false;

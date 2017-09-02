@@ -13,7 +13,7 @@ rm -rf $TEST_ROOT/store0 $TEST_ROOT/store1
 export NIX_CONF_DIR=$TEST_ROOT/etc2
 mkdir -p $NIX_CONF_DIR
 echo "
-build-sandbox-paths = /nix/store
+sandbox-paths = /nix/store
 sandbox-build-dir = /build-tmp
 " > $NIX_CONF_DIR/nix.conf
 

@@ -34,40 +34,40 @@ void printGCWarning()
 }
 
 
-void printMissing(ref<Store> store, const PathSet & paths)
+void printMissing(ref<Store> store, const PathSet & paths, Verbosity lvl)
 {
     unsigned long long downloadSize, narSize;
     PathSet willBuild, willSubstitute, unknown;
     store->queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
-    printMissing(store, willBuild, willSubstitute, unknown, downloadSize, narSize);
+    printMissing(store, willBuild, willSubstitute, unknown, downloadSize, narSize, lvl);
 }
 
 
 void printMissing(ref<Store> store, const PathSet & willBuild,
     const PathSet & willSubstitute, const PathSet & unknown,
-    unsigned long long downloadSize, unsigned long long narSize)
+    unsigned long long downloadSize, unsigned long long narSize, Verbosity lvl)
 {
     if (!willBuild.empty()) {
-        printInfo(format("these derivations will be built:"));
+        printMsg(lvl, "these derivations will be built:");
         Paths sorted = store->topoSortPaths(willBuild);
         reverse(sorted.begin(), sorted.end());
         for (auto & i : sorted)
-            printInfo(format("  %1%") % i);
+            printMsg(lvl, fmt("  %s", i));
     }
 
     if (!willSubstitute.empty()) {
-        printInfo(format("these paths will be fetched (%.2f MiB download, %.2f MiB unpacked):")
-            % (downloadSize / (1024.0 * 1024.0))
-            % (narSize / (1024.0 * 1024.0)));
+        printMsg(lvl, fmt("these paths will be fetched (%.2f MiB download, %.2f MiB unpacked):",
+                downloadSize / (1024.0 * 1024.0),
+                narSize / (1024.0 * 1024.0)));
         for (auto & i : willSubstitute)
-            printInfo(format("  %1%") % i);
+            printMsg(lvl, fmt("  %s", i));
     }
 
     if (!unknown.empty()) {
-        printInfo(format("don't know how to build these paths%1%:")
-            % (settings.readOnlyMode ? " (may be caused by read-only store access)" : ""));
+        printMsg(lvl, fmt("don't know how to build these paths%s:",
+                (settings.readOnlyMode ? " (may be caused by read-only store access)" : "")));
         for (auto & i : unknown)
-            printInfo(format("  %1%") % i);
+            printMsg(lvl, fmt("  %s", i));
     }
 }
 
@@ -171,7 +171,7 @@ struct LegacyArgs : public MixCommonArgs
         });
 
         mkFlag1('j', "max-jobs", "jobs", "maximum number of parallel builds", [=](std::string s) {
-            settings.set("build-max-jobs", s);
+            settings.set("max-jobs", s);
         });
 
         auto intSettingAlias = [&](char shortName, const std::string & longName,
@@ -181,9 +181,9 @@ struct LegacyArgs : public MixCommonArgs
             });
         };
 
-        intSettingAlias(0, "cores", "maximum number of CPU cores to use inside a build", "build-cores");
-        intSettingAlias(0, "max-silent-time", "number of seconds of silence before a build is killed", "build-max-silent-time");
-        intSettingAlias(0, "timeout", "number of seconds before a build is killed", "build-timeout");
+        intSettingAlias(0, "cores", "maximum number of CPU cores to use inside a build", "cores");
+        intSettingAlias(0, "max-silent-time", "number of seconds of silence before a build is killed", "max-silent-time");
+        intSettingAlias(0, "timeout", "number of seconds before a build is killed", "timeout");
 
         mkFlag(0, "readonly-mode", "do not write to the Nix store",
             &settings.readOnlyMode);

@@ -107,6 +107,8 @@ void Store::queryMissing(const PathSet & targets,
     PathSet & willBuild_, PathSet & willSubstitute_, PathSet & unknown_,
     unsigned long long & downloadSize_, unsigned long long & narSize_)
 {
+    Activity act(*logger, lvlDebug, actUnknown, "querying info about missing paths");
+
     downloadSize_ = narSize_ = 0;
 
     ThreadPool pool;

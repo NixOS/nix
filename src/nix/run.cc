@@ -16,6 +16,8 @@ using namespace nix;
 
 std::string chrootHelperName = "__run_in_chroot";
 
+extern char * * environ;
+
 struct CmdRun : InstallablesCommand
 {
     Strings command = { "bash" };
@@ -85,7 +87,7 @@ struct CmdRun : InstallablesCommand
                 if (s) kept[var] = s;
             }
 
-            clearenv();
+            environ = nullptr;
 
             for (auto & var : kept)
                 setenv(var.first.c_str(), var.second.c_str(), 1);
@@ -202,6 +204,6 @@ void chrootHelper(int argc, char * * argv)
     throw SysError("unable to exec '%s'", cmd);
 
 #else
-    throw Error("mounting the Nix store on '%s' is not supported on this platform", >storeDir);
+    throw Error("mounting the Nix store on '%s' is not supported on this platform", storeDir);
 #endif
 }

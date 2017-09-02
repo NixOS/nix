@@ -20,7 +20,7 @@ makeTest {
       startAll;
 
       # Copying to /tmp should succeed.
-      $machine->succeed('nix-build --option build-use-sandbox false -E \'(with import <nixpkgs> {}; runCommand "foo" {} "
+      $machine->succeed('nix-build --option sandbox false -E \'(with import <nixpkgs> {}; runCommand "foo" {} "
         mkdir -p $out
         cp ${pkgs.coreutils}/bin/id /tmp/id
       ")\' ');
@@ -30,7 +30,7 @@ makeTest {
       $machine->succeed("rm /tmp/id");
 
       # Creating a setuid binary should fail.
-      $machine->fail('nix-build --option build-use-sandbox false -E \'(with import <nixpkgs> {}; runCommand "foo" {} "
+      $machine->fail('nix-build --option sandbox false -E \'(with import <nixpkgs> {}; runCommand "foo" {} "
         mkdir -p $out
         cp ${pkgs.coreutils}/bin/id /tmp/id
         chmod 4755 /tmp/id
@@ -41,7 +41,7 @@ makeTest {
       $machine->succeed("rm /tmp/id");
 
       # Creating a setgid binary should fail.
-      $machine->fail('nix-build --option build-use-sandbox false -E \'(with import <nixpkgs> {}; runCommand "foo" {} "
+      $machine->fail('nix-build --option sandbox false -E \'(with import <nixpkgs> {}; runCommand "foo" {} "
         mkdir -p $out
         cp ${pkgs.coreutils}/bin/id /tmp/id
         chmod 2755 /tmp/id
@@ -52,7 +52,7 @@ makeTest {
       $machine->succeed("rm /tmp/id");
 
       # The checks should also work on 32-bit binaries.
-      $machine->fail('nix-build --option build-use-sandbox false -E \'(with import <nixpkgs> { system = "i686-linux"; }; runCommand "foo" {} "
+      $machine->fail('nix-build --option sandbox false -E \'(with import <nixpkgs> { system = "i686-linux"; }; runCommand "foo" {} "
         mkdir -p $out
         cp ${pkgs.coreutils}/bin/id /tmp/id
         chmod 2755 /tmp/id
@@ -63,7 +63,7 @@ makeTest {
       $machine->succeed("rm /tmp/id");
 
       # The tests above use fchmodat(). Test chmod() as well.
-      $machine->succeed('nix-build --option build-use-sandbox false -E \'(with import <nixpkgs> {}; runCommand "foo" { buildInputs = [ perl ]; } "
+      $machine->succeed('nix-build --option sandbox false -E \'(with import <nixpkgs> {}; runCommand "foo" { buildInputs = [ perl ]; } "
         mkdir -p $out
         cp ${pkgs.coreutils}/bin/id /tmp/id
         perl -e \"chmod 0666, qw(/tmp/id) or die\"
@@ -73,7 +73,7 @@ makeTest {
 
       $machine->succeed("rm /tmp/id");
 
-      $machine->fail('nix-build --option build-use-sandbox false -E \'(with import <nixpkgs> {}; runCommand "foo" { buildInputs = [ perl ]; } "
+      $machine->fail('nix-build --option sandbox false -E \'(with import <nixpkgs> {}; runCommand "foo" { buildInputs = [ perl ]; } "
         mkdir -p $out
         cp ${pkgs.coreutils}/bin/id /tmp/id
         perl -e \"chmod 04755, qw(/tmp/id) or die\"
@@ -84,7 +84,7 @@ makeTest {
       $machine->succeed("rm /tmp/id");
 
       # And test fchmod().
-      $machine->succeed('nix-build --option build-use-sandbox false -E \'(with import <nixpkgs> {}; runCommand "foo" { buildInputs = [ perl ]; } "
+      $machine->succeed('nix-build --option sandbox false -E \'(with import <nixpkgs> {}; runCommand "foo" { buildInputs = [ perl ]; } "
         mkdir -p $out
         cp ${pkgs.coreutils}/bin/id /tmp/id
         perl -e \"my \\\$x; open \\\$x, qw(/tmp/id); chmod 01750, \\\$x or die\"
@@ -94,7 +94,7 @@ makeTest {
 
       $machine->succeed("rm /tmp/id");
 
-      $machine->fail('nix-build --option build-use-sandbox false -E \'(with import <nixpkgs> {}; runCommand "foo" { buildInputs = [ perl ]; } "
+      $machine->fail('nix-build --option sandbox false -E \'(with import <nixpkgs> {}; runCommand "foo" { buildInputs = [ perl ]; } "
         mkdir -p $out
         cp ${pkgs.coreutils}/bin/id /tmp/id
         perl -e \"my \\\$x; open \\\$x, qw(/tmp/id); chmod 04777, \\\$x or die\"

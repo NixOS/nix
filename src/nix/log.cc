@@ -2,10 +2,11 @@
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "progress-bar.hh"
 
 using namespace nix;
 
-struct CmdLog : InstallablesCommand
+struct CmdLog : InstallableCommand
 {
     CmdLog()
     {
@@ -27,21 +28,22 @@ struct CmdLog : InstallablesCommand
 
         subs.push_front(store);
 
-        for (auto & inst : installables) {
-            for (auto & b : inst->toBuildable()) {
-                auto path = b.second.drvPath != "" ? b.second.drvPath : b.first;
-                bool found = false;
-                for (auto & sub : subs) {
-                    auto log = sub->getBuildLog(path);
+        for (auto & b : installable->toBuildable(true)) {
+
+            for (auto & sub : subs) {
+                auto log = b.second.drvPath != "" ? sub->getBuildLog(b.second.drvPath) : nullptr;
+                if (!log) {
+                    log = sub->getBuildLog(b.first);
                     if (!log) continue;
-                    std::cout << *log;
-                    found = true;
-                    break;
                 }
-                if (!found)
-                    throw Error("build log of path '%s' is not available", path);
+                stopProgressBar();
+                printInfo("got build log for '%s' from '%s'", b.first, sub->getUri());
+                std::cout << *log;
+                return;
             }
         }
+
+        throw Error("build log of '%s' is not available", installable->what());
     }
 };
 

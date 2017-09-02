@@ -24,6 +24,7 @@ typedef enum {
     actOptimiseStore = 106,
     actVerifyPaths = 107,
     actSubstitute = 108,
+    actQueryPathInfo = 109,
 } ActivityType;
 
 typedef enum {
@@ -40,7 +41,7 @@ typedef uint64_t ActivityId;
 
 class Logger
 {
-    friend class Activity;
+    friend struct Activity;
 
 public:
 

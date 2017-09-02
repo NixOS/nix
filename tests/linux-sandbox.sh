@@ -16,7 +16,7 @@ rm -rf $TEST_ROOT/store0
 export NIX_STORE_DIR=/my/store
 export NIX_REMOTE="local?root=$TEST_ROOT/store0"
 
-outPath=$(nix-build dependencies.nix --no-out-link --option build-sandbox-paths /nix/store)
+outPath=$(nix-build dependencies.nix --no-out-link --option sandbox-paths /nix/store)
 
 [[ $outPath =~ /my/store/.*-dependencies ]]
 

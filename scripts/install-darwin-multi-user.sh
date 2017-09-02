@@ -744,9 +744,9 @@ place_nix_configuration() {
     cat <<EOF > "$SCRATCH/nix.conf"
 build-users-group = $NIX_BUILD_GROUP_NAME
 
-build-max-jobs = $NIX_USER_COUNT
-build-cores = 1
-build-use-sandbox = false
+max-jobs = $NIX_USER_COUNT
+cores = 1
+sandbox = false
 
 binary-caches = https://cache.nixos.org/
 trusted-binary-caches =

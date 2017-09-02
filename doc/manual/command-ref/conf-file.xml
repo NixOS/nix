@@ -45,13 +45,12 @@ Comments start with a <literal>#</literal> character.  Here is an
 example configuration file:</para>
 
 <programlisting>
-gc-keep-outputs = true       # Nice for developers
-gc-keep-derivations = true   # Idem
-env-keep-derivations = false
+keep-outputs = true       # Nice for developers
+keep-derivations = true   # Idem
 </programlisting>
 
 <para>You can override settings on the command line using the
-<option>--option</option> flag, e.g. <literal>--option gc-keep-outputs
+<option>--option</option> flag, e.g. <literal>--option keep-outputs
 false</literal>.</para>
 
 <para>The following settings are currently available:
@@ -59,7 +58,7 @@ false</literal>.</para>
 <variablelist>
 
 
-  <varlistentry xml:id="conf-gc-keep-outputs"><term><literal>gc-keep-outputs</literal></term>
+  <varlistentry xml:id="conf-keep-outputs"><term><literal>keep-outputs</literal></term>
 
     <listitem><para>If <literal>true</literal>, the garbage collector
     will keep the outputs of non-garbage derivations.  If
@@ -76,7 +75,7 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry xml:id="conf-gc-keep-derivations"><term><literal>gc-keep-derivations</literal></term>
+  <varlistentry xml:id="conf-keep-derivations"><term><literal>keep-derivations</literal></term>
 
     <listitem><para>If <literal>true</literal> (default), the garbage
     collector will keep the derivations from which non-garbage store
@@ -88,12 +87,12 @@ false</literal>.</para>
     traceability (e.g., it allows you to ask with what dependencies or
     options a store path was built), so by default this option is on.
     Turn it off to save a bit of disk space (or a lot if
-    <literal>gc-keep-outputs</literal> is also turned on).</para></listitem>
+    <literal>keep-outputs</literal> is also turned on).</para></listitem>
 
   </varlistentry>
 
 
-  <varlistentry><term><literal>env-keep-derivations</literal></term>
+  <varlistentry><term><literal>keep-env-derivations</literal></term>
 
     <listitem><para>If <literal>false</literal> (default), derivations
     are not stored in Nix user environments.  That is, the derivation
@@ -105,19 +104,19 @@ false</literal>.</para>
     garbage-collected until the user environment generation is deleted
     (<command>nix-env --delete-generations</command>).  To prevent
     build-time-only dependencies from being collected, you should also
-    turn on <literal>gc-keep-outputs</literal>.</para>
+    turn on <literal>keep-outputs</literal>.</para>
 
     <para>The difference between this option and
-    <literal>gc-keep-derivations</literal> is that this one is
+    <literal>keep-derivations</literal> is that this one is
     “sticky”: it applies to any user environment created while this
-    option was enabled, while <literal>gc-keep-derivations</literal>
+    option was enabled, while <literal>keep-derivations</literal>
     only applies at the moment the garbage collector is
     run.</para></listitem>
 
   </varlistentry>
 
 
-  <varlistentry xml:id="conf-build-max-jobs"><term><literal>build-max-jobs</literal></term>
+  <varlistentry xml:id="conf-max-jobs"><term><literal>max-jobs</literal></term>
 
     <listitem><para>This option defines the maximum number of jobs
     that Nix will try to build in parallel.  The default is
@@ -130,7 +129,7 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry xml:id="conf-build-cores"><term><literal>build-cores</literal></term>
+  <varlistentry xml:id="conf-cores"><term><literal>cores</literal></term>
 
     <listitem><para>Sets the value of the
     <envar>NIX_BUILD_CORES</envar> environment variable in the
@@ -149,7 +148,7 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry xml:id="conf-build-max-silent-time"><term><literal>build-max-silent-time</literal></term>
+  <varlistentry xml:id="conf-max-silent-time"><term><literal>max-silent-time</literal></term>
 
     <listitem>
 
@@ -170,7 +169,7 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry xml:id="conf-build-timeout"><term><literal>build-timeout</literal></term>
+  <varlistentry xml:id="conf-timeout"><term><literal>timeout</literal></term>
 
     <listitem>
 
@@ -190,7 +189,7 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry xml:id="conf-build-max-log-size"><term><literal>build-max-log-size</literal></term>
+  <varlistentry xml:id="conf-max-build-log-size"><term><literal>max-build-log-size</literal></term>
 
     <listitem>
 
@@ -245,7 +244,7 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry><term><literal>build-use-sandbox</literal></term>
+  <varlistentry><term><literal>sandbox</literal></term>
 
     <listitem><para>If set to <literal>true</literal>, builds will be
     performed in a <emphasis>sandboxed environment</emphasis>, i.e.,
@@ -254,7 +253,7 @@ false</literal>.</para>
     directory, private versions of <filename>/proc</filename>,
     <filename>/dev</filename>, <filename>/dev/shm</filename> and
     <filename>/dev/pts</filename> (on Linux), and the paths configured with the
-    <link linkend='conf-build-sandbox-paths'><literal>build-sandbox-paths</literal>
+    <link linkend='conf-sandbox-paths'><literal>sandbox-paths</literal>
     option</link>. This is useful to prevent undeclared dependencies
     on files in directories such as <filename>/usr/bin</filename>. In
     addition, on Linux, builds run in private PID, mount, network, IPC
@@ -280,8 +279,8 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry xml:id="conf-build-sandbox-paths">
-    <term><literal>build-sandbox-paths</literal></term>
+  <varlistentry xml:id="conf-sandbox-paths">
+    <term><literal>sandbox-paths</literal></term>
 
     <listitem><para>A list of paths bind-mounted into Nix sandbox
     environments. You can use the syntax
@@ -303,17 +302,17 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry xml:id="conf-build-extra-sandbox-paths">
+  <varlistentry xml:id="conf-extra-sandbox-paths">
     <term><literal>build-extra-sandbox-paths</literal></term>
 
     <listitem><para>A list of additional paths appended to
-    <option>build-sandbox-paths</option>. Useful if you want to extend
+    <option>sandbox-paths</option>. Useful if you want to extend
     its default value.</para></listitem>
 
   </varlistentry>
 
 
-  <varlistentry><term><literal>build-use-substitutes</literal></term>
+  <varlistentry><term><literal>use-substitutes</literal></term>
 
     <listitem><para>If set to <literal>true</literal> (default), Nix
     will use binary substitutes if available.  This option can be
@@ -322,7 +321,7 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry><term><literal>build-fallback</literal></term>
+  <varlistentry><term><literal>fallback</literal></term>
 
     <listitem><para>If set to <literal>true</literal>, Nix will fall
     back to building from source if a binary substitute fails.  This
@@ -332,7 +331,7 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry><term><literal>build-keep-log</literal></term>
+  <varlistentry><term><literal>keep-build-log</literal></term>
 
     <listitem><para>If set to <literal>true</literal> (the default),
     Nix will write the build log of a derivation (i.e. the standard
@@ -344,7 +343,7 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry><term><literal>build-compress-log</literal></term>
+  <varlistentry><term><literal>compress-build-log</literal></term>
 
     <listitem><para>If set to <literal>true</literal> (the default),
     build logs written to <filename>/nix/var/log/nix/drvs</filename>
@@ -597,7 +596,7 @@ password <replaceable>my-password</replaceable>
             <para>Pass a list of files and directories to be included in the
             sandbox for this build. One entry per line, terminated by an empty
             line. Entries have the same format as
-            <literal>build-sandbox-paths</literal>.</para>
+            <literal>sandbox-paths</literal>.</para>
 
           </listitem>
 
@@ -608,7 +607,7 @@ password <replaceable>my-password</replaceable>
   </varlistentry>
 
 
-  <varlistentry xml:id="conf-build-repeat"><term><literal>build-repeat</literal></term>
+  <varlistentry xml:id="conf-repeat"><term><literal>repeat</literal></term>
 
     <listitem><para>How many times to repeat builds to check whether
     they are deterministic. The default value is 0. If the value is
@@ -651,7 +650,7 @@ password <replaceable>my-password</replaceable>
     as <command>sudo</command> or <command>ping</command> will
     fail. (Note that in sandbox builds, no such programs are available
     unless you bind-mount them into the sandbox via the
-    <option>build-sandbox-paths</option> option.) You can allow the
+    <option>sandbox-paths</option> option.) You can allow the
     use of such programs by enabling this option. This is impure and
     usually undesirable, but may be useful in certain scenarios
     (e.g. to spin up containers or set up userspace network interfaces

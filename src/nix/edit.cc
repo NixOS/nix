@@ -8,7 +8,7 @@
 
 using namespace nix;
 
-struct CmdEdit : InstallablesCommand
+struct CmdEdit : InstallableCommand
 {
     std::string name() override
     {
@@ -34,44 +34,42 @@ struct CmdEdit : InstallablesCommand
     {
         auto state = getEvalState();
 
-        for (auto & i : installables) {
-            auto v = i->toValue(*state);
+        auto v = installable->toValue(*state);
 
-            Value * v2;
-            try {
-                auto dummyArgs = state->allocBindings(0);
-                v2 = findAlongAttrPath(*state, "meta.position", *dummyArgs, *v);
-            } catch (Error &) {
-                throw Error("package '%s' has no source location information", i->what());
-            }
-
-            auto pos = state->forceString(*v2);
-            debug("position is %s", pos);
-
-            auto colon = pos.rfind(':');
-            if (colon == std::string::npos)
-                throw Error("cannot parse meta.position attribute '%s'", pos);
-
-            std::string filename(pos, 0, colon);
-            int lineno = std::stoi(std::string(pos, colon + 1));
-
-            auto editor = getEnv("EDITOR", "cat");
-
-            Strings args{editor};
-
-            if (editor.find("emacs") != std::string::npos ||
-                editor.find("nano") != std::string::npos ||
-                editor.find("vim") != std::string::npos)
-                args.push_back(fmt("+%d", lineno));
-
-            args.push_back(filename);
-
-            stopProgressBar();
-
-            execvp(editor.c_str(), stringsToCharPtrs(args).data());
-
-            throw SysError("cannot run editor '%s'", editor);
+        Value * v2;
+        try {
+            auto dummyArgs = state->allocBindings(0);
+            v2 = findAlongAttrPath(*state, "meta.position", *dummyArgs, *v);
+        } catch (Error &) {
+            throw Error("package '%s' has no source location information", installable->what());
         }
+
+        auto pos = state->forceString(*v2);
+        debug("position is %s", pos);
+
+        auto colon = pos.rfind(':');
+        if (colon == std::string::npos)
+            throw Error("cannot parse meta.position attribute '%s'", pos);
+
+        std::string filename(pos, 0, colon);
+        int lineno = std::stoi(std::string(pos, colon + 1));
+
+        auto editor = getEnv("EDITOR", "cat");
+
+        Strings args{editor};
+
+        if (editor.find("emacs") != std::string::npos ||
+            editor.find("nano") != std::string::npos ||
+            editor.find("vim") != std::string::npos)
+            args.push_back(fmt("+%d", lineno));
+
+        args.push_back(filename);
+
+        stopProgressBar();
+
+        execvp(editor.c_str(), stringsToCharPtrs(args).data());
+
+        throw SysError("cannot run editor '%s'", editor);
     }
 };
 

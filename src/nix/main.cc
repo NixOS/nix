@@ -8,6 +8,7 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "progress-bar.hh"
+#include "finally.hh"
 
 extern std::string chrootHelperName;
 
@@ -83,6 +84,8 @@ void mainWrapped(int argc, char * * argv)
     args.parseCmdline(argvToStrings(argc, argv));
 
     if (!args.command) args.showHelpAndExit();
+
+    Finally f([]() { stopProgressBar(); });
 
     if (isatty(STDERR_FILENO))
         startProgressBar();
