@@ -7,22 +7,17 @@ readonly dest="/nix"
 readonly self="$(dirname "$0")"
 readonly nix="@nix@"
 readonly cacert="@cacert@"
-readonly USER
-
-# Global declaration block
-userID="$USER" # for the case when USER not set (root in some environments, environment not gone through login shell (Docker)). Guessing username from UID needed.
-
 
 if ! [ -e "$self/.reginfo" ]; then
     echo "$0: incomplete installer (.reginfo is missing)" >&2
 fi
 
 # in case if USER not set
-if [ -z "$userID" ]; then
+if [ -z "$USER" ]; then
     echo "$0: Environment variable USER is not set" >&2
-    echo "$0: Detecting username from UID=$(id -u)" >&2
-    userID="$(id -u -n)"    # Taking username from  UID
-    echo "$0: Username: $userID" >&2
+    echo "$0: Detected username from UID=$(id -u)" >&2
+    USER="$(whoami)"    # Taking username from  UID
+    echo "$0: Username: $USER" >&2
 fi
 
 if [ -z "$HOME" ]; then
@@ -49,7 +44,7 @@ fi
 echo "performing a single-user installation of Nix..." >&2
 
 if ! [ -e $dest ]; then
-    cmd="mkdir -m 0755 $dest && chown $userID $dest"
+    cmd="mkdir -m 0755 $dest && chown $USER $dest"
     echo "directory $dest does not exist; creating it by running '$cmd' using sudo" >&2
     if ! sudo sh -c "$cmd"; then
         echo "$0: please manually run '$cmd' as root to create $dest" >&2
@@ -58,7 +53,7 @@ if ! [ -e $dest ]; then
 fi
 
 if ! [ -w $dest ]; then
-    echo "$0: directory $dest exists, but is not writable by you. This could indicate that another user has already performed a single-user installation of Nix on this system. If you wish to enable multi-user support see http://nixos.org/nix/manual/#ssec-multi-user. If you wish to continue with a single-user install for $userID please run 'chown -R $userID $dest' as root." >&2
+    echo "$0: directory $dest exists, but is not writable by you. This could indicate that another user has already performed a single-user installation of Nix on this system. If you wish to enable multi-user support see http://nixos.org/nix/manual/#ssec-multi-user. If you wish to continue with a single-user install for $USER please run 'chown -R $USER $dest' as root." >&2
     exit 1
 fi
 
