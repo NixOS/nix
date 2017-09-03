@@ -22,6 +22,31 @@ if [ -z "$HOME" ]; then
     exit 1
 fi
 
+if [ ! -e "$HOME" ]; then
+    echo "$0: Home directory $HOME does not exist" >&2
+    exit 1
+fi
+
+if [ ! -d "$HOME" ]; then
+    echo "$0: Home directory $HOME is not a directory" >&2
+    exit 1
+fi
+
+if [ ! -w "$HOME" ]; then
+    echo "$0: Home directory $HOME is not writable for user $USER. No deal" >&2
+    exit 1
+fi
+
+if [ ! -O "$HOME" ]; then
+    echo "$0: Home directory $HOME is not owned by user $USER, users HOME probably must be owned by user" >&2
+    exit 1
+fi
+
+if [ ! -x "$HOME" ]; then
+    echo "$0: Home directory $HOME is not marked as executable for user $USER, how we are going to go into it?" >&2
+    exit 1
+fi
+
 # macOS support for 10.10 or higher
 if [ "$(uname -s)" = "Darwin" ]; then
     if [ $(($(sw_vers -productVersion | cut -d '.' -f 2))) -lt 10 ]; then
