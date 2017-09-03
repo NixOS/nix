@@ -40,13 +40,51 @@ fi
 
 echo "performing a single-user installation of Nix..." >&2
 
-if ! [ -e $dest ]; then
-    cmd="mkdir -m 0755 $dest && chown $USER $dest"
-    echo "directory $dest does not exist; creating it by running '$cmd' using sudo" >&2
-    if ! sudo sh -c "$cmd"; then
-        echo "$0: please manually run '$cmd' as root to create $dest" >&2
-        exit 1
+
+if [ -d "$dest" ] ; then
+
+    echo "Directory $dest already exists; skipping creation"
+
+else
+    echo "Directory $dest does not exist;"
+
+    # Shell parses variable with current user, so value under sudo/su not changes.
+    # It is const, but don't move it above USER set/checks.
+    readonly cmd="mkdir -m 0755 $dest && chown $USER $dest"
+
+    # Trying to create $dest by all means
+
+    # For case user is root, or has access to create $cmd. Else -> do 'then' section
+    if sh -c "$cmd" > /dev/null 2>&1 ; then
+        echo "Creating $dest directory by running $cmd using $USER rights"
+    else
+        if which sudo > /dev/null 2>&1 || type sudo > /dev/null 2>&1 ; then
+            echo "Creating $dest directory by running $cmd using sudo:"
+            if sudo -n true 2> /dev/null ; then
+                echo "Checked: sudo access does not require password."
+            else
+                echo "Checked: sudo access requires to enter password:"
+            fi
+            # Using sudo to create directory
+            if ! sudo sh -c "$cmd" && echo "Exiting priviliged mode." ; then
+                echo "Password don't match or user $USER not in sudoers." >&2
+            fi
+        else
+            echo "'sudo' seems not installed"
+        fi
+
     fi
+
+    # if dest still not created (with user or sudo) - use su to access root
+    if [ -d "$dest" ] ; then
+        echo "Trying to get privileges using su and root password"
+        if ! su sh -c "$cmd" && echo "Exiting priviliged mode."; then
+            # all means failed, Exit!
+            echo "$0: Can't get root access to create $dest folder. All variants failed. Exiting..." >&2
+            exit 1
+        fi
+    fi
+
 fi
 
 if ! [ -w $dest ]; then
