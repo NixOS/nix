@@ -4,8 +4,9 @@
 #include "config.hh"
 
 #include <map>
-#include <sys/types.h>
+#include <limits>
 
+#include <sys/types.h>
 
 namespace nix {
 
@@ -342,6 +343,13 @@ public:
 
     Setting<Strings> hashedMirrors{this, {"http://tarballs.nixos.org/"}, "hashed-mirrors",
         "A list of servers used by builtins.fetchurl to fetch files by hash."};
+
+    Setting<uint64_t> minFree{this, 0, "min-free",
+        "Automatically run the garbage collector when free disk space drops below the specified amount."};
+
+    Setting<uint64_t> maxFree{this, std::numeric_limits<uint64_t>::max(), "max-free",
+        "Stop deleting garbage when free disk space is above the specified amount."};
+
 };
 
 

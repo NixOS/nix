@@ -244,6 +244,18 @@ LocalStore::LocalStore(const Params & params)
 
 LocalStore::~LocalStore()
 {
+    std::shared_future<void> future;
+
+    {
+        auto state(_state.lock());
+        if (state->gcRunning)
+            future = state->gcFuture;
+    }
+
+    if (future.valid()) {
+        printError("waiting for auto-GC to finish on exit...");
+        future.get();
+    }
 
     try {
         auto state(_state.lock());
@@ -991,6 +1003,8 @@ void LocalStore::addToStore(const ValidPathInfo & info, const ref<std::string> &
             StringSource source(*nar);
             restorePath(realPath, source);
 
+            autoGC();
+
             canonicalisePathMetaData(realPath, -1);
 
             optimisePath(realPath); // FIXME: combine with hashPath()
@@ -1024,6 +1038,8 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
         if (repair || !isValidPath(dstPath)) {
 
             deletePath(realPath);
+
+            autoGC();
 
             if (recursive) {
                 StringSource source(dump);
@@ -1096,6 +1112,8 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
         if (repair || !isValidPath(dstPath)) {
 
             deletePath(realPath);
+
+            autoGC();
 
             writeFile(realPath, s);
 

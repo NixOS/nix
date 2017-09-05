@@ -393,6 +393,10 @@ configureFlags = "--prefix=${placeholder "out"} --includedir=${placeholder "dev"
     package repository.</para>
   </listitem>
 
+  <listitem>
+    <para>Automatic garbage collection.</para>
+  </listitem>
+
 </itemizedlist>
 
 <para>This release has contributions from TBD.</para>

@@ -1,6 +1,7 @@
 #include "derivations.hh"
 #include "globals.hh"
 #include "local-store.hh"
+#include "finally.hh"
 
 #include <functional>
 #include <queue>
@@ -9,6 +10,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -842,6 +844,74 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     /* While we're at it, vacuum the database. */
     //if (options.action == GCOptions::gcDeleteDead) vacuumDB();
+}
+
+
+void LocalStore::autoGC(bool sync)
+{
+    auto getAvail = [this]() {
+        struct statvfs st;
+        if (statvfs(realStoreDir.c_str(), &st))
+            throw SysError("getting filesystem info about '%s'", realStoreDir);
+
+        return (uint64_t) st.f_bavail * st.f_bsize;
+    };
+
+    std::shared_future<void> future;
+
+    {
+        auto state(_state.lock());
+
+        if (state->gcRunning) {
+            future = state->gcFuture;
+            debug("waiting for auto-GC to finish");
+            goto sync;
+        }
+
+        auto now = std::chrono::steady_clock::now();
+
+        if (now < state->lastGCCheck + std::chrono::seconds(5)) return;
+
+        auto avail = getAvail();
+
+        state->lastGCCheck = now;
+
+        if (avail >= settings.minFree || avail >= settings.maxFree) return;
+
+        if (avail > state->availAfterGC * 0.97) return;
+
+        state->gcRunning = true;
+
+        std::promise<void> promise;
+        future = state->gcFuture = promise.get_future().share();
+
+        std::thread([promise{std::move(promise)}, this, avail, getAvail]() mutable {
+
+            /* Wake up any threads waiting for the auto-GC to finish. */
+            Finally wakeup([&]() {
+                auto state(_state.lock());
+                state->gcRunning = false;
+                state->lastGCCheck = std::chrono::steady_clock::now();
+                promise.set_value();
+            });
+
+            printInfo("running auto-GC to free %d bytes", settings.maxFree - avail);
+
+            GCOptions options;
+            options.maxFreed = settings.maxFree - avail;
+
+            GCResults results;
+
+            collectGarbage(options, results);
+
+            _state.lock()->availAfterGC = getAvail();
+
+        }).detach();
+    }
+
+ sync:
+    // Wait for the future outside of the state lock.
+    if (sync) future.get();
 }
 
 
