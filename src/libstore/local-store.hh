@@ -59,7 +59,6 @@ private:
         SQLiteStmt stmtQueryValidPaths;
 
         /* The file to which we write our temporary roots. */
-        Path fnTempRoots;
         AutoCloseFD fdTempRoots;
     };
 
@@ -75,6 +74,8 @@ public:
     const Path reservedPath;
     const Path schemaPath;
     const Path trashDir;
+    const Path tempRootsDir;
+    const Path fnTempRoots;
 
 private:
 

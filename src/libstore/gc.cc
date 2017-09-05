@@ -18,7 +18,6 @@ namespace nix {
 
 
 static string gcLockName = "gc.lock";
-static string tempRootsDir = "temproots";
 static string gcRootsDir = "gcroots";
 
 
@@ -153,30 +152,25 @@ void LocalStore::addTempRoot(const Path & path)
     if (!state->fdTempRoots) {
 
         while (1) {
-            Path dir = (format("%1%/%2%") % stateDir % tempRootsDir).str();
-            createDirs(dir);
-
-            state->fnTempRoots = (format("%1%/%2%") % dir % getpid()).str();
-
             AutoCloseFD fdGCLock = openGCLock(ltRead);
 
-            if (pathExists(state->fnTempRoots))
+            if (pathExists(fnTempRoots))
                 /* It *must* be stale, since there can be no two
                    processes with the same pid. */
-                unlink(state->fnTempRoots.c_str());
+                unlink(fnTempRoots.c_str());
 
-            state->fdTempRoots = openLockFile(state->fnTempRoots, true);
+            state->fdTempRoots = openLockFile(fnTempRoots, true);
 
             fdGCLock = -1;
 
-            debug(format("acquiring read lock on '%1%'") % state->fnTempRoots);
+            debug(format("acquiring read lock on '%1%'") % fnTempRoots);
             lockFile(state->fdTempRoots.get(), ltRead, true);
 
             /* Check whether the garbage collector didn't get in our
                way. */
             struct stat st;
             if (fstat(state->fdTempRoots.get(), &st) == -1)
-                throw SysError(format("statting '%1%'") % state->fnTempRoots);
+                throw SysError(format("statting '%1%'") % fnTempRoots);
             if (st.st_size == 0) break;
 
             /* The garbage collector deleted this file before we could
@@ -188,14 +182,14 @@ void LocalStore::addTempRoot(const Path & path)
 
     /* Upgrade the lock to a write lock.  This will cause us to block
        if the garbage collector is holding our lock. */
-    debug(format("acquiring write lock on '%1%'") % state->fnTempRoots);
+    debug(format("acquiring write lock on '%1%'") % fnTempRoots);
     lockFile(state->fdTempRoots.get(), ltWrite, true);
 
     string s = path + '\0';
     writeFull(state->fdTempRoots.get(), s);
 
     /* Downgrade to a read lock. */
-    debug(format("downgrading to read lock on '%1%'") % state->fnTempRoots);
+    debug(format("downgrading to read lock on '%1%'") % fnTempRoots);
     lockFile(state->fdTempRoots.get(), ltRead, true);
 }
 
@@ -204,11 +198,10 @@ void LocalStore::readTempRoots(PathSet & tempRoots, FDs & fds)
 {
     /* Read the `temproots' directory for per-process temporary root
        files. */
-    DirEntries tempRootFiles = readDirectory(
-        (format("%1%/%2%") % stateDir % tempRootsDir).str());
+    DirEntries tempRootFiles = readDirectory(tempRootsDir);
 
     for (auto & i : tempRootFiles) {
-        Path path = (format("%1%/%2%/%3%") % stateDir % tempRootsDir % i.name).str();
+        Path path = tempRootsDir + "/" + i.name;
 
         debug(format("reading temporary root file '%1%'") % path);
         FDPtr fd(new AutoCloseFD(open(path.c_str(), O_CLOEXEC | O_RDWR, 0666)));
@@ -222,21 +215,25 @@ void LocalStore::readTempRoots(PathSet & tempRoots, FDs & fds)
         //FDPtr fd(new AutoCloseFD(openLockFile(path, false)));
         //if (*fd == -1) continue;
 
-        /* Try to acquire a write lock without blocking.  This can
-           only succeed if the owning process has died.  In that case
-           we don't care about its temporary roots. */
-        if (lockFile(fd->get(), ltWrite, false)) {
-            printError(format("removing stale temporary roots file '%1%'") % path);
-            unlink(path.c_str());
-            writeFull(fd->get(), "d");
-            continue;
-        }
+        if (path != fnTempRoots) {
 
-        /* Acquire a read lock.  This will prevent the owning process
-           from upgrading to a write lock, therefore it will block in
-           addTempRoot(). */
-        debug(format("waiting for read lock on '%1%'") % path);
-        lockFile(fd->get(), ltRead, true);
+            /* Try to acquire a write lock without blocking.  This can
+               only succeed if the owning process has died.  In that case
+               we don't care about its temporary roots. */
+            if (lockFile(fd->get(), ltWrite, false)) {
+                printError(format("removing stale temporary roots file '%1%'") % path);
+                unlink(path.c_str());
+                writeFull(fd->get(), "d");
+                continue;
+            }
+
+            /* Acquire a read lock.  This will prevent the owning process
+               from upgrading to a write lock, therefore it will block in
+               addTempRoot(). */
+            debug(format("waiting for read lock on '%1%'") % path);
+            lockFile(fd->get(), ltRead, true);
+
+        }
 
         /* Read the entire file. */
         string contents = readFile(fd->get());

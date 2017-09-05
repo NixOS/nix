@@ -51,6 +51,8 @@ LocalStore::LocalStore(const Params & params)
     , reservedPath(dbDir + "/reserved")
     , schemaPath(dbDir + "/schema")
     , trashDir(realStoreDir + "/trash")
+    , tempRootsDir(stateDir + "/temproots")
+    , fnTempRoots(fmt("%s/%d", tempRootsDir, getpid()))
     , publicKeys(getDefaultPublicKeys())
 {
     auto state(_state.lock());
@@ -61,7 +63,7 @@ LocalStore::LocalStore(const Params & params)
     createDirs(linksDir);
     Path profilesDir = stateDir + "/profiles";
     createDirs(profilesDir);
-    createDirs(stateDir + "/temproots");
+    createDirs(tempRootsDir);
     createDirs(dbDir);
     Path gcRootsDir = stateDir + "/gcroots";
     if (!pathExists(gcRootsDir)) {
@@ -242,12 +244,12 @@ LocalStore::LocalStore(const Params & params)
 
 LocalStore::~LocalStore()
 {
-    auto state(_state.lock());
 
     try {
+        auto state(_state.lock());
         if (state->fdTempRoots) {
             state->fdTempRoots = -1;
-            unlink(state->fnTempRoots.c_str());
+            unlink(fnTempRoots.c_str());
         }
     } catch (...) {
         ignoreException();
