@@ -22,7 +22,7 @@ struct CmdCopy : StorePathsCommand
         mkFlag()
             .longName("no-check-sigs")
             .description("do not require that paths are signed by trusted keys")
-            .handler([&](Strings ss) { checkSigs = NoCheckSigs; });
+            .set(&checkSigs, NoCheckSigs);
     }
 
     std::string name() override

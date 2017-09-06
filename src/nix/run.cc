@@ -41,7 +41,7 @@ struct CmdRun : InstallablesCommand
             .longName("ignore-environment")
             .shortName('i')
             .description("clear the entire environment (except those specified with --keep)")
-            .handler([&](Strings ss) { ignoreEnvironment = true; });
+            .set(&ignoreEnvironment, true);
 
         mkFlag()
             .longName("keep")

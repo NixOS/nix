@@ -80,6 +80,19 @@ public:
         FlagMaker & arity(size_t arity) { flag->arity = arity; return *this; };
         FlagMaker & handler(std::function<void(Strings)> handler) { flag->handler = handler; return *this; };
         FlagMaker & category(const std::string & s) { flag->category = s; return *this; };
+
+        FlagMaker & dest(std::string * dest) {
+            assert(flag->arity == 1);
+            flag->handler = [=](Strings ss) { *dest = ss.front(); };
+            return *this;
+        };
+
+        template<class T>
+        FlagMaker & set(T * dest, const T & val) {
+            assert(flag->arity == 0);
+            flag->handler = [=](Strings ss) { *dest = val; };
+            return *this;
+        };
     };
 
     FlagMaker mkFlag();
