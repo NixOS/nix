@@ -70,17 +70,27 @@ ref<EvalState> SourceExprCommand::getEvalState()
     return ref<EvalState>(evalState);
 }
 
+Buildable Installable::toBuildable()
+{
+    auto buildables = toBuildables();
+    if (buildables.size() != 1)
+        throw Error("installable '%s' evaluates to %d derivations, where only one is expected", what(), buildables.size());
+    return std::move(buildables[0]);
+}
+
 struct InstallableStoreDrv : Installable
 {
-    Path storePath;
+    Path drvPath;
 
-    InstallableStoreDrv(const Path & storePath) : storePath(storePath) { }
+    InstallableStoreDrv(const Path & drvPath) : drvPath(drvPath) { }
 
-    std::string what() override { return storePath; }
+    std::string what() override { return drvPath; }
 
-    Buildables toBuildable(bool singular) override
+    Buildables toBuildables() override
     {
-        return {{storePath, {}}};
+        Buildable b = {drvPath};
+        // FIXME: add outputs?
+        return {b};
     }
 };
 
@@ -92,9 +102,9 @@ struct InstallableStorePath : Installable
 
     std::string what() override { return storePath; }
 
-    Buildables toBuildable(bool singular) override
+    Buildables toBuildables() override
     {
-        return {{storePath, {}}};
+        return {{"", {{"out", storePath}}}};
     }
 };
 
@@ -104,7 +114,7 @@ struct InstallableValue : Installable
 
     InstallableValue(SourceExprCommand & cmd) : cmd(cmd) { }
 
-    Buildables toBuildable(bool singular) override
+    Buildables toBuildables() override
     {
         auto state = cmd.getEvalState();
 
@@ -117,16 +127,32 @@ struct InstallableValue : Installable
         DrvInfos drvs;
         getDerivations(*state, *v, "", autoArgs, drvs, false);
 
-        if (singular && drvs.size() != 1)
-            throw Error("installable '%s' evaluates to %d derivations, where only one is expected", what(), drvs.size());
-
         Buildables res;
 
-        for (auto & drv : drvs)
-            for (auto & output : drv.queryOutputs())
-                res.emplace(output.second, Whence{output.first, drv.queryDrvPath()});
+        PathSet drvPaths;
 
-        return res;
+        for (auto & drv : drvs) {
+            Buildable b{drv.queryDrvPath()};
+            drvPaths.insert(b.drvPath);
+
+            auto outputName = drv.queryOutputName();
+            if (outputName == "")
+                throw Error("derivation '%s' lacks an 'outputName' attribute", b.drvPath);
+
+            b.outputs.emplace(outputName, drv.queryOutPath());
+
+            res.push_back(std::move(b));
+        }
+
+        // Hack to recognize .all: if all drvs have the same drvPath,
+        // merge the buildables.
+        if (drvPaths.size() == 1) {
+            Buildable b{*drvPaths.begin()};
+            for (auto & b2 : res)
+                b.outputs.insert(b2.outputs.begin(), b2.outputs.end());
+            return {b};
+        } else
+            return res;
     }
 };
 
@@ -214,23 +240,38 @@ static std::vector<std::shared_ptr<Installable>> parseInstallables(
     return result;
 }
 
-PathSet InstallablesCommand::toStorePaths(ref<Store> store, ToStorePathsMode mode)
+Buildables InstallablesCommand::toBuildables(ref<Store> store, RealiseMode mode)
 {
     if (mode != Build)
         settings.readOnlyMode = true;
 
-    PathSet outPaths, buildables;
+    Buildables buildables;
 
-    for (auto & i : installables)
-        for (auto & b : i->toBuildable()) {
-            outPaths.insert(b.first);
-            buildables.insert(b.second.drvPath != "" ? b.second.drvPath : b.first);
+    PathSet pathsToBuild;
+
+    for (auto & i : installables) {
+        for (auto & b : i->toBuildables()) {
+            if (b.drvPath != "")
+                pathsToBuild.insert(b.drvPath);
+            buildables.push_back(std::move(b));
         }
+    }
 
     if (mode == DryRun)
-        printMissing(store, buildables, lvlError);
+        printMissing(store, pathsToBuild, lvlError);
     else if (mode == Build)
-        store->buildPaths(buildables);
+        store->buildPaths(pathsToBuild);
+
+    return buildables;
+}
+
+PathSet InstallablesCommand::toStorePaths(ref<Store> store, RealiseMode mode)
+{
+    PathSet outPaths;
+
+    for (auto & b : toBuildables(store, mode))
+        for (auto & output : b.outputs)
+            outPaths.insert(output.second);
 
     return outPaths;
 }

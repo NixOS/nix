@@ -23,9 +23,20 @@ struct CmdBuild : MixDryRun, InstallablesCommand
 
     void run(ref<Store> store) override
     {
-        auto paths = toStorePaths(store, dryRun ? DryRun : Build);
+        auto buildables = toBuildables(store, dryRun ? DryRun : Build);
 
-        printError("build result: %s", showPaths(paths));
+        for (size_t i = 0; i < buildables.size(); ++i) {
+            auto & b(buildables[i]);
+
+            for (auto & output : b.outputs) {
+                if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
+                    std::string symlink = "result";
+                    if (i) symlink += fmt("-%d", i);
+                    if (output.first != "out") symlink += fmt("-%s", output.first);
+                    store2->addPermRoot(output.second, absPath(symlink), true);
+                }
+            }
+        }
     }
 };
 

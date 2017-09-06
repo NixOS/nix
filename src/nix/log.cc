@@ -24,23 +24,25 @@ struct CmdLog : InstallableCommand
 
     void run(ref<Store> store) override
     {
+        settings.readOnlyMode = true;
+
         auto subs = getDefaultSubstituters();
 
         subs.push_front(store);
 
-        for (auto & b : installable->toBuildable(true)) {
+        auto b = installable->toBuildable();
 
-            for (auto & sub : subs) {
-                auto log = b.second.drvPath != "" ? sub->getBuildLog(b.second.drvPath) : nullptr;
-                if (!log) {
-                    log = sub->getBuildLog(b.first);
-                    if (!log) continue;
-                }
-                stopProgressBar();
-                printInfo("got build log for '%s' from '%s'", b.first, sub->getUri());
-                std::cout << *log;
-                return;
+        for (auto & sub : subs) {
+            auto log = b.drvPath != "" ? sub->getBuildLog(b.drvPath) : nullptr;
+            for (auto & output : b.outputs) {
+                if (log) break;
+                log = sub->getBuildLog(output.second);
             }
+            if (!log) continue;
+            stopProgressBar();
+            printInfo("got build log for '%s' from '%s'", installable->what(), sub->getUri());
+            std::cout << *log;
+            return;
         }
 
         throw Error("build log of '%s' is not available", installable->what());

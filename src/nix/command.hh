@@ -44,17 +44,24 @@ private:
     std::shared_ptr<Store> _store;
 };
 
-struct Whence { std::string outputName; Path drvPath; };
-typedef std::map<Path, Whence> Buildables;
+struct Buildable
+{
+    Path drvPath; // may be empty
+    std::map<std::string, Path> outputs;
+};
+
+typedef std::vector<Buildable> Buildables;
 
 struct Installable
 {
     virtual std::string what() = 0;
 
-    virtual Buildables toBuildable(bool singular = false)
+    virtual Buildables toBuildables()
     {
         throw Error("argument '%s' cannot be built", what());
     }
+
+    Buildable toBuildable();
 
     virtual Value * toValue(EvalState & state)
     {
@@ -97,9 +104,11 @@ struct InstallablesCommand : virtual Args, SourceExprCommand
         expectArgs("installables", &_installables);
     }
 
-    enum ToStorePathsMode { Build, NoBuild, DryRun };
+    enum RealiseMode { Build, NoBuild, DryRun };
 
-    PathSet toStorePaths(ref<Store> store, ToStorePathsMode mode);
+    Buildables toBuildables(ref<Store> store, RealiseMode mode);
+
+    PathSet toStorePaths(ref<Store> store, RealiseMode mode);
 
     void prepare() override;
 
