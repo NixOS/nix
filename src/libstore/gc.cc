@@ -887,24 +887,32 @@ void LocalStore::autoGC(bool sync)
 
         std::thread([promise{std::move(promise)}, this, avail, getAvail]() mutable {
 
-            /* Wake up any threads waiting for the auto-GC to finish. */
-            Finally wakeup([&]() {
-                auto state(_state.lock());
-                state->gcRunning = false;
-                state->lastGCCheck = std::chrono::steady_clock::now();
-                promise.set_value();
-            });
+            try {
 
-            printInfo("running auto-GC to free %d bytes", settings.maxFree - avail);
+                /* Wake up any threads waiting for the auto-GC to finish. */
+                Finally wakeup([&]() {
+                    auto state(_state.lock());
+                    state->gcRunning = false;
+                    state->lastGCCheck = std::chrono::steady_clock::now();
+                    promise.set_value();
+                });
 
-            GCOptions options;
-            options.maxFreed = settings.maxFree - avail;
+                printInfo("running auto-GC to free %d bytes", settings.maxFree - avail);
 
-            GCResults results;
+                GCOptions options;
+                options.maxFreed = settings.maxFree - avail;
 
-            collectGarbage(options, results);
+                GCResults results;
 
-            _state.lock()->availAfterGC = getAvail();
+                collectGarbage(options, results);
+
+                _state.lock()->availAfterGC = getAvail();
+
+            } catch (...) {
+                // FIXME: we could propagate the exception to the
+                // future, but we don't really care.
+                ignoreException();
+            }
 
         }).detach();
     }
