@@ -76,9 +76,9 @@ else
     fi
 
     # if dest still not created (with user or sudo) - use su to access root
-    if [ -d "$dest" ] ; then
+    if [ ! -d "$dest" ] ; then
         echo "Trying to get privileges using su and root password"
-        if ! su sh -c "$cmd" && echo "Exiting priviliged mode."; then
+        if ! su root 'sh -c "$cmd"' && echo "Exiting priviliged mode."; then
             # all means failed, Exit!
             echo "$0: Can't get root access to create $dest folder. All variants failed. Exiting..." >&2
             exit 1
