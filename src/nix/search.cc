@@ -56,6 +56,24 @@ struct CmdSearch : SourceExprCommand, MixJSON
         return "query available packages";
     }
 
+    Examples examples() override
+    {
+        return {
+            Example{
+                "To show all available packages:",
+                "nix search"
+            },
+            Example{
+                "To show any packages containing 'blender' in its name or description:",
+                "nix search blender"
+            },
+            Example{
+                "To search for Firefox and Chromium:",
+                "nix search 'firefox|chromium'"
+            },
+        };
+    }
+
     void run(ref<Store> store) override
     {
         settings.readOnlyMode = true;
