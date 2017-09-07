@@ -70,6 +70,24 @@ struct CmdRun : InstallablesCommand
         return "run a shell in which the specified packages are available";
     }
 
+    Examples examples() override
+    {
+        return {
+            Example{
+                "To start a shell providing GNU Hello from NixOS 17.03:",
+                "nix run -f channel:nixos-17.03 hello"
+            },
+            Example{
+                "To start a shell providing youtube-dl from your 'nixpkgs' channel:",
+                "nix run nixpkgs.youtube-dl"
+            },
+            Example{
+                "To run GNU Hello:",
+                "nix run nixpkgs.hello -c hello --greeting 'Hi everybody!'"
+            },
+        };
+    }
+
     void run(ref<Store> store) override
     {
         auto outPaths = toStorePaths(store, Build);
