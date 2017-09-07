@@ -27,6 +27,24 @@ struct CmdEval : MixJSON, InstallablesCommand
         return "evaluate a Nix expression";
     }
 
+    Examples examples() override
+    {
+        return {
+            Example{
+                "To evaluate a Nix expression given on the command line:",
+                "nix eval '(1 + 2)'"
+            },
+            Example{
+                "To evaluate a Nix expression from a file or URI:",
+                "nix eval -f channel:nixos-17.09 hello.name"
+            },
+            Example{
+                "To get the current version of Nixpkgs:",
+                "nix eval --raw nixpkgs.lib.nixpkgsVersion"
+            },
+        };
+    }
+
     void run(ref<Store> store) override
     {
         if (raw && json)
