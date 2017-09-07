@@ -35,6 +35,20 @@ struct CmdBuild : MixDryRun, InstallablesCommand
         return "build a derivation or fetch a store path";
     }
 
+    Examples examples() override
+    {
+        return {
+            Example{
+                "To build and run GNU Hello from NixOS 17.03:",
+                "nix build -f channel:nixos-17.03 hello; ./result/bin/hello"
+            },
+            Example{
+                "To build the build.x86_64-linux attribute from release.nix:",
+                "nix build -f release.nix build.x86_64-linux"
+            },
+        };
+    }
+
     void run(ref<Store> store) override
     {
         auto buildables = toBuildables(store, dryRun ? DryRun : Build);
