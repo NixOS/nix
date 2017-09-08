@@ -21,7 +21,7 @@ ThreadPool::~ThreadPool()
     std::vector<std::thread> workers;
     {
         auto state(state_.lock());
-        state->quit = true;
+        quit = true;
         std::swap(workers, state->workers);
     }
 
@@ -36,7 +36,7 @@ ThreadPool::~ThreadPool()
 void ThreadPool::enqueue(const work_t & t)
 {
     auto state(state_.lock());
-    if (state->quit)
+    if (quit)
         throw ThreadPoolShutDown("cannot enqueue a work item while the thread pool is shutting down");
     state->left.push(t);
     if (state->left.size() > state->workers.size() && state->workers.size() < maxThreads)
@@ -63,6 +63,8 @@ void ThreadPool::process()
 
 void ThreadPool::workerEntry()
 {
+    interruptCheck = [&]() { return (bool) quit; };
+
     bool didWork = false;
     std::exception_ptr exc;
 
@@ -80,7 +82,7 @@ void ThreadPool::workerEntry()
                     if (!state->exception) {
                         state->exception = exc;
                         // Tell the other workers to quit.
-                        state->quit = true;
+                        quit = true;
                         work.notify_all();
                     } else {
                         /* Print the exception, since we can't
@@ -100,7 +102,7 @@ void ThreadPool::workerEntry()
             /* Wait until a work item is available or another thread
                had an exception or we're asked to quit. */
             while (true) {
-                if (state->quit) {
+                if (quit) {
                     if (!state->active)
                         done.notify_one();
                     return;

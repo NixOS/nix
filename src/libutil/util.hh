@@ -273,13 +273,16 @@ void closeOnExec(int fd);
 
 extern bool _isInterrupted;
 
+extern thread_local std::function<bool()> interruptCheck;
+
 void setInterruptThrown();
 
 void _interrupted();
 
 void inline checkInterrupt()
 {
-    if (_isInterrupted) _interrupted();
+    if (_isInterrupted || (interruptCheck && interruptCheck()))
+        _interrupted();
 }
 
 MakeError(Interrupted, BaseError)

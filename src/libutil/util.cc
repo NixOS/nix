@@ -1002,6 +1002,7 @@ void closeOnExec(int fd)
 bool _isInterrupted = false;
 
 static thread_local bool interruptThrown = false;
+thread_local std::function<bool()> interruptCheck;
 
 void setInterruptThrown()
 {
@@ -1018,7 +1019,6 @@ void _interrupted()
         throw Interrupted("interrupted by the user");
     }
 }
-
 
 
 //////////////////////////////////////////////////////////////////////

@@ -7,6 +7,7 @@
 #include <functional>
 #include <thread>
 #include <map>
+#include <atomic>
 
 namespace nix {
 
@@ -47,8 +48,9 @@ private:
         size_t active = 0;
         std::exception_ptr exception;
         std::vector<std::thread> workers;
-        bool quit = false;
     };
+
+    std::atomic_bool quit{false};
 
     Sync<State> state_;
 
