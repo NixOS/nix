@@ -97,7 +97,7 @@ ref<Store> StoreCommand::createStore()
 
 void StoreCommand::run()
 {
-    run(createStore());
+    run(getStore());
 }
 
 StorePathsCommand::StorePathsCommand()
