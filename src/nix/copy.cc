@@ -14,6 +14,8 @@ struct CmdCopy : StorePathsCommand
 
     CheckSigsFlag checkSigs = CheckSigs;
 
+    SubstituteFlag substitute = NoSubstitute;
+
     CmdCopy()
     {
         mkFlag(0, "from", "store-uri", "URI of the source Nix store", &srcUri);
@@ -23,6 +25,12 @@ struct CmdCopy : StorePathsCommand
             .longName("no-check-sigs")
             .description("do not require that paths are signed by trusted keys")
             .set(&checkSigs, NoCheckSigs);
+
+        mkFlag()
+            .longName("substitute")
+            .shortName('s')
+            .description("whether to try substitutes on the destination store (only supported by SSH)")
+            .set(&substitute, Substitute);
     }
 
     std::string name() override
@@ -66,7 +74,7 @@ struct CmdCopy : StorePathsCommand
         ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
 
         copyPaths(srcStore, dstStore, PathSet(storePaths.begin(), storePaths.end()),
-            NoRepair, checkSigs);
+            NoRepair, checkSigs, substitute);
     }
 };
 
