@@ -105,6 +105,13 @@ struct LegacySSHStore : public Store
             readLongLong(conn->from); // download size
             info->narSize = readLongLong(conn->from);
 
+            if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 4) {
+                auto s = readString(conn->from);
+                info->narHash = s.empty() ? Hash() : Hash(s);
+                conn->from >> info->ca;
+                info->sigs = readStrings<StringSet>(conn->from);
+            }
+
             auto s = readString(conn->from);
             assert(s == "");
 

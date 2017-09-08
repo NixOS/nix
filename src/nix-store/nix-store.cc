@@ -858,6 +858,8 @@ static void opServe(Strings opFlags, Strings opArgs)
                         // !!! Maybe we want compression?
                         out << info->narSize // downloadSize
                             << info->narSize;
+                        if (GET_PROTOCOL_MINOR(clientVersion) >= 4)
+                            out << (info->narHash ? info->narHash.to_string() : "") << info->ca << info->sigs;
                     } catch (InvalidPath &) {
                     }
                 }
