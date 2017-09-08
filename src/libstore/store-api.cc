@@ -593,22 +593,18 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     MyStringSink sink(progress);
     srcStore->narFromPath({storePath}, sink);
 
-    if (!info->narHash && !checkSigs) {
+    if (!info->narHash) {
         auto info2 = make_ref<ValidPathInfo>(*info);
         info2->narHash = hashString(htSHA256, *sink.s);
         if (!info->narSize) info2->narSize = sink.s->size();
         info = info2;
     }
 
-    assert(info->narHash);
-
     if (info->ultimate) {
         auto info2 = make_ref<ValidPathInfo>(*info);
         info2->ultimate = false;
         info = info2;
     }
-
-    assert(info->narHash);
 
     dstStore->addToStore(*info, sink.s, repair, checkSigs);
 }
