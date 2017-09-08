@@ -2202,7 +2202,7 @@ void DerivationGoal::initEnv()
     env["NIX_BUILD_CORES"] = (format("%d") % settings.buildCores).str();
 
     /* In non-structured mode, add all bindings specified in the
-       derivation via the environments, except those listed in the
+       derivation via the environment, except those listed in the
        passAsFile attribute. Those are passed as file names pointing
        to temporary files containing the contents. Note that
        passAsFile is ignored in structure mode because it's not
@@ -2258,6 +2258,11 @@ void DerivationGoal::initEnv()
         Strings varNames = tokenizeString<Strings>(get(drv->env, "impureEnvVars"));
         for (auto & i : varNames) env[i] = getEnv(i);
     }
+
+    /* Currently structured log messages piggyback on stderr, but we
+       may change that in the future. So tell the builder which file
+       descriptor to use for that. */
+    env["NIX_LOG_FD"] = "2";
 }
 
 
