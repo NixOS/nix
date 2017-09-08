@@ -44,7 +44,7 @@ private:
     struct State
     {
         std::queue<work_t> left;
-        size_t pending = 0;
+        size_t active = 0;
         std::exception_ptr exception;
         std::vector<std::thread> workers;
         bool quit = false;
