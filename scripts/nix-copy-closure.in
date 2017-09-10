@@ -7,8 +7,10 @@ use Nix::Config;
 use Nix::Store;
 use Nix::CopyClosure;
 use List::Util qw(sum);
+use IO::Handle;
 
 binmode STDERR, ":encoding(utf8)";
+STDERR->autoflush(1);
 
 if (scalar @ARGV < 1) {
     print STDERR <<EOF
