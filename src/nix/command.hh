@@ -93,6 +93,8 @@ private:
     Value * vSourceExpr = 0;
 };
 
+enum RealiseMode { Build, NoBuild, DryRun };
+
 /* A command that operates on a list of "installables", which can be
    store paths, attribute paths, Nix expressions, etc. */
 struct InstallablesCommand : virtual Args, SourceExprCommand
@@ -103,12 +105,6 @@ struct InstallablesCommand : virtual Args, SourceExprCommand
     {
         expectArgs("installables", &_installables);
     }
-
-    enum RealiseMode { Build, NoBuild, DryRun };
-
-    Buildables toBuildables(ref<Store> store, RealiseMode mode);
-
-    PathSet toStorePaths(ref<Store> store, RealiseMode mode);
 
     void prepare() override;
 
@@ -197,5 +193,18 @@ struct RegisterCommand
         commands->emplace(command->name(), command);
     }
 };
+
+std::shared_ptr<Installable> parseInstallable(
+    SourceExprCommand & cmd, ref<Store> store, const std::string & installable,
+    bool useDefaultInstallables);
+
+Buildables toBuildables(ref<Store> store, RealiseMode mode,
+    std::vector<std::shared_ptr<Installable>> installables);
+
+PathSet toStorePaths(ref<Store> store, RealiseMode mode,
+    std::vector<std::shared_ptr<Installable>> installables);
+
+Path toStorePath(ref<Store> store, RealiseMode mode,
+    std::shared_ptr<Installable> installable);
 
 }

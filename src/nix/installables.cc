@@ -240,7 +240,17 @@ static std::vector<std::shared_ptr<Installable>> parseInstallables(
     return result;
 }
 
-Buildables InstallablesCommand::toBuildables(ref<Store> store, RealiseMode mode)
+std::shared_ptr<Installable> parseInstallable(
+    SourceExprCommand & cmd, ref<Store> store, const std::string & installable,
+    bool useDefaultInstallables)
+{
+    auto installables = parseInstallables(cmd, store, {installable}, false);
+    assert(installables.size() == 1);
+    return installables.front();
+}
+
+Buildables toBuildables(ref<Store> store, RealiseMode mode,
+    std::vector<std::shared_ptr<Installable>> installables)
 {
     if (mode != Build)
         settings.readOnlyMode = true;
@@ -251,8 +261,13 @@ Buildables InstallablesCommand::toBuildables(ref<Store> store, RealiseMode mode)
 
     for (auto & i : installables) {
         for (auto & b : i->toBuildables()) {
-            if (b.drvPath != "")
-                pathsToBuild.insert(b.drvPath);
+            if (b.drvPath != "") {
+                StringSet outputNames;
+                for (auto & output : b.outputs)
+                    outputNames.insert(output.first);
+                pathsToBuild.insert(
+                    b.drvPath + "!" + concatStringsSep(",", outputNames));
+            }
             buildables.push_back(std::move(b));
         }
     }
@@ -265,15 +280,27 @@ Buildables InstallablesCommand::toBuildables(ref<Store> store, RealiseMode mode)
     return buildables;
 }
 
-PathSet InstallablesCommand::toStorePaths(ref<Store> store, RealiseMode mode)
+PathSet toStorePaths(ref<Store> store, RealiseMode mode,
+    std::vector<std::shared_ptr<Installable>> installables)
 {
     PathSet outPaths;
 
-    for (auto & b : toBuildables(store, mode))
+    for (auto & b : toBuildables(store, mode, installables))
         for (auto & output : b.outputs)
             outPaths.insert(output.second);
 
     return outPaths;
+}
+
+Path toStorePath(ref<Store> store, RealiseMode mode,
+    std::shared_ptr<Installable> installable)
+{
+    auto paths = toStorePaths(store, mode, {installable});
+
+    if (paths.size() != 1)
+            throw Error("argument '%s' should evaluate to one store path", installable->what());
+
+    return *paths.begin();
 }
 
 void InstallablesCommand::prepare()
@@ -283,9 +310,7 @@ void InstallablesCommand::prepare()
 
 void InstallableCommand::prepare()
 {
-    auto installables = parseInstallables(*this, getStore(), {_installable}, false);
-    assert(installables.size() == 1);
-    installable = installables.front();
+    installable = parseInstallable(*this, getStore(), _installable, false);
 }
 
 }

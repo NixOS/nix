@@ -90,7 +90,7 @@ struct CmdRun : InstallablesCommand
 
     void run(ref<Store> store) override
     {
-        auto outPaths = toStorePaths(store, Build);
+        auto outPaths = toStorePaths(store, Build, installables);
 
         auto accessor = store->getFSAccessor();
 
