@@ -50,7 +50,7 @@ struct MixLs : virtual Args
             }
         };
 
-        doPath = [&](const FSAccessor::Stat & st , const Path & curPath,
+        doPath = [&](const FSAccessor::Stat & st, const Path & curPath,
             const std::string & relPath, bool showDirectory)
         {
             if (st.type == FSAccessor::Type::tDirectory && !showDirectory) {
