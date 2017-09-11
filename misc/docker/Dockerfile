@@ -1,13 +1,16 @@
 FROM alpine
 
-RUN wget -O- http://nixos.org/releases/nix/nix-1.11.7/nix-1.11.7-x86_64-linux.tar.bz2 | bzcat - | tar xf - \
-    && echo "nixbld:x:30000:nixbld1,nixbld2,nixbld3,nixbld4,nixbld5,nixbld6,nixbld7,nixbld8,nixbld9,nixbld10,nixbld11,nixbld12,nixbld13,nixbld14,nixbld15,nixbld16,nixbld17,nixbld18,nixbld19,nixbld20,nixbld21,nixbld22,nixbld23,nixbld24,nixbld25,nixbld26,nixbld27,nixbld28,nixbld29,nixbld30" >> /etc/group \
-    && for i in $(seq 1 30); do echo "nixbld$i:x:$((30000 + $i)):30000:::" >> /etc/passwd; done \
-    && mkdir -m 0755 /nix && USER=root sh nix-*-x86_64-linux/install \
-    && echo ". /root/.nix-profile/etc/profile.d/nix.sh" >> /etc/profile \
-    && rm -r /nix-*-x86_64-linux \
-    && apk --update add bash tar \
-    && rm -rf /var/cache/apk/*
+# Enable HTTPS support in wget.
+RUN apk add --update openssl
+
+# Download Nix and install it into the system.
+RUN wget -O- https://nixos.org/releases/nix/nix-1.11.14/nix-1.11.14-x86_64-linux.tar.bz2 | bzcat - | tar xf - \
+  && addgroup -g 30000 -S nixbld \
+  && for i in $(seq 1 30); do adduser -S -D -h /var/empty -g "Nix build user $i" -u $((30000 + i)) -G nixbld nixbld$i ; done \
+  && mkdir -m 0755 /nix && USER=root sh nix-*-x86_64-linux/install \
+  && ln -s /root/.nix-profile/etc/profile.d/nix.sh /etc/profile.d/ \
+  && rm -r /nix-*-x86_64-linux \
+  && rm -r /var/cache/apk/*
 
 ONBUILD ENV \
     ENV=/etc/profile \
