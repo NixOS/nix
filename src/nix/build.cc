@@ -15,7 +15,6 @@ struct CmdBuild : MixDryRun, InstallablesCommand
             .longName("out-link")
             .shortName('o')
             .description("path of the symlink to the build result")
-            .arity(1)
             .labels({"path"})
             .dest(&outLink);
 

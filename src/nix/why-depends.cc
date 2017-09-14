@@ -233,6 +233,8 @@ struct CmdWhyDepends : SourceExprCommand
                 }
             };
 
+            // FIXME: should use scanForReferences().
+
             visitPath(node.path);
 
             for (auto & ref : refs) {
