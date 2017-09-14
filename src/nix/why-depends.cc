@@ -1,6 +1,4 @@
 #include "command.hh"
-#include "common-args.hh"
-#include "shared.hh"
 #include "store-api.hh"
 #include "progress-bar.hh"
 #include "fs-accessor.hh"
@@ -59,8 +57,16 @@ struct CmdWhyDepends : SourceExprCommand
     {
         return {
             Example{
-                "To show which files in Hello's closure depend on Glibc:",
+                "To show one path through the dependency graph leading from Hello to Glibc:",
                 "nix why-depends nixpkgs.hello nixpkgs.glibc"
+            },
+            Example{
+                "To show all files and paths in the dependency graph leading from Thunderbird to libX11:",
+                "nix why-depends --all nixpkgs.thunderbird nixpkgs.xorg.libX11"
+            },
+            Example{
+                "To show why Glibc depends on itself:",
+                "nix why-depends nixpkgs.glibc nixpkgs.glibc"
             },
         };
     }
@@ -141,9 +147,9 @@ struct CmdWhyDepends : SourceExprCommand
            and `dependency`. */
         std::function<void(Node &, const string &, const string &)> printNode;
 
-        const string treeConn = "├───";
-        const string treeLast = "└───";
-        const string treeLine = "│   ";
+        const string treeConn = "╠═══";
+        const string treeLast = "╚═══";
+        const string treeLine = "║   ";
         const string treeNull = "    ";
 
         struct BailOut { };
@@ -156,7 +162,9 @@ struct CmdWhyDepends : SourceExprCommand
                 firstPad != "" ? "=> " : "",
                 node.path);
 
-            if (node.path == dependencyPath && !all) throw BailOut();
+            if (node.path == dependencyPath && !all
+                && packagePath != dependencyPath)
+                throw BailOut();
 
             if (node.visited) return;
             node.visited = true;
@@ -167,7 +175,7 @@ struct CmdWhyDepends : SourceExprCommand
             std::set<std::string> hashes;
 
             for (auto & ref : node.refs) {
-                if (ref == node.path) continue;
+                if (ref == node.path && packagePath != dependencyPath) continue;
                 auto & node2 = graph.at(ref);
                 if (node2.dist == inf) continue;
                 refs.emplace(node2.dist, &node2);
