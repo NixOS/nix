@@ -196,8 +196,10 @@ void LocalStore::addTempRoot(const Path & path)
 }
 
 
-void LocalStore::readTempRoots(PathSet & tempRoots, FDs & fds)
+PathSet LocalStore::readTempRoots(FDs & fds)
 {
+    PathSet tempRoots;
+
     /* Read the `temproots' directory for per-process temporary root
        files. */
     DirEntries tempRootFiles = readDirectory(tempRootsDir);
@@ -253,6 +255,8 @@ void LocalStore::readTempRoots(PathSet & tempRoots, FDs & fds)
 
         fds.push_back(fd); /* keep open */
     }
+
+    return tempRoots;
 }
 
 
@@ -316,7 +320,7 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
 }
 
 
-Roots LocalStore::findRoots()
+Roots LocalStore::findRootsNoTemp()
 {
     Roots roots;
 
@@ -325,6 +329,27 @@ Roots LocalStore::findRoots()
     if (pathExists(stateDir + "/manifests"))
         findRoots(stateDir + "/manifests", DT_UNKNOWN, roots);
     findRoots(stateDir + "/profiles", DT_UNKNOWN, roots);
+
+    /* Add additional roots returned by the program specified by the
+       NIX_ROOT_FINDER environment variable.  This is typically used
+       to add running programs to the set of roots (to prevent them
+       from being garbage collected). */
+    size_t n = 0;
+    for (auto & root : findRuntimeRoots())
+        roots[fmt("{memory:%d}", n++)] = root;
+
+    return roots;
+}
+
+
+Roots LocalStore::findRoots()
+{
+    Roots roots = findRootsNoTemp();
+
+    FDs fds;
+    size_t n = 0;
+    for (auto & root : readTempRoots(fds))
+        roots[fmt("{temp:%d}", n++)] = root;
 
     return roots;
 }
@@ -369,8 +394,9 @@ static void readFileRoots(const char * path, StringSet & paths)
     }
 }
 
-void LocalStore::findRuntimeRoots(PathSet & roots)
+PathSet LocalStore::findRuntimeRoots()
 {
+    PathSet roots;
     StringSet paths;
     auto procDir = AutoCloseDir{opendir("/proc")};
     if (procDir) {
@@ -454,6 +480,8 @@ void LocalStore::findRuntimeRoots(PathSet & roots)
                 roots.insert(path);
             }
         }
+
+    return roots;
 }
 
 
@@ -554,17 +582,13 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
 
 bool LocalStore::canReachRoot(GCState & state, PathSet & visited, const Path & path)
 {
-    if (visited.find(path) != visited.end()) return false;
+    if (visited.count(path)) return false;
 
-    if (state.alive.find(path) != state.alive.end()) {
-        return true;
-    }
+    if (state.alive.count(path)) return true;
 
-    if (state.dead.find(path) != state.dead.end()) {
-        return false;
-    }
+    if (state.dead.count(path)) return false;
 
-    if (state.roots.find(path) != state.roots.end()) {
+    if (state.roots.count(path)) {
         debug(format("cannot delete '%1%' because it's a root") % path);
         state.alive.insert(path);
         return true;
@@ -724,22 +748,15 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     /* Find the roots.  Since we've grabbed the GC lock, the set of
        permanent roots cannot increase now. */
     printError(format("finding garbage collector roots..."));
-    Roots rootMap = options.ignoreLiveness ? Roots() : findRoots();
+    Roots rootMap = options.ignoreLiveness ? Roots() : findRootsNoTemp();
 
     for (auto & i : rootMap) state.roots.insert(i.second);
-
-    /* Add additional roots returned by the program specified by the
-       NIX_ROOT_FINDER environment variable.  This is typically used
-       to add running programs to the set of roots (to prevent them
-       from being garbage collected). */
-    if (!options.ignoreLiveness)
-        findRuntimeRoots(state.roots);
 
     /* Read the temporary roots.  This acquires read locks on all
        per-process temporary root files.  So after this point no paths
        can be added to the set of temporary roots. */
     FDs fds;
-    readTempRoots(state.tempRoots, fds);
+    state.tempRoots = readTempRoots(fds);
     state.roots.insert(state.tempRoots.begin(), state.tempRoots.end());
 
     /* After this point the set of roots or temporary roots cannot

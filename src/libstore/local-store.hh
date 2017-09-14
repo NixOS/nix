@@ -176,7 +176,7 @@ private:
     typedef std::shared_ptr<AutoCloseFD> FDPtr;
     typedef list<FDPtr> FDs;
 
-    void readTempRoots(PathSet & tempRoots, FDs & fds);
+    PathSet readTempRoots(FDs & fds);
 
 public:
 
@@ -261,7 +261,9 @@ private:
 
     void findRoots(const Path & path, unsigned char type, Roots & roots);
 
-    void findRuntimeRoots(PathSet & roots);
+    Roots findRootsNoTemp();
+
+    PathSet findRuntimeRoots();
 
     void removeUnusedLinks(const GCState & state);
 
