@@ -176,7 +176,7 @@ private:
     typedef std::shared_ptr<AutoCloseFD> FDPtr;
     typedef list<FDPtr> FDs;
 
-    PathSet readTempRoots(FDs & fds);
+    std::set<std::pair<pid_t, Path>> readTempRoots(FDs & fds);
 
 public:
 

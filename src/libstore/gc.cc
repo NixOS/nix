@@ -196,16 +196,16 @@ void LocalStore::addTempRoot(const Path & path)
 }
 
 
-PathSet LocalStore::readTempRoots(FDs & fds)
+std::set<std::pair<pid_t, Path>> LocalStore::readTempRoots(FDs & fds)
 {
-    PathSet tempRoots;
+    std::set<std::pair<pid_t, Path>> tempRoots;
 
     /* Read the `temproots' directory for per-process temporary root
        files. */
-    DirEntries tempRootFiles = readDirectory(tempRootsDir);
-
-    for (auto & i : tempRootFiles) {
+    for (auto & i : readDirectory(tempRootsDir)) {
         Path path = tempRootsDir + "/" + i.name;
+
+        pid_t pid = std::stoi(i.name);
 
         debug(format("reading temporary root file '%1%'") % path);
         FDPtr fd(new AutoCloseFD(open(path.c_str(), O_CLOEXEC | O_RDWR, 0666)));
@@ -247,9 +247,9 @@ PathSet LocalStore::readTempRoots(FDs & fds)
 
         while ((end = contents.find((char) 0, pos)) != string::npos) {
             Path root(contents, pos, end - pos);
-            debug(format("got temporary root '%1%'") % root);
+            debug("got temporary root '%s'", root);
             assertStorePath(root);
-            tempRoots.insert(root);
+            tempRoots.emplace(pid, root);
             pos = end + 1;
         }
 
@@ -347,9 +347,13 @@ Roots LocalStore::findRoots()
     Roots roots = findRootsNoTemp();
 
     FDs fds;
+    pid_t prev = -1;
     size_t n = 0;
-    for (auto & root : readTempRoots(fds))
-        roots[fmt("{temp:%d}", n++)] = root;
+    for (auto & root : readTempRoots(fds)) {
+        if (prev != root.first) n = 0;
+        prev = root.first;
+        roots[fmt("{temp:%d:%d}", root.first, n++)] = root.second;
+    }
 
     return roots;
 }
@@ -756,7 +760,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        per-process temporary root files.  So after this point no paths
        can be added to the set of temporary roots. */
     FDs fds;
-    state.tempRoots = readTempRoots(fds);
+    for (auto & root : readTempRoots(fds))
+        state.tempRoots.insert(root.second);
     state.roots.insert(state.tempRoots.begin(), state.tempRoots.end());
 
     /* After this point the set of roots or temporary roots cannot
