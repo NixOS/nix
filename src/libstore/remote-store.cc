@@ -45,7 +45,13 @@ RemoteStore::RemoteStore(const Params & params)
     , connections(make_ref<Pool<Connection>>(
             std::max(1, (int) maxConnections),
             [this]() { return openConnectionWrapper(); },
-            [](const ref<Connection> & r) { return r->to.good() && r->from.good(); }
+            [this](const ref<Connection> & r) {
+                return
+                    r->to.good()
+                    && r->from.good()
+                    && std::chrono::duration_cast<std::chrono::seconds>(
+                        std::chrono::steady_clock::now() - r->startTime).count() < maxConnectionAge;
+            }
             ))
 {
 }
@@ -105,6 +111,8 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
 
     conn->from.fd = conn->fd.get();
     conn->to.fd = conn->fd.get();
+
+    conn->startTime = std::chrono::steady_clock::now();
 
     initConnection(*conn);
 
@@ -616,6 +624,12 @@ void RemoteStore::queryMissing(const PathSet & targets,
 void RemoteStore::connect()
 {
     auto conn(connections->get());
+}
+
+
+void RemoteStore::flushBadConnections()
+{
+    connections->flushBad();
 }
 
 

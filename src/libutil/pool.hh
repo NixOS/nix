@@ -168,6 +168,16 @@ public:
     {
         return state.lock()->max;
     }
+
+    void flushBad()
+    {
+        auto state_(state.lock());
+        std::vector<ref<R>> left;
+        for (auto & p : state_->idle)
+            if (validator(p))
+                left.push_back(p);
+        std::swap(state_->idle, left);
+    }
 };
 
 }

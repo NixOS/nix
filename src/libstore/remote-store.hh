@@ -25,6 +25,9 @@ public:
     const Setting<int> maxConnections{(Store*) this, 1,
             "max-connections", "maximum number of concurrent connections to the Nix daemon"};
 
+    const Setting<unsigned int> maxConnectionAge{(Store*) this, std::numeric_limits<unsigned int>::max(),
+            "max-connection-age", "number of seconds to reuse a connection"};
+
     RemoteStore(const Params & params);
 
     /* Implementations of abstract store API methods. */
@@ -95,6 +98,8 @@ public:
 
     void connect() override;
 
+    void flushBadConnections();
+
 protected:
 
     struct Connection
@@ -102,6 +107,7 @@ protected:
         FdSink to;
         FdSource from;
         unsigned int daemonVersion;
+        std::chrono::time_point<std::chrono::steady_clock> startTime;
 
         virtual ~Connection();
 
