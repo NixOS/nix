@@ -158,7 +158,9 @@ int main(int argc, char * * argv)
             auto actualUri = resolveMirrorUri(state, uri);
 
             /* Download the file. */
-            auto result = getDownloader()->download(DownloadRequest(actualUri));
+            DownloadRequest req(actualUri);
+            req.decompress = false;
+            auto result = getDownloader()->download(req);
 
             AutoDelete tmpDir(createTempDir(), true);
             Path tmpFile = (Path) tmpDir + "/tmp";

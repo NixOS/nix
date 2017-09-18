@@ -27,6 +27,7 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
            the result anyway. */
         DownloadRequest request(url);
         request.verifyTLS = false;
+        request.decompress = false;
 
         /* Note: have to use a fresh downloader here because we're in
            a forked process. */

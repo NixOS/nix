@@ -269,7 +269,8 @@ struct CurlDownloader : public Downloader
                 done = true;
 
                 try {
-                    result.data = decodeContent(encoding, ref<std::string>(result.data));
+                    if (request.decompress)
+                        result.data = decodeContent(encoding, ref<std::string>(result.data));
                     callSuccess(success, failure, const_cast<const DownloadResult &>(result));
                     act.progress(result.data->size(), result.data->size());
                 } catch (...) {
