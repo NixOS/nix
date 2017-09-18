@@ -105,12 +105,12 @@ void mainWrapped(int argc, char * * argv)
     for (int i = 1; i < argc; ++i)
         args.push_back(argv[i]);
 
-    // Heuristic to see if we're invoked as a shebang script, namely, if we
-    // have a single argument, it's the name of an executable file, and it
-    // starts with "#!".
+    // Heuristic to see if we're invoked as a shebang script, namely,
+    // if we have at least one argument, it's the name of an
+    // executable file, and it starts with "#!".
     if (runEnv && argc > 1 && !std::regex_search(argv[1], std::regex("nix-shell"))) {
         script = argv[1];
-        if (access(script.c_str(), F_OK) == 0 && access(script.c_str(), X_OK) == 0) {
+        try {
             auto lines = tokenizeString<Strings>(readFile(script), "\n");
             if (std::regex_search(lines.front(), std::regex("^#!"))) {
                 lines.pop_front();
@@ -126,7 +126,7 @@ void mainWrapped(int argc, char * * argv)
                             args.push_back(word);
                 }
             }
-        }
+        } catch (SysError &) { }
     }
 
     parseCmdLine(myName, args, [&](Strings::iterator & arg, const Strings::iterator & end) {
