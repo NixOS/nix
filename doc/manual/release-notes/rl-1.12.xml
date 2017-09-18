@@ -397,6 +397,16 @@ configureFlags = "--prefix=${placeholder "out"} --includedir=${placeholder "dev"
     <para>Automatic garbage collection.</para>
   </listitem>
 
+  <listitem>
+    <para><command>nix why-depends</command></para>
+  </listitem>
+
+  <listitem>
+    <para><command>nix-store -q --roots</command> and
+    <command>nix-store --gc --print-roots</command> now show temporary
+    and in-memory roots.</para>
+  </listitem>
+
 </itemizedlist>
 
 <para>This release has contributions from TBD.</para>
