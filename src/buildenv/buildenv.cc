@@ -74,10 +74,11 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
                     auto prevPriority = priorities[dstFile];
                     if (prevPriority == priority)
                         throw Error(format(
-                                "collision between '%1%' and '%2%'; "
-                                "use 'nix-env --set-flag priority NUMBER PKGNAME' "
+                                "Packages '%1%' and '%2%' have the same priority '%3%'"
+                                "use 'nix-env --set-flag priority NUMBER INSTALLED_PKGNAME' "
                                 "to change the priority of one of the conflicting packages"
-                                ) % srcFile % target);
+                                " ('0' being the highest priority)"
+                                ) % srcFile % target % priority);
                     if (prevPriority < priority)
                         continue;
                     if (unlink(dstFile.c_str()) == -1)
