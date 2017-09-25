@@ -156,7 +156,7 @@ struct CmdWhyDepends : SourceExprCommand
 
         printNode = [&](Node & node, const string & firstPad, const string & tailPad) {
             assert(node.dist != inf);
-            std::cerr << fmt("%s%s%s%s" ANSI_NORMAL "\n",
+            std::cout << fmt("%s%s%s%s" ANSI_NORMAL "\n",
                 firstPad,
                 node.visited ? "\e[38;5;244m" : "",
                 firstPad != "" ? "=> " : "",
@@ -209,7 +209,7 @@ struct CmdWhyDepends : SourceExprCommand
                     for (auto & hash : hashes) {
                         auto pos = contents.find(hash);
                         if (pos != std::string::npos) {
-                            size_t margin = 16;
+                            size_t margin = 32;
                             auto pos2 = pos >= margin ? pos - margin : 0;
                             hits[hash].emplace_back(fmt("%s: …%s…\n",
                                     p2,
@@ -244,7 +244,7 @@ struct CmdWhyDepends : SourceExprCommand
 
                 for (auto & hit : hits[hash]) {
                     bool first = hit == *hits[hash].begin();
-                    std::cerr << tailPad
+                    std::cout << tailPad
                               << (first ? (last ? treeLast : treeConn) : (last ? treeNull : treeLine))
                               << hit;
                     if (!all) break;
