@@ -99,16 +99,20 @@ perl/Makefile.config
 /misc/systemd/nix-daemon.socket
 /misc/upstart/nix-daemon.conf
 
+/src/resolve-system-dependencies/resolve-system-dependencies
+
 inst/
 
 *.a
 *.o
 *.so
+*.dylib
 *.dll
 *.exe
 *.dep
 *~
 *.pc
+*.plist
 
 # GNU Global
 GPATH

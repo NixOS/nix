@@ -278,26 +278,43 @@ struct CurlDownloader : public Downloader
                     callFailure(failure, std::current_exception());
                 }
             } else {
-                Error err =
-                    (httpStatus == 404 || code == CURLE_FILE_COULDNT_READ_FILE) ? NotFound :
-                    httpStatus == 403 ? Forbidden :
-                    (httpStatus == 408 || httpStatus == 500 || httpStatus == 503
-                        || httpStatus == 504  || httpStatus == 522 || httpStatus == 524
-                        || code == CURLE_COULDNT_RESOLVE_HOST
-                        || code == CURLE_RECV_ERROR
+                // We treat most errors as transient, but won't retry when hopeless
+                Error err = Transient;
 
-                        // this seems to occur occasionally for retriable reasons, and shows up in an error like this:
-                        //   curl: (23) Failed writing body (315 != 16366)
-                        || code == CURLE_WRITE_ERROR
-
-                        // this is a generic SSL failure that in some cases (e.g., certificate error) is permanent but also appears in transient cases, so we consider it retryable
-                        || code == CURLE_SSL_CONNECT_ERROR
-#if LIBCURL_VERSION_NUM >= 0x073200
-                        || code == CURLE_HTTP2
-                        || code == CURLE_HTTP2_STREAM
-#endif
-                        ) ? Transient :
-                    Misc;
+                if (httpStatus == 404 || code == CURLE_FILE_COULDNT_READ_FILE) {
+                    // The file is definitely not there
+                    err = NotFound;
+                } else if (httpStatus == 401 || httpStatus == 403 || httpStatus == 407) {
+                    // Don't retry on authentication/authorization failures
+                    err = Forbidden;
+                } else if (httpStatus >= 400 && httpStatus < 500 && httpStatus != 408) {
+                    // Most 4xx errors are client errors and are probably not worth retrying:
+                    //   * 408 means the server timed out waiting for us, so we try again
+                    err = Misc;
+                } else if (httpStatus == 501 || httpStatus == 505 || httpStatus == 511) {
+                    // Let's treat most 5xx (server) errors as transient, except for a handful:
+                    //   * 501 not implemented
+                    //   * 505 http version not supported
+                    //   * 511 we're behind a captive portal
+                    err = Misc;
+                } else {
+                    // Don't bother retrying on certain cURL errors either
+                    switch (code) {
+                        case CURLE_FAILED_INIT:
+                        case CURLE_NOT_BUILT_IN:
+                        case CURLE_REMOTE_ACCESS_DENIED:
+                        case CURLE_FILE_COULDNT_READ_FILE:
+                        case CURLE_FUNCTION_NOT_FOUND:
+                        case CURLE_ABORTED_BY_CALLBACK:
+                        case CURLE_BAD_FUNCTION_ARGUMENT:
+                        case CURLE_INTERFACE_FAILED:
+                        case CURLE_UNKNOWN_OPTION:
+                        err = Misc;
+                        break;
+                        default: // Shut up warnings
+                        break;
+                    }
+                }
 
                 attempt++;
 
