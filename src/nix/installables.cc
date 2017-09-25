@@ -303,6 +303,30 @@ Path toStorePath(ref<Store> store, RealiseMode mode,
     return *paths.begin();
 }
 
+PathSet toDerivations(ref<Store> store,
+    std::vector<std::shared_ptr<Installable>> installables, bool useDeriver)
+{
+    PathSet drvPaths;
+
+    for (auto & i : installables)
+        for (auto & b : i->toBuildables()) {
+            if (b.drvPath.empty()) {
+                if (!useDeriver)
+                    throw Error("argument '%s' did not evaluate to a derivation", i->what());
+                for (auto & output : b.outputs) {
+                    auto derivers = store->queryValidDerivers(output.second);
+                    if (derivers.empty())
+                        throw Error("'%s' does not have a known deriver", i->what());
+                    // FIXME: use all derivers?
+                    drvPaths.insert(*derivers.begin());
+                }
+            } else
+                drvPaths.insert(b.drvPath);
+        }
+
+    return drvPaths;
+}
+
 void InstallablesCommand::prepare()
 {
     installables = parseInstallables(*this, getStore(), _installables, useDefaultInstallables());

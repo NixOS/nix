@@ -207,4 +207,8 @@ PathSet toStorePaths(ref<Store> store, RealiseMode mode,
 Path toStorePath(ref<Store> store, RealiseMode mode,
     std::shared_ptr<Installable> installable);
 
+PathSet toDerivations(ref<Store> store,
+    std::vector<std::shared_ptr<Installable>> installables,
+    bool useDeriver = false);
+
 }
