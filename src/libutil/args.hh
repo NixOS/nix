@@ -90,7 +90,7 @@ public:
 
         template<class T>
         FlagMaker & set(T * dest, const T & val) {
-            flag->arity = 1;
+            flag->arity = 0;
             flag->handler = [=](Strings ss) { *dest = val; };
             return *this;
         };
