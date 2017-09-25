@@ -50,6 +50,7 @@ static void addChannel(const string & url, const string & name)
     readChannels();
     channels[name] = url;
     writeChannels();
+    std::cerr << "Remember to run nix-channel --update to apply the changes!\n";
 }
 
 static auto profile = Path{};
