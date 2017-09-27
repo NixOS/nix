@@ -267,7 +267,9 @@ Buildables toBuildables(ref<Store> store, RealiseMode mode,
                     outputNames.insert(output.first);
                 pathsToBuild.insert(
                     b.drvPath + "!" + concatStringsSep(",", outputNames));
-            }
+            } else
+                for (auto & output : b.outputs)
+                    pathsToBuild.insert(output.second);
             buildables.push_back(std::move(b));
         }
     }
