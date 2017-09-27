@@ -17,6 +17,7 @@ struct CmdCopy : StorePathsCommand
     SubstituteFlag substitute = NoSubstitute;
 
     CmdCopy()
+        : StorePathsCommand(true)
     {
         mkFlag(0, "from", "store-uri", "URI of the source Nix store", &srcUri);
         mkFlag(0, "to", "store-uri", "URI of the destination Nix store", &dstUri);

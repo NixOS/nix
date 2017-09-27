@@ -100,9 +100,21 @@ void StoreCommand::run()
     run(getStore());
 }
 
-StorePathsCommand::StorePathsCommand()
+StorePathsCommand::StorePathsCommand(bool recursive)
+    : recursive(recursive)
 {
-    mkFlag('r', "recursive", "apply operation to closure of the specified paths", &recursive);
+    if (recursive)
+        mkFlag()
+            .longName("no-recursive")
+            .description("apply operation to specified paths only")
+            .set(&this->recursive, false);
+    else
+        mkFlag()
+            .longName("recursive")
+            .shortName('r')
+            .description("apply operation to closure of the specified paths")
+            .set(&this->recursive, true);
+
     mkFlag(0, "all", "apply operation to the entire store", &all);
 }
 

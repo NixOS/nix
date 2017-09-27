@@ -141,7 +141,7 @@ private:
 
 public:
 
-    StorePathsCommand();
+    StorePathsCommand(bool recursive = false);
 
     using StoreCommand::run;
 
