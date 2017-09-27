@@ -165,7 +165,7 @@ public:
 
         if (type == actQueryPathInfo) {
             auto name = storePathToName(getS(fields, 0));
-            i->s = fmt("querying about " ANSI_BOLD "%s" ANSI_NORMAL " on %s", name, getS(fields, 1));
+            i->s = fmt("querying " ANSI_BOLD "%s" ANSI_NORMAL " on %s", name, getS(fields, 1));
         }
 
         if ((type == actDownload && hasAncestor(*state, actCopyPath, parent))
