@@ -462,7 +462,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
         for (auto & eaName: tokenizeString<Strings>(std::string(eaBuf.data(), eaSize), std::string("\000", 1))) {
             /* Ignore SELinux security labels since these cannot be
                removed even by root. */
-            if (eaName == "security.selinux") continue;
+            if (eaName == "security.selinux" || eaName == "system.nfs4_acl") continue;
             if (lremovexattr(path.c_str(), eaName.c_str()) == -1)
                 throw SysError("removing extended attribute '%s' from '%s'", eaName, path);
         }
