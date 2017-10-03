@@ -336,7 +336,7 @@ EOF
 
     for file in ~/.bash_profile ~/.bash_login ~/.profile ~/.zshenv ~/.zprofile ~/.zshrc ~/.zlogin; do
         if [ -f "$file" ]; then
-            if grep -l ".nix-profile" "$file"; then
+            if grep -l "^[^#].*.nix-profile" "$file"; then
                 failure <<EOF
 I found a reference to a ".nix-profile" in $file.
 This has a high chance of breaking a new nix installation. It was most
