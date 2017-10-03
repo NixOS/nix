@@ -7,20 +7,38 @@ define run-install-test
 
 endef
 
+# Color code from https://unix.stackexchange.com/a/10065
 installcheck:
-	@total=0; failed=0; for i in $(_installcheck-list); do \
+	@total=0; failed=0; \
+	pad="                           "; \
+	red=""; \
+	green=""; \
+	normal=""; \
+	if [ -t 1 ]; then \
+		ncolors="$$(tput colors)"; \
+		if [[ -n "$$ncolors" && $$ncolors -ge 8 ]]; then \
+			red="$$(tput setaf 1)"; \
+			green="$$(tput setaf 2)"; \
+			normal="$$(tput sgr0)"; \
+		fi; \
+	fi; \
+	for i in $(_installcheck-list); do \
 	  total=$$((total + 1)); \
-	  echo "running test $$i"; \
-	  if (cd $$(dirname $$i) && $(tests-environment) $$(basename $$i)); then \
-	    echo "PASS: $$i"; \
+	  printf "running test $$i... $${pad:$${#i}}"; \
+	  log="$$(cd $$(dirname $$i) && $(tests-environment) $$(basename $$i) 2>&1)"; \
+	  if [ $$? == 0 ]; then \
+	    echo "[$${green}PASS$$normal]"; \
 	  else \
-	    echo "FAIL: $$i"; \
+	    echo "[$${red}FAIL$$normal]"; \
+	    echo "$$log" | sed 's/^/    /'; \
 	    failed=$$((failed + 1)); \
 	  fi; \
 	done; \
 	if [ "$$failed" != 0 ]; then \
-	  echo "$$failed out of $$total tests failed "; \
+	  echo "$${red}$$failed out of $$total tests failed $$normal"; \
 	  exit 1; \
+	else \
+		echo "$${green}All tests succeeded"; \
 	fi
 
 .PHONY: check installcheck
