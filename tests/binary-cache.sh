@@ -6,7 +6,7 @@ clearCache
 # Create the binary cache.
 outPath=$(nix-build dependencies.nix --no-out-link)
 
-nix copy --recursive --to file://$cacheDir $outPath
+nix copy --to file://$cacheDir $outPath
 
 
 basicTests() {
@@ -117,7 +117,7 @@ badKey="$(cat $TEST_ROOT/pk2)"
 res=($(nix-store --generate-binary-cache-key foo.nixos.org-1 $TEST_ROOT/sk3 $TEST_ROOT/pk3))
 otherKey="$(cat $TEST_ROOT/pk3)"
 
-nix copy --recursive --to file://$cacheDir?secret-key=$TEST_ROOT/sk1 $outPath
+nix copy --to file://$cacheDir?secret-key=$TEST_ROOT/sk1 $outPath
 
 
 # Downloading should fail if we don't provide a key.
