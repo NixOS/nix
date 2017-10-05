@@ -748,13 +748,13 @@ configure_shell_profile() {
 
 setup_default_profile() {
     _sudo "to installing a bootstrapping Nix in to the default Profile" \
-          -i "$NIX_INSTALLED_NIX/bin/nix-env" -i "$NIX_INSTALLED_NIX"
+          HOME=$ROOT_HOME "$NIX_INSTALLED_NIX/bin/nix-env" -i "$NIX_INSTALLED_NIX"
 
     _sudo "to installing a bootstrapping SSL certificate just for Nix in to the default Profile" \
-          -i "$NIX_INSTALLED_NIX/bin/nix-env" -i "$NIX_INSTALLED_CACERT"
+          HOME=$ROOT_HOME "$NIX_INSTALLED_NIX/bin/nix-env" -i "$NIX_INSTALLED_CACERT"
 
     _sudo "to update the default channel in the default profile" \
-          -i NIX_SSL_CERT_FILE=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt "$NIX_INSTALLED_NIX/bin/nix-channel" --update nixpkgs
+          HOME=$ROOT_HOME NIX_SSL_CERT_FILE=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt "$NIX_INSTALLED_NIX/bin/nix-channel" --update nixpkgs
 }
 
 
