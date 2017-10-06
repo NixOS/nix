@@ -10,13 +10,12 @@ endef
 # Color code from https://unix.stackexchange.com/a/10065
 installcheck:
 	@total=0; failed=0; \
-	pad="                           "; \
 	red=""; \
 	green=""; \
 	normal=""; \
 	if [ -t 1 ]; then \
 		ncolors="$$(tput colors)"; \
-		if [[ -n "$$ncolors" && $$ncolors -ge 8 ]]; then \
+		if [ -n "$$ncolors" ] && [ "$$ncolors" -ge 8 ]; then \
 			red="$$(tput setaf 1)"; \
 			green="$$(tput setaf 2)"; \
 			normal="$$(tput sgr0)"; \
@@ -24,9 +23,9 @@ installcheck:
 	fi; \
 	for i in $(_installcheck-list); do \
 	  total=$$((total + 1)); \
-	  printf "running test $$i... $${pad:$${#i}}"; \
+	  printf "running test $$i..."; \
 	  log="$$(cd $$(dirname $$i) && $(tests-environment) $$(basename $$i) 2>&1)"; \
-	  if [ $$? == 0 ]; then \
+	  if [ $$? -eq 0 ]; then \
 	    echo "[$${green}PASS$$normal]"; \
 	  else \
 	    echo "[$${red}FAIL$$normal]"; \
