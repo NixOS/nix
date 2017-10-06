@@ -332,7 +332,7 @@ let
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages =
-            [ "libsqlite3-dev" "libbz2-dev" "libcurl-dev" "libcurl3-nss" "libssl-dev" "liblzma-dev" "libseccomp-dev" ]
+            [ "libsqlite3-dev" "libbz2-dev" "libcurl-dev" "libcurl3-nss" "libssl-dev" "liblzma-dev" "libseccomp-dev" "ncurses-bin" ]
             ++ extraPackages; };
       memSize = 1024;
       meta.schedulingPriority = 50;
