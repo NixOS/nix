@@ -26,9 +26,9 @@ installcheck:
 	  printf "running test $$i..."; \
 	  log="$$(cd $$(dirname $$i) && $(tests-environment) $$(basename $$i) 2>&1)"; \
 	  if [ $$? -eq 0 ]; then \
-	    echo "[$${green}PASS$$normal]"; \
+	    echo " [$${green}PASS$$normal]"; \
 	  else \
-	    echo "[$${red}FAIL$$normal]"; \
+	    echo " [$${red}FAIL$$normal]"; \
 	    echo "$$log" | sed 's/^/    /'; \
 	    failed=$$((failed + 1)); \
 	  fi; \
