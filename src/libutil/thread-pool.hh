@@ -44,19 +44,22 @@ private:
 
     struct State
     {
-        std::queue<work_t> left;
+        std::queue<work_t> pending;
         size_t active = 0;
         std::exception_ptr exception;
         std::vector<std::thread> workers;
+        bool draining = false;
     };
 
     std::atomic_bool quit{false};
 
     Sync<State> state_;
 
-    std::condition_variable work, done;
+    std::condition_variable work;
 
-    void workerEntry();
+    void doWork(bool mainThread);
+
+    void shutdown();
 };
 
 /* Process in parallel a set of items of type T that have a partial
