@@ -2351,6 +2351,8 @@ void DerivationGoal::doExportReferencesGraph()
 void setupSeccomp()
 {
 #if __linux__
+    if (!settings.filterSyscalls) return;
+
     scmp_filter_ctx ctx;
 
     if (!(ctx = seccomp_init(SCMP_ACT_ALLOW)))

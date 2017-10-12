@@ -336,6 +336,12 @@ public:
         "String appended to the user agent in HTTP requests."};
 
 #if __linux__
+    Setting<bool> filterSyscalls{this, true, "filter-syscalls",
+            "Whether to prevent certain dangerous system calls, such as "
+            "creation of setuid/setgid files or adding ACLs or extended "
+            "attributes. Only disable this if you're aware of the "
+            "security implications."};
+
     Setting<bool> allowNewPrivileges{this, false, "allow-new-privileges",
         "Whether builders can acquire new privileges by calling programs with "
         "setuid/setgid bits or with file capabilities."};
