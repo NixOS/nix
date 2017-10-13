@@ -226,7 +226,7 @@ die "$0: ‘-p’ and ‘-E’ are mutually exclusive\n" if $packages && $fromAr
 if ($packages) {
     push @instArgs, "--expr";
     @exprs = (
-        'with import <nixpkgs> { }; runCommand "shell" { buildInputs = [ '
+        'with import <nixpkgs> { }; (pkgs.runCommandCC or pkgs.runCommand) "shell" { buildInputs = [ '
         . (join " ", map { "($_)" } @exprs) . ']; } ""');
 } elsif (!$fromArgs) {
     @exprs = ("shell.nix") if scalar @exprs == 0 && $runEnv && -e "shell.nix";
