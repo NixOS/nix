@@ -13,9 +13,6 @@ namespace nix {
 Path exportGit(ref<Store> store, const std::string & uri,
     const std::string & ref, const std::string & rev)
 {
-    if (!isUri(uri))
-        throw EvalError(format("'%s' is not a valid URI") % uri);
-
     if (rev != "") {
         std::regex revRegex("^[0-9a-fA-F]{40}$");
         if (!std::regex_match(rev, revRegex))
@@ -47,7 +44,7 @@ Path exportGit(ref<Store> store, const std::string & uri,
     if (stat(localRefFile.c_str(), &st) != 0 ||
         st.st_mtime < now - settings.tarballTtl)
     {
-        runProgram("git", true, { "-C", cacheDir, "fetch", "--force", uri, ref + ":" + localRef });
+        runProgram("git", true, { "-C", cacheDir, "fetch", "--force", "--", uri, ref + ":" + localRef });
 
         struct timeval times[2];
         times[0].tv_sec = now;
