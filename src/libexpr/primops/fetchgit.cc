@@ -19,11 +19,6 @@ Path exportGit(ref<Store> store, const std::string & uri,
             throw Error("invalid Git revision '%s'", rev);
     }
 
-    // FIXME: too restrictive, but better safe than sorry.
-    std::regex refRegex("^[0-9a-zA-Z][0-9a-zA-Z.-]+$");
-    if (!std::regex_match(ref, refRegex))
-        throw Error("invalid Git ref '%s'", ref);
-
     Path cacheDir = getCacheDir() + "/nix/git";
 
     if (!pathExists(cacheDir)) {
