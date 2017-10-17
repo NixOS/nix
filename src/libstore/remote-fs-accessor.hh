@@ -13,6 +13,9 @@ class RemoteFSAccessor : public FSAccessor
     std::map<Path, ref<FSAccessor>> nars;
 
     std::pair<ref<FSAccessor>, Path> fetch(const Path & path_);
+
+    friend class BinaryCacheStore;
+
 public:
 
     RemoteFSAccessor(ref<Store> store);

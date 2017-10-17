@@ -17,66 +17,6 @@
 
 namespace nix {
 
-/* Given requests for a path /nix/store/<x>/<y>, this accessor will
-   first download the NAR for /nix/store/<x> from the binary cache,
-   build a NAR accessor for that NAR, and use that to access <y>. */
-struct BinaryCacheStoreAccessor : public FSAccessor
-{
-    ref<BinaryCacheStore> store;
-
-    std::map<Path, ref<FSAccessor>> nars;
-
-    BinaryCacheStoreAccessor(ref<BinaryCacheStore> store)
-        : store(store)
-    {
-    }
-
-    std::pair<ref<FSAccessor>, Path> fetch(const Path & path_)
-    {
-        auto path = canonPath(path_);
-
-        auto storePath = store->toStorePath(path);
-        std::string restPath = std::string(path, storePath.size());
-
-        if (!store->isValidPath(storePath))
-            throw InvalidPath(format("path '%1%' is not a valid store path") % storePath);
-
-        auto i = nars.find(storePath);
-        if (i != nars.end()) return {i->second, restPath};
-
-        StringSink sink;
-        store->narFromPath(storePath, sink);
-
-        auto accessor = makeNarAccessor(sink.s);
-        nars.emplace(storePath, accessor);
-        return {accessor, restPath};
-    }
-
-    Stat stat(const Path & path) override
-    {
-        auto res = fetch(path);
-        return res.first->stat(res.second);
-    }
-
-    StringSet readDirectory(const Path & path) override
-    {
-        auto res = fetch(path);
-        return res.first->readDirectory(res.second);
-    }
-
-    std::string readFile(const Path & path) override
-    {
-        auto res = fetch(path);
-        return res.first->readFile(res.second);
-    }
-
-    std::string readLink(const Path & path) override
-    {
-        auto res = fetch(path);
-        return res.first->readLink(res.second);
-    }
-};
-
 BinaryCacheStore::BinaryCacheStore(const Params & params)
     : Store(params)
 {
@@ -161,7 +101,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
     if (info.narHash && info.narHash != narInfo->narHash)
         throw Error(format("refusing to copy corrupted path '%1%' to binary cache") % info.path);
 
-    auto accessor_ = std::dynamic_pointer_cast<BinaryCacheStoreAccessor>(accessor);
+    auto accessor_ = std::dynamic_pointer_cast<RemoteFSAccessor>(accessor);
 
     /* Optionally write a JSON file containing a listing of the
        contents of the NAR. */
