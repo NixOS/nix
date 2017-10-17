@@ -19,10 +19,19 @@ Path exportGit(ref<Store> store, const std::string & uri,
             throw Error("invalid Git revision '%s'", rev);
     }
 
-    // FIXME: too restrictive, but better safe than sorry.
-    std::regex refRegex("^[0-9a-zA-Z][0-9a-zA-Z.-]+$");
-    if (!std::regex_match(ref, refRegex))
-        throw Error("invalid Git ref '%s'", ref);
+    Pid check_ref_pid = startProcess([&]() {
+        execlp("git", "git", "check-ref-format", "--allow-onelevel", ref.c_str(), NULL);
+        throw SysError("executing git check-ref-format");
+    });
+    auto status = check_ref_pid.wait();
+    if (WIFEXITED(status)) {
+        if (WEXITSTATUS(status) != 0) {
+            throw Error("invalid Git ref '%s'", ref);
+        }
+    } else {
+        throw ExecError(status, format("program 'git check-ref-format' %1%")
+            % statusToString(status));
+    }
 
     Path cacheDir = getCacheDir() + "/nix/git";
 
