@@ -3,10 +3,12 @@
 
 namespace nix {
 
-
-RemoteFSAccessor::RemoteFSAccessor(ref<Store> store)
+RemoteFSAccessor::RemoteFSAccessor(ref<Store> store, const Path & cacheDir)
     : store(store)
+    , cacheDir(cacheDir)
 {
+    if (cacheDir != "")
+        createDirs(cacheDir);
 }
 
 std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_)
@@ -23,7 +25,21 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_)
     if (i != nars.end()) return {i->second, restPath};
 
     StringSink sink;
-    store->narFromPath(storePath, sink);
+
+    Path cacheFile = cacheDir != "" ? fmt("%s/%s.nar", cacheDir, storePathToHash(storePath)) : "";
+
+    try {
+        if (cacheFile != "")
+            *sink.s = nix::readFile(cacheFile);
+    } catch (SysError &) { }
+
+    if (sink.s->empty()) {
+        store->narFromPath(storePath, sink);
+
+        if (cacheFile != "")
+            /* FIXME: do this asynchronously. */
+            writeFile(cacheFile, *sink.s);
+    }
 
     auto accessor = makeNarAccessor(sink.s);
     nars.emplace(storePath, accessor);

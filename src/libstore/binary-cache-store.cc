@@ -319,7 +319,7 @@ Path BinaryCacheStore::addTextToStore(const string & name, const string & s,
 
 ref<FSAccessor> BinaryCacheStore::getFSAccessor()
 {
-    return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()));
+    return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()), localNarCache);
 }
 
 std::shared_ptr<std::string> BinaryCacheStore::getBuildLog(const Path & path)
