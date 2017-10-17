@@ -667,7 +667,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
         try {
             if (hasPrefix(elem.second, "git://") || hasSuffix(elem.second, ".git"))
                 // FIXME: support specifying revision/branch
-                res = { true, exportGit(store, elem.second, "master") };
+                res = { true, exportGit(*this, elem.second, "master") };
             else
                 res = { true, getDownloader()->downloadCached(store, elem.second, true) };
         } catch (DownloadError & e) {

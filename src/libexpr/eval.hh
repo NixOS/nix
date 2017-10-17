@@ -193,6 +193,9 @@ public:
     /* The same, but used during parsing to resolve variables. */
     StaticEnv staticBaseEnv; // !!! should be private
 
+    /* Cache of git reference validity lookups */
+    std::map<string, bool> validGitRefCache;
+
 private:
 
     unsigned int baseEnvDispl = 0;
