@@ -10,19 +10,31 @@
 
 namespace nix {
 
-Path exportGit(ref<Store> store, const std::string & uri,
+Path exportGit(EvalState & state, const std::string & uri,
     const std::string & ref, const std::string & rev)
 {
+    auto store = state.store;
     if (rev != "") {
         std::regex revRegex("^[0-9a-fA-F]{40}$");
         if (!std::regex_match(rev, revRegex))
             throw Error("invalid Git revision '%s'", rev);
     }
 
-    // FIXME: too restrictive, but better safe than sorry.
-    std::regex refRegex("^[0-9a-zA-Z][0-9a-zA-Z.-]+$");
-    if (!std::regex_match(ref, refRegex))
+    auto refLookup = state.validGitRefCache.find(ref);
+    if (refLookup == state.validGitRefCache.end()) {
+        try {
+            runProgram("git", true, { "check-ref-format", "--allow-onelevel", ref });
+            refLookup = state.validGitRefCache.emplace(ref, true).first;
+        } catch (ExecError & e) {
+            if (WIFSIGNALED(e.status)) {
+                throw;
+            }
+            refLookup = state.validGitRefCache.emplace(ref, false).first;
+        }
+    }
+    if (!refLookup->second) {
         throw Error("invalid Git ref '%s'", ref);
+    }
 
     Path cacheDir = getCacheDir() + "/nix/git";
 
@@ -124,7 +136,7 @@ static void prim_fetchgit(EvalState & state, const Pos & pos, Value * * args, Va
     } else
         url = state.forceStringNoCtx(*args[0], pos);
 
-    Path storePath = exportGit(state.store, url, ref, rev);
+    Path storePath = exportGit(state, url, ref, rev);
 
     mkString(v, storePath, PathSet({storePath}));
 }

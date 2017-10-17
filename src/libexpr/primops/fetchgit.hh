@@ -2,13 +2,11 @@
 
 #include <string>
 
-#include "ref.hh"
-
 namespace nix {
 
-class Store;
+class EvalState;
 
-Path exportGit(ref<Store> store, const std::string & uri,
+Path exportGit(EvalState & state, const std::string & uri,
     const std::string & ref, const std::string & rev = "");
 
 }
