@@ -11,6 +11,19 @@ RemoteFSAccessor::RemoteFSAccessor(ref<Store> store, const Path & cacheDir)
         createDirs(cacheDir);
 }
 
+Path RemoteFSAccessor::makeCacheFile(const Path & storePath)
+{
+    assert(cacheDir != "");
+    return fmt("%s/%s.nar", cacheDir, storePathToHash(storePath));
+}
+
+void RemoteFSAccessor::addToCache(const Path & storePath, const std::string & nar)
+{
+    if (cacheDir != "")
+        /* FIXME: do this asynchronously. */
+        writeFile(makeCacheFile(storePath), nar);
+}
+
 std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_)
 {
     auto path = canonPath(path_);
@@ -26,19 +39,14 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_)
 
     StringSink sink;
 
-    Path cacheFile = cacheDir != "" ? fmt("%s/%s.nar", cacheDir, storePathToHash(storePath)) : "";
-
     try {
-        if (cacheFile != "")
-            *sink.s = nix::readFile(cacheFile);
+        if (cacheDir != "")
+            *sink.s = nix::readFile(makeCacheFile(storePath));
     } catch (SysError &) { }
 
     if (sink.s->empty()) {
         store->narFromPath(storePath, sink);
-
-        if (cacheFile != "")
-            /* FIXME: do this asynchronously. */
-            writeFile(cacheFile, *sink.s);
+        addToCache(storePath, *sink.s);
     }
 
     auto accessor = makeNarAccessor(sink.s);
