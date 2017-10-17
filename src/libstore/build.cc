@@ -2774,14 +2774,10 @@ void DerivationGoal::runChild()
                     sandboxProfile += "(deny default (with no-log))\n";
                 }
 
-                sandboxProfile +=
-                    #include "sandbox-defaults.sb.gen.hh"
-                    ;
+                sandboxProfile += "(import \"sandbox-defaults.sb\")";
 
                 if (fixedOutput)
-                    sandboxProfile +=
-                        #include "sandbox-network.sb.gen.hh"
-                        ;
+                    sandboxProfile += "(import \"sandbox-network.sb\")";
 
                 /* Our rwx outputs */
                 sandboxProfile += "(allow file-read* file-write* process-exec\n";
@@ -2824,9 +2820,7 @@ void DerivationGoal::runChild()
 
                 sandboxProfile += additionalSandboxProfile;
             } else
-                sandboxProfile +=
-                    #include "sandbox-minimal.sb.gen.hh"
-                    ;
+                sandboxProfile += "(import \"sandbox-minimal.sb\")";
 
             debug("Generated sandbox profile:");
             debug(sandboxProfile);
@@ -2848,6 +2842,8 @@ void DerivationGoal::runChild()
             args.push_back(sandboxFile);
             args.push_back("-D");
             args.push_back("_GLOBAL_TMP_DIR=" + globalTmpDir);
+            args.push_back("-D");
+            args.push_back("IMPORT_DIR=" + settings.nixDataDir + "/nix/sandbox/");
             args.push_back(drv->builder);
         }
 #endif
