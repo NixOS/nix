@@ -23,7 +23,7 @@
 #include <unistd.h>
 
 #ifdef __APPLE__
-#include <sys/syscall.h>
+#include <sys/sysctl.h>
 #endif
 
 #ifdef __linux__
@@ -786,13 +786,64 @@ pid_t Pid::release()
     return p;
 }
 
-
 void killUser(uid_t uid)
 {
     debug(format("killing all processes running under uid '%1%'") % uid);
 
     assert(uid != 0); /* just to be safe... */
 
+#ifdef __APPLE__
+    /* We originally had very similar logic here as on the Linux side, but
+       then got bitten hard by a system crashing bug as described in here:
+       https://github.com/NixOS/nix/issues/1583. So now we adopt this other
+       approach, but we should go back to the kill approach once Apple fixes
+       their kernel. */
+
+    // Borrowed from https://stackoverflow.com/a/7733928
+    int err = 0;
+    size_t length = 0, newlength = 0;
+
+    // XXX: Should this be KERN_PROC_RUID? EUID vs. real UID
+    static const int name[4] = { CTL_KERN, KERN_PROC, KERN_PROC_UID, static_cast<int>(uid) };
+
+    int tries = 100;
+    bool done = false;
+
+    while (!done) {
+        tries--;
+
+        // First call with NULL to get number of processes. Yeah yeah TOCTOU is fun, but we check
+        // that it hasn't changed later and keep going until it's 0
+        err = sysctl((int *)name, 4, NULL, &length, NULL, 0);
+        if (err)
+            throw SysError("calling sysctl to get size");
+
+        vector<struct kinfo_proc> proc_list(length);
+
+        newlength = length;
+        err = sysctl((int *)name, 4, (void *)proc_list.data(), &newlength, NULL, 0);
+        if (err)
+            throw SysError("calling sysctl to get process list");
+
+        // @grahamc points out https://utcc.utoronto.ca/~cks/space/blog/unix/ProcessKillingTrick
+        for (auto proc : proc_list) {
+            kill(proc.kp_proc.p_pid, SIGSTOP);
+        }
+
+        for (auto proc : proc_list) {
+            kill(proc.kp_proc.p_pid, SIGKILL);
+        }
+
+        if (newlength == 0)
+            break;
+
+        if (tries <= 0)
+            break;
+    }
+
+    if (newlength != 0)
+        throw SysError("ran out of tries but there were processes left. I've created a monster!!!");
+#else
     /* The system call kill(-1, sig) sends the signal `sig' to all
        users to which the current process can send signals.  So we
        fork a process, switch to uid, and send a mass kill. */
@@ -806,16 +857,7 @@ void killUser(uid_t uid)
             throw SysError("setting uid");
 
         while (true) {
-#ifdef __APPLE__
-            /* OSX's kill syscall takes a third parameter that, among
-               other things, determines if kill(-1, signo) affects the
-               calling process. In the OSX libc, it's set to true,
-               which means "follow POSIX", which we don't want here
-                 */
-            if (syscall(SYS_kill, -1, SIGKILL, false) == 0) break;
-#else
             if (kill(-1, SIGKILL) == 0) break;
-#endif
             if (errno == ESRCH) break; /* no more processes */
             if (errno != EINTR)
                 throw SysError(format("cannot kill processes for uid '%1%'") % uid);
@@ -827,12 +869,14 @@ void killUser(uid_t uid)
     int status = pid.wait();
     if (status != 0)
         throw Error(format("cannot kill processes for uid '%1%': %2%") % uid % statusToString(status));
-
+ 
+#endif
     /* !!! We should really do some check to make sure that there are
        no processes left running under `uid', but there is no portable
        way to do so (I think).  The most reliable way may be `ps -eo
        uid | grep -q $uid'. */
 }
+
 
 
 //////////////////////////////////////////////////////////////////////
