@@ -116,7 +116,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
 
             if (accessor_) {
                 accessor_->nars.emplace(info.path, narAccessor);
-                accessor_->addToCache(info.path, *nar);
+                //accessor_->addToCache(info.path, *nar);
             }
 
             std::function<void(const Path &, JSONPlaceholder &)> recurse;
@@ -164,7 +164,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
     else {
         if (accessor_) {
             accessor_->nars.emplace(info.path, makeNarAccessor(nar));
-            accessor_->addToCache(info.path, *nar);
+            //accessor_->addToCache(info.path, *nar);
         }
     }
 
