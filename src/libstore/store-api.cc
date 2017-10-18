@@ -619,6 +619,8 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const PathSet & storePa
     for (auto & path : storePaths)
         if (!valid.count(path)) missing.insert(path);
 
+    if (missing.empty()) return;
+
     Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
 
     std::atomic<size_t> nrDone{0};
