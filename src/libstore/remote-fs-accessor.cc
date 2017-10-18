@@ -19,9 +19,13 @@ Path RemoteFSAccessor::makeCacheFile(const Path & storePath)
 
 void RemoteFSAccessor::addToCache(const Path & storePath, const std::string & nar)
 {
-    if (cacheDir != "")
+    try {
+        if (cacheDir == "") return;
         /* FIXME: do this asynchronously. */
         writeFile(makeCacheFile(storePath), nar);
+    } catch (...) {
+        ignoreException();
+    }
 }
 
 std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_)
