@@ -278,7 +278,7 @@ void mainWrapped(int argc, char * * argv)
                 /* If we're in a #! script, interpret filenames
                    relative to the script. */
                 exprs.push_back(state.parseExprFromFile(resolveExprPath(lookupFileArg(state,
-                    inShebang && !packages ? absPath(i, dirOf(script)) : i))));
+                    inShebang && !packages ? absPath(i, absPath(dirOf(script))) : i))));
         }
 
     /* Evaluate them into derivations. */
