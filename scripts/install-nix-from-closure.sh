@@ -6,7 +6,41 @@ dest="/nix"
 self="$(dirname "$0")"
 nix="@nix@"
 cacert="@cacert@"
+default_channel_url="https://nixos.org/channels/nixpkgs-unstable"
+channel_url="$default_channel_url"
+default_channel_name="nixpkgs"
+channel_name="$default_channel_name"
 
+for arg in "$@"; do
+    case "$arg" in
+        --help)
+            echo "Nix install script"
+            echo ""
+            echo "Usage: $(basename "$0") [options]"
+            echo ""
+            echo "Options:"
+            echo "  --channel=URL"
+            echo "          The Nix channel to get expressions from."
+            echo "          If URL is empty, no channel will be registered."
+            echo "          Default: $default_channel_url"
+            echo ""
+            echo "  --channel-name=NAME"
+            echo "          Optional name to give the Nix channel."
+            echo "          Default: $default_channel_name"
+            exit 0
+            ;;
+        --channel=*)
+            channel_url=$(echo "$arg" | cut -d= -f2)
+            ;;
+        --channel-name=*)
+            channel_name=$(echo "$arg" | cut -d= -f2)
+            ;;
+        *) echo "Unsupported argument: $arg"
+           echo "Try --help"
+           exit 1
+           ;;
+    esac
+done
 
 if ! [ -e "$self/.reginfo" ]; then
     echo "$0: incomplete installer (.reginfo is missing)" >&2
@@ -40,7 +74,7 @@ fi
 
 echo "performing a single-user installation of Nix..." >&2
 
-if ! [ -e $dest ]; then
+if ! [ -e "$dest" ]; then
     cmd="mkdir -m 0755 $dest && chown $USER $dest"
     echo "directory $dest does not exist; creating it by running '$cmd' using sudo" >&2
     if ! sudo sh -c "$cmd"; then
@@ -49,12 +83,15 @@ if ! [ -e $dest ]; then
     fi
 fi
 
-if ! [ -w $dest ]; then
-    echo "$0: directory $dest exists, but is not writable by you. This could indicate that another user has already performed a single-user installation of Nix on this system. If you wish to enable multi-user support see http://nixos.org/nix/manual/#ssec-multi-user. If you wish to continue with a single-user install for $USER please run 'chown -R $USER $dest' as root." >&2
+if ! [ -w "$dest" ]; then
+    echo "$0: directory $dest exists, but is not writable by you." >&2
+    echo "$0: This could indicate that another user has already performed a single-user installation of Nix on this system." >&2
+    echo "$0: If you wish to enable multi-user support see http://nixos.org/nix/manual/#ssec-multi-user." >&2
+    echo "$0: If you wish to continue with a single-user install for $USER please run ‘chown -R $USER $dest’ as root." >&2
     exit 1
 fi
 
-mkdir -p $dest/store
+mkdir -p "$dest/store"
 
 printf "copying Nix to %s..." "${dest}/store" >&2
 
@@ -75,7 +112,7 @@ done
 echo "" >&2
 
 echo "initialising Nix database..." >&2
-if ! $nix/bin/nix-store --init; then
+if ! "$nix/bin/nix-store" --init; then
     echo "$0: failed to initialize the Nix database" >&2
     exit 1
 fi
@@ -94,23 +131,25 @@ fi
 
 # Install an SSL certificate bundle.
 if [ -z "$NIX_SSL_CERT_FILE" ] || ! [ -f "$NIX_SSL_CERT_FILE" ]; then
-    $nix/bin/nix-env -i "$cacert"
+    "$nix/bin/nix-env" -i "$cacert"
     export NIX_SSL_CERT_FILE="$HOME/.nix-profile/etc/ssl/certs/ca-bundle.crt"
 fi
 
-# Subscribe the user to the Nixpkgs channel and fetch it.
-if ! $nix/bin/nix-channel --list | grep -q "^nixpkgs "; then
-    $nix/bin/nix-channel --add https://nixos.org/channels/nixpkgs-unstable
-fi
-if [ -z "$_NIX_INSTALLER_TEST" ]; then
-    $nix/bin/nix-channel --update nixpkgs
+if [ -n "$channel_url" ]; then
+    # Subscribe the user to the Nixpkgs channel and fetch it.
+    if ! "$nix/bin/nix-channel" --list | grep -q "^$channel_name "; then
+        "$nix/bin/nix-channel" --add "$channel_url" "$channel_name"
+    fi
+    if [ -z "$_NIX_INSTALLER_TEST" ]; then
+        "$nix/bin/nix-channel" --update "$channel_name"
+    fi
 fi
 
 added=
 if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
 
     # Make the shell source nix.sh during login.
-    p=$HOME/.nix-profile/etc/profile.d/nix.sh
+    p="$HOME/.nix-profile/etc/profile.d/nix.sh"
 
     for i in .bash_profile .bash_login .profile; do
         fn="$HOME/$i"
