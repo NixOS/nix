@@ -1,0 +1,56 @@
+<chapter xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="ch-uninstalling-nix">
+
+<title>Uninstalling Nix</title>
+
+<para>The following steps describes how to remove Nix from your system.</para>
+
+<para>First of all you need to remove the <filename>/nix</filename>
+directory:</para>
+
+<screen>sudo rm -rf /nix</screen>
+
+<para>You also need to remove some files from your home directory:</para>
+
+<screen>
+rm -rf $HOME/.nix-profile
+rm -rf $HOME/.nix-defexpr
+rm -rf $HOME/.nix-channels
+rm -rf $HOME/.config/nixpkgs
+</screen>
+
+<para>Then you need to remove the line that references Nix from your
+<filename><envar>$HOME</envar>/.profile</filename>. Assuming that your username
+is <literal>user</literal> it should look something like this:</para>
+
+<screen>
+if [ -e /home/user/.nix-profile/etc/profile.d/nix.sh ]; then . /home/user/.nix-profile/etc/profile.d/nix.sh; fi # added by Nix installer
+</screen>
+
+<para>There might also be some configuration files in
+<filename>/etc/nix</filename> that you need to delete:</para>
+
+<screen>
+sudo rm -rf /etc/nix
+</screen>
+
+<para>Finally, on a multi-user installation of Nix, you will also need to remove
+the <literal>nixbld[0-9]</literal> users.</para>
+
+<screen>
+sudo deluser nixbld0
+sudo deluser nixbld1
+sudo deluser nixbld2
+sudo deluser nixbld3
+sudo deluser nixbld4
+sudo deluser nixbld5
+sudo deluser nixbld6
+sudo deluser nixbld7
+sudo deluser nixbld8
+sudo deluser nixbld9
+</screen>
+
+</chapter>
