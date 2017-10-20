@@ -41,16 +41,16 @@ sudo rm -rf /etc/nix
 the <literal>nixbld[0-9]</literal> users.</para>
 
 <screen>
-sudo deluser nixbld0
-sudo deluser nixbld1
-sudo deluser nixbld2
-sudo deluser nixbld3
-sudo deluser nixbld4
-sudo deluser nixbld5
-sudo deluser nixbld6
-sudo deluser nixbld7
-sudo deluser nixbld8
-sudo deluser nixbld9
+sudo userdel nixbld0
+sudo userdel nixbld1
+sudo userdel nixbld2
+sudo userdel nixbld3
+sudo userdel nixbld4
+sudo userdel nixbld5
+sudo userdel nixbld6
+sudo userdel nixbld7
+sudo userdel nixbld8
+sudo userdel nixbld9
 </screen>
 
 </chapter>
