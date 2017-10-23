@@ -52,8 +52,7 @@
       information about store paths.</para></listitem>
 
       <listitem><para><command>nix run</command> starts a shell in
-      which the specified packages are available. (TODO: currently
-      broken in chroot mode)</para></listitem>
+      which the specified packages are available.</para></listitem>
 
       <listitem><para><command>nix log</command> shows the build log
       of a package or path. If the build log is not available locally,
@@ -74,6 +73,17 @@
       name, package name or description. It caches available packages
       to speed up searches.</para></listitem>
 
+      <listitem><para><command>nix why-depends</command> (d41c5eb13f4f3a37d80dbc6d3888644170c3b44a).</para></listitem>
+
+      <listitem><para><command>nix show-derivation</command> (e8d6ee7c1b90a2fe6d824f1a875acc56799ae6e2).</para></listitem>
+
+      <listitem><para><command>nix add-to-store</command> (970366266b8df712f5f9cedb45af183ef5a8357f).</para></listitem>
+
+      <listitem><para>Progress indicator.</para></listitem>
+
+      <listitem><para>All options are available as flags now
+      (b8283773bd64d7da6859ed520ee19867742a03ba).</para></listitem>
+
     </itemizedlist>
 
   </listitem>
@@ -81,10 +91,6 @@
   <listitem>
     <para>The external program <command>nix-repl</command> has been
     integrated into Nix as <command>nix repl</command>.</para>
-  </listitem>
-
-  <listitem>
-    <para>Nix now supports floating-point numbers.</para>
   </listitem>
 
   <listitem>
@@ -172,11 +178,6 @@
   </listitem>
 
   <listitem>
-    <para>“Nested” log output was removed. As a result,
-    <command>nix-log2xml</command> was also removed.</para>
-  </listitem>
-
-  <listitem>
     <para>When <option>--no-build-output</option> is given, the last
     10 lines of the build log will be shown if a build
     fails.</para>
@@ -192,10 +193,6 @@
     path,
     e.g. <literal>nixpkgs=git://github.com/NixOS/nixpkgs</literal>.
     (d8bf0d4859e28ddd23401fbe89f4e528aa09ddb3)</para>
-  </listitem>
-
-  <listitem>
-    <para>Removed OpenSSL-based signing. (f435f8247553656774dd1b2c88e9de5d59cab203)</para>
   </listitem>
 
   <listitem>
@@ -252,18 +249,8 @@ configureFlags = "--prefix=${placeholder "out"} --includedir=${placeholder "dev"
   </listitem>
 
   <listitem>
-    <para>Added builtin function
-    <varname>builtins.partition</varname>.</para>
-  </listitem>
-
-  <listitem>
     <para>Support for HTTP/2. This makes binary cache lookups much
     more efficient. (90ad02bf626b885a5dd8967894e2eafc953bdf92)</para>
-  </listitem>
-
-  <listitem>
-    <para>Caching of failed builds has been
-    removed. (8cffec84859cec8b610a2a22ab0c4d462a9351ff)</para>
   </listitem>
 
   <listitem>
@@ -373,7 +360,7 @@ configureFlags = "--prefix=${placeholder "out"} --includedir=${placeholder "dev"
   </listitem>
 
   <listitem>
-    <para><command>nix-shell</command> now used
+    <para><command>nix-shell</command> now uses
     <varname>bashInteractive</varname> from Nixpkgs, rather than the
     <command>bash</command> command that happens to be in the caller’s
     <envar>PATH</envar>. This is especially important on macOS where
@@ -383,14 +370,9 @@ configureFlags = "--prefix=${placeholder "out"} --includedir=${placeholder "dev"
   </listitem>
 
   <listitem>
-    <para><function>builtins.split</function>.
-    (b8867a0239b1930a16f9ef3f7f3e864b01416dff))</para>
-  </listitem>
-
-  <listitem>
-    <para><filename>nix-mode.el</filename> has been removed from Nix. It is now a separate repository
-    in <uri>https://github.com/NixOS/nix-mode</uri> and can be installed through the MELPA
-    package repository.</para>
+    <para>New builtin functions: <function>builtins.split</function>
+    (b8867a0239b1930a16f9ef3f7f3e864b01416dff),
+    <function>builtins.partition</function>.</para>
   </listitem>
 
   <listitem>
@@ -398,13 +380,43 @@ configureFlags = "--prefix=${placeholder "out"} --includedir=${placeholder "dev"
   </listitem>
 
   <listitem>
-    <para><command>nix why-depends</command></para>
-  </listitem>
-
-  <listitem>
     <para><command>nix-store -q --roots</command> and
     <command>nix-store --gc --print-roots</command> now show temporary
     and in-memory roots.</para>
+  </listitem>
+
+  <listitem>
+    <para>Builders can now communicate what build phase they are in by
+    writing messages to the file descriptor specified in
+    <envar>NIX_LOG_FD</envar>. (88e6bb76de5564b3217be9688677d1c89101b2a3)
+    </para>
+  </listitem>
+
+</itemizedlist>
+
+<para>Some features were removed:</para>
+
+<itemizedlist>
+
+  <listitem>
+    <para>“Nested” log output. As a result,
+    <command>nix-log2xml</command> was also removed.</para>
+  </listitem>
+
+  <listitem>
+    <para>OpenSSL-based signing. (f435f8247553656774dd1b2c88e9de5d59cab203)</para>
+  </listitem>
+
+  <listitem>
+    <para>Caching of failed
+    builds. (8cffec84859cec8b610a2a22ab0c4d462a9351ff)</para>
+  </listitem>
+
+  <listitem>
+    <para><filename>nix-mode.el</filename> has been removed from
+    Nix. It is now a separate repository in
+    <uri>https://github.com/NixOS/nix-mode</uri> and can be installed
+    through the MELPA package repository.</para>
   </listitem>
 
 </itemizedlist>
