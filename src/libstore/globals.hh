@@ -2,6 +2,7 @@
 
 #include "types.hh"
 #include "config.hh"
+#include "util.hh"
 
 #include <map>
 #include <limits>
@@ -83,6 +84,9 @@ public:
 
     /* File name of the socket the daemon listens to.  */
     Path nixDaemonSocketFile;
+
+    Setting<std::string> storeUri{this, getEnv("NIX_REMOTE", "auto"), "store",
+        "The default Nix store to use."};
 
     Setting<bool> keepFailed{this, false, "keep-failed",
         "Whether to keep temporary directories of failed builds."};

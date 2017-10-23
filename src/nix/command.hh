@@ -33,7 +33,6 @@ class Store;
 /* A command that require a Nix store. */
 struct StoreCommand : virtual Command
 {
-    std::string storeUri;
     StoreCommand();
     void run() override;
     ref<Store> getStore();

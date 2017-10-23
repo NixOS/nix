@@ -78,9 +78,6 @@ bool MultiCommand::processArgs(const Strings & args, bool finish)
 
 StoreCommand::StoreCommand()
 {
-    storeUri = getEnv("NIX_REMOTE");
-
-    mkFlag(0, "store", "store-uri", "URI of the Nix store to use", &storeUri);
 }
 
 ref<Store> StoreCommand::getStore()
@@ -92,7 +89,7 @@ ref<Store> StoreCommand::getStore()
 
 ref<Store> StoreCommand::createStore()
 {
-    return openStore(storeUri);
+    return openStore();
 }
 
 void StoreCommand::run()

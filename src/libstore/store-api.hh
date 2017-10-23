@@ -716,7 +716,7 @@ void removeTempRoots();
    You can pass parameters to the store implementation by appending
    ‘?key=value&key=value&...’ to the URI.
 */
-ref<Store> openStore(const std::string & uri = getEnv("NIX_REMOTE"),
+ref<Store> openStore(const std::string & uri = settings.storeUri.get(),
     const Store::Params & extraParams = Store::Params());
 
 
@@ -727,7 +727,8 @@ enum StoreType {
 };
 
 
-StoreType getStoreType(const std::string & uri = getEnv("NIX_REMOTE"), const std::string & stateDir = settings.nixStateDir);
+StoreType getStoreType(const std::string & uri = settings.storeUri.get(),
+    const std::string & stateDir = settings.nixStateDir);
 
 /* Return the default substituter stores, defined by the
    ‘substituters’ option and various legacy options like
