@@ -92,7 +92,17 @@ struct FdSink : BufferedSink
     FdSink() : fd(-1) { }
     FdSink(int fd) : fd(fd) { }
     FdSink(FdSink&&) = default;
-    FdSink& operator=(FdSink&&) = default;
+
+    FdSink& operator=(FdSink && s)
+    {
+        flush();
+        fd = s.fd;
+        s.fd = -1;
+        warn = s.warn;
+        written = s.written;
+        return *this;
+    }
+
     ~FdSink();
 
     void write(const unsigned char * data, size_t len) override;
@@ -112,6 +122,16 @@ struct FdSource : BufferedSource
 
     FdSource() : fd(-1) { }
     FdSource(int fd) : fd(fd) { }
+    FdSource(FdSource&&) = default;
+
+    FdSource& operator=(FdSource && s)
+    {
+        fd = s.fd;
+        s.fd = -1;
+        read = s.read;
+        return *this;
+    }
+
     size_t readUnbuffered(unsigned char * data, size_t len) override;
     bool good() override;
 private:

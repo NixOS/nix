@@ -606,6 +606,8 @@ struct HookInstance
     /* The process ID of the hook. */
     Pid pid;
 
+    FdSink sink;
+
     HookInstance();
 
     ~HookInstance();
@@ -642,11 +644,7 @@ HookInstance::HookInstance()
 
         Strings args = {
             baseNameOf(settings.buildHook),
-            settings.thisSystem,
-            std::to_string(settings.maxSilentTime),
-            std::to_string(settings.buildTimeout),
             std::to_string(verbosity),
-            settings.builders
         };
 
         execv(settings.buildHook.get().c_str(), stringsToCharPtrs(args).data());
@@ -657,6 +655,11 @@ HookInstance::HookInstance()
     pid.setSeparatePG(true);
     fromHook.writeSide = -1;
     toHook.readSide = -1;
+
+    sink = FdSink(toHook.writeSide.get());
+    for (auto & setting : settings.getSettings())
+        sink << 1 << setting.first << setting.second;
+    sink << 0;
 }
 
 
@@ -1633,9 +1636,13 @@ HookReply DerivationGoal::tryBuildHook()
         for (auto & i : features) checkStoreName(i); /* !!! abuse */
 
         /* Send the request to the hook. */
-        writeLine(worker.hook->toHook.writeSide.get(), (format("%1% %2% %3% %4%")
-                % (worker.getNrLocalBuilds() < settings.maxBuildJobs ? "1" : "0")
-                % drv->platform % drvPath % concatStringsSep(",", features)).str());
+        worker.hook->sink
+            << "try"
+            << (worker.getNrLocalBuilds() < settings.maxBuildJobs ? 1 : 0)
+            << drv->platform
+            << drvPath
+            << features;
+        worker.hook->sink.flush();
 
         /* Read the first line of input, which should be a word indicating
            whether the hook wishes to perform the build. */
@@ -1680,12 +1687,13 @@ HookReply DerivationGoal::tryBuildHook()
 
     /* Tell the hook all the inputs that have to be copied to the
        remote system. */
-    writeLine(hook->toHook.writeSide.get(), concatStringsSep(" ", inputPaths));
+    hook->sink << inputPaths;
 
     /* Tell the hooks the missing outputs that have to be copied back
        from the remote system. */
-    writeLine(hook->toHook.writeSide.get(), concatStringsSep(" ", missingPaths));
+    hook->sink << missingPaths;
 
+    hook->sink = FdSink();
     hook->toHook.writeSide = -1;
 
     /* Create the log file and pipe. */
@@ -3986,7 +3994,7 @@ void Worker::run(const Goals & _topGoals)
         else {
             if (awake.empty() && 0 == settings.maxBuildJobs) throw Error(
                 "unable to start any build; either increase '--max-jobs' "
-                "or enable distributed builds");
+                "or enable remote builds");
             assert(!awake.empty());
         }
     }

@@ -46,16 +46,23 @@ int main (int argc, char * * argv)
         unsetenv("DISPLAY");
         unsetenv("SSH_ASKPASS");
 
-        if (argc != 6)
+        if (argc != 2)
             throw UsageError("called without required arguments");
 
-        auto store = openStore().cast<LocalStore>();
+        verbosity = (Verbosity) std::stoll(argv[1]);
 
-        auto localSystem = argv[1];
-        settings.maxSilentTime = std::stoll(argv[2]);
-        settings.buildTimeout = std::stoll(argv[3]);
-        verbosity = (Verbosity) std::stoll(argv[4]);
-        settings.builders = argv[5];
+        FdSource source(STDIN_FILENO);
+
+        /* Read the parent's settings. */
+        while (readInt(source)) {
+            auto name = readString(source);
+            auto value = readString(source);
+            settings.set(name, value);
+        }
+
+        settings.maxBuildJobs.set("1"); // hack to make tests with local?root= work
+
+        auto store = openStore().cast<LocalStore>();
 
         /* It would be more appropriate to use $XDG_RUNTIME_DIR, since
            that gets cleared on reboot, but it wouldn't work on macOS. */
@@ -74,18 +81,20 @@ int main (int argc, char * * argv)
 
         string drvPath;
         string storeUri;
-        for (string line; getline(cin, line);) {
-            auto tokens = tokenizeString<std::vector<string>>(line);
-            auto sz = tokens.size();
-            if (sz != 3 && sz != 4)
-                throw Error("invalid build hook line '%1%'", line);
-            auto amWilling = tokens[0] == "1";
-            auto neededSystem = tokens[1];
-            drvPath = tokens[2];
-            auto requiredFeatures = sz == 3 ?
-                std::set<string>{} :
-                tokenizeString<std::set<string>>(tokens[3], ",");
-            auto canBuildLocally = amWilling && (neededSystem == localSystem);
+
+        while (true) {
+
+            try {
+                auto s = readString(source);
+                if (s != "try") return;
+            } catch (EndOfFile &) { return; }
+
+            auto amWilling = readInt(source);
+            auto neededSystem = readString(source);
+            source >> drvPath;
+            auto requiredFeatures = readStrings<std::set<std::string>>(source);
+
+            auto canBuildLocally = amWilling && (neededSystem == settings.thisSystem);
 
             /* Error ignored here, will be caught later */
             mkdir(currentLoad.c_str(), 0777);
@@ -100,7 +109,7 @@ int main (int argc, char * * argv)
                 Machine * bestMachine = nullptr;
                 unsigned long long bestLoad = 0;
                 for (auto & m : machines) {
-                    debug("considering building on '%s'", m.storeUri);
+                    debug("considering building on remote machine '%s'", m.storeUri);
 
                     if (m.enabled && std::find(m.systemTypes.begin(),
                             m.systemTypes.end(),
@@ -184,15 +193,9 @@ int main (int argc, char * * argv)
 
 connected:
         std::cerr << "# accept\n";
-        string line;
-        if (!getline(cin, line))
-            throw Error("hook caller didn't send inputs");
 
-        auto inputs = tokenizeString<PathSet>(line);
-        if (!getline(cin, line))
-            throw Error("hook caller didn't send outputs");
-
-        auto outputs = tokenizeString<PathSet>(line);
+        auto inputs = readStrings<PathSet>(source);
+        auto outputs = readStrings<PathSet>(source);
 
         AutoCloseFD uploadLock = openLockFile(currentLoad + "/" + escapeUri(storeUri) + ".upload-lock", true);
 

@@ -9,16 +9,11 @@ chmod -R u+w $TEST_ROOT/store0 || true
 chmod -R u+w $TEST_ROOT/store1 || true
 rm -rf $TEST_ROOT/store0 $TEST_ROOT/store1
 
-# FIXME: --option is not passed to build-remote, so have to create a config file.
-export NIX_CONF_DIR=$TEST_ROOT/etc2
-mkdir -p $NIX_CONF_DIR
-echo "
-sandbox-paths = /nix/store
-sandbox-build-dir = /build-tmp
-" > $NIX_CONF_DIR/nix.conf
+nix build -f build-hook.nix -o $TEST_ROOT/result --max-jobs 0 \
+  --sandbox-paths /nix/store --sandbox-build-dir /build-tmp \
+  --builders "local?root=$TEST_ROOT/store0; local?root=$TEST_ROOT/store1 - - 1 1 foo"
 
-outPath=$(nix-build build-hook.nix --no-out-link -j0 \
-  --option builders "local?root=$TEST_ROOT/store0; local?root=$TEST_ROOT/store1 - - 1 1 foo")
+outPath=$TEST_ROOT/result
 
 cat $outPath/foobar | grep FOOBAR
 
