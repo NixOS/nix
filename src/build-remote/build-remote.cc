@@ -16,6 +16,7 @@
 #include "serialise.hh"
 #include "store-api.hh"
 #include "derivations.hh"
+#include "local-store.hh"
 
 using namespace nix;
 using std::cin;
@@ -48,7 +49,7 @@ int main (int argc, char * * argv)
         if (argc != 6)
             throw UsageError("called without required arguments");
 
-        auto store = openStore();
+        auto store = openStore().cast<LocalStore>();
 
         auto localSystem = argv[1];
         settings.maxSilentTime = std::stoll(argv[2]);
@@ -58,7 +59,7 @@ int main (int argc, char * * argv)
 
         /* It would be more appropriate to use $XDG_RUNTIME_DIR, since
            that gets cleared on reboot, but it wouldn't work on macOS. */
-        currentLoad = settings.nixStateDir + "/current-load";
+        currentLoad = store->stateDir + "/current-load";
 
         std::shared_ptr<Store> sshStore;
         AutoCloseFD bestSlotLock;
