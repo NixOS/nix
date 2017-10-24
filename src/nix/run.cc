@@ -20,7 +20,7 @@ extern char * * environ;
 
 struct CmdRun : InstallablesCommand
 {
-    Strings command = { "bash" };
+    std::vector<std::string> command = { "bash" };
     StringSet keep, unset;
     bool ignoreEnvironment = false;
 
@@ -32,7 +32,7 @@ struct CmdRun : InstallablesCommand
             .description("command and arguments to be executed; defaults to 'bash'")
             .arity(ArityAny)
             .labels({"command", "args"})
-            .handler([&](Strings ss) {
+            .handler([&](std::vector<std::string> ss) {
                 if (ss.empty()) throw UsageError("--command requires at least one argument");
                 command = ss;
             });
@@ -49,7 +49,7 @@ struct CmdRun : InstallablesCommand
             .description("keep specified environment variable")
             .arity(1)
             .labels({"name"})
-            .handler([&](Strings ss) { keep.insert(ss.front()); });
+            .handler([&](std::vector<std::string> ss) { keep.insert(ss.front()); });
 
         mkFlag()
             .longName("unset")
@@ -57,7 +57,7 @@ struct CmdRun : InstallablesCommand
             .description("unset specified environment variable")
             .arity(1)
             .labels({"name"})
-            .handler([&](Strings ss) { unset.insert(ss.front()); });
+            .handler([&](std::vector<std::string> ss) { unset.insert(ss.front()); });
     }
 
     std::string name() override
@@ -126,7 +126,8 @@ struct CmdRun : InstallablesCommand
         setenv("PATH", concatStringsSep(":", unixPath).c_str(), 1);
 
         std::string cmd = *command.begin();
-        Strings args = command;
+        Strings args;
+        for (auto & arg : command) args.push_back(arg);
 
         stopProgressBar();
 

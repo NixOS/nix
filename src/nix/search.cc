@@ -38,12 +38,12 @@ struct CmdSearch : SourceExprCommand, MixJSON
             .longName("update-cache")
             .shortName('u')
             .description("update the package search cache")
-            .handler([&](Strings ss) { writeCache = true; useCache = false; });
+            .handler([&]() { writeCache = true; useCache = false; });
 
         mkFlag()
             .longName("no-cache")
             .description("do not use or update the package search cache")
-            .handler([&](Strings ss) { writeCache = false; useCache = false; });
+            .handler([&]() { writeCache = false; useCache = false; });
     }
 
     std::string name() override

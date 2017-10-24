@@ -1,6 +1,6 @@
 #include "command.hh"
 #include "attr-path.hh"
-#include "common-opts.hh"
+#include "common-eval-args.hh"
 #include "derivations.hh"
 #include "eval-inline.hh"
 #include "eval.hh"
@@ -11,6 +11,16 @@
 #include <regex>
 
 namespace nix {
+
+SourceExprCommand::SourceExprCommand()
+{
+    mkFlag()
+        .shortName('f')
+        .longName("file")
+        .label("file")
+        .description("evaluate FILE rather than the default")
+        .dest(&file);
+}
 
 Value * SourceExprCommand::getSourceExpr(EvalState & state)
 {
@@ -66,7 +76,7 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
 ref<EvalState> SourceExprCommand::getEvalState()
 {
     if (!evalState)
-        evalState = std::make_shared<EvalState>(Strings{}, getStore());
+        evalState = std::make_shared<EvalState>(searchPath, getStore());
     return ref<EvalState>(evalState);
 }
 
@@ -120,9 +130,7 @@ struct InstallableValue : Installable
 
         auto v = toValue(*state);
 
-        // FIXME
-        std::map<string, string> autoArgs_;
-        Bindings & autoArgs(*evalAutoArgs(*state, autoArgs_));
+        Bindings & autoArgs = *cmd.getAutoArgs(*state);
 
         DrvInfos drvs;
         getDerivations(*state, *v, "", autoArgs, drvs, false);
@@ -187,9 +195,7 @@ struct InstallableAttrPath : InstallableValue
     {
         auto source = cmd.getSourceExpr(state);
 
-        // FIXME
-        std::map<string, string> autoArgs_;
-        Bindings & autoArgs(*evalAutoArgs(state, autoArgs_));
+        Bindings & autoArgs = *cmd.getAutoArgs(state);
 
         Value * v = findAlongAttrPath(state, attrPath, autoArgs, *source);
         state.forceValue(*v);
@@ -203,14 +209,14 @@ std::string attrRegex = R"([A-Za-z_][A-Za-z0-9-_+]*)";
 static std::regex attrPathRegex(fmt(R"(%1%(\.%1%)*)", attrRegex));
 
 static std::vector<std::shared_ptr<Installable>> parseInstallables(
-    SourceExprCommand & cmd, ref<Store> store, Strings ss, bool useDefaultInstallables)
+    SourceExprCommand & cmd, ref<Store> store, std::vector<std::string> ss, bool useDefaultInstallables)
 {
     std::vector<std::shared_ptr<Installable>> result;
 
     if (ss.empty() && useDefaultInstallables) {
         if (cmd.file == "")
             cmd.file = ".";
-        ss = Strings{""};
+        ss = {""};
     }
 
     for (auto & s : ss) {

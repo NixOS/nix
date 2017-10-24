@@ -24,11 +24,11 @@ void Command::printHelp(const string & programName, std::ostream & out)
 MultiCommand::MultiCommand(const Commands & _commands)
     : commands(_commands)
 {
-    expectedArgs.push_back(ExpectedArg{"command", 1, true, [=](Strings ss) {
+    expectedArgs.push_back(ExpectedArg{"command", 1, true, [=](std::vector<std::string> ss) {
         assert(!command);
-        auto i = commands.find(ss.front());
+        auto i = commands.find(ss[0]);
         if (i == commands.end())
-            throw UsageError(format("'%1%' is not a recognised command") % ss.front());
+            throw UsageError("'%s' is not a recognised command", ss[0]);
         command = i->second;
     }});
 }

@@ -4,7 +4,7 @@
 #include "store-api.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
-#include "common-opts.hh"
+#include "common-eval-args.hh"
 #include "attr-path.hh"
 
 #include <iostream>
@@ -48,15 +48,18 @@ int main(int argc, char * * argv)
 
         HashType ht = htSHA256;
         std::vector<string> args;
-        Strings searchPath;
         bool printPath = getEnv("PRINT_PATH") != "";
         bool fromExpr = false;
         string attrPath;
-        std::map<string, string> autoArgs_;
         bool unpack = false;
         string name;
 
-        parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
+        struct MyArgs : LegacyArgs, MixEvalArgs
+        {
+            using LegacyArgs::LegacyArgs;
+        };
+
+        MyArgs myArgs(baseNameOf(argv[0]), [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--help")
                 showManPage("nix-prefetch-url");
             else if (*arg == "--version")
@@ -77,10 +80,6 @@ int main(int argc, char * * argv)
                 unpack = true;
             else if (*arg == "--name")
                 name = getArg(*arg, arg, end);
-            else if (parseAutoArgs(arg, end, autoArgs_))
-                ;
-            else if (parseSearchPathArg(arg, end, searchPath))
-                ;
             else if (*arg != "" && arg->at(0) == '-')
                 return false;
             else
@@ -88,13 +87,15 @@ int main(int argc, char * * argv)
             return true;
         });
 
+        myArgs.parseCmdline(argvToStrings(argc, argv));
+
         if (args.size() > 2)
             throw UsageError("too many arguments");
 
         auto store = openStore();
-        EvalState state(searchPath, store);
+        EvalState state(myArgs.searchPath, store);
 
-        Bindings & autoArgs(*evalAutoArgs(state, autoArgs_));
+        Bindings & autoArgs = *myArgs.getAutoArgs(state);
 
         /* If -A is given, get the URI from the specified Nix
            expression. */

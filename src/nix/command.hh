@@ -1,10 +1,12 @@
 #pragma once
 
 #include "args.hh"
+#include "common-eval-args.hh"
 
 namespace nix {
 
 struct Value;
+struct Bindings;
 class EvalState;
 
 /* A command is an argument parser that can be executed by calling its
@@ -68,14 +70,11 @@ struct Installable
     }
 };
 
-struct SourceExprCommand : virtual Args, StoreCommand
+struct SourceExprCommand : virtual Args, StoreCommand, MixEvalArgs
 {
     Path file;
 
-    SourceExprCommand()
-    {
-        mkFlag('f', "file", "file", "evaluate FILE rather than the default", &file);
-    }
+    SourceExprCommand();
 
     /* Return a value representing the Nix expression from which we
        are installing. This is either the file specified by ‘--file’,
@@ -111,7 +110,7 @@ struct InstallablesCommand : virtual Args, SourceExprCommand
 
 private:
 
-    Strings _installables;
+    std::vector<std::string> _installables;
 };
 
 struct InstallableCommand : virtual Args, SourceExprCommand

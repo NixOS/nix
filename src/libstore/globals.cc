@@ -116,17 +116,17 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::s
     args.mkFlag()
         .longName(name)
         .description("Enable sandboxing.")
-        .handler([=](Strings ss) { value = smEnabled; })
+        .handler([=](std::vector<std::string> ss) { value = smEnabled; })
         .category(category);
     args.mkFlag()
         .longName("no-" + name)
         .description("Disable sandboxing.")
-        .handler([=](Strings ss) { value = smDisabled; })
+        .handler([=](std::vector<std::string> ss) { value = smDisabled; })
         .category(category);
     args.mkFlag()
         .longName("relaxed-" + name)
         .description("Enable sandboxing, but allow builds to disable it.")
-        .handler([=](Strings ss) { value = smRelaxed; })
+        .handler([=](std::vector<std::string> ss) { value = smRelaxed; })
         .category(category);
 }
 

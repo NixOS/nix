@@ -152,7 +152,7 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
         .longName(name)
         .description(description)
         .arity(1)
-        .handler([=](Strings ss) { set(*ss.begin()); })
+        .handler([=](std::vector<std::string> ss) { set(ss[0]); })
         .category(category);
 }
 
@@ -201,12 +201,12 @@ template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string &
     args.mkFlag()
         .longName(name)
         .description(description)
-        .handler([=](Strings ss) { value = true; })
+        .handler([=](std::vector<std::string> ss) { value = true; })
         .category(category);
     args.mkFlag()
         .longName("no-" + name)
         .description(description)
-        .handler([=](Strings ss) { value = false; })
+        .handler([=](std::vector<std::string> ss) { value = false; })
         .category(category);
 }
 

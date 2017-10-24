@@ -1,4 +1,3 @@
-#include "common-args.hh"
 #include "globals.hh"
 #include "shared.hh"
 #include "store-api.hh"
@@ -149,71 +148,78 @@ void initNix()
 }
 
 
-struct LegacyArgs : public MixCommonArgs
+LegacyArgs::LegacyArgs(const std::string & programName,
+    std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
+    : MixCommonArgs(programName), parseArg(parseArg)
 {
-    std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg;
+    mkFlag()
+        .longName("no-build-output")
+        .shortName('Q')
+        .description("do not show build output")
+        .set(&settings.verboseBuild, false);
 
-    LegacyArgs(const std::string & programName,
-        std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
-        : MixCommonArgs(programName), parseArg(parseArg)
-    {
-        mkFlag('Q', "no-build-output", "do not show build output",
-            &settings.verboseBuild, false);
+    mkFlag()
+        .longName("keep-failed")
+        .shortName('K')
+        .description("keep temporary directories of failed builds")
+        .set(&(bool&) settings.keepFailed, true);
 
-        mkFlag('K', "keep-failed", "keep temporary directories of failed builds",
-            &(bool&) settings.keepFailed);
+    mkFlag()
+        .longName("keep-going")
+        .shortName('k')
+        .description("keep going after a build fails")
+        .set(&(bool&) settings.keepGoing, true);
 
-        mkFlag('k', "keep-going", "keep going after a build fails",
-            &(bool&) settings.keepGoing);
+    mkFlag()
+        .longName("fallback")
+        .description("build from source if substitution fails")
+        .set(&(bool&) settings.tryFallback, true);
 
-        mkFlag(0, "fallback", "build from source if substitution fails", []() {
-            settings.tryFallback = true;
+    mkFlag1('j', "max-jobs", "jobs", "maximum number of parallel builds", [=](std::string s) {
+        settings.set("max-jobs", s);
+    });
+
+    auto intSettingAlias = [&](char shortName, const std::string & longName,
+        const std::string & description, const std::string & dest) {
+        mkFlag<unsigned int>(shortName, longName, description, [=](unsigned int n) {
+            settings.set(dest, std::to_string(n));
         });
+    };
 
-        mkFlag1('j', "max-jobs", "jobs", "maximum number of parallel builds", [=](std::string s) {
-            settings.set("max-jobs", s);
-        });
+    intSettingAlias(0, "cores", "maximum number of CPU cores to use inside a build", "cores");
+    intSettingAlias(0, "max-silent-time", "number of seconds of silence before a build is killed", "max-silent-time");
+    intSettingAlias(0, "timeout", "number of seconds before a build is killed", "timeout");
 
-        auto intSettingAlias = [&](char shortName, const std::string & longName,
-            const std::string & description, const std::string & dest) {
-            mkFlag<unsigned int>(shortName, longName, description, [=](unsigned int n) {
-                settings.set(dest, std::to_string(n));
-            });
-        };
+    mkFlag(0, "readonly-mode", "do not write to the Nix store",
+        &settings.readOnlyMode);
 
-        intSettingAlias(0, "cores", "maximum number of CPU cores to use inside a build", "cores");
-        intSettingAlias(0, "max-silent-time", "number of seconds of silence before a build is killed", "max-silent-time");
-        intSettingAlias(0, "timeout", "number of seconds before a build is killed", "timeout");
+    mkFlag(0, "show-trace", "show Nix expression stack trace in evaluation errors",
+        &settings.showTrace);
 
-        mkFlag(0, "readonly-mode", "do not write to the Nix store",
-            &settings.readOnlyMode);
+    mkFlag(0, "no-gc-warning", "disable warning about not using '--add-root'",
+        &gcWarning, false);
+}
 
-        mkFlag(0, "show-trace", "show Nix expression stack trace in evaluation errors",
-            &settings.showTrace);
 
-        mkFlag(0, "no-gc-warning", "disable warning about not using '--add-root'",
-            &gcWarning, false);
-    }
+bool LegacyArgs::processFlag(Strings::iterator & pos, Strings::iterator end)
+{
+    if (MixCommonArgs::processFlag(pos, end)) return true;
+    bool res = parseArg(pos, end);
+    if (res) ++pos;
+    return res;
+}
 
-    bool processFlag(Strings::iterator & pos, Strings::iterator end) override
-    {
-        if (MixCommonArgs::processFlag(pos, end)) return true;
-        bool res = parseArg(pos, end);
-        if (res) ++pos;
-        return res;
-    }
 
-    bool processArgs(const Strings & args, bool finish) override
-    {
-        if (args.empty()) return true;
-        assert(args.size() == 1);
-        Strings ss(args);
-        auto pos = ss.begin();
-        if (!parseArg(pos, ss.end()))
-            throw UsageError(format("unexpected argument '%1%'") % args.front());
-        return true;
-    }
-};
+bool LegacyArgs::processArgs(const Strings & args, bool finish)
+{
+    if (args.empty()) return true;
+    assert(args.size() == 1);
+    Strings ss(args);
+    auto pos = ss.begin();
+    if (!parseArg(pos, ss.end()))
+        throw UsageError(format("unexpected argument '%1%'") % args.front());
+    return true;
+}
 
 
 void parseCmdLine(int argc, char * * argv,

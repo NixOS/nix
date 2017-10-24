@@ -37,7 +37,7 @@ protected:
         std::string description;
         Strings labels;
         size_t arity = 0;
-        std::function<void(Strings)> handler;
+        std::function<void(std::vector<std::string>)> handler;
         std::string category;
     };
 
@@ -54,7 +54,7 @@ protected:
         std::string label;
         size_t arity; // 0 = any
         bool optional;
-        std::function<void(Strings)> handler;
+        std::function<void(std::vector<std::string>)> handler;
     };
 
     std::list<ExpectedArg> expectedArgs;
@@ -76,40 +76,41 @@ public:
         FlagMaker & longName(const std::string & s) { flag->longName = s; return *this; };
         FlagMaker & shortName(char s) { flag->shortName = s; return *this; };
         FlagMaker & description(const std::string & s) { flag->description = s; return *this; };
-        FlagMaker & labels(const Strings & ls) { flag->labels = ls; return *this; };
+        FlagMaker & label(const std::string & l) { flag->arity = 1; flag->labels = {l}; return *this; };
+        FlagMaker & labels(const Strings & ls) { flag->arity = ls.size(); flag->labels = ls; return *this; };
         FlagMaker & arity(size_t arity) { flag->arity = arity; return *this; };
-        FlagMaker & handler(std::function<void(Strings)> handler) { flag->handler = handler; return *this; };
+        FlagMaker & handler(std::function<void(std::vector<std::string>)> handler) { flag->handler = handler; return *this; };
+        FlagMaker & handler(std::function<void()> handler) { flag->handler = [handler](std::vector<std::string>) { handler(); }; return *this; };
+        FlagMaker & handler(std::function<void(std::string)> handler) {
+            flag->arity = 1;
+            flag->handler = [handler](std::vector<std::string> ss) { handler(std::move(ss[0])); };
+            return *this;
+        };
         FlagMaker & category(const std::string & s) { flag->category = s; return *this; };
 
         template<class T>
-        FlagMaker & dest(T * dest) {
+        FlagMaker & dest(T * dest)
+        {
             flag->arity = 1;
-            flag->handler = [=](Strings ss) { *dest = ss.front(); };
+            flag->handler = [=](std::vector<std::string> ss) { *dest = ss[0]; };
             return *this;
         };
 
         template<class T>
-        FlagMaker & set(T * dest, const T & val) {
+        FlagMaker & set(T * dest, const T & val)
+        {
             flag->arity = 0;
-            flag->handler = [=](Strings ss) { *dest = val; };
+            flag->handler = [=](std::vector<std::string> ss) { *dest = val; };
             return *this;
         };
+
+        FlagMaker & mkHashTypeFlag(HashType * ht);
     };
 
     FlagMaker mkFlag();
 
     /* Helper functions for constructing flags / positional
        arguments. */
-
-    void mkFlag(char shortName, const std::string & longName,
-        const std::string & description, std::function<void()> fun)
-    {
-        mkFlag()
-            .shortName(shortName)
-            .longName(longName)
-            .description(description)
-            .handler(std::bind(fun));
-    }
 
     void mkFlag1(char shortName, const std::string & longName,
         const std::string & label, const std::string & description,
@@ -121,7 +122,7 @@ public:
             .labels({label})
             .description(description)
             .arity(1)
-            .handler([=](Strings ss) { fun(ss.front()); });
+            .handler([=](std::vector<std::string> ss) { fun(ss[0]); });
     }
 
     void mkFlag(char shortName, const std::string & name,
@@ -129,17 +130,6 @@ public:
     {
         mkFlag(shortName, name, description, dest, true);
     }
-
-    void mkFlag(char shortName, const std::string & longName,
-        const std::string & label, const std::string & description,
-        string * dest)
-    {
-        mkFlag1(shortName, longName, label, description, [=](std::string s) {
-            *dest = s;
-        });
-    }
-
-    void mkHashTypeFlag(const std::string & name, HashType * ht);
 
     template<class T>
     void mkFlag(char shortName, const std::string & longName, const std::string & description,
@@ -149,7 +139,7 @@ public:
             .shortName(shortName)
             .longName(longName)
             .description(description)
-            .handler([=](Strings ss) { *dest = value; });
+            .handler([=](std::vector<std::string> ss) { *dest = value; });
     }
 
     template<class I>
@@ -171,10 +161,10 @@ public:
             .labels({"N"})
             .description(description)
             .arity(1)
-            .handler([=](Strings ss) {
+            .handler([=](std::vector<std::string> ss) {
                 I n;
-                if (!string2Int(ss.front(), n))
-                    throw UsageError(format("flag '--%1%' requires a integer argument") % longName);
+                if (!string2Int(ss[0], n))
+                    throw UsageError("flag '--%s' requires a integer argument", longName);
                 fun(n);
             });
     }
@@ -182,16 +172,16 @@ public:
     /* Expect a string argument. */
     void expectArg(const std::string & label, string * dest, bool optional = false)
     {
-        expectedArgs.push_back(ExpectedArg{label, 1, optional, [=](Strings ss) {
-            *dest = ss.front();
+        expectedArgs.push_back(ExpectedArg{label, 1, optional, [=](std::vector<std::string> ss) {
+            *dest = ss[0];
         }});
     }
 
     /* Expect 0 or more arguments. */
-    void expectArgs(const std::string & label, Strings * dest)
+    void expectArgs(const std::string & label, std::vector<std::string> * dest)
     {
-        expectedArgs.push_back(ExpectedArg{label, 0, false, [=](Strings ss) {
-            *dest = ss;
+        expectedArgs.push_back(ExpectedArg{label, 0, false, [=](std::vector<std::string> ss) {
+            *dest = std::move(ss);
         }});
     }
 

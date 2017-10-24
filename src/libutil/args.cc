@@ -100,7 +100,7 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
 
     auto process = [&](const std::string & name, const Flag & flag) -> bool {
         ++pos;
-        Strings args;
+        std::vector<std::string> args;
         for (size_t n = 0 ; n < flag.arity; ++n) {
             if (pos == end) {
                 if (flag.arity == ArityAny) break;
@@ -109,7 +109,7 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
             }
             args.push_back(*pos++);
         }
-        flag.handler(args);
+        flag.handler(std::move(args));
         return true;
     };
 
@@ -144,7 +144,9 @@ bool Args::processArgs(const Strings & args, bool finish)
     if ((exp.arity == 0 && finish) ||
         (exp.arity > 0 && args.size() == exp.arity))
     {
-        exp.handler(args);
+        std::vector<std::string> ss;
+        for (auto & s : args) ss.push_back(s);
+        exp.handler(std::move(ss));
         expectedArgs.pop_front();
         res = true;
     }
@@ -155,13 +157,17 @@ bool Args::processArgs(const Strings & args, bool finish)
     return res;
 }
 
-void Args::mkHashTypeFlag(const std::string & name, HashType * ht)
+Args::FlagMaker & Args::FlagMaker::mkHashTypeFlag(HashType * ht)
 {
-    mkFlag1(0, name, "TYPE", "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512')", [=](std::string s) {
+    arity(1);
+    label("type");
+    description("hash algorithm ('md5', 'sha1', 'sha256', or 'sha512')");
+    handler([ht](std::string s) {
         *ht = parseHashType(s);
         if (*ht == htUnknown)
-            throw UsageError(format("unknown hash type '%1%'") % s);
+            throw UsageError("unknown hash type '%1%'", s);
     });
+    return *this;
 }
 
 Strings argvToStrings(int argc, char * * argv)

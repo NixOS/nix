@@ -19,8 +19,16 @@ struct CmdCopy : StorePathsCommand
     CmdCopy()
         : StorePathsCommand(true)
     {
-        mkFlag(0, "from", "store-uri", "URI of the source Nix store", &srcUri);
-        mkFlag(0, "to", "store-uri", "URI of the destination Nix store", &dstUri);
+        mkFlag()
+            .longName("from")
+            .labels({"store-uri"})
+            .description("URI of the source Nix store")
+            .dest(&srcUri);
+        mkFlag()
+            .longName("to")
+            .labels({"store-uri"})
+            .description("URI of the destination Nix store")
+            .dest(&dstUri);
 
         mkFlag()
             .longName("no-check-sigs")

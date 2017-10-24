@@ -20,19 +20,29 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
     NixArgs() : MultiCommand(*RegisterCommand::commands), MixCommonArgs("nix")
     {
-        mkFlag('h', "help", "show usage information", [&]() { showHelpAndExit(); });
+        mkFlag()
+            .longName("help")
+            .shortName('h')
+            .description("show usage information")
+            .handler([&]() { showHelpAndExit(); });
 
-        mkFlag(0, "help-config", "show configuration options", [=]() {
-            std::cout << "The following configuration options are available:\n\n";
-            Table2 tbl;
-            for (const auto & s : settings._getSettings())
-                if (!s.second.isAlias)
-                    tbl.emplace_back(s.first, s.second.setting->description);
-            printTable(std::cout, tbl);
-            throw Exit();
-        });
+        mkFlag()
+            .longName("help-config")
+            .description("show configuration options")
+            .handler([&]() {
+                std::cout << "The following configuration options are available:\n\n";
+                Table2 tbl;
+                for (const auto & s : settings._getSettings())
+                    if (!s.second.isAlias)
+                        tbl.emplace_back(s.first, s.second.setting->description);
+                printTable(std::cout, tbl);
+                throw Exit();
+            });
 
-        mkFlag(0, "version", "show version information", std::bind(printVersion, programName));
+        mkFlag()
+            .longName("version")
+            .description("show version information")
+            .handler([&]() { printVersion(programName); });
 
         std::string cat = "config";
         settings.convertToArgs(*this, cat);

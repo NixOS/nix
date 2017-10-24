@@ -7,7 +7,7 @@
 #include "eval.hh"
 #include "eval-inline.hh"
 #include "store-api.hh"
-#include "common-opts.hh"
+#include "common-eval-args.hh"
 #include "get-drvs.hh"
 #include "derivations.hh"
 #include "affinity.hh"
@@ -44,7 +44,7 @@ struct NixRepl
 
     NixRepl(const Strings & searchPath, nix::ref<Store> store);
     ~NixRepl();
-    void mainLoop(const Strings & files);
+    void mainLoop(const std::vector<std::string> & files);
     StringSet completePrefix(string prefix);
     bool getLine(string & input, const std::string &prompt);
     Path getDerivationPath(Value & v);
@@ -131,7 +131,7 @@ static void completionCallback(const char * s, linenoiseCompletions *lc)
 }
 
 
-void NixRepl::mainLoop(const Strings & files)
+void NixRepl::mainLoop(const std::vector<std::string> & files)
 {
     string error = ANSI_RED "error:" ANSI_NORMAL " ";
     std::cout << "Welcome to Nix version " << nixVersion << ". Type :? for help." << std::endl << std::endl;
@@ -664,9 +664,9 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     return str;
 }
 
-struct CmdRepl : StoreCommand
+struct CmdRepl : StoreCommand, MixEvalArgs
 {
-    Strings files;
+    std::vector<std::string> files;
 
     CmdRepl()
     {
@@ -682,8 +682,7 @@ struct CmdRepl : StoreCommand
 
     void run(ref<Store> store) override
     {
-        // FIXME: pass searchPath
-        NixRepl repl({}, openStore());
+        NixRepl repl(searchPath, openStore());
         repl.mainLoop(files);
     }
 };

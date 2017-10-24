@@ -12,14 +12,16 @@ struct CmdHash : Command
     Base base = Base16;
     bool truncate = false;
     HashType ht = htSHA512;
-    Strings paths;
+    std::vector<std::string> paths;
 
     CmdHash(Mode mode) : mode(mode)
     {
         mkFlag(0, "base64", "print hash in base-64", &base, Base64);
         mkFlag(0, "base32", "print hash in base-32 (Nix-specific)", &base, Base32);
         mkFlag(0, "base16", "print hash in base-16", &base, Base16);
-        mkHashTypeFlag("type", &ht);
+        mkFlag()
+            .longName("type")
+            .mkHashTypeFlag(&ht);
         expectArgs("paths", &paths);
     }
 
@@ -53,11 +55,13 @@ struct CmdToBase : Command
 {
     Base base;
     HashType ht = htSHA512;
-    Strings args;
+    std::vector<std::string> args;
 
     CmdToBase(Base base) : base(base)
     {
-        mkHashTypeFlag("type", &ht);
+        mkFlag()
+            .longName("type")
+            .mkHashTypeFlag(&ht);
         expectArgs("strings", &args);
     }
 
@@ -95,7 +99,7 @@ static int compatNixHash(int argc, char * * argv)
     bool base32 = false;
     bool truncate = false;
     enum { opHash, opTo32, opTo16 } op = opHash;
-    Strings ss;
+    std::vector<std::string> ss;
 
     parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
         if (*arg == "--help")

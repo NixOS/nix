@@ -25,7 +25,7 @@ struct CmdVerify : StorePathsCommand
             .labels({"store-uri"})
             .description("use signatures from specified store")
             .arity(1)
-            .handler([&](Strings ss) { substituterUris.push_back(ss.front()); });
+            .handler([&](std::vector<std::string> ss) { substituterUris.push_back(ss[0]); });
         mkIntFlag('n', "sigs-needed", "require that each path has at least N valid signatures", &sigsNeeded);
     }
 

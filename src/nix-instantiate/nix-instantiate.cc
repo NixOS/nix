@@ -8,7 +8,7 @@
 #include "value-to-json.hh"
 #include "util.hh"
 #include "store-api.hh"
-#include "common-opts.hh"
+#include "common-eval-args.hh"
 
 #include <map>
 #include <iostream>
@@ -89,7 +89,7 @@ int main(int argc, char * * argv)
         initNix();
         initGC();
 
-        Strings files, searchPath;
+        Strings files;
         bool readStdin = false;
         bool fromArgs = false;
         bool findFile = false;
@@ -100,10 +100,14 @@ int main(int argc, char * * argv)
         bool strict = false;
         Strings attrPaths;
         bool wantsReadWrite = false;
-        std::map<string, string> autoArgs_;
         RepairFlag repair = NoRepair;
 
-        parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
+        struct MyArgs : LegacyArgs, MixEvalArgs
+        {
+            using LegacyArgs::LegacyArgs;
+        };
+
+        MyArgs myArgs(baseNameOf(argv[0]), [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--help")
                 showManPage("nix-instantiate");
             else if (*arg == "--version")
@@ -122,10 +126,6 @@ int main(int argc, char * * argv)
                 findFile = true;
             else if (*arg == "--attr" || *arg == "-A")
                 attrPaths.push_back(getArg(*arg, arg, end));
-            else if (parseAutoArgs(arg, end, autoArgs_))
-                ;
-            else if (parseSearchPathArg(arg, end, searchPath))
-                ;
             else if (*arg == "--add-root")
                 gcRoot = getArg(*arg, arg, end);
             else if (*arg == "--indirect")
@@ -149,15 +149,17 @@ int main(int argc, char * * argv)
             return true;
         });
 
+        myArgs.parseCmdline(argvToStrings(argc, argv));
+
         if (evalOnly && !wantsReadWrite)
             settings.readOnlyMode = true;
 
         auto store = openStore();
 
-        EvalState state(searchPath, store);
+        EvalState state(myArgs.searchPath, store);
         state.repair = repair;
 
-        Bindings & autoArgs(*evalAutoArgs(state, autoArgs_));
+        Bindings & autoArgs = *myArgs.getAutoArgs(state);
 
         if (attrPaths.empty()) attrPaths = {""};
 

@@ -19,7 +19,7 @@ struct CmdCopySigs : StorePathsCommand
             .labels({"store-uri"})
             .description("use signatures from specified store")
             .arity(1)
-            .handler([&](Strings ss) { substituterUris.push_back(ss.front()); });
+            .handler([&](std::vector<std::string> ss) { substituterUris.push_back(ss[0]); });
     }
 
     std::string name() override
@@ -101,7 +101,12 @@ struct CmdSignPaths : StorePathsCommand
 
     CmdSignPaths()
     {
-        mkFlag('k', "key-file", {"file"}, "file containing the secret signing key", &secretKeyFile);
+        mkFlag()
+            .shortName('k')
+            .longName("key-file")
+            .label("file")
+            .description("file containing the secret signing key")
+            .dest(&secretKeyFile);
     }
 
     std::string name() override

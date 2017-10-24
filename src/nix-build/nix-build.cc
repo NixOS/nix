@@ -14,7 +14,7 @@
 #include "eval.hh"
 #include "eval-inline.hh"
 #include "get-drvs.hh"
-#include "common-opts.hh"
+#include "common-eval-args.hh"
 #include "attr-path.hh"
 
 using namespace nix;
@@ -80,8 +80,6 @@ void mainWrapped(int argc, char * * argv)
     auto interactive = isatty(STDIN_FILENO) && isatty(STDERR_FILENO);
     Strings attrPaths;
     Strings left;
-    Strings searchPath;
-    std::map<string, string> autoArgs_;
     RepairFlag repair = NoRepair;
     Path gcRoot;
     BuildMode buildMode = bmNormal;
@@ -129,7 +127,12 @@ void mainWrapped(int argc, char * * argv)
         } catch (SysError &) { }
     }
 
-    parseCmdLine(myName, args, [&](Strings::iterator & arg, const Strings::iterator & end) {
+    struct MyArgs : LegacyArgs, MixEvalArgs
+    {
+        using LegacyArgs::LegacyArgs;
+    };
+
+    MyArgs myArgs(myName, [&](Strings::iterator & arg, const Strings::iterator & end) {
         if (*arg == "--help") {
             deletePath(tmpDir);
             showManPage(myName);
@@ -152,12 +155,6 @@ void mainWrapped(int argc, char * * argv)
 
         else if (*arg == "--out-link" || *arg == "-o")
             outLink = getArg(*arg, arg, end);
-
-        else if (parseAutoArgs(arg, end, autoArgs_))
-            ;
-
-        else if (parseSearchPathArg(arg, end, searchPath))
-            ;
 
         else if (*arg == "--add-root")
             gcRoot = getArg(*arg, arg, end);
@@ -237,15 +234,17 @@ void mainWrapped(int argc, char * * argv)
         return true;
     });
 
+    myArgs.parseCmdline(args);
+
     if (packages && fromArgs)
         throw UsageError("'-p' and '-E' are mutually exclusive");
 
     auto store = openStore();
 
-    EvalState state(searchPath, store);
+    EvalState state(myArgs.searchPath, store);
     state.repair = repair;
 
-    Bindings & autoArgs(*evalAutoArgs(state, autoArgs_));
+    Bindings & autoArgs = *myArgs.getAutoArgs(state);
 
     if (packages) {
         std::ostringstream joined;

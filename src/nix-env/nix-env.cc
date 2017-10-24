@@ -1,5 +1,5 @@
 #include "attr-path.hh"
-#include "common-opts.hh"
+#include "common-eval-args.hh"
 #include "derivations.hh"
 #include "eval.hh"
 #include "get-drvs.hh"
@@ -1309,8 +1309,7 @@ int main(int argc, char * * argv)
         initNix();
         initGC();
 
-        Strings opFlags, opArgs, searchPath;
-        std::map<string, string> autoArgs_;
+        Strings opFlags, opArgs;
         Operation op = 0;
         RepairFlag repair = NoRepair;
         string file;
@@ -1326,7 +1325,12 @@ int main(int argc, char * * argv)
         globals.removeAll = false;
         globals.prebuiltOnly = false;
 
-        parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
+        struct MyArgs : LegacyArgs, MixEvalArgs
+        {
+            using LegacyArgs::LegacyArgs;
+        };
+
+        MyArgs myArgs(baseNameOf(argv[0]), [&](Strings::iterator & arg, const Strings::iterator & end) {
             Operation oldOp = op;
 
             if (*arg == "--help")
@@ -1335,10 +1339,6 @@ int main(int argc, char * * argv)
                 op = opVersion;
             else if (*arg == "--install" || *arg == "-i")
                 op = opInstall;
-            else if (parseAutoArgs(arg, end, autoArgs_))
-                ;
-            else if (parseSearchPathArg(arg, end, searchPath))
-                ;
             else if (*arg == "--force-name") // undocumented flag for nix-install-package
                 globals.forceName = getArg(*arg, arg, end);
             else if (*arg == "--uninstall" || *arg == "-e")
@@ -1391,17 +1391,19 @@ int main(int argc, char * * argv)
             return true;
         });
 
+        myArgs.parseCmdline(argvToStrings(argc, argv));
+
         if (!op) throw UsageError("no operation specified");
 
         auto store = openStore();
 
-        globals.state = std::shared_ptr<EvalState>(new EvalState(searchPath, store));
+        globals.state = std::shared_ptr<EvalState>(new EvalState(myArgs.searchPath, store));
         globals.state->repair = repair;
 
         if (file != "")
             globals.instSource.nixExprPath = lookupFileArg(*globals.state, file);
 
-        globals.instSource.autoArgs = evalAutoArgs(*globals.state, autoArgs_);
+        globals.instSource.autoArgs = myArgs.getAutoArgs(*globals.state);
 
         if (globals.profile == "")
             globals.profile = getEnv("NIX_PROFILE", "");
