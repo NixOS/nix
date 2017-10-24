@@ -198,6 +198,12 @@ LegacyArgs::LegacyArgs(const std::string & programName,
 
     mkFlag(0, "no-gc-warning", "disable warning about not using '--add-root'",
         &gcWarning, false);
+
+    mkFlag()
+        .longName("store")
+        .label("store-uri")
+        .description("URI of the Nix store to use")
+        .dest(&(std::string&) settings.storeUri);
 }
 
 
