@@ -42,6 +42,8 @@ int main (int argc, char * * argv)
     return handleExceptions(argv[0], [&]() {
         initNix();
 
+        logger = makeJSONLogger(*logger);
+
         /* Ensure we don't get any SSH passphrase or host key popups. */
         unsetenv("DISPLAY");
         unsetenv("SSH_ASKPASS");
@@ -172,6 +174,8 @@ int main (int argc, char * * argv)
 
                 try {
 
+                    Activity act(*logger, lvlTalkative, actUnknown, fmt("connecting to '%s'", bestMachine->storeUri));
+
                     Store::Params storeParams{{"max-connections", "1"}, {"log-fd", "4"}};
                     if (bestMachine->sshKey != "")
                         storeParams["ssh-key"] = bestMachine->sshKey;
@@ -197,21 +201,25 @@ connected:
         auto inputs = readStrings<PathSet>(source);
         auto outputs = readStrings<PathSet>(source);
 
-        AutoCloseFD uploadLock = openLockFile(currentLoad + "/" + escapeUri(storeUri) + ".upload-lock", true);
+        {
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("waiting for the upload lock to '%s'", storeUri));
 
-        auto old = signal(SIGALRM, handleAlarm);
-        alarm(15 * 60);
-        if (!lockFile(uploadLock.get(), ltWrite, true))
-            printError("somebody is hogging the upload lock for '%s', continuing...");
-        alarm(0);
-        signal(SIGALRM, old);
-        copyPaths(store, ref<Store>(sshStore), inputs, NoRepair, NoCheckSigs);
-        uploadLock = -1;
+            AutoCloseFD uploadLock = openLockFile(currentLoad + "/" + escapeUri(storeUri) + ".upload-lock", true);
+
+            auto old = signal(SIGALRM, handleAlarm);
+            alarm(15 * 60);
+            if (!lockFile(uploadLock.get(), ltWrite, true))
+                printError("somebody is hogging the upload lock for '%s', continuing...");
+            alarm(0);
+            signal(SIGALRM, old);
+            copyPaths(store, ref<Store>(sshStore), inputs, NoRepair, NoCheckSigs);
+            uploadLock = -1;
+        }
 
         BasicDerivation drv(readDerivation(drvPath));
         drv.inputSrcs = inputs;
 
-        printError("building '%s' on '%s'", drvPath, storeUri);
+        printInfo("building '%s' on '%s'", drvPath, storeUri);
         auto result = sshStore->buildDerivation(drvPath, drv);
 
         if (!result.success())
