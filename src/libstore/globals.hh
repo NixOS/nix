@@ -138,12 +138,8 @@ public:
     PathSetting buildHook{this, true, nixLibexecDir + "/nix/build-remote", "build-hook",
         "The path of the helper program that executes builds to remote machines."};
 
-    Setting<std::string> builders{this, "", "builders",
+    Setting<std::string> builders{this, "@" + nixConfDir + "/machines", "builders",
         "A semicolon-separated list of build machines, in the format of nix.machines."};
-
-    Setting<Strings> builderFiles{this,
-        {nixConfDir + "/machines"}, "builder-files",
-        "A list of files specifying build machines."};
 
     Setting<off_t> reservedSize{this, 8 * 1024 * 1024, "gc-reserved-space",
         "Amount of reserved disk space for the garbage collector."};

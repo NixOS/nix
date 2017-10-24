@@ -47,9 +47,22 @@ bool Machine::mandatoryMet(const std::set<string> & features) const {
 void parseMachines(const std::string & s, Machines & machines)
 {
     for (auto line : tokenizeString<std::vector<string>>(s, "\n;")) {
-        chomp(line);
+        trim(line);
         line.erase(std::find(line.begin(), line.end(), '#'), line.end());
         if (line.empty()) continue;
+
+        if (line[0] == '@') {
+            auto file = trim(std::string(line, 1));
+            try {
+                parseMachines(readFile(file), machines);
+            } catch (const SysError & e) {
+                if (e.errNo != ENOENT)
+                    throw;
+                debug("cannot find machines file '%s'", file);
+            }
+            continue;
+        }
+
         auto tokens = tokenizeString<std::vector<string>>(line);
         auto sz = tokens.size();
         if (sz < 1)
@@ -73,15 +86,6 @@ void parseMachines(const std::string & s, Machines & machines)
 Machines getMachines()
 {
     Machines machines;
-
-    for (auto & file : settings.builderFiles.get()) {
-        try {
-            parseMachines(readFile(file), machines);
-        } catch (const SysError & e) {
-            if (e.errNo != ENOENT)
-                throw;
-        }
-    }
 
     parseMachines(settings.builders, machines);
 

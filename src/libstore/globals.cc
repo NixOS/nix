@@ -53,7 +53,12 @@ Settings::Settings()
 
     /* Backwards compatibility. */
     auto s = getEnv("NIX_REMOTE_SYSTEMS");
-    if (s != "") builderFiles = tokenizeString<Strings>(s, ":");
+    if (s != "") {
+        Strings ss;
+        for (auto & p : tokenizeString<Strings>(s, ":"))
+            ss.push_back("@" + p);
+        builders = concatStringsSep(" ", ss);
+    }
 
 #if defined(__linux__) && defined(SANDBOX_SHELL)
     sandboxPaths = tokenizeString<StringSet>("/bin/sh=" SANDBOX_SHELL);
