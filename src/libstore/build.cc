@@ -1402,9 +1402,15 @@ void DerivationGoal::tryToBuild()
     bool buildLocally = buildMode != bmNormal || drv->willBuildLocally();
 
     auto started = [&]() {
-        act = std::make_unique<Activity>(*logger, lvlInfo, actBuild,
-            hook ? fmt("building '%s' on '%s'", drvPath, machineName) : fmt("building '%s'", drvPath),
-            Logger::Fields{drvPath, hook ? machineName : ""});
+        auto msg = fmt(
+            buildMode == bmRepair ? "repairing outputs of '%s'" :
+            buildMode == bmCheck ? "checking outputs of '%s'" :
+            nrRounds > 1 ? "building '%s' (round %d/%d)" :
+            "building '%s'", drvPath, curRound, nrRounds);
+        fmt("building '%s'", drvPath);
+        if (hook) msg += fmt(" on '%s'", machineName);
+        act = std::make_unique<Activity>(*logger, lvlInfo, actBuild, msg,
+            Logger::Fields{drvPath, hook ? machineName : "", curRound, nrRounds});
         mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
         worker.updateProgress();
     };
@@ -1738,14 +1744,6 @@ int childEntry(void * arg)
 
 void DerivationGoal::startBuilder()
 {
-    auto f = format(
-        buildMode == bmRepair ? "repairing path(s) %1%" :
-        buildMode == bmCheck ? "checking path(s) %1%" :
-        nrRounds > 1 ? "building path(s) %1% (round %2%/%3%)" :
-        "building path(s) %1%");
-    f.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
-    printInfo(f % showPaths(missingPaths) % curRound % nrRounds);
-
     /* Right platform? */
     if (!drv->canBuildLocally()) {
         throw Error(
@@ -3600,8 +3598,6 @@ void SubstitutionGoal::tryToRun()
         worker.waitForBuildSlot(shared_from_this());
         return;
     }
-
-    printInfo(format("fetching path '%1%'...") % storePath);
 
     maintainRunningSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.runningSubstitutions);
     worker.updateProgress();

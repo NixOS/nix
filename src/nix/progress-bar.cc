@@ -159,6 +159,10 @@ public:
             auto machineName = getS(fields, 1);
             if (machineName != "")
                 i->s += fmt(" on " ANSI_BOLD "%s" ANSI_NORMAL, machineName);
+            auto curRound = getI(fields, 2);
+            auto nrRounds = getI(fields, 3);
+            if (nrRounds != 1)
+                i->s += fmt(" (round %d/%d)", curRound, nrRounds);
         }
 
         if (type == actSubstitute) {
