@@ -565,8 +565,16 @@ void Store::buildPaths(const PathSet & paths, BuildMode buildMode)
 void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     const Path & storePath, RepairFlag repair, CheckSigsFlag checkSigs)
 {
-    Activity act(*logger, lvlInfo, actCopyPath, fmt("copying path '%s'", storePath),
-        {storePath, srcStore->getUri(), dstStore->getUri()});
+    auto srcUri = srcStore->getUri();
+    auto dstUri = dstStore->getUri();
+
+    Activity act(*logger, lvlInfo, actCopyPath,
+        srcUri == "local"
+          ? fmt("copying path '%s' to '%s'", storePath, dstUri)
+          : dstUri == "local"
+            ? fmt("copying path '%s' from '%s'", storePath, srcUri)
+            : fmt("copying path '%s' from '%s' to '%s'", storePath, srcUri, dstUri),
+        {storePath, srcUri, dstUri});
     PushActivity pact(act.id);
 
     auto info = srcStore->queryPathInfo(storePath);

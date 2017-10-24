@@ -133,7 +133,8 @@ Logger * makeDefaultLogger();
 Logger * makeJSONLogger(Logger & prevLogger);
 
 bool handleJSONLogMessage(const std::string & msg,
-    const Activity & act, std::map<ActivityId, Activity> & activities);
+    const Activity & act, std::map<ActivityId, Activity> & activities,
+    bool trusted);
 
 extern Verbosity verbosity; /* suppress msgs > this */
 

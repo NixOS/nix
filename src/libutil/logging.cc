@@ -176,7 +176,7 @@ static Logger::Fields getFields(nlohmann::json & json)
 }
 
 bool handleJSONLogMessage(const std::string & msg,
-    const Activity & act, std::map<ActivityId, Activity> & activities)
+    const Activity & act, std::map<ActivityId, Activity> & activities, bool trusted)
 {
     if (!hasPrefix(msg, "@nix ")) return false;
 
@@ -187,7 +187,7 @@ bool handleJSONLogMessage(const std::string & msg,
 
         if (action == "start") {
             auto type = (ActivityType) json["type"];
-            if (type == actDownload || type == actUnknown)
+            if (trusted || type == actDownload)
                 activities.emplace(std::piecewise_construct,
                     std::forward_as_tuple(json["id"]),
                     std::forward_as_tuple(*logger, (Verbosity) json["level"], type,

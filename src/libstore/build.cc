@@ -1403,7 +1403,7 @@ void DerivationGoal::tryToBuild()
 
     auto started = [&]() {
         act = std::make_unique<Activity>(*logger, lvlInfo, actBuild,
-            fmt("building '%s'", drvPath),
+            hook ? fmt("building '%s' on '%s'", drvPath, machineName) : fmt("building '%s'", drvPath),
             Logger::Fields{drvPath, hook ? machineName : ""});
         mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
         worker.updateProgress();
@@ -1659,7 +1659,7 @@ HookReply DerivationGoal::tryBuildHook()
         string reply;
         while (true) {
             string s = readLine(worker.hook->fromHook.readSide.get());
-            if (handleJSONLogMessage(s, worker.act, worker.hook->activities))
+            if (handleJSONLogMessage(s, worker.act, worker.hook->activities, true))
                 ;
             else if (string(s, 0, 2) == "# ") {
                 reply = string(s, 2);
@@ -3270,7 +3270,7 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
     if (hook && fd == hook->fromHook.readSide.get()) {
         for (auto c : data)
             if (c == '\n') {
-                handleJSONLogMessage(currentHookLine, worker.act, hook->activities);
+                handleJSONLogMessage(currentHookLine, worker.act, hook->activities, true);
                 currentHookLine.clear();
             } else
                 currentHookLine += c;
@@ -3287,7 +3287,7 @@ void DerivationGoal::handleEOF(int fd)
 
 void DerivationGoal::flushLine()
 {
-    if (handleJSONLogMessage(currentLogLine, *act, builderActivities))
+    if (handleJSONLogMessage(currentLogLine, *act, builderActivities, false))
         ;
 
     else {

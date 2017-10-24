@@ -201,10 +201,10 @@ connected:
         auto inputs = readStrings<PathSet>(source);
         auto outputs = readStrings<PathSet>(source);
 
+        AutoCloseFD uploadLock = openLockFile(currentLoad + "/" + escapeUri(storeUri) + ".upload-lock", true);
+
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("waiting for the upload lock to '%s'", storeUri));
-
-            AutoCloseFD uploadLock = openLockFile(currentLoad + "/" + escapeUri(storeUri) + ".upload-lock", true);
 
             auto old = signal(SIGALRM, handleAlarm);
             alarm(15 * 60);
@@ -212,14 +212,18 @@ connected:
                 printError("somebody is hogging the upload lock for '%s', continuing...");
             alarm(0);
             signal(SIGALRM, old);
-            copyPaths(store, ref<Store>(sshStore), inputs, NoRepair, NoCheckSigs);
-            uploadLock = -1;
         }
+
+        {
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("copying dependencies to '%s'", storeUri));
+            copyPaths(store, ref<Store>(sshStore), inputs, NoRepair, NoCheckSigs);
+        }
+
+        uploadLock = -1;
 
         BasicDerivation drv(readDerivation(store->realStoreDir + "/" + baseNameOf(drvPath)));
         drv.inputSrcs = inputs;
 
-        printInfo("building '%s' on '%s'", drvPath, storeUri);
         auto result = sshStore->buildDerivation(drvPath, drv);
 
         if (!result.success())
@@ -230,6 +234,7 @@ connected:
             if (!store->isValidPath(path)) missing.insert(path);
 
         if (!missing.empty()) {
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("copying outputs from '%s'", storeUri));
             setenv("NIX_HELD_LOCKS", concatStringsSep(" ", missing).c_str(), 1); /* FIXME: ugly */
             copyPaths(ref<Store>(sshStore), store, missing, NoRepair, NoCheckSigs);
         }
