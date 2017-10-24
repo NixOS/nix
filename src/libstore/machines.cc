@@ -17,7 +17,11 @@ Machine::Machine(decltype(storeUri) storeUri,
     storeUri(
         // Backwards compatibility: if the URI is a hostname,
         // prepend ssh://.
-        storeUri.find("://") != std::string::npos || hasPrefix(storeUri, "local") || hasPrefix(storeUri, "remote") || hasPrefix(storeUri, "auto")
+        storeUri.find("://") != std::string::npos
+        || hasPrefix(storeUri, "local")
+        || hasPrefix(storeUri, "remote")
+        || hasPrefix(storeUri, "auto")
+        || hasPrefix(storeUri, "/")
         ? storeUri
         : "ssh://" + storeUri),
     systemTypes(systemTypes),

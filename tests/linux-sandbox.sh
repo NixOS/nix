@@ -14,7 +14,7 @@ chmod -R u+w $TEST_ROOT/store0 || true
 rm -rf $TEST_ROOT/store0
 
 export NIX_STORE_DIR=/my/store
-export NIX_REMOTE="local?root=$TEST_ROOT/store0"
+export NIX_REMOTE=$TEST_ROOT/store0
 
 outPath=$(nix-build dependencies.nix --no-out-link --option sandbox-paths /nix/store)
 

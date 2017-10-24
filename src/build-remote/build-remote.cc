@@ -176,9 +176,13 @@ int main (int argc, char * * argv)
 
                     Activity act(*logger, lvlTalkative, actUnknown, fmt("connecting to '%s'", bestMachine->storeUri));
 
-                    Store::Params storeParams{{"max-connections", "1"}, {"log-fd", "4"}};
-                    if (bestMachine->sshKey != "")
-                        storeParams["ssh-key"] = bestMachine->sshKey;
+                    Store::Params storeParams;
+                    if (hasPrefix(storeUri, "ssh://")) {
+                        storeParams["max-connections"] ="1";
+                        storeParams["log-fd"] = "4";
+                        if (bestMachine->sshKey != "")
+                            storeParams["ssh-key"] = bestMachine->sshKey;
+                    }
 
                     sshStore = openStore(bestMachine->storeUri, storeParams);
                     sshStore->connect();
