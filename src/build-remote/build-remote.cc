@@ -196,7 +196,7 @@ int main (int argc, char * * argv)
         }
 
 connected:
-        std::cerr << "# accept\n";
+        std::cerr << "# accept\n" << storeUri << "\n";
 
         auto inputs = readStrings<PathSet>(source);
         auto outputs = readStrings<PathSet>(source);

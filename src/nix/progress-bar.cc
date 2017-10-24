@@ -156,6 +156,9 @@ public:
             if (hasSuffix(name, ".drv"))
                 name.resize(name.size() - 4);
             i->s = fmt("building " ANSI_BOLD "%s" ANSI_NORMAL, name);
+            auto machineName = getS(fields, 1);
+            if (machineName != "")
+                i->s += fmt(" on " ANSI_BOLD "%s" ANSI_NORMAL, machineName);
         }
 
         if (type == actSubstitute) {

@@ -852,6 +852,9 @@ private:
 
     std::map<ActivityId, Activity> builderActivities;
 
+    /* The remote machine on which we're building. */
+    std::string machineName;
+
 public:
     DerivationGoal(const Path & drvPath, const StringSet & wantedOutputs,
         Worker & worker, BuildMode buildMode = bmNormal);
@@ -1400,7 +1403,8 @@ void DerivationGoal::tryToBuild()
 
     auto started = [&]() {
         act = std::make_unique<Activity>(*logger, lvlInfo, actBuild,
-            fmt("building '%s'", drvPath), Logger::Fields{drvPath});
+            fmt("building '%s'", drvPath),
+            Logger::Fields{drvPath, hook ? machineName : ""});
         mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
         worker.updateProgress();
     };
@@ -1691,9 +1695,9 @@ HookReply DerivationGoal::tryBuildHook()
             throw;
     }
 
-    printMsg(lvlTalkative, format("using hook to build path(s) %1%") % showPaths(missingPaths));
-
     hook = std::move(worker.hook);
+
+    machineName = readLine(hook->fromHook.readSide.get());
 
     /* Tell the hook all the inputs that have to be copied to the
        remote system. */
