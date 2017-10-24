@@ -216,7 +216,7 @@ connected:
             uploadLock = -1;
         }
 
-        BasicDerivation drv(readDerivation(drvPath));
+        BasicDerivation drv(readDerivation(store->realStoreDir + "/" + baseNameOf(drvPath)));
         drv.inputSrcs = inputs;
 
         printInfo("building '%s' on '%s'", drvPath, storeUri);
