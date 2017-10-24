@@ -509,7 +509,7 @@ static void performOp(TunnelLogger * logger, ref<LocalStore> store,
         verbosity = (Verbosity) readInt(from);
         settings.maxBuildJobs.assign(readInt(from));
         settings.maxSilentTime = readInt(from);
-        settings.useBuildHook = readInt(from) != 0;
+        readInt(from); // obsolete useBuildHook
         settings.verboseBuild = lvlError == (Verbosity) readInt(from);
         readInt(from); // obsolete logType
         readInt(from); // obsolete printBuildTrace

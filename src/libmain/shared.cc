@@ -188,9 +188,6 @@ struct LegacyArgs : public MixCommonArgs
         mkFlag(0, "readonly-mode", "do not write to the Nix store",
             &settings.readOnlyMode);
 
-        mkFlag(0, "no-build-hook", "disable use of the build hook mechanism",
-            &(bool&) settings.useBuildHook, false);
-
         mkFlag(0, "show-trace", "show Nix expression stack trace in evaluation errors",
             &settings.showTrace);
 

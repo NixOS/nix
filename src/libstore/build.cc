@@ -274,6 +274,10 @@ public:
     uint64_t expectedNarSize = 0;
     uint64_t doneNarSize = 0;
 
+    /* Whether to ask the build hook if it can build a derivation. If
+       it answers with "decline-permanently", we don't try again. */
+    bool tryBuildHook = true;
+
     Worker(LocalStore & store);
     ~Worker();
 
@@ -1622,7 +1626,7 @@ void DerivationGoal::buildDone()
 
 HookReply DerivationGoal::tryBuildHook()
 {
-    if (!settings.useBuildHook || !useDerivation) return rpDecline;
+    if (!worker.tryBuildHook || !useDerivation) return rpDecline;
 
     if (!worker.hook)
         worker.hook = std::make_unique<HookInstance>();
@@ -1662,7 +1666,7 @@ HookReply DerivationGoal::tryBuildHook()
         if (reply == "decline")
             return rpDecline;
         else if (reply == "decline-permanently") {
-            settings.useBuildHook = false;
+            worker.tryBuildHook = false;
             worker.hook = 0;
             return rpDecline;
         }

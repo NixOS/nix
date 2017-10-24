@@ -166,7 +166,7 @@ void RemoteStore::setOptions(Connection & conn)
        << verbosity
        << settings.maxBuildJobs
        << settings.maxSilentTime
-       << settings.useBuildHook
+       << true
        << (settings.verboseBuild ? lvlError : lvlVomit)
        << 0 // obsolete log type
        << 0 /* obsolete print build trace */

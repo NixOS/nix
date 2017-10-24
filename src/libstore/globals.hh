@@ -132,9 +132,6 @@ public:
         "The maximum duration in seconds that a builder can run. "
         "0 means infinity.", {"build-timeout"}};
 
-    Setting<bool> useBuildHook{this, true, "remote-builds",
-        "Whether to use build hooks (for distributed builds)."};
-
     PathSetting buildHook{this, true, nixLibexecDir + "/nix/build-remote", "build-hook",
         "The path of the helper program that executes builds to remote machines."};
 
