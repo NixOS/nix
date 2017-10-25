@@ -389,8 +389,9 @@ PathSet Store::queryValidPaths(const PathSet & paths, SubstituteFlag maybeSubsti
     Sync<State> state_(State{paths.size(), PathSet()});
 
     std::condition_variable wakeup;
+    ThreadPool pool;
 
-    for (auto & path : paths)
+    auto doQuery = [&](const Path & path ) {
         queryPathInfo(path,
             [path, &state_, &wakeup](ref<ValidPathInfo> info) {
                 auto state(state_.lock());
@@ -411,6 +412,12 @@ PathSet Store::queryValidPaths(const PathSet & paths, SubstituteFlag maybeSubsti
                 if (!--state->left)
                     wakeup.notify_one();
             });
+    };
+
+    for (auto & path : paths)
+        pool.enqueue(std::bind(doQuery, path));
+
+    pool.process();
 
     while (true) {
         auto state(state_.lock());
