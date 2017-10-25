@@ -392,6 +392,7 @@ PathSet Store::queryValidPaths(const PathSet & paths, SubstituteFlag maybeSubsti
     ThreadPool pool;
 
     auto doQuery = [&](const Path & path ) {
+        checkInterrupt();
         queryPathInfo(path,
             [path, &state_, &wakeup](ref<ValidPathInfo> info) {
                 auto state(state_.lock());
