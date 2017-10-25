@@ -2400,10 +2400,10 @@ void DerivationGoal::writeStructuredAttrs()
             }
 
             if (value.is_null())
-                return "''";
+                return std::string("''");
 
             if (value.is_boolean())
-                return value.get<bool>() ? "1" : "";
+                return value.get<bool>() ? std::string("1") : std::string("");
 
             return {};
         };
