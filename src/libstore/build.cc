@@ -914,9 +914,6 @@ private:
     /* Make a file owned by the builder. */
     void chownToBuilder(const Path & path);
 
-    /* Handle the exportReferencesGraph attribute. */
-    void doExportReferencesGraph();
-
     /* Run the builder's process. */
     void runChild();
 
@@ -1745,6 +1742,37 @@ int childEntry(void * arg)
 }
 
 
+PathSet exportReferences(Store & store, Path storePath)
+{
+    /* Check that the store path is valid. */
+    if (!store.isInStore(storePath))
+        throw BuildError(format("'exportReferencesGraph' contains a non-store path '%1%'")
+            % storePath);
+    storePath = store.toStorePath(storePath);
+    if (!store.isValidPath(storePath))
+        throw BuildError(format("'exportReferencesGraph' contains an invalid path '%1%'")
+            % storePath);
+
+    /* If there are derivations in the graph, then include their
+       outputs as well.  This is useful if you want to do things
+       like passing all build-time dependencies of some path to a
+       derivation that builds a NixOS DVD image. */
+    PathSet paths, paths2;
+    store.computeFSClosure(storePath, paths);
+    paths2 = paths;
+
+    for (auto & j : paths2) {
+        if (isDerivation(j)) {
+            Derivation drv = store.derivationFromPath(j);
+            for (auto & k : drv.outputs)
+                store.computeFSClosure(k.second.path, paths);
+        }
+    }
+
+    return paths;
+}
+
+
 void DerivationGoal::startBuilder()
 {
     /* Right platform? */
@@ -1820,7 +1848,29 @@ void DerivationGoal::startBuilder()
     writeStructuredAttrs();
 
     /* Handle exportReferencesGraph(), if set. */
-    doExportReferencesGraph();
+    if (!drv->env.count("__json")) {
+        /* The `exportReferencesGraph' feature allows the references graph
+           to be passed to a builder.  This attribute should be a list of
+           pairs [name1 path1 name2 path2 ...].  The references graph of
+           each `pathN' will be stored in a text file `nameN' in the
+           temporary build directory.  The text files have the format used
+           by `nix-store --register-validity'.  However, the deriver
+           fields are left empty. */
+        string s = get(drv->env, "exportReferencesGraph");
+        Strings ss = tokenizeString<Strings>(s);
+        if (ss.size() % 2 != 0)
+            throw BuildError(format("odd number of tokens in 'exportReferencesGraph': '%1%'") % s);
+        for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
+            string fileName = *i++;
+            checkStoreName(fileName); /* !!! abuse of this function */
+            Path storePath = *i++;
+
+            /* Write closure info to <fileName>. */
+            writeFile(tmpDir + "/" + fileName,
+                worker.store.makeValidityRegistration(
+                    exportReferences(worker.store, storePath), false, false));
+        }
+    }
 
     if (useChroot) {
 
@@ -2309,6 +2359,20 @@ void DerivationGoal::writeStructuredAttrs()
             outputs[i.first] = rewriteStrings(i.second.path, inputRewrites);
         json["outputs"] = outputs;
 
+        /* Handle exportReferencesGraph. */
+        auto e = json.find("exportReferencesGraph");
+        if (e != json.end() && e->is_object()) {
+            for (auto i = e->begin(); i != e->end(); ++i) {
+                std::ostringstream str;
+                {
+                    JSONPlaceholder jsonRoot(str, true);
+                    worker.store.pathInfoToJSON(jsonRoot,
+                        exportReferences(worker.store, i->get<std::string>()), false, true);
+                }
+                json[i.key()] = nlohmann::json::parse(str.str()); // urgh
+            }
+        }
+
         writeFile(tmpDir + "/.attrs.json", json.dump());
 
         /* As a convenience to bash scripts, write a shell file that
@@ -2390,71 +2454,6 @@ void DerivationGoal::chownToBuilder(const Path & path)
     if (!buildUser) return;
     if (chown(path.c_str(), buildUser->getUID(), buildUser->getGID()) == -1)
         throw SysError(format("cannot change ownership of '%1%'") % path);
-}
-
-
-void DerivationGoal::doExportReferencesGraph()
-{
-    /* The `exportReferencesGraph' feature allows the references graph
-       to be passed to a builder.  This attribute should be a list of
-       pairs [name1 path1 name2 path2 ...].  The references graph of
-       each `pathN' will be stored in a text file `nameN' in the
-       temporary build directory.  The text files have the format used
-       by `nix-store --register-validity'.  However, the deriver
-       fields are left empty. */
-    string s = get(drv->env, "exportReferencesGraph");
-    Strings ss = tokenizeString<Strings>(s);
-    if (ss.size() % 2 != 0)
-        throw BuildError(format("odd number of tokens in 'exportReferencesGraph': '%1%'") % s);
-    for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
-        string fileName = *i++;
-        checkStoreName(fileName); /* !!! abuse of this function */
-
-        /* Check that the store path is valid. */
-        Path storePath = *i++;
-        if (!worker.store.isInStore(storePath))
-            throw BuildError(format("'exportReferencesGraph' contains a non-store path '%1%'")
-                % storePath);
-        storePath = worker.store.toStorePath(storePath);
-        if (!worker.store.isValidPath(storePath))
-            throw BuildError(format("'exportReferencesGraph' contains an invalid path '%1%'")
-                % storePath);
-
-        /* If there are derivations in the graph, then include their
-           outputs as well.  This is useful if you want to do things
-           like passing all build-time dependencies of some path to a
-           derivation that builds a NixOS DVD image. */
-        PathSet paths, paths2;
-        worker.store.computeFSClosure(storePath, paths);
-        paths2 = paths;
-
-        for (auto & j : paths2) {
-            if (isDerivation(j)) {
-                Derivation drv = worker.store.derivationFromPath(j);
-                for (auto & k : drv.outputs)
-                    worker.store.computeFSClosure(k.second.path, paths);
-            }
-        }
-
-        if (!drv->env.count("__json")) {
-
-            /* Write closure info to <fileName>. */
-            writeFile(tmpDir + "/" + fileName,
-                worker.store.makeValidityRegistration(paths, false, false));
-
-        } else {
-
-            /* Write a more comprehensive JSON serialisation to
-               <fileName>. */
-            std::ostringstream str;
-            {
-                JSONPlaceholder jsonRoot(str, true);
-                worker.store.pathInfoToJSON(jsonRoot, paths, false, true);
-            }
-            writeFile(tmpDir + "/" + fileName, str.str());
-
-        }
-    }
 }
 
 

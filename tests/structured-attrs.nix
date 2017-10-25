@@ -1,5 +1,16 @@
 with import ./config.nix;
 
+let
+
+  dep = mkDerivation {
+    name = "dep";
+    buildCommand = ''
+      mkdir $out; echo bla > $out/bla
+    '';
+  };
+
+in
+
 mkDerivation {
   name = "structured";
 
@@ -21,6 +32,12 @@ mkDerivation {
 
     mkdir ''${outputs[out]}
     echo bar > $dest
+
+    json=$(cat .attrs.json)
+    [[ $json =~ '"narHash":"sha256:1r7yc43zqnzl5b0als5vnyp649gk17i37s7mj00xr8kc47rjcybk"' ]]
+    [[ $json =~ '"narSize":288' ]]
+    [[ $json =~ '"closureSize":288' ]]
+    [[ $json =~ '"references":[]' ]]
   '';
 
   buildInputs = [ "a" "b" "c" 123 "'" "\"" null ];
@@ -44,4 +61,6 @@ mkDerivation {
   "foo bar" = "BAD";
   "1foobar" = "BAD";
   "foo$" = "BAD";
+
+  exportReferencesGraph.refs = dep;
 }
