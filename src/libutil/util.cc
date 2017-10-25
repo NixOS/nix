@@ -1142,6 +1142,16 @@ std::string toLower(const std::string & s)
 }
 
 
+std::string shellEscape(const std::string & s)
+{
+    std::string r = "'";
+    for (auto & i : s)
+        if (i == '\'') r += "'\\''"; else r += i;
+    r += '\'';
+    return r;
+}
+
+
 void ignoreException()
 {
     try {

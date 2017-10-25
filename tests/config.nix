@@ -13,7 +13,7 @@ rec {
     derivation ({
       inherit system;
       builder = shell;
-      args = ["-e" args.builder or (builtins.toFile "builder.sh" "eval \"$buildCommand\"")];
+      args = ["-e" args.builder or (builtins.toFile "builder.sh" "if [ -e .attrs.sh ]; then source .attrs.sh; fi; eval \"$buildCommand\"")];
       PATH = path;
     } // removeAttrs args ["builder" "meta"])
     // { meta = args.meta or {}; };

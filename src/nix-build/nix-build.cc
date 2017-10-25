@@ -196,10 +196,6 @@ void mainWrapped(int argc, char * * argv)
             interactive = false;
             auto execArgs = "";
 
-            auto shellEscape = [](const string & s) {
-                return "'" + std::regex_replace(s, std::regex("'"), "'\\''") + "'";
-            };
-
             // Überhack to support Perl. Perl examines the shebang and
             // executes it unless it contains the string "perl" or "indir",
             // or (undocumented) argv[0] does not contain "perl". Exploit

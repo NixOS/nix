@@ -352,10 +352,8 @@ bool hasSuffix(const string & s, const string & suffix);
 std::string toLower(const std::string & s);
 
 
-/* Escape a string that contains octal-encoded escape codes such as
-   used in /etc/fstab and /proc/mounts (e.g. "foo\040bar" decodes to
-   "foo bar"). */
-string decodeOctalEscaped(const string & s);
+/* Escape a string as a shell word. */
+std::string shellEscape(const std::string & s);
 
 
 /* Exception handling in destructors: print an error message, then

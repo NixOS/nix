@@ -713,7 +713,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         if (outputHashRecursive) outputHashAlgo = "r:" + outputHashAlgo;
 
         Path outPath = state.store->makeFixedOutputPath(outputHashRecursive, h, drvName);
-        drv.env["out"] = outPath;
+        if (!jsonObject) drv.env["out"] = outPath;
         drv.outputs["out"] = DerivationOutput(outPath, outputHashAlgo, *outputHash);
     }
 
@@ -724,7 +724,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
            an empty value.  This ensures that changes in the set of
            output names do get reflected in the hash. */
         for (auto & i : outputs) {
-            drv.env[i] = "";
+            if (!jsonObject) drv.env[i] = "";
             drv.outputs[i] = DerivationOutput("", "", "");
         }
 
@@ -735,7 +735,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         for (auto & i : drv.outputs)
             if (i.second.path == "") {
                 Path outPath = state.store->makeOutputPath(i.first, h, drvName);
-                drv.env[i.first] = outPath;
+                if (!jsonObject) drv.env[i.first] = outPath;
                 i.second.path = outPath;
             }
     }

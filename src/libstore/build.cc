@@ -18,6 +18,7 @@
 #include <thread>
 #include <future>
 #include <chrono>
+#include <regex>
 
 #include <limits.h>
 #include <sys/time.h>
@@ -54,6 +55,8 @@
 #if HAVE_STATVFS
 #include <sys/statvfs.h>
 #endif
+
+#include <nlohmann/json.hpp>
 
 
 namespace nix {
@@ -2286,12 +2289,99 @@ void DerivationGoal::initEnv()
 }
 
 
+static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
+
+
 void DerivationGoal::writeStructuredAttrs()
 {
-    auto json = drv->env.find("__json");
-    if (json == drv->env.end()) return;
+    auto jsonAttr = drv->env.find("__json");
+    if (jsonAttr == drv->env.end()) return;
 
-    writeFile(tmpDir + "/.attrs.json", rewriteStrings(json->second, inputRewrites));
+    try {
+
+        auto jsonStr = rewriteStrings(jsonAttr->second, inputRewrites);
+
+        auto json = nlohmann::json::parse(jsonStr);
+
+        /* Add an "outputs" object containing the output paths. */
+        nlohmann::json outputs;
+        for (auto & i : drv->outputs)
+            outputs[i.first] = rewriteStrings(i.second.path, inputRewrites);
+        json["outputs"] = outputs;
+
+        writeFile(tmpDir + "/.attrs.json", json.dump());
+
+        /* As a convenience to bash scripts, write a shell file that
+           maps all attributes that are representable in bash -
+           namely, strings, integers, nulls, Booleans, and arrays and
+           objects consisting entirely of those values. (So nested
+           arrays or objects are not supported.) */
+
+        auto handleSimpleType = [](const nlohmann::json & value) -> std::experimental::optional<std::string> {
+            if (value.is_string())
+                return shellEscape(value);
+
+            if (value.is_number()) {
+                auto f = value.get<float>();
+                if (std::ceil(f) == f)
+                    return std::to_string(value.get<int>());
+            }
+
+            if (value.is_null())
+                return "''";
+
+            if (value.is_boolean())
+                return value.get<bool>() ? "1" : "";
+
+            return {};
+        };
+
+        std::string jsonSh;
+
+        for (auto i = json.begin(); i != json.end(); ++i) {
+
+            if (!std::regex_match(i.key(), shVarName)) continue;
+
+            auto & value = i.value();
+
+            auto s = handleSimpleType(value);
+            if (s)
+                jsonSh += fmt("declare %s=%s\n", i.key(), *s);
+
+            else if (value.is_array()) {
+                std::string s2;
+                bool good = true;
+
+                for (auto i = value.begin(); i != value.end(); ++i) {
+                    auto s3 = handleSimpleType(i.value());
+                    if (!s3) { good = false; break; }
+                    s2 += *s3; s2 += ' ';
+                }
+
+                if (good)
+                    jsonSh += fmt("declare -a %s=(%s)\n", i.key(), s2);
+            }
+
+            else if (value.is_object()) {
+                std::string s2;
+                bool good = true;
+
+                for (auto i = value.begin(); i != value.end(); ++i) {
+                    auto s3 = handleSimpleType(i.value());
+                    if (!s3) { good = false; break; }
+                    s2 += fmt("[%s]=%s ", shellEscape(i.key()), *s3);
+                }
+
+                if (good)
+                    jsonSh += fmt("declare -A %s=(%s)\n", i.key(), s2);
+            }
+        }
+
+        writeFile(tmpDir + "/.attrs.sh", jsonSh);
+
+    } catch (std::exception & e) {
+        throw Error("cannot process __json attribute of '%s': %s", drvPath, e.what());
+    }
 }
 
 

@@ -14,7 +14,8 @@ nix_tests = \
   placeholders.sh nix-shell.sh \
   linux-sandbox.sh \
   build-remote.sh \
-  nar-index.sh
+  nar-index.sh \
+  structured-attrs.sh
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
