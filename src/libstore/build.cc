@@ -1742,24 +1742,29 @@ int childEntry(void * arg)
 }
 
 
-PathSet exportReferences(Store & store, Path storePath)
+PathSet exportReferences(Store & store, PathSet storePaths)
 {
-    /* Check that the store path is valid. */
-    if (!store.isInStore(storePath))
-        throw BuildError(format("'exportReferencesGraph' contains a non-store path '%1%'")
-            % storePath);
-    storePath = store.toStorePath(storePath);
-    if (!store.isValidPath(storePath))
-        throw BuildError(format("'exportReferencesGraph' contains an invalid path '%1%'")
-            % storePath);
+    PathSet paths;
+
+    for (auto storePath : storePaths) {
+
+        /* Check that the store path is valid. */
+        if (!store.isInStore(storePath))
+            throw BuildError(format("'exportReferencesGraph' contains a non-store path '%1%'")
+                % storePath);
+        storePath = store.toStorePath(storePath);
+        if (!store.isValidPath(storePath))
+            throw BuildError(format("'exportReferencesGraph' contains an invalid path '%1%'")
+                % storePath);
+
+        store.computeFSClosure(storePath, paths);
+    }
 
     /* If there are derivations in the graph, then include their
        outputs as well.  This is useful if you want to do things
        like passing all build-time dependencies of some path to a
        derivation that builds a NixOS DVD image. */
-    PathSet paths, paths2;
-    store.computeFSClosure(storePath, paths);
-    paths2 = paths;
+    PathSet paths2(paths);
 
     for (auto & j : paths2) {
         if (isDerivation(j)) {
@@ -1868,7 +1873,7 @@ void DerivationGoal::startBuilder()
             /* Write closure info to <fileName>. */
             writeFile(tmpDir + "/" + fileName,
                 worker.store.makeValidityRegistration(
-                    exportReferences(worker.store, storePath), false, false));
+                    exportReferences(worker.store, {storePath}), false, false));
         }
     }
 
@@ -2366,8 +2371,11 @@ void DerivationGoal::writeStructuredAttrs()
                 std::ostringstream str;
                 {
                     JSONPlaceholder jsonRoot(str, true);
+                    PathSet storePaths;
+                    for (auto & p : *i)
+                        storePaths.insert(p.get<std::string>());
                     worker.store.pathInfoToJSON(jsonRoot,
-                        exportReferences(worker.store, i->get<std::string>()), false, true);
+                        exportReferences(worker.store, storePaths), false, true);
                 }
                 json[i.key()] = nlohmann::json::parse(str.str()); // urgh
             }

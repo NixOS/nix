@@ -62,5 +62,5 @@ mkDerivation {
   "1foobar" = "BAD";
   "foo$" = "BAD";
 
-  exportReferencesGraph.refs = dep;
+  exportReferencesGraph.refs = [ dep ];
 }
