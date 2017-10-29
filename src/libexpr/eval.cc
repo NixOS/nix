@@ -149,7 +149,7 @@ string showType(const Value & v)
     switch (v.type) {
         case tInt: return "an integer";
         case tBool: return "a boolean";
-        case tString: return "a string";
+        case tString: return v.string.context ? "a string with context" : "a string";
         case tPath: return "a path";
         case tNull: return "null";
         case tAttrs: return "a set";
