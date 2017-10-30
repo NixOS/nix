@@ -223,8 +223,7 @@
     <para><function>builtins.fetchurl</function> and
     <function>builtins.fetchTarball</function> now support
     <varname>sha256</varname> and <varname>name</varname>
-    attributes. Using these functions is now allowed in restricted
-    mode if a hash is supplied.</para>
+    attributes.</para>
   </listitem>
 
   <listitem>
