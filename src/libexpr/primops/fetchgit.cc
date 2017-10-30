@@ -88,10 +88,10 @@ Path exportGit(ref<Store> store, const std::string & uri,
     return storePath;
 }
 
-static void prim_fetchgit(EvalState & state, const Pos & pos, Value * * args, Value & v)
+static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     // FIXME: cut&paste from fetch().
-    if (state.restricted) throw Error("'fetchgit' is not allowed in restricted mode");
+    if (state.restricted) throw Error("'fetchGit' is not allowed in restricted mode");
 
     std::string url;
     std::string ref = "master";
@@ -118,7 +118,7 @@ static void prim_fetchgit(EvalState & state, const Pos & pos, Value * * args, Va
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
-                throw EvalError("unsupported argument '%s' to 'fetchgit', at %s", attr.name, *attr.pos);
+                throw EvalError("unsupported argument '%s' to 'fetchGit', at %s", attr.name, *attr.pos);
         }
 
         if (url.empty())
@@ -132,6 +132,6 @@ static void prim_fetchgit(EvalState & state, const Pos & pos, Value * * args, Va
     mkString(v, storePath, PathSet({storePath}));
 }
 
-static RegisterPrimOp r("__fetchgit", 1, prim_fetchgit);
+static RegisterPrimOp r("fetchGit", 1, prim_fetchGit);
 
 }

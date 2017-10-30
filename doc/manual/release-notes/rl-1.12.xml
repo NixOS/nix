@@ -184,7 +184,7 @@
   </listitem>
 
   <listitem>
-    <para><function>builtins.fetchgit</function>.
+    <para><function>builtins.fetchGit</function>.
     (38539b943a060d9cdfc24d6e5d997c0885b8aa2f)</para>
   </listitem>
 
