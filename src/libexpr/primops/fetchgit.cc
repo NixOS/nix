@@ -29,8 +29,6 @@ Path exportGit(ref<Store> store, const std::string & uri,
         runProgram("git", true, { "init", "--bare", cacheDir });
     }
 
-    //Activity act(*logger, lvlInfo, format("fetching Git repository '%s'") % uri);
-
     std::string localRef = hashString(htSHA256, fmt("%s-%s", uri, ref)).to_string(Base32, false);
 
     Path localRefFile = cacheDir + "/refs/heads/" + localRef;
@@ -42,7 +40,11 @@ Path exportGit(ref<Store> store, const std::string & uri,
     if (stat(localRefFile.c_str(), &st) != 0 ||
         st.st_mtime < now - settings.tarballTtl)
     {
-        runProgram("git", true, { "-C", cacheDir, "fetch", "--force", "--", uri, ref + ":" + localRef });
+        Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Git repository '%s'", uri));
+
+        // FIXME: git stderr messes up our progress indicator, so
+        // we're using --quiet for now. Should process its stderr.
+        runProgram("git", true, { "-C", cacheDir, "fetch", "--quiet", "--force", "--", uri, ref + ":" + localRef });
 
         struct timeval times[2];
         times[0].tv_sec = now;
