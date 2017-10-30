@@ -2774,10 +2774,10 @@ void DerivationGoal::runChild()
                     sandboxProfile += "(deny default (with no-log))\n";
                 }
 
-                sandboxProfile += "(import \"sandbox-defaults.sb\")";
+                sandboxProfile += "(import \"sandbox-defaults.sb\")\n";
 
                 if (fixedOutput)
-                    sandboxProfile += "(import \"sandbox-network.sb\")";
+                    sandboxProfile += "(import \"sandbox-network.sb\")\n";
 
                 /* Our rwx outputs */
                 sandboxProfile += "(allow file-read* file-write* process-exec\n";
@@ -2820,7 +2820,7 @@ void DerivationGoal::runChild()
 
                 sandboxProfile += additionalSandboxProfile;
             } else
-                sandboxProfile += "(import \"sandbox-minimal.sb\")";
+                sandboxProfile += "(import \"sandbox-minimal.sb\")\n";
 
             debug("Generated sandbox profile:");
             debug(sandboxProfile);
@@ -2828,6 +2828,8 @@ void DerivationGoal::runChild()
             Path sandboxFile = tmpDir + "/.sandbox.sb";
 
             writeFile(sandboxFile, sandboxProfile);
+
+            bool allowLocalNetworking = get(drv->env, "__darwinAllowLocalNetworking") == "1";
 
             /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different mechanisms
                to find temporary directories, so we want to open up a broader place for them to dump their files, if needed. */
@@ -2844,6 +2846,10 @@ void DerivationGoal::runChild()
             args.push_back("_GLOBAL_TMP_DIR=" + globalTmpDir);
             args.push_back("-D");
             args.push_back("IMPORT_DIR=" + settings.nixDataDir + "/nix/sandbox/");
+            if (allowLocalNetworking) {
+                args.push_back("-D");
+                args.push_back(string("_ALLOW_LOCAL_NETWORKING=1"));
+            }
             args.push_back(drv->builder);
         }
 #endif
