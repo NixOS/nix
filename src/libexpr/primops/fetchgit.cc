@@ -117,6 +117,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     std::string ref = "master";
     std::string rev;
     std::string name = "source";
+    PathSet context;
 
     state.forceValue(*args[0]);
 
@@ -126,11 +127,8 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
 
         for (auto & attr : *args[0]->attrs) {
             string n(attr.name);
-            if (n == "url") {
-                PathSet context;
+            if (n == "url")
                 url = state.coerceToString(*attr.pos, *attr.value, context, false, false);
-                if (hasPrefix(url, "/")) url = "file://" + url;
-            }
             else if (n == "ref")
                 ref = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "rev")
@@ -145,7 +143,9 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
             throw EvalError(format("'url' argument required, at %1%") % pos);
 
     } else
-        url = state.forceStringNoCtx(*args[0], pos);
+        url = state.coerceToString(pos, *args[0], context, false, false);
+
+    if (hasPrefix(url, "/")) url = "file://" + url;
 
     // FIXME: git externals probably can be used to bypass the URI
     // whitelist. Ah well.
