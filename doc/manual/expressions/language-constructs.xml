@@ -333,7 +333,20 @@ with (import ./definitions.nix); ...</programlisting>
 
 makes all attributes defined in the file
 <filename>definitions.nix</filename> available as if they were defined
-locally in a <literal>rec</literal>-expression.</para>
+locally in a <literal>let</literal>-expression.</para>
+
+<para>The bindings introduced by <literal>with</literal> do not shadow bindings
+introduced by other means, e.g.
+
+<programlisting>
+let a = 3; in with { a = 1; }; let a = 4; in with { a = 2; }; ...</programlisting>
+
+establishes the same scope as
+
+<programlisting>
+let a = 1; in let a = 2; in let a = 3; in let a = 4; in ...</programlisting>
+
+</para>
 
 </simplesect>
 

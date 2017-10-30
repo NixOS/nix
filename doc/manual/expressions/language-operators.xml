@@ -41,6 +41,11 @@ weakest binding).</para>
         argument <replaceable>e2</replaceable>.</entry>
       </row>
       <row>
+        <entry><literal>-</literal> <replaceable>e</replaceable></entry>
+        <entry>none</entry>
+        <entry>Arithmetic negation.</entry>
+      </row>
+      <row>
         <entry><replaceable>e</replaceable> <literal>?</literal>
         <replaceable>attrpath</replaceable></entry>
         <entry>none</entry>
@@ -55,13 +60,24 @@ weakest binding).</para>
         <entry>List concatenation.</entry>
       </row>
       <row>
-        <entry><replaceable>e1</replaceable> <literal>+</literal> <replaceable>e2</replaceable></entry>
+        <entry>
+          <replaceable>e1</replaceable> <literal>*</literal> <replaceable>e2</replaceable>,
+          <replaceable>e1</replaceable> <literal>/</literal> <replaceable>e2</replaceable>
+        </entry>
         <entry>left</entry>
-        <entry>String or path concatenation.</entry>
+        <entry>Arithmetic multiplication and division.</entry>
+      </row>
+      <row>
+        <entry>
+          <replaceable>e1</replaceable> <literal>+</literal> <replaceable>e2</replaceable>,
+          <replaceable>e1</replaceable> <literal>-</literal> <replaceable>e2</replaceable>
+        </entry>
+        <entry>left</entry>
+        <entry>Arithmetic addition and subtraction.  String or path concatenation (only by <literal>+</literal>).</entry>
       </row>
       <row>
         <entry><literal>!</literal> <replaceable>e</replaceable></entry>
-        <entry>left</entry>
+        <entry>none</entry>
         <entry>Boolean negation.</entry>
       </row>
       <row>
@@ -75,16 +91,22 @@ weakest binding).</para>
         attributes).</entry>
       </row>
       <row>
-        <entry><replaceable>e1</replaceable> <literal>==</literal>
-        <replaceable>e2</replaceable></entry>
+        <entry>
+          <replaceable>e1</replaceable> <literal>&lt;</literal> <replaceable>e2</replaceable>,
+          <replaceable>e1</replaceable> <literal>&gt;</literal> <replaceable>e2</replaceable>,
+          <replaceable>e1</replaceable> <literal>&lt;=</literal> <replaceable>e2</replaceable>,
+          <replaceable>e1</replaceable> <literal>&gt;=</literal> <replaceable>e2</replaceable>
+        </entry>
         <entry>none</entry>
-        <entry>Equality.</entry>
+        <entry>Arithmetic comparison.</entry>
       </row>
       <row>
-        <entry><replaceable>e1</replaceable> <literal>!=</literal>
-        <replaceable>e2</replaceable></entry>
+        <entry>
+          <replaceable>e1</replaceable> <literal>==</literal> <replaceable>e2</replaceable>,
+          <replaceable>e1</replaceable> <literal>!=</literal> <replaceable>e2</replaceable>
+        </entry>
         <entry>none</entry>
-        <entry>Inequality.</entry>
+        <entry>Equality and inequality.</entry>
       </row>
       <row>
         <entry><replaceable>e1</replaceable> <literal>&amp;&amp;</literal>
