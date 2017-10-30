@@ -1907,11 +1907,11 @@ static void prim_compareVersions(EvalState & state, const Pos & pos, Value * * a
 
 
 void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
-    const string & who, bool unpack)
+    const string & who, bool unpack, const std::string & defaultName)
 {
     string url;
     Hash expectedHash;
-    string name = "";
+    string name = defaultName;
 
     state.forceValue(*args[0]);
 
@@ -1947,13 +1947,13 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
 
 static void prim_fetchurl(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    fetch(state, pos, args, v, "fetchurl", false);
+    fetch(state, pos, args, v, "fetchurl", false, "");
 }
 
 
 static void prim_fetchTarball(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    fetch(state, pos, args, v, "fetchTarball", true);
+    fetch(state, pos, args, v, "fetchTarball", true, "source");
 }
 
 
