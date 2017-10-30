@@ -49,7 +49,7 @@ rec {
     if comp (head list2) (head list1) then [(head list2)] ++ mergeLists comp list1 (tail list2) else
     [(head list1)] ++ mergeLists comp (tail list1) list2;
 
-  id = x: x;
+  id = x:x; # sic
 
   const = x: y: x;
 
