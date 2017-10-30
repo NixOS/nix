@@ -481,4 +481,10 @@ struct MaintainCount
 std::pair<unsigned short, unsigned short> getWindowSize();
 
 
+/* Used in various places. */
+typedef std::function<bool(const Path & path)> PathFilter;
+
+extern PathFilter defaultPathFilter;
+
+
 }

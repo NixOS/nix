@@ -29,7 +29,7 @@ const std::string narVersionMagic1 = "nix-archive-1";
 
 static string caseHackSuffix = "~nix~case~hack~";
 
-PathFilter defaultPathFilter;
+PathFilter defaultPathFilter = [](const Path &) { return true; };
 
 
 static void dumpContents(const Path & path, size_t size,

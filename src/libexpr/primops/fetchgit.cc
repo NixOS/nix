@@ -16,9 +16,48 @@ using namespace std::string_literals;
 namespace nix {
 
 GitInfo exportGit(ref<Store> store, const std::string & uri,
-    const std::string & ref, const std::string & rev,
+    std::experimental::optional<std::string> ref, const std::string & rev,
     const std::string & name)
 {
+    if (!ref && rev == "" && hasPrefix(uri, "/") && pathExists(uri + "/.git")) {
+
+        bool clean = true;
+
+        try {
+            runProgram("git", true, { "-C", uri, "diff-index", "--quiet", "HEAD", "--" });
+        } catch (ExecError e) {
+            if (!WIFEXITED(e.status) || WEXITSTATUS(e.status) != 1) throw;
+            clean = false;
+        }
+
+        if (!clean) {
+
+            /* This is an unclean working tree. So copy all tracked
+               files. */
+
+            GitInfo gitInfo;
+            gitInfo.rev = "0000000000000000000000000000000000000000";
+            gitInfo.shortRev = std::string(gitInfo.rev, 0, 7);
+
+            auto files = tokenizeString<std::set<std::string>>(
+                runProgram("git", true, { "-C", uri, "ls-files", "-z" }), "\0"s);
+
+            PathFilter filter = [&](const Path & p) -> bool {
+                assert(hasPrefix(p, uri));
+                auto st = lstat(p);
+                if (S_ISDIR(st.st_mode)) return true;
+                std::string file(p, uri.size() + 1);
+                return files.count(file);
+            };
+
+            gitInfo.storePath = store->addToStore("source", uri, true, htSHA256, filter);
+
+            return gitInfo;
+        }
+    }
+
+    if (!ref) ref = "master";
+
     if (rev != "") {
         std::regex revRegex("^[0-9a-fA-F]{40}$");
         if (!std::regex_match(rev, revRegex))
@@ -32,7 +71,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         runProgram("git", true, { "init", "--bare", cacheDir });
     }
 
-    std::string localRef = hashString(htSHA256, fmt("%s-%s", uri, ref)).to_string(Base32, false);
+    std::string localRef = hashString(htSHA256, fmt("%s-%s", uri, *ref)).to_string(Base32, false);
 
     Path localRefFile = cacheDir + "/refs/heads/" + localRef;
 
@@ -47,7 +86,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
         // FIXME: git stderr messes up our progress indicator, so
         // we're using --quiet for now. Should process its stderr.
-        runProgram("git", true, { "-C", cacheDir, "fetch", "--quiet", "--force", "--", uri, ref + ":" + localRef });
+        runProgram("git", true, { "-C", cacheDir, "fetch", "--quiet", "--force", "--", uri, *ref + ":" + localRef });
 
         struct timeval times[2];
         times[0].tv_sec = now;
@@ -114,7 +153,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     std::string url;
-    std::string ref = "master";
+    std::experimental::optional<std::string> ref;
     std::string rev;
     std::string name = "source";
     PathSet context;
@@ -145,7 +184,7 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     } else
         url = state.coerceToString(pos, *args[0], context, false, false);
 
-    if (hasPrefix(url, "/")) url = "file://" + url;
+    if (!isUri(url)) url = absPath(url);
 
     // FIXME: git externals probably can be used to bypass the URI
     // whitelist. Ah well.
