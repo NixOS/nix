@@ -1911,7 +1911,7 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
 {
     string url;
     Hash expectedHash;
-    string name;
+    string name = "";
 
     state.forceValue(*args[0]);
 

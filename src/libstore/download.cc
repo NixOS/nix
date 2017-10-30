@@ -23,6 +23,8 @@
 #include <cmath>
 #include <random>
 
+using namespace std::string_literals;
+
 namespace nix {
 
 double getTime()
@@ -604,7 +606,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
     Path cacheDir = getCacheDir() + "/nix/tarballs";
     createDirs(cacheDir);
 
-    string urlHash = hashString(htSHA256, url).to_string(Base32, false);
+    string urlHash = hashString(htSHA256, name + std::string("\0"s) + url).to_string(Base32, false);
 
     Path dataFile = cacheDir + "/" + urlHash + ".info";
     Path fileLink = cacheDir + "/" + urlHash + "-file";
