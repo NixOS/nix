@@ -30,6 +30,29 @@
 ; Without this line clang cannot write to /dev/null, breaking some configure tests.
 (allow file-read-metadata (literal "/dev"))
 
+; Many packages like to do local networking in their test suites, but let's only
+; allow it if the package explicitly asks for it.
+(if (param "_ALLOW_LOCAL_NETWORKING")
+    (begin
+      (allow network* (local ip) (local tcp) (local udp))
+
+      ; Allow access to /etc/resolv.conf (which is a symlink to
+      ; /private/var/run/resolv.conf).
+      ; TODO: deduplicate with sandbox-network.sb
+      (allow file-read-metadata
+             (literal "/var")
+             (literal "/etc")
+             (literal "/etc/resolv.conf")
+             (literal "/private/etc/resolv.conf"))
+
+      (allow file-read*
+             (literal "/private/var/run/resolv.conf"))
+
+      ; Allow DNS lookups. This is even needed for localhost, which lots of tests rely on
+      (allow file-read-metadata (literal "/etc/hosts"))
+      (allow file-read*         (literal "/private/etc/hosts"))
+      (allow network-outbound (remote unix-socket (path-literal "/private/var/run/mDNSResponder")))))
+
 ; Standard devices.
 (allow file*
        (literal "/dev/null")
@@ -54,5 +77,4 @@
 (allow file-read-metadata
        (literal "/etc")
        (literal "/var")
-       (literal "/private/var/tmp")
-       )
+       (literal "/private/var/tmp"))
