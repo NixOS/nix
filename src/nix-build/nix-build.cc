@@ -167,6 +167,9 @@ void mainWrapped(int argc, char * * argv)
             buildMode = bmRepair;
         }
 
+        else if (*arg == "--hash")
+            buildMode = bmHash;
+
         else if (*arg == "--run-env") // obsolete
             runEnv = true;
 
