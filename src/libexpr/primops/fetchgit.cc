@@ -1,3 +1,4 @@
+#include "fetchgit.hh"
 #include "primops.hh"
 #include "eval-inline.hh"
 #include "download.hh"
@@ -8,11 +9,13 @@
 
 #include <regex>
 
+#include <nlohmann/json.hpp>
+
 using namespace std::string_literals;
 
 namespace nix {
 
-Path exportGit(ref<Store> store, const std::string & uri,
+GitInfo exportGit(ref<Store> store, const std::string & uri,
     const std::string & ref, const std::string & rev,
     const std::string & name)
 {
@@ -56,36 +59,56 @@ Path exportGit(ref<Store> store, const std::string & uri,
     }
 
     // FIXME: check whether rev is an ancestor of ref.
-    std::string commitHash = rev != "" ? rev : chomp(readFile(localRefFile));
+    GitInfo gitInfo;
+    gitInfo.rev = rev != "" ? rev : chomp(readFile(localRefFile));
+    gitInfo.shortRev = std::string(gitInfo.rev, 0, 7);
 
-    printTalkative("using revision %s of repo '%s'", uri, commitHash);
+    printTalkative("using revision %s of repo '%s'", uri, gitInfo.rev);
 
-    std::string storeLinkName = hashString(htSHA512, name + std::string("\0"s) + commitHash).to_string(Base32, false);
+    std::string storeLinkName = hashString(htSHA512, name + std::string("\0"s) + gitInfo.rev).to_string(Base32, false);
     Path storeLink = cacheDir + "/" + storeLinkName + ".link";
     PathLocks storeLinkLock({storeLink}, fmt("waiting for lock on '%1%'...", storeLink));
 
-    if (pathExists(storeLink)) {
-        auto storePath = readLink(storeLink);
-        store->addTempRoot(storePath);
-        if (store->isValidPath(storePath)) {
-            return storePath;
+    try {
+        // FIXME: doesn't handle empty lines
+        auto json = nlohmann::json::parse(readFile(storeLink));
+
+        assert(json["uri"] == uri && json["name"] == name && json["rev"] == gitInfo.rev);
+
+        gitInfo.storePath = json["storePath"];
+
+        if (store->isValidPath(gitInfo.storePath)) {
+            gitInfo.revCount = json["revCount"];
+            return gitInfo;
         }
+
+    } catch (SysError & e) {
+        if (e.errNo != ENOENT) throw;
     }
 
     // FIXME: should pipe this, or find some better way to extract a
     // revision.
-    auto tar = runProgram("git", true, { "-C", cacheDir, "archive", commitHash });
+    auto tar = runProgram("git", true, { "-C", cacheDir, "archive", gitInfo.rev });
 
     Path tmpDir = createTempDir();
     AutoDelete delTmpDir(tmpDir, true);
 
     runProgram("tar", true, { "x", "-C", tmpDir }, tar);
 
-    auto storePath = store->addToStore(name, tmpDir);
+    gitInfo.storePath = store->addToStore(name, tmpDir);
 
-    replaceSymlink(storePath, storeLink);
+    gitInfo.revCount = std::stoull(runProgram("git", true, { "-C", cacheDir, "rev-list", "--count", gitInfo.rev }));
 
-    return storePath;
+    nlohmann::json json;
+    json["storePath"] = gitInfo.storePath;
+    json["uri"] = uri;
+    json["name"] = name;
+    json["rev"] = gitInfo.rev;
+    json["revCount"] = gitInfo.revCount;
+
+    writeFile(storeLink, json.dump());
+
+    return gitInfo;
 }
 
 static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -127,9 +150,14 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     } else
         url = state.forceStringNoCtx(*args[0], pos);
 
-    Path storePath = exportGit(state.store, url, ref, rev, name);
+    auto gitInfo = exportGit(state.store, url, ref, rev, name);
 
-    mkString(v, storePath, PathSet({storePath}));
+    state.mkAttrs(v, 8);
+    mkString(*state.allocAttr(v, state.sOutPath), gitInfo.storePath, PathSet({gitInfo.storePath}));
+    mkString(*state.allocAttr(v, state.symbols.create("rev")), gitInfo.rev);
+    mkString(*state.allocAttr(v, state.symbols.create("shortRev")), gitInfo.shortRev);
+    mkInt(*state.allocAttr(v, state.symbols.create("revCount")), gitInfo.revCount);
+    v.attrs->sort();
 }
 
 static RegisterPrimOp r("fetchGit", 1, prim_fetchGit);
