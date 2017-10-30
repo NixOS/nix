@@ -563,8 +563,24 @@ password <replaceable>my-password</replaceable>
       <para>If set to <literal>true</literal>, the Nix evaluator will
       not allow access to any files outside of the Nix search path (as
       set via the <envar>NIX_PATH</envar> environment variable or the
-      <option>-I</option> option). The default is
+      <option>-I</option> option), or to URIs outside of
+      <option>allowed-uri</option>. The default is
       <literal>false</literal>.</para>
+
+    </listitem>
+
+  </varlistentry>
+
+
+  <varlistentry xml:id="conf-allowed-uris"><term><literal>allowed-uris</literal></term>
+
+    <listitem>
+
+      <para>A list of URI prefixes to which access is allowed in
+      restricted evaluation mode. For example, when set to
+      <literal>https://github.com/NixOS</literal>, builtin functions
+      such as <function>fetchGit</function> are allowed to access
+      <literal>https://github.com/NixOS/patchelf.git</literal>.</para>
 
     </listitem>
 

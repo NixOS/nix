@@ -225,7 +225,7 @@ public:
 
     Setting<bool> restrictEval{this, false, "restrict-eval",
         "Whether to restrict file system access to paths in $NIX_PATH, "
-        "and to disallow fetching files from the network."};
+        "and network access to the URI prefixes listed in 'allowed-uris'."};
 
     Setting<size_t> buildRepeat{this, 0, "repeat",
         "The number of times to repeat a build in order to verify determinism.",
@@ -353,6 +353,8 @@ public:
     Setting<uint64_t> maxFree{this, std::numeric_limits<uint64_t>::max(), "max-free",
         "Stop deleting garbage when free disk space is above the specified amount."};
 
+    Setting<Strings> allowedUris{this, {}, "allowed-uris",
+        "Prefixes of URIs that builtin functions such as fetchurl and fetchGit are allowed to fetch."};
 };
 
 

@@ -110,6 +110,8 @@ public:
 
     Path checkSourcePath(const Path & path);
 
+    void checkURI(const std::string & uri);
+
     /* Parse a Nix expression from the specified file. */
     Expr * parseExprFromFile(const Path & path);
     Expr * parseExprFromFile(const Path & path, StaticEnv & staticEnv);

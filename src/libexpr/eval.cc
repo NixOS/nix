@@ -355,6 +355,26 @@ Path EvalState::checkSourcePath(const Path & path_)
 }
 
 
+void EvalState::checkURI(const std::string & uri)
+{
+    if (!restricted) return;
+
+    /* 'uri' should be equal to a prefix, or in a subdirectory of a
+       prefix. Thus, the prefix https://github.co does not permit
+       access to https://github.com. Note: this allows 'http://' and
+       'https://' as prefixes for any http/https URI. */
+    for (auto & prefix : settings.allowedUris.get())
+        if (uri == prefix ||
+            (uri.size() > prefix.size()
+            && prefix.size() > 0
+            && hasPrefix(uri, prefix)
+            && (prefix[prefix.size() - 1] == '/' || uri[prefix.size()] == '/')))
+            return;
+
+    throw RestrictedPathError("access to URI '%s' is forbidden in restricted mode", uri);
+}
+
+
 void EvalState::addConstant(const string & name, Value & v)
 {
     Value * v2 = allocValue();

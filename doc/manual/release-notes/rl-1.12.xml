@@ -418,6 +418,14 @@ configureFlags = "--prefix=${placeholder "out"} --includedir=${placeholder "dev"
     through the MELPA package repository.</para>
   </listitem>
 
+  <listitem>
+    <para>In restricted evaluation mode
+    (<option>--restrict-eval</option>), builtin functions that
+    download from the network (such as <function>fetchGit</function>)
+    are permitted to fetch underneath the list of URI prefixes
+    specified in the option <option>allowed-uris</option>.</para>
+  </listitem>
+
 </itemizedlist>
 
 <para>This release has contributions from TBD.</para>

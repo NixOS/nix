@@ -113,9 +113,6 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
 static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    // FIXME: cut&paste from fetch().
-    if (state.restricted) throw Error("'fetchGit' is not allowed in restricted mode");
-
     std::string url;
     std::string ref = "master";
     std::string rev;
@@ -149,6 +146,10 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
 
     } else
         url = state.forceStringNoCtx(*args[0], pos);
+
+    // FIXME: git externals probably can be used to bypass the URI
+    // whitelist. Ah well.
+    state.checkURI(url);
 
     auto gitInfo = exportGit(state.store, url, ref, rev, name);
 
