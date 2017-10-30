@@ -1937,7 +1937,7 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     } else
         url = state.forceStringNoCtx(*args[0], pos);
 
-    if (state.restricted && !expectedHash)
+    if (state.restricted)
         throw Error(format("'%1%' is not allowed in restricted mode") % who);
 
     Path res = getDownloader()->downloadCached(state.store, url, unpack, name, expectedHash);

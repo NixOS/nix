@@ -271,7 +271,7 @@ public:
         "Number of parallel HTTP connections.",
         {"binary-caches-parallel-connections"}};
 
-    Setting<bool> enableHttp2{this, true, "enable-http2",
+    Setting<bool> enableHttp2{this, true, "http2",
         "Whether to enable HTTP/2 support."};
 
     Setting<unsigned int> tarballTtl{this, 60 * 60, "tarball-ttl",
