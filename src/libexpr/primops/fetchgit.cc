@@ -73,7 +73,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         // FIXME: doesn't handle empty lines
         auto json = nlohmann::json::parse(readFile(storeLink));
 
-        assert(json["uri"] == uri && json["name"] == name && json["rev"] == gitInfo.rev);
+        assert(json["name"] == name && json["rev"] == gitInfo.rev);
 
         gitInfo.storePath = json["storePath"];
 
