@@ -8,10 +8,13 @@
 
 #include <regex>
 
+using namespace std::string_literals;
+
 namespace nix {
 
 Path exportGit(ref<Store> store, const std::string & uri,
-    const std::string & ref, const std::string & rev)
+    const std::string & ref, const std::string & rev,
+    const std::string & name)
 {
     if (rev != "") {
         std::regex revRegex("^[0-9a-fA-F]{40}$");
@@ -51,12 +54,12 @@ Path exportGit(ref<Store> store, const std::string & uri,
     }
 
     // FIXME: check whether rev is an ancestor of ref.
-    std::string commitHash =
-        rev != "" ? rev : chomp(readFile(localRefFile));
+    std::string commitHash = rev != "" ? rev : chomp(readFile(localRefFile));
 
     printTalkative("using revision %s of repo '%s'", uri, commitHash);
 
-    Path storeLink = cacheDir + "/" + commitHash + ".link";
+    std::string storeLinkName = hashString(htSHA512, name + std::string("\0"s) + commitHash).to_string(Base32, false);
+    Path storeLink = cacheDir + "/" + storeLinkName + ".link";
     PathLocks storeLinkLock({storeLink}, fmt("waiting for lock on '%1%'...", storeLink));
 
     if (pathExists(storeLink)) {
@@ -76,7 +79,7 @@ Path exportGit(ref<Store> store, const std::string & uri,
 
     runProgram("tar", true, { "x", "-C", tmpDir }, tar);
 
-    auto storePath = store->addToStore("git-export", tmpDir);
+    auto storePath = store->addToStore(name, tmpDir);
 
     replaceSymlink(storePath, storeLink);
 
@@ -91,6 +94,7 @@ static void prim_fetchgit(EvalState & state, const Pos & pos, Value * * args, Va
     std::string url;
     std::string ref = "master";
     std::string rev;
+    std::string name = "source";
 
     state.forceValue(*args[0]);
 
@@ -99,16 +103,18 @@ static void prim_fetchgit(EvalState & state, const Pos & pos, Value * * args, Va
         state.forceAttrs(*args[0], pos);
 
         for (auto & attr : *args[0]->attrs) {
-            string name(attr.name);
-            if (name == "url") {
+            string n(attr.name);
+            if (n == "url") {
                 PathSet context;
                 url = state.coerceToString(*attr.pos, *attr.value, context, false, false);
                 if (hasPrefix(url, "/")) url = "file://" + url;
             }
-            else if (name == "ref")
+            else if (n == "ref")
                 ref = state.forceStringNoCtx(*attr.value, *attr.pos);
-            else if (name == "rev")
+            else if (n == "rev")
                 rev = state.forceStringNoCtx(*attr.value, *attr.pos);
+            else if (n == "name")
+                name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
                 throw EvalError("unsupported argument '%s' to 'fetchgit', at %s", attr.name, *attr.pos);
         }
@@ -119,7 +125,7 @@ static void prim_fetchgit(EvalState & state, const Pos & pos, Value * * args, Va
     } else
         url = state.forceStringNoCtx(*args[0], pos);
 
-    Path storePath = exportGit(state.store, url, ref, rev);
+    Path storePath = exportGit(state.store, url, ref, rev, name);
 
     mkString(v, storePath, PathSet({storePath}));
 }
