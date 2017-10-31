@@ -1009,22 +1009,21 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
 }
 
 
-struct FilterFromExpr : PathFilter
+static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    EvalState & state;
-    Value & filter;
-    Pos pos;
+    PathSet context;
+    Path path = state.coerceToPath(pos, *args[1], context);
+    if (!context.empty())
+        throw EvalError(format("string '%1%' cannot refer to other paths, at %2%") % path % pos);
 
-    FilterFromExpr(EvalState & state, Value & filter, const Pos & pos)
-        : state(state), filter(filter), pos(pos)
-    {
-    }
+    state.forceValue(*args[0]);
+    if (args[0]->type != tLambda)
+        throw TypeError(format("first argument in call to 'filterSource' is not a function but %1%, at %2%") % showType(*args[0]) % pos);
 
-    bool operator () (const Path & path)
-    {
-        struct stat st;
-        if (lstat(path.c_str(), &st))
-            throw SysError(format("getting attributes of path '%1%'") % path);
+    path = state.checkSourcePath(path);
+
+    PathFilter filter = [&](const Path & path) {
+        auto st = lstat(path);
 
         /* Call the filter function.  The first argument is the path,
            the second is a string indicating the type of the file. */
@@ -1032,7 +1031,7 @@ struct FilterFromExpr : PathFilter
         mkString(arg1, path);
 
         Value fun2;
-        state.callFunction(filter, arg1, fun2, noPos);
+        state.callFunction(*args[0], arg1, fun2, noPos);
 
         Value arg2;
         mkString(arg2,
@@ -1045,24 +1044,7 @@ struct FilterFromExpr : PathFilter
         state.callFunction(fun2, arg2, res, noPos);
 
         return state.forceBool(res, pos);
-    }
-};
-
-
-static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args, Value & v)
-{
-    PathSet context;
-    Path path = state.coerceToPath(pos, *args[1], context);
-    if (!context.empty())
-        throw EvalError(format("string '%1%' cannot refer to other paths, at %2%") % path % pos);
-
-    state.forceValue(*args[0]);
-    if (args[0]->type != tLambda)
-        throw TypeError(format("first argument in call to 'filterSource' is not a function but %1%, at %2%") % showType(*args[0]) % pos);
-
-    FilterFromExpr filter(state, *args[0], pos);
-
-    path = state.checkSourcePath(path);
+    };
 
     Path dstPath = settings.readOnlyMode
         ? state.store->computeStorePathForPath(path, true, htSHA256, filter).first
