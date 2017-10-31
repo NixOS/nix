@@ -14,6 +14,7 @@
 #include "globals.hh"
 #include "command.hh"
 #include "finally.hh"
+#include "comment.hh"
 
 #include "src/linenoise/linenoise.h"
 
@@ -25,6 +26,7 @@ namespace nix {
 #define ESC_BLU "\033[34;1m"
 #define ESC_MAG "\033[35m"
 #define ESC_CYA "\033[36m"
+#define ESC_BLK "\033[30;1m"
 #define ESC_END "\033[0m"
 
 struct NixRepl
@@ -59,7 +61,11 @@ struct NixRepl
 
     typedef set<Value *> ValuesSeen;
     std::ostream &  printValue(std::ostream & str, Value & v, unsigned int maxDepth);
+    std::ostream &  printValueAndDoc(std::ostream & str, Value & v, unsigned int maxDepth);
     std::ostream &  printValue(std::ostream & str, Value & v, unsigned int maxDepth, ValuesSeen & seen);
+
+    // Only prints if a comment is found preceding the position.
+    void tryPrintDoc(std::ostream & str, Pos & pos);
 };
 
 
@@ -425,7 +431,7 @@ bool NixRepl::processLine(string line)
         } else {
             Value v;
             evalString(line, v);
-            printValue(std::cout, v, 1) << std::endl;
+            printValueAndDoc(std::cout, v, 1) << std::endl;
         }
     }
 
@@ -508,6 +514,59 @@ void NixRepl::evalString(string s, Value & v)
     state.forceValue(v);
 }
 
+
+std::ostream & NixRepl::printValueAndDoc(std::ostream & str, Value & v, unsigned int maxDepth)
+{
+    printValue(str, v, maxDepth);
+
+    switch (v.type) {
+    case tLambda:
+      tryPrintDoc(str, v.lambda.fun->pos);
+      break;
+    default:
+      break;
+    }
+    return str;
+}
+
+void NixRepl::tryPrintDoc(std::ostream & str, Pos & pos) {
+
+    Comment::Doc doc = Comment::lookupDoc(pos);
+
+    if (!doc.name.empty()) {
+        str << std::endl;
+        str << std::endl << "| " << ESC_BLK << doc.name << ESC_END << std::endl;
+        str << "| ";
+        for (size_t i = 0; i < doc.name.length(); i++) {
+            str << '-';
+        }
+        str << std::endl;
+        str << "| " << std::endl;
+    }
+
+    // If we're showing any form of doc at all, we need to inform
+    // user about partially applied functions.
+    if (!doc.name.empty() || !doc.comment.empty()) {
+
+        if (doc.timesApplied > 0) {
+            str << "| " << ESC_YEL << "NOTE: " << ESC_BLK << "This function has already been applied!" << ESC_END << std::endl
+                << "|       You should ignore the first "
+                               << ESC_BLK << std::to_string(doc.timesApplied) << ESC_END
+                               << " parameter(s) in this documentation," << std::endl
+                << "|       because they have already been applied." << std::endl
+                << "|" << std::endl;
+        }
+    }
+
+    if (!doc.comment.empty()) {
+        std::stringstream commentStream(doc.comment);
+        std::string line;
+        while(std::getline(commentStream,line,'\n')){
+            str << "| " << line << std::endl;
+        }
+    }
+
+}
 
 std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int maxDepth)
 {
