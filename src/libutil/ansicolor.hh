@@ -17,5 +17,6 @@ namespace nix {
 #define ANSI_BLUE "\e[34;1m"
 #define ANSI_MAGENTA "\e[35;1m"
 #define ANSI_CYAN "\e[36;1m"
+#define ANSI_YELLOW "\e[33;m"
 
 }
