@@ -148,6 +148,16 @@ public:
     Setting<std::string> buildUsersGroup{this, "", "build-users-group",
         "The Unix group that contains the build users."};
 
+    #if __linux__
+    const uint32_t idsPerBuild = 1 << 18;
+
+    Setting<uint32_t> startId{this, 872415232, "start-id",
+        "The first UID and GID to use for dynamic ID allocation. (0 means disable.)"};
+
+    Setting<uint32_t> uidCount{this, idsPerBuild * 128, "id-count",
+        "The number of UIDs/GIDs to use for dynamic ID allocation."};
+    #endif
+
     Setting<bool> impersonateLinux26{this, false, "impersonate-linux-26",
         "Whether to impersonate a Linux 2.6 machine on newer kernels.",
         {"build-impersonate-linux-26"}};
