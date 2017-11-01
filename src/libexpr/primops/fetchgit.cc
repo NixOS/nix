@@ -106,10 +106,9 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
     std::string storeLinkName = hashString(htSHA512, name + std::string("\0"s) + gitInfo.rev).to_string(Base32, false);
     Path storeLink = cacheDir + "/" + storeLinkName + ".link";
-    PathLocks storeLinkLock({storeLink}, fmt("waiting for lock on '%1%'...", storeLink));
+    PathLocks storeLinkLock({storeLink}, fmt("waiting for lock on '%1%'...", storeLink)); // FIXME: broken
 
     try {
-        // FIXME: doesn't handle empty lines
         auto json = nlohmann::json::parse(readFile(storeLink));
 
         assert(json["name"] == name && json["rev"] == gitInfo.rev);

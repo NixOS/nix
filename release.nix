@@ -76,7 +76,7 @@ let
           [ curl
             bzip2 xz brotli
             openssl pkgconfig sqlite boehmgc
-
+            mercurial
           ]
           ++ lib.optional stdenv.isLinux libseccomp
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium

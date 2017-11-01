@@ -15,7 +15,8 @@ nix_tests = \
   linux-sandbox.sh \
   build-remote.sh \
   nar-index.sh \
-  structured-attrs.sh
+  structured-attrs.sh \
+  fetchMercurial.sh
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))

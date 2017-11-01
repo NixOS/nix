@@ -707,7 +707,7 @@ bool isUri(const string & s)
     size_t pos = s.find("://");
     if (pos == string::npos) return false;
     string scheme(s, 0, pos);
-    return scheme == "http" || scheme == "https" || scheme == "file" || scheme == "channel" || scheme == "git" || scheme == "s3";
+    return scheme == "http" || scheme == "https" || scheme == "file" || scheme == "channel" || scheme == "git" || scheme == "s3" || scheme == "ssh";
 }
 
 
