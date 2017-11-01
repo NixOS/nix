@@ -6,7 +6,7 @@ namespace nix {
 
 class Store;
 class EvalState;
-struct Bindings;
+class Bindings;
 
 struct MixEvalArgs : virtual Args
 {

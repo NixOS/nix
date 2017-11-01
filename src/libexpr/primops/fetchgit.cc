@@ -56,7 +56,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         }
     }
 
-    if (!ref) ref = "master";
+    if (!ref) ref = "master"s;
 
     if (rev != "") {
         std::regex revRegex("^[0-9a-fA-F]{40}$");
