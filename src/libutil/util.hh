@@ -245,6 +245,23 @@ string runProgram(Path program, bool searchPath = false,
     const Strings & args = Strings(),
     const std::experimental::optional<std::string> & input = {});
 
+struct RunOptions
+{
+    Path program;
+    bool searchPath = true;
+    Strings args;
+    std::experimental::optional<std::string> input;
+    bool _killStderr = false;
+
+    RunOptions(const Path & program, const Strings & args)
+        : program(program), args(args) { };
+
+    RunOptions & killStderr(bool v) { _killStderr = true; return *this; }
+};
+
+std::pair<int, std::string> runProgram(const RunOptions & options);
+
+
 class ExecError : public Error
 {
 public:

@@ -896,31 +896,45 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
 string runProgram(Path program, bool searchPath, const Strings & args,
     const std::experimental::optional<std::string> & input)
 {
+    RunOptions opts(program, args);
+    opts.searchPath = searchPath;
+    opts.input = input;
+
+    auto res = runProgram(opts);
+
+    if (!statusOk(res.first))
+        throw ExecError(res.first, fmt("program '%1%' %2%", program, statusToString(res.first)));
+
+    return res.second;
+}
+
+std::pair<int, std::string> runProgram(const RunOptions & options)
+{
     checkInterrupt();
 
     /* Create a pipe. */
     Pipe out, in;
     out.create();
-    if (input) in.create();
+    if (options.input) in.create();
 
     /* Fork. */
     Pid pid = startProcess([&]() {
         if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
             throw SysError("dupping stdout");
-        if (input && dup2(in.readSide.get(), STDIN_FILENO) == -1)
+        if (options.input && dup2(in.readSide.get(), STDIN_FILENO) == -1)
             throw SysError("dupping stdin");
 
-        Strings args_(args);
-        args_.push_front(program);
+        Strings args_(options.args);
+        args_.push_front(options.program);
 
         restoreSignals();
 
-        if (searchPath)
-            execvp(program.c_str(), stringsToCharPtrs(args_).data());
+        if (options.searchPath)
+            execvp(options.program.c_str(), stringsToCharPtrs(args_).data());
         else
-            execv(program.c_str(), stringsToCharPtrs(args_).data());
+            execv(options.program.c_str(), stringsToCharPtrs(args_).data());
 
-        throw SysError(format("executing '%1%'") % program);
+        throw SysError("executing '%1%'", options.program);
     });
 
     out.writeSide = -1;
@@ -935,11 +949,11 @@ string runProgram(Path program, bool searchPath, const Strings & args,
     });
 
 
-    if (input) {
+    if (options.input) {
         in.readSide = -1;
         writerThread = std::thread([&]() {
             try {
-                writeFull(in.writeSide.get(), *input);
+                writeFull(in.writeSide.get(), *options.input);
                 promise.set_value();
             } catch (...) {
                 promise.set_exception(std::current_exception());
@@ -952,14 +966,11 @@ string runProgram(Path program, bool searchPath, const Strings & args,
 
     /* Wait for the child to finish. */
     int status = pid.wait();
-    if (!statusOk(status))
-        throw ExecError(status, format("program '%1%' %2%")
-            % program % statusToString(status));
 
     /* Wait for the writer thread to finish. */
-    if (input) promise.get_future().get();
+    if (options.input) promise.get_future().get();
 
-    return result;
+    return {status, result};
 }
 
 

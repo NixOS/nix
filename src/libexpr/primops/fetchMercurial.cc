@@ -22,6 +22,8 @@ struct HgInfo
     uint64_t revCount = 0;
 };
 
+std::regex commitHashRegex("^[0-9a-fA-F]{40}$");
+
 HgInfo exportMercurial(ref<Store> store, const std::string & uri,
     std::string rev, const std::string & name)
 {
@@ -66,20 +68,28 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
     Path stampFile = fmt("%s/.hg/%s.stamp", cacheDir, hashString(htSHA512, rev).to_string(Base32, false));
 
     /* If we haven't pulled this repo less than ‘tarball-ttl’ seconds,
-       do so now. FIXME: don't do this if "rev" is a hash and we
-       fetched it previously */
+       do so now. */
     time_t now = time(0);
     struct stat st;
     if (stat(stampFile.c_str(), &st) != 0 ||
         st.st_mtime < now - settings.tarballTtl)
     {
-        Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Mercurial repository '%s'", uri));
+        /* Except that if this is a commit hash that we already have,
+           we don't have to pull again. */
+        if (!(std::regex_match(rev, commitHashRegex)
+                && pathExists(cacheDir)
+                && runProgram(
+                    RunOptions("hg", { "log", "-R", cacheDir, "-r", rev, "--template", "1" })
+                    .killStderr(true)).second == "1"))
+        {
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Mercurial repository '%s'", uri));
 
-        if (pathExists(cacheDir)) {
-            runProgram("hg", true, { "pull", "-R", cacheDir, "--", uri });
-        } else {
-            createDirs(dirOf(cacheDir));
-            runProgram("hg", true, { "clone", "--noupdate", "--", uri, cacheDir });
+            if (pathExists(cacheDir)) {
+                runProgram("hg", true, { "pull", "-R", cacheDir, "--", uri });
+            } else {
+                createDirs(dirOf(cacheDir));
+                runProgram("hg", true, { "clone", "--noupdate", "--", uri, cacheDir });
+            }
         }
 
         writeFile(stampFile, "");

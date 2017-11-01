@@ -9,7 +9,7 @@ clearStore
 
 repo=$TEST_ROOT/hg
 
-rm -rfv $repo ${repo}-tmp $TEST_HOME/.cache/nix/hg
+rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix/hg
 
 hg init $repo
 echo '[ui]' >> $repo/.hg/hgrc
@@ -24,12 +24,13 @@ echo world > $repo/hello
 hg commit --cwd $repo -m 'Bla2'
 rev2=$(hg log --cwd $repo -r tip --template '{node}')
 
-hg log --cwd $repo
-
-hg log --cwd $repo -r tip --template '{node}\n'
-
+# Fetch the default branch.
 path=$(nix eval --raw "(builtins.fetchMercurial file://$repo).outPath")
 [[ $(cat $path/hello) = world ]]
+
+# Fetch using an explicit revision hash.
+path2=$(nix eval --raw "(builtins.fetchMercurial { url = file://$repo; rev = \"$rev2\"; }).outPath")
+[[ $path = $path2 ]]
 
 # Fetch again. This should be cached.
 mv $repo ${repo}-tmp
@@ -42,6 +43,13 @@ path2=$(nix eval --raw "(builtins.fetchMercurial file://$repo).outPath")
 
 # But with TTL 0, it should fail.
 (! nix eval --tarball-ttl 0 --raw "(builtins.fetchMercurial file://$repo)")
+
+# Fetching with a explicit hash should succeed.
+path2=$(nix eval --tarball-ttl 0 --raw "(builtins.fetchMercurial { url = file://$repo; rev = \"$rev2\"; }).outPath")
+[[ $path = $path2 ]]
+
+path2=$(nix eval --tarball-ttl 0 --raw "(builtins.fetchMercurial { url = file://$repo; rev = \"$rev1\"; }).outPath")
+[[ $(cat $path2/hello) = utrecht ]]
 
 mv ${repo}-tmp $repo
 
