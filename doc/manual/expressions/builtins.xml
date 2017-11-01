@@ -264,13 +264,13 @@ stdenv.mkDerivation { … }
 
     Note that when obtaining the hash with <varname>nix-prefetch-url
     </varname> the option <varname>--unpack</varname> is required.
-    </para> 
-      
-    <para>This function can also verify the contents against a hash. 
-    In that case, the function takes a set instead of a URL. The set 
+    </para>
+
+    <para>This function can also verify the contents against a hash.
+    In that case, the function takes a set instead of a URL. The set
     requires the attribute <varname>url</varname> and the attribute
     <varname>sha256</varname>, e.g.
-      
+
 <programlisting>
 with import (fetchTarball {
   url = https://github.com/NixOS/nixpkgs-channels/archive/nixos-14.12.tar.gz;
@@ -279,7 +279,7 @@ with import (fetchTarball {
 
 stdenv.mkDerivation { … }
 </programlisting>
-      
+
     </para>
 
     <para>This function is not available if <link
@@ -1245,8 +1245,9 @@ stdenv.mkDerivation (rec {
     <replaceable>e</replaceable>, namely <literal>"int"</literal>,
     <literal>"bool"</literal>, <literal>"string"</literal>,
     <literal>"path"</literal>, <literal>"null"</literal>,
-    <literal>"set"</literal>, <literal>"list"</literal> or
-    <literal>"lambda"</literal>.</para></listitem>
+    <literal>"set"</literal>, <literal>"list"</literal>,
+    <literal>"lambda"</literal> or
+    <literal>"float"</literal>.</para></listitem>
 
   </varlistentry>
 
