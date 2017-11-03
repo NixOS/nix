@@ -57,15 +57,18 @@ path2=$(nix eval --raw "(builtins.fetchGit $repo).outPath")
 [[ $path = $path2 ]]
 
 # Using an unclean tree should yield the tracked but uncommitted changes.
-echo foo > $repo/foo
+mkdir $repo/dir1 $repo/dir2
+echo foo > $repo/dir1/foo
 echo bar > $repo/bar
-git -C $repo add foo
+echo bar > $repo/dir2/bar
+git -C $repo add dir1/foo
 git -C $repo rm hello
 
 path2=$(nix eval --raw "(builtins.fetchGit $repo).outPath")
 [ ! -e $path2/hello ]
 [ ! -e $path2/bar ]
-[[ $(cat $path2/foo) = foo ]]
+[ ! -e $path2/dir2/bar ]
+[[ $(cat $path2/dir1/foo) = foo ]]
 
 [[ $(nix eval --raw "(builtins.fetchGit $repo).rev") = 0000000000000000000000000000000000000000 ]]
 

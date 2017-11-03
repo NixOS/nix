@@ -58,15 +58,18 @@ path2=$(nix eval --raw "(builtins.fetchMercurial $repo).outPath")
 [[ $path = $path2 ]]
 
 # Using an unclean tree should yield the tracked but uncommitted changes.
-echo foo > $repo/foo
+mkdir $repo/dir1 $repo/dir2
+echo foo > $repo/dir1/foo
 echo bar > $repo/bar
-hg add --cwd $repo foo
+echo bar > $repo/dir2/bar
+hg add --cwd $repo dir1/foo
 hg rm --cwd $repo hello
 
 path2=$(nix eval --raw "(builtins.fetchMercurial $repo).outPath")
 [ ! -e $path2/hello ]
 [ ! -e $path2/bar ]
-[[ $(cat $path2/foo) = foo ]]
+[ ! -e $path2/dir2/bar ]
+[[ $(cat $path2/dir1/foo) = foo ]]
 
 [[ $(nix eval --raw "(builtins.fetchMercurial $repo).rev") = 0000000000000000000000000000000000000000 ]]
 

@@ -44,11 +44,15 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
             PathFilter filter = [&](const Path & p) -> bool {
                 assert(hasPrefix(p, uri));
-                auto st = lstat(p);
                 std::string file(p, uri.size() + 1);
-                if (file == ".git") return false;
-                // FIXME: filter out directories with no tracked files.
-                if (S_ISDIR(st.st_mode)) return true;
+
+                auto st = lstat(p);
+
+                if (S_ISDIR(st.st_mode)) {
+                    auto i = files.lower_bound(file);
+                    return i != files.end() && hasPrefix(*i, file);
+                }
+
                 return files.count(file);
             };
 
