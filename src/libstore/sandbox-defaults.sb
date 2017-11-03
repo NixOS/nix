@@ -21,6 +21,9 @@
 ; Allow sending signals within the sandbox.
 (allow signal (target same-sandbox))
 
+; Allow getpwuid.
+(allow mach-lookup (global-name "com.apple.system.opendirectoryd.libinfo"))
+
 ; Access to /tmp.
 (allow file* process-exec (literal "/tmp") (subpath TMPDIR))
 
