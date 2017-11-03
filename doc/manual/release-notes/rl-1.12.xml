@@ -189,13 +189,6 @@
   </listitem>
 
   <listitem>
-    <para>Git repositories can now be specified in the Nix search
-    path,
-    e.g. <literal>nixpkgs=git://github.com/NixOS/nixpkgs</literal>.
-    (d8bf0d4859e28ddd23401fbe89f4e528aa09ddb3)</para>
-  </listitem>
-
-  <listitem>
     <para><literal>&lt;nix/fetchurl.nix&gt;</literal> now uses the
     content-addressable tarball cache at
     <uri>http://tarballs.nixos.org/</uri>, just like

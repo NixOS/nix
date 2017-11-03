@@ -523,7 +523,6 @@ formal
 #include "eval.hh"
 #include "download.hh"
 #include "store-api.hh"
-#include "primops/fetchgit.hh"
 
 
 namespace nix {
@@ -665,11 +664,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
 
     if (isUri(elem.second)) {
         try {
-            if (hasPrefix(elem.second, "git://") || hasSuffix(elem.second, ".git"))
-                // FIXME: support specifying revision/branch
-                res = { true, exportGit(store, elem.second).storePath };
-            else
-                res = { true, getDownloader()->downloadCached(store, elem.second, true) };
+            res = { true, getDownloader()->downloadCached(store, elem.second, true) };
         } catch (DownloadError & e) {
             printError(format("warning: Nix search path entry '%1%' cannot be downloaded, ignoring") % elem.second);
             res = { false, "" };
