@@ -241,8 +241,8 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
             auto & error = res.GetError();
             if (error.GetErrorType() == Aws::S3::S3Errors::RESOURCE_NOT_FOUND
                 || error.GetErrorType() == Aws::S3::S3Errors::NO_SUCH_KEY
-                || (error.GetErrorType() == Aws::S3::S3Errors::UNKNOWN // FIXME
-                    && error.GetMessage().find("404") != std::string::npos))
+                // If bucket listing is disabled, 404s turn into 403s
+                || error.GetErrorType() == Aws::S3::S3Errors::ACCESS_DENIED)
                 return false;
             throw Error(format("AWS error fetching '%s': %s") % path % error.GetMessage());
         }
