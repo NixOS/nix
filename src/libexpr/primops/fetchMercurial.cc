@@ -167,7 +167,7 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
-                throw EvalError("unsupported argument '%s' to 'fetchGit', at %s", attr.name, *attr.pos);
+                throw EvalError("unsupported argument '%s' to 'fetchMercurial', at %s", attr.name, *attr.pos);
         }
 
         if (url.empty())
