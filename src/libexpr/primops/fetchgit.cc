@@ -45,8 +45,10 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
             PathFilter filter = [&](const Path & p) -> bool {
                 assert(hasPrefix(p, uri));
                 auto st = lstat(p);
-                if (S_ISDIR(st.st_mode)) return true;
                 std::string file(p, uri.size() + 1);
+                if (file == ".git") return false;
+                // FIXME: filter out directories with no tracked files.
+                if (S_ISDIR(st.st_mode)) return true;
                 return files.count(file);
             };
 
@@ -80,21 +82,27 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     time_t now = time(0);
     struct stat st;
     if (stat(localRefFile.c_str(), &st) != 0 ||
-        st.st_mtime < now - settings.tarballTtl)
+        st.st_mtime <= now - settings.tarballTtl)
     {
-        Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Git repository '%s'", uri));
+        if (rev == "" ||
+            chomp(runProgram(
+                RunOptions("git", { "-C", cacheDir, "cat-file", "-t", rev })
+                .killStderr(true)).second) != "commit")
+        {
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Git repository '%s'", uri));
 
-        // FIXME: git stderr messes up our progress indicator, so
-        // we're using --quiet for now. Should process its stderr.
-        runProgram("git", true, { "-C", cacheDir, "fetch", "--quiet", "--force", "--", uri, *ref + ":" + localRef });
+            // FIXME: git stderr messes up our progress indicator, so
+            // we're using --quiet for now. Should process its stderr.
+            runProgram("git", true, { "-C", cacheDir, "fetch", "--quiet", "--force", "--", uri, *ref + ":" + localRef });
 
-        struct timeval times[2];
-        times[0].tv_sec = now;
-        times[0].tv_usec = 0;
-        times[1].tv_sec = now;
-        times[1].tv_usec = 0;
+            struct timeval times[2];
+            times[0].tv_sec = now;
+            times[0].tv_usec = 0;
+            times[1].tv_sec = now;
+            times[1].tv_usec = 0;
 
-        utimes(localRefFile.c_str(), times);
+            utimes(localRefFile.c_str(), times);
+        }
     }
 
     // FIXME: check whether rev is an ancestor of ref.
