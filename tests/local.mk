@@ -16,6 +16,7 @@ nix_tests = \
   build-remote.sh \
   nar-index.sh \
   structured-attrs.sh \
+  fetchGit.sh \
   fetchMercurial.sh
   # parallel.sh
 

@@ -76,6 +76,9 @@ let
           [ curl
             bzip2 xz brotli
             openssl pkgconfig sqlite boehmgc
+
+            # Tests
+            git
             mercurial
           ]
           ++ lib.optional stdenv.isLinux libseccomp

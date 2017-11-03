@@ -25,6 +25,7 @@ with import ./release-common.nix { inherit pkgs; };
       perlPackages.DBDSQLite
 
       # Tests
+      git
       mercurial
     ]
     ++ lib.optional stdenv.isLinux libseccomp;

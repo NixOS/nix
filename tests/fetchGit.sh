@@ -1,0 +1,83 @@
+source common.sh
+
+if [[ -z $(type -p git) ]]; then
+    echo "Git not installed; skipping Git tests"
+    exit 0
+fi
+
+clearStore
+
+repo=$TEST_ROOT/git
+
+rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix/git
+
+git init $repo
+git -C $repo config user.email "foobar@example.com"
+git -C $repo config user.name "Foobar"
+
+echo utrecht > $repo/hello
+git -C $repo add hello
+git -C $repo commit -m 'Bla1'
+rev1=$(git -C $repo rev-parse HEAD)
+
+echo world > $repo/hello
+git -C $repo commit -m 'Bla2' -a
+rev2=$(git -C $repo rev-parse HEAD)
+
+# Fetch the default branch.
+path=$(nix eval --raw "(builtins.fetchGit file://$repo).outPath")
+[[ $(cat $path/hello) = world ]]
+
+# Fetch using an explicit revision hash.
+path2=$(nix eval --raw "(builtins.fetchGit { url = file://$repo; rev = \"$rev2\"; }).outPath")
+[[ $path = $path2 ]]
+
+# Fetch again. This should be cached.
+mv $repo ${repo}-tmp
+path2=$(nix eval --raw "(builtins.fetchGit file://$repo).outPath")
+[[ $path = $path2 ]]
+
+[[ $(nix eval "(builtins.fetchGit file://$repo).revCount") = 2 ]]
+[[ $(nix eval --raw "(builtins.fetchGit file://$repo).rev") = $rev2 ]]
+
+# But with TTL 0, it should fail.
+(! nix eval --tarball-ttl 0 "(builtins.fetchGit file://$repo)" -vvvvv)
+
+# Fetching with a explicit hash should succeed.
+path2=$(nix eval --tarball-ttl 0 --raw "(builtins.fetchGit { url = file://$repo; rev = \"$rev2\"; }).outPath")
+[[ $path = $path2 ]]
+
+path2=$(nix eval --tarball-ttl 0 --raw "(builtins.fetchGit { url = file://$repo; rev = \"$rev1\"; }).outPath")
+[[ $(cat $path2/hello) = utrecht ]]
+
+mv ${repo}-tmp $repo
+
+# Using a clean working tree should produce the same result.
+path2=$(nix eval --raw "(builtins.fetchGit $repo).outPath")
+[[ $path = $path2 ]]
+
+# Using an unclean tree should yield the tracked but uncommitted changes.
+echo foo > $repo/foo
+echo bar > $repo/bar
+git -C $repo add foo
+git -C $repo rm hello
+
+path2=$(nix eval --raw "(builtins.fetchGit $repo).outPath")
+[ ! -e $path2/hello ]
+[ ! -e $path2/bar ]
+[[ $(cat $path2/foo) = foo ]]
+
+[[ $(nix eval --raw "(builtins.fetchGit $repo).rev") = 0000000000000000000000000000000000000000 ]]
+
+# ... unless we're using an explicit ref or rev.
+path3=$(nix eval --raw "(builtins.fetchGit { url = $repo; ref = \"master\"; }).outPath")
+[[ $path = $path3 ]]
+
+path3=$(nix eval --raw "(builtins.fetchGit { url = $repo; rev = \"$rev2\"; }).outPath")
+[[ $path = $path3 ]]
+
+# Committing should not affect the store path.
+git -C $repo commit -m 'Bla3' -a
+
+path4=$(nix eval --tarball-ttl 0 --raw "(builtins.fetchGit file://$repo).outPath")
+[[ $path2 = $path4 ]]

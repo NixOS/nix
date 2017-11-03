@@ -42,7 +42,7 @@ path2=$(nix eval --raw "(builtins.fetchMercurial file://$repo).outPath")
 [[ $(nix eval --raw "(builtins.fetchMercurial file://$repo).rev") = $rev2 ]]
 
 # But with TTL 0, it should fail.
-(! nix eval --tarball-ttl 0 --raw "(builtins.fetchMercurial file://$repo)")
+(! nix eval --tarball-ttl 0 "(builtins.fetchMercurial file://$repo)")
 
 # Fetching with a explicit hash should succeed.
 path2=$(nix eval --tarball-ttl 0 --raw "(builtins.fetchMercurial { url = file://$repo; rev = \"$rev2\"; }).outPath")
