@@ -320,7 +320,15 @@ let
       memSize = 2047;
       meta.schedulingPriority = 50;
 
-      postRPMInstall = "cd /tmp/rpmout/BUILD/nix-* && make installcheck";
+      postRPMInstall = ''
+        cd /tmp/rpmout/BUILD/nix-*
+        make installcheck
+        useradd alice
+        mount -t tmpfs none /nix/store
+        nix-daemon &
+        su -c 'bash -l -c "nix-build --option binary-caches \"\" --no-out-link tests/dependencies.nix"' alice
+        umount /nix/store
+      '';
     };
 
 
@@ -357,11 +365,14 @@ let
 
       postDebInstall = ''
         make installcheck
+        useradd alice
+        mount -t tmpfs none /nix/store
+        nix-daemon &
+        su -c 'bash -l -c "nix-build --option binary-caches \"\" --no-out-link tests/dependencies.nix"' alice
+        umount /nix/store
       '';
 
       debMaintainer = "Eelco Dolstra <eelco.dolstra@logicblox.com>";
-
-      #enableParallelBuilding = true;
     };
 
 
