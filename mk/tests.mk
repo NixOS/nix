@@ -12,21 +12,23 @@ installcheck:
 	@total=0; failed=0; \
 	red=""; \
 	green=""; \
+	yellow=""; \
 	normal=""; \
 	if [ -t 1 ]; then \
-		ncolors="$$(tput colors)"; \
-		if [ -n "$$ncolors" ] && [ "$$ncolors" -ge 8 ]; then \
-			red="$$(tput setaf 1)"; \
-			green="$$(tput setaf 2)"; \
-			normal="$$(tput sgr0)"; \
-		fi; \
+		red="[31;1m"; \
+		green="[32;1m"; \
+		yellow="[33;1m"; \
+		normal="[m"; \
 	fi; \
 	for i in $(_installcheck-list); do \
 	  total=$$((total + 1)); \
 	  printf "running test $$i..."; \
 	  log="$$(cd $$(dirname $$i) && $(tests-environment) $$(basename $$i) 2>&1)"; \
-	  if [ $$? -eq 0 ]; then \
+	  status=$$?; \
+	  if [ $$status -eq 0 ]; then \
 	    echo " [$${green}PASS$$normal]"; \
+	  elif [ $$status -eq 99 ]; then \
+	    echo " [$${yellow}SKIP$$normal]"; \
 	  else \
 	    echo " [$${red}FAIL$$normal]"; \
 	    echo "$$log" | sed 's/^/    /'; \

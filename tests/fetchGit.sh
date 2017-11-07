@@ -2,7 +2,7 @@ source common.sh
 
 if [[ -z $(type -p git) ]]; then
     echo "Git not installed; skipping Git tests"
-    exit 0
+    exit 99
 fi
 
 clearStore
