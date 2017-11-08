@@ -25,7 +25,14 @@
 (allow mach-lookup (global-name "com.apple.system.opendirectoryd.libinfo"))
 
 ; Access to /tmp.
-(allow file* process-exec (literal "/tmp") (subpath TMPDIR))
+; The network-outbound/network-inbound ones are for unix domain sockets, which
+; we allow access to in TMPDIR (but if we allow them more broadly, you could in
+; theory escape the sandbox)
+(allow file* process-exec network-outbound network-inbound
+       (literal "/tmp") (subpath TMPDIR))
+
+; Always allow unix domain sockets, since they can't hurt purity or security
+
 
 ; Some packages like to read the system version.
 (allow file-read* (literal "/System/Library/CoreServices/SystemVersion.plist"))
