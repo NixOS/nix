@@ -31,9 +31,6 @@
 (allow file* process-exec network-outbound network-inbound
        (literal "/tmp") (subpath TMPDIR))
 
-; Always allow unix domain sockets, since they can't hurt purity or security
-
-
 ; Some packages like to read the system version.
 (allow file-read* (literal "/System/Library/CoreServices/SystemVersion.plist"))
 
