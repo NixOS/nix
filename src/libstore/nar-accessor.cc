@@ -182,7 +182,8 @@ ref<FSAccessor> makeNarAccessor(ref<const std::string> nar)
     return make_ref<NarAccessor>(nar);
 }
 
-void listNar(JSONPlaceholder & res, ref<FSAccessor> accessor, const Path & path)
+void listNar(JSONPlaceholder & res, ref<FSAccessor> accessor,
+    const Path & path, bool recurse)
 {
     auto st = accessor->stat(path);
 
@@ -200,8 +201,11 @@ void listNar(JSONPlaceholder & res, ref<FSAccessor> accessor, const Path & path)
         {
             auto res2 = obj.object("entries");
             for (auto & name : accessor->readDirectory(path)) {
-                auto res3 = res2.placeholder(name);
-                listNar(res3, accessor, path + "/" + name);
+                if (recurse) {
+                    auto res3 = res2.placeholder(name);
+                    listNar(res3, accessor, path + "/" + name, true);
+                } else
+                    res2.object(name);
             }
         }
         break;

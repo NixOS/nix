@@ -10,6 +10,9 @@ ref<FSAccessor> makeNarAccessor(ref<const std::string> nar);
 
 class JSONPlaceholder;
 
-void listNar(JSONPlaceholder & res, ref<FSAccessor> accessor, const Path & path);
+/* Write a JSON representation of the contents of a NAR (except file
+   contents). */
+void listNar(JSONPlaceholder & res, ref<FSAccessor> accessor,
+    const Path & path, bool recurse);
 
 }

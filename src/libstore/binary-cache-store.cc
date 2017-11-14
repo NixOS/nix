@@ -121,7 +121,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
 
             {
                 auto res = jsonRoot.placeholder("root");
-                listNar(res, narAccessor, "");
+                listNar(res, narAccessor, "", true);
             }
         }
 
