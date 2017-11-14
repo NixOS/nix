@@ -43,10 +43,6 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .longName("version")
             .description("show version information")
             .handler([&]() { printVersion(programName); });
-
-        std::string cat = "config";
-        settings.convertToArgs(*this, cat);
-        hiddenCategories.insert(cat);
     }
 
     void printFlags(std::ostream & out) override

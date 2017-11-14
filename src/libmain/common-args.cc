@@ -34,6 +34,10 @@ MixCommonArgs::MixCommonArgs(const string & programName)
                 warn(e.what());
             }
         });
+
+    std::string cat = "config";
+    settings.convertToArgs(*this, cat);
+    hiddenCategories.insert(cat);
 }
 
 }
