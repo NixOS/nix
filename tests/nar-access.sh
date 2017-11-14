@@ -32,3 +32,7 @@ diff -u baz.cat-nar $storePath/foo/baz
 [[ $(nix ls-store --json $storePath) = '{"type":"directory","entries":{"foo":{},"foo-x":{},"qux":{},"zyx":{}}}' ]]
 [[ $(nix ls-store --json -R $storePath/foo) = '{"type":"directory","entries":{"bar":{"type":"regular","size":0},"baz":{"type":"regular","size":0},"data":{"type":"regular","size":58}}}' ]]
 [[ $(nix ls-store --json -R $storePath/foo/bar) = '{"type":"regular","size":0}' ]]
+
+# Test missing files.
+nix ls-store --json -R $storePath/xyzzy 2>&1 | grep 'does not exist in NAR'
+nix ls-store $storePath/xyzzy 2>&1 | grep 'does not exist'

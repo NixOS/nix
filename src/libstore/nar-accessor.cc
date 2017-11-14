@@ -214,7 +214,7 @@ void listNar(JSONPlaceholder & res, ref<FSAccessor> accessor,
         obj.attr("target", accessor->readLink(path));
         break;
     default:
-        abort();
+        throw Error("path '%s' does not exist in NAR", path);
     }
 }
 
