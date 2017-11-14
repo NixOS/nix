@@ -196,7 +196,7 @@ let
 
         doInstallCheck = true;
 
-        lcovFilter = [ "*/boost/*" "*-tab.*" ];
+        lcovFilter = [ "*/boost/*" "*-tab.*" "*/nlohmann/*" "*/linenoise/*" ];
 
         # We call `dot', and even though we just use it to
         # syntax-check generated dot files, it still requires some
