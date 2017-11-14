@@ -185,7 +185,7 @@ let
         buildInputs =
           [ curl bzip2 openssl pkgconfig sqlite xz libsodium libseccomp
             # These are for "make check" only:
-            graphviz libxml2 libxslt
+            graphviz libxml2 libxslt git mercurial
           ];
 
         configureFlags = ''
