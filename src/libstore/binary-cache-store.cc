@@ -119,42 +119,9 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
                 accessor_->addToCache(info.path, *nar);
             }
 
-            std::function<void(const Path &, JSONPlaceholder &)> recurse;
-
-            recurse = [&](const Path & path, JSONPlaceholder & res) {
-                auto st = narAccessor->stat(path);
-
-                auto obj = res.object();
-
-                switch (st.type) {
-                case FSAccessor::Type::tRegular:
-                    obj.attr("type", "regular");
-                    obj.attr("size", st.fileSize);
-                    if (st.isExecutable)
-                        obj.attr("executable", true);
-                    break;
-                case FSAccessor::Type::tDirectory:
-                    obj.attr("type", "directory");
-                    {
-                        auto res2 = obj.object("entries");
-                        for (auto & name : narAccessor->readDirectory(path)) {
-                            auto res3 = res2.placeholder(name);
-                            recurse(path + "/" + name, res3);
-                        }
-                    }
-                    break;
-                case FSAccessor::Type::tSymlink:
-                    obj.attr("type", "symlink");
-                    obj.attr("target", narAccessor->readLink(path));
-                    break;
-                default:
-                    abort();
-                }
-            };
-
             {
                 auto res = jsonRoot.placeholder("root");
-                recurse("", res);
+                listNar(res, narAccessor, "");
             }
         }
 

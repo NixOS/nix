@@ -8,4 +8,8 @@ namespace nix {
    file. */
 ref<FSAccessor> makeNarAccessor(ref<const std::string> nar);
 
+class JSONPlaceholder;
+
+void listNar(JSONPlaceholder & res, ref<FSAccessor> accessor, const Path & path);
+
 }

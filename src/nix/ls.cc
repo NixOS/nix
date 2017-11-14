@@ -2,10 +2,12 @@
 #include "store-api.hh"
 #include "fs-accessor.hh"
 #include "nar-accessor.hh"
+#include "common-args.hh"
+#include "json.hh"
 
 using namespace nix;
 
-struct MixLs : virtual Args
+struct MixLs : virtual Args, MixJSON
 {
     std::string path;
 
@@ -20,7 +22,7 @@ struct MixLs : virtual Args
         mkFlag('d', "directory", "show directories rather than their contents", &showDirectory);
     }
 
-    void list(ref<FSAccessor> accessor)
+    void listText(ref<FSAccessor> accessor)
     {
         std::function<void(const FSAccessor::Stat &, const Path &, const std::string &, bool)> doPath;
 
@@ -61,16 +63,23 @@ struct MixLs : virtual Args
                 showFile(curPath, relPath);
         };
 
-        if (path == "/") {
-            path = "";
-        }
-
         auto st = accessor->stat(path);
         if (st.type == FSAccessor::Type::tMissing)
             throw Error(format("path '%1%' does not exist") % path);
         doPath(st, path,
             st.type == FSAccessor::Type::tDirectory ? "." : baseNameOf(path),
             showDirectory);
+    }
+
+    void list(ref<FSAccessor> accessor)
+    {
+        if (path == "/") path = "";
+
+        if (json) {
+            JSONPlaceholder jsonRoot(std::cout, true);
+            listNar(jsonRoot, accessor, path);
+        } else
+            listText(accessor);
     }
 };
 

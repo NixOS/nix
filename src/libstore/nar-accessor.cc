@@ -1,5 +1,6 @@
 #include "nar-accessor.hh"
 #include "archive.hh"
+#include "json.hh"
 
 #include <map>
 #include <stack>
@@ -179,6 +180,38 @@ struct NarAccessor : public FSAccessor
 ref<FSAccessor> makeNarAccessor(ref<const std::string> nar)
 {
     return make_ref<NarAccessor>(nar);
+}
+
+void listNar(JSONPlaceholder & res, ref<FSAccessor> accessor, const Path & path)
+{
+    auto st = accessor->stat(path);
+
+    auto obj = res.object();
+
+    switch (st.type) {
+    case FSAccessor::Type::tRegular:
+        obj.attr("type", "regular");
+        obj.attr("size", st.fileSize);
+        if (st.isExecutable)
+            obj.attr("executable", true);
+        break;
+    case FSAccessor::Type::tDirectory:
+        obj.attr("type", "directory");
+        {
+            auto res2 = obj.object("entries");
+            for (auto & name : accessor->readDirectory(path)) {
+                auto res3 = res2.placeholder(name);
+                listNar(res3, accessor, path + "/" + name);
+            }
+        }
+        break;
+    case FSAccessor::Type::tSymlink:
+        obj.attr("type", "symlink");
+        obj.attr("target", accessor->readLink(path));
+        break;
+    default:
+        abort();
+    }
 }
 
 }
