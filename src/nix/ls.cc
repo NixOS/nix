@@ -76,7 +76,7 @@ struct MixLs : virtual Args, MixJSON
         if (path == "/") path = "";
 
         if (json) {
-            JSONPlaceholder jsonRoot(std::cout, true);
+            JSONPlaceholder jsonRoot(std::cout);
             listNar(jsonRoot, accessor, path);
         } else
             listText(accessor);

@@ -65,7 +65,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             pathLen = std::max(pathLen, storePath.size());
 
         if (json) {
-            JSONPlaceholder jsonRoot(std::cout, true);
+            JSONPlaceholder jsonRoot(std::cout);
             store->pathInfoToJSON(jsonRoot,
                 // FIXME: preserve order?
                 PathSet(storePaths.begin(), storePaths.end()),

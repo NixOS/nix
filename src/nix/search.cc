@@ -84,7 +84,7 @@ struct CmdSearch : SourceExprCommand, MixJSON
 
         bool first = true;
 
-        auto jsonOut = json ? std::make_unique<JSONObject>(std::cout, true) : nullptr;
+        auto jsonOut = json ? std::make_unique<JSONObject>(std::cout) : nullptr;
 
         auto sToplevel = state->symbols.create("_toplevel");
         auto sRecurse = state->symbols.create("recurseForDerivations");

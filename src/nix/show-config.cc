@@ -26,7 +26,7 @@ struct CmdShowConfig : Command, MixJSON
     {
         if (json) {
             // FIXME: use appropriate JSON types (bool, ints, etc).
-            JSONObject jsonObj(std::cout, true);
+            JSONObject jsonObj(std::cout);
             settings.toJSON(jsonObj);
         } else {
             for (auto & s : settings.getSettings())
