@@ -1,7 +1,7 @@
 source common.sh
 
 echo "building test path"
-storePath="$(nix-build nar-index.nix -A a --no-out-link)"
+storePath="$(nix-build nar-access.nix -A a --no-out-link)"
 
 cd "$TEST_ROOT"
 

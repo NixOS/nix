@@ -14,7 +14,7 @@ nix_tests = \
   placeholders.sh nix-shell.sh \
   linux-sandbox.sh \
   build-remote.sh \
-  nar-index.sh \
+  nar-access.sh \
   structured-attrs.sh \
   fetchGit.sh \
   fetchMercurial.sh
