@@ -73,6 +73,23 @@ Path BinaryCacheStore::narInfoFileFor(const Path & storePath)
     return storePathToHash(storePath) + ".narinfo";
 }
 
+void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
+{
+    auto narInfoFile = narInfoFileFor(narInfo->path);
+
+    upsertFile(narInfoFile, narInfo->to_string(), "text/x-nix-narinfo");
+
+    auto hashPart = storePathToHash(narInfo->path);
+
+    {
+        auto state_(state.lock());
+        state_->pathInfoCache.upsert(hashPart, std::shared_ptr<NarInfo>(narInfo));
+    }
+
+    if (diskCache)
+        diskCache->upsertNarInfo(getUri(), hashPart, std::shared_ptr<NarInfo>(narInfo));
+}
+
 void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
     RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
 {
@@ -88,8 +105,6 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
             throw Error(format("cannot add '%s' to the binary cache because the reference '%s' is not valid")
                 % info.path % ref);
         }
-
-    auto narInfoFile = narInfoFileFor(info.path);
 
     assert(nar->compare(0, narMagic.size(), narMagic) == 0);
 
@@ -168,17 +183,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
     /* Atomically write the NAR info file.*/
     if (secretKey) narInfo->sign(*secretKey);
 
-    upsertFile(narInfoFile, narInfo->to_string(), "text/x-nix-narinfo");
-
-    auto hashPart = storePathToHash(narInfo->path);
-
-    {
-        auto state_(state.lock());
-        state_->pathInfoCache.upsert(hashPart, std::shared_ptr<NarInfo>(narInfo));
-    }
-
-    if (diskCache)
-        diskCache->upsertNarInfo(getUri(), hashPart, std::shared_ptr<NarInfo>(narInfo));
+    writeNarInfo(narInfo);
 
     stats.narInfoWrite++;
 }
@@ -291,6 +296,22 @@ Path BinaryCacheStore::addTextToStore(const string & name, const string & s,
 ref<FSAccessor> BinaryCacheStore::getFSAccessor()
 {
     return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()), localNarCache);
+}
+
+void BinaryCacheStore::addSignatures(const Path & storePath, const StringSet & sigs)
+{
+    /* Note: this is inherently racy since there is no locking on
+       binary caches. In particular, with S3 this unreliable, even
+       when addSignatures() is called sequentially on a path, because
+       S3 might return an outdated cached version. */
+
+    auto narInfo = make_ref<NarInfo>((NarInfo &) *queryPathInfo(storePath));
+
+    narInfo->sigs.insert(sigs.begin(), sigs.end());
+
+    auto narInfoFile = narInfoFileFor(narInfo->path);
+
+    writeNarInfo(narInfo);
 }
 
 std::shared_ptr<std::string> BinaryCacheStore::getBuildLog(const Path & path)

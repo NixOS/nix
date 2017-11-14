@@ -60,3 +60,9 @@ info=$(nix path-info --store file://$cacheDir --json $outPath2)
 (! [[ $info =~ '"ultimate":true' ]])
 [[ $info =~ 'cache1.example.org' ]]
 (! [[ $info =~ 'cache2.example.org' ]])
+
+# Verify that adding a signature to a path in a binary cache works.
+nix sign-paths --store file://$cacheDir --key-file $TEST_ROOT/sk2 $outPath2
+info=$(nix path-info --store file://$cacheDir --json $outPath2)
+[[ $info =~ 'cache1.example.org' ]]
+[[ $info =~ 'cache2.example.org' ]]

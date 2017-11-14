@@ -59,6 +59,8 @@ private:
 
     std::string narInfoFileFor(const Path & storePath);
 
+    void writeNarInfo(ref<NarInfo> narInfo);
+
 public:
 
     bool isValidPathUncached(const Path & path) override;
@@ -119,8 +121,7 @@ public:
 
     ref<FSAccessor> getFSAccessor() override;
 
-    void addSignatures(const Path & storePath, const StringSet & sigs) override
-    { unsupported(); }
+    void addSignatures(const Path & storePath, const StringSet & sigs) override;
 
     std::shared_ptr<std::string> getBuildLog(const Path & path) override;
 
