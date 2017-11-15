@@ -17,6 +17,7 @@ public:
     int status;
     Exit() : status(0) { }
     Exit(int status) : status(status) { }
+    virtual ~Exit();
 };
 
 int handleExceptions(const string & programName, std::function<void()> fun);
