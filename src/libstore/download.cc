@@ -533,7 +533,7 @@ struct CurlDownloader : public Downloader
             // FIXME: do this on a worker thread
             sync2async<DownloadResult>(success, failure, [&]() -> DownloadResult {
 #ifdef ENABLE_S3
-                S3Helper s3Helper(Aws::Region::US_EAST_1); // FIXME: make configurable
+                S3Helper s3Helper("", Aws::Region::US_EAST_1); // FIXME: make configurable
                 auto slash = request.uri.find('/', 5);
                 if (slash == std::string::npos)
                     throw nix::Error("bad S3 URI '%s'", request.uri);

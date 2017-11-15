@@ -10,6 +10,8 @@
 #include "istringstream_nocopy.hh"
 
 #include <aws/core/Aws.h>
+#include <aws/core/auth/AWSCredentialsProvider.h>
+#include <aws/core/auth/AWSCredentialsProviderChain.h>
 #include <aws/core/client/ClientConfiguration.h>
 #include <aws/core/client/DefaultRetryStrategy.h>
 #include <aws/core/utils/logging/FormattedLogSystem.h>
@@ -77,9 +79,15 @@ static void initAWS()
     });
 }
 
-S3Helper::S3Helper(const string & region)
+S3Helper::S3Helper(const std::string & profile, const std::string & region)
     : config(makeConfig(region))
-    , client(make_ref<Aws::S3::S3Client>(*config, true, false))
+    , client(make_ref<Aws::S3::S3Client>(
+            profile == ""
+            ? std::dynamic_pointer_cast<Aws::Auth::AWSCredentialsProvider>(
+                std::make_shared<Aws::Auth::DefaultAWSCredentialsProviderChain>())
+            : std::dynamic_pointer_cast<Aws::Auth::AWSCredentialsProvider>(
+                std::make_shared<Aws::Auth::ProfileConfigFileAWSCredentialsProvider>(profile.c_str())),
+            *config, true, false))
 {
 }
 
@@ -148,6 +156,7 @@ S3Helper::DownloadResult S3Helper::getObject(
 
 struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 {
+    const Setting<std::string> profile{this, "", "profile", "The name of the AWS configuration profile to use."};
     const Setting<std::string> region{this, Aws::Region::US_EAST_1, "region", {"aws-region"}};
     const Setting<std::string> narinfoCompression{this, "", "narinfo-compression", "compression method for .narinfo files"};
     const Setting<std::string> lsCompression{this, "", "ls-compression", "compression method for .ls files"};
@@ -163,7 +172,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         const Params & params, const std::string & bucketName)
         : S3BinaryCacheStore(params)
         , bucketName(bucketName)
-        , s3Helper(region)
+        , s3Helper(profile, region)
     {
         diskCache = getNarInfoDiskCache();
     }
