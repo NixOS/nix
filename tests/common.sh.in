@@ -90,4 +90,15 @@ fail() {
     exit 1
 }
 
+expect() {
+    local expected res
+    expected="$1"
+    shift
+    set +e
+    "$@"
+    res="$?"
+    set -e
+    [[ $res -eq $expected ]]
+}
+
 set -x
