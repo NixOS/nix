@@ -402,12 +402,15 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry><term><literal>signed-binary-caches</literal></term>
+  <varlistentry><term><literal>require-sigs</literal></term>
 
-    <listitem><para>If set to <literal>*</literal> (the default), Nix
-    will only download binaries if they are signed using one of the
-    keys listed in <option>trusted-public-keys</option>. Set to
-    the empty string to disable signature checking.</para></listitem>
+    <listitem><para>If set to <literal>true</literal> (the default),
+    any non-content-addressed path added or copied to the Nix store
+    (e.g. when substituting from a binary cache) must have a valid
+    signature, that is, be signed using one of the keys listed in
+    <option>trusted-public-keys</option>. Set to
+    <literal>false</literal> to disable signature
+    checking.</para></listitem>
 
   </varlistentry>
 

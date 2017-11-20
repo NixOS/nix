@@ -281,6 +281,11 @@ public:
     Setting<std::string> signedBinaryCaches{this, "*", "signed-binary-caches",
         "Obsolete."};
 
+    Setting<bool> requireSigs{this, signedBinaryCaches == "*", "require-sigs",
+        "Whether to check that any non-content-addressed path added to the "
+        "Nix store has a valid signature (that is, one signed using a key "
+        "listed in 'trusted-public-keys'."};
+
     Setting<Strings> substituters{this,
         nixStore == "/nix/store" ? Strings{"https://cache.nixos.org/"} : Strings(),
         "substituters",

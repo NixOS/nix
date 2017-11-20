@@ -97,7 +97,7 @@ public:
 private:
 
     Setting<bool> requireSigs{(Store*) this,
-        settings.signedBinaryCaches != "", // FIXME
+        settings.requireSigs,
         "require-sigs", "whether store paths should have a trusted signature on import"};
 
     PublicKeys publicKeys;
