@@ -42,6 +42,10 @@ struct CmdEval : MixJSON, InstallablesCommand
                 "To get the current version of Nixpkgs:",
                 "nix eval --raw nixpkgs.lib.nixpkgsVersion"
             },
+            Example{
+                "To print the store path of the Hello package:",
+                "nix eval --raw nixpkgs.hello"
+            },
         };
     }
 
@@ -56,10 +60,10 @@ struct CmdEval : MixJSON, InstallablesCommand
 
         for (auto & i : installables) {
             auto v = i->toValue(*state);
+            PathSet context;
             if (raw) {
-                std::cout << state->forceString(*v);
+                std::cout << state->coerceToString(noPos, *v, context);
             } else if (json) {
-                PathSet context;
                 auto jsonElem = jsonOut->placeholder();
                 printValueAsJSON(*state, true, *v, jsonElem, context);
             } else {
