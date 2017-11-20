@@ -747,14 +747,6 @@ build-users-group = $NIX_BUILD_GROUP_NAME
 max-jobs = $NIX_USER_COUNT
 cores = 1
 sandbox = false
-
-binary-caches = https://cache.nixos.org/
-trusted-binary-caches =
-binary-cache-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
-signed-binary-caches = *
-
-trusted-users = root
-allowed-users = *
 EOF
     _sudo "to place the default nix daemon configuration (part 2)" \
           install -m 0664 "$SCRATCH/nix.conf" /etc/nix/nix.conf
