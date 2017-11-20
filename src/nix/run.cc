@@ -184,7 +184,7 @@ void chrootHelper(int argc, char * * argv)
        but that doesn't work in a user namespace yet (Ubuntu has a
        patch for this:
        https://bugs.launchpad.net/ubuntu/+source/linux/+bug/1478578). */
-    if (true /* !pathExists(storeDir) */) {
+    if (!pathExists(storeDir)) {
         // FIXME: Use overlayfs?
 
         Path tmpDir = createTempDir();
