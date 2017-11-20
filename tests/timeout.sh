@@ -15,7 +15,7 @@ if ! echo "$messages" | grep -q "timed out"; then
     exit 1
 fi
 
-if nix-build -Q timeout.nix -A infiniteLoop --option max-build-log-size 100; then
+if nix-build -Q timeout.nix -A infiniteLoop --max-build-log-size 100; then
     echo "build should have failed"
     exit 1
 fi

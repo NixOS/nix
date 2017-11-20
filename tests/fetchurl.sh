@@ -5,7 +5,7 @@ clearStore
 # Test fetching a flat file.
 hash=$(nix-hash --flat --type sha256 ./fetchurl.sh)
 
-outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr sha256 $hash --no-out-link --option hashed-mirrors '')
+outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr sha256 $hash --no-out-link --hashed-mirrors '')
 
 cmp $outPath fetchurl.sh
 
@@ -14,7 +14,7 @@ clearStore
 
 hash=$(nix hash-file --type sha512 --base64 ./fetchurl.sh)
 
-outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr sha512 $hash --no-out-link --option hashed-mirrors '')
+outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr sha512 $hash --no-out-link --hashed-mirrors '')
 
 cmp $outPath fetchurl.sh
 
@@ -29,7 +29,7 @@ rm -rf $mirror
 mkdir -p $mirror/sha512
 ln -s $(pwd)/fetchurl.sh $mirror/sha512/$hash32
 
-outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr sha512 $hash --no-out-link --option hashed-mirrors "file://$mirror")
+outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr sha512 $hash --no-out-link --hashed-mirrors "file://$mirror")
 
 # Test unpacking a NAR.
 rm -rf $TEST_ROOT/archive
