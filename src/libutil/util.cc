@@ -221,9 +221,9 @@ Path readLink(const Path & path)
         ssize_t rlSize = readlink(path.c_str(), buf, bufSize);
         if (rlSize == -1)
             if (errno == EINVAL)
-                throw Error(format("'%1%' is not a symlink") % path);
+                throw Error("'%1%' is not a symlink", path);
             else
-                throw SysError(format("reading symbolic link '%1%'") % path);
+                throw SysError("reading symbolic link '%1%'", path);
         else if (rlSize < bufSize)
             return string(buf, rlSize);
     }
