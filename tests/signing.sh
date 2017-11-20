@@ -52,6 +52,16 @@ nix sign-paths --key-file $TEST_ROOT/sk1 $outPath2
 
 nix verify -r $outPath2 --sigs-needed 1 --trusted-public-keys $pk1
 
+# Build something content-addressed.
+outPathCA=$(IMPURE_VAR1=foo IMPURE_VAR2=bar nix-build ./fixed.nix -A good.0)
+
+[[ $(nix path-info --json $outPathCA) =~ '"ca":"fixed:md5:' ]]
+
+# Content-addressed paths don't need signatures, so they verify
+# regardless of --sigs-needed.
+nix verify $outPathCA
+nix verify $outPathCA --sigs-needed 1000
+
 # Copy to a binary cache.
 nix copy --to file://$cacheDir $outPath2
 
@@ -73,7 +83,7 @@ rm -rf $TEST_ROOT/store0
 (! nix copy --to $TEST_ROOT/store0 $outPath)
 
 # But succeed if we supply the public keys.
-(nix copy --to $TEST_ROOT/store0 $outPath --trusted-public-keys $pk1)
+nix copy --to $TEST_ROOT/store0 $outPath --trusted-public-keys $pk1
 
 expect 2 nix verify --store $TEST_ROOT/store0 -r $outPath
 
@@ -86,3 +96,6 @@ nix copy --to $TEST_ROOT/store0?require-sigs=false $outPath2
 
 # But signatures should still get copied.
 nix verify --store $TEST_ROOT/store0 -r $outPath2 --trusted-public-keys $pk1
+
+# Content-addressed stuff can be copied without signatures.
+nix copy --to $TEST_ROOT/store0 $outPathCA
