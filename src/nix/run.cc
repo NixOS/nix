@@ -30,8 +30,8 @@ struct CmdRun : InstallablesCommand
             .longName("command")
             .shortName('c')
             .description("command and arguments to be executed; defaults to 'bash'")
-            .arity(ArityAny)
             .labels({"command", "args"})
+            .arity(ArityAny)
             .handler([&](std::vector<std::string> ss) {
                 if (ss.empty()) throw UsageError("--command requires at least one argument");
                 command = ss;
