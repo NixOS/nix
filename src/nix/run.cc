@@ -195,12 +195,15 @@ void chrootHelper(int argc, char * * argv)
             throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);
 
         for (auto entry : readDirectory("/")) {
+            auto src = "/" + entry.name;
+            auto st = lstat(src);
+            if (!S_ISDIR(st.st_mode)) continue;
             Path dst = tmpDir + "/" + entry.name;
             if (pathExists(dst)) continue;
             if (mkdir(dst.c_str(), 0700) == -1)
-                throw SysError(format("creating directory '%s'") % dst);
-            if (mount(("/" + entry.name).c_str(), dst.c_str(), "", MS_BIND | MS_REC, 0) == -1)
-                throw SysError(format("mounting '%s' on '%s'") %  ("/" + entry.name) % dst);
+                throw SysError("creating directory '%s'", dst);
+            if (mount(src.c_str(), dst.c_str(), "", MS_BIND | MS_REC, 0) == -1)
+                throw SysError("mounting '%s' on '%s'", src, dst);
         }
 
         char * cwd = getcwd(0, 0);
