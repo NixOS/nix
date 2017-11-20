@@ -216,18 +216,17 @@ bool pathExists(const Path & path)
 Path readLink(const Path & path)
 {
     checkInterrupt();
-    struct stat st = lstat(path);
-    if (!S_ISLNK(st.st_mode))
-        throw Error(format("'%1%' is not a symlink") % path);
-    auto bufSize = std::max(st.st_size, (off_t) PATH_MAX + 1);
-    char buf[bufSize];
-    ssize_t rlsize = readlink(path.c_str(), buf, bufSize);
-    if (rlsize == -1)
-        throw SysError(format("reading symbolic link '%1%'") % path);
-    else if (rlsize > bufSize)
-        throw Error(format("symbolic link '%1%' size overflow %2% > %3%")
-            % path % rlsize % bufSize);
-    return string(buf, rlsize);
+    for (ssize_t bufSize = PATH_MAX/4; true; bufSize += bufSize/2) {
+        char buf[bufSize];
+        ssize_t rlSize = readlink(path.c_str(), buf, bufSize);
+        if (rlSize == -1)
+            if (errno == EINVAL)
+                throw Error(format("'%1%' is not a symlink") % path);
+            else
+                throw SysError(format("reading symbolic link '%1%'") % path);
+        else if (rlSize < bufSize)
+            return string(buf, rlSize);
+    }
 }
 
 
