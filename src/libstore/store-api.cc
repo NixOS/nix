@@ -577,9 +577,9 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
     auto dstUri = dstStore->getUri();
 
     Activity act(*logger, lvlInfo, actCopyPath,
-        srcUri == "local"
+        srcUri == "local" || srcUri == "daemon"
           ? fmt("copying path '%s' to '%s'", storePath, dstUri)
-          : dstUri == "local"
+          : dstUri == "local" || dstUri == "daemon"
             ? fmt("copying path '%s' from '%s'", storePath, srcUri)
             : fmt("copying path '%s' from '%s' to '%s'", storePath, srcUri, dstUri),
         {storePath, srcUri, dstUri});
