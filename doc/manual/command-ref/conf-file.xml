@@ -408,9 +408,9 @@ false</literal>.</para>
     any non-content-addressed path added or copied to the Nix store
     (e.g. when substituting from a binary cache) must have a valid
     signature, that is, be signed using one of the keys listed in
-    <option>trusted-public-keys</option>. Set to
-    <literal>false</literal> to disable signature
-    checking.</para></listitem>
+    <option>trusted-public-keys</option> or
+    <option>secret-key-files</option>. Set to <literal>false</literal>
+    to disable signature checking.</para></listitem>
 
   </varlistentry>
 
@@ -422,6 +422,19 @@ false</literal>.</para>
     they must be signed with one of these keys. For example:
     <literal>cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
     hydra.nixos.org-1:CNHJZBh9K4tP3EKF6FkkgeVYsS3ohTl+oS0Qa8bezVs=</literal>.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry><term><literal>secret-key-files</literal></term>
+
+    <listitem><para>A whitespace-separated list of files containing
+    secret (private) keys. These are used to sign locally-built
+    paths. They can be generated using <command>nix-store
+    --generate-binary-cache-key</command>. The corresponding public
+    key can be distributed to other users, who can add it to
+    <option>trusted-public-keys</option> in their
+    <filename>nix.conf</filename>.</para></listitem>
 
   </varlistentry>
 
