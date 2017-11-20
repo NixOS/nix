@@ -259,10 +259,11 @@ public:
     Setting<bool> enforceDeterminism{this, true, "enforce-determinism",
         "Whether to fail if repeated builds produce different output."};
 
-    Setting<Strings> binaryCachePublicKeys{this,
+    Setting<Strings> trustedPublicKeys{this,
         {"cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="},
-        "binary-cache-public-keys",
-        "Trusted public keys for secure substitution."};
+        "trusted-public-keys",
+        "Trusted public keys for secure substitution.",
+        {"binary-cache-public-keys"}};
 
     Setting<Strings> secretKeyFiles{this, {}, "secret-key-files",
         "Secret keys with which to sign local builds."};

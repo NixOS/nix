@@ -131,11 +131,11 @@ clearCacheCache
 clearStore
 clearCacheCache
 
-(! nix-store -r $outPath --option binary-caches "file://$cacheDir" --option signed-binary-caches '*' --option binary-cache-public-keys "$badKey")
+(! nix-store -r $outPath --option binary-caches "file://$cacheDir" --option signed-binary-caches '*' --option trusted-public-keys "$badKey")
 
 
 # It should succeed if we provide the correct key.
-nix-store -r $outPath --option binary-caches "file://$cacheDir" --option signed-binary-caches '*' --option binary-cache-public-keys "$otherKey $publicKey"
+nix-store -r $outPath --option binary-caches "file://$cacheDir" --option signed-binary-caches '*' --option trusted-public-keys "$otherKey $publicKey"
 
 
 # It should fail if we corrupt the .narinfo.
@@ -152,10 +152,10 @@ done
 
 clearCacheCache
 
-(! nix-store -r $outPath --option binary-caches "file://$cacheDir2" --option signed-binary-caches '*' --option binary-cache-public-keys "$publicKey")
+(! nix-store -r $outPath --option binary-caches "file://$cacheDir2" --option signed-binary-caches '*' --option trusted-public-keys "$publicKey")
 
 # If we provide a bad and a good binary cache, it should succeed.
 
-nix-store -r $outPath --option binary-caches "file://$cacheDir2 file://$cacheDir" --option signed-binary-caches '*' --option binary-cache-public-keys "$publicKey"
+nix-store -r $outPath --option binary-caches "file://$cacheDir2 file://$cacheDir" --option signed-binary-caches '*' --option trusted-public-keys "$publicKey"
 
 fi # HAVE_LIBSODIUM

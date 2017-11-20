@@ -406,17 +406,17 @@ false</literal>.</para>
 
     <listitem><para>If set to <literal>*</literal> (the default), Nix
     will only download binaries if they are signed using one of the
-    keys listed in <option>binary-cache-public-keys</option>. Set to
+    keys listed in <option>trusted-public-keys</option>. Set to
     the empty string to disable signature checking.</para></listitem>
 
   </varlistentry>
 
 
-  <varlistentry><term><literal>binary-cache-public-keys</literal></term>
+  <varlistentry><term><literal>trusted-public-keys</literal></term>
 
-    <listitem><para>A whitespace-separated list of public keys
-    corresponding to the secret keys trusted to sign binary
-    caches. For example:
+    <listitem><para>A whitespace-separated list of public keys. When
+    paths are copied from another Nix store (such as a binary cache),
+    they must be signed with one of these keys. For example:
     <literal>cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
     hydra.nixos.org-1:CNHJZBh9K4tP3EKF6FkkgeVYsS3ohTl+oS0Qa8bezVs=</literal>.</para></listitem>
 

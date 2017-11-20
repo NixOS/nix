@@ -105,7 +105,7 @@ PublicKeys getDefaultPublicKeys()
 
     // FIXME: filter duplicates
 
-    for (auto s : settings.binaryCachePublicKeys.get()) {
+    for (auto s : settings.trustedPublicKeys.get()) {
         PublicKey key(s);
         publicKeys.emplace(key.name, key);
     }

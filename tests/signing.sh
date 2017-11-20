@@ -22,13 +22,13 @@ nix verify -r $outPath
 
 expect 2 nix verify -r $outPath --sigs-needed 1
 
-nix verify -r $outPath --sigs-needed 1 --binary-cache-public-keys $pk1
+nix verify -r $outPath --sigs-needed 1 --trusted-public-keys $pk1
 
-expect 2 nix verify -r $outPath --sigs-needed 2 --binary-cache-public-keys $pk1
+expect 2 nix verify -r $outPath --sigs-needed 2 --trusted-public-keys $pk1
 
-nix verify -r $outPath --sigs-needed 2 --binary-cache-public-keys "$pk1 $pk2"
+nix verify -r $outPath --sigs-needed 2 --trusted-public-keys "$pk1 $pk2"
 
-nix verify --all --sigs-needed 2 --binary-cache-public-keys "$pk1 $pk2"
+nix verify --all --sigs-needed 2 --trusted-public-keys "$pk1 $pk2"
 
 # Build something unsigned.
 outPath2=$(nix-build simple.nix --no-out-link)
@@ -45,12 +45,12 @@ nix verify -r $outPath2
 
 expect 2 nix verify -r $outPath2 --sigs-needed 1
 
-expect 2 nix verify -r $outPath2 --sigs-needed 1 --binary-cache-public-keys $pk1
+expect 2 nix verify -r $outPath2 --sigs-needed 1 --trusted-public-keys $pk1
 
 # Test "nix sign-paths".
 nix sign-paths --key-file $TEST_ROOT/sk1 $outPath2
 
-nix verify -r $outPath2 --sigs-needed 1 --binary-cache-public-keys $pk1
+nix verify -r $outPath2 --sigs-needed 1 --trusted-public-keys $pk1
 
 # Copy to a binary cache.
 nix copy --to file://$cacheDir $outPath2
