@@ -18,7 +18,8 @@ nix_tests = \
   structured-attrs.sh \
   fetchGit.sh \
   fetchMercurial.sh \
-  signing.sh
+  signing.sh \
+  run.sh
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
