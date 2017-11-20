@@ -66,3 +66,23 @@ nix sign-paths --store file://$cacheDir --key-file $TEST_ROOT/sk2 $outPath2
 info=$(nix path-info --store file://$cacheDir --json $outPath2)
 [[ $info =~ 'cache1.example.org' ]]
 [[ $info =~ 'cache2.example.org' ]]
+
+# Copying to a diverted store should fail due to a lack of valid signatures.
+chmod -R u+w $TEST_ROOT/store0 || true
+rm -rf $TEST_ROOT/store0
+(! nix copy --to $TEST_ROOT/store0 $outPath)
+
+# But succeed if we supply the public keys.
+(nix copy --to $TEST_ROOT/store0 $outPath --trusted-public-keys $pk1)
+
+expect 2 nix verify --store $TEST_ROOT/store0 -r $outPath
+
+nix verify --store $TEST_ROOT/store0 -r $outPath --trusted-public-keys $pk1
+nix verify --store $TEST_ROOT/store0 -r $outPath --sigs-needed 2 --trusted-public-keys "$pk1 $pk2"
+
+# It should also succeed if we disable signature checking.
+(! nix copy --to $TEST_ROOT/store0 $outPath2)
+nix copy --to $TEST_ROOT/store0?require-sigs=false $outPath2
+
+# But signatures should still get copied.
+nix verify --store $TEST_ROOT/store0 -r $outPath2 --trusted-public-keys $pk1
