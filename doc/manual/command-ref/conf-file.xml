@@ -543,11 +543,12 @@ password <replaceable>my-password</replaceable>
       <literal>wheel</literal> group. The default is
       <literal>root</literal>.</para>
 
-      <warning><para>The users listed here have the ability to
-      compromise the security of a multi-user Nix store. For instance,
-      they could install Trojan horses subsequently executed by other
-      users. So you should consider carefully whether to add users to
-      this list.</para></warning>
+      <warning><para>Adding a user to <option>trusted-users</option>
+      is essentially equivalent to giving that user root access to the
+      system. For example, the user can set
+      <option>sandbox-paths</option> and thereby obtain read access to
+      directories that are otherwise inacessible to
+      them.</para></warning>
 
     </listitem>
 
