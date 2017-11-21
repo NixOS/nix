@@ -17,7 +17,9 @@ if [[ $(uname) = Linux ]]; then
 
     # Note: we need the sandbox paths to ensure that the shell is
     # visible in the sandbox.
-    nix run --sandbox-paths '/nix? /bin? /lib? /usr?' --store $TEST_ROOT/store0 -f run.nix hello -c hello | grep 'Hello World'
+    nix run --sandbox-build-dir /build-tmp \
+        --sandbox-paths '/nix? /bin? /lib? /usr?' \
+        --store $TEST_ROOT/store0 -f run.nix hello -c hello | grep 'Hello World'
 
     path2=$(nix run --sandbox-paths '/nix? /bin? /lib? /usr?' --store $TEST_ROOT/store0 -f run.nix hello -c $SHELL -c 'type -p hello')
 
