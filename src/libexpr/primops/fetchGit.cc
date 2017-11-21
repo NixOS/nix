@@ -56,8 +56,9 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
                 auto st = lstat(p);
 
                 if (S_ISDIR(st.st_mode)) {
-                    auto i = files.lower_bound(file);
-                    return i != files.end() && hasPrefix(*i, file);
+                    auto prefix = file + "/";
+                    auto i = files.lower_bound(prefix);
+                    return i != files.end() && hasPrefix(*i, prefix);
                 }
 
                 return files.count(file);

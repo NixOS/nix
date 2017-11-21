@@ -16,7 +16,8 @@ echo '[ui]' >> $repo/.hg/hgrc
 echo 'username = Foobar <foobar@example.org>' >> $repo/.hg/hgrc
 
 echo utrecht > $repo/hello
-hg add --cwd $repo hello
+touch $repo/.hgignore
+hg add --cwd $repo hello .hgignore
 hg commit --cwd $repo -m 'Bla1'
 rev1=$(hg log --cwd $repo -r tip --template '{node}')
 
@@ -69,6 +70,7 @@ path2=$(nix eval --raw "(builtins.fetchMercurial $repo).outPath")
 [ ! -e $path2/hello ]
 [ ! -e $path2/bar ]
 [ ! -e $path2/dir2/bar ]
+[ ! -e $path2/.hg ]
 [[ $(cat $path2/dir1/foo) = foo ]]
 
 [[ $(nix eval --raw "(builtins.fetchMercurial $repo).rev") = 0000000000000000000000000000000000000000 ]]

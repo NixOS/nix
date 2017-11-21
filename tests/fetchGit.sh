@@ -16,7 +16,8 @@ git -C $repo config user.email "foobar@example.com"
 git -C $repo config user.name "Foobar"
 
 echo utrecht > $repo/hello
-git -C $repo add hello
+touch $repo/.gitignore
+git -C $repo add hello .gitignore
 git -C $repo commit -m 'Bla1'
 rev1=$(git -C $repo rev-parse HEAD)
 
@@ -68,6 +69,7 @@ path2=$(nix eval --raw "(builtins.fetchGit $repo).outPath")
 [ ! -e $path2/hello ]
 [ ! -e $path2/bar ]
 [ ! -e $path2/dir2/bar ]
+[ ! -e $path2/.git ]
 [[ $(cat $path2/dir1/foo) = foo ]]
 
 [[ $(nix eval --raw "(builtins.fetchGit $repo).rev") = 0000000000000000000000000000000000000000 ]]
