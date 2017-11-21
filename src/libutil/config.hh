@@ -142,6 +142,12 @@ public:
 
     void set(const std::string & str) override;
 
+    virtual void override(const T & v)
+    {
+        overriden = true;
+        value = v;
+    }
+
     std::string to_string() override;
 
     void convertToArg(Args & args, const std::string & category) override;
