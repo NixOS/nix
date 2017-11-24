@@ -263,6 +263,8 @@ void mainWrapped(int argc, char * * argv)
     if (runEnv)
         setenv("IN_NIX_SHELL", pure ? "pure" : "impure", 1);
 
+    DrvInfos drvs;
+
     /* Parse the expressions. */
     std::vector<Expr *> exprs;
 
@@ -272,6 +274,8 @@ void mainWrapped(int argc, char * * argv)
         for (auto i : left) {
             if (fromArgs)
                 exprs.push_back(state.parseExprFromString(i, absPath(".")));
+            else if (store->isStorePath(i) && std::regex_match(i, std::regex(".*\\.drv(!.*)?")))
+                drvs.push_back(DrvInfo(state, store, i));
             else
                 /* If we're in a #! script, interpret filenames
                    relative to the script. */
@@ -280,8 +284,6 @@ void mainWrapped(int argc, char * * argv)
         }
 
     /* Evaluate them into derivations. */
-    DrvInfos drvs;
-
     if (attrPaths.empty()) attrPaths = {""};
 
     for (auto e : exprs) {

@@ -10,6 +10,13 @@ output=$(nix-shell --pure shell.nix -A shellDrv --run \
 
 [ "$output" = " - foo - bar" ]
 
+# Test nix-shell on a .drv
+[[ $(nix-shell --pure $(nix-instantiate shell.nix -A shellDrv) --run \
+    'echo "$IMPURE_VAR - $VAR_FROM_STDENV_SETUP - $VAR_FROM_NIX"') = " - foo - bar" ]]
+
+[[ $(nix-shell --pure $(nix-instantiate shell.nix -A shellDrv) --run \
+    'echo "$IMPURE_VAR - $VAR_FROM_STDENV_SETUP - $VAR_FROM_NIX"') = " - foo - bar" ]]
+
 # Test nix-shell -p
 output=$(NIX_PATH=nixpkgs=shell.nix nix-shell --pure -p foo bar --run 'echo "$(foo) $(bar)"')
 [ "$output" = "foo bar" ]

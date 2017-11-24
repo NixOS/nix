@@ -1,6 +1,7 @@
 #include "get-drvs.hh"
 #include "util.hh"
 #include "eval-inline.hh"
+#include "derivations.hh"
 
 #include <cstring>
 #include <regex>
@@ -12,6 +13,33 @@ namespace nix {
 DrvInfo::DrvInfo(EvalState & state, const string & attrPath, Bindings * attrs)
     : state(&state), attrs(attrs), attrPath(attrPath)
 {
+}
+
+
+DrvInfo::DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPathWithOutputs)
+    : state(&state), attrs(nullptr), attrPath("")
+{
+    auto spec = parseDrvPathWithOutputs(drvPathWithOutputs);
+
+    drvPath = spec.first;
+
+    auto drv = store->derivationFromPath(drvPath);
+
+    name = storePathToName(drvPath);
+
+    if (spec.second.size() > 1)
+        throw Error("building more than one derivation output is not supported, in '%s'", drvPathWithOutputs);
+
+    outputName =
+        spec.second.empty()
+        ? get(drv.env, "outputName", "out")
+        : *spec.second.begin();
+
+    auto i = drv.outputs.find(outputName);
+    if (i == drv.outputs.end())
+        throw Error("derivation '%s' does not have output '%s'", drvPath, outputName);
+
+    outPath = i->second.path;
 }
 
 

@@ -37,6 +37,7 @@ public:
 
     DrvInfo(EvalState & state) : state(&state) { };
     DrvInfo(EvalState & state, const string & attrPath, Bindings * attrs);
+    DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPathWithOutputs);
 
     string queryName() const;
     string querySystem() const;
