@@ -21,6 +21,7 @@ export NIX_REMOTE=$NIX_REMOTE_
 unset NIX_PATH
 export TEST_HOME=$TEST_ROOT/test-home
 export HOME=$TEST_HOME
+unset XDG_CACHE_HOME
 mkdir -p $TEST_HOME
 
 export PATH=@bindir@:$PATH
