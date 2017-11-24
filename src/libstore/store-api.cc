@@ -516,6 +516,8 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const PathSet & storePaths
                     std::shared_ptr<const ValidPathInfo>(info));
 
                 if (narInfo) {
+                    if (!narInfo->url.empty())
+                        jsonPath.attr("url", narInfo->url);
                     if (narInfo->fileHash)
                         jsonPath.attr("downloadHash", narInfo->fileHash.to_string());
                     if (narInfo->fileSize)
