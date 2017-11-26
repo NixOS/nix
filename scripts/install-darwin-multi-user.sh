@@ -269,7 +269,7 @@ ready to go.
 
 Try it! Open a new terminal, and type:
 
-  $ nix-shell -p figlet -p lolcat --run "echo 'nix rules' | figlet | lolcat"
+  $ nix-shell -p nix-info --run "nix-info -m"
 
 Thank you for using this installer. If you have any feedback, don't
 hesitate:
