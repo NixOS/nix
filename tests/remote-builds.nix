@@ -85,7 +85,10 @@ in
       }
 
       # Perform a build and check that it was performed on the slave.
-      my $out = $client->succeed("nix-build ${expr nodes.client.config 1}");
+      my $out = $client->succeed(
+        "nix-build ${expr nodes.client.config 1} 2> build-output",
+        "grep -q Hello build-output"
+      );
       $slave1->succeed("test -e $out");
 
       # And a parallel build.
