@@ -1608,8 +1608,8 @@ void DerivationGoal::buildDone()
         outputLocks.unlock();
 
     } catch (BuildError & e) {
-        if (!hook)
-            printError(e.msg());
+        printError(e.msg());
+
         outputLocks.unlock();
 
         BuildResult::Status st = BuildResult::MiscFailure;
