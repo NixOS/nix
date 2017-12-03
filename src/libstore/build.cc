@@ -664,7 +664,8 @@ HookInstance::HookInstance()
     toHook.readSide = -1;
 
     sink = FdSink(toHook.writeSide.get());
-    for (auto & setting : settings.getSettings())
+    /* Send overridden settings. */
+    for (auto & setting : settings.getSettings(true))
         sink << 1 << setting.first << setting.second;
     sink << 0;
 }
