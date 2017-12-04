@@ -214,13 +214,28 @@ struct CmdSearch : SourceExprCommand, MixJSON
         }
 
         else {
+            createDirs(dirOf(jsonCacheFileName));
+
             Path tmpFile = fmt("%s.tmp.%d", jsonCacheFileName, getpid());
 
-            std::ofstream jsonCacheFile(tmpFile);
+            std::ofstream jsonCacheFile;
 
-            auto cache = writeCache ? std::make_unique<JSONObject>(jsonCacheFile, false) : nullptr;
+            try {
+                // iostream considered harmful
+                jsonCacheFile.exceptions(std::ofstream::failbit);
+                jsonCacheFile.open(tmpFile);
 
-            doExpr(getSourceExpr(*state), "", true, cache.get());
+                auto cache = writeCache ? std::make_unique<JSONObject>(jsonCacheFile, false) : nullptr;
+
+                doExpr(getSourceExpr(*state), "", true, cache.get());
+
+            } catch (std::exception &) {
+                /* Fun fact: catching std::ios::failure does not work
+                   due to C++11 ABI shenanigans.
+                   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=66145 */
+                if (!jsonCacheFile)
+                    throw Error("error writing to %s", tmpFile);
+            }
 
             if (rename(tmpFile.c_str(), jsonCacheFileName.c_str()) == -1)
                 throw SysError("cannot rename '%s' to '%s'", tmpFile, jsonCacheFileName);
