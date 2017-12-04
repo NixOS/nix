@@ -43,8 +43,6 @@ let
           (cd perl ; autoreconf --install --force --verbose)
           # TeX needs a writable font cache.
           export VARTEXFONTS=$TMPDIR/texfonts
-
-          cp -rv ${nlohmann_json}/include/nlohmann src/nlohmann
         '';
 
         distPhase =
