@@ -221,6 +221,10 @@ let
       nix = build.x86_64-linux; system = "x86_64-linux";
     });
 
+    tests.sshStoreBuilds = (import ./tests/ssh-store-builds.nix rec {
+      nix = build.x86_64-linux; system = "x86_64-linux";
+    });
+
     tests.nix-copy-closure = (import ./tests/nix-copy-closure.nix rec {
       nix = build.x86_64-linux; system = "x86_64-linux";
     });
