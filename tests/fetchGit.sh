@@ -86,3 +86,10 @@ git -C $repo commit -m 'Bla3' -a
 
 path4=$(nix eval --tarball-ttl 0 --raw "(builtins.fetchGit file://$repo).outPath")
 [[ $path2 = $path4 ]]
+
+# tarball-ttl should be ignored if we specify a rev
+echo delft > $repo/hello
+git -C $repo add hello
+git -C $repo commit -m 'Bla4'
+rev3=$(git -C $repo rev-parse HEAD)
+nix eval --tarball-ttl 3600 "(builtins.fetchGit { url = $repo; rev = \"$rev3\"; })" >/dev/null
