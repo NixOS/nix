@@ -10,13 +10,13 @@ namespace nix {
 
 struct NarMember
 {
-    FSAccessor::Type type;
+    FSAccessor::Type type = FSAccessor::Type::tMissing;
 
-    bool isExecutable;
+    bool isExecutable = false;
 
     /* If this is a regular file, position of the contents of this
        file in the NAR. */
-    size_t start, size;
+    size_t start = 0, size = 0;
 
     std::string target;
 
@@ -142,7 +142,7 @@ struct NarAccessor : public FSAccessor
         auto i = indexer.find(path);
         if (i == nullptr)
             return {FSAccessor::Type::tMissing, 0, false};
-        return {i->type, i->size, i->isExecutable};
+        return {i->type, i->size, i->isExecutable, i->start};
     }
 
     StringSet readDirectory(const Path & path) override
@@ -195,6 +195,8 @@ void listNar(JSONPlaceholder & res, ref<FSAccessor> accessor,
         obj.attr("size", st.fileSize);
         if (st.isExecutable)
             obj.attr("executable", true);
+        if (st.narOffset)
+            obj.attr("narOffset", st.narOffset);
         break;
     case FSAccessor::Type::tDirectory:
         obj.attr("type", "directory");

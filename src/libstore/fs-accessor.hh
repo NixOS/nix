@@ -13,9 +13,10 @@ public:
 
     struct Stat
     {
-        Type type;
-        uint64_t fileSize; // regular files only
-        bool isExecutable; // regular files only
+        Type type = tMissing;
+        uint64_t fileSize = 0; // regular files only
+        bool isExecutable = false; // regular files only
+        uint64_t narOffset = 0; // regular files only
     };
 
     virtual Stat stat(const Path & path) = 0;

@@ -27,8 +27,8 @@ diff -u baz.cat-nar $storePath/foo/baz
 
 # Test --json.
 [[ $(nix ls-nar --json $narFile /) = '{"type":"directory","entries":{"foo":{},"foo-x":{},"qux":{},"zyx":{}}}' ]]
-[[ $(nix ls-nar --json -R $narFile /foo) = '{"type":"directory","entries":{"bar":{"type":"regular","size":0},"baz":{"type":"regular","size":0},"data":{"type":"regular","size":58}}}' ]]
-[[ $(nix ls-nar --json -R $narFile /foo/bar) = '{"type":"regular","size":0}' ]]
+[[ $(nix ls-nar --json -R $narFile /foo) = '{"type":"directory","entries":{"bar":{"type":"regular","size":0,"narOffset":368},"baz":{"type":"regular","size":0,"narOffset":552},"data":{"type":"regular","size":58,"narOffset":736}}}' ]]
+[[ $(nix ls-nar --json -R $narFile /foo/bar) = '{"type":"regular","size":0,"narOffset":368}' ]]
 [[ $(nix ls-store --json $storePath) = '{"type":"directory","entries":{"foo":{},"foo-x":{},"qux":{},"zyx":{}}}' ]]
 [[ $(nix ls-store --json -R $storePath/foo) = '{"type":"directory","entries":{"bar":{"type":"regular","size":0},"baz":{"type":"regular","size":0},"data":{"type":"regular","size":58}}}' ]]
 [[ $(nix ls-store --json -R $storePath/foo/bar) = '{"type":"regular","size":0}' ]]
