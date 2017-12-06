@@ -62,9 +62,9 @@ public:
     ForwardSource(Source & readSource, Sink & writeSink) : readSource(readSource), writeSink(writeSink) {}
     size_t read(unsigned char * data, size_t len) override
     {
-        auto res = readSource.read(data, len);
-        writeSink(data, len);
-        return res;
+        auto n = readSource.read(data, len);
+        writeSink(data, n);
+        return n;
     }
 };
 
