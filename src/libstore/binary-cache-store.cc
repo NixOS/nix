@@ -129,10 +129,8 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
 
             auto narAccessor = makeNarAccessor(nar);
 
-            if (accessor_) {
-                accessor_->nars.emplace(info.path, narAccessor);
-                accessor_->addToCache(info.path, *nar);
-            }
+            if (accessor_)
+                accessor_->addToCache(info.path, *nar, narAccessor);
 
             {
                 auto res = jsonRoot.placeholder("root");
@@ -144,10 +142,8 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
     }
 
     else {
-        if (accessor_) {
-            accessor_->nars.emplace(info.path, makeNarAccessor(nar));
-            accessor_->addToCache(info.path, *nar);
-        }
+        if (accessor_)
+            accessor_->addToCache(info.path, *nar, makeNarAccessor(nar));
     }
 
     /* Compress the NAR. */

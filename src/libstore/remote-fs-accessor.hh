@@ -18,9 +18,10 @@ class RemoteFSAccessor : public FSAccessor
 
     friend class BinaryCacheStore;
 
-    Path makeCacheFile(const Path & storePath);
+    Path makeCacheFile(const Path & storePath, const std::string & ext);
 
-    void addToCache(const Path & storePath, const std::string & nar);
+    void addToCache(const Path & storePath, const std::string & nar,
+        ref<FSAccessor> narAccessor);
 
 public:
 
