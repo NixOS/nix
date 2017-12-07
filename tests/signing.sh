@@ -53,7 +53,7 @@ nix sign-paths --key-file $TEST_ROOT/sk1 $outPath2
 nix verify -r $outPath2 --sigs-needed 1 --trusted-public-keys $pk1
 
 # Build something content-addressed.
-outPathCA=$(IMPURE_VAR1=foo IMPURE_VAR2=bar nix-build ./fixed.nix -A good.0)
+outPathCA=$(IMPURE_VAR1=foo IMPURE_VAR2=bar nix-build ./fixed.nix -A good.0 --no-out-link)
 
 [[ $(nix path-info --json $outPathCA) =~ '"ca":"fixed:md5:' ]]
 
