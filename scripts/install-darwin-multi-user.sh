@@ -264,7 +264,7 @@ them and open them again. Other than that, you should be ready to go.
 
 Try it! Open a new terminal, and type:
 
-  $ nix-shell -p figlet -p lolcat --run "echo 'nix rules' | figlet | lolcat"
+  $ nix-shell -p nix-info --run "nix-info -m"
 
 Thank you for using this installer. If you have any feedback, don't
 hesitate:
@@ -473,10 +473,8 @@ create_build_user_for_core() {
 
     if ! /usr/bin/dscl . -read "$dsclpath" > /dev/null 2>&1; then
         _sudo "Creating the Nix build user, $username" \
-              /usr/sbin/sysadminctl -addUser -fullName "Nix build user $coreid" \
-	      -home /var/empty \
-	      -UID "${uid}" \
-              -addUser "${username}"
+              /usr/bin/dscl . create "$dsclpath" \
+              UniqueID "${uid}"
         row "           Created" "Yes"
     else
         actual_uid=$(dsclattr "$dsclpath" "UniqueID")
@@ -504,6 +502,22 @@ EOF
         row "          IsHidden" "Yes"
     fi
 
+    if [ "$(dsclattr "$dsclpath" "NFSHomeDirectory")" = "/var/empty" ]; then
+        row "          NFSHomeDirectory" "/var/empty"
+    else
+        _sudo "in order to give $username a safe home directory" \
+              /usr/bin/dscl . -create "$dsclpath" "NFSHomeDirectory" "/var/empty"
+        row "          NFSHomeDirectory" "/var/empty"
+    fi
+
+    if [ "$(dsclattr "$dsclpath" "RealName")" = "Nix build user $coreid" ]; then
+        row "          RealName" "Nix build user $coreid"
+    else
+        _sudo "in order to give $username a useful name" \
+              /usr/bin/dscl . -create "$dsclpath" "RealName" "Nix build user $coreid"
+        row "          RealName" "Nix build user $coreid"
+    fi
+
     if [ "$(dsclattr "$dsclpath" "UserShell")" = "/sbin/nologin" ]; then
         row "   Logins Disabled" "Yes"
     else
@@ -521,11 +535,11 @@ EOF
         row "  Member of $NIX_BUILD_GROUP_NAME" "Yes"
     fi
 
-    if [ "$(dsclattr "$dsclpath" "PrimaryGroupId")" = "$NIX_BUILD_GROUP_ID" ]; then
+    if [ "$(dsclattr "$dsclpath" "PrimaryGroupID")" = "$NIX_BUILD_GROUP_ID" ]; then
         row "    PrimaryGroupID" "$NIX_BUILD_GROUP_ID"
     else
         _sudo "to let the nix daemon use this user for builds (this might seem redundant, but there are two concepts of group membership)" \
-              /usr/bin/dscl . -create "$dsclpath" "PrimaryGroupId" "$NIX_BUILD_GROUP_ID"
+              /usr/bin/dscl . -create "$dsclpath" "PrimaryGroupID" "$NIX_BUILD_GROUP_ID"
         row "    PrimaryGroupID" "$NIX_BUILD_GROUP_ID"
 
     fi
