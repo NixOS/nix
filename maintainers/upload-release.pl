@@ -83,6 +83,7 @@ downloadFile("tarball", "3"); # .tar.bz2
 my ($tarball, $tarballHash) = downloadFile("tarball", "4"); # .tar.xz
 my ($tarball_i686_linux, $tarball_i686_linux_hash) = downloadFile("binaryTarball.i686-linux", "1");
 my ($tarball_x86_64_linux, $tarball_x86_64_linux_hash) = downloadFile("binaryTarball.x86_64-linux", "1");
+my ($tarball_aarch64_linux, $tarball_aarch64_linux_hash) = downloadFile("binaryTarball.aarch64-linux", "1");
 my ($tarball_x86_64_darwin, $tarball_x86_64_darwin_hash) = downloadFile("binaryTarball.x86_64-darwin", "1");
 
 # Update Nixpkgs in a very hacky way.
@@ -111,6 +112,7 @@ write_file("$nixpkgsDir/nixos/modules/installer/tools/nix-fallback-paths.nix",
            "{\n" .
            "  x86_64-linux = \"" . getStorePath("build.x86_64-linux") . "\";\n" .
            "  i686-linux = \"" . getStorePath("build.i686-linux") . "\";\n" .
+           "  aarch64-linux = \"" . getStorePath("build.aarch64-linux") . "\";\n" .
            "  x86_64-darwin = \"" . getStorePath("build.x86_64-darwin") . "\";\n" .
            "}\n");
 
@@ -144,6 +146,7 @@ write_file("$siteDir/nix-release.tt",
            "latestNixVersion = \"$version\"\n" .
            "nix_hash_i686_linux = \"$tarball_i686_linux_hash\"\n" .
            "nix_hash_x86_64_linux = \"$tarball_x86_64_linux_hash\"\n" .
+           "nix_hash_aarch64_linux = \"$tarball_aarch64_linux_hash\"\n" .
            "nix_hash_x86_64_darwin = \"$tarball_x86_64_darwin_hash\"\n" .
            "-%]\n");
 
