@@ -126,9 +126,9 @@ cryptographic hash as <literal>nix-store --dump
 
 <para>Computing the same hash as <command>nix-prefetch-url</command>:
 <screen>
-$ nix-prefetch-url file://<(echo test)
+$ nix-prefetch-url file://&lt;(echo test)
 1lkgqb6fclns49861dwk9rzb6xnfkxbpws74mxnx01z9qyv1pjpj
-$ nix-hash --type sha256 --flat --base32 <(echo test)
+$ nix-hash --type sha256 --flat --base32 &lt;(echo test)
 1lkgqb6fclns49861dwk9rzb6xnfkxbpws74mxnx01z9qyv1pjpj
 </screen>
 </para>
