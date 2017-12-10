@@ -369,11 +369,13 @@ struct CurlDownloader : public Downloader
 
         curlm = curl_multi_init();
 
-        #if LIBCURL_VERSION_NUM >= 0x072b00 // correct?
+        #if LIBCURL_VERSION_NUM >= 0x072b00 // Multiplex requires >= 7.43.0
         curl_multi_setopt(curlm, CURLMOPT_PIPELINING, CURLPIPE_MULTIPLEX);
         #endif
+        #if LIBCURL_VERSION_NUM >= 0x071e00 // Max connections requires >= 7.30.0
         curl_multi_setopt(curlm, CURLMOPT_MAX_TOTAL_CONNECTIONS,
             settings.binaryCachesParallelConnections.get());
+        #endif
 
         enableHttp2 = settings.enableHttp2;
 
