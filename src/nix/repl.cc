@@ -185,7 +185,7 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
 bool NixRepl::getLine(string & input, const std::string &prompt)
 {
     char * s = linenoise(prompt.c_str());
-    Finally doFree([&]() { linenoiseFree(s); });
+    Finally doFree([&]() { free(s); });
     if (!s) return false;
     input += s;
     return true;
