@@ -6,7 +6,7 @@
 namespace nix {
 
 struct Value;
-struct Bindings;
+class Bindings;
 class EvalState;
 
 /* A command is an argument parser that can be executed by calling its
