@@ -79,7 +79,7 @@ typedef std::shared_ptr<Goal> GoalPtr;
 typedef std::weak_ptr<Goal> WeakGoalPtr;
 
 struct CompareGoalPtrs {
-    bool operator() (const GoalPtr & a, const GoalPtr & b);
+    bool operator() (const GoalPtr & a, const GoalPtr & b) const;
 };
 
 /* Set of goals. */
@@ -178,7 +178,7 @@ protected:
 };
 
 
-bool CompareGoalPtrs::operator() (const GoalPtr & a, const GoalPtr & b) {
+bool CompareGoalPtrs::operator() (const GoalPtr & a, const GoalPtr & b) const {
     string s1 = a->key();
     string s2 = b->key();
     return s1 < s2;
