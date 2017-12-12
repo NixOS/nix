@@ -134,6 +134,14 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
   </varlistentry>
 
+  <varlistentry><term><function>builtins.concatStringsSep</function>
+  <replaceable>separator</replaceable> <replaceable>list</replaceable></term>
+
+    <listitem><para>Concatenate a list of strings with a separator
+    between each element, e.g. <literal>concatStringsSep "/"
+    ["usr" "local" "bin"] == "usr/local/bin"</literal></para></listitem>
+
+  </varlistentry>
 
   <varlistentry
   xml:id='builtin-currentSystem'><term><varname>builtins.currentSystem</varname></term>
