@@ -123,7 +123,7 @@ let
 
       runCommand "nix-binary-tarball-${version}"
         { exportReferencesGraph = [ "closure1" toplevel "closure2" cacert ];
-          buildInputs = [ perl shellcheck ];
+          buildInputs = [ perl /* shellcheck */ ];
           meta.description = "Distribution-independent Nix bootstrap binaries for ${system}";
         }
         ''
@@ -136,8 +136,8 @@ let
             --subst-var-by nix ${toplevel} \
             --subst-var-by cacert ${cacert}
 
-          shellcheck -e SC1090 $TMPDIR/install
-          shellcheck -e SC1091,SC2002 $TMPDIR/install-darwin-multi-user
+          #shellcheck -e SC1090 $TMPDIR/install
+          #shellcheck -e SC1091,SC2002 $TMPDIR/install-darwin-multi-user
 
           chmod +x $TMPDIR/install
           chmod +x $TMPDIR/install-darwin-multi-user
