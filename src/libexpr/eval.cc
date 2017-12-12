@@ -1542,7 +1542,10 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
         throwEvalError("file names are not allowed to end in '%1%'", drvExtension);
 
     Path dstPath;
-    if (srcToStore[path] != "")
+    if (store->isStorePath(path))
+        /* Already a store path. */
+        dstPath = path;
+    else if (srcToStore[path] != "")
         dstPath = srcToStore[path];
     else {
         dstPath = settings.readOnlyMode
