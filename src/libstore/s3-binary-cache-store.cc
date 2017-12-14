@@ -87,7 +87,7 @@ S3Helper::S3Helper(const std::string & profile, const std::string & region)
                 std::make_shared<Aws::Auth::DefaultAWSCredentialsProviderChain>())
             : std::dynamic_pointer_cast<Aws::Auth::AWSCredentialsProvider>(
                 std::make_shared<Aws::Auth::ProfileConfigFileAWSCredentialsProvider>(profile.c_str())),
-            *config, true, false))
+            *config, Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never, false))
 {
 }
 
