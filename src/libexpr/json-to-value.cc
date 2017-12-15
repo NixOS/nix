@@ -106,10 +106,16 @@ static void parseJSON(EvalState & state, const char * & s, Value & v)
             tmp_number += *s++;
         }
 
-        if (number_type == tFloat)
-            mkFloat(v, stod(tmp_number));
-        else
-            mkInt(v, stoi(tmp_number));
+        try {
+            if (number_type == tFloat)
+                mkFloat(v, stod(tmp_number));
+            else
+                mkInt(v, stoi(tmp_number));
+        } catch (std::invalid_argument e) {
+            throw JSONParseError("invalid JSON number");
+        } catch (std::out_of_range e) {
+            throw JSONParseError("out-of-range JSON number");
+        }
     }
 
     else if (strncmp(s, "true", 4) == 0) {

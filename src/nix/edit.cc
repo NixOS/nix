@@ -52,7 +52,12 @@ struct CmdEdit : InstallableCommand
             throw Error("cannot parse meta.position attribute '%s'", pos);
 
         std::string filename(pos, 0, colon);
-        int lineno = std::stoi(std::string(pos, colon + 1));
+        int lineno;
+        try {
+            lineno = std::stoi(std::string(pos, colon + 1));
+        } catch (std::invalid_argument e) {
+            throw Error("cannot parse line number '%s'", pos);
+        }
 
         auto editor = getEnv("EDITOR", "cat");
 
