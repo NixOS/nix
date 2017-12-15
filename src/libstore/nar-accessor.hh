@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "fs-accessor.hh"
 
 namespace nix {
