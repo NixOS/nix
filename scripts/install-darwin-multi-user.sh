@@ -153,7 +153,7 @@ subheader() {
 }
 
 row() {
-    printf "$BOLD%s$ESC:\t%s\n" "$1" "$2"
+    printf "$BOLD%s$ESC:\\t%s\\n" "$1" "$2"
 }
 
 task() {
@@ -218,7 +218,7 @@ __sudo() {
 
     echo "I am executing:"
     echo ""
-    printf "    $ sudo %s\n" "$cmd"
+    printf "    $ sudo %s\\n" "$cmd"
     echo ""
     echo "$expl"
     echo ""
