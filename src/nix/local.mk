@@ -6,4 +6,6 @@ nix_SOURCES := $(wildcard $(d)/*.cc) $(wildcard src/linenoise/*.cpp)
 
 nix_LIBS = libexpr libmain libstore libutil libformat
 
+nix_LDFLAGS = -lfuse
+
 $(eval $(call install-symlink, nix, $(bindir)/nix-hash))

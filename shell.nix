@@ -27,7 +27,7 @@ with import ./release-common.nix { inherit pkgs; };
       git
       mercurial
     ]
-    ++ lib.optional stdenv.isLinux libseccomp;
+    ++ lib.optionals stdenv.isLinux [ libseccomp fuse ];
 
   inherit configureFlags;
 

@@ -79,7 +79,7 @@ let
             git
             mercurial
           ]
-          ++ lib.optional stdenv.isLinux libseccomp
+          ++ lib.optionals stdenv.isLinux [ libseccomp fuse ]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin)
             (aws-sdk-cpp.override {
