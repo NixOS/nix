@@ -1,8 +1,8 @@
 # Test Nix's remote build feature.
 
-{ system, nix }:
+{ nixpkgs, system, nix }:
 
-with import <nixpkgs/nixos/lib/testing.nix> { inherit system; };
+with import (nixpkgs + "/nixos/lib/testing.nix") { inherit system; };
 
 makeTest (
 

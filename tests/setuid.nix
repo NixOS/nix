@@ -1,8 +1,8 @@
 # Verify that Linux builds cannot create setuid or setgid binaries.
 
-{ system, nix }:
+{ nixpkgs, system, nix }:
 
-with import <nixpkgs/nixos/lib/testing.nix> { inherit system; };
+with import (nixpkgs + "/nixos/lib/testing.nix") { inherit system; };
 
 makeTest {
 

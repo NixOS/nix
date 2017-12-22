@@ -1,8 +1,8 @@
 # Test ‘nix-copy-closure’.
 
-{ system, nix }:
+{ nixpkgs, system, nix }:
 
-with import <nixpkgs/nixos/lib/testing.nix> { inherit system; };
+with import (nixpkgs + /nixos/lib/testing.nix) { inherit system; };
 
 makeTest (let pkgA = pkgs.cowsay; pkgB = pkgs.wget; pkgC = pkgs.hello; in {
 

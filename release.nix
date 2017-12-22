@@ -1,12 +1,12 @@
-{ nix ? { outPath = ./.; revCount = 1234; shortRev = "abcdef"; }
-, nixpkgs ? { outPath = <nixpkgs>; revCount = 1234; shortRev = "abcdef"; }
+{ nix ? fetchGit ./.
+, nixpkgs ? fetchTarball channel:nixos-17.09
 , officialRelease ? false
 , systems ? [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
 }:
 
 let
 
-  pkgs = import <nixpkgs> {};
+  pkgs = import nixpkgs {};
 
   jobs = rec {
 
@@ -27,16 +27,14 @@ let
             pkgconfig sqlite libsodium boehmgc
             docbook5 docbook5_xsl
             autoconf-archive
-            git
           ] ++ lib.optional stdenv.isLinux libseccomp;
 
         configureFlags = "--enable-gc";
 
         postUnpack = ''
-          # Clean up when building from a working tree.
-          if [[ -d $sourceRoot/.git ]]; then
-            git -C $sourceRoot clean -fd
-          fi
+          ls -la source
+          (cd source && find . -type f) | cut -c3- > source/.dist-files
+          cat source/.dist-files
         '';
 
         preConfigure = ''
@@ -62,7 +60,7 @@ let
 
     build = pkgs.lib.genAttrs systems (system:
 
-      with import <nixpkgs> { inherit system; };
+      with import nixpkgs { inherit system; };
 
       with import ./release-common.nix { inherit pkgs; };
 
@@ -105,7 +103,7 @@ let
 
     perlBindings = pkgs.lib.genAttrs systems (system:
 
-      let pkgs = import <nixpkgs> { inherit system; }; in with pkgs;
+      let pkgs = import nixpkgs { inherit system; }; in with pkgs;
 
       releaseTools.nixBuild {
         name = "nix-perl";
@@ -131,7 +129,7 @@ let
     binaryTarball = pkgs.lib.genAttrs systems (system:
 
       # FIXME: temporarily use a different branch for the Darwin build.
-      with import <nixpkgs> { inherit system; };
+      with import nixpkgs { inherit system; };
 
       let
         toplevel = builtins.getAttr system jobs.build;
@@ -174,7 +172,7 @@ let
 
 
     coverage =
-      with import <nixpkgs> { system = "x86_64-linux"; };
+      with import nixpkgs { system = "x86_64-linux"; };
 
       releaseTools.coverageAnalysis {
         name = "nix-build";
@@ -218,20 +216,23 @@ let
 
     # System tests.
     tests.remoteBuilds = (import ./tests/remote-builds.nix rec {
+      inherit nixpkgs;
       nix = build.x86_64-linux; system = "x86_64-linux";
     });
 
     tests.nix-copy-closure = (import ./tests/nix-copy-closure.nix rec {
+      inherit nixpkgs;
       nix = build.x86_64-linux; system = "x86_64-linux";
     });
 
     tests.setuid = pkgs.lib.genAttrs (pkgs.lib.filter (pkgs.lib.hasSuffix "-linux") systems) (system:
       import ./tests/setuid.nix rec {
+        inherit nixpkgs;
         nix = build.${system}; inherit system;
       });
 
     tests.binaryTarball =
-      with import <nixpkgs> { system = "x86_64-linux"; };
+      with import nixpkgs { system = "x86_64-linux"; };
       vmTools.runInLinuxImage (runCommand "nix-binary-tarball-test"
         { diskImage = vmTools.diskImages.ubuntu1204x86_64;
         }
@@ -250,7 +251,7 @@ let
         ''); # */
 
     tests.evalNixpkgs =
-      import <nixpkgs/pkgs/top-level/make-tarball.nix> {
+      import (nixpkgs + "/pkgs/top-level/make-tarball.nix") {
         inherit nixpkgs;
         inherit pkgs;
         nix = build.x86_64-linux;
@@ -304,7 +305,7 @@ let
   makeRPM =
     system: diskImageFun: extraPackages:
 
-    with import <nixpkgs> { inherit system; };
+    with import nixpkgs { inherit system; };
 
     releaseTools.rpmBuild rec {
       name = "nix-rpm";
@@ -326,7 +327,7 @@ let
   makeDeb =
     system: diskImageFun: extraPackages: extraDebPackages:
 
-    with import <nixpkgs> { inherit system; };
+    with import nixpkgs { inherit system; };
 
     releaseTools.debBuild {
       name = "nix-deb";
