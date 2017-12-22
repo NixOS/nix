@@ -34,6 +34,7 @@ let
           --with-dbi=${perlPackages.DBI}/${perl.libPrefix}
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}
           --with-www-curl=${perlPackages.WWWCurl}/${perl.libPrefix}
+          --with-try-tiny=${perlPackages.TryTiny}/${perl.libPrefix}
         '';
 
         postUnpack = ''

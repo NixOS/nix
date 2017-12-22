@@ -7,6 +7,7 @@ use Nix::Store;
 use Nix::Utils;
 use File::Basename;
 use Text::ParseWords;
+use Try::Tiny;
 use Cwd;
 
 binmode STDERR, ":encoding(utf8)";
@@ -307,7 +308,29 @@ foreach my $expr (@exprs) {
             'shopt -u nullglob; ' .
             'unset TZ; ' . (defined $ENV{'TZ'} ? "export TZ='${ENV{'TZ'}}'; " : '') .
             $envCommand);
-        my @args = ($ENV{NIX_BUILD_SHELL} // "bash");
+        my $buildShell = $ENV{NIX_BUILD_SHELL} // "";
+        if ($buildShell eq "") {
+            try {
+                # !!! would prefer the perl 5.8.0 pipe open feature here.
+                my $pid = open(SHELLPATH, "-|") || exec
+                    "$Nix::Config::binDir/nix-instantiate",
+                    "-E", "(import <nixpkgs> {}).bashInteractive";
+                $buildShell = <DRVPATHS>;
+                if (!close DRVPATHS) {
+                    die "nix-instantiate killed by signal " . ($? & 127) . "\n"
+                        if ($? & 127);
+                }
+                chomp $buildShell;
+                $buildShell += "/bin/bash";
+                if (! -x $buildShell) {
+                    die "expected shell ‘$buildShell’ to exist, but it doesn't";
+                }
+            } catch {
+                warn "$_; will use bash from your environment";
+                $buildShell = "bash";
+            };
+        }
+        my @args = ($buildShell);
         push @args, "--rcfile" if $interactive;
         push @args, $rcfile;
         exec @args;

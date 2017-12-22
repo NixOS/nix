@@ -18,6 +18,7 @@ BuildRequires: perl(DBD::SQLite)
 BuildRequires: perl(DBI)
 BuildRequires: perl(WWW::Curl)
 BuildRequires: perl(ExtUtils::ParseXS)
+BuildRequires: perl(Try::Tiny)
 Requires: /usr/bin/perl
 Requires: curl
 Requires: perl-DBD-SQLite

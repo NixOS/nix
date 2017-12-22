@@ -30,8 +30,8 @@
   or higher.  If your distribution does not provide it, please install
   it from <link xlink:href="http://www.sqlite.org/" />.</para></listitem>
 
-  <listitem><para>The Perl DBI, DBD::SQLite, and WWW::Curl libraries, which are
-  available from <link
+  <listitem><para>The Perl DBI, DBD::SQLite, WWW::Curl, and Try::Tiny
+  libraries, which are available from <link
   xlink:href="http://search.cpan.org/">CPAN</link> if your
   distribution does not provide them.</para></listitem>
 
