@@ -188,6 +188,7 @@ let
         FONTCONFIG_FILE = texFunctions.fontsConf;
       };
 
+    rpm_centos74x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.centos74x86_64) [];
 
     rpm_fedora19i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora19i386) [];
     rpm_fedora19x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora19x86_64) [];
@@ -288,6 +289,7 @@ let
           deb_ubuntu1404x86_64 # LTS
           deb_ubuntu1504i386
           deb_ubuntu1504x86_64
+          rpm_centos74x86_64
           rpm_fedora20i386
           rpm_fedora20x86_64
           rpm_fedora21i386

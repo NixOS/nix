@@ -6,7 +6,7 @@ Name: nix
 Version: @PACKAGE_VERSION@
 Release: 2%{?dist}
 License: LGPLv2+
-%if 0%{?rhel}
+%if 0%{?rhel} && 0%{?rhel} < 7
 Group: Applications/System
 %endif
 URL: http://nixos.org/
@@ -43,7 +43,7 @@ it can be used equally well under other Unix systems.
 
 %package        devel
 Summary:        Development files for %{name}
-%if 0%{?rhel}
+%if 0%{?rhel} && 0%{?rhel} < 7
 Group:          Development/Libraries
 %endif
 Requires:       %{name}%{?_isa} = %{version}-%{release}
@@ -55,7 +55,7 @@ developing applications that use %{name}.
 
 %package doc
 Summary:        Documentation files for %{name}
-%if 0%{?rhel}
+%if 0%{?rhel} && 0%{?rhel} < 7
 Group:          Documentation
 %endif
 BuildArch:      noarch
@@ -158,7 +158,7 @@ done
 %post
 chgrp %{nixbld_group} /nix/store
 chmod 1775 /nix/store
-%if ! 0%{?rhel}
+%if ! 0%{?rhel} || 0%{?rhel} >= 7
 # Enable and start Nix worker
 systemctl enable nix-daemon.socket nix-daemon.service
 systemctl start  nix-daemon.socket
@@ -170,7 +170,7 @@ systemctl start  nix-daemon.socket
 %{perl_vendorarch}/*
 %exclude %dir %{perl_vendorarch}/auto/
 %{_prefix}/libexec/*
-%if ! 0%{?rhel}
+%if ! 0%{?rhel} || 0%{?rhel} >= 7
 %{_prefix}/lib/systemd/system/nix-daemon.socket
 %{_prefix}/lib/systemd/system/nix-daemon.service
 %endif
