@@ -23,7 +23,7 @@ struct GitInfo
 };
 
 GitInfo exportGit(ref<Store> store, const std::string & uri,
-    std::experimental::optional<std::string> ref, const std::string & rev,
+    std::experimental::optional<std::string> ref, std::string rev,
     const std::string & name)
 {
     if (!ref && rev == "" && hasPrefix(uri, "/") && pathExists(uri + "/.git")) {
@@ -68,6 +68,10 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
             return gitInfo;
         }
+
+        // clean working tree, but no ref or rev specified.  Use 'HEAD'.
+        rev = chomp(runProgram("git", true, { "-C", uri, "rev-parse", "HEAD" }));
+        ref = "HEAD"s;
     }
 
     if (!ref) ref = "master"s;
