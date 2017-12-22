@@ -10,6 +10,7 @@
 #include "istringstream_nocopy.hh"
 
 #include <aws/core/Aws.h>
+#include <aws/core/VersionConfig.h>
 #include <aws/core/auth/AWSCredentialsProvider.h>
 #include <aws/core/auth/AWSCredentialsProviderChain.h>
 #include <aws/core/client/ClientConfiguration.h>
@@ -87,7 +88,14 @@ S3Helper::S3Helper(const std::string & profile, const std::string & region)
                 std::make_shared<Aws::Auth::DefaultAWSCredentialsProviderChain>())
             : std::dynamic_pointer_cast<Aws::Auth::AWSCredentialsProvider>(
                 std::make_shared<Aws::Auth::ProfileConfigFileAWSCredentialsProvider>(profile.c_str())),
-            *config, Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never, false))
+            *config,
+            // FIXME: https://github.com/aws/aws-sdk-cpp/issues/759
+#if AWS_VERSION_MAJOR == 1 && AWS_VERSION_MINOR < 3
+            false,
+#else
+            Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never,
+#endif
+            false))
 {
 }
 
