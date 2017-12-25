@@ -32,7 +32,6 @@ let
         configureFlags = "--enable-gc";
 
         postUnpack = ''
-          ls -la source
           (cd source && find . -type f) | cut -c3- > source/.dist-files
           cat source/.dist-files
         '';
