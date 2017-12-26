@@ -1098,13 +1098,12 @@ Path LocalStore::addToStore(const string & name, const Path & _srcPath,
             copyPath(srcPath, dstPath, filter, recursive);
 
             canonicalisePathMetaData(dstPath, -1);
-            HashResult hash = hashPath(htSHA256, dstPath);
             optimisePath(dstPath); // FIXME: combine with hashPath()
 
             ValidPathInfo info;
             info.path = dstPath;
-            info.narHash = hash.first;
-            info.narSize = hash.second;
+            info.narHash = h.first;
+            info.narSize = h.second;
             registerValidPath(info);
         }
 
