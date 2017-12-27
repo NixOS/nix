@@ -93,3 +93,29 @@ git -C $repo add hello
 git -C $repo commit -m 'Bla4'
 rev3=$(git -C $repo rev-parse HEAD)
 nix eval --tarball-ttl 3600 "(builtins.fetchGit { url = $repo; rev = \"$rev3\"; })" >/dev/null
+
+# Update 'path' to reflect latest master
+path=$(nix eval --raw "(builtins.fetchGit file://$repo).outPath")
+
+# Check behavior when non-master branch is used
+git -C $repo checkout $rev2 -b dev
+echo dev > $repo/hello
+
+# File URI uses 'master' unless specified otherwise
+path2=$(nix eval --raw "(builtins.fetchGit file://$repo).outPath")
+[[ $path = $path2 ]]
+
+# Using local path with branch other than 'master' should work when clean or dirty
+path3=$(nix eval --raw "(builtins.fetchGit $repo).outPath")
+# (check dirty-tree handling was used)
+[[ $(nix eval --raw "(builtins.fetchGit $repo).rev") = 0000000000000000000000000000000000000000 ]]
+
+# Committing shouldn't change store path, or switch to using 'master'
+git -C $repo commit -m 'Bla5' -a
+path4=$(nix eval --raw "(builtins.fetchGit $repo).outPath")
+[[ $(cat $path4/hello) = dev ]]
+[[ $path3 = $path4 ]]
+
+# Confirm same as 'dev' branch
+path5=$(nix eval --raw "(builtins.fetchGit { url = $repo; ref = \"dev\"; }).outPath")
+[[ $path3 = $path5 ]]
