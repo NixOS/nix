@@ -19,7 +19,8 @@ nix_tests = \
   fetchGit.sh \
   fetchMercurial.sh \
   signing.sh \
-  run.sh
+  run.sh \
+  brotli.sh
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))

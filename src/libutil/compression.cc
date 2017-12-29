@@ -7,6 +7,11 @@
 #include <cstdio>
 #include <cstring>
 
+#if HAVE_BROTLI
+#include <brotli/decode.h>
+#include <brotli/encode.h>
+#endif // HAVE_BROTLI
+
 #include <iostream>
 
 namespace nix {
@@ -94,8 +99,56 @@ static ref<std::string> decompressBzip2(const std::string & in)
 
 static ref<std::string> decompressBrotli(const std::string & in)
 {
-    // FIXME: use libbrotli
-    return make_ref<std::string>(runProgram(BRO, true, {"-d"}, {in}));
+#if !HAVE_BROTLI
+    return make_ref<std::string>(runProgram(BROTLI, true, {"-d"}, {in}));
+#else
+    auto *s = BrotliDecoderCreateInstance(nullptr, nullptr, nullptr);
+    if (!s)
+        throw CompressionError("unable to initialize brotli decoder");
+
+    Finally free([s]() { BrotliDecoderDestroyInstance(s); });
+
+    uint8_t outbuf[BUFSIZ];
+    ref<std::string> res = make_ref<std::string>();
+    const uint8_t *next_in = (uint8_t *)in.c_str();
+    size_t avail_in = in.size();
+    uint8_t *next_out = outbuf;
+    size_t avail_out = sizeof(outbuf);
+
+    while (true) {
+        checkInterrupt();
+
+        auto ret = BrotliDecoderDecompressStream(s,
+                &avail_in, &next_in,
+                &avail_out, &next_out,
+                nullptr);
+
+        switch (ret) {
+        case BROTLI_DECODER_RESULT_ERROR:
+            throw CompressionError("error while decompressing brotli file");
+        case BROTLI_DECODER_RESULT_NEEDS_MORE_INPUT:
+            throw CompressionError("incomplete or corrupt brotli file");
+        case BROTLI_DECODER_RESULT_SUCCESS:
+            if (avail_in != 0)
+                throw CompressionError("unexpected input after brotli decompression");
+            break;
+        case BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT:
+            // I'm not sure if this can happen, but abort if this happens with empty buffer
+            if (avail_out == sizeof(outbuf))
+                throw CompressionError("brotli decompression requires larger buffer");
+            break;
+        }
+
+        // Always ensure we have full buffer for next invocation
+        if (avail_out < sizeof(outbuf)) {
+            res->append((char*)outbuf, sizeof(outbuf) - avail_out);
+            next_out = outbuf;
+            avail_out = sizeof(outbuf);
+        }
+
+        if (ret == BROTLI_DECODER_RESULT_SUCCESS) return res;
+    }
+#endif // HAVE_BROTLI
 }
 
 ref<std::string> compress(const std::string & method, const std::string & in)
@@ -270,25 +323,22 @@ struct BzipSink : CompressionSink
     }
 };
 
-struct BrotliSink : CompressionSink
+struct LambdaCompressionSink : CompressionSink
 {
     Sink & nextSink;
     std::string data;
-
-    BrotliSink(Sink & nextSink) : nextSink(nextSink)
+    using CompressFnTy = std::function<std::string(const std::string&)>;
+    CompressFnTy compressFn;
+    LambdaCompressionSink(Sink& nextSink, CompressFnTy compressFn)
+        : nextSink(nextSink)
+        , compressFn(std::move(compressFn))
     {
-    }
-
-    ~BrotliSink()
-    {
-    }
-
-    // FIXME: use libbrotli
+    };
 
     void finish() override
     {
         flush();
-        nextSink(runProgram(BRO, true, {}, data));
+        nextSink(compressFn(data));
     }
 
     void write(const unsigned char * data, size_t len) override
@@ -297,6 +347,107 @@ struct BrotliSink : CompressionSink
         this->data.append((const char *) data, len);
     }
 };
+
+struct BrotliCmdSink : LambdaCompressionSink
+{
+    BrotliCmdSink(Sink& nextSink)
+        : LambdaCompressionSink(nextSink, [](const std::string& data) {
+            return runProgram(BROTLI, true, {}, data);
+        })
+    {
+    }
+};
+
+#if HAVE_BROTLI
+struct BrotliSink : CompressionSink
+{
+    Sink & nextSink;
+    uint8_t outbuf[BUFSIZ];
+    BrotliEncoderState *state;
+    bool finished = false;
+
+    BrotliSink(Sink & nextSink) : nextSink(nextSink)
+    {
+        state = BrotliEncoderCreateInstance(nullptr, nullptr, nullptr);
+        if (!state)
+            throw CompressionError("unable to initialise brotli encoder");
+    }
+
+    ~BrotliSink()
+    {
+        BrotliEncoderDestroyInstance(state);
+    }
+
+    void finish() override
+    {
+        flush();
+        assert(!finished);
+
+        const uint8_t *next_in = nullptr;
+        size_t avail_in = 0;
+        uint8_t *next_out = outbuf;
+        size_t avail_out = sizeof(outbuf);
+        while (!finished) {
+            checkInterrupt();
+
+            if (!BrotliEncoderCompressStream(state,
+                        BROTLI_OPERATION_FINISH,
+                        &avail_in, &next_in,
+                        &avail_out, &next_out,
+                        nullptr))
+                throw CompressionError("error while finishing brotli file");
+
+            finished = BrotliEncoderIsFinished(state);
+            if (avail_out == 0 || finished) {
+                nextSink(outbuf, sizeof(outbuf) - avail_out);
+                next_out = outbuf;
+                avail_out = sizeof(outbuf);
+            }
+        }
+    }
+
+    void write(const unsigned char * data, size_t len) override
+    {
+        assert(!finished);
+
+        // Don't feed brotli too much at once
+        const size_t CHUNK_SIZE = sizeof(outbuf) << 2;
+        while (len) {
+          size_t n = std::min(CHUNK_SIZE, len);
+          writeInternal(data, n);
+          data += n;
+          len -= n;
+        }
+    }
+  private:
+    void writeInternal(const unsigned char * data, size_t len)
+    {
+        assert(!finished);
+
+        const uint8_t *next_in = data;
+        size_t avail_in = len;
+        uint8_t *next_out = outbuf;
+        size_t avail_out = sizeof(outbuf);
+
+        while (avail_in > 0) {
+            checkInterrupt();
+
+            if (!BrotliEncoderCompressStream(state,
+                      BROTLI_OPERATION_PROCESS,
+                      &avail_in, &next_in,
+                      &avail_out, &next_out,
+                      nullptr))
+                throw CompressionError("error while compressing brotli file");
+
+            if (avail_out < sizeof(outbuf) || avail_in == 0) {
+                nextSink(outbuf, sizeof(outbuf) - avail_out);
+                next_out = outbuf;
+                avail_out = sizeof(outbuf);
+            }
+        }
+    }
+};
+#endif // HAVE_BROTLI
 
 ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink)
 {
@@ -307,7 +458,11 @@ ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & next
     else if (method == "bzip2")
         return make_ref<BzipSink>(nextSink);
     else if (method == "br")
+#if HAVE_BROTLI
         return make_ref<BrotliSink>(nextSink);
+#else
+        return make_ref<BrotliCmdSink>(nextSink);
+#endif
     else
         throw UnknownCompressionMethod(format("unknown compression method '%s'") % method);
 }
