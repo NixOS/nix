@@ -1,5 +1,6 @@
 %undefine _hardened_build
 
+%global debug_package %{nil}
 %global nixbld_user "nix-builder-"
 %global nixbld_group "nixbld"
 
