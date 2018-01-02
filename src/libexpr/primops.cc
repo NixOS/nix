@@ -1653,6 +1653,14 @@ static void prim_unsafeDiscardStringContext(EvalState & state, const Pos & pos, 
 }
 
 
+static void prim_hasContext(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    PathSet context;
+    state.forceString(*args[0], context, pos);
+    mkBool(v, !context.empty());
+}
+
+
 /* Sometimes we want to pass a derivation path (i.e. pkg.drvPath) to a
    builder without causing the derivation to be built (for instance,
    in the derivation that builds NARs in nix-push, when doing
@@ -2083,6 +2091,7 @@ void EvalState::createBaseEnv()
     addPrimOp("toString", 1, prim_toString);
     addPrimOp("__substring", 3, prim_substring);
     addPrimOp("__stringLength", 1, prim_stringLength);
+    addPrimOp("__hasContext", 1, prim_hasContext);
     addPrimOp("__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
     addPrimOp("__unsafeDiscardOutputDependency", 1, prim_unsafeDiscardOutputDependency);
     addPrimOp("__hashString", 2, prim_hashString);
