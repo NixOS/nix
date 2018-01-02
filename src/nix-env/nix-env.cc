@@ -897,6 +897,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
     bool jsonOutput = false;
 
     enum { sInstalled, sAvailable } source = sInstalled;
+    enum { eAll, eApproximate, eStrict } evaluate = eApproximate;
 
     settings.readOnlyMode = true; /* makes evaluation a bit faster */
 
@@ -912,6 +913,9 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         else if (arg == "--meta") printMeta = true;
         else if (arg == "--installed") source = sInstalled;
         else if (arg == "--available" || arg == "-a") source = sAvailable;
+        else if (arg == "--all") evaluate = eAll;
+        else if (arg == "--approximate") evaluate = eApproximate;
+        else if (arg == "--strict") evaluate = eStrict;
         else if (arg == "--xml") xmlOutput = true;
         else if (arg == "--json") jsonOutput = true;
         else if (arg == "--attr-path" || arg == "-P") printAttrPath = true;
@@ -992,6 +996,24 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             if (i.hasFailed()) continue;
 
             //Activity act(*logger, lvlDebug, format("outputting query result '%1%'") % i.attrPath);
+
+            /* Filter. */
+            if (!printStatus && !globals.prebuiltOnly && evaluate != eAll) {
+                if (evaluate == eStrict)
+                    /* Force evaluation. The above `try` will skip this element
+                       if this throws an exception. */
+                    i.queryOutPath();
+                else {
+                    /* Skip derivations based on `.meta.available`. */
+                    Value * check = i.queryMeta("available");
+                    if (!check || check->type != tBool)
+                        /* Fallback to evaluation as above. */
+                        i.queryOutPath();
+                    else if (check->boolean == false)
+                        /* Just skip it. */
+                        continue;
+                }
+            }
 
             if (globals.prebuiltOnly &&
                 validPaths.find(i.queryOutPath()) == validPaths.end() &&
