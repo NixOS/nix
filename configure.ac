@@ -127,7 +127,7 @@ NEED_PROG(gzip, gzip)
 NEED_PROG(xz, xz)
 AC_PATH_PROG(dot, dot)
 AC_PATH_PROG(pv, pv, pv)
-AC_PATH_PROG(bro, bro, bro)
+AC_PATH_PROGS(brotli, brotli bro, bro)
 AC_PATH_PROG(lsof, lsof, lsof)
 
 
@@ -175,6 +175,13 @@ AC_SUBST(HAVE_SODIUM, [$have_sodium])
 # Look for liblzma, a required dependency.
 PKG_CHECK_MODULES([LIBLZMA], [liblzma], [CXXFLAGS="$LIBLZMA_CFLAGS $CXXFLAGS"])
 
+
+# Look for libbrotli{enc,dec}, optional dependencies
+PKG_CHECK_MODULES([LIBBROTLI], [libbrotlienc libbrotlidec],
+  [AC_DEFINE([HAVE_BROTLI], [1], [Whether to use libbrotli.])
+   CXXFLAGS="$LIBBROTLI_CFLAGS $CXXFLAGS"]
+   have_brotli=1], [have_brotli=])
+AC_SUBST(HAVE_BROTLI, [$have_brotli])
 
 # Look for libseccomp, required for Linux sandboxing.
 if test "$sys_name" = linux; then
