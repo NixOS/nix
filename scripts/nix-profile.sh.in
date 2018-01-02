@@ -60,12 +60,6 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
     # This part should be kept in sync with nixpkgs:nixos/modules/programs/environment.nix
     NIX_PROFILES="@localstatedir@/nix/profiles/default $NIX_USER_PROFILE_DIR"
 
-    for i in $NIX_PROFILES; do
-        if [ -d "$i/lib/aspell" ]; then
-            export ASPELL_CONF="dict-dir $i/lib/aspell"
-        fi
-    done
-
     # Set $NIX_SSL_CERT_FILE so that Nixpkgs applications like curl work.
     if [ -e /etc/ssl/certs/ca-certificates.crt ]; then # NixOS, Ubuntu, Debian, Gentoo, Arch
         export NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
