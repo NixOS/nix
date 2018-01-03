@@ -313,7 +313,7 @@ let
         { extraPackages =
             [ "sqlite" "sqlite-devel" "bzip2-devel" "libcurl-devel" "openssl-devel" "xz-devel" "libseccomp-devel" ]
             ++ extraPackages; };
-      memSize = 1024;
+      memSize = 2048;
       meta.schedulingPriority = 50;
       postRPMInstall = "cd /tmp/rpmout/BUILD/nix-* && make installcheck";
       #enableParallelBuilding = true;
