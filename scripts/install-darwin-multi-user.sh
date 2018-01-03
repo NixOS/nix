@@ -24,7 +24,7 @@ readonly YELLOW='\033[38;33m'
 readonly YELLOW_UL='\033[38;4;33m'
 
 readonly CORES=$(sysctl -n hw.ncpu)
-readonly NIX_USER_COUNT="$CORES"
+readonly NIX_USER_COUNT="32"
 readonly NIX_BUILD_GROUP_ID="30000"
 readonly NIX_BUILD_GROUP_NAME="nixbld"
 readonly NIX_FIRST_BUILD_UID="30001"
