@@ -150,7 +150,7 @@ public:
     Setting<bool> syncBeforeRegistering{this, false, "sync-before-registering",
         "Whether to call sync() before registering a path as valid."};
 
-    Setting<bool> useSubstitutes{this, true, "use-substitutes",
+    Setting<bool> useSubstitutes{this, true, "substitute",
         "Whether to use substitutes.",
         {"build-use-substitutes"}};
 

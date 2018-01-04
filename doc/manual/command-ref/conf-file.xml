@@ -312,7 +312,7 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry><term><literal>use-substitutes</literal></term>
+  <varlistentry><term><literal>substitute</literal></term>
 
     <listitem><para>If set to <literal>true</literal> (default), Nix
     will use binary substitutes if available.  This option can be
