@@ -241,6 +241,7 @@ struct ExprLambda : Expr
     void setName(Symbol & name);
     string showNamePos() const;
     COMMON_METHODS
+    virtual Value * maybeThunk(EvalState & state, Env & env) { return eval(state, env); }
 };
 
 struct ExprLet : Expr
