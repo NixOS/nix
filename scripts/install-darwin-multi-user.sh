@@ -33,7 +33,7 @@ readonly NIX_FIRST_BUILD_UID="30001"
 readonly NIX_ROOT="/nix"
 readonly PLIST_DEST=/Library/LaunchDaemons/org.nixos.nix-daemon.plist
 
-readonly PROFILE_TARGETS=("/etc/profile" "/etc/bashrc" "/etc/zshrc")
+readonly PROFILE_TARGETS=("/etc/bashrc" "/etc/zshrc")
 readonly PROFILE_BACKUP_SUFFIX=".backup-before-nix"
 readonly PROFILE_NIX_FILE="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
 
