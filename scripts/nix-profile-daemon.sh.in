@@ -52,3 +52,7 @@ fi
 export NIX_SSL_CERT_FILE="@localstatedir@/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"
 export NIX_PATH="@localstatedir@/nix/profiles/per-user/root/channels"
 export PATH="$HOME/.nix-profile/bin:$HOME/.nix-profile/lib/kde4/libexec:@localstatedir@/nix/profiles/default/bin:@localstatedir@/nix/profiles/default:@localstatedir@/nix/profiles/default/lib/kde4/libexec:$PATH"
+
+if [ -n $MANPATH ]; then
+    export MANPATH="$HOME/.nix-profile/share/man:@localstatedir@/nix/var/nix/profiles/default/share/man:$MANPATH"
+fi
