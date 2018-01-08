@@ -223,10 +223,10 @@ Path Store::makeTextPath(const string & name, const Hash & hash,
 
 
 std::pair<Path, Hash> Store::computeStorePathForPath(const Path & srcPath,
+    const string & name,
     bool recursive, HashType hashAlgo, PathFilter & filter) const
 {
     Hash h = recursive ? hashPath(hashAlgo, srcPath, filter).first : hashFile(hashAlgo, srcPath);
-    string name = baseNameOf(srcPath);
     Path dstPath = makeFixedOutputPath(recursive, h, name);
     return std::pair<Path, Hash>(dstPath, h);
 }

@@ -309,7 +309,22 @@ struct CompareValues
             case tString:
                 return strcmp(v1->string.s, v2->string.s) < 0;
             case tPath:
-                return strcmp(v1->path, v2->path) < 0;
+            {
+                auto cmp = strcmp(v1->path.p, v2->path.p);
+                if (cmp == 0)
+                    if (v1->path.name)
+                        if (v2->path.name)
+                            return strcmp(v1->path.name, v2->path.name) < 0;
+                        else
+                            return false;
+                    else
+                        if (v2->path.name)
+                            return true;
+                        else
+                            return false;
+                else
+                    return cmp < 0;
+            }
             default:
                 throw EvalError(format("cannot compare %1% with %2%") % showType(*v1) % showType(*v2));
         }
@@ -938,6 +953,18 @@ static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Val
     v.attrs->sort();
 }
 
+/* Set the name a path should be copied to the store with */
+static void prim_setPathName(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceValue(*args[0], pos);
+    if (args[0]->type != tPath)
+        throwTypeError("value is %1% while a path was expected, at %2%", *args[0], pos);
+    state.forceStringNoCtx(*args[1], pos);
+    mkPathNoCopy(v, args[0]->path.p);
+    v.path.name = args[1]->string.s;
+}
+
+
 
 /*************************************************************
  * Creating files
@@ -1046,9 +1073,12 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
         return state.forceBool(res, pos);
     };
 
+    auto base = !(args[1]->type == tPath && args[1]->path.name)
+        ? baseNameOf(path)
+        : args[1]->path.name;
     Path dstPath = settings.readOnlyMode
-        ? state.store->computeStorePathForPath(path, true, htSHA256, filter).first
-        : state.store->addToStore(baseNameOf(path), path, true, htSHA256, filter, state.repair);
+        ? state.store->computeStorePathForPath(path, base, true, htSHA256, filter).first
+        : state.store->addToStore(base, path, true, htSHA256, filter, state.repair);
 
     mkString(v, dstPath, {dstPath});
 }
@@ -2042,6 +2072,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__readFile", 1, prim_readFile);
     addPrimOp("__readDir", 1, prim_readDir);
     addPrimOp("__findFile", 2, prim_findFile);
+    addPrimOp("__setPathName", 2, prim_setPathName);
 
     // Creating files
     addPrimOp("__toXML", 1, prim_toXML);

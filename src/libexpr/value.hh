@@ -126,7 +126,10 @@ struct Value
             const char * * context; // must be in sorted order
         } string;
 
-        const char * path;
+        struct {
+            const char * p;
+            const char * name; // If null, use p's basename
+        } path;
         Bindings * attrs;
         struct {
             unsigned int size;
@@ -251,7 +254,8 @@ static inline void mkPathNoCopy(Value & v, const char * s)
     assert(s == canonPath(s));
     clearValue(v);
     v.type = tPath;
-    v.path = s;
+    v.path.p = s;
+    v.path.name = nullptr;
 }
 
 

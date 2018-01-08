@@ -47,7 +47,7 @@ void copyContext(const Value & v, PathSet & context);
 
 /* Cache for calls to addToStore(); maps source paths to the store
    paths. */
-typedef std::map<Path, Path> SrcToStore;
+typedef std::map<std::pair<Path, std::string>, Path> SrcToStore;
 
 
 std::ostream & operator << (std::ostream & str, const Value & v);
@@ -179,7 +179,7 @@ public:
     string coerceToString(const Pos & pos, Value & v, PathSet & context,
         bool coerceMore = false, bool copyToStore = true);
 
-    string copyPathToStore(PathSet & context, const Path & path);
+    string copyPathToStore(PathSet & context, const Path & path, const string & name);
 
     /* Path coercion.  Converts strings, paths and derivations to a
        path.  The result is guaranteed to be a canonicalised, absolute
