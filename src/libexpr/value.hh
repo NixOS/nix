@@ -1,6 +1,7 @@
 #pragma once
 
 #include "symbol-table.hh"
+#include "util.hh"
 
 #if HAVE_BOEHMGC
 #include <gc/gc_allocator.h>
@@ -247,6 +248,7 @@ void mkString(Value & v, const char * s);
 
 static inline void mkPathNoCopy(Value & v, const char * s)
 {
+    assert(s == canonPath(s));
     clearValue(v);
     v.type = tPath;
     v.path = s;
