@@ -411,7 +411,7 @@ static void performOp(TunnelLogger * logger, ref<LocalStore> store,
             /* Repairing is not atomic, so disallowed for "untrusted"
                clients.  */
             if (mode == bmRepair && !trusted)
-                throw Error("repairing is not supported when building through the Nix daemon");
+                throw Error("repairing is not allowed because you are not in 'trusted-users'");
         }
         logger->startWork();
         store->buildPaths(drvs, mode);
