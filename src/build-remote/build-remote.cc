@@ -218,9 +218,11 @@ connected:
             signal(SIGALRM, old);
         }
 
+        auto substitute = settings.buildersUseSubstitutes ? Substitute : NoSubstitute;
+
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("copying dependencies to '%s'", storeUri));
-            copyPaths(store, ref<Store>(sshStore), inputs, NoRepair, NoCheckSigs);
+            copyPaths(store, ref<Store>(sshStore), inputs, NoRepair, NoCheckSigs, substitute);
         }
 
         uploadLock = -1;
@@ -240,7 +242,7 @@ connected:
         if (!missing.empty()) {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("copying outputs from '%s'", storeUri));
             setenv("NIX_HELD_LOCKS", concatStringsSep(" ", missing).c_str(), 1); /* FIXME: ugly */
-            copyPaths(ref<Store>(sshStore), store, missing, NoRepair, NoCheckSigs);
+            copyPaths(ref<Store>(sshStore), store, missing, NoRepair, NoCheckSigs, substitute);
         }
 
         return;
