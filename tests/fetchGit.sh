@@ -119,3 +119,16 @@ path4=$(nix eval --raw "(builtins.fetchGit $repo).outPath")
 # Confirm same as 'dev' branch
 path5=$(nix eval --raw "(builtins.fetchGit { url = $repo; ref = \"dev\"; }).outPath")
 [[ $path3 = $path5 ]]
+
+
+# Nuke the cache
+rm -rf $TEST_HOME/.cache/nix/git
+
+# Try again, but without 'git' on PATH
+NIX=$(command -v nix)
+# This should fail
+(! PATH= $NIX eval --raw "(builtins.fetchGit { url = $repo; ref = \"dev\"; }).outPath" )
+
+# Try again, with 'git' available.  This should work.
+path5=$(nix eval --raw "(builtins.fetchGit { url = $repo; ref = \"dev\"; }).outPath")
+[[ $path3 = $path5 ]]
