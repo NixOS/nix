@@ -85,7 +85,6 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     Path cacheDir = getCacheDir() + "/nix/git";
 
     if (!pathExists(cacheDir)) {
-        createDirs(cacheDir);
         runProgram("git", true, { "init", "--bare", cacheDir });
     }
 
