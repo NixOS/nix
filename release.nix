@@ -314,7 +314,7 @@ let
             [ "sqlite" "sqlite-devel" "bzip2-devel" "libcurl-devel" "openssl-devel" "xz-devel" "libseccomp-devel" ]
             ++ extraPackages; };
       memSize = 2048;
-      meta.schedulingPriority = 50;
+      meta.schedulingPriority = "50";
       postRPMInstall = "cd /tmp/rpmout/BUILD/nix-* && make installcheck";
       #enableParallelBuilding = true;
     };
@@ -336,7 +336,7 @@ let
             [ "libsqlite3-dev" "libbz2-dev" "libcurl-dev" "libcurl3-nss" "libssl-dev" "liblzma-dev" "libseccomp-dev" ]
             ++ extraPackages; };
       memSize = 1024;
-      meta.schedulingPriority = 50;
+      meta.schedulingPriority = "50";
       postInstall = "make installcheck";
       configureFlags = "--sysconfdir=/etc";
       debRequires =
