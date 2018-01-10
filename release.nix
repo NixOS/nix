@@ -1,4 +1,4 @@
-{ nix ? fetchGit ./.
+{ nix ? builtins.fetchGit ./.
 , nixpkgs ? fetchTarball channel:nixos-17.09
 , officialRelease ? false
 , systems ? [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
