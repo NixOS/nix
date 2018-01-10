@@ -138,6 +138,11 @@ public:
     Setting<std::string> builders{this, "@" + nixConfDir + "/machines", "builders",
         "A semicolon-separated list of build machines, in the format of nix.machines."};
 
+    Setting<bool> buildersUseSubstitutes{this, false, "builders-use-substitutes",
+        "Whether build machines should use their own substitutes for obtaining "
+        "build dependencies if possible, rather than waiting for this host to "
+        "upload them."};
+
     Setting<off_t> reservedSize{this, 8 * 1024 * 1024, "gc-reserved-space",
         "Amount of reserved disk space for the garbage collector."};
 
