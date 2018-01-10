@@ -313,7 +313,8 @@ let
         { extraPackages =
             [ "sqlite" "sqlite-devel" "bzip2-devel" "libcurl-devel" "openssl-devel" "xz-devel" "libseccomp-devel" ]
             ++ extraPackages; };
-      memSize = 2048;
+      # At most 2047MB can be simulated in qemu-system-i386
+      memSize = 2047;
       meta.schedulingPriority = 50;
       postRPMInstall = "cd /tmp/rpmout/BUILD/nix-* && make installcheck";
       #enableParallelBuilding = true;
