@@ -89,7 +89,7 @@ private:
 
     /* A cache from path names to values. */
 #if HAVE_BOEHMGC
-    typedef std::map<Path, Value, std::less<Path>, traceable_allocator<std::pair<const Path, Value> > > FileEvalCache;
+    typedef std::map<Path, Value, std::less<Path>, traceable_allocator<std::pair<const Path, Value>>> FileEvalCache;
 #else
     typedef std::map<Path, Value> FileEvalCache;
 #endif
@@ -269,6 +269,8 @@ private:
     unsigned long nrListConcats = 0;
     unsigned long nrPrimOpCalls = 0;
     unsigned long nrFunctionCalls = 0;
+    unsigned long nrMemoiseHits = 0;
+    unsigned long nrMemoiseMisses = 0;
 
     bool countCalls;
 
@@ -287,6 +289,22 @@ private:
     friend struct ExprOpConcatLists;
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
+    friend void prim_memoise(EvalState & state, const Pos & pos, Value * * args, Value & v);
+
+    /* State for builtins.memoise. */
+    struct MemoArgComparator
+    {
+        EvalState & state;
+        MemoArgComparator(EvalState & state) : state(state) { }
+        bool operator()(Value * a, Value * b);
+    };
+
+    typedef std::map<Value *, Value, MemoArgComparator, traceable_allocator<std::pair<const Value *, Value>>> PerLambdaMemo;
+
+    typedef std::pair<Env *, ExprLambda *> LambdaKey;
+
+    // FIXME: use std::unordered_map
+    std::map<LambdaKey, PerLambdaMemo, std::less<LambdaKey>, traceable_allocator<std::pair<const LambdaKey, PerLambdaMemo>>> memos;
 };
 
 
