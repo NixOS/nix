@@ -647,7 +647,7 @@ chat_about_sudo() {
         cat <<EOF
 This script is going to call sudo a lot. Normally, it would show you
 exactly what commands it is running and why. However, the script is
-run in  a headless fashion, like this:
+run in a headless fashion, like this:
 
   $ curl https://nixos.org/nix/install | sh
 
