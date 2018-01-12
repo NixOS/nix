@@ -50,6 +50,7 @@ struct CmdLog : InstallableCommand
 
         auto b = installable->toBuildable();
 
+        RunPager pager;
         for (auto & sub : subs) {
             auto log = b.drvPath != "" ? sub->getBuildLog(b.drvPath) : nullptr;
             for (auto & output : b.outputs) {
