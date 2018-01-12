@@ -597,6 +597,11 @@ public:
        "nix-cache-info" file. Lower value means higher priority. */
     virtual int getPriority() { return 0; }
 
+    virtual Path toRealPath(const Path & storePath)
+    {
+        return storePath;
+    }
+
 protected:
 
     Stats stats;
@@ -639,9 +644,10 @@ public:
 
     virtual Path getRealStoreDir() { return storeDir; }
 
-    Path toRealPath(const Path & storePath)
+    Path toRealPath(const Path & storePath) override
     {
-        return getRealStoreDir() + "/" + baseNameOf(storePath);
+        assert(isInStore(storePath));
+        return getRealStoreDir() + "/" + std::string(storePath, storeDir.size() + 1);
     }
 
     std::shared_ptr<std::string> getBuildLog(const Path & path) override;

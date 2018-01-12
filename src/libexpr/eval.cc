@@ -375,6 +375,16 @@ void EvalState::checkURI(const std::string & uri)
 }
 
 
+Path EvalState::toRealPath(const Path & path, const PathSet & context)
+{
+    // FIXME: check whether 'path' is in 'context'.
+    return
+        !context.empty() && store->isInStore(path)
+        ? store->toRealPath(path)
+        : path;
+};
+
+
 void EvalState::addConstant(const string & name, Value & v)
 {
     Value * v2 = allocValue();

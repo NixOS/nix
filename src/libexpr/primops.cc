@@ -84,10 +84,10 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
             % path % e.path % pos);
     }
 
-    path = state.checkSourcePath(path);
+    Path realPath = state.checkSourcePath(state.toRealPath(path, context));
 
     if (state.store->isStorePath(path) && state.store->isValidPath(path) && isDerivation(path)) {
-        Derivation drv = readDerivation(path);
+        Derivation drv = readDerivation(realPath);
         Value & w = *state.allocValue();
         state.mkAttrs(w, 3 + drv.outputs.size());
         Value * v2 = state.allocAttr(w, state.sDrvPath);
@@ -114,7 +114,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
     } else {
         state.forceAttrs(*args[0]);
         if (args[0]->attrs->empty())
-            state.evalFile(path, v);
+            state.evalFile(realPath, v);
         else {
             Env * env = &state.allocEnv(args[0]->attrs->size());
             env->up = &state.baseEnv;
@@ -127,8 +127,8 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
                 env->values[displ++] = attr.value;
             }
 
-            printTalkative("evaluating file '%1%'", path);
-            Expr * e = state.parseExprFromFile(resolveExprPath(path), staticEnv);
+            printTalkative("evaluating file '%1%'", realPath);
+            Expr * e = state.parseExprFromFile(resolveExprPath(realPath), staticEnv);
 
             e->eval(state, *env, v);
         }
@@ -863,7 +863,7 @@ static void prim_readFile(EvalState & state, const Pos & pos, Value * * args, Va
         throw EvalError(format("cannot read '%1%', since path '%2%' is not valid, at %3%")
             % path % e.path % pos);
     }
-    string s = readFile(state.checkSourcePath(path));
+    string s = readFile(state.checkSourcePath(state.toRealPath(path, context)));
     if (s.find((char) 0) != string::npos)
         throw Error(format("the contents of the file '%1%' cannot be represented as a Nix string") % path);
     mkString(v, s.c_str());
