@@ -2,7 +2,7 @@ source common.sh
 
 clearStore
 
-if [[ $(uname) != Linux ]]; then exit; fi
+if ! canUseSandbox; then exit; fi
 if [[ ! $SHELL =~ /nix/store ]]; then exit; fi
 
 chmod -R u+w $TEST_ROOT/store0 || true

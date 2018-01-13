@@ -87,6 +87,24 @@ killDaemon() {
     trap "" EXIT
 }
 
+canUseSandbox() {
+    if [[ $(uname) != Linux ]]; then return 1; fi
+
+    if [ ! -L /proc/self/ns/user ]; then
+        echo "Kernel doesn't support user namespaces, skipping this test..."
+        return 1
+    fi
+
+    if [ -e /proc/sys/kernel/unprivileged_userns_clone ]; then
+        if [ "$(cat /proc/sys/kernel/unprivileged_userns_clone)" != 1 ]; then
+            echo "Unprivileged user namespaces disabled by sysctl, skipping this test..."
+            return 1
+        fi
+    fi
+
+    return 0
+}
+
 fail() {
     echo "$1"
     exit 1

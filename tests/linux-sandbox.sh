@@ -2,7 +2,7 @@ source common.sh
 
 clearStore
 
-if [[ $(uname) != Linux ]]; then exit; fi
+if ! canUseSandbox; then exit; fi
 
 # Note: we need to bind-mount $SHELL into the chroot. Currently we
 # only support the case where $SHELL is in the Nix store, because
