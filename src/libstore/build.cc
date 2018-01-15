@@ -1810,8 +1810,13 @@ void DerivationGoal::startBuilder()
             useChroot = !fixedOutput && get(drv->env, "__noChroot") != "1";
     }
 
-    if (worker.store.storeDir != worker.store.realStoreDir)
-        useChroot = true;
+    if (worker.store.storeDir != worker.store.realStoreDir) {
+        #if __linux__
+            useChroot = true;
+        #else
+            throw Error("building using a diverted store is not supported on this platform");
+        #endif
+    }
 
     /* If `build-users-group' is not empty, then we have to build as
        one of the members of that group. */
