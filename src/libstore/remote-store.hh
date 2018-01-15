@@ -134,6 +134,7 @@ class UDSRemoteStore : public LocalFSStore, public RemoteStore
 public:
 
     UDSRemoteStore(const Params & params);
+    UDSRemoteStore(std::string path, const Params & params);
 
     std::string getUri() override;
 
@@ -145,6 +146,7 @@ private:
     };
 
     ref<RemoteStore::Connection> openConnection() override;
+    std::experimental::optional<std::string> path;
 };
 
 
