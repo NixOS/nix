@@ -300,15 +300,24 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
 {
     countCalls = getEnv("NIX_COUNT_CALLS", "0") != "0";
 
-    restricted = settings.restrictEval;
-
     assert(gcInitialised);
 
     /* Initialise the Nix expression search path. */
-    Strings paths = parseNixPath(getEnv("NIX_PATH", ""));
-    for (auto & i : _searchPath) addToSearchPath(i);
-    for (auto & i : paths) addToSearchPath(i);
+    if (!settings.pureEval) {
+        Strings paths = parseNixPath(getEnv("NIX_PATH", ""));
+        for (auto & i : _searchPath) addToSearchPath(i);
+        for (auto & i : paths) addToSearchPath(i);
+    }
     addToSearchPath("nix=" + settings.nixDataDir + "/nix/corepkgs");
+
+    if (settings.restrictEval || settings.pureEval) {
+        allowedPaths = PathSet();
+        for (auto & i : searchPath) {
+            auto r = resolveSearchPathElem(i);
+            if (!r.first) continue;
+            allowedPaths->insert(r.second);
+        }
+    }
 
     clearValue(vEmptySet);
     vEmptySet.type = tAttrs;
@@ -326,38 +335,39 @@ EvalState::~EvalState()
 
 Path EvalState::checkSourcePath(const Path & path_)
 {
-    if (!restricted) return path_;
+    if (!allowedPaths) return path_;
+
+    auto doThrow = [&]() [[noreturn]] {
+        throw RestrictedPathError("access to path '%1%' is forbidden in restricted mode", path_);
+    };
+
+    bool found = false;
+
+    for (auto & i : *allowedPaths) {
+        if (isDirOrInDir(path_, i)) {
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) doThrow();
 
     /* Resolve symlinks. */
     debug(format("checking access to '%s'") % path_);
     Path path = canonPath(path_, true);
 
-    for (auto & i : searchPath) {
-        auto r = resolveSearchPathElem(i);
-        if (!r.first) continue;
-        if (path == r.second || isInDir(path, r.second))
+    for (auto & i : *allowedPaths) {
+        if (isDirOrInDir(path, i))
             return path;
     }
 
-    /* To support import-from-derivation, allow access to anything in
-       the store. FIXME: only allow access to paths that have been
-       constructed by this evaluation. */
-    if (store->isInStore(path)) return path;
-
-#if 0
-    /* Hack to support the chroot dependencies of corepkgs (see
-       corepkgs/config.nix.in). */
-    if (path == settings.nixPrefix && isStorePath(settings.nixPrefix))
-        return path;
-#endif
-
-    throw RestrictedPathError(format("access to path '%1%' is forbidden in restricted mode") % path_);
+    doThrow();
 }
 
 
 void EvalState::checkURI(const std::string & uri)
 {
-    if (!restricted) return;
+    if (!settings.restrictEval) return;
 
     /* 'uri' should be equal to a prefix, or in a subdirectory of a
        prefix. Thus, the prefix https://github.co does not permit
@@ -396,7 +406,7 @@ void EvalState::addConstant(const string & name, Value & v)
 }
 
 
-void EvalState::addPrimOp(const string & name,
+Value * EvalState::addPrimOp(const string & name,
     unsigned int arity, PrimOpFun primOp)
 {
     Value * v = allocValue();
@@ -407,6 +417,7 @@ void EvalState::addPrimOp(const string & name,
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
     baseEnv.values[0]->attrs->push_back(Attr(sym, v));
+    return v;
 }
 
 
@@ -659,8 +670,10 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 }
 
 
-void EvalState::evalFile(const Path & path, Value & v)
+void EvalState::evalFile(const Path & path_, Value & v)
 {
+    auto path = checkSourcePath(path_);
+
     FileEvalCache::iterator i;
     if ((i = fileEvalCache.find(path)) != fileEvalCache.end()) {
         v = i->second;

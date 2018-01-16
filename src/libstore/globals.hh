@@ -232,6 +232,9 @@ public:
         "Whether to restrict file system access to paths in $NIX_PATH, "
         "and network access to the URI prefixes listed in 'allowed-uris'."};
 
+    Setting<bool> pureEval{this, false, "pure-eval",
+        "Whether to restrict file system and network access to files specified by cryptographic hash."};
+
     Setting<size_t> buildRepeat{this, 0, "repeat",
         "The number of times to repeat a build in order to verify determinism.",
         {"build-repeat"}};

@@ -6,7 +6,7 @@
 
 let
 
-  pkgs = import nixpkgs {};
+  pkgs = import nixpkgs { system = "x86_64-linux"; };
 
   jobs = rec {
 

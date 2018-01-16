@@ -39,7 +39,7 @@ installcheck:
 	  echo "$${red}$$failed out of $$total tests failed $$normal"; \
 	  exit 1; \
 	else \
-		echo "$${green}All tests succeeded"; \
+		echo "$${green}All tests succeeded$$normal"; \
 	fi
 
 .PHONY: check installcheck

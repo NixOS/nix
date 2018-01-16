@@ -76,9 +76,9 @@ public:
        already exist there. */
     RepairFlag repair;
 
-    /* If set, don't allow access to files outside of the Nix search
-       path or to environment variables. */
-    bool restricted;
+    /* The allowed filesystem paths in restricted or pure evaluation
+       mode. */
+    std::experimental::optional<PathSet> allowedPaths;
 
     Value vEmptySet;
 
@@ -212,7 +212,7 @@ private:
 
     void addConstant(const string & name, Value & v);
 
-    void addPrimOp(const string & name,
+    Value * addPrimOp(const string & name,
         unsigned int arity, PrimOpFun primOp);
 
 public:

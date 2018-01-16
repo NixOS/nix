@@ -22,10 +22,15 @@ struct GitInfo
     uint64_t revCount = 0;
 };
 
+std::regex revRegex("^[0-9a-fA-F]{40}$");
+
 GitInfo exportGit(ref<Store> store, const std::string & uri,
     std::experimental::optional<std::string> ref, std::string rev,
     const std::string & name)
 {
+    if (settings.pureEval && rev == "")
+        throw Error("in pure evaluation mode, 'fetchGit' requires a Git revision");
+
     if (!ref && rev == "" && hasPrefix(uri, "/") && pathExists(uri + "/.git")) {
 
         bool clean = true;
@@ -76,11 +81,8 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
     if (!ref) ref = "master"s;
 
-    if (rev != "") {
-        std::regex revRegex("^[0-9a-fA-F]{40}$");
-        if (!std::regex_match(rev, revRegex))
-            throw Error("invalid Git revision '%s'", rev);
-    }
+    if (rev != "" && !std::regex_match(rev, revRegex))
+        throw Error("invalid Git revision '%s'", rev);
 
     Path cacheDir = getCacheDir() + "/nix/git";
 
@@ -231,6 +233,9 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     mkString(*state.allocAttr(v, state.symbols.create("shortRev")), gitInfo.shortRev);
     mkInt(*state.allocAttr(v, state.symbols.create("revCount")), gitInfo.revCount);
     v.attrs->sort();
+
+    if (state.allowedPaths)
+        state.allowedPaths->insert(gitInfo.storePath);
 }
 
 static RegisterPrimOp r("fetchGit", 1, prim_fetchGit);

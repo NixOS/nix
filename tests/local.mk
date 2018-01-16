@@ -20,7 +20,8 @@ nix_tests = \
   fetchMercurial.sh \
   signing.sh \
   run.sh \
-  brotli.sh
+  brotli.sh \
+  pure-eval.sh
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))

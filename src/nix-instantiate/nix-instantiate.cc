@@ -182,7 +182,7 @@ int main(int argc, char * * argv)
         for (auto & i : files) {
             Expr * e = fromArgs
                 ? state.parseExprFromString(i, absPath("."))
-                : state.parseExprFromFile(resolveExprPath(lookupFileArg(state, i)));
+                : state.parseExprFromFile(resolveExprPath(state.checkSourcePath(lookupFileArg(state, i))));
             processExpr(state, attrPaths, parseOnly, strict, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         }

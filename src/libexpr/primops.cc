@@ -439,7 +439,7 @@ static void prim_tryEval(EvalState & state, const Pos & pos, Value * * args, Val
 static void prim_getEnv(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string name = state.forceStringNoCtx(*args[0], pos);
-    mkString(v, state.restricted ? "" : getEnv(name));
+    mkString(v, settings.restrictEval || settings.pureEval ? "" : getEnv(name));
 }
 
 
@@ -1929,7 +1929,14 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
 
     state.checkURI(url);
 
+    if (settings.pureEval && !expectedHash)
+        throw Error("in pure evaluation mode, '%s' requires a 'sha256' argument", who);
+
     Path res = getDownloader()->downloadCached(state.store, url, unpack, name, expectedHash);
+
+    if (state.allowedPaths)
+        state.allowedPaths->insert(res);
+
     mkString(v, res, PathSet({res}));
 }
 
@@ -1981,11 +1988,28 @@ void EvalState::createBaseEnv()
     mkNull(v);
     addConstant("null", v);
 
-    mkInt(v, time(0));
-    addConstant("__currentTime", v);
+    auto vThrow = addPrimOp("throw", 1, prim_throw);
 
-    mkString(v, settings.thisSystem);
-    addConstant("__currentSystem", v);
+    auto addPurityError = [&](const std::string & name) {
+        Value * v2 = allocValue();
+        mkString(*v2, fmt("'%s' is not allowed in pure evaluation mode", name));
+        mkApp(v, *vThrow, *v2);
+        addConstant(name, v);
+    };
+
+    if (settings.pureEval)
+        addPurityError("__currentTime");
+    else {
+        mkInt(v, time(0));
+        addConstant("__currentTime", v);
+    }
+
+    if (settings.pureEval)
+        addPurityError("__currentSystem");
+    else {
+        mkString(v, settings.thisSystem);
+        addConstant("__currentSystem", v);
+    }
 
     mkString(v, nixVersion);
     addConstant("__nixVersion", v);
@@ -2001,10 +2025,10 @@ void EvalState::createBaseEnv()
     addConstant("__langVersion", v);
 
     // Miscellaneous
-    addPrimOp("scopedImport", 2, prim_scopedImport);
+    auto vScopedImport = addPrimOp("scopedImport", 2, prim_scopedImport);
     Value * v2 = allocValue();
     mkAttrs(*v2, 0);
-    mkApp(v, *baseEnv.values[baseEnvDispl - 1], *v2);
+    mkApp(v, *vScopedImport, *v2);
     forceValue(v);
     addConstant("import", v);
     if (settings.enableNativeCode) {
@@ -2020,7 +2044,6 @@ void EvalState::createBaseEnv()
     addPrimOp("__isBool", 1, prim_isBool);
     addPrimOp("__genericClosure", 1, prim_genericClosure);
     addPrimOp("abort", 1, prim_abort);
-    addPrimOp("throw", 1, prim_throw);
     addPrimOp("__addErrorContext", 2, prim_addErrorContext);
     addPrimOp("__tryEval", 1, prim_tryEval);
     addPrimOp("__getEnv", 1, prim_getEnv);
@@ -2035,7 +2058,10 @@ void EvalState::createBaseEnv()
 
     // Paths
     addPrimOp("__toPath", 1, prim_toPath);
-    addPrimOp("__storePath", 1, prim_storePath);
+    if (settings.pureEval)
+        addPurityError("__storePath");
+    else
+        addPrimOp("__storePath", 1, prim_storePath);
     addPrimOp("__pathExists", 1, prim_pathExists);
     addPrimOp("baseNameOf", 1, prim_baseNameOf);
     addPrimOp("dirOf", 1, prim_dirOf);

@@ -29,9 +29,16 @@ rev2=$(git -C $repo rev-parse HEAD)
 path=$(nix eval --raw "(builtins.fetchGit file://$repo).outPath")
 [[ $(cat $path/hello) = world ]]
 
+# In pure eval mode, fetchGit without a revision should fail.
+[[ $(nix eval --raw "(builtins.readFile (fetchGit file://$repo + \"/hello\"))") = world ]]
+(! nix eval --pure-eval --raw "(builtins.readFile (fetchGit file://$repo + \"/hello\"))")
+
 # Fetch using an explicit revision hash.
 path2=$(nix eval --raw "(builtins.fetchGit { url = file://$repo; rev = \"$rev2\"; }).outPath")
 [[ $path = $path2 ]]
+
+# In pure eval mode, fetchGit with a revision should succeed.
+[[ $(nix eval --pure-eval --raw "(builtins.readFile (fetchGit { url = file://$repo; rev = \"$rev2\"; } + \"/hello\"))") = world ]]
 
 # Fetch again. This should be cached.
 mv $repo ${repo}-tmp

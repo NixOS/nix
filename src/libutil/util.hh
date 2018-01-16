@@ -53,9 +53,11 @@ Path dirOf(const Path & path);
    following the final `/'. */
 string baseNameOf(const Path & path);
 
-/* Check whether a given path is a descendant of the given
-   directory. */
+/* Check whether 'path' is a descendant of 'dir'. */
 bool isInDir(const Path & path, const Path & dir);
+
+/* Check whether 'path' is equal to 'dir' or a descendant of 'dir'. */
+bool isDirOrInDir(const Path & path, const Path & dir);
 
 /* Get status of `path'. */
 struct stat lstat(const Path & path);
