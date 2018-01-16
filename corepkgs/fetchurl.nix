@@ -1,4 +1,4 @@
-{ system ? builtins.currentSystem
+{ system ? "" # obsolete
 , url
 , md5 ? "", sha1 ? "", sha256 ? "", sha512 ? ""
 , outputHash ?
@@ -17,7 +17,9 @@ derivation {
   inherit outputHashAlgo outputHash;
   outputHashMode = if unpack || executable then "recursive" else "flat";
 
-  inherit name system url executable unpack;
+  inherit name url executable unpack;
+
+  system = "builtin";
 
   # No need to double the amount of network traffic
   preferLocalBuild = true;
