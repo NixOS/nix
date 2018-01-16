@@ -30,10 +30,8 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
 
     vSourceExpr = state.allocValue();
 
-    if (file != "") {
-        Expr * e = state.parseExprFromFile(resolveExprPath(lookupFileArg(state, file)));
-        state.eval(e, *vSourceExpr);
-    }
+    if (file != "")
+        state.evalFile(lookupFileArg(state, file), *vSourceExpr);
 
     else {
 
