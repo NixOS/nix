@@ -193,9 +193,6 @@ LegacyArgs::LegacyArgs(const std::string & programName,
     mkFlag(0, "readonly-mode", "do not write to the Nix store",
         &settings.readOnlyMode);
 
-    mkFlag(0, "show-trace", "show Nix expression stack trace in evaluation errors",
-        &settings.showTrace);
-
     mkFlag(0, "no-gc-warning", "disable warning about not using '--add-root'",
         &gcWarning, false);
 

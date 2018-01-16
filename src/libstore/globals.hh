@@ -211,7 +211,8 @@ public:
     bool lockCPU;
 
     /* Whether to show a stack trace if Nix evaluation fails. */
-    bool showTrace = false;
+    Setting<bool> showTrace{this, false, "show-trace",
+        "Whether to show a stack trace on evaluation errors."};
 
     Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation",
         "Whether builtin functions that allow executing native code should be enabled."};
