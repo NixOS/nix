@@ -734,6 +734,14 @@ builtins.fetchurl {
   </varlistentry>
 
 
+  <varlistentry xml:id="conf-show-trace"><term><literal>show-trace</literal></term>
+
+    <listitem><para>Causes Nix to print out a stack trace in case of Nix
+    expression evaluation errors.</para></listitem>
+
+  </varlistentry>
+
+
 </variablelist>
 
 </para>
