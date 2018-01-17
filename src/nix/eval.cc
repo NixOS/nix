@@ -5,6 +5,7 @@
 #include "eval.hh"
 #include "json.hh"
 #include "value-to-json.hh"
+#include "progress-bar.hh"
 
 using namespace nix;
 
@@ -58,6 +59,9 @@ struct CmdEval : MixJSON, InstallableCommand
 
         auto v = installable->toValue(*state);
         PathSet context;
+
+        stopProgressBar();
+
         if (raw) {
             std::cout << state->coerceToString(noPos, *v, context);
         } else if (json) {
