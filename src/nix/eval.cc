@@ -8,7 +8,7 @@
 
 using namespace nix;
 
-struct CmdEval : MixJSON, InstallablesCommand
+struct CmdEval : MixJSON, InstallableCommand
 {
     bool raw = false;
 
@@ -56,20 +56,16 @@ struct CmdEval : MixJSON, InstallablesCommand
 
         auto state = getEvalState();
 
-        auto jsonOut = json ? std::make_unique<JSONList>(std::cout) : nullptr;
-
-        for (auto & i : installables) {
-            auto v = i->toValue(*state);
-            PathSet context;
-            if (raw) {
-                std::cout << state->coerceToString(noPos, *v, context);
-            } else if (json) {
-                auto jsonElem = jsonOut->placeholder();
-                printValueAsJSON(*state, true, *v, jsonElem, context);
-            } else {
-                state->forceValueDeep(*v);
-                std::cout << *v << "\n";
-            }
+        auto v = installable->toValue(*state);
+        PathSet context;
+        if (raw) {
+            std::cout << state->coerceToString(noPos, *v, context);
+        } else if (json) {
+            JSONPlaceholder jsonOut(std::cout);
+            printValueAsJSON(*state, true, *v, jsonOut, context);
+        } else {
+            state->forceValueDeep(*v);
+            std::cout << *v << "\n";
         }
     }
 };
