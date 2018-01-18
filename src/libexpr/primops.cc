@@ -1997,16 +1997,12 @@ void EvalState::createBaseEnv()
         addConstant(name, v);
     };
 
-    if (settings.pureEval)
-        addPurityError("__currentTime");
-    else {
+    if (!settings.pureEval) {
         mkInt(v, time(0));
         addConstant("__currentTime", v);
     }
 
-    if (settings.pureEval)
-        addPurityError("__currentSystem");
-    else {
+    if (!settings.pureEval) {
         mkString(v, settings.thisSystem);
         addConstant("__currentSystem", v);
     }
