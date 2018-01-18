@@ -2933,8 +2933,11 @@ void DerivationGoal::runChild()
         if (drv->isBuiltin()) {
             try {
                 logger = makeJSONLogger(*logger);
-                if (drv->builder == "builtin:fetchurl")
-                    builtinFetchurl(*drv, netrcData);
+                if (drv->builder == "builtin:fetchurl") {
+                    /* fetchurl might need to rewrite its outputs, so let's pass in a closure to rewrite anythings */
+                    auto rewriter = [&](const std::string & in) { return rewriteStrings(in, inputRewrites); };
+                    builtinFetchurl(*drv, netrcData, rewriter);
+                }
                 else
                     throw Error(format("unsupported builtin function '%1%'") % string(drv->builder, 8));
                 _exit(0);

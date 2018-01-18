@@ -337,7 +337,8 @@ Path EvalState::checkSourcePath(const Path & path_)
 {
     if (!allowedPaths) return path_;
 
-    auto doThrow = [&]() [[noreturn]] {
+    // This originally had [[noreturn]] on it, but clang barfs on that, so we'll get a warning until it learns
+    auto doThrow = [&]() {
         throw RestrictedPathError("access to path '%1%' is forbidden in restricted mode", path_);
     };
 
