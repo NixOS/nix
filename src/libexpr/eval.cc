@@ -84,7 +84,11 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
         str << "\"";
         break;
     case tPath:
-        str << v.path; // !!! escaping?
+        if (v.path.name)
+            str << "(builtins.setPathName ";
+        str << v.path.p; // !!! escaping?
+        if (v.path.name)
+            str << " " << v.path.name << ")";
         break;
     case tNull:
         str << "null";
@@ -1508,8 +1512,11 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     }
 
     if (v.type == tPath) {
-        Path path(canonPath(v.path));
-        return copyToStore ? copyPathToStore(context, path) : path;
+        return copyToStore
+            ? copyPathToStore(context, v.path.p, v.path.name
+                ? v.path.name
+                : baseNameOf(v.path.p))
+            : v.path.p;
     }
 
     if (v.type == tAttrs) {
@@ -1556,19 +1563,20 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
 }
 
 
-string EvalState::copyPathToStore(PathSet & context, const Path & path)
+string EvalState::copyPathToStore(PathSet & context, const Path & path, const string & name)
 {
-    if (nix::isDerivation(path))
+    if (nix::isDerivation(name))
         throwEvalError("file names are not allowed to end in '%1%'", drvExtension);
 
     Path dstPath;
-    if (srcToStore[path] != "")
-        dstPath = srcToStore[path];
+    auto cacheKey = std::pair<Path, string>(path, name);
+    if (srcToStore[cacheKey] != "")
+        dstPath = srcToStore[cacheKey];
     else {
         dstPath = settings.readOnlyMode
-            ? store->computeStorePathForPath(checkSourcePath(path)).first
-            : store->addToStore(baseNameOf(path), checkSourcePath(path), true, htSHA256, defaultPathFilter, repair);
-        srcToStore[path] = dstPath;
+            ? store->computeStorePathForPath(checkSourcePath(path), name).first
+            : store->addToStore(name, checkSourcePath(path), true, htSHA256, defaultPathFilter, repair);
+        srcToStore[cacheKey] = dstPath;
         printMsg(lvlChatty, format("copied source '%1%' -> '%2%'")
             % path % dstPath);
     }
@@ -1618,7 +1626,23 @@ bool EvalState::eqValues(Value & v1, Value & v2)
             return strcmp(v1.string.s, v2.string.s) == 0;
 
         case tPath:
-            return strcmp(v1.path, v2.path) == 0;
+            if (strcmp(v1.path.p, v2.path.p) == 0) {
+                if (v1.path.name) {
+                    if (v2.path.name) {
+                        return strcmp(v1.path.name, v2.path.name) == 0;
+                    } else {
+                        return v1.path.name == baseNameOf(v2.path.p);
+                    }
+                } else {
+                    if (v2.path.name) {
+                        return v2.path.name == baseNameOf(v1.path.p);
+                    } else {
+                        return true;
+                    }
+                }
+            } else {
+                return false;
+            }
 
         case tNull:
             return true;
@@ -1769,7 +1793,9 @@ size_t valueSize(Value & v)
                     sz += doString(*p);
             break;
         case tPath:
-            sz += doString(v.path);
+            sz += doString(v.path.p);
+            if (v.path.name)
+                sz += doString(v.path.name);
             break;
         case tAttrs:
             if (seen.find(v.attrs) == seen.end()) {

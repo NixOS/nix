@@ -1,6 +1,7 @@
 #pragma once
 
 #include "symbol-table.hh"
+#include "util.hh"
 
 #if HAVE_BOEHMGC
 #include <gc/gc_allocator.h>
@@ -125,7 +126,10 @@ struct Value
             const char * * context; // must be in sorted order
         } string;
 
-        const char * path;
+        struct {
+            const char * p;
+            const char * name; // If null, use p's basename
+        } path;
         Bindings * attrs;
         struct {
             unsigned int size;
@@ -247,9 +251,11 @@ void mkString(Value & v, const char * s);
 
 static inline void mkPathNoCopy(Value & v, const char * s)
 {
+    assert(s == canonPath(s));
     clearValue(v);
     v.type = tPath;
-    v.path = s;
+    v.path.p = s;
+    v.path.name = nullptr;
 }
 
 

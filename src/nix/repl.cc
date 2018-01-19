@@ -554,7 +554,13 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
 
     case tPath:
-        str << ESC_GRE << v.path << ESC_END; // !!! escaping?
+        str << ESC_GRE;
+        if (v.path.name)
+            str << "(builtins.setPathName ";
+        str << v.path.p; // !!! escaping?
+        if (v.path.name)
+            str << " " << v.path.name << ")";
+        str << ESC_END;
         break;
 
     case tNull:

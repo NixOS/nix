@@ -306,6 +306,7 @@ public:
        store path to which srcPath is to be copied.  Returns the store
        path and the cryptographic hash of the contents of srcPath. */
     std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
+        const string & name,
         bool recursive = true, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter) const;
 
