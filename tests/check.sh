@@ -16,3 +16,17 @@ nix-build dependencies.nix --no-out-link --repeat 3
 (! nix-build check.nix -A nondeterministic --no-out-link --repeat 1 2> $TEST_ROOT/log)
 grep 'differs from previous round' $TEST_ROOT/log
 
+path=$(nix-build check.nix -A fetchurl --no-out-link)
+
+chmod +w $path
+echo foo > $path
+chmod -w $path
+
+nix-build check.nix -A fetchurl --no-out-link --check
+
+# Note: "check" doesn't repair anything, it just compares to the hash stored in the database.
+[[ $(cat $path) = foo ]]
+
+nix-build check.nix -A fetchurl --no-out-link --repair
+
+[[ $(cat $path) != foo ]]

@@ -2933,8 +2933,13 @@ void DerivationGoal::runChild()
         if (drv->isBuiltin()) {
             try {
                 logger = makeJSONLogger(*logger);
+
+                BasicDerivation drv2(*drv);
+                for (auto & e : drv2.env)
+                    e.second = rewriteStrings(e.second, inputRewrites);
+
                 if (drv->builder == "builtin:fetchurl")
-                    builtinFetchurl(*drv, netrcData);
+                    builtinFetchurl(drv2, netrcData);
                 else
                     throw Error(format("unsupported builtin function '%1%'") % string(drv->builder, 8));
                 _exit(0);
