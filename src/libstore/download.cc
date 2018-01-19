@@ -303,6 +303,7 @@ struct CurlDownloader : public Downloader
                     // Don't bother retrying on certain cURL errors either
                     switch (code) {
                         case CURLE_FAILED_INIT:
+                        case CURLE_URL_MALFORMAT:
                         case CURLE_NOT_BUILT_IN:
                         case CURLE_REMOTE_ACCESS_DENIED:
                         case CURLE_FILE_COULDNT_READ_FILE:
