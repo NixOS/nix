@@ -337,10 +337,6 @@ Path EvalState::checkSourcePath(const Path & path_)
 {
     if (!allowedPaths) return path_;
 
-    auto doThrow = [&]() [[noreturn]] {
-        throw RestrictedPathError("access to path '%1%' is forbidden in restricted mode", path_);
-    };
-
     bool found = false;
 
     for (auto & i : *allowedPaths) {
@@ -350,7 +346,8 @@ Path EvalState::checkSourcePath(const Path & path_)
         }
     }
 
-    if (!found) doThrow();
+    if (!found)
+        throw RestrictedPathError("access to path '%1%' is forbidden in restricted mode", path_);
 
     /* Resolve symlinks. */
     debug(format("checking access to '%s'") % path_);
@@ -361,7 +358,7 @@ Path EvalState::checkSourcePath(const Path & path_)
             return path;
     }
 
-    doThrow();
+    throw RestrictedPathError("access to path '%1%' is forbidden in restricted mode", path);
 }
 
 
