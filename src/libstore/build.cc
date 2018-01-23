@@ -6,6 +6,7 @@
 #include "archive.hh"
 #include "affinity.hh"
 #include "builtins.hh"
+#include "download.hh"
 #include "finally.hh"
 #include "compression.hh"
 #include "json.hh"
@@ -1777,6 +1778,19 @@ PathSet exportReferences(Store & store, PathSet storePaths)
     return paths;
 }
 
+static std::once_flag dns_resolve_flag;
+
+static void preloadNSS() {
+    /* builtin:fetchurl can trigger a DNS lookup, which with glibc can trigger a dynamic library load of
+       one of the glibc NSS libraries in a sandboxed child, which will fail unless the library's already
+       been loaded in the parent. So we force a download of an invalid URL to force the NSS machinery to
+       load its lookup libraries in the parent before any child gets a chance to. */
+    std::call_once(dns_resolve_flag, []() {
+        DownloadRequest request("http://this.pre-initializes.the.dns.resolvers.invalid");
+        request.tries = 1; // We only need to do it once, and this also suppresses an annoying warning
+        try { getDownloader()->download(request); } catch (...) {}
+    });
+}
 
 void DerivationGoal::startBuilder()
 {
@@ -1786,6 +1800,9 @@ void DerivationGoal::startBuilder()
             format("a '%1%' is required to build '%3%', but I am a '%2%'")
             % drv->platform % settings.thisSystem % drvPath);
     }
+
+    if (drv->isBuiltin())
+        preloadNSS();
 
 #if __APPLE__
     additionalSandboxProfile = get(drv->env, "__sandboxProfile");
