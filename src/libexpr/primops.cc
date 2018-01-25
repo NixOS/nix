@@ -1009,20 +1009,13 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
 }
 
 
-static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args, Value & v)
+static void addPath(EvalState & state, const Pos & pos, const string & name, const Path & path_,
+    Value * filterFun, bool recursive, const Hash & expectedHash, Value & v)
 {
-    PathSet context;
-    Path path = state.coerceToPath(pos, *args[1], context);
-    if (!context.empty())
-        throw EvalError(format("string '%1%' cannot refer to other paths, at %2%") % path % pos);
-
-    state.forceValue(*args[0]);
-    if (args[0]->type != tLambda)
-        throw TypeError(format("first argument in call to 'filterSource' is not a function but %1%, at %2%") % showType(*args[0]) % pos);
-
-    path = state.checkSourcePath(path);
-
-    PathFilter filter = [&](const Path & path) {
+    const auto path = settings.pureEval && expectedHash ?
+        path_ :
+        state.checkSourcePath(path_);
+    PathFilter filter = filterFun ? ([&](const Path & path) {
         auto st = lstat(path);
 
         /* Call the filter function.  The first argument is the path,
@@ -1031,7 +1024,7 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
         mkString(arg1, path);
 
         Value fun2;
-        state.callFunction(*args[0], arg1, fun2, noPos);
+        state.callFunction(*filterFun, arg1, fun2, noPos);
 
         Value arg2;
         mkString(arg2,
@@ -1044,13 +1037,76 @@ static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args
         state.callFunction(fun2, arg2, res, noPos);
 
         return state.forceBool(res, pos);
-    };
+    }) : defaultPathFilter;
 
-    Path dstPath = settings.readOnlyMode
-        ? state.store->computeStorePathForPath(path, true, htSHA256, filter).first
-        : state.store->addToStore(baseNameOf(path), path, true, htSHA256, filter, state.repair);
+    Path expectedStorePath;
+    if (expectedHash) {
+        expectedStorePath =
+            state.store->makeFixedOutputPath(recursive, expectedHash, name);
+    }
+    Path dstPath;
+    if (!expectedHash || !state.store->isValidPath(expectedStorePath)) {
+        dstPath = settings.readOnlyMode
+            ? state.store->computeStorePathForPath(name, path, recursive, htSHA256, filter).first
+            : state.store->addToStore(name, path, recursive, htSHA256, filter, state.repair);
+        if (expectedHash && expectedStorePath != dstPath) {
+            throw Error(format("store path mismatch in (possibly filtered) path added from '%1%'") % path);
+        }
+    } else
+        dstPath = expectedStorePath;
 
     mkString(v, dstPath, {dstPath});
+}
+
+
+static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    PathSet context;
+    Path path = state.coerceToPath(pos, *args[1], context);
+    if (!context.empty())
+        throw EvalError(format("string '%1%' cannot refer to other paths, at %2%") % path % pos);
+
+    state.forceValue(*args[0]);
+    if (args[0]->type != tLambda)
+        throw TypeError(format("first argument in call to 'filterSource' is not a function but %1%, at %2%") % showType(*args[0]) % pos);
+
+    addPath(state, pos, baseNameOf(path), path, args[0], true, Hash(), v);
+}
+
+static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceAttrs(*args[0], pos);
+    Path path;
+    string name;
+    Value * filterFun = nullptr;
+    auto recursive = true;
+    Hash expectedHash;
+
+    for (auto & attr : *args[0]->attrs) {
+        const string & n(attr.name);
+        if (n == "path") {
+            PathSet context;
+            path = state.coerceToPath(*attr.pos, *attr.value, context);
+            if (!context.empty())
+                throw EvalError(format("string '%1%' cannot refer to other paths, at %2%") % path % *attr.pos);
+        } else if (attr.name == state.sName)
+            name = state.forceStringNoCtx(*attr.value, *attr.pos);
+        else if (n == "filter") {
+            state.forceValue(*attr.value);
+            filterFun = attr.value;
+        } else if (n == "recursive")
+            recursive = state.forceBool(*attr.value, *attr.pos);
+        else if (n == "sha256")
+            expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
+        else
+            throw EvalError(format("unsupported argument '%1%' to 'addPath', at %2%") % attr.name % *attr.pos);
+    }
+    if (path.empty())
+        throw EvalError(format("'path' required, at %1%") % pos);
+    if (name.empty())
+        name = baseNameOf(path);
+
+    addPath(state, pos, name, path, filterFun, recursive, expectedHash, v);
 }
 
 
@@ -2071,6 +2127,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__fromJSON", 1, prim_fromJSON);
     addPrimOp("__toFile", 2, prim_toFile);
     addPrimOp("__filterSource", 2, prim_filterSource);
+    addPrimOp("__path", 1, prim_path);
 
     // Sets
     addPrimOp("__attrNames", 1, prim_attrNames);

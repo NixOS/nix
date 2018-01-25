@@ -305,9 +305,9 @@ public:
     /* This is the preparatory part of addToStore(); it computes the
        store path to which srcPath is to be copied.  Returns the store
        path and the cryptographic hash of the contents of srcPath. */
-    std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
-        bool recursive = true, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter) const;
+    std::pair<Path, Hash> computeStorePathForPath(const string & name,
+        const Path & srcPath, bool recursive = true,
+        HashType hashAlgo = htSHA256, PathFilter & filter = defaultPathFilter) const;
 
     /* Preparatory part of addTextToStore().
 
