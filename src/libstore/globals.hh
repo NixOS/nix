@@ -287,10 +287,7 @@ public:
     Setting<unsigned int> tarballTtl{this, 60 * 60, "tarball-ttl",
         "How soon to expire files fetched by builtins.fetchTarball and builtins.fetchurl."};
 
-    Setting<std::string> signedBinaryCaches{this, "*", "signed-binary-caches",
-        "Obsolete."};
-
-    Setting<bool> requireSigs{this, signedBinaryCaches == "*", "require-sigs",
+    Setting<bool> requireSigs{this, true, "require-sigs",
         "Whether to check that any non-content-addressed path added to the "
         "Nix store has a valid signature (that is, one signed using a key "
         "listed in 'trusted-public-keys'."};
