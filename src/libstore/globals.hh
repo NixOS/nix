@@ -15,6 +15,13 @@ typedef enum { smEnabled, smRelaxed, smDisabled } SandboxMode;
 
 extern bool useCaseHack; // FIXME
 
+/* There's no real downside to us enabling the sandbox by default on Darwin */
+#if __APPLE__
+#define smDefault smEnabled
+#else
+#define smDefault smDisabled
+#endif
+
 struct CaseHackSetting : public BaseSetting<bool>
 {
     CaseHackSetting(Config * options,
@@ -217,7 +224,7 @@ public:
     Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation",
         "Whether builtin functions that allow executing native code should be enabled."};
 
-    Setting<SandboxMode> sandboxMode{this, smDisabled, "sandbox",
+    Setting<SandboxMode> sandboxMode{this, smDefault, "sandbox",
         "Whether to enable sandboxed builds. Can be \"true\", \"false\" or \"relaxed\".",
         {"build-use-chroot", "build-use-sandbox"}};
 
