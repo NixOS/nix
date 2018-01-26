@@ -22,6 +22,7 @@
 #include <thread>
 #include <cmath>
 #include <random>
+#include <algorithm>
 
 using namespace std::string_literals;
 
@@ -91,6 +92,8 @@ struct CurlDownloader : public Downloader
         {
             if (!request.expectedETag.empty())
                 requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + request.expectedETag).c_str());
+            if (!request.mimeType.empty())
+                requestHeaders = curl_slist_append(requestHeaders, ("Content-Type: " + request.mimeType).c_str());
         }
 
         ~DownloadItem()
@@ -185,6 +188,22 @@ struct CurlDownloader : public Downloader
             return 0;
         }
 
+        size_t readOffset = 0;
+        int readCallback(char *buffer, size_t size, size_t nitems)
+        {
+            if (readOffset == request.data->length())
+                return 0;
+            auto count = std::min(size * nitems, request.data->length() - readOffset);
+            memcpy(buffer, request.data->data() + readOffset, count);
+            readOffset += count;
+            return count;
+        }
+
+        static int readCallbackWrapper(char *buffer, size_t size, size_t nitems, void * userp)
+        {
+            return ((DownloadItem *) userp)->readCallback(buffer, size, nitems);
+        }
+
         long lowSpeedTimeout = 300;
 
         void init()
@@ -224,6 +243,13 @@ struct CurlDownloader : public Downloader
 
             if (request.head)
                 curl_easy_setopt(req, CURLOPT_NOBODY, 1);
+
+            if (request.data) {
+                curl_easy_setopt(req, CURLOPT_UPLOAD, 1L);
+                curl_easy_setopt(req, CURLOPT_READFUNCTION, readCallbackWrapper);
+                curl_easy_setopt(req, CURLOPT_READDATA, this);
+                curl_easy_setopt(req, CURLOPT_INFILESIZE_LARGE, (curl_off_t) request.data->length());
+            }
 
             if (request.verifyTLS) {
                 if (settings.caFile != "")
@@ -265,7 +291,7 @@ struct CurlDownloader : public Downloader
             }
 
             if (code == CURLE_OK &&
-                (httpStatus == 200 || httpStatus == 304 || httpStatus == 226 /* FTP */ || httpStatus == 0 /* other protocol */))
+                (httpStatus == 200 || httpStatus == 201 || httpStatus == 204 || httpStatus == 304 || httpStatus == 226 /* FTP */ || httpStatus == 0 /* other protocol */))
             {
                 result.cached = httpStatus == 304;
                 done = true;
