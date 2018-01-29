@@ -312,10 +312,10 @@ struct CurlDownloader : public Downloader
                         case CURLE_BAD_FUNCTION_ARGUMENT:
                         case CURLE_INTERFACE_FAILED:
                         case CURLE_UNKNOWN_OPTION:
-                        err = Misc;
-                        break;
+                            err = Misc;
+                            break;
                         default: // Shut up warnings
-                        break;
+                            break;
                     }
                 }
 
