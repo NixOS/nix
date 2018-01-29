@@ -315,6 +315,12 @@ static void prim_isBool(EvalState & state, const Pos & pos, Value * * args, Valu
     mkBool(v, args[0]->type == tBool);
 }
 
+/* Determine whether the argument is a path. */
+static void prim_isPath(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceValue(*args[0]);
+    mkBool(v, args[0]->type == tPath);
+}
 
 struct CompareValues
 {
@@ -2169,6 +2175,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__isInt", 1, prim_isInt);
     addPrimOp("__isFloat", 1, prim_isFloat);
     addPrimOp("__isBool", 1, prim_isBool);
+    addPrimOp("__isPath", 1, prim_isPath);
     addPrimOp("__genericClosure", 1, prim_genericClosure);
     addPrimOp("abort", 1, prim_abort);
     addPrimOp("__addErrorContext", 2, prim_addErrorContext);
