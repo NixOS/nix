@@ -78,9 +78,22 @@ UDSRemoteStore::UDSRemoteStore(const Params & params)
 }
 
 
+UDSRemoteStore::UDSRemoteStore(std::string socket_path, const Params & params)
+    : Store(params)
+    , LocalFSStore(params)
+    , RemoteStore(params)
+    , path(socket_path)
+{
+}
+
+
 std::string UDSRemoteStore::getUri()
 {
-    return "daemon";
+    if (path) {
+        return std::string("unix://") + *path;
+    } else {
+        return "daemon";
+    }
 }
 
 
@@ -98,7 +111,7 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
         throw SysError("cannot create Unix domain socket");
     closeOnExec(conn->fd.get());
 
-    string socketPath = settings.nixDaemonSocketFile;
+    string socketPath = path ? *path : settings.nixDaemonSocketFile;
 
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
@@ -721,5 +734,14 @@ void RemoteStore::Connection::processStderr(Sink * sink, Source * source)
     }
 }
 
+static std::string uriScheme = "unix://";
+
+static RegisterStoreImplementation regStore([](
+    const std::string & uri, const Store::Params & params)
+    -> std::shared_ptr<Store>
+{
+    if (std::string(uri, 0, uriScheme.size()) != uriScheme) return 0;
+    return std::make_shared<UDSRemoteStore>(std::string(uri, uriScheme.size()), params);
+});
 
 }
