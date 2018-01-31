@@ -21,8 +21,8 @@ struct DownloadRequest
     std::shared_ptr<std::string> data;
     std::string mimeType;
 
-    DownloadRequest(const std::string & uri, std::shared_ptr<std::string> data = nullptr, std::string mimeType = "")
-        : uri(uri), parentAct(curActivity), data(std::move(data)), mimeType(std::move(mimeType)) { }
+    DownloadRequest(const std::string & uri)
+        : uri(uri), parentAct(curActivity) { }
 };
 
 struct DownloadResult

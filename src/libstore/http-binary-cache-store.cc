@@ -38,7 +38,7 @@ public:
             try {
                 BinaryCacheStore::init();
             } catch (UploadToHTTP &) {
-                throw Error(format("'%s' does not appear to be a binary cache") % cacheUri);
+                throw Error("'%s' does not appear to be a binary cache", cacheUri);
             }
             diskCache->createCache(cacheUri, storeDir, wantMassQuery_, priority);
         }
@@ -67,8 +67,9 @@ protected:
         const std::string & data,
         const std::string & mimeType) override
     {
-        auto data_ = std::make_shared<string>(data);
-        auto req = DownloadRequest(cacheUri + "/" + path, data_, mimeType);
+        auto req = DownloadRequest(cacheUri + "/" + path);
+        req.data = std::make_shared<string>(data); // FIXME: inefficient
+        req.mimeType = mimeType;
         try {
             getDownloader()->download(req);
         } catch (DownloadError & e) {
