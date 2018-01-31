@@ -705,6 +705,9 @@ void removeTempRoots();
    * ‘daemon’: The Nix store accessed via a Unix domain socket
      connection to nix-daemon.
 
+   * ‘unix://<path>’: The Nix store accessed via a Unix domain socket
+     connection to nix-daemon, with the socket located at <path>.
+
    * ‘auto’ or ‘’: Equivalent to ‘local’ or ‘daemon’ depending on
      whether the user has write access to the local Nix
      store/database.
