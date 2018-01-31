@@ -40,18 +40,36 @@ typedef std::map<Path, StringSet> DerivationInputs;
 
 typedef std::map<string, string> StringPairs;
 
+
+/* A Derivation without its closure (sub-derivations).
+   This is used to prevent having to send the closure of a drv file
+   (which could be very large), e.g. for remote build operations. */
 struct BasicDerivation
 {
-    DerivationOutputs outputs; /* keyed on symbolic IDs */
-    PathSet inputSrcs; /* inputs that are sources */
+    /* Keyed on symbolic IDs, like `"out"` or `"doc"`. */
+    DerivationOutputs outputs;
+
+    /* Inputs that are sources. <- TODO what’s a source? */
+    PathSet inputSrcs;
+
+    /* The system architecture this derivation can be built on,
+       as returned by `config/config.guess`, e.g. `"x86_64-linux"` */
     string platform;
+
+    /* Program that executes the build. Either a path to a derivation
+       or a script. */
     Path builder;
+
+    /* Command line arguments passed to the builder. */
     Strings args;
+
+    /* POSIX environment passed to the builder. */
     StringPairs env;
 
     virtual ~BasicDerivation() { };
 };
 
+/* Description of a build action, input for the builder. */
 struct Derivation : BasicDerivation
 {
     DerivationInputs inputDrvs; /* inputs that are sub-derivations */
