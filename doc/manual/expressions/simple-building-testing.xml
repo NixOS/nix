@@ -81,6 +81,4 @@ Just pass the option <link linkend='opt-max-jobs'><option>-j
 in parallel, or set.  Typically this should be the number of
 CPUs.</para>
 
-<xi:include href="debug-build.xml" />
-
 </section>

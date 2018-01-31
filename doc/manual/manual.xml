@@ -12,14 +12,11 @@
         <firstname>Eelco</firstname>
         <surname>Dolstra</surname>
       </personname>
-      <affiliation>
-        <orgname>LogicBlox</orgname>
-      </affiliation>
       <contrib>Author</contrib>
     </author>
 
     <copyright>
-      <year>2004-2014</year>
+      <year>2004-2017</year>
       <holder>Eelco Dolstra</holder>
     </copyright>
 
@@ -41,7 +38,6 @@
   <xi:include href="expressions/writing-nix-expressions.xml" />
   <xi:include href="advanced-topics/advanced-topics.xml" />
   <xi:include href="command-ref/command-ref.xml" />
-  <xi:include href="troubleshooting/troubleshooting.xml" />
   <xi:include href="glossary/glossary.xml" />
   <xi:include href="hacking.xml" />
   <xi:include href="release-notes/release-notes.xml" />

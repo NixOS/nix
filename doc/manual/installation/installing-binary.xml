@@ -79,16 +79,6 @@ alice$ ./install
 
 </para>
 
-<para>Nix can be uninstalled using <command>rpm -e nix</command> or
-<command>dpkg -r nix</command> on RPM- and Dpkg-based systems,
-respectively.  After this you should manually remove the Nix store and
-other auxiliary data, if desired:
-
-<screen>
-$ rm -rf /nix</screen>
-
-</para>
-
 <para>You can uninstall Nix simply by running:
 
 <screen>
