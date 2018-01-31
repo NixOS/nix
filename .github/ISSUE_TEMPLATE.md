@@ -14,7 +14,7 @@ Examples of _Nix_ issues:
 
 - Nix segfaults when I run `nix-build -A blahblah`
 - The Nix language needs a new builtin: `builtins.foobar`
-- Regression in the behavior of `nix-env` in Nix 1.12
+- Regression in the behavior of `nix-env` in Nix 2.0
 
 Examples of _nixpkgs_ issues:
 
