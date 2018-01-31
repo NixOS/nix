@@ -67,7 +67,13 @@ protected:
         const std::string & data,
         const std::string & mimeType) override
     {
-        throw UploadToHTTP("uploading to an HTTP binary cache is not supported");
+        auto data_ = std::make_shared<string>(data);
+        auto req = DownloadRequest(cacheUri + "/" + path, data_, mimeType);
+        try {
+            getDownloader()->download(req);
+        } catch (DownloadError & e) {
+            throw UploadToHTTP(format("uploading to HTTP binary cache at %1% not supported: %2%") % cacheUri % e.msg());
+        }
     }
 
     void getFile(const std::string & path,
