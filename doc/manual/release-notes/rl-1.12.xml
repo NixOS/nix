@@ -79,6 +79,11 @@
 
       <listitem><para><command>nix add-to-store</command> (970366266b8df712f5f9cedb45af183ef5a8357f).</para></listitem>
 
+      <listitem><para><command>nix upgrade-nix</command> upgrades Nix
+      to the latest stable version. This requires that Nix is
+      installed in a profile. (Thus it won’t work on NixOS, or if it’s
+      installed outside of the Nix store.)</para></listitem>
+
       <listitem><para>Progress indicator.</para></listitem>
 
       <listitem><para>All options are available as flags now

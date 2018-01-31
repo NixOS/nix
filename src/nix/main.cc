@@ -16,6 +16,8 @@ void chrootHelper(int argc, char * * argv);
 
 namespace nix {
 
+std::string programPath;
+
 struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
     NixArgs() : MultiCommand(*RegisterCommand::commands), MixCommonArgs("nix")
@@ -78,7 +80,8 @@ void mainWrapped(int argc, char * * argv)
     initNix();
     initGC();
 
-    string programName = baseNameOf(argv[0]);
+    programPath = argv[0];
+    string programName = baseNameOf(programPath);
 
     {
         auto legacy = (*RegisterLegacyCommand::commands)[programName];

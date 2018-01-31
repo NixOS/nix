@@ -5,6 +5,8 @@
 
 namespace nix {
 
+extern std::string programPath;
+
 struct Value;
 class Bindings;
 class EvalState;
