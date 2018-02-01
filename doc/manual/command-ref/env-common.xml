@@ -154,6 +154,8 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
   <literal>daemon</literal> if you want to use the Nix daemon to
   execute Nix operations. This is necessary in <link
   linkend="ssec-multi-user">multi-user Nix installations</link>.
+  If the Nix daemon's Unix socket is at some non-standard path,
+  this variable should be set to <literal>unix://path/to/socket</literal>.
   Otherwise, it should be left unset.</para></listitem>
 
 </varlistentry>
