@@ -141,7 +141,7 @@ void mainWrapped(int argc, char * * argv)
         else if (*arg == "--version")
             printVersion(myName);
 
-        else if (*arg == "--add-drv-link")
+        else if (*arg == "--add-drv-link" || *arg == "--indirect")
             ; // obsolete
 
         else if (*arg == "--no-out-link" || *arg == "--no-link")
