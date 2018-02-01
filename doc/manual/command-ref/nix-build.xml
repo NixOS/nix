@@ -29,8 +29,6 @@
       </group>
       <replaceable>attrPath</replaceable>
     </arg>
-    <arg><option>--drv-link</option> <replaceable>drvlink</replaceable></arg>
-    <arg><option>--add-drv-link</option></arg>
     <arg><option>--no-out-link</option></arg>
     <arg>
       <group choice='req'>
@@ -90,25 +88,6 @@ or renamed.  So don’t rename the symlink.</para></warning>
 also <xref linkend="sec-common-options" />.</phrase></para>
 
 <variablelist>
-
-  <varlistentry><term><option>--drv-link</option> <replaceable>drvlink</replaceable></term>
-
-    <listitem><para>Add a symlink named
-    <replaceable>drvlink</replaceable> to the store derivation
-    produced by <command>nix-instantiate</command>.  The derivation is
-    a root of the garbage collector until the symlink is deleted or
-    renamed.  If there are multiple derivations, numbers are suffixed
-    to <replaceable>drvlink</replaceable> to distinguish between
-    them.</para></listitem>
-
-  </varlistentry>
-
-  <varlistentry><term><option>--add-drv-link</option></term>
-
-    <listitem><para>Shorthand for <option>--drv-link</option>
-    <filename>./derivation</filename>.</para></listitem>
-
-  </varlistentry>
 
   <varlistentry><term><option>--no-out-link</option></term>
 
