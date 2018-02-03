@@ -5,14 +5,21 @@ clearStore
 export IMPURE_VAR1=foo
 export IMPURE_VAR2=bar
 
+path=$(nix-store -q $(nix-instantiate fixed.nix -A good.0))
+
+echo 'testing bad...'
+nix-build fixed.nix -A bad --no-out-link && fail "should fail"
+
+# Building with the bad hash should produce the "good" output path as
+# a side-effect.
+[[ -e $path ]]
+nix path-info --json $path | grep fixed:md5:2qk15sxzzjlnpjk9brn7j8ppcd
+
 echo 'testing good...'
 nix-build fixed.nix -A good --no-out-link
 
 echo 'testing good2...'
 nix-build fixed.nix -A good2 --no-out-link
-
-echo 'testing bad...'
-nix-build fixed.nix -A bad --no-out-link && fail "should fail"
 
 echo 'testing reallyBad...'
 nix-instantiate fixed.nix -A reallyBad && fail "should fail"

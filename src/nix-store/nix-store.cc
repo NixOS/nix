@@ -122,7 +122,6 @@ static void opRealise(Strings opFlags, Strings opArgs)
         if (i == "--dry-run") dryRun = true;
         else if (i == "--repair") buildMode = bmRepair;
         else if (i == "--check") buildMode = bmCheck;
-        else if (i == "--hash") buildMode = bmHash;
         else if (i == "--ignore-unknown") ignoreUnknown = true;
         else throw UsageError(format("unknown flag '%1%'") % i);
 

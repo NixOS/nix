@@ -99,11 +99,11 @@
   </listitem>
 
   <listitem>
-    <para>New build mode <command>nix-build --hash</command> that
-    builds a derivation, computes the hash of the output, and moves
-    the output to the store path corresponding to what a fixed-output
-    derivation with that hash would produce.
-    (Add docs and examples; see d367b8e7875161e655deaa96bf8a5dd0bcf8229e)</para>
+    <para>If a fixed-output derivation produces a result with an
+    incorrect hash, the output path will be moved to the location
+    corresponding to the actual hash and registered as valid. Thus, a
+    subsequent build of the fixed-output derivation with the correct
+    hash is unnecessary.</para>
   </listitem>
 
   <listitem>

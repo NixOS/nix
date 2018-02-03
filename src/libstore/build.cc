@@ -1124,11 +1124,6 @@ void DerivationGoal::haveDerivation()
         return;
     }
 
-    /* Reject doing a hash build of anything other than a fixed-output
-       derivation. */
-    if (buildMode == bmHash && !drv->isFixedOutput())
-        throw Error("cannot do a hash build of non-fixed-output derivation '%1%'", drvPath);
-
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
@@ -1320,9 +1315,7 @@ void DerivationGoal::inputsRealised()
     allPaths.insert(inputPaths.begin(), inputPaths.end());
 
     /* Is this a fixed-output derivation? */
-    fixedOutput = true;
-    for (auto & i : drv->outputs)
-        if (i.second.hash == "") fixedOutput = false;
+    fixedOutput = drv->isFixedOutput();
 
     /* Don't repeat fixed-output derivations since they're already
        verified by their output hash.*/
@@ -3019,6 +3012,8 @@ void DerivationGoal::registerOutputs()
     bool runDiffHook = settings.runDiffHook;
     bool keepPreviousRound = settings.keepFailed || runDiffHook;
 
+    std::exception_ptr delayedException;
+
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all
        output paths read-only. */
@@ -3093,7 +3088,7 @@ void DerivationGoal::registerOutputs()
         /* Check that fixed-output derivations produced the right
            outputs (i.e., the content hash should match the specified
            hash). */
-        if (i.second.hash != "") {
+        if (fixedOutput) {
 
             bool recursive; Hash h;
             i.second.parseHashInfo(recursive, h);
@@ -3109,27 +3104,34 @@ void DerivationGoal::registerOutputs()
             /* Check the hash. In hash mode, move the path produced by
                the derivation to its content-addressed location. */
             Hash h2 = recursive ? hashPath(h.type, actualPath).first : hashFile(h.type, actualPath);
-            if (buildMode == bmHash) {
-                Path dest = worker.store.makeFixedOutputPath(recursive, h2, drv->env["name"]);
-                printError(format("build produced path '%1%' with %2% hash '%3%'")
-                    % dest % printHashType(h.type) % printHash16or32(h2));
-                if (worker.store.isValidPath(dest))
-                    return;
+
+            Path dest = worker.store.makeFixedOutputPath(recursive, h2, drv->env["name"]);
+
+            if (h != h2) {
+
+                /* Throw an error after registering the path as
+                   valid. */
+                delayedException = std::make_exception_ptr(
+                    BuildError("fixed-output derivation produced path '%s' with %s hash '%s' instead of the expected hash '%s'",
+                        dest, printHashType(h.type), printHash16or32(h2), printHash16or32(h)));
+
                 Path actualDest = worker.store.toRealPath(dest);
+
+                if (worker.store.isValidPath(dest))
+                    std::rethrow_exception(delayedException);
+
                 if (actualPath != actualDest) {
                     PathLocks outputLocks({actualDest});
                     deletePath(actualDest);
                     if (rename(actualPath.c_str(), actualDest.c_str()) == -1)
                         throw SysError(format("moving '%1%' to '%2%'") % actualPath % dest);
                 }
+
                 path = dest;
                 actualPath = actualDest;
-            } else {
-                if (h != h2)
-                    throw BuildError(
-                        format("output path '%1%' has %2% hash '%3%' when '%4%' was expected")
-                        % path % i.second.hashAlgo % printHash16or32(h2) % printHash16or32(h));
             }
+            else
+                assert(path == dest);
 
             info.ca = makeFixedOutputCA(recursive, h2);
         }
@@ -3306,6 +3308,11 @@ void DerivationGoal::registerOutputs()
        paths referenced by each of them.  If there are cycles in the
        outputs, this will fail. */
     worker.store.registerValidPaths(infos);
+
+    /* In case of a fixed-output derivation hash mismatch, throw an
+       exception now that we have registered the output as valid. */
+    if (delayedException)
+        std::rethrow_exception(delayedException);
 }
 
 
