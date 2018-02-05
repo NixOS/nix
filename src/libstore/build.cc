@@ -3684,7 +3684,10 @@ void SubstitutionGoal::tryNext()
     /* Bail out early if this substituter lacks a valid
        signature. LocalStore::addToStore() also checks for this, but
        only after we've downloaded the path. */
-    if (worker.store.requireSigs && !info->checkSignatures(worker.store, worker.store.publicKeys)) {
+    if (worker.store.requireSigs
+        && !sub->isTrusted
+        && !info->checkSignatures(worker.store, worker.store.publicKeys))
+    {
         printInfo(format("warning: substituter '%s' does not have a valid signature for path '%s'")
             % sub->getUri() % storePath);
         tryNext();
@@ -3752,7 +3755,7 @@ void SubstitutionGoal::tryToRun()
             PushActivity pact(act.id);
 
             copyStorePath(ref<Store>(sub), ref<Store>(worker.store.shared_from_this()),
-                storePath, repair);
+                storePath, repair, sub->isTrusted ? NoCheckSigs : CheckSigs);
 
             promise.set_value();
         } catch (...) {
