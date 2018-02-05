@@ -167,7 +167,12 @@ public:
 
         if (type == actSubstitute) {
             auto name = storePathToName(getS(fields, 0));
-            i->s = fmt("fetching " ANSI_BOLD "%s" ANSI_NORMAL " from %s", name, getS(fields, 1));
+            auto sub = getS(fields, 1);
+            i->s = fmt(
+                hasPrefix(sub, "local")
+                ? "copying " ANSI_BOLD "%s" ANSI_NORMAL " from %s"
+                : "fetching " ANSI_BOLD "%s" ANSI_NORMAL " from %s",
+                name, sub);
         }
 
         if (type == actQueryPathInfo) {
