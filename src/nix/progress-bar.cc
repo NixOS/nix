@@ -3,8 +3,9 @@
 #include "sync.hh"
 #include "store-api.hh"
 
-#include <map>
 #include <atomic>
+#include <map>
+#include <thread>
 
 namespace nix {
 
@@ -101,15 +102,28 @@ private:
 
     Sync<State> state_;
 
+    std::thread updateThread;
+
+    std::condition_variable quitCV, updateCV;
+
 public:
 
     ProgressBar()
     {
+        updateThread = std::thread([&]() {
+            auto state(state_.lock());
+            while (state->active) {
+                state.wait(updateCV);
+                draw(*state);
+                state.wait_for(quitCV, std::chrono::milliseconds(50));
+            }
+        });
     }
 
     ~ProgressBar()
     {
         stop();
+        updateThread.join();
     }
 
     void stop()
@@ -121,6 +135,8 @@ public:
         writeToStderr("\r\e[K");
         if (status != "")
             writeToStderr("[" + status + "]\n");
+        updateCV.notify_one();
+        quitCV.notify_one();
     }
 
     void log(Verbosity lvl, const FormatOrString & fs) override
@@ -132,7 +148,7 @@ public:
     void log(State & state, Verbosity lvl, const std::string & s)
     {
         writeToStderr("\r\e[K" + s + ANSI_NORMAL "\n");
-        update(state);
+        draw(state);
     }
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
@@ -185,7 +201,7 @@ public:
             || (type == actCopyPath && hasAncestor(*state, actSubstitute, parent)))
             i->visible = false;
 
-        update(*state);
+        update();
     }
 
     /* Check whether an activity has an ancestore with the specified
@@ -220,7 +236,7 @@ public:
             state->its.erase(i);
         }
 
-        update(*state);
+        update();
     }
 
     void result(ActivityId act, ResultType type, const std::vector<Field> & fields) override
@@ -230,7 +246,7 @@ public:
         if (type == resFileLinked) {
             state->filesLinked++;
             state->bytesLinked += getI(fields, 0);
-            update(*state);
+            update();
         }
 
         else if (type == resBuildLogLine) {
@@ -243,25 +259,25 @@ public:
                 info.lastLine = lastLine;
                 state->activities.emplace_back(info);
                 i->second = std::prev(state->activities.end());
-                update(*state);
+                update();
             }
         }
 
         else if (type == resUntrustedPath) {
             state->untrustedPaths++;
-            update(*state);
+            update();
         }
 
         else if (type == resCorruptedPath) {
             state->corruptedPaths++;
-            update(*state);
+            update();
         }
 
         else if (type == resSetPhase) {
             auto i = state->its.find(act);
             assert(i != state->its.end());
             i->second->phase = getS(fields, 0);
-            update(*state);
+            update();
         }
 
         else if (type == resProgress) {
@@ -272,7 +288,7 @@ public:
             actInfo.expected = getI(fields, 1);
             actInfo.running = getI(fields, 2);
             actInfo.failed = getI(fields, 3);
-            update(*state);
+            update();
         }
 
         else if (type == resSetExpected) {
@@ -284,17 +300,16 @@ public:
             state->activitiesByType[type].expected -= j;
             j = getI(fields, 1);
             state->activitiesByType[type].expected += j;
-            update(*state);
+            update();
         }
     }
 
     void update()
     {
-        auto state(state_.lock());
-        update(*state);
+        updateCV.notify_one();
     }
 
-    void update(State & state)
+    void draw(State & state)
     {
         if (!state.active) return;
 
