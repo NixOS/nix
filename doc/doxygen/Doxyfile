@@ -1,0 +1,8 @@
+RECURSIVE = YES
+INPUT = ../../src/
+PROJECT_NAME = nix
+
+HTML_HEADER = include/header.html
+HTML_FOOTER = include/footer.html
+HTML_EXTRA_STYLESHEET = include/extra.css
+HTML_EXTRA_FILES = include/extra.js
