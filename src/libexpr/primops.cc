@@ -49,24 +49,38 @@ InvalidPathError::InvalidPathError(const Path & path) :
 void EvalState::realiseContext(const PathSet & context)
 {
     PathSet drvs;
+
     for (auto & i : context) {
         std::pair<string, string> decoded = decodeContext(i);
         Path ctx = decoded.first;
         assert(store->isStorePath(ctx));
         if (!store->isValidPath(ctx))
             throw InvalidPathError(ctx);
-        if (!decoded.second.empty() && nix::isDerivation(ctx))
+        if (!decoded.second.empty() && nix::isDerivation(ctx)) {
             drvs.insert(decoded.first + "!" + decoded.second);
+
+            /* Add the output of this derivation to the allowed
+               paths. */
+            if (allowedPaths) {
+                auto drv = store->derivationFromPath(decoded.first);
+                DerivationOutputs::iterator i = drv.outputs.find(decoded.second);
+                if (i == drv.outputs.end())
+                    throw Error("derivation '%s' does not have an output named '%s'", decoded.first, decoded.second);
+                allowedPaths->insert(i->second.path);
+            }
+        }
     }
-    if (!drvs.empty()) {
-        if (!settings.enableImportFromDerivation)
-            throw EvalError(format("attempted to realize '%1%' during evaluation but 'allow-import-from-derivation' is false") % *(drvs.begin()));
-        /* For performance, prefetch all substitute info. */
-        PathSet willBuild, willSubstitute, unknown;
-        unsigned long long downloadSize, narSize;
-        store->queryMissing(drvs, willBuild, willSubstitute, unknown, downloadSize, narSize);
-        store->buildPaths(drvs);
-    }
+
+    if (drvs.empty()) return;
+
+    if (!settings.enableImportFromDerivation)
+        throw EvalError(format("attempted to realize '%1%' during evaluation but 'allow-import-from-derivation' is false") % *(drvs.begin()));
+
+    /* For performance, prefetch all substitute info. */
+    PathSet willBuild, willSubstitute, unknown;
+    unsigned long long downloadSize, narSize;
+    store->queryMissing(drvs, willBuild, willSubstitute, unknown, downloadSize, narSize);
+    store->buildPaths(drvs);
 }
 
 

@@ -36,3 +36,5 @@ ln -sfn $(pwd)/restricted.nix $TEST_ROOT/restricted.nix
 (! nix-instantiate --eval --restrict-eval $TEST_ROOT/restricted.nix -I $TEST_ROOT)
 (! nix-instantiate --eval --restrict-eval $TEST_ROOT/restricted.nix -I .)
 nix-instantiate --eval --restrict-eval $TEST_ROOT/restricted.nix -I $TEST_ROOT -I .
+
+[[ $(nix eval --raw --restrict-eval -I . '(builtins.readFile "${import ./simple.nix}/hello")') == 'Hello World!' ]]
