@@ -22,7 +22,8 @@ nix_tests = \
   run.sh \
   brotli.sh \
   pure-eval.sh \
-  check.sh
+  check.sh \
+  extra-builtins.sh
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))

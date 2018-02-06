@@ -741,6 +741,34 @@ builtins.fetchurl {
 
   </varlistentry>
 
+  <varlistentry xml:id="conf-enable-native-code"><term><literal>allow-unsafe-native-code-during-evaluation</literal></term>
+
+    <listitem>
+
+      <para>If set to <literal>true</literal>, extra functions that allow
+      nix expressions to extend the language are added to the <literal>
+      builtins</literal> set. Because these functions entail running arbitrary
+      code as the evaluating user, this option should only be enabled when
+      all evaluated nix expressions are fully trusted! Defaults to <literal>
+      false</literal>.</para>
+
+    </listitem>
+
+  </varlistentry>
+
+  <varlistentry xml:id="conf-extra-builtins-file"><term><literal>extra-builtins-file</literal></term>
+
+    <listitem>
+
+      <para>An absolute path to a Nix expression specifying
+      <link linkend="builtin-extraBuiltins">extraBuiltins</link>. See
+      the documentation of that builtin for more details. Defaults to
+      <filename>$NIX_CONF_DIR/extra-builtins.nix</filename>.</para>
+
+    </listitem>
+
+  </varlistentry>
+
 
 </variablelist>
 

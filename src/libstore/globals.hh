@@ -367,6 +367,9 @@ public:
 
     Setting<Strings> allowedUris{this, {}, "allowed-uris",
         "Prefixes of URIs that builtin functions such as fetchurl and fetchGit are allowed to fetch."};
+
+    Setting<Path> extraBuiltinsFile{this, fmt("%s/extra-builtins.nix", nixConfDir), "extra-builtins-file",
+        "The path to a nix expression defining extra expression-language level builtins."};
 };
 
 

@@ -22,6 +22,20 @@
 #include <regex>
 #include <dlfcn.h>
 
+#if HAVE_BOEHMGC
+
+#include <gc/gc.h>
+#include <gc/gc_cpp.h>
+
+#define NEW new (UseGC)
+
+#else
+
+#define NEW new
+
+#endif
+
+
 
 namespace nix {
 
@@ -2152,6 +2166,35 @@ void EvalState::createBaseEnv()
         v2->attrs->sort();
     }
     addConstant("__nixPath", v);
+
+    try {
+        auto path = absPath(settings.extraBuiltinsFile);
+        auto fun = allocValue();
+        evalFile(path, *fun);
+        Value * arg;
+        if (settings.enableNativeCode) {
+            arg = baseEnv.values[0];
+        } else {
+            arg = allocValue();
+            mkAttrs(*arg, 2);
+
+            auto sExec = symbols.create("exec");
+            auto vExec = allocAttr(*arg, sExec);
+            vExec->type = tPrimOp;
+            vExec->primOp = NEW PrimOp(prim_exec, 1, sExec);
+
+            auto sImportNative = symbols.create("importNative");
+            auto vImportNative = allocAttr(*arg, sImportNative);
+            vImportNative->type = tPrimOp;
+            vImportNative->primOp = NEW PrimOp(prim_importNative, 2, sImportNative);
+        }
+        mkApp(v, *fun, *arg);
+    } catch (SysError & e) {
+        if (e.errNo != ENOENT)
+            throw;
+        mkNull(v);
+    }
+    addConstant("__extraBuiltins", v);
 
     if (RegisterPrimOp::primOps)
         for (auto & primOp : *RegisterPrimOp::primOps)

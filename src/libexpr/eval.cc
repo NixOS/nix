@@ -311,7 +311,7 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
     addToSearchPath("nix=" + settings.nixDataDir + "/nix/corepkgs");
 
     if (settings.restrictEval || settings.pureEval) {
-        allowedPaths = PathSet();
+        allowedPaths = PathSet({absPath(settings.extraBuiltinsFile)});
         for (auto & i : searchPath) {
             auto r = resolveSearchPathElem(i);
             if (!r.first) continue;

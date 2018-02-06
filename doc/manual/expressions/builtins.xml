@@ -1269,7 +1269,65 @@ stdenv.mkDerivation (rec {
 
   </varlistentry>
 
+  <varlistentry><term><function>builtins.exec</function>
+  <replaceable>args</replaceable></term>
 
+  <listitem>
+    <para>Run the command specified by the arguments given in
+    <varname>args</varname> and parse its <literal>stdout</literal> as
+    a nix expression which is parsed into the return value. The first argument
+    in the list is treated as a program name, and it is looked up in the
+    <envar>PATH</envar>. This builtin is only available when the
+    <literal>allow-unsafe-native-code-during-evaluation</literal>
+    option is set to <literal>true</literal>, as the executed program can
+    run arbitrary code as the user running the nix evaluation.</para>
+  </listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><function>builtins.importNative</function>
+  <replaceable>path</replaceable>
+  <replaceable>symbol</replaceable></term>
+
+  <listitem>
+    <para>Run native code to initialize a nix value. The dynamic shared
+    object at <varname>path</varname> is dynamically opened and the
+    symbol at <varname>symbol</varname> is interpreted as a C++ function
+    taking a reference to a nix::EvalState representing the current evaluator
+    state and an uninitialized reference to a nix::Value that is expected
+    to be initialized by the function. That value is the result of the
+    call to <literal>importNative</literal>. This builtin is only
+    available when the <literal>allow-unsafe-native-code-during-evaluation</literal>
+    option is set to <literal>true</literal>, as the loaded C++ code can
+    run arbitrary code as the user running the nix evaluation.</para>
+
+    <para>As the DSO is loaded into a running nix process, it should not
+    be linked to any of the shared libraries nix is linked to and can
+    expect them to be available at runtime. Due to the lack of a stable
+    internal ABI, users should take care that the headers used to build
+    the DSO match those of the currently running nix evaluation.</para>
+  </listitem>
+
+  </varlistentry>
+
+  <varlistentry
+  xml:id='builtin-extraBuiltins'><term><varname>builtins.extraBuiltins</varname></term>
+
+    <listitem><para>The result of calling the function defined in the
+    expression specified by the <literal>extra-builtins-file</literal>
+    setting (default <filename>$NIX_CONF_DIR/extra-builtins.nix</filename>)
+    at a set containing at least the <literal>exec</literal> and
+    <literal>importNative</literal> builtins, even if the <literal>
+    allow-unsafe-native-code-during-evaluation</literal> option is set
+    to <literal>false</literal>. This can be used to give nix expressions
+    access to extra functions that rely on running native code during
+    evaluation, without requiring them to be built into nix or requiring
+    the user to arbitrarily trust any nix expressions they evaluate.</para>
+
+    <para>This defaults to <literal>null</literal> if the file doesn't
+    exist.</para></listitem>
+
+  </varlistentry>
 </variablelist>
 
 
