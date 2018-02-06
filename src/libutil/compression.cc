@@ -191,8 +191,13 @@ struct XzSink : CompressionSink
 
     XzSink(Sink & nextSink) : nextSink(nextSink)
     {
-        lzma_ret ret = lzma_easy_encoder(
-            &strm, 6, LZMA_CHECK_CRC64);
+        lzma_mt mt_options = {};
+        mt_options.flags = 0;
+        mt_options.timeout = 300;
+        mt_options.check = LZMA_CHECK_CRC64;
+        mt_options.threads = lzma_cputhreads();
+        lzma_ret ret = lzma_stream_encoder_mt(
+            &strm, &mt_options);
         if (ret != LZMA_OK)
             throw CompressionError("unable to initialise lzma encoder");
         // FIXME: apply the x86 BCJ filter?
