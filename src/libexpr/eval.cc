@@ -378,6 +378,18 @@ void EvalState::checkURI(const std::string & uri)
             && (prefix[prefix.size() - 1] == '/' || uri[prefix.size()] == '/')))
             return;
 
+    /* If the URI is a path, then check it against allowedPaths as
+       well. */
+    if (hasPrefix(uri, "/")) {
+        checkSourcePath(uri);
+        return;
+    }
+
+    if (hasPrefix(uri, "file://")) {
+        checkSourcePath(std::string(uri, 7));
+        return;
+    }
+
     throw RestrictedPathError("access to URI '%s' is forbidden in restricted mode", uri);
 }
 
