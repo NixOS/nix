@@ -3428,7 +3428,7 @@ void DerivationGoal::flushLine()
     else {
         if (settings.verboseBuild &&
             (settings.printRepeatedBuilds || curRound == 1))
-            printError(filterANSIEscapes(currentLogLine, true));
+            printError(currentLogLine);
         else {
             logTail.push_back(currentLogLine);
             if (logTail.size() > settings.logLines) logTail.pop_front();

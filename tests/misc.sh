@@ -16,4 +16,4 @@ nix-env --foo 2>&1 | grep "no operation"
 nix-env -q --foo 2>&1 | grep "unknown flag"
 
 # Eval Errors.
-nix-instantiate --eval -E 'let a = {} // a; in a.foo' 2>&1 | grep "infinite recursion encountered, at (string):1:15$"
+nix-instantiate --eval -E 'let a = {} // a; in a.foo' 2>&1 | grep "infinite recursion encountered, at .*(string).*:1:15$"

@@ -44,7 +44,7 @@ public:
             prefix = std::string("<") + c + ">";
         }
 
-        writeToStderr(prefix + (tty ? fs.s : filterANSIEscapes(fs.s)) + "\n");
+        writeToStderr(prefix + filterANSIEscapes(fs.s) + "\n");
     }
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,

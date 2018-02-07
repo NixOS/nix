@@ -1178,36 +1178,51 @@ void ignoreException()
 }
 
 
-string filterANSIEscapes(const string & s, bool nixOnly)
+std::string filterANSIEscapes(const std::string & s, unsigned int width)
 {
-    string t, r;
-    enum { stTop, stEscape, stCSI } state = stTop;
-    for (auto c : s) {
-        if (state == stTop) {
-            if (c == '\e') {
-                state = stEscape;
-                r = c;
-            } else
-                t += c;
-        } else if (state == stEscape) {
-            r += c;
-            if (c == '[')
-                state = stCSI;
-            else {
-                t += r;
-                state = stTop;
+    std::string t, e;
+    size_t w = 0;
+    auto i = s.begin();
+
+    while (w < (size_t) width && i != s.end()) {
+
+        if (*i == '\e') {
+            std::string e;
+            e += *i++;
+            char last = 0;
+
+            if (i != s.end() && *i == '[') {
+                e += *i++;
+                // eat parameter bytes
+                while (i != s.end() && *i >= 0x30 && *i <= 0x3f) e += *i++;
+                // eat intermediate bytes
+                while (i != s.end() && *i >= 0x20 && *i <= 0x2f) e += *i++;
+                // eat final byte
+                if (i != s.end() && *i >= 0x40 && *i <= 0x7e) e += last = *i++;
+            } else {
+                if (i != s.end() && *i >= 0x40 && *i <= 0x5f) e += *i++;
             }
-        } else {
-            r += c;
-            if (c >= 0x40 && c <= 0x7e) {
-                if (nixOnly && (c != 'p' && c != 'q' && c != 's' && c != 'a' && c != 'b'))
-                    t += r;
-                state = stTop;
-                r.clear();
+
+            if (last == 'm')
+                t += e;
+        }
+
+        else if (*i == '\t') {
+            i++; t += ' '; w++;
+            while (w < (size_t) width && w % 8) {
+                t += ' '; w++;
             }
         }
+
+        else if (*i == '\r')
+            // do nothing for now
+            ;
+
+        else {
+            t += *i++; w++;
+        }
     }
-    t += r;
+
     return t;
 }
 
