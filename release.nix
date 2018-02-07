@@ -225,7 +225,7 @@ let
     });
 
     tests.setuid = pkgs.lib.genAttrs
-      (pkgs.lib.filter (system: system == "x86_64-linux" || system == "i686-linux") systems)
+      ["i686-linux" "x86_64-linux"]
       (system:
         import ./tests/setuid.nix rec {
           inherit nixpkgs;
