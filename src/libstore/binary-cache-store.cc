@@ -149,7 +149,7 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, const ref<std::str
     /* Compress the NAR. */
     narInfo->compression = compression;
     auto now1 = std::chrono::steady_clock::now();
-    auto narCompressed = compress(compression, *nar);
+    auto narCompressed = compress(compression, *nar, settings.parallelCompression);
     auto now2 = std::chrono::steady_clock::now();
     narInfo->fileHash = hashString(htSHA256, *narCompressed);
     narInfo->fileSize = narCompressed->size();
