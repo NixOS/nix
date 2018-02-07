@@ -19,6 +19,8 @@ public:
     const Setting<bool> writeNARListing{this, false, "write-nar-listing", "whether to write a JSON file listing the files in each NAR"};
     const Setting<Path> secretKeyFile{this, "", "secret-key", "path to secret key used to sign the binary cache"};
     const Setting<Path> localNarCache{this, "", "local-nar-cache", "path to a local cache of NARs"};
+    const Setting<bool> parallelCompression{this, false, "parallel-compression",
+        "enable multi-threading compression, available for xz only currently"};
 
 private:
 

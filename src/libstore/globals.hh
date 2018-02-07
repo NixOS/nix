@@ -174,9 +174,6 @@ public:
         "Whether to compress logs.",
         {"build-compress-log"}};
 
-    Setting<bool> parallelCompression{this, false, "parallel-compression",
-        "Whether to enable parallel compression, only supported with xz currently"};
-
     Setting<unsigned long> maxLogSize{this, 0, "max-build-log-size",
         "Maximum number of bytes a builder can write to stdout/stderr "
         "before being killed (0 means no limit).",
