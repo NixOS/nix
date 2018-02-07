@@ -193,9 +193,14 @@ struct XzSink : CompressionSink
     {
         lzma_mt mt_options = {};
         mt_options.flags = 0;
-        mt_options.timeout = 300;
+        mt_options.timeout = 300; // Using the same setting as the xz cmd line
         mt_options.check = LZMA_CHECK_CRC64;
         mt_options.threads = lzma_cputhreads();
+        mt_options.block_size = 0;
+        if (mt_options.threads == 0)
+            mt_options.threads = 1;
+        // FIXME: maybe use lzma_stream_encoder_mt_memusage() to control the
+        // number of threads.
         lzma_ret ret = lzma_stream_encoder_mt(
             &strm, &mt_options);
         if (ret != LZMA_OK)
