@@ -308,8 +308,9 @@ stdenv.mkDerivation { … }
   </varlistentry>
 
 
-  <varlistentry><term><function>builtins.filterSource</function>
-  <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+  <varlistentry xml:id='builtin-filterSource'>
+    <term><function>builtins.filterSource</function>
+    <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
 
     <listitem>
 
@@ -768,6 +769,75 @@ Evaluates to <literal>[ "foo" ]</literal>.
 
   </varlistentry>
 
+  <varlistentry>
+    <term>
+      <function>builtins.path</function>
+      <replaceable>args</replaceable>
+    </term>
+
+    <listitem>
+      <para>
+        An enrichment of the built-in path type, based on the attributes
+        present in <replaceable>args</replaceable>. All are optional
+        except <varname>path</varname>:
+      </para>
+
+      <variablelist>
+        <varlistentry>
+          <term>path</term>
+          <listitem>
+            <para>The underlying path.</para>
+          </listitem>
+        </varlistentry>
+        <varlistentry>
+          <term>name</term>
+          <listitem>
+            <para>
+              The name of the path when added to the store. This can
+              used to reference paths that have nix-illegal characters
+              in their names, like <literal>@</literal>.
+            </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry>
+          <term>filter</term>
+          <listitem>
+            <para>
+              A function of the type expected by
+              <link linkend="builtin-filterSource">builtins.filterSource</link>,
+              with the same semantics.
+            </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry>
+          <term>recursive</term>
+          <listitem>
+            <para>
+              When <literal>false</literal>, when
+              <varname>path</varname> is added to the store it is with a
+              flat hash, rather than a hash of the NAR serialization of
+              the file. Thus, <varname>path</varname> must refer to a
+              regular file, not a directory. This allows similar
+              behavior to <literal>fetchurl</literal>. Defaults to
+              <literal>true</literal>.
+            </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry>
+          <term>sha256</term>
+          <listitem>
+            <para>
+              When provided, this is the expected hash of the file at
+              the path. Evaluation will fail if the hash is incorrect,
+              and providing a hash allows
+              <literal>builtins.path</literal> to be used even when the
+              <literal>pure-eval</literal> nix config option is on.
+            </para>
+          </listitem>
+        </varlistentry>
+      </variablelist>
+    </listitem>
+  </varlistentry>
 
   <varlistentry><term><function>builtins.pathExists</function>
   <replaceable>path</replaceable></term>

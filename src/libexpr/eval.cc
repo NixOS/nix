@@ -1578,7 +1578,7 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
         dstPath = srcToStore[path];
     else {
         dstPath = settings.readOnlyMode
-            ? store->computeStorePathForPath(checkSourcePath(path)).first
+            ? store->computeStorePathForPath(baseNameOf(path), checkSourcePath(path)).first
             : store->addToStore(baseNameOf(path), checkSourcePath(path), true, htSHA256, defaultPathFilter, repair);
         srcToStore[path] = dstPath;
         printMsg(lvlChatty, format("copied source '%1%' -> '%2%'")
