@@ -46,13 +46,13 @@ in
           nix.buildMachines =
             [ { hostName = "slave1";
                 sshUser = "root";
-                sshKey = "/root/.ssh/id_dsa";
+                sshKey = "/root/.ssh/id_ed25519";
                 system = "i686-linux";
                 maxJobs = 1;
               }
               { hostName = "slave2";
                 sshUser = "root";
-                sshKey = "/root/.ssh/id_dsa";
+                sshKey = "/root/.ssh/id_ed25519";
                 system = "i686-linux";
                 maxJobs = 1;
               }
@@ -70,10 +70,10 @@ in
       startAll;
 
       # Create an SSH key on the client.
-      my $key = `${pkgs.openssh}/bin/ssh-keygen -t dsa -f key -N ""`;
+      my $key = `${pkgs.openssh}/bin/ssh-keygen -t ed25519 -f key -N ""`;
       $client->succeed("mkdir -p -m 700 /root/.ssh");
-      $client->copyFileFromHost("key", "/root/.ssh/id_dsa");
-      $client->succeed("chmod 600 /root/.ssh/id_dsa");
+      $client->copyFileFromHost("key", "/root/.ssh/id_ed25519");
+      $client->succeed("chmod 600 /root/.ssh/id_ed25519");
 
       # Install the SSH key on the slaves.
       $client->waitForUnit("network.target");
