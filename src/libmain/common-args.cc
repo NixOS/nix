@@ -37,6 +37,10 @@ MixCommonArgs::MixCommonArgs(const string & programName)
 
     std::string cat = "config";
     settings.convertToArgs(*this, cat);
+
+    // Backward compatibility hack: nix-env already had a --system flag.
+    if (programName == "nix-env") longFlags.erase("system");
+
     hiddenCategories.insert(cat);
 }
 

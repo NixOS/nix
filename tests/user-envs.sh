@@ -24,6 +24,9 @@ rm -f $HOME/.nix-defexpr
 ln -s $(pwd)/user-envs.nix $HOME/.nix-defexpr
 nix-env -qa '*' --description | grep -q silly
 
+# Query the system.
+nix-env -qa '*' --system | grep -q $system
+
 # Install "foo-1.0".
 nix-env -i foo-1.0
 
