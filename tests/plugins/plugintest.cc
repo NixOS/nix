@@ -2,9 +2,9 @@
 
 using namespace nix;
 
-static void prim_constNull (EvalState & state, const Pos & pos, Value ** args, Value & v)
+static void prim_anotherNull (EvalState & state, const Pos & pos, Value ** args, Value & v)
 {
     mkNull(v);
 }
 
-static RegisterPrimOp r("constNull", 1, prim_constNull);
+static RegisterPrimOp r("anotherNull", 0, prim_anotherNull);

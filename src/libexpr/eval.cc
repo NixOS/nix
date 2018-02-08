@@ -404,7 +404,7 @@ Path EvalState::toRealPath(const Path & path, const PathSet & context)
 };
 
 
-void EvalState::addConstant(const string & name, Value & v)
+Value * EvalState::addConstant(const string & name, Value & v)
 {
     Value * v2 = allocValue();
     *v2 = v;
@@ -412,12 +412,18 @@ void EvalState::addConstant(const string & name, Value & v)
     baseEnv.values[baseEnvDispl++] = v2;
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
     baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v2));
+    return v2;
 }
 
 
 Value * EvalState::addPrimOp(const string & name,
     unsigned int arity, PrimOpFun primOp)
 {
+    if (arity == 0) {
+        Value v;
+        primOp(*this, noPos, nullptr, v);
+        return addConstant(name, v);
+    }
     Value * v = allocValue();
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
     Symbol sym = symbols.create(name2);

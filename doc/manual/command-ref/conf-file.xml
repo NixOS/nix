@@ -750,7 +750,7 @@ builtins.fetchurl {
         files will be dlopened by Nix, allowing them to affect
         execution through static initialization. In particular, these
         plugins may construct static instances of RegisterPrimOp to
-        add new primops to the expression language,
+        add new primops or constants to the expression language,
         RegisterStoreImplementation to add new store implementations,
         and RegisterCommand to add new subcommands to the
         <literal>nix</literal> command. See the constructors for those
