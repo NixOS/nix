@@ -22,6 +22,7 @@ public:
 
 int handleExceptions(const string & programName, std::function<void()> fun);
 
+/* Don't forget to call initPlugins() after settings are initialized! */
 void initNix();
 
 void parseCmdLine(int argc, char * * argv,

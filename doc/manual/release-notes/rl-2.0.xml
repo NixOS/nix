@@ -389,6 +389,13 @@ configureFlags = "--prefix=${placeholder "out"} --includedir=${placeholder "dev"
     </para>
   </listitem>
 
+  <listitem>
+    <para>
+      Nix can now be extended with plugins. See the documentation of
+      the 'plugin-files' option for more details.
+    </para>
+  </listitem>
+
 </itemizedlist>
 
 <para>Some features were removed:</para>

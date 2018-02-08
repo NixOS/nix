@@ -92,6 +92,8 @@ void mainWrapped(int argc, char * * argv)
 
     args.parseCmdline(argvToStrings(argc, argv));
 
+    initPlugins();
+
     if (!args.command) args.showHelpAndExit();
 
     Finally f([]() { stopProgressBar(); });

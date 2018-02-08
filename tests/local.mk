@@ -22,7 +22,8 @@ nix_tests = \
   run.sh \
   brotli.sh \
   pure-eval.sh \
-  check.sh
+  check.sh \
+  plugins.sh
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
@@ -31,4 +32,4 @@ tests-environment = NIX_REMOTE= $(bash) -e
 
 clean-files += $(d)/common.sh
 
-installcheck: $(d)/common.sh
+installcheck: $(d)/common.sh $(d)/plugins/plugintest.so
