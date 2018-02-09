@@ -3688,8 +3688,8 @@ void SubstitutionGoal::tryNext()
         && !sub->isTrusted
         && !info->checkSignatures(worker.store, worker.store.publicKeys))
     {
-        printInfo(format("warning: substituter '%s' does not have a valid signature for path '%s'")
-            % sub->getUri() % storePath);
+        printError("warning: substituter '%s' does not have a valid signature for path '%s'",
+            sub->getUri(), storePath);
         tryNext();
         return;
     }
@@ -3779,7 +3779,7 @@ void SubstitutionGoal::finished()
     try {
         promise.get_future().get();
     } catch (Error & e) {
-        printInfo(e.msg());
+        printError(e.msg());
 
         /* Try the next substitute. */
         state = &SubstitutionGoal::tryNext;
