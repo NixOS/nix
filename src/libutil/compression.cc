@@ -151,10 +151,10 @@ static ref<std::string> decompressBrotli(const std::string & in)
 #endif // HAVE_BROTLI
 }
 
-ref<std::string> compress(const std::string & method, const std::string & in)
+ref<std::string> compress(const std::string & method, const std::string & in, const bool parallel)
 {
     StringSink ssink;
-    auto sink = makeCompressionSink(method, ssink);
+    auto sink = makeCompressionSink(method, ssink, parallel);
     (*sink)(in);
     sink->finish();
     return ssink.s;
@@ -189,10 +189,28 @@ struct XzSink : CompressionSink
     lzma_stream strm = LZMA_STREAM_INIT;
     bool finished = false;
 
-    XzSink(Sink & nextSink) : nextSink(nextSink)
+    XzSink(Sink & nextSink, const bool parallel) : nextSink(nextSink)
     {
-        lzma_ret ret = lzma_easy_encoder(
-            &strm, 6, LZMA_CHECK_CRC64);
+        lzma_ret ret;
+        if (parallel) {
+            lzma_mt mt_options = {};
+            mt_options.flags = 0;
+            mt_options.timeout = 300; // Using the same setting as the xz cmd line
+            mt_options.preset = LZMA_PRESET_DEFAULT;
+            mt_options.filters = NULL;
+            mt_options.check = LZMA_CHECK_CRC64;
+            mt_options.threads = lzma_cputhreads();
+            mt_options.block_size = 0;
+            if (mt_options.threads == 0)
+                mt_options.threads = 1;
+            // FIXME: maybe use lzma_stream_encoder_mt_memusage() to control the
+            // number of threads.
+            ret = lzma_stream_encoder_mt(
+                &strm, &mt_options);
+        } else
+            ret = lzma_easy_encoder(
+                &strm, 6, LZMA_CHECK_CRC64);
+
         if (ret != LZMA_OK)
             throw CompressionError("unable to initialise lzma encoder");
         // FIXME: apply the x86 BCJ filter?
@@ -449,12 +467,12 @@ struct BrotliSink : CompressionSink
 };
 #endif // HAVE_BROTLI
 
-ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink)
+ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel)
 {
     if (method == "none")
         return make_ref<NoneSink>(nextSink);
     else if (method == "xz")
-        return make_ref<XzSink>(nextSink);
+        return make_ref<XzSink>(nextSink, parallel);
     else if (method == "bzip2")
         return make_ref<BzipSink>(nextSink);
     else if (method == "br")
