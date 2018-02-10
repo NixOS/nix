@@ -192,6 +192,7 @@ struct XzSink : CompressionSink
     XzSink(Sink & nextSink, const bool parallel) : nextSink(nextSink)
     {
         lzma_ret ret;
+#ifdef HAVE_LZMA_MT
         if (parallel) {
             lzma_mt mt_options = {};
             mt_options.flags = 0;
@@ -208,6 +209,7 @@ struct XzSink : CompressionSink
             ret = lzma_stream_encoder_mt(
                 &strm, &mt_options);
         } else
+#endif
             ret = lzma_easy_encoder(
                 &strm, 6, LZMA_CHECK_CRC64);
 

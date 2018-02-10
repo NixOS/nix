@@ -175,6 +175,8 @@ AC_SUBST(HAVE_SODIUM, [$have_sodium])
 
 # Look for liblzma, a required dependency.
 PKG_CHECK_MODULES([LIBLZMA], [liblzma], [CXXFLAGS="$LIBLZMA_CFLAGS $CXXFLAGS"])
+AC_CHECK_LIB([lzma], [lzma_stream_encoder_mt],
+  [AC_DEFINE([HAVE_LZMA_MT], [1], [xz multithreaded compression support])])
 
 
 # Look for libbrotli{enc,dec}, optional dependencies
