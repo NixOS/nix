@@ -1,6 +1,7 @@
 #include "compression.hh"
 #include "util.hh"
 #include "finally.hh"
+#include "logging.hh"
 
 #include <lzma.h>
 #include <bzlib.h>
@@ -192,8 +193,8 @@ struct XzSink : CompressionSink
     XzSink(Sink & nextSink, const bool parallel) : nextSink(nextSink)
     {
         lzma_ret ret;
-#ifdef HAVE_LZMA_MT
         if (parallel) {
+#ifdef HAVE_LZMA_MT
             lzma_mt mt_options = {};
             mt_options.flags = 0;
             mt_options.timeout = 300; // Using the same setting as the xz cmd line
@@ -209,6 +210,9 @@ struct XzSink : CompressionSink
             ret = lzma_stream_encoder_mt(
                 &strm, &mt_options);
         } else
+#else
+            printMsg(lvlError, "Warning: parallel XZ compression requested but not supported, falling back to single-threaded compression");
+        }
 #endif
             ret = lzma_easy_encoder(
                 &strm, 6, LZMA_CHECK_CRC64);
@@ -471,6 +475,9 @@ struct BrotliSink : CompressionSink
 
 ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel)
 {
+    if (parallel && method != "xz")
+        printMsg(lvlError, format("Warning: parallel compression requested but not supported for method '%1%', falling back to single-threaded compression") % method);
+
     if (method == "none")
         return make_ref<NoneSink>(nextSink);
     else if (method == "xz")
