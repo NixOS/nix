@@ -1700,10 +1700,13 @@ void EvalState::printStats()
     printMsg(v, format("  time elapsed: %1%") % cpuTime);
     printMsg(v, format("  size of a value: %1%") % sizeof(Value));
     printMsg(v, format("  size of an attr: %1%") % sizeof(Attr));
-    printMsg(v, format("  environments allocated: %1% (%2% bytes)") % nrEnvs % bEnvs);
-    printMsg(v, format("  list elements: %1% (%2% bytes)") % nrListElems % bLists);
+    printMsg(v, format("  environments allocated count: %1%") % nrEnvs);
+    printMsg(v, format("  environments allocated bytes: %1%") % bEnvs);
+    printMsg(v, format("  list elements count: %1%") % nrListElems);
+    printMsg(v, format("  list elements bytes: %1%") % bLists);
     printMsg(v, format("  list concatenations: %1%") % nrListConcats);
-    printMsg(v, format("  values allocated: %1% (%2% bytes)") % nrValues % bValues);
+    printMsg(v, format("  values allocated count: %1%") % nrValues);
+    printMsg(v, format("  values allocated bytes: %1%") % bValues);
     printMsg(v, format("  sets allocated: %1% (%2% bytes)") % nrAttrsets % bAttrsets);
     printMsg(v, format("  right-biased unions: %1%") % nrOpUpdates);
     printMsg(v, format("  values copied in right-biased unions: %1%") % nrOpUpdateValuesCopied);
