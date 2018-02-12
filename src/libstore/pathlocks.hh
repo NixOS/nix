@@ -2,9 +2,7 @@
 
 #include "util.hh"
 
-
 namespace nix {
-
 
 /* Open (possibly create) a lock file and return the file descriptor.
    -1 is returned if create is false and the lock could not be opened
@@ -18,6 +16,7 @@ enum LockType { ltRead, ltWrite, ltNone };
 
 bool lockFile(int fd, LockType lockType, bool wait);
 
+MakeError(AlreadyLocked, Error);
 
 class PathLocks
 {
@@ -38,9 +37,6 @@ public:
     void setDeletion(bool deletePaths);
 };
 
-
-// FIXME: not thread-safe!
 bool pathIsLockedByMe(const Path & path);
-
 
 }

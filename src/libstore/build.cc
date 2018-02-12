@@ -1335,19 +1335,6 @@ void DerivationGoal::tryToBuild()
 {
     trace("trying to build");
 
-    /* Check for the possibility that some other goal in this process
-       has locked the output since we checked in haveDerivation().
-       (It can't happen between here and the lockPaths() call below
-       because we're not allowing multi-threading.)  If so, put this
-       goal to sleep until another goal finishes, then try again. */
-    for (auto & i : drv->outputs)
-        if (pathIsLockedByMe(worker.store.toRealPath(i.second.path))) {
-            debug(format("putting derivation '%1%' to sleep because '%2%' is locked by another goal")
-                % drvPath % i.second.path);
-            worker.waitForAnyGoal(shared_from_this());
-            return;
-        }
-
     /* Obtain locks on all output paths.  The locks are automatically
        released when we exit this function or Nix crashes.  If we
        can't acquire the lock, then continue; hopefully some other
@@ -3739,6 +3726,17 @@ void SubstitutionGoal::tryToRun()
         return;
     }
 
+    /* If the store path is already locked (probably by a
+       DerivationGoal), then put this goal to sleep. Note: we don't
+       acquire a lock here since that breaks addToStore(), so below we
+       handle an AlreadyLocked exception from addToStore(). The check
+       here is just an optimisation to prevent having to redo a
+       download due to a locked path. */
+    if (pathIsLockedByMe(worker.store.toRealPath(storePath))) {
+        worker.waitForAWhile(shared_from_this());
+        return;
+    }
+
     maintainRunningSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.runningSubstitutions);
     worker.updateProgress();
 
@@ -3778,6 +3776,12 @@ void SubstitutionGoal::finished()
 
     try {
         promise.get_future().get();
+    } catch (AlreadyLocked & e) {
+        /* Probably a DerivationGoal is already building this store
+           path. Sleep for a while and try again. */
+        state = &SubstitutionGoal::init;
+        worker.waitForAWhile(shared_from_this());
+        return;
     } catch (Error & e) {
         printError(e.msg());
 

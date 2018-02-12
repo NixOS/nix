@@ -113,8 +113,10 @@ bool PathLocks::lockPaths(const PathSet & _paths,
 
         {
             auto lockedPaths(lockedPaths_.lock());
-            if (lockedPaths->count(lockPath))
-                throw Error("deadlock: trying to re-acquire self-held lock '%s'", lockPath);
+            if (lockedPaths->count(lockPath)) {
+                if (!wait) return false;
+                throw AlreadyLocked("deadlock: trying to re-acquire self-held lock '%s'", lockPath);
+            }
             lockedPaths->insert(lockPath);
         }
 

@@ -992,8 +992,8 @@ void LocalStore::addToStore(const ValidPathInfo & info, const ref<std::string> &
         /* Lock the output path.  But don't lock if we're being called
            from a build hook (whose parent process already acquired a
            lock on this path). */
-        Strings locksHeld = tokenizeString<Strings>(getEnv("NIX_HELD_LOCKS"));
-        if (find(locksHeld.begin(), locksHeld.end(), info.path) == locksHeld.end())
+        static auto locksHeld = tokenizeString<PathSet>(getEnv("NIX_HELD_LOCKS"));
+        if (!locksHeld.count(info.path))
             outputLock.lockPaths({realPath});
 
         if (repair || !isValidPath(info.path)) {
