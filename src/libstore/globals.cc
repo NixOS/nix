@@ -142,12 +142,24 @@ void MaxBuildJobsSetting::set(const std::string & str)
 void initPlugins()
 {
     for (const auto & pluginFile : settings.pluginFiles.get()) {
-        /* handle is purposefully leaked as there may be state in the
-           DSO needed by the action of the plugin. */
-        void *handle =
-            dlopen(pluginFile.c_str(), RTLD_LAZY | RTLD_LOCAL);
-        if (!handle)
-            throw Error(format("could not dynamically open plugin file '%1%': %2%") % pluginFile % dlerror());
+        Paths pluginFiles;
+        try {
+            auto ents = readDirectory(pluginFile);
+            for (const auto & ent : ents)
+                pluginFiles.emplace_back(pluginFile + "/" + ent.name);
+        } catch (SysError & e) {
+            if (e.errNo != ENOTDIR)
+                throw;
+            pluginFiles.emplace_back(pluginFile);
+        }
+        for (const auto & file : pluginFiles) {
+            /* handle is purposefully leaked as there may be state in the
+               DSO needed by the action of the plugin. */
+            void *handle =
+                dlopen(file.c_str(), RTLD_LAZY | RTLD_LOCAL);
+            if (!handle)
+                throw Error("could not dynamically open plugin file '%s%': %s%", file, dlerror());
+        }
     }
 }
 
