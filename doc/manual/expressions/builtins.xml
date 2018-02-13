@@ -126,6 +126,17 @@ if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
   </varlistentry>
 
 
+  <varlistentry><term><function>builtins.splitVersion</function>
+  <replaceable>s</replaceable></term>
+
+    <listitem><para>Split a string representing a version into its
+    components, by the same version splitting logic underlying the
+    version comparison in <link linkend="ssec-version-comparisons">
+    <command>nix-env -u</command></link>.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry><term><function>builtins.concatLists</function>
   <replaceable>lists</replaceable></term>
 

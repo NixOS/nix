@@ -41,7 +41,7 @@ bool DrvName::matches(DrvName & n)
 }
 
 
-static string nextComponent(string::const_iterator & p,
+string nextComponent(string::const_iterator & p,
     const string::const_iterator end)
 {
     /* Skip any dots and dashes (component separators). */
