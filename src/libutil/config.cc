@@ -80,7 +80,31 @@ void Config::applyConfigFile(const Path & path, bool fatal)
             vector<string> tokens = tokenizeString<vector<string> >(line);
             if (tokens.empty()) continue;
 
-            if (tokens.size() < 2 || tokens[1] != "=")
+            if (tokens.size() < 2)
+                throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+
+            auto include = false;
+            auto ignoreMissing = false;
+            if (tokens[0] == "include")
+                include = true;
+            else if (tokens[0] == "!include") {
+                include = true;
+                ignoreMissing = true;
+            }
+
+            if (include) {
+                if (tokens.size() != 2)
+                    throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+                auto p = absPath(tokens[1], dirOf(path));
+                if (pathExists(p)) {
+                    applyConfigFile(p, fatal);
+                } else if (!ignoreMissing) {
+                    throw Error("file '%1%' included from '%2%' not found", p, path);
+                }
+                continue;
+            }
+
+            if (tokens[1] != "=")
                 throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
 
             string name = tokens[0];

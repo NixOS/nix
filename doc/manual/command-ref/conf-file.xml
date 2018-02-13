@@ -40,7 +40,12 @@
 
 <para>The configuration files consist of
 <literal><replaceable>name</replaceable> =
-<replaceable>value</replaceable></literal> pairs, one per line.
+<replaceable>value</replaceable></literal> pairs, one per line. Other
+files can be included with a line like <literal>include
+<replaceable>path</replaceable></literal>, where
+<replaceable>path</replaceable> is interpreted relative to the current
+conf file and a missing file is an error unless
+<literal>!include</literal> is used instead.
 Comments start with a <literal>#</literal> character.  Here is an
 example configuration file:</para>
 
