@@ -742,6 +742,33 @@ builtins.fetchurl {
   </varlistentry>
 
 
+  <varlistentry xml:id="conf-plugin-files">
+    <term><literal>plugin-files</literal></term>
+    <listitem>
+      <para>
+        A list of plugin files to be loaded by Nix. Each of these
+        files will be dlopened by Nix, allowing them to affect
+        execution through static initialization. In particular, these
+        plugins may construct static instances of RegisterPrimOp to
+        add new primops to the expression language,
+        RegisterStoreImplementation to add new store implementations,
+        and RegisterCommand to add new subcommands to the
+        <literal>nix</literal> command. See the constructors for those
+        types for more details.
+      </para>
+      <para>
+	Since these files are loaded into the same address space as
+        Nix itself, they must be DSOs compatible with the instance of
+        Nix running at the time (i.e. compiled against the same
+        headers, not linked to any incompatible libraries). They
+        should not be linked to any Nix libs directly, as those will
+        be available already at load time.
+      </para>
+    </listitem>
+
+  </varlistentry>
+
+
 </variablelist>
 
 </para>

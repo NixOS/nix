@@ -89,6 +89,8 @@ int main(int argc, char * * argv)
 
         myArgs.parseCmdline(argvToStrings(argc, argv));
 
+        initPlugins();
+
         if (args.size() > 2)
             throw UsageError("too many arguments");
 

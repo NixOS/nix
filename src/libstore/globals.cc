@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <map>
 #include <thread>
+#include <dlfcn.h>
 
 
 namespace nix {
@@ -136,5 +137,19 @@ void MaxBuildJobsSetting::set(const std::string & str)
     else if (!string2Int(str, value))
         throw UsageError("configuration setting '%s' should be 'auto' or an integer", name);
 }
+
+
+void initPlugins()
+{
+    for (const auto & pluginFile : settings.pluginFiles.get()) {
+        /* handle is purposefully leaked as there may be state in the
+           DSO needed by the action of the plugin. */
+        void *handle =
+            dlopen(pluginFile.c_str(), RTLD_LAZY | RTLD_LOCAL);
+        if (!handle)
+            throw Error(format("could not dynamically open plugin file '%1%': %2%") % pluginFile % dlerror());
+    }
+}
+
 
 }

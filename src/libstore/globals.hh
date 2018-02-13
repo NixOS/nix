@@ -367,11 +367,18 @@ public:
 
     Setting<Strings> allowedUris{this, {}, "allowed-uris",
         "Prefixes of URIs that builtin functions such as fetchurl and fetchGit are allowed to fetch."};
+
+    Setting<Paths> pluginFiles{this, {}, "plugin-files",
+        "Plugins to dynamically load at nix initialization time."};
 };
 
 
 // FIXME: don't use a global variable.
 extern Settings settings;
+
+/* This should be called after settings are initialized, but before
+   anything else */
+void initPlugins();
 
 
 extern const string nixVersion;

@@ -213,6 +213,9 @@ int main(int argc, char ** argv)
             }
             return true;
         });
+
+        initPlugins();
+
         switch (cmd) {
             case cNone:
                 throw UsageError("no command specified");

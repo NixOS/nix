@@ -1393,6 +1393,8 @@ int main(int argc, char * * argv)
 
         myArgs.parseCmdline(argvToStrings(argc, argv));
 
+        initPlugins();
+
         if (!op) throw UsageError("no operation specified");
 
         auto store = openStore();

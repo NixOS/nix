@@ -45,6 +45,11 @@ endif
 # - $(1)_INSTALL_DIR: the directory where the library will be
 #   installed.  Defaults to $(libdir).
 #
+# - $(1)_EXCLUDE_FROM_LIBRARY_LIST: if defined, the library will not
+#   be automatically marked as a dependency of the top-level all
+#   target andwill not be listed in the make help output. This is
+#   useful for libraries built solely for testing, for example.
+#
 # - BUILD_SHARED_LIBS: if equal to ‘1’, a dynamic library will be
 #   built, otherwise a static library.
 define build-library
@@ -149,7 +154,9 @@ define build-library
   $(1)_DEPS := $$(foreach fn, $$($(1)_OBJS), $$(call filename-to-dep, $$(fn)))
   -include $$($(1)_DEPS)
 
+  ifndef $(1)_EXCLUDE_FROM_LIBRARY_LIST
   libs-list += $$($(1)_PATH)
+  endif
   clean-files += $$(_d)/*.a $$(_d)/*.$(SO_EXT) $$(_d)/*.o $$(_d)/.*.dep $$($(1)_DEPS) $$($(1)_OBJS)
   dist-files += $$(_srcs)
 endef
