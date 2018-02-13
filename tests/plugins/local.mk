@@ -1,9 +1,9 @@
-libraries += plugintest
+libraries += libplugintest
 
-plugintest_DIR := $(d)
+libplugintest_DIR := $(d)
 
-plugintest_SOURCES := $(d)/plugintest.cc
+libplugintest_SOURCES := $(d)/plugintest.cc
 
-plugintest_ALLOW_UNDEFINED := 1
+libplugintest_ALLOW_UNDEFINED := 1
 
-plugintest_EXCLUDE_FROM_LIBRARY_LIST := 1
+libplugintest_EXCLUDE_FROM_LIBRARY_LIST := 1
