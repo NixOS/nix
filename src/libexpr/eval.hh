@@ -210,7 +210,7 @@ private:
 
     void createBaseEnv();
 
-    void addConstant(const string & name, Value & v);
+    Value * addConstant(const string & name, Value & v);
 
     Value * addPrimOp(const string & name,
         unsigned int arity, PrimOpFun primOp);
