@@ -161,6 +161,22 @@ void initPlugins()
                 throw Error("could not dynamically open plugin file '%s%': %s%", file, dlerror());
         }
     }
+    /* We handle settings registrations here, since plugins can add settings */
+    if (RegisterSetting::settingRegistrations) {
+        for (auto & registration : *RegisterSetting::settingRegistrations)
+            settings.addSetting(registration);
+        delete RegisterSetting::settingRegistrations;
+    }
+    settings.handleUnknownSettings();
+}
+
+RegisterSetting::SettingRegistrations * RegisterSetting::settingRegistrations;
+
+RegisterSetting::RegisterSetting(AbstractSetting * s)
+{
+    if (!settingRegistrations)
+        settingRegistrations = new SettingRegistrations;
+    settingRegistrations->emplace_back(s);
 }
 
 

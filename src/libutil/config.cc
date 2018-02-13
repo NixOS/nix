@@ -7,10 +7,12 @@ namespace nix {
 void Config::set(const std::string & name, const std::string & value)
 {
     auto i = _settings.find(name);
-    if (i == _settings.end())
-        throw UsageError("unknown setting '%s'", name);
-    i->second.setting->set(value);
-    i->second.setting->overriden = true;
+    if (i == _settings.end()) {
+        extras.emplace(name, value);
+    } else {
+        i->second.setting->set(value);
+        i->second.setting->overriden = true;
+    }
 }
 
 void Config::addSetting(AbstractSetting * setting)
@@ -21,34 +23,37 @@ void Config::addSetting(AbstractSetting * setting)
 
     bool set = false;
 
-    auto i = initials.find(setting->name);
-    if (i != initials.end()) {
+    auto i = extras.find(setting->name);
+    if (i != extras.end()) {
         setting->set(i->second);
         setting->overriden = true;
-        initials.erase(i);
+        extras.erase(i);
         set = true;
     }
 
     for (auto & alias : setting->aliases) {
-        auto i = initials.find(alias);
-        if (i != initials.end()) {
+        auto i = extras.find(alias);
+        if (i != extras.end()) {
             if (set)
                 warn("setting '%s' is set, but it's an alias of '%s' which is also set",
                     alias, setting->name);
             else {
                 setting->set(i->second);
                 setting->overriden = true;
-                initials.erase(i);
+                extras.erase(i);
                 set = true;
             }
         }
     }
 }
 
-void Config::warnUnknownSettings()
+void Config::handleUnknownSettings(bool fatal)
 {
-    for (auto & i : initials)
-        warn("unknown setting '%s'", i.first);
+    for (auto & s : extras)
+        if (fatal)
+            throw UsageError("unknown setting '%s%'", s.first);
+        else
+            warn("unknown setting '%s'", s.first);
 }
 
 StringMap Config::getSettings(bool overridenOnly)
@@ -60,7 +65,7 @@ StringMap Config::getSettings(bool overridenOnly)
     return res;
 }
 
-void Config::applyConfigFile(const Path & path, bool fatal)
+void Config::applyConfigFile(const Path & path)
 {
     try {
         string contents = readFile(path);
@@ -97,7 +102,7 @@ void Config::applyConfigFile(const Path & path, bool fatal)
                     throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
                 auto p = absPath(tokens[1], dirOf(path));
                 if (pathExists(p)) {
-                    applyConfigFile(p, fatal);
+                    applyConfigFile(p);
                 } else if (!ignoreMissing) {
                     throw Error("file '%1%' included from '%2%' not found", p, path);
                 }
@@ -112,12 +117,7 @@ void Config::applyConfigFile(const Path & path, bool fatal)
             vector<string>::iterator i = tokens.begin();
             advance(i, 2);
 
-            try {
-                set(name, concatStringsSep(" ", Strings(i, tokens.end()))); // FIXME: slow
-            } catch (UsageError & e) {
-                if (fatal) throw;
-                warn("in configuration file '%s': %s", path, e.what());
-            }
+            set(name, concatStringsSep(" ", Strings(i, tokens.end()))); // FIXME: slow
         };
     } catch (SysError &) { }
 }

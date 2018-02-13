@@ -757,9 +757,10 @@ builtins.fetchurl {
         plugins may construct static instances of RegisterPrimOp to
         add new primops or constants to the expression language,
         RegisterStoreImplementation to add new store implementations,
-        and RegisterCommand to add new subcommands to the
-        <literal>nix</literal> command. See the constructors for those
-        types for more details.
+        RegisterCommand to add new subcommands to the
+        <literal>nix</literal> command, and RegisterSetting to add new
+        nix config settings. See the constructors for those types for
+        more details.
       </para>
       <para>
 	Since these files are loaded into the same address space as
