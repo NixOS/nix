@@ -36,3 +36,9 @@ diff -u baz.cat-nar $storePath/foo/baz
 # Test missing files.
 nix ls-store --json -R $storePath/xyzzy 2>&1 | grep 'does not exist in NAR'
 nix ls-store $storePath/xyzzy 2>&1 | grep 'does not exist'
+
+# Test failure to dump.
+if nix-store --dump $storePath >/dev/full ; then
+    echo "dumping to /dev/full should fail"
+    exit -1
+fi
