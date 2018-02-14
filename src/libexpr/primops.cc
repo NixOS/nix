@@ -1961,6 +1961,26 @@ static void prim_compareVersions(EvalState & state, const Pos & pos, Value * * a
 }
 
 
+static void prim_splitVersion(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    string version = state.forceStringNoCtx(*args[0], pos);
+    auto iter = version.cbegin();
+    Strings components;
+    while (iter != version.cend()) {
+        auto component = nextComponent(iter, version.cend());
+        if (component.empty())
+            break;
+        components.emplace_back(std::move(component));
+    }
+    state.mkList(v, components.size());
+    unsigned int n = 0;
+    for (auto & component : components) {
+        auto listElem = v.listElems()[n++] = state.allocValue();
+        mkString(*listElem, std::move(component));
+    }
+}
+
+
 /*************************************************************
  * Networking
  *************************************************************/
@@ -2196,6 +2216,7 @@ void EvalState::createBaseEnv()
     // Versions
     addPrimOp("__parseDrvName", 1, prim_parseDrvName);
     addPrimOp("__compareVersions", 2, prim_compareVersions);
+    addPrimOp("__splitVersion", 1, prim_splitVersion);
 
     // Derivations
     addPrimOp("derivationStrict", 1, prim_derivationStrict);
