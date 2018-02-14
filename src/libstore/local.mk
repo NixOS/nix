@@ -38,6 +38,7 @@ libstore_CXXFLAGS = \
  -DNIX_CONF_DIR=\"$(sysconfdir)/nix\" \
  -DNIX_LIBEXEC_DIR=\"$(libexecdir)\" \
  -DNIX_BIN_DIR=\"$(bindir)\" \
+ -DNIX_MAN_DIR=\"$(mandir)\" \
  -DSANDBOX_SHELL="\"$(sandbox_shell)\"" \
  -DLSOF=\"$(lsof)\"
 

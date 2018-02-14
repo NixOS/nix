@@ -262,6 +262,7 @@ void printVersion(const string & programName)
 void showManPage(const string & name)
 {
     restoreSignals();
+    setenv("MANPATH", settings.nixManDir.c_str(), 1);
     execlp("man", "man", name.c_str(), NULL);
     throw SysError(format("command 'man %1%' failed") % name.c_str());
 }
