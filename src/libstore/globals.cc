@@ -38,6 +38,7 @@ Settings::Settings()
     , nixConfDir(canonPath(getEnv("NIX_CONF_DIR", NIX_CONF_DIR)))
     , nixLibexecDir(canonPath(getEnv("NIX_LIBEXEC_DIR", NIX_LIBEXEC_DIR)))
     , nixBinDir(canonPath(getEnv("NIX_BIN_DIR", NIX_BIN_DIR)))
+    , nixManDir(canonPath(NIX_MAN_DIR))
     , nixDaemonSocketFile(canonPath(nixStateDir + DEFAULT_SOCKET_PATH))
 {
     buildUsersGroup = getuid() == 0 ? "nixbld" : "";

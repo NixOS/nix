@@ -82,6 +82,9 @@ public:
     /* The directory where the main programs are stored. */
     Path nixBinDir;
 
+    /* The directory where the man pages are stored. */
+    Path nixManDir;
+
     /* File name of the socket the daemon listens to.  */
     Path nixDaemonSocketFile;
 
