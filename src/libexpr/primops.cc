@@ -553,7 +553,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     for (auto & i : args[0]->attrs->lexicographicOrder()) {
         if (i->name == state.sIgnoreNulls) continue;
-        string key = i->name;
+        const string & key = i->name;
         vomit("processing attribute '%1%'", key);
 
         auto handleHashMode = [&](const std::string & s) {
