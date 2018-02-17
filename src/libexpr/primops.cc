@@ -612,8 +612,6 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                         drv.builder = state.forceString(*i->value, context, posDrvName);
                     else if (i->name == state.sSystem)
                         drv.platform = state.forceStringNoCtx(*i->value, posDrvName);
-                    else if (i->name == state.sName)
-                        drvName = state.forceStringNoCtx(*i->value, posDrvName);
                     else if (i->name == state.sOutputHash)
                         outputHash = state.forceStringNoCtx(*i->value, posDrvName);
                     else if (i->name == state.sOutputHashAlgo)
@@ -634,10 +632,6 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                     drv.env.emplace(key, s);
                     if (i->name == state.sBuilder) drv.builder = s;
                     else if (i->name == state.sSystem) drv.platform = s;
-                    else if (i->name == state.sName) {
-                        drvName = s;
-                        printMsg(lvlVomit, format("derivation name is '%1%'") % drvName);
-                    }
                     else if (i->name == state.sOutputHash) outputHash = s;
                     else if (i->name == state.sOutputHashAlgo) outputHashAlgo = s;
                     else if (i->name == state.sOutputHashMode) handleHashMode(s);
