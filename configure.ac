@@ -186,9 +186,21 @@ AC_SUBST(HAVE_BROTLI, [$have_brotli])
 
 # Look for libseccomp, required for Linux sandboxing.
 if test "$sys_name" = linux; then
-  PKG_CHECK_MODULES([LIBSECCOMP], [libseccomp],
-                    [CXXFLAGS="$LIBSECCOMP_CFLAGS $CXXFLAGS"])
+  AC_ARG_ENABLE([seccomp-sandboxing],
+                AC_HELP_STRING([--disable-seccomp-sandboxing],
+                               [Don't build support for seccomp sandboxing (only recommended if your arch doesn't support libseccomp yet!)]
+                              ))
+  if test "x$enable_seccomp_sandboxing" != "xno"; then
+    PKG_CHECK_MODULES([LIBSECCOMP], [libseccomp],
+                      [CXXFLAGS="$LIBSECCOMP_CFLAGS $CXXFLAGS"])
+    have_seccomp=1
+  else
+    have_seccomp=
+  fi
+else
+  have_seccomp=
 fi
+AC_SUBST(HAVE_SECCOMP, [$have_seccomp])
 
 
 # Look for aws-cpp-sdk-s3.

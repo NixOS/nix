@@ -25,7 +25,7 @@ ifeq ($(OS), SunOS)
 	libstore_LDFLAGS += -lsocket
 endif
 
-ifeq ($(OS), Linux)
+ifeq ($(HAVE_SECCOMP), 1)
 	libstore_LDFLAGS += -lseccomp
 endif
 

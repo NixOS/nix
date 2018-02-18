@@ -49,7 +49,9 @@
 #include <sys/param.h>
 #include <sys/mount.h>
 #include <sys/syscall.h>
+#if HAVE_SECCOMP
 #include <seccomp.h>
+#endif
 #define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
 #endif
 
@@ -2469,7 +2471,7 @@ void DerivationGoal::chownToBuilder(const Path & path)
 
 void setupSeccomp()
 {
-#if __linux__
+#if __linux__ && HAVE_SECCOMP
     if (!settings.filterSyscalls) return;
 
     scmp_filter_ctx ctx;
