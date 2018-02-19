@@ -386,5 +386,12 @@ void initPlugins();
 
 extern const string nixVersion;
 
+struct RegisterSetting
+{
+    typedef std::vector<AbstractSetting *> SettingRegistrations;
+    static SettingRegistrations * settingRegistrations;
+    RegisterSetting(AbstractSetting * s);
+};
+
 
 }

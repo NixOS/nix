@@ -839,7 +839,7 @@ ref<Store> openStore(const std::string & uri_,
     for (auto fun : *RegisterStoreImplementation::implementations) {
         auto store = fun(uri, params);
         if (store) {
-            store->warnUnknownSettings();
+            store->handleUnknownSettings();
             return ref<Store>(store);
         }
     }
