@@ -200,18 +200,16 @@ let
       };
 
 
-    rpm_fedora25i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora25i386) [ "libsodium-devel" ];
-    rpm_fedora25x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora25x86_64) [ "libsodium-devel" ];
+    rpm_fedora27x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora27x86_64) [ "brotli-devel" ];
 
+    deb_debian9i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian9i386) [ ];
+    deb_debian9x86_64 = makeDeb_x86_64 (diskImageFunsFun: diskImageFunsFun.debian9x86_64) [ ];
 
-    #deb_debian8i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian8i386) [ "libsodium-dev" ];
-    #deb_debian8x86_64 = makeDeb_x86_64 (diskImageFunsFun: diskImageFunsFun.debian8x86_64) [ "libsodium-dev" ];
+    deb_ubuntu1604i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1604i386) [ ];
+    deb_ubuntu1604x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1604x86_64) [ ];
 
-    deb_ubuntu1604i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1604i386) [ "libsodium-dev" ];
-    deb_ubuntu1604x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1604x86_64) [ "libsodium-dev" ];
-    deb_ubuntu1610i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1610i386) [ "libsodium-dev" ];
-    deb_ubuntu1610x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1610x86_64) [ "libsodium-dev" ];
-
+    deb_ubuntu1710i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1710i386) [ ];
+    deb_ubuntu1710x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1710x86_64) [ ];
 
     # System tests.
     tests.remoteBuilds = (import ./tests/remote-builds.nix rec {
@@ -283,12 +281,11 @@ let
           binaryTarball.i686-linux
           binaryTarball.x86_64-darwin
           binaryTarball.x86_64-linux
-          #deb_debian8i386
-          #deb_debian8x86_64
-          deb_ubuntu1604i386
-          deb_ubuntu1604x86_64
-          rpm_fedora25i386
-          rpm_fedora25x86_64
+          deb_debian9i386
+          deb_debian9x86_64
+          deb_ubuntu1710i386
+          deb_ubuntu1710x86_64
+          rpm_fedora27x86_64
           tests.remoteBuilds
           tests.nix-copy-closure
           tests.binaryTarball
@@ -314,7 +311,8 @@ let
 
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages =
-            [ "sqlite" "sqlite-devel" "bzip2-devel" "libcurl-devel" "openssl" "openssl-devel" "xz-devel" "libseccomp-devel" ]
+            [ "sqlite" "sqlite-devel" "bzip2-devel" "libcurl-devel" "openssl"
+              "openssl-devel" "xz-devel" "libseccomp-devel" "libsodium-devel" ]
             ++ extraPackages; };
       # At most 2047MB can be simulated in qemu-system-i386
       memSize = 2047;
@@ -347,7 +345,8 @@ let
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages =
             [ "build-essential" "debhelper" "mount"
-              "libsqlite3-dev" "libbz2-dev" "libcurl-dev" "libcurl4-openssl-dev" "libssl-dev" "liblzma-dev" "libseccomp-dev" ]
+              "libsqlite3-dev" "libbz2-dev" "libcurl-dev" "libsodium-dev"
+              "libcurl4-openssl-dev" "libssl-dev" "liblzma-dev" "libseccomp-dev" ]
             ++ extraPackages; };
       memSize = 1024;
       meta.schedulingPriority = 50;

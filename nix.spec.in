@@ -13,6 +13,7 @@ Requires: xz
 Requires: openssl
 Requires: libsodium
 Requires: libseccomp
+Requires: brotli
 BuildRequires: make
 BuildRequires: gcc-c++
 BuildRequires: bzip2-devel
@@ -22,6 +23,7 @@ BuildRequires: xz-devel
 BuildRequires: openssl-devel
 BuildRequires: libsodium-devel
 BuildRequires: libseccomp-devel
+BuildRequires: brotli-devel
 
 %description
 Nix is a purely functional package manager. It allows multiple
