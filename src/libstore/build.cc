@@ -2471,9 +2471,9 @@ void DerivationGoal::chownToBuilder(const Path & path)
 
 void setupSeccomp()
 {
-#if __linux__ && HAVE_SECCOMP
+#if __linux__
     if (!settings.filterSyscalls) return;
-
+#if HAVE_SECCOMP
     scmp_filter_ctx ctx;
 
     if (!(ctx = seccomp_init(SCMP_ACT_ALLOW)))
@@ -2519,6 +2519,11 @@ void setupSeccomp()
 
     if (seccomp_load(ctx) != 0)
         throw SysError("unable to load seccomp BPF program");
+#else
+    throw Error("%s\n%s",
+        "seccomp is not supported on this platform"
+        "you can avoid this by setting the filter-syscalls option to false, but note that untrusted builds can then create setuid binaries!");
+#endif
 #endif
 }
 
