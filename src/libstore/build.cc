@@ -2520,9 +2520,9 @@ void setupSeccomp()
     if (seccomp_load(ctx) != 0)
         throw SysError("unable to load seccomp BPF program");
 #else
-    throw Error("%s\n%s",
-        "seccomp is not supported on this platform"
-        "you can avoid this by setting the filter-syscalls option to false, but note that untrusted builds can then create setuid binaries!");
+    throw Error(
+        "seccomp is not supported on this platform; "
+        "you can bypass this error by setting the option 'filter-syscalls' to false, but note that untrusted builds can then create setuid binaries!");
 #endif
 #endif
 }
