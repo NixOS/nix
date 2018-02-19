@@ -1,6 +1,7 @@
 #include "compression.hh"
 #include "util.hh"
 #include "finally.hh"
+#include "logging.hh"
 
 #include <lzma.h>
 #include <bzlib.h>
@@ -189,28 +190,9 @@ struct XzSink : CompressionSink
     lzma_stream strm = LZMA_STREAM_INIT;
     bool finished = false;
 
-    XzSink(Sink & nextSink, const bool parallel) : nextSink(nextSink)
-    {
-        lzma_ret ret;
-        if (parallel) {
-            lzma_mt mt_options = {};
-            mt_options.flags = 0;
-            mt_options.timeout = 300; // Using the same setting as the xz cmd line
-            mt_options.preset = LZMA_PRESET_DEFAULT;
-            mt_options.filters = NULL;
-            mt_options.check = LZMA_CHECK_CRC64;
-            mt_options.threads = lzma_cputhreads();
-            mt_options.block_size = 0;
-            if (mt_options.threads == 0)
-                mt_options.threads = 1;
-            // FIXME: maybe use lzma_stream_encoder_mt_memusage() to control the
-            // number of threads.
-            ret = lzma_stream_encoder_mt(
-                &strm, &mt_options);
-        } else
-            ret = lzma_easy_encoder(
-                &strm, 6, LZMA_CHECK_CRC64);
-
+    template <typename F>
+    XzSink(Sink & nextSink, F&& initEncoder) : nextSink(nextSink) {
+        lzma_ret ret = initEncoder();
         if (ret != LZMA_OK)
             throw CompressionError("unable to initialise lzma encoder");
         // FIXME: apply the x86 BCJ filter?
@@ -218,6 +200,9 @@ struct XzSink : CompressionSink
         strm.next_out = outbuf;
         strm.avail_out = sizeof(outbuf);
     }
+    XzSink(Sink & nextSink) : XzSink(nextSink, [this]() {
+        return lzma_easy_encoder(&strm, 6, LZMA_CHECK_CRC64);
+    }) {}
 
     ~XzSink()
     {
@@ -270,6 +255,27 @@ struct XzSink : CompressionSink
         }
     }
 };
+
+#ifdef HAVE_LZMA_MT
+struct ParallelXzSink : public XzSink
+{
+  ParallelXzSink(Sink &nextSink) : XzSink(nextSink, [this]() {
+        lzma_mt mt_options = {};
+        mt_options.flags = 0;
+        mt_options.timeout = 300; // Using the same setting as the xz cmd line
+        mt_options.preset = LZMA_PRESET_DEFAULT;
+        mt_options.filters = NULL;
+        mt_options.check = LZMA_CHECK_CRC64;
+        mt_options.threads = lzma_cputhreads();
+        mt_options.block_size = 0;
+        if (mt_options.threads == 0)
+            mt_options.threads = 1;
+        // FIXME: maybe use lzma_stream_encoder_mt_memusage() to control the
+        // number of threads.
+        return lzma_stream_encoder_mt(&strm, &mt_options);
+  }) {}
+};
+#endif
 
 struct BzipSink : CompressionSink
 {
@@ -469,10 +475,18 @@ struct BrotliSink : CompressionSink
 
 ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel)
 {
+    if (parallel) {
+#ifdef HAVE_LZMA_MT
+        if (method == "xz")
+            return make_ref<ParallelXzSink>(nextSink);
+#endif
+        printMsg(lvlError, format("Warning: parallel compression requested but not supported for method '%1%', falling back to single-threaded compression") % method);
+    }
+
     if (method == "none")
         return make_ref<NoneSink>(nextSink);
     else if (method == "xz")
-        return make_ref<XzSink>(nextSink, parallel);
+        return make_ref<XzSink>(nextSink);
     else if (method == "bzip2")
         return make_ref<BzipSink>(nextSink);
     else if (method == "br")
