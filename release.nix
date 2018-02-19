@@ -366,6 +366,7 @@ let
         make installcheck
         useradd alice
         mount -t tmpfs none /nix/store
+        rm -rf /homeless-shelter
         nix-daemon &
         su -c 'bash -l -c "nix-build --option binary-caches \"\" --no-out-link tests/dependencies.nix"' alice
         umount /nix/store
