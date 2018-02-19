@@ -7,13 +7,14 @@
 namespace nix {
 
 
+/* Note: Various places expect the allocated memory to be zeroed. */
 static void * allocBytes(size_t n)
 {
     void * p;
 #if HAVE_BOEHMGC
     p = GC_malloc(n);
 #else
-    p = malloc(n);
+    p = calloc(n, 1);
 #endif
     if (!p) throw std::bad_alloc();
     return p;

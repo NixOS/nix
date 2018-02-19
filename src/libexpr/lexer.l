@@ -49,9 +49,10 @@ static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
 }
 
 
-static Expr * unescapeStr(SymbolTable & symbols, const char * s)
+static Expr * unescapeStr(SymbolTable & symbols, const char * s, size_t length)
 {
     string t;
+    t.reserve(length);
     char c;
     while ((c = *s++)) {
         if (c == '\\') {
@@ -150,7 +151,7 @@ or          { return OR_KW; }
                 /* It is impossible to match strings ending with '$' with one
                    regex because trailing contexts are only valid at the end
                    of a rule. (A sane but undocumented limitation.) */
-                yylval->e = unescapeStr(data->symbols, yytext);
+                yylval->e = unescapeStr(data->symbols, yytext, yyleng);
                 return STR;
               }
 <STRING>\$\{  { PUSH_STATE(INSIDE_DOLLAR_CURLY); return DOLLAR_CURLY; }
@@ -178,7 +179,7 @@ or          { return OR_KW; }
                    return IND_STR;
                  }
 <IND_STRING>\'\'\\. {
-                   yylval->e = unescapeStr(data->symbols, yytext + 2);
+                   yylval->e = unescapeStr(data->symbols, yytext + 2, yyleng - 2);
                    return IND_STR;
                  }
 <IND_STRING>\$\{ { PUSH_STATE(INSIDE_DOLLAR_CURLY); return DOLLAR_CURLY; }

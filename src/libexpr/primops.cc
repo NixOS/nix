@@ -553,7 +553,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     for (auto & i : args[0]->attrs->lexicographicOrder()) {
         if (i->name == state.sIgnoreNulls) continue;
-        string key = i->name;
+        const string & key = i->name;
         vomit("processing attribute '%1%'", key);
 
         auto handleHashMode = [&](const std::string & s) {
@@ -589,7 +589,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
-            if (key == "args") {
+            if (i->name == state.sArgs) {
                 state.forceList(*i->value, pos);
                 for (unsigned int n = 0; n < i->value->listSize(); ++n) {
                     string s = state.coerceToString(posDrvName, *i->value->listElems()[n], context, true);
@@ -612,15 +612,13 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                         drv.builder = state.forceString(*i->value, context, posDrvName);
                     else if (i->name == state.sSystem)
                         drv.platform = state.forceStringNoCtx(*i->value, posDrvName);
-                    else if (i->name == state.sName)
-                        drvName = state.forceStringNoCtx(*i->value, posDrvName);
-                    else if (key == "outputHash")
+                    else if (i->name == state.sOutputHash)
                         outputHash = state.forceStringNoCtx(*i->value, posDrvName);
-                    else if (key == "outputHashAlgo")
+                    else if (i->name == state.sOutputHashAlgo)
                         outputHashAlgo = state.forceStringNoCtx(*i->value, posDrvName);
-                    else if (key == "outputHashMode")
+                    else if (i->name == state.sOutputHashMode)
                         handleHashMode(state.forceStringNoCtx(*i->value, posDrvName));
-                    else if (key == "outputs") {
+                    else if (i->name == state.sOutputs) {
                         /* Require ‘outputs’ to be a list of strings. */
                         state.forceList(*i->value, posDrvName);
                         Strings ss;
@@ -634,14 +632,10 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
                     drv.env.emplace(key, s);
                     if (i->name == state.sBuilder) drv.builder = s;
                     else if (i->name == state.sSystem) drv.platform = s;
-                    else if (i->name == state.sName) {
-                        drvName = s;
-                        printMsg(lvlVomit, format("derivation name is '%1%'") % drvName);
-                    }
-                    else if (key == "outputHash") outputHash = s;
-                    else if (key == "outputHashAlgo") outputHashAlgo = s;
-                    else if (key == "outputHashMode") handleHashMode(s);
-                    else if (key == "outputs")
+                    else if (i->name == state.sOutputHash) outputHash = s;
+                    else if (i->name == state.sOutputHashAlgo) outputHashAlgo = s;
+                    else if (i->name == state.sOutputHashMode) handleHashMode(s);
+                    else if (i->name == state.sOutputs)
                         handleOutputs(tokenizeString<Strings>(s));
                 }
 
@@ -1138,8 +1132,11 @@ static void prim_attrNames(EvalState & state, const Pos & pos, Value * * args, V
     state.mkList(v, args[0]->attrs->size());
 
     size_t n = 0;
-    for (auto & i : args[0]->attrs->lexicographicOrder())
-        mkString(*(v.listElems()[n++] = state.allocValue()), i->name);
+    for (auto & i : *args[0]->attrs)
+        mkString(*(v.listElems()[n++] = state.allocValue()), i.name);
+
+    std::sort(v.listElems(), v.listElems() + n,
+              [](Value * v1, Value * v2) { return strcmp(v1->string.s, v2->string.s) < 0; });
 }
 
 

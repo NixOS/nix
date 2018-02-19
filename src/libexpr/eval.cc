@@ -43,13 +43,14 @@ static char * dupString(const char * s)
 }
 
 
+/* Note: Various places expect the allocated memory to be zeroed. */
 static void * allocBytes(size_t n)
 {
     void * p;
 #if HAVE_BOEHMGC
     p = GC_malloc(n);
 #else
-    p = malloc(n);
+    p = calloc(n, 1);
 #endif
     if (!p) throw std::bad_alloc();
     return p;
@@ -293,6 +294,10 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
     , sWrong(symbols.create("wrong"))
     , sStructuredAttrs(symbols.create("__structuredAttrs"))
     , sBuilder(symbols.create("builder"))
+    , sArgs(symbols.create("args"))
+    , sOutputHash(symbols.create("outputHash"))
+    , sOutputHashAlgo(symbols.create("outputHashAlgo"))
+    , sOutputHashMode(symbols.create("outputHashMode"))
     , repair(NoRepair)
     , store(store)
     , baseEnv(allocEnv(128))
@@ -582,9 +587,7 @@ Env & EvalState::allocEnv(unsigned int size)
     Env * env = (Env *) allocBytes(sizeof(Env) + size * sizeof(Value *));
     env->size = size;
 
-    /* Clear the values because maybeThunk() and lookupVar fromWith expect this. */
-    for (unsigned i = 0; i < size; ++i)
-        env->values[i] = 0;
+    /* We assume that env->values has been cleared by the allocator; maybeThunk() and lookupVar fromWith expect this. */
 
     return *env;
 }
