@@ -96,7 +96,6 @@ div.example
     margin-right: 1.5em;
     background: #f4f4f8;
     border-radius: 0.4em;
-    box-shadow: 0.4em 0.4em 0.5em #e0e0e0;
 }
 
 div.example p.title
@@ -106,7 +105,6 @@ div.example p.title
 
 div.example pre
 {
-    box-shadow: none;
 }
 
 
@@ -116,15 +114,12 @@ div.example pre
 
 pre.screen, pre.programlisting
 {
-    border: 1px solid #b0b0b0;
-    padding: 3px 3px;
+    padding: 6px 6px;
     margin-left: 1.5em;
     margin-right: 1.5em;
     color: #600000;
     background: #f4f4f8;
     font-family: monospace;
-    border-radius: 0.4em;
-    box-shadow: 0.4em 0.4em 0.5em #e0e0e0;
 }
 
 div.example pre.programlisting
@@ -149,7 +144,6 @@ div.example pre.programlisting
     padding: 0.3em 0.3em 0.3em 0.3em;
     background: #fffff5;
     border-radius: 0.4em;
-    box-shadow: 0.4em 0.4em 0.5em #e0e0e0;
 }
 
 div.note, div.warning
@@ -256,13 +250,11 @@ span.command strong
 
 div.calloutlist table
 {
-    box-shadow: none;
 }
 
 table
 {
     border-collapse: collapse;
-    box-shadow: 0.4em 0.4em 0.5em #e0e0e0;
 }
 
 div.affiliation

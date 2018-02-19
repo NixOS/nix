@@ -90,6 +90,16 @@ struct CmdLsStore : StoreCommand, MixLs
         expectArg("path", &path);
     }
 
+    Examples examples() override
+    {
+        return {
+            Example{
+                "To list the contents of a store path in a binary cache:",
+                "nix ls-store --store https://cache.nixos.org/ -lR /nix/store/0i2jd68mp5g6h2sa5k9c85rb80sn8hi9-hello-2.10"
+            },
+        };
+    }
+
     std::string name() override
     {
         return "ls-store";
@@ -114,6 +124,16 @@ struct CmdLsNar : Command, MixLs
     {
         expectArg("nar", &narPath);
         expectArg("path", &path);
+    }
+
+    Examples examples() override
+    {
+        return {
+            Example{
+                "To list a specific file in a NAR:",
+                "nix ls-nar -l hello.nar /bin/hello"
+            },
+        };
     }
 
     std::string name() override

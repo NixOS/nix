@@ -85,6 +85,10 @@ struct CmdRun : InstallablesCommand
                 "To run GNU Hello:",
                 "nix run nixpkgs.hello -c hello --greeting 'Hi everybody!'"
             },
+            Example{
+                "To run GNU Hello in a chroot store:",
+                "nix run --store ~/my-nix nixpkgs.hello -c hello"
+            },
         };
     }
 
