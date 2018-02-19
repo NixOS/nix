@@ -196,6 +196,7 @@ if test "$sys_name" = linux; then
     PKG_CHECK_MODULES([LIBSECCOMP], [libseccomp],
                       [CXXFLAGS="$LIBSECCOMP_CFLAGS $CXXFLAGS"])
     have_seccomp=1
+    AC_DEFINE([HAVE_SECCOMP], [1], [Whether seccomp is available and should be used for sandboxing.])
   else
     have_seccomp=
   fi
