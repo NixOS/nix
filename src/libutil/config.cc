@@ -47,13 +47,10 @@ void Config::addSetting(AbstractSetting * setting)
     }
 }
 
-void Config::handleUnknownSettings(bool fatal)
+void Config::handleUnknownSettings()
 {
     for (auto & s : extras)
-        if (fatal)
-            throw UsageError("unknown setting '%s%'", s.first);
-        else
-            warn("unknown setting '%s'", s.first);
+        warn("unknown setting '%s'", s.first);
 }
 
 StringMap Config::getSettings(bool overridenOnly)

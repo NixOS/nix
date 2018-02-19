@@ -60,7 +60,7 @@ public:
 
     void addSetting(AbstractSetting * setting);
 
-    void handleUnknownSettings(bool fatal = false);
+    void handleUnknownSettings();
 
     StringMap getSettings(bool overridenOnly = false);
 
