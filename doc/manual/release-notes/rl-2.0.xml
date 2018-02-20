@@ -97,7 +97,7 @@
 
       <listitem>
         <para>Unlike the legacy commands, it has a consistent way to
-        refer to packages and package-like argumements (like store
+        refer to packages and package-like arguments (like store
         paths). For example, the following commands all copy the GNU
         Hello package to a remote machine:
 
@@ -190,7 +190,7 @@
       <listitem>
         <para><command>nix search</command> replaces <command>nix-env
         -qa</command>. It searches the available packages for
-        occurences of a search string in the attribute name, package
+        occurrences of a search string in the attribute name, package
         name or description. Unlike <command>nix-env -qa</command>, it
         has a cache to speed up subsequent searches.</para>
       </listitem>
@@ -878,7 +878,7 @@ configureFlags = "--prefix=${placeholder "out"} --includedir=${placeholder "dev"
 
   <listitem>
     <para>On Linux, builds are now executed in a user
-    namespace with uid 1000 and gid 100.</para>
+    namespace with UID 1000 and GID 100.</para>
   </listitem>
 
 </itemizedlist>
@@ -908,6 +908,107 @@ configureFlags = "--prefix=${placeholder "out"} --includedir=${placeholder "dev"
 
 </para>
 
-<para>This release has contributions from TBD.</para>
+<para>This release has contributions from
+
+Adrien Devresse,
+Alexander Ried,
+Alex Cruice,
+Alexey Shmalko,
+AmineChikhaoui,
+Andy Wingo,
+Aneesh Agrawal,
+Anthony Cowley,
+Armijn Hemel,
+aszlig,
+Ben Gamari,
+Benjamin Hipple,
+Benjamin Staffin,
+Benno Fünfstück,
+Bjørn Forsman,
+Brian McKenna,
+Charles Strahan,
+Chase Adams,
+Chris Martin,
+Christian Theune,
+Chris Warburton,
+Daiderd Jordan,
+Dan Connolly,
+Daniel Peebles,
+Dan Peebles,
+davidak,
+David McFarland,
+Dmitry Kalinkin,
+Domen Kožar,
+Eelco Dolstra,
+Emery Hemingway,
+Eric Litak,
+Eric Wolf,
+Fabian Schmitthenner,
+Frederik Rietdijk,
+Gabriel Gonzalez,
+Giorgio Gallo,
+Graham Christensen,
+Guillaume Maudoux,
+Harmen,
+Iavael,
+James Broadhead,
+James Earl Douglas,
+Janus Troelsen,
+Jeremy Shaw,
+Joachim Schiele,
+Joe Hermaszewski,
+Joel Moberg,
+Johannes 'fish' Ziemke,
+Jörg Thalheim,
+Jude Taylor,
+kballou,
+Keshav Kini,
+Kjetil Orbekk,
+Langston Barrett,
+Linus Heckemann,
+Ludovic Courtès,
+Manav Rathi,
+Marc Scholten,
+Markus Hauck,
+Matt Audesse,
+Matthew Bauer,
+Matthias Beyer,
+Matthieu Coudron,
+N1X,
+Nathan Zadoks,
+Neil Mayhew,
+Nicolas B. Pierron,
+Niklas Hambüchen,
+Nikolay Amiantov,
+Ole Jørgen Brønner,
+Orivej Desh,
+Peter Simons,
+Peter Stuart,
+Pyry Jahkola,
+regnat,
+Renzo Carbonara,
+Rhys,
+Robert Vollmert,
+Scott Olson,
+Scott R. Parish,
+Sergei Trofimovich,
+Shea Levy,
+Sheena Artrip,
+Spencer Baugh,
+Stefan Junker,
+Susan Potter,
+Thomas Tuegel,
+Timothy Allen,
+Tristan Hume,
+Tuomas Tynkkynen,
+tv,
+Tyson Whitehead,
+Vladimír Čunát,
+Will Dietz,
+wmertens,
+Wout Mertens,
+zimbatm and
+Zoran Plesivčak.
+</para>
 
 </section>
