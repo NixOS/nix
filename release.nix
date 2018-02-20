@@ -1,5 +1,5 @@
 { nix ? builtins.fetchGit ./.
-, nixpkgs ? fetchTarball channel:nixos-17.09
+, nixpkgs ? builtins.fetchGit { url = https://github.com/NixOS/nixpkgs.git; ref = "nix-2.0"; }
 , officialRelease ? false
 , systems ? [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
 }:
@@ -127,7 +127,6 @@ let
 
     binaryTarball = pkgs.lib.genAttrs systems (system:
 
-      # FIXME: temporarily use a different branch for the Darwin build.
       with import nixpkgs { inherit system; };
 
       let
@@ -137,7 +136,7 @@ let
 
       runCommand "nix-binary-tarball-${version}"
         { exportReferencesGraph = [ "closure1" toplevel "closure2" cacert ];
-          buildInputs = [ perl shellcheck ];
+          buildInputs = [ perl ] ++ lib.optional (system != "aarch64-linux") shellcheck;
           meta.description = "Distribution-independent Nix bootstrap binaries for ${system}";
         }
         ''
@@ -150,8 +149,10 @@ let
             --subst-var-by nix ${toplevel} \
             --subst-var-by cacert ${cacert}
 
-          shellcheck -e SC1090 $TMPDIR/install
-          shellcheck -e SC1091,SC2002 $TMPDIR/install-darwin-multi-user
+          if type -p shellcheck; then
+            shellcheck -e SC1090 $TMPDIR/install
+            shellcheck -e SC1091,SC2002 $TMPDIR/install-darwin-multi-user
+          fi
 
           chmod +x $TMPDIR/install
           chmod +x $TMPDIR/install-darwin-multi-user
