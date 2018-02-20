@@ -1216,7 +1216,7 @@ std::string filterANSIEscapes(const std::string & s, unsigned int width)
 
         else if (*i == '\r')
             // do nothing for now
-            ;
+            i++;
 
         else {
             t += *i++; w++;
