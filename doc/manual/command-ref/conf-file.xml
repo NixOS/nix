@@ -763,7 +763,7 @@ builtins.fetchurl {
         more details.
       </para>
       <para>
-	Since these files are loaded into the same address space as
+        Since these files are loaded into the same address space as
         Nix itself, they must be DSOs compatible with the instance of
         Nix running at the time (i.e. compiled against the same
         headers, not linked to any incompatible libraries). They
@@ -771,13 +771,22 @@ builtins.fetchurl {
         be available already at load time.
       </para>
       <para>
-	If an entry in the list is a directory, all files in the
-	directory are loaded as plugins (non-recursively).
+        If an entry in the list is a directory, all files in the
+        directory are loaded as plugins (non-recursively).
       </para>
     </listitem>
 
   </varlistentry>
 
+
+  <varlistentry xml:id="conf-builders">
+    <term><literal>builders</literal></term>
+    <listitem>
+      <para>A list of machines on which to perform builds. <phrase
+      condition="manual">See <xref linkend="chap-distributed-builds"
+      /> for details.</phrase></para>
+    </listitem>
+  </varlistentry>
 
 </variablelist>
 
