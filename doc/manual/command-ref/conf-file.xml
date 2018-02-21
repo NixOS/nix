@@ -63,147 +63,99 @@ false</literal>.</para>
 <variablelist>
 
 
-  <varlistentry xml:id="conf-keep-outputs"><term><literal>keep-outputs</literal></term>
-
-    <listitem><para>If <literal>true</literal>, the garbage collector
-    will keep the outputs of non-garbage derivations.  If
-    <literal>false</literal> (default), outputs will be deleted unless
-    they are GC roots themselves (or reachable from other roots).</para>
-
-    <para>In general, outputs must be registered as roots separately.
-    However, even if the output of a derivation is registered as a
-    root, the collector will still delete store paths that are used
-    only at build time (e.g., the C compiler, or source tarballs
-    downloaded from the network).  To prevent it from doing so, set
-    this option to <literal>true</literal>.</para></listitem>
-
-  </varlistentry>
-
-
-  <varlistentry xml:id="conf-keep-derivations"><term><literal>keep-derivations</literal></term>
-
-    <listitem><para>If <literal>true</literal> (default), the garbage
-    collector will keep the derivations from which non-garbage store
-    paths were built.  If <literal>false</literal>, they will be
-    deleted unless explicitly registered as a root (or reachable from
-    other roots).</para>
-
-    <para>Keeping derivation around is useful for querying and
-    traceability (e.g., it allows you to ask with what dependencies or
-    options a store path was built), so by default this option is on.
-    Turn it off to save a bit of disk space (or a lot if
-    <literal>keep-outputs</literal> is also turned on).</para></listitem>
-
-  </varlistentry>
-
-
-  <varlistentry><term><literal>keep-env-derivations</literal></term>
-
-    <listitem><para>If <literal>false</literal> (default), derivations
-    are not stored in Nix user environments.  That is, the derivation
-    any build-time-only dependencies may be garbage-collected.</para>
-
-    <para>If <literal>true</literal>, when you add a Nix derivation to
-    a user environment, the path of the derivation is stored in the
-    user environment.  Thus, the derivation will not be
-    garbage-collected until the user environment generation is deleted
-    (<command>nix-env --delete-generations</command>).  To prevent
-    build-time-only dependencies from being collected, you should also
-    turn on <literal>keep-outputs</literal>.</para>
-
-    <para>The difference between this option and
-    <literal>keep-derivations</literal> is that this one is
-    “sticky”: it applies to any user environment created while this
-    option was enabled, while <literal>keep-derivations</literal>
-    only applies at the moment the garbage collector is
-    run.</para></listitem>
-
-  </varlistentry>
-
-
-  <varlistentry xml:id="conf-max-jobs"><term><literal>max-jobs</literal></term>
-
-    <listitem><para>This option defines the maximum number of jobs
-    that Nix will try to build in parallel.  The default is
-    <literal>1</literal>. The special value <literal>auto</literal>
-    causes Nix to use the number of CPUs in your system.  It can be
-    overridden using the <option
-    linkend='opt-max-jobs'>--max-jobs</option> (<option>-j</option>)
-    command line switch.</para></listitem>
-
-  </varlistentry>
-
-
-  <varlistentry xml:id="conf-cores"><term><literal>cores</literal></term>
-
-    <listitem><para>Sets the value of the
-    <envar>NIX_BUILD_CORES</envar> environment variable in the
-    invocation of builders.  Builders can use this variable at their
-    discretion to control the maximum amount of parallelism.  For
-    instance, in Nixpkgs, if the derivation attribute
-    <varname>enableParallelBuilding</varname> is set to
-    <literal>true</literal>, the builder passes the
-    <option>-j<replaceable>N</replaceable></option> flag to GNU Make.
-    It can be overridden using the <option
-    linkend='opt-cores'>--cores</option> command line switch and
-    defaults to <literal>1</literal>.  The value <literal>0</literal>
-    means that the builder should use all available CPU cores in the
-    system.</para></listitem>
-
-  </varlistentry>
-
-
-  <varlistentry xml:id="conf-max-silent-time"><term><literal>max-silent-time</literal></term>
+  <varlistentry xml:id="conf-allowed-uris"><term><literal>allowed-uris</literal></term>
 
     <listitem>
 
-      <para>This option defines the maximum number of seconds that a
-      builder can go without producing any data on standard output or
-      standard error.  This is useful (for instance in an automated
-      build system) to catch builds that are stuck in an infinite
-      loop, or to catch remote builds that are hanging due to network
-      problems.  It can be overridden using the <option
-      linkend="opt-max-silent-time">--max-silent-time</option> command
-      line switch.</para>
-
-      <para>The value <literal>0</literal> means that there is no
-      timeout.  This is also the default.</para>
+      <para>A list of URI prefixes to which access is allowed in
+      restricted evaluation mode. For example, when set to
+      <literal>https://github.com/NixOS</literal>, builtin functions
+      such as <function>fetchGit</function> are allowed to access
+      <literal>https://github.com/NixOS/patchelf.git</literal>.</para>
 
     </listitem>
 
   </varlistentry>
 
 
-  <varlistentry xml:id="conf-timeout"><term><literal>timeout</literal></term>
+  <varlistentry xml:id="conf-allow-import-from-derivation"><term><literal>allow-import-from-derivation</literal></term>
+
+    <listitem><para>By default, Nix allows you to <function>import</function> from a derivation,
+    allowing building at evaluation time. With this option set to false, Nix will throw an error
+    when evaluating an expression that uses this feature, allowing users to ensure their evaluation
+    will not require any builds to take place.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry xml:id="conf-allow-new-privileges"><term><literal>allow-new-privileges</literal></term>
+
+    <listitem><para>(Linux-specific.) By default, builders on Linux
+    cannot acquire new privileges by calling setuid/setgid programs or
+    programs that have file capabilities. For example, programs such
+    as <command>sudo</command> or <command>ping</command> will
+    fail. (Note that in sandbox builds, no such programs are available
+    unless you bind-mount them into the sandbox via the
+    <option>sandbox-paths</option> option.) You can allow the
+    use of such programs by enabling this option. This is impure and
+    usually undesirable, but may be useful in certain scenarios
+    (e.g. to spin up containers or set up userspace network interfaces
+    in tests).</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry xml:id="conf-allowed-users"><term><literal>allowed-users</literal></term>
 
     <listitem>
 
-      <para>This option defines the maximum number of seconds that a
-      builder can run.  This is useful (for instance in an automated
-      build system) to catch builds that are stuck in an infinite loop
-      but keep writing to their standard output or standard error.  It
-      can be overridden using the <option
-      linkend="opt-timeout">--timeout</option> command line
-      switch.</para>
+      <para>A list of names of users (separated by whitespace) that
+      are allowed to connect to the Nix daemon. As with the
+      <option>trusted-users</option> option, you can specify groups by
+      prefixing them with <literal>@</literal>. Also, you can allow
+      all users by specifying <literal>*</literal>. The default is
+      <literal>*</literal>.</para>
 
-      <para>The value <literal>0</literal> means that there is no
-      timeout.  This is also the default.</para>
+      <para>Note that trusted users are always allowed to connect.</para>
 
     </listitem>
 
   </varlistentry>
 
 
-  <varlistentry xml:id="conf-max-build-log-size"><term><literal>max-build-log-size</literal></term>
+  <varlistentry><term><literal>auto-optimise-store</literal></term>
 
+    <listitem><para>If set to <literal>true</literal>, Nix
+    automatically detects files in the store that have identical
+    contents, and replaces them with hard links to a single copy.
+    This saves disk space.  If set to <literal>false</literal> (the
+    default), you can still run <command>nix-store
+    --optimise</command> to get rid of duplicate
+    files.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry xml:id="conf-builders">
+    <term><literal>builders</literal></term>
     <listitem>
-
-      <para>This option defines the maximum number of bytes that a
-      builder can write to its stdout/stderr.  If the builder exceeds
-      this limit, it’s killed.  A value of <literal>0</literal> (the
-      default) means that there is no limit.</para>
-
+      <para>A list of machines on which to perform builds. <phrase
+      condition="manual">See <xref linkend="chap-distributed-builds"
+      /> for details.</phrase></para>
     </listitem>
+  </varlistentry>
+
+
+  <varlistentry><term><literal>builders-use-substitutes</literal></term>
+
+    <listitem><para>If set to <literal>true</literal>, Nix will instruct
+    remote build machines to use their own binary substitutes if available. In
+    practical terms, this means that remote hosts will fetch as many build
+    dependencies as possible from their own substitutes (e.g, from
+    <literal>cache.nixos.org</literal>), instead of waiting for this host to
+    upload them all. This can drastically reduce build times if the network
+    connection between this computer and the remote build host is slow. Defaults
+    to <literal>false</literal>.</para></listitem>
 
   </varlistentry>
 
@@ -249,66 +201,51 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry><term><literal>sandbox</literal></term>
+  <varlistentry><term><literal>compress-build-log</literal></term>
 
-    <listitem><para>If set to <literal>true</literal>, builds will be
-    performed in a <emphasis>sandboxed environment</emphasis>, i.e.,
-    they’re isolated from the normal file system hierarchy and will
-    only see their dependencies in the Nix store, the temporary build
-    directory, private versions of <filename>/proc</filename>,
-    <filename>/dev</filename>, <filename>/dev/shm</filename> and
-    <filename>/dev/pts</filename> (on Linux), and the paths configured with the
-    <link linkend='conf-sandbox-paths'><literal>sandbox-paths</literal>
-    option</link>. This is useful to prevent undeclared dependencies
-    on files in directories such as <filename>/usr/bin</filename>. In
-    addition, on Linux, builds run in private PID, mount, network, IPC
-    and UTS namespaces to isolate them from other processes in the
-    system (except that fixed-output derivations do not run in private
-    network namespace to ensure they can access the network).</para>
+    <listitem><para>If set to <literal>true</literal> (the default),
+    build logs written to <filename>/nix/var/log/nix/drvs</filename>
+    will be compressed on the fly using bzip2.  Otherwise, they will
+    not be compressed.</para></listitem>
 
-    <para>Currently, sandboxing only work on Linux and macOS. The use
-    of a sandbox requires that Nix is run as root (so you should use
-    the <link linkend='conf-build-users-group'>“build users”
-    feature</link> to perform the actual builds under different users
-    than root).</para>
+  </varlistentry>
 
-    <para>If this option is set to <literal>relaxed</literal>, then
-    fixed-output derivations and derivations that have the
-    <varname>__noChroot</varname> attribute set to
-    <literal>true</literal> do not run in sandboxes.</para>
 
-    <para>The default is <literal>false</literal>.</para>
+  <varlistentry xml:id="conf-connect-timeout"><term><literal>connect-timeout</literal></term>
+
+    <listitem>
+
+      <para>The timeout (in seconds) for establishing connections in
+      the binary cache substituter.  It corresponds to
+      <command>curl</command>’s <option>--connect-timeout</option>
+      option.</para>
 
     </listitem>
 
   </varlistentry>
 
 
-  <varlistentry xml:id="conf-sandbox-paths">
-    <term><literal>sandbox-paths</literal></term>
+  <varlistentry xml:id="conf-cores"><term><literal>cores</literal></term>
 
-    <listitem><para>A list of paths bind-mounted into Nix sandbox
-    environments. You can use the syntax
-    <literal><replaceable>target</replaceable>=<replaceable>source</replaceable></literal>
-    to mount a path in a different location in the sandbox; for
-    instance, <literal>/bin=/nix-bin</literal> will mount the path
-    <literal>/nix-bin</literal> as <literal>/bin</literal> inside the
-    sandbox. If <replaceable>source</replaceable> is followed by
-    <literal>?</literal>, then it is not an error if
-    <replaceable>source</replaceable> does not exist; for example,
-    <literal>/dev/nvidiactl?</literal> specifies that
-    <filename>/dev/nvidiactl</filename> will only be mounted in the
-    sandbox if it exists in the host filesystem.</para>
-
-    <para>Depending on how Nix was built, the default value for this option
-    may be empty or provide <filename>/bin/sh</filename> as a
-    bind-mount of <command>bash</command>.</para></listitem>
+    <listitem><para>Sets the value of the
+    <envar>NIX_BUILD_CORES</envar> environment variable in the
+    invocation of builders.  Builders can use this variable at their
+    discretion to control the maximum amount of parallelism.  For
+    instance, in Nixpkgs, if the derivation attribute
+    <varname>enableParallelBuilding</varname> is set to
+    <literal>true</literal>, the builder passes the
+    <option>-j<replaceable>N</replaceable></option> flag to GNU Make.
+    It can be overridden using the <option
+    linkend='opt-cores'>--cores</option> command line switch and
+    defaults to <literal>1</literal>.  The value <literal>0</literal>
+    means that the builder should use all available CPU cores in the
+    system.</para></listitem>
 
   </varlistentry>
 
 
   <varlistentry xml:id="conf-extra-sandbox-paths">
-    <term><literal>build-extra-sandbox-paths</literal></term>
+    <term><literal>extra-sandbox-paths</literal></term>
 
     <listitem><para>A list of additional paths appended to
     <option>sandbox-paths</option>. Useful if you want to extend
@@ -317,25 +254,13 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry><term><literal>substitute</literal></term>
+  <varlistentry><term><literal>extra-substituters</literal></term>
 
-    <listitem><para>If set to <literal>true</literal> (default), Nix
-    will use binary substitutes if available.  This option can be
-    disabled to force building from source.</para></listitem>
-
-  </varlistentry>
-
-
-  <varlistentry><term><literal>builders-use-substitutes</literal></term>
-
-    <listitem><para>If set to <literal>true</literal>, Nix will instruct
-    remote build machines to use their own binary substitutes if available. In
-    practical terms, this means that remote hosts will fetch as many build
-    dependencies as possible from their own substitutes (e.g, from
-    <literal>cache.nixos.org</literal>), instead of waiting for this host to
-    upload them all. This can drastically reduce build times if the network
-    connection between this computer and the remote build host is slow. Defaults
-    to <literal>false</literal>.</para></listitem>
+    <listitem><para>Additional binary caches appended to those
+    specified in <option>substituters</option>.  When used by
+    unprivileged users, untrusted substituters (i.e. those not listed
+    in <option>trusted-substituters</option>) are silently
+    ignored.</para></listitem>
 
   </varlistentry>
 
@@ -346,6 +271,54 @@ false</literal>.</para>
     back to building from source if a binary substitute fails.  This
     is equivalent to the <option>--fallback</option> flag.  The
     default is <literal>false</literal>.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry><term><literal>fsync-metadata</literal></term>
+
+    <listitem><para>If set to <literal>true</literal>, changes to the
+    Nix store metadata (in <filename>/nix/var/nix/db</filename>) are
+    synchronously flushed to disk.  This improves robustness in case
+    of system crashes, but reduces performance.  The default is
+    <literal>true</literal>.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry xml:id="conf-hashed-mirrors"><term><literal>hashed-mirrors</literal></term>
+
+    <listitem><para>A list of web servers used by
+    <function>builtins.fetchurl</function> to obtain files by
+    hash. The default is
+    <literal>http://tarballs.nixos.org/</literal>. Given a hash type
+    <replaceable>ht</replaceable> and a base-16 hash
+    <replaceable>h</replaceable>, Nix will try to download the file
+    from
+    <literal>hashed-mirror/<replaceable>ht</replaceable>/<replaceable>h</replaceable></literal>.
+    This allows files to be downloaded even if they have disappeared
+    from their original URI. For example, given the default mirror
+    <literal>http://tarballs.nixos.org/</literal>, when building the derivation
+
+<programlisting>
+builtins.fetchurl {
+  url = https://example.org/foo-1.2.3.tar.xz;
+  sha256 = "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae";
+}
+</programlisting>
+
+    Nix will attempt to download this file from
+    <literal>http://tarballs.nixos.org/sha256/2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae</literal>
+    first. If it is not available there, if will try the original URI.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry><term><literal>http-connections</literal></term>
+
+    <listitem><para>The maximum number of parallel TCP connections
+    used to fetch files from binary caches and by other downloads. It
+    defaults to 25. 0 means no limit.</para></listitem>
 
   </varlistentry>
 
@@ -362,107 +335,108 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry><term><literal>compress-build-log</literal></term>
+  <varlistentry xml:id="conf-keep-derivations"><term><literal>keep-derivations</literal></term>
 
-    <listitem><para>If set to <literal>true</literal> (the default),
-    build logs written to <filename>/nix/var/log/nix/drvs</filename>
-    will be compressed on the fly using bzip2.  Otherwise, they will
-    not be compressed.</para></listitem>
+    <listitem><para>If <literal>true</literal> (default), the garbage
+    collector will keep the derivations from which non-garbage store
+    paths were built.  If <literal>false</literal>, they will be
+    deleted unless explicitly registered as a root (or reachable from
+    other roots).</para>
 
-  </varlistentry>
-
-
-  <varlistentry><term><literal>substituters</literal></term>
-
-    <listitem><para>A list of URLs of substituters, separated by
-    whitespace.  The default is
-    <literal>https://cache.nixos.org</literal>.</para></listitem>
+    <para>Keeping derivation around is useful for querying and
+    traceability (e.g., it allows you to ask with what dependencies or
+    options a store path was built), so by default this option is on.
+    Turn it off to save a bit of disk space (or a lot if
+    <literal>keep-outputs</literal> is also turned on).</para></listitem>
 
   </varlistentry>
 
 
-  <!--
-  <varlistentry><term><literal>binary-caches-files</literal></term>
+  <varlistentry><term><literal>keep-env-derivations</literal></term>
 
-    <listitem><para>A list of names of files that will be read to
-    obtain additional binary cache URLs.  The default is
-    <literal>/nix/var/nix/profiles/per-user/<replaceable>username</replaceable>/channels/binary-caches/*</literal>.
-    Note that when you’re using the Nix daemon,
-    <replaceable>username</replaceable> is always equal to
-    <literal>root</literal>, so Nix will only use the binary caches
-    provided by the channels installed by root.  Do not set this
-    option to read files created by untrusted users!</para></listitem>
+    <listitem><para>If <literal>false</literal> (default), derivations
+    are not stored in Nix user environments.  That is, the derivation
+    any build-time-only dependencies may be garbage-collected.</para>
 
-  </varlistentry>
-  -->
+    <para>If <literal>true</literal>, when you add a Nix derivation to
+    a user environment, the path of the derivation is stored in the
+    user environment.  Thus, the derivation will not be
+    garbage-collected until the user environment generation is deleted
+    (<command>nix-env --delete-generations</command>).  To prevent
+    build-time-only dependencies from being collected, you should also
+    turn on <literal>keep-outputs</literal>.</para>
 
-
-  <varlistentry><term><literal>trusted-substituters</literal></term>
-
-    <listitem><para>A list of URLs of substituters, separated by
-    whitespace.  These are not used by default, but can be enabled by
-    users of the Nix daemon by specifying <literal>--option
-    substituters <replaceable>urls</replaceable></literal> on the
-    command line.  Unprivileged users are only allowed to pass a
-    subset of the URLs listed in <literal>substituters</literal> and
-    <literal>trusted-substituters</literal>.</para></listitem>
+    <para>The difference between this option and
+    <literal>keep-derivations</literal> is that this one is
+    “sticky”: it applies to any user environment created while this
+    option was enabled, while <literal>keep-derivations</literal>
+    only applies at the moment the garbage collector is
+    run.</para></listitem>
 
   </varlistentry>
 
 
-  <varlistentry><term><literal>extra-substituters</literal></term>
+  <varlistentry xml:id="conf-keep-outputs"><term><literal>keep-outputs</literal></term>
 
-    <listitem><para>Additional binary caches appended to those
-    specified in <option>substituters</option>.  When used by
-    unprivileged users, untrusted substituters (i.e. those not listed
-    in <option>trusted-substituters</option>) are silently
-    ignored.</para></listitem>
+    <listitem><para>If <literal>true</literal>, the garbage collector
+    will keep the outputs of non-garbage derivations.  If
+    <literal>false</literal> (default), outputs will be deleted unless
+    they are GC roots themselves (or reachable from other roots).</para>
 
-  </varlistentry>
-
-
-  <varlistentry><term><literal>require-sigs</literal></term>
-
-    <listitem><para>If set to <literal>true</literal> (the default),
-    any non-content-addressed path added or copied to the Nix store
-    (e.g. when substituting from a binary cache) must have a valid
-    signature, that is, be signed using one of the keys listed in
-    <option>trusted-public-keys</option> or
-    <option>secret-key-files</option>. Set to <literal>false</literal>
-    to disable signature checking.</para></listitem>
+    <para>In general, outputs must be registered as roots separately.
+    However, even if the output of a derivation is registered as a
+    root, the collector will still delete store paths that are used
+    only at build time (e.g., the C compiler, or source tarballs
+    downloaded from the network).  To prevent it from doing so, set
+    this option to <literal>true</literal>.</para></listitem>
 
   </varlistentry>
 
 
-  <varlistentry><term><literal>trusted-public-keys</literal></term>
+  <varlistentry xml:id="conf-max-build-log-size"><term><literal>max-build-log-size</literal></term>
 
-    <listitem><para>A whitespace-separated list of public keys. When
-    paths are copied from another Nix store (such as a binary cache),
-    they must be signed with one of these keys. For example:
-    <literal>cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
-    hydra.nixos.org-1:CNHJZBh9K4tP3EKF6FkkgeVYsS3ohTl+oS0Qa8bezVs=</literal>.</para></listitem>
+    <listitem>
 
-  </varlistentry>
+      <para>This option defines the maximum number of bytes that a
+      builder can write to its stdout/stderr.  If the builder exceeds
+      this limit, it’s killed.  A value of <literal>0</literal> (the
+      default) means that there is no limit.</para>
 
-
-  <varlistentry><term><literal>secret-key-files</literal></term>
-
-    <listitem><para>A whitespace-separated list of files containing
-    secret (private) keys. These are used to sign locally-built
-    paths. They can be generated using <command>nix-store
-    --generate-binary-cache-key</command>. The corresponding public
-    key can be distributed to other users, who can add it to
-    <option>trusted-public-keys</option> in their
-    <filename>nix.conf</filename>.</para></listitem>
+    </listitem>
 
   </varlistentry>
 
 
-  <varlistentry><term><literal>http-connections</literal></term>
+  <varlistentry xml:id="conf-max-jobs"><term><literal>max-jobs</literal></term>
 
-    <listitem><para>The maximum number of parallel TCP connections
-    used to fetch files from binary caches and by other downloads. It
-    defaults to 25. 0 means no limit.</para></listitem>
+    <listitem><para>This option defines the maximum number of jobs
+    that Nix will try to build in parallel.  The default is
+    <literal>1</literal>. The special value <literal>auto</literal>
+    causes Nix to use the number of CPUs in your system.  It can be
+    overridden using the <option
+    linkend='opt-max-jobs'>--max-jobs</option> (<option>-j</option>)
+    command line switch.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry xml:id="conf-max-silent-time"><term><literal>max-silent-time</literal></term>
+
+    <listitem>
+
+      <para>This option defines the maximum number of seconds that a
+      builder can go without producing any data on standard output or
+      standard error.  This is useful (for instance in an automated
+      build system) to catch builds that are stuck in an infinite
+      loop, or to catch remote builds that are hanging due to network
+      problems.  It can be overridden using the <option
+      linkend="opt-max-silent-time">--max-silent-time</option> command
+      line switch.</para>
+
+      <para>The value <literal>0</literal> means that there is no
+      timeout.  This is also the default.</para>
+
+    </listitem>
 
   </varlistentry>
 
@@ -490,134 +464,33 @@ password <replaceable>my-password</replaceable>
   </varlistentry>
 
 
-  <varlistentry><term><literal>system</literal></term>
-
-    <listitem><para>This option specifies the canonical Nix system
-    name of the current installation, such as
-    <literal>i686-linux</literal> or
-    <literal>x86_64-darwin</literal>.  Nix can only build derivations
-    whose <literal>system</literal> attribute equals the value
-    specified here.  In general, it never makes sense to modify this
-    value from its default, since you can use it to ‘lie’ about the
-    platform you are building on (e.g., perform a Mac OS build on a
-    Linux machine; the result would obviously be wrong).  It only
-    makes sense if the Nix binaries can run on multiple platforms,
-    e.g., ‘universal binaries’ that run on <literal>x86_64-linux</literal> and
-    <literal>i686-linux</literal>.</para>
-
-    <para>It defaults to the canonical Nix system name detected by
-    <filename>configure</filename> at build time.</para></listitem>
-
-  </varlistentry>
-
-
-  <varlistentry><term><literal>fsync-metadata</literal></term>
-
-    <listitem><para>If set to <literal>true</literal>, changes to the
-    Nix store metadata (in <filename>/nix/var/nix/db</filename>) are
-    synchronously flushed to disk.  This improves robustness in case
-    of system crashes, but reduces performance.  The default is
-    <literal>true</literal>.</para></listitem>
-
-  </varlistentry>
-
-
-  <varlistentry><term><literal>auto-optimise-store</literal></term>
-
-    <listitem><para>If set to <literal>true</literal>, Nix
-    automatically detects files in the store that have identical
-    contents, and replaces them with hard links to a single copy.
-    This saves disk space.  If set to <literal>false</literal> (the
-    default), you can still run <command>nix-store
-    --optimise</command> to get rid of duplicate
-    files.</para></listitem>
-
-  </varlistentry>
-
-
-  <varlistentry xml:id="conf-connect-timeout"><term><literal>connect-timeout</literal></term>
-
+  <varlistentry xml:id="conf-plugin-files">
+    <term><literal>plugin-files</literal></term>
     <listitem>
-
-      <para>The timeout (in seconds) for establishing connections in
-      the binary cache substituter.  It corresponds to
-      <command>curl</command>’s <option>--connect-timeout</option>
-      option.</para>
-
-    </listitem>
-
-  </varlistentry>
-
-
-  <varlistentry xml:id="conf-trusted-users"><term><literal>trusted-users</literal></term>
-
-    <listitem>
-
-      <para>A list of names of users (separated by whitespace) that
-      have additional rights when connecting to the Nix daemon, such
-      as the ability to specify additional binary caches, or to import
-      unsigned NARs. You can also specify groups by prefixing them
-      with <literal>@</literal>; for instance,
-      <literal>@wheel</literal> means all users in the
-      <literal>wheel</literal> group. The default is
-      <literal>root</literal>.</para>
-
-      <warning><para>Adding a user to <option>trusted-users</option>
-      is essentially equivalent to giving that user root access to the
-      system. For example, the user can set
-      <option>sandbox-paths</option> and thereby obtain read access to
-      directories that are otherwise inacessible to
-      them.</para></warning>
-
-    </listitem>
-
-  </varlistentry>
-
-
-  <varlistentry xml:id="conf-allowed-users"><term><literal>allowed-users</literal></term>
-
-    <listitem>
-
-      <para>A list of names of users (separated by whitespace) that
-      are allowed to connect to the Nix daemon. As with the
-      <option>trusted-users</option> option, you can specify groups by
-      prefixing them with <literal>@</literal>. Also, you can allow
-      all users by specifying <literal>*</literal>. The default is
-      <literal>*</literal>.</para>
-
-      <para>Note that trusted users are always allowed to connect.</para>
-
-    </listitem>
-
-  </varlistentry>
-
-
-  <varlistentry xml:id="conf-restrict-eval"><term><literal>restrict-eval</literal></term>
-
-    <listitem>
-
-      <para>If set to <literal>true</literal>, the Nix evaluator will
-      not allow access to any files outside of the Nix search path (as
-      set via the <envar>NIX_PATH</envar> environment variable or the
-      <option>-I</option> option), or to URIs outside of
-      <option>allowed-uri</option>. The default is
-      <literal>false</literal>.</para>
-
-    </listitem>
-
-  </varlistentry>
-
-
-  <varlistentry xml:id="conf-allowed-uris"><term><literal>allowed-uris</literal></term>
-
-    <listitem>
-
-      <para>A list of URI prefixes to which access is allowed in
-      restricted evaluation mode. For example, when set to
-      <literal>https://github.com/NixOS</literal>, builtin functions
-      such as <function>fetchGit</function> are allowed to access
-      <literal>https://github.com/NixOS/patchelf.git</literal>.</para>
-
+      <para>
+        A list of plugin files to be loaded by Nix. Each of these
+        files will be dlopened by Nix, allowing them to affect
+        execution through static initialization. In particular, these
+        plugins may construct static instances of RegisterPrimOp to
+        add new primops or constants to the expression language,
+        RegisterStoreImplementation to add new store implementations,
+        RegisterCommand to add new subcommands to the
+        <literal>nix</literal> command, and RegisterSetting to add new
+        nix config settings. See the constructors for those types for
+        more details.
+      </para>
+      <para>
+        Since these files are loaded into the same address space as
+        Nix itself, they must be DSOs compatible with the instance of
+        Nix running at the time (i.e. compiled against the same
+        headers, not linked to any incompatible libraries). They
+        should not be linked to any Nix libs directly, as those will
+        be available already at load time.
+      </para>
+      <para>
+        If an entry in the list is a directory, all files in the
+        directory are loaded as plugins (non-recursively).
+      </para>
     </listitem>
 
   </varlistentry>
@@ -671,6 +544,70 @@ password <replaceable>my-password</replaceable>
   </varlistentry>
 
 
+  <varlistentry><term><literal>require-sigs</literal></term>
+
+    <listitem><para>If set to <literal>true</literal> (the default),
+    any non-content-addressed path added or copied to the Nix store
+    (e.g. when substituting from a binary cache) must have a valid
+    signature, that is, be signed using one of the keys listed in
+    <option>trusted-public-keys</option> or
+    <option>secret-key-files</option>. Set to <literal>false</literal>
+    to disable signature checking.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry xml:id="conf-restrict-eval"><term><literal>restrict-eval</literal></term>
+
+    <listitem>
+
+      <para>If set to <literal>true</literal>, the Nix evaluator will
+      not allow access to any files outside of the Nix search path (as
+      set via the <envar>NIX_PATH</envar> environment variable or the
+      <option>-I</option> option), or to URIs outside of
+      <option>allowed-uri</option>. The default is
+      <literal>false</literal>.</para>
+
+    </listitem>
+
+  </varlistentry>
+
+
+  <varlistentry><term><literal>sandbox</literal></term>
+
+    <listitem><para>If set to <literal>true</literal>, builds will be
+    performed in a <emphasis>sandboxed environment</emphasis>, i.e.,
+    they’re isolated from the normal file system hierarchy and will
+    only see their dependencies in the Nix store, the temporary build
+    directory, private versions of <filename>/proc</filename>,
+    <filename>/dev</filename>, <filename>/dev/shm</filename> and
+    <filename>/dev/pts</filename> (on Linux), and the paths configured with the
+    <link linkend='conf-sandbox-paths'><literal>sandbox-paths</literal>
+    option</link>. This is useful to prevent undeclared dependencies
+    on files in directories such as <filename>/usr/bin</filename>. In
+    addition, on Linux, builds run in private PID, mount, network, IPC
+    and UTS namespaces to isolate them from other processes in the
+    system (except that fixed-output derivations do not run in private
+    network namespace to ensure they can access the network).</para>
+
+    <para>Currently, sandboxing only work on Linux and macOS. The use
+    of a sandbox requires that Nix is run as root (so you should use
+    the <link linkend='conf-build-users-group'>“build users”
+    feature</link> to perform the actual builds under different users
+    than root).</para>
+
+    <para>If this option is set to <literal>relaxed</literal>, then
+    fixed-output derivations and derivations that have the
+    <varname>__noChroot</varname> attribute set to
+    <literal>true</literal> do not run in sandboxes.</para>
+
+    <para>The default is <literal>false</literal>.</para>
+
+    </listitem>
+
+  </varlistentry>
+
+
   <varlistentry xml:id="conf-sandbox-dev-shm-size"><term><literal>sandbox-dev-shm-size</literal></term>
 
     <listitem><para>This option determines the maximum size of the
@@ -684,57 +621,38 @@ password <replaceable>my-password</replaceable>
   </varlistentry>
 
 
-  <varlistentry xml:id="conf-allow-import-from-derivation"><term><literal>allow-import-from-derivation</literal></term>
+  <varlistentry xml:id="conf-sandbox-paths">
+    <term><literal>sandbox-paths</literal></term>
 
-    <listitem><para>By default, Nix allows you to <function>import</function> from a derivation,
-    allowing building at evaluation time. With this option set to false, Nix will throw an error
-    when evaluating an expression that uses this feature, allowing users to ensure their evaluation
-    will not require any builds to take place.</para></listitem>
+    <listitem><para>A list of paths bind-mounted into Nix sandbox
+    environments. You can use the syntax
+    <literal><replaceable>target</replaceable>=<replaceable>source</replaceable></literal>
+    to mount a path in a different location in the sandbox; for
+    instance, <literal>/bin=/nix-bin</literal> will mount the path
+    <literal>/nix-bin</literal> as <literal>/bin</literal> inside the
+    sandbox. If <replaceable>source</replaceable> is followed by
+    <literal>?</literal>, then it is not an error if
+    <replaceable>source</replaceable> does not exist; for example,
+    <literal>/dev/nvidiactl?</literal> specifies that
+    <filename>/dev/nvidiactl</filename> will only be mounted in the
+    sandbox if it exists in the host filesystem.</para>
 
-  </varlistentry>
-
-
-  <varlistentry xml:id="conf-allow-new-privileges"><term><literal>allow-new-privileges</literal></term>
-
-    <listitem><para>(Linux-specific.) By default, builders on Linux
-    cannot acquire new privileges by calling setuid/setgid programs or
-    programs that have file capabilities. For example, programs such
-    as <command>sudo</command> or <command>ping</command> will
-    fail. (Note that in sandbox builds, no such programs are available
-    unless you bind-mount them into the sandbox via the
-    <option>sandbox-paths</option> option.) You can allow the
-    use of such programs by enabling this option. This is impure and
-    usually undesirable, but may be useful in certain scenarios
-    (e.g. to spin up containers or set up userspace network interfaces
-    in tests).</para></listitem>
+    <para>Depending on how Nix was built, the default value for this option
+    may be empty or provide <filename>/bin/sh</filename> as a
+    bind-mount of <command>bash</command>.</para></listitem>
 
   </varlistentry>
 
 
-  <varlistentry xml:id="conf-hashed-mirrors"><term><literal>hashed-mirrors</literal></term>
+  <varlistentry><term><literal>secret-key-files</literal></term>
 
-    <listitem><para>A list of web servers used by
-    <function>builtins.fetchurl</function> to obtain files by
-    hash. The default is
-    <literal>http://tarballs.nixos.org/</literal>. Given a hash type
-    <replaceable>ht</replaceable> and a base-16 hash
-    <replaceable>h</replaceable>, Nix will try to download the file
-    from
-    <literal>hashed-mirror/<replaceable>ht</replaceable>/<replaceable>h</replaceable></literal>.
-    This allows files to be downloaded even if they have disappeared
-    from their original URI. For example, given the default mirror
-    <literal>http://tarballs.nixos.org/</literal>, when building the derivation
-
-<programlisting>
-builtins.fetchurl {
-  url = https://example.org/foo-1.2.3.tar.xz;
-  sha256 = "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae";
-}
-</programlisting>
-
-    Nix will attempt to download this file from
-    <literal>http://tarballs.nixos.org/sha256/2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae</literal>
-    first. If it is not available there, if will try the original URI.</para></listitem>
+    <listitem><para>A whitespace-separated list of files containing
+    secret (private) keys. These are used to sign locally-built
+    paths. They can be generated using <command>nix-store
+    --generate-binary-cache-key</command>. The corresponding public
+    key can be distributed to other users, who can add it to
+    <option>trusted-public-keys</option> in their
+    <filename>nix.conf</filename>.</para></listitem>
 
   </varlistentry>
 
@@ -747,46 +665,113 @@ builtins.fetchurl {
   </varlistentry>
 
 
-  <varlistentry xml:id="conf-plugin-files">
-    <term><literal>plugin-files</literal></term>
+  <varlistentry><term><literal>substitute</literal></term>
+
+    <listitem><para>If set to <literal>true</literal> (default), Nix
+    will use binary substitutes if available.  This option can be
+    disabled to force building from source.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry><term><literal>substituters</literal></term>
+
+    <listitem><para>A list of URLs of substituters, separated by
+    whitespace.  The default is
+    <literal>https://cache.nixos.org</literal>.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry><term><literal>system</literal></term>
+
+    <listitem><para>This option specifies the canonical Nix system
+    name of the current installation, such as
+    <literal>i686-linux</literal> or
+    <literal>x86_64-darwin</literal>.  Nix can only build derivations
+    whose <literal>system</literal> attribute equals the value
+    specified here.  In general, it never makes sense to modify this
+    value from its default, since you can use it to ‘lie’ about the
+    platform you are building on (e.g., perform a Mac OS build on a
+    Linux machine; the result would obviously be wrong).  It only
+    makes sense if the Nix binaries can run on multiple platforms,
+    e.g., ‘universal binaries’ that run on <literal>x86_64-linux</literal> and
+    <literal>i686-linux</literal>.</para>
+
+    <para>It defaults to the canonical Nix system name detected by
+    <filename>configure</filename> at build time.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry xml:id="conf-timeout"><term><literal>timeout</literal></term>
+
     <listitem>
-      <para>
-        A list of plugin files to be loaded by Nix. Each of these
-        files will be dlopened by Nix, allowing them to affect
-        execution through static initialization. In particular, these
-        plugins may construct static instances of RegisterPrimOp to
-        add new primops or constants to the expression language,
-        RegisterStoreImplementation to add new store implementations,
-        RegisterCommand to add new subcommands to the
-        <literal>nix</literal> command, and RegisterSetting to add new
-        nix config settings. See the constructors for those types for
-        more details.
-      </para>
-      <para>
-        Since these files are loaded into the same address space as
-        Nix itself, they must be DSOs compatible with the instance of
-        Nix running at the time (i.e. compiled against the same
-        headers, not linked to any incompatible libraries). They
-        should not be linked to any Nix libs directly, as those will
-        be available already at load time.
-      </para>
-      <para>
-        If an entry in the list is a directory, all files in the
-        directory are loaded as plugins (non-recursively).
-      </para>
+
+      <para>This option defines the maximum number of seconds that a
+      builder can run.  This is useful (for instance in an automated
+      build system) to catch builds that are stuck in an infinite loop
+      but keep writing to their standard output or standard error.  It
+      can be overridden using the <option
+      linkend="opt-timeout">--timeout</option> command line
+      switch.</para>
+
+      <para>The value <literal>0</literal> means that there is no
+      timeout.  This is also the default.</para>
+
     </listitem>
 
   </varlistentry>
 
 
-  <varlistentry xml:id="conf-builders">
-    <term><literal>builders</literal></term>
-    <listitem>
-      <para>A list of machines on which to perform builds. <phrase
-      condition="manual">See <xref linkend="chap-distributed-builds"
-      /> for details.</phrase></para>
-    </listitem>
+  <varlistentry><term><literal>trusted-public-keys</literal></term>
+
+    <listitem><para>A whitespace-separated list of public keys. When
+    paths are copied from another Nix store (such as a binary cache),
+    they must be signed with one of these keys. For example:
+    <literal>cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+    hydra.nixos.org-1:CNHJZBh9K4tP3EKF6FkkgeVYsS3ohTl+oS0Qa8bezVs=</literal>.</para></listitem>
+
   </varlistentry>
+
+
+  <varlistentry><term><literal>trusted-substituters</literal></term>
+
+    <listitem><para>A list of URLs of substituters, separated by
+    whitespace.  These are not used by default, but can be enabled by
+    users of the Nix daemon by specifying <literal>--option
+    substituters <replaceable>urls</replaceable></literal> on the
+    command line.  Unprivileged users are only allowed to pass a
+    subset of the URLs listed in <literal>substituters</literal> and
+    <literal>trusted-substituters</literal>.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry xml:id="conf-trusted-users"><term><literal>trusted-users</literal></term>
+
+    <listitem>
+
+      <para>A list of names of users (separated by whitespace) that
+      have additional rights when connecting to the Nix daemon, such
+      as the ability to specify additional binary caches, or to import
+      unsigned NARs. You can also specify groups by prefixing them
+      with <literal>@</literal>; for instance,
+      <literal>@wheel</literal> means all users in the
+      <literal>wheel</literal> group. The default is
+      <literal>root</literal>.</para>
+
+      <warning><para>Adding a user to <option>trusted-users</option>
+      is essentially equivalent to giving that user root access to the
+      system. For example, the user can set
+      <option>sandbox-paths</option> and thereby obtain read access to
+      directories that are otherwise inacessible to
+      them.</para></warning>
+
+    </listitem>
+
+  </varlistentry>
+
 
 </variablelist>
 
