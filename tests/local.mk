@@ -13,6 +13,7 @@ nix_tests = \
   check-reqs.sh pass-as-file.sh tarball.sh restricted.sh \
   placeholders.sh nix-shell.sh \
   linux-sandbox.sh \
+  build-dry.sh \
   build-remote.sh \
   nar-access.sh \
   structured-attrs.sh \

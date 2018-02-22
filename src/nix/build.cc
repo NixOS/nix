@@ -52,6 +52,8 @@ struct CmdBuild : MixDryRun, InstallablesCommand
     {
         auto buildables = build(store, dryRun ? DryRun : Build, installables);
 
+        if (dryRun) return;
+
         for (size_t i = 0; i < buildables.size(); ++i) {
             auto & b(buildables[i]);
 
