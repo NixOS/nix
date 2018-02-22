@@ -323,13 +323,12 @@
 
       <listitem>
         <para><command>nix sign-paths</command> signs store
-        paths. (TODO: add examples)</para>
+        paths.</para>
       </listitem>
 
       <listitem>
         <para><command>nix copy-sigs</command> copies signatures from
-        one store to another. (TODO: add examples and
-        tests)</para>
+        one store to another.</para>
       </listitem>
 
       <listitem>
@@ -460,7 +459,7 @@
         secret keys specified by the <option>secret-key-files</option>
         store option. Secret/public key pairs can be generated using
         <command>nix-store
-        --generate-binary-cache-key</command>. (TODO: rename)</para>
+        --generate-binary-cache-key</command>.</para>
 
         <para>In addition, locally-built store paths are marked as
         “ultimately trusted”, but this bit is not propagated when
@@ -723,8 +722,7 @@ configureFlags = "--prefix=${placeholder "out"} --includedir=${placeholder "dev"
 
     will cause the <envar>configureFlags</envar> environment variable
     to contain the actual store paths corresponding to the
-    <literal>out</literal> and <literal>dev</literal> outputs. TODO:
-    add docs.</para>
+    <literal>out</literal> and <literal>dev</literal> outputs.</para>
   </listitem>
 
 </itemizedlist>
