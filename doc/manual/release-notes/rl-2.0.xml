@@ -810,10 +810,6 @@ configureFlags = "--prefix=${placeholder "out"} --includedir=${placeholder "dev"
 <itemizedlist>
 
   <listitem>
-    <para>Sandbox builds are now enabled by default on Linux.</para>
-  </listitem>
-
-  <listitem>
     <para>Values such as Booleans, integers, (nested) lists and
     attribute sets can <link
     xlink:href="https://github.com/NixOS/nix/commit/6de33a9c675b187437a2e1abbcb290981a89ecb1">now</link>

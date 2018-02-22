@@ -220,13 +220,7 @@ public:
     Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation",
         "Whether builtin functions that allow executing native code should be enabled."};
 
-    Setting<SandboxMode> sandboxMode{this,
-        #if __linux__
-          smEnabled
-        #else
-          smDisabled
-        #endif
-        , "sandbox",
+    Setting<SandboxMode> sandboxMode{this, smDisabled, "sandbox",
         "Whether to enable sandboxed builds. Can be \"true\", \"false\" or \"relaxed\".",
         {"build-use-chroot", "build-use-sandbox"}};
 
