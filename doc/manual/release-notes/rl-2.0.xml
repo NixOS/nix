@@ -42,7 +42,7 @@
     <para>The command <command>nix-push</command> has been removed as
     part of the effort to eliminate Nix's dependency on Perl. You can
     use <command>nix copy</command> instead, e.g. <literal>nix copy
-    --to /tmp/my-binary-cache <replaceable>paths…</replaceable></literal></para>
+    --to file:///tmp/my-binary-cache <replaceable>paths…</replaceable></literal></para>
   </listitem>
 
   <listitem>
