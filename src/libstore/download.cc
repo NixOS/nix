@@ -717,7 +717,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
             Path tmpDir = createTempDir();
             AutoDelete autoDelete(tmpDir, true);
             // FIXME: this requires GNU tar for decompression.
-            runProgram("tar", true, {"xf", storePath, "-C", tmpDir, "--strip-components", "1"});
+            runProgram("tar", true, {"xf", store->toRealPath(storePath), "-C", tmpDir, "--strip-components", "1"});
             unpackedStorePath = store->addToStore(name, tmpDir, true, htSHA256, defaultPathFilter, NoRepair);
         }
         replaceSymlink(unpackedStorePath, unpackedLink);
@@ -727,7 +727,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
     if (expectedStorePath != "" && storePath != expectedStorePath)
         throw nix::Error("store path mismatch in file downloaded from '%s'", url);
 
-    return storePath;
+    return store->toRealPath(storePath);
 }
 
 
