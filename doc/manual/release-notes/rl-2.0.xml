@@ -35,7 +35,7 @@
     available paths from the installation medium. The replacement is
     to use a chroot store as a substituter
     (e.g. <literal>--substituters /mnt</literal>), or to build into a
-    chroot store (e.g. <literal>--store /mnt --substituter /</literal>).</para>
+    chroot store (e.g. <literal>--store /mnt --substituters /</literal>).</para>
   </listitem>
 
   <listitem>
