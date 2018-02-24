@@ -536,7 +536,7 @@
     xlink:href="https://github.com/NixOS/nix/commit/8bdf83f936adae6f2c907a6d2541e80d4120f051">no
     longer</link> a fatal error if build rounds produce different
     output. Also, a hook named <option>diff-hook</option> is <link
-    xlink:href="https://github.com/NixOS/nix/commit/9a313469a4bdea2d1e8df24d16289dc2a172a169w">provided</link>
+    xlink:href="https://github.com/NixOS/nix/commit/9a313469a4bdea2d1e8df24d16289dc2a172a169">provided</link>
     to allow you to run tools such as <command>diffoscope</command>
     when build rounds produce different output.</para>
   </listitem>
