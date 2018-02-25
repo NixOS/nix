@@ -85,6 +85,7 @@ static Expr * unescapeStr(SymbolTable & symbols, const char * s, size_t length)
 %}
 
 
+ANY         .|\n
 ID          [a-zA-Z\_][a-zA-Z0-9\_\'\-]*
 INT         [0-9]+
 FLOAT       (([1-9][0-9]*\.[0-9]*)|(0?\.[0-9]+))([Ee][+-]?[0-9]+)?
@@ -146,8 +147,8 @@ or          { return OR_KW; }
 <INITIAL,INSIDE_DOLLAR_CURLY>\" {
                 PUSH_STATE(STRING); return '"';
               }
-<STRING>([^\$\"\\]|\$[^\{\"\\]|\\.|\$\\.)*\$/\" |
-<STRING>([^\$\"\\]|\$[^\{\"\\]|\\.|\$\\.)+ {
+<STRING>([^\$\"\\]|\$[^\{\"\\]|\\{ANY}|\$\\{ANY})*\$/\" |
+<STRING>([^\$\"\\]|\$[^\{\"\\]|\\{ANY}|\$\\{ANY})+ {
                 /* It is impossible to match strings ending with '$' with one
                    regex because trailing contexts are only valid at the end
                    of a rule. (A sane but undocumented limitation.) */
@@ -178,7 +179,7 @@ or          { return OR_KW; }
                    yylval->e = new ExprIndStr("''");
                    return IND_STR;
                  }
-<IND_STRING>\'\'\\. {
+<IND_STRING>\'\'\\{ANY} {
                    yylval->e = unescapeStr(data->symbols, yytext + 2, yyleng - 2);
                    return IND_STR;
                  }
@@ -208,7 +209,7 @@ or          { return OR_KW; }
 \#[^\r\n]*    /* single-line comments */
 \/\*([^*]|\*+[^*/])*\*+\/  /* long comments */
 
-.           return yytext[0];
+{ANY}           return yytext[0];
 
 }
 
