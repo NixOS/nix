@@ -78,6 +78,11 @@ struct CmdSearch : SourceExprCommand, MixJSON
     {
         settings.readOnlyMode = true;
 
+        // Empty search string should match all packages
+        // Use "^" here instead of ".*" due to differences in resulting highlighting
+        // (see #1893 -- libc++ claims empty search string is not in POSIX grammar)
+        if (re.empty()) re = "^";
+
         std::regex regex(re, std::regex::extended | std::regex::icase);
 
         auto state = getEvalState();
