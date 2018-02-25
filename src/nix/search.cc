@@ -237,7 +237,7 @@ struct CmdSearch : SourceExprCommand, MixJSON
                     throw Error("error writing to %s", tmpFile);
             }
 
-            if (rename(tmpFile.c_str(), jsonCacheFileName.c_str()) == -1)
+            if (writeCache && rename(tmpFile.c_str(), jsonCacheFileName.c_str()) == -1)
                 throw SysError("cannot rename '%s' to '%s'", tmpFile, jsonCacheFileName);
         }
     }
