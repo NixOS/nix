@@ -16,8 +16,6 @@ using namespace nix;
 
 std::string chrootHelperName = "__run_in_chroot";
 
-extern char * * environ;
-
 struct CmdRun : InstallablesCommand
 {
     std::vector<std::string> command = { "bash" };
@@ -109,7 +107,7 @@ struct CmdRun : InstallablesCommand
                 if (s) kept[var] = s;
             }
 
-            environ = nullptr;
+            clearEnv();
 
             for (auto & var : kept)
                 setenv(var.first.c_str(), var.second.c_str(), 1);

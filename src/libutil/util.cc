@@ -73,6 +73,13 @@ std::map<std::string, std::string> getEnv()
 }
 
 
+void clearEnv()
+{
+    for (auto & name : getEnv())
+        unsetenv(name.first.c_str());
+}
+
+
 Path absPath(Path path, Path dir)
 {
     if (path[0] != '/') {
