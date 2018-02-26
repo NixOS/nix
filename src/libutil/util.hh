@@ -32,6 +32,9 @@ string getEnv(const string & key, const string & def = "");
 /* Get the entire environment. */
 std::map<std::string, std::string> getEnv();
 
+/* Clear the environment. */
+void clearEnv();
+
 /* Return an absolutized path, resolving paths relative to the
    specified directory, or the current directory otherwise.  The path
    is also canonicalised. */
