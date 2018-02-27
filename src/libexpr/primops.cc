@@ -1913,21 +1913,32 @@ static void prim_replaceStrings(EvalState & state, const Pos & pos, Value * * ar
     auto s = state.forceString(*args[2], context, pos);
 
     string res;
-    for (size_t p = 0; p < s.size(); ) {
+    // Loops one past last character to handle the case where 'from' contains an empty string.
+    for (size_t p = 0; p <= s.size(); ) {
         bool found = false;
         auto i = from.begin();
         auto j = to.begin();
         for (; i != from.end(); ++i, ++j)
             if (s.compare(p, i->size(), *i) == 0) {
                 found = true;
-                p += i->size();
                 res += j->first;
+                if (i->empty()) {
+                    if (p < s.size())
+                        res += s[p];
+                    p++;
+                } else {
+                    p += i->size();
+                }
                 for (auto& path : j->second)
                     context.insert(path);
                 j->second.clear();
                 break;
             }
-        if (!found) res += s[p++];
+        if (!found) {
+            if (p < s.size())
+                res += s[p];
+            p++;
+        }
     }
 
     mkString(v, res, context);
