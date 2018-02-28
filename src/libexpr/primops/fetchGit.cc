@@ -79,7 +79,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         ref = "HEAD"s;
     }
 
-    if (!ref) ref = "master"s;
+    if (!ref) ref = "HEAD"s;
 
     if (rev != "" && !std::regex_match(rev, revRegex))
         throw Error("invalid Git revision '%s'", rev);
