@@ -2236,7 +2236,7 @@ void EvalState::createBaseEnv()
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
-    string path = settings.nixDataDir + "/nix/corepkgs/derivation.nix";
+    string path = canonPath(settings.nixDataDir + "/nix/corepkgs/derivation.nix", true);
     sDerivationNix = symbols.create(path);
     evalFile(path, v);
     addConstant("derivation", v);
