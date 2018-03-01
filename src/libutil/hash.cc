@@ -256,12 +256,12 @@ Hash hashFile(HashType ht, const Path & path)
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
     if (!fd) throw SysError(format("opening file '%1%'") % path);
 
-    unsigned char buf[8192];
+    std::vector<unsigned char> buf(8192);
     ssize_t n;
-    while ((n = read(fd.get(), buf, sizeof(buf)))) {
+    while ((n = read(fd.get(), buf.data(), buf.size()))) {
         checkInterrupt();
         if (n == -1) throw SysError(format("reading file '%1%'") % path);
-        update(ht, ctx, buf, n);
+        update(ht, ctx, buf.data(), n);
     }
 
     finish(ht, ctx, hash.hash);

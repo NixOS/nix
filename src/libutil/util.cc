@@ -229,16 +229,17 @@ bool pathExists(const Path & path)
 Path readLink(const Path & path)
 {
     checkInterrupt();
+    std::vector<char> buf;
     for (ssize_t bufSize = PATH_MAX/4; true; bufSize += bufSize/2) {
-        char buf[bufSize];
-        ssize_t rlSize = readlink(path.c_str(), buf, bufSize);
+        buf.resize(bufSize);
+        ssize_t rlSize = readlink(path.c_str(), buf.data(), bufSize);
         if (rlSize == -1)
             if (errno == EINVAL)
                 throw Error("'%1%' is not a symlink", path);
             else
                 throw SysError("reading symbolic link '%1%'", path);
         else if (rlSize < bufSize)
-            return string(buf, rlSize);
+            return string(buf.data(), rlSize);
     }
 }
 
@@ -293,10 +294,10 @@ string readFile(int fd)
     if (fstat(fd, &st) == -1)
         throw SysError("statting file");
 
-    auto buf = std::make_unique<unsigned char[]>(st.st_size);
-    readFull(fd, buf.get(), st.st_size);
+    std::vector<unsigned char> buf(st.st_size);
+    readFull(fd, buf.data(), st.st_size);
 
-    return string((char *) buf.get(), st.st_size);
+    return string((char *) buf.data(), st.st_size);
 }
 
 
@@ -438,10 +439,10 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
 static Lazy<Path> getHome2([]() {
     Path homeDir = getEnv("HOME");
     if (homeDir.empty()) {
-        char buf[16384];
+        std::vector<char> buf(16384);
         struct passwd pwbuf;
         struct passwd * pw;
-        if (getpwuid_r(getuid(), &pwbuf, buf, sizeof(buf), &pw) != 0
+        if (getpwuid_r(getuid(), &pwbuf, buf.data(), buf.size(), &pw) != 0
             || !pw || !pw->pw_dir || !pw->pw_dir[0])
             throw Error("cannot determine user's home directory");
         homeDir = pw->pw_dir;
@@ -569,16 +570,16 @@ void writeFull(int fd, const string & s, bool allowInterrupts)
 string drainFD(int fd)
 {
     string result;
-    unsigned char buffer[4096];
+    std::vector<unsigned char> buffer(4096);
     while (1) {
         checkInterrupt();
-        ssize_t rd = read(fd, buffer, sizeof buffer);
+        ssize_t rd = read(fd, buffer.data(), buffer.size());
         if (rd == -1) {
             if (errno != EINTR)
                 throw SysError("reading from file");
         }
         else if (rd == 0) break;
-        else result.append((char *) buffer, rd);
+        else result.append((char *) buffer.data(), rd);
     }
     return result;
 }
