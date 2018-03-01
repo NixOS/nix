@@ -33,10 +33,6 @@ clearCache
 ## Search expressions
 
 # Check that empty search string matches all
-EMPTY=$(nix search)
-BOL=$(nix search "^")
-ALL=$(nix search ".*")
-
-diff <(printf "%s" $EMPTY) <(printf "%s" $BOL)
-# "ALL" highlights differently, not sure preferred behavior
-# diff <(printf "%s" $EMPTY) <(printf "%s" $ALL)
+nix search|grep -q foo
+nix search|grep -q bar
+nix search|grep -q hello
