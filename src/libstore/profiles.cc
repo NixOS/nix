@@ -160,19 +160,24 @@ void deleteGenerations(const Path & profile, const std::set<unsigned int> & gens
 void deleteGenerationsGreaterThan(const Path & profile, int max, bool dryRun)
 {
     PathLocks lock;
-
     lockProfile(lock, profile);
 
     int curGen;
+    bool fromCurGen = false;
     Generations gens = findGenerations(profile, curGen);
-
     for (auto i = gens.rbegin(); i != gens.rend(); ++i) {
-        if (max) {
+        if (i->number == curGen) {
+            fromCurGen = true;
             max--;
             continue;
         }
-        if (i->number != curGen)
+        if (fromCurGen) {
+            if (max) {
+                max--;
+                continue;
+            }
             deleteGeneration2(profile, i->number, dryRun);
+        }
     }
 }
 
