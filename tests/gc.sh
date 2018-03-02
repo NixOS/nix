@@ -34,6 +34,14 @@ if test -e $drvPath; then false; fi
 
 rm "$NIX_STATE_DIR"/gcroots/foo
 
+coproc nix keep-paths
+echo "$outPath" >&${COPROC[1]}
+read <&${COPROC[0]}
+if nix-store --delete $outPath; then false; fi
+test -e $outPath
+exec {COPROC[1]}>&- {COPROC[0]}<&-
+wait $COPROC_pid
+
 nix-collect-garbage
 
 # Check that the output has been GC'd.
