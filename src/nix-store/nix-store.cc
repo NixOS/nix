@@ -631,6 +631,7 @@ static void opDump(Strings opFlags, Strings opArgs)
     FdSink sink(STDOUT_FILENO);
     string path = *opArgs.begin();
     dumpPath(path, sink);
+    sink.flush();
 }
 
 
@@ -656,6 +657,7 @@ static void opExport(Strings opFlags, Strings opArgs)
 
     FdSink sink(STDOUT_FILENO);
     store->exportPaths(opArgs, sink);
+    sink.flush();
 }
 
 

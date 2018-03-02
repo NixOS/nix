@@ -67,7 +67,8 @@ void FdSink::write(const unsigned char * data, size_t len)
     try {
         writeFull(fd, data, len);
     } catch (SysError & e) {
-        _good = true;
+        _good = false;
+        throw;
     }
 }
 

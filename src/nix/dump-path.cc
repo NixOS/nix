@@ -29,6 +29,7 @@ struct CmdDumpPath : StorePathCommand
     {
         FdSink sink(STDOUT_FILENO);
         store->narFromPath(storePath, sink);
+        sink.flush();
     }
 };
 
