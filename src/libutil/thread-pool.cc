@@ -3,6 +3,8 @@
 
 namespace nix {
 
+void ThreadPoolShutDown::anchor() {}
+
 ThreadPool::ThreadPool(size_t _maxThreads)
     : maxThreads(_maxThreads)
 {

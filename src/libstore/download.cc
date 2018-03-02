@@ -29,6 +29,8 @@ using namespace std::string_literals;
 
 namespace nix {
 
+void DownloadError::anchor() {}
+
 double getTime()
 {
     struct timeval tv;

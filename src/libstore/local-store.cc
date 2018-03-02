@@ -39,6 +39,7 @@
 
 namespace nix {
 
+void PathInUse::anchor() {}
 
 LocalStore::LocalStore(const Params & params)
     : Store(params)

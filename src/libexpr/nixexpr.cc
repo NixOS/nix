@@ -7,6 +7,16 @@
 
 namespace nix {
 
+// anchor vtables
+void EvalError::anchor() {}
+void ParseError::anchor() {}
+void IncompleteParseError::anchor() {}
+void AssertionError::anchor() {}
+void ThrownError::anchor() {}
+void Abort::anchor() {}
+void TypeError::anchor() {}
+void UndefinedVarError::anchor() {}
+void RestrictedPathError::anchor() {}
 
 /* Displaying abstract syntax trees. */
 

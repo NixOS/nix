@@ -12,6 +12,10 @@
 
 namespace nix {
 
+void SubstError::anchor() {}
+void BuildError::anchor() {}
+void InvalidPath::anchor() {}
+void Unsupported::anchor() {}
 
 bool Store::isInStore(const Path & path) const
 {

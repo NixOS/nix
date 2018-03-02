@@ -4,6 +4,7 @@
 
 namespace nix {
 
+void JSONParseError::anchor() {}
 
 static void skipWhitespace(const char * & s)
 {

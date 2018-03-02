@@ -33,6 +33,9 @@ static void decompressNone(Source & source, Sink & sink)
     }
 }
 
+void UnknownCompressionMethod::anchor() {}
+void CompressionError::anchor() {}
+
 static void decompressXZ(Source & source, Sink & sink)
 {
     lzma_stream strm(LZMA_STREAM_INIT);
