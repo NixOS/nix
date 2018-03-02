@@ -159,7 +159,6 @@ void deleteGenerations(const Path & profile, const std::set<unsigned int> & gens
 
 void deleteGenerationsGreaterThan(const Path & profile, int max, bool dryRun)
 {
-    int max_keep = 0;
     PathLocks lock;
 
     lockProfile(lock, profile);
@@ -172,7 +171,8 @@ void deleteGenerationsGreaterThan(const Path & profile, int max, bool dryRun)
             max--;
             continue;
         }
-        deleteGeneration2(profile, i->number, dryRun);
+        if (i->number != curGen)
+            deleteGeneration2(profile, i->number, dryRun);
     }
 }
 
