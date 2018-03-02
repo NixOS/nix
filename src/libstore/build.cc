@@ -4154,9 +4154,9 @@ void Worker::waitForInput()
         assert(goal);
 
         set<int> fds2(j->fds);
+        std::vector<unsigned char> buffer(4096);
         for (auto & k : fds2) {
             if (FD_ISSET(k, &fds)) {
-                std::vector<unsigned char> buffer(4096);
                 ssize_t rd = read(k, buffer.data(), buffer.size());
                 if (rd == -1) {
                     if (errno != EINTR)
