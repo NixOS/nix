@@ -1395,7 +1395,7 @@ void ExprInclude::eval(EvalState & state, Env & env, Value & v)
     auto realPath = state.checkSourcePath(
         state.toRealPath(state.coerceToPath(pos, vPath, context), context));
 
-    printError("including file '%1%'", realPath);
+    printTalkative("including file '%1%'", realPath);
 
     auto e = state.parseExprFromFile(resolveExprPath(realPath), *staticEnv);
 
