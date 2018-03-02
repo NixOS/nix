@@ -82,14 +82,14 @@ struct CmdSearch : SourceExprCommand, MixJSON
 
         auto state = getEvalState();
 
-        bool first = true;
-
         auto jsonOut = json ? std::make_unique<JSONObject>(std::cout) : nullptr;
 
         auto sToplevel = state->symbols.create("_toplevel");
         auto sRecurse = state->symbols.create("recurseForDerivations");
 
         bool fromCache = false;
+
+        std::map<std::string, std::string> results;
 
         std::function<void(Value *, std::string, bool, JSONObject *)> doExpr;
 
@@ -138,10 +138,7 @@ struct CmdSearch : SourceExprCommand, MixJSON
                             jsonElem.attr("description", description);
 
                         } else {
-                            if (!first) std::cout << "\n";
-                            first = false;
-
-                            std::cout << fmt(
+                            results[attrPath] = fmt(
                                 "Attribute name: %s\n"
                                 "Package name: %s\n"
                                 "Version: %s\n"
@@ -240,6 +237,9 @@ struct CmdSearch : SourceExprCommand, MixJSON
             if (rename(tmpFile.c_str(), jsonCacheFileName.c_str()) == -1)
                 throw SysError("cannot rename '%s' to '%s'", tmpFile, jsonCacheFileName);
         }
+
+        for (auto el : results) std::cout << el.second << "\n";
+
     }
 };
 
