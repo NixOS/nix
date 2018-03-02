@@ -191,6 +191,11 @@ void ExprPos::show(std::ostream & str)
     str << "__curPos";
 }
 
+void ExprInclude::show(std::ostream & str)
+{
+    str << "(include " << *path << ")";
+}
+
 
 std::ostream & operator << (std::ostream & str, const Pos & pos)
 {
@@ -400,6 +405,24 @@ void ExprConcatStrings::bindVars(const StaticEnv & env)
 
 void ExprPos::bindVars(const StaticEnv & env)
 {
+}
+
+void ExprInclude::bindVars(const StaticEnv & env)
+{
+    path->bindVars(env);
+
+    /* Copy the static environment so that ExprInclude::eval() can
+       pass it to parseExprFromFile(). FIXME: if there are many uses
+       of 'include' in the same scope, we should cache this. */
+
+    const StaticEnv * srcEnv = &env;
+    StaticEnv * * dstEnv = &staticEnv;
+
+    while (srcEnv) {
+        *dstEnv = new StaticEnv(*srcEnv);
+        srcEnv = srcEnv->up;
+        dstEnv = (StaticEnv * *) &(*dstEnv)->up;
+    }
 }
 
 

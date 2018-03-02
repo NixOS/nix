@@ -109,6 +109,7 @@ in          { return IN; }
 rec         { return REC; }
 inherit     { return INHERIT; }
 or          { return OR_KW; }
+include     { return INCLUDE; }
 \.\.\.      { return ELLIPSIS; }
 
 \=\=        { return EQ; }

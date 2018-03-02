@@ -1386,6 +1386,23 @@ void ExprPos::eval(EvalState & state, Env & env, Value & v)
 }
 
 
+void ExprInclude::eval(EvalState & state, Env & env, Value & v)
+{
+    Value vPath;
+    path->eval(state, env, vPath);
+
+    PathSet context;
+    auto realPath = state.checkSourcePath(
+        state.toRealPath(state.coerceToPath(pos, vPath, context), context));
+
+    printError("including file '%1%'", realPath);
+
+    auto e = state.parseExprFromFile(resolveExprPath(realPath), *staticEnv);
+
+    e->eval(state, env, v);
+}
+
+
 void EvalState::forceValueDeep(Value & v)
 {
     std::set<const Value *> seen;

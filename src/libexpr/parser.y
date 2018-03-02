@@ -270,7 +270,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %token <nf> FLOAT
 %token <path> PATH HPATH SPATH
 %token <uri> URI
-%token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL OR_KW
+%token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL OR_KW INCLUDE
 %token DOLLAR_CURLY /* == ${ */
 %token IND_STRING_OPEN IND_STRING_CLOSE
 %token ELLIPSIS
@@ -348,6 +348,7 @@ expr_app
   : expr_app expr_select
     { $$ = new ExprApp(CUR_POS, $1, $2); }
   | expr_select { $$ = $1; }
+  | INCLUDE expr_select { $$ = new ExprInclude(CUR_POS, $2); }
   ;
 
 expr_select
