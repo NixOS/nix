@@ -39,29 +39,36 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
 
         auto searchPath = state.getSearchPath();
 
-        state.mkAttrs(*vSourceExpr, searchPath.size() + 1);
+        std::unordered_set<std::string> pathAttrNames;
+        pathAttrNames.reserve(searchPath.size());
+        for (const auto & i : searchPath) {
+            if (i.first == "") {
+                DirEntries ents;
+                try {
+                    ents = readDirectory(i.second);
+                } catch (SysError & e) {
+                    if (e.errNo == ENOENT || e.errNo == ENOTDIR)
+                        continue;
+                    throw;
+                }
+                for (const auto & ent : ents) {
+                    pathAttrNames.insert(ent.name);
+                }
+            } else {
+                pathAttrNames.insert(i.first);
+            }
+        }
+
+        state.mkAttrs(*vSourceExpr, pathAttrNames.size() + 1);
 
         mkBool(*state.allocAttr(*vSourceExpr, sToplevel), true);
 
-        std::unordered_set<std::string> seen;
-
-        for (auto & i : searchPath) {
-            if (i.first == "") continue;
-            if (seen.count(i.first)) continue;
-            seen.insert(i.first);
-#if 0
-            auto res = state.resolveSearchPathElem(i);
-            if (!res.first) continue;
-            if (!pathExists(res.second)) continue;
-            mkApp(*state.allocAttr(*vSourceExpr, state.symbols.create(i.first)),
-                state.getBuiltin("import"),
-                mkString(*state.allocValue(), res.second));
-#endif
+        for (const auto & name : pathAttrNames) {
             Value * v1 = state.allocValue();
             mkPrimOpApp(*v1, state.getBuiltin("findFile"), state.getBuiltin("nixPath"));
             Value * v2 = state.allocValue();
-            mkApp(*v2, *v1, mkString(*state.allocValue(), i.first));
-            mkApp(*state.allocAttr(*vSourceExpr, state.symbols.create(i.first)),
+            mkApp(*v2, *v1, mkString(*state.allocValue(), name));
+            mkApp(*state.allocAttr(*vSourceExpr, state.symbols.create(name)),
                 state.getBuiltin("import"), *v2);
         }
 
