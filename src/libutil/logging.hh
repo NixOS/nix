@@ -94,8 +94,7 @@ struct Activity
 
     Activity(const Activity & act) = delete;
 
-    ~Activity()
-    { logger.stopActivity(id); }
+    ~Activity();
 
     void progress(uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) const
     { result(resProgress, done, expected, running, failed); }

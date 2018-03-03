@@ -221,4 +221,12 @@ bool handleJSONLogMessage(const std::string & msg,
     return true;
 }
 
+Activity::~Activity() {
+    try {
+        logger.stopActivity(id);
+    } catch (...) {
+        ignoreException();
+    }
+}
+
 }
