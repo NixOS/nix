@@ -1,0 +1,15 @@
+<section xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="ssec-relnotes-2.0.1">
+
+<title>Relase 2.0.1 (2018-03-05)</title>
+
+<para>
+  This release fixes a number of bugs found since the 2.0 release,
+  including fixing <literal>ssh-ng</literal> stores and macOS support
+  improvements.
+</para>
+
+</section>
