@@ -172,6 +172,9 @@ void RemoteStore::initConnection(Connection & conn)
 
 void RemoteStore::setOptions(Connection & conn)
 {
+    printMsg(lvlVomit, format("sending options to remote store, verbosity = '%1%'")
+        % verbosity);
+
     conn.to << wopSetOptions
        << settings.keepFailed
        << settings.keepGoing
@@ -188,9 +191,15 @@ void RemoteStore::setOptions(Connection & conn)
 
     if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 12) {
         auto overrides = settings.getSettings(true);
+        // Don't override the store uri on the remote side.
+        overrides.erase(settings.storeUri.name);
+
         conn.to << overrides.size();
-        for (auto & i : overrides)
+        for (auto & i : overrides) {
+            printMsg(lvlVomit, format("sending setting, %1% = '%2%'")
+                % i.first % i.second);
             conn.to << i.first << i.second;
+        }
     }
 
     conn.processStderr();
