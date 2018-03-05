@@ -62,7 +62,13 @@ public:
 
     void handleUnknownSettings();
 
-    StringMap getSettings(bool overridenOnly = false);
+    enum SettingsSubset {
+        all,
+        overriddenOnly,
+        forwardableOnly
+    };
+
+    StringMap getSettings(SettingsSubset subset = all);
 
     const Settings & _getSettings() { return _settings; }
 
@@ -84,6 +90,8 @@ public:
     const std::string name;
     const std::string description;
     const std::set<std::string> aliases;
+    /* Whether the setting should be forwarded to remote machines. */
+    const bool forwardable;
 
     int created = 123;
 
@@ -94,7 +102,8 @@ protected:
     AbstractSetting(
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases);
+        const std::set<std::string> & aliases,
+        bool forwardable = false);
 
     virtual ~AbstractSetting()
     {
@@ -127,8 +136,9 @@ public:
     BaseSetting(const T & def,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {})
-        : AbstractSetting(name, description, aliases)
+        const std::set<std::string> & aliases = {},
+        bool forwardable = false)
+        : AbstractSetting(name, description, aliases, forwardable)
         , value(def)
     { }
 
@@ -173,8 +183,9 @@ public:
         const T & def,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {})
-        : BaseSetting<T>(def, name, description, aliases)
+        const std::set<std::string> & aliases = {},
+        bool forwardable = false)
+        : BaseSetting<T>(def, name, description, aliases, forwardable)
     {
         options->addSetting(this);
     }
@@ -195,8 +206,9 @@ public:
         const Path & def,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {})
-        : BaseSetting<Path>(def, name, description, aliases)
+        const std::set<std::string> & aliases = {},
+        bool forwardable = false)
+        : BaseSetting<Path>(def, name, description, aliases, forwardable)
         , allowEmpty(allowEmpty)
     {
         options->addSetting(this);

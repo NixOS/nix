@@ -503,18 +503,26 @@ static void performOp(TunnelLogger * logger, ref<LocalStore> store,
     }
 
     case wopSetOptions: {
-        settings.keepFailed = readInt(from);
-        settings.keepGoing = readInt(from);
-        settings.tryFallback = readInt(from);
-        verbosity = (Verbosity) readInt(from);
-        settings.maxBuildJobs.assign(readInt(from));
-        settings.maxSilentTime = readInt(from);
-        readInt(from); // obsolete useBuildHook
-        settings.verboseBuild = lvlError == (Verbosity) readInt(from);
-        readInt(from); // obsolete logType
-        readInt(from); // obsolete printBuildTrace
-        settings.buildCores = readInt(from);
-        settings.useSubstitutes  = readInt(from);
+        bool remote = GET_PROTOCOL_MINOR(clientVersion) >= 21
+            ? readInt(from)
+            : false;
+        if (remote) {
+            verbosity = (Verbosity) readInt(from);
+            settings.verboseBuild = lvlError == (Verbosity) readInt(from);
+        } else {
+            settings.keepFailed = readInt(from);
+            settings.keepGoing = readInt(from);
+            settings.tryFallback = readInt(from);
+            verbosity = (Verbosity) readInt(from);
+            settings.maxBuildJobs.assign(readInt(from));
+            settings.maxSilentTime = readInt(from);
+            readInt(from); // obsolete useBuildHook
+            settings.verboseBuild = lvlError == (Verbosity) readInt(from);
+            readInt(from); // obsolete logType
+            readInt(from); // obsolete printBuildTrace
+            settings.buildCores = readInt(from);
+            settings.useSubstitutes  = readInt(from);
+        }
 
         StringMap overrides;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 12) {
@@ -554,7 +562,9 @@ static void performOp(TunnelLogger * logger, ref<LocalStore> store,
                     ;
                 else if (trusted
                     || name == settings.buildTimeout.name
-                    || name == settings.connectTimeout.name)
+                    || name == settings.connectTimeout.name
+                    || name == settings.tryFallback.name
+                    || name == settings.maxSilentTime.name)
                     settings.set(name, value);
                 else if (setSubstituters(settings.substituters))
                     ;

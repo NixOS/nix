@@ -95,11 +95,11 @@ public:
         "Whether to keep temporary directories of failed builds."};
 
     Setting<bool> keepGoing{this, false, "keep-going",
-        "Whether to keep building derivations when another build fails."};
+        "Whether to keep building derivations when another build fails.", {}, true};
 
     Setting<bool> tryFallback{this, false, "fallback",
         "Whether to fall back to building when substitution fails.",
-        {"build-fallback"}};
+        {"build-fallback"}, true};
 
     /* Whether to show build log output in real time. */
     bool verboseBuild = true;
@@ -129,11 +129,11 @@ public:
         "The maximum time in seconds that a builer can go without "
         "producing any output on stdout/stderr before it is killed. "
         "0 means infinity.",
-        {"build-max-silent-time"}};
+        {"build-max-silent-time"}, true};
 
     Setting<time_t> buildTimeout{this, 0, "timeout",
         "The maximum duration in seconds that a builder can run. "
-        "0 means infinity.", {"build-timeout"}};
+        "0 means infinity.", {"build-timeout"}, true};
 
     PathSetting buildHook{this, true, nixLibexecDir + "/nix/build-remote", "build-hook",
         "The path of the helper program that executes builds to remote machines."};
@@ -241,7 +241,7 @@ public:
 
     Setting<size_t> buildRepeat{this, 0, "repeat",
         "The number of times to repeat a build in order to verify determinism.",
-        {"build-repeat"}};
+        {"build-repeat"}, true};
 
 #if __linux__
     Setting<std::string> sandboxShmSize{this, "50%", "sandbox-dev-shm-size",
@@ -269,7 +269,7 @@ public:
         "specified on its command line."};
 
     Setting<bool> enforceDeterminism{this, true, "enforce-determinism",
-        "Whether to fail if repeated builds produce different output."};
+        "Whether to fail if repeated builds produce different output.", {}, true};
 
     Setting<Strings> trustedPublicKeys{this,
         {"cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="},
@@ -318,7 +318,8 @@ public:
         "Which users or groups are allowed to connect to the daemon."};
 
     Setting<bool> printMissing{this, true, "print-missing",
-        "Whether to print what paths need to be built or downloaded."};
+        "Whether to print what paths need to be built or downloaded.",
+        {}, true};
 
     Setting<std::string> preBuildHook{this,
 #if __APPLE__
@@ -360,7 +361,8 @@ public:
 #endif
 
     Setting<Strings> hashedMirrors{this, {"http://tarballs.nixos.org/"}, "hashed-mirrors",
-        "A list of servers used by builtins.fetchurl to fetch files by hash."};
+        "A list of servers used by builtins.fetchurl to fetch files by hash.",
+        {}, true};
 
     Setting<uint64_t> minFree{this, 0, "min-free",
         "Automatically run the garbage collector when free disk space drops below the specified amount."};
