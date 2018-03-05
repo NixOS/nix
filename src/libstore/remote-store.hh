@@ -122,11 +122,12 @@ protected:
 
     ref<Pool<Connection>> connections;
 
+    virtual void setOptions(Connection & conn);
+
 private:
 
     std::atomic_bool failed{false};
 
-    void setOptions(Connection & conn);
 };
 
 class UDSRemoteStore : public LocalFSStore, public RemoteStore
