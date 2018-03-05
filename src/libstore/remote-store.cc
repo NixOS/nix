@@ -40,7 +40,7 @@ template PathSet readStorePaths(Store & store, Source & from);
 template Paths readStorePaths(Store & store, Source & from);
 
 /* TODO: Separate these store impls into different files, give them better names */
-RemoteStore::RemoteStore(const Params & params)
+RemoteStore::RemoteStore(const Params & params, bool remoteSystem)
     : Store(params)
     , connections(make_ref<Pool<Connection>>(
             std::max(1, (int) maxConnections),
@@ -53,6 +53,7 @@ RemoteStore::RemoteStore(const Params & params)
                         std::chrono::steady_clock::now() - r->startTime).count() < maxConnectionAge;
             }
             ))
+    , remoteSystem{remoteSystem}
 {
 }
 
@@ -172,22 +173,38 @@ void RemoteStore::initConnection(Connection & conn)
 
 void RemoteStore::setOptions(Connection & conn)
 {
-    conn.to << wopSetOptions
-       << settings.keepFailed
-       << settings.keepGoing
-       << settings.tryFallback
-       << verbosity
-       << settings.maxBuildJobs
-       << settings.maxSilentTime
-       << true
-       << (settings.verboseBuild ? lvlError : lvlVomit)
-       << 0 // obsolete log type
-       << 0 /* obsolete print build trace */
-       << settings.buildCores
-       << settings.useSubstitutes;
+    conn.to << wopSetOptions;
+    bool remoteSystem;
+    if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 21) {
+        remoteSystem = this->remoteSystem;
+        conn.to << remoteSystem;
+    } else {
+        remoteSystem = false;
+    }
+    if (remoteSystem) {
+        conn.to
+           << verbosity
+           << (settings.verboseBuild ? lvlError : lvlVomit);
+    } else {
+        conn.to
+           << settings.keepFailed
+           << settings.keepGoing
+           << settings.tryFallback
+           << verbosity
+           << settings.maxBuildJobs
+           << settings.maxSilentTime
+           << true
+           << (settings.verboseBuild ? lvlError : lvlVomit)
+           << 0 // obsolete log type
+           << 0 /* obsolete print build trace */
+           << settings.buildCores
+           << settings.useSubstitutes;
+    }
 
     if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 12) {
-        auto overrides = settings.getSettings(true);
+        auto overrides = settings.getSettings(remoteSystem ?
+            forwardableOnly :
+            overriddenOnly);
         conn.to << overrides.size();
         for (auto & i : overrides)
             conn.to << i.first << i.second;

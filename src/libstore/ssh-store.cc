@@ -19,7 +19,7 @@ public:
 
     SSHStore(const std::string & host, const Params & params)
         : Store(params)
-        , RemoteStore(params)
+        , RemoteStore(params, true)
         , host(host)
         , master(
             host,

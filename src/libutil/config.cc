@@ -53,11 +53,17 @@ void Config::handleUnknownSettings()
         warn("unknown setting '%s'", s.first);
 }
 
-StringMap Config::getSettings(bool overridenOnly)
+StringMap Config::getSettings(SettingsSubset subset)
 {
     StringMap res;
+    auto predicate = subset == all ?
+        [](const Settings::value_type & it){ return true; } :
+        subset == overriddenOnly ?
+            [](const Settings::value_type & it){ return it.second.setting->overriden; } :
+            [](const Settings::value_type & it){ return it.second.setting->forwardable; };
+    Settings opts;
     for (auto & opt : _settings)
-        if (!opt.second.isAlias && (!overridenOnly || opt.second.setting->overriden))
+        if (predicate(opt))
             res.emplace(opt.first, opt.second.setting->to_string());
     return res;
 }
@@ -146,8 +152,9 @@ void Config::convertToArgs(Args & args, const std::string & category)
 AbstractSetting::AbstractSetting(
     const std::string & name,
     const std::string & description,
-    const std::set<std::string> & aliases)
-    : name(name), description(description), aliases(aliases)
+    const std::set<std::string> & aliases,
+    bool forwardable)
+    : name(name), description(description), aliases(aliases), forwardable(forwardable)
 {
 }
 

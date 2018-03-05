@@ -28,7 +28,7 @@ public:
     const Setting<unsigned int> maxConnectionAge{(Store*) this, std::numeric_limits<unsigned int>::max(),
             "max-connection-age", "number of seconds to reuse a connection"};
 
-    RemoteStore(const Params & params);
+    RemoteStore(const Params & params, bool remoteSystem = false);
 
     /* Implementations of abstract store API methods. */
 
@@ -127,6 +127,12 @@ private:
     std::atomic_bool failed{false};
 
     void setOptions(Connection & conn);
+
+    /* Whether the daemon is on a remote system.
+       Note that currently this overloads "the daemon doesn't share
+       our system nix.conf" and "we shouldn't pass non-forwardable
+       settings." */
+    const bool remoteSystem;
 };
 
 class UDSRemoteStore : public LocalFSStore, public RemoteStore
