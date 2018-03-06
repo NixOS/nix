@@ -59,7 +59,7 @@ static void makeSymlink(const Path & link, const Path & target)
 
     /* Create the new symlink. */
     Path tempLink = (format("%1%.tmp-%2%-%3%")
-        % link % getpid() % rand()).str();
+        % link % getpid() % random()).str();
     createSymlink(target, tempLink);
 
     /* Atomically replace the old one. */

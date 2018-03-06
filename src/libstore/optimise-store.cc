@@ -213,7 +213,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     MakeReadOnly makeReadOnly(mustToggle ? dirOf(path) : "");
 
     Path tempLink = (format("%1%/.tmp-link-%2%-%3%")
-        % realStoreDir % getpid() % rand()).str();
+        % realStoreDir % getpid() % random()).str();
 
     if (link(linkPath.c_str(), tempLink.c_str()) == -1) {
         if (errno == EMLINK) {
