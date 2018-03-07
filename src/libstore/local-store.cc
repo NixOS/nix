@@ -1215,7 +1215,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
                 /* Check the content hash (optionally - slow). */
                 printMsg(lvlTalkative, format("checking contents of '%1%'") % i);
-                HashResult current = hashPath(info->narHash.type, i);
+                HashResult current = hashPath(info->narHash.type, toRealPath(i));
 
                 if (info->narHash != nullHash && info->narHash != current.first) {
                     printError(format("path '%1%' was modified! "
