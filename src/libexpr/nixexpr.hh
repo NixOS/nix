@@ -283,12 +283,12 @@ struct ExprOpNot : Expr
 };
 
 #define MakeBinOp(name, s) \
-    struct Expr##name : Expr \
+    struct name : Expr \
     { \
         Pos pos; \
         Expr * e1, * e2; \
-        Expr##name(Expr * e1, Expr * e2) : e1(e1), e2(e2) { }; \
-        Expr##name(const Pos & pos, Expr * e1, Expr * e2) : pos(pos), e1(e1), e2(e2) { }; \
+        name(Expr * e1, Expr * e2) : e1(e1), e2(e2) { }; \
+        name(const Pos & pos, Expr * e1, Expr * e2) : pos(pos), e1(e1), e2(e2) { }; \
         void show(std::ostream & str) \
         { \
             str << "(" << *e1 << " " s " " << *e2 << ")";   \
@@ -300,14 +300,14 @@ struct ExprOpNot : Expr
         void eval(EvalState & state, Env & env, Value & v); \
     };
 
-MakeBinOp(App, "")
-MakeBinOp(OpEq, "==")
-MakeBinOp(OpNEq, "!=")
-MakeBinOp(OpAnd, "&&")
-MakeBinOp(OpOr, "||")
-MakeBinOp(OpImpl, "->")
-MakeBinOp(OpUpdate, "//")
-MakeBinOp(OpConcatLists, "++")
+MakeBinOp(ExprApp, "")
+MakeBinOp(ExprOpEq, "==")
+MakeBinOp(ExprOpNEq, "!=")
+MakeBinOp(ExprOpAnd, "&&")
+MakeBinOp(ExprOpOr, "||")
+MakeBinOp(ExprOpImpl, "->")
+MakeBinOp(ExprOpUpdate, "//")
+MakeBinOp(ExprOpConcatLists, "++")
 
 struct ExprConcatStrings : Expr
 {
