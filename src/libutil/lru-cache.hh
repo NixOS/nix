@@ -2,6 +2,7 @@
 
 #include <map>
 #include <list>
+#include <experimental/optional>
 
 namespace nix {
 
@@ -63,18 +64,17 @@ public:
 
     /* Look up an item in the cache. If it exists, it becomes the most
        recently used item. */
-    // FIXME: use boost::optional?
-    Value * get(const Key & key)
+    std::experimental::optional<Value> get(const Key & key)
     {
         auto i = data.find(key);
-        if (i == data.end()) return 0;
+        if (i == data.end()) return {};
 
         /* Move this item to the back of the LRU list. */
         lru.erase(i->second.first.it);
         auto j = lru.insert(lru.end(), i);
         i->second.first.it = j;
 
-        return &i->second.second;
+        return i->second.second;
     }
 
     size_t size()
