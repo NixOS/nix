@@ -22,7 +22,7 @@ struct DownloadRequest
     std::string mimeType;
 
     DownloadRequest(const std::string & uri)
-        : uri(uri), parentAct(curActivity) { }
+        : uri(uri), parentAct(getCurActivity()) { }
 };
 
 struct DownloadResult

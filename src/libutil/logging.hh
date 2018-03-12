@@ -77,7 +77,8 @@ public:
     virtual void result(ActivityId act, ResultType type, const Fields & fields) { };
 };
 
-extern thread_local ActivityId curActivity;
+ActivityId getCurActivity();
+void setCurActivity(const ActivityId activityId);
 
 struct Activity
 {
@@ -86,10 +87,10 @@ struct Activity
     const ActivityId id;
 
     Activity(Logger & logger, Verbosity lvl, ActivityType type, const std::string & s = "",
-        const Logger::Fields & fields = {}, ActivityId parent = curActivity);
+        const Logger::Fields & fields = {}, ActivityId parent = getCurActivity());
 
     Activity(Logger & logger, ActivityType type,
-        const Logger::Fields & fields = {}, ActivityId parent = curActivity)
+        const Logger::Fields & fields = {}, ActivityId parent = getCurActivity())
         : Activity(logger, lvlError, type, "", fields, parent) { };
 
     Activity(const Activity & act) = delete;
@@ -121,8 +122,8 @@ struct Activity
 struct PushActivity
 {
     const ActivityId prevAct;
-    PushActivity(ActivityId act) : prevAct(curActivity) { curActivity = act; }
-    ~PushActivity() { curActivity = prevAct; }
+    PushActivity(ActivityId act) : prevAct(getCurActivity()) { setCurActivity(act); }
+    ~PushActivity() { setCurActivity(prevAct); }
 };
 
 extern Logger * logger;
