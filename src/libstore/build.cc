@@ -1189,7 +1189,7 @@ void DerivationGoal::outputsSubstituted()
     for (auto & i : drv->inputSrcs) {
         if (worker.store.isValidPath(i)) continue;
         if (!settings.useSubstitutes)
-            throw Error(format("dependency of '%1%' of '%2%' does not exist, and substitution is disabled")
+            throw Error(format("dependency '%1%' of '%2%' does not exist, and substitution is disabled")
                 % i % drvPath);
         addWaitee(worker.makeSubstitutionGoal(i));
     }
