@@ -138,7 +138,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     gitInfo.rev = rev != "" ? rev : chomp(readFile(localRefFile));
     gitInfo.shortRev = std::string(gitInfo.rev, 0, 7);
 
-    printTalkative("using revision %s of repo '%s'", uri, gitInfo.rev);
+    printTalkative("using revision %s of repo '%s'", gitInfo.rev, uri);
 
     std::string storeLinkName = hashString(htSHA512, name + std::string("\0"s) + gitInfo.rev).to_string(Base32, false);
     Path storeLink = cacheDir + "/" + storeLinkName + ".link";
