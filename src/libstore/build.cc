@@ -156,7 +156,7 @@ public:
         abort();
     }
 
-    void trace(const format & f);
+    void trace(const FormatOrString & fs);
 
     string getName()
     {
@@ -417,9 +417,9 @@ void Goal::amDone(ExitCode result)
 }
 
 
-void Goal::trace(const format & f)
+void Goal::trace(const FormatOrString & fs)
 {
-    debug(format("%1%: %2%") % name % f);
+    debug("%1%: %2%", name, fs.s);
 }
 
 

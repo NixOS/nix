@@ -1,6 +1,5 @@
 makefiles = \
   local.mk \
-  src/boost/format/local.mk \
   src/libutil/local.mk \
   src/libstore/local.mk \
   src/libmain/local.mk \

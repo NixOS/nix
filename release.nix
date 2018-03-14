@@ -1,5 +1,5 @@
 { nix ? builtins.fetchGit ./.
-, nixpkgs ? builtins.fetchGit https://github.com/NixOS/nixpkgs.git
+, nixpkgs ? builtins.fetchGit { url = https://github.com/NixOS/nixpkgs.git; ref = "release-18.03"; }
 , officialRelease ? false
 , systems ? [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
 }:
@@ -71,6 +71,7 @@ let
           [ curl
             bzip2 xz brotli
             openssl pkgconfig sqlite boehmgc
+            boost
 
             # Tests
             git
@@ -192,7 +193,7 @@ let
 
         doInstallCheck = true;
 
-        lcovFilter = [ "*/boost/*" "*-tab.*" "*/nlohmann/*" "*/linenoise/*" ];
+        lcovFilter = [ "*-tab.*" "*/nlohmann/*" "*/linenoise/*" ];
 
         # We call `dot', and even though we just use it to
         # syntax-check generated dot files, it still requires some

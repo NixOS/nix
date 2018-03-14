@@ -7,7 +7,7 @@
 
 namespace nix {
 
-[[noreturn]] void throwSQLiteError(sqlite3 * db, const format & f)
+[[noreturn]] void throwSQLiteError(sqlite3 * db, const FormatOrString & fs)
 {
     int err = sqlite3_errcode(db);
 
@@ -21,7 +21,7 @@ namespace nix {
             : fmt("SQLite database '%s' is busy", path));
     }
     else
-        throw SQLiteError("%s: %s (in '%s')", f.str(), sqlite3_errstr(err), path);
+        throw SQLiteError("%s: %s (in '%s')", fs.s, sqlite3_errstr(err), path);
 }
 
 SQLite::SQLite(const Path & path)

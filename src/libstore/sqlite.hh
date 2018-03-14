@@ -93,7 +93,7 @@ struct SQLiteTxn
 MakeError(SQLiteError, Error);
 MakeError(SQLiteBusy, SQLiteError);
 
-[[noreturn]] void throwSQLiteError(sqlite3 * db, const format & f);
+[[noreturn]] void throwSQLiteError(sqlite3 * db, const FormatOrString & fs);
 
 void handleSQLiteBusy(const SQLiteBusy & e);
 

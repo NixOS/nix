@@ -1,6 +1,6 @@
 { useClang ? false }:
 
-with import <nixpkgs> {};
+with import (builtins.fetchGit { url = https://github.com/NixOS/nixpkgs.git; ref = "release-18.03"; }) {};
 
 with import ./release-common.nix { inherit pkgs; };
 
@@ -18,6 +18,7 @@ with import ./release-common.nix { inherit pkgs; };
         customMemoryManagement = false;
       })
       autoreconfHook
+      boost
 
       # For nix-perl
       perl
