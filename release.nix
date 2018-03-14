@@ -14,6 +14,8 @@ let
     tarball =
       with pkgs;
 
+      with import ./release-common.nix { inherit pkgs; };
+
       releaseTools.sourceTarball {
         name = "nix-tarball";
         version = builtins.readFile ./version;
@@ -21,13 +23,7 @@ let
         src = nix;
         inherit officialRelease;
 
-        buildInputs =
-          [ curl bison flex libxml2 libxslt
-            bzip2 xz brotli
-            pkgconfig sqlite libsodium boehmgc
-            docbook5 docbook5_xsl
-            autoconf-archive
-          ] ++ lib.optional stdenv.isLinux libseccomp;
+        buildInputs = tarballDeps ++ buildDeps;
 
         configureFlags = "--enable-gc";
 
@@ -67,23 +63,7 @@ let
         name = "nix";
         src = tarball;
 
-        buildInputs =
-          [ curl
-            bzip2 xz brotli
-            openssl pkgconfig sqlite boehmgc
-            boost
-
-            # Tests
-            git
-            mercurial
-          ]
-          ++ lib.optional stdenv.isLinux libseccomp
-          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
-          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin)
-            (aws-sdk-cpp.override {
-              apis = ["s3"];
-              customMemoryManagement = false;
-            });
+        buildInputs = buildDeps;
 
         configureFlags = configureFlags ++
           [ "--sysconfdir=/etc" ];

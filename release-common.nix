@@ -1,9 +1,11 @@
 { pkgs }:
 
+with pkgs;
+
 rec {
   # Use "busybox-sandbox-shell" if present,
   # if not (legacy) fallback and hope it's sufficient.
-  sh = pkgs.busybox-sandbox-shell or (pkgs.busybox.override {
+  sh = pkgs.busybox-sandbox-shell or (busybox.override {
     useMusl = true;
     enableStatic = true;
     enableMinimal = true;
@@ -30,7 +32,41 @@ rec {
   configureFlags =
     [ "--disable-init-state"
       "--enable-gc"
-    ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
+    ] ++ lib.optionals stdenv.isLinux [
       "--with-sandbox-shell=${sh}/bin/busybox"
+    ];
+
+  tarballDeps =
+    [ bison
+      flex
+      libxml2
+      libxslt
+      docbook5
+      docbook5_xsl
+      autoconf-archive
+      autoreconfHook
+    ];
+
+  buildDeps =
+    [ curl
+      bzip2 xz brotli
+      openssl pkgconfig sqlite boehmgc
+      boost
+
+      # Tests
+      git
+      mercurial
+    ]
+    ++ lib.optional stdenv.isLinux libseccomp
+    ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
+    ++ lib.optional (stdenv.isLinux || stdenv.isDarwin)
+      (aws-sdk-cpp.override {
+        apis = ["s3"];
+        customMemoryManagement = false;
+      });
+
+  perlDeps =
+    [ perl
+      perlPackages.DBDSQLite
     ];
 }
