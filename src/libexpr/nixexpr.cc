@@ -10,7 +10,7 @@ namespace nix {
 
 /* Displaying abstract syntax trees. */
 
-std::ostream & operator << (std::ostream & str, Expr & e)
+std::ostream & operator << (std::ostream & str, const Expr & e)
 {
     e.show(str);
     return str;
@@ -58,48 +58,48 @@ std::ostream & operator << (std::ostream & str, const Symbol & sym)
     return str;
 }
 
-void Expr::show(std::ostream & str)
+void Expr::show(std::ostream & str) const
 {
     abort();
 }
 
-void ExprInt::show(std::ostream & str)
+void ExprInt::show(std::ostream & str) const
 {
     str << n;
 }
 
-void ExprFloat::show(std::ostream & str)
+void ExprFloat::show(std::ostream & str) const
 {
     str << nf;
 }
 
-void ExprString::show(std::ostream & str)
+void ExprString::show(std::ostream & str) const
 {
     showString(str, s);
 }
 
-void ExprPath::show(std::ostream & str)
+void ExprPath::show(std::ostream & str) const
 {
     str << s;
 }
 
-void ExprVar::show(std::ostream & str)
+void ExprVar::show(std::ostream & str) const
 {
     str << name;
 }
 
-void ExprSelect::show(std::ostream & str)
+void ExprSelect::show(std::ostream & str) const
 {
     str << "(" << *e << ")." << showAttrPath(attrPath);
     if (def) str << " or (" << *def << ")";
 }
 
-void ExprOpHasAttr::show(std::ostream & str)
+void ExprOpHasAttr::show(std::ostream & str) const
 {
     str << "((" << *e << ") ? " << showAttrPath(attrPath) << ")";
 }
 
-void ExprAttrs::show(std::ostream & str)
+void ExprAttrs::show(std::ostream & str) const
 {
     if (recursive) str << "rec ";
     str << "{ ";
@@ -113,7 +113,7 @@ void ExprAttrs::show(std::ostream & str)
     str << "}";
 }
 
-void ExprList::show(std::ostream & str)
+void ExprList::show(std::ostream & str) const
 {
     str << "[ ";
     for (auto & i : elems)
@@ -121,7 +121,7 @@ void ExprList::show(std::ostream & str)
     str << "]";
 }
 
-void ExprLambda::show(std::ostream & str)
+void ExprLambda::show(std::ostream & str) const
 {
     str << "(";
     if (matchAttrs) {
@@ -143,7 +143,7 @@ void ExprLambda::show(std::ostream & str)
     str << ": " << *body << ")";
 }
 
-void ExprLet::show(std::ostream & str)
+void ExprLet::show(std::ostream & str) const
 {
     str << "(let ";
     for (auto & i : attrs->attrs)
@@ -155,27 +155,27 @@ void ExprLet::show(std::ostream & str)
     str << "in " << *body << ")";
 }
 
-void ExprWith::show(std::ostream & str)
+void ExprWith::show(std::ostream & str) const
 {
     str << "(with " << *attrs << "; " << *body << ")";
 }
 
-void ExprIf::show(std::ostream & str)
+void ExprIf::show(std::ostream & str) const
 {
     str << "(if " << *cond << " then " << *then << " else " << *else_ << ")";
 }
 
-void ExprAssert::show(std::ostream & str)
+void ExprAssert::show(std::ostream & str) const
 {
     str << "assert " << *cond << "; " << *body;
 }
 
-void ExprOpNot::show(std::ostream & str)
+void ExprOpNot::show(std::ostream & str) const
 {
     str << "(! " << *e << ")";
 }
 
-void ExprConcatStrings::show(std::ostream & str)
+void ExprConcatStrings::show(std::ostream & str) const
 {
     bool first = true;
     str << "(";
@@ -186,7 +186,7 @@ void ExprConcatStrings::show(std::ostream & str)
     str << ")";
 }
 
-void ExprPos::show(std::ostream & str)
+void ExprPos::show(std::ostream & str) const
 {
     str << "__curPos";
 }
