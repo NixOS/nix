@@ -6,7 +6,16 @@
 
 namespace nix {
 
-thread_local ActivityId curActivity = 0;
+static thread_local ActivityId curActivity = 0;
+
+ActivityId getCurActivity()
+{
+    return curActivity;
+}
+void setCurActivity(const ActivityId activityId)
+{
+    curActivity = activityId;
+}
 
 Logger * logger = makeDefaultLogger();
 
