@@ -1185,7 +1185,7 @@ void ignoreException()
 }
 
 
-std::string filterANSIEscapes(const std::string & s, unsigned int width)
+std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned int width)
 {
     std::string t, e;
     size_t w = 0;
@@ -1210,7 +1210,7 @@ std::string filterANSIEscapes(const std::string & s, unsigned int width)
                 if (i != s.end() && *i >= 0x40 && *i <= 0x5f) e += *i++;
             }
 
-            if (last == 'm')
+            if (!filterAll && last == 'm')
                 t += e;
         }
 

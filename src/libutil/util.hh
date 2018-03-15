@@ -391,11 +391,13 @@ void ignoreException();
 #define ANSI_BLUE "\e[34;1m"
 
 
-/* Truncate a string to 'width' printable characters. Certain ANSI
-   escape sequences (such as colour setting) are copied but not
-   included in the character count. Other ANSI escape sequences are
-   filtered. Also, tabs are expanded to spaces. */
+/* Truncate a string to 'width' printable characters. If 'filterAll'
+   is true, all ANSI escape sequences are filtered out. Otherwise,
+   some escape sequences (such as colour setting) are copied but not
+   included in the character count. Also, tabs are expanded to
+   spaces. */
 std::string filterANSIEscapes(const std::string & s,
+    bool filterAll = false,
     unsigned int width = std::numeric_limits<unsigned int>::max());
 
 
