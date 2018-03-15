@@ -53,7 +53,7 @@ public:
             prefix = std::string("<") + c + ">";
         }
 
-        writeToStderr(prefix + filterANSIEscapes(fs.s) + "\n");
+        writeToStderr(prefix + filterANSIEscapes(fs.s, !tty) + "\n");
     }
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,

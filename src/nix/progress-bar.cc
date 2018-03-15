@@ -308,7 +308,7 @@ public:
         auto width = getWindowSize().second;
         if (width <= 0) std::numeric_limits<decltype(width)>::max();
 
-        writeToStderr("\r" + filterANSIEscapes(line, width) + "\e[K");
+        writeToStderr("\r" + filterANSIEscapes(line, false, width) + "\e[K");
     }
 
     std::string getStatus(State & state)
