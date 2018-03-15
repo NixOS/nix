@@ -1316,7 +1316,8 @@ void EvalState::concatLists(Value & v, unsigned int nrLists, Value * * lists, co
     auto out = v.listElems();
     for (unsigned int n = 0, pos = 0; n < nrLists; ++n) {
         unsigned int l = lists[n]->listSize();
-        memcpy(out + pos, lists[n]->listElems(), l * sizeof(Value *));
+        if (l)
+            memcpy(out + pos, lists[n]->listElems(), l * sizeof(Value *));
         pos += l;
     }
 }
