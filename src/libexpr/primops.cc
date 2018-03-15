@@ -1601,12 +1601,16 @@ static void prim_partition(EvalState & state, const Pos & pos, Value * * args, V
     state.mkAttrs(v, 2);
 
     Value * vRight = state.allocAttr(v, state.sRight);
-    state.mkList(*vRight, right.size());
-    memcpy(vRight->listElems(), right.data(), sizeof(Value *) * right.size());
+    auto rsize = right.size();
+    state.mkList(*vRight, rsize);
+    if (rsize)
+        memcpy(vRight->listElems(), right.data(), sizeof(Value *) * rsize);
 
     Value * vWrong = state.allocAttr(v, state.sWrong);
-    state.mkList(*vWrong, wrong.size());
-    memcpy(vWrong->listElems(), wrong.data(), sizeof(Value *) * wrong.size());
+    auto wsize = wrong.size();
+    state.mkList(*vWrong, wsize);
+    if (wsize)
+        memcpy(vWrong->listElems(), wrong.data(), sizeof(Value *) * wsize);
 
     v.attrs->sort();
 }

@@ -195,6 +195,7 @@ struct CurlDownloader : public Downloader
             if (readOffset == request.data->length())
                 return 0;
             auto count = std::min(size * nitems, request.data->length() - readOffset);
+            assert(count);
             memcpy(buffer, request.data->data() + readOffset, count);
             readOffset += count;
             return count;
