@@ -964,19 +964,10 @@ void LocalStore::invalidatePath(State & state, const Path & path)
 }
 
 
-void LocalStore::addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
+void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
     RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
 {
     assert(info.narHash);
-
-    Hash h = hashString(htSHA256, *nar);
-    if (h != info.narHash)
-        throw Error("hash mismatch importing path '%s'; expected hash '%s', got '%s'",
-            info.path, info.narHash.to_string(), h.to_string());
-
-    if (nar->size() != info.narSize)
-        throw Error("size mismatch importing path '%s'; expected %s, got %s",
-            info.path, info.narSize, nar->size());
 
     if (requireSigs && checkSigs && !info.checkSignatures(*this, publicKeys))
         throw Error("cannot add path '%s' because it lacks a valid signature", info.path);
@@ -999,8 +990,27 @@ void LocalStore::addToStore(const ValidPathInfo & info, const ref<std::string> &
 
             deletePath(realPath);
 
-            StringSource source(*nar);
-            restorePath(realPath, source);
+            /* While restoring the path from the NAR, compute the hash
+               of the NAR. */
+            HashSink hashSink(htSHA256);
+
+            LambdaSource wrapperSource([&](unsigned char * data, size_t len) -> size_t {
+                size_t n = source.read(data, len);
+                hashSink(data, n);
+                return n;
+            });
+
+            restorePath(realPath, wrapperSource);
+
+            auto hashResult = hashSink.finish();
+
+            if (hashResult.first != info.narHash)
+                throw Error("hash mismatch importing path '%s'; expected hash '%s', got '%s'",
+                    info.path, info.narHash.to_string(), hashResult.first.to_string());
+
+            if (hashResult.second != info.narSize)
+                throw Error("size mismatch importing path '%s'; expected %s, got %s",
+                    info.path, info.narSize, hashResult.second);
 
             autoGC();
 

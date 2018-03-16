@@ -399,9 +399,14 @@ public:
     virtual bool wantMassQuery() { return false; }
 
     /* Import a path into the store. */
+    virtual void addToStore(const ValidPathInfo & info, Source & narSource,
+        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs,
+        std::shared_ptr<FSAccessor> accessor = 0);
+
+    // FIXME: remove
     virtual void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
         RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs,
-        std::shared_ptr<FSAccessor> accessor = 0) = 0;
+        std::shared_ptr<FSAccessor> accessor = 0);
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.

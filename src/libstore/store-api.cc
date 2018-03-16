@@ -590,32 +590,15 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
 
     uint64_t total = 0;
 
-    auto progress = [&](size_t len) {
-        total += len;
-        act.progress(total, info->narSize);
-    };
-
-    struct MyStringSink : StringSink
-    {
-        typedef std::function<void(size_t)> Callback;
-        Callback callback;
-        MyStringSink(Callback callback) : callback(callback) { }
-        void operator () (const unsigned char * data, size_t len) override
-        {
-            StringSink::operator ()(data, len);
-            callback(len);
-        };
-    };
-
-    MyStringSink sink(progress);
-    srcStore->narFromPath({storePath}, sink);
-
+    // FIXME
+#if 0
     if (!info->narHash) {
         auto info2 = make_ref<ValidPathInfo>(*info);
         info2->narHash = hashString(htSHA256, *sink.s);
         if (!info->narSize) info2->narSize = sink.s->size();
         info = info2;
     }
+#endif
 
     if (info->ultimate) {
         auto info2 = make_ref<ValidPathInfo>(*info);
@@ -623,7 +606,16 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
         info = info2;
     }
 
-    dstStore->addToStore(*info, sink.s, repair, checkSigs);
+    auto source = sinkToSource([&](Sink & sink) {
+        LambdaSink wrapperSink([&](const unsigned char * data, size_t len) {
+            sink(data, len);
+            total += len;
+            act.progress(total, info->narSize);
+        });
+        srcStore->narFromPath({storePath}, wrapperSink);
+    });
+
+    dstStore->addToStore(*info, *source, repair, checkSigs);
 }
 
 
@@ -807,6 +799,21 @@ std::string makeFixedOutputCA(bool recursive, const Hash & hash)
     return "fixed:" + (recursive ? (std::string) "r:" : "") + hash.to_string();
 }
 
+
+void Store::addToStore(const ValidPathInfo & info, Source & narSource,
+    RepairFlag repair, CheckSigsFlag checkSigs,
+    std::shared_ptr<FSAccessor> accessor)
+{
+    addToStore(info, make_ref<std::string>(narSource.drain()), repair, checkSigs, accessor);
+}
+
+void Store::addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
+    RepairFlag repair, CheckSigsFlag checkSigs,
+    std::shared_ptr<FSAccessor> accessor)
+{
+    StringSource source(*nar);
+    addToStore(info, source, repair, checkSigs, accessor);
+}
 
 }
 

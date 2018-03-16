@@ -61,6 +61,8 @@ struct Source
     virtual size_t read(unsigned char * data, size_t len) = 0;
 
     virtual bool good() { return true; }
+
+    std::string drain();
 };
 
 
@@ -189,6 +191,27 @@ struct LambdaSink : Sink
         lambda(data, len);
     }
 };
+
+
+/* Convert a function into a source. */
+struct LambdaSource : Source
+{
+    typedef std::function<size_t(unsigned char *, size_t)> lambda_t;
+
+    lambda_t lambda;
+
+    LambdaSource(const lambda_t & lambda) : lambda(lambda) { }
+
+    size_t read(unsigned char * data, size_t len) override
+    {
+        return lambda(data, len);
+    }
+};
+
+
+/* Convert a function that feeds data into a Sink into a Source. The
+   Source executes the function as a coroutine. */
+std::unique_ptr<Source> sinkToSource(std::function<void(Sink &)> fun);
 
 
 void writePadding(size_t len, Sink & sink);

@@ -695,7 +695,7 @@ static void performOp(TunnelLogger * logger, ref<LocalStore> store,
         parseDump(tee, tee.source);
 
         logger->startWork();
-        store->addToStore(info, tee.source.data, (RepairFlag) repair,
+        store.cast<Store>()->addToStore(info, tee.source.data, (RepairFlag) repair,
             dontCheckSigs ? NoCheckSigs : CheckSigs, nullptr);
         logger->stopWork();
         break;
