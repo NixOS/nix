@@ -70,7 +70,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 if (gcRoot == "")
                     printGCWarning();
                 else {
-                    Path rootName = gcRoot;
+                    Path rootName = indirectRoot ? absPath(gcRoot) : gcRoot;
                     if (++rootNr > 1) rootName += "-" + std::to_string(rootNr);
                     auto store2 = state.store.dynamic_pointer_cast<LocalFSStore>();
                     if (store2)

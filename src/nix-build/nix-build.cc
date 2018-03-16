@@ -271,10 +271,14 @@ void mainWrapped(int argc, char * * argv)
         exprs = {state.parseStdin()};
     else
         for (auto i : left) {
+            auto absolute = i;
+            try {
+                absolute = canonPath(absPath(i), true);
+            } catch (Error e) {};
             if (fromArgs)
                 exprs.push_back(state.parseExprFromString(i, absPath(".")));
-            else if (store->isStorePath(i) && std::regex_match(i, std::regex(".*\\.drv(!.*)?")))
-                drvs.push_back(DrvInfo(state, store, i));
+            else if (store->isStorePath(absolute) && std::regex_match(absolute, std::regex(".*\\.drv(!.*)?")))
+                drvs.push_back(DrvInfo(state, store, absolute));
             else
                 /* If we're in a #! script, interpret filenames
                    relative to the script. */
