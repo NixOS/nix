@@ -3,6 +3,7 @@
 #include "affinity.hh"
 #include "sync.hh"
 #include "finally.hh"
+#include "serialise.hh"
 
 #include <cctype>
 #include <cerrno>
@@ -568,19 +569,25 @@ void writeFull(int fd, const string & s, bool allowInterrupts)
 
 string drainFD(int fd)
 {
-    string result;
-    unsigned char buffer[4096];
+    StringSink sink;
+    drainFD(fd, sink);
+    return std::move(*sink.s);
+}
+
+
+void drainFD(int fd, Sink & sink)
+{
+    std::vector<unsigned char> buf(4096);
     while (1) {
         checkInterrupt();
-        ssize_t rd = read(fd, buffer, sizeof buffer);
+        ssize_t rd = read(fd, buf.data(), buf.size());
         if (rd == -1) {
             if (errno != EINTR)
                 throw SysError("reading from file");
         }
         else if (rd == 0) break;
-        else result.append((char *) buffer, rd);
+        else sink(buf.data(), rd);
     }
-    return result;
 }
 
 
@@ -920,20 +927,47 @@ string runProgram(Path program, bool searchPath, const Strings & args,
     return res.second;
 }
 
-std::pair<int, std::string> runProgram(const RunOptions & options)
+std::pair<int, std::string> runProgram(const RunOptions & options_)
+{
+    RunOptions options(options_);
+    StringSink sink;
+    options.stdout = &sink;
+
+    int status = 0;
+
+    try {
+        runProgram2(options);
+    } catch (ExecError & e) {
+        status = e.status;
+    }
+
+    return {status, std::move(*sink.s)};
+}
+
+void runProgram2(const RunOptions & options)
 {
     checkInterrupt();
 
+    assert(!(options.stdin && options.input));
+
+    std::unique_ptr<Source> source_;
+    Source * source = options.stdin;
+
+    if (options.input) {
+        source_ = std::make_unique<StringSource>(*options.input);
+        source = source_.get();
+    }
+
     /* Create a pipe. */
     Pipe out, in;
-    out.create();
-    if (options.input) in.create();
+    if (options.stdout) out.create();
+    if (source) in.create();
 
     /* Fork. */
     Pid pid = startProcess([&]() {
-        if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
+        if (options.stdout && dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
             throw SysError("dupping stdout");
-        if (options.input && dup2(in.readSide.get(), STDIN_FILENO) == -1)
+        if (source && dup2(in.readSide.get(), STDIN_FILENO) == -1)
             throw SysError("dupping stdin");
 
         Strings args_(options.args);
@@ -961,11 +995,20 @@ std::pair<int, std::string> runProgram(const RunOptions & options)
     });
 
 
-    if (options.input) {
+    if (source) {
         in.readSide = -1;
         writerThread = std::thread([&]() {
             try {
-                writeFull(in.writeSide.get(), *options.input);
+                std::vector<unsigned char> buf(8 * 1024);
+                while (true) {
+                    size_t n;
+                    try {
+                        n = source->read(buf.data(), buf.size());
+                    } catch (EndOfFile &) {
+                        break;
+                    }
+                    writeFull(in.writeSide.get(), buf.data(), n);
+                }
                 promise.set_value();
             } catch (...) {
                 promise.set_exception(std::current_exception());
@@ -974,15 +1017,17 @@ std::pair<int, std::string> runProgram(const RunOptions & options)
         });
     }
 
-    string result = drainFD(out.readSide.get());
+    if (options.stdout)
+        drainFD(out.readSide.get(), *options.stdout);
 
     /* Wait for the child to finish. */
     int status = pid.wait();
 
     /* Wait for the writer thread to finish. */
-    if (options.input) promise.get_future().get();
+    if (source) promise.get_future().get();
 
-    return {status, result};
+    if (status)
+        throw ExecError(status, fmt("program '%1%' %2%", options.program, statusToString(status)));
 }
 
 

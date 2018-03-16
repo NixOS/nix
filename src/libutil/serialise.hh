@@ -56,7 +56,7 @@ struct Source
     void operator () (unsigned char * data, size_t len);
 
     /* Store up to ‘len’ in the buffer pointed to by ‘data’, and
-       return the number of bytes stored.  If blocks until at least
+       return the number of bytes stored.  It blocks until at least
        one byte is available. */
     virtual size_t read(unsigned char * data, size_t len) = 0;
 
@@ -171,6 +171,22 @@ struct TeeSource : Source
         size_t n = orig.read(data, len);
         this->data->append((const char *) data, n);
         return n;
+    }
+};
+
+
+/* Convert a function into a sink. */
+struct LambdaSink : Sink
+{
+    typedef std::function<void(const unsigned char *, size_t)> lambda_t;
+
+    lambda_t lambda;
+
+    LambdaSink(const lambda_t & lambda) : lambda(lambda) { }
+
+    virtual void operator () (const unsigned char * data, size_t len)
+    {
+        lambda(data, len);
     }
 };
 

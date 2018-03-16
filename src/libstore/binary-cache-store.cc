@@ -203,22 +203,18 @@ void BinaryCacheStore::narFromPath(const Path & storePath, Sink & sink)
     stats.narRead++;
     stats.narReadCompressedBytes += nar->size();
 
-    /* Decompress the NAR. FIXME: would be nice to have the remote
-       side do this. */
-    try {
-        nar = decompress(info->compression, *nar);
-    } catch (UnknownCompressionMethod &) {
-        throw Error(format("binary cache path '%s' uses unknown compression method '%s'")
-            % storePath % info->compression);
-    }
+    uint64_t narSize = 0;
 
-    stats.narReadBytes += nar->size();
+    StringSource source(*nar);
 
-    printMsg(lvlTalkative, format("exporting path '%1%' (%2% bytes)") % storePath % nar->size());
+    LambdaSink wrapperSink([&](const unsigned char * data, size_t len) {
+        sink(data, len);
+        narSize += len;
+    });
 
-    assert(nar->size() % 8 == 0);
+    decompress(info->compression, source, wrapperSink);
 
-    sink((unsigned char *) nar->c_str(), nar->size());
+    stats.narReadBytes += narSize;
 }
 
 void BinaryCacheStore::queryPathInfoUncached(const Path & storePath,

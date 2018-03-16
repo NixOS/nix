@@ -25,6 +25,9 @@
 
 namespace nix {
 
+struct Sink;
+struct Source;
+
 
 /* Return an environment variable. */
 string getEnv(const string & key, const string & def = "");
@@ -150,6 +153,7 @@ MakeError(EndOfFile, Error)
 /* Read a file descriptor until EOF occurs. */
 string drainFD(int fd);
 
+void drainFD(int fd, Sink & sink);
 
 
 /* Automatic cleanup of resources. */
@@ -256,6 +260,8 @@ struct RunOptions
     bool searchPath = true;
     Strings args;
     std::experimental::optional<std::string> input;
+    Source * stdin = nullptr;
+    Sink * stdout = nullptr;
     bool _killStderr = false;
 
     RunOptions(const Path & program, const Strings & args)
@@ -265,6 +271,8 @@ struct RunOptions
 };
 
 std::pair<int, std::string> runProgram(const RunOptions & options);
+
+void runProgram2(const RunOptions & options);
 
 
 class ExecError : public Error
