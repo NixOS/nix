@@ -4,7 +4,7 @@ FROM alpine
 RUN apk add --update openssl
 
 # Download Nix and install it into the system.
-RUN wget -O- https://nixos.org/releases/nix/nix-1.11.14/nix-1.11.14-x86_64-linux.tar.bz2 | bzcat - | tar xf - \
+RUN wget -O- https://nixos.org/releases/nix/nix-2.0/nix-2.0-x86_64-linux.tar.bz2 | bzcat - | tar xf - \
   && addgroup -g 30000 -S nixbld \
   && for i in $(seq 1 30); do adduser -S -D -h /var/empty -g "Nix build user $i" -u $((30000 + i)) -G nixbld nixbld$i ; done \
   && mkdir -m 0755 /nix && USER=root sh nix-*-x86_64-linux/install \
