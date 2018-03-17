@@ -123,7 +123,7 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry><term><literal>auto-optimise-store</literal></term>
+  <varlistentry xmls:id="conf-auto-optimise-store"><term><literal>auto-optimise-store</literal></term>
 
     <listitem><para>If set to <literal>true</literal>, Nix
     automatically detects files in the store that have identical
@@ -146,7 +146,7 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry><term><literal>builders-use-substitutes</literal></term>
+  <varlistentry xml:id="conf-builders-use-substitutes"><term><literal>builders-use-substitutes</literal></term>
 
     <listitem><para>If set to <literal>true</literal>, Nix will instruct
     remote build machines to use their own binary substitutes if available. In
@@ -201,7 +201,7 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry><term><literal>compress-build-log</literal></term>
+  <varlistentry xml:id="conf-compress-build-log"><term><literal>compress-build-log</literal></term>
 
     <listitem><para>If set to <literal>true</literal> (the default),
     build logs written to <filename>/nix/var/log/nix/drvs</filename>
@@ -254,7 +254,7 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry><term><literal>extra-substituters</literal></term>
+  <varlistentry xml:id="conf-extra-substituters"><term><literal>extra-substituters</literal></term>
 
     <listitem><para>Additional binary caches appended to those
     specified in <option>substituters</option>.  When used by
@@ -265,7 +265,7 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry><term><literal>fallback</literal></term>
+  <varlistentry xml:id="conf-fallback"><term><literal>fallback</literal></term>
 
     <listitem><para>If set to <literal>true</literal>, Nix will fall
     back to building from source if a binary substitute fails.  This
@@ -275,7 +275,7 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry><term><literal>fsync-metadata</literal></term>
+  <varlistentry xml:id="conf-fsync-metadata"><term><literal>fsync-metadata</literal></term>
 
     <listitem><para>If set to <literal>true</literal>, changes to the
     Nix store metadata (in <filename>/nix/var/nix/db</filename>) are
@@ -314,7 +314,7 @@ builtins.fetchurl {
   </varlistentry>
 
 
-  <varlistentry><term><literal>http-connections</literal></term>
+  <varlistentry xml:id="conf-http-connections"><term><literal>http-connections</literal></term>
 
     <listitem><para>The maximum number of parallel TCP connections
     used to fetch files from binary caches and by other downloads. It
@@ -323,7 +323,7 @@ builtins.fetchurl {
   </varlistentry>
 
 
-  <varlistentry><term><literal>keep-build-log</literal></term>
+  <varlistentry xml:id="conf-keep-build-log"><term><literal>keep-build-log</literal></term>
 
     <listitem><para>If set to <literal>true</literal> (the default),
     Nix will write the build log of a derivation (i.e. the standard
@@ -352,7 +352,7 @@ builtins.fetchurl {
   </varlistentry>
 
 
-  <varlistentry><term><literal>keep-env-derivations</literal></term>
+  <varlistentry xml:id="conf-keep-env-derivations"><term><literal>keep-env-derivations</literal></term>
 
     <listitem><para>If <literal>false</literal> (default), derivations
     are not stored in Nix user environments.  That is, the derivation
@@ -441,7 +441,7 @@ builtins.fetchurl {
   </varlistentry>
 
 
-  <varlistentry><term><literal>netrc-file</literal></term>
+  <varlistentry xml:id="conf-netrc-file"><term><literal>netrc-file</literal></term>
 
     <listitem><para>If set to an absolute path to a <filename>netrc</filename>
     file, Nix will use the HTTP authentication credentials in this file when
@@ -544,7 +544,7 @@ password <replaceable>my-password</replaceable>
   </varlistentry>
 
 
-  <varlistentry><term><literal>require-sigs</literal></term>
+  <varlistentry xml:id="conf-require-sigs"><term><literal>require-sigs</literal></term>
 
     <listitem><para>If set to <literal>true</literal> (the default),
     any non-content-addressed path added or copied to the Nix store
@@ -573,7 +573,7 @@ password <replaceable>my-password</replaceable>
   </varlistentry>
 
 
-  <varlistentry><term><literal>sandbox</literal></term>
+  <varlistentry xml:id="conf-sandbox"><term><literal>sandbox</literal></term>
 
     <listitem><para>If set to <literal>true</literal>, builds will be
     performed in a <emphasis>sandboxed environment</emphasis>, i.e.,
@@ -644,7 +644,7 @@ password <replaceable>my-password</replaceable>
   </varlistentry>
 
 
-  <varlistentry><term><literal>secret-key-files</literal></term>
+  <varlistentry xml:id="conf-secret-key-files"><term><literal>secret-key-files</literal></term>
 
     <listitem><para>A whitespace-separated list of files containing
     secret (private) keys. These are used to sign locally-built
@@ -665,7 +665,7 @@ password <replaceable>my-password</replaceable>
   </varlistentry>
 
 
-  <varlistentry><term><literal>substitute</literal></term>
+  <varlistentry xml:id="conf-substitute"><term><literal>substitute</literal></term>
 
     <listitem><para>If set to <literal>true</literal> (default), Nix
     will use binary substitutes if available.  This option can be
@@ -674,7 +674,7 @@ password <replaceable>my-password</replaceable>
   </varlistentry>
 
 
-  <varlistentry><term><literal>substituters</literal></term>
+  <varlistentry xml:id="conf-substituters"><term><literal>substituters</literal></term>
 
     <listitem><para>A list of URLs of substituters, separated by
     whitespace.  The default is
@@ -683,7 +683,7 @@ password <replaceable>my-password</replaceable>
   </varlistentry>
 
 
-  <varlistentry><term><literal>system</literal></term>
+  <varlistentry xml:id="conf-system"><term><literal>system</literal></term>
 
     <listitem><para>This option specifies the canonical Nix system
     name of the current installation, such as
@@ -724,7 +724,7 @@ password <replaceable>my-password</replaceable>
   </varlistentry>
 
 
-  <varlistentry><term><literal>trusted-public-keys</literal></term>
+  <varlistentry xml:id="conf-trusted-public-keys"><term><literal>trusted-public-keys</literal></term>
 
     <listitem><para>A whitespace-separated list of public keys. When
     paths are copied from another Nix store (such as a binary cache),
@@ -735,7 +735,7 @@ password <replaceable>my-password</replaceable>
   </varlistentry>
 
 
-  <varlistentry><term><literal>trusted-substituters</literal></term>
+  <varlistentry xml:id="conf-trusted-substituters"><term><literal>trusted-substituters</literal></term>
 
     <listitem><para>A list of URLs of substituters, separated by
     whitespace.  These are not used by default, but can be enabled by
