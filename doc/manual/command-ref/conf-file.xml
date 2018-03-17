@@ -406,6 +406,12 @@ builtins.fetchurl {
 
   </varlistentry>
 
+  <varlistentry xml:id="conf-max-free"><term><literal>max-free</literal></term>
+
+    <listitem><para>This option defines after how many free bytes to stop collecting
+    garbage once the <literal>min-free</literal> condition gets triggered.</para></listitem>
+
+  </varlistentry>
 
   <varlistentry xml:id="conf-max-jobs"><term><literal>max-jobs</literal></term>
 
@@ -436,6 +442,17 @@ builtins.fetchurl {
       <para>The value <literal>0</literal> means that there is no
       timeout.  This is also the default.</para>
 
+    </listitem>
+
+  </varlistentry>
+
+  <varlistentry xml:id="conf-min-free"><term><literal>min-free</literal></term>
+
+    <listitem>
+      <para>When the disk reaches <literal>min-free</literal> bytes of free disk space during a build, nix
+        will start to garbage-collection until <literal>max-free</literal> bytes are available on the disk.
+        A value of <literal>0</literal> (the default) means that this feature is disabled.</para>
+      </para>
     </listitem>
 
   </varlistentry>
