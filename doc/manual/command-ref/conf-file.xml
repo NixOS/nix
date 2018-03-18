@@ -123,7 +123,7 @@ false</literal>.</para>
   </varlistentry>
 
 
-  <varlistentry xmls:id="conf-auto-optimise-store"><term><literal>auto-optimise-store</literal></term>
+  <varlistentry xml:id="conf-auto-optimise-store"><term><literal>auto-optimise-store</literal></term>
 
     <listitem><para>If set to <literal>true</literal>, Nix
     automatically detects files in the store that have identical
@@ -452,7 +452,6 @@ builtins.fetchurl {
       <para>When the disk reaches <literal>min-free</literal> bytes of free disk space during a build, nix
         will start to garbage-collection until <literal>max-free</literal> bytes are available on the disk.
         A value of <literal>0</literal> (the default) means that this feature is disabled.</para>
-      </para>
     </listitem>
 
   </varlistentry>
