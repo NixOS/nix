@@ -1,5 +1,5 @@
 { nix ? builtins.fetchGit ./.
-, nixpkgs ? builtins.fetchGit { url = https://github.com/NixOS/nixpkgs.git; ref = "release-18.03"; }
+, nixpkgs ? builtins.fetchGit { url = https://github.com/NixOS/nixpkgs-channels.git; ref = "nixos-18.03"; }
 , officialRelease ? false
 , systems ? [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
 }:
@@ -55,7 +55,9 @@ let
 
     build = pkgs.lib.genAttrs systems (system:
 
-      with import nixpkgs { inherit system; };
+      let pkgs = import nixpkgs { inherit system; }; in
+
+      with pkgs;
 
       with import ./release-common.nix { inherit pkgs; };
 
