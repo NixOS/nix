@@ -260,8 +260,8 @@ struct RunOptions
     bool searchPath = true;
     Strings args;
     std::experimental::optional<std::string> input;
-    Source * stdin = nullptr;
-    Sink * stdout = nullptr;
+    Source * standardIn = nullptr;
+    Sink * standardOut = nullptr;
     bool _killStderr = false;
 
     RunOptions(const Path & program, const Strings & args)
