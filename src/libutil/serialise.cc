@@ -185,7 +185,7 @@ std::unique_ptr<Source> sinkToSource(std::function<void(Sink &)> fun)
 
             if (pos == cur.size()) {
                 if (!cur.empty()) coro();
-                cur = std::move(coro.get());
+                cur = coro.get();
                 pos = 0;
             }
 
