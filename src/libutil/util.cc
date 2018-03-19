@@ -931,7 +931,7 @@ std::pair<int, std::string> runProgram(const RunOptions & options_)
 {
     RunOptions options(options_);
     StringSink sink;
-    options.stdout = &sink;
+    options.standardOut = &sink;
 
     int status = 0;
 
@@ -948,10 +948,10 @@ void runProgram2(const RunOptions & options)
 {
     checkInterrupt();
 
-    assert(!(options.stdin && options.input));
+    assert(!(options.standardIn && options.input));
 
     std::unique_ptr<Source> source_;
-    Source * source = options.stdin;
+    Source * source = options.standardIn;
 
     if (options.input) {
         source_ = std::make_unique<StringSource>(*options.input);
@@ -960,12 +960,12 @@ void runProgram2(const RunOptions & options)
 
     /* Create a pipe. */
     Pipe out, in;
-    if (options.stdout) out.create();
+    if (options.standardOut) out.create();
     if (source) in.create();
 
     /* Fork. */
     Pid pid = startProcess([&]() {
-        if (options.stdout && dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
+        if (options.standardOut && dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
             throw SysError("dupping stdout");
         if (source && dup2(in.readSide.get(), STDIN_FILENO) == -1)
             throw SysError("dupping stdin");
@@ -1017,8 +1017,8 @@ void runProgram2(const RunOptions & options)
         });
     }
 
-    if (options.stdout)
-        drainFD(out.readSide.get(), *options.stdout);
+    if (options.standardOut)
+        drainFD(out.readSide.get(), *options.standardOut);
 
     /* Wait for the child to finish. */
     int status = pid.wait();
