@@ -80,7 +80,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
     time_t now = time(0);
     struct stat st;
     if (stat(stampFile.c_str(), &st) != 0 ||
-        st.st_mtime <= now - settings.tarballTtl)
+        st.st_mtime + settings.tarballTtl <= now)
     {
         /* Except that if this is a commit hash that we already have,
            we don't have to pull again. */
