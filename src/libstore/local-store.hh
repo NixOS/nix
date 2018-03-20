@@ -222,7 +222,7 @@ public:
 
 private:
 
-    int getSchema();
+    int getSchema(State & state, bool dbOpen);
 
     void openDB(State & state, bool create);
 
