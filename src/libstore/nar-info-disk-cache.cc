@@ -260,11 +260,8 @@ public:
 
 ref<NarInfoDiskCache> getNarInfoDiskCache()
 {
-    static Sync<std::shared_ptr<NarInfoDiskCache>> cache;
-
-    auto cache_(cache.lock());
-    if (!*cache_) *cache_ = std::make_shared<NarInfoDiskCacheImpl>();
-    return ref<NarInfoDiskCache>(*cache_);
+    static ref<NarInfoDiskCache> cache = make_ref<NarInfoDiskCacheImpl>();
+    return cache;
 }
 
 }
