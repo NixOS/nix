@@ -25,7 +25,7 @@ makefiles = \
   tests/local.mk \
   tests/plugins/local.mk
 
-GLOBAL_CXXFLAGS += -std=c++14 -g -Wall -include config.h
+GLOBAL_CXXFLAGS += -g -Wall -include config.h
 
 -include Makefile.config
 
