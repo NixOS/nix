@@ -1,11 +1,9 @@
-with import <nix/config.nix>;
-
 { derivations, manifest }:
 
 derivation {
   name = "user-environment";
-  system = builtins.currentSystem;
-  builder = nixLibexecDir + "/nix/buildenv";
+  system = "builtin";
+  builder = "builtin:buildenv";
 
   inherit manifest;
 
@@ -24,21 +22,4 @@ derivation {
 
   # Also don't bother substituting.
   allowSubstitutes = false;
-
-  __sandboxProfile = ''
-    (allow sysctl-read)
-    (allow file-read*
-           (literal "/usr/lib/libSystem.dylib")
-           (literal "/usr/lib/libSystem.B.dylib")
-           (literal "/usr/lib/libobjc.A.dylib")
-           (literal "/usr/lib/libobjc.dylib")
-           (literal "/usr/lib/libauto.dylib")
-           (literal "/usr/lib/libc++abi.dylib")
-           (literal "/usr/lib/libc++.1.dylib")
-           (literal "/usr/lib/libDiagnosticMessagesClient.dylib")
-           (subpath "/usr/lib/system")
-           (subpath "/dev"))
-  '';
-
-  inherit chrootDeps;
 }

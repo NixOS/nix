@@ -1,14 +1,15 @@
-#include "shared.hh"
+#include "builtins.hh"
+
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <algorithm>
 
-using namespace nix;
+namespace nix {
 
 typedef std::map<Path,int> Priorities;
 
-static bool isDirectory (const Path & path)
+static bool isDirectory(const Path & path)
 {
     struct stat st;
     if (stat(path.c_str(), &st) == -1)
@@ -16,9 +17,11 @@ static bool isDirectory (const Path & path)
     return S_ISDIR(st.st_mode);
 }
 
-static auto priorities = Priorities{};
+// FIXME: change into local variables.
 
-static auto symlinks = 0;
+static Priorities priorities;
+
+static unsigned long symlinks;
 
 /* For each activated package, create symlinks */
 static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
@@ -95,10 +98,10 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
 
 typedef std::set<Path> FileProp;
 
-static auto done = FileProp{};
-static auto postponed = FileProp{};
+static FileProp done;
+static FileProp postponed = FileProp{};
 
-static auto out = string{};
+static Path out;
 
 static void addPkg(const Path & pkgDir, int priority)
 {
@@ -107,7 +110,7 @@ static void addPkg(const Path & pkgDir, int priority)
     done.insert(pkgDir);
     createLinks(pkgDir, out, priority);
     auto propagatedFN = pkgDir + "/nix-support/propagated-user-env-packages";
-    auto propagated = string{};
+    std::string propagated;
     {
         AutoCloseFD fd = open(propagatedFN.c_str(), O_RDONLY | O_CLOEXEC);
         if (!fd) {
@@ -126,62 +129,65 @@ struct Package {
     Path path;
     bool active;
     int priority;
-    Package(Path path, bool active, int priority) : path{std::move(path)}, active{active}, priority{priority} {}
+    Package(Path path, bool active, int priority) : path{path}, active{active}, priority{priority} {}
 };
 
 typedef std::vector<Package> Packages;
 
-int main(int argc, char ** argv)
+void builtinBuildenv(const BasicDerivation & drv)
 {
-    return handleExceptions(argv[0], [&]() {
-        initNix();
-        out = getEnv("out");
-        if (mkdir(out.c_str(), 0755) == -1)
-            throw SysError(format("creating %1%") % out);
+    auto getAttr = [&](const string & name) {
+        auto i = drv.env.find(name);
+        if (i == drv.env.end()) throw Error("attribute '%s' missing", name);
+        return i->second;
+    };
 
-        /* Convert the stuff we get from the environment back into a coherent
-         * data type.
-         */
-        auto pkgs = Packages{};
-        auto derivations = tokenizeString<Strings>(getEnv("derivations"));
-        while (!derivations.empty()) {
-            /* !!! We're trusting the caller to structure derivations env var correctly */
-            auto active = derivations.front(); derivations.pop_front();
-            auto priority = stoi(derivations.front()); derivations.pop_front();
-            auto outputs = stoi(derivations.front()); derivations.pop_front();
-            for (auto n = 0; n < outputs; n++) {
-                auto path = derivations.front(); derivations.pop_front();
-                pkgs.emplace_back(path, active != "false", priority);
-            }
+    out = getAttr("out");
+    createDirs(out);
+
+    /* Convert the stuff we get from the environment back into a
+     * coherent data type. */
+    Packages pkgs;
+    auto derivations = tokenizeString<Strings>(getAttr("derivations"));
+    while (!derivations.empty()) {
+        /* !!! We're trusting the caller to structure derivations env var correctly */
+        auto active = derivations.front(); derivations.pop_front();
+        auto priority = stoi(derivations.front()); derivations.pop_front();
+        auto outputs = stoi(derivations.front()); derivations.pop_front();
+        for (auto n = 0; n < outputs; n++) {
+            auto path = derivations.front(); derivations.pop_front();
+            pkgs.emplace_back(path, active != "false", priority);
         }
+    }
 
-        /* Symlink to the packages that have been installed explicitly by the
-         * user. Process in priority order to reduce unnecessary
-         * symlink/unlink steps.
-         */
-        std::sort(pkgs.begin(), pkgs.end(), [](const Package & a, const Package & b) {
-            return a.priority < b.priority || (a.priority == b.priority && a.path < b.path);
-        });
-        for (const auto & pkg : pkgs)
-            if (pkg.active)
-                addPkg(pkg.path, pkg.priority);
-
-        /* Symlink to the packages that have been "propagated" by packages
-         * installed by the user (i.e., package X declares that it wants Y
-         * installed as well). We do these later because they have a lower
-         * priority in case of collisions.
-         */
-        auto priorityCounter = 1000;
-        while (!postponed.empty()) {
-            auto pkgDirs = postponed;
-            postponed = FileProp{};
-            for (const auto & pkgDir : pkgDirs)
-                addPkg(pkgDir, priorityCounter++);
-        }
-
-        std::cerr << "created " << symlinks << " symlinks in user environment\n";
-
-        createSymlink(getEnv("manifest"), out + "/manifest.nix");
+    /* Symlink to the packages that have been installed explicitly by the
+     * user. Process in priority order to reduce unnecessary
+     * symlink/unlink steps.
+     */
+    std::sort(pkgs.begin(), pkgs.end(), [](const Package & a, const Package & b) {
+        return a.priority < b.priority || (a.priority == b.priority && a.path < b.path);
     });
+    for (const auto & pkg : pkgs)
+        if (pkg.active)
+            addPkg(pkg.path, pkg.priority);
+
+    /* Symlink to the packages that have been "propagated" by packages
+     * installed by the user (i.e., package X declares that it wants Y
+     * installed as well). We do these later because they have a lower
+     * priority in case of collisions.
+     */
+    auto priorityCounter = 1000;
+    while (!postponed.empty()) {
+        auto pkgDirs = postponed;
+        postponed = FileProp{};
+        for (const auto & pkgDir : pkgDirs)
+            addPkg(pkgDir, priorityCounter++);
+    }
+
+    printError("created %d symlinks in user environment", symlinks);
+
+    createSymlink(getAttr("manifest"), out + "/manifest.nix");
+}
+
 }
 

@@ -2949,6 +2949,8 @@ void DerivationGoal::runChild()
 
                 if (drv->builder == "builtin:fetchurl")
                     builtinFetchurl(drv2, netrcData);
+                else if (drv->builder == "builtin:buildenv")
+                    builtinBuildenv(drv2);
                 else
                     throw Error(format("unsupported builtin function '%1%'") % string(drv->builder, 8));
                 _exit(0);
