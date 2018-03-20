@@ -162,11 +162,6 @@ int main(int argc, char ** argv)
     return handleExceptions(argv[0], [&]() {
         initNix();
 
-        // Turn on caching in nix-prefetch-url.
-        auto channelCache = settings.nixStateDir + "/channel-cache";
-        createDirs(channelCache);
-        setenv("NIX_DOWNLOAD_CACHE", channelCache.c_str(), 1);
-
         // Figure out the name of the `.nix-channels' file to use
         auto home = getHome();
         channelsList = home + "/.nix-channels";
