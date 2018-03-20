@@ -263,7 +263,7 @@ void showManPage(const string & name)
 {
     restoreSignals();
     setenv("MANPATH", settings.nixManDir.c_str(), 1);
-    execlp("man", "man", name.c_str(), NULL);
+    execlp("man", "man", name.c_str(), (char *)NULL);
     throw SysError(format("command 'man %1%' failed") % name.c_str());
 }
 
@@ -325,10 +325,10 @@ RunPager::RunPager()
             setenv("LESS", "FRSXMK", 1);
         restoreSignals();
         if (pager)
-            execl("/bin/sh", "sh", "-c", pager, NULL);
-        execlp("pager", "pager", NULL);
-        execlp("less", "less", NULL);
-        execlp("more", "more", NULL);
+            execl("/bin/sh", "sh", "-c", pager, (char *)NULL);
+        execlp("pager", "pager", (char *)NULL);
+        execlp("less", "less", (char *)NULL);
+        execlp("more", "more", (char *)NULL);
         throw SysError(format("executing '%1%'") % pager);
     });
 
