@@ -567,21 +567,38 @@ void writeFull(int fd, const string & s, bool allowInterrupts)
 }
 
 
-string drainFD(int fd)
+string drainFD(int fd, bool block)
 {
     StringSink sink;
-    drainFD(fd, sink);
+    drainFD(fd, sink, block);
     return std::move(*sink.s);
 }
 
 
-void drainFD(int fd, Sink & sink)
+void drainFD(int fd, Sink & sink, bool block)
 {
+    int saved;
+
+    Finally finally([&]() {
+        if (!block) {
+            if (fcntl(fd, F_SETFL, saved) == -1)
+                throw SysError("making file descriptor blocking");
+        }
+    });
+
+    if (!block) {
+        saved = fcntl(fd, F_GETFL);
+        if (fcntl(fd, F_SETFL, saved | O_NONBLOCK) == -1)
+            throw SysError("making file descriptor non-blocking");
+    }
+
     std::vector<unsigned char> buf(4096);
     while (1) {
         checkInterrupt();
         ssize_t rd = read(fd, buf.data(), buf.size());
         if (rd == -1) {
+            if (!block && (errno == EAGAIN || errno == EWOULDBLOCK))
+                break;
             if (errno != EINTR)
                 throw SysError("reading from file");
         }

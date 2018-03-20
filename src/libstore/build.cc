@@ -652,6 +652,11 @@ HookInstance::HookInstance()
         if (dup2(builderOut.writeSide.get(), 4) == -1)
             throw SysError("dupping builder's stdout/stderr");
 
+        /* Hack: pass the read side of that fd to allow build-remote
+           to read SSH error messages. */
+        if (dup2(builderOut.readSide.get(), 5) == -1)
+            throw SysError("dupping builder's stdout/stderr");
+
         Strings args = {
             baseNameOf(settings.buildHook),
             std::to_string(verbosity),

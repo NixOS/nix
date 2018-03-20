@@ -151,9 +151,9 @@ MakeError(EndOfFile, Error)
 
 
 /* Read a file descriptor until EOF occurs. */
-string drainFD(int fd);
+string drainFD(int fd, bool block = true);
 
-void drainFD(int fd, Sink & sink);
+void drainFD(int fd, Sink & sink, bool block = true);
 
 
 /* Automatic cleanup of resources. */

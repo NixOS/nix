@@ -191,8 +191,10 @@ int main (int argc, char * * argv)
                     storeUri = bestMachine->storeUri;
 
                 } catch (std::exception & e) {
-                    printError("unable to open SSH connection to '%s': %s; trying other available machines...",
-                        bestMachine->storeUri, e.what());
+                    auto msg = chomp(drainFD(5, false));
+                    printError("cannot build on '%s': %s%s",
+                        bestMachine->storeUri, e.what(),
+                        (msg.empty() ? "" : ": " + msg));
                     bestMachine->enabled = false;
                     continue;
                 }
@@ -202,6 +204,8 @@ int main (int argc, char * * argv)
         }
 
 connected:
+        close(5);
+
         std::cerr << "# accept\n" << storeUri << "\n";
 
         auto inputs = readStrings<PathSet>(source);
