@@ -155,17 +155,15 @@ let
 
 
     coverage =
-      with import nixpkgs { system = "x86_64-linux"; };
+      with pkgs;
+
+      with import ./release-common.nix { inherit pkgs; };
 
       releaseTools.coverageAnalysis {
         name = "nix-build";
         src = tarball;
 
-        buildInputs =
-          [ curl bzip2 openssl pkgconfig sqlite xz libsodium libseccomp
-            # These are for "make check" only:
-            graphviz libxml2 libxslt git mercurial
-          ];
+        buildInputs = buildDeps;
 
         configureFlags = ''
           --disable-init-state
@@ -175,7 +173,7 @@ let
 
         doInstallCheck = true;
 
-        lcovFilter = [ "*-tab.*" "*/nlohmann/*" "*/linenoise/*" ];
+        lcovFilter = [ "*/boost/*" "*-tab.*" "*/nlohmann/*" "*/linenoise/*" ];
 
         # We call `dot', and even though we just use it to
         # syntax-check generated dot files, it still requires some
