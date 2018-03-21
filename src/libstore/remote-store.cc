@@ -377,7 +377,7 @@ Path RemoteStore::queryPathFromHashPart(const string & hashPart)
 }
 
 
-void RemoteStore::addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
+void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
     RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
 {
     auto conn(connections->get());
@@ -388,8 +388,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, const ref<std::string> 
         StringSink sink;
         sink << 1 // == path follows
             ;
-        assert(nar->size() % 8 == 0);
-        sink((unsigned char *) nar->data(), nar->size());
+        copyNAR(source, sink);
         sink
             << exportMagic
             << info.path
@@ -412,7 +411,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, const ref<std::string> 
                  << info.references << info.registrationTime << info.narSize
                  << info.ultimate << info.sigs << info.ca
                  << repair << !checkSigs;
-        conn->to(*nar);
+        copyNAR(source, conn->to);
         conn->processStderr();
     }
 }
