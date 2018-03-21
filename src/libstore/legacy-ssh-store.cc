@@ -16,6 +16,7 @@ struct LegacySSHStore : public Store
     const Setting<int> maxConnections{this, 1, "max-connections", "maximum number of concurrent SSH connections"};
     const Setting<Path> sshKey{this, "", "ssh-key", "path to an SSH private key"};
     const Setting<bool> compress{this, false, "compress", "whether to compress the connection"};
+    const Setting<Path> remoteProgram{this, "nix-store", "remote-program", "path to the nix-store executable on the remote system"};
 
     // Hack for getting remote build log output.
     const Setting<int> logFD{this, -1, "log-fd", "file descriptor to which SSH's stderr is connected"};
@@ -55,7 +56,7 @@ struct LegacySSHStore : public Store
     ref<Connection> openConnection()
     {
         auto conn = make_ref<Connection>();
-        conn->sshConn = master.startCommand("nix-store --serve --write");
+        conn->sshConn = master.startCommand(fmt("%s --serve --write", remoteProgram));
         conn->to = FdSink(conn->sshConn->in.get());
         conn->from = FdSource(conn->sshConn->out.get());
 
