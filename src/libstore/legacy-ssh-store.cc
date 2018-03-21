@@ -151,12 +151,7 @@ struct LegacySSHStore : public Store
 
         conn->to << cmdDumpStorePath << path;
         conn->to.flush();
-
-        /* FIXME: inefficient. */
-        ParseSink parseSink; /* null sink; just parse the NAR */
-        TeeSource savedNAR(conn->from);
-        parseDump(parseSink, savedNAR);
-        sink(*savedNAR.data);
+        copyNAR(conn->from, sink);
     }
 
     PathSet queryAllValidPaths() override { unsupported(); }

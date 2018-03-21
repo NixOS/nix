@@ -74,6 +74,9 @@ void parseDump(ParseSink & sink, Source & source);
 
 void restorePath(const Path & path, Source & source);
 
+/* Read a NAR from 'source' and write it to 'sink'. */
+void copyNAR(Source & source, Sink & sink);
+
 
 // FIXME: global variables are bad m'kay.
 extern bool useCaseHack;

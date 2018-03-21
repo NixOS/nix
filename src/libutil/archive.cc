@@ -350,4 +350,21 @@ void restorePath(const Path & path, Source & source)
 }
 
 
+void copyNAR(Source & source, Sink & sink)
+{
+    // FIXME: if 'source' is the output of dumpPath() followed by EOF,
+    // we should just forward all data directly without parsing.
+
+    ParseSink parseSink; /* null sink; just parse the NAR */
+
+    LambdaSource wrapper([&](unsigned char * data, size_t len) {
+        auto n = source.read(data, len);
+        sink(data, n);
+        return n;
+    });
+
+    parseDump(parseSink, wrapper);
+}
+
+
 }

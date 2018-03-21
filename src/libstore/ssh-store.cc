@@ -63,29 +63,12 @@ private:
     };
 };
 
-
-class ForwardSource : public Source
-{
-    Source & readSource;
-    Sink & writeSink;
-public:
-    ForwardSource(Source & readSource, Sink & writeSink) : readSource(readSource), writeSink(writeSink) {}
-    size_t read(unsigned char * data, size_t len) override
-    {
-        auto n = readSource.read(data, len);
-        writeSink(data, n);
-        return n;
-    }
-};
-
 void SSHStore::narFromPath(const Path & path, Sink & sink)
 {
     auto conn(connections->get());
     conn->to << wopNarFromPath << path;
     conn->processStderr();
-    ParseSink ps;
-    auto fwd = ForwardSource(conn->from, sink);
-    parseDump(ps, fwd);
+    copyNAR(conn->from, sink);
 }
 
 ref<FSAccessor> SSHStore::getFSAccessor()
