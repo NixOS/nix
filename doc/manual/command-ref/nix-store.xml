@@ -501,10 +501,11 @@ error: cannot delete path `/nix/store/zq0h41l75vlb4z45kzgjjmsjxvcv1qk7-mesa-6.4'
     <arg choice='plain'><option>--referrers</option></arg>
     <arg choice='plain'><option>--referrers-closure</option></arg>
     <arg choice='plain'><option>--deriver</option></arg>
-    <arg choice='plain'><option>--deriver</option></arg>
+    <arg choice='plain'><option>-d</option></arg>
     <arg choice='plain'><option>--graph</option></arg>
     <arg choice='plain'><option>--tree</option></arg>
     <arg choice='plain'><option>--binding</option> <replaceable>name</replaceable></arg>
+    <arg choice='plain'><option>-b</option> <replaceable>name</replaceable></arg>
     <arg choice='plain'><option>--hash</option></arg>
     <arg choice='plain'><option>--size</option></arg>
     <arg choice='plain'><option>--roots</option></arg>
@@ -642,6 +643,7 @@ query is applied to the target of the symlink.</para>
   </varlistentry>
 
   <varlistentry><term><option>--deriver</option></term>
+    <term><option>-d</option></term>
 
     <listitem><para>Prints the <link
     linkend="gloss-deriver">deriver</link> of the store paths
@@ -678,6 +680,7 @@ query is applied to the target of the symlink.</para>
   </varlistentry>
 
   <varlistentry><term><option>--binding</option> <replaceable>name</replaceable></term>
+    <term><option>-b</option> <replaceable>name</replaceable></term>
 
     <listitem><para>Prints the value of the attribute
     <replaceable>name</replaceable> (i.e., environment variable) of
