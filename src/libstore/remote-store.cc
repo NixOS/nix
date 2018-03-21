@@ -385,21 +385,21 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 18) {
         conn->to << wopImportPaths;
 
-        StringSink sink;
-        sink << 1 // == path follows
-            ;
-        copyNAR(source, sink);
-        sink
-            << exportMagic
-            << info.path
-            << info.references
-            << info.deriver
-            << 0 // == no legacy signature
-            << 0 // == no path follows
-            ;
+        auto source2 = sinkToSource([&](Sink & sink) {
+            sink << 1 // == path follows
+                ;
+            copyNAR(source, sink);
+            sink
+                << exportMagic
+                << info.path
+                << info.references
+                << info.deriver
+                << 0 // == no legacy signature
+                << 0 // == no path follows
+                ;
+        });
 
-        StringSource source(*sink.s);
-        conn->processStderr(0, &source);
+        conn->processStderr(0, source2.get());
 
         auto importedPaths = readStorePaths<PathSet>(*this, conn->from);
         assert(importedPaths.size() <= 1);
