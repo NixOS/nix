@@ -208,32 +208,6 @@ struct TunnelSource : BufferedSource
 };
 
 
-/* If the NAR archive contains a single file at top-level, then save
-   the contents of the file to `s'.  Otherwise barf. */
-struct RetrieveRegularNARSink : ParseSink
-{
-    bool regular;
-    string s;
-
-    RetrieveRegularNARSink() : regular(true) { }
-
-    void createDirectory(const Path & path)
-    {
-        regular = false;
-    }
-
-    void receiveContents(unsigned char * data, unsigned int len)
-    {
-        s.append((const char *) data, len);
-    }
-
-    void createSymlink(const Path & path, const string & target)
-    {
-        regular = false;
-    }
-};
-
-
 static void performOp(TunnelLogger * logger, ref<LocalStore> store,
     bool trusted, unsigned int clientVersion,
     Source & from, Sink & to, unsigned int op)
@@ -339,31 +313,15 @@ static void performOp(TunnelLogger * logger, ref<LocalStore> store,
     }
 
     case wopAddToStore: {
-        bool fixed, recursive;
-        std::string s, baseName;
-        from >> baseName >> fixed /* obsolete */ >> recursive >> s;
-        /* Compatibility hack. */
-        if (!fixed) {
-            s = "sha256";
-            recursive = true;
+        if (GET_PROTOCOL_MINOR(clientVersion) < 15) {
+            throw Error("adding to the store is not supported with an old Nix client");
         }
-        HashType hashAlgo = parseHashType(s);
 
-        TeeSource savedNAR(from);
-        RetrieveRegularNARSink savedRegular;
-
-        if (recursive) {
-            /* Get the entire NAR dump from the client and save it to
-               a string so that we can pass it to
-               addToStoreFromDump(). */
-            ParseSink sink; /* null sink; just parse the NAR */
-            parseDump(sink, savedNAR);
-        } else
-            parseDump(savedRegular, from);
+        Path dstPath = readStorePath(*store, from);
+        bool recursive = readInt(from) == 1;
 
         logger->startWork();
-        if (!savedRegular.regular) throw Error("regular file expected");
-        Path path = store->addToStoreFromDump(recursive ? *savedNAR.data : savedRegular.s, baseName, recursive, hashAlgo);
+        Path path = store->addToStoreFromDump(from, dstPath, recursive);
         logger->stopWork();
 
         to << path;
