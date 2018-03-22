@@ -134,8 +134,8 @@ static void decompressBrotli(Source & source, Sink & sink)
 {
 #if !HAVE_BROTLI
     RunOptions options(BROTLI, {"-d"});
-    options.stdin = &source;
-    options.stdout = &sink;
+    options.standardIn = &source;
+    options.standardOut = &sink;
     runProgram2(options);
 #else
     auto *s = BrotliDecoderCreateInstance(nullptr, nullptr, nullptr);
