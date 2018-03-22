@@ -40,14 +40,14 @@ static void dumpContents(const Path & path, size_t size,
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
     if (!fd) throw SysError(format("opening file '%1%'") % path);
 
-    unsigned char buf[65536];
+    std::vector<unsigned char> buf(65536);
     size_t left = size;
 
     while (left > 0) {
-        size_t n = left > sizeof(buf) ? sizeof(buf) : left;
-        readFull(fd.get(), buf, n);
+        size_t n = left > buf.size() ? buf.size() : left;
+        readFull(fd.get(), buf.data(), n);
         left -= n;
-        sink(buf, n);
+        sink(buf.data(), n);
     }
 
     writePadding(size, sink);
@@ -146,14 +146,14 @@ static void parseContents(ParseSink & sink, Source & source, const Path & path)
     sink.preallocateContents(size);
 
     unsigned long long left = size;
-    unsigned char buf[65536];
+    std::vector<unsigned char> buf(65536);
 
     while (left) {
         checkInterrupt();
-        unsigned int n = sizeof(buf);
-        if ((unsigned long long) n > left) n = left;
-        source(buf, n);
-        sink.receiveContents(buf, n);
+        auto n = buf.size();
+        if ((unsigned long long)n > left) n = left;
+        source(buf.data(), n);
+        sink.receiveContents(buf.data(), n);
         left -= n;
     }
 

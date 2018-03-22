@@ -4161,10 +4161,10 @@ void Worker::waitForInput()
         assert(goal);
 
         set<int> fds2(j->fds);
+        std::vector<unsigned char> buffer(4096);
         for (auto & k : fds2) {
             if (FD_ISSET(k, &fds)) {
-                unsigned char buffer[4096];
-                ssize_t rd = read(k, buffer, sizeof(buffer));
+                ssize_t rd = read(k, buffer.data(), buffer.size());
                 if (rd == -1) {
                     if (errno != EINTR)
                         throw SysError(format("reading from %1%")
@@ -4176,7 +4176,7 @@ void Worker::waitForInput()
                 } else {
                     printMsg(lvlVomit, format("%1%: read %2% bytes")
                         % goal->getName() % rd);
-                    string data((char *) buffer, rd);
+                    string data((char *) buffer.data(), rd);
                     j->lastOutput = after;
                     goal->handleChildOutput(k, data);
                 }
