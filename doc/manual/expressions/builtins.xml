@@ -307,6 +307,61 @@ stdenv.mkDerivation { … }
 
   </varlistentry>
 
+  <varlistentry>
+    <term>
+      <function>builtins.fetchGit</function>
+      <replaceable>args</replaceable>
+    </term>
+
+    <listitem>
+      <para>
+        Fetch a path from git. <replaceable>args</replaceable> can be
+        a URL, in which case the HEAD of the repo at that URL is
+        fetched. Otherwise, it can be an attribute with the following
+        attributes (all except <varname>url</varname> optional):
+      </para>
+
+      <variablelist>
+        <varlistentry>
+          <term>url</term>
+          <listitem>
+            <para>
+              The URL of the repo.
+            </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry>
+          <term>name</term>
+          <listitem>
+            <para>
+              The name of the directory the repo should be exported to
+              in the store. Defaults to the basename of the URL.
+            </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry>
+          <term>rev</term>
+          <listitem>
+            <para>
+              The git revision to fetch. Defaults to the tip of
+              <varname>ref</varname>.
+            </para>
+          </listitem>
+        </varlistentry>
+        <varlistentry>
+          <term>ref</term>
+          <listitem>
+            <para>
+              The git ref to look for the requested revision under.
+              This is often a branch or tag name. Defaults to
+              <literal>HEAD</literal>.
+            </para>
+          </listitem>
+        </varlistentry>
+      </variablelist>
+    </listitem>
+  </varlistentry>
+
 
   <varlistentry><term><function>builtins.filter</function>
   <replaceable>f</replaceable> <replaceable>xs</replaceable></term>
