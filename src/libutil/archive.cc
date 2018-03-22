@@ -44,7 +44,7 @@ static void dumpContents(const Path & path, size_t size,
     size_t left = size;
 
     while (left > 0) {
-        size_t n = left > buf.size() ? buf.size() : left;
+        auto n = std::min(left, buf.size());
         readFull(fd.get(), buf.data(), n);
         left -= n;
         sink(buf.data(), n);
