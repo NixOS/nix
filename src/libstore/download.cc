@@ -726,8 +726,13 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
         storePath = unpackedStorePath;
     }
 
-    if (expectedStorePath != "" && storePath != expectedStorePath)
-        throw nix::Error("store path mismatch in file downloaded from '%s'", url);
+    if (expectedStorePath != "" && storePath != expectedStorePath) {
+        Hash gotHash = unpack
+            ? hashPath(expectedHash.type, store->toRealPath(storePath)).first
+            : hashFile(expectedHash.type, store->toRealPath(storePath));
+        throw nix::Error("hash mismatch in file downloaded from '%s': expected hash '%s', got '%s'",
+            url, expectedHash.to_string(), gotHash.to_string());
+    }
 
     return store->toRealPath(storePath);
 }
