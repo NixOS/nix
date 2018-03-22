@@ -284,12 +284,6 @@ let
           binaryTarball.i686-linux
           binaryTarball.x86_64-darwin
           binaryTarball.x86_64-linux
-          #deb_debian8i386
-          #deb_debian8x86_64
-          deb_ubuntu1604i386
-          deb_ubuntu1604x86_64
-          rpm_fedora25i386
-          rpm_fedora25x86_64
           tests.remoteBuilds
           tests.nix-copy-closure
           tests.binaryTarball
