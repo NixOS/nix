@@ -632,7 +632,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
     if (expectedHash) {
         expectedStorePath = store->makeFixedOutputPath(unpack, expectedHash, name);
         if (store->isValidPath(expectedStorePath))
-            return expectedStorePath;
+            return store->toRealPath(expectedStorePath);
     }
 
     Path cacheDir = getCacheDir() + "/nix/tarballs";
