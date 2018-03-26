@@ -411,8 +411,9 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
                  << info.references << info.registrationTime << info.narSize
                  << info.ultimate << info.sigs << info.ca
                  << repair << !checkSigs;
-        copyNAR(source, conn->to);
-        conn->processStderr();
+        bool tunnel = GET_PROTOCOL_MINOR(conn->daemonVersion) >= 21;
+        if (!tunnel) copyNAR(source, conn->to);
+        conn->processStderr(0, tunnel ? &source : nullptr);
     }
 }
 

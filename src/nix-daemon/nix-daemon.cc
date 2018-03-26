@@ -690,12 +690,22 @@ static void performOp(TunnelLogger * logger, ref<LocalStore> store,
         if (!trusted)
             info.ultimate = false;
 
-        TeeSink tee(from);
-        parseDump(tee, tee.source);
+        std::string saved;
+        std::unique_ptr<Source> source;
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 21)
+            source = std::make_unique<TunnelSource>(from);
+        else {
+            TeeSink tee(from);
+            parseDump(tee, tee.source);
+            saved = std::move(*tee.source.data);
+            source = std::make_unique<StringSource>(saved);
+        }
 
         logger->startWork();
-        store.cast<Store>()->addToStore(info, tee.source.data, (RepairFlag) repair,
+
+        store.cast<Store>()->addToStore(info, *source, (RepairFlag) repair,
             dontCheckSigs ? NoCheckSigs : CheckSigs, nullptr);
+
         logger->stopWork();
         break;
     }
