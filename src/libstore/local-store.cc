@@ -976,7 +976,8 @@ const PublicKeys & LocalStore::getPublicKeys()
 void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
     RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
 {
-    assert(info.narHash);
+    if (!info.narHash)
+        throw Error("cannot add path '%s' because it lacks a hash", info.path);
 
     if (requireSigs && checkSigs && !info.checkSignatures(*this, getPublicKeys()))
         throw Error("cannot add path '%s' because it lacks a valid signature", info.path);
