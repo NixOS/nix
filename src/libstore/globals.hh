@@ -13,26 +13,6 @@ namespace nix {
 
 typedef enum { smEnabled, smRelaxed, smDisabled } SandboxMode;
 
-extern bool useCaseHack; // FIXME
-
-struct CaseHackSetting : public BaseSetting<bool>
-{
-    CaseHackSetting(Config * options,
-        const std::string & name,
-        const std::string & description,
-        const std::set<std::string> & aliases = {})
-        : BaseSetting<bool>(useCaseHack, name, description, aliases)
-    {
-        options->addSetting(this);
-    }
-
-    void set(const std::string & str) override
-    {
-        BaseSetting<bool>::set(str);
-        nix::useCaseHack = value;
-    }
-};
-
 struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
 {
     MaxBuildJobsSetting(Config * options,
@@ -55,10 +35,6 @@ class Settings : public Config {
 public:
 
     Settings();
-
-    void loadConfFile();
-
-    void set(const string & name, const string & value);
 
     Path nixPrefix;
 
@@ -353,9 +329,6 @@ public:
     Setting<bool> enableImportFromDerivation{this, true, "allow-import-from-derivation",
         "Whether the evaluator allows importing the result of a derivation."};
 
-    CaseHackSetting useCaseHack{this, "use-case-hack",
-        "Whether to enable a Darwin-specific hack for dealing with file name collisions."};
-
     Setting<unsigned long> connectTimeout{this, 0, "connect-timeout",
         "Timeout for connecting to servers during downloads. 0 means use curl's builtin default."};
 
@@ -398,15 +371,8 @@ extern Settings settings;
    anything else */
 void initPlugins();
 
+void loadConfFile();
 
 extern const string nixVersion;
-
-struct RegisterSetting
-{
-    typedef std::vector<AbstractSetting *> SettingRegistrations;
-    static SettingRegistrations * settingRegistrations;
-    RegisterSetting(AbstractSetting * s);
-};
-
 
 }

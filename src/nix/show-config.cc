@@ -27,10 +27,12 @@ struct CmdShowConfig : Command, MixJSON
         if (json) {
             // FIXME: use appropriate JSON types (bool, ints, etc).
             JSONObject jsonObj(std::cout);
-            settings.toJSON(jsonObj);
+            globalConfig.toJSON(jsonObj);
         } else {
-            for (auto & s : settings.getSettings())
-                std::cout << s.first + " = " + s.second + "\n";
+            std::map<std::string, Config::SettingInfo> settings;
+            globalConfig.getSettings(settings);
+            for (auto & s : settings)
+                std::cout << s.first + " = " + s.second.value + "\n";
         }
     }
 };

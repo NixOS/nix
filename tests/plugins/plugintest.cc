@@ -1,16 +1,21 @@
-#include "globals.hh"
+#include "config.hh"
 #include "primops.hh"
 
 using namespace nix;
 
-static BaseSetting<bool> settingSet{false, "setting-set",
+struct MySettings : Config
+{
+    Setting<bool> settingSet{this, false, "setting-set",
         "Whether the plugin-defined setting was set"};
+};
 
-static RegisterSetting rs(&settingSet);
+MySettings mySettings;
+
+static GlobalConfig::Register rs(&mySettings);
 
 static void prim_anotherNull (EvalState & state, const Pos & pos, Value ** args, Value & v)
 {
-    if (settingSet)
+    if (mySettings.settingSet)
         mkNull(v);
     else
         mkBool(v, false);

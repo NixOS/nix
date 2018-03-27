@@ -4,15 +4,13 @@
 
 namespace nix {
 
-void Config::set(const std::string & name, const std::string & value)
+bool Config::set(const std::string & name, const std::string & value)
 {
     auto i = _settings.find(name);
-    if (i == _settings.end()) {
-        extras.emplace(name, value);
-    } else {
-        i->second.setting->set(value);
-        i->second.setting->overriden = true;
-    }
+    if (i == _settings.end()) return false;
+    i->second.setting->set(value);
+    i->second.setting->overriden = true;
+    return true;
 }
 
 void Config::addSetting(AbstractSetting * setting)
@@ -23,46 +21,51 @@ void Config::addSetting(AbstractSetting * setting)
 
     bool set = false;
 
-    auto i = extras.find(setting->name);
-    if (i != extras.end()) {
+    auto i = unknownSettings.find(setting->name);
+    if (i != unknownSettings.end()) {
         setting->set(i->second);
         setting->overriden = true;
-        extras.erase(i);
+        unknownSettings.erase(i);
         set = true;
     }
 
     for (auto & alias : setting->aliases) {
-        auto i = extras.find(alias);
-        if (i != extras.end()) {
+        auto i = unknownSettings.find(alias);
+        if (i != unknownSettings.end()) {
             if (set)
                 warn("setting '%s' is set, but it's an alias of '%s' which is also set",
                     alias, setting->name);
             else {
                 setting->set(i->second);
                 setting->overriden = true;
-                extras.erase(i);
+                unknownSettings.erase(i);
                 set = true;
             }
         }
     }
 }
 
-void Config::handleUnknownSettings()
+void AbstractConfig::warnUnknownSettings()
 {
-    for (auto & s : extras)
+    for (auto & s : unknownSettings)
         warn("unknown setting '%s'", s.first);
 }
 
-StringMap Config::getSettings(bool overridenOnly)
+void AbstractConfig::reapplyUnknownSettings()
 {
-    StringMap res;
-    for (auto & opt : _settings)
-        if (!opt.second.isAlias && (!overridenOnly || opt.second.setting->overriden))
-            res.emplace(opt.first, opt.second.setting->to_string());
-    return res;
+    auto unknownSettings2 = std::move(unknownSettings);
+    for (auto & s : unknownSettings2)
+        set(s.first, s.second);
 }
 
-void Config::applyConfigFile(const Path & path)
+void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overridenOnly)
+{
+    for (auto & opt : _settings)
+        if (!opt.second.isAlias && (!overridenOnly || opt.second.setting->overriden))
+            res.emplace(opt.first, SettingInfo{opt.second.setting->to_string(), opt.second.setting->description});
+}
+
+void AbstractConfig::applyConfigFile(const Path & path)
 {
     try {
         string contents = readFile(path);
@@ -285,6 +288,51 @@ void PathSetting::set(const std::string & str)
             throw UsageError("setting '%s' cannot be empty", name);
     } else
         value = canonPath(str);
+}
+
+bool GlobalConfig::set(const std::string & name, const std::string & value)
+{
+    for (auto & config : *configRegistrations)
+        if (config->set(name, value)) return true;
+
+    unknownSettings.emplace(name, value);
+
+    return false;
+}
+
+void GlobalConfig::getSettings(std::map<std::string, SettingInfo> & res, bool overridenOnly)
+{
+    for (auto & config : *configRegistrations)
+        config->getSettings(res, overridenOnly);
+}
+
+void GlobalConfig::resetOverriden()
+{
+    for (auto & config : *configRegistrations)
+        config->resetOverriden();
+}
+
+void GlobalConfig::toJSON(JSONObject & out)
+{
+    for (auto & config : *configRegistrations)
+        config->toJSON(out);
+}
+
+void GlobalConfig::convertToArgs(Args & args, const std::string & category)
+{
+    for (auto & config : *configRegistrations)
+        config->convertToArgs(args, category);
+}
+
+GlobalConfig globalConfig;
+
+GlobalConfig::ConfigRegistrations * GlobalConfig::configRegistrations;
+
+GlobalConfig::Register::Register(Config * config)
+{
+    if (!configRegistrations)
+        configRegistrations = new ConfigRegistrations;
+    configRegistrations->emplace_back(config);
 }
 
 }

@@ -672,8 +672,10 @@ HookInstance::HookInstance()
     toHook.readSide = -1;
 
     sink = FdSink(toHook.writeSide.get());
-    for (auto & setting : settings.getSettings())
-        sink << 1 << setting.first << setting.second;
+    std::map<std::string, Config::SettingInfo> settings;
+    globalConfig.getSettings(settings);
+    for (auto & setting : settings)
+        sink << 1 << setting.first << setting.second.value;
     sink << 0;
 }
 

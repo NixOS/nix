@@ -13,17 +13,25 @@
 
 #include "archive.hh"
 #include "util.hh"
-
+#include "config.hh"
 
 namespace nix {
 
+struct ArchiveSettings : Config
+{
+    Setting<bool> useCaseHack{this,
+        #if __APPLE__
+            true,
+        #else
+            false,
+        #endif
+        "use-case-hack",
+        "Whether to enable a Darwin-specific hack for dealing with file name collisions."};
+};
 
-bool useCaseHack =
-#if __APPLE__
-    true;
-#else
-    false;
-#endif
+static ArchiveSettings archiveSettings;
+
+static GlobalConfig::Register r1(&archiveSettings);
 
 const std::string narVersionMagic1 = "nix-archive-1";
 
@@ -78,7 +86,7 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
            the case hack applied by restorePath(). */
         std::map<string, string> unhacked;
         for (auto & i : readDirectory(path))
-            if (useCaseHack) {
+            if (archiveSettings.useCaseHack) {
                 string name(i.name);
                 size_t pos = i.name.find(caseHackSuffix);
                 if (pos != string::npos) {
@@ -243,7 +251,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
                     if (name <= prevName)
                         throw Error("NAR directory is not sorted");
                     prevName = name;
-                    if (useCaseHack) {
+                    if (archiveSettings.useCaseHack) {
                         auto i = names.find(name);
                         if (i != names.end()) {
                             debug(format("case collision between '%1%' and '%2%'") % i->first % name);

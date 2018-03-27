@@ -28,9 +28,10 @@ namespace nix {
 
 Settings settings;
 
+static GlobalConfig::Register r1(&settings);
+
 Settings::Settings()
-    : Config({})
-    , nixPrefix(NIX_PREFIX)
+    : nixPrefix(NIX_PREFIX)
     , nixStore(canonPath(getEnv("NIX_STORE_DIR", getEnv("NIX_STORE", NIX_STORE_DIR))))
     , nixDataDir(canonPath(getEnv("NIX_DATA_DIR", NIX_DATA_DIR)))
     , nixLogDir(canonPath(getEnv("NIX_LOG_DIR", NIX_LOG_DIR)))
@@ -69,20 +70,15 @@ Settings::Settings()
     allowedImpureHostPrefixes = tokenizeString<StringSet>(DEFAULT_ALLOWED_IMPURE_PREFIXES);
 }
 
-void Settings::loadConfFile()
+void loadConfFile()
 {
-    applyConfigFile(nixConfDir + "/nix.conf");
+    globalConfig.applyConfigFile(settings.nixConfDir + "/nix.conf");
 
     /* We only want to send overrides to the daemon, i.e. stuff from
        ~/.nix/nix.conf or the command line. */
-    resetOverriden();
+    globalConfig.resetOverriden();
 
-    applyConfigFile(getConfigDir() + "/nix/nix.conf");
-}
-
-void Settings::set(const string & name, const string & value)
-{
-    Config::set(name, value);
+    globalConfig.applyConfigFile(getConfigDir() + "/nix/nix.conf");
 }
 
 unsigned int Settings::getDefaultCores()
@@ -162,23 +158,11 @@ void initPlugins()
                 throw Error("could not dynamically open plugin file '%s': %s", file, dlerror());
         }
     }
-    /* We handle settings registrations here, since plugins can add settings */
-    if (RegisterSetting::settingRegistrations) {
-        for (auto & registration : *RegisterSetting::settingRegistrations)
-            settings.addSetting(registration);
-        delete RegisterSetting::settingRegistrations;
-    }
-    settings.handleUnknownSettings();
+
+    /* Since plugins can add settings, try to re-apply previously
+       unknown settings. */
+    globalConfig.reapplyUnknownSettings();
+    globalConfig.warnUnknownSettings();
 }
-
-RegisterSetting::SettingRegistrations * RegisterSetting::settingRegistrations;
-
-RegisterSetting::RegisterSetting(AbstractSetting * s)
-{
-    if (!settingRegistrations)
-        settingRegistrations = new SettingRegistrations;
-    settingRegistrations->emplace_back(s);
-}
-
 
 }

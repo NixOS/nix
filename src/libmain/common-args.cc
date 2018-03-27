@@ -29,14 +29,14 @@ MixCommonArgs::MixCommonArgs(const string & programName)
         .arity(2)
         .handler([](std::vector<std::string> ss) {
             try {
-                settings.set(ss[0], ss[1]);
+                globalConfig.set(ss[0], ss[1]);
             } catch (UsageError & e) {
                 warn(e.what());
             }
         });
 
     std::string cat = "config";
-    settings.convertToArgs(*this, cat);
+    globalConfig.convertToArgs(*this, cat);
 
     // Backward compatibility hack: nix-env already had a --system flag.
     if (programName == "nix-env") longFlags.erase("system");

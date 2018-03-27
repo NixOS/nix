@@ -78,10 +78,6 @@ void restorePath(const Path & path, Source & source);
 void copyNAR(Source & source, Sink & sink);
 
 
-// FIXME: global variables are bad m'kay.
-extern bool useCaseHack;
-
-
 extern const std::string narVersionMagic1;
 
 

@@ -27,7 +27,7 @@ static ref<Store> store()
     static std::shared_ptr<Store> _store;
     if (!_store) {
         try {
-            settings.loadConfFile();
+            loadConfFile();
             settings.lockCPU = false;
             _store = openStore();
         } catch (Error & e) {

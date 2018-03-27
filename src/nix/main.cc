@@ -34,9 +34,10 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .handler([&]() {
                 std::cout << "The following configuration options are available:\n\n";
                 Table2 tbl;
-                for (const auto & s : settings._getSettings())
-                    if (!s.second.isAlias)
-                        tbl.emplace_back(s.first, s.second.setting->description);
+                std::map<std::string, Config::SettingInfo> settings;
+                globalConfig.getSettings(settings);
+                for (const auto & s : settings)
+                    tbl.emplace_back(s.first, s.second.description);
                 printTable(std::cout, tbl);
                 throw Exit();
             });

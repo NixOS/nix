@@ -187,10 +187,11 @@ void RemoteStore::setOptions(Connection & conn)
        << settings.useSubstitutes;
 
     if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 12) {
-        auto overrides = settings.getSettings(true);
+        std::map<std::string, Config::SettingInfo> overrides;
+        globalConfig.getSettings(overrides, true);
         conn.to << overrides.size();
         for (auto & i : overrides)
-            conn.to << i.first << i.second;
+            conn.to << i.first << i.second.value;
     }
 
     conn.processStderr();
