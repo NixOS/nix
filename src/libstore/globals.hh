@@ -256,13 +256,6 @@ public:
     Setting<Strings> secretKeyFiles{this, {}, "secret-key-files",
         "Secret keys with which to sign local builds."};
 
-    Setting<size_t> binaryCachesParallelConnections{this, 25, "http-connections",
-        "Number of parallel HTTP connections.",
-        {"binary-caches-parallel-connections"}};
-
-    Setting<bool> enableHttp2{this, true, "http2",
-        "Whether to enable HTTP/2 support."};
-
     Setting<unsigned int> tarballTtl{this, 60 * 60, "tarball-ttl",
         "How soon to expire files fetched by builtins.fetchTarball and builtins.fetchurl."};
 
@@ -328,12 +321,6 @@ public:
 
     Setting<bool> enableImportFromDerivation{this, true, "allow-import-from-derivation",
         "Whether the evaluator allows importing the result of a derivation."};
-
-    Setting<unsigned long> connectTimeout{this, 0, "connect-timeout",
-        "Timeout for connecting to servers during downloads. 0 means use curl's builtin default."};
-
-    Setting<std::string> userAgentSuffix{this, "", "user-agent-suffix",
-        "String appended to the user agent in HTTP requests."};
 
 #if __linux__
     Setting<bool> filterSyscalls{this, true, "filter-syscalls",

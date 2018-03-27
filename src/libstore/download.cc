@@ -29,6 +29,26 @@ using namespace std::string_literals;
 
 namespace nix {
 
+struct DownloadSettings : Config
+{
+    Setting<bool> enableHttp2{this, true, "http2",
+        "Whether to enable HTTP/2 support."};
+
+    Setting<std::string> userAgentSuffix{this, "", "user-agent-suffix",
+        "String appended to the user agent in HTTP requests."};
+
+    Setting<size_t> httpConnections{this, 25, "http-connections",
+        "Number of parallel HTTP connections.",
+        {"binary-caches-parallel-connections"}};
+
+    Setting<unsigned long> connectTimeout{this, 0, "connect-timeout",
+        "Timeout for connecting to servers during downloads. 0 means use curl's builtin default."};
+};
+
+static DownloadSettings downloadSettings;
+
+static GlobalConfig::Register r1(&downloadSettings);
+
 std::string resolveUri(const std::string & uri)
 {
     if (uri.compare(0, 8, "channel:") == 0)
@@ -53,8 +73,6 @@ struct CurlDownloader : public Downloader
 
     std::random_device rd;
     std::mt19937 mt19937;
-
-    bool enableHttp2;
 
     struct DownloadItem : public std::enable_shared_from_this<DownloadItem>
     {
@@ -221,12 +239,12 @@ struct CurlDownloader : public Downloader
             curl_easy_setopt(req, CURLOPT_NOSIGNAL, 1);
             curl_easy_setopt(req, CURLOPT_USERAGENT,
                 ("curl/" LIBCURL_VERSION " Nix/" + nixVersion +
-                    (settings.userAgentSuffix != "" ? " " + settings.userAgentSuffix.get() : "")).c_str());
+                    (downloadSettings.userAgentSuffix != "" ? " " + downloadSettings.userAgentSuffix.get() : "")).c_str());
             #if LIBCURL_VERSION_NUM >= 0x072b00
             curl_easy_setopt(req, CURLOPT_PIPEWAIT, 1);
             #endif
             #if LIBCURL_VERSION_NUM >= 0x072f00
-            if (downloader.enableHttp2)
+            if (downloadSettings.enableHttp2)
                 curl_easy_setopt(req, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
             #endif
             curl_easy_setopt(req, CURLOPT_WRITEFUNCTION, DownloadItem::writeCallbackWrapper);
@@ -258,7 +276,7 @@ struct CurlDownloader : public Downloader
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYHOST, 0);
             }
 
-            curl_easy_setopt(req, CURLOPT_CONNECTTIMEOUT, settings.connectTimeout.get());
+            curl_easy_setopt(req, CURLOPT_CONNECTTIMEOUT, downloadSettings.connectTimeout.get());
 
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_LIMIT, 1L);
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_TIME, lowSpeedTimeout);
@@ -401,10 +419,8 @@ struct CurlDownloader : public Downloader
         #endif
         #if LIBCURL_VERSION_NUM >= 0x071e00 // Max connections requires >= 7.30.0
         curl_multi_setopt(curlm, CURLMOPT_MAX_TOTAL_CONNECTIONS,
-            settings.binaryCachesParallelConnections.get());
+            downloadSettings.httpConnections.get());
         #endif
-
-        enableHttp2 = settings.enableHttp2;
 
         wakeupPipe.create();
         fcntl(wakeupPipe.readSide.get(), F_SETFL, O_NONBLOCK);

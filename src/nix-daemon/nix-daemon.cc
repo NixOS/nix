@@ -553,7 +553,7 @@ static void performOp(TunnelLogger * logger, ref<LocalStore> store,
                     ;
                 else if (trusted
                     || name == settings.buildTimeout.name
-                    || name == settings.connectTimeout.name)
+                    || name == "connect-timeout")
                     settings.set(name, value);
                 else if (setSubstituters(settings.substituters))
                     ;
