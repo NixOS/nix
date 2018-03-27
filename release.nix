@@ -115,16 +115,15 @@ let
       let
         toplevel = builtins.getAttr system jobs.build;
         version = toplevel.src.version;
+        installerClosureInfo = closureInfo { rootPaths = [ toplevel cacert ]; };
       in
 
       runCommand "nix-binary-tarball-${version}"
-        { exportReferencesGraph = [ "closure1" toplevel "closure2" cacert ];
-          buildInputs = [ perl ] ++ lib.optional (system != "aarch64-linux") shellcheck;
+        { nativeBuildInputs = lib.optional (system != "aarch64-linux") shellcheck;
           meta.description = "Distribution-independent Nix bootstrap binaries for ${system}";
         }
         ''
-          storePaths=$(perl ${pathsFromGraph} ./closure1 ./closure2)
-          printRegistration=1 perl ${pathsFromGraph} ./closure1 ./closure2 > $TMPDIR/reginfo
+          cp ${installerClosureInfo}/registration $TMPDIR/reginfo
           substitute ${./scripts/install-nix-from-closure.sh} $TMPDIR/install \
             --subst-var-by nix ${toplevel} \
             --subst-var-by cacert ${cacert}
@@ -150,7 +149,8 @@ let
             --transform "s,$TMPDIR/install,$dir/install," \
             --transform "s,$TMPDIR/reginfo,$dir/.reginfo," \
             --transform "s,$NIX_STORE,$dir/store,S" \
-            $TMPDIR/install $TMPDIR/install-darwin-multi-user $TMPDIR/reginfo $storePaths
+            $TMPDIR/install $TMPDIR/install-darwin-multi-user $TMPDIR/reginfo \
+            $(cat ${installerClosureInfo}/store-paths)
         '');
 
 
