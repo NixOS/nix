@@ -81,8 +81,7 @@ struct CurlDownloader : public Downloader
         DownloadResult result;
         Activity act;
         bool done = false; // whether either the success or failure function has been called
-        std::function<void(const DownloadResult &)> success;
-        std::function<void(std::exception_ptr exc)> failure;
+        Callback<DownloadResult> callback;
         CURL * req = 0;
         bool active = false; // whether the handle has been added to the multi object
         std::string status;
@@ -97,10 +96,13 @@ struct CurlDownloader : public Downloader
 
         std::string encoding;
 
-        DownloadItem(CurlDownloader & downloader, const DownloadRequest & request)
+        DownloadItem(CurlDownloader & downloader,
+            const DownloadRequest & request,
+            Callback<DownloadResult> callback)
             : downloader(downloader)
             , request(request)
             , act(*logger, lvlTalkative, actDownload, fmt("downloading '%s'", request.uri), {request.uri}, request.parentAct)
+            , callback(callback)
         {
             if (!request.expectedETag.empty())
                 requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + request.expectedETag).c_str());
@@ -129,7 +131,7 @@ struct CurlDownloader : public Downloader
         {
             assert(!done);
             done = true;
-            callFailure(failure, std::make_exception_ptr(e));
+            callback.rethrow(std::make_exception_ptr(e));
         }
 
         size_t writeCallback(void * contents, size_t size, size_t nmemb)
@@ -316,11 +318,11 @@ struct CurlDownloader : public Downloader
                 try {
                     if (request.decompress)
                         result.data = decodeContent(encoding, ref<std::string>(result.data));
-                    callSuccess(success, failure, const_cast<const DownloadResult &>(result));
                     act.progress(result.data->size(), result.data->size());
+                    callback(std::move(result));
                 } catch (...) {
                     done = true;
-                    callFailure(failure, std::current_exception());
+                    callback.rethrow();
                 }
             } else {
                 // We treat most errors as transient, but won't retry when hopeless
@@ -570,13 +572,12 @@ struct CurlDownloader : public Downloader
     }
 
     void enqueueDownload(const DownloadRequest & request,
-        std::function<void(const DownloadResult &)> success,
-        std::function<void(std::exception_ptr exc)> failure) override
+        Callback<DownloadResult> callback) override
     {
         /* Ugly hack to support s3:// URIs. */
         if (hasPrefix(request.uri, "s3://")) {
             // FIXME: do this on a worker thread
-            sync2async<DownloadResult>(success, failure, [&]() -> DownloadResult {
+            try {
 #ifdef ENABLE_S3
                 S3Helper s3Helper("", Aws::Region::US_EAST_1); // FIXME: make configurable
                 auto slash = request.uri.find('/', 5);
@@ -590,18 +591,15 @@ struct CurlDownloader : public Downloader
                 if (!s3Res.data)
                     throw DownloadError(NotFound, fmt("S3 object '%s' does not exist", request.uri));
                 res.data = s3Res.data;
-                return res;
+                callback(std::move(res));
 #else
                 throw nix::Error("cannot download '%s' because Nix is not built with S3 support", request.uri);
 #endif
-            });
+            } catch (...) { callback.rethrow(); }
             return;
         }
 
-        auto item = std::make_shared<DownloadItem>(*this, request);
-        item->success = success;
-        item->failure = failure;
-        enqueueItem(item);
+        enqueueItem(std::make_shared<DownloadItem>(*this, request, callback));
     }
 };
 
@@ -622,8 +620,13 @@ std::future<DownloadResult> Downloader::enqueueDownload(const DownloadRequest & 
 {
     auto promise = std::make_shared<std::promise<DownloadResult>>();
     enqueueDownload(request,
-        [promise](const DownloadResult & result) { promise->set_value(result); },
-        [promise](std::exception_ptr exc) { promise->set_exception(exc); });
+        {[promise](std::future<DownloadResult> fut) {
+            try {
+                promise->set_value(fut.get());
+            } catch (...) {
+                promise->set_exception(std::current_exception());
+            }
+        }});
     return promise->get_future();
 }
 

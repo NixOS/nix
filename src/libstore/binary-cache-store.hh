@@ -41,8 +41,7 @@ public:
     /* Return the contents of the specified file, or null if it
        doesn't exist. */
     virtual void getFile(const std::string & path,
-        std::function<void(std::shared_ptr<std::string>)> success,
-        std::function<void(std::exception_ptr exc)> failure) = 0;
+        Callback<std::shared_ptr<std::string>> callback) = 0;
 
     std::shared_ptr<std::string> getFile(const std::string & path);
 
@@ -71,8 +70,7 @@ public:
     { unsupported(); }
 
     void queryPathInfoUncached(const Path & path,
-        std::function<void(std::shared_ptr<ValidPathInfo>)> success,
-        std::function<void(std::exception_ptr exc)> failure) override;
+        Callback<std::shared_ptr<ValidPathInfo>> callback) override;
 
     void queryReferrers(const Path & path,
         PathSet & referrers) override

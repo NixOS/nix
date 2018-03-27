@@ -15,6 +15,7 @@
 #include <map>
 #include <sstream>
 #include <experimental/optional>
+#include <future>
 
 #ifndef HAVE_STRUCT_DIRENT_D_TYPE
 #define DT_UNKNOWN 0
@@ -424,44 +425,30 @@ string get(const T & map, const string & key, const string & def = "")
 }
 
 
-/* Call ‘failure’ with the current exception as argument. If ‘failure’
-   throws an exception, abort the program. */
-void callFailure(const std::function<void(std::exception_ptr exc)> & failure,
-    std::exception_ptr exc = std::current_exception());
-
-
-/* Evaluate the function ‘f’. If it returns a value, call ‘success’
-   with that value as its argument. If it or ‘success’ throws an
-   exception, call ‘failure’. If ‘failure’ throws an exception, abort
-   the program. */
-template<class T>
-void sync2async(
-    const std::function<void(T)> & success,
-    const std::function<void(std::exception_ptr exc)> & failure,
-    const std::function<T()> & f)
+/* A callback is a wrapper around a lambda that accepts a valid of
+   type T or an exception. (We abuse std::future<T> to pass the value or
+   exception.) */
+template<typename T>
+struct Callback
 {
-    try {
-        success(f());
-    } catch (...) {
-        callFailure(failure);
-    }
-}
+    std::function<void(std::future<T>)> fun;
 
+    Callback(std::function<void(std::future<T>)> fun) : fun(fun) { }
 
-/* Call the function ‘success’. If it throws an exception, call
-   ‘failure’. If that throws an exception, abort the program. */
-template<class T>
-void callSuccess(
-    const std::function<void(T)> & success,
-    const std::function<void(std::exception_ptr exc)> & failure,
-    T && arg)
-{
-    try {
-        success(arg);
-    } catch (...) {
-        callFailure(failure);
+    void operator()(T && t) const
+    {
+        std::promise<T> promise;
+        promise.set_value(std::move(t));
+        fun(promise.get_future());
     }
-}
+
+    void rethrow(const std::exception_ptr & exc = std::current_exception()) const
+    {
+        std::promise<T> promise;
+        promise.set_exception(exc);
+        fun(promise.get_future());
+    }
+};
 
 
 /* Start a thread that handles various signals. Also block those signals

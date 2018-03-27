@@ -84,10 +84,9 @@ struct LegacySSHStore : public Store
     }
 
     void queryPathInfoUncached(const Path & path,
-        std::function<void(std::shared_ptr<ValidPathInfo>)> success,
-        std::function<void(std::exception_ptr exc)> failure) override
+        Callback<std::shared_ptr<ValidPathInfo>> callback) override
     {
-        sync2async<std::shared_ptr<ValidPathInfo>>(success, failure, [&]() -> std::shared_ptr<ValidPathInfo> {
+        try {
             auto conn(connections->get());
 
             debug("querying remote host '%s' for info on '%s'", host, path);
@@ -97,7 +96,7 @@ struct LegacySSHStore : public Store
 
             auto info = std::make_shared<ValidPathInfo>();
             conn->from >> info->path;
-            if (info->path.empty()) return nullptr;
+            if (info->path.empty()) return callback(nullptr);
             assert(path == info->path);
 
             PathSet references;
@@ -116,8 +115,8 @@ struct LegacySSHStore : public Store
             auto s = readString(conn->from);
             assert(s == "");
 
-            return info;
-        });
+            callback(std::move(info));
+        } catch (...) { callback.rethrow(); }
     }
 
     void addToStore(const ValidPathInfo & info, Source & source,

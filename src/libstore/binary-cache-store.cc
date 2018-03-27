@@ -58,12 +58,13 @@ std::shared_ptr<std::string> BinaryCacheStore::getFile(const std::string & path)
 {
     std::promise<std::shared_ptr<std::string>> promise;
     getFile(path,
-        [&](std::shared_ptr<std::string> result) {
-            promise.set_value(result);
-        },
-        [&](std::exception_ptr exc) {
-            promise.set_exception(exc);
-        });
+        {[&](std::future<std::shared_ptr<std::string>> result) {
+            try {
+                promise.set_value(result.get());
+            } catch (...) {
+                promise.set_exception(std::current_exception());
+            }
+        }});
     return promise.get_future().get();
 }
 
@@ -218,8 +219,7 @@ void BinaryCacheStore::narFromPath(const Path & storePath, Sink & sink)
 }
 
 void BinaryCacheStore::queryPathInfoUncached(const Path & storePath,
-        std::function<void(std::shared_ptr<ValidPathInfo>)> success,
-        std::function<void(std::exception_ptr exc)> failure)
+    Callback<std::shared_ptr<ValidPathInfo>> callback)
 {
     auto uri = getUri();
     auto act = std::make_shared<Activity>(*logger, lvlTalkative, actQueryPathInfo,
@@ -229,17 +229,22 @@ void BinaryCacheStore::queryPathInfoUncached(const Path & storePath,
     auto narInfoFile = narInfoFileFor(storePath);
 
     getFile(narInfoFile,
-        [=](std::shared_ptr<std::string> data) {
-            if (!data) return success(0);
+        {[=](std::future<std::shared_ptr<std::string>> fut) {
+            try {
+                auto data = fut.get();
 
-            stats.narInfoRead++;
+                if (!data) return callback(nullptr);
 
-            callSuccess(success, failure, (std::shared_ptr<ValidPathInfo>)
-                std::make_shared<NarInfo>(*this, *data, narInfoFile));
+                stats.narInfoRead++;
 
-            (void) act; // force Activity into this lambda to ensure it stays alive
-        },
-        failure);
+                callback((std::shared_ptr<ValidPathInfo>)
+                    std::make_shared<NarInfo>(*this, *data, narInfoFile));
+
+                (void) act; // force Activity into this lambda to ensure it stays alive
+            } catch (...) {
+                callback.rethrow();
+            }
+        }});
 }
 
 Path BinaryCacheStore::addToStore(const string & name, const Path & srcPath,
