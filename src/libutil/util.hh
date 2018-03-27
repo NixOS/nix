@@ -98,6 +98,7 @@ unsigned char getFileType(const Path & path);
 /* Read the contents of a file into a string. */
 string readFile(int fd);
 string readFile(const Path & path, bool drain = false);
+void readFile(const Path & path, Sink & sink);
 
 /* Write a string to a file. */
 void writeFile(const Path & path, const string & s, mode_t mode = 0666);
