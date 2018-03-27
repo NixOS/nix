@@ -29,7 +29,7 @@ struct CaseHackSetting : public BaseSetting<bool>
     void set(const std::string & str) override
     {
         BaseSetting<bool>::set(str);
-        nix::useCaseHack = true;
+        nix::useCaseHack = value;
     }
 };
 
