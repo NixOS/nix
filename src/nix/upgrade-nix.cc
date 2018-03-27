@@ -46,7 +46,7 @@ struct CmdUpgradeNix : StoreCommand
 
     void run(ref<Store> store) override
     {
-        settings.pureEval = true;
+        evalSettings.pureEval = true;
 
         if (profileDir == "")
             profileDir = getProfileDir(store);

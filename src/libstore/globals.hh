@@ -193,9 +193,6 @@ public:
     Setting<bool> showTrace{this, false, "show-trace",
         "Whether to show a stack trace on evaluation errors."};
 
-    Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation",
-        "Whether builtin functions that allow executing native code should be enabled."};
-
     Setting<SandboxMode> sandboxMode{this, smDisabled, "sandbox",
         "Whether to enable sandboxed builds. Can be \"true\", \"false\" or \"relaxed\".",
         {"build-use-chroot", "build-use-sandbox"}};
@@ -207,13 +204,6 @@ public:
     Setting<PathSet> extraSandboxPaths{this, {}, "extra-sandbox-paths",
         "Additional paths to make available inside the build sandbox.",
         {"build-extra-chroot-dirs", "build-extra-sandbox-paths"}};
-
-    Setting<bool> restrictEval{this, false, "restrict-eval",
-        "Whether to restrict file system access to paths in $NIX_PATH, "
-        "and network access to the URI prefixes listed in 'allowed-uris'."};
-
-    Setting<bool> pureEval{this, false, "pure-eval",
-        "Whether to restrict file system and network access to files specified by cryptographic hash."};
 
     Setting<size_t> buildRepeat{this, 0, "repeat",
         "The number of times to repeat a build in order to verify determinism.",
@@ -319,9 +309,6 @@ public:
     /* Path to the SSL CA file used */
     Path caFile;
 
-    Setting<bool> enableImportFromDerivation{this, true, "allow-import-from-derivation",
-        "Whether the evaluator allows importing the result of a derivation."};
-
 #if __linux__
     Setting<bool> filterSyscalls{this, true, "filter-syscalls",
             "Whether to prevent certain dangerous system calls, such as "
@@ -342,9 +329,6 @@ public:
 
     Setting<uint64_t> maxFree{this, std::numeric_limits<uint64_t>::max(), "max-free",
         "Stop deleting garbage when free disk space is above the specified amount."};
-
-    Setting<Strings> allowedUris{this, {}, "allowed-uris",
-        "Prefixes of URIs that builtin functions such as fetchurl and fetchGit are allowed to fetch."};
 
     Setting<Paths> pluginFiles{this, {}, "plugin-files",
         "Plugins to dynamically load at nix initialization time."};

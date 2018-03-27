@@ -310,14 +310,14 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
     static_assert(sizeof(Env) == 16, "environment must be 16 bytes");
 
     /* Initialise the Nix expression search path. */
-    if (!settings.pureEval) {
+    if (!evalSettings.pureEval) {
         Strings paths = parseNixPath(getEnv("NIX_PATH", ""));
         for (auto & i : _searchPath) addToSearchPath(i);
         for (auto & i : paths) addToSearchPath(i);
     }
     addToSearchPath("nix=" + canonPath(settings.nixDataDir + "/nix/corepkgs", true));
 
-    if (settings.restrictEval || settings.pureEval) {
+    if (evalSettings.restrictEval || evalSettings.pureEval) {
         allowedPaths = PathSet();
 
         for (auto & i : searchPath) {
@@ -387,13 +387,13 @@ Path EvalState::checkSourcePath(const Path & path_)
 
 void EvalState::checkURI(const std::string & uri)
 {
-    if (!settings.restrictEval) return;
+    if (!evalSettings.restrictEval) return;
 
     /* 'uri' should be equal to a prefix, or in a subdirectory of a
        prefix. Thus, the prefix https://github.co does not permit
        access to https://github.com. Note: this allows 'http://' and
        'https://' as prefixes for any http/https URI. */
-    for (auto & prefix : settings.allowedUris.get())
+    for (auto & prefix : evalSettings.allowedUris.get())
         if (uri == prefix ||
             (uri.size() > prefix.size()
             && prefix.size() > 0
@@ -1896,6 +1896,11 @@ bool ExternalValueBase::operator==(const ExternalValueBase & b) const
 std::ostream & operator << (std::ostream & str, const ExternalValueBase & v) {
     return v.print(str);
 }
+
+
+EvalSettings evalSettings;
+
+static GlobalConfig::Register r1(&evalSettings);
 
 
 }

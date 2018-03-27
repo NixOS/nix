@@ -5,6 +5,7 @@
 #include "nixexpr.hh"
 #include "symbol-table.hh"
 #include "hash.hh"
+#include "config.hh"
 
 #include <map>
 #include <unordered_map>
@@ -319,5 +320,26 @@ struct InvalidPathError : EvalError
     ~InvalidPathError() throw () { };
 #endif
 };
+
+struct EvalSettings : Config
+{
+    Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation",
+        "Whether builtin functions that allow executing native code should be enabled."};
+
+    Setting<bool> restrictEval{this, false, "restrict-eval",
+        "Whether to restrict file system access to paths in $NIX_PATH, "
+        "and network access to the URI prefixes listed in 'allowed-uris'."};
+
+    Setting<bool> pureEval{this, false, "pure-eval",
+        "Whether to restrict file system and network access to files specified by cryptographic hash."};
+
+    Setting<bool> enableImportFromDerivation{this, true, "allow-import-from-derivation",
+        "Whether the evaluator allows importing the result of a derivation."};
+
+    Setting<Strings> allowedUris{this, {}, "allowed-uris",
+        "Prefixes of URIs that builtin functions such as fetchurl and fetchGit are allowed to fetch."};
+};
+
+extern EvalSettings evalSettings;
 
 }

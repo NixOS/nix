@@ -27,7 +27,7 @@ std::regex commitHashRegex("^[0-9a-fA-F]{40}$");
 HgInfo exportMercurial(ref<Store> store, const std::string & uri,
     std::string rev, const std::string & name)
 {
-    if (settings.pureEval && rev == "")
+    if (evalSettings.pureEval && rev == "")
         throw Error("in pure evaluation mode, 'fetchMercurial' requires a Mercurial revision");
 
     if (rev == "" && hasPrefix(uri, "/") && pathExists(uri + "/.hg")) {

@@ -28,7 +28,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     std::experimental::optional<std::string> ref, std::string rev,
     const std::string & name)
 {
-    if (settings.pureEval && rev == "")
+    if (evalSettings.pureEval && rev == "")
         throw Error("in pure evaluation mode, 'fetchGit' requires a Git revision");
 
     if (!ref && rev == "" && hasPrefix(uri, "/") && pathExists(uri + "/.git")) {

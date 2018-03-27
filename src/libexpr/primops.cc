@@ -73,7 +73,7 @@ void EvalState::realiseContext(const PathSet & context)
 
     if (drvs.empty()) return;
 
-    if (!settings.enableImportFromDerivation)
+    if (!evalSettings.enableImportFromDerivation)
         throw EvalError(format("attempted to realize '%1%' during evaluation but 'allow-import-from-derivation' is false") % *(drvs.begin()));
 
     /* For performance, prefetch all substitute info. */
@@ -464,7 +464,7 @@ static void prim_tryEval(EvalState & state, const Pos & pos, Value * * args, Val
 static void prim_getEnv(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     string name = state.forceStringNoCtx(*args[0], pos);
-    mkString(v, settings.restrictEval || settings.pureEval ? "" : getEnv(name));
+    mkString(v, evalSettings.restrictEval || evalSettings.pureEval ? "" : getEnv(name));
 }
 
 
@@ -1031,7 +1031,7 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
 static void addPath(EvalState & state, const Pos & pos, const string & name, const Path & path_,
     Value * filterFun, bool recursive, const Hash & expectedHash, Value & v)
 {
-    const auto path = settings.pureEval && expectedHash ?
+    const auto path = evalSettings.pureEval && expectedHash ?
         path_ :
         state.checkSourcePath(path_);
     PathFilter filter = filterFun ? ([&](const Path & path) {
@@ -2056,7 +2056,7 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
 
     state.checkURI(url);
 
-    if (settings.pureEval && !expectedHash)
+    if (evalSettings.pureEval && !expectedHash)
         throw Error("in pure evaluation mode, '%s' requires a 'sha256' argument", who);
 
     Path res = getDownloader()->downloadCached(state.store, url, unpack, name, expectedHash);
@@ -2124,12 +2124,12 @@ void EvalState::createBaseEnv()
         addConstant(name, v);
     };
 
-    if (!settings.pureEval) {
+    if (!evalSettings.pureEval) {
         mkInt(v, time(0));
         addConstant("__currentTime", v);
     }
 
-    if (!settings.pureEval) {
+    if (!evalSettings.pureEval) {
         mkString(v, settings.thisSystem);
         addConstant("__currentSystem", v);
     }
@@ -2154,7 +2154,7 @@ void EvalState::createBaseEnv()
     mkApp(v, *vScopedImport, *v2);
     forceValue(v);
     addConstant("import", v);
-    if (settings.enableNativeCode) {
+    if (evalSettings.enableNativeCode) {
         addPrimOp("__importNative", 2, prim_importNative);
         addPrimOp("__exec", 1, prim_exec);
     }
@@ -2181,7 +2181,7 @@ void EvalState::createBaseEnv()
 
     // Paths
     addPrimOp("__toPath", 1, prim_toPath);
-    if (settings.pureEval)
+    if (evalSettings.pureEval)
         addPurityError("__storePath");
     else
         addPrimOp("__storePath", 1, prim_storePath);
