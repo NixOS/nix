@@ -253,6 +253,8 @@ std::string Store::getUri()
 
 bool Store::isValidPath(const Path & storePath)
 {
+    assertStorePath(storePath);
+
     auto hashPart = storePathToHash(storePath);
 
     {
