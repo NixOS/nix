@@ -57,8 +57,10 @@ void MultiCommand::printHelp(const string & programName, std::ostream & out)
     }
     printTable(out, table);
 
+#if 0
     out << "\n";
     out << "For full documentation, run 'man " << programName << "' or 'man " << programName << "-<COMMAND>'.\n";
+#endif
 }
 
 bool MultiCommand::processFlag(Strings::iterator & pos, Strings::iterator end)
