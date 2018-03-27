@@ -21,6 +21,7 @@ struct DownloadRequest
     bool decompress = true;
     std::shared_ptr<std::string> data;
     std::string mimeType;
+    std::function<void(char *, size_t)> dataCallback;
 
     DownloadRequest(const std::string & uri)
         : uri(uri), parentAct(getCurActivity()) { }
@@ -48,6 +49,10 @@ struct Downloader
 
     /* Synchronously download a file. */
     DownloadResult download(const DownloadRequest & request);
+
+    /* Download a file, writing its data to a sink. The sink will be
+       invoked on the thread of the caller. */
+    void download(DownloadRequest && request, Sink & sink);
 
     /* Check if the specified file is already in ~/.cache/nix/tarballs
        and is more recent than ‘tarball-ttl’ seconds. Otherwise,
