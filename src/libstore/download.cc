@@ -609,10 +609,8 @@ struct CurlDownloader : public Downloader
 
 ref<Downloader> getDownloader()
 {
-    static std::shared_ptr<Downloader> downloader;
-    static std::once_flag downloaderCreated;
-    std::call_once(downloaderCreated, [&]() { downloader = makeDownloader(); });
-    return ref<Downloader>(downloader);
+    static ref<Downloader> downloader = makeDownloader();
+    return downloader;
 }
 
 ref<Downloader> makeDownloader()
