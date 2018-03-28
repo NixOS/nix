@@ -29,8 +29,15 @@ if [ "$(uname -s)" = "Darwin" ]; then
         exit 1
     fi
 
-    printf '\e[1;31mSwitching to the Multi-User Darwin Installer\e[0m\n'
-    exec "$self/install-darwin-multi-user"
+    printf '\e[1;31mSwitching to the Daemon-based Installer\e[0m\n'
+    exec "$self/install-multi-user"
+    exit 0
+fi
+
+# Linux & Systemd support
+if [ "$(uname -s)" = "Linux" ] && [ -e /run/systemd/system ]; then
+    printf '\e[1;31mSwitching to the Daemon-based Installer\e[0m\n'
+    exec "$self/install-multi-user"
     exit 0
 fi
 
