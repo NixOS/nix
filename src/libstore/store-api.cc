@@ -765,7 +765,8 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
     else if (hasPrefix(ca, "fixed:")) {
         bool recursive = ca.compare(6, 2, "r:") == 0;
         Hash hash(std::string(ca, recursive ? 8 : 6));
-        if (store.makeFixedOutputPath(recursive, hash, storePathToName(path)) == path)
+        if (references.empty() &&
+            store.makeFixedOutputPath(recursive, hash, storePathToName(path)) == path)
             return true;
         else
             warn();
