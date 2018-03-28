@@ -127,17 +127,39 @@ let
           substitute ${./scripts/install-nix-from-closure.sh} $TMPDIR/install \
             --subst-var-by nix ${toplevel} \
             --subst-var-by cacert ${cacert}
-          substitute ${./scripts/install-darwin-multi-user.sh} $TMPDIR/install-darwin-multi-user \
+
+          substitute ${./scripts/install-darwin-multi-user.sh} $TMPDIR/install-darwin-multi-user.sh \
+            --subst-var-by nix ${toplevel} \
+            --subst-var-by cacert ${cacert}
+          substitute ${./scripts/install-systemd-multi-user.sh} $TMPDIR/install-systemd-multi-user.sh \
+            --subst-var-by nix ${toplevel} \
+            --subst-var-by cacert ${cacert}
+          substitute ${./scripts/install-multi-user.sh} $TMPDIR/install-multi-user \
             --subst-var-by nix ${toplevel} \
             --subst-var-by cacert ${cacert}
 
           if type -p shellcheck; then
-            shellcheck -e SC1090 $TMPDIR/install
-            shellcheck -e SC1091,SC2002 $TMPDIR/install-darwin-multi-user
+            # SC1090: Don't worry about not being able to find
+            #         $nix/etc/profile.d/nix.sh
+            shellcheck --exclude SC1090 $TMPDIR/install
+            shellcheck $TMPDIR/install-darwin-multi-user.sh
+            shellcheck $TMPDIR/install-systemd-multi-user.sh
+
+            # SC1091: Don't panic about not being able to source
+            #         /etc/profile
+            # SC2002: Ignore "useless cat" "error", when loading
+            #         .reginfo, as the cat is a much cleaner
+            #         implementation, even though it is "useless"
+            # SC2116: Allow ROOT_HOME=$(echo ~root) for resolving
+            #         root's home directory
+            shellcheck --external-sources \
+              --exclude SC1091,SC2002,SC2116 $TMPDIR/install-multi-user
           fi
 
           chmod +x $TMPDIR/install
-          chmod +x $TMPDIR/install-darwin-multi-user
+          chmod +x $TMPDIR/install-darwin-multi-user.sh
+          chmod +x $TMPDIR/install-systemd-multi-user.sh
+          chmod +x $TMPDIR/install-multi-user
           dir=nix-${version}-${system}
           fn=$out/$dir.tar.bz2
           mkdir -p $out/nix-support
@@ -149,7 +171,9 @@ let
             --transform "s,$TMPDIR/install,$dir/install," \
             --transform "s,$TMPDIR/reginfo,$dir/.reginfo," \
             --transform "s,$NIX_STORE,$dir/store,S" \
-            $TMPDIR/install $TMPDIR/install-darwin-multi-user $TMPDIR/reginfo \
+            $TMPDIR/install $TMPDIR/install-darwin-multi-user.sh \
+            $TMPDIR/install-systemd-multi-user.sh \
+            $TMPDIR/install-multi-user $TMPDIR/reginfo \
             $(cat ${installerClosureInfo}/store-paths)
         '');
 
