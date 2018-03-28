@@ -22,52 +22,60 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
         return i->second;
     };
 
-    auto fetch = [&](const string & url) {
-        /* No need to do TLS verification, because we check the hash of
-           the result anyway. */
-        DownloadRequest request(url);
-        request.verifyTLS = false;
-        request.decompress = false;
+    Path storePath = getAttr("out");
+    auto mainUrl = getAttr("url");
 
-        /* Note: have to use a fresh downloader here because we're in
-           a forked process. */
-        auto data = makeDownloader()->download(request);
-        assert(data.data);
+    /* Note: have to use a fresh downloader here because we're in
+       a forked process. */
+    auto downloader = makeDownloader();
 
-        return data.data;
+    auto fetch = [&](const std::string & url) {
+
+        auto source = sinkToSource([&](Sink & sink) {
+
+            /* No need to do TLS verification, because we check the hash of
+               the result anyway. */
+            DownloadRequest request(url);
+            request.verifyTLS = false;
+            request.decompress = false;
+
+            downloader->download(std::move(request), sink);
+        });
+
+        if (get(drv.env, "unpack", "") == "1") {
+
+            if (hasSuffix(mainUrl, ".xz")) {
+                auto source2 = sinkToSource([&](Sink & sink) {
+                    decompress("xz", *source, sink);
+                });
+                restorePath(storePath, *source2);
+            } else
+                restorePath(storePath, *source);
+
+        } else
+              writeFile(storePath, *source);
+
+        auto executable = drv.env.find("executable");
+        if (executable != drv.env.end() && executable->second == "1") {
+            if (chmod(storePath.c_str(), 0755) == -1)
+                throw SysError(format("making '%1%' executable") % storePath);
+        }
     };
 
-    std::shared_ptr<std::string> data;
-
+    /* Try the hashed mirrors first. */
     if (getAttr("outputHashMode") == "flat")
         for (auto hashedMirror : settings.hashedMirrors.get())
             try {
                 if (!hasSuffix(hashedMirror, "/")) hashedMirror += '/';
                 auto ht = parseHashType(getAttr("outputHashAlgo"));
-                data = fetch(hashedMirror + printHashType(ht) + "/" + Hash(getAttr("outputHash"), ht).to_string(Base16, false));
-                break;
+                fetch(hashedMirror + printHashType(ht) + "/" + Hash(getAttr("outputHash"), ht).to_string(Base16, false));
+                return;
             } catch (Error & e) {
                 debug(e.what());
             }
 
-    if (!data) data = fetch(getAttr("url"));
-
-    Path storePath = getAttr("out");
-
-    auto unpack = drv.env.find("unpack");
-    if (unpack != drv.env.end() && unpack->second == "1") {
-        if (string(*data, 0, 6) == string("\xfd" "7zXZ\0", 6))
-            data = decompress("xz", *data);
-        StringSource source(*data);
-        restorePath(storePath, source);
-    } else
-        writeFile(storePath, *data);
-
-    auto executable = drv.env.find("executable");
-    if (executable != drv.env.end() && executable->second == "1") {
-        if (chmod(storePath.c_str(), 0755) == -1)
-            throw SysError(format("making '%1%' executable") % storePath);
-    }
+    /* Otherwise try the specified URL. */
+    fetch(mainUrl);
 }
 
 }

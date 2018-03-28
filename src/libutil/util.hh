@@ -103,6 +103,8 @@ void readFile(const Path & path, Sink & sink);
 /* Write a string to a file. */
 void writeFile(const Path & path, const string & s, mode_t mode = 0666);
 
+void writeFile(const Path & path, Source & source, mode_t mode = 0666);
+
 /* Read a line from a file descriptor. */
 string readLine(int fd);
 

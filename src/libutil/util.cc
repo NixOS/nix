@@ -328,6 +328,23 @@ void writeFile(const Path & path, const string & s, mode_t mode)
 }
 
 
+void writeFile(const Path & path, Source & source, mode_t mode)
+{
+    AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
+    if (!fd)
+        throw SysError(format("opening file '%1%'") % path);
+
+    std::vector<unsigned char> buf(64 * 1024);
+
+    while (true) {
+        try {
+            auto n = source.read(buf.data(), buf.size());
+            writeFull(fd.get(), (unsigned char *) buf.data(), n);
+        } catch (EndOfFile &) { break; }
+    }
+}
+
+
 string readLine(int fd)
 {
     string s;
