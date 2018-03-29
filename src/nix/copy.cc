@@ -67,6 +67,12 @@ struct CmdCopy : StorePathsCommand
                 "To copy a closure from another machine via SSH:",
                 "nix copy --from ssh://server /nix/store/a6cnl93nk1wxnq84brbbwr6hxw9gp2w9-blender-2.79-rc2"
             },
+#ifdef ENABLE_S3
+            Example{
+                "To populate the current folder build output to a S3 binary cache:",
+                "nix copy --to s3://my-bucket?region=eu-west-1"
+            },
+#endif
         };
     }
 
