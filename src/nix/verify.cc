@@ -3,6 +3,7 @@
 #include "store-api.hh"
 #include "sync.hh"
 #include "thread-pool.hh"
+#include "references.hh"
 
 #include <atomic>
 
@@ -88,10 +89,15 @@ struct CmdVerify : StorePathsCommand
 
                 if (!noContents) {
 
-                    HashSink sink(info->narHash.type);
-                    store->narFromPath(info->path, sink);
+                    std::unique_ptr<AbstractHashSink> hashSink;
+                    if (info->ca == "")
+                        hashSink = std::make_unique<HashSink>(info->narHash.type);
+                    else
+                        hashSink = std::make_unique<HashModuloSink>(info->narHash.type, storePathToHash(info->path));
 
-                    auto hash = sink.finish();
+                    store->narFromPath(info->path, *hashSink);
+
+                    auto hash = hashSink->finish();
 
                     if (hash.first != info->narHash) {
                         corrupted++;

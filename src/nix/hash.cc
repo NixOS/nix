@@ -2,6 +2,8 @@
 #include "hash.hh"
 #include "legacy.hh"
 #include "shared.hh"
+#include "references.hh"
+#include "archive.hh"
 
 using namespace nix;
 
@@ -13,6 +15,7 @@ struct CmdHash : Command
     bool truncate = false;
     HashType ht = htSHA256;
     std::vector<std::string> paths;
+    std::experimental::optional<std::string> modulus;
 
     CmdHash(Mode mode) : mode(mode)
     {
@@ -23,6 +26,11 @@ struct CmdHash : Command
         mkFlag()
             .longName("type")
             .mkHashTypeFlag(&ht);
+        mkFlag()
+            .longName("modulo")
+            .description("compute hash modulo specified string")
+            .labels({"modulus"})
+            .dest(&modulus);
         expectArgs("paths", &paths);
     }
 
@@ -41,7 +49,19 @@ struct CmdHash : Command
     void run() override
     {
         for (auto path : paths) {
-            Hash h = mode == mFile ? hashFile(ht, path) : hashPath(ht, path).first;
+
+            std::unique_ptr<AbstractHashSink> hashSink;
+            if (modulus)
+                hashSink = std::make_unique<HashModuloSink>(ht, *modulus);
+            else
+                hashSink = std::make_unique<HashSink>(ht);
+
+            if (mode == mFile)
+                readFile(path, *hashSink);
+            else
+                dumpPath(path, *hashSink);
+
+            Hash h = hashSink->finish().first;
             if (truncate && h.hashSize > 20) h = compressHash(h, 20);
             std::cout << format("%1%\n") %
                 h.to_string(base, base == SRI);

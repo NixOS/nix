@@ -362,6 +362,20 @@ string replaceStrings(const std::string & s,
     const std::string & from, const std::string & to);
 
 
+std::string rewriteStrings(const std::string & s, const StringMap & rewrites);
+
+
+/* If a set contains 'from', remove it and insert 'to'. */
+template<typename T>
+void replaceInSet(std::set<T> & set, const T & from, const T & to)
+{
+    auto i = set.find(from);
+    if (i == set.end()) return;
+    set.erase(i);
+    set.insert(to);
+}
+
+
 /* Convert the exit status of a child as returned by wait() into an
    error string. */
 string statusToString(int status);
