@@ -483,7 +483,11 @@ EOF
         row "    Home Directory" "/var/empty"
     fi
 
-    if [ "$(poly_user_note_get "$username")" = "Nix build user $coreid" ]; then
+    # We use grep instead of an equality check because it is difficult
+    # to extract _just_ the user's note, instead it is prefixed with
+    # some plist junk. This was causing the user note to always be set,
+    # even if there was no reason for it.
+    if ! poly_user_note_get "$username" | grep -q "Nix build user $coreid"; then
         row "              Note" "Nix build user $coreid"
     else
         poly_user_note_set "$username" "Nix build user $coreid"
