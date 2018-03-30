@@ -369,7 +369,7 @@ and try again.
 EOF
         fi
 
-        if grep -qi "nix" "$profile_target"; then
+        if [ -e "$profile_target" ] && grep -qi "nix" "$profile_target"; then
             failure <<EOF
 It looks like $profile_target already has some Nix configuration in
 there. There should be no reason to run this again. If you're having
