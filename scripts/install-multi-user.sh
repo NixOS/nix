@@ -453,10 +453,10 @@ create_build_user_for_core() {
         row "           Created" "Yes"
     else
         actual_uid=$(poly_user_id_get "$username")
-        if [ "$actual_uid" -ne "$uid" ]; then
+        if [ "$actual_uid" != "$uid" ]; then
             failure <<EOF
 It seems the build user $username already exists, but with the UID
-with the UID $actual_uid. This script can't really handle that right
+with the UID '$actual_uid'. This script can't really handle that right
 now, so I'm going to give up.
 
 If you already created the users and you know they start from
