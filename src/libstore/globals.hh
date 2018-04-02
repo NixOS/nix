@@ -310,14 +310,16 @@ public:
         "Disabled substituters that may be enabled via the substituters option by untrusted users.",
         {"trusted-binary-caches"}};
 
-    Setting<int> ttlNegativeDiskCache{this, 3600, "negative-disk-cache-ttl",
-        "The TTL in seconds for negative lookups in the disk cache."};
-
-    Setting<int> ttlPositiveDiskCache{this, 30 * 24 * 3600, "positive-disk-cache-ttl",
-        "The TTL in seconds for positive lookups in the disk cache."};
-
     Setting<Strings> trustedUsers{this, {"root"}, "trusted-users",
         "Which users or groups are trusted to ask the daemon to do unsafe things."};
+
+    Setting<unsigned int> ttlNegativeDiskCache{this, 3600, "negative-disk-cache-ttl",
+        "The TTL in seconds for negative lookups in the disk cache i.e binary cache lookups that "
+        "return an invalid path result"};
+
+    Setting<unsigned int> ttlPositiveDiskCache{this, 30 * 24 * 3600, "positive-disk-cache-ttl",
+        "The TTL in seconds for positive lookups in the disk cache i.e binary cache lookups that "
+        "return a valid path result."};
 
     /* ?Who we trust to use the daemon in safe ways */
     Setting<Strings> allowedUsers{this, {"*"}, "allowed-users",

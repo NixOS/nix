@@ -788,6 +788,30 @@ password <replaceable>my-password</replaceable>
 
   </varlistentry>
 
+  <varlistentry xml:id="conf-negative-disk-cache-ttl"><term><literal>negative-disk-cache-ttl</literal></term>
+
+    <listitem>
+
+      <para>The TTL in seconds for negative lookups. If a store path is queried from a substituer but
+      was not found, there will be a negative lookup cached in the local disk cache database for the specified
+      duration.</para>
+
+    </listitem>
+
+  </varlistentry>
+
+  <varlistentry xml:id="conf-positive-disk-cache-ttl"><term><literal>positive-disk-cache-ttl</literal></term>
+
+    <listitem>
+
+      <para>The TTL in seconds for positive lookups. If a store path is queried from a substituer, the result of
+      the query will be cached in the local disk cache database including some of the NAR metadata. Setting a TTL
+      for positive lookups can be useful in case of builds that aren't reproducible, in which case having a more
+      frequent cache invalidation would prevent hash mismatch issues.</para>
+
+    </listitem>
+
+  </varlistentry>
 
 </variablelist>
 
