@@ -25,6 +25,7 @@ nix_tests = \
   pure-eval.sh \
   check.sh \
   plugins.sh \
+  missing-features.sh \
   search.sh
   # parallel.sh
 

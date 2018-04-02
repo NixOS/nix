@@ -1786,9 +1786,24 @@ void DerivationGoal::startBuilder()
 {
     /* Right platform? */
     if (!drv->canBuildLocally()) {
-        throw Error(
-            format("a '%1%' is required to build '%3%', but I am a '%2%'")
-            % drv->platform % settings.thisSystem % drvPath);
+        Strings features = tokenizeString<Strings>(get(drv->env, "requiredSystemFeatures"));
+
+        if (features.size() == 1) {
+            throw Error(
+                "a '%s' system with the feature '%s' is required to build '%s'",
+                drv->platform, concatStringsSep("', '", features), drvPath
+                );
+        } else if (features.size() > 1) {
+            throw Error(
+                "a '%s' system with the features '%s' is required to build '%s'",
+                drv->platform, concatStringsSep("', '", features), drvPath
+                );
+        } else {
+            throw Error(
+                "a '%s' system is required to build '%s'",
+                drv->platform, drvPath
+                );
+        }
     }
 
     if (drv->isBuiltin())
