@@ -1203,7 +1203,10 @@ in foo</programlisting>
 
     This is not allowed because it would cause a cyclic dependency in
     the computation of the cryptographic hashes for
-    <varname>foo</varname> and <varname>bar</varname>.</para></listitem>
+    <varname>foo</varname> and <varname>bar</varname>.</para>
+    <para>It is also not possible to reference the result of a derivation. 
+    If you are using Nixpkgs, the <literal>writeTextFile</literal> function is able to 
+    do that.</para></listitem>
 
   </varlistentry>
 
