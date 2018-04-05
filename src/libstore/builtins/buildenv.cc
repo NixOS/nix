@@ -26,12 +26,23 @@ static unsigned long symlinks;
 /* For each activated package, create symlinks */
 static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
 {
-    auto srcFiles = readDirectory(srcDir);
+    DirEntries srcFiles;
+
+    try {
+        srcFiles = readDirectory(srcDir);
+    } catch (SysError & e) {
+        if (e.errNo == ENOTDIR) {
+            printError("warning: not including '%s' in the user environment because it's not a directory", srcDir);
+            return;
+        }
+        throw;
+    }
+
     for (const auto & ent : srcFiles) {
         if (ent.name[0] == '.')
             /* not matched by glob */
             continue;
-        const auto & srcFile = srcDir + "/" + ent.name;
+        auto srcFile = srcDir + "/" + ent.name;
         auto dstFile = dstDir + "/" + ent.name;
 
         /* The files below are special-cased to that they don't show up
@@ -44,9 +55,10 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
             hasSuffix(srcFile, "/nix-support") ||
             hasSuffix(srcFile, "/perllocal.pod") ||
             hasSuffix(srcFile, "/info/dir") ||
-            hasSuffix(srcFile, "/log")) {
+            hasSuffix(srcFile, "/log"))
             continue;
-        } else if (isDirectory(srcFile)) {
+
+        else if (isDirectory(srcFile)) {
             struct stat dstSt;
             auto res = lstat(dstFile.c_str(), &dstSt);
             if (res == 0) {
@@ -68,7 +80,9 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
                 }
             } else if (errno != ENOENT)
                 throw SysError(format("getting status of '%1%'") % dstFile);
-        } else {
+        }
+
+        else {
             struct stat dstSt;
             auto res = lstat(dstFile.c_str(), &dstSt);
             if (res == 0) {
@@ -90,6 +104,7 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
             } else if (errno != ENOENT)
                 throw SysError(format("getting status of '%1%'") % dstFile);
         }
+
         createSymlink(srcFile, dstFile);
         priorities[dstFile] = priority;
         symlinks++;
@@ -105,24 +120,18 @@ static Path out;
 
 static void addPkg(const Path & pkgDir, int priority)
 {
-    if (done.find(pkgDir) != done.end())
-        return;
+    if (done.count(pkgDir)) return;
     done.insert(pkgDir);
     createLinks(pkgDir, out, priority);
-    auto propagatedFN = pkgDir + "/nix-support/propagated-user-env-packages";
-    std::string propagated;
-    {
-        AutoCloseFD fd = open(propagatedFN.c_str(), O_RDONLY | O_CLOEXEC);
-        if (!fd) {
-            if (errno == ENOENT)
-                return;
-            throw SysError(format("opening '%1%'") % propagatedFN);
-        }
-        propagated = readFile(fd.get());
+
+    try {
+        for (const auto & p : tokenizeString<std::vector<string>>(
+                readFile(pkgDir + "/nix-support/propagated-user-env-packages"), " \n"))
+            if (!done.count(p))
+                postponed.insert(p);
+    } catch (SysError & e) {
+        if (e.errNo != ENOENT && e.errNo != ENOTDIR) throw;
     }
-    for (const auto & p : tokenizeString<std::vector<string>>(propagated, " \n"))
-        if (done.find(p) == done.end())
-            postponed.insert(p);
 }
 
 struct Package {
@@ -190,4 +199,3 @@ void builtinBuildenv(const BasicDerivation & drv)
 }
 
 }
-
