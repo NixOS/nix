@@ -237,6 +237,40 @@ void Store::queryMissing(const PathSet & targets,
     pool.process();
 }
 
+/* Some code to print a tree representation of a derivation dependency
+   graph.  Topological sorting is used to keep the tree relatively
+   flat. */
+
+const string treeConn = "+---";
+const string treeLine = "|   ";
+const string treeNull = "    ";
+
+
+string Store::printTree(const Path & path,
+    const string & firstPad, const string & tailPad, PathSet & done,
+    std::function<Paths(const Path&)> getChildren)
+{
+    string out;
+    Paths children;
+
+    if (done.find(path) != done.end()) {
+        out.append(str(format("%1%%2% [...]\n") % firstPad % path));
+        return "";
+    }
+    done.insert(path);
+
+    out.append(str(format("%1%%2%\n") % firstPad % path));
+
+    children = getChildren(path);
+
+    for (auto i = children.begin(); i != children.end(); ++i) {
+        auto j = i; ++j;
+        out.append(printTree(*i, tailPad + treeConn,
+            j == children.end() ? tailPad + treeNull : tailPad + treeLine,
+            done, getChildren));
+    }
+    return out;
+}
 
 Paths Store::topoSortPaths(const PathSet & paths)
 {

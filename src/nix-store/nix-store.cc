@@ -228,45 +228,6 @@ static PathSet maybeUseOutputs(const Path & storePath, bool useOutput, bool forc
     else return {storePath};
 }
 
-
-/* Some code to print a tree representation of a derivation dependency
-   graph.  Topological sorting is used to keep the tree relatively
-   flat. */
-
-const string treeConn = "+---";
-const string treeLine = "|   ";
-const string treeNull = "    ";
-
-
-static void printTree(const Path & path,
-    const string & firstPad, const string & tailPad, PathSet & done)
-{
-    if (done.find(path) != done.end()) {
-        cout << format("%1%%2% [...]\n") % firstPad % path;
-        return;
-    }
-    done.insert(path);
-
-    cout << format("%1%%2%\n") % firstPad % path;
-
-    auto references = store->queryPathInfo(path)->references;
-
-    /* Topologically sort under the relation A < B iff A \in
-       closure(B).  That is, if derivation A is an (possibly indirect)
-       input of B, then A is printed first.  This has the effect of
-       flattening the tree, preventing deeply nested structures.  */
-    Paths sorted = store->topoSortPaths(references);
-    reverse(sorted.begin(), sorted.end());
-
-    for (auto i = sorted.begin(); i != sorted.end(); ++i) {
-        auto j = i; ++j;
-        printTree(*i, tailPad + treeConn,
-            j == sorted.end() ? tailPad + treeNull : tailPad + treeLine,
-            done);
-    }
-}
-
-
 /* Perform various sorts of queries. */
 static void opQuery(Strings opFlags, Strings opArgs)
 {
@@ -388,8 +349,19 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qTree: {
             PathSet done;
+            auto locStorePtr = store;
+            auto getChildren = [locStorePtr](Path p){
+                auto references = locStorePtr->queryPathInfo(p)->references;
+                /* Topologically sort under the relation A < B iff A \in
+                   closure(B).  That is, if derivation A is an (possibly indirect)
+                   input of B, then A is printed first.  This has the effect of
+                   flattening the tree, preventing deeply nested structures.  */
+                Paths sorted = locStorePtr->topoSortPaths(references);
+                reverse(sorted.begin(), sorted.end());
+                return sorted;
+            };
             for (auto & i : opArgs)
-                printTree(store->followLinksToStorePath(i), "", "", done);
+                cout << store->printTree(store->followLinksToStorePath(i), "", "", done, getChildren);
             break;
         }
 

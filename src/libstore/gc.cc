@@ -786,8 +786,23 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         for (auto & i : options.pathsToDelete) {
             assertStorePath(i);
             tryToDelete(state, i);
-            if (state.dead.find(i) == state.dead.end())
-                throw Error(format("cannot delete path '%1%' since it is still alive") % i);
+            if (state.dead.find(i) == state.dead.end()) {
+                PathSet done;
+                auto getGcRootChildren = [this, &state](Path p){
+                    PathSet incomingLinks;
+                    PathSet alreadyVisited;
+                    PathSet children;
+                    queryReferrers(p, incomingLinks);
+                    for (auto & j : incomingLinks)
+                        if(canReachRoot(state, alreadyVisited, p))
+                            children.insert(j);
+                    Paths sorted = topoSortPaths(children);
+                    reverse(sorted.begin(), sorted.end());
+                    return sorted;
+                };
+                string tree = printTree(i, "", "", done, getGcRootChildren);
+                throw Error(format("cannot delete path '%1%': it's still referrenced by the following GC roots \n\n%2%") % i % tree);
+            }
         }
 
     } else if (options.maxFreed > 0) {

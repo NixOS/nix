@@ -551,6 +551,9 @@ public:
        relation.  If p refers to q, then p preceeds q in this list. */
     Paths topoSortPaths(const PathSet & paths);
 
+    string printTree(const Path & path, const string & firstPad,
+        const string & tailPad, PathSet & done, std::function<Paths(const Path&)> getChildren); 
+
     /* Export multiple paths in the format expected by ‘nix-store
        --import’. */
     void exportPaths(const Paths & paths, Sink & sink);
