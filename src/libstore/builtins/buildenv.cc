@@ -9,14 +9,6 @@ namespace nix {
 
 typedef std::map<Path,int> Priorities;
 
-static bool isDirectory(const Path & path)
-{
-    struct stat st;
-    if (stat(path.c_str(), &st) == -1)
-        throw SysError(format("getting status of '%1%'") % path);
-    return S_ISDIR(st.st_mode);
-}
-
 // FIXME: change into local variables.
 
 static Priorities priorities;
@@ -45,6 +37,18 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
         auto srcFile = srcDir + "/" + ent.name;
         auto dstFile = dstDir + "/" + ent.name;
 
+        struct stat srcSt;
+        try {
+            if (stat(srcFile.c_str(), &srcSt) == -1)
+                throw SysError("getting status of '%1%'", srcFile);
+        } catch (SysError & e) {
+            if (e.errNo == ENOENT || e.errNo == ENOTDIR) {
+                printError("warning: skipping dangling symlink '%s'", dstFile);
+                continue;
+            }
+            throw;
+        }
+
         /* The files below are special-cased to that they don't show up
          * in user profiles, either because they are useless, or
          * because they would cauase pointless collisions (e.g., each
@@ -58,7 +62,7 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
             hasSuffix(srcFile, "/log"))
             continue;
 
-        else if (isDirectory(srcFile)) {
+        else if (S_ISDIR(srcSt.st_mode)) {
             struct stat dstSt;
             auto res = lstat(dstFile.c_str(), &dstSt);
             if (res == 0) {
@@ -66,10 +70,9 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
                     createLinks(srcFile, dstFile, priority);
                     continue;
                 } else if (S_ISLNK(dstSt.st_mode)) {
-                    auto target = readLink(dstFile);
-                    if (!isDirectory(target))
-                        throw Error(format("collision between '%1%' and non-directory '%2%'")
-                            % srcFile % target);
+                    auto target = canonPath(dstFile, true);
+                    if (!S_ISDIR(lstat(target).st_mode))
+                        throw Error("collision between '%1%' and non-directory '%2%'", srcFile, target);
                     if (unlink(dstFile.c_str()) == -1)
                         throw SysError(format("unlinking '%1%'") % dstFile);
                     if (mkdir(dstFile.c_str(), 0755) == -1)
@@ -87,20 +90,20 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
             auto res = lstat(dstFile.c_str(), &dstSt);
             if (res == 0) {
                 if (S_ISLNK(dstSt.st_mode)) {
-                    auto target = readLink(dstFile);
                     auto prevPriority = priorities[dstFile];
                     if (prevPriority == priority)
-                        throw Error(format(
+                        throw Error(
                                 "packages '%1%' and '%2%' have the same priority %3%; "
                                 "use 'nix-env --set-flag priority NUMBER INSTALLED_PKGNAME' "
                                 "to change the priority of one of the conflicting packages"
-                                " (0 being the highest priority)"
-                                ) % srcFile % target % priority);
+                                " (0 being the highest priority)",
+                                srcFile, readLink(dstFile), priority);
                     if (prevPriority < priority)
                         continue;
                     if (unlink(dstFile.c_str()) == -1)
                         throw SysError(format("unlinking '%1%'") % dstFile);
-                }
+                } else if (S_ISDIR(dstSt.st_mode))
+                    throw Error("collision between non-directory '%1%' and directory '%2%'", srcFile, dstFile);
             } else if (errno != ENOENT)
                 throw SysError(format("getting status of '%1%'") % dstFile);
         }
