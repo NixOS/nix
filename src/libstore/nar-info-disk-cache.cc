@@ -1,6 +1,7 @@
 #include "nar-info-disk-cache.hh"
 #include "sync.hh"
 #include "sqlite.hh"
+#include "globals.hh"
 
 #include <sqlite3.h>
 
@@ -46,10 +47,6 @@ create table if not exists LastPurge (
 class NarInfoDiskCacheImpl : public NarInfoDiskCache
 {
 public:
-
-    /* How long negative and positive lookups are valid. */
-    const int ttlNegative = 3600;
-    const int ttlPositive = 30 * 24 * 3600;
 
     /* How often to purge expired entries from the cache. */
     const int purgeInterval = 24 * 3600;
@@ -116,8 +113,8 @@ public:
                 SQLiteStmt(state->db,
                     "delete from NARs where ((present = 0 and timestamp < ?) or (present = 1 and timestamp < ?))")
                     .use()
-                    (now - ttlNegative)
-                    (now - ttlPositive)
+                    (now - settings.ttlNegativeNarInfoCache)
+                    (now - settings.ttlPositiveNarInfoCache)
                     .exec();
 
                 debug("deleted %d entries from the NAR info disk cache", sqlite3_changes(state->db));
@@ -186,8 +183,8 @@ public:
             auto queryNAR(state->queryNAR.use()
                 (cache.id)
                 (hashPart)
-                (now - ttlNegative)
-                (now - ttlPositive));
+                (now - settings.ttlNegativeNarInfoCache)
+                (now - settings.ttlPositiveNarInfoCache));
 
             if (!queryNAR.next())
                 return {oUnknown, 0};

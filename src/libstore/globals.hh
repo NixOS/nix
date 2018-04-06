@@ -313,6 +313,14 @@ public:
     Setting<Strings> trustedUsers{this, {"root"}, "trusted-users",
         "Which users or groups are trusted to ask the daemon to do unsafe things."};
 
+    Setting<unsigned int> ttlNegativeNarInfoCache{this, 3600, "narinfo-cache-negative-ttl",
+        "The TTL in seconds for negative lookups in the disk cache i.e binary cache lookups that "
+        "return an invalid path result"};
+
+    Setting<unsigned int> ttlPositiveNarInfoCache{this, 30 * 24 * 3600, "narinfo-cache-positive-ttl",
+        "The TTL in seconds for positive lookups in the disk cache i.e binary cache lookups that "
+        "return a valid path result."};
+
     /* ?Who we trust to use the daemon in safe ways */
     Setting<Strings> allowedUsers{this, {"*"}, "allowed-users",
         "Which users or groups are allowed to connect to the daemon."};
