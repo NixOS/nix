@@ -113,8 +113,8 @@ public:
                 SQLiteStmt(state->db,
                     "delete from NARs where ((present = 0 and timestamp < ?) or (present = 1 and timestamp < ?))")
                     .use()
-                    (now - settings.ttlNegativeDiskCache)
-                    (now - settings.ttlPositiveDiskCache)
+                    (now - settings.ttlNegativeNarInfoCache)
+                    (now - settings.ttlPositiveNarInfoCache)
                     .exec();
 
                 debug("deleted %d entries from the NAR info disk cache", sqlite3_changes(state->db));
@@ -183,8 +183,8 @@ public:
             auto queryNAR(state->queryNAR.use()
                 (cache.id)
                 (hashPart)
-                (now - settings.ttlNegativeDiskCache)
-                (now - settings.ttlPositiveDiskCache));
+                (now - settings.ttlNegativeNarInfoCache)
+                (now - settings.ttlPositiveNarInfoCache));
 
             if (!queryNAR.next())
                 return {oUnknown, 0};
