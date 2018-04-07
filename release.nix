@@ -28,8 +28,8 @@ let
         configureFlags = "--enable-gc";
 
         postUnpack = ''
-          (cd source && find . -type f) | cut -c3- > source/.dist-files
-          cat source/.dist-files
+          (cd $sourceRoot && find . -type f) | cut -c3- > $sourceRoot/.dist-files
+          cat $sourceRoot/.dist-files
         '';
 
         preConfigure = ''
