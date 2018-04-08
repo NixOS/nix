@@ -45,5 +45,12 @@ let pkgs = rec {
 
   bash = shell;
 
+  # ruby "interpreter" that outputs "$@"
+  ruby = runCommand "ruby" {} ''
+    mkdir -p $out/bin
+    echo 'printf -- "$*"' > $out/bin/ruby
+    chmod a+rx $out/bin/ruby
+  '';
+
   inherit pkgs;
 }; in pkgs
