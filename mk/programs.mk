@@ -51,7 +51,7 @@ define build-program
   else
 
     $(DESTDIR)$$($(1)_INSTALL_PATH): $$($(1)_PATH) | $(DESTDIR)$$($(1)_INSTALL_DIR)/
-	install -t $$($(1)_INSTALL_DIR) $$<
+	install -t $(DESTDIR)$$($(1)_INSTALL_DIR) $$<
 
   endif
 
