@@ -155,7 +155,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
 extern "C" typedef void (*ValueInitializer)(EvalState & state, Value & v);
 
 /* Load a ValueInitializer from a DSO and return whatever it initializes */
-static void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value & v)
+void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
     Path path = state.coerceToPath(pos, *args[0], context);
@@ -193,7 +193,7 @@ static void prim_importNative(EvalState & state, const Pos & pos, Value * * args
 
 
 /* Execute a program and parse its output */
-static void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
+void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceList(*args[0], pos);
     auto elems = args[0]->listElems();
