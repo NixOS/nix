@@ -456,7 +456,7 @@ $ nix-env -f ~/foo.nix -i '.*'</screen>
 from another profile:
 
 <screen>
-$ nix-env -i --from-profile /nix/var/nix/profiles/foo -i gcc</screen>
+$ nix-env -i --from-profile /nix/var/nix/profiles/foo gcc</screen>
 
 </para>
 
