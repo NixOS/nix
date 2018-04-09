@@ -1035,7 +1035,7 @@ static void daemonLoop(char * * argv)
             }, options);
 
         } catch (Interrupted & e) {
-            throw;
+            return;
         } catch (Error & e) {
             printError(format("error processing connection: %1%") % e.msg());
         }
