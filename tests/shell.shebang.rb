@@ -1,4 +1,4 @@
-#! @ENV_PROG@ nix-shell
+#! @SHELL_PROG@
 #! ruby
 #! nix-shell -I nixpkgs=shell.nix --no-substitute
 #! nix-shell --pure -p ruby -i ruby

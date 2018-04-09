@@ -43,7 +43,7 @@ output=$($TEST_ROOT/shell.shebang.sh abc def)
 # Test nix-shell shebang mode for ruby
 # This uses a fake interpreter that returns the arguments passed
 # This, in turn, verifies the `rc` script is valid and the `load()` script (given using `-e`) is as expected.
-sed -e "s|@ENV_PROG@|$(type -p env)|" shell.shebang.rb > $TEST_ROOT/shell.shebang.rb
+sed -e "s|@SHELL_PROG@|$(type -p nix-shell)|" shell.shebang.rb > $TEST_ROOT/shell.shebang.rb
 chmod a+rx $TEST_ROOT/shell.shebang.rb
 
 output=$($TEST_ROOT/shell.shebang.rb abc ruby)
