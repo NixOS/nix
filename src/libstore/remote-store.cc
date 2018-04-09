@@ -297,31 +297,34 @@ void RemoteStore::queryPathInfoUncached(const Path & path,
     Callback<std::shared_ptr<ValidPathInfo>> callback)
 {
     try {
-        auto conn(connections->get());
-        conn->to << wopQueryPathInfo << path;
-        try {
-            conn->processStderr();
-        } catch (Error & e) {
-            // Ugly backwards compatibility hack.
-            if (e.msg().find("is not valid") != std::string::npos)
-                throw InvalidPath(e.what());
-            throw;
-        }
-        if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 17) {
-            bool valid; conn->from >> valid;
-            if (!valid) throw InvalidPath(format("path '%s' is not valid") % path);
-        }
-        auto info = std::make_shared<ValidPathInfo>();
-        info->path = path;
-        info->deriver = readString(conn->from);
-        if (info->deriver != "") assertStorePath(info->deriver);
-        info->narHash = Hash(readString(conn->from), htSHA256);
-        info->references = readStorePaths<PathSet>(*this, conn->from);
-        conn->from >> info->registrationTime >> info->narSize;
-        if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
-            conn->from >> info->ultimate;
-            info->sigs = readStrings<StringSet>(conn->from);
-            conn->from >> info->ca;
+        std::shared_ptr<ValidPathInfo> info;
+        {
+            auto conn(connections->get());
+            conn->to << wopQueryPathInfo << path;
+            try {
+                conn->processStderr();
+            } catch (Error & e) {
+                // Ugly backwards compatibility hack.
+                if (e.msg().find("is not valid") != std::string::npos)
+                    throw InvalidPath(e.what());
+                throw;
+            }
+            if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 17) {
+                bool valid; conn->from >> valid;
+                if (!valid) throw InvalidPath(format("path '%s' is not valid") % path);
+            }
+            info = std::make_shared<ValidPathInfo>();
+            info->path = path;
+            info->deriver = readString(conn->from);
+            if (info->deriver != "") assertStorePath(info->deriver);
+            info->narHash = Hash(readString(conn->from), htSHA256);
+            info->references = readStorePaths<PathSet>(*this, conn->from);
+            conn->from >> info->registrationTime >> info->narSize;
+            if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 16) {
+                conn->from >> info->ultimate;
+                info->sigs = readStrings<StringSet>(conn->from);
+                conn->from >> info->ca;
+            }
         }
         callback(std::move(info));
     } catch (...) { callback.rethrow(); }
