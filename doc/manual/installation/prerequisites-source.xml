@@ -9,6 +9,9 @@
 <itemizedlist>
 
   <listitem><para>GNU Make.</para></listitem>
+  
+  <listitem><para>Bash Shell. Bash, and no other shell, is required to
+  run the <literal>./configure</literal> script.</para></listitem>
 
   <listitem><para>A version of GCC or Clang that supports C++14.</para></listitem>
 
@@ -28,6 +31,14 @@
   distribution does not provide these, you can obtain bzip2 from <link
   xlink:href="http://www.bzip.org/"/>.</para></listitem>
 
+  <listitem><para><literal>liblzma/literal>, which is provided by
+  XZ Utils. If your distribution does not provide this, you can
+  get it from <link xlink:href="https://tukaani.org/xz/"/>.</para></listitem>
+  
+  <listitem><para>cURL and its library. If your distribution does not
+  provide it, you can get it from <link
+  xlink:href="https://curl.haxx.se/"/>.</para></listitem>
+      
   <listitem><para>The SQLite embedded database library, version 3.6.19
   or higher.  If your distribution does not provide it, please install
   it from <link xlink:href="http://www.sqlite.org/" />.</para></listitem>
