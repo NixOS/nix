@@ -4,6 +4,8 @@
   <dict>
     <key>Label</key>
     <string>org.nixos.nix-daemon</string>
+    <key>KeepAlive</key>
+    <true/>
     <key>RunAtLoad</key>
     <true/>
     <key>Program</key>
