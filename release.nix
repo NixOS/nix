@@ -206,7 +206,6 @@ let
       };
 
 
-    rpm_fedora27i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora27i386) [ ];
     rpm_fedora27x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora27x86_64) [ ];
 
 
