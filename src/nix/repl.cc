@@ -197,6 +197,7 @@ bool NixRepl::getLine(string & input, const std::string &prompt)
       }
     }
     input += s;
+    input += '\n';
     return true;
 }
 
