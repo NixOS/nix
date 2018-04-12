@@ -159,7 +159,7 @@ void initPlugins()
             void *handle =
                 dlopen(file.c_str(), RTLD_LAZY | RTLD_LOCAL);
             if (!handle)
-                throw Error("could not dynamically open plugin file '%s%': %s%", file, dlerror());
+                throw Error("could not dynamically open plugin file '%s': %s", file, dlerror());
         }
     }
     /* We handle settings registrations here, since plugins can add settings */
