@@ -60,7 +60,8 @@ This is because tools such as compilers don’t search in per-packages
 directories such as
 <filename>/nix/store/5lbfaxb722zp…-openssl-0.9.8d/include</filename>,
 so if a package builds correctly on your system, this is because you
-specified the dependency explicitly.</para>
+specified the dependency explicitly. This takes care of the build-time
+dependencies.</para>
 
 <para>Once a package is built, runtime dependencies are found by
 scanning binaries for the hash parts of Nix store paths (such as
