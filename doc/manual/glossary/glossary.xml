@@ -104,7 +104,7 @@
 
   <glossdef><para>A store path <varname>Q</varname> is reachable from
   another store path <varname>P</varname> if <varname>Q</varname> is in the
-  <link linked="gloss-closure">closure</link> of the
+  <link linkend="gloss-closure">closure</link> of the
   <link linkend="gloss-reference">references</link> relation.
   </para></glossdef>
 </glossentry>
