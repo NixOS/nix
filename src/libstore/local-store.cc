@@ -53,7 +53,6 @@ LocalStore::LocalStore(const Params & params)
     , trashDir(realStoreDir + "/trash")
     , tempRootsDir(stateDir + "/temproots")
     , fnTempRoots(fmt("%s/%d", tempRootsDir, getpid()))
-    , publicKeys(getDefaultPublicKeys())
 {
     auto state(_state.lock());
 
@@ -964,6 +963,15 @@ void LocalStore::invalidatePath(State & state, const Path & path)
 }
 
 
+const PublicKeys & LocalStore::getPublicKeys()
+{
+    auto state(_state.lock());
+    if (!state->publicKeys)
+        state->publicKeys = std::make_unique<PublicKeys>(getDefaultPublicKeys());
+    return *state->publicKeys;
+}
+
+
 void LocalStore::addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
     RepairFlag repair, CheckSigsFlag checkSigs, std::shared_ptr<FSAccessor> accessor)
 {
@@ -978,7 +986,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, const ref<std::string> &
         throw Error("size mismatch importing path '%s'; expected %s, got %s",
             info.path, info.narSize, nar->size());
 
-    if (requireSigs && checkSigs && !info.checkSignatures(*this, publicKeys))
+    if (requireSigs && checkSigs && !info.checkSignatures(*this, getPublicKeys()))
         throw Error("cannot add path '%s' because it lacks a valid signature", info.path);
 
     addTempRoot(info.path);

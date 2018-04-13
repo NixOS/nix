@@ -3680,7 +3680,7 @@ void SubstitutionGoal::tryNext()
        only after we've downloaded the path. */
     if (worker.store.requireSigs
         && !sub->isTrusted
-        && !info->checkSignatures(worker.store, worker.store.publicKeys))
+        && !info->checkSignatures(worker.store, worker.store.getPublicKeys()))
     {
         printError("warning: substituter '%s' does not have a valid signature for path '%s'",
             sub->getUri(), storePath);

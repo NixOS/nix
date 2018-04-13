@@ -77,6 +77,8 @@ private:
            minFree but not much below availAfterGC, then there is no
            point in starting a new GC. */
         uint64_t availAfterGC = std::numeric_limits<uint64_t>::max();
+
+        std::unique_ptr<PublicKeys> publicKeys;
     };
 
     Sync<State, std::recursive_mutex> _state;
@@ -100,7 +102,7 @@ private:
         settings.requireSigs,
         "require-sigs", "whether store paths should have a trusted signature on import"};
 
-    PublicKeys publicKeys;
+    const PublicKeys & getPublicKeys();
 
 public:
 
