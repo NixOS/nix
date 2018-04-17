@@ -271,7 +271,18 @@ static void prim_isNull(EvalState & state, const Pos & pos, Value * * args, Valu
 static void prim_isFunction(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0]);
-    mkBool(v, args[0]->type == tLambda);
+    bool res;
+    switch (args[0]->type) {
+        case tLambda:
+        case tPrimOp:
+        case tPrimOpApp:
+            res = true;
+            break;
+        default:
+            res = false;
+            break;
+    }
+    mkBool(v, res);
 }
 
 
