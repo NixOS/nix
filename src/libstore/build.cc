@@ -964,6 +964,8 @@ private:
     }
 
     void done(BuildResult::Status status, const string & msg = "");
+
+    PathSet exportReferences(PathSet storePaths);
 };
 
 
@@ -1730,22 +1732,23 @@ int childEntry(void * arg)
 }
 
 
-PathSet exportReferences(Store & store, PathSet storePaths)
+PathSet DerivationGoal::exportReferences(PathSet storePaths)
 {
     PathSet paths;
 
     for (auto storePath : storePaths) {
 
         /* Check that the store path is valid. */
-        if (!store.isInStore(storePath))
+        if (!worker.store.isInStore(storePath))
             throw BuildError(format("'exportReferencesGraph' contains a non-store path '%1%'")
                 % storePath);
-        storePath = store.toStorePath(storePath);
-        if (!store.isValidPath(storePath))
-            throw BuildError(format("'exportReferencesGraph' contains an invalid path '%1%'")
-                % storePath);
 
-        store.computeFSClosure(storePath, paths);
+        storePath = worker.store.toStorePath(storePath);
+
+        if (!inputPaths.count(storePath))
+            throw BuildError("cannot export references of path '%s' because it is not in the input closure of the derivation", storePath);
+
+        worker.store.computeFSClosure(storePath, paths);
     }
 
     /* If there are derivations in the graph, then include their
@@ -1756,9 +1759,9 @@ PathSet exportReferences(Store & store, PathSet storePaths)
 
     for (auto & j : paths2) {
         if (isDerivation(j)) {
-            Derivation drv = store.derivationFromPath(j);
+            Derivation drv = worker.store.derivationFromPath(j);
             for (auto & k : drv.outputs)
-                store.computeFSClosure(k.second.path, paths);
+                worker.store.computeFSClosure(k.second.path, paths);
         }
     }
 
@@ -1882,7 +1885,7 @@ void DerivationGoal::startBuilder()
             /* Write closure info to <fileName>. */
             writeFile(tmpDir + "/" + fileName,
                 worker.store.makeValidityRegistration(
-                    exportReferences(worker.store, {storePath}), false, false));
+                    exportReferences({storePath}), false, false));
         }
     }
 
@@ -2384,7 +2387,7 @@ void DerivationGoal::writeStructuredAttrs()
                     for (auto & p : *i)
                         storePaths.insert(p.get<std::string>());
                     worker.store.pathInfoToJSON(jsonRoot,
-                        exportReferences(worker.store, storePaths), false, true);
+                        exportReferences(storePaths), false, true);
                 }
                 json[i.key()] = nlohmann::json::parse(str.str()); // urgh
             }
