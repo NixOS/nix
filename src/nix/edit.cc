@@ -61,7 +61,7 @@ struct CmdEdit : InstallableCommand
 
         auto editor = getEnv("EDITOR", "cat");
 
-        Strings args{editor};
+        auto args = tokenizeString<Strings>(editor);
 
         if (editor.find("emacs") != std::string::npos ||
             editor.find("nano") != std::string::npos ||
@@ -72,7 +72,7 @@ struct CmdEdit : InstallableCommand
 
         stopProgressBar();
 
-        execvp(editor.c_str(), stringsToCharPtrs(args).data());
+        execvp(args.front().c_str(), stringsToCharPtrs(args).data());
 
         throw SysError("cannot run editor '%s'", editor);
     }
