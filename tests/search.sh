@@ -29,6 +29,11 @@ clearCache
 # Check search that matches nothing
 (( $(nix search nosuchpackageexists | wc -l) == 0 ))
 
+# Search for multiple arguments
+(( $(nix search hello empty | wc -l) == 5 ))
+
+# Multiple arguments will not exist
+(( $(nix search hello broken | wc -l) == 0 ))
 
 ## Search expressions
 
