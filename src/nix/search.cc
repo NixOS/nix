@@ -25,14 +25,14 @@ std::string hilite(const std::string & s, const std::smatch & m)
 
 struct CmdSearch : SourceExprCommand, MixJSON
 {
-    std::string re;
+    std::vector<std::string> res;
 
     bool writeCache = true;
     bool useCache = true;
 
     CmdSearch()
     {
-        expectArg("regex", &re, true);
+        expectArgs("regex", &res);
 
         mkFlag()
             .longName("update-cache")
@@ -68,8 +68,12 @@ struct CmdSearch : SourceExprCommand, MixJSON
                 "nix search blender"
             },
             Example{
-                "To search for Firefox and Chromium:",
+                "To search for Firefox or Chromium:",
                 "nix search 'firefox|chromium'"
+            },
+            Example{
+                "To search for git and frontend or gui:",
+                "nix search git 'frontend|gui'"
             },
         };
     }
@@ -81,9 +85,16 @@ struct CmdSearch : SourceExprCommand, MixJSON
         // Empty search string should match all packages
         // Use "^" here instead of ".*" due to differences in resulting highlighting
         // (see #1893 -- libc++ claims empty search string is not in POSIX grammar)
-        if (re.empty()) re = "^";
+        if (res.empty()) {
+            res.push_back("^");
+        }
 
-        std::regex regex(re, std::regex::extended | std::regex::icase);
+        std::vector<std::regex> regexes;
+        regexes.reserve(res.size());
+
+        for (auto &re : res) {
+            regexes.push_back(std::regex(re, std::regex::extended | std::regex::icase));
+        }
 
         auto state = getEvalState();
 
@@ -102,6 +113,7 @@ struct CmdSearch : SourceExprCommand, MixJSON
             debug("at attribute '%s'", attrPath);
 
             try {
+                uint found = 0;
 
                 state->forceValue(*v);
 
@@ -115,25 +127,33 @@ struct CmdSearch : SourceExprCommand, MixJSON
                 if (state->isDerivation(*v)) {
 
                     DrvInfo drv(*state, attrPath, v->attrs);
+                    std::string description;
+                    std::smatch attrPathMatch;
+                    std::smatch descriptionMatch;
+                    std::smatch nameMatch;
+                    std::string name;
 
                     DrvName parsed(drv.queryName());
 
-                    std::smatch attrPathMatch;
-                    std::regex_search(attrPath, attrPathMatch, regex);
+                    for (auto &regex : regexes) {
+                        std::regex_search(attrPath, attrPathMatch, regex);
 
-                    auto name = parsed.name;
-                    std::smatch nameMatch;
-                    std::regex_search(name, nameMatch, regex);
+                        name = parsed.name;
+                        std::regex_search(name, nameMatch, regex);
 
-                    std::string description = drv.queryMetaString("description");
-                    std::replace(description.begin(), description.end(), '\n', ' ');
-                    std::smatch descriptionMatch;
-                    std::regex_search(description, descriptionMatch, regex);
+                        description = drv.queryMetaString("description");
+                        std::replace(description.begin(), description.end(), '\n', ' ');
+                        std::regex_search(description, descriptionMatch, regex);
 
-                    if (!attrPathMatch.empty()
-                        || !nameMatch.empty()
-                        || !descriptionMatch.empty())
-                    {
+                        if (!attrPathMatch.empty()
+                            || !nameMatch.empty()
+                            || !descriptionMatch.empty())
+                        {
+                            found++;
+                        }
+                    }
+
+                    if (found == res.size()) {
                         if (json) {
 
                             auto jsonElem = jsonOut->object(attrPath);
