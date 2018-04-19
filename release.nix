@@ -268,7 +268,8 @@ let
           export NIX_STATE_DIR=$TMPDIR
           nix-store --init
 
-          nix-instantiate ${nixpkgs}/nixos/release-combined.nix -A tested --dry-run
+          nix-instantiate ${nixpkgs}/nixos/release-combined.nix -A tested --dry-run \
+            --arg nixpkgs '{ outPath = ${nixpkgs}; revCount = 123; shortRev = "abcdefgh"; }'
 
           touch $out
         '';
