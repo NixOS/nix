@@ -34,7 +34,7 @@ fi
 if [ "$(uname -s)" = "Darwin" ]; then
     INSTALL_MODE=daemon
 elif [ "$(uname -s)" = "Linux" ] && [ -e /run/systemd/system ]; then
-    INSTALL_MODE=no-daemon
+    INSTALL_MODE=daemon
 else
     INSTALL_MODE=no-daemon
 fi
