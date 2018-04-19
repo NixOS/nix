@@ -28,14 +28,39 @@ if [ "$(uname -s)" = "Darwin" ]; then
         echo "$0: macOS $(sw_vers -productVersion) is not supported, upgrade to 10.10 or higher"
         exit 1
     fi
-
-    printf '\e[1;31mSwitching to the Daemon-based Installer\e[0m\n'
-    exec "$self/install-multi-user"
-    exit 0
 fi
 
-# Linux & Systemd support
-if [ "$(uname -s)" = "Linux" ] && [ -e /run/systemd/system ]; then
+# Determine if we should punt to the single-user installer or not
+if [ "$(uname -s)" = "Darwin" ]; then
+    INSTALL_MODE=daemon
+elif [ "$(uname -s)" = "Linux" ] && [ -e /run/systemd/system ]; then
+    INSTALL_MODE=daemon
+else
+    INSTALL_MODE=no-daemon
+fi
+
+# Trivially handle the --daemon / --no-daemon options
+if [ "x${1:-}" = "x--no-daemon" ]; then
+    INSTALL_MODE=no-daemon
+elif [ "x${1:-}" = "x--daemon" ]; then
+    INSTALL_MODE=daemon
+elif [ "x${1:-}" != "x" ]; then
+    (
+        echo "Nix Installer [--daemon|--no-daemon]"
+        echo ""
+        echo " --daemon:    Force the installer to use the Daemon"
+        echo "              based installer, even though it may not"
+        echo "              work."
+        echo ""
+        echo " --no-daemon: Force a no-daemon, single-user"
+        echo "              installation even when the preferred"
+        echo "              method is with the daemon."
+        echo ""
+    ) >&2
+    exit
+fi
+
+if [ "$INSTALL_MODE" = "daemon" ]; then
     printf '\e[1;31mSwitching to the Daemon-based Installer\e[0m\n'
     exec "$self/install-multi-user"
     exit 0
