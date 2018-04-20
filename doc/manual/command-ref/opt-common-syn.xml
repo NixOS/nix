@@ -9,6 +9,9 @@
   </group>
 </arg>
 <arg>
+  <arg choice='plain'><option>--quiet</option></arg>
+</arg>
+<arg>
   <group choice='plain'>
     <arg choice='plain'><option>--no-build-output</option></arg>
     <arg choice='plain'><option>-Q</option></arg>
