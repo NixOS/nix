@@ -2691,8 +2691,8 @@ void DerivationGoal::runChild()
                 } else {
                     if (errno != EINVAL)
                         throw SysError("mounting /dev/pts");
-                    doBind("/dev/pts", "/dev/pts");
-                    doBind("/dev/ptmx", "/dev/ptmx");
+                    doBind("/dev/pts", chrootRootDir + "/dev/pts");
+                    doBind("/dev/ptmx", chrootRootDir + "/dev/ptmx");
                 }
             }
 
