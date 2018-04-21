@@ -173,7 +173,11 @@ struct CurlDownloader : public Downloader
 
         int progressCallback(double dltotal, double dlnow)
         {
-            act.progress(dlnow, dltotal);
+            try {
+              act.progress(dlnow, dltotal);
+            } catch (nix::Interrupted &) {
+              assert(_isInterrupted);
+            }
             return _isInterrupted;
         }
 
