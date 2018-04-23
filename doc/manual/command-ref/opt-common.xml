@@ -75,6 +75,23 @@
 </varlistentry>
 
 
+<varlistentry><term><option>--quiet</option></term>
+
+  <listitem>
+
+  <para>Decreases the level of verbosity of diagnostic messages
+  printed on standard error.  This is the inverse option to
+  <option>-v</option> / <option>--verbose</option>.
+  </para>
+
+  <para>This option may be specified repeatedly.  See the previous
+  verbosity levels list.</para>
+
+  </listitem>
+
+</varlistentry>
+
+
 <varlistentry><term><option>--no-build-output</option> / <option>-Q</option></term>
 
   <listitem><para>By default, output written by builders to standard
