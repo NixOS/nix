@@ -57,16 +57,8 @@ bool BasicDerivation::isBuiltin() const
 bool BasicDerivation::canBuildLocally() const
 {
     return platform == settings.thisSystem
-        || isBuiltin()
-#if __linux__
-        || (platform == "i686-linux" && settings.thisSystem == "x86_64-linux")
-        || (platform == "armv6l-linux" && settings.thisSystem == "armv7l-linux")
-        || (platform == "armv5tel-linux" && (settings.thisSystem == "armv7l-linux" || settings.thisSystem == "armv6l-linux"))
-#elif __FreeBSD__
-        || (platform == "i686-linux" && settings.thisSystem == "x86_64-freebsd")
-        || (platform == "i686-linux" && settings.thisSystem == "i686-freebsd")
-#endif
-        ;
+        || settings.extraPlatforms.get().count(platform) > 0
+        || isBuiltin();
 }
 
 

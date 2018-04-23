@@ -98,7 +98,9 @@ int main (int argc, char * * argv)
             source >> drvPath;
             auto requiredFeatures = readStrings<std::set<std::string>>(source);
 
-            auto canBuildLocally = amWilling && (neededSystem == settings.thisSystem);
+            auto canBuildLocally = amWilling
+                &&  (  neededSystem == settings.thisSystem
+                    || settings.extraPlatforms.get().count(neededSystem) > 0);
 
             /* Error ignored here, will be caught later */
             mkdir(currentLoad.c_str(), 0777);

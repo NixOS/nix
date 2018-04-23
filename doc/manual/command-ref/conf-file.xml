@@ -254,6 +254,25 @@ false</literal>.</para>
   </varlistentry>
 
 
+  <varlistentry xml:id="conf-extra-platforms"><term><literal>extra-platforms</literal></term>
+
+    <listitem><para>Platforms other than the native one which
+    this machine is capable of building for. This can be useful for
+    supporting additional architectures on compatible machines:
+    i686-linux can be built on x86_64-linux machines (and the default
+    for this setting reflects this); armv7 is backwards-compatible with
+    armv6 and armv5tel; some aarch64 machines can also natively run
+    32-bit ARM code; and qemu-user may be used to support non-native
+    platforms (though this may be slow and buggy). Most values for this
+    are not enabled by default because build systems will often
+    misdetect the target platform and generate incompatible code, so you
+    may wish to cross-check the results of using this option against
+    proper natively-built versions of your
+    derivations.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry xml:id="conf-extra-substituters"><term><literal>extra-substituters</literal></term>
 
     <listitem><para>Additional binary caches appended to those

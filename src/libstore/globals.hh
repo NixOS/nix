@@ -295,6 +295,13 @@ public:
         "Nix store has a valid signature (that is, one signed using a key "
         "listed in 'trusted-public-keys'."};
 
+    Setting<StringSet> extraPlatforms{this,
+        SYSTEM == "x86_64-linux" ? StringSet{"i686-linux"} : StringSet{},
+        "extra-platforms",
+        "Additional platforms that can be built on the local system. "
+        "These may be supported natively (e.g. armv7 on some aarch64 CPUs "
+        "or using hacks like qemu-user."};
+
     Setting<Strings> substituters{this,
         nixStore == "/nix/store" ? Strings{"https://cache.nixos.org/"} : Strings(),
         "substituters",
