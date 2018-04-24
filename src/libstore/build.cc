@@ -1998,8 +1998,10 @@ void DerivationGoal::startBuilder()
                 "nogroup:x:65534:\n") % sandboxGid).str());
 
         /* Create /etc/hosts with localhost entry. */
-        if (!fixedOutput)
+        if (!fixedOutput) {
             writeFile(chrootRootDir + "/etc/hosts", "127.0.0.1 localhost\n");
+            writeFile(chrootRootDir + "/etc/nsswitch.conf", "hosts: files\n");
+        }
 
         /* Make the closure of the inputs available in the chroot,
            rather than the whole Nix store.  This prevents any access
