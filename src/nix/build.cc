@@ -22,6 +22,19 @@ struct CmdBuild : MixDryRun, InstallablesCommand
             .longName("no-link")
             .description("do not create a symlink to the build result")
             .set(&outLink, Path(""));
+
+        mkFlag()
+            .longName("keep-failed")
+            .shortName('K')
+            .description("keep temporary directories of failed builds")
+            .set(&(bool&) settings.keepFailed, true);
+
+        mkFlag()
+            .longName("keep-going")
+            .shortName('k')
+            .description("keep going after a build fails")
+            .set(&(bool&) settings.keepGoing, true);
+
     }
 
     std::string name() override
