@@ -2,19 +2,21 @@
 
 set -e
 
-dest="/nix"
-self="$(dirname "$0")"
-nix="@nix@"
-cacert="@cacert@"
-
+# Static global declaration block
+readonly dest="/nix"
+readonly self="$(dirname "$0")"
+readonly nix="@nix@"
+readonly cacert="@cacert@"
 
 if ! [ -e "$self/.reginfo" ]; then
     echo "$0: incomplete installer (.reginfo is missing)" >&2
 fi
 
+# in case if USER not set
 if [ -z "$USER" ]; then
-    echo "$0: \$USER is not set" >&2
-    exit 1
+    echo "$0: Environment variable USER is not set" >&2
+    USER="$(whoami)"    # Taking username from  UID
+    echo "$0: Detected username: $USER" >&2
 fi
 
 if [ -z "$HOME" ]; then
