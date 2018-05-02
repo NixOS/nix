@@ -112,7 +112,13 @@ impureEnvVars = [ "http_proxy" "https_proxy" <replaceable>...</replaceable> ];
     linkend="fixed-output-drvs">fixed-output derivations</link>, where
     impurities such as these are okay since (the hash of) the output
     is known in advance.  It is ignored for all other
-    derivations.</para></listitem>
+    derivations.</para>
+
+    <warning><para><varname>impureEnvVars</varname> implementation takes
+    environment variables from the current builder process. When a daemon is
+    building its environmental variables are used. Without the daemon, the
+    environmental variables come from the environment of the
+    <command>nix-build</command>.</para></warning></listitem>
 
   </varlistentry>
 
