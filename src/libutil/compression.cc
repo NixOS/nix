@@ -326,7 +326,20 @@ struct BzipSink : CompressionSink
 
     void write(const unsigned char * data, size_t len) override
     {
+        /* Bzip2's 'avail_in' parameter is an unsigned int, so we need
+           to split the input into chunks of at most 4 GiB. */
+        while (len) {
+            auto n = std::min((size_t) std::numeric_limits<decltype(strm.avail_in)>::max(), len);
+            writeInternal(data, n);
+            data += n;
+            len -= n;
+        }
+    }
+
+    void writeInternal(const unsigned char * data, size_t len)
+    {
         assert(!finished);
+        assert(len <= std::numeric_limits<decltype(strm.avail_in)>::max());
 
         strm.next_in = (char *) data;
         strm.avail_in = len;
@@ -432,8 +445,6 @@ struct BrotliSink : CompressionSink
 
     void write(const unsigned char * data, size_t len) override
     {
-        assert(!finished);
-
         // Don't feed brotli too much at once
         const size_t CHUNK_SIZE = sizeof(outbuf) << 2;
         while (len) {
@@ -443,7 +454,7 @@ struct BrotliSink : CompressionSink
           len -= n;
         }
     }
-  private:
+
     void writeInternal(const unsigned char * data, size_t len)
     {
         assert(!finished);
