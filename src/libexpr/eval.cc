@@ -422,7 +422,7 @@ Value * EvalState::addConstant(const string & name, Value & v)
 
 
 Value * EvalState::addPrimOp(const string & name,
-    unsigned int arity, PrimOpFun primOp)
+    size_t arity, PrimOpFun primOp)
 {
     if (arity == 0) {
         Value v;
@@ -528,7 +528,7 @@ Value & mkString(Value & v, const string & s, const PathSet & context)
 {
     mkString(v, s.c_str());
     if (!context.empty()) {
-        unsigned int n = 0;
+        size_t n = 0;
         v.string.context = (const char * *)
             allocBytes((context.size() + 1) * sizeof(char *));
         for (auto & i : context)
@@ -547,7 +547,7 @@ void mkPath(Value & v, const char * s)
 
 inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 {
-    for (unsigned int l = var.level; l; --l, env = env->up) ;
+    for (size_t l = var.level; l; --l, env = env->up) ;
 
     if (!var.fromWith) return env->values[var.displ];
 
@@ -566,7 +566,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
         }
         if (!env->prevWith)
             throwUndefinedVarError("undefined variable '%1%' at %2%", var.name, var.pos);
-        for (unsigned int l = env->prevWith; l; --l, env = env->up) ;
+        for (size_t l = env->prevWith; l; --l, env = env->up) ;
     }
 }
 
@@ -578,14 +578,15 @@ Value * EvalState::allocValue()
 }
 
 
-Env & EvalState::allocEnv(unsigned int size)
+Env & EvalState::allocEnv(size_t size)
 {
-    assert(size <= std::numeric_limits<decltype(Env::size)>::max());
+    if (size > std::numeric_limits<decltype(Env::size)>::max())
+        throw Error("environment size %d is too big", size);
 
     nrEnvs++;
     nrValuesInEnvs += size;
     Env * env = (Env *) allocBytes(sizeof(Env) + size * sizeof(Value *));
-    env->size = size;
+    env->size = (decltype(Env::size)) size;
 
     /* We assume that env->values has been cleared by the allocator; maybeThunk() and lookupVar fromWith expect this. */
 
@@ -593,7 +594,7 @@ Env & EvalState::allocEnv(unsigned int size)
 }
 
 
-void EvalState::mkList(Value & v, unsigned int size)
+void EvalState::mkList(Value & v, size_t size)
 {
     clearValue(v);
     if (size == 1)
@@ -805,7 +806,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         /* The recursive attributes are evaluated in the new
            environment, while the inherited attributes are evaluated
            in the original environment. */
-        unsigned int displ = 0;
+        size_t displ = 0;
         for (auto & i : attrs) {
             Value * vAttr;
             if (hasOverrides && !i.second.inherited) {
@@ -879,7 +880,7 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
     /* The recursive attributes are evaluated in the new environment,
        while the inherited attributes are evaluated in the original
        environment. */
-    unsigned int displ = 0;
+    size_t displ = 0;
     for (auto & i : attrs->attrs)
         env2.values[displ++] = i.second.e->maybeThunk(state, i.second.inherited ? env : env2);
 
@@ -890,7 +891,7 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 void ExprList::eval(EvalState & state, Env & env, Value & v)
 {
     state.mkList(v, elems.size());
-    for (unsigned int n = 0; n < elems.size(); ++n)
+    for (size_t n = 0; n < elems.size(); ++n)
         v.listElems()[n] = elems[n]->maybeThunk(state, env);
 }
 
@@ -1012,22 +1013,22 @@ void ExprApp::eval(EvalState & state, Env & env, Value & v)
 void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
 {
     /* Figure out the number of arguments still needed. */
-    unsigned int argsDone = 0;
+    size_t argsDone = 0;
     Value * primOp = &fun;
     while (primOp->type == tPrimOpApp) {
         argsDone++;
         primOp = primOp->primOpApp.left;
     }
     assert(primOp->type == tPrimOp);
-    unsigned int arity = primOp->primOp->arity;
-    unsigned int argsLeft = arity - argsDone;
+    auto arity = primOp->primOp->arity;
+    auto argsLeft = arity - argsDone;
 
     if (argsLeft == 1) {
         /* We have all the arguments, so call the primop. */
 
         /* Put all the arguments in an array. */
         Value * vArgs[arity];
-        unsigned int n = arity - 1;
+        auto n = arity - 1;
         vArgs[n--] = &arg;
         for (Value * arg = &fun; arg->type == tPrimOpApp; arg = arg->primOpApp.left)
             vArgs[n--] = arg->primOpApp.right;
@@ -1076,13 +1077,13 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
 
     ExprLambda & lambda(*fun.lambda.fun);
 
-    unsigned int size =
+    auto size =
         (lambda.arg.empty() ? 0 : 1) +
         (lambda.matchAttrs ? lambda.formals->formals.size() : 0);
     Env & env2(allocEnv(size));
     env2.up = fun.lambda.env;
 
-    unsigned int displ = 0;
+    size_t displ = 0;
 
     if (!lambda.matchAttrs)
         env2.values[displ++] = &arg;
@@ -1096,7 +1097,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         /* For each formal argument, get the actual argument.  If
            there is no matching actual argument but the formal
            argument has a default, use the default. */
-        unsigned int attrsUsed = 0;
+        size_t attrsUsed = 0;
         for (auto & i : lambda.formals->formals) {
             Bindings::iterator j = arg.attrs->find(i.name);
             if (j == arg.attrs->end()) {
@@ -1294,15 +1295,15 @@ void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
 }
 
 
-void EvalState::concatLists(Value & v, unsigned int nrLists, Value * * lists, const Pos & pos)
+void EvalState::concatLists(Value & v, size_t nrLists, Value * * lists, const Pos & pos)
 {
     nrListConcats++;
 
     Value * nonEmpty = 0;
-    unsigned int len = 0;
-    for (unsigned int n = 0; n < nrLists; ++n) {
+    size_t len = 0;
+    for (size_t n = 0; n < nrLists; ++n) {
         forceList(*lists[n], pos);
-        unsigned int l = lists[n]->listSize();
+        auto l = lists[n]->listSize();
         len += l;
         if (l) nonEmpty = lists[n];
     }
@@ -1314,8 +1315,8 @@ void EvalState::concatLists(Value & v, unsigned int nrLists, Value * * lists, co
 
     mkList(v, len);
     auto out = v.listElems();
-    for (unsigned int n = 0, pos = 0; n < nrLists; ++n) {
-        unsigned int l = lists[n]->listSize();
+    for (size_t n = 0, pos = 0; n < nrLists; ++n) {
+        auto l = lists[n]->listSize();
         if (l)
             memcpy(out + pos, lists[n]->listElems(), l * sizeof(Value *));
         pos += l;
@@ -1410,7 +1411,7 @@ void EvalState::forceValueDeep(Value & v)
         }
 
         else if (v.isList()) {
-            for (unsigned int n = 0; n < v.listSize(); ++n)
+            for (size_t n = 0; n < v.listSize(); ++n)
                 recurse(*v.listElems()[n]);
         }
     };
@@ -1562,7 +1563,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
 
         if (v.isList()) {
             string result;
-            for (unsigned int n = 0; n < v.listSize(); ++n) {
+            for (size_t n = 0; n < v.listSize(); ++n) {
                 result += coerceToString(pos, *v.listElems()[n],
                     context, coerceMore, copyToStore);
                 if (n < v.listSize() - 1
@@ -1649,7 +1650,7 @@ bool EvalState::eqValues(Value & v1, Value & v2)
         case tList2:
         case tListN:
             if (v1.listSize() != v2.listSize()) return false;
-            for (unsigned int n = 0; n < v1.listSize(); ++n)
+            for (size_t n = 0; n < v1.listSize(); ++n)
                 if (!eqValues(*v1.listElems()[n], *v2.listElems()[n])) return false;
             return true;
 
@@ -1740,26 +1741,26 @@ void EvalState::printStats()
         v = lvlInfo;
 
         printMsg(v, format("calls to %1% primops:") % primOpCalls.size());
-        typedef std::multimap<unsigned int, Symbol> PrimOpCalls_;
+        typedef std::multimap<size_t, Symbol> PrimOpCalls_;
         PrimOpCalls_ primOpCalls_;
         for (auto & i : primOpCalls)
-            primOpCalls_.insert(std::pair<unsigned int, Symbol>(i.second, i.first));
+            primOpCalls_.insert(std::pair<size_t, Symbol>(i.second, i.first));
         for (auto i = primOpCalls_.rbegin(); i != primOpCalls_.rend(); ++i)
             printMsg(v, format("%1$10d %2%") % i->first % i->second);
 
         printMsg(v, format("calls to %1% functions:") % functionCalls.size());
-        typedef std::multimap<unsigned int, ExprLambda *> FunctionCalls_;
+        typedef std::multimap<size_t, ExprLambda *> FunctionCalls_;
         FunctionCalls_ functionCalls_;
         for (auto & i : functionCalls)
-            functionCalls_.insert(std::pair<unsigned int, ExprLambda *>(i.second, i.first));
+            functionCalls_.insert(std::pair<size_t, ExprLambda *>(i.second, i.first));
         for (auto i = functionCalls_.rbegin(); i != functionCalls_.rend(); ++i)
             printMsg(v, format("%1$10d %2%") % i->first % i->second->showNamePos());
 
         printMsg(v, format("evaluations of %1% attributes:") % attrSelects.size());
-        typedef std::multimap<unsigned int, Pos> AttrSelects_;
+        typedef std::multimap<size_t, Pos> AttrSelects_;
         AttrSelects_ attrSelects_;
         for (auto & i : attrSelects)
-            attrSelects_.insert(std::pair<unsigned int, Pos>(i.second, i.first));
+            attrSelects_.insert(std::pair<size_t, Pos>(i.second, i.first));
         for (auto i = attrSelects_.rbegin(); i != attrSelects_.rend(); ++i)
             printMsg(v, format("%1$10d %2%") % i->first % i->second);
 
@@ -1810,7 +1811,7 @@ size_t valueSize(Value & v)
             if (seen.find(v.listElems()) == seen.end()) {
                 seen.insert(v.listElems());
                 sz += v.listSize() * sizeof(Value *);
-                for (unsigned int n = 0; n < v.listSize(); ++n)
+                for (size_t n = 0; n < v.listSize(); ++n)
                     sz += doValue(*v.listElems()[n]);
             }
             break;
@@ -1846,7 +1847,7 @@ size_t valueSize(Value & v)
 
         size_t sz = sizeof(Env) + sizeof(Value *) * env.size;
 
-        for (unsigned int i = 0; i < env.size; ++i)
+        for (size_t i = 0; i < env.size; ++i)
             if (env.values[i])
                 sz += doValue(*env.values[i]);
 

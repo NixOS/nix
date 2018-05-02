@@ -214,7 +214,7 @@ private:
     Value * addConstant(const string & name, Value & v);
 
     Value * addPrimOp(const string & name,
-        unsigned int arity, PrimOpFun primOp);
+        size_t arity, PrimOpFun primOp);
 
 public:
 
@@ -248,18 +248,18 @@ public:
 
     /* Allocation primitives. */
     Value * allocValue();
-    Env & allocEnv(unsigned int size);
+    Env & allocEnv(size_t size);
 
     Value * allocAttr(Value & vAttrs, const Symbol & name);
 
-    Bindings * allocBindings(Bindings::size_t capacity);
+    Bindings * allocBindings(size_t capacity);
 
-    void mkList(Value & v, unsigned int length);
-    void mkAttrs(Value & v, unsigned int capacity);
+    void mkList(Value & v, size_t length);
+    void mkAttrs(Value & v, size_t capacity);
     void mkThunk_(Value & v, Expr * expr);
     void mkPos(Value & v, Pos * pos);
 
-    void concatLists(Value & v, unsigned int nrLists, Value * * lists, const Pos & pos);
+    void concatLists(Value & v, size_t nrLists, Value * * lists, const Pos & pos);
 
     /* Print statistics. */
     void printStats();
@@ -282,15 +282,15 @@ private:
 
     bool countCalls;
 
-    typedef std::map<Symbol, unsigned int> PrimOpCalls;
+    typedef std::map<Symbol, size_t> PrimOpCalls;
     PrimOpCalls primOpCalls;
 
-    typedef std::map<ExprLambda *, unsigned int> FunctionCalls;
+    typedef std::map<ExprLambda *, size_t> FunctionCalls;
     FunctionCalls functionCalls;
 
     void incrFunctionCall(ExprLambda * fun);
 
-    typedef std::map<Pos, unsigned int> AttrSelects;
+    typedef std::map<Pos, size_t> AttrSelects;
     AttrSelects attrSelects;
 
     friend struct ExprOpUpdate;

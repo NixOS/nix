@@ -842,9 +842,9 @@ private:
     BuildResult result;
 
     /* The current round, if we're building multiple times. */
-    unsigned int curRound = 1;
+    size_t curRound = 1;
 
-    unsigned int nrRounds;
+    size_t nrRounds;
 
     /* Path registration info from the previous round, if we're
        building multiple times. Since this contains the hash, it
@@ -1169,7 +1169,7 @@ void DerivationGoal::outputsSubstituted()
         return;
     }
 
-    unsigned int nrInvalid = checkPathValidity(false, buildMode == bmRepair).size();
+    auto nrInvalid = checkPathValidity(false, buildMode == bmRepair).size();
     if (buildMode == bmNormal && nrInvalid == 0) {
         done(BuildResult::Substituted);
         return;

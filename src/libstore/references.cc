@@ -13,7 +13,7 @@ namespace nix {
 static unsigned int refLength = 32; /* characters */
 
 
-static void search(const unsigned char * s, unsigned int len,
+static void search(const unsigned char * s, size_t len,
     StringSet & hashes, StringSet & seen)
 {
     static bool initialised = false;
@@ -25,7 +25,7 @@ static void search(const unsigned char * s, unsigned int len,
         initialised = true;
     }
 
-    for (unsigned int i = 0; i + refLength <= len; ) {
+    for (size_t i = 0; i + refLength <= len; ) {
         int j;
         bool match = true;
         for (j = refLength - 1; j >= 0; --j)
@@ -73,7 +73,7 @@ void RefScanSink::operator () (const unsigned char * data, size_t len)
 
     search(data, len, hashes, seen);
 
-    unsigned int tailLen = len <= refLength ? len : refLength;
+    size_t tailLen = len <= refLength ? len : refLength;
     tail =
         string(tail, tail.size() < refLength - tailLen ? 0 : tail.size() - (refLength - tailLen)) +
         string((const char *) data + len - tailLen, tailLen);

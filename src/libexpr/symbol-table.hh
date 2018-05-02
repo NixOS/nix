@@ -69,7 +69,7 @@ public:
         return Symbol(&*res.first);
     }
 
-    unsigned int size() const
+    size_t size() const
     {
         return symbols.size();
     }

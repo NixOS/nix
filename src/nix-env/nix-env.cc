@@ -198,13 +198,13 @@ static Path getDefNixExprPath()
 }
 
 
-static int getPriority(EvalState & state, DrvInfo & drv)
+static long getPriority(EvalState & state, DrvInfo & drv)
 {
     return drv.queryMetaInt("priority", 0);
 }
 
 
-static int comparePriorities(EvalState & state, DrvInfo & drv1, DrvInfo & drv2)
+static long comparePriorities(EvalState & state, DrvInfo & drv1, DrvInfo & drv2)
 {
     return getPriority(state, drv2) - getPriority(state, drv1);
 }
@@ -270,7 +270,7 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
 
             for (auto & j : matches) {
                 DrvName drvName(j.first.queryName());
-                int d = 1;
+                long d = 1;
 
                 Newest::iterator k = newest.find(drvName.name);
 
@@ -578,7 +578,7 @@ static void upgradeDerivations(Globals & globals,
                             (upgradeType == utEq && d == 0) ||
                             upgradeType == utAlways)
                         {
-                            int d2 = -1;
+                            long d2 = -1;
                             if (bestElem != availElems.end()) {
                                 d2 = comparePriorities(*globals.state, *bestElem, *j);
                                 if (d2 == 0) d2 = compareVersions(bestVersion, newName.version);
@@ -784,22 +784,22 @@ typedef list<Strings> Table;
 
 void printTable(Table & table)
 {
-    unsigned int nrColumns = table.size() > 0 ? table.front().size() : 0;
+    auto nrColumns = table.size() > 0 ? table.front().size() : 0;
 
-    vector<unsigned int> widths;
+    vector<size_t> widths;
     widths.resize(nrColumns);
 
     for (auto & i : table) {
         assert(i.size() == nrColumns);
         Strings::iterator j;
-        unsigned int column;
+        size_t column;
         for (j = i.begin(), column = 0; j != i.end(); ++j, ++column)
             if (j->size() > widths[column]) widths[column] = j->size();
     }
 
     for (auto & i : table) {
         Strings::iterator j;
-        unsigned int column;
+        size_t column;
         for (j = i.begin(), column = 0; j != i.end(); ++j, ++column) {
             string s = *j;
             replace(s.begin(), s.end(), '\n', ' ');

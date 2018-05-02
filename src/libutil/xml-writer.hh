@@ -44,7 +44,7 @@ public:
 private:
     void writeAttrs(const XMLAttrs & attrs);
 
-    void indent_(unsigned int depth);
+    void indent_(size_t depth);
 };
 
 

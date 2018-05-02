@@ -82,7 +82,7 @@ static string printHash32(const Hash & hash)
     string s;
     s.reserve(len);
 
-    for (int n = len - 1; n >= 0; n--) {
+    for (int n = (int) len - 1; n >= 0; n--) {
         unsigned int b = n * 5;
         unsigned int i = b / 8;
         unsigned int j = b % 8;

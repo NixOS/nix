@@ -128,7 +128,7 @@ struct Value
         const char * path;
         Bindings * attrs;
         struct {
-            unsigned int size;
+            size_t size;
             Value * * elems;
         } bigList;
         Value * smallList[2];
@@ -166,7 +166,7 @@ struct Value
         return type == tList1 || type == tList2 ? smallList : bigList.elems;
     }
 
-    unsigned int listSize() const
+    size_t listSize() const
     {
         return type == tList1 ? 1 : type == tList2 ? 2 : bigList.size;
     }

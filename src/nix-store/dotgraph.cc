@@ -47,8 +47,7 @@ static string makeNode(const string & id, const string & label,
 static string symbolicName(const string & path)
 {
     string p = baseNameOf(path);
-    int dash = p.find('-');
-    return string(p, dash + 1);
+    return string(p, p.find('-') + 1);
 }
 
 
