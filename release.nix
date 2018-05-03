@@ -216,6 +216,14 @@ let
     deb_ubuntu1710x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1710x86_64) [ ] [ "libsodium18" "libboost-context1.62.0" ];
 
 
+    arx = with pkgs; lib.genAttrs systems (system:
+      runCommand "nix-arx-${tarball.version}.sh" {
+        buildInputs = [ haskellPackages.arx ];
+      } ''
+        arx tmpx --shared -o $out ${binaryTarball.${system}}/*.tar.bz2 // \
+          'cd * && sh install'
+      '');
+
     # System tests.
     tests.remoteBuilds = (import ./tests/remote-builds.nix rec {
       inherit nixpkgs;
