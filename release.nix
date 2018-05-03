@@ -124,6 +124,8 @@ let
         }
         ''
           cp ${installerClosureInfo}/registration $TMPDIR/reginfo
+
+          # TODO should be able to use reginfo instead of this
           (echo "nix=${toplevel}"; echo "cacert=${cacert}") > $TMPDIR/hashes-${system}
 
           cp ${./scripts/install-nix-from-closure.sh} $TMPDIR/install
