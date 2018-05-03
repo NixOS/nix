@@ -1,16 +1,16 @@
-#!/bin/sh
+#!/usr/bin/env sh
 
 set -e
 
 dest="/nix"
 self="$(dirname "$0")"
-nix="@nix@"
-cacert="@cacert@"
-
 
 if ! [ -e "$self/.reginfo" ]; then
     echo "$0: incomplete installer (.reginfo is missing)" >&2
 fi
+
+system=$(uname -m | sed s,i.86,i686,)-$(uname -s | tr '[:upper:]' '[:lower:]')
+source $self/hashes-$system
 
 if [ -z "$USER" ]; then
     echo "$0: \$USER is not set" >&2
