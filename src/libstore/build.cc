@@ -3235,6 +3235,8 @@ void DerivationGoal::registerOutputs()
         info.ultimate = true;
         worker.store.signPathInfo(info);
 
+        if (!info.references.empty()) info.ca.clear();
+
         infos.push_back(info);
     }
 
