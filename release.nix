@@ -124,19 +124,12 @@ let
         }
         ''
           cp ${installerClosureInfo}/registration $TMPDIR/reginfo
-          substitute ${./scripts/install-nix-from-closure.sh} $TMPDIR/install \
-            --subst-var-by nix ${toplevel} \
-            --subst-var-by cacert ${cacert}
+          (echo "nix=${toplevel}"; echo "cacert=${cacert}") > $TMPDIR/hashes-${system}
 
-          substitute ${./scripts/install-darwin-multi-user.sh} $TMPDIR/install-darwin-multi-user.sh \
-            --subst-var-by nix ${toplevel} \
-            --subst-var-by cacert ${cacert}
-          substitute ${./scripts/install-systemd-multi-user.sh} $TMPDIR/install-systemd-multi-user.sh \
-            --subst-var-by nix ${toplevel} \
-            --subst-var-by cacert ${cacert}
-          substitute ${./scripts/install-multi-user.sh} $TMPDIR/install-multi-user \
-            --subst-var-by nix ${toplevel} \
-            --subst-var-by cacert ${cacert}
+          cp ${./scripts/install-nix-from-closure.sh} $TMPDIR/install
+          cp ${./scripts/install-darwin-multi-user.sh} $TMPDIR/install-darwin-multi-user.sh
+          cp ${./scripts/install-systemd-multi-user.sh} $TMPDIR/install-systemd-multi-user.sh
+          cp ${./scripts/install-multi-user.sh} $TMPDIR/install-multi-user
 
           if type -p shellcheck; then
             # SC1090: Don't worry about not being able to find
