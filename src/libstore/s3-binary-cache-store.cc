@@ -296,8 +296,8 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         transferConfig.uploadProgressCallback =
             [&](const TransferManager *transferManager,
                 const std::shared_ptr<const TransferHandle>
-                    &transferHandle)
-            {
+                    &transferHandle) {
+              //FIXME: find a way to properly abort the multipart upload.
               checkInterrupt();
               printTalkative("upload progress ('%s'): '%d' of '%d' bytes",
                              path,
