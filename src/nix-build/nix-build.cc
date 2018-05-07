@@ -354,7 +354,7 @@ void mainWrapped(int argc, char * * argv)
         // Build or fetch all dependencies of the derivation.
         for (const auto & input : drv.inputDrvs)
             if (std::all_of(envExclude.cbegin(), envExclude.cend(), [&](const string & exclude) { return !std::regex_search(input.first, std::regex(exclude)); }))
-                pathsToBuild.insert(input.first);
+                pathsToBuild.insert(makeDrvPathWithOutputs(input.first, input.second));
         for (const auto & src : drv.inputSrcs)
             pathsToBuild.insert(src);
 
