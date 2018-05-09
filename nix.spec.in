@@ -3,33 +3,47 @@
 %global nixbld_user "nix-builder-"
 %global nixbld_group "nixbld"
 
+# NOTE: BUILD on EL7 requires
+# - Centos / RHEL7 software collection repository 
+#   yum install centos-release-scl
+#
+# - Recent boost backport
+#   curl https://copr.fedorainfracloud.org/coprs/whosthere/boost/repo/epel-7/whosthere-boost-epel-7.repo -o /etc/yum.repos.d/whosthere-boost-epel-7.repo
+#
+
+# Disable documentation generation
+# necessary on some platforms
+%bcond_without docgen
+
 Summary: The Nix software deployment system
 Name: nix
 Version: @PACKAGE_VERSION@
 Release: 2%{?dist}
 License: LGPLv2+
-%if 0%{?rhel} && 0%{?rhel} < 7
 Group: Applications/System
-%endif
 URL: http://nixos.org/
 Source0: %{name}-%{version}.tar.bz2
-%if 0%{?el5}
-BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
-%endif
+
 Requires: curl
 Requires: bzip2
 Requires: gzip
 Requires: xz
-Requires: libseccomp
-Requires: boost-context
+BuildRequires: bison
+BuildRequires: boost-devel >= 1.60
 BuildRequires: bzip2-devel
-BuildRequires: sqlite-devel
+
+# for RHEL <= 7, we need software collections for a C++14 compatible compatible compiler
+%if 0%{?rhel}
+BuildRequires: devtoolset-7-gcc
+BuildRequires: devtoolset-7-gcc-c++
+%endif
+
+BuildRequires: flex
 BuildRequires: libcurl-devel
 BuildRequires: libseccomp-devel
-BuildRequires: boost-devel
-
-# Hack to make that shitty RPM scanning hack shut up.
-Provides: perl(Nix::SSH)
+BuildRequires: openssl-devel
+BuildRequires: sqlite-devel
+BuildRequires: xz-devel
 
 %description
 Nix is a purely functional package manager. It allows multiple
@@ -41,9 +55,6 @@ it can be used equally well under other Unix systems.
 
 %package        devel
 Summary:        Development files for %{name}
-%if 0%{?rhel} && 0%{?rhel} < 7
-Group:          Development/Libraries
-%endif
 Requires:       %{name}%{?_isa} = %{version}-%{release}
 
 %description   devel
@@ -53,9 +64,6 @@ developing applications that use %{name}.
 
 %package doc
 Summary:        Documentation files for %{name}
-%if 0%{?rhel} && 0%{?rhel} < 7
-Group:          Documentation
-%endif
 BuildArch:      noarch
 Requires:       %{name} = %{version}-%{release}
 
@@ -67,20 +75,25 @@ The %{name}-doc package contains documentation files for %{name}.
 
 
 %build
+%if 0%{?rhel}
+source /opt/rh/devtoolset-7/enable 
+%endif
 extraFlags=
 # - override docdir so large documentation files are owned by the
 #   -doc subpackage
 # - set localstatedir by hand to the preferred nix value
 %configure --localstatedir=/nix/var \
+	   %{!?without_docgen:--disable-doc-gen} \
            --docdir=%{_defaultdocdir}/%{name}-doc-%{version} \
            $extraFlags
-make -j$NIX_BUILD_CORES -l$NIX_BUILD_CORES
+make V=1 %{?_smp_mflags}
 
 
 %install
-%if 0%{?el5}
-rm -rf $RPM_BUILD_ROOT
+%if 0%{?rhel}
+source /opt/rh/devtoolset-7/enable 
 %endif
+
 make DESTDIR=$RPM_BUILD_ROOT install
 
 find $RPM_BUILD_ROOT -name '*.la' -exec rm -f {} ';'
@@ -130,6 +143,7 @@ systemctl start  nix-daemon.socket
 %endif
 
 %files
+%license COPYING
 %{_bindir}/nix*
 %{_libdir}/*.so
 %{_prefix}/libexec/*
@@ -138,9 +152,11 @@ systemctl start  nix-daemon.socket
 %{_prefix}/lib/systemd/system/nix-daemon.service
 %endif
 %{_datadir}/nix
+%if ! %{without docgen}
 %{_mandir}/man1/*.1*
 %{_mandir}/man5/*.5*
 %{_mandir}/man8/*.8*
+%endif
 %config(noreplace) %{_sysconfdir}/profile.d/nix.sh
 %config(noreplace) %{_sysconfdir}/profile.d/nix-daemon.sh
 /nix
@@ -149,6 +165,9 @@ systemctl start  nix-daemon.socket
 %{_includedir}/nix
 %{_prefix}/lib/pkgconfig/*.pc
 
+
+%if ! %{without docgen}
 %files doc
 %docdir %{_defaultdocdir}/%{name}-doc-%{version}
 %{_defaultdocdir}/%{name}-doc-%{version}
+%endif
