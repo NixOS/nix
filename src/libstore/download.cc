@@ -623,7 +623,7 @@ DownloadResult Downloader::download(const DownloadRequest & request)
     return enqueueDownload(request).get();
 }
 
-Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpack, string name, const Hash & expectedHash, string * effectiveUrl)
+Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpack, string name, const Hash & expectedHash, string * effectiveUrl, int ttl)
 {
     auto url = resolveUri(url_);
 
@@ -653,7 +653,6 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
 
     string expectedETag;
 
-    int ttl = settings.tarballTtl;
     bool skip = false;
 
     if (pathExists(fileLink) && pathExists(dataFile)) {
