@@ -317,10 +317,20 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
 
     if (settings.restrictEval || settings.pureEval) {
         allowedPaths = PathSet();
+
         for (auto & i : searchPath) {
             auto r = resolveSearchPathElem(i);
             if (!r.first) continue;
-            allowedPaths->insert(r.second);
+
+            auto path = r.second;
+
+            if (store->isInStore(r.second)) {
+                PathSet closure;
+                store->computeFSClosure(store->toStorePath(r.second), closure);
+                for (auto & path : closure)
+                    allowedPaths->insert(path);
+            } else
+                allowedPaths->insert(r.second);
         }
     }
 
