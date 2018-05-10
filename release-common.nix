@@ -61,7 +61,7 @@ rec {
     ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
     ++ lib.optional (stdenv.isLinux || stdenv.isDarwin)
       (aws-sdk-cpp.override {
-        apis = ["s3"];
+        apis = ["s3" "transfer"];
         customMemoryManagement = false;
       });
 
