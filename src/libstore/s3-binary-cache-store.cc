@@ -174,7 +174,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
     const Setting<std::string> lsCompression{this, "", "ls-compression", "compression method for .ls files"};
     const Setting<std::string> logCompression{this, "", "log-compression", "compression method for log/* files"};
     const Setting<uint64_t> bufferSize{
-        this, 5 * 1024 * 1024, "buffer-size", "size (in bytes) of each part in multi-part uploads. defaults to 5Mb"};
+        this, 5 * 1024 * 1024, "buffer-size", "size (in bytes) of each part in multi-part uploads"};
 
     std::string bucketName;
 
