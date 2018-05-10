@@ -93,7 +93,11 @@ PATH        [a-zA-Z0-9\.\_\-\+]*(\/[a-zA-Z0-9\.\_\-\+]+)+\/?
 HPATH       \~(\/[a-zA-Z0-9\.\_\-\+]+)+\/?
 SPATH       \<[a-zA-Z0-9\.\_\-\+]+(\/[a-zA-Z0-9\.\_\-\+]+)*\>
 URI         [a-zA-Z][a-zA-Z0-9\+\-\.]*\:[a-zA-Z0-9\%\/\?\:\@\&\=\+\$\,\-\_\.\!\~\*\']+
-
+U           [\x80-\xbf]
+U2          [\xc2-\xdf]
+U3          [\xe0-\xef]
+U4          [\xf0-\xf4]
+UGLYPH      {U2}{U}|{U3}{U}{U}|{U4}{U}{U}{U}
 
 %%
 
@@ -212,6 +216,8 @@ or          { return OR_KW; }
 {ANY}           return yytext[0];
 
 }
+
+{UGLYPH} { throw ParseError(format("Cannot use the unicode character '%1%' in a nix expression.") % yytext);}
 
 <<EOF>> { data->atEnd = true; return 0; }
 
