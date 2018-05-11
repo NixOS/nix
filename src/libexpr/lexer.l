@@ -209,7 +209,11 @@ or          { return OR_KW; }
 \#[^\r\n]*    /* single-line comments */
 \/\*([^*]|\*+[^*/])*\*+\/  /* long comments */
 
-{ANY}           return yytext[0];
+{ANY}       {
+              /* Don't return a negative number, as this will cause
+                 Bison to stop parsing without an error. */
+              return (unsigned char) yytext[0];
+            }
 
 }
 
