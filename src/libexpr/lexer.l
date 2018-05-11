@@ -213,7 +213,5 @@ or          { return OR_KW; }
 
 }
 
-<<EOF>> { data->atEnd = true; return 0; }
-
 %%
 
