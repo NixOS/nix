@@ -1676,6 +1676,52 @@ static void prim_div(EvalState & state, const Pos & pos, Value * * args, Value &
     }
 }
 
+static void prim_mod(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    NixFloat f2 = state.forceFloat(*args[1], pos);
+    if (f2 == 0) throw EvalError(format("division by zero, at %1%") % pos);
+
+    if (args[0]->type == tFloat || args[1]->type == tFloat) {
+        mkFloat(v, state.forceFloat(*args[0], pos) % state.forceFloat(*args[1], pos));
+    } else {
+        NixInt i1 = state.forceInt(*args[0], pos);
+        NixInt i2 = state.forceInt(*args[1], pos);
+        /* Avoid division overflow as it might raise SIGFPE. */
+        if (i1 == std::numeric_limits<NixInt>::min() && i2 == -1)
+            throw EvalError(format("overflow in integer division, at %1%") % pos);
+        mkInt(v, i1 % i2);
+    }
+}
+
+static void prim_bin_and(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    mkInt(v, state.forceInt(*args[0], pos) & state.forceInt(*args[1], pos));
+}
+
+static void prim_bin_or(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    mkInt(v, state.forceInt(*args[0], pos) | state.forceInt(*args[1], pos));
+}
+
+static void prim_bin_xor(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    mkInt(v, state.forceInt(*args[0], pos) ^ state.forceInt(*args[1], pos));
+}
+
+static void prim_bin_shl(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    mkInt(v, state.forceInt(*args[0], pos) << (state.forceInt(*args[1], pos) & 63));
+}
+
+static void prim_bin_unsigned_shr(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    mkInt(v, (unsigned long)state.forceInt(*args[0], pos) >> (state.forceInt(*args[1], pos) & 63));
+}
+
+static void prim_bin_signed_shr(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    mkInt(v, (signed long)state.forceInt(*args[0], pos) >> (state.forceInt(*args[1], pos) & 63));
+}
 
 static void prim_lessThan(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -2221,6 +2267,13 @@ void EvalState::createBaseEnv()
     addPrimOp("__sub", 2, prim_sub);
     addPrimOp("__mul", 2, prim_mul);
     addPrimOp("__div", 2, prim_div);
+    addPrimOp("__mod", 2, prim_mod);
+    addPrimOp("__bin_and", 2, prim_bin_and);
+    addPrimOp("__bin_or", 2, prim_bin_or);
+    addPrimOp("__bin_xor", 2, prim_bin_xor);
+    addPrimOp("__bin_shl", 2, prim_bin_shl);
+    addPrimOp("__bin_unsigned_shr", 2, prim_bin_unsigned_shr);
+    addPrimOp("__bin_signed_shr", 2, prim_bin_signed_shr);
     addPrimOp("__lessThan", 2, prim_lessThan);
 
     // String manipulation
