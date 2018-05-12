@@ -58,6 +58,14 @@ string getEnv(const string & key, const string & def)
     return value ? string(value) : def;
 }
 
+void Error::anchor() {}
+void BaseError::anchor() {}
+void SysError::anchor() {}
+void ExecError::anchor() {}
+void EndOfFile::anchor() {}
+void Interrupted::anchor() {}
+void FormatError::anchor() {}
+
 
 std::map<std::string, std::string> getEnv()
 {

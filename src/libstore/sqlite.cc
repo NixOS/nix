@@ -7,6 +7,9 @@
 
 namespace nix {
 
+void SQLiteError::anchor() {}
+void SQLiteBusy::anchor() {}
+
 [[noreturn]] void throwSQLiteError(sqlite3 * db, const FormatOrString & fs)
 {
     int err = sqlite3_errcode(db);

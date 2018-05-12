@@ -109,6 +109,8 @@ public:
     const string & msg() const { return err; }
     const string & prefix() const { return prefix_; }
     BaseError & addPrefix(const FormatOrString & fs);
+private:
+    virtual void anchor();
 };
 
 #define MakeError(newClass, superClass) \
@@ -116,6 +118,8 @@ public:
     {                                                   \
     public:                                             \
         using superClass::superClass;                   \
+    private:                                            \
+        void anchor() override;                         \
     };
 
 MakeError(Error, BaseError)
@@ -133,6 +137,7 @@ public:
 private:
 
     std::string addErrno(const std::string & s);
+    void anchor() override;
 };
 
 

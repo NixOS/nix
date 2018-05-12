@@ -15,6 +15,7 @@
 
 namespace nix {
 
+void BadHash::anchor() {}
 
 void Hash::init()
 {

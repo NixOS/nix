@@ -7,6 +7,8 @@ namespace nix {
 
 MakeError(UploadToHTTP, Error);
 
+void UploadToHTTP::anchor() {}
+
 class HttpBinaryCacheStore : public BinaryCacheStore
 {
 private:

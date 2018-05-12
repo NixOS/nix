@@ -3,6 +3,8 @@
 
 namespace nix {
 
+void UsageError::anchor() {}
+
 Args::FlagMaker Args::mkFlag()
 {
     return FlagMaker(*this);

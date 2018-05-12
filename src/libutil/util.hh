@@ -284,6 +284,8 @@ public:
     ExecError(int status, Args... args)
         : Error(args...), status(status)
     { }
+private:
+    void anchor() override;
 };
 
 /* Convert a list of strings to a null-terminated vector of char
