@@ -2,6 +2,7 @@
 
 #include "types.hh"
 #include "hash.hh"
+#include "globals.hh"
 
 #include <string>
 #include <future>
@@ -54,7 +55,7 @@ struct Downloader
        use the recorded ETag to verify if the server has a more
        recent version, and if so, download it to the Nix store. */
     Path downloadCached(ref<Store> store, const string & uri, bool unpack, string name = "",
-        const Hash & expectedHash = Hash(), string * effectiveUri = nullptr);
+        const Hash & expectedHash = Hash(), string * effectiveUri = nullptr, int ttl = settings.tarballTtl);
 
     enum Error { NotFound, Forbidden, Misc, Transient, Interrupted };
 };
