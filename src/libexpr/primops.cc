@@ -1028,12 +1028,9 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
 }
 
 
-static void addPath(EvalState & state, const Pos & pos, const string & name, const Path & path_,
-    Value * filterFun, bool recursive, const Hash & expectedHash, Value & v)
+static void addPath(EvalState & state, const Pos & pos, string name, const Pos & pathPos,
+    Value & pathVal, Value * filterFun, bool recursive, const Hash & expectedHash, Value & v)
 {
-    const auto path = settings.pureEval && expectedHash ?
-        path_ :
-        state.checkSourcePath(path_);
     PathFilter filter = filterFun ? ([&](const Path & path) {
         auto st = lstat(path);
 
@@ -1058,6 +1055,13 @@ static void addPath(EvalState & state, const Pos & pos, const string & name, con
         return state.forceBool(res, pos);
     }) : defaultPathFilter;
 
+    PathSet context;
+    Path path_;
+    if (name.empty()) {
+        path_ = state.coerceToPath(pathPos, pathVal, context);
+        name = baseNameOf(path_);
+    }
+
     Path expectedStorePath;
     if (expectedHash) {
         expectedStorePath =
@@ -1065,6 +1069,13 @@ static void addPath(EvalState & state, const Pos & pos, const string & name, con
     }
     Path dstPath;
     if (!expectedHash || !state.store->isValidPath(expectedStorePath)) {
+        if (path_.empty())
+            path_ = state.coerceToPath(pathPos, pathVal, context);
+        if (!context.empty())
+            throw EvalError(format("string '%1%' cannot refer to other paths, at %2%") % path_ % pathPos);
+        const auto path = settings.pureEval && expectedHash ?
+            path_ :
+            state.checkSourcePath(path_);
         dstPath = settings.readOnlyMode
             ? state.store->computeStorePathForPath(name, path, recursive, htSHA256, filter).first
             : state.store->addToStore(name, path, recursive, htSHA256, filter, state.repair);
@@ -1080,22 +1091,18 @@ static void addPath(EvalState & state, const Pos & pos, const string & name, con
 
 static void prim_filterSource(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    PathSet context;
-    Path path = state.coerceToPath(pos, *args[1], context);
-    if (!context.empty())
-        throw EvalError(format("string '%1%' cannot refer to other paths, at %2%") % path % pos);
-
     state.forceValue(*args[0]);
     if (args[0]->type != tLambda)
         throw TypeError(format("first argument in call to 'filterSource' is not a function but %1%, at %2%") % showType(*args[0]) % pos);
 
-    addPath(state, pos, baseNameOf(path), path, args[0], true, Hash(), v);
+    addPath(state, pos, "", pos, *args[1], args[0], true, Hash(), v);
 }
 
 static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceAttrs(*args[0], pos);
-    Path path;
+    Value * pathVal = nullptr;
+    Pos * pathPos;
     string name;
     Value * filterFun = nullptr;
     auto recursive = true;
@@ -1104,10 +1111,8 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
     for (auto & attr : *args[0]->attrs) {
         const string & n(attr.name);
         if (n == "path") {
-            PathSet context;
-            path = state.coerceToPath(*attr.pos, *attr.value, context);
-            if (!context.empty())
-                throw EvalError(format("string '%1%' cannot refer to other paths, at %2%") % path % *attr.pos);
+            pathVal = attr.value;
+            pathPos = attr.pos;
         } else if (attr.name == state.sName)
             name = state.forceStringNoCtx(*attr.value, *attr.pos);
         else if (n == "filter") {
@@ -1120,12 +1125,10 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
         else
             throw EvalError(format("unsupported argument '%1%' to 'addPath', at %2%") % attr.name % *attr.pos);
     }
-    if (path.empty())
+    if (!pathVal)
         throw EvalError(format("'path' required, at %1%") % pos);
-    if (name.empty())
-        name = baseNameOf(path);
 
-    addPath(state, pos, name, path, filterFun, recursive, expectedHash, v);
+    addPath(state, pos, name, *pathPos, *pathVal, filterFun, recursive, expectedHash, v);
 }
 
 
