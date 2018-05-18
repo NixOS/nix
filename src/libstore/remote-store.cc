@@ -422,10 +422,13 @@ Path RemoteStore::addToStore(const string & name, const Path & _srcPath,
 {
     if (repair) throw Error("repairing is not supported when building through the Nix daemon");
 
-    auto conn(connections->get());
-
     Path srcPath(absPath(_srcPath));
 
+    struct stat st;
+    if (lstat(srcPath.c_str(), &st))
+        throw SysError(format("getting attributes of path '%1%'") % srcPath);
+
+    auto conn(connections->get());
     conn->to << wopAddToStore << name
        << ((hashAlgo == htSHA256 && recursive) ? 0 : 1) /* backwards compatibility hack */
        << (recursive ? 1 : 0)
