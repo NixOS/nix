@@ -58,6 +58,22 @@ if [ "$(nix-hash $path2)" != "$hash" -o -e $path2/bad ]; then
     exit 1
 fi
 
+# Corrupt the mtime of a path and check that nix-store --verify --check-contents repairs it.
+touch $path2/bar
+nix-store --verify --check-contents
+if [ "$(stat -c '%Y' $path2/bar)" != 1 ]; then
+    echo "mtime not repaired properly" >&2
+    exit 1
+fi
+
+# Give write permission to a path and check that nix-store --verify --check-contents removes it.
+chmod -R +w $path2
+nix-store --verify --check-contents
+if [ "$(stat -c '%a' $path2)" != 555 ] || [ "$(stat -c '%a' $path2/bar)" != 444 ]; then
+    echo "write permission not removed properly" >&2
+    exit 1
+fi
+
 # Check --verify-path and --repair-path.
 nix-store --verify-path $path2
 
