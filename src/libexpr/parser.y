@@ -663,7 +663,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
             res = { false, "" };
         }
     } else {
-        auto path = absPath(elem.second);
+        auto path = absPath(expandTilde(elem.second));
         if (pathExists(path))
             res = { true, path };
         else {
