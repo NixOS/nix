@@ -379,7 +379,7 @@ void LocalStore::makeStoreWritable()
 const time_t mtimeStore = 1; /* 1 second into the epoch */
 
 
-static void canonicaliseTimestampAndPermissions(const Path & path, const struct stat & st)
+static void canonicaliseTimestampAndPermissions(const Path & path, const struct stat & st, bool complain)
 {
     if (!S_ISLNK(st.st_mode)) {
 
@@ -390,6 +390,10 @@ static void canonicaliseTimestampAndPermissions(const Path & path, const struct 
             mode = (st.st_mode & S_IFMT)
                  | 0444
                  | (st.st_mode & S_IXUSR ? 0111 : 0);
+
+            if (complain)
+                printError(format("repairing mode of '%1%' from %2$o to %3$o") % path % st.st_mode % mode);
+
             if (chmod(path.c_str(), mode) == -1)
                 throw SysError(format("changing mode of '%1%' to %2$o") % path % mode);
         }
@@ -402,6 +406,10 @@ static void canonicaliseTimestampAndPermissions(const Path & path, const struct 
         times[0].tv_usec = 0;
         times[1].tv_sec = mtimeStore;
         times[1].tv_usec = 0;
+
+        if (complain)
+            printError(format("repairing mtime of '%1%' from %2% to %3%") % path % st.st_mtime % mtimeStore);
+
 #if HAVE_LUTIMES
         if (lutimes(path.c_str(), times) == -1)
             if (errno != ENOSYS ||
@@ -419,11 +427,11 @@ void canonicaliseTimestampAndPermissions(const Path & path)
     struct stat st;
     if (lstat(path.c_str(), &st))
         throw SysError(format("getting attributes of path '%1%'") % path);
-    canonicaliseTimestampAndPermissions(path, st);
+    canonicaliseTimestampAndPermissions(path, st, false);
 }
 
 
-static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSeen & inodesSeen)
+static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSeen & inodesSeen, bool complain)
 {
     checkInterrupt();
 
@@ -485,7 +493,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
 
     inodesSeen.insert(Inode(st.st_dev, st.st_ino));
 
-    canonicaliseTimestampAndPermissions(path, st);
+    canonicaliseTimestampAndPermissions(path, st, complain);
 
     /* Change ownership to the current uid.  If it's a symlink, use
        lchown if available, otherwise don't bother.  Wrong ownership
@@ -495,6 +503,10 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
        store (since that directory is group-writable for the Nix build
        users group); we check for this case below. */
     if (st.st_uid != geteuid()) {
+        if (complain)
+            printError(format("repairing owner of '%1%' from %2% to %3%")
+                % path % st.st_uid % geteuid());
+
 #if HAVE_LCHOWN
         if (lchown(path.c_str(), geteuid(), getegid()) == -1)
 #else
@@ -508,14 +520,14 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
     if (S_ISDIR(st.st_mode)) {
         DirEntries entries = readDirectory(path);
         for (auto & i : entries)
-            canonicalisePathMetaData_(path + "/" + i.name, fromUid, inodesSeen);
+            canonicalisePathMetaData_(path + "/" + i.name, fromUid, inodesSeen, complain);
     }
 }
 
 
-void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen)
+void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen, bool complain)
 {
-    canonicalisePathMetaData_(path, fromUid, inodesSeen);
+    canonicalisePathMetaData_(path, fromUid, inodesSeen, complain);
 
     /* On platforms that don't have lchown(), the top-level path can't
        be a symlink, since we can't change its ownership. */
@@ -530,10 +542,10 @@ void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & ino
 }
 
 
-void canonicalisePathMetaData(const Path & path, uid_t fromUid)
+void canonicalisePathMetaData(const Path & path, uid_t fromUid, bool complain)
 {
     InodesSeen inodesSeen;
-    canonicalisePathMetaData(path, fromUid, inodesSeen);
+    canonicalisePathMetaData(path, fromUid, inodesSeen, complain);
 }
 
 
@@ -1023,7 +1035,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             autoGC();
 
-            canonicalisePathMetaData(realPath, -1);
+            canonicalisePathMetaData(realPath, -1, false);
 
             optimisePath(realPath); // FIXME: combine with hashPath()
 
@@ -1065,7 +1077,7 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
             } else
                 writeFile(realPath, dump);
 
-            canonicalisePathMetaData(realPath, -1);
+            canonicalisePathMetaData(realPath, -1, false);
 
             /* Register the SHA-256 hash of the NAR serialisation of
                the path in the database.  We may just have computed it
@@ -1135,7 +1147,7 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
 
             writeFile(realPath, s);
 
-            canonicalisePathMetaData(realPath, -1);
+            canonicalisePathMetaData(realPath, -1, false);
 
             StringSink sink;
             dumpString(s, sink);
@@ -1227,10 +1239,14 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
         printInfo("checking hashes...");
 
         Hash nullHash(htSHA256);
+        InodesSeen inodesSeen;
 
         for (auto & i : validPaths) {
             try {
                 auto info = std::const_pointer_cast<ValidPathInfo>(std::shared_ptr<const ValidPathInfo>(queryPathInfo(i)));
+
+                /* Check that path metadata is canonical, which also attempts to fix it */
+                canonicalisePathMetaData(i, -1, inodesSeen, true);
 
                 /* Check the content hash (optionally - slow). */
                 printMsg(lvlTalkative, format("checking contents of '%1%'") % i);

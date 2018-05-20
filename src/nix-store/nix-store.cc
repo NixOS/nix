@@ -502,7 +502,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
         if (!store->isValidPath(info.path) || reregister) {
             /* !!! races */
             if (canonicalise)
-                canonicalisePathMetaData(info.path, -1);
+                canonicalisePathMetaData(info.path, -1, false);
             if (!hashGiven) {
                 HashResult hash = hashPath(htSHA256, info.path);
                 info.narHash = hash.first;

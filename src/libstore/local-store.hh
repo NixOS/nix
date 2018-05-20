@@ -308,9 +308,14 @@ typedef set<Inode> InodesSeen;
    - the permissions are set of 444 or 555 (i.e., read-only with or
      without execute permission; setuid bits etc. are cleared)
    - the owner and group are set to the Nix user and group, if we're
-     running as root. */
-void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen);
-void canonicalisePathMetaData(const Path & path, uid_t fromUid);
+     running as root.
+
+  If @complain is true, additionally print a message for each metadata being
+  fixed (for use by `nix-store --verify --check-contents'), otherwise the
+  operation is silent.
+*/
+void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen, bool complain);
+void canonicalisePathMetaData(const Path & path, uid_t fromUid, bool complain);
 
 void canonicaliseTimestampAndPermissions(const Path & path);
 

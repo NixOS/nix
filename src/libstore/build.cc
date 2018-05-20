@@ -3080,7 +3080,7 @@ void DerivationGoal::registerOutputs()
             /* Canonicalise first.  This ensures that the path we're
                rewriting doesn't contain a hard link to /etc/shadow or
                something like that. */
-            canonicalisePathMetaData(actualPath, buildUser ? buildUser->getUID() : -1, inodesSeen);
+            canonicalisePathMetaData(actualPath, buildUser ? buildUser->getUID() : -1, inodesSeen, false);
 
             /* FIXME: this is in-memory. */
             StringSink sink;
@@ -3147,7 +3147,7 @@ void DerivationGoal::registerOutputs()
         /* Get rid of all weird permissions.  This also checks that
            all files are owned by the build user, if applicable. */
         canonicalisePathMetaData(actualPath,
-            buildUser && !rewritten ? buildUser->getUID() : -1, inodesSeen);
+            buildUser && !rewritten ? buildUser->getUID() : -1, inodesSeen, false);
 
         /* For this output path, find the references to other paths
            contained in it.  Compute the SHA-256 NAR hash at the same
