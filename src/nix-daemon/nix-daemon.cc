@@ -197,7 +197,8 @@ struct TunnelSource : BufferedSource
 {
     Source & from;
     TunnelSource(Source & from) : from(from) { }
-    size_t readUnbuffered(unsigned char * data, size_t len)
+protected:
+    size_t readUnbuffered(unsigned char * data, size_t len) override
     {
         to << STDERR_READ << len;
         to.flush();
