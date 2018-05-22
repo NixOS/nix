@@ -77,10 +77,12 @@ struct BufferedSource : Source
 
     size_t read(unsigned char * data, size_t len) override;
 
-    /* Underlying read call, to be overridden. */
-    virtual size_t readUnbuffered(unsigned char * data, size_t len) = 0;
 
     bool hasData();
+
+protected:
+    /* Underlying read call, to be overridden. */
+    virtual size_t readUnbuffered(unsigned char * data, size_t len) = 0;
 };
 
 
@@ -134,8 +136,9 @@ struct FdSource : BufferedSource
         return *this;
     }
 
-    size_t readUnbuffered(unsigned char * data, size_t len) override;
     bool good() override;
+protected:
+    size_t readUnbuffered(unsigned char * data, size_t len) override;
 private:
     bool _good = true;
 };

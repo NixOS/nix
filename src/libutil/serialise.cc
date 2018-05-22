@@ -133,7 +133,7 @@ size_t FdSource::readUnbuffered(unsigned char * data, size_t len)
     ssize_t n;
     do {
         checkInterrupt();
-        n = ::read(fd, (char *) data, bufSize);
+        n = ::read(fd, (char *) data, len);
     } while (n == -1 && errno == EINTR);
     if (n == -1) { _good = false; throw SysError("reading from file"); }
     if (n == 0) { _good = false; throw EndOfFile("unexpected end-of-file"); }
