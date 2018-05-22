@@ -307,6 +307,8 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
 
     assert(gcInitialised);
 
+    static_assert(sizeof(Env) == 16);
+
     /* Initialise the Nix expression search path. */
     if (!settings.pureEval) {
         Strings paths = parseNixPath(getEnv("NIX_PATH", ""));
@@ -568,12 +570,12 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
     if (!var.fromWith) return env->values[var.displ];
 
     while (1) {
-        if (!env->haveWithAttrs) {
+        if (env->type == Env::HasWithExpr) {
             if (noEval) return 0;
             Value * v = allocValue();
             evalAttrs(*env->up, (Expr *) env->values[0], *v);
             env->values[0] = v;
-            env->haveWithAttrs = true;
+            env->type = Env::HasWithAttrs;
         }
         Bindings::iterator j = env->values[0]->attrs->find(var.name);
         if (j != env->values[0]->attrs->end()) {
@@ -603,6 +605,7 @@ Env & EvalState::allocEnv(size_t size)
     nrValuesInEnvs += size;
     Env * env = (Env *) allocBytes(sizeof(Env) + size * sizeof(Value *));
     env->size = (decltype(Env::size)) size;
+    env->type = Env::Plain;
 
     /* We assume that env->values has been cleared by the allocator; maybeThunk() and lookupVar fromWith expect this. */
 
@@ -1205,7 +1208,7 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
     Env & env2(state.allocEnv(1));
     env2.up = &env;
     env2.prevWith = prevWith;
-    env2.haveWithAttrs = false;
+    env2.type = Env::HasWithExpr;
     env2.values[0] = (Value *) attrs;
 
     body->eval(state, env2, v);
@@ -1863,9 +1866,10 @@ size_t valueSize(Value & v)
 
         size_t sz = sizeof(Env) + sizeof(Value *) * env.size;
 
-        for (size_t i = 0; i < env.size; ++i)
-            if (env.values[i])
-                sz += doValue(*env.values[i]);
+        if (env.type != Env::HasWithExpr)
+            for (size_t i = 0; i < env.size; ++i)
+                if (env.values[i])
+                    sz += doValue(*env.values[i]);
 
         if (env.up) sz += doEnv(*env.up);
 
