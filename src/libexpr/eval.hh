@@ -7,6 +7,7 @@
 #include "hash.hh"
 
 #include <map>
+#include <unordered_map>
 
 
 namespace nix {
@@ -99,6 +100,9 @@ private:
     SearchPath searchPath;
 
     std::map<std::string, std::pair<bool, std::string>> searchPathResolved;
+
+    /* Cache used by checkSourcePath(). */
+    std::unordered_map<Path, Path> resolvedPaths;
 
 public:
 

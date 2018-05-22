@@ -352,6 +352,10 @@ Path EvalState::checkSourcePath(const Path & path_)
 {
     if (!allowedPaths) return path_;
 
+    auto i = resolvedPaths.find(path_);
+    if (i != resolvedPaths.end())
+        return i->second;
+
     bool found = false;
 
     for (auto & i : *allowedPaths) {
@@ -369,8 +373,10 @@ Path EvalState::checkSourcePath(const Path & path_)
     Path path = canonPath(path_, true);
 
     for (auto & i : *allowedPaths) {
-        if (isDirOrInDir(path, i))
+        if (isDirOrInDir(path, i)) {
+            resolvedPaths[path_] = path;
             return path;
+        }
     }
 
     throw RestrictedPathError("access to path '%1%' is forbidden in restricted mode", path);
