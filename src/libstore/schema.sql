@@ -1,3 +1,5 @@
+pragma user_version = 10;
+
 create table if not exists ValidPaths (
     id               integer primary key autoincrement not null,
     path             text unique not null,

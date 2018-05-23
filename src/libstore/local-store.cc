@@ -149,12 +149,9 @@ LocalStore::LocalStore(const Params & params)
 
     /* Check the current database schema and if necessary do an
        upgrade.  */
-    int curSchema = getSchema();
-    if (curSchema > nixSchemaVersion)
-        throw Error(format("current Nix store schema is version %1%, but I only support %2%")
-            % curSchema % nixSchemaVersion);
+    int curSchema = getSchema(*state, false);
 
-    else if (curSchema == 0) { /* new store */
+    if (curSchema == 0) { /* new store */
         curSchema = nixSchemaVersion;
         openDB(*state, true);
         writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
@@ -180,37 +177,36 @@ LocalStore::LocalStore(const Params & params)
 
         /* Get the schema version again, because another process may
            have performed the upgrade already. */
-        curSchema = getSchema();
+        curSchema = getSchema(*state, true);
 
         if (curSchema < 7) { upgradeStore7(); }
-
-        openDB(*state, false);
 
         if (curSchema < 8) {
             SQLiteTxn txn(state->db);
             state->db.exec("alter table ValidPaths add column ultimate integer");
             state->db.exec("alter table ValidPaths add column sigs text");
+            state->db.exec("pragma user_version = 8");
             txn.commit();
         }
 
         if (curSchema < 9) {
             SQLiteTxn txn(state->db);
             state->db.exec("drop table FailedPaths");
+            state->db.exec("pragma user_version = 9");
             txn.commit();
         }
 
         if (curSchema < 10) {
             SQLiteTxn txn(state->db);
             state->db.exec("alter table ValidPaths add column ca text");
+            state->db.exec("pragma user_version = 10");
             txn.commit();
         }
 
-        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
+        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str(), 0666, true);
 
         lockFile(globalLock.get(), ltRead, true);
     }
-
-    else openDB(*state, false);
 
     /* Prepare SQL statements. */
     state->stmtRegisterValidPath.create(state->db,
@@ -274,13 +270,28 @@ std::string LocalStore::getUri()
 }
 
 
-int LocalStore::getSchema()
+int LocalStore::getSchema(State & state, bool dbOpen)
 {
     int curSchema = 0;
     if (pathExists(schemaPath)) {
         string s = readFile(schemaPath);
         if (!string2Int(s, curSchema))
             throw Error(format("'%1%' is corrupt") % schemaPath);
+    }
+    if (curSchema > nixSchemaVersion)
+        throw Error(format("current Nix store schema is version %1%, but I only support %2%")
+            % curSchema % nixSchemaVersion);
+    if (curSchema >= 6) {
+        if (!dbOpen)
+            openDB(state, false);
+        SQLiteStmt schemaQuery;
+        schemaQuery.create(state.db, "pragma user_version;");
+        if (sqlite3_step(schemaQuery) != SQLITE_ROW)
+            throwSQLiteError(state.db, "querying nix schema version");
+        int curSchema_ = sqlite3_column_int(schemaQuery, 0);
+        curSchema = curSchema_ ?
+            curSchema_ :
+            curSchema;
     }
     return curSchema;
 }

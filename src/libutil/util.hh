@@ -99,7 +99,7 @@ string readFile(int fd);
 string readFile(const Path & path, bool drain = false);
 
 /* Write a string to a file. */
-void writeFile(const Path & path, const string & s, mode_t mode = 0666);
+void writeFile(const Path & path, const string & s, mode_t mode = 0666, bool sync = false);
 
 /* Read a line from a file descriptor. */
 string readLine(int fd);
