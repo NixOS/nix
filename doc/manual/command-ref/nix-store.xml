@@ -204,7 +204,7 @@ printed.)</para>
     with <option>-K</option>, if an output path is not identical to
     the corresponding output from the previous build, the new output
     path is left in
-    <filename>/nix/store/<replaceable>name</replaceable>-check.</filename></para>
+    <filename>/nix/store/<replaceable>name</replaceable>.check.</filename></para>
 
     <para>See also the <option>build-repeat</option> configuration
     option, which repeats a derivation a number of times and prevents
