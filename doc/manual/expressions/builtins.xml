@@ -92,6 +92,36 @@ available as <function>builtins.derivation</function>.</para>
   </varlistentry>
 
 
+  <varlistentry><term><function>builtins.bitAnd</function>
+  <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+
+    <listitem><para>Return the bitwise AND of the integers
+    <replaceable>e1</replaceable> and
+    <replaceable>e2</replaceable>.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry><term><function>builtins.bitOr</function>
+  <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+
+    <listitem><para>Return the bitwise OR of the integers
+    <replaceable>e1</replaceable> and
+    <replaceable>e2</replaceable>.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry><term><function>builtins.bitXor</function>
+  <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+
+    <listitem><para>Return the bitwise XOR of the integers
+    <replaceable>e1</replaceable> and
+    <replaceable>e2</replaceable>.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry><term><varname>builtins</varname></term>
 
     <listitem><para>The set <varname>builtins</varname> contains all

@@ -1676,6 +1676,20 @@ static void prim_div(EvalState & state, const Pos & pos, Value * * args, Value &
     }
 }
 
+static void prim_bitAnd(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    mkInt(v, state.forceInt(*args[0], pos) & state.forceInt(*args[1], pos));
+}
+
+static void prim_bitOr(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    mkInt(v, state.forceInt(*args[0], pos) | state.forceInt(*args[1], pos));
+}
+
+static void prim_bitXor(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    mkInt(v, state.forceInt(*args[0], pos) ^ state.forceInt(*args[1], pos));
+}
 
 static void prim_lessThan(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -2221,6 +2235,9 @@ void EvalState::createBaseEnv()
     addPrimOp("__sub", 2, prim_sub);
     addPrimOp("__mul", 2, prim_mul);
     addPrimOp("__div", 2, prim_div);
+    addPrimOp("__bitAnd", 2, prim_bitAnd);
+    addPrimOp("__bitOr", 2, prim_bitOr);
+    addPrimOp("__bitXor", 2, prim_bitXor);
     addPrimOp("__lessThan", 2, prim_lessThan);
 
     // String manipulation
