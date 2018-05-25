@@ -21,4 +21,51 @@ in your <filename>~/.profile</filename> (or similar), like this:</para>
 <screen>
 source <replaceable>prefix</replaceable>/etc/profile.d/nix.sh</screen>
 
+<section xml:id="sec-nix-ssl-cert-file">
+
+<title><envar>NIX_SSL_CERT_FILE</envar></title>
+
+<para>If you need to specify a custom certificate bundle to account
+for an HTTPS-intercepting man in the middle proxy, you must specify
+the path to the certificate bundle in the environment variable
+<envar>NIX_SSL_CERT_FILE</envar>.</para>
+
+
+<para>If you don't specify a <envar>NIX_SSL_CERT_FILE</envar>
+manually, Nix will install and use its own certificate
+bundle.</para>
+
+<procedure>
+  <step><para>Set the environment variable and install Nix</para>
+    <screen>
+$ export NIX_SSL_CERT_FILE=/etc/ssl/my-certificate-bundle.crt
+$ curl https://nixos.org/nix/install | sh
+</screen></step>
+
+  <step><para>In the shell profile and rc files (for example,
+  <filename>/etc/bashrc</filename>, <filename>/etc/zshrc</filename>),
+  add the following line:</para>
+<programlisting>
+export NIX_SSL_CERT_FILE=/etc/ssl/my-certificate-bundle.crt
+</programlisting>
+</step>
+</procedure>
+
+<note><para>You must not add the export and then do the install, as
+the Nix installer will detect the presense of Nix configuration, and
+abort.</para></note>
+
+<section>
+<title><envar>NIX_SSL_CERT_FILE</envar> with macOS and the Nix daemon</title>
+
+<para>On macOS you must specify the environment variable for the Nix
+daemon service, then restart it:</para>
+
+<screen>
+$ sudo launchctl setenv NIX_SSL_CERT_FILE /etc/ssl/my-certificate-bundle.crt
+$ sudo launchctl kickstart -k system/org.nixos.nix-daemon
+</screen>
+</section>
+
+</section>
 </chapter>
