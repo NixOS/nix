@@ -727,11 +727,17 @@ setup_default_profile() {
     _sudo "to installing a bootstrapping Nix in to the default Profile" \
           HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-env" -i "$NIX_INSTALLED_NIX"
 
-    _sudo "to installing a bootstrapping SSL certificate just for Nix in to the default Profile" \
-          HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-env" -i "$NIX_INSTALLED_CACERT"
+    if [ -z "$NIX_SSL_CERT_FILE" ] || ! [ -f "$NIX_SSL_CERT_FILE" ]; then
+        _sudo "to installing a bootstrapping SSL certificate just for Nix in to the default Profile" \
+              HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-env" -i "$NIX_INSTALLED_CACERT"
+        export NIX_SSL_CERT_FILE=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt
+    fi
 
+    # Have to explicitly pass NIX_SSL_CERT_FILE as part of the sudo call,
+    # otherwise it will be lost in environments where sudo doesn't pass
+    # all the environment variables by default.
     _sudo "to update the default channel in the default profile" \
-          HOME="$ROOT_HOME" NIX_SSL_CERT_FILE=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt "$NIX_INSTALLED_NIX/bin/nix-channel" --update nixpkgs
+          HOME="$ROOT_HOME" NIX_SSL_CERT_FILE="$NIX_SSL_CERT_FILE" "$NIX_INSTALLED_NIX/bin/nix-channel" --update nixpkgs
 }
 
 
