@@ -120,8 +120,6 @@ struct TunnelLogger : public Logger
       want to send out stderr to the client. */
     void startWork()
     {
-        std::vector<std::string> pendingMsgs;
-
         auto state(state_.lock());
         state->canSendStderr = true;
 
