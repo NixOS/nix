@@ -307,7 +307,7 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
 
     assert(gcInitialised);
 
-    static_assert(sizeof(Env) == 16);
+    static_assert(sizeof(Env) == 16, "environment must be 16 bytes");
 
     /* Initialise the Nix expression search path. */
     if (!settings.pureEval) {
