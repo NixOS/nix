@@ -295,6 +295,24 @@ let
         '';
 
 
+    installerScript =
+      pkgs.runCommand "installer-script"
+        { buildInputs = [ build.x86_64-linux ];
+        }
+        ''
+          mkdir -p $out/nix-support
+
+          substitute ${./scripts/install.in} $out/install \
+            ${pkgs.lib.concatMapStrings
+              (system: "--replace '@binaryTarball_${system}@' $(nix hash-file --type sha256 ${binaryTarball.${system}}/*.tar.bz2) ")
+              [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
+            } \
+            --replace '@nixVersion@' ${build.x86_64-linux.src.version}
+
+          echo "file installer $out/install" >> $out/nix-support/hydra-build-products
+        '';
+
+
     # Aggregate job containing the release-critical jobs.
     release = pkgs.releaseTools.aggregate {
       name = "nix-${tarball.version}";
@@ -304,14 +322,17 @@ let
           build.i686-linux
           build.x86_64-darwin
           build.x86_64-linux
+          build.aarch64-linux
           binaryTarball.i686-linux
           binaryTarball.x86_64-darwin
           binaryTarball.x86_64-linux
+          binaryTarball.aarch64-linux
           tests.remoteBuilds
           tests.nix-copy-closure
           tests.binaryTarball
           tests.evalNixpkgs
           tests.evalNixOS
+          installerScript
         ];
     };
 
