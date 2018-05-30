@@ -459,7 +459,9 @@ stdenv.mkDerivation {
       <literal>"unknown"</literal> (for other kinds of files such as
       device nodes or fifos — but note that those cannot be copied to
       the Nix store, so if the predicate returns
-      <literal>true</literal> for them, the copy will fail).</para>
+      <literal>true</literal> for them, the copy will fail). If you
+      exclude a directory, the entire corresponding subtree of
+      <replaceable>e2</replaceable> will be excluded.</para>
 
     </listitem>
 
