@@ -76,15 +76,20 @@ sub downloadFile {
 
     write_file("$dstFile.sha256", $sha256_expected);
 
+    if (! -e "$dstFile.asc") {
+        system("gpg2 --detach-sign --armor $dstFile") == 0 or die "unable to sign $dstFile\n";
+    }
+
     return ($dstFile, $sha256_expected);
 }
 
 downloadFile("tarball", "2"); # .tar.bz2
 my ($tarball, $tarballHash) = downloadFile("tarball", "3"); # .tar.xz
-my ($tarball_i686_linux, $tarball_i686_linux_hash) = downloadFile("binaryTarball.i686-linux", "1");
-my ($tarball_x86_64_linux, $tarball_x86_64_linux_hash) = downloadFile("binaryTarball.x86_64-linux", "1");
-my ($tarball_aarch64_linux, $tarball_aarch64_linux_hash) = downloadFile("binaryTarball.aarch64-linux", "1");
-my ($tarball_x86_64_darwin, $tarball_x86_64_darwin_hash) = downloadFile("binaryTarball.x86_64-darwin", "1");
+downloadFile("binaryTarball.i686-linux", "1");
+downloadFile("binaryTarball.x86_64-linux", "1");
+downloadFile("binaryTarball.aarch64-linux", "1");
+downloadFile("binaryTarball.x86_64-darwin", "1");
+downloadFile("installerScript", "1");
 
 # Update Nixpkgs in a very hacky way.
 system("cd $nixpkgsDir && git pull") == 0 or die;
@@ -144,17 +149,6 @@ system("cd $siteDir && git pull") == 0 or die;
 write_file("$siteDir/nix-release.tt",
            "[%-\n" .
            "latestNixVersion = \"$version\"\n" .
-           "nix_hash_i686_linux = \"$tarball_i686_linux_hash\"\n" .
-           "nix_hash_x86_64_linux = \"$tarball_x86_64_linux_hash\"\n" .
-           "nix_hash_aarch64_linux = \"$tarball_aarch64_linux_hash\"\n" .
-           "nix_hash_x86_64_darwin = \"$tarball_x86_64_darwin_hash\"\n" .
            "-%]\n");
-
-system("cd $siteDir && nix-shell --run 'make nix/install nix/install.sig'") == 0 or die;
-
-copy("$siteDir/nix/install", "$siteDir/nix/install-$version") or die;
-copy("$siteDir/nix/install.sig", "$siteDir/nix/install-$version.sig") or die;
-
-system("cd $siteDir && git add nix/install-$version nix/install-$version.sig") == 0 or die;
 
 system("cd $siteDir && git commit -a -m 'Nix $version released'") == 0 or die;
