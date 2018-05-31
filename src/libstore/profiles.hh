@@ -39,6 +39,8 @@ void deleteGeneration(const Path & profile, unsigned int gen);
 
 void deleteGenerations(const Path & profile, const std::set<unsigned int> & gensToDelete, bool dryRun);
 
+void deleteGenerationsGreaterThan(const Path & profile, const int max, bool dryRun);
+
 void deleteOldGenerations(const Path & profile, bool dryRun);
 
 void deleteGenerationsOlderThan(const Path & profile, time_t t, bool dryRun);

@@ -1346,11 +1346,12 @@ $ nix-env --list-generations
 <para>This operation deletes the specified generations of the current
 profile.  The generations can be a list of generation numbers, the
 special value <literal>old</literal> to delete all non-current
-generations, or a value such as <literal>30d</literal> to delete all
+generations,  a value such as <literal>30d</literal> to delete all
 generations older than the specified number of days (except for the
-generation that was active at that point in time).
-Periodically deleting old generations is important to make garbage
-collection effective.</para>
+generation that was active at that point in time), or a value such as.
+<literal>+5</literal> to only keep the specified items older than the
+current generation. Periodically deleting old generations is important
+to make garbage collection effective.</para>
 
 </refsection>
 
@@ -1358,6 +1359,8 @@ collection effective.</para>
 
 <screen>
 $ nix-env --delete-generations 3 4 8
+
+$ nix-env --delete-generations +5
 
 $ nix-env --delete-generations 30d
 
@@ -1458,7 +1461,7 @@ error: no generation older than the current (91) exists</screen>
 <refsection condition="manpage"><title>Environment variables</title>
 
 <variablelist>
-  
+
   <varlistentry><term><envar>NIX_PROFILE</envar></term>
 
     <listitem><para>Location of the Nix profile.  Defaults to the
@@ -1472,6 +1475,6 @@ error: no generation older than the current (91) exists</screen>
 </variablelist>
 
 </refsection>
-  
+
 
 </refentry>
