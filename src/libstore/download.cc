@@ -213,7 +213,7 @@ struct CurlDownloader : public Downloader
         }
 
         size_t readOffset = 0;
-        int readCallback(char *buffer, size_t size, size_t nitems)
+        size_t readCallback(char *buffer, size_t size, size_t nitems)
         {
             if (readOffset == request.data->length())
                 return 0;
@@ -224,7 +224,7 @@ struct CurlDownloader : public Downloader
             return count;
         }
 
-        static int readCallbackWrapper(char *buffer, size_t size, size_t nitems, void * userp)
+        static size_t readCallbackWrapper(char *buffer, size_t size, size_t nitems, void * userp)
         {
             return ((DownloadItem *) userp)->readCallback(buffer, size, nitems);
         }
