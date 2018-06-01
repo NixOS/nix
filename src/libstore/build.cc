@@ -1489,9 +1489,11 @@ void DerivationGoal::buildDone()
     /* Since we got an EOF on the logger pipe, the builder is presumed
        to have terminated.  In fact, the builder could also have
        simply have closed its end of the pipe, so just to be sure,
-       kill it. */
-    int status = hook ? hook->pid.kill() : pid.kill();
-
+       kill it after a delay (~10s) if the process is still alive.*/
+    int status = hook ? hook->pid.waitWithTimeout() : pid.waitWithTimeout();
+    if (status == -1) {
+        status = hook ? hook->pid.kill() : pid.kill();
+    }
     debug(format("builder process for '%1%' finished") % drvPath);
 
     result.timesBuilt++;

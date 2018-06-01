@@ -223,6 +223,9 @@ public:
     operator pid_t();
     int kill();
     int wait();
+    /* Wait ~10 seconds and return the pid status or -1 if no process
+       changes occured */
+    int waitWithTimeout();
 
     void setSeparatePG(bool separatePG);
     void setKillSignal(int signal);

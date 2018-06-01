@@ -787,6 +787,25 @@ int Pid::kill()
 }
 
 
+int Pid::waitWithTimeout()
+{
+    assert(pid != -1);
+    int timeout = 10000;
+    int i = 9;
+    while (i--) {
+        int status;
+        int res = waitpid(pid, &status, WNOHANG);
+        if (res == pid) {
+            pid = -1;
+            return status;
+        }
+        checkInterrupt();
+        usleep(timeout);
+        timeout *= 2;
+    }
+    return -1;
+}
+
 int Pid::wait()
 {
     assert(pid != -1);
