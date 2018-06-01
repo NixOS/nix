@@ -102,7 +102,9 @@ struct CurlDownloader : public Downloader
             Callback<DownloadResult> callback)
             : downloader(downloader)
             , request(request)
-            , act(*logger, lvlTalkative, actDownload, fmt("downloading '%s'", request.uri), {request.uri}, request.parentAct)
+            , act(*logger, lvlTalkative, actDownload,
+                fmt(request.data ? "uploading '%s'" : "downloading '%s'", request.uri),
+                {request.uri}, request.parentAct)
             , callback(callback)
         {
             if (!request.expectedETag.empty())
@@ -371,12 +373,20 @@ struct CurlDownloader : public Downloader
 
                 attempt++;
 
+                auto verb = request.data ? "upload" : "download";
+
                 auto exc =
                     code == CURLE_ABORTED_BY_CALLBACK && _isInterrupted
-                    ? DownloadError(Interrupted, format("download of '%s' was interrupted") % request.uri)
+                    ? DownloadError(Interrupted, fmt("%s of '%s' was interrupted", verb, request.uri))
                     : httpStatus != 0
-                      ? DownloadError(err, format("unable to download '%s': HTTP error %d (curl error: %s)") % request.uri % httpStatus % curl_easy_strerror(code))
-                      : DownloadError(err, format("unable to download '%s': %s (%d)") % request.uri % curl_easy_strerror(code) % code);
+                    ? DownloadError(err,
+                        fmt("unable to %s '%s': HTTP error %d",
+                            verb, request.uri, httpStatus)
+                        + (code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
+                        )
+                    : DownloadError(err,
+                        fmt("unable to %s '%s': %s (%d)",
+                            verb, request.uri, curl_easy_strerror(code), code));
 
                 /* If this is a transient error, then maybe retry the
                    download after a while. */

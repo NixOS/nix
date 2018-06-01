@@ -73,7 +73,7 @@ protected:
         try {
             getDownloader()->download(req);
         } catch (DownloadError & e) {
-            throw UploadToHTTP(format("uploading to HTTP binary cache at %1% not supported: %2%") % cacheUri % e.msg());
+            throw UploadToHTTP("while uploading to HTTP binary cache at '%s': %s", cacheUri, e.msg());
         }
     }
 
