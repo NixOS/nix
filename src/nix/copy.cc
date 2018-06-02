@@ -8,16 +8,17 @@
 
 using namespace nix;
 
-struct CmdCopy : StorePathsCommand
+struct CmdCopy : StoreCommand
 {
     std::string srcUri, dstUri;
+    bool recursive = false;
+    std::vector<std::string> srcPaths;
 
     CheckSigsFlag checkSigs = CheckSigs;
 
     SubstituteFlag substitute = NoSubstitute;
 
-    CmdCopy()
-        : StorePathsCommand(true)
+    CmdCopy() : StoreCommand()
     {
         mkFlag()
             .longName("from")
@@ -31,6 +32,12 @@ struct CmdCopy : StorePathsCommand
             .dest(&dstUri);
 
         mkFlag()
+            .longName("recursive")
+            .shortName('r')
+            .description("apply operation to closure of the specified paths")
+            .set(&this->recursive, true);
+
+        mkFlag()
             .longName("no-check-sigs")
             .description("do not require that paths are signed by trusted keys")
             .set(&checkSigs, NoCheckSigs);
@@ -40,6 +47,8 @@ struct CmdCopy : StorePathsCommand
             .shortName('s')
             .description("whether to try substitutes on the destination store (only supported by SSH)")
             .set(&substitute, Substitute);
+
+        expectArgs("paths", &srcPaths);
     }
 
     std::string name() override
@@ -81,15 +90,20 @@ struct CmdCopy : StorePathsCommand
         return srcUri.empty() ? StoreCommand::createStore() : openStore(srcUri);
     }
 
-    void run(ref<Store> srcStore, Paths storePaths) override
+    void run(ref<Store> srcStore) override
     {
         if (srcUri.empty() && dstUri.empty())
             throw UsageError("you must pass '--from' and/or '--to'");
 
         ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
 
-        copyPaths(srcStore, dstStore, PathSet(storePaths.begin(), storePaths.end()),
-            NoRepair, checkSigs, substitute);
+        if (recursive) {
+            PathSet closure;
+            srcStore->computeFSClosure(PathSet(srcPaths.begin(), srcPaths.end()), closure, false, false);
+            copyPaths(srcStore, dstStore, closure, NoRepair, checkSigs, substitute);
+        } else {
+            copyPaths(srcStore, dstStore, PathSet(srcPaths.begin(), srcPaths.end()), NoRepair, checkSigs, substitute);
+        }
     }
 };
 
