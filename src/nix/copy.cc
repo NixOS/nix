@@ -11,7 +11,6 @@ using namespace nix;
 struct CmdCopy : StoreCommand
 {
     std::string srcUri, dstUri;
-    bool recursive = false;
     std::vector<std::string> srcPaths;
 
     CheckSigsFlag checkSigs = CheckSigs;
@@ -30,12 +29,6 @@ struct CmdCopy : StoreCommand
             .labels({"store-uri"})
             .description("URI of the destination Nix store")
             .dest(&dstUri);
-
-        mkFlag()
-            .longName("recursive")
-            .shortName('r')
-            .description("apply operation to closure of the specified paths")
-            .set(&this->recursive, true);
 
         mkFlag()
             .longName("no-check-sigs")
@@ -97,13 +90,9 @@ struct CmdCopy : StoreCommand
 
         ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
 
-        if (recursive) {
-            PathSet closure;
-            srcStore->computeFSClosure(PathSet(srcPaths.begin(), srcPaths.end()), closure, false, false);
-            copyPaths(srcStore, dstStore, closure, NoRepair, checkSigs, substitute);
-        } else {
-            copyPaths(srcStore, dstStore, PathSet(srcPaths.begin(), srcPaths.end()), NoRepair, checkSigs, substitute);
-        }
+        PathSet closure;
+        srcStore->computeFSClosure(PathSet(srcPaths.begin(), srcPaths.end()), closure, false, false);
+        copyPaths(srcStore, dstStore, closure, NoRepair, checkSigs, substitute);
     }
 };
 
