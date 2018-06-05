@@ -334,7 +334,7 @@ struct CurlDownloader : public Downloader
                 // We treat most errors as transient, but won't retry when hopeless
                 Error err = Transient;
 
-                if (httpStatus == 404 || code == CURLE_FILE_COULDNT_READ_FILE) {
+                if (httpStatus == 404 || httpStatus == 410 || code == CURLE_FILE_COULDNT_READ_FILE) {
                     // The file is definitely not there
                     err = NotFound;
                 } else if (httpStatus == 401 || httpStatus == 403 || httpStatus == 407) {
