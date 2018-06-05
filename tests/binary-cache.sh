@@ -88,7 +88,7 @@ nix-build --substituters "file://$cacheDir" dependencies.nix --dry-run # get inf
 mkdir $cacheDir/tmp
 mv $cacheDir/*.nar* $cacheDir/tmp/
 
-NIX_DEBUG_SUBST=1 nix-build --substituters "file://$cacheDir" dependencies.nix -o $TEST_ROOT/result --fallback
+nix-build --substituters "file://$cacheDir" dependencies.nix -o $TEST_ROOT/result --fallback
 
 mv $cacheDir/tmp/* $cacheDir/
 
