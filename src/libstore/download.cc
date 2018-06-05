@@ -574,6 +574,11 @@ struct CurlDownloader : public Downloader
 
     void enqueueItem(std::shared_ptr<DownloadItem> item)
     {
+        if (item->request.data
+            && !hasPrefix(item->request.uri, "http://")
+            && !hasPrefix(item->request.uri, "https://"))
+            throw nix::Error("uploading to '%s' is not supported", item->request.uri);
+
         {
             auto state(state_.lock());
             if (state->quit)

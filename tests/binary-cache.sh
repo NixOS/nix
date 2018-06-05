@@ -52,9 +52,6 @@ export _NIX_FORCE_HTTP_BINARY_CACHE_STORE=1
 basicTests
 
 
-unset _NIX_FORCE_HTTP_BINARY_CACHE_STORE
-
-
 # Test whether Nix notices if the NAR doesn't match the hash in the NAR info.
 clearStore
 
@@ -86,11 +83,13 @@ clearStore
 nix-build --substituters "file://$cacheDir" dependencies.nix --dry-run # get info
 
 mkdir $cacheDir/tmp
-mv $cacheDir/*.nar* $cacheDir/tmp/
+mv $cacheDir/nar $cacheDir/nar2
 
-nix-build --substituters "file://$cacheDir" dependencies.nix -o $TEST_ROOT/result --fallback
+(! nix-build --substituters "file://$cacheDir" --no-require-sigs dependencies.nix -o $TEST_ROOT/result)
 
-mv $cacheDir/tmp/* $cacheDir/
+nix-build --substituters "file://$cacheDir" --no-require-sigs dependencies.nix -o $TEST_ROOT/result --fallback
+
+mv $cacheDir/nar2 $cacheDir/nar
 
 
 # Test whether building works if the binary cache contains an
@@ -107,6 +106,7 @@ if [ -n "$HAVE_SODIUM" ]; then
 
 # Create a signed binary cache.
 clearCache
+clearCacheCache
 
 declare -a res=($(nix-store --generate-binary-cache-key test.nixos.org-1 $TEST_ROOT/sk1 $TEST_ROOT/pk1 ))
 publicKey="$(cat $TEST_ROOT/pk1)"
@@ -117,7 +117,7 @@ badKey="$(cat $TEST_ROOT/pk2)"
 res=($(nix-store --generate-binary-cache-key foo.nixos.org-1 $TEST_ROOT/sk3 $TEST_ROOT/pk3))
 otherKey="$(cat $TEST_ROOT/pk3)"
 
-nix copy --to file://$cacheDir?secret-key=$TEST_ROOT/sk1 $outPath
+_NIX_FORCE_HTTP_BINARY_CACHE_STORE= nix copy --to file://$cacheDir?secret-key=$TEST_ROOT/sk1 $outPath
 
 
 # Downloading should fail if we don't provide a key.
