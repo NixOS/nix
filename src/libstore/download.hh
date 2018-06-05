@@ -25,6 +25,11 @@ struct DownloadRequest
 
     DownloadRequest(const std::string & uri)
         : uri(uri), parentAct(getCurActivity()) { }
+
+    std::string verb()
+    {
+        return data ? "upload" : "download";
+    }
 };
 
 struct DownloadResult

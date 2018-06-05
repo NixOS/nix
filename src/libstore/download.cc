@@ -307,8 +307,8 @@ struct CurlDownloader : public Downloader
             if (effectiveUrlCStr)
                 result.effectiveUrl = effectiveUrlCStr;
 
-            debug(format("finished download of '%s'; curl status = %d, HTTP status = %d, body = %d bytes")
-                % request.uri % code % httpStatus % (result.data ? result.data->size() : 0));
+            debug("finished %s of '%s'; curl status = %d, HTTP status = %d, body = %d bytes",
+                request.verb(), request.uri, code, httpStatus, result.data ? result.data->size() : 0);
 
             if (code == CURLE_WRITE_ERROR && result.etag == request.expectedETag) {
                 code = CURLE_OK;
@@ -373,20 +373,18 @@ struct CurlDownloader : public Downloader
 
                 attempt++;
 
-                auto verb = request.data ? "upload" : "download";
-
                 auto exc =
                     code == CURLE_ABORTED_BY_CALLBACK && _isInterrupted
-                    ? DownloadError(Interrupted, fmt("%s of '%s' was interrupted", verb, request.uri))
+                    ? DownloadError(Interrupted, fmt("%s of '%s' was interrupted", request.verb(), request.uri))
                     : httpStatus != 0
                     ? DownloadError(err,
                         fmt("unable to %s '%s': HTTP error %d",
-                            verb, request.uri, httpStatus)
+                            request.verb(), request.uri, httpStatus)
                         + (code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
                         )
                     : DownloadError(err,
                         fmt("unable to %s '%s': %s (%d)",
-                            verb, request.uri, curl_easy_strerror(code), code));
+                            request.verb(), request.uri, curl_easy_strerror(code), code));
 
                 /* If this is a transient error, then maybe retry the
                    download after a while. */
@@ -547,7 +545,7 @@ struct CurlDownloader : public Downloader
             }
 
             for (auto & item : incoming) {
-                debug(format("starting download of %s") % item->request.uri);
+                debug("starting %s of %s", item->request.verb(), item->request.uri);
                 item->init();
                 curl_multi_add_handle(curlm, item->req);
                 item->active = true;
