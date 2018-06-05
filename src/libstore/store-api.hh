@@ -22,6 +22,7 @@ MakeError(SubstError, Error)
 MakeError(BuildError, Error) /* denotes a permanent build failure */
 MakeError(InvalidPath, Error)
 MakeError(Unsupported, Error)
+MakeError(SubstituteGone, Error)
 
 
 struct BasicDerivation;

@@ -76,19 +76,28 @@ if nix-store --substituters "file://$cacheDir" -r $outPath; then
 fi
 
 
-# Test whether fallback works if we have cached info but the
-# corresponding NAR has disappeared.
+# Test whether fallback works if a NAR has disappeared. This does not require --fallback.
 clearStore
 
-nix-build --substituters "file://$cacheDir" dependencies.nix --dry-run # get info
-
-mkdir $cacheDir/tmp
 mv $cacheDir/nar $cacheDir/nar2
+
+nix-build --substituters "file://$cacheDir" --no-require-sigs dependencies.nix -o $TEST_ROOT/result
+
+mv $cacheDir/nar2 $cacheDir/nar
+
+
+# Test whether fallback works if a NAR is corrupted. This does require --fallback.
+clearStore
+
+mv $cacheDir/nar $cacheDir/nar2
+mkdir $cacheDir/nar
+for i in $(cd $cacheDir/nar2 && echo *); do touch $cacheDir/nar/$i; done
 
 (! nix-build --substituters "file://$cacheDir" --no-require-sigs dependencies.nix -o $TEST_ROOT/result)
 
 nix-build --substituters "file://$cacheDir" --no-require-sigs dependencies.nix -o $TEST_ROOT/result --fallback
 
+rm -rf $cacheDir/nar
 mv $cacheDir/nar2 $cacheDir/nar
 
 
