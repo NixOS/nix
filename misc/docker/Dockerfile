@@ -4,8 +4,8 @@ FROM alpine
 RUN apk add --update openssl
 
 # Download Nix and install it into the system.
-RUN wget https://nixos.org/releases/nix/nix-2.0.2/nix-2.0.2-x86_64-linux.tar.bz2 \
-  && echo "d0c2492d7d8f824e3b1ace15a1a58f64a0a8faacc59936ebedfe18905d982d7c  nix-2.0.2-x86_64-linux.tar.bz2" | sha256sum -c \
+RUN wget https://nixos.org/releases/nix/nix-2.0.4/nix-2.0.4-x86_64-linux.tar.bz2 \
+  && echo "d6db178007014ed47ad5460c1bd5b2cb9403b1ec543a0d6507cb27e15358341f  nix-2.0.4-x86_64-linux.tar.bz2" | sha256sum -c \
   && tar xjf nix-*-x86_64-linux.tar.bz2 \
   && addgroup -g 30000 -S nixbld \
   && for i in $(seq 1 30); do adduser -S -D -h /var/empty -g "Nix build user $i" -u $((30000 + i)) -G nixbld nixbld$i ; done \
