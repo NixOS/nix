@@ -299,7 +299,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
                     &transferHandle) {
               //FIXME: find a way to properly abort the multipart upload.
               checkInterrupt();
-              printTalkative("upload progress ('%s'): '%d' of '%d' bytes",
+              debug("upload progress ('%s'): '%d' of '%d' bytes",
                              path,
                              transferHandle->GetBytesTransferred(),
                              transferHandle->GetBytesTotalSize());
