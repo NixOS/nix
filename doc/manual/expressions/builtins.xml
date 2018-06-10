@@ -509,8 +509,7 @@ builtins.fromJSON ''{"x": [1, 2, 3], "y": null}''
 </programlisting>
 
     returns the value <literal>{ x = [ 1 2 3 ]; y = null;
-    }</literal>. Floating point numbers are not
-    supported.</para></listitem>
+    }</literal>.</para></listitem>
 
   </varlistentry>
 
