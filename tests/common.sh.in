@@ -94,11 +94,9 @@ canUseSandbox() {
         return 1
     fi
 
-    if [ -e /proc/sys/kernel/unprivileged_userns_clone ]; then
-        if [ "$(cat /proc/sys/kernel/unprivileged_userns_clone)" != 1 ]; then
-            echo "Unprivileged user namespaces disabled by sysctl, skipping this test..."
-            return 1
-        fi
+    if ! unshare --user true ; then
+        echo "Unprivileged user namespaces disabled by sysctl, skipping this test..."
+        return 1
     fi
 
     return 0
