@@ -276,6 +276,7 @@ public:
 
     /* Print statistics. */
     void printStats();
+    void printStats2();
 
     void realiseContext(const PathSet & context);
 

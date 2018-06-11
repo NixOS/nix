@@ -13,6 +13,9 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
+#include <sys/time.h>
+#include <sys/resource.h>
+
 #if HAVE_BOEHMGC
 
 #include <gc/gc.h>
@@ -574,10 +577,19 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 }
 
 
+std::atomic<uint64_t> nrValuesFreed{0};
+
+void finalizeValue(void * obj, void * data)
+{
+    nrValuesFreed++;
+}
+
 Value * EvalState::allocValue()
 {
     nrValues++;
-    return (Value *) allocBytes(sizeof(Value));
+    auto v = (Value *) allocBytes(sizeof(Value));
+    //GC_register_finalizer_no_order(v, finalizeValue, nullptr, nullptr, nullptr);
+    return v;
 }
 
 
@@ -1706,6 +1718,20 @@ bool EvalState::eqValues(Value & v1, Value & v2)
     }
 }
 
+
+void EvalState::printStats2()
+{
+    struct rusage ru;
+    getrusage(RUSAGE_SELF, &ru);
+
+    GC_prof_stats_s gc;
+    GC_get_prof_stats(&gc, sizeof(gc));
+
+    printError("STATS %d %d %d %d %d %d",
+        nrValues, nrValuesFreed.load(), nrValues - nrValuesFreed,
+        ru.ru_maxrss,
+        gc.heapsize_full, gc.free_bytes_full);
+}
 
 void EvalState::printStats()
 {
