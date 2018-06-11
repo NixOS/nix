@@ -425,25 +425,28 @@ PathSet LocalStore::findRuntimeRoots()
                         readProcLink((format("%1%/%2%") % fdStr % fd_ent->d_name).str(), paths);
                     }
                 }
-                if (errno)
+                if (errno) {
+                    if (errno == ESRCH)
+                        continue;
                     throw SysError(format("iterating /proc/%1%/fd") % ent->d_name);
+                }
                 fdDir.reset();
 
-                auto mapLines =
-                    tokenizeString<std::vector<string>>(readFile((format("/proc/%1%/maps") % ent->d_name).str(), true), "\n");
-                for (const auto& line : mapLines) {
-                    auto match = std::smatch{};
-                    if (std::regex_match(line, match, mapRegex))
-                        paths.emplace(match[1]);
-                }
-
                 try {
+                    auto mapLines =
+                        tokenizeString<std::vector<string>>(readFile((format("/proc/%1%/maps") % ent->d_name).str(), true), "\n");
+                    for (const auto& line : mapLines) {
+                        auto match = std::smatch{};
+                        if (std::regex_match(line, match, mapRegex))
+                            paths.emplace(match[1]);
+                    }
+
                     auto envString = readFile((format("/proc/%1%/environ") % ent->d_name).str(), true);
                     auto env_end = std::sregex_iterator{};
                     for (auto i = std::sregex_iterator{envString.begin(), envString.end(), storePathRegex}; i != env_end; ++i)
                         paths.emplace(i->str());
                 } catch (SysError & e) {
-                    if (errno == ENOENT || errno == EACCES)
+                    if (errno == ENOENT || errno == EACCES || errno == ESRCH)
                         continue;
                     throw;
                 }
