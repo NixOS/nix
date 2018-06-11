@@ -332,7 +332,6 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
 
 EvalState::~EvalState()
 {
-    fileEvalCache.clear();
 }
 
 
@@ -711,7 +710,17 @@ void EvalState::evalFile(const Path & path_, Value & v)
     }
 
     printTalkative("evaluating file '%1%'", path2);
-    Expr * e = parseExprFromFile(checkSourcePath(path2));
+    Expr * e = nullptr;
+
+    auto j = fileParseCache.find(path2);
+    if (j != fileParseCache.end())
+        e = j->second;
+
+    if (!e)
+        e = parseExprFromFile(checkSourcePath(path2));
+
+    fileParseCache[path2] = e;
+
     try {
         eval(e, v);
     } catch (Error & e) {
