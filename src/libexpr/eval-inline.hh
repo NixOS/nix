@@ -78,4 +78,18 @@ inline void EvalState::forceList(Value & v, const Pos & pos)
         throwTypeError("value is %1% while a list was expected, at %2%", v, pos);
 }
 
+/* Note: Various places expect the allocated memory to be zeroed. */
+inline void * allocBytes(size_t n)
+{
+    void * p;
+#if HAVE_BOEHMGC
+    p = GC_malloc(n);
+#else
+    p = calloc(n, 1);
+#endif
+    if (!p) throw std::bad_alloc();
+    return p;
+}
+
+
 }

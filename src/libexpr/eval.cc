@@ -43,20 +43,6 @@ static char * dupString(const char * s)
 }
 
 
-/* Note: Various places expect the allocated memory to be zeroed. */
-static void * allocBytes(size_t n)
-{
-    void * p;
-#if HAVE_BOEHMGC
-    p = GC_malloc(n);
-#else
-    p = calloc(n, 1);
-#endif
-    if (!p) throw std::bad_alloc();
-    return p;
-}
-
-
 static void printValue(std::ostream & str, std::set<const Value *> & active, const Value & v)
 {
     checkInterrupt();
