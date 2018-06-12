@@ -464,6 +464,9 @@ static void installDerivations(Globals & globals,
 
     StringSet newNames;
     for (auto & i : newElems) {
+        /* Evaluate (and possibly fail) now before giving any mixed signals to the user. */
+        i.queryOutPath();
+
         /* `forceName' is a hack to get package names right in some
            one-click installs, namely those where the name used in the
            path is not the one we want (e.g., `java-front' versus
