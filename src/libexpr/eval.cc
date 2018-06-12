@@ -21,12 +21,6 @@
 #include <gc/gc.h>
 #include <gc/gc_cpp.h>
 
-#define NEW new (UseGC)
-
-#else
-
-#define NEW new
-
 #endif
 
 
@@ -37,7 +31,7 @@ static char * dupString(const char * s)
 {
     char * t;
 #if HAVE_BOEHMGC
-    t = GC_strdup(s);
+    t = GC_STRDUP(s);
 #else
     t = strdup(s);
 #endif
@@ -446,7 +440,7 @@ Value * EvalState::addPrimOp(const string & name,
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
     Symbol sym = symbols.create(name2);
     v->type = tPrimOp;
-    v->primOp = NEW PrimOp(primOp, arity, sym);
+    v->primOp = new PrimOp(primOp, arity, sym);
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
     baseEnv.values[0]->attrs->push_back(Attr(sym, v));

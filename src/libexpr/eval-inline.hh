@@ -83,7 +83,7 @@ inline void * allocBytes(size_t n)
 {
     void * p;
 #if HAVE_BOEHMGC
-    p = GC_malloc(n);
+    p = GC_MALLOC(n);
 #else
     p = calloc(n, 1);
 #endif
