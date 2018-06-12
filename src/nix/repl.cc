@@ -693,8 +693,8 @@ struct CmdRepl : StoreCommand, MixEvalArgs
 
     void run(ref<Store> store) override
     {
-        NixRepl repl(searchPath, openStore());
-        repl.mainLoop(files);
+        auto repl = std::make_unique<NixRepl>(searchPath, openStore());
+        repl->mainLoop(files);
     }
 };
 

@@ -239,10 +239,10 @@ void mainWrapped(int argc, char * * argv)
 
     auto store = openStore();
 
-    EvalState state(myArgs.searchPath, store);
-    state.repair = repair;
+    auto state = std::make_unique<EvalState>(myArgs.searchPath, store);
+    state->repair = repair;
 
-    Bindings & autoArgs = *myArgs.getAutoArgs(state);
+    Bindings & autoArgs = *myArgs.getAutoArgs(*state);
 
     if (packages) {
         std::ostringstream joined;
@@ -268,7 +268,7 @@ void mainWrapped(int argc, char * * argv)
     std::vector<Expr *> exprs;
 
     if (readStdin)
-        exprs = {state.parseStdin()};
+        exprs = {state->parseStdin()};
     else
         for (auto i : left) {
             auto absolute = i;
@@ -276,13 +276,13 @@ void mainWrapped(int argc, char * * argv)
                 absolute = canonPath(absPath(i), true);
             } catch (Error e) {};
             if (fromArgs)
-                exprs.push_back(state.parseExprFromString(i, absPath(".")));
+                exprs.push_back(state->parseExprFromString(i, absPath(".")));
             else if (store->isStorePath(absolute) && std::regex_match(absolute, std::regex(".*\\.drv(!.*)?")))
-                drvs.push_back(DrvInfo(state, store, absolute));
+                drvs.push_back(DrvInfo(*state, store, absolute));
             else
                 /* If we're in a #! script, interpret filenames
                    relative to the script. */
-                exprs.push_back(state.parseExprFromFile(resolveExprPath(state.checkSourcePath(lookupFileArg(state,
+                exprs.push_back(state->parseExprFromFile(resolveExprPath(state->checkSourcePath(lookupFileArg(*state,
                     inShebang && !packages ? absPath(i, absPath(dirOf(script))) : i)))));
         }
 
@@ -291,12 +291,12 @@ void mainWrapped(int argc, char * * argv)
 
     for (auto e : exprs) {
         Value vRoot;
-        state.eval(e, vRoot);
+        state->eval(e, vRoot);
 
         for (auto & i : attrPaths) {
-            Value & v(*findAlongAttrPath(state, i, autoArgs, vRoot));
-            state.forceValue(v);
-            getDerivations(state, v, "", autoArgs, drvs, false);
+            Value & v(*findAlongAttrPath(*state, i, autoArgs, vRoot));
+            state->forceValue(v);
+            getDerivations(*state, v, "", autoArgs, drvs, false);
         }
     }
 
@@ -332,12 +332,12 @@ void mainWrapped(int argc, char * * argv)
         if (shell == "") {
 
             try {
-                auto expr = state.parseExprFromString("(import <nixpkgs> {}).bashInteractive", absPath("."));
+                auto expr = state->parseExprFromString("(import <nixpkgs> {}).bashInteractive", absPath("."));
 
                 Value v;
-                state.eval(expr, v);
+                state->eval(expr, v);
 
-                auto drv = getDerivation(state, v, false);
+                auto drv = getDerivation(*state, v, false);
                 if (!drv)
                     throw Error("the 'bashInteractive' attribute in <nixpkgs> did not evaluate to a derivation");
 

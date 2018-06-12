@@ -158,16 +158,16 @@ int main(int argc, char * * argv)
 
         auto store = openStore();
 
-        EvalState state(myArgs.searchPath, store);
-        state.repair = repair;
+        auto state = std::make_unique<EvalState>(myArgs.searchPath, store);
+        state->repair = repair;
 
-        Bindings & autoArgs = *myArgs.getAutoArgs(state);
+        Bindings & autoArgs = *myArgs.getAutoArgs(*state);
 
         if (attrPaths.empty()) attrPaths = {""};
 
         if (findFile) {
             for (auto & i : files) {
-                Path p = state.findFile(i);
+                Path p = state->findFile(i);
                 if (p == "") throw Error(format("unable to find '%1%'") % i);
                 std::cout << p << std::endl;
             }
@@ -175,20 +175,20 @@ int main(int argc, char * * argv)
         }
 
         if (readStdin) {
-            Expr * e = state.parseStdin();
-            processExpr(state, attrPaths, parseOnly, strict, autoArgs,
+            Expr * e = state->parseStdin();
+            processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         } else if (files.empty() && !fromArgs)
             files.push_back("./default.nix");
 
         for (auto & i : files) {
             Expr * e = fromArgs
-                ? state.parseExprFromString(i, absPath("."))
-                : state.parseExprFromFile(resolveExprPath(state.checkSourcePath(lookupFileArg(state, i))));
-            processExpr(state, attrPaths, parseOnly, strict, autoArgs,
+                ? state->parseExprFromString(i, absPath("."))
+                : state->parseExprFromFile(resolveExprPath(state->checkSourcePath(lookupFileArg(*state, i))));
+            processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         }
 
-        state.printStats();
+        state->printStats();
     });
 }

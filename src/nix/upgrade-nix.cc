@@ -118,13 +118,13 @@ struct CmdUpgradeNix : StoreCommand
         auto req = DownloadRequest("https://github.com/NixOS/nixpkgs/raw/master/nixos/modules/installer/tools/nix-fallback-paths.nix");
         auto res = getDownloader()->download(req);
 
-        EvalState state(Strings(), store);
-        auto v = state.allocValue();
-        state.eval(state.parseExprFromString(*res.data, "/no-such-path"), *v);
-        Bindings & bindings(*state.allocBindings(0));
-        auto v2 = findAlongAttrPath(state, settings.thisSystem, bindings, *v);
+        auto state = std::make_unique<EvalState>(Strings(), store);
+        auto v = state->allocValue();
+        state->eval(state->parseExprFromString(*res.data, "/no-such-path"), *v);
+        Bindings & bindings(*state->allocBindings(0));
+        auto v2 = findAlongAttrPath(*state, settings.thisSystem, bindings, *v);
 
-        return state.forceString(*v2);
+        return state->forceString(*v2);
     }
 };
 

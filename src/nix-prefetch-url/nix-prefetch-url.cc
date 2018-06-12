@@ -95,9 +95,9 @@ int main(int argc, char * * argv)
             throw UsageError("too many arguments");
 
         auto store = openStore();
-        EvalState state(myArgs.searchPath, store);
+        auto state = std::make_unique<EvalState>(myArgs.searchPath, store);
 
-        Bindings & autoArgs = *myArgs.getAutoArgs(state);
+        Bindings & autoArgs = *myArgs.getAutoArgs(*state);
 
         /* If -A is given, get the URI from the specified Nix
            expression. */
@@ -107,33 +107,33 @@ int main(int argc, char * * argv)
                 throw UsageError("you must specify a URI");
             uri = args[0];
         } else {
-            Path path = resolveExprPath(lookupFileArg(state, args.empty() ? "." : args[0]));
+            Path path = resolveExprPath(lookupFileArg(*state, args.empty() ? "." : args[0]));
             Value vRoot;
-            state.evalFile(path, vRoot);
-            Value & v(*findAlongAttrPath(state, attrPath, autoArgs, vRoot));
-            state.forceAttrs(v);
+            state->evalFile(path, vRoot);
+            Value & v(*findAlongAttrPath(*state, attrPath, autoArgs, vRoot));
+            state->forceAttrs(v);
 
             /* Extract the URI. */
-            auto attr = v.attrs->find(state.symbols.create("urls"));
+            auto attr = v.attrs->find(state->symbols.create("urls"));
             if (attr == v.attrs->end())
                 throw Error("attribute set does not contain a 'urls' attribute");
-            state.forceList(*attr->value);
+            state->forceList(*attr->value);
             if (attr->value->listSize() < 1)
                 throw Error("'urls' list is empty");
-            uri = state.forceString(*attr->value->listElems()[0]);
+            uri = state->forceString(*attr->value->listElems()[0]);
 
             /* Extract the hash mode. */
-            attr = v.attrs->find(state.symbols.create("outputHashMode"));
+            attr = v.attrs->find(state->symbols.create("outputHashMode"));
             if (attr == v.attrs->end())
                 printInfo("warning: this does not look like a fetchurl call");
             else
-                unpack = state.forceString(*attr->value) == "recursive";
+                unpack = state->forceString(*attr->value) == "recursive";
 
             /* Extract the name. */
             if (name.empty()) {
-                attr = v.attrs->find(state.symbols.create("name"));
+                attr = v.attrs->find(state->symbols.create("name"));
                 if (attr != v.attrs->end())
-                    name = state.forceString(*attr->value);
+                    name = state->forceString(*attr->value);
             }
         }
 
@@ -158,7 +158,7 @@ int main(int argc, char * * argv)
 
         if (storePath.empty()) {
 
-            auto actualUri = resolveMirrorUri(state, uri);
+            auto actualUri = resolveMirrorUri(*state, uri);
 
             /* Download the file. */
             DownloadRequest req(actualUri);
