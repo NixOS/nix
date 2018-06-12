@@ -29,7 +29,9 @@
 #include <sys/utsname.h>
 #include <sys/select.h>
 #include <sys/resource.h>
+#include <sys/socket.h>
 #include <fcntl.h>
+#include <netdb.h>
 #include <unistd.h>
 #include <errno.h>
 #include <cstring>
@@ -1777,12 +1779,14 @@ static std::once_flag dns_resolve_flag;
 static void preloadNSS() {
     /* builtin:fetchurl can trigger a DNS lookup, which with glibc can trigger a dynamic library load of
        one of the glibc NSS libraries in a sandboxed child, which will fail unless the library's already
-       been loaded in the parent. So we force a download of an invalid URL to force the NSS machinery to
+       been loaded in the parent. So we force a lookup of an invalid domain to force the NSS machinery to
        load its lookup libraries in the parent before any child gets a chance to. */
     std::call_once(dns_resolve_flag, []() {
-        DownloadRequest request("http://this.pre-initializes.the.dns.resolvers.invalid");
-        request.tries = 1; // We only need to do it once, and this also suppresses an annoying warning
-        try { getDownloader()->download(request); } catch (...) {}
+        struct addrinfo *res = NULL;
+
+        if (getaddrinfo("this.pre-initializes.the.dns.resolvers.invalid.", "http", NULL, &res) != 0) {
+            if (res) freeaddrinfo(res);
+        }
     });
 }
 
