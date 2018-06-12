@@ -877,11 +877,6 @@ $ nix-env --set-flag priority 10 gcc</screen>
     <arg choice='plain'><option>--available</option></arg>
     <arg choice='plain'><option>-a</option></arg>
   </group>
-  <group choice='opt'>
-    <arg choice='plain'><option>--all</option></arg>
-    <arg choice='plain'><option>--approximate</option></arg>
-    <arg choice='plain'><option>--strict</option></arg>
-  </group>
 
   <sbr />
 
