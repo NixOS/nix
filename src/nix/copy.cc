@@ -8,16 +8,16 @@
 
 using namespace nix;
 
-struct CmdCopy : StorePathsCommand
+struct CmdCopy : StoreCommand
 {
     std::string srcUri, dstUri;
+    std::vector<std::string> srcPaths;
 
     CheckSigsFlag checkSigs = CheckSigs;
 
     SubstituteFlag substitute = NoSubstitute;
 
-    CmdCopy()
-        : StorePathsCommand(true)
+    CmdCopy() : StoreCommand()
     {
         mkFlag()
             .longName("from")
@@ -40,6 +40,8 @@ struct CmdCopy : StorePathsCommand
             .shortName('s')
             .description("whether to try substitutes on the destination store (only supported by SSH)")
             .set(&substitute, Substitute);
+
+        expectArgs("paths", &srcPaths);
     }
 
     std::string name() override
@@ -81,15 +83,16 @@ struct CmdCopy : StorePathsCommand
         return srcUri.empty() ? StoreCommand::createStore() : openStore(srcUri);
     }
 
-    void run(ref<Store> srcStore, Paths storePaths) override
+    void run(ref<Store> srcStore) override
     {
         if (srcUri.empty() && dstUri.empty())
             throw UsageError("you must pass '--from' and/or '--to'");
 
         ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
 
-        copyPaths(srcStore, dstStore, PathSet(storePaths.begin(), storePaths.end()),
-            NoRepair, checkSigs, substitute);
+        PathSet closure;
+        srcStore->computeFSClosure(PathSet(srcPaths.begin(), srcPaths.end()), closure, false, false);
+        copyPaths(srcStore, dstStore, closure, NoRepair, checkSigs, substitute);
     }
 };
 
