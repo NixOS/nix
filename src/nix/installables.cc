@@ -86,22 +86,6 @@ Buildable Installable::toBuildable()
     return std::move(buildables[0]);
 }
 
-struct InstallableStoreDrv : Installable
-{
-    Path drvPath;
-
-    InstallableStoreDrv(const Path & drvPath) : drvPath(drvPath) { }
-
-    std::string what() override { return drvPath; }
-
-    Buildables toBuildables() override
-    {
-        Buildable b = {drvPath};
-        // FIXME: add outputs?
-        return {b};
-    }
-};
-
 struct InstallableStorePath : Installable
 {
     Path storePath;
@@ -226,12 +210,8 @@ static std::vector<std::shared_ptr<Installable>> parseInstallables(
 
             auto path = store->toStorePath(store->followLinksToStore(s));
 
-            if (store->isStorePath(path)) {
-                if (isDerivation(path))
-                    result.push_back(std::make_shared<InstallableStoreDrv>(path));
-                else
-                    result.push_back(std::make_shared<InstallableStorePath>(path));
-            }
+            if (store->isStorePath(path))
+                result.push_back(std::make_shared<InstallableStorePath>(path));
         }
 
         else if (s == "" || std::regex_match(s, attrPathRegex))
