@@ -342,7 +342,7 @@ Hash hashDerivationModulo(Store & store, Derivation drv)
         Hash h = drvHashes[i.first];
         if (!h) {
             assert(store.isValidPath(i.first));
-            Derivation drv2 = readDerivation(i.first);
+            Derivation drv2 = readDerivation(store.toRealPath(i.first));
             h = hashDerivationModulo(store, drv2);
             drvHashes[i.first] = h;
         }
