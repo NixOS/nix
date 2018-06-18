@@ -220,6 +220,7 @@ struct CurlDownloader : public Downloader
 
             curl_easy_setopt(req, CURLOPT_URL, request.uri.c_str());
             curl_easy_setopt(req, CURLOPT_FOLLOWLOCATION, 1L);
+            curl_easy_setopt(req, CURLOPT_MAXREDIRS, 10);
             curl_easy_setopt(req, CURLOPT_NOSIGNAL, 1);
             curl_easy_setopt(req, CURLOPT_USERAGENT,
                 ("curl/" LIBCURL_VERSION " Nix/" + nixVersion +
@@ -340,6 +341,7 @@ struct CurlDownloader : public Downloader
                         case CURLE_INTERFACE_FAILED:
                         case CURLE_UNKNOWN_OPTION:
                         case CURLE_SSL_CACERT_BADFILE:
+                        case CURLE_TOO_MANY_REDIRECTS:
                             err = Misc;
                             break;
                         default: // Shut up warnings
