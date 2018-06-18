@@ -75,9 +75,10 @@ public:
         updateThread = std::thread([&]() {
             auto state(state_.lock());
             while (state->active) {
-                state.wait(updateCV);
+                auto r = state.wait_for(updateCV, std::chrono::seconds(1));
                 draw(*state);
-                state.wait_for(quitCV, std::chrono::milliseconds(50));
+                if (r == std::cv_status::no_timeout)
+                  state.wait_for(quitCV, std::chrono::milliseconds(50));
             }
         });
     }
