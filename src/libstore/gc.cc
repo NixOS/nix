@@ -366,7 +366,7 @@ try_again:
     char buf[bufsiz];
     auto res = readlink(file.c_str(), buf, bufsiz);
     if (res == -1) {
-        if (errno == ENOENT || errno == EACCES)
+        if (errno == ENOENT || errno == EACCES || errno == ESRCH)
             return;
         throw SysError("reading symlink");
     }
