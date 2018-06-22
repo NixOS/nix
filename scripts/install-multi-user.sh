@@ -253,6 +253,12 @@ Try it! Open a new terminal, and type:
 
   $ nix-shell -p nix-info --run "nix-info -m"
 
+Important Information:
+- Nix is installed to $NIX_ROOT
+- Your user profile is at $HOME/.nix-profile
+- The installer has updated $PROFILE_TARGETS with a call to load the nix daemon.
+- If you are getting command not found errors, make sure that your '$PATH' contains $HOME/.nix-profile/bin
+
 Thank you for using this installer. If you have any feedback, don't
 hesitate:
 
