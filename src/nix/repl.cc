@@ -132,6 +132,24 @@ static char * completionCallback(char * s, int *match) {
     auto *res = strdup(possible.begin()->c_str() + strlen(s));
     if (!res) throw Error("allocation failure");
     return res;
+  } else if (possible.size() > 1) {
+    auto checkAllHaveSameAt = [&](size_t pos) {
+      auto &first = *possible.begin();
+      for (auto &p : possible) {
+        if (p.size() <= pos || p[pos] != first[pos])
+          return false;
+      }
+      return true;
+    };
+    size_t start = strlen(s);
+    size_t len = 0;
+    while (checkAllHaveSameAt(start + len)) ++len;
+    if (len > 0) {
+      *match = 1;
+      auto *res = strdup(std::string(*possible.begin(), start, len).c_str());
+      if (!res) throw Error("allocation failure");
+      return res;
+    }
   }
 
   *match = 0;
