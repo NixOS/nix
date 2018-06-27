@@ -399,7 +399,7 @@ setup_report() {
     row "     Build Users" "$NIX_USER_COUNT"
     row "  Build Group ID" "$NIX_BUILD_GROUP_ID"
     row "Build Group Name" "$NIX_BUILD_GROUP_NAME"
-    if [ "${ALLOW_PREEXISTING_INSTALLATION:-}" != "" ]; then
+    if [ "${ALLOW_PREEXISTING_INSTALLATION:-1}" != "" ]; then
         row "Preexisting Install" "Allowed"
     fi
 
@@ -767,7 +767,7 @@ main() {
     welcome_to_nix
     chat_about_sudo
 
-    if [ "${ALLOW_PREEXISTING_INSTALLATION:-}" = "" ]; then
+    if [ "${ALLOW_PREEXISTING_INSTALLATION:-1}" = "" ]; then
         validate_starting_assumptions
     fi
 
