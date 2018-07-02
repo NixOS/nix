@@ -7,19 +7,25 @@
 #include "common-args.hh"
 #include "json.hh"
 #include "json-to-value.hh"
+#include "shared.hh"
 
 #include <regex>
 #include <fstream>
 
 using namespace nix;
 
-std::string hilite(const std::string & s, const std::smatch & m)
+std::string wrap(std::string prefix, std::string s)
+{
+    return prefix + s + ANSI_NORMAL;
+}
+
+std::string hilite(const std::string & s, const std::smatch & m, std::string postfix)
 {
     return
         m.empty()
         ? s
         : std::string(m.prefix())
-          + ANSI_RED + std::string(m.str()) + ANSI_NORMAL
+          + ANSI_RED + std::string(m.str()) + postfix
           + std::string(m.suffix());
 }
 
@@ -75,6 +81,10 @@ struct CmdSearch : SourceExprCommand, MixJSON
                 "To search for git and frontend or gui:",
                 "nix search git 'frontend|gui'"
             },
+            Example{
+                "To display the description of the found packages:",
+                "nix search git --verbose"
+            }
         };
     }
 
@@ -164,14 +174,10 @@ struct CmdSearch : SourceExprCommand, MixJSON
 
                         } else {
                             results[attrPath] = fmt(
-                                "Attribute name: %s\n"
-                                "Package name: %s\n"
-                                "Version: %s\n"
-                                "Description: %s\n",
-                                hilite(attrPath, attrPathMatch),
-                                hilite(name, nameMatch),
-                                parsed.version,
-                                hilite(description, descriptionMatch));
+                                "* %s (%s)\n  %s\n",
+                                wrap("\e[0;1m", hilite(attrPath, attrPathMatch, "\e[0;1m")),
+                                wrap("\e[0;2m", hilite(parsed.fullName, nameMatch, "\e[0;2m")),
+                                hilite(description, descriptionMatch, ANSI_NORMAL));
                         }
                     }
 
@@ -263,6 +269,10 @@ struct CmdSearch : SourceExprCommand, MixJSON
                 throw SysError("cannot rename '%s' to '%s'", tmpFile, jsonCacheFileName);
         }
 
+        if (results.size() == 0)
+            throw Error("no results for the given search term(s)!");
+
+        RunPager pager;
         for (auto el : results) std::cout << el.second << "\n";
 
     }
