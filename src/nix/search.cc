@@ -184,6 +184,10 @@ struct CmdSearch : SourceExprCommand, MixJSON
                         } else {
                             auto name = hilite(parsed.name, nameMatch, "\e[0;2m")
                                 + std::string(parsed.fullName, parsed.name.length());
+
+                            if (description.empty()) {
+                                description = "\e[3mNo description\e[23m";
+                            }
                             results[attrPath] = fmt(
                                 "* %s (%s)\n  %s\n",
                                 wrap("\e[0;1m", hilite(attrPath, attrPathMatch, "\e[0;1m")),
@@ -281,11 +285,13 @@ struct CmdSearch : SourceExprCommand, MixJSON
                 throw SysError("cannot rename '%s' to '%s'", tmpFile, jsonCacheFileName);
         }
 
-        if (!json && results.size() == 0)
-            throw Error("no results for the given search term(s)!");
+        if (!json) {
+            if (results.size() == 0)
+                throw Error("no results for the given search term(s)!");
 
-        RunPager pager;
-        for (auto el : results) std::cout << el.second << "\n";
+            RunPager pager;
+            for (auto el : results) std::cout << el.second << "\n";
+        }
 
     }
 };
