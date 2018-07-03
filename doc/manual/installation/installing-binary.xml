@@ -36,33 +36,6 @@ behaviour.
 
 </para>
 
-<!--
-<para>You can also manually download and install a binary package.
-Binary packages of the latest stable release are available for Fedora,
-Debian, Ubuntu, macOS and various other systems from the <link
-xlink:href="http://nixos.org/nix/download.html">Nix homepage</link>.
-You can also get builds of the latest development release from our
-<link
-xlink:href="http://hydra.nixos.org/job/nix/master/release/latest-finished#tabs-constituents">continuous
-build system</link>.</para>
-
-<para>For Fedora, RPM packages are available.  These can be installed
-or upgraded using <command>rpm -U</command>.  For example,
-
-<screen>
-$ rpm -U nix-1.8-1.i386.rpm</screen>
-
-</para>
-
-<para>For Debian and Ubuntu, you can download a Deb package and
-install it like this:
-
-<screen>
-$ dpkg -i nix_1.8-1_amd64.deb</screen>
-
-</para>
--->
-
 <para>You can also download a binary tarball that contains Nix and all
 its dependencies.  (This is what the install script at
 <uri>https://nixos.org/nix/install</uri> does automatically.)  You
