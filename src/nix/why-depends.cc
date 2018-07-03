@@ -2,6 +2,7 @@
 #include "store-api.hh"
 #include "progress-bar.hh"
 #include "fs-accessor.hh"
+#include "shared.hh"
 
 #include <queue>
 
@@ -237,6 +238,7 @@ struct CmdWhyDepends : SourceExprCommand
 
             visitPath(node.path);
 
+            RunPager pager;
             for (auto & ref : refs) {
                 auto hash = storePathToHash(ref.second->path);
 
