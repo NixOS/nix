@@ -1,7 +1,7 @@
 #include "primops.hh"
 #include "eval-inline.hh"
 
-#include <cpptoml.h>
+#include "cpptoml/cpptoml.h"
 
 namespace nix {
 

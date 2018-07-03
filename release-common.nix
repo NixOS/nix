@@ -2,23 +2,6 @@
 
 with pkgs;
 
-let
-
-  cpptoml = runCommand "cpptoml"
-    { src = fetchFromGitHub {
-        owner = "skystrife";
-        repo = "cpptoml";
-        rev = "43d7d8e52de149fd84aedf7eb71814ff9e6b2f7e";
-        sha256 = "0gdxk1mj5hpj93df1kwfl903w06nihbb1ayr3x336775jm2d2cw6";
-      };
-    }
-    ''
-      mkdir -p $out/include
-      cp $src/include/cpptoml.h $out/include/
-    '';
-
-in
-
 rec {
   # Use "busybox-sandbox-shell" if present,
   # if not (legacy) fallback and hope it's sufficient.
@@ -69,7 +52,6 @@ rec {
       bzip2 xz brotli
       openssl pkgconfig sqlite boehmgc
       boost
-      cpptoml
 
       # Tests
       git
