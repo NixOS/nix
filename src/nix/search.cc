@@ -35,6 +35,7 @@ struct CmdSearch : SourceExprCommand, MixJSON
 
     bool writeCache = true;
     bool useCache = true;
+    bool attrPathOnly = false;
 
     CmdSearch()
     {
@@ -51,6 +52,13 @@ struct CmdSearch : SourceExprCommand, MixJSON
             .longName = "no-cache",
             .description = "do not use or update the package search cache",
             .handler = {[&]() { writeCache = false; useCache = false; }}
+        });
+
+        addFlag({
+            .longName = "attr-path",
+            .shortName = 'A',
+            .description = "Only search for attribute paths",
+            .handler = {[&]() { attrPathOnly = true; }}
         });
     }
 
@@ -77,6 +85,10 @@ struct CmdSearch : SourceExprCommand, MixJSON
             Example{
                 "To search for git and frontend or gui:",
                 "nix search git 'frontend|gui'"
+            },
+            Example{
+                "Only search for attribute paths:",
+                "nix search -A git"
             }
         };
     }
@@ -139,12 +151,16 @@ struct CmdSearch : SourceExprCommand, MixJSON
                     DrvName parsed(drv.queryName());
 
                     for (auto &regex : regexes) {
+                        description = drv.queryMetaString("description");
                         std::regex_search(attrPath, attrPathMatch, regex);
+                        if (attrPathOnly) {
+                            if (!attrPathMatch.empty()) found++;
+                            continue;
+                        }
 
                         name = parsed.name;
                         std::regex_search(name, nameMatch, regex);
 
-                        description = drv.queryMetaString("description");
                         std::replace(description.begin(), description.end(), '\n', ' ');
                         std::regex_search(description, descriptionMatch, regex);
 
