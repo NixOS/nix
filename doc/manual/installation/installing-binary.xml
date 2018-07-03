@@ -6,11 +6,47 @@
 
 <title>Installing a Binary Distribution</title>
 
+<section>
+<title>Installing using the one-liner</title>
+
 <para>If you are using Linux or macOS, the easiest way to install
 Nix is to run the following command:
 
 <screen>
-$ bash &lt;(curl https://nixos.org/nix/install)
+$ curl https://nixos.org/nix/install | sh
+</screen>
+
+This will perform a default installation of Nix for your platform.
+
+<segmentedlist>
+	<?dbhtml list-presentation="table"?>
+	<?dbfo   list-presentation="table"?>
+	<title>System differences</title>
+	<segtitle>System</segtitle>
+	<segtitle>Default installation</segtitle>
+	<seglistitem>
+		<seg>Linux</seg>
+		<seg>Defaults to a single-user install</seg>
+	</seglistitem>
+	<seglistitem>
+		<seg>macOS</seg>
+		<seg>Defaults to a multi-user install</seg>
+	</seglistitem>
+</segmentedlist>
+
+It is possible to pass additional parameters to the installer using the
+following form.
+
+<screen>
+$ curl https://nixos.org/nix/install | sh -s -- [--daemon --no-daemon]
+</screen>
+</para>
+
+<section>
+<title>Single-user install</title>
+<para>
+<screen>
+$ curl https://nixos.org/nix/install | sh -s -- --no-daemon
 </screen>
 
 This will perform a single-user installation of Nix, meaning that
@@ -29,12 +65,61 @@ $ chown alice /nix
 The install script will modify the first writable file from amongst
 <filename>.bash_profile</filename>, <filename>.bash_login</filename>
 and <filename>.profile</filename> to source
-<filename>~/.nix-profile/etc/profile.d/nix.sh</filename>. You can set
+<filename>~/.nix-profile/etc/profile.d/nix.sh</filename>.  You can set
 the <command>NIX_INSTALLER_NO_MODIFY_PROFILE</command> environment
 variable before executing the install script to disable this
 behaviour.
 
 </para>
+</section>
+
+<section>
+<title>Multi-user install</title>
+<screen>
+$ curl https://nixos.org/nix/install | sh -s -- --daemon
+</screen>
+<para>
+The exact steps taken by the installer are different depending of the
+target platform.  The multi-user installation will explain what it will
+do before doing it to the system.
+</para>
+<para>
+It will
+<orderedlist>
+	<listitem><para>
+Make sure your computer doesn't already have Nix.  If it does, I
+will show you instructions on how to clean up your old one.
+	</para></listitem>
+
+	<listitem><para>
+Show you what we are going to install and where.  Then we will ask
+if you are ready to continue.
+	</para></listitem>
+
+	<listitem><para>
+Create the system users and groups that the Nix daemon uses to run
+builds.
+	</para></listitem>
+
+	<listitem><para>
+Perform the basic installation of the Nix files daemon.
+	</para></listitem>
+
+	<listitem><para>
+Configure your shell to import special Nix Profile files, so you
+can use Nix.
+	</para></listitem>
+
+	<listitem><para>
+Start the Nix daemon.
+	</para></listitem>
+</orderedlist>
+</para>
+</section>
+</section>
+
+<section>
+<title>Installing from a binary tarball</title>
 
 <para>You can also download a binary tarball that contains Nix and all
 its dependencies.  (This is what the install script at
@@ -59,5 +144,6 @@ $ rm -rf /nix
 </screen>
 
 </para>
+</section>
 
 </chapter>
