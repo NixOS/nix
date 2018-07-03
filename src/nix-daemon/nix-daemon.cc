@@ -233,7 +233,7 @@ struct RetrieveRegularNARSink : ParseSink
 };
 
 
-static void performOp(TunnelLogger * logger, ref<LocalStore> store,
+static void performOp(TunnelLogger * logger, ref<Store> store,
     bool trusted, unsigned int clientVersion,
     Source & from, Sink & to, unsigned int op)
 {
@@ -362,7 +362,11 @@ static void performOp(TunnelLogger * logger, ref<LocalStore> store,
 
         logger->startWork();
         if (!savedRegular.regular) throw Error("regular file expected");
-        Path path = store->addToStoreFromDump(recursive ? *savedNAR.data : savedRegular.s, baseName, recursive, hashAlgo);
+
+        auto store2 = store.dynamic_pointer_cast<LocalStore>();
+        if (!store2) throw Error("operation is only supported by LocalStore");
+
+        Path path = store2->addToStoreFromDump(recursive ? *savedNAR.data : savedRegular.s, baseName, recursive, hashAlgo);
         logger->stopWork();
 
         to << path;
@@ -776,7 +780,7 @@ static void processConnection(bool trusted)
         Store::Params params; // FIXME: get params from somewhere
         // Disable caching since the client already does that.
         params["path-info-cache-size"] = "0";
-        auto store = make_ref<LocalStore>(params);
+        auto store = openStore(settings.storeUri, params);
 
         tunnelLogger->stopWork();
         to.flush();
