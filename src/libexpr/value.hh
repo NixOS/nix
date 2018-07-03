@@ -44,7 +44,7 @@ class JSONPlaceholder;
 
 
 typedef long NixInt;
-typedef float NixFloat;
+typedef double NixFloat;
 
 /* External values must descend from ExternalValueBase, so that
  * type-agnostic nix functions (e.g. showType) can be implemented

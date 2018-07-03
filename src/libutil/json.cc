@@ -31,6 +31,7 @@ template<> void toJSON<unsigned long>(std::ostream & str, const unsigned long & 
 template<> void toJSON<long long>(std::ostream & str, const long long & n) { str << n; }
 template<> void toJSON<unsigned long long>(std::ostream & str, const unsigned long long & n) { str << n; }
 template<> void toJSON<float>(std::ostream & str, const float & n) { str << n; }
+template<> void toJSON<double>(std::ostream & str, const double & n) { str << n; }
 
 template<> void toJSON<std::string>(std::ostream & str, const std::string & s)
 {
