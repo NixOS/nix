@@ -221,6 +221,48 @@ static void decompressBrotli(Source & source, Sink & sink)
 #endif // HAVE_BROTLI
 }
 
+#if HAVE_ZSTD
+static void decompressZstd(Source & source, Sink & sink)
+{
+  auto *s = ZSTD_createDStream();
+  if (!s)
+    throw CompressionError("unable to initialize zstd decoder");
+
+  Finally free([s]() { ZSTD_freeDStream(s); });
+
+  size_t toRead = ZSTD_initDStream(s);
+  if (ZSTD_isError(toRead))
+    throw CompressionError("unable to initialize zstd streaming decoder");
+
+  std::vector<uint8_t> inbuf(ZSTD_DStreamInSize());
+  std::vector<uint8_t> outbuf(ZSTD_DStreamOutSize());
+
+  while (true) {
+    checkInterrupt();
+
+    size_t read = 0;
+    try {
+      read = source.read(inbuf.data(), toRead);
+    } catch (EndOfFile &) {
+      // *** This is different than others! ***
+      // We're done if no more input
+      return;
+    }
+
+    ZSTD_inBuffer input{inbuf.data(), read, 0};
+
+    while (input.pos < input.size) {
+      checkInterrupt();
+      ZSTD_outBuffer output{outbuf.data(), outbuf.size(), 0};
+      toRead = ZSTD_decompressStream(s, &output, &input);
+      if (ZSTD_isError(toRead))
+        throw CompressionError("error while decompressing zstd data");
+      sink(outbuf.data(), output.pos);
+    }
+  }
+}
+#endif // HAVE_ZSTD
+
 ref<std::string> decompress(const std::string & method, const std::string & in)
 {
     StringSource source(in);
@@ -239,6 +281,10 @@ void decompress(const std::string & method, Source & source, Sink & sink)
         return decompressBzip2(source, sink);
     else if (method == "br")
         return decompressBrotli(source, sink);
+#if HAVE_ZSTD
+    else if (method == "zstd")
+        return decompressZstd(source, sink);
+#endif
     else
         throw UnknownCompressionMethod("unknown compression method '%s'", method);
 }
