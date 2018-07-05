@@ -1356,6 +1356,24 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
 }
 
 
+/* Apply a function to every element of an attribute set. */
+static void prim_mapAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceFunction(*args[0], pos);
+    state.forceAttrs(*args[1], pos);
+
+    state.mkAttrs(v, args[1]->attrs->size());
+
+    for (auto & i : *args[1]->attrs) {
+        Value vName, vFun2;
+        mkString(vName, i.name);
+        state.callFunction(*args[0], vName, vFun2, pos);
+        state.callFunction(vFun2, *i.value, *state.allocAttr(v, i.name), pos);
+    }
+}
+
+
+
 /*************************************************************
  * Lists
  *************************************************************/
@@ -1624,6 +1642,36 @@ static void prim_partition(EvalState & state, const Pos & pos, Value * * args, V
         memcpy(vWrong->listElems(), wrong.data(), sizeof(Value *) * wsize);
 
     v.attrs->sort();
+}
+
+
+/* concatMap = f: list: concatLists (map f list); */
+/* C++-version is to avoid allocating `mkApp', call `f' eagerly */
+static void prim_concatMap(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceFunction(*args[0], pos);
+    state.forceList(*args[1], pos);
+    auto nrLists = args[1]->listSize();
+
+    Value lists[nrLists];
+    size_t len = 0;
+
+    for (unsigned int n = 0; n < nrLists; ++n) {
+        Value * vElem = args[1]->listElems()[n];
+        state.forceValue(*vElem);
+        state.callFunction(*args[0], *vElem, lists[n], pos);
+        state.forceList(lists[n], pos);
+        len += lists[n].listSize();
+    }
+
+    state.mkList(v, len);
+    auto out = v.listElems();
+    for (unsigned int n = 0, pos = 0; n < nrLists; ++n) {
+        auto l = lists[n].listSize();
+        if (l)
+            memcpy(out + pos, lists[n].listElems(), l * sizeof(Value *));
+        pos += l;
+    }
 }
 
 
@@ -2212,6 +2260,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__intersectAttrs", 2, prim_intersectAttrs);
     addPrimOp("__catAttrs", 2, prim_catAttrs);
     addPrimOp("__functionArgs", 1, prim_functionArgs);
+    addPrimOp("__mapAttrs", 2, prim_mapAttrs);
 
     // Lists
     addPrimOp("__isList", 1, prim_isList);
@@ -2229,6 +2278,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__genList", 2, prim_genList);
     addPrimOp("__sort", 2, prim_sort);
     addPrimOp("__partition", 2, prim_partition);
+    addPrimOp("__concatMap", 2, prim_concatMap);
 
     // Integer arithmetic
     addPrimOp("__add", 2, prim_add);
