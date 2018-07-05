@@ -1651,20 +1651,28 @@ static void prim_concatMap(EvalState & state, const Pos & pos, Value * * args, V
 {
     state.forceFunction(*args[0], pos);
     state.forceList(*args[1], pos);
-    auto len = args[1]->listSize();
+    auto nrLists = args[1]->listSize();
 
-    Value vList;
-    state.mkList(vList, len);
+    Value lists[nrLists];
+    size_t len = 0;
 
-    for (unsigned int n = 0; n < len; ++n) {
+    for (unsigned int n = 0; n < nrLists; ++n) {
         Value * vElem = args[1]->listElems()[n];
         state.forceValue(*vElem);
-        state.callFunction(*args[0], *vElem, *(vList.listElems()[n] = state.allocValue()), pos);
+        state.callFunction(*args[0], *vElem, lists[n], pos);
+        state.forceList(lists[n], pos);
+        len += lists[n].listSize();
     }
 
-    state.concatLists(v, len, vList.listElems(), pos);
+    state.mkList(v, len);
+    auto out = v.listElems();
+    for (unsigned int n = 0, pos = 0; n < nrLists; ++n) {
+        auto l = lists[n].listSize();
+        if (l)
+            memcpy(out + pos, lists[n].listElems(), l * sizeof(Value *));
+        pos += l;
+    }
 }
-
 
 
 /*************************************************************
