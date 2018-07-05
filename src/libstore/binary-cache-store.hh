@@ -20,7 +20,11 @@ public:
     const Setting<Path> secretKeyFile{this, "", "secret-key", "path to secret key used to sign the binary cache"};
     const Setting<Path> localNarCache{this, "", "local-nar-cache", "path to a local cache of NARs"};
     const Setting<bool> parallelCompression{this, false, "parallel-compression",
-        "enable multi-threading compression, available for xz only currently"};
+        "enable multi-threading compression for NARs, available for xz only currently"};
+    const Setting<int> compressionLevel{this, -1, "compression-level",
+        "specify 'preset level' of compression to be used with NARs: "
+        "meaning and accepted range of values depends on compression method selected, "
+        "other than -1 which we reserve to indicate Nix defaults should be used"};
 
 private:
 
