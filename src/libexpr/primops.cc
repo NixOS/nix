@@ -1659,7 +1659,6 @@ static void prim_concatMap(EvalState & state, const Pos & pos, Value * * args, V
 
     for (unsigned int n = 0; n < nrLists; ++n) {
         Value * vElem = args[1]->listElems()[n];
-        state.forceValue(*vElem);
         state.callFunction(*args[0], *vElem, lists[n], pos);
         state.forceList(lists[n], pos);
         len += lists[n].listSize();
