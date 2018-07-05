@@ -186,6 +186,13 @@ PKG_CHECK_MODULES([LIBBROTLI], [libbrotlienc libbrotlidec],
    have_brotli=1], [have_brotli=])
 AC_SUBST(HAVE_BROTLI, [$have_brotli])
 
+# Look for libzstd, optional dependency
+PKG_CHECK_MODULES([LIBZSTD], [libzstd],
+  [AC_DEFINE([HAVE_ZSTD], [1], [Whether to use libzstd.])
+   CXXFLAGS="$LIBZSTD_CFLAGS $CXXFLAGS"
+   have_zstd=1], [have_zstd=])
+AC_SUBST(HAVE_ZSTD, [$have_zstd])
+
 # Look for libseccomp, required for Linux sandboxing.
 if test "$sys_name" = linux; then
   AC_ARG_ENABLE([seccomp-sandboxing],

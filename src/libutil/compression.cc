@@ -13,6 +13,14 @@
 #include <brotli/encode.h>
 #endif // HAVE_BROTLI
 
+#if HAVE_ZSTD
+#include <zstd.h>
+// Not set by earlier versions, so be sure it's set
+#ifndef ZSTD_CLEVEL_DEFAULT
+#  define ZSTD_CLEVEL_DEFAULT 3
+#endif
+#endif
+
 #include <iostream>
 
 namespace nix {
@@ -554,6 +562,70 @@ struct BrotliSink : CompressionSink
 };
 #endif // HAVE_BROTLI
 
+#if HAVE_ZSTD
+struct ZstdSink: CompressionSink
+{
+    Sink & nextSink;
+    uint8_t outbuf[BUFSIZ];
+    ZSTD_CStream *state;
+
+
+    bool finished = false;
+
+    ZstdSink(Sink & nextSink, int level = COMPRESSION_LEVEL_DEFAULT) : nextSink(nextSink)
+    {
+        state = ZSTD_createCStream();
+        if (!state)
+            throw CompressionError("unable to initialise zstd encoder");
+
+        auto r = ZSTD_initCStream(state, checkLevel(1, 19, ZSTD_CLEVEL_DEFAULT, "zstd", level));
+        if (ZSTD_isError(r))
+          throw CompressionError("unable to initialise zstd encoder");
+
+        size_t recBufOutSize = ZSTD_CStreamOutSize();
+        if (BUFSIZ < recBufOutSize)
+          throw CompressionError("compile-time buffer size smaller than recommended by zstd: %zu < %zu",
+              BUFSIZ, recBufOutSize);
+    }
+
+    ~ZstdSink()
+    {
+        ZSTD_freeCStream(state);
+    }
+
+    void finish() override
+    {
+        flush();
+        assert(!finished);
+
+        ZSTD_outBuffer output{outbuf, sizeof(outbuf), 0};
+
+        auto r = ZSTD_endStream(state, &output);
+        if (r > 0)
+           throw CompressionError("zstd not flushed, bytes remaining: %zd", r);
+        else if (ZSTD_isError(r))
+          throw CompressionError("error finish'ing zstd stream");
+
+        nextSink(outbuf, output.pos);
+    }
+
+    void write(const unsigned char * data, size_t len) override
+    {
+        ZSTD_inBuffer input{data, len, 0};
+        while (input.pos < input.size) {
+          ZSTD_outBuffer output{outbuf, sizeof(outbuf), 0};
+          auto r = ZSTD_compressStream(state, &output, &input);
+          if (ZSTD_isError(r))
+            throw CompressionError("error compressing with zstd");
+          // (zstd suggests amount that should be 'read' next,
+          // which we ignore since we can't make use of it currently)
+
+          nextSink(outbuf, output.pos);
+        }
+    }
+};
+#endif // HAVE_ZSTD
+
 ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel, int level)
 {
     if (parallel) {
@@ -575,6 +647,10 @@ ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & next
         return make_ref<BrotliSink>(nextSink, level);
 #else
         return make_ref<BrotliCmdSink>(nextSink, level);
+#endif
+#if HAVE_ZSTD
+    else if (method == "zstd")
+        return make_ref<ZstdSink>(nextSink, level);
 #endif
     else
         throw UnknownCompressionMethod(format("unknown compression method '%s'") % method);
