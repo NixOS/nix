@@ -1365,10 +1365,11 @@ static void prim_mapAttrs(EvalState & state, const Pos & pos, Value * * args, Va
     state.mkAttrs(v, args[1]->attrs->size());
 
     for (auto & i : *args[1]->attrs) {
-        Value vName, vFun2;
-        mkString(vName, i.name);
-        state.callFunction(*args[0], vName, vFun2, pos);
-        state.callFunction(vFun2, *i.value, *state.allocAttr(v, i.name), pos);
+        Value * vName = state.allocValue();
+        Value * vFun2 = state.allocValue();
+        mkString(*vName, i.name);
+        state.callFunction(*args[0], *vName, *vFun2, pos);
+        mkApp(*state.allocAttr(v, i.name), *vFun2, *i.value);
     }
 }
 
@@ -1658,7 +1659,6 @@ static void prim_concatMap(EvalState & state, const Pos & pos, Value * * args, V
 
     for (unsigned int n = 0; n < nrLists; ++n) {
         Value * vElem = args[1]->listElems()[n];
-        state.forceValue(*vElem);
         state.callFunction(*args[0], *vElem, lists[n], pos);
         state.forceList(lists[n], pos);
         len += lists[n].listSize();
