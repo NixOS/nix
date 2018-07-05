@@ -182,7 +182,7 @@ AC_CHECK_LIB([lzma], [lzma_stream_encoder_mt],
 # Look for libbrotli{enc,dec}, optional dependencies
 PKG_CHECK_MODULES([LIBBROTLI], [libbrotlienc libbrotlidec],
   [AC_DEFINE([HAVE_BROTLI], [1], [Whether to use libbrotli.])
-   CXXFLAGS="$LIBBROTLI_CFLAGS $CXXFLAGS"]
+   CXXFLAGS="$LIBBROTLI_CFLAGS $CXXFLAGS"
    have_brotli=1], [have_brotli=])
 AC_SUBST(HAVE_BROTLI, [$have_brotli])
 
