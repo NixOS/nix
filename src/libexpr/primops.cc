@@ -1356,7 +1356,7 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
 }
 
 
-/* Apply a function to every element of a list. */
+/* Apply a function to every element of an attribute set. */
 static void prim_mapAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceFunction(*args[0], pos);
