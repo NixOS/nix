@@ -12,7 +12,7 @@ struct RegisterPrimOp
     /* You can register a constant by passing an arity of 0. fun
        will get called during EvalState initialization, so there
        may be primops not yet added and builtins is not yet sorted. */
-    RegisterPrimOp(std::string name, size_t arity, PrimOpFun fun);
+    RegisterPrimOp(const std::string & name, size_t arity, PrimOpFun fun);
 };
 
 /* These primops are disabled without enableNativeCode, but plugins

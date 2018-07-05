@@ -19,8 +19,8 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
     if (pathExists(manifestFile)) {
         Value v;
         state.evalFile(manifestFile, v);
-        Bindings & bindings(*state.allocBindings(0));
-        getDerivations(state, v, "", bindings, elems, false);
+        Bindings * bindings = BindingsBuilder(0).result();
+        getDerivations(state, v, "", *bindings, elems, false);
     }
     return elems;
 }
@@ -42,8 +42,8 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
     /* Construct the whole top level derivation. */
     PathSet references;
-    Value manifest;
-    state.mkList(manifest, elems.size());
+    Value * manifest = state.allocValue();
+    state.mkList(*manifest, elems.size());
     unsigned int n = 0;
     for (auto & i : elems) {
         /* Create a pseudo-derivation containing the name, system,
@@ -51,29 +51,54 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
            as the meta attributes. */
         Path drvPath = keepDerivations ? i.queryDrvPath() : "";
 
-        Value & v(*state.allocValue());
-        manifest.listElems()[n++] = &v;
-        state.mkAttrs(v, 16);
+        Value * v = state.allocValue();
+        manifest->listElems()[n++] = v;
 
-        mkString(*state.allocAttr(v, state.sType), "derivation");
-        mkString(*state.allocAttr(v, state.sName), i.queryName());
+        BindingsBuilder bb(16);
+
+        Value * vv1 = state.allocValue();
+        mkString(*vv1, "derivation");
+        bb.push_back(state.sType, vv1, &noPos);
+
+        Value * vv2 = state.allocValue();
+        mkString(*vv2, i.queryName());
+        bb.push_back(state.sName, vv2, &noPos);
+
         auto system = i.querySystem();
-        if (!system.empty())
-            mkString(*state.allocAttr(v, state.sSystem), system);
-        mkString(*state.allocAttr(v, state.sOutPath), i.queryOutPath());
-        if (drvPath != "")
-            mkString(*state.allocAttr(v, state.sDrvPath), i.queryDrvPath());
+        if (!system.empty()) {
+            Value * vv3 = state.allocValue();
+            mkString(*vv3, system);
+            bb.push_back(state.sSystem, vv3, &noPos);
+        }
+
+        Value * vv4 = state.allocValue();
+        mkString(*vv4, i.queryOutPath());
+        bb.push_back(state.sOutPath, vv4, &noPos);
+
+        if (drvPath != "") {
+            Value * vv5 = state.allocValue();
+            mkString(*vv5, i.queryDrvPath());
+            bb.push_back(state.sDrvPath, vv5, &noPos);
+        }
 
         // Copy each output meant for installation.
         DrvInfo::Outputs outputs = i.queryOutputs(true);
-        Value & vOutputs = *state.allocAttr(v, state.sOutputs);
-        state.mkList(vOutputs, outputs.size());
+
+        Value * vOutputs = state.allocValue();
+        state.mkList(*vOutputs, outputs.size());
+        bb.push_back(state.sOutputs, vOutputs, &noPos);
+
         unsigned int m = 0;
         for (auto & j : outputs) {
-            mkString(*(vOutputs.listElems()[m++] = state.allocValue()), j.first);
-            Value & vOutputs = *state.allocAttr(v, state.symbols.create(j.first));
-            state.mkAttrs(vOutputs, 2);
-            mkString(*state.allocAttr(vOutputs, state.sOutPath), j.second);
+            mkString(*(vOutputs->listElems()[m++] = state.allocValue()), j.first);
+            Value * vOutputs = state.allocValue();
+            bb.push_back(state.symbols.create(j.first), vOutputs, &noPos);
+
+            BindingsBuilder bbOutputs(2);
+            Value * vv6 = state.allocValue();
+            mkString(*vv6, j.second);
+            bbOutputs.push_back(state.sOutPath, vv6, &noPos);
+            state.mkAttrs(*vOutputs, bbOutputs);
 
             /* This is only necessary when installing store paths, e.g.,
                `nix-env -i /nix/store/abcd...-foo'. */
@@ -84,16 +109,18 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         }
 
         // Copy the meta attributes.
-        Value & vMeta = *state.allocAttr(v, state.sMeta);
-        state.mkAttrs(vMeta, 16);
+        Value * vMeta = state.allocValue();
+        bb.push_back(state.sMeta, vMeta, &noPos);
+
+        BindingsBuilder bbMeta(16);
         StringSet metaNames = i.queryMetaNames();
         for (auto & j : metaNames) {
             Value * v = i.queryMeta(j);
             if (!v) continue;
-            vMeta.attrs->push_back(Attr(state.symbols.create(j), v));
+            bbMeta.push_back(state.symbols.create(j), v, &noPos);
         }
-        vMeta.attrs->sort();
-        v.attrs->sort();
+        state.mkAttrs(*vMeta, bbMeta);
+        state.mkAttrs(*v, bb);
 
         if (drvPath != "") references.insert(drvPath);
     }
@@ -102,7 +129,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
        the store; we need it for future modifications of the
        environment. */
     Path manifestFile = state.store->addTextToStore("env-manifest.nix",
-        (format("%1%") % manifest).str(), references);
+        (format("%1%") % *manifest).str(), references);
 
     /* Get the environment builder expression. */
     Value envBuilder;
@@ -111,21 +138,23 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     /* Construct a Nix expression that calls the user environment
        builder with the manifest as argument. */
     Value args, topLevel;
-    state.mkAttrs(args, 3);
-    mkString(*state.allocAttr(args, state.symbols.create("manifest")),
-        manifestFile, {manifestFile});
-    args.attrs->push_back(Attr(state.symbols.create("derivations"), &manifest));
-    args.attrs->sort();
+    BindingsBuilder bb(3);
+    Value * vManifest = state.allocValue();
+    mkString(*vManifest, manifestFile, {manifestFile});
+    bb.push_back(state.symbols.create("manifest"), vManifest, &noPos);
+    bb.push_back(state.symbols.create("derivations"), manifest, &noPos);
+    state.mkAttrs(args, bb);
+
     mkApp(topLevel, envBuilder, args);
 
     /* Evaluate it. */
     debug("evaluating user environment builder");
     state.forceValue(topLevel);
     PathSet context;
-    Attr & aDrvPath(*topLevel.attrs->find(state.sDrvPath));
-    Path topLevelDrv = state.coerceToPath(aDrvPath.pos ? *(aDrvPath.pos) : noPos, *(aDrvPath.value), context);
-    Attr & aOutPath(*topLevel.attrs->find(state.sOutPath));
-    Path topLevelOut = state.coerceToPath(aOutPath.pos ? *(aOutPath.pos) : noPos, *(aOutPath.value), context);
+    Bindings::find_iterator aDrvPath = topLevel.attrs->find(state.sDrvPath);
+    Path topLevelDrv = state.coerceToPath(aDrvPath.pos() ? *aDrvPath.pos() : noPos, *aDrvPath.value(), context);
+    Bindings::find_iterator aOutPath = topLevel.attrs->find(state.sOutPath);
+    Path topLevelOut = state.coerceToPath(aOutPath.pos() ? *aOutPath.pos() : noPos, *aOutPath.value(), context);
 
     /* Realise the resulting store expression. */
     debug("building user environment");

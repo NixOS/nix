@@ -40,19 +40,19 @@ void printValueAsJSON(EvalState & state, bool strict,
             break;
 
         case tAttrs: {
-            Bindings::iterator i = v.attrs->find(state.sOutPath);
-            if (i == v.attrs->end()) {
+            Bindings::find_iterator i = v.attrs->find(state.sOutPath);
+            if (!i.found()) {
                 auto obj(out.object());
                 StringSet names;
-                for (auto & j : *v.attrs)
-                    names.insert(j.name);
+                for (Bindings::iterator j = v.attrs->begin(); !j.at_end(); ++j)
+                    names.insert(j.name());
                 for (auto & j : names) {
-                    Attr & a(*v.attrs->find(state.symbols.create(j)));
+                    Bindings::find_iterator a = v.attrs->find(state.symbols.create(j));
                     auto placeholder(obj.placeholder(j));
-                    printValueAsJSON(state, strict, *a.value, placeholder, context);
+                    printValueAsJSON(state, strict, *a.value(), placeholder, context);
                 }
             } else
-                printValueAsJSON(state, strict, *i->value, out, context);
+                printValueAsJSON(state, strict, *i.value(), out, context);
             break;
         }
 

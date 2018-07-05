@@ -199,18 +199,18 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
 
         state.forceAttrs(*args[0], pos);
 
-        for (auto & attr : *args[0]->attrs) {
-            string n(attr.name);
+        for (Bindings::iterator attr = args[0]->attrs->begin(); !attr.at_end(); ++attr) {
+            const string & n(attr.name());
             if (n == "url")
-                url = state.coerceToString(*attr.pos, *attr.value, context, false, false);
+                url = state.coerceToString(*attr.pos(), *attr.value(), context, false, false);
             else if (n == "ref")
-                ref = state.forceStringNoCtx(*attr.value, *attr.pos);
+                ref = state.forceStringNoCtx(*attr.value(), *attr.pos());
             else if (n == "rev")
-                rev = state.forceStringNoCtx(*attr.value, *attr.pos);
+                rev = state.forceStringNoCtx(*attr.value(), *attr.pos());
             else if (n == "name")
-                name = state.forceStringNoCtx(*attr.value, *attr.pos);
+                name = state.forceStringNoCtx(*attr.value(), *attr.pos());
             else
-                throw EvalError("unsupported argument '%s' to 'fetchGit', at %s", attr.name, *attr.pos);
+                throw EvalError("unsupported argument '%s' to 'fetchGit', at %s", attr.name(), *attr.pos());
         }
 
         if (url.empty())
@@ -227,12 +227,12 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
 
     auto gitInfo = exportGit(state.store, url, ref, rev, name);
 
-    state.mkAttrs(v, 8);
-    mkString(*state.allocAttr(v, state.sOutPath), gitInfo.storePath, PathSet({gitInfo.storePath}));
-    mkString(*state.allocAttr(v, state.symbols.create("rev")), gitInfo.rev);
-    mkString(*state.allocAttr(v, state.symbols.create("shortRev")), gitInfo.shortRev);
-    mkInt(*state.allocAttr(v, state.symbols.create("revCount")), gitInfo.revCount);
-    v.attrs->sort();
+    BindingsBuilder bb(8);
+    Value * v1 = state.allocValue();  mkString(*v1, gitInfo.storePath, PathSet({gitInfo.storePath}));  bb.push_back(state.sOutPath                  , v1, &noPos);
+    Value * v2 = state.allocValue();  mkString(*v2, gitInfo.rev);                                      bb.push_back(state.symbols.create("rev"     ), v2, &noPos);
+    Value * v3 = state.allocValue();  mkString(*v3, gitInfo.shortRev);                                 bb.push_back(state.symbols.create("shortRev"), v3, &noPos);
+    Value * v4 = state.allocValue();  mkInt   (*v4, gitInfo.revCount);                                 bb.push_back(state.symbols.create("revCount"), v4, &noPos);
+    state.mkAttrs(v, bb);
 
     if (state.allowedPaths)
         state.allowedPaths->insert(gitInfo.storePath);

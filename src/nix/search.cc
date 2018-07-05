@@ -129,7 +129,7 @@ struct CmdSearch : SourceExprCommand, MixJSON
 
                 if (v->type == tLambda && toplevel) {
                     Value * v2 = state->allocValue();
-                    state->autoCallFunction(*state->allocBindings(1), *v, *v2);
+                    state->autoCallFunction(*BindingsBuilder(0).result(), *v, *v2);
                     v = v2;
                     state->forceValue(*v);
                 }
@@ -195,9 +195,9 @@ struct CmdSearch : SourceExprCommand, MixJSON
                 else if (v->type == tAttrs) {
 
                     if (!toplevel) {
-                        auto attrs = v->attrs;
-                        Bindings::iterator j = attrs->find(sRecurse);
-                        if (j == attrs->end() || !state->forceBool(*j->value, *j->pos)) {
+                        Bindings* attrs = v->attrs;
+                        Bindings::find_iterator j = attrs->find(sRecurse);
+                        if (!j.found() || !state->forceBool(*j.value(), *j.pos())) {
                             debug("skip attribute '%s'", attrPath);
                             return;
                         }
@@ -205,15 +205,15 @@ struct CmdSearch : SourceExprCommand, MixJSON
 
                     bool toplevel2 = false;
                     if (!fromCache) {
-                        Bindings::iterator j = v->attrs->find(sToplevel);
-                        toplevel2 = j != v->attrs->end() && state->forceBool(*j->value, *j->pos);
+                        Bindings::find_iterator j = v->attrs->find(sToplevel);
+                        toplevel2 = j.found() && state->forceBool(*j.value(), *j.pos());
                     }
 
-                    for (auto & i : *v->attrs) {
+                    for (Bindings::iterator i = v->attrs->begin(); !i.at_end(); ++i) {
                         auto cache2 =
-                            cache ? std::make_unique<JSONObject>(cache->object(i.name)) : nullptr;
-                        doExpr(i.value,
-                            attrPath == "" ? (std::string) i.name : attrPath + "." + (std::string) i.name,
+                            cache ? std::make_unique<JSONObject>(cache->object(i.name())) : nullptr;
+                        doExpr(i.value(),
+                            attrPath == "" ? (const std::string &) i.name() : attrPath + "." + (const std::string &) i.name(),
                             toplevel2 || fromCache, cache2 ? cache2.get() : nullptr);
                     }
                 }

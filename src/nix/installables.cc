@@ -39,9 +39,11 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
 
         auto searchPath = state.getSearchPath();
 
-        state.mkAttrs(*vSourceExpr, searchPath.size() + 1);
+        BindingsBuilder bb(searchPath.size() + 1);
 
-        mkBool(*state.allocAttr(*vSourceExpr, sToplevel), true);
+        Value * v = state.allocValue();
+        mkBool(*v, true);
+        bb.push_back(sToplevel, v, &noPos);
 
         std::unordered_set<std::string> seen;
 
@@ -61,11 +63,12 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
             mkPrimOpApp(*v1, state.getBuiltin("findFile"), state.getBuiltin("nixPath"));
             Value * v2 = state.allocValue();
             mkApp(*v2, *v1, mkString(*state.allocValue(), i.first));
-            mkApp(*state.allocAttr(*vSourceExpr, state.symbols.create(i.first)),
-                state.getBuiltin("import"), *v2);
+            Value * v3 = state.allocValue();
+            mkApp(*v3, state.getBuiltin("import"), *v2);
+            bb.push_back(state.symbols.create(i.first), v3, &noPos);
         }
 
-        vSourceExpr->attrs->sort();
+        state.mkAttrs(*vSourceExpr, bb);
     }
 
     return vSourceExpr;

@@ -84,10 +84,10 @@ static void parseJSON(EvalState & state, const char * & s, Value & v)
             if (*s != ',') throw JSONParseError("expected ',' or '}' after JSON member");
             s++;
         }
-        state.mkAttrs(v, attrs.size());
+        BindingsBuilder bb(attrs.size());
         for (auto & i : attrs)
-            v.attrs->push_back(Attr(i.first, i.second));
-        v.attrs->sort();
+            bb.push_back(i.first, i.second, &noPos);
+        state.mkAttrs(v, bb);
         s++;
     }
 

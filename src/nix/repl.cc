@@ -250,8 +250,8 @@ StringSet NixRepl::completePrefix(string prefix)
             e->eval(state, *env, v);
             state.forceAttrs(v);
 
-            for (auto & i : *v.attrs) {
-                string name = i.name;
+            for (Bindings::iterator i = v.attrs->begin(); !i.at_end(); ++i) {
+                const string & name = i.name();
                 if (string(name, 0, cur2.size()) != cur2) continue;
                 completions.insert(prev + expr + "." + name);
             }
@@ -441,8 +441,8 @@ void NixRepl::loadFile(const Path & path)
     loadedFiles.push_back(path);
     Value v, v2;
     state.evalFile(lookupFileArg(state, path), v);
-    Bindings & bindings(*state.allocBindings(0));
-    state.autoCallFunction(bindings, v, v2);
+    Bindings * bindings = BindingsBuilder(0).result();
+    state.autoCallFunction(*bindings, v, v2);
     addAttrsToScope(v2);
 }
 
@@ -480,8 +480,8 @@ void NixRepl::reloadFiles()
 void NixRepl::addAttrsToScope(Value & attrs)
 {
     state.forceAttrs(attrs);
-    for (auto & i : *attrs.attrs)
-        addVarToScope(i.name, *i.value);
+    for (Bindings::iterator i = attrs.attrs->begin(); !i.at_end(); ++i)
+        addVarToScope(i.name(), *i.value());
     std::cout << format("Added %1% variables.") % attrs.attrs->size() << std::endl;
 }
 
@@ -570,9 +570,9 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 
         if (isDrv) {
             str << "«derivation ";
-            Bindings::iterator i = v.attrs->find(state.sDrvPath);
+            Bindings::find_iterator i = v.attrs->find(state.sDrvPath);
             PathSet context;
-            Path drvPath = i != v.attrs->end() ? state.coerceToPath(*i->pos, *i->value, context) : "???";
+            Path drvPath = i.found() ? state.coerceToPath(*i.pos(), *i.value(), context) : "???";
             str << drvPath << "»";
         }
 
@@ -581,21 +581,21 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 
             typedef std::map<string, Value *> Sorted;
             Sorted sorted;
-            for (auto & i : *v.attrs)
-                sorted[i.name] = i.value;
+            for (Bindings::iterator i = v.attrs->begin(); !i.at_end(); ++i)
+                sorted[i.name()] = i.value();
 
             /* If this is a derivation, then don't show the
                self-references ("all", "out", etc.). */
             StringSet hidden;
             if (isDrv) {
                 hidden.insert("all");
-                Bindings::iterator i = v.attrs->find(state.sOutputs);
-                if (i == v.attrs->end())
+                Bindings::find_iterator i = v.attrs->find(state.sOutputs);
+                if (!i.found())
                     hidden.insert("out");
                 else {
-                    state.forceList(*i->value);
-                    for (unsigned int j = 0; j < i->value->listSize(); ++j)
-                        hidden.insert(state.forceStringNoCtx(*i->value->listElems()[j]));
+                    state.forceList(*i.value());
+                    for (unsigned int j = 0; j < i.value()->listSize(); ++j)
+                        hidden.insert(state.forceStringNoCtx(*i.value()->listElems()[j]));
                 }
             }
 
