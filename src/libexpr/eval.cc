@@ -1076,6 +1076,8 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
 
 void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & pos)
 {
+    forceValue(fun, pos);
+
     if (fun.type == tPrimOp || fun.type == tPrimOpApp) {
         callPrimOp(fun, arg, v, pos);
         return;
@@ -1091,10 +1093,8 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         auto & fun2 = *allocValue();
         fun2 = fun;
         /* !!! Should we use the attr pos here? */
-        forceValue(*found->value, pos);
         Value v2;
         callFunction(*found->value, fun2, v2, pos);
-        forceValue(v2, pos);
         return callFunction(v2, arg, v, pos);
       }
     }
@@ -1181,7 +1181,6 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
     if (fun.type == tAttrs) {
         auto found = fun.attrs->find(sFunctor);
         if (found != fun.attrs->end()) {
-            forceValue(*found->value);
             Value * v = allocValue();
             callFunction(*found->value, fun, *v, noPos);
             forceValue(*v);
@@ -1565,7 +1564,6 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     if (v.type == tAttrs) {
         auto i = v.attrs->find(sToString);
         if (i != v.attrs->end()) {
-            forceValue(*i->value, pos);
             Value v1;
             callFunction(*i->value, v, v1, pos);
             return coerceToString(pos, v1, context, coerceMore, copyToStore);
