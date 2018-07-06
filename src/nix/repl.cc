@@ -14,6 +14,7 @@
 #include "globals.hh"
 #include "command.hh"
 #include "finally.hh"
+#include "progress-bar.hh"
 
 #include "src/linenoise/linenoise.h"
 
@@ -693,6 +694,7 @@ struct CmdRepl : StoreCommand, MixEvalArgs
 
     void run(ref<Store> store) override
     {
+        stopProgressBar();
         auto repl = std::make_unique<NixRepl>(searchPath, openStore());
         repl->mainLoop(files);
     }
