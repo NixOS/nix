@@ -655,6 +655,7 @@ struct ZstdSink: CompressionSink
     {
         ZSTD_inBuffer input{data, len, 0};
         while (input.pos < input.size) {
+          checkInterrupt();
           ZSTD_outBuffer output{outbuf.data(), outbuf.size(), 0};
           auto r = ZSTD_compressStream(state, &output, &input);
           if (ZSTD_isError(r))
