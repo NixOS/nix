@@ -1725,6 +1725,7 @@ void EvalState::printStats2()
     struct rusage ru;
     getrusage(RUSAGE_SELF, &ru);
 
+#if HAVE_BOEHMGC
     GC_prof_stats_s gc;
     GC_get_prof_stats(&gc, sizeof(gc));
 
@@ -1732,6 +1733,11 @@ void EvalState::printStats2()
         nrValues, nrValuesFreed.load(), nrValues - nrValuesFreed,
         ru.ru_maxrss,
         gc.heapsize_full, gc.free_bytes_full);
+#else
+    printError("STATS %d %d %d %d",
+        nrValues, nrValuesFreed.load(), nrValues - nrValuesFreed,
+        ru.ru_maxrss);
+#endif
 }
 
 void EvalState::printStats()
