@@ -1428,7 +1428,6 @@ static void prim_tail(EvalState & state, const Pos & pos, Value * * args, Value 
 /* Apply a function to every element of a list. */
 static void prim_map(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceFunction(*args[0], pos);
     state.forceList(*args[1], pos);
 
     state.mkList(v, args[1]->listSize());
@@ -1556,7 +1555,6 @@ static void prim_all(EvalState & state, const Pos & pos, Value * * args, Value &
 
 static void prim_genList(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceFunction(*args[0], pos);
     auto len = state.forceInt(*args[1], pos);
 
     if (len < 0)
