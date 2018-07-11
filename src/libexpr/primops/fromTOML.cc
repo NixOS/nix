@@ -50,7 +50,7 @@ static void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Va
         }
 
         else if (t->is_value()) {
-            if (auto val = t->as<NixInt>())
+            if (auto val = t->as<int64_t>())
                 mkInt(v, val->get());
             else if (auto val = t->as<NixFloat>())
                 mkFloat(v, val->get());
