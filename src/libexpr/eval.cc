@@ -1720,20 +1720,6 @@ bool EvalState::eqValues(Value & v1, Value & v2)
 }
 
 
-void EvalState::printStats2()
-{
-    struct rusage ru;
-    getrusage(RUSAGE_SELF, &ru);
-
-    GC_prof_stats_s gc;
-    GC_get_prof_stats(&gc, sizeof(gc));
-
-    printError("STATS %d %d %d %d %d %d",
-        nrValues, nrValuesFreed.load(), nrValues - nrValuesFreed,
-        ru.ru_maxrss,
-        gc.heapsize_full, gc.free_bytes_full);
-}
-
 void EvalState::printStats()
 {
     bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
