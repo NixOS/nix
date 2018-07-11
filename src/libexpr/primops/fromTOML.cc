@@ -20,7 +20,7 @@ static void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Va
         if (auto t2 = t->as_table()) {
 
             size_t size = 0;
-            for (auto & i : *t2) size++;
+            for (auto & i : *t2) { (void) i; size++; }
 
             state.mkAttrs(v, size);
 
