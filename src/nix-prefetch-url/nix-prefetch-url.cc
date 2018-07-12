@@ -9,6 +9,10 @@
 
 #include <iostream>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 using namespace nix;
 
 
@@ -160,14 +164,20 @@ int main(int argc, char * * argv)
 
             auto actualUri = resolveMirrorUri(*state, uri);
 
-            /* Download the file. */
-            DownloadRequest req(actualUri);
-            req.decompress = false;
-            auto result = getDownloader()->download(req);
-
             AutoDelete tmpDir(createTempDir(), true);
             Path tmpFile = (Path) tmpDir + "/tmp";
-            writeFile(tmpFile, *result.data);
+
+            /* Download the file. */
+            {
+                AutoCloseFD fd = open(tmpFile.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
+                if (!fd) throw SysError("creating temporary file '%s'", tmpFile);
+
+                FdSink sink(fd.get());
+
+                DownloadRequest req(actualUri);
+                req.decompress = false;
+                getDownloader()->download(std::move(req), sink);
+            }
 
             /* Optionally unpack the file. */
             if (unpack) {
@@ -191,7 +201,7 @@ int main(int argc, char * * argv)
 
             /* FIXME: inefficient; addToStore() will also hash
                this. */
-            hash = unpack ? hashPath(ht, tmpFile).first : hashString(ht, *result.data);
+            hash = unpack ? hashPath(ht, tmpFile).first : hashFile(ht, tmpFile);
 
             if (expectedHash != Hash(ht) && expectedHash != hash)
                 throw Error(format("hash mismatch for '%1%'") % uri);
