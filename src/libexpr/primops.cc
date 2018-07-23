@@ -1508,19 +1508,20 @@ static void prim_foldlStrict(EvalState & state, const Pos & pos, Value * * args,
     state.forceFunction(*args[0], pos);
     state.forceList(*args[2], pos);
 
-    Value * vCur = args[1];
+    if (args[2]->listSize()) {
+        Value * vCur = args[1];
 
-    if (args[2]->listSize())
         for (unsigned int n = 0; n < args[2]->listSize(); ++n) {
             Value vTmp;
             state.callFunction(*args[0], *vCur, vTmp, pos);
             vCur = n == args[2]->listSize() - 1 ? &v : state.allocValue();
             state.callFunction(vTmp, *args[2]->listElems()[n], *vCur, pos);
         }
-    else
-        v = *vCur;
-
-    state.forceValue(v);
+        state.forceValue(v);
+    } else {
+        state.forceValue(*args[1]);
+        v = *args[1];
+    }
 }
 
 
