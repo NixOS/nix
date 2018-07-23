@@ -273,7 +273,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %token IND_STRING_OPEN IND_STRING_CLOSE
 %token ELLIPSIS
 
-%left IMPL
+%right IMPL
 %left OR
 %left AND
 %nonassoc EQ NEQ
