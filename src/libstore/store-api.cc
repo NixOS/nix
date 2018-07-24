@@ -629,11 +629,12 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const PathSet & storePa
     Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
 
     std::atomic<size_t> nrDone{0};
+    std::atomic<size_t> nrFailed{0};
     std::atomic<uint64_t> bytesExpected{0};
     std::atomic<uint64_t> nrRunning{0};
 
     auto showProgress = [&]() {
-        act.progress(nrDone, missing.size(), nrRunning);
+        act.progress(nrDone, missing.size(), nrRunning, nrFailed);
     };
 
     ThreadPool pool;
@@ -662,7 +663,16 @@ void copyPaths(ref<Store> srcStore, ref<Store> dstStore, const PathSet & storePa
             if (!dstStore->isValidPath(storePath)) {
                 MaintainCount<decltype(nrRunning)> mc(nrRunning);
                 showProgress();
-                copyStorePath(srcStore, dstStore, storePath, repair, checkSigs);
+                try {
+                    copyStorePath(srcStore, dstStore, storePath, repair, checkSigs);
+                } catch (Error &e) {
+                    nrFailed++;
+                    if (!settings.keepGoing)
+                        throw e;
+                    logger->log(lvlError, format("could not copy %s: %s") % storePath % e.what());
+                    showProgress();
+                    return;
+                }
             }
 
             nrDone++;
