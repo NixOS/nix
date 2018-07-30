@@ -50,6 +50,14 @@ and <filename>.profile</filename> to source
 the <command>NIX_INSTALLER_NO_MODIFY_PROFILE</command> environment
 variable before executing the install script to disable this
 behaviour.
+
+You can also do a binary multi-user installation by passing
+<option>--daemon</option> to the above bash invocation, as follows:
+
+<screen>
+$ bash &lt;(curl https://nixos.org/nix/install) --daemon
+</screen>
+
 </para>
 
 
