@@ -1359,7 +1359,6 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
 /* Apply a function to every element of an attribute set. */
 static void prim_mapAttrs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceFunction(*args[0], pos);
     state.forceAttrs(*args[1], pos);
 
     state.mkAttrs(v, args[1]->attrs->size());
@@ -1368,7 +1367,7 @@ static void prim_mapAttrs(EvalState & state, const Pos & pos, Value * * args, Va
         Value * vName = state.allocValue();
         Value * vFun2 = state.allocValue();
         mkString(*vName, i.name);
-        state.callFunction(*args[0], *vName, *vFun2, pos);
+        mkApp(*vFun2, *args[0], *vName);
         mkApp(*state.allocAttr(v, i.name), *vFun2, *i.value);
     }
 }
@@ -1429,7 +1428,6 @@ static void prim_tail(EvalState & state, const Pos & pos, Value * * args, Value 
 /* Apply a function to every element of a list. */
 static void prim_map(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceFunction(*args[0], pos);
     state.forceList(*args[1], pos);
 
     state.mkList(v, args[1]->listSize());
@@ -1558,7 +1556,6 @@ static void prim_all(EvalState & state, const Pos & pos, Value * * args, Value &
 
 static void prim_genList(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.forceFunction(*args[0], pos);
     auto len = state.forceInt(*args[1], pos);
 
     if (len < 0)
