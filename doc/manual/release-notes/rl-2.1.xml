@@ -1,0 +1,47 @@
+<section xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="ssec-relnotes-2.1">
+
+<title>Release 2.1 (2018-08-??)</title>
+
+<para>This is primarily a bug fix release. It also reduces memory
+consumption in certain situations. In addition, it has the following
+new features:</para>
+
+<itemizedlist>
+
+  <listitem>
+    <para>New builtin functions:
+    <literal>builtins.bitAnd</literal>,
+    <literal>builtins.bitOr</literal>,
+    <literal>builtins.bitXor</literal>,
+    <literal>builtins.fromTOML</literal>,
+    <literal>builtins.concatMap</literal>,
+    <literal>builtins.mapAttrs</literal>.
+    </para>
+  </listitem>
+
+  <listitem>
+    <para>The S3 binary cache store now supports uploading NARs larger
+    than 5 GiB.</para>
+  </listitem>
+
+  <listitem>
+    <para>The flag <option>--fallback</option> is no longer required
+    to recover from disappeared NARs in binary caches.</para>
+  </listitem>
+
+  <listitem>
+    <para><command>nix-daemon</command> now respects
+    <option>--store</option>, so it can be run as a non-root
+    user.</para>
+  </listitem>
+
+</itemizedlist>
+
+<para>This release has contributions from TODO.
+</para>
+
+</section>
