@@ -332,7 +332,7 @@ let
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
         { extraPackages =
-            [ "sqlite" "sqlite-devel" "bzip2-devel" "libcurl-devel" "openssl-devel" "xz-devel" "libseccomp-devel" "libsodium-devel" "boost-devel" ]
+            [ "sqlite" "sqlite-devel" "bzip2-devel" "libcurl-devel" "openssl-devel" "xz-devel" "libseccomp-devel" "libsodium-devel" "boost-devel" "bison" "flex" ]
             ++ extraPackages; };
       # At most 2047MB can be simulated in qemu-system-i386
       memSize = 2047;
