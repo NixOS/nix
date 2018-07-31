@@ -118,10 +118,27 @@ fetch prebuilt binaries from <uri>cache.nixos.org</uri>.</para>
       </para>
     </listitem>
     </varlistentry>
+
+    <varlistentry><term><literal>endpoint</literal></term>
+    <listitem>
+      <para>
+        The URL to your S3-compatible service, for when not using
+        Amazon S3. Do not specify this value if you're using Amazon
+        S3.
+      </para>
+      <note><para>This endpoint must support HTTPS and will use
+      path-based addressing instead of virtual host based
+      addressing.</para></note>
+    </listitem>
+    </varlistentry>
   </variablelist>
 
   <example><title>Uploading with non-default credential profile for Amazon S3</title>
     <para><command>nix copy --to ssh://machine nixpkgs.hello s3://example-bucket?profile=cache-upload</command></para>
+  </example>
+
+  <example><title>Uploading to an S3-Compatible Binary Cache</title>
+    <para><command>nix copy --to ssh://machine nixpkgs.hello s3://example-bucket?profile=cache-upload&amp;endpoint=minio.example.com</command></para>
   </example>
 
   <para>The user writing to the bucket will need to perform the

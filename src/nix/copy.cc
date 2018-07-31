@@ -72,6 +72,10 @@ struct CmdCopy : StorePathsCommand
                 "To populate the current folder build output to a S3 binary cache:",
                 "nix copy --to s3://my-bucket?region=eu-west-1"
             },
+            Example{
+                "To populate the current folder build output to an S3-compatible binary cache:",
+                "nix copy --to s3://my-bucket?region=eu-west-1&endpoint=example.com"
+            },
 #endif
         };
     }

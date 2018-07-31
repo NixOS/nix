@@ -84,8 +84,8 @@ static void initAWS()
     });
 }
 
-S3Helper::S3Helper(const std::string & profile, const std::string & region)
-    : config(makeConfig(region))
+S3Helper::S3Helper(const std::string & profile, const std::string & region, const std::string & endpoint)
+    : config(makeConfig(region, endpoint))
     , client(make_ref<Aws::S3::S3Client>(
             profile == ""
             ? std::dynamic_pointer_cast<Aws::Auth::AWSCredentialsProvider>(
@@ -99,7 +99,7 @@ S3Helper::S3Helper(const std::string & profile, const std::string & region)
 #else
             Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never,
 #endif
-            false))
+            endpoint.empty()))
 {
 }
 
@@ -116,11 +116,14 @@ class RetryStrategy : public Aws::Client::DefaultRetryStrategy
     }
 };
 
-ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig(const string & region)
+ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig(const string & region, const string & endpoint)
 {
     initAWS();
     auto res = make_ref<Aws::Client::ClientConfiguration>();
     res->region = region;
+    if (!endpoint.empty()) {
+        res->endpointOverride = endpoint;
+    }
     res->requestTimeoutMs = 600 * 1000;
     res->retryStrategy = std::make_shared<RetryStrategy>();
     res->caFile = settings.caFile;
@@ -170,6 +173,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 {
     const Setting<std::string> profile{this, "", "profile", "The name of the AWS configuration profile to use."};
     const Setting<std::string> region{this, Aws::Region::US_EAST_1, "region", {"aws-region"}};
+    const Setting<std::string> endpoint{this, "", "endpoint", "An optional override of the endpoint to use when talking to S3."};
     const Setting<std::string> narinfoCompression{this, "", "narinfo-compression", "compression method for .narinfo files"};
     const Setting<std::string> lsCompression{this, "", "ls-compression", "compression method for .ls files"};
     const Setting<std::string> logCompression{this, "", "log-compression", "compression method for log/* files"};
@@ -186,7 +190,7 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         const Params & params, const std::string & bucketName)
         : S3BinaryCacheStore(params)
         , bucketName(bucketName)
-        , s3Helper(profile, region)
+        , s3Helper(profile, region, endpoint)
     {
         diskCache = getNarInfoDiskCache();
     }
