@@ -152,11 +152,11 @@ systemctl start  nix-daemon.socket
 %{_prefix}/lib/systemd/system/nix-daemon.service
 %endif
 %{_datadir}/nix
-%if ! %{without docgen}
-%{_mandir}/man1/*.1*
-%{_mandir}/man5/*.5*
-%{_mandir}/man8/*.8*
-%endif
+#%if ! %{without docgen}
+#%{_mandir}/man1/*.1*
+#%{_mandir}/man5/*.5*
+#%{_mandir}/man8/*.8*
+#%endif
 %config(noreplace) %{_sysconfdir}/profile.d/nix.sh
 %config(noreplace) %{_sysconfdir}/profile.d/nix-daemon.sh
 /nix
@@ -166,8 +166,8 @@ systemctl start  nix-daemon.socket
 %{_prefix}/lib/pkgconfig/*.pc
 
 
-%if ! %{without docgen}
-%files doc
-%docdir %{_defaultdocdir}/%{name}-doc-%{version}
-%{_defaultdocdir}/%{name}-doc-%{version}
-%endif
+#%if ! %{without docgen}
+#%files doc
+#%docdir %{_defaultdocdir}/%{name}-doc-%{version}
+#%{_defaultdocdir}/%{name}-doc-%{version}
+#%endif
