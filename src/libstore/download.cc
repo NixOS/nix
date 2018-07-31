@@ -718,15 +718,17 @@ void Downloader::download(DownloadRequest && request, Sink & sink)
     while (true) {
         checkInterrupt();
 
-        if (state->quit) {
-            if (state->exc) std::rethrow_exception(state->exc);
-            break;
-        }
-
         /* If no data is available, then wait for the download thread
            to wake us up. */
-        if (state->data.empty())
+        if (state->data.empty()) {
+
+            if (state->quit) {
+                if (state->exc) std::rethrow_exception(state->exc);
+                break;
+            }
+
             state.wait(state->avail);
+        }
 
         /* If data is available, then flush it to the sink and wake up
            the download thread if it's blocked on a full buffer. */
