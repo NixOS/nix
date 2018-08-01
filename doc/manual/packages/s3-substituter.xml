@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<section xmlns="http://docbook.org/ns/docbook"
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         xmlns:xi="http://www.w3.org/2001/XInclude"
+         version="5.0"
+         xml:id="ssec-s3-substituter">
+
+<title>Serving a Nix store via AWS S3 or S3-compatible Service</title>
+
+<para>Nix has built-in support for storing and fetching store paths
+from Amazon S3 and S3 compatible services. This uses the same
+<emphasis>binary</emphasis> cache mechanism that Nix usually uses to
+fetch prebuilt binaries from <uri>cache.nixos.org</uri>.</para>
+
+<para>In this example we will use the bucket named
+<literal>example-bucket</literal>.</para>
+
+<section xml:id="ssec-s3-substituter-anonymous-reads">
+  <title>Anonymous Reads to your S3-compatible binary cache</title>
+
+  <para>If your binary cache is publicly accessible and does not
+  require authentication, the simplest and easiest way to use Nix with
+  your S3 compatible binary cache is to use the HTTP URL for that
+  cache.</para>
+
+  <para>For AWS S3 the binary cache URL for example bucket will be
+  exactly <uri>https://example-bucket.s3.amazonaws.com</uri>. For S3
+  compatible binary caches ago have to consult your software's
+  documentation.</para>
+
+  <para>Your bucket will need the following bucket policy:</para>
+
+  <programlisting>
+<![CDATA[
+{
+  "Id": "DirectReads",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AlowDirectReads",
+      "Action": [
+        "s3:GetObject"
+      ],
+      "Effect": "Allow",
+      "Resource": "arn:aws:s3:::example-bucket/*",
+      "Principal": "*"
+    }
+  ]
+}
+]]>
+</programlisting>
+</section>
+
+<section xml:id="ssec-s3-substituter-authenticated-reads">
+  <title>Authenticated Reads to your S3 binary cache</title>
+
+  <para>For AWS S3 the binary cache URL for example bucket will be
+  exactly <uri>s3://example-bucket</uri>.</para>
+
+  <para>Nix will use the <link
+  xlink:href="https://docs.aws.amazon.com/sdk-for-java/v1/developer-guide/credentials.html#credentials-default.">default
+  credential provider chain</link> for authenticating requests to
+  Amazon S3.</para>
+
+  <para>Nix supports authenticated writes to S3 compatible binary
+  caches but only supports Authenticated reads from Amazon S3.
+  Additionally, the following limitations are in place for
+  authenticated reads:</para>
+
+  <itemizedlist>
+    <listitem><para>The bucket must actually be hosted by Amazon S3 and
+    <emphasis>not</emphasis> an S3 compatible
+    service.</para></listitem>
+
+    <listitem><para>The bucket must be within the
+    <literal>us-east-1</literal> region.</para></listitem>
+
+    <listitem><para>The Amazon credentials, if stored in a credential
+    profile, must be stored in the <literal>default</literal>
+    profile.</para></listitem>
+  </itemizedlist>
+
+  <para>Your bucket will need a bucket policy allowing the desired
+  users to perform the <literal>s3:GetObject</literal> action on all
+  objects in the bucket.</para>
+</section>
+
+
+<section xml:id="ssec-s3-substituter-authenticated-writes">
+  <title>Authenticated Writes to your S3-compatible binary cache</title>
+
+  <para>Nix support fully supports writing to Amazon S3 and S3
+  compatible buckets. The binary cache URL for our example bucket will
+  be <uri>s3://example-bucket</uri>.</para>
+
+  <para>Nix will use the <link
+  xlink:href="https://docs.aws.amazon.com/sdk-for-java/v1/developer-guide/credentials.html#credentials-default.">default
+  credential provider chain</link> for authenticating requests to
+  Amazon S3.</para>
+
+  <para>The following options can be specified as URL parameters to
+  the S3 URL:</para>
+  <variablelist>
+    <varlistentry><term><literal>profile</literal></term>
+    <listitem>
+      <para>
+        The name of the AWS configuration profile to use. By default
+        Nix will use the <literal>default</literal> profile.
+      </para>
+    </listitem>
+    </varlistentry>
+
+    <varlistentry><term><literal>region</literal></term>
+    <listitem>
+      <para>
+        The region of the S3 bucket. <literal>us–east-1</literal> by
+        default.
+      </para>
+    </listitem>
+    </varlistentry>
+  </variablelist>
+
+  <example><title>Uploading with non-default credential profile for Amazon S3</title>
+    <para><command>nix copy --to ssh://machine nixpkgs.hello s3://example-bucket?profile=cache-upload</command></para>
+  </example>
+
+  <para>The user writing to the bucket will need to perform the
+  following actions against the bucket:</para>
+
+  <itemizedlist>
+    <listitem><para><literal>s3:ListBucket</literal></para></listitem>
+    <listitem><para><literal>s3:GetBucketLocation</literal></para></listitem>
+    <listitem><para><literal>s3:ListObjects</literal></para></listitem>
+    <listitem><para><literal>s3:GetObject</literal></para></listitem>
+    <listitem><para><literal>s3:PutObject</literal></para></listitem>
+    <listitem><para><literal>s3:ListBucketMultipartUploads</literal></para></listitem>
+    <listitem><para><literal>s3:CreateMultipartUpload</literal></para></listitem>
+    <listitem><para><literal>s3:ListMultipartUploadParts</literal></para></listitem>
+    <listitem><para><literal>s3:AbortMultipartUpload</literal></para></listitem>
+  </itemizedlist>
+</section>
+</section>
