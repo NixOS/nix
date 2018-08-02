@@ -85,7 +85,6 @@ void mainWrapped(int argc, char * * argv)
     BuildMode buildMode = bmNormal;
     bool readStdin = false;
 
-    auto shell = getEnv("SHELL", "/bin/sh");
     std::string envCommand; // interactive shell
     Strings envExclude;
 
