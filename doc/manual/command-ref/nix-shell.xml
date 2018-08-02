@@ -32,6 +32,7 @@
     <arg><option>--run</option> <replaceable>cmd</replaceable></arg>
     <arg><option>--exclude</option> <replaceable>regexp</replaceable></arg>
     <arg><option>--pure</option></arg>
+    <arg><option>--keep</option> <replaceable>name</replaceable></arg>
     <group choice='req'>
       <arg choice='plain'>
         <group choice='req'>
@@ -164,6 +165,13 @@ also <xref linkend="sec-common-options" />.</phrase></para>
     linkend="ssec-nix-shell-shebang">below</link>).</para>
 
     </listitem></varlistentry>
+
+  <varlistentry><term><option>--keep</option> <replaceable>name</replaceable></term>
+
+    <listitem><para>When a <option>--pure</option> shell is started,
+    keep the listed environment variables.</para></listitem>
+
+  </varlistentry>
 
 </variablelist>
 

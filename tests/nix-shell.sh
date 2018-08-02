@@ -4,11 +4,18 @@ clearStore
 
 # Test nix-shell -A
 export IMPURE_VAR=foo
+export SELECTED_IMPURE_VAR=baz
 export NIX_BUILD_SHELL=$SHELL
 output=$(nix-shell --pure shell.nix -A shellDrv --run \
     'echo "$IMPURE_VAR - $VAR_FROM_STDENV_SETUP - $VAR_FROM_NIX"')
 
 [ "$output" = " - foo - bar" ]
+
+# Test --keep
+output=$(nix-shell --pure --keep SELECTED_IMPURE_VAR shell.nix -A shellDrv --run \
+    'echo "$IMPURE_VAR - $VAR_FROM_STDENV_SETUP - $VAR_FROM_NIX - $SELECTED_IMPURE_VAR"')
+
+[ "$output" = " - foo - bar - baz" ]
 
 # Test nix-shell on a .drv
 [[ $(nix-shell --pure $(nix-instantiate shell.nix -A shellDrv) --run \
