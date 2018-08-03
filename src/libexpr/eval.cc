@@ -349,19 +349,25 @@ Path EvalState::checkSourcePath(const Path & path_)
 
     bool found = false;
 
+    /* First canonicalize the path without symlinks, so we make sure an
+     * attacker can't append ../../... to a path that would be in allowedPaths
+     * and thus leak symlink targets.
+     */
+    Path abspath = canonPath(path_);
+
     for (auto & i : *allowedPaths) {
-        if (isDirOrInDir(path_, i)) {
+        if (isDirOrInDir(abspath, i)) {
             found = true;
             break;
         }
     }
 
     if (!found)
-        throw RestrictedPathError("access to path '%1%' is forbidden in restricted mode", path_);
+        throw RestrictedPathError("access to path '%1%' is forbidden in restricted mode", abspath);
 
     /* Resolve symlinks. */
-    debug(format("checking access to '%s'") % path_);
-    Path path = canonPath(path_, true);
+    debug(format("checking access to '%s'") % abspath);
+    Path path = canonPath(abspath, true);
 
     for (auto & i : *allowedPaths) {
         if (isDirOrInDir(path, i)) {

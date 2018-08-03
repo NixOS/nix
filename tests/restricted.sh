@@ -38,3 +38,14 @@ ln -sfn $(pwd)/restricted.nix $TEST_ROOT/restricted.nix
 nix-instantiate --eval --restrict-eval $TEST_ROOT/restricted.nix -I $TEST_ROOT -I .
 
 [[ $(nix eval --raw --restrict-eval -I . '(builtins.readFile "${import ./simple.nix}/hello")') == 'Hello World!' ]]
+
+# Check whether we can leak symlink information through directory traversal.
+traverseDir="$(pwd)/restricted-traverse-me"
+ln -sfn "$(pwd)/restricted-secret" "$(pwd)/restricted-innocent"
+mkdir -p "$traverseDir"
+goUp="..$(echo "$traverseDir" | sed -e 's,[^/]\+,..,g')"
+output="$(nix eval --raw --restrict-eval -I "$traverseDir" \
+    "(builtins.readFile \"$traverseDir/$goUp$(pwd)/restricted-innocent\")" \
+    2>&1 || :)"
+echo "$output" | grep "is forbidden"
+! echo "$output" | grep -F restricted-secret
