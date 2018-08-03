@@ -844,8 +844,24 @@ ref<Store> openStore(const std::string & uri_,
     if (q != std::string::npos) {
         for (auto s : tokenizeString<Strings>(uri.substr(q + 1), "&")) {
             auto e = s.find('=');
-            if (e != std::string::npos)
-                params[s.substr(0, e)] = s.substr(e + 1);
+            if (e != std::string::npos) {
+                auto value = s.substr(e + 1);
+                std::string decoded;
+                for (size_t i = 0; i < value.size(); ) {
+                    if (value[i] == '%') {
+                        if (i + 2 >= value.size())
+                            throw Error("invalid URI parameter '%s'", value);
+                        try {
+                            decoded += std::stoul(std::string(value, i + 1, 2), 0, 16);
+                            i += 3;
+                        } catch (...) {
+                            throw Error("invalid URI parameter '%s'", value);
+                        }
+                    } else
+                        decoded += value[i++];
+                }
+                params[s.substr(0, e)] = decoded;
+            }
         }
         uri = uri_.substr(0, q);
     }
