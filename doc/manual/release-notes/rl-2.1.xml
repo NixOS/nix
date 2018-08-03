@@ -29,6 +29,12 @@ new features:</para>
   </listitem>
 
   <listitem>
+    <para>The S3 binary cache store now supports uploading to
+    S3-compatible services with the <literal>endpoint</literal>
+    option.</para>
+  </listitem>
+
+  <listitem>
     <para>The flag <option>--fallback</option> is no longer required
     to recover from disappeared NARs in binary caches.</para>
   </listitem>
