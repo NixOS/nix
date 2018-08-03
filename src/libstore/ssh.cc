@@ -4,8 +4,9 @@ namespace nix {
 
 SSHMaster::SSHMaster(const std::string & host, const std::string & keyFile, bool useMaster, bool compress, int logFD)
     : host(host)
+    , fakeSSH(host == "localhost")
     , keyFile(keyFile)
-    , useMaster(useMaster)
+    , useMaster(useMaster && !fakeSSH)
     , compress(compress)
     , logFD(logFD)
 {
@@ -45,12 +46,19 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
         if (logFD != -1 && dup2(logFD, STDERR_FILENO) == -1)
             throw SysError("duping over stderr");
 
-        Strings args = { "ssh", host.c_str(), "-x", "-a" };
-        addCommonSSHOpts(args);
-        if (socketPath != "")
-            args.insert(args.end(), {"-S", socketPath});
-        if (verbosity >= lvlChatty)
-            args.push_back("-v");
+        Strings args;
+
+        if (fakeSSH) {
+            args = { "bash", "-c" };
+        } else {
+            args = { "ssh", host.c_str(), "-x", "-a" };
+            addCommonSSHOpts(args);
+            if (socketPath != "")
+                args.insert(args.end(), {"-S", socketPath});
+            if (verbosity >= lvlChatty)
+                args.push_back("-v");
+        }
+
         args.push_back(command);
         execvp(args.begin()->c_str(), stringsToCharPtrs(args).data());
 
