@@ -98,6 +98,9 @@ void mainWrapped(int argc, char * * argv)
 
     std::string outLink = "./result";
 
+    // List of environment variables kept for --pure
+    std::set<string> keepVars{"HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL", "TZ", "PAGER", "NIX_BUILD_SHELL", "SHLVL"};
+
     Strings args;
     for (int i = 1; i < argc; ++i)
         args.push_back(argv[i]);
@@ -216,6 +219,9 @@ void mainWrapped(int argc, char * * argv)
                 envCommand = (format("exec %1% %2% %3% %4%") % execArgs % interpreter % script % joined.str()).str();
             }
         }
+
+        else if (*arg == "--keep")
+            keepVars.insert(getArg(*arg, arg, end));
 
         else if (*arg == "-")
             readStdin = true;
@@ -367,7 +373,6 @@ void mainWrapped(int argc, char * * argv)
         auto tmp = getEnv("TMPDIR", getEnv("XDG_RUNTIME_DIR", "/tmp"));
 
         if (pure) {
-            std::set<string> keepVars{"HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL", "TZ", "PAGER", "NIX_BUILD_SHELL", "SHLVL"};
             decltype(env) newEnv;
             for (auto & i : env)
                 if (keepVars.count(i.first))
