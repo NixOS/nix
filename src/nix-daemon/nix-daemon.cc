@@ -707,6 +707,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
         logger->startWork();
 
+        // FIXME: race if addToStore doesn't read source?
         store.cast<Store>()->addToStore(info, *source, (RepairFlag) repair,
             dontCheckSigs ? NoCheckSigs : CheckSigs, nullptr);
 

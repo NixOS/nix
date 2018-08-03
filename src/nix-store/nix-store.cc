@@ -924,6 +924,28 @@ static void opServe(Strings opFlags, Strings opArgs)
                 break;
             }
 
+            case cmdAddToStoreNar: {
+                if (!writeAllowed) throw Error("importing paths is not allowed");
+
+                ValidPathInfo info;
+                info.path = readStorePath(*store, in);
+                in >> info.deriver;
+                if (!info.deriver.empty())
+                    store->assertStorePath(info.deriver);
+                info.narHash = Hash(readString(in), htSHA256);
+                info.references = readStorePaths<PathSet>(*store, in);
+                in >> info.registrationTime >> info.narSize >> info.ultimate;
+                info.sigs = readStrings<StringSet>(in);
+                in >> info.ca;
+
+                // FIXME: race if addToStore doesn't read source?
+                store->addToStore(info, in, NoRepair, NoCheckSigs);
+
+                out << 1; // indicate success
+
+                break;
+            }
+
             default:
                 throw Error(format("unknown serve command %1%") % cmd);
         }
