@@ -860,7 +860,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             }
 
             case cmdDumpStorePath:
-                dumpPath(readStorePath(*store, in), out);
+                store->narFromPath(readStorePath(*store, in), out);
                 break;
 
             case cmdImportPaths: {
