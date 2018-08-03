@@ -25,7 +25,8 @@ nix_tests = \
   pure-eval.sh \
   check.sh \
   plugins.sh \
-  search.sh
+  search.sh \
+  nix-copy-ssh.sh
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
