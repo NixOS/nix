@@ -38,6 +38,7 @@ struct DownloadResult
     std::string etag;
     std::string effectiveUrl;
     std::shared_ptr<std::string> data;
+    uint64_t bodySize = 0;
 };
 
 class Store;

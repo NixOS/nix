@@ -140,6 +140,7 @@ struct CurlDownloader : public Downloader
         size_t writeCallback(void * contents, size_t size, size_t nmemb)
         {
             size_t realSize = size * nmemb;
+            result.bodySize += realSize;
             if (request.dataCallback)
                 request.dataCallback((char *) contents, realSize);
             else
@@ -162,6 +163,7 @@ struct CurlDownloader : public Downloader
                 auto ss = tokenizeString<vector<string>>(line, " ");
                 status = ss.size() >= 2 ? ss[1] : "";
                 result.data = std::make_shared<std::string>();
+                result.bodySize = 0;
                 encoding = "";
             } else {
                 auto i = line.find(':');
@@ -296,6 +298,7 @@ struct CurlDownloader : public Downloader
             curl_easy_setopt(req, CURLOPT_NETRC, CURL_NETRC_OPTIONAL);
 
             result.data = std::make_shared<std::string>();
+            result.bodySize = 0;
         }
 
         void finish(CURLcode code)
@@ -309,7 +312,7 @@ struct CurlDownloader : public Downloader
                 result.effectiveUrl = effectiveUrlCStr;
 
             debug("finished %s of '%s'; curl status = %d, HTTP status = %d, body = %d bytes",
-                request.verb(), request.uri, code, httpStatus, result.data ? result.data->size() : 0);
+                request.verb(), request.uri, code, httpStatus, result.bodySize);
 
             if (code == CURLE_WRITE_ERROR && result.etag == request.expectedETag) {
                 code = CURLE_OK;
