@@ -291,10 +291,6 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         transferConfig.s3Client = s3Helper.client;
         transferConfig.bufferSize = bufferSize;
 
-        if (contentEncoding != "")
-            transferConfig.createMultipartUploadTemplate.SetContentEncoding(
-                contentEncoding);
-
         transferConfig.uploadProgressCallback =
             [&](const TransferManager *transferManager,
                 const std::shared_ptr<const TransferHandle>
@@ -336,8 +332,10 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         auto now1 = std::chrono::steady_clock::now();
 
         std::shared_ptr<TransferHandle> transferHandle =
-            transferManager->UploadFile(stream, bucketName, path, mimeType,
-                                        Aws::Map<Aws::String, Aws::String>());
+            transferManager->UploadFile(
+                stream, bucketName, path, mimeType,
+                Aws::Map<Aws::String, Aws::String>(),
+                nullptr, contentEncoding);
 
         transferHandle->WaitUntilFinished();
 
