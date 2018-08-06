@@ -8,10 +8,8 @@
 #include <cstdio>
 #include <cstring>
 
-#if HAVE_BROTLI
 #include <brotli/decode.h>
 #include <brotli/encode.h>
-#endif // HAVE_BROTLI
 
 #include <iostream>
 
@@ -132,12 +130,6 @@ static void decompressBzip2(Source & source, Sink & sink)
 
 static void decompressBrotli(Source & source, Sink & sink)
 {
-#if !HAVE_BROTLI
-    RunOptions options(BROTLI, {"-d"});
-    options.standardIn = &source;
-    options.standardOut = &sink;
-    runProgram2(options);
-#else
     auto *s = BrotliDecoderCreateInstance(nullptr, nullptr, nullptr);
     if (!s)
         throw CompressionError("unable to initialize brotli decoder");
@@ -193,7 +185,6 @@ static void decompressBrotli(Source & source, Sink & sink)
 
         if (ret == BROTLI_DECODER_RESULT_SUCCESS) return;
     }
-#endif // HAVE_BROTLI
 }
 
 ref<std::string> decompress(const std::string & method, const std::string & in)
@@ -403,42 +394,6 @@ struct BzipSink : CompressionSink
     }
 };
 
-struct LambdaCompressionSink : CompressionSink
-{
-    Sink & nextSink;
-    std::string data;
-    using CompressFnTy = std::function<std::string(const std::string&)>;
-    CompressFnTy compressFn;
-    LambdaCompressionSink(Sink& nextSink, CompressFnTy compressFn)
-        : nextSink(nextSink)
-        , compressFn(std::move(compressFn))
-    {
-    };
-
-    void finish() override
-    {
-        flush();
-        nextSink(compressFn(data));
-    }
-
-    void write(const unsigned char * data, size_t len) override
-    {
-        checkInterrupt();
-        this->data.append((const char *) data, len);
-    }
-};
-
-struct BrotliCmdSink : LambdaCompressionSink
-{
-    BrotliCmdSink(Sink& nextSink)
-        : LambdaCompressionSink(nextSink, [](const std::string& data) {
-            return runProgram(BROTLI, true, {}, data);
-        })
-    {
-    }
-};
-
-#if HAVE_BROTLI
 struct BrotliSink : CompressionSink
 {
     Sink & nextSink;
@@ -525,7 +480,6 @@ struct BrotliSink : CompressionSink
         }
     }
 };
-#endif // HAVE_BROTLI
 
 ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel)
 {
@@ -544,11 +498,7 @@ ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & next
     else if (method == "bzip2")
         return make_ref<BzipSink>(nextSink);
     else if (method == "br")
-#if HAVE_BROTLI
         return make_ref<BrotliSink>(nextSink);
-#else
-        return make_ref<BrotliCmdSink>(nextSink);
-#endif
     else
         throw UnknownCompressionMethod(format("unknown compression method '%s'") % method);
 }

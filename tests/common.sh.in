@@ -31,7 +31,6 @@ export xmllint="@xmllint@"
 export SHELL="@bash@"
 export PAGER=cat
 export HAVE_SODIUM="@HAVE_SODIUM@"
-export HAVE_BROTLI="@HAVE_BROTLI@"
 
 export version=@PACKAGE_VERSION@
 export system=@system@
