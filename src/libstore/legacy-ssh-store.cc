@@ -59,7 +59,7 @@ struct LegacySSHStore : public Store
     {
         auto conn = make_ref<Connection>();
         conn->sshConn = master.startCommand(
-            fmt("command time %s --serve --write", remoteProgram)
+            fmt("%s --serve --write", remoteProgram)
             + (remoteStore.get() == "" ? "" : " --store " + shellEscape(remoteStore.get())));
         conn->to = FdSink(conn->sshConn->in.get());
         conn->from = FdSource(conn->sshConn->out.get());
