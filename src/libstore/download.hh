@@ -88,7 +88,4 @@ public:
 
 bool isUri(const string & s);
 
-/* Decode data according to the Content-Encoding header. */
-ref<std::string> decodeContent(const std::string & encoding, ref<std::string> data);
-
 }

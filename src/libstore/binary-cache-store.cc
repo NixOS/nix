@@ -217,17 +217,6 @@ void BinaryCacheStore::narFromPath(const Path & storePath, Sink & sink)
 {
     auto info = queryPathInfo(storePath).cast<const NarInfo>();
 
-    auto source = sinkToSource([this, url{info->url}](Sink & sink) {
-        try {
-            getFile(url, sink);
-        } catch (NoSuchBinaryCacheFile & e) {
-            throw SubstituteGone(e.what());
-        }
-    });
-
-    stats.narRead++;
-    //stats.narReadCompressedBytes += nar->size(); // FIXME
-
     uint64_t narSize = 0;
 
     LambdaSink wrapperSink([&](const unsigned char * data, size_t len) {
@@ -235,8 +224,18 @@ void BinaryCacheStore::narFromPath(const Path & storePath, Sink & sink)
         narSize += len;
     });
 
-    decompress(info->compression, *source, wrapperSink);
+    auto decompressor = makeDecompressionSink(info->compression, wrapperSink);
 
+    try {
+        getFile(info->url, *decompressor);
+    } catch (NoSuchBinaryCacheFile & e) {
+        throw SubstituteGone(e.what());
+    }
+
+    decompressor->flush();
+
+    stats.narRead++;
+    //stats.narReadCompressedBytes += nar->size(); // FIXME
     stats.narReadBytes += narSize;
 }
 

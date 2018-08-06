@@ -39,21 +39,16 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
             request.verifyTLS = false;
             request.decompress = false;
 
-            downloader->download(std::move(request), sink);
+            auto decompressor = makeDecompressionSink(
+                hasSuffix(mainUrl, ".xz") ? "xz" : "none", sink);
+            downloader->download(std::move(request), *decompressor);
+            decompressor->finish();
         });
 
-        if (get(drv.env, "unpack", "") == "1") {
-
-            if (hasSuffix(mainUrl, ".xz")) {
-                auto source2 = sinkToSource([&](Sink & sink) {
-                    decompress("xz", *source, sink);
-                });
-                restorePath(storePath, *source2);
-            } else
-                restorePath(storePath, *source);
-
-        } else
-              writeFile(storePath, *source);
+        if (get(drv.env, "unpack", "") == "1")
+            restorePath(storePath, *source);
+        else
+            writeFile(storePath, *source);
 
         auto executable = drv.env.find("executable");
         if (executable != drv.env.end() && executable->second == "1") {

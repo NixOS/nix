@@ -58,16 +58,6 @@ std::string resolveUri(const std::string & uri)
         return uri;
 }
 
-ref<std::string> decodeContent(const std::string & encoding, ref<std::string> data)
-{
-    if (encoding == "")
-        return data;
-    else if (encoding == "br")
-        return decompress(encoding, *data);
-    else
-        throw Error("unsupported Content-Encoding '%s'", encoding);
-}
-
 struct CurlDownloader : public Downloader
 {
     CURLM * curlm = 0;
@@ -106,6 +96,12 @@ struct CurlDownloader : public Downloader
                 fmt(request.data ? "uploading '%s'" : "downloading '%s'", request.uri),
                 {request.uri}, request.parentAct)
             , callback(callback)
+            , finalSink([this](const unsigned char * data, size_t len) {
+                if (this->request.dataCallback)
+                    this->request.dataCallback((char *) data, len);
+                else
+                    this->result.data->append((char *) data, len);
+              })
         {
             if (!request.expectedETag.empty())
                 requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + request.expectedETag).c_str());
@@ -129,23 +125,40 @@ struct CurlDownloader : public Downloader
             }
         }
 
-        template<class T>
-        void fail(const T & e)
+        void failEx(std::exception_ptr ex)
         {
             assert(!done);
             done = true;
-            callback.rethrow(std::make_exception_ptr(e));
+            callback.rethrow(ex);
         }
+
+        template<class T>
+        void fail(const T & e)
+        {
+            failEx(std::make_exception_ptr(e));
+        }
+
+        LambdaSink finalSink;
+        std::shared_ptr<CompressionSink> decompressionSink;
+
+        std::exception_ptr writeException;
 
         size_t writeCallback(void * contents, size_t size, size_t nmemb)
         {
-            size_t realSize = size * nmemb;
-            result.bodySize += realSize;
-            if (request.dataCallback)
-                request.dataCallback((char *) contents, realSize);
-            else
-                result.data->append((char *) contents, realSize);
-            return realSize;
+            try {
+                size_t realSize = size * nmemb;
+                result.bodySize += realSize;
+
+                if (!decompressionSink)
+                    decompressionSink = makeDecompressionSink(encoding, finalSink);
+
+                (*decompressionSink)((unsigned char *) contents, realSize);
+
+                return realSize;
+            } catch (...) {
+                writeException = std::current_exception();
+                return 0;
+            }
         }
 
         static size_t writeCallbackWrapper(void * contents, size_t size, size_t nmemb, void * userp)
@@ -314,27 +327,33 @@ struct CurlDownloader : public Downloader
             debug("finished %s of '%s'; curl status = %d, HTTP status = %d, body = %d bytes",
                 request.verb(), request.uri, code, httpStatus, result.bodySize);
 
+            if (decompressionSink)
+                decompressionSink->finish();
+
             if (code == CURLE_WRITE_ERROR && result.etag == request.expectedETag) {
                 code = CURLE_OK;
                 httpStatus = 304;
             }
 
-            if (code == CURLE_OK &&
+            if (writeException)
+                failEx(writeException);
+
+            else if (code == CURLE_OK &&
                 (httpStatus == 200 || httpStatus == 201 || httpStatus == 204 || httpStatus == 304 || httpStatus == 226 /* FTP */ || httpStatus == 0 /* other protocol */))
             {
                 result.cached = httpStatus == 304;
                 done = true;
 
                 try {
-                    if (request.decompress)
-                        result.data = decodeContent(encoding, ref<std::string>(result.data));
                     act.progress(result.data->size(), result.data->size());
                     callback(std::move(result));
                 } catch (...) {
                     done = true;
                     callback.rethrow();
                 }
-            } else {
+            }
+
+            else {
                 // We treat most errors as transient, but won't retry when hopeless
                 Error err = Transient;
 
@@ -369,6 +388,7 @@ struct CurlDownloader : public Downloader
                         case CURLE_UNKNOWN_OPTION:
                         case CURLE_SSL_CACERT_BADFILE:
                         case CURLE_TOO_MANY_REDIRECTS:
+                        case CURLE_WRITE_ERROR:
                             err = Misc;
                             break;
                         default: // Shut up warnings

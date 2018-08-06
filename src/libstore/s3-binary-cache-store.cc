@@ -153,10 +153,8 @@ S3Helper::DownloadResult S3Helper::getObject(
         auto result = checkAws(fmt("AWS error fetching '%s'", key),
             client->GetObject(request));
 
-        res.data = decodeContent(
-            result.GetContentEncoding(),
-            make_ref<std::string>(
-                dynamic_cast<std::stringstream &>(result.GetBody()).str()));
+        res.data = decompress(result.GetContentEncoding(),
+            dynamic_cast<std::stringstream &>(result.GetBody()).str());
 
     } catch (S3Error & e) {
         if (e.err != Aws::S3::S3Errors::NO_SUCH_KEY) throw;
