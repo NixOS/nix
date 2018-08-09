@@ -121,10 +121,12 @@ struct InstallableCommand : virtual Args, SourceExprCommand
 
     InstallableCommand()
     {
-        expectArg("installable", &_installable);
+        expectArg("installable", &_installable, useDefaultInstallable());
     }
 
     void prepare() override;
+
+    virtual bool useDefaultInstallable() { return true; }
 
 private:
 

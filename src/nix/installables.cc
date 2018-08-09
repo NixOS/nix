@@ -320,7 +320,7 @@ void InstallablesCommand::prepare()
 
 void InstallableCommand::prepare()
 {
-    installable = parseInstallable(*this, getStore(), _installable, false);
+    installable = parseInstallable(*this, getStore(), _installable, useDefaultInstallable());
 }
 
 }
