@@ -275,6 +275,9 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         return true;
     }
 
+    std::shared_ptr<TransferManager> transferManager;
+    std::once_flag transferManagerCreated;
+
     void uploadFile(const std::string & path, const std::string & data,
         const std::string & mimeType,
         const std::string & contentEncoding)
@@ -286,25 +289,28 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         static std::shared_ptr<Aws::Utils::Threading::PooledThreadExecutor>
             executor = std::make_shared<Aws::Utils::Threading::PooledThreadExecutor>(maxThreads);
 
-        TransferManagerConfiguration transferConfig(executor.get());
+        std::call_once(transferManagerCreated, [&]() {
 
-        transferConfig.s3Client = s3Helper.client;
-        transferConfig.bufferSize = bufferSize;
+            TransferManagerConfiguration transferConfig(executor.get());
 
-        transferConfig.uploadProgressCallback =
-            [&](const TransferManager *transferManager,
-                const std::shared_ptr<const TransferHandle>
-                    &transferHandle) {
-              //FIXME: find a way to properly abort the multipart upload.
-              //checkInterrupt();
-              debug("upload progress ('%s'): '%d' of '%d' bytes",
-                             path,
-                             transferHandle->GetBytesTransferred(),
-                             transferHandle->GetBytesTotalSize());
-            };
+            transferConfig.s3Client = s3Helper.client;
+            transferConfig.bufferSize = bufferSize;
 
-        std::shared_ptr<TransferManager> transferManager =
-            TransferManager::Create(transferConfig);
+            transferConfig.uploadProgressCallback =
+                [&](const TransferManager *transferManager,
+                    const std::shared_ptr<const TransferHandle>
+                    &transferHandle)
+                {
+                    //FIXME: find a way to properly abort the multipart upload.
+                    //checkInterrupt();
+                    debug("upload progress ('%s'): '%d' of '%d' bytes",
+                        path,
+                        transferHandle->GetBytesTransferred(),
+                        transferHandle->GetBytesTotalSize());
+                };
+
+            transferManager = TransferManager::Create(transferConfig);
+        });
 
         auto now1 = std::chrono::steady_clock::now();
 
