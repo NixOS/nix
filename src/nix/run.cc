@@ -12,6 +12,8 @@
 #include <sys/mount.h>
 #endif
 
+#include <queue>
+
 using namespace nix;
 
 std::string chrootHelperName = "__run_in_chroot";
@@ -121,10 +123,27 @@ struct CmdRun : InstallablesCommand
                 unsetenv(var.c_str());
         }
 
+        std::unordered_set<Path> done;
+        std::queue<Path> todo;
+        for (auto & path : outPaths) todo.push(path);
+
         auto unixPath = tokenizeString<Strings>(getEnv("PATH"), ":");
-        for (auto & path : outPaths)
-            if (accessor->stat(path + "/bin").type != FSAccessor::tMissing)
+
+        while (!todo.empty()) {
+            Path path = todo.front();
+            todo.pop();
+            if (!done.insert(path).second) continue;
+
+            if (true)
                 unixPath.push_front(path + "/bin");
+
+            auto propPath = path + "/nix-support/propagated-user-env-packages";
+            if (accessor->stat(propPath).type == FSAccessor::tRegular) {
+                for (auto & p : tokenizeString<Paths>(readFile(propPath)))
+                    todo.push(p);
+            }
+        }
+
         setenv("PATH", concatStringsSep(":", unixPath).c_str(), 1);
 
         std::string cmd = *command.begin();
