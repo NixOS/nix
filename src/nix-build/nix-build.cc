@@ -134,101 +134,148 @@ void mainWrapped(int argc, char * * argv)
         using LegacyArgs::LegacyArgs;
     };
 
+    // Keeps argument stable if runEnv changes in args (obsolete --run-env parameter)
+    auto runningNixShell = runEnv;
+
+    /*
+     * WIP!!
+     *
+     * Comments before the option explain whether it is documented as:
+     *
+     *  * only for a tool
+     *  * shared between tools
+     *  * obsolete
+     *  * missing
+     *
+     * Further notes added for some.
+     *
+     */
     MyArgs myArgs(myName, [&](Strings::iterator & arg, const Strings::iterator & end) {
-        if (*arg == "--help") {
-            deletePath(tmpDir);
-            showManPage(myName);
-        }
-
-        else if (*arg == "--version")
-            printVersion(myName);
-
-        else if (*arg == "--add-drv-link" || *arg == "--indirect")
-            ; // obsolete
-
-        else if (*arg == "--no-out-link" || *arg == "--no-link")
-            outLink = (Path) tmpDir + "/result";
-
-        else if (*arg == "--attr" || *arg == "-A")
-            attrPaths.push_back(getArg(*arg, arg, end));
-
-        else if (*arg == "--drv-link")
-            getArg(*arg, arg, end); // obsolete
-
-        else if (*arg == "--out-link" || *arg == "-o")
-            outLink = getArg(*arg, arg, end);
-
-        else if (*arg == "--add-root")
-            gcRoot = getArg(*arg, arg, end);
-
-        else if (*arg == "--dry-run")
-            dryRun = true;
-
-        else if (*arg == "--repair") {
-            repair = Repair;
-            buildMode = bmRepair;
-        }
-
-        else if (*arg == "--run-env") // obsolete
-            runEnv = true;
-
-        else if (*arg == "--command" || *arg == "--run") {
-            if (*arg == "--run")
-                interactive = false;
-            envCommand = getArg(*arg, arg, end) + "\nexit";
-        }
-
-        else if (*arg == "--check")
-            buildMode = bmCheck;
-
-        else if (*arg == "--exclude")
-            envExclude.push_back(getArg(*arg, arg, end));
-
-        else if (*arg == "--expr" || *arg == "-E")
-            fromArgs = true;
-
-        else if (*arg == "--pure") pure = true;
-        else if (*arg == "--impure") pure = false;
-
-        else if (*arg == "--packages" || *arg == "-p")
-            packages = true;
-
-        else if (inShebang && *arg == "-i") {
-            auto interpreter = getArg(*arg, arg, end);
-            interactive = false;
-            auto execArgs = "";
-
-            // Überhack to support Perl. Perl examines the shebang and
-            // executes it unless it contains the string "perl" or "indir",
-            // or (undocumented) argv[0] does not contain "perl". Exploit
-            // the latter by doing "exec -a".
-            if (std::regex_search(interpreter, std::regex("perl")))
-                execArgs = "-a PERL";
-
-            std::ostringstream joined;
-            for (const auto & i : savedArgs)
-                joined << shellEscape(i) << ' ';
-
-            if (std::regex_search(interpreter, std::regex("ruby"))) {
-                // Hack for Ruby. Ruby also examines the shebang. It tries to
-                // read the shebang to understand which packages to read from. Since
-                // this is handled via nix-shell -p, we wrap our ruby script execution
-                // in ruby -e 'load' which ignores the shebangs.
-                envCommand = (format("exec %1% %2% -e 'load(\"%3%\")' -- %4%") % execArgs % interpreter % script % joined.str()).str();
-            } else {
-                envCommand = (format("exec %1% %2% %3% %4%") % execArgs % interpreter % script % joined.str()).str();
+        // First parses arguments
+        if (*arg != "-" && *arg != "" && arg->at(0) == '-') {
+            /*
+             * First handle all shared arguments
+             */
+            // errors on arguments.
+            if (*arg == "--help") {
+                deletePath(tmpDir);
+                showManPage(myName);
             }
+
+            else if (*arg == "--version")
+                printVersion(myName);
+
+            else if (*arg == "--attr" || *arg == "-A")
+                attrPaths.push_back(getArg(*arg, arg, end));
+
+            else if (*arg == "--dry-run")
+                dryRun = true;
+
+            else if (*arg == "--repair") {
+                repair = Repair;
+                buildMode = bmRepair;
+            }
+
+            else if (*arg == "--check")
+                buildMode = bmCheck;
+
+            else if (*arg == "--expr" || *arg == "-E")
+                fromArgs = true;
+
+            // // none
+            // // FIXME : make this work??!? this is broken.
+            // else if (*arg == "--add-root")
+            //     gcRoot = getArg(*arg, arg, end);
+
+            /* Handles shared obsolete arguments. */
+            else if (*arg == "--add-drv-link" || *arg == "--indirect")
+                ; // obsolete
+
+            else if (*arg == "--drv-link")
+                getArg(*arg, arg, end); // obsolete
+
+            else if (*arg == "--run-env")
+                runEnv = true; // obsolete
+
+            /* Continues with per-app specific arguments */
+            else if (runningNixShell)
+                /*
+                 * nix-shell specific arguments.
+                 */
+                if (*arg == "--command" || *arg == "--run") {
+                    if (*arg == "--run")
+                        interactive = false;
+                    envCommand = getArg(*arg, arg, end) + "\nexit";
+                }
+
+                else if (*arg == "--exclude")
+                    envExclude.push_back(getArg(*arg, arg, end));
+
+                else if (*arg == "--pure") pure = true;
+                else if (*arg == "--impure") pure = false;
+
+                else if (*arg == "--packages" || *arg == "-p")
+                    packages = true;
+
+                else if (*arg == "--keep")
+                    keepVars.insert(getArg(*arg, arg, end));
+
+                else if (inShebang && *arg == "-i") {
+                    auto interpreter = getArg(*arg, arg, end);
+                    interactive = false;
+                    auto execArgs = "";
+
+                    // Überhack to support Perl. Perl examines the shebang and
+                    // executes it unless it contains the string "perl" or "indir",
+                    // or (undocumented) argv[0] does not contain "perl". Exploit
+                    // the latter by doing "exec -a".
+                    if (std::regex_search(interpreter, std::regex("perl")))
+                        execArgs = "-a PERL";
+
+                    std::ostringstream joined;
+                    for (const auto & i : savedArgs)
+                        joined << shellEscape(i) << ' ';
+
+                    if (std::regex_search(interpreter, std::regex("ruby"))) {
+                        // Hack for Ruby. Ruby also examines the shebang. It tries to
+                        // read the shebang to understand which packages to read from. Since
+                        // this is handled via nix-shell -p, we wrap our ruby script execution
+                        // in ruby -e 'load' which ignores the shebangs.
+                        envCommand = (format("exec %1% %2% -e 'load(\"%3%\")' -- %4%") % execArgs % interpreter % script % joined.str()).str();
+                    } else {
+                        envCommand = (format("exec %1% %2% %3% %4%") % execArgs % interpreter % script % joined.str()).str();
+                    }
+                }
+
+                else
+                    // Unknown argument.
+                    return false;
+            else {
+                /*
+                 * nix-build specific arguments.
+                 */
+                if (*arg == "--no-out-link" || *arg == "--no-link")
+                    outLink = (Path) tmpDir + "/result";
+
+                else if (*arg == "--out-link" || *arg == "-o")
+                    outLink = getArg(*arg, arg, end);
+
+                else
+                    // Unknown argument.
+                    return false;
+            }
+
+            // Success in parsing argument.
+            return true;
         }
 
-        else if (*arg == "--keep")
-            keepVars.insert(getArg(*arg, arg, end));
-
+        // missing from documentation
+        // `nix-shell ./shell.nix` !== `echo 'import ./shell.nix' | nix-shell -`
+        // FIXME : ???
         else if (*arg == "-")
             readStdin = true;
 
-        else if (*arg != "" && arg->at(0) == '-')
-            return false;
-
+        // left-over stuff (for --packages in nix-shell, other paths for nix-build)
         else
             left.push_back(*arg);
 
