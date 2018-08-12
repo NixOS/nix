@@ -59,6 +59,9 @@
   <replaceable>name</replaceable>
   <replaceable>value</replaceable>
 </arg>
+<arg>
+  <arg choice='plain'><option>--repair</option></arg>
+</arg>
 <sbr />
 
 </nop>
