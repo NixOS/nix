@@ -21,6 +21,12 @@
     <command>nix-shell</command>
     <arg><option>--arg</option> <replaceable>name</replaceable> <replaceable>value</replaceable></arg>
     <arg><option>--argstr</option> <replaceable>name</replaceable> <replaceable>value</replaceable></arg>
+    <arg><option>--check</option></arg>
+    <arg><option>--dry-run</option></arg>
+    <group>
+      <arg choice='plain'><option>--expr</option></arg>
+      <arg choice='plain'><option>-E</option></arg>
+    </group>
     <arg>
       <group choice='req'>
         <arg choice='plain'><option>--attr</option></arg>

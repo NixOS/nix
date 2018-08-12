@@ -22,6 +22,12 @@
     <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common-syn.xml#xmlns(db=http://docbook.org/ns/docbook)xpointer(/db:nop/*)" />
     <arg><option>--arg</option> <replaceable>name</replaceable> <replaceable>value</replaceable></arg>
     <arg><option>--argstr</option> <replaceable>name</replaceable> <replaceable>value</replaceable></arg>
+    <arg><option>--check</option></arg>
+    <arg><option>--dry-run</option></arg>
+    <group>
+      <arg choice='plain'><option>--expr</option></arg>
+      <arg choice='plain'><option>-E</option></arg>
+    </group>
     <arg>
       <group choice='req'>
         <arg choice='plain'><option>--attr</option></arg>
