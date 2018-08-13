@@ -450,7 +450,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
     ssize_t eaSize = llistxattr(path.c_str(), nullptr, 0);
 
     if (eaSize < 0) {
-        if (errno != ENOTSUP)
+        if (errno != ENOTSUP && errno != ENODATA)
             throw SysError("querying extended attributes of '%s'", path);
     } else if (eaSize > 0) {
         std::vector<char> eaBuf(eaSize);
