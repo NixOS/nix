@@ -40,6 +40,81 @@
 true # so {...} body has some code, shell will not permit otherwise
 
 }
+
+
+###############################
+###  Documentation
+###############################
+{
+
+#
+#      Installer consist of:
+#      1. Setup environment
+#      2. Main constants
+#      3. CLI control constants
+#      4. CLI output functions
+#      5. Program stage functions
+#      6. Main function
+#      7. Invocation of the main function (aka "Start of the script")
+#
+#
+
+# Special things about this script
+#
+# 1) Script tries to be fully POSIX compatible,
+# code heavy follows that requirement.
+#
+# 2) Notice, Warning, Error, ErrorRevert level massages have a special
+# functions. That is done to be:
+#   * uniformal in output
+#   * proper color highlihtgting
+#   * proper message classification
+#   * informative for the user
+#   * convinient for use in the code
+#   * code readability
+#   * less function invocations
+#   * to have an extendable and editable output system in a shell script
+# all at the same time.
+#
+# Message body starts from a new line.
+# And has 4 spaces from the left. Always.
+#
+# Code example:
+###############################
+#
+#        notice "
+#
+#    Install executed for ROOT.
+#
+#    Doing classic Linux package manager mode.
+#    In Nix this mode is called: single-user mode for root.
+#
+#    Nix can do multi-user mode, and manage package trees for users
+#    independently.
+#    "
+#
+###############################
+#
+# This is the best balance of code simplicity and code readability found so far.
+#
+# Output of the example (in a green color):
+###############################
+#
+#./install: Notice:
+#
+#    Install executed for ROOT.
+#
+#    Doing classic Linux package manager mode.
+#    In Nix this mode is called: single-user mode for root.
+#
+#    Nix can do multi-user mode, and manage package trees for users
+#    independently.
+#
+###############################
+#
+true # so {...} body has some code, shell will not permit otherwise
+
+}
 set -e
 
 dest="/nix"
