@@ -388,9 +388,6 @@ if [ "$INSTALL_MODE" = "daemon" ]; then
     exit 0
 fi
 
-if [ "$(id -u)" -eq 0 ]; then
-    printf '\e[1;31mwarning: installing Nix as root is not supported by this script!\e[0m\n'
-fi
 
 echo "performing a single-user installation of Nix..." >&2
 
