@@ -115,8 +115,22 @@ true # so {...} body has some code, shell will not permit otherwise
 true # so {...} body has some code, shell will not permit otherwise
 
 }
-set -e
 
+
+###############################
+###  Setup environment
+###############################
+{
+
+# Set the character collating sequence to be numeric ASCII/C standard.
+readonly LC_COLLATE=C
+# Set the character set to be the standard one-byte ASCII.
+readonly LANG=C
+# Set default umask; to be non-restrictive and friendly to others.
+# umask obviously can heavy influence Nix work, and functioning of packages.
+umask 022
+
+}
 dest="/nix"
 self="$(dirname "$0")"
 nix="@nix@"
