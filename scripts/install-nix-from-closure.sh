@@ -406,6 +406,25 @@ checkingRequirements() {
     Destination '$dest' exists, but is not a directory, nor a link to one.
     "
         fi
+
+        if [ ! -w $dest ]; then
+            # Do not mindlessly help a user to chroot the directory
+            # - that is a disservice.
+            # Let user who does not know - at least a chanse to search and read
+            # on the topic.
+            # Person needs to know/find command themselves, and know about
+            # consequences.
+            error "
+
+    Destination directory '$dest' exists, but is not writable for user '$USER'.
+
+    To enable multi-user support see:
+    http://nixos.org/nix/manual/#ssec-multi-user
+
+    To nevertheless do a single-user install for '$USER':
+    recursively set user '$USER' as owner for '$dest' directory.
+    "
+        fi
     }
 }
 
@@ -461,10 +480,6 @@ fi
 echo "performing a single-user installation of Nix..." >&2
 
 
-if ! [ -w $dest ]; then
-    echo "$0: directory $dest exists, but is not writable by you. This could indicate that another user has already performed a single-user installation of Nix on this system. If you wish to enable multi-user support see http://nixos.org/nix/manual/#ssec-multi-user. If you wish to continue with a single-user install for $USER please run 'chown -R $USER $dest' as root." >&2
-    exit 1
-fi
 
 mkdir -p $dest/store
 
