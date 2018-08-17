@@ -648,28 +648,39 @@ installNix() {
         }
         mkdir -p "$dest"/store
     }
+
+    copyNix() {
+        print "Copying Nix to '$dest/store': "
+
+        for object in $(cd "$self/store" >/dev/null && echo ./*); do
+            printf '.'
+            get="$self/store/$object"
+            tmp="$dest/store/$object.$$" ## $$ - is process PID
+            put="$dest/store/$object"
+
+            # If $dest/store/$object.$$ exists - remove. Very certain - it is a directory from previous cycle.
+            if [ -e "$tmp" ]; then
+                rm -rf "$tmp"
+            fi
+            # If $put does not exist - populate it.
+            if ! [ -e "$put" ]; then
+                # Copy $get to $tmp
+                cp -Rp "$get" "$tmp"
+                # Remove write permissions from $tmp recursively
+                chmod -R a-w "$tmp"
+                # Place $tmp as $put
+                mv "$tmp" "$put"
+            else
+                print "Already exists, skipping: '$put'"
+            fi
+
+        done
+        printf '\n'
+    }
 }
 
 }
 echo "performing a single-user installation of Nix..." >&2
-printf "copying Nix to %s..." "${dest}/store" >&2
-
-for i in $(cd "$self/store" >/dev/null && echo ./*); do
-    printf "." >&2
-    i_tmp="$dest/store/$i.$$"
-    if [ -e "$i_tmp" ]; then
-        rm -rf "$i_tmp"
-    fi
-    if ! [ -e "$dest/store/$i" ]; then
-        cp -Rp "$self/store/$i" "$i_tmp"
-        chmod -R a-w "$i_tmp"
-        chmod +w "$i_tmp"
-        mv "$i_tmp" "$dest/store/$i"
-        chmod -w "$dest/store/$i"
-    fi
-done
-echo "" >&2
-
 echo "initialising Nix database..." >&2
 if ! $nix/bin/nix-store --init; then
     echo "$0: failed to initialize the Nix database" >&2
