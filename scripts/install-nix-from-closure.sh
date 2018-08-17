@@ -697,17 +697,25 @@ installNix() {
     "
         fi
     }
+
+    setupProfile() {
+        # Modifying current runtime environment variables to use Nix.
+        # Persistent changes are configured later.
+        print "Launching $nix/etc/profile.d/nix.sh"
+        # shellcheck source=/dev/null
+        . "$nix/etc/profile.d/nix.sh"
+        print "Left $nix/etc/profile.d/nix.sh"
+        if ! "$nix/bin/nix-env" -i "$nix"; then
+            error "
+
+    Unable to install Nix into your default profile
+    "
+        fi
+    }
 }
 
 }
 echo "performing a single-user installation of Nix..." >&2
-. "$nix/etc/profile.d/nix.sh"
-
-if ! "$nix/bin/nix-env" -i "$nix"; then
-    echo "$0: unable to install Nix into your default profile" >&2
-    exit 1
-fi
-
 # Install an SSL certificate bundle.
 if [ -z "$NIX_SSL_CERT_FILE" ] || ! [ -f "$NIX_SSL_CERT_FILE" ]; then
     $nix/bin/nix-env -i "$cacert"
