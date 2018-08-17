@@ -384,6 +384,14 @@ checkingRequirements() {
     "
         fi
 
+        if [ ! -x "$HOME" ]; then
+            error "
+
+    Home directory '$HOME' is not marked as executable for user '$USER',
+    how then we are going to go into it?
+    "
+        fi
+
     }
 }
 
