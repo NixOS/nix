@@ -802,6 +802,9 @@ installNix() {
     '
 
     }
+
+    # Invoke main function for installNix
+    mainInstallNix
 }
 
 }
