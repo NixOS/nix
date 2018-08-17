@@ -747,14 +747,24 @@ installNix() {
         print "Subscribing to channel: nixpkgs=$channelUrl"
         "$nix"/bin/nix-channel --add "$channelUrl"
     }
+
+    updateRepos() {
+        # Subscribe the user to the Nixpkgs channel and fetch it.
+        trap 'updateReposRevert $LINENO $?' INT TERM ABRT QUIT
+        updateReposRevert() {
+            error "
+
+    Received Error signal from line $1
+    " "$2"
+        }
+        print 'Pulling information from channel: nixpkgs'
+        # nix-channel should be fully transactional, so no 'nix-channel --rollback'
+        "$nix"/bin/nix-channel --update nixpkgs
+    }
 }
 
 }
 echo "performing a single-user installation of Nix..." >&2
-if [ -z "$_NIX_INSTALLER_TEST" ]; then
-    $nix/bin/nix-channel --update nixpkgs
-fi
-
 added=
 if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
 
