@@ -582,6 +582,54 @@ installNix() {
 
     # Nix is pure, and claims to be transactional.
     # So show people clean transactional installation.
+
+    createDest() {
+
+        trap destCreateRevert 1
+
+        destCreateRevert() {
+            # all means failed, Exit!
+            error "
+
+    Can't get root access to create  directory '$dest'. All variants failed.
+    Exiting...
+    "
+        }
+
+        # Shell parses variable with current user, so value under sudo/su not changes.
+        # It is const, but don't move it above USER set/checks.
+        readonly cmd="mkdir -m 0755 $dest && chown $USER $dest"
+
+        # Trying to create $dest by all means
+
+        # If user has rights to successfully execute $cmd. Else -> try to elevate rights section
+        if sh -c "$cmd" > /dev/null 2>&1 ; then
+            print "Creating $dest directory by running $cmd using $USER rights"
+        else
+            if command -v sudo > /dev/null 2>&1 ; then
+                print "Creating $dest directory by running $cmd using sudo:"
+                # Using sudo to create directory
+                if ! sudo sh -c "$cmd" && print "Exiting privileged mode." ; then
+                    # It is not Warning by rules, by logging rules goes to stderr
+                    >&2 notice "
+
+    Could not succefully execute command with 'sudo'.
+    "
+                fi
+            else
+                print "'sudo' seems not installed"
+            fi
+
+        fi
+
+        # If dest still not created (with user or sudo) - use su to access root
+        if [ ! -d "$dest" ] ; then
+            print 'Trying to get privileges using su and root password'
+            if ! su root sh -c "$cmd" && print 'Exiting priviliged mode.'; then
+                exit 1 # Look into the trap
+            fi
+        fi
+    }
 }
 
 }
