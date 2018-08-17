@@ -425,6 +425,14 @@ checkingRequirements() {
     recursively set user '$USER' as owner for '$dest' directory.
     "
         fi
+
+        # If checks are OK
+        warning "
+
+    Destination directory '$dest' already exists. Skipping creation of '$dest'.
+    "
+
+    fi
     }
 }
 
