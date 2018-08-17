@@ -393,6 +393,9 @@ checkingRequirements() {
         fi
 
     }
+
+    checkDest() {
+    }
 }
 
 }
