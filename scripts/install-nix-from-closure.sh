@@ -307,6 +307,9 @@ checkingRequirements() {
     "
         fi
     }
+
+    checkEnv() {
+    }
 }
 
 }
