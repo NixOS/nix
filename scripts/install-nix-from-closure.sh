@@ -712,16 +712,28 @@ installNix() {
     "
         fi
     }
+
+    installCerts() {
+        # Install an SSL certificate bundle.
+        trap 'installCertsRevert $LINENO $?' INT TERM ABRT QUIT
+        subscribeChannelsRevert() {
+            errorRevert "Received Error signal from line $1"
+            errorRevert "Reverting installation of certificate bundle"
+            "$nix/bin/nix-env" --uninstall "$cacert"
+            error "
+
+    Changes reverted.
+    " "$2"
+        }
+        print 'Installing SSL certificate bundle.'
+        "$nix/bin/nix-env" --install "$cacert"
+        readonly NIX_SSL_CERT_FILE="$HOME/.nix-profile/etc/ssl/certs/ca-bundle.crt"
+        export NIX_SSL_CERT_FILE
+    }
 }
 
 }
 echo "performing a single-user installation of Nix..." >&2
-# Install an SSL certificate bundle.
-if [ -z "$NIX_SSL_CERT_FILE" ] || ! [ -f "$NIX_SSL_CERT_FILE" ]; then
-    $nix/bin/nix-env -i "$cacert"
-    export NIX_SSL_CERT_FILE="$HOME/.nix-profile/etc/ssl/certs/ca-bundle.crt"
-fi
-
 # Subscribe the user to the Nixpkgs channel and fetch it.
 if ! $nix/bin/nix-channel --list | grep -q "^nixpkgs "; then
     $nix/bin/nix-channel --add https://nixos.org/channels/nixpkgs-unstable
