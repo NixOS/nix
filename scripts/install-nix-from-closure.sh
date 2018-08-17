@@ -347,6 +347,9 @@ checkingRequirements() {
         fi
 
     }
+
+    checkHome() {
+    }
 }
 
 }
