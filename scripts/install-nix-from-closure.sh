@@ -372,6 +372,18 @@ checkingRequirements() {
     "
         fi
 
+        # POSIX: `ls` is only able. No `test -O`, `find` can do this in POSIX
+        # AWK is more portable then `cut -d'c' -fN`
+        if [ "$(ls -ld "$HOME" | awk '{print $3}')" != "$USER" ]; then
+            contactUs    # Let's get particular reports and solutions
+            error "
+
+    Home directory '$HOME' is not owned by user '$USER'.
+    If you have legitimate case, please file a bug with description.
+    We gather information on particular cases.
+    "
+        fi
+
     }
 }
 
