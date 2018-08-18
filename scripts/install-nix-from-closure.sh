@@ -338,15 +338,18 @@ checkingRequirements() {
             readonly USER="$(id -u -n)"    # id is POSIX
             print "Detected username: $USER"
         fi
+
+        if [ -z "$HOME" ]; then
+            error "
+
+    Environment variable HOME is not set.
+    "
+        fi
+
     }
 }
 
 }
-if [ -z "$HOME" ]; then
-    echo "$0: \$HOME is not set" >&2
-    exit 1
-fi
-
 # macOS support for 10.10 or higher
 if [ "$(uname -s)" = "Darwin" ]; then
     if [ $(($(sw_vers -productVersion | cut -d '.' -f 2))) -lt 10 ]; then
