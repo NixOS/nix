@@ -816,29 +816,34 @@ installNix() {
 {
 
 postinstall() {
-}
 
-}
-added=
-if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
+    notice '
 
-    # Make the shell source nix.sh during login.
-    p=$HOME/.nix-profile/etc/profile.d/nix.sh
+    Launching postinstall tasks:
+    '
+    added=0
+    if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
+        # Make shell to source nix.sh during login.
+        readonly nix_profile="$HOME/.nix-profile/etc/profile.d/nix.sh"
+        for file in .bash_profile .bash_login .profile; do
+            user_profile="$HOME/$file"
+            if [ -w "$user_profile" ]; then
+                if ! grep -q "$nix_profile" "$user_profile"; then
+                    notice "
 
-    for i in .bash_profile .bash_login .profile; do
-        fn="$HOME/$i"
-        if [ -w "$fn" ]; then
-            if ! grep -q "$p" "$fn"; then
-                echo "modifying $fn..." >&2
-                echo "if [ -e $p ]; then . $p; fi # added by Nix installer" >> "$fn"
+    Modifying $user_profile...
+    "
+                    printf 'if [ -e %s ]; then . %s; fi # added by Nix installer\n'\
+                           "$nix_profile" "$nix_profile" >> "$user_profile"
+                fi
+                added=1
+                break
             fi
-            added=1
-            break
-        fi
-    done
+        done
+    fi
+}
 
-fi
-
+}
 if [ -z "$added" ]; then
     cat >&2 <<EOF
 
