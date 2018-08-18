@@ -808,6 +808,17 @@ installNix() {
 }
 
 }
+
+
+###############################
+###  Postinstall
+###############################
+{
+
+postinstall() {
+}
+
+}
 added=
 if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
 
