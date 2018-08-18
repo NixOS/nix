@@ -356,6 +356,14 @@ checkingRequirements() {
     Home directory '$HOME' does not exist.
     "
         fi
+
+    # -d also resolves symbolic soft links if they point to directory
+        if [ ! -d "$HOME" ]; then
+            error "
+
+    Home directory '$HOME' is not a directory, nor a link to one.
+    "
+        fi
     }
 }
 
