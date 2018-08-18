@@ -873,3 +873,18 @@ postinstall() {
 }
 
 }
+
+
+###############################
+###  Main function
+###############################
+main() {
+
+    checkingRequirements
+    checkInstallerMode "$@"
+    execInstallerMode
+    installNix
+    postinstall
+    contactUs
+
+}
