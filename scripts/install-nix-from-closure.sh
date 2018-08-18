@@ -152,6 +152,44 @@ readonly cacert="@cacert@"
 readonly appname="$0"
 
 }
+
+
+###############################
+###  CLI control constants
+###############################
+{
+
+# This chain is created to output color for normal circumstances.
+# If CI desides to report to the processes that they run in a terminal,
+# while at the same time CI not took effort to parse the terminal color
+# commands, and also not took effort to have according to it's possibilities
+# $TERM configuration record in a termcap DB - well it is really on a CI.
+
+# If the file descriptor reports a terminal - then try to use correct DB colors
+if test -t ; then
+    # If terminal reports a terminfo/termcap DB of colors available - use DB.
+    # Else - use literal color codes.
+    if tput colors > /dev/null 2>&1 ; then
+        # use tput and terminfo DB
+        readonly red=$(tput setaf 1)
+        readonly green=$(tput setaf 2)
+        readonly yellow=$(tput setaf 3)
+        readonly blue=$(tput setaf 4)
+        readonly bold=$(tput smso)
+        readonly reset=$(tput sgr0) # Reset to default output
+    else
+        # tput is not present on some systems (Alpine Linux),
+        # this trick allows to store, not 'codes' - literal term command symbol.
+        readonly red=$(printf '\033[1;31m')
+        readonly green=$(printf '\033[1;32m')
+        readonly yellow=$(printf '\033[1;33m')
+        readonly blue=$(printf '\033[1;34m')
+        readonly bold=$(printf '\033[1m')
+        readonly reset=$(printf '\033[0;m') # Reset to default output
+    fi
+fi
+
+}
 dest="/nix"
 self="$(dirname "$0")"
 nix="@nix@"
