@@ -364,6 +364,14 @@ checkingRequirements() {
     Home directory '$HOME' is not a directory, nor a link to one.
     "
         fi
+
+        if [ ! -w "$HOME" ]; then
+            error "
+
+    Home directory '$HOME' is not writable for user '$USER'. No deal.
+    "
+        fi
+
     }
 }
 
