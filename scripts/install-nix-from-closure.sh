@@ -327,15 +327,21 @@ checkingRequirements() {
     it allows users manage their own independent trees of packages.
     "
         fi
+
+        # In case USER is not set
+        # Example: running inside container
+        if [ -z "$USER" ]; then
+            notice "
+
+    Environment variable USER is not set.
+    "
+            readonly USER="$(id -u -n)"    # id is POSIX
+            print "Detected username: $USER"
+        fi
     }
 }
 
 }
-if [ -z "$USER" ]; then
-    echo "$0: \$USER is not set" >&2
-    exit 1
-fi
-
 if [ -z "$HOME" ]; then
     echo "$0: \$HOME is not set" >&2
     exit 1
