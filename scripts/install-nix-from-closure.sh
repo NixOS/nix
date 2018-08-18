@@ -761,10 +761,50 @@ installNix() {
         # nix-channel should be fully transactional, so no 'nix-channel --rollback'
         "$nix"/bin/nix-channel --update nixpkgs
     }
+
+    # Wrap function invocations process into function
+    mainInstallNix() {
+
+        # TODO: Determine to write single/multi user after bug #1559 is resolved
+        notice '
+
+    Performing a single-user installation of Nix:
+    '
+
+        if [ ! -d "$dest" ] ; then
+            createDest
+        fi
+
+        createStore
+
+        copyNix
+
+        initializeDB
+
+        setupProfile
+
+
+        if [ -z "$NIX_SSL_CERT_FILE" ] || [ ! -f "$NIX_SSL_CERT_FILE" ]; then
+            installCerts
+        fi
+
+        if ! "$nix"/bin/nix-channel --list | grep -q '^nixpkgs '; then
+            subscribeChannels
+        fi
+
+        if [ -z "$_NIX_INSTALLER_TEST" ]; then
+            updateRepos
+        fi
+
+        notice '
+
+    Installation finished. 8)
+    '
+
+    }
 }
 
 }
-echo "performing a single-user installation of Nix..." >&2
 added=
 if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
 
