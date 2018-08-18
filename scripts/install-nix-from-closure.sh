@@ -309,6 +309,24 @@ checkingRequirements() {
     }
 
     checkEnv() {
+
+        if [ "$(id -u)" -eq 0 ]; then
+            # TODO: At least merge single/multiuser,
+            # when https://github.com/NixOS/nix/issues/1559 solved.
+            # TODO: Reword after scripts integration and option switching
+            # becomes clear.
+            notice "
+
+    Install executed for ROOT.
+
+    Doing systemwide root install - this is classic Linux package manager mode.
+    In Nix this mode is called: single-user mode for root.
+
+    Nix has a multi-user mode.
+    That is the main Nix mode,
+    it allows users manage their own independent trees of packages.
+    "
+        fi
     }
 }
 
