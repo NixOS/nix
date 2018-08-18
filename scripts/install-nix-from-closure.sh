@@ -433,6 +433,35 @@ checkingRequirements() {
     "
 
     fi
+
+    if [ -e "$dest"/store ]; then
+
+        if [ ! -d "$dest"/store ]; then
+            error "
+
+    Store directory '$dest/store' exists and it's not a directory nor a link
+    to one.
+    "
+        fi
+
+        if [ ! -w "$dest"/store ]; then
+            error "
+
+    Store directory '$dest/store' exists, but is not writable for user '$USER'.
+
+    This could indicate that another user has already performed
+    a single-user installation of Nix on this system.
+
+    If you wish to enable multi-user support see:
+    https://nixos.org/nix/manual/#ssec-multi-user
+
+    To nevertheless do a single-user install for '$USER':
+    recursively set user '$USER' as owner for '$dest/store' directory.
+    "
+        fi
+
+    fi
+
     }
 }
 
