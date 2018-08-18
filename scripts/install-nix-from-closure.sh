@@ -288,6 +288,19 @@ contactUs() {
 }
 
 }
+
+
+###############################
+###  Checking requirements
+###############################
+{
+
+checkingRequirements() {
+    # NOTE: This function - checks only, - do not make any changes to the system.
+    # And becouse of that and POSIx - it can be universally reused.
+}
+
+}
 if ! [ -e "$self/.reginfo" ]; then
     echo "$0: incomplete installer (.reginfo is missing)" >&2
 fi
