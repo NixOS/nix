@@ -546,6 +546,42 @@ execInstallerMode() {
 {
 
 installNix() {
+
+    # In this function, if some action makes any change to the system,
+    # or error is possible - that needs to be wrapped in a function.
+    # For example, having func(){...}.
+    # Inside func() you start with setup of traps, before errors/actions happen.
+    # So when catch happen - according revert functions be launched:
+    # 'trap funcRevertOnCondition condition'.
+    # And funcRevertOnCondition is described right after the trap.
+    #
+    # Once more, now in code. How all actions operate inside this function:
+    #**************************************************
+    #
+    #    installNix() {
+    #
+    #        func() {
+    #
+    #            trap 'funcRevertOnCondition $LINENO $?' condition
+    #            funcRevertOnCondition() {
+    #                errorRevert "Received Error signal from line $1"
+    #                # revert action
+    #                >&2 contactUs # This function gives contact information
+    #                exit "$?"
+    #            }
+    #
+    #            # action of functions
+    #            # 'exit SIG # to the trap that catches exit SIG'
+    #        }
+    #
+    #        func
+    #
+    #    }
+    #
+    #**************************************************
+
+    # Nix is pure, and claims to be transactional.
+    # So show people clean transactional installation.
 }
 
 }
