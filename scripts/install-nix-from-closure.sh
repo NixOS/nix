@@ -190,12 +190,104 @@ if test -t ; then
 fi
 
 }
-dest="/nix"
-self="$(dirname "$0")"
-nix="@nix@"
-cacert="@cacert@"
 
 
+###############################
+###  CLI output functions
+###############################
+{
+
+# NOTE: Script output corresponds to the classification of massages
+# [RFC 5424](https://tools.ietf.org/html/rfc5424) - "The Syslog Protocol"
+# Standard holds an industy-wide agreed criterias for messages.
+# For example, systemd/journald messages fully correspond to RFC 5424.
+
+# NOTE: Unified output function
+# Every message in the script gets eventually printed by this function
+print() {
+    # Using `printf`, because it is more portable than `echo`.
+
+    # Would take message from "$message", or from the first argument.
+    # So using it for both flaxibly chaining for any functions and both
+    # a as simple:
+    # print 'Output message to user'
+    # - are both possible at the same time.
+    if [ -z "$message" ]; then
+        message="$1"
+    fi
+    if [ -z "$color" ]; then
+        color="$reset"
+    fi
+    if [ -z "$prefix" ]; then
+        prefix='Info'
+    fi
+
+    # This line makes all prints in script
+    # Form of message:
+    # Application: Prefix: Body of message
+    printf '%s%s: %s: %s%s\n' "$color" "$appname" "$prefix" "$message" "$reset"
+
+    # At this lines, output of message is done. So unset print variables.
+    unset color
+    unset prefix
+    unset message
+}
+
+# Since 'info' name is already taken by the well known Unix textinfo reader -
+# just use 'print' for Info level messages
+
+notice() {
+    message="$1"
+    color="$green"
+    prefix='Notice'
+    print
+}
+
+warning() {
+    message="$1"
+    color="$yellow"
+    prefix='Warning'
+    >&2 print
+}
+
+# NOTE: 'error' throws the exit signal
+error() {
+    message="$1"
+    exitSig="$2"
+    color="$red"
+    prefix='Error'
+    >&2 print
+    if [ -z "$exitSig" ]; then
+        exit 1
+    fi
+}
+
+# NOTE: 'errorRevert' is a function to print messages in 'error' form
+# when script catches an error and during a revert.
+# It does not throw exit signal, so we can keep add to the error message
+# before we decide in the end to launch the 'error' that throws exit signal.
+errorRevert() {
+    message="$1"
+    color="$red"
+    prefix='Error'
+    >&2 print
+}
+
+contactUs() {
+    print '
+
+    To search/open bugreports: https://github.com/nixos/nix/issues
+
+    To contact the team and community:
+     - IRC: #nixos on irc.freenode.net
+     - Twitter: @nixos_org
+
+    Matrix community rooms: https://matrix.to/#/@nix:matrix.org
+                            https://matrix.to/#/@nixos:matrix.org
+    '
+}
+
+}
 if ! [ -e "$self/.reginfo" ]; then
     echo "$0: incomplete installer (.reginfo is missing)" >&2
 fi
