@@ -476,6 +476,10 @@ checkingRequirements() {
         checkDest
 
     }
+
+    # Execute the whole checkingRequirements()
+    mainCheckingRequirements
+
 }
 
 }
