@@ -349,6 +349,13 @@ checkingRequirements() {
     }
 
     checkHome() {
+
+        if [ ! -e "$HOME" ]; then
+            error "
+
+    Home directory '$HOME' does not exist.
+    "
+        fi
     }
 }
 
