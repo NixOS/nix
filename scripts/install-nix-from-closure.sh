@@ -538,6 +538,17 @@ execInstallerMode() {
 }
 
 }
+
+
+###############################
+###  Install Nix
+###############################
+{
+
+installNix() {
+}
+
+}
 echo "performing a single-user installation of Nix..." >&2
 
 
