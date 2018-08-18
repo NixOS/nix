@@ -841,27 +841,35 @@ postinstall() {
             fi
         done
     fi
+
+    # TODO: Investigate use of:
+    # "Attempting to execute login from any shell but the login shell will produce an error message"
+
+    if [ "$added" -eq 0 ]; then
+        notice "
+
+    Installation finished!
+    To ensure that environment variables are set for Nix,
+    please add the line
+
+    . $nix-profile
+
+    to your shell profile (e.g. ~/.profile).
+    "
+
+    else
+        notice "
+
+    Installation finished!
+    To use Nix - re-login to shell environment.
+    Or to use it directly now, in the current runtime environment -
+    run this script to set Nix-specific environment variables:
+
+    . $nix-profile
+
+    in current runtime environment.
+    "
+    fi
 }
 
 }
-if [ -z "$added" ]; then
-    cat >&2 <<EOF
-
-Installation finished!  To ensure that the necessary environment
-variables are set, please add the line
-
-  . $p
-
-to your shell profile (e.g. ~/.profile).
-EOF
-else
-    cat >&2 <<EOF
-
-Installation finished!  To ensure that the necessary environment
-variables are set, either log in again, or type
-
-  . $p
-
-in your shell.
-EOF
-fi
