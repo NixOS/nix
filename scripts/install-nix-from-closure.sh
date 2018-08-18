@@ -463,6 +463,19 @@ checkingRequirements() {
     fi
 
     }
+
+    # Invocation of functions
+    mainCheckingRequirements() {
+
+        checkBundle
+
+        checkEnv
+
+        checkHome
+
+        checkDest
+
+    }
 }
 
 }
