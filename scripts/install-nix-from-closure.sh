@@ -131,6 +131,27 @@ readonly LANG=C
 umask 022
 
 }
+
+
+###############################
+###  Main constants
+###############################
+{
+
+# NOTE: If you are changing the destanation from `/nix` to something other -
+# please read the link:
+# https://nixos.org/nixos/nix-pills/install-on-your-running-system.html#idm140737316619344
+# TL;DR: Destination path change - changes the package hashes.
+# Nix relies on hashes to determine packages.
+# Local hashes & the central binary cache repository hashes not going to match.
+# That mean that Nix going to compile packages from sources.
+readonly dest='/nix'
+readonly self="$(dirname "$(realpath "$0")")"
+readonly nix="@nix@"
+readonly cacert="@cacert@"
+readonly appname="$0"
+
+}
 dest="/nix"
 self="$(dirname "$0")"
 nix="@nix@"
