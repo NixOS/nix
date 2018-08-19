@@ -7,6 +7,7 @@
 #include "finally.hh"
 #include "fs-accessor.hh"
 #include "progress-bar.hh"
+#include "affinity.hh"
 
 #if __linux__
 #include <sys/mount.h>
@@ -153,6 +154,8 @@ struct CmdRun : InstallablesCommand
         stopProgressBar();
 
         restoreSignals();
+
+        restoreAffinity();
 
         /* If this is a diverted store (i.e. its "logical" location
            (typically /nix/store) differs from its "physical" location
