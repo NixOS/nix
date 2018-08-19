@@ -189,10 +189,6 @@ let
 
         buildInputs = buildDeps;
 
-        configureFlags = ''
-          --disable-init-state
-        '';
-
         dontInstall = false;
 
         doInstallCheck = true;

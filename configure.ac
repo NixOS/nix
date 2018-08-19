@@ -229,12 +229,6 @@ if test "$gc" = yes; then
 fi
 
 
-AC_ARG_ENABLE(init-state, AC_HELP_STRING([--disable-init-state],
-  [do not initialise DB etc. in `make install']),
-  init_state=$enableval, init_state=yes)
-#AM_CONDITIONAL(INIT_STATE, test "$init_state" = "yes")
-
-
 # documentation generation switch
 AC_ARG_ENABLE(doc-gen, AC_HELP_STRING([--disable-doc-gen],
   [disable documentation generation]),
