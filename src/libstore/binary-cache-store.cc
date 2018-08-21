@@ -232,7 +232,7 @@ void BinaryCacheStore::narFromPath(const Path & storePath, Sink & sink)
         throw SubstituteGone(e.what());
     }
 
-    decompressor->flush();
+    decompressor->finish();
 
     stats.narRead++;
     //stats.narReadCompressedBytes += nar->size(); // FIXME
