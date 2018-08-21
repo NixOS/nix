@@ -24,6 +24,20 @@ struct GitInfo
 
 std::regex revRegex("^[0-9a-fA-F]{40}$");
 
+static bool isRevInCache(const std::string & rev, const Path & cacheDir)
+{
+    try {
+        runProgram("git", true, { "-C", cacheDir, "cat-file", "-e", rev });
+        return true;
+    } catch (ExecError & e) {
+        if (WIFEXITED(e.status)) {
+            return false;
+        } else {
+            throw;
+        }
+    }
+}
+
 GitInfo exportGit(ref<Store> store, const std::string & uri,
     std::experimental::optional<std::string> ref, std::string rev,
     const std::string & name)
@@ -99,16 +113,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     /* If a rev was specified, we need to fetch if it's not in the
        repo. */
     if (rev != "") {
-        try {
-            runProgram("git", true, { "-C", cacheDir, "cat-file", "-e", rev });
-            doFetch = false;
-        } catch (ExecError & e) {
-            if (WIFEXITED(e.status)) {
-                doFetch = true;
-            } else {
-                throw;
-            }
-        }
+        doFetch = !isRevInCache(rev, cacheDir);
     } else {
         /* If the local ref is older than ‘tarball-ttl’ seconds, do a
            git fetch to update the local ref to the remote ref. */
