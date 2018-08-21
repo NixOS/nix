@@ -15,12 +15,10 @@
 
 namespace nix {
 
-static const size_t bufSize = 32 * 1024;
-
 // Don't feed brotli too much at once.
 struct ChunkedCompressionSink : CompressionSink
 {
-    uint8_t outbuf[BUFSIZ];
+    uint8_t outbuf[32 * 1024];
 
     void write(const unsigned char * data, size_t len) override
     {
@@ -124,7 +122,7 @@ struct BzipDecompressionSink : ChunkedCompressionSink
         write(nullptr, 0);
     }
 
-    void writeInternal(const unsigned char * data, size_t len)
+    void writeInternal(const unsigned char * data, size_t len) override
     {
         assert(len <= std::numeric_limits<decltype(strm.avail_in)>::max());
 
@@ -173,7 +171,7 @@ struct BrotliDecompressionSink : ChunkedCompressionSink
         writeInternal(nullptr, 0);
     }
 
-    void writeInternal(const unsigned char * data, size_t len)
+    void writeInternal(const unsigned char * data, size_t len) override
     {
         const uint8_t * next_in = data;
         size_t avail_in = len;
@@ -330,7 +328,7 @@ struct BzipCompressionSink : ChunkedCompressionSink
         writeInternal(nullptr, 0);
     }
 
-    void writeInternal(const unsigned char * data, size_t len)
+    void writeInternal(const unsigned char * data, size_t len) override
     {
         assert(len <= std::numeric_limits<decltype(strm.avail_in)>::max());
 
@@ -380,7 +378,7 @@ struct BrotliCompressionSink : ChunkedCompressionSink
         writeInternal(nullptr, 0);
     }
 
-    void writeInternal(const unsigned char * data, size_t len)
+    void writeInternal(const unsigned char * data, size_t len) override
     {
         const uint8_t * next_in = data;
         size_t avail_in = len;
