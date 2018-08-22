@@ -74,8 +74,6 @@ let
 
         makeFlags = "profiledir=$(out)/etc/profile.d";
 
-        preBuild = "unset NIX_INDENT_MAKE";
-
         installFlags = "sysconfdir=$(out)/etc";
 
         doInstallCheck = true;
@@ -103,8 +101,6 @@ let
         enableParallelBuilding = true;
 
         postUnpack = "sourceRoot=$sourceRoot/perl";
-
-        preBuild = "unset NIX_INDENT_MAKE";
       });
 
 
@@ -188,10 +184,6 @@ let
         src = tarball;
 
         buildInputs = buildDeps;
-
-        configureFlags = ''
-          --disable-init-state
-        '';
 
         dontInstall = false;
 
