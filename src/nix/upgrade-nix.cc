@@ -103,11 +103,18 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         if (hasPrefix(where, "/run/current-system"))
             throw Error("Nix on NixOS must be upgraded via 'nixos-rebuild'");
 
-        Path profileDir;
-        Path userEnv;
+        Path profileDir = dirOf(where);
+
+        // Resolve profile to /nix/var/nix/profiles/<name> link.
+        while (baseNameOf(dirOf(canonPath(profileDir))) != "profiles")
+            profileDir = readLink(profileDir);
+
+        printInfo("found profile '%s'", profileDir);
+
+        Path userEnv = canonPath(profileDir, true);
 
         if (baseNameOf(where) != "bin" ||
-            !hasSuffix(userEnv = canonPath(profileDir = dirOf(where), true), "user-environment"))
+            !hasSuffix(userEnv, "user-environment"))
             throw Error("directory '%s' does not appear to be part of a Nix profile", where);
 
         if (!store->isValidPath(userEnv))
