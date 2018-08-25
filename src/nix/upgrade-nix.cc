@@ -1,4 +1,5 @@
 #include "command.hh"
+#include "common-args.hh"
 #include "store-api.hh"
 #include "download.hh"
 #include "eval.hh"
@@ -6,7 +7,7 @@
 
 using namespace nix;
 
-struct CmdUpgradeNix : StoreCommand
+struct CmdUpgradeNix : MixDryRun, StoreCommand
 {
     Path profileDir;
 
@@ -61,21 +62,25 @@ struct CmdUpgradeNix : StoreCommand
 
         {
             Activity act(*logger, lvlInfo, actUnknown, fmt("downloading '%s'...", storePath));
-            store->ensurePath(storePath);
+            if (!dryRun)
+                store->ensurePath(storePath);
         }
 
         {
             Activity act(*logger, lvlInfo, actUnknown, fmt("verifying that '%s' works...", storePath));
-            auto program = storePath + "/bin/nix-env";
-            auto s = runProgram(program, false, {"--version"});
-            if (s.find("Nix") == std::string::npos)
-                throw Error("could not verify that '%s' works", program);
+            if (!dryRun) {
+                auto program = storePath + "/bin/nix-env";
+                auto s = runProgram(program, false, {"--version"});
+                if (s.find("Nix") == std::string::npos)
+                    throw Error("could not verify that '%s' works", program);
+            }
         }
 
         {
             Activity act(*logger, lvlInfo, actUnknown, fmt("installing '%s' into profile '%s'...", storePath, profileDir));
-            runProgram(settings.nixBinDir + "/nix-env", false,
-                {"--profile", profileDir, "-i", storePath, "--no-sandbox"});
+            if (!dryRun)
+                runProgram(settings.nixBinDir + "/nix-env", false,
+                    {"--profile", profileDir, "-i", storePath, "--no-sandbox"});
         }
     }
 
