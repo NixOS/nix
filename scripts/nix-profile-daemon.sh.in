@@ -5,7 +5,7 @@ __ETC_PROFILE_NIX_SOURCED=1
 # Set up secure multi-user builds: non-root users build through the
 # Nix daemon.
 if [ "$USER" != root -o ! -w @localstatedir@/nix/db ]; then
-    export NIX_REMOTE=daemon
+    export NIX_REMOTE=unix://@localstatedir@/nix/daemon-socket/socket
 fi
 
 export NIX_USER_PROFILE_DIR="@localstatedir@/nix/profiles/per-user/$USER"
