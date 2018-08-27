@@ -345,7 +345,7 @@ struct CurlDownloader : public Downloader
                 done = true;
 
                 try {
-                    act.progress(result.data->size(), result.data->size());
+                    act.progress(result.bodySize, result.bodySize);
                     callback(std::move(result));
                 } catch (...) {
                     done = true;
