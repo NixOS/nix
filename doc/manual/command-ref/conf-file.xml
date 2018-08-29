@@ -437,7 +437,8 @@ builtins.fetchurl {
     <listitem><para>This option defines the maximum number of jobs
     that Nix will try to build in parallel.  The default is
     <literal>1</literal>. The special value <literal>auto</literal>
-    causes Nix to use the number of CPUs in your system.  It can be
+    causes Nix to use the number of CPUs in your system.  <literal>0</literal>
+    is useful when using remote builders to prevent any local builds.  It can be
     overridden using the <option
     linkend='opt-max-jobs'>--max-jobs</option> (<option>-j</option>)
     command line switch.</para></listitem>
