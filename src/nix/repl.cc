@@ -173,9 +173,14 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
             printMsg(lvlError, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
         }
 
+        if (input.size() > 0) {
+            // Remove trailing newline before adding to history
+            input.erase(input.size() - 1);
+            linenoiseHistoryAdd(input.c_str());
+        }
+
         // We handled the current input fully, so we should clear it
         // and read brand new input.
-        linenoiseHistoryAdd(input.c_str());
         input.clear();
         std::cout << std::endl;
     }
