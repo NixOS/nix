@@ -12,6 +12,8 @@
 
 
 %{
+#include <boost/lexical_cast.hpp>
+
 #include "nixexpr.hh"
 #include "parser-tab.hh"
 
@@ -124,9 +126,11 @@ or          { return OR_KW; }
 
 {ID}        { yylval->id = strdup(yytext); return ID; }
 {INT}       { errno = 0;
-              yylval->n = strtol(yytext, 0, 10);
-              if (errno != 0)
+              try {
+                  yylval->n = boost::lexical_cast<int64_t>(yytext);
+              } catch (const boost::bad_lexical_cast &) {
                   throw ParseError(format("invalid integer '%1%'") % yytext);
+              }
               return INT;
             }
 {FLOAT}     { errno = 0;
