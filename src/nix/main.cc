@@ -24,7 +24,6 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
     {
         mkFlag()
             .longName("help")
-            .shortName('h')
             .description("show usage information")
             .handler([&]() { showHelpAndExit(); });
 
