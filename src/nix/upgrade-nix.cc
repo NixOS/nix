@@ -1,4 +1,5 @@
 #include "command.hh"
+#include "common-args.hh"
 #include "store-api.hh"
 #include "download.hh"
 #include "eval.hh"
@@ -6,7 +7,7 @@
 
 using namespace nix;
 
-struct CmdUpgradeNix : StoreCommand
+struct CmdUpgradeNix : MixDryRun, StoreCommand
 {
     Path profileDir;
     std::string storePathsUrl = "https://github.com/NixOS/nixpkgs/raw/master/nixos/modules/installer/tools/nix-fallback-paths.nix";
@@ -68,21 +69,25 @@ struct CmdUpgradeNix : StoreCommand
 
         {
             Activity act(*logger, lvlInfo, actUnknown, fmt("downloading '%s'...", storePath));
-            store->ensurePath(storePath);
+            if (!dryRun)
+                store->ensurePath(storePath);
         }
 
         {
             Activity act(*logger, lvlInfo, actUnknown, fmt("verifying that '%s' works...", storePath));
-            auto program = storePath + "/bin/nix-env";
-            auto s = runProgram(program, false, {"--version"});
-            if (s.find("Nix") == std::string::npos)
-                throw Error("could not verify that '%s' works", program);
+            if (!dryRun) {
+                auto program = storePath + "/bin/nix-env";
+                auto s = runProgram(program, false, {"--version"});
+                if (s.find("Nix") == std::string::npos)
+                    throw Error("could not verify that '%s' works", program);
+            }
         }
 
         {
             Activity act(*logger, lvlInfo, actUnknown, fmt("installing '%s' into profile '%s'...", storePath, profileDir));
-            runProgram(settings.nixBinDir + "/nix-env", false,
-                {"--profile", profileDir, "-i", storePath, "--no-sandbox"});
+            if (!dryRun)
+                runProgram(settings.nixBinDir + "/nix-env", false,
+                    {"--profile", profileDir, "-i", storePath, "--no-sandbox"});
         }
     }
 
@@ -105,11 +110,18 @@ struct CmdUpgradeNix : StoreCommand
         if (hasPrefix(where, "/run/current-system"))
             throw Error("Nix on NixOS must be upgraded via 'nixos-rebuild'");
 
-        Path profileDir;
-        Path userEnv;
+        Path profileDir = dirOf(where);
+
+        // Resolve profile to /nix/var/nix/profiles/<name> link.
+        while (baseNameOf(dirOf(canonPath(profileDir))) != "profiles")
+            profileDir = readLink(profileDir);
+
+        printInfo("found profile '%s'", profileDir);
+
+        Path userEnv = canonPath(profileDir, true);
 
         if (baseNameOf(where) != "bin" ||
-            !hasSuffix(userEnv = canonPath(profileDir = dirOf(where), true), "user-environment"))
+            !hasSuffix(userEnv, "user-environment"))
             throw Error("directory '%s' does not appear to be part of a Nix profile", where);
 
         if (!store->isValidPath(userEnv))
