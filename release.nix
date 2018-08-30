@@ -241,6 +241,7 @@ let
         { diskImage = vmTools.diskImages.ubuntu1204x86_64;
         }
         ''
+          set -x
           useradd -m alice
           su - alice -c 'tar xf ${binaryTarball.x86_64-linux}/*.tar.*'
           mkdir /dest-nix
@@ -251,14 +252,13 @@ let
           su - alice -c 'PAGER= nix-store -qR ${build.x86_64-linux}'
 
           # Check whether 'nix upgrade-nix' works.
-          (! [ -L /nix/var/nix/profiles/per-user/alice/profile-2-link ])
           cat > /tmp/paths.nix <<EOF
           {
             x86_64-linux = "${build.x86_64-linux}";
           }
           EOF
           su - alice -c 'nix upgrade-nix -vvv --nix-store-paths-url file:///tmp/paths.nix'
-          [ -L /nix/var/nix/profiles/per-user/alice/profile-2-link ]
+          (! [ -L /home/alice/.profile-1-link ])
           su - alice -c 'PAGER= nix-store -qR ${build.x86_64-linux}'
 
           mkdir -p $out/nix-support

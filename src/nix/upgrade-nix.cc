@@ -4,6 +4,8 @@
 #include "download.hh"
 #include "eval.hh"
 #include "attr-path.hh"
+#include "names.hh"
+#include "progress-bar.hh"
 
 using namespace nix;
 
@@ -67,28 +69,36 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
             storePath = getLatestNix(store);
         }
 
+        auto version = DrvName(storePathToName(storePath)).version;
+
+        if (dryRun) {
+            stopProgressBar();
+            printError("would upgrade to version %s", version);
+            return;
+        }
+
         {
             Activity act(*logger, lvlInfo, actUnknown, fmt("downloading '%s'...", storePath));
-            if (!dryRun)
-                store->ensurePath(storePath);
+            store->ensurePath(storePath);
         }
 
         {
             Activity act(*logger, lvlInfo, actUnknown, fmt("verifying that '%s' works...", storePath));
-            if (!dryRun) {
-                auto program = storePath + "/bin/nix-env";
-                auto s = runProgram(program, false, {"--version"});
-                if (s.find("Nix") == std::string::npos)
-                    throw Error("could not verify that '%s' works", program);
-            }
+            auto program = storePath + "/bin/nix-env";
+            auto s = runProgram(program, false, {"--version"});
+            if (s.find("Nix") == std::string::npos)
+                throw Error("could not verify that '%s' works", program);
         }
+
+        stopProgressBar();
 
         {
             Activity act(*logger, lvlInfo, actUnknown, fmt("installing '%s' into profile '%s'...", storePath, profileDir));
-            if (!dryRun)
-                runProgram(settings.nixBinDir + "/nix-env", false,
-                    {"--profile", profileDir, "-i", storePath, "--no-sandbox"});
+            runProgram(settings.nixBinDir + "/nix-env", false,
+                {"--profile", profileDir, "-i", storePath, "--no-sandbox"});
         }
+
+        printError(ANSI_GREEN "upgrade to version %s done" ANSI_NORMAL, version);
     }
 
     /* Return the profile in which Nix is installed. */
@@ -113,7 +123,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         Path profileDir = dirOf(where);
 
         // Resolve profile to /nix/var/nix/profiles/<name> link.
-        while (baseNameOf(dirOf(canonPath(profileDir))) != "profiles" && isLink(profileDir))
+        while (canonPath(profileDir).find("/profiles/") == std::string::npos && isLink(profileDir))
             profileDir = readLink(profileDir);
 
         printInfo("found profile '%s'", profileDir);
