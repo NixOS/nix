@@ -5,8 +5,6 @@
 #include "common-args.hh"
 
 #include <algorithm>
-#include <boost/format.hpp>
-#include <iomanip>
 
 using namespace nix;
 
@@ -21,7 +19,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
     {
         mkFlag('s', "size", "print size of the NAR dump of each path", &showSize);
         mkFlag('S', "closure-size", "print sum size of the NAR dumps of the closure of each path", &showClosureSize);
-        mkFlag('H', "human-readable", "with -s and -S, print sizes like 1K 234M 5.67G etc.", &humanReadable);
+        mkFlag('h', "human-readable", "with -s and -S, print sizes like 1K 234M 5.67G etc.", &humanReadable);
         mkFlag(0, "sigs", "show signatures", &showSigs);
     }
 
@@ -44,7 +42,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             },
             Example{
                 "To show a package's closure size and all its dependencies with human readable sizes:",
-                "nix path-info -rsSH nixpkgs.rust"
+                "nix path-info -rsSh nixpkgs.rust"
             },
             Example{
                 "To check the existence of a path in a binary cache:",
@@ -65,10 +63,10 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
         };
     }
 
-    void printSize(int value)
+    void printSize(unsigned long long value)
     {
         if (!humanReadable) {
-            std::cout << '\t' << boost::format("%11d") % value;
+            std::cout << fmt("\t%11d", value);
             return;
         }
 
@@ -81,7 +79,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             ++power;
             res /= 1024;
         }
-        std::cout << '\t' << boost::format("%11.1f") % res << idents[power];
+        std::cout << fmt("\t%6.1f%c", res, idents.at(power));
     }
 
     void run(ref<Store> store, Paths storePaths) override
