@@ -249,6 +249,18 @@ let
           su - alice -c '_NIX_INSTALLER_TEST=1 ./nix-*/install'
           su - alice -c 'nix-store --verify'
           su - alice -c 'PAGER= nix-store -qR ${build.x86_64-linux}'
+
+          # Check whether 'nix upgrade-nix' works.
+          (! [ -L /nix/var/nix/profiles/per-user/alice/profile-2-link ])
+          cat > /tmp/paths.nix <<EOF
+          {
+            x86_64-linux = "${build.x86_64-linux}";
+          }
+          EOF
+          su - alice -c 'nix upgrade-nix -vvv --nix-store-paths-url file:///tmp/paths.nix'
+          [ -L /nix/var/nix/profiles/per-user/alice/profile-2-link ]
+          su - alice -c 'PAGER= nix-store -qR ${build.x86_64-linux}'
+
           mkdir -p $out/nix-support
           touch $out/nix-support/hydra-build-products
           umount /nix
