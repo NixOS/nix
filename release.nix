@@ -67,6 +67,14 @@ let
 
         buildInputs = buildDeps;
 
+        preConfigure =
+          # Copy libboost_context so we don't get all of Boost in our closure.
+          # https://github.com/NixOS/nixpkgs/issues/45462
+          ''
+            mkdir -p $out/lib
+            cp ${boost}/lib/libboost_context* $out/lib
+          '';
+
         configureFlags = configureFlags ++
           [ "--sysconfdir=/etc" ];
 
