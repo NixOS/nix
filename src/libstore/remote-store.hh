@@ -97,6 +97,8 @@ public:
 
     void connect() override;
 
+    unsigned int getProtocol() override;
+
     void flushBadConnections();
 
 protected:

@@ -209,6 +209,8 @@ public:
 
     void registerValidPaths(const ValidPathInfos & infos);
 
+    unsigned int getProtocol() override;
+
     void vacuumDB();
 
     /* Repair the contents of the given path by redownloading it using

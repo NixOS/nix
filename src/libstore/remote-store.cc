@@ -646,6 +646,13 @@ void RemoteStore::connect()
 }
 
 
+unsigned int RemoteStore::getProtocol()
+{
+    auto conn(connections->get());
+    return conn->daemonVersion;
+}
+
+
 void RemoteStore::flushBadConnections()
 {
     connections->flushBad();
