@@ -4,7 +4,7 @@
       version="5.0"
       xml:id="ssec-relnotes-2.1">
 
-<title>Release 2.1 (2018-08-??)</title>
+<title>Release 2.1 (2018-08-31)</title>
 
 <para>This is primarily a bug fix release. It also reduces memory
 consumption in certain situations. In addition, it has the following
@@ -41,8 +41,12 @@ new features:</para>
 
   <listitem>
     <para><command>nix-daemon</command> now respects
-    <option>--store</option>, so it can be run as a non-root
-    user.</para>
+    <option>--store</option>.</para>
+  </listitem>
+
+  <listitem>
+    <para><command>nix run</command> now respects
+    <varname>nix-support/propagated-user-env-packages</varname>.</para>
   </listitem>
 
 </itemizedlist>
