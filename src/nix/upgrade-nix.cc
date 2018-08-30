@@ -9,6 +9,7 @@ using namespace nix;
 struct CmdUpgradeNix : StoreCommand
 {
     Path profileDir;
+    std::string storePathsUrl = "https://github.com/NixOS/nixpkgs/raw/master/nixos/modules/installer/tools/nix-fallback-paths.nix";
 
     CmdUpgradeNix()
     {
@@ -18,6 +19,12 @@ struct CmdUpgradeNix : StoreCommand
             .labels({"profile-dir"})
             .description("the Nix profile to upgrade")
             .dest(&profileDir);
+
+        mkFlag()
+            .longName("nix-store-paths-url")
+            .labels({"url"})
+            .description("URL of the file that contains the store paths of the latest Nix release")
+            .dest(&storePathsUrl);
     }
 
     std::string name() override
@@ -115,7 +122,7 @@ struct CmdUpgradeNix : StoreCommand
     Path getLatestNix(ref<Store> store)
     {
         // FIXME: use nixos.org?
-        auto req = DownloadRequest("https://github.com/NixOS/nixpkgs/raw/master/nixos/modules/installer/tools/nix-fallback-paths.nix");
+        auto req = DownloadRequest(storePathsUrl);
         auto res = getDownloader()->download(req);
 
         auto state = std::make_unique<EvalState>(Strings(), store);
