@@ -1,4 +1,5 @@
 #include "command.hh"
+#include "serve-protocol.hh"
 #include "shared.hh"
 #include "store-api.hh"
 #include "worker-protocol.hh"
@@ -35,14 +36,18 @@ struct CmdDoctor : StoreCommand
         checkStoreProtocol(store->getProtocol());
     }
 
-    void checkStoreProtocol(unsigned int proto) {
-        if (PROTOCOL_VERSION != proto) {
+    void checkStoreProtocol(unsigned int storeProto) {
+        auto clientProto = GET_PROTOCOL_MAJOR(SERVE_PROTOCOL_VERSION) == GET_PROTOCOL_MAJOR(storeProto)
+            ? SERVE_PROTOCOL_VERSION
+            : PROTOCOL_VERSION;
+
+        if (clientProto != storeProto) {
             std::cout << "Warning: protocol version of this client does not match the store." << std::endl;
             std::cout << "While this is not necessarily a problem it's recommended to keep the client in" << std::endl;
             std::cout << "sync with the daemon." << std::endl;
             std::cout << std::endl;
-            std::cout << "Client protocol: " << formatProtocol(PROTOCOL_VERSION) << std::endl;
-            std::cout << "Store protocol: " << formatProtocol(proto) << std::endl;
+            std::cout << "Client protocol: " << formatProtocol(clientProto) << std::endl;
+            std::cout << "Store protocol: " << formatProtocol(storeProto) << std::endl;
             std::cout << std::endl;
         }
     }
