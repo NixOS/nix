@@ -113,7 +113,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         Path profileDir = dirOf(where);
 
         // Resolve profile to /nix/var/nix/profiles/<name> link.
-        while (baseNameOf(dirOf(canonPath(profileDir))) != "profiles")
+        while (baseNameOf(dirOf(canonPath(profileDir))) != "profiles" && isLink(profileDir))
             profileDir = readLink(profileDir);
 
         printInfo("found profile '%s'", profileDir);
