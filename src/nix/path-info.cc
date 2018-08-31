@@ -103,7 +103,10 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
                 auto info = store->queryPathInfo(storePath);
                 storePath = info->path; // FIXME: screws up padding
 
-                std::cout << storePath << std::string(std::max(0, (int) pathLen - (int) storePath.size()), ' ');
+                std::cout << storePath;
+
+                if (showSize || showClosureSize || showSigs)
+                    std::cout << std::string(std::max(0, (int) pathLen - (int) storePath.size()), ' ');
 
                 if (showSize)
                     printSize(info->narSize);
