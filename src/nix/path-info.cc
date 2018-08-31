@@ -5,6 +5,7 @@
 #include "common-args.hh"
 
 #include <algorithm>
+#include <array>
 
 using namespace nix;
 
