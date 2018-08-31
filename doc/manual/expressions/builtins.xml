@@ -558,7 +558,20 @@ builtins.genList (x: x * x) 5
     locate the file <filename>~/.nixpkgs/config.nix</filename>, which
     contains user-local settings for Nix Packages.  (That is, it does
     a <literal>getEnv "HOME"</literal> to locate the user’s home
-    directory.)</para></listitem>
+    directory.)</para>
+
+    <para>You can use <function>getEnv</function> to pass additional
+    environment variables to a derivation that is (exclusively) used
+    with <literal>nix-shell --pure</literal>, for example to pass the
+    SSH authentication socket:
+
+<programlisting>
+derivation {
+  …
+  SSH_AUTH_SOCK = builtins.getEnv "SSH_AUTH_SOCK";
+}
+</programlisting>
+    </para></listitem>
 
   </varlistentry>
 
