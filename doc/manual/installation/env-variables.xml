@@ -39,7 +39,7 @@ bundle.</para>
   <step><para>Set the environment variable and install Nix</para>
     <screen>
 $ export NIX_SSL_CERT_FILE=/etc/ssl/my-certificate-bundle.crt
-$ curl https://nixos.org/nix/install | sh
+$ sh &lt;(curl https://nixos.org/nix/install)
 </screen></step>
 
   <step><para>In the shell profile and rc files (for example,

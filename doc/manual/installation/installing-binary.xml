@@ -6,13 +6,30 @@
 
 <title>Installing a Binary Distribution</title>
 
-<para>If you are using Linux or macOS, the easiest way to install
-Nix is to run the following command:
+<para>If you are using Linux or macOS, the easiest way to install Nix
+is to run the following command:
 
 <screen>
-$ bash &lt;(curl https://nixos.org/nix/install)
+  $ sh &lt;(curl https://nixos.org/nix/install)
 </screen>
 
+As of Nix 2.1.0, the Nix installer will always default to creating a
+single-user installation, however opting in to the multi-user
+installation is highly recommended.
+</para>
+
+<section xml:id="sect-single-user-installation">
+  <title>Single User Installation</title>
+
+  <para>
+    To explicitly select a single-user installation on your system:
+
+    <screen>
+  sh &lt;(curl https://nixos.org/nix/install) --no-daemon
+</screen>
+  </para>
+
+<para>
 This will perform a single-user installation of Nix, meaning that
 <filename>/nix</filename> is owned by the invoking user.  You should
 run this under your usual user account, <emphasis>not</emphasis> as
@@ -33,51 +50,8 @@ and <filename>.profile</filename> to source
 the <command>NIX_INSTALLER_NO_MODIFY_PROFILE</command> environment
 variable before executing the install script to disable this
 behaviour.
-
 </para>
 
-<!--
-<para>You can also manually download and install a binary package.
-Binary packages of the latest stable release are available for Fedora,
-Debian, Ubuntu, macOS and various other systems from the <link
-xlink:href="http://nixos.org/nix/download.html">Nix homepage</link>.
-You can also get builds of the latest development release from our
-<link
-xlink:href="http://hydra.nixos.org/job/nix/master/release/latest-finished#tabs-constituents">continuous
-build system</link>.</para>
-
-<para>For Fedora, RPM packages are available.  These can be installed
-or upgraded using <command>rpm -U</command>.  For example,
-
-<screen>
-$ rpm -U nix-1.8-1.i386.rpm</screen>
-
-</para>
-
-<para>For Debian and Ubuntu, you can download a Deb package and
-install it like this:
-
-<screen>
-$ dpkg -i nix_1.8-1_amd64.deb</screen>
-
-</para>
--->
-
-<para>You can also download a binary tarball that contains Nix and all
-its dependencies.  (This is what the install script at
-<uri>https://nixos.org/nix/install</uri> does automatically.)  You
-should unpack it somewhere (e.g. in <filename>/tmp</filename>), and
-then run the script named <command>install</command> inside the binary
-tarball:
-
-<screen>
-alice$ cd /tmp
-alice$ tar xfj nix-1.8-x86_64-darwin.tar.bz2
-alice$ cd nix-1.8-x86_64-darwin
-alice$ ./install
-</screen>
-
-</para>
 
 <para>You can uninstall Nix simply by running:
 
@@ -86,5 +60,131 @@ $ rm -rf /nix
 </screen>
 
 </para>
+</section>
 
+<section xml:id="sect-multi-user-installation">
+  <title>Multi User Installation</title>
+  <para>
+    The multi-user Nix installation creates system users, and a system
+    service for the Nix daemon.
+  </para>
+
+  <itemizedlist>
+    <title>Supported Systems</title>
+
+    <listitem>
+      <para>Linux running systemd, with SELinux disabled</para>
+    </listitem>
+    <listitem><para>macOS</para></listitem>
+  </itemizedlist>
+
+  <para>
+    You can instruct the installer to perform a multi-user
+    installation on your system:
+
+    <screen>
+  sh &lt;(curl https://nixos.org/nix/install) --daemon
+</screen>
+  </para>
+
+  <para>
+    The multi-user installation of Nix will create build users between
+    the user IDs 30001 and 30032, and a group with the group ID 30000.
+
+    You should run this under your usual user account,
+    <emphasis>not</emphasis> as root. The script will invoke
+    <command>sudo</command> as needed.
+  </para>
+
+  <note><para>
+    If you need Nix to use a different group ID or user ID set, you
+    will have to download the tarball manually and <link
+    linkend="sect-nix-install-binary-tarball">edit the install
+    script</link>.
+  </para></note>
+
+  <para>
+    The installer will modify <filename>/etc/bashrc</filename>, and
+    <filename>/etc/zshrc</filename> if they exist. The installer will
+    first back up these files with a
+    <literal>.backup-before-nix</literal> extension. The installer
+    will also create <filename>/etc/profile.d/nix.sh</filename>.
+  </para>
+
+  <para>You can uninstall Nix with the following commands:
+
+<screen>
+sudo rm -rf /etc/profile/nix.sh /etc/nix /nix ~root/.nix-profile ~root/.nix-defexpr ~root/.nix-channels ~/.nix-profile ~/.nix-defexpr ~/.nix-channels
+
+# If you are on Linux with systemd, you will need to run:
+sudo systemctl stop nix-daemon.socket
+sudo systemctl stop nix-daemon.service
+sudo systemctl disable nix-daemon.socket
+sudo systemctl disable nix-daemon.service
+sudo systemctl daemon-reload
+
+# If you are on macOS, you will need to run:
+sudo launchctl unload /Library/LaunchDaemons/org.nixos.nix-daemon.plist
+sudo rm /Library/LaunchDaemons/org.nixos.nix-daemon.plist
+</screen>
+
+    There may also be references to Nix in
+    <filename>/etc/profile</filename>,
+    <filename>/etc/bashrc</filename>, and
+    <filename>/etc/zshrc</filename> which you may remove.
+  </para>
+
+</section>
+
+<section xml:id="sect-nix-install-pinned-version-url">
+  <title>Installing a pinned Nix version from a URL</title>
+
+  <para>
+    NixOS.org hosts version-specific installation URLs for all Nix
+    versions since 1.11.16, at
+    <literal>https://nixos.org/releases/nix/nix-VERSION/install</literal>.
+  </para>
+
+  <para>
+    These install scripts can be used the same as the main
+  NixOS.org installation script:
+
+  <screen>
+  sh &lt;(curl https://nixos.org/nix/install)
+</screen>
+  </para>
+
+  <para>
+    In the same directory of the install script are sha256 sums, and
+    gpg signature files.
+  </para>
+</section>
+
+<section xml:id="sect-nix-install-binary-tarball">
+  <title>Installing from a binary tarball</title>
+
+  <para>
+    You can also download a binary tarball that contains Nix and all
+    its dependencies.  (This is what the install script at
+    <uri>https://nixos.org/nix/install</uri> does automatically.)  You
+    should unpack it somewhere (e.g. in <filename>/tmp</filename>),
+    and then run the script named <command>install</command> inside
+    the binary tarball:
+
+
+<screen>
+alice$ cd /tmp
+alice$ tar xfj nix-1.8-x86_64-darwin.tar.bz2
+alice$ cd nix-1.8-x86_64-darwin
+alice$ ./install
+</screen>
+  </para>
+
+  <para>
+    If you need to edit the multi-user installation script to use
+    different group ID or a different user ID range, modify the
+    variables set in the file named
+    <filename>install-multi-user</filename>.
+  </para>
+</section>
 </chapter>
