@@ -219,8 +219,6 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     } else
         url = state.coerceToString(pos, *args[0], context, false, false);
 
-    if (!isUri(url)) url = absPath(url);
-
     // FIXME: git externals probably can be used to bypass the URI
     // whitelist. Ah well.
     state.checkURI(url);
