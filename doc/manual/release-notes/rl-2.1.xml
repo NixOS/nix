@@ -51,7 +51,60 @@ new features:</para>
 
 </itemizedlist>
 
-<para>This release has contributions from TODO.
+<para>This release has contributions from
+
+Adrien Devresse,
+Aleksandr Pashkov,
+Alexandre Esteves,
+Amine Chikhaoui,
+Andrew Dunham,
+Asad Saeeduddin,
+aszlig,
+Ben Challenor,
+Ben Gamari,
+Benjamin Hipple,
+Bogdan Seniuc,
+Corey O'Connor,
+Daiderd Jordan,
+Daniel Peebles,
+Daniel Poelzleithner,
+Danylo Hlynskyi,
+Dmitry Kalinkin,
+Domen Kožar,
+Doug Beardsley,
+Eelco Dolstra,
+Erik Arvstedt,
+Félix Baylac-Jacqué,
+Gleb Peregud,
+Graham Christensen,
+Guillaume Maudoux,
+Ivan Kozik,
+John Arnold,
+Justin Humm,
+Linus Heckemann,
+Lorenzo Manacorda,
+Matthew Justin Bauer,
+Matthew O'Gorman,
+Maximilian Bosch,
+Michael Bishop,
+Michael Fiano,
+Michael Mercier,
+Michael Raskin,
+Michael Weiss,
+Nicolas Dudebout,
+Peter Simons,
+Ryan Trinkle,
+Samuel Dionne-Riel,
+Sean Seefried,
+Shea Levy,
+Symphorien Gibol,
+Tim Engler,
+Tim Sears,
+Tuomas Tynkkynen,
+volth,
+Will Dietz,
+Yorick van Pelt and
+zimbatm.
 </para>
 
 </section>
