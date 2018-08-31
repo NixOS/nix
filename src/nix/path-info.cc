@@ -70,9 +70,9 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             return;
         }
 
-        static constexpr std::array<char, 9> idents = {
+        static const std::array<char, 9> idents{{
             ' ', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'
-        };
+        }};
         size_t power = 0;
         double res = value;
         while (res > 1024 && power < idents.size()) {
