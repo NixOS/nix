@@ -41,7 +41,7 @@ encountered</quote>).</para></footnote>.</para>
 </simplesect>
 
 
-<simplesect><title>Let-expressions</title>
+<simplesect xml:id="sect-let-expressions"><title>Let-expressions</title>
 
 <para>A let-expression allows you define local variables for an
 expression.  For instance,
