@@ -402,17 +402,10 @@ stdenv.mkDerivation { … }
       <example>
         <title>Fetching a private repository over SSH</title>
         <programlisting>builtins.fetchGit {
-  url = "ssh://git@github.com/my-secret/repository.git";
+  url = "git@github.com:my-secret/repository.git";
   ref = "master";
   rev = "adab8b916a45068c044658c4158d81878f9ed1c3";
 }</programlisting>
-
-      <note><para>
-        Note the URL format is not the same as <command>git
-        clone</command>. <function>builtins.fetchGit</function> uses
-        a <literal>/</literal> instead of a <literal>:</literal>
-        between <literal>github.com</literal> and
-        <literal>my-secret</literal>.</para></note>
       </example>
 
       <example>
