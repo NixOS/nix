@@ -1,6 +1,7 @@
 <part xmlns="http://docbook.org/ns/docbook"
       xmlns:xlink="http://www.w3.org/1999/xlink"
       xmlns:xi="http://www.w3.org/2001/XInclude"
+      xml:id="part-advanced-topics"
       version="5.0">
 
 <title>Advanced Topics</title>
