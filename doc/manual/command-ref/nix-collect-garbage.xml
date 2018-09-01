@@ -60,4 +60,12 @@ $ nix-collect-garbage -d</screen>
 
 </refsection>
 
+<refsection><title>NixOS Boot Entries</title>
+<para>If your <filename>/boot</filename> partition runs out of space,
+after clearing old profiles you must run rebuild your system with
+<literal>nixos-rebuild</literal> to update the
+<filename>/boot</filename> partition and clear space.
+</para>
+</refsection>
+
 </refentry>
