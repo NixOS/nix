@@ -105,7 +105,23 @@ hello = callPackage ../applications/misc/hello/ex-1 { };
 hello = callPackage ../applications/misc/hello/ex-1 { stdenv = myStdenv; };
 </programlisting>
 
-    </para></note>
+    </para>
+
+    <para>A useful way to use the callPackage function would be to
+    change the name of the above <filename>default.nix</filename>
+    to <filename>hello.nix</filename> and create a new
+    <filename>default.nix</filename> as follows:</para>
+
+<programlisting>
+(import &lt;nixpkgs&gt; {}).callPackage ./hello.nix {}
+</programlisting>
+
+    <para>This infrastructure allows you to build it as a local
+    package simply by running <literal>nix-build</literal> or drop
+    into a build environment shell with
+    <literal>nix-shell</literal></para>
+
+    </note>
 
   </callout>
 
