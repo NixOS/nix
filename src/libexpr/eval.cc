@@ -1739,17 +1739,16 @@ void EvalState::printStats()
     uint64_t bValues = nrValues * sizeof(Value);
     uint64_t bAttrsets = nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Attr);
 
+    auto sum = bEnvs + bLists + bValues + bAttrsets;
+
     printMsg(v, format("  time elapsed: %1%") % cpuTime);
     printMsg(v, format("  size of a value: %1%") % sizeof(Value));
     printMsg(v, format("  size of an attr: %1%") % sizeof(Attr));
-    printMsg(v, format("  environments allocated count: %1%") % nrEnvs);
-    printMsg(v, format("  environments allocated bytes: %1%") % bEnvs);
-    printMsg(v, format("  list elements count: %1%") % nrListElems);
-    printMsg(v, format("  list elements bytes: %1%") % bLists);
+    printMsg(v, format("  environments allocated: %1% (%2% bytes, %3%%%)") % nrEnvs % bEnvs % ((bEnvs*100) / sum));
+    printMsg(v, format("  list elements: %1% (%2% bytes %3%%%)") % nrListElems % bLists % ((bLists*100)/sum));
     printMsg(v, format("  list concatenations: %1%") % nrListConcats);
-    printMsg(v, format("  values allocated count: %1%") % nrValues);
-    printMsg(v, format("  values allocated bytes: %1%") % bValues);
-    printMsg(v, format("  sets allocated: %1% (%2% bytes)") % nrAttrsets % bAttrsets);
+    printMsg(v, format("  values allocated: %1% (%2% bytes %3%%%)") % nrValues % bValues % ((bValues*100)/sum));
+    printMsg(v, format("  sets allocated: %1% (%2% bytes %3%%%)") % nrAttrsets % bAttrsets % ((bAttrsets*100)/sum));
     printMsg(v, format("  right-biased unions: %1%") % nrOpUpdates);
     printMsg(v, format("  values copied in right-biased unions: %1%") % nrOpUpdateValuesCopied);
     printMsg(v, format("  symbols in symbol table: %1%") % symbols.size());
@@ -1760,6 +1759,8 @@ void EvalState::printStats()
     printMsg(v, format("  number of primop calls: %1%") % nrPrimOpCalls);
     printMsg(v, format("  number of function calls: %1%") % nrFunctionCalls);
     printMsg(v, format("  total allocations: %1% bytes") % (bEnvs + bLists + bValues + bAttrsets));
+
+    printMsg(v, format("  sets: %1% (%2% each, %3% mb total), attrs-in-sets: %4% (%5% each, %6% mb total)") % nrAttrsets % sizeof(Bindings) % ((nrAttrsets * sizeof(Bindings)) / 1024 / 1024) % nrAttrsInAttrsets % sizeof(Attr) % ((nrAttrsInAttrsets * sizeof(Attr)) / 1024 / 1024));
 
 #if HAVE_BOEHMGC
     GC_word heapSize, totalBytes;
