@@ -113,7 +113,7 @@ hello = callPackage ../applications/misc/hello/ex-1 { stdenv = myStdenv; };
     <filename>default.nix</filename> as follows:</para>
 
 <programlisting>
-(import <nixpkgs> {}).callPackage ./hello.nix {}
+(import &lt;nixpkgs&gt; {}).callPackage ./hello.nix {}
 </programlisting>
 
     <para>This infrastructure allows you to build it as a local
