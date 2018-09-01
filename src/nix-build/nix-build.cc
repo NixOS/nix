@@ -495,6 +495,7 @@ void mainWrapped(int argc, char * * argv)
 
         for (auto & path : outPaths)
             std::cout << path << '\n';
+        state->printStats();
     }
 }
 
