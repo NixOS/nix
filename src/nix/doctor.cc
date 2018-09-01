@@ -33,7 +33,24 @@ struct CmdDoctor : StoreCommand
         std::cout << "Store uri: " << store->getUri() << std::endl;
         std::cout << std::endl;
 
+        checkNixInPath();
         checkStoreProtocol(store->getProtocol());
+    }
+
+    void checkNixInPath() {
+        PathSet dirs;
+
+        for (auto & dir : tokenizeString<Strings>(getEnv("PATH"), ":"))
+            if (pathExists(dir + "/nix-env"))
+                dirs.insert(dirOf(canonPath(dir + "/nix-env", true)));
+
+        if (dirs.size() != 1) {
+            std::cout << "Warning: multiple versions of nix found in PATH." << std::endl;
+            std::cout << std::endl;
+            for (auto & dir : dirs)
+                std::cout << "  " << dir << std::endl;
+            std::cout << std::endl;
+        }
     }
 
     void checkStoreProtocol(unsigned int storeProto) {
