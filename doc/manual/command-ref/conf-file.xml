@@ -527,7 +527,12 @@ password <replaceable>my-password</replaceable>
 
     For the exact syntax, see <link
     xlink:href="https://ec.haxx.se/usingcurl-netrc.html">the
-    <literal>curl</literal> documentation.</link></para></listitem>
+    <literal>curl</literal> documentation.</link></para>
+
+    <note><para>This must be an absolute path, and <literal>~</literal>
+    is not resolved. For example, <filename>~/.netrc</filename> won't
+    resolve to your home directory's <filename>.netrc</filename>.</para></note>
+    </listitem>
 
   </varlistentry>
 
