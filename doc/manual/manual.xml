@@ -32,6 +32,7 @@
 
   <xi:include href="introduction/introduction.xml" />
   <xi:include href="installation/installation.xml" />
+  <xi:include href="installation/upgrading.xml" />
   <xi:include href="packages/package-management.xml" />
   <xi:include href="expressions/writing-nix-expressions.xml" />
   <xi:include href="advanced-topics/advanced-topics.xml" />
