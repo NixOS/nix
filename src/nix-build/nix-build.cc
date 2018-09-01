@@ -305,6 +305,8 @@ void mainWrapped(int argc, char * * argv)
         }
     }
 
+    state->printStats();
+
     auto buildPaths = [&](const PathSet & paths) {
         /* Note: we do this even when !printMissing to efficiently
            fetch binary cache data. */
