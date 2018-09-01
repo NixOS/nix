@@ -74,13 +74,6 @@ new features:</para>
 
 </itemizedlist>
 
-<para>
-  Multi-user Nix users on macOS can upgrade Nix by running
-  <command>sudo -i sh -c 'nix-channel --update &amp;&amp; nix-env -iA
-  nixpkgs.nix'; sudo launchctl stop org.nixos.nix-daemon; sudo
-  launchctl start org.nixos.nix-daemon</command>.
-</para>
-
 <para>This release has contributions from
 
 Adrien Devresse,
