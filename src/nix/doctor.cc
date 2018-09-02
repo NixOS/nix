@@ -34,6 +34,7 @@ struct CmdDoctor : StoreCommand
         std::cout << std::endl;
 
         checkNixInPath();
+        checkProfileRoots(store);
         checkStoreProtocol(store->getProtocol());
     }
 
@@ -46,6 +47,40 @@ struct CmdDoctor : StoreCommand
 
         if (dirs.size() != 1) {
             std::cout << "Warning: multiple versions of nix found in PATH." << std::endl;
+            std::cout << std::endl;
+            for (auto & dir : dirs)
+                std::cout << "  " << dir << std::endl;
+            std::cout << std::endl;
+        }
+    }
+
+    void checkProfileRoots(ref<Store> store) {
+        PathSet dirs;
+
+        Roots roots = store->findRoots();
+
+        for (auto & dir : tokenizeString<Strings>(getEnv("PATH"), ":"))
+            try {
+                auto profileDir = canonPath(dirOf(dir), true);
+                if (hasSuffix(profileDir, "user-environment") &&
+                    store->isValidPath(profileDir)) {
+                    PathSet referrers;
+                    store->computeFSClosure({profileDir}, referrers, true,
+                            settings.gcKeepOutputs, settings.gcKeepDerivations);
+                    bool found = false;
+                    for (auto & i : roots)
+                        if (referrers.find(i.second) != referrers.end())
+                            found = true;
+                    if (!found)
+                        dirs.insert(dir);
+
+                }
+            } catch (SysError &) {}
+
+        if (!dirs.empty()) {
+            std::cout << "Warning: found profiles without a gcroot." << std::endl;
+            std::cout << "The generation this profile points to will be deleted with the next gc, resulting" << std::endl;
+            std::cout << "in broken symlinks.  Make sure your profiles are in " << settings.nixStateDir << "/profiles." << std::endl;
             std::cout << std::endl;
             for (auto & dir : dirs)
                 std::cout << "  " << dir << std::endl;
