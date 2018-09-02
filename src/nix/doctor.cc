@@ -33,8 +33,12 @@ struct CmdDoctor : StoreCommand
         std::cout << "Store uri: " << store->getUri() << std::endl;
         std::cout << std::endl;
 
-        checkNixInPath();
-        checkProfileRoots(store);
+        auto type = getStoreType();
+
+        if (type < tOther) {
+            checkNixInPath();
+            checkProfileRoots(store);
+        }
         checkStoreProtocol(store->getProtocol());
     }
 
@@ -56,7 +60,6 @@ struct CmdDoctor : StoreCommand
 
     void checkProfileRoots(ref<Store> store) {
         PathSet dirs;
-
         Roots roots = store->findRoots();
 
         for (auto & dir : tokenizeString<Strings>(getEnv("PATH"), ":"))
