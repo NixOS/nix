@@ -4,13 +4,36 @@
       version="5.0"
       xml:id="ssec-relnotes-2.1">
 
-<title>Release 2.1 (2018-08-31)</title>
+<title>Release 2.1 (2018-09-02)</title>
 
 <para>This is primarily a bug fix release. It also reduces memory
 consumption in certain situations. In addition, it has the following
 new features:</para>
 
 <itemizedlist>
+
+  <listitem>
+    <para>The Nix installer will no longer default to the Multi-User
+    installation for macOS. You can still <link
+    linkend="sect-multi-user-installation">instruct the installer to
+    run in multi-user mode</link>.
+    </para>
+  </listitem>
+
+  <listitem>
+    <para>The Nix installer now supports performing a Multi-User
+    installation for Linux computers which are running systemd. You
+    can <link
+    linkend="sect-multi-user-installation">select a Multi-User installation</link> by passing the
+    <option>--daemon</option> flag to the installer: <command>sh &lt;(curl
+    https://nixos.org/nix/install) --daemon</command>.
+    </para>
+
+    <para>The multi-user installer cannot handle systems with SELinux.
+    If your system has SELinux enabled, you can <link
+    linkend="sect-single-user-installation">force the installer to run
+    in single-user mode</link>.</para>
+  </listitem>
 
   <listitem>
     <para>New builtin functions:
@@ -47,29 +70,6 @@ new features:</para>
   <listitem>
     <para><command>nix run</command> now respects
     <varname>nix-support/propagated-user-env-packages</varname>.</para>
-  </listitem>
-
-  <listitem>
-    <para>The Nix installer will no longer default to the Multi-User
-    installation for macOS. You can still <link
-    linkend="sect-multi-user-installation">instruct the installer to
-    run in multi-user mode</link>.
-    </para>
-  </listitem>
-
-  <listitem>
-    <para>The Nix installer now supports performing a Multi-User
-    installation for Linux computers which are running systemd. You
-    can <link
-    linkend="sect-multi-user-installation">select a Multi-User installation</link> by passing the
-    <option>--daemon</option> flag to the installer: <command>sh &lt;(curl
-    https://nixos.org/nix/install) --daemon</command>.
-    </para>
-
-    <para>The multi-user installer cannot handle systems with SELinux.
-    If your system has SELinux enabled, you can <link
-    linkend="sect-single-user-installation">force the installer to run
-    in single-user mode</link>.</para>
   </listitem>
 
 </itemizedlist>
