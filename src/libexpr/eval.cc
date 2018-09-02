@@ -1730,9 +1730,7 @@ bool EvalState::eqValues(Value & v1, Value & v2)
 void EvalState::printStats()
 {
     bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
-    bool showJsonStats = getEnv("NIX_SHOW_STATS", "0") == "json";
     Verbosity v = showStats ? lvlInfo : lvlDebug;
-    printMsg(v, "evaluation statistics:");
 
     struct rusage buf;
     getrusage(RUSAGE_SELF, &buf);
@@ -1743,13 +1741,12 @@ void EvalState::printStats()
     uint64_t bValues = nrValues * sizeof(Value);
     uint64_t bAttrsets = nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Attr);
 
-    auto sum = bEnvs + bLists + bValues + bAttrsets;
-
 #if HAVE_BOEHMGC
     GC_word heapSize, totalBytes;
     GC_get_heap_usage_safe(&heapSize, 0, 0, 0, &totalBytes);
 #endif
-    if (showJsonStats) {
+    if (showStats) {
+        printMsg(v, "evaluation statistics:");
         auto outPath = getEnv("NIX_SHOW_STATS_PATH","-");
         std::fstream fs;
         if (outPath != "-") {
@@ -1761,6 +1758,7 @@ void EvalState::printStats()
         {
             auto envs = topObj.object("envs");
             envs.attr("number", nrEnvs);
+            envs.attr("elements", nrValuesInEnvs);
             envs.attr("bytes", bEnvs);
         }
         {
@@ -1783,6 +1781,7 @@ void EvalState::printStats()
             auto sets = topObj.object("sets");
             sets.attr("number", nrAttrsets);
             sets.attr("bytes", bAttrsets);
+            sets.attr("elements", nrAttrsInAttrsets);
         }
         {
             JSONObject sizes = topObj.object("sizes");
@@ -1802,35 +1801,6 @@ void EvalState::printStats()
         JSONObject gc = topObj.object("gc");
         gc.attr("heapSize", heapSize);
         gc.attr("totalBytes", totalBytes);
-#endif
-    } else {
-        if (getEnv("NIX_SHOW_STATS_PATH","-") != "-") {
-            printError("warning: $NIX_SHOW_STATS_PATH only works in combination with NIX_SHOW_STATS=json");
-        }
-        printMsg(v, format("  time elapsed: %1%") % cpuTime);
-        printMsg(v, format("  size of a value: %1%") % sizeof(Value));
-        printMsg(v, format("  size of an attr: %1%") % sizeof(Attr));
-        printMsg(v, format("  environments allocated: %1% (%2% bytes, %3%%%)") % nrEnvs % bEnvs % ((bEnvs*100) / sum));
-        printMsg(v, format("  list elements: %1% (%2% bytes %3%%%)") % nrListElems % bLists % ((bLists*100)/sum));
-        printMsg(v, format("  list concatenations: %1%") % nrListConcats);
-        printMsg(v, format("  values allocated: %1% (%2% bytes %3%%%)") % nrValues % bValues % ((bValues*100)/sum));
-        printMsg(v, format("  sets allocated: %1% (%2% bytes %3%%%)") % nrAttrsets % bAttrsets % ((bAttrsets*100)/sum));
-        printMsg(v, format("  right-biased unions: %1%") % nrOpUpdates);
-        printMsg(v, format("  values copied in right-biased unions: %1%") % nrOpUpdateValuesCopied);
-        printMsg(v, format("  symbols in symbol table: %1%") % symbols.size());
-        printMsg(v, format("  size of symbol table: %1%") % symbols.totalSize());
-        printMsg(v, format("  number of thunks: %1%") % nrThunks);
-        printMsg(v, format("  number of thunks avoided: %1%") % nrAvoided);
-        printMsg(v, format("  number of attr lookups: %1%") % nrLookups);
-        printMsg(v, format("  number of primop calls: %1%") % nrPrimOpCalls);
-        printMsg(v, format("  number of function calls: %1%") % nrFunctionCalls);
-        printMsg(v, format("  total allocations: %1% bytes") % (bEnvs + bLists + bValues + bAttrsets));
-
-        printMsg(v, format("  sets: %1% (%2% each, %3% mb total), attrs-in-sets: %4% (%5% each, %6% mb total)") % nrAttrsets % sizeof(Bindings) % ((nrAttrsets * sizeof(Bindings)) / 1024 / 1024) % nrAttrsInAttrsets % sizeof(Attr) % ((nrAttrsInAttrsets * sizeof(Attr)) / 1024 / 1024));
-
-#if HAVE_BOEHMGC
-        printMsg(v, format("  current Boehm heap size: %1% bytes") % heapSize);
-        printMsg(v, format("  total Boehm heap allocations: %1% bytes") % totalBytes);
 #endif
     }
 
