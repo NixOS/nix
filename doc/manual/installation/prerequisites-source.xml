@@ -29,7 +29,8 @@
   <literal>libbz2</literal> library.  Thus you must have bzip2
   installed, including development headers and libraries.  If your
   distribution does not provide these, you can obtain bzip2 from <link
-  xlink:href="http://www.bzip.org/"/>.</para></listitem>
+  xlink:href="https://web.archive.org/web/20180624184756/http://www.bzip.org/"
+  />.</para></listitem>
 
   <listitem><para><literal>liblzma</literal>, which is provided by
   XZ Utils. If your distribution does not provide this, you can
