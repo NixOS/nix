@@ -50,6 +50,40 @@ allowedRequisites = [ foobar ];
 
   </varlistentry>
 
+  <varlistentry><term><varname>disallowedReferences</varname></term>
+
+    <listitem><para>The optional attribute
+    <varname>disallowedReferences</varname> specifies a list of illegal
+    references (dependencies) of the output of the builder.  For
+    example,
+
+<programlisting>
+disallowedReferences = [ foo ];
+</programlisting>
+
+    enforces that the output of a derivation cannot have a direct runtime
+    dependencies on the derivation <varname>foo</varname>.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry><term><varname>disallowedRequisites</varname></term>
+
+    <listitem><para>This attribute is similar to
+    <varname>disallowedReferences</varname>, but it specifies illegal
+    requisites for the whole closure, so all the dependencies
+    recursively.  For example,
+
+<programlisting>
+disallowedRequisites = [ foobar ];
+</programlisting>
+
+    enforces that the output of a derivation cannot have any
+    runtime dependency on <varname>foobar</varname> or any other derivation
+    depending recursively on <varname>foobar</varname>.</para></listitem>
+
+  </varlistentry>
+
 
   <varlistentry><term><varname>exportReferencesGraph</varname></term>
 

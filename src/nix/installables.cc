@@ -99,7 +99,7 @@ struct InstallableStorePath : Installable
 
     Buildables toBuildables() override
     {
-        return {{"", {{"out", storePath}}}};
+        return {{isDerivation(storePath) ? storePath : "", {{"out", storePath}}}};
     }
 };
 

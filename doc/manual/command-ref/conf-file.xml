@@ -437,7 +437,10 @@ builtins.fetchurl {
     <listitem><para>This option defines the maximum number of jobs
     that Nix will try to build in parallel.  The default is
     <literal>1</literal>. The special value <literal>auto</literal>
-    causes Nix to use the number of CPUs in your system.  It can be
+    causes Nix to use the number of CPUs in your system.  <literal>0</literal>
+    is useful when using remote builders to prevent any local builds (except for
+    <literal>preferLocalBuild</literal> derivation attribute which executes locally
+    regardless).  It can be
     overridden using the <option
     linkend='opt-max-jobs'>--max-jobs</option> (<option>-j</option>)
     command line switch.</para></listitem>
@@ -524,7 +527,12 @@ password <replaceable>my-password</replaceable>
 
     For the exact syntax, see <link
     xlink:href="https://ec.haxx.se/usingcurl-netrc.html">the
-    <literal>curl</literal> documentation.</link></para></listitem>
+    <literal>curl</literal> documentation.</link></para>
+
+    <note><para>This must be an absolute path, and <literal>~</literal>
+    is not resolved. For example, <filename>~/.netrc</filename> won't
+    resolve to your home directory's <filename>.netrc</filename>.</para></note>
+    </listitem>
 
   </varlistentry>
 

@@ -161,16 +161,20 @@ size_t StringSource::read(unsigned char * data, size_t len)
 #error Coroutines are broken in this version of Boost!
 #endif
 
-std::unique_ptr<Source> sinkToSource(std::function<void(Sink &)> fun)
+std::unique_ptr<Source> sinkToSource(
+    std::function<void(Sink &)> fun,
+    std::function<void()> eof)
 {
     struct SinkToSource : Source
     {
         typedef boost::coroutines2::coroutine<std::string> coro_t;
 
+        std::function<void()> eof;
         coro_t::pull_type coro;
 
-        SinkToSource(std::function<void(Sink &)> fun)
-            : coro([&](coro_t::push_type & yield) {
+        SinkToSource(std::function<void(Sink &)> fun, std::function<void()> eof)
+            : eof(eof)
+            , coro([&](coro_t::push_type & yield) {
                 LambdaSink sink([&](const unsigned char * data, size_t len) {
                     if (len) yield(std::string((const char *) data, len));
                 });
@@ -184,8 +188,7 @@ std::unique_ptr<Source> sinkToSource(std::function<void(Sink &)> fun)
 
         size_t read(unsigned char * data, size_t len) override
         {
-            if (!coro)
-                throw EndOfFile("coroutine has finished");
+            if (!coro) { eof(); abort(); }
 
             if (pos == cur.size()) {
                 if (!cur.empty()) coro();
@@ -201,7 +204,7 @@ std::unique_ptr<Source> sinkToSource(std::function<void(Sink &)> fun)
         }
     };
 
-    return std::make_unique<SinkToSource>(fun);
+    return std::make_unique<SinkToSource>(fun, eof);
 }
 
 

@@ -81,6 +81,7 @@ or a newline, e.g.
 
 <para>Each machine specification consists of the following elements,
 separated by spaces. Only the first element is required.
+To leave a field at its default, set it to <literal>-</literal>.
 
 <orderedlist>
 

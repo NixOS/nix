@@ -131,7 +131,7 @@ struct LegacySSHStore : public Store
 
         auto conn(connections->get());
 
-        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 4) {
+        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 5) {
 
             conn->to
                 << cmdAddToStoreNar

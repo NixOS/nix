@@ -7,10 +7,13 @@
 #include "finally.hh"
 #include "fs-accessor.hh"
 #include "progress-bar.hh"
+#include "affinity.hh"
 
 #if __linux__
 #include <sys/mount.h>
 #endif
+
+#include <queue>
 
 using namespace nix;
 
@@ -121,10 +124,27 @@ struct CmdRun : InstallablesCommand
                 unsetenv(var.c_str());
         }
 
+        std::unordered_set<Path> done;
+        std::queue<Path> todo;
+        for (auto & path : outPaths) todo.push(path);
+
         auto unixPath = tokenizeString<Strings>(getEnv("PATH"), ":");
-        for (auto & path : outPaths)
-            if (accessor->stat(path + "/bin").type != FSAccessor::tMissing)
+
+        while (!todo.empty()) {
+            Path path = todo.front();
+            todo.pop();
+            if (!done.insert(path).second) continue;
+
+            if (true)
                 unixPath.push_front(path + "/bin");
+
+            auto propPath = path + "/nix-support/propagated-user-env-packages";
+            if (accessor->stat(propPath).type == FSAccessor::tRegular) {
+                for (auto & p : tokenizeString<Paths>(readFile(propPath)))
+                    todo.push(p);
+            }
+        }
+
         setenv("PATH", concatStringsSep(":", unixPath).c_str(), 1);
 
         std::string cmd = *command.begin();
@@ -134,6 +154,8 @@ struct CmdRun : InstallablesCommand
         stopProgressBar();
 
         restoreSignals();
+
+        restoreAffinity();
 
         /* If this is a diverted store (i.e. its "logical" location
            (typically /nix/store) differs from its "physical" location

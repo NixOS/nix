@@ -4,8 +4,8 @@
 #include "json.hh"
 #include "common-args.hh"
 
-#include <iomanip>
 #include <algorithm>
+#include <array>
 
 using namespace nix;
 
@@ -13,12 +13,14 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
 {
     bool showSize = false;
     bool showClosureSize = false;
+    bool humanReadable = false;
     bool showSigs = false;
 
     CmdPathInfo()
     {
         mkFlag('s', "size", "print size of the NAR dump of each path", &showSize);
         mkFlag('S', "closure-size", "print sum size of the NAR dumps of the closure of each path", &showClosureSize);
+        mkFlag('h', "human-readable", "with -s and -S, print sizes like 1K 234M 5.67G etc.", &humanReadable);
         mkFlag(0, "sigs", "show signatures", &showSigs);
     }
 
@@ -40,6 +42,10 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
                 "nix path-info -rS /run/current-system | sort -nk2"
             },
             Example{
+                "To show a package's closure size and all its dependencies with human readable sizes:",
+                "nix path-info -rsSh nixpkgs.rust"
+            },
+            Example{
                 "To check the existence of a path in a binary cache:",
                 "nix path-info -r /nix/store/7qvk5c91...-geeqie-1.1 --store https://cache.nixos.org/"
             },
@@ -56,6 +62,25 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
                 "nix path-info --json --all -S | jq 'map(select(.closureSize > 1e9)) | sort_by(.closureSize) | map([.path, .closureSize])'"
             },
         };
+    }
+
+    void printSize(unsigned long long value)
+    {
+        if (!humanReadable) {
+            std::cout << fmt("\t%11d", value);
+            return;
+        }
+
+        static const std::array<char, 9> idents{{
+            ' ', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'
+        }};
+        size_t power = 0;
+        double res = value;
+        while (res > 1024 && power < idents.size()) {
+            ++power;
+            res /= 1024;
+        }
+        std::cout << fmt("\t%6.1f%c", res, idents.at(power));
     }
 
     void run(ref<Store> store, Paths storePaths) override
@@ -78,13 +103,16 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
                 auto info = store->queryPathInfo(storePath);
                 storePath = info->path; // FIXME: screws up padding
 
-                std::cout << storePath << std::string(std::max(0, (int) pathLen - (int) storePath.size()), ' ');
+                std::cout << storePath;
+
+                if (showSize || showClosureSize || showSigs)
+                    std::cout << std::string(std::max(0, (int) pathLen - (int) storePath.size()), ' ');
 
                 if (showSize)
-                    std::cout << '\t' << std::setw(11) << info->narSize;
+                    printSize(info->narSize);
 
                 if (showClosureSize)
-                    std::cout << '\t' << std::setw(11) << store->getClosureSize(storePath).first;
+                    printSize(store->getClosureSize(storePath).first);
 
                 if (showSigs) {
                     std::cout << '\t';

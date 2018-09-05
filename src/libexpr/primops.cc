@@ -1696,6 +1696,8 @@ static void prim_concatMap(EvalState & state, const Pos & pos, Value * * args, V
 
 static void prim_add(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
+    state.forceValue(*args[0], pos);
+    state.forceValue(*args[1], pos);
     if (args[0]->type == tFloat || args[1]->type == tFloat)
         mkFloat(v, state.forceFloat(*args[0], pos) + state.forceFloat(*args[1], pos));
     else
@@ -1705,6 +1707,8 @@ static void prim_add(EvalState & state, const Pos & pos, Value * * args, Value &
 
 static void prim_sub(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
+    state.forceValue(*args[0], pos);
+    state.forceValue(*args[1], pos);
     if (args[0]->type == tFloat || args[1]->type == tFloat)
         mkFloat(v, state.forceFloat(*args[0], pos) - state.forceFloat(*args[1], pos));
     else
@@ -1714,6 +1718,8 @@ static void prim_sub(EvalState & state, const Pos & pos, Value * * args, Value &
 
 static void prim_mul(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
+    state.forceValue(*args[0], pos);
+    state.forceValue(*args[1], pos);
     if (args[0]->type == tFloat || args[1]->type == tFloat)
         mkFloat(v, state.forceFloat(*args[0], pos) * state.forceFloat(*args[1], pos));
     else
@@ -1723,6 +1729,9 @@ static void prim_mul(EvalState & state, const Pos & pos, Value * * args, Value &
 
 static void prim_div(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
+    state.forceValue(*args[0], pos);
+    state.forceValue(*args[1], pos);
+
     NixFloat f2 = state.forceFloat(*args[1], pos);
     if (f2 == 0) throw EvalError(format("division by zero, at %1%") % pos);
 

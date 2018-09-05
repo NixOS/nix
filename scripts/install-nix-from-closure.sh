@@ -30,15 +30,14 @@ if [ "$(uname -s)" = "Darwin" ]; then
     fi
 fi
 
-# Determine if we should punt to the single-user installer or not
+# Determine if we could use the multi-user installer or not
 if [ "$(uname -s)" = "Darwin" ]; then
-    INSTALL_MODE=daemon
+    echo "Note: a multi-user installation is possible. See https://nixos.org/nix/manual/#sect-multi-user-installation" >&2
 elif [ "$(uname -s)" = "Linux" ] && [ -e /run/systemd/system ]; then
-    INSTALL_MODE=daemon
-else
-    INSTALL_MODE=no-daemon
+    echo "Note: a multi-user installation is possible. See https://nixos.org/nix/manual/#sect-multi-user-installation" >&2
 fi
 
+INSTALL_MODE=no-daemon
 # Trivially handle the --daemon / --no-daemon options
 if [ "x${1:-}" = "x--no-daemon" ]; then
     INSTALL_MODE=no-daemon
@@ -47,14 +46,18 @@ elif [ "x${1:-}" = "x--daemon" ]; then
 elif [ "x${1:-}" != "x" ]; then
     (
         echo "Nix Installer [--daemon|--no-daemon]"
+
+        echo "Choose installation method."
         echo ""
-        echo " --daemon:    Force the installer to use the Daemon"
-        echo "              based installer, even though it may not"
-        echo "              work."
+        echo " --daemon:    Installs and configures a background daemon that manages the store,"
+        echo "              providing multi-user support and better isolation for local builds."
+        echo "              Both for security and reproducibility, this method is recommended if"
+        echo "              supported on your platform."
+        echo "              See https://nixos.org/nix/manual/#sect-multi-user-installation"
         echo ""
-        echo " --no-daemon: Force a no-daemon, single-user"
-        echo "              installation even when the preferred"
-        echo "              method is with the daemon."
+        echo " --no-daemon: Simple, single-user installation that does not require root and is"
+        echo "              trivial to uninstall."
+        echo "              (default)"
         echo ""
     ) >&2
     exit

@@ -305,6 +305,8 @@ void mainWrapped(int argc, char * * argv)
         }
     }
 
+    state->printStats();
+
     auto buildPaths = [&](const PathSet & paths) {
         /* Note: we do this even when !printMissing to efficiently
            fetch binary cache data. */
@@ -419,7 +421,6 @@ void mainWrapped(int argc, char * * argv)
                 R"s([ -n "$PS1" ] && PS1='\n\[\033[1;32m\][nix-shell:\w]\$\[\033[0m\] '; )s"
                 "if [ \"$(type -t runHook)\" = function ]; then runHook shellHook; fi; "
                 "unset NIX_ENFORCE_PURITY; "
-                "unset NIX_INDENT_MAKE; "
                 "shopt -u nullglob; "
                 "unset TZ; %4%"
                 "%5%",

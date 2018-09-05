@@ -275,6 +275,9 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         return true;
     }
 
+    std::shared_ptr<TransferManager> transferManager;
+    std::once_flag transferManagerCreated;
+
     void uploadFile(const std::string & path, const std::string & data,
         const std::string & mimeType,
         const std::string & contentEncoding)
@@ -286,48 +289,28 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         static std::shared_ptr<Aws::Utils::Threading::PooledThreadExecutor>
             executor = std::make_shared<Aws::Utils::Threading::PooledThreadExecutor>(maxThreads);
 
-        TransferManagerConfiguration transferConfig(executor.get());
+        std::call_once(transferManagerCreated, [&]() {
 
-        transferConfig.s3Client = s3Helper.client;
-        transferConfig.bufferSize = bufferSize;
+            TransferManagerConfiguration transferConfig(executor.get());
 
-        transferConfig.uploadProgressCallback =
-            [&](const TransferManager *transferManager,
-                const std::shared_ptr<const TransferHandle>
-                    &transferHandle) {
-              //FIXME: find a way to properly abort the multipart upload.
-              checkInterrupt();
-              debug("upload progress ('%s'): '%d' of '%d' bytes",
-                             path,
-                             transferHandle->GetBytesTransferred(),
-                             transferHandle->GetBytesTotalSize());
-            };
+            transferConfig.s3Client = s3Helper.client;
+            transferConfig.bufferSize = bufferSize;
 
-        transferConfig.transferStatusUpdatedCallback =
-            [&](const TransferManager *,
-                const std::shared_ptr<const TransferHandle>
-                    &transferHandle) {
-              switch (transferHandle->GetStatus()) {
-                  case TransferStatus::COMPLETED:
-                      printTalkative("upload of '%s' completed", path);
-                      stats.put++;
-                      stats.putBytes += data.size();
-                      break;
-                  case TransferStatus::IN_PROGRESS:
-                      break;
-                  case TransferStatus::FAILED:
-                      throw Error("AWS error: failed to upload 's3://%s/%s'",
-                                  bucketName, path);
-                      break;
-                  default:
-                      throw Error("AWS error: transfer status of 's3://%s/%s' "
-                                  "in unexpected state",
-                                  bucketName, path);
-              };
-            };
+            transferConfig.uploadProgressCallback =
+                [&](const TransferManager *transferManager,
+                    const std::shared_ptr<const TransferHandle>
+                    &transferHandle)
+                {
+                    //FIXME: find a way to properly abort the multipart upload.
+                    //checkInterrupt();
+                    debug("upload progress ('%s'): '%d' of '%d' bytes",
+                        path,
+                        transferHandle->GetBytesTransferred(),
+                        transferHandle->GetBytesTotalSize());
+                };
 
-        std::shared_ptr<TransferManager> transferManager =
-            TransferManager::Create(transferConfig);
+            transferManager = TransferManager::Create(transferConfig);
+        });
 
         auto now1 = std::chrono::steady_clock::now();
 
@@ -339,6 +322,16 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
         transferHandle->WaitUntilFinished();
 
+        if (transferHandle->GetStatus() == TransferStatus::FAILED)
+            throw Error("AWS error: failed to upload 's3://%s/%s': %s",
+                bucketName, path, transferHandle->GetLastError().GetMessage());
+
+        if (transferHandle->GetStatus() != TransferStatus::COMPLETED)
+            throw Error("AWS error: transfer status of 's3://%s/%s' in unexpected state",
+                bucketName, path);
+
+        printTalkative("upload of '%s' completed", path);
+
         auto now2 = std::chrono::steady_clock::now();
 
         auto duration =
@@ -349,6 +342,8 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
                   bucketName % path % data.size() % duration);
 
         stats.putTimeMs += duration;
+        stats.putBytes += data.size();
+        stats.put++;
     }
 
     void upsertFile(const std::string & path, const std::string & data,

@@ -398,6 +398,84 @@ stdenv.mkDerivation { … }
           </listitem>
         </varlistentry>
       </variablelist>
+
+      <example>
+        <title>Fetching a private repository over SSH</title>
+        <programlisting>builtins.fetchGit {
+  url = "git@github.com:my-secret/repository.git";
+  ref = "master";
+  rev = "adab8b916a45068c044658c4158d81878f9ed1c3";
+}</programlisting>
+      </example>
+
+      <example>
+        <title>Fetching a repository's specific commit on an arbitrary branch</title>
+        <para>
+          If the revision you're looking for is in the default branch
+          of the gift repository you don't strictly need to specify
+          the branch name in the <varname>ref</varname> attribute.
+        </para>
+        <para>
+          However, if the revision you're looking for is in a future
+          branch for the non-default branch you will need to specify
+          the the <varname>ref</varname> attribute as well.
+        </para>
+        <programlisting>builtins.fetchGit {
+  url = "https://github.com/nixos/nix.git";
+  rev = "841fcbd04755c7a2865c51c1e2d3b045976b7452";
+  ref = "1.11-maintenance";
+}</programlisting>
+        <note>
+          <para>
+            It is nice to always specify the branch which a revision
+            belongs to. Without the branch being specified, the
+            fetcher might fail if the default branch changes.
+            Additionally, it can be confusing to try a commit from a
+            non-default branch and see the fetch fail. If the branch
+            is specified the fault is much more obvious.
+          </para>
+        </note>
+      </example>
+
+      <example>
+        <title>Fetching a repository's specific commit on the default branch</title>
+        <para>
+          If the revision you're looking for is in the default branch
+          of the gift repository you may omit the
+          <varname>ref</varname> attribute.
+        </para>
+        <programlisting>builtins.fetchGit {
+  url = "https://github.com/nixos/nix.git";
+  rev = "841fcbd04755c7a2865c51c1e2d3b045976b7452";
+}</programlisting>
+      </example>
+
+      <example>
+        <title>Fetching a tag</title>
+        <programlisting>builtins.fetchGit {
+  url = "https://github.com/nixos/nix.git";
+  ref = "tags/1.9";
+}</programlisting>
+        <note><para>Due to a bug (<link
+        xlink:href="https://github.com/NixOS/nix/issues/2385">#2385</link>),
+        only non-annotated tags can be fetched.</para></note>
+      </example>
+
+      <example>
+        <title>Fetching the latest version of a remote branch</title>
+        <para>
+          <function>builtins.fetchGit</function> can behave impurely
+           fetch the latest version of a remote branch.
+        </para>
+        <note><para>Nix will refetch the branch in accordance to
+        <option>tarball-ttl</option>.</para></note>
+        <note><para>This behavior is disabled in
+        <emphasis>Pure evaluation mode</emphasis>.</para></note>
+        <programlisting>builtins.fetchGit {
+  url = "ssh://git@github.com/nixos/nix.git";
+  ref = "master";
+}</programlisting>
+      </example>
     </listitem>
   </varlistentry>
 
@@ -1244,8 +1322,8 @@ in foo</programlisting>
     This is not allowed because it would cause a cyclic dependency in
     the computation of the cryptographic hashes for
     <varname>foo</varname> and <varname>bar</varname>.</para>
-    <para>It is also not possible to reference the result of a derivation. 
-    If you are using Nixpkgs, the <literal>writeTextFile</literal> function is able to 
+    <para>It is also not possible to reference the result of a derivation.
+    If you are using Nixpkgs, the <literal>writeTextFile</literal> function is able to
     do that.</para></listitem>
 
   </varlistentry>
