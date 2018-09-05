@@ -24,6 +24,7 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
 
     Path storePath = getAttr("out");
     auto mainUrl = getAttr("url");
+    bool unpack = get(drv.env, "unpack", "") == "1";
 
     /* Note: have to use a fresh downloader here because we're in
        a forked process. */
@@ -40,12 +41,12 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
             request.decompress = false;
 
             auto decompressor = makeDecompressionSink(
-                hasSuffix(mainUrl, ".xz") ? "xz" : "none", sink);
+                unpack && hasSuffix(mainUrl, ".xz") ? "xz" : "none", sink);
             downloader->download(std::move(request), *decompressor);
             decompressor->finish();
         });
 
-        if (get(drv.env, "unpack", "") == "1")
+        if (unpack)
             restorePath(storePath, *source);
         else
             writeFile(storePath, *source);
