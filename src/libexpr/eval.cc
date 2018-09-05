@@ -26,8 +26,6 @@
 
 #endif
 
-using std::cout;
-
 namespace nix {
 
 
@@ -1746,14 +1744,11 @@ void EvalState::printStats()
     GC_get_heap_usage_safe(&heapSize, 0, 0, 0, &totalBytes);
 #endif
     if (showStats) {
-        printMsg(v, "evaluation statistics:");
         auto outPath = getEnv("NIX_SHOW_STATS_PATH","-");
         std::fstream fs;
-        if (outPath != "-") {
+        if (outPath != "-")
             fs.open(outPath, std::fstream::out);
-            printMsg(v, format("  written to: %1%") % outPath);
-        }
-        JSONObject topObj(outPath == "-" ? cout : fs, true);
+        JSONObject topObj(outPath == "-" ? std::cerr : fs, true);
         topObj.attr("cpuTime",cpuTime);
         {
             auto envs = topObj.object("envs");
