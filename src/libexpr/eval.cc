@@ -1728,7 +1728,6 @@ bool EvalState::eqValues(Value & v1, Value & v2)
 void EvalState::printStats()
 {
     bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
-    Verbosity v = showStats ? lvlInfo : lvlDebug;
 
     struct rusage buf;
     getrusage(RUSAGE_SELF, &buf);
@@ -1779,7 +1778,7 @@ void EvalState::printStats()
             sets.attr("elements", nrAttrsInAttrsets);
         }
         {
-            JSONObject sizes = topObj.object("sizes");
+            auto sizes = topObj.object("sizes");
             sizes.attr("Env", sizeof(Env));
             sizes.attr("Value", sizeof(Value));
             sizes.attr("Bindings", sizeof(Bindings));
@@ -1793,40 +1792,47 @@ void EvalState::printStats()
         topObj.attr("nrPrimOpCalls", nrPrimOpCalls);
         topObj.attr("nrFunctionCalls", nrFunctionCalls);
 #if HAVE_BOEHMGC
-        JSONObject gc = topObj.object("gc");
-        gc.attr("heapSize", heapSize);
-        gc.attr("totalBytes", totalBytes);
+        {
+            auto gc = topObj.object("gc");
+            gc.attr("heapSize", heapSize);
+            gc.attr("totalBytes", totalBytes);
+        }
 #endif
-    }
-
-
-    if (countCalls) {
-        v = lvlInfo;
-
-        printMsg(v, format("calls to %1% primops:") % primOpCalls.size());
-        typedef std::multimap<size_t, Symbol> PrimOpCalls_;
-        PrimOpCalls_ primOpCalls_;
-        for (auto & i : primOpCalls)
-            primOpCalls_.insert(std::pair<size_t, Symbol>(i.second, i.first));
-        for (auto i = primOpCalls_.rbegin(); i != primOpCalls_.rend(); ++i)
-            printMsg(v, format("%1$10d %2%") % i->first % i->second);
-
-        printMsg(v, format("calls to %1% functions:") % functionCalls.size());
-        typedef std::multimap<size_t, ExprLambda *> FunctionCalls_;
-        FunctionCalls_ functionCalls_;
-        for (auto & i : functionCalls)
-            functionCalls_.insert(std::pair<size_t, ExprLambda *>(i.second, i.first));
-        for (auto i = functionCalls_.rbegin(); i != functionCalls_.rend(); ++i)
-            printMsg(v, format("%1$10d %2%") % i->first % i->second->showNamePos());
-
-        printMsg(v, format("evaluations of %1% attributes:") % attrSelects.size());
-        typedef std::multimap<size_t, Pos> AttrSelects_;
-        AttrSelects_ attrSelects_;
-        for (auto & i : attrSelects)
-            attrSelects_.insert(std::pair<size_t, Pos>(i.second, i.first));
-        for (auto i = attrSelects_.rbegin(); i != attrSelects_.rend(); ++i)
-            printMsg(v, format("%1$10d %2%") % i->first % i->second);
-
+        if (countCalls) {
+            {
+                auto obj = topObj.object("primops");
+                for (auto & i : primOpCalls)
+                    obj.attr(i.first, i.second);
+            }
+            {
+                auto list = topObj.list("functions");
+                for (auto & i : functionCalls) {
+                    auto obj = list.object();
+                    if (i.first->name.set())
+                        obj.attr("name", (const string &) i.first->name);
+                    else
+                        obj.attr("name", nullptr);
+                    if (i.first->pos) {
+                        obj.attr("file", (const string &) i.first->pos.file);
+                        obj.attr("line", i.first->pos.line);
+                        obj.attr("column", i.first->pos.column);
+                    }
+                    obj.attr("count", i.second);
+                }
+            }
+            {
+                auto list = topObj.list("attributes");
+                for (auto & i : attrSelects) {
+                    auto obj = list.object();
+                    if (i.first) {
+                        obj.attr("file", (const string &) i.first.file);
+                        obj.attr("line", i.first.line);
+                        obj.attr("column", i.first.column);
+                    }
+                    obj.attr("count", i.second);
+                }
+            }
+        }
     }
 }
 
