@@ -4,6 +4,8 @@
 
 #include <algorithm>
 
+#include <fcntl.h>
+
 namespace nix {
 
 struct HashAndWriteSink : Sink
@@ -69,9 +71,22 @@ Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, 
         if (n == 0) break;
         if (n != 1) throw Error("input doesn't look like something created by 'nix-store --export'");
 
+        /* Extract the NAR from the source, writing it to a temporary file. */
+
+        auto tempDir = createTempDir();
+        AutoDelete delTempDir(tempDir, true);
+        Path tempPath = tempDir + "/x";
+
+        AutoCloseFD fd = open(tempPath.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
+        if (!fd)
+            throw SysError(format("opening file '%1%'") % tempPath);
+
         /* Extract the NAR from the source. */
-        TeeSink tee(source);
-        parseDump(tee, tee.source);
+        FdTeeSink fdTeeSink(source, fd.get());
+        parseDump(fdTeeSink, fdTeeSink.source);
+
+        fdTeeSink.source.fdSink.flush();
+        size_t readSize = fdTeeSink.source.fdSink.written;
 
         uint32_t magic = readInt(source);
         if (magic != exportMagic)
@@ -88,14 +103,21 @@ Paths Store::importPaths(Source & source, std::shared_ptr<FSAccessor> accessor, 
         info.deriver = readString(source);
         if (info.deriver != "") assertStorePath(info.deriver);
 
-        info.narHash = hashString(htSHA256, *tee.source.data);
-        info.narSize = tee.source.data->size();
+        info.narHash = hashFile(htSHA256, tempPath);
+        info.narSize = readSize;
 
         // Ignore optional legacy signature.
         if (readInt(source) == 1)
             readString(source);
 
-        addToStore(info, tee.source.data, NoRepair, checkSigs, accessor);
+        // Rewind the the Fd so we can read that source from the beginning.
+        if (lseek(fd.get(), 0, SEEK_SET) != 0)
+            throw SysError("seeking in '%s'", tempPath);
+        // We open a new FdSource instead of using `fdTeeSink.source` because
+        // just rewinding the fd, doesn't reset internal state in the FdSource.
+        FdSource fdSource(fd.get());
+
+        addToStore(info, fdSource, NoRepair, checkSigs, accessor);
 
         res.push_back(info.path);
     }

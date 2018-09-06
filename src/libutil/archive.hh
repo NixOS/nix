@@ -70,6 +70,13 @@ struct TeeSink : ParseSink
     TeeSink(Source & source) : source(source) { }
 };
 
+struct FdTeeSink : ParseSink
+{
+    FdTeeSource source;
+
+    FdTeeSink(Source & source, int fd) : source(source, fd) { }
+};
+
 void parseDump(ParseSink & sink, Source & source);
 
 void restorePath(const Path & path, Source & source);

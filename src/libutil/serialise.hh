@@ -180,6 +180,22 @@ struct TeeSource : Source
 };
 
 
+/* Adapter class of a Source that saves all data read to the given FD. */
+struct FdTeeSource : Source
+{
+    Source & orig;
+    FdSink fdSink;
+    FdTeeSource(Source & orig, int fd)
+        : orig(orig), fdSink(fd) { }
+    size_t read(unsigned char * data, size_t len)
+    {
+        size_t n = orig.read(data, len);
+        fdSink.write(data, n);
+        return n;
+    }
+};
+
+
 /* Convert a function into a sink. */
 struct LambdaSink : Sink
 {
