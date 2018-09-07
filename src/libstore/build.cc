@@ -3682,6 +3682,12 @@ void SubstitutionGoal::tryNext()
     } catch (InvalidPath &) {
         tryNext();
         return;
+    } catch (SubstituterDisabled &) {
+        if (settings.tryFallback) {
+            tryNext();
+            return;
+        }
+        throw;
     } catch (Error & e) {
         if (settings.tryFallback) {
             printError(e.what());
