@@ -3682,6 +3682,13 @@ void SubstitutionGoal::tryNext()
     } catch (InvalidPath &) {
         tryNext();
         return;
+    } catch (Error & e) {
+        if (settings.tryFallback) {
+            printError(e.what());
+            tryNext();
+            return;
+        }
+        throw;
     }
 
     /* Update the total expected download size. */
