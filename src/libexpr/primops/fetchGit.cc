@@ -120,6 +120,13 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     {
         Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Git repository '%s'", uri));
 
+        if (ref == "*"s) {
+          /* Do full checkout. */
+          runProgram("git", true, { "-C", cacheDir, "fetch", "--quiet", "--force", "--", uri, "+refs/heads/*:refs/heads/*" });
+
+          ref = "HEAD"s;
+        }
+
         // FIXME: git stderr messes up our progress indicator, so
         // we're using --quiet for now. Should process its stderr.
         runProgram("git", true, { "-C", cacheDir, "fetch", "--quiet", "--force", "--", uri, *ref + ":" + localRef });
