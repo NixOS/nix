@@ -275,7 +275,7 @@ as a means of providing Nix store access to a restricted ssh user.
 
     <listitem><para>Allow the connected client to request the realization
     of derivations. In effect, this can be used to make the host act
-    as a build slave.</para></listitem>
+    as a remote builder.</para></listitem>
 
   </varlistentry>
 
