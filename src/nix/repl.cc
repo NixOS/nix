@@ -31,6 +31,7 @@ struct NixRepl
 {
     string curDir;
     EvalState state;
+    Bindings * autoArgs;
 
     Strings loadedFiles;
 
@@ -446,8 +447,7 @@ void NixRepl::loadFile(const Path & path)
     loadedFiles.push_back(path);
     Value v, v2;
     state.evalFile(lookupFileArg(state, path), v);
-    Bindings & bindings(*state.allocBindings(0));
-    state.autoCallFunction(bindings, v, v2);
+    state.autoCallFunction(*autoArgs, v, v2);
     addAttrsToScope(v2);
 }
 
@@ -699,6 +699,7 @@ struct CmdRepl : StoreCommand, MixEvalArgs
     void run(ref<Store> store) override
     {
         auto repl = std::make_unique<NixRepl>(searchPath, openStore());
+        repl->autoArgs = getAutoArgs(repl->state);
         repl->mainLoop(files);
     }
 };
