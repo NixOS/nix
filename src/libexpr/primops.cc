@@ -866,7 +866,7 @@ static void prim_baseNameOf(EvalState & state, const Pos & pos, Value * * args, 
 static void prim_dirOf(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    Path dir = dirOf(state.coerceToPath(pos, *args[0], context));
+    Path dir = dirOf(state.coerceToString(pos, *args[0], context, false, false));
     if (args[0]->type == tPath) mkPath(v, dir.c_str()); else mkString(v, dir, context);
 }
 
