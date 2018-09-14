@@ -453,7 +453,6 @@ static void prim_tryEval(EvalState & state, const Pos & pos, Value * * args, Val
         v.attrs->push_back(Attr(state.sValue, args[0]));
         mkBool(*state.allocAttr(v, state.symbols.create("success")), true);
     } catch (AssertionError & e) {
-        mkBool(*state.allocAttr(v, state.sValue), false);
         mkBool(*state.allocAttr(v, state.symbols.create("success")), false);
     }
     v.attrs->sort();
