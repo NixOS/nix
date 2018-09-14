@@ -119,7 +119,7 @@ let
       let
         toplevel = builtins.getAttr system jobs.build;
         version = toplevel.src.version;
-        installerClosureInfo = closureInfo { rootPaths = [ toplevel cacert ]; };
+        installerClosureInfo = closureInfo { rootPaths = [ toplevel cacert policycoreutils nix-selinux-policy ]; };
       in
 
       runCommand "nix-binary-tarball-${version}"
@@ -140,7 +140,9 @@ let
             --subst-var-by cacert ${cacert}
           substitute ${./scripts/install-multi-user.sh} $TMPDIR/install-multi-user \
             --subst-var-by nix ${toplevel} \
-            --subst-var-by cacert ${cacert}
+            --subst-var-by cacert ${cacert} \
+            --subst-var-by semodule ${policycoreutils}/bin/semodule \
+            --subst-var-by policy ${nix-selinux-policy}/nix.pp
 
           if type -p shellcheck; then
             # SC1090: Don't worry about not being able to find
