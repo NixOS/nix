@@ -20,7 +20,7 @@ struct CmdBuild : MixDryRun, InstallablesCommand
 
         mkFlag()
             .longName("no-link")
-            .description("do not create a symlink to the build result")
+            .description("print result paths to stdout instead of creating a symlink")
             .set(&outLink, Path(""));
     }
 
@@ -57,14 +57,17 @@ struct CmdBuild : MixDryRun, InstallablesCommand
         for (size_t i = 0; i < buildables.size(); ++i) {
             auto & b(buildables[i]);
 
-            if (outLink != "")
-                for (auto & output : b.outputs)
-                    if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
+            for (auto & output : b.outputs)
+                if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
+                    if (outLink != "") {
                         std::string symlink = outLink;
                         if (i) symlink += fmt("-%d", i);
                         if (output.first != "out") symlink += fmt("-%s", output.first);
                         store2->addPermRoot(output.second, absPath(symlink), true);
+                    } else {
+                        std::cout << output.second << std::endl;
                     }
+                }
         }
     }
 };
