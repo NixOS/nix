@@ -20,7 +20,7 @@ struct CmdBuild : MixDryRun, InstallablesCommand
 
         mkFlag()
             .longName("no-link")
-            .description("print result paths to stdout instead of creating a symlink")
+            .description("print result paths to stdout instead of creating symlinks")
             .set(&outLink, Path(""));
     }
 
