@@ -8,7 +8,7 @@
 
   <para>
     Multi-user Nix users on macOS can upgrade Nix by running this:
-    <command>$ sudo -i sh -c 'nix-channel --update &amp;&amp; nix-env
+    <command>sudo -i sh -c 'nix-channel --update &amp;&amp; nix-env
       -iA nixpkgs.nix'; sudo launchctl stop org.nixos.nix-daemon; sudo
       launchctl start org.nixos.nix-daemon</command>
   </para>
