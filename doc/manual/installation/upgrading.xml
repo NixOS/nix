@@ -7,15 +7,16 @@
   <title>Upgrading Nix</title>
 
   <para>
-    Multi-user Nix users on macOS can upgrade Nix by running
-    <command>sudo -i sh -c 'nix-channel --update &amp;&amp; nix-env
-    -iA nixpkgs.nix'; sudo launchctl stop org.nixos.nix-daemon; sudo
-    launchctl start org.nixos.nix-daemon</command>.
+    Multi-user Nix users on macOS can upgrade Nix by running:
+    <command>sudo -i sh -c 'nix-channel --update &amp;&amp;
+    nix-env -iA nixpkgs.nix &amp;&amp;
+    launchctl remove org.nixos.nix-daemon &amp;&amp;
+    launchctl load /Library/LaunchDaemons/org.nixos.nix-daemon.plist'</command>
   </para>
+
 
   <para>
-    Single-user installations of Nix should run <command>nix-channel
-    --update; nix-env -iA nixpkgs.nix</command>.
+    Single-user installations of Nix should run this:
+    <command>nix-channel --update; nix-env -iA nixpkgs.nix</command>
   </para>
-
 </chapter>
