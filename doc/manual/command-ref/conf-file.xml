@@ -135,7 +135,6 @@ false</literal>.</para>
 
   </varlistentry>
 
-
   <varlistentry xml:id="conf-builders">
     <term><literal>builders</literal></term>
     <listitem>
@@ -158,7 +157,6 @@ false</literal>.</para>
     to <literal>false</literal>.</para></listitem>
 
   </varlistentry>
-
 
   <varlistentry xml:id="conf-build-users-group"><term><literal>build-users-group</literal></term>
 
@@ -210,7 +208,6 @@ false</literal>.</para>
 
   </varlistentry>
 
-
   <varlistentry xml:id="conf-connect-timeout"><term><literal>connect-timeout</literal></term>
 
     <listitem>
@@ -242,7 +239,6 @@ false</literal>.</para>
     system.</para></listitem>
 
   </varlistentry>
-
 
   <varlistentry xml:id="conf-extra-sandbox-paths">
     <term><literal>extra-sandbox-paths</literal></term>
@@ -283,7 +279,6 @@ false</literal>.</para>
 
   </varlistentry>
 
-
   <varlistentry xml:id="conf-fallback"><term><literal>fallback</literal></term>
 
     <listitem><para>If set to <literal>true</literal>, Nix will fall
@@ -292,7 +287,6 @@ false</literal>.</para>
     default is <literal>false</literal>.</para></listitem>
 
   </varlistentry>
-
 
   <varlistentry xml:id="conf-fsync-metadata"><term><literal>fsync-metadata</literal></term>
 
@@ -303,7 +297,6 @@ false</literal>.</para>
     <literal>true</literal>.</para></listitem>
 
   </varlistentry>
-
 
   <varlistentry xml:id="conf-hashed-mirrors"><term><literal>hashed-mirrors</literal></term>
 
@@ -367,9 +360,7 @@ builtins.fetchurl {
     options a store path was built), so by default this option is on.
     Turn it off to save a bit of disk space (or a lot if
     <literal>keep-outputs</literal> is also turned on).</para></listitem>
-
   </varlistentry>
-
 
   <varlistentry xml:id="conf-keep-env-derivations"><term><literal>keep-env-derivations</literal></term>
 
@@ -394,7 +385,6 @@ builtins.fetchurl {
 
   </varlistentry>
 
-
   <varlistentry xml:id="conf-keep-outputs"><term><literal>keep-outputs</literal></term>
 
     <listitem><para>If <literal>true</literal>, the garbage collector
@@ -408,9 +398,7 @@ builtins.fetchurl {
     only at build time (e.g., the C compiler, or source tarballs
     downloaded from the network).  To prevent it from doing so, set
     this option to <literal>true</literal>.</para></listitem>
-
   </varlistentry>
-
 
   <varlistentry xml:id="conf-max-build-log-size"><term><literal>max-build-log-size</literal></term>
 
@@ -444,9 +432,7 @@ builtins.fetchurl {
     overridden using the <option
     linkend='opt-max-jobs'>--max-jobs</option> (<option>-j</option>)
     command line switch.</para></listitem>
-
   </varlistentry>
-
 
   <varlistentry xml:id="conf-max-silent-time"><term><literal>max-silent-time</literal></term>
 
@@ -603,7 +589,6 @@ password <replaceable>my-password</replaceable>
 
   </varlistentry>
 
-
   <varlistentry xml:id="conf-repeat"><term><literal>repeat</literal></term>
 
     <listitem><para>How many times to repeat builds to check whether
@@ -614,7 +599,6 @@ password <replaceable>my-password</replaceable>
     are not registered as “valid” in Nix’s database.</para></listitem>
 
   </varlistentry>
-
 
   <varlistentry xml:id="conf-require-sigs"><term><literal>require-sigs</literal></term>
 
@@ -678,7 +662,6 @@ password <replaceable>my-password</replaceable>
     </listitem>
 
   </varlistentry>
-
 
   <varlistentry xml:id="conf-sandbox-dev-shm-size"><term><literal>sandbox-dev-shm-size</literal></term>
 
@@ -745,7 +728,6 @@ password <replaceable>my-password</replaceable>
 
   </varlistentry>
 
-
   <varlistentry xml:id="conf-substituters"><term><literal>substituters</literal></term>
 
     <listitem><para>A list of URLs of substituters, separated by
@@ -753,7 +735,6 @@ password <replaceable>my-password</replaceable>
     <literal>https://cache.nixos.org</literal>.</para></listitem>
 
   </varlistentry>
-
 
   <varlistentry xml:id="conf-system"><term><literal>system</literal></term>
 
@@ -795,7 +776,6 @@ password <replaceable>my-password</replaceable>
 
   </varlistentry>
 
-
   <varlistentry xml:id="conf-trusted-public-keys"><term><literal>trusted-public-keys</literal></term>
 
     <listitem><para>A whitespace-separated list of public keys. When
@@ -805,7 +785,6 @@ password <replaceable>my-password</replaceable>
     hydra.nixos.org-1:CNHJZBh9K4tP3EKF6FkkgeVYsS3ohTl+oS0Qa8bezVs=</literal>.</para></listitem>
 
   </varlistentry>
-
 
   <varlistentry xml:id="conf-trusted-substituters"><term><literal>trusted-substituters</literal></term>
 
@@ -818,7 +797,6 @@ password <replaceable>my-password</replaceable>
     <literal>trusted-substituters</literal>.</para></listitem>
 
   </varlistentry>
-
 
   <varlistentry xml:id="conf-trusted-users"><term><literal>trusted-users</literal></term>
 
@@ -845,8 +823,177 @@ password <replaceable>my-password</replaceable>
   </varlistentry>
 
 </variablelist>
-
 </para>
+
+<refsection>
+  <title>Deprecated Settings</title>
+
+<para>
+
+<variablelist>
+
+  <varlistentry xml:id="conf-binary-caches">
+    <term><literal>binary-caches</literal></term>
+
+    <listitem><para><emphasis>Deprecated:</emphasis>
+    <literal>binary-caches</literal> is now an alias to
+    <xref linkend="conf-substituters" />.</para></listitem>
+  </varlistentry>
+
+  <varlistentry xml:id="conf-binary-cache-public-keys">
+    <term><literal>binary-cache-public-keys</literal></term>
+
+    <listitem><para><emphasis>Deprecated:</emphasis>
+    <literal>binary-cache-public-keys</literal> is now an alias to
+    <xref linkend="conf-trusted-public-keys" />.</para></listitem>
+  </varlistentry>
+
+  <varlistentry xml:id="conf-build-compress-log">
+    <term><literal>build-compress-log</literal></term>
+
+    <listitem><para><emphasis>Deprecated:</emphasis>
+    <literal>build-compress-log</literal> is now an alias to
+    <xref linkend="conf-compress-build-log" />.</para></listitem>
+  </varlistentry>
+
+  <varlistentry xml:id="conf-build-cores">
+    <term><literal>build-cores</literal></term>
+
+    <listitem><para><emphasis>Deprecated:</emphasis>
+    <literal>build-cores</literal> is now an alias to
+    <xref linkend="conf-cores" />.</para></listitem>
+  </varlistentry>
+
+  <varlistentry xml:id="conf-build-extra-chroot-dirs">
+    <term><literal>build-extra-chroot-dirs</literal></term>
+
+    <listitem><para><emphasis>Deprecated:</emphasis>
+    <literal>build-extra-chroot-dirs</literal> is now an alias to
+    <xref linkend="conf-extra-sandbox-paths" />.</para></listitem>
+  </varlistentry>
+
+  <varlistentry xml:id="conf-build-extra-sandbox-paths">
+    <term><literal>build-extra-sandbox-paths</literal></term>
+
+    <listitem><para><emphasis>Deprecated:</emphasis>
+    <literal>build-extra-sandbox-paths</literal> is now an alias to
+    <xref linkend="conf-extra-sandbox-paths" />.</para></listitem>
+  </varlistentry>
+
+  <varlistentry xml:id="conf-build-fallback">
+    <term><literal>build-fallback</literal></term>
+
+    <listitem><para><emphasis>Deprecated:</emphasis>
+    <literal>build-fallback</literal> is now an alias to
+    <xref linkend="conf-fallback" />.</para></listitem>
+  </varlistentry>
+
+  <varlistentry xml:id="conf-build-max-jobs">
+    <term><literal>build-max-jobs</literal></term>
+
+    <listitem><para><emphasis>Deprecated:</emphasis>
+    <literal>build-max-jobs</literal> is now an alias to
+    <xref linkend="conf-max-jobs" />.</para></listitem>
+  </varlistentry>
+
+  <varlistentry xml:id="conf-build-max-log-size">
+    <term><literal>build-max-log-size</literal></term>
+
+    <listitem><para><emphasis>Deprecated:</emphasis>
+    <literal>build-max-log-size</literal> is now an alias to
+    <xref linkend="conf-max-build-log-size" />.</para></listitem>
+  </varlistentry>
+
+  <varlistentry xml:id="conf-build-max-silent-time">
+    <term><literal>build-max-silent-time</literal></term>
+
+    <listitem><para><emphasis>Deprecated:</emphasis>
+    <literal>build-max-silent-time</literal> is now an alias to
+    <xref linkend="conf-max-silent-time" />.</para></listitem>
+  </varlistentry>
+
+  <varlistentry xml:id="conf-build-repeat">
+    <term><literal>build-repeat</literal></term>
+
+    <listitem><para><emphasis>Deprecated:</emphasis>
+    <literal>build-repeat</literal> is now an alias to
+    <xref linkend="conf-repeat" />.</para></listitem>
+  </varlistentry>
+
+  <varlistentry xml:id="conf-build-timeout">
+    <term><literal>build-timeout</literal></term>
+
+    <listitem><para><emphasis>Deprecated:</emphasis>
+    <literal>build-timeout</literal> is now an alias to
+    <xref linkend="conf-timeout" />.</para></listitem>
+  </varlistentry>
+
+  <varlistentry xml:id="conf-build-use-chroot">
+    <term><literal>build-use-chroot</literal></term>
+
+    <listitem><para><emphasis>Deprecated:</emphasis>
+    <literal>build-use-chroot</literal> is now an alias to
+    <xref linkend="conf-sandbox" />.</para></listitem>
+  </varlistentry>
+
+  <varlistentry xml:id="conf-build-use-sandbox">
+    <term><literal>build-use-sandbox</literal></term>
+
+    <listitem><para><emphasis>Deprecated:</emphasis>
+    <literal>build-use-sandbox</literal> is now an alias to
+    <xref linkend="conf-sandbox" />.</para></listitem>
+  </varlistentry>
+
+  <varlistentry xml:id="conf-build-use-substitutes">
+    <term><literal>build-use-substitutes</literal></term>
+
+    <listitem><para><emphasis>Deprecated:</emphasis>
+    <literal>build-use-substitutes</literal> is now an alias to
+    <xref linkend="conf-substitute" />.</para></listitem>
+  </varlistentry>
+
+  <varlistentry xml:id="conf-gc-keep-derivations">
+    <term><literal>gc-keep-derivations</literal></term>
+
+    <listitem><para><emphasis>Deprecated:</emphasis>
+    <literal>gc-keep-derivations</literal> is now an alias to
+    <xref linkend="conf-keep-derivations" />.</para></listitem>
+  </varlistentry>
+
+  <varlistentry xml:id="conf-gc-keep-outputs">
+    <term><literal>gc-keep-outputs</literal></term>
+
+    <listitem><para><emphasis>Deprecated:</emphasis>
+    <literal>gc-keep-outputs</literal> is now an alias to
+    <xref linkend="conf-keep-outputs" />.</para></listitem>
+  </varlistentry>
+
+  <varlistentry xml:id="conf-env-keep-derivations">
+    <term><literal>env-keep-derivations</literal></term>
+
+    <listitem><para><emphasis>Deprecated:</emphasis>
+    <literal>env-keep-derivations</literal> is now an alias to
+    <xref linkend="conf-keep-env-derivations" />.</para></listitem>
+  </varlistentry>
+
+  <varlistentry xml:id="conf-extra-binary-caches">
+    <term><literal>extra-binary-caches</literal></term>
+
+    <listitem><para><emphasis>Deprecated:</emphasis>
+    <literal>extra-binary-caches</literal> is now an alias to
+    <xref linkend="conf-extra-substituters" />.</para></listitem>
+  </varlistentry>
+
+  <varlistentry xml:id="conf-trusted-binary-caches">
+    <term><literal>trusted-binary-caches</literal></term>
+
+    <listitem><para><emphasis>Deprecated:</emphasis>
+    <literal>trusted-binary-caches</literal> is now an alias to
+    <xref linkend="conf-trusted-substituters" />.</para></listitem>
+  </varlistentry>
+</variablelist>
+</para>
+</refsection>
 
 </refsection>
 
