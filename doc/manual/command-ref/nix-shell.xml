@@ -317,13 +317,28 @@ while (my $token = $p->get_tag("a")) {
 
 </para>
 
-<para>Finally, the following Haskell script uses a specific branch of
-Nixpkgs/NixOS (the 14.12 stable branch):
+<para>Sometimes you need to pass a simple Nix expression to customize
+a package like Terraform:
+
+<programlisting><![CDATA[
+#! /usr/bin/env nix-shell
+#! nix-shell -i bash -p "terraform.withPlugins (plugins: [ plugins.openstack ])"
+
+terraform apply
+]]></programlisting>
+
+<note><para>You must use double quotes (<literal>"</literal>) when
+passing a simple Nix expression in a nix-shell shebang.</para></note>
+</para>
+
+<para>Finally, using the merging of multiple nix-shell shebangs the
+following Haskell script uses a specific branch of Nixpkgs/NixOS (the
+18.03 stable branch):
 
 <programlisting><![CDATA[
 #! /usr/bin/env nix-shell
 #! nix-shell -i runghc -p haskellPackages.ghc haskellPackages.HTTP haskellPackages.tagsoup
-#! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/nixos-14.12.tar.gz
+#! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs-channels/archive/nixos-18.03.tar.gz
 
 import Network.HTTP
 import Text.HTML.TagSoup
