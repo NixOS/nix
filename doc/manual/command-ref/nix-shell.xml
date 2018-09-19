@@ -317,6 +317,20 @@ while (my $token = $p->get_tag("a")) {
 
 </para>
 
+<para>Sometimes you need to pass a simple Nix expression to customize
+a package like Terraform:
+
+<programlisting><![CDATA[
+#! /usr/bin/env nix-shell
+#! nix-shell -i bash -p "terraform.withPlugins (plugins: [ plugins.openstack ])"
+
+terraform apply
+]]></programlisting>
+
+<note><para>You must use double quotes (<literal>"</literal>) when
+passing a simple Nix expression in a nix-shell shebang.</para></note>
+</para>
+
 <para>Finally, using the merging of multiple nix-shell shebangs the
 following Haskell script uses a specific branch of Nixpkgs/NixOS (the
 18.03 stable branch):
