@@ -28,6 +28,9 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     std::experimental::optional<std::string> ref, std::string rev,
     const std::string & name)
 {
+    Path gitLockFile = getCacheDir() + "/nix/git.lock";
+    PathLocks gitLock({gitLockFile}, "waiting for Git fetch...");
+
     if (evalSettings.pureEval && rev == "")
         throw Error("in pure evaluation mode, 'fetchGit' requires a Git revision");
 
