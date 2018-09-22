@@ -3683,18 +3683,12 @@ void SubstitutionGoal::tryNext()
         tryNext();
         return;
     } catch (SubstituterDisabled &) {
-        if (settings.tryFallback) {
-            tryNext();
-            return;
-        }
-        throw;
+        tryNext();
+        return;
     } catch (Error & e) {
-        if (settings.tryFallback) {
-            printError(e.what());
-            tryNext();
-            return;
-        }
-        throw;
+        printError(e.what());
+        tryNext();
+        return;
     }
 
     /* Update the total expected download size. */

@@ -882,10 +882,7 @@ void LocalStore::querySubstitutablePathInfos(const PathSet & paths,
             } catch (InvalidPath) {
             } catch (SubstituterDisabled) {
             } catch (Error & e) {
-                if (settings.tryFallback)
-                    printError(e.what());
-                else
-                    throw;
+                printError(e.what());
             }
         }
     }
