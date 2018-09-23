@@ -78,6 +78,7 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
     if [ -n "${MANPATH}" ]; then
         export MANPATH="$NIX_LINK/share/man:$MANPATH"
     fi
+    export XDG_DATA_DIRS="$NIX_LINK/share:$XDG_DATA_DIRS"
 
     export PATH="$NIX_LINK/bin:$__savedpath"
     unset __savedpath NIX_LINK NIX_USER_PROFILE_DIR NIX_PROFILES
