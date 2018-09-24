@@ -62,6 +62,9 @@ typedef enum {
 #define STDERR_RESULT         0x52534c54
 
 
+class Store;
+class Source;
+
 Path readStorePath(Store & store, Source & from);
 template<class T> T readStorePaths(Store & store, Source & from);
 
