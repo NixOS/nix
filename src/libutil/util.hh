@@ -553,4 +553,8 @@ typedef std::function<bool(const Path & path)> PathFilter;
 extern PathFilter defaultPathFilter;
 
 
+/* Create a Unix domain socket in listen mode. */
+AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode);
+
+
 }

@@ -156,52 +156,14 @@ static void daemonLoop(char * * argv)
         if (getEnv("LISTEN_PID") != std::to_string(getpid()) || getEnv("LISTEN_FDS") != "1")
             throw Error("unexpected systemd environment variables");
         fdSocket = SD_LISTEN_FDS_START;
+        closeOnExec(fdSocket.get());
     }
 
     /* Otherwise, create and bind to a Unix domain socket. */
     else {
-
-        /* Create and bind to a Unix domain socket. */
-        fdSocket = socket(PF_UNIX, SOCK_STREAM, 0);
-        if (!fdSocket)
-            throw SysError("cannot create Unix domain socket");
-
-        string socketPath = settings.nixDaemonSocketFile;
-
-        createDirs(dirOf(socketPath));
-
-        /* Urgh, sockaddr_un allows path names of only 108 characters.
-           So chdir to the socket directory so that we can pass a
-           relative path name. */
-        if (chdir(dirOf(socketPath).c_str()) == -1)
-            throw SysError("cannot change current directory");
-        Path socketPathRel = "./" + baseNameOf(socketPath);
-
-        struct sockaddr_un addr;
-        addr.sun_family = AF_UNIX;
-        if (socketPathRel.size() >= sizeof(addr.sun_path))
-            throw Error(format("socket path '%1%' is too long") % socketPathRel);
-        strcpy(addr.sun_path, socketPathRel.c_str());
-
-        unlink(socketPath.c_str());
-
-        /* Make sure that the socket is created with 0666 permission
-           (everybody can connect --- provided they have access to the
-           directory containing the socket). */
-        mode_t oldMode = umask(0111);
-        int res = bind(fdSocket.get(), (struct sockaddr *) &addr, sizeof(addr));
-        umask(oldMode);
-        if (res == -1)
-            throw SysError(format("cannot bind to socket '%1%'") % socketPath);
-
-        if (chdir("/") == -1) /* back to the root */
-            throw SysError("cannot change current directory");
-
-        if (listen(fdSocket.get(), 5) == -1)
-            throw SysError(format("cannot listen on socket '%1%'") % socketPath);
+        createDirs(dirOf(settings.nixDaemonSocketFile));
+        fdSocket = createUnixDomainSocket(settings.nixDaemonSocketFile, 0666);
     }
-
-    closeOnExec(fdSocket.get());
 
     /* Loop accepting connections. */
     while (1) {
