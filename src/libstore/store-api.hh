@@ -422,6 +422,13 @@ public:
         bool recursive = true, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) = 0;
 
+    // FIXME: remove?
+    virtual Path addToStoreFromDump(const string & dump, const string & name,
+        bool recursive = true, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
+    {
+        throw Error("addToStoreFromDump() is not supported by this store");
+    }
+
     /* Like addToStore, but the contents written to the output path is
        a regular file containing the given string. */
     virtual Path addTextToStore(const string & name, const string & s,

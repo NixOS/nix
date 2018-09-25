@@ -316,10 +316,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         if (!savedRegular.regular) throw Error("regular file expected");
 
-        auto store2 = store.dynamic_pointer_cast<LocalStore>();
-        if (!store2) throw Error("operation is only supported by LocalStore");
-
-        Path path = store2->addToStoreFromDump(recursive ? *savedNAR.data : savedRegular.s, baseName, recursive, hashAlgo);
+        Path path = store->addToStoreFromDump(recursive ? *savedNAR.data : savedRegular.s, baseName, recursive, hashAlgo);
         logger->stopWork();
 
         to << path;
