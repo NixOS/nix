@@ -21,7 +21,7 @@ public:
 
     virtual void upsertNarInfo(
         const std::string & uri, const std::string & hashPart,
-        std::shared_ptr<ValidPathInfo> info) = 0;
+        std::shared_ptr<const ValidPathInfo> info) = 0;
 };
 
 /* Return a singleton cache object that can be used concurrently by

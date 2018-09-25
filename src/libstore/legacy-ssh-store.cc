@@ -88,7 +88,7 @@ struct LegacySSHStore : public Store
     }
 
     void queryPathInfoUncached(const Path & path,
-        Callback<std::shared_ptr<ValidPathInfo>> callback) noexcept override
+        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
     {
         try {
             auto conn(connections->get());

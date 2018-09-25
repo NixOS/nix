@@ -258,7 +258,7 @@ protected:
 
     struct State
     {
-        LRUCache<std::string, std::shared_ptr<ValidPathInfo>> pathInfoCache;
+        LRUCache<std::string, std::shared_ptr<const ValidPathInfo>> pathInfoCache;
     };
 
     Sync<State> state;
@@ -361,12 +361,12 @@ public:
 
     /* Asynchronous version of queryPathInfo(). */
     void queryPathInfo(const Path & path,
-        Callback<ref<ValidPathInfo>> callback) noexcept;
+        Callback<ref<const ValidPathInfo>> callback) noexcept;
 
 protected:
 
     virtual void queryPathInfoUncached(const Path & path,
-        Callback<std::shared_ptr<ValidPathInfo>> callback) noexcept = 0;
+        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept = 0;
 
 public:
 
