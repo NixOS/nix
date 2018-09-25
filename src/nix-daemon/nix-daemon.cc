@@ -140,6 +140,15 @@ static PeerInfo getPeerInfo(int remote)
 #define SD_LISTEN_FDS_START 3
 
 
+static ref<Store> openUncachedStore()
+{
+    Store::Params params; // FIXME: get params from somewhere
+    // Disable caching since the client already does that.
+    params["path-info-cache-size"] = "0";
+    return openStore(settings.storeUri, params);
+}
+
+
 static void daemonLoop(char * * argv)
 {
     if (chdir("/") == -1)
@@ -230,7 +239,7 @@ static void daemonLoop(char * * argv)
                 /* Handle the connection. */
                 FdSource from(remote.get());
                 FdSink to(remote.get());
-                processConnection(from, to, trusted, user, peer.uid);
+                processConnection(openUncachedStore(), from, to, trusted, user, peer.uid);
 
                 exit(0);
             }, options);
@@ -312,7 +321,7 @@ static int _main(int argc, char * * argv)
             } else {
                 FdSource from(STDIN_FILENO);
                 FdSink to(STDOUT_FILENO);
-                processConnection(from, to, true, "root", 0);
+                processConnection(openUncachedStore(), from, to, true, "root", 0);
             }
         } else {
             daemonLoop(argv);
