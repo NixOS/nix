@@ -557,7 +557,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                     ;
                 else if (trusted
                     || name == settings.buildTimeout.name
-                    || name == "connect-timeout")
+                    || name == "connect-timeout"
+                    || (name == "builders" && value == ""))
                     settings.set(name, value);
                 else if (setSubstituters(settings.substituters))
                     ;
