@@ -710,11 +710,12 @@ void Downloader::download(DownloadRequest && request, Sink & sink)
 
         /* If the buffer is full, then go to sleep until the calling
            thread wakes us up (i.e. when it has removed data from the
-           buffer). Note: this does stall the download thread. */
-        while (state->data.size() > 1024 * 1024) {
-            if (state->quit) return;
+           buffer). We don't wait forever to prevent stalling the
+           download thread. (Hopefully sleeping will throttle the
+           sender.) */
+        if (state->data.size() > 1024 * 1024) {
             debug("download buffer is full; going to sleep");
-            state.wait(state->request);
+            state.wait_for(state->request, std::chrono::seconds(10));
         }
 
         /* Append data to the buffer and wake up the calling
@@ -736,30 +737,36 @@ void Downloader::download(DownloadRequest && request, Sink & sink)
             state->request.notify_one();
         }});
 
-    auto state(_state->lock());
-
     while (true) {
         checkInterrupt();
 
-        /* If no data is available, then wait for the download thread
-           to wake us up. */
-        if (state->data.empty()) {
+        std::string chunk;
 
-            if (state->quit) {
-                if (state->exc) std::rethrow_exception(state->exc);
-                break;
+        /* Grab data if available, otherwise wait for the download
+           thread to wake us up. */
+        {
+            auto state(_state->lock());
+
+            while (state->data.empty()) {
+
+                if (state->quit) {
+                    if (state->exc) std::rethrow_exception(state->exc);
+                    return;
+                }
+
+                state.wait(state->avail);
             }
 
-            state.wait(state->avail);
-        }
+            chunk = std::move(state->data);
 
-        /* If data is available, then flush it to the sink and wake up
-           the download thread if it's blocked on a full buffer. */
-        if (!state->data.empty()) {
-            sink((unsigned char *) state->data.data(), state->data.size());
-            state->data.clear();
             state->request.notify_one();
         }
+
+        /* Flush the data to the sink and wake up the download thread
+           if it's blocked on a full buffer. We don't hold the state
+           lock while doing this to prevent blocking the download
+           thread if sink() takes a long time. */
+        sink((unsigned char *) chunk.data(), chunk.size());
     }
 }
 
