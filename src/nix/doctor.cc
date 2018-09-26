@@ -42,7 +42,8 @@ struct CmdDoctor : StoreCommand
         checkStoreProtocol(store->getProtocol());
     }
 
-    void checkNixInPath() {
+    void checkNixInPath()
+    {
         PathSet dirs;
 
         for (auto & dir : tokenizeString<Strings>(getEnv("PATH"), ":"))
@@ -58,32 +59,29 @@ struct CmdDoctor : StoreCommand
         }
     }
 
-    void checkProfileRoots(ref<Store> store) {
+    void checkProfileRoots(ref<Store> store)
+    {
         PathSet dirs;
-        Roots roots = store->findRoots();
 
-        for (auto & dir : tokenizeString<Strings>(getEnv("PATH"), ":"))
+        for (auto & dir : tokenizeString<Strings>(getEnv("PATH"), ":")) {
+            Path profileDir = dirOf(dir);
             try {
-                auto profileDir = canonPath(dirOf(dir), true);
-                if (hasSuffix(profileDir, "user-environment") &&
-                    store->isValidPath(profileDir)) {
-                    PathSet referrers;
-                    store->computeFSClosure({profileDir}, referrers, true,
-                            settings.gcKeepOutputs, settings.gcKeepDerivations);
-                    bool found = false;
-                    for (auto & i : roots)
-                        if (referrers.find(i.second) != referrers.end())
-                            found = true;
-                    if (!found)
-                        dirs.insert(dir);
+                Path userEnv = canonPath(profileDir, true);
 
+                if (store->isStorePath(userEnv) && hasSuffix(userEnv, "user-environment")) {
+                    while (profileDir.find("/profiles/") == std::string::npos && isLink(profileDir))
+                        profileDir = absPath(readLink(profileDir), dirOf(profileDir));
+
+                    if (profileDir.find("/profiles/") == std::string::npos)
+                        dirs.insert(dir);
                 }
             } catch (SysError &) {}
+        }
 
         if (!dirs.empty()) {
-            std::cout << "Warning: found profiles without a gcroot." << std::endl;
-            std::cout << "The generation this profile points to will be deleted with the next gc, resulting" << std::endl;
-            std::cout << "in broken symlinks.  Make sure your profiles are in " << settings.nixStateDir << "/profiles." << std::endl;
+            std::cout << "Warning: found profiles outside of " << settings.nixStateDir << "/profiles." << std::endl;
+            std::cout << "The generation this profile points to might not have a gcroot and could be" << std::endl;
+            std::cout << "garbage collected, resulting in broken symlinks." << std::endl;
             std::cout << std::endl;
             for (auto & dir : dirs)
                 std::cout << "  " << dir << std::endl;
@@ -91,7 +89,8 @@ struct CmdDoctor : StoreCommand
         }
     }
 
-    void checkStoreProtocol(unsigned int storeProto) {
+    void checkStoreProtocol(unsigned int storeProto)
+    {
         auto clientProto = GET_PROTOCOL_MAJOR(SERVE_PROTOCOL_VERSION) == GET_PROTOCOL_MAJOR(storeProto)
             ? SERVE_PROTOCOL_VERSION
             : PROTOCOL_VERSION;
