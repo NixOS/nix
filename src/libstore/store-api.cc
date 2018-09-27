@@ -610,7 +610,7 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
         });
         srcStore->narFromPath({storePath}, wrapperSink);
     }, [&]() {
-	throw EndOfFile("NAR for '%s' fetched from '%s' is incomplete", storePath, srcStore->getUri());
+        throw EndOfFile("NAR for '%s' fetched from '%s' is incomplete", storePath, srcStore->getUri());
     });
 
     dstStore->addToStore(*info, *source, repair, checkSigs);

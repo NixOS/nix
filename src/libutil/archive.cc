@@ -283,7 +283,7 @@ void parseDump(ParseSink & sink, Source & source)
 {
     string version;
     try {
-        version = readString(source);
+        version = readString(source, narVersionMagic1.size());
     } catch (SerialisationError & e) {
         /* This generally means the integer at the start couldn't be
            decoded.  Ignore and throw the exception below. */

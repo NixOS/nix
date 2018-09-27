@@ -150,10 +150,8 @@ static void loadSourceExpr(EvalState & state, const Path & path, Value & v)
     if (stat(path.c_str(), &st) == -1)
         throw SysError(format("getting information about '%1%'") % path);
 
-    if (isNixExpr(path, st)) {
+    if (isNixExpr(path, st))
         state.evalFile(path, v);
-        return;
-    }
 
     /* The path is a directory.  Put the Nix expressions in the
        directory in a set, with the file name of each expression as
@@ -170,6 +168,8 @@ static void loadSourceExpr(EvalState & state, const Path & path, Value & v)
         getAllExprs(state, path, attrs, bb);
         state.mkAttrs(v, bb);
     }
+
+    else throw Error("path '%s' is not a directory or a Nix expression", path);
 }
 
 

@@ -880,6 +880,12 @@ void LocalStore::querySubstitutablePathInfos(const PathSet & paths,
                     narInfo ? narInfo->fileSize : 0,
                     info->narSize};
             } catch (InvalidPath) {
+            } catch (SubstituterDisabled) {
+            } catch (Error & e) {
+                if (settings.tryFallback)
+                    printError(e.what());
+                else
+                    throw;
             }
         }
     }

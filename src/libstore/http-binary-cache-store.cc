@@ -13,6 +13,14 @@ private:
 
     Path cacheUri;
 
+    struct State
+    {
+        bool enabled = true;
+        std::chrono::steady_clock::time_point disabledUntil;
+    };
+
+    Sync<State> _state;
+
 public:
 
     HttpBinaryCacheStore(
@@ -46,8 +54,33 @@ public:
 
 protected:
 
+    void maybeDisable()
+    {
+        auto state(_state.lock());
+        if (state->enabled && settings.tryFallback) {
+            int t = 60;
+            printError("disabling binary cache '%s' for %s seconds", getUri(), t);
+            state->enabled = false;
+            state->disabledUntil = std::chrono::steady_clock::now() + std::chrono::seconds(t);
+        }
+    }
+
+    void checkEnabled()
+    {
+        auto state(_state.lock());
+        if (state->enabled) return;
+        if (std::chrono::steady_clock::now() > state->disabledUntil) {
+            state->enabled = true;
+            debug("re-enabling binary cache '%s'", getUri());
+            return;
+        }
+        throw SubstituterDisabled("substituter '%s' is disabled", getUri());
+    }
+
     bool fileExists(const std::string & path) override
     {
+        checkEnabled();
+
         try {
             DownloadRequest request(cacheUri + "/" + path);
             request.head = true;
@@ -59,6 +92,7 @@ protected:
                bucket is unlistable, so treat 403 as 404. */
             if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
                 return false;
+            maybeDisable();
             throw;
         }
     }
@@ -86,12 +120,14 @@ protected:
 
     void getFile(const std::string & path, Sink & sink) override
     {
+        checkEnabled();
         auto request(makeRequest(path));
         try {
             getDownloader()->download(std::move(request), sink);
         } catch (DownloadError & e) {
             if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
                 throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache '%s'", path, getUri());
+            maybeDisable();
             throw;
         }
     }
@@ -99,15 +135,18 @@ protected:
     void getFile(const std::string & path,
         Callback<std::shared_ptr<std::string>> callback) override
     {
+        checkEnabled();
+
         auto request(makeRequest(path));
 
         getDownloader()->enqueueDownload(request,
-            {[callback](std::future<DownloadResult> result) {
+            {[callback, this](std::future<DownloadResult> result) {
                 try {
                     callback(result.get().data);
                 } catch (DownloadError & e) {
                     if (e.error == Downloader::NotFound || e.error == Downloader::Forbidden)
                         return callback(std::shared_ptr<std::string>());
+                    maybeDisable();
                     callback.rethrow();
                 } catch (...) {
                     callback.rethrow();
