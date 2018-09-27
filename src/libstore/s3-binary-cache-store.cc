@@ -19,8 +19,6 @@
 #include <aws/core/utils/logging/LogMacros.h>
 #include <aws/core/utils/threading/Executor.h>
 #include <aws/s3/S3Client.h>
-#include <aws/s3/model/CreateBucketRequest.h>
-#include <aws/s3/model/GetBucketLocationRequest.h>
 #include <aws/s3/model/GetObjectRequest.h>
 #include <aws/s3/model/HeadObjectRequest.h>
 #include <aws/s3/model/ListObjectsRequest.h>
@@ -201,32 +199,6 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
     void init() override
     {
         if (!diskCache->cacheExists(getUri(), wantMassQuery_, priority)) {
-
-            /* Create the bucket if it doesn't already exists. */
-            // FIXME: HeadBucket would be more appropriate, but doesn't return
-            // an easily parsed 404 message.
-            auto res = s3Helper.client->GetBucketLocation(
-                Aws::S3::Model::GetBucketLocationRequest().WithBucket(bucketName));
-
-            if (!res.IsSuccess()) {
-                if (res.GetError().GetErrorType() != Aws::S3::S3Errors::NO_SUCH_BUCKET)
-                    throw Error(format("AWS error checking bucket '%s': %s") % bucketName % res.GetError().GetMessage());
-
-                printInfo("creating S3 bucket '%s'...", bucketName);
-
-                // Stupid S3 bucket locations.
-                auto bucketConfig = Aws::S3::Model::CreateBucketConfiguration();
-                if (s3Helper.config->region != "us-east-1")
-                    bucketConfig.SetLocationConstraint(
-                        Aws::S3::Model::BucketLocationConstraintMapper::GetBucketLocationConstraintForName(
-                            s3Helper.config->region));
-
-                checkAws(format("AWS error creating bucket '%s'") % bucketName,
-                    s3Helper.client->CreateBucket(
-                        Aws::S3::Model::CreateBucketRequest()
-                        .WithBucket(bucketName)
-                        .WithCreateBucketConfiguration(bucketConfig)));
-            }
 
             BinaryCacheStore::init();
 
