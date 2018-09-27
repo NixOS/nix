@@ -417,16 +417,20 @@ void mainWrapped(int argc, char * * argv)
                 "dontAddDisableDepTrack=1; "
                 "[ -e $stdenv/setup ] && source $stdenv/setup; "
                 "%3%"
+                "PATH=\"%4%:$PATH\"; "
+                "SHELL=%5%; "
                 "set +e; "
                 R"s([ -n "$PS1" ] && PS1='\n\[\033[1;32m\][nix-shell:\w]\$\[\033[0m\] '; )s"
                 "if [ \"$(type -t runHook)\" = function ]; then runHook shellHook; fi; "
                 "unset NIX_ENFORCE_PURITY; "
                 "shopt -u nullglob; "
-                "unset TZ; %4%"
-                "%5%",
+                "unset TZ; %6%"
+                "%7%",
                 (Path) tmpDir,
                 (pure ? "" : "p=$PATH; "),
                 (pure ? "" : "PATH=$PATH:$p; unset p; "),
+                dirOf(shell),
+                shell,
                 (getenv("TZ") ? (string("export TZ='") + getenv("TZ") + "'; ") : ""),
                 envCommand));
 
