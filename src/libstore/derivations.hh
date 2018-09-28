@@ -56,13 +56,9 @@ struct BasicDerivation
        the given derivation. */
     Path findOutput(const string & id) const;
 
-    bool willBuildLocally() const;
-
     bool substitutesAllowed() const;
 
     bool isBuiltin() const;
-
-    bool canBuildLocally() const;
 
     /* Return true iff this is a fixed-output derivation. */
     bool isFixedOutput() const;

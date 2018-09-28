@@ -11,6 +11,7 @@
 #include "compression.hh"
 #include "json.hh"
 #include "nar-info.hh"
+#include "parsed-derivations.hh"
 
 #include <algorithm>
 #include <iostream>
@@ -740,8 +741,7 @@ private:
     /* The derivation stored at drvPath. */
     std::unique_ptr<BasicDerivation> drv;
 
-    /* The contents of drv->env["__json"]. */
-    std::experimental::optional<nlohmann::json> structuredAttrs;
+    std::unique_ptr<ParsedDerivation> parsedDrv;
 
     /* The remainder is state held during the build. */
 
@@ -922,13 +922,6 @@ private:
 
     /* Fill in the environment for the builder. */
     void initEnv();
-
-    /* Get an attribute from drv->env or from drv->env["__json"]. */
-    std::experimental::optional<std::string> getAttr(const std::string & name);
-
-    bool getBoolAttr(const std::string & name, bool def = false);
-
-    std::experimental::optional<Strings> getStringsAttr(const std::string & name);
 
     /* Write a JSON file containing the derivation attributes. */
     void writeStructuredAttrs();
@@ -1149,15 +1142,7 @@ void DerivationGoal::haveDerivation()
         return;
     }
 
-    /* Parse the __json attribute, if any. */
-    auto jsonAttr = drv->env.find("__json");
-    if (jsonAttr != drv->env.end()) {
-        try {
-            structuredAttrs = nlohmann::json::parse(jsonAttr->second);
-        } catch (std::exception & e) {
-            throw Error("cannot process __json attribute of '%s': %s", drvPath, e.what());
-        }
-    }
+    parsedDrv = std::make_unique<ParsedDerivation>(drvPath, *drv);
 
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
@@ -1415,7 +1400,7 @@ void DerivationGoal::tryToBuild()
     /* Don't do a remote build if the derivation has the attribute
        `preferLocalBuild' set.  Also, check and repair modes are only
        supported for local builds. */
-    bool buildLocally = buildMode != bmNormal || drv->willBuildLocally();
+    bool buildLocally = buildMode != bmNormal || parsedDrv->willBuildLocally();
 
     auto started = [&]() {
         auto msg = fmt(
@@ -1664,7 +1649,7 @@ HookReply DerivationGoal::tryBuildHook()
         /* Tell the hook about system features (beyond the system type)
            required from the build machine.  (The hook could parse the
            drv file itself, but this is easier.) */
-        auto features = getStringsAttr("requiredSystemFeatures").value_or(Strings());
+        auto features = parsedDrv->getStringsAttr("requiredSystemFeatures").value_or(Strings());
 
         /* Send the request to the hook. */
         worker.hook->sink
@@ -1812,7 +1797,7 @@ static void preloadNSS() {
 void DerivationGoal::startBuilder()
 {
     /* Right platform? */
-    if (!drv->canBuildLocally()) {
+    if (!parsedDrv->canBuildLocally()) {
         throw Error(
             format("a '%1%' is required to build '%3%', but I am a '%2%'")
             % drv->platform % settings.thisSystem % drvPath);
@@ -1822,12 +1807,12 @@ void DerivationGoal::startBuilder()
         preloadNSS();
 
 #if __APPLE__
-    additionalSandboxProfile = getAttr("__sandboxProfile").value_or("");
+    additionalSandboxProfile = parsedDrv->getStringAttr("__sandboxProfile").value_or("");
 #endif
 
     /* Are we doing a chroot build? */
     {
-        auto noChroot = getBoolAttr("__noChroot");
+        auto noChroot = parsedDrv->getBoolAttr("__noChroot");
         if (settings.sandboxMode == smEnabled) {
             if (noChroot)
                 throw Error(format("derivation '%1%' has '__noChroot' set, "
@@ -1893,7 +1878,7 @@ void DerivationGoal::startBuilder()
     writeStructuredAttrs();
 
     /* Handle exportReferencesGraph(), if set. */
-    if (!structuredAttrs) {
+    if (!parsedDrv->getStructuredAttrs()) {
         /* The `exportReferencesGraph' feature allows the references graph
            to be passed to a builder.  This attribute should be a list of
            pairs [name1 path1 name2 path2 ...].  The references graph of
@@ -1958,7 +1943,7 @@ void DerivationGoal::startBuilder()
         PathSet allowedPaths = settings.allowedImpureHostPrefixes;
 
         /* This works like the above, except on a per-derivation level */
-        auto impurePaths = getStringsAttr("__impureHostDeps").value_or(Strings());
+        auto impurePaths = parsedDrv->getStringsAttr("__impureHostDeps").value_or(Strings());
 
         for (auto & i : impurePaths) {
             bool found = false;
@@ -2326,7 +2311,7 @@ void DerivationGoal::initEnv()
        passAsFile is ignored in structure mode because it's not
        needed (attributes are not passed through the environment, so
        there is no size constraint). */
-    if (!structuredAttrs) {
+    if (!parsedDrv->getStructuredAttrs()) {
 
         StringSet passAsFile = tokenizeString<StringSet>(get(drv->env, "passAsFile"));
         int fileNr = 0;
@@ -2373,7 +2358,7 @@ void DerivationGoal::initEnv()
        fixed-output derivations is by definition pure (since we
        already know the cryptographic hash of the output). */
     if (fixedOutput) {
-        for (auto & i : getStringsAttr("impureEnvVars").value_or(Strings()))
+        for (auto & i : parsedDrv->getStringsAttr("impureEnvVars").value_or(Strings()))
             env[i] = getEnv(i);
     }
 
@@ -2384,80 +2369,12 @@ void DerivationGoal::initEnv()
 }
 
 
-std::experimental::optional<std::string> DerivationGoal::getAttr(const std::string & name)
-{
-    if (structuredAttrs) {
-        auto i = structuredAttrs->find(name);
-        if (i == structuredAttrs->end())
-            return {};
-        else {
-            if (!i->is_string())
-                throw Error("attribute '%s' of derivation '%s' must be a string", name, drvPath);
-            return i->get<std::string>();
-        }
-    } else {
-        auto i = drv->env.find(name);
-        if (i == drv->env.end())
-            return {};
-        else
-            return i->second;
-    }
-}
-
-
-bool DerivationGoal::getBoolAttr(const std::string & name, bool def)
-{
-    if (structuredAttrs) {
-        auto i = structuredAttrs->find(name);
-        if (i == structuredAttrs->end())
-            return def;
-        else {
-            if (!i->is_boolean())
-                throw Error("attribute '%s' of derivation '%s' must be a Boolean", name, drvPath);
-            return i->get<bool>();
-        }
-    } else {
-        auto i = drv->env.find(name);
-        if (i == drv->env.end())
-            return def;
-        else
-            return i->second == "1";
-    }
-}
-
-
-std::experimental::optional<Strings> DerivationGoal::getStringsAttr(const std::string & name)
-{
-    if (structuredAttrs) {
-        auto i = structuredAttrs->find(name);
-        if (i == structuredAttrs->end())
-            return {};
-        else {
-            if (!i->is_array())
-                throw Error("attribute '%s' of derivation '%s' must be a list of strings", name, drvPath);
-            Strings res;
-            for (auto j = i->begin(); j != i->end(); ++j) {
-                if (!j->is_string())
-                    throw Error("attribute '%s' of derivation '%s' must be a list of strings", name, drvPath);
-                res.push_back(j->get<std::string>());
-            }
-            return res;
-        }
-    } else {
-        auto i = drv->env.find(name);
-        if (i == drv->env.end())
-            return {};
-        else
-            return tokenizeString<Strings>(i->second);
-    }
-}
-
-
 static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
 
 
 void DerivationGoal::writeStructuredAttrs()
 {
+    auto & structuredAttrs = parsedDrv->getStructuredAttrs();
     if (!structuredAttrs) return;
 
     auto json = *structuredAttrs;
@@ -2997,7 +2914,7 @@ void DerivationGoal::runChild()
 
             writeFile(sandboxFile, sandboxProfile);
 
-            bool allowLocalNetworking = getBoolAttr("__darwinAllowLocalNetworking");
+            bool allowLocalNetworking = parsedDrv->getBoolAttr("__darwinAllowLocalNetworking");
 
             /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different mechanisms
                to find temporary directories, so we want to open up a broader place for them to dump their files, if needed. */
@@ -3283,7 +3200,7 @@ void DerivationGoal::registerOutputs()
 
         /* Enforce `allowedReferences' and friends. */
         auto checkRefs = [&](const string & attrName, bool allowed, bool recursive) {
-            auto value = getStringsAttr(attrName);
+            auto value = parsedDrv->getStringsAttr(attrName);
             if (!value) return;
 
             PathSet spec = parseReferenceSpecifiers(worker.store, *drv, *value);
