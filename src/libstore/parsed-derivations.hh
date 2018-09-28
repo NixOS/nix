@@ -25,6 +25,8 @@ public:
 
     std::experimental::optional<Strings> getStringsAttr(const std::string & name) const;
 
+    StringSet getRequiredSystemFeatures() const;
+
     bool canBuildLocally() const;
 
     bool willBuildLocally() const;

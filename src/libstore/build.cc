@@ -1646,18 +1646,13 @@ HookReply DerivationGoal::tryBuildHook()
 
     try {
 
-        /* Tell the hook about system features (beyond the system type)
-           required from the build machine.  (The hook could parse the
-           drv file itself, but this is easier.) */
-        auto features = parsedDrv->getStringsAttr("requiredSystemFeatures").value_or(Strings());
-
         /* Send the request to the hook. */
         worker.hook->sink
             << "try"
             << (worker.getNrLocalBuilds() < settings.maxBuildJobs ? 1 : 0)
             << drv->platform
             << drvPath
-            << features;
+            << parsedDrv->getRequiredSystemFeatures();
         worker.hook->sink.flush();
 
         /* Read the first line of input, which should be a word indicating
@@ -1797,11 +1792,13 @@ static void preloadNSS() {
 void DerivationGoal::startBuilder()
 {
     /* Right platform? */
-    if (!parsedDrv->canBuildLocally()) {
-        throw Error(
-            format("a '%1%' is required to build '%3%', but I am a '%2%'")
-            % drv->platform % settings.thisSystem % drvPath);
-    }
+    if (!parsedDrv->canBuildLocally())
+        throw Error("a '%s' with features {%s} is required to build '%s', but I am a '%s' with features {%s}",
+            drv->platform,
+            concatStringsSep(", ", parsedDrv->getRequiredSystemFeatures()),
+            drvPath,
+            settings.thisSystem,
+            concatStringsSep(", ", settings.systemFeatures));
 
     if (drv->isBuiltin())
         preloadNSS();
@@ -2625,7 +2622,7 @@ void DerivationGoal::runChild()
                 createDirs(chrootRootDir + "/dev/shm");
                 createDirs(chrootRootDir + "/dev/pts");
                 ss.push_back("/dev/full");
-                if (pathExists("/dev/kvm"))
+                if (settings.systemFeatures.get().count("kvm") && pathExists("/dev/kvm"))
                     ss.push_back("/dev/kvm");
                 ss.push_back("/dev/null");
                 ss.push_back("/dev/random");

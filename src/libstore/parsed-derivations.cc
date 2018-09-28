@@ -82,11 +82,25 @@ std::experimental::optional<Strings> ParsedDerivation::getStringsAttr(const std:
     }
 }
 
+StringSet ParsedDerivation::getRequiredSystemFeatures() const
+{
+    StringSet res;
+    for (auto & i : getStringsAttr("requiredSystemFeatures").value_or(Strings()))
+        res.insert(i);
+    return res;
+}
+
 bool ParsedDerivation::canBuildLocally() const
 {
-    return drv.platform == settings.thisSystem
-        || settings.extraPlatforms.get().count(drv.platform) > 0
-        || drv.isBuiltin();
+    if (drv.platform != settings.thisSystem.get()
+        && !settings.extraPlatforms.get().count(drv.platform)
+        && !drv.isBuiltin())
+        return false;
+
+    for (auto & feature : getRequiredSystemFeatures())
+        if (!settings.systemFeatures.get().count(feature)) return false;
+
+    return true;
 }
 
 bool ParsedDerivation::willBuildLocally() const

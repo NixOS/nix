@@ -11,7 +11,8 @@ rm -rf $TEST_ROOT/store0 $TEST_ROOT/store1
 
 nix build -f build-hook.nix -o $TEST_ROOT/result --max-jobs 0 \
   --sandbox-paths /nix/store --sandbox-build-dir /build-tmp \
-  --builders "$TEST_ROOT/store0; $TEST_ROOT/store1 - - 1 1 foo"
+  --builders "$TEST_ROOT/store0; $TEST_ROOT/store1 - - 1 1 foo" \
+  --system-features foo
 
 outPath=$TEST_ROOT/result
 

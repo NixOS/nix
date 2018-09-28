@@ -757,6 +757,33 @@ password <replaceable>my-password</replaceable>
   </varlistentry>
 
 
+  <varlistentry xml:id="conf-system-features"><term><literal>system-features</literal></term>
+
+    <listitem><para>A set of system “features” supported by this
+    machine, e.g. <literal>kvm</literal>. Derivations can express a
+    dependency on such features through the derivation attribute
+    <varname>requiredSystemFeatures</varname>. For example, the
+    attribute
+
+<programlisting>
+requiredSystemFeatures = [ "kvm" ];
+</programlisting>
+
+    ensures that the derivation can only be built on a machine with
+    the <literal>kvm</literal> feature.</para>
+
+    <para>This setting by default includes <literal>kvm</literal> if
+    <filename>/dev/kvm</filename> is accessible, and the
+    pseudo-features <literal>nixos-test</literal>,
+    <literal>benchmark</literal> and <literal>big-parallel</literal>
+    that are used in Nixpkgs to route builds to specific
+    machines.</para>
+
+    </listitem>
+
+  </varlistentry>
+
+
   <varlistentry xml:id="conf-timeout"><term><literal>timeout</literal></term>
 
     <listitem>

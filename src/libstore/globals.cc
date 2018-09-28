@@ -86,6 +86,21 @@ unsigned int Settings::getDefaultCores()
     return std::max(1U, std::thread::hardware_concurrency());
 }
 
+StringSet Settings::getDefaultSystemFeatures()
+{
+    /* For backwards compatibility, accept some "features" that are
+       used in Nixpkgs to route builds to certain machines but don't
+       actually require anything special on the machines. */
+    StringSet features{"nixos-test", "benchmark", "big-parallel"};
+
+    #if __linux__
+    if (access("/dev/kvm", R_OK | W_OK) == 0)
+        features.insert("kvm");
+    #endif
+
+    return features;
+}
+
 const string nixVersion = PACKAGE_VERSION;
 
 template<> void BaseSetting<SandboxMode>::set(const std::string & str)

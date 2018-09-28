@@ -32,6 +32,8 @@ class Settings : public Config {
 
     unsigned int getDefaultCores();
 
+    StringSet getDefaultSystemFeatures();
+
 public:
 
     Settings();
@@ -260,6 +262,10 @@ public:
         "Additional platforms that can be built on the local system. "
         "These may be supported natively (e.g. armv7 on some aarch64 CPUs "
         "or using hacks like qemu-user."};
+
+    Setting<StringSet> systemFeatures{this, getDefaultSystemFeatures(),
+        "system-features",
+        "Optional features that this system implements (like \"kvm\")."};
 
     Setting<Strings> substituters{this,
         nixStore == "/nix/store" ? Strings{"https://cache.nixos.org/"} : Strings(),
