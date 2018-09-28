@@ -1665,7 +1665,6 @@ HookReply DerivationGoal::tryBuildHook()
            required from the build machine.  (The hook could parse the
            drv file itself, but this is easier.) */
         auto features = getStringsAttr("requiredSystemFeatures").value_or(Strings());
-        for (auto & i : features) checkStoreName(i); /* !!! abuse */
 
         /* Send the request to the hook. */
         worker.hook->sink
