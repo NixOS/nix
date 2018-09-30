@@ -3025,6 +3025,39 @@ static RegisterPrimOp primop_concatLists({
     .fun = prim_concatLists,
 });
 
+static void prim_sublist(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    int start = state.forceInt(*args[0], pos, "while evaluating the first argument passed to builtins.sublist");
+    size_t len = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.sublist");
+    state.forceList(*args[2], pos, "while evaluating the third argument passed to builtins.sublist");
+
+    size_t count = std::min(
+        len,
+        (size_t)std::max(
+            0,
+            std::min(
+                (int)args[2]->listSize() - start,
+                (int)len + start
+            )
+        )
+    );
+
+    state.mkList(v, count);
+    auto out = v.listElems();
+    memcpy(out, args[2]->listElems() + std::max(0, start), count * sizeof(Value*));
+}
+
+static RegisterPrimOp primop_sublist({
+    .name = "__sublist",
+    .args = {"start", "count", "list"},
+    .doc = R"(
+        Return a list consisting of at most `count` elements of `list`,
+        starting at index `start`. If `start` is negative, return the
+        first `start + count` elements.
+    )",
+    .fun = prim_sublist,
+});
+
 /* Return the length of a list.  This is an O(1) time operation. */
 static void prim_length(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
