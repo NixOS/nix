@@ -1490,6 +1490,18 @@ static void prim_concatLists(EvalState & state, const Pos & pos, Value * * args,
     state.concatLists(v, args[0]->listSize(), args[0]->listElems(), pos);
 }
 
+/* return a subsection of a list */
+static void prim_sublist(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    int start = state.forceInt(*args[0], pos);
+    size_t len = state.forceInt(*args[1], pos);
+    state.forceList(*args[2], pos);
+    size_t count = std::min(args[2]->listSize() - start, len);
+
+    state.mkList(v, count);
+    auto out = v.listElems();
+    memcpy(out, args[2]->listElems() + start, count * sizeof(Value*));
+}
 
 /* Return the length of a list.  This is an O(1) time operation. */
 static void prim_length(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -2286,6 +2298,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__sort", 2, prim_sort);
     addPrimOp("__partition", 2, prim_partition);
     addPrimOp("__concatMap", 2, prim_concatMap);
+    addPrimOp("__sublist", 3, prim_sublist);
 
     // Integer arithmetic
     addPrimOp("__add", 2, prim_add);
