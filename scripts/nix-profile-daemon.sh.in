@@ -68,4 +68,4 @@ elif [ -e "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt" ]; then # 
 fi
 
 export NIX_PATH="nixpkgs=@localstatedir@/nix/profiles/per-user/root/channels/nixpkgs:@localstatedir@/nix/profiles/per-user/root/channels"
-export PATH="$HOME/.nix-profile/bin:$HOME/.nix-profile/lib/kde4/libexec:@localstatedir@/nix/profiles/default/bin:@localstatedir@/nix/profiles/default:@localstatedir@/nix/profiles/default/lib/kde4/libexec:$PATH"
+export PATH="$HOME/.nix-profile/bin:@localstatedir@/nix/profiles/default/bin:$PATH"
