@@ -1,0 +1,25 @@
+<section xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      version="5.0"
+      xml:id="ssec-relnotes-2.2">
+
+<title>Release 2.2 (201?-??-??)</title>
+
+<para>This release has the following changes:</para>
+
+<itemizedlist>
+
+  <listitem>
+    <para>The derivation attribute
+    <varname>requiredSystemFeatures</varname> is now enforced for
+    local builds, and not just to route builds to remote builders.
+    The supported features of a machine can be specified through the
+    configuration setting <varname>system-features</varname>.
+    </para>
+  </listitem>
+
+</itemizedlist>
+
+</section>
+
