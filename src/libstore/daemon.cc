@@ -186,8 +186,75 @@ struct RetrieveRegularNARSink : ParseSink
     }
 };
 
+struct ClientSettings
+{
+    bool keepFailed;
+    bool keepGoing;
+    bool tryFallback;
+    Verbosity verbosity;
+    unsigned int maxBuildJobs;
+    time_t maxSilentTime;
+    bool verboseBuild;
+    unsigned int buildCores;
+    bool useSubstitutes;
+    StringMap overrides;
+
+    void apply(TrustedFlag trusted)
+    {
+        settings.keepFailed = keepFailed;
+        settings.keepGoing = keepGoing;
+        settings.tryFallback = tryFallback;
+        nix::verbosity = verbosity;
+        settings.maxBuildJobs.assign(maxBuildJobs);
+        settings.maxSilentTime = maxSilentTime;
+        settings.verboseBuild = verboseBuild;
+        settings.buildCores = buildCores;
+        settings.useSubstitutes = useSubstitutes;
+
+        for (auto & i : overrides) {
+            auto & name(i.first);
+            auto & value(i.second);
+
+            auto setSubstituters = [&](Setting<Strings> & res) {
+                if (name != res.name && res.aliases.count(name) == 0)
+                    return false;
+                StringSet trusted = settings.trustedSubstituters;
+                for (auto & s : settings.substituters.get())
+                    trusted.insert(s);
+                Strings subs;
+                auto ss = tokenizeString<Strings>(value);
+                for (auto & s : ss)
+                    if (trusted.count(s))
+                        subs.push_back(s);
+                    else
+                        warn("ignoring untrusted substituter '%s'", s);
+                res = subs;
+                return true;
+            };
+
+            try {
+                if (name == "ssh-auth-sock") // obsolete
+                    ;
+                else if (trusted
+                    || name == settings.buildTimeout.name
+                    || name == "connect-timeout"
+                    || (name == "builders" && value == ""))
+                    settings.set(name, value);
+                else if (setSubstituters(settings.substituters))
+                    ;
+                else if (setSubstituters(settings.extraSubstituters))
+                    ;
+                else
+                    warn("ignoring the user-specified setting '%s', because it is a restricted setting and you are not a trusted user", name);
+            } catch (UsageError & e) {
+                warn(e.what());
+            }
+        }
+    }
+};
+
 static void performOp(TunnelLogger * logger, ref<Store> store,
-    bool trusted, unsigned int clientVersion,
+    TrustedFlag trusted, RecursiveFlag recursive, unsigned int clientVersion,
     Source & from, BufferedSink & to, unsigned int op)
 {
     switch (op) {
@@ -464,70 +531,37 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopSetOptions: {
-        settings.keepFailed = readInt(from);
-        settings.keepGoing = readInt(from);
-        settings.tryFallback = readInt(from);
-        verbosity = (Verbosity) readInt(from);
-        settings.maxBuildJobs.assign(readInt(from));
-        settings.maxSilentTime = readInt(from);
+
+        ClientSettings clientSettings;
+
+        clientSettings.keepFailed = readInt(from);
+        clientSettings.keepGoing = readInt(from);
+        clientSettings.tryFallback = readInt(from);
+        clientSettings.verbosity = (Verbosity) readInt(from);
+        clientSettings.maxBuildJobs = readInt(from);
+        clientSettings.maxSilentTime = readInt(from);
         readInt(from); // obsolete useBuildHook
-        settings.verboseBuild = lvlError == (Verbosity) readInt(from);
+        clientSettings.verboseBuild = lvlError == (Verbosity) readInt(from);
         readInt(from); // obsolete logType
         readInt(from); // obsolete printBuildTrace
-        settings.buildCores = readInt(from);
-        settings.useSubstitutes  = readInt(from);
+        clientSettings.buildCores = readInt(from);
+        clientSettings.useSubstitutes = readInt(from);
 
-        StringMap overrides;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 12) {
             unsigned int n = readInt(from);
             for (unsigned int i = 0; i < n; i++) {
                 string name = readString(from);
                 string value = readString(from);
-                overrides.emplace(name, value);
+                clientSettings.overrides.emplace(name, value);
             }
         }
 
         logger->startWork();
 
-        for (auto & i : overrides) {
-            auto & name(i.first);
-            auto & value(i.second);
-
-            auto setSubstituters = [&](Setting<Strings> & res) {
-                if (name != res.name && res.aliases.count(name) == 0)
-                    return false;
-                StringSet trusted = settings.trustedSubstituters;
-                for (auto & s : settings.substituters.get())
-                    trusted.insert(s);
-                Strings subs;
-                auto ss = tokenizeString<Strings>(value);
-                for (auto & s : ss)
-                    if (trusted.count(s))
-                        subs.push_back(s);
-                    else
-                        warn("ignoring untrusted substituter '%s'", s);
-                res = subs;
-                return true;
-            };
-
-            try {
-                if (name == "ssh-auth-sock") // obsolete
-                    ;
-                else if (trusted
-                    || name == settings.buildTimeout.name
-                    || name == "connect-timeout"
-                    || (name == "builders" && value == ""))
-                    settings.set(name, value);
-                else if (setSubstituters(settings.substituters))
-                    ;
-                else if (setSubstituters(settings.extraSubstituters))
-                    ;
-                else
-                    warn("ignoring the user-specified setting '%s', because it is a restricted setting and you are not a trusted user", name);
-            } catch (UsageError & e) {
-                warn(e.what());
-            }
-        }
+        // FIXME: use some setting in recursive mode. Will need to use
+        // non-global variables.
+        if (!recursive)
+            clientSettings.apply(trusted);
 
         logger->stopWork();
         break;
@@ -694,11 +728,12 @@ void processConnection(
     ref<Store> store,
     FdSource & from,
     FdSink & to,
-    bool trusted,
+    TrustedFlag trusted,
+    RecursiveFlag recursive,
     const std::string & userName,
     uid_t userId)
 {
-    MonitorFdHup monitor(from.fd);
+    auto monitor = !recursive ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
 
     /* Exchange the greeting. */
     unsigned int magic = readInt(from);
@@ -712,7 +747,9 @@ void processConnection(
 
     auto tunnelLogger = new TunnelLogger(to, clientVersion);
     auto prevLogger = nix::logger;
-    logger = tunnelLogger;
+    // FIXME
+    if (!recursive)
+        logger = tunnelLogger;
 
     unsigned int opCount = 0;
 
@@ -721,8 +758,10 @@ void processConnection(
         prevLogger->log(lvlDebug, fmt("%d operations", opCount));
     });
 
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 14 && readInt(from))
-        setAffinityTo(readInt(from));
+    if (GET_PROTOCOL_MINOR(clientVersion) >= 14 && readInt(from)) {
+        auto affinity = readInt(from);
+        setAffinityTo(affinity);
+    }
 
     readInt(from); // obsolete reserveSpace
 
@@ -760,7 +799,7 @@ void processConnection(
             opCount++;
 
             try {
-                performOp(tunnelLogger, store, trusted, clientVersion, from, to, op);
+                performOp(tunnelLogger, store, trusted, recursive, clientVersion, from, to, op);
             } catch (Error & e) {
                 /* If we're not in a state where we can send replies, then
                    something went wrong processing the input of the

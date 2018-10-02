@@ -3,11 +3,15 @@
 
 namespace nix::daemon {
 
+enum TrustedFlag : bool { NotTrusted = false, Trusted = true };
+enum RecursiveFlag : bool { NotRecursive = false, Recursive = true };
+
 void processConnection(
     ref<Store> store,
     FdSource & from,
     FdSink & to,
-    bool trusted,
+    TrustedFlag trusted,
+    RecursiveFlag recursive,
     const std::string & userName,
     uid_t userId);
 
