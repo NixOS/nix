@@ -1874,6 +1874,21 @@ static void preloadNSS() {
     });
 }
 
+
+void linkOrCopy(const Path & from, const Path & to)
+{
+    if (link(from.c_str(), to.c_str()) == -1) {
+        /* Hard-linking fails if we exceed the maximum link count on a
+           file (e.g. 32000 of ext3), which is quite possible after a
+           'nix-store --optimise'. FIXME: actually, why don't we just
+           bind-mount in this case? */
+        if (errno != EMLINK)
+            throw SysError("linking '%s' to '%s'", to, from);
+        copyPath(from, to);
+    }
+}
+
+
 void DerivationGoal::startBuilder()
 {
     /* Right platform? */
@@ -2117,22 +2132,8 @@ void DerivationGoal::startBuilder()
                 throw SysError(format("getting attributes of path '%1%'") % i);
             if (S_ISDIR(st.st_mode))
                 dirsInChroot[i] = r;
-            else {
-                Path p = chrootRootDir + i;
-                debug("linking '%1%' to '%2%'", p, r);
-                if (link(r.c_str(), p.c_str()) == -1) {
-                    /* Hard-linking fails if we exceed the maximum
-                       link count on a file (e.g. 32000 of ext3),
-                       which is quite possible after a `nix-store
-                       --optimise'. */
-                    if (errno != EMLINK)
-                        throw SysError(format("linking '%1%' to '%2%'") % p % i);
-                    StringSink sink;
-                    dumpPath(r, sink);
-                    StringSource source(*sink.s);
-                    restorePath(p, source);
-                }
-            }
+            else
+                linkOrCopy(r, chrootRootDir + i);
         }
 
         /* If we're repairing, checking or rebuilding part of a
