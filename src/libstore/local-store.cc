@@ -1210,7 +1210,8 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
     bool errors = false;
 
-    /* Acquire the global GC lock to prevent a garbage collection. */
+    /* Acquire the global GC lock to get a consistent snapshot of
+       existing and valid paths. */
     AutoCloseFD fdGCLock = openGCLock(ltWrite);
 
     PathSet store;
@@ -1221,12 +1222,10 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
     PathSet validPaths2 = queryAllValidPaths(), validPaths, done;
 
+    fdGCLock = -1;
+
     for (auto & i : validPaths2)
         verifyPath(i, store, done, validPaths, repair, errors);
-
-    /* Release the GC lock so that checking content hashes (which can
-       take ages) doesn't block the GC or builds. */
-    fdGCLock = -1;
 
     /* Optionally, check the content hashes (slow). */
     if (checkContents) {
