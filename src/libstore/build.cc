@@ -3984,17 +3984,6 @@ void SubstitutionGoal::tryToRun()
         return;
     }
 
-    /* If the store path is already locked (probably by a
-       DerivationGoal), then put this goal to sleep. Note: we don't
-       acquire a lock here since that breaks addToStore(), so below we
-       handle an AlreadyLocked exception from addToStore(). The check
-       here is just an optimisation to prevent having to redo a
-       download due to a locked path. */
-    if (pathIsLockedByMe(worker.store.toRealPath(storePath))) {
-        worker.waitForAWhile(shared_from_this());
-        return;
-    }
-
     maintainRunningSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.runningSubstitutions);
     worker.updateProgress();
 
@@ -4034,12 +4023,6 @@ void SubstitutionGoal::finished()
 
     try {
         promise.get_future().get();
-    } catch (AlreadyLocked & e) {
-        /* Probably a DerivationGoal is already building this store
-           path. Sleep for a while and try again. */
-        state = &SubstitutionGoal::init;
-        worker.waitForAWhile(shared_from_this());
-        return;
     } catch (std::exception & e) {
         printError(e.what());
 

@@ -29,7 +29,7 @@ static string gcRootsDir = "gcroots";
    read.  To be precise: when they try to create a new temporary root
    file, they will block until the garbage collector has finished /
    yielded the GC lock. */
-int LocalStore::openGCLock(LockType lockType)
+AutoCloseFD LocalStore::openGCLock(LockType lockType)
 {
     Path fnGCLock = (format("%1%/%2%")
         % stateDir % gcLockName).str();
@@ -49,7 +49,7 @@ int LocalStore::openGCLock(LockType lockType)
        process that can open the file for reading can DoS the
        collector. */
 
-    return fdGCLock.release();
+    return fdGCLock;
 }
 
 

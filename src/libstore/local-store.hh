@@ -263,7 +263,7 @@ private:
     bool isActiveTempFile(const GCState & state,
         const Path & path, const string & suffix);
 
-    int openGCLock(LockType lockType);
+    AutoCloseFD openGCLock(LockType lockType);
 
     void findRoots(const Path & path, unsigned char type, Roots & roots);
 
