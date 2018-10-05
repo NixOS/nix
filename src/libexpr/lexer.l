@@ -194,6 +194,8 @@ or          { return OR_KW; }
                    return IND_STR;
                  }
 
+<INITIAL>{URI}       { yylval->uri = strdup(yytext); return URI; }
+
 <INITIAL,INSIDE_DOLLAR_CURLY>{
 
 {PATH}      { if (yytext[yyleng-1] == '/')
@@ -207,7 +209,6 @@ or          { return OR_KW; }
               return HPATH;
             }
 {SPATH}     { yylval->path = strdup(yytext); return SPATH; }
-{URI}       { yylval->uri = strdup(yytext); return URI; }
 
 [ \t\r\n]+    /* eat up whitespace */
 \#[^\r\n]*    /* single-line comments */
