@@ -14,6 +14,7 @@ class Pid;
 struct FdSink;
 struct FdSource;
 template<typename T> class Pool;
+struct ConnectionHandle;
 
 
 /* FIXME: RemoteStore is a misnomer - should be something like
@@ -111,7 +112,7 @@ protected:
 
         virtual ~Connection();
 
-        void processStderr(Sink * sink = 0, Source * source = 0);
+        std::exception_ptr processStderr(Sink * sink = 0, Source * source = 0);
     };
 
     ref<Connection> openConnectionWrapper();
@@ -123,6 +124,10 @@ protected:
     ref<Pool<Connection>> connections;
 
     virtual void setOptions(Connection & conn);
+
+    ConnectionHandle getConnection();
+
+    friend class ConnectionHandle;
 
 private:
 
