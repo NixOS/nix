@@ -103,6 +103,7 @@ protected:
 
     struct Connection
     {
+        AutoCloseFD fd;
         FdSink to;
         FdSource from;
         unsigned int daemonVersion;
@@ -139,11 +140,6 @@ public:
     std::string getUri() override;
 
 private:
-
-    struct Connection : RemoteStore::Connection
-    {
-        AutoCloseFD fd;
-    };
 
     ref<RemoteStore::Connection> openConnection() override;
     std::experimental::optional<std::string> path;
