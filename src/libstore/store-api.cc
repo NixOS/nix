@@ -320,6 +320,8 @@ ref<const ValidPathInfo> Store::queryPathInfo(const Path & storePath)
 void Store::queryPathInfo(const Path & storePath,
     Callback<ref<ValidPathInfo>> callback)
 {
+    assertStorePath(storePath);
+
     auto hashPart = storePathToHash(storePath);
 
     try {
