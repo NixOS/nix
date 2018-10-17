@@ -11,14 +11,14 @@ oops() {
 }
 
 tmpDir="$(mktemp -d -t nix-binary-tarball-unpack.XXXXXXXXXX || \
-          oops "Can\'t create temporary directory for downloading the Nix binary tarball")"
+          oops "Can't create temporary directory for downloading the Nix binary tarball")"
 cleanup() {
     rm -rf "$tmpDir"
 }
 trap cleanup EXIT INT QUIT TERM
 
 require_util() {
-    type "$1" > /dev/null 2>&1 || which "$1" > /dev/null 2>&1 ||
+    type "$1" > /dev/null 2>&1 || command -v "$1" > /dev/null 2>&1 ||
         oops "you do not have '$1' installed, which I need to $2"
 }
 
