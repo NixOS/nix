@@ -181,6 +181,17 @@
 </varlistentry>
 
 
+<varlistentry><term><option>--keep-successful</option> / <option>-K</option></term>
+
+  <listitem><para>Specifies that in case of a build success, the
+  temporary directory (usually in <filename>/tmp</filename>) in which
+  the build takes place should not be deleted.  The path of the build
+  directory is printed as an informational message.
+    </para>
+  </listitem>
+</varlistentry>
+
+
 <varlistentry><term><option>--fallback</option></term>
 
   <listitem>

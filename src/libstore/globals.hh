@@ -69,6 +69,9 @@ public:
     Setting<std::string> storeUri{this, getEnv("NIX_REMOTE", "auto"), "store",
         "The default Nix store to use."};
 
+    Setting<bool> keepSuccessful{this, false, "keep-successful",
+        "Whether to keep temporary directories of successful builds."};
+
     Setting<bool> keepFailed{this, false, "keep-failed",
         "Whether to keep temporary directories of failed builds."};
 

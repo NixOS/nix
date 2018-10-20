@@ -3372,7 +3372,7 @@ void DerivationGoal::deleteTmpDir(bool force)
     if (tmpDir != "") {
         /* Don't keep temporary directories for builtins because they
            might have privileged stuff (like a copy of netrc). */
-        if (settings.keepFailed && !force && !drv->isBuiltin()) {
+        if (((settings.keepFailed && !force) || (settings.keepSuccessful && force)) && !drv->isBuiltin()) {
             printError(
                 format("note: keeping build directory '%2%'")
                 % drvPath % tmpDir);

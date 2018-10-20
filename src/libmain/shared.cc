@@ -159,6 +159,12 @@ LegacyArgs::LegacyArgs(const std::string & programName,
         .set(&settings.verboseBuild, false);
 
     mkFlag()
+        .longName("keep-successful")
+        .shortName('S')
+        .description("keep temporary directories of successful builds")
+        .set(&(bool&) settings.keepSuccessful, true);
+
+    mkFlag()
         .longName("keep-failed")
         .shortName('K')
         .description("keep temporary directories of failed builds")

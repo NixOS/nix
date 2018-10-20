@@ -175,6 +175,7 @@ void RemoteStore::initConnection(Connection & conn)
 void RemoteStore::setOptions(Connection & conn)
 {
     conn.to << wopSetOptions
+       << settings.keepSuccessful
        << settings.keepFailed
        << settings.keepGoing
        << settings.tryFallback
