@@ -33,7 +33,7 @@ rec {
   };
 
   # When specifying all the requisites, the build succeeds.
-  test1 = makeTest 1 [ dep1 dep2 deps ];
+  test1 = makeTest 1 [ "out" dep1 dep2 deps ];
 
   # But missing anything it fails.
   test2 = makeTest 2 [ dep2 deps ];

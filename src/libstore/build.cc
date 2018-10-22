@@ -21,6 +21,7 @@
 #include <future>
 #include <chrono>
 #include <regex>
+#include <queue>
 
 #include <limits.h>
 #include <sys/time.h>
@@ -857,7 +858,7 @@ private:
        building multiple times. Since this contains the hash, it
        allows us to compare whether two rounds produced the same
        result. */
-    ValidPathInfos prevInfos;
+    std::map<Path, ValidPathInfo> prevInfos;
 
     const uid_t sandboxUid = 1000;
     const gid_t sandboxGid = 100;
@@ -937,6 +938,11 @@ private:
     /* Check that the derivation outputs all exist and register them
        as valid. */
     void registerOutputs();
+
+    /* Check that an output meets the requirements specified by the
+       'outputChecks' attribute (or the legacy
+       '{allowed,disallowed}{References,Requisites}' attributes). */
+    void checkOutputs(const std::map<std::string, ValidPathInfo> & outputs);
 
     /* Open a log file and a pipe to it. */
     Path openLogFile();
@@ -3010,7 +3016,7 @@ void DerivationGoal::registerOutputs()
         if (allValid) return;
     }
 
-    ValidPathInfos infos;
+    std::map<std::string, ValidPathInfo> infos;
 
     /* Set of inodes seen during calls to canonicalisePathMetaData()
        for this build's outputs.  This needs to be shared between
@@ -3195,49 +3201,6 @@ void DerivationGoal::registerOutputs()
                 debug(format("referenced input: '%1%'") % i);
         }
 
-        /* Enforce `allowedReferences' and friends. */
-        auto checkRefs = [&](const string & attrName, bool allowed, bool recursive) {
-            auto value = parsedDrv->getStringsAttr(attrName);
-            if (!value) return;
-
-            PathSet spec = parseReferenceSpecifiers(worker.store, *drv, *value);
-
-            PathSet used;
-            if (recursive) {
-                /* Our requisites are the union of the closures of our references. */
-                for (auto & i : references)
-                    /* Don't call computeFSClosure on ourselves. */
-                    if (path != i)
-                        worker.store.computeFSClosure(i, used);
-            } else
-                used = references;
-
-            PathSet badPaths;
-
-            for (auto & i : used)
-                if (allowed) {
-                    if (spec.find(i) == spec.end())
-                        badPaths.insert(i);
-                } else {
-                    if (spec.find(i) != spec.end())
-                        badPaths.insert(i);
-                }
-
-            if (!badPaths.empty()) {
-                string badPathsStr;
-                for (auto & i : badPaths) {
-                    badPathsStr += "\n\t";
-                    badPathsStr += i;
-                }
-                throw BuildError(format("output '%1%' is not allowed to refer to the following paths:%2%") % actualPath % badPathsStr);
-            }
-        };
-
-        checkRefs("allowedReferences", true, false);
-        checkRefs("allowedRequisites", true, true);
-        checkRefs("disallowedReferences", false, false);
-        checkRefs("disallowedRequisites", false, true);
-
         if (curRound == nrRounds) {
             worker.store.optimisePath(actualPath); // FIXME: combine with scanForReferences()
             worker.markContentsGood(path);
@@ -3253,10 +3216,13 @@ void DerivationGoal::registerOutputs()
 
         if (!info.references.empty()) info.ca.clear();
 
-        infos.push_back(info);
+        infos[i.first] = info;
     }
 
     if (buildMode == bmCheck) return;
+
+    /* Apply output checks. */
+    checkOutputs(infos);
 
     /* Compare the result with the previous round, and report which
        path is different, if any.*/
@@ -3265,16 +3231,16 @@ void DerivationGoal::registerOutputs()
         for (auto i = prevInfos.begin(), j = infos.begin(); i != prevInfos.end(); ++i, ++j)
             if (!(*i == *j)) {
                 result.isNonDeterministic = true;
-                Path prev = i->path + checkSuffix;
+                Path prev = i->second.path + checkSuffix;
                 bool prevExists = keepPreviousRound && pathExists(prev);
                 auto msg = prevExists
-                    ? fmt("output '%1%' of '%2%' differs from '%3%' from previous round", i->path, drvPath, prev)
-                    : fmt("output '%1%' of '%2%' differs from previous round", i->path, drvPath);
+                    ? fmt("output '%1%' of '%2%' differs from '%3%' from previous round", i->second.path, drvPath, prev)
+                    : fmt("output '%1%' of '%2%' differs from previous round", i->second.path, drvPath);
 
                 auto diffHook = settings.diffHook;
                 if (prevExists && diffHook != "" && runDiffHook) {
                     try {
-                        auto diff = runProgram(diffHook, true, {prev, i->path});
+                        auto diff = runProgram(diffHook, true, {prev, i->second.path});
                         if (diff != "")
                             printError(chomp(diff));
                     } catch (Error & error) {
@@ -3319,12 +3285,163 @@ void DerivationGoal::registerOutputs()
     /* Register each output path as valid, and register the sets of
        paths referenced by each of them.  If there are cycles in the
        outputs, this will fail. */
-    worker.store.registerValidPaths(infos);
+    {
+        ValidPathInfos infos2;
+        for (auto & i : infos) infos2.push_back(i.second);
+        worker.store.registerValidPaths(infos2);
+    }
 
     /* In case of a fixed-output derivation hash mismatch, throw an
        exception now that we have registered the output as valid. */
     if (delayedException)
         std::rethrow_exception(delayedException);
+}
+
+
+void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
+{
+    std::map<Path, const ValidPathInfo &> outputsByPath;
+    for (auto & output : outputs)
+        outputsByPath.emplace(output.second.path, output.second);
+
+    for (auto & output : outputs) {
+        auto & outputName = output.first;
+        auto & info = output.second;
+
+        struct Checks
+        {
+            std::experimental::optional<uint64_t> maxSize, maxClosureSize;
+            std::experimental::optional<Strings> allowedReferences, allowedRequisites, disallowedReferences, disallowedRequisites;
+        };
+
+        /* Compute the closure and closure size of some output. This
+           is slightly tricky because some of its references (namely
+           other outputs) may not be valid yet. */
+        auto getClosure = [&](const Path & path)
+        {
+            uint64_t closureSize = 0;
+            PathSet pathsDone;
+            std::queue<Path> pathsLeft;
+            pathsLeft.push(path);
+
+            while (!pathsLeft.empty()) {
+                auto path = pathsLeft.front();
+                pathsLeft.pop();
+                if (!pathsDone.insert(path).second) continue;
+
+                auto i = outputsByPath.find(path);
+                if (i != outputsByPath.end()) {
+                    closureSize += i->second.narSize;
+                    for (auto & ref : i->second.references)
+                        pathsLeft.push(ref);
+                } else {
+                    auto info = worker.store.queryPathInfo(path);
+                    closureSize += info->narSize;
+                    for (auto & ref : info->references)
+                        pathsLeft.push(ref);
+                }
+            }
+
+            return std::make_pair(pathsDone, closureSize);
+        };
+
+        auto checkRefs = [&](const std::experimental::optional<Strings> & value, bool allowed, bool recursive)
+        {
+            if (!value) return;
+
+            PathSet spec = parseReferenceSpecifiers(worker.store, *drv, *value);
+
+            PathSet used = recursive ? getClosure(info.path).first : info.references;
+
+            PathSet badPaths;
+
+            for (auto & i : used)
+                if (allowed) {
+                    if (spec.find(i) == spec.end())
+                        badPaths.insert(i);
+                } else {
+                    if (spec.find(i) != spec.end())
+                        badPaths.insert(i);
+                }
+
+            if (!badPaths.empty()) {
+                string badPathsStr;
+                for (auto & i : badPaths) {
+                    badPathsStr += "\n  ";
+                    badPathsStr += i;
+                }
+                throw BuildError("output '%s' is not allowed to refer to the following paths:%s", info.path, badPathsStr);
+            }
+        };
+
+        auto applyChecks = [&](const Checks & checks)
+        {
+            if (checks.maxSize && info.narSize > *checks.maxSize)
+                throw BuildError("path '%s' is too large at %d bytes; limit is %d bytes",
+                    info.path, info.narSize, *checks.maxSize);
+
+            if (checks.maxClosureSize) {
+                uint64_t closureSize = getClosure(info.path).second;
+                if (closureSize > *checks.maxClosureSize)
+                    throw BuildError("closure of path '%s' is too large at %d bytes; limit is %d bytes",
+                        info.path, closureSize, *checks.maxClosureSize);
+            }
+
+            checkRefs(checks.allowedReferences, true, false);
+            checkRefs(checks.allowedRequisites, true, true);
+            checkRefs(checks.disallowedReferences, false, false);
+            checkRefs(checks.disallowedRequisites, false, true);
+        };
+
+        if (auto structuredAttrs = parsedDrv->getStructuredAttrs()) {
+            auto outputChecks = structuredAttrs->find("outputChecks");
+            if (outputChecks != structuredAttrs->end()) {
+                auto output = outputChecks->find(outputName);
+
+                if (output != outputChecks->end()) {
+                    Checks checks;
+
+                    auto maxSize = output->find("maxSize");
+                    if (maxSize != output->end())
+                        checks.maxSize = maxSize->get<uint64_t>();
+
+                    auto maxClosureSize = output->find("maxClosureSize");
+                    if (maxClosureSize != output->end())
+                        checks.maxClosureSize = maxClosureSize->get<uint64_t>();
+
+                    auto get = [&](const std::string & name) -> std::experimental::optional<Strings> {
+                        auto i = output->find(name);
+                        if (i != output->end()) {
+                            Strings res;
+                            for (auto j = i->begin(); j != i->end(); ++j) {
+                                if (!j->is_string())
+                                    throw Error("attribute '%s' of derivation '%s' must be a list of strings", name, drvPath);
+                                res.push_back(j->get<std::string>());
+                            }
+                            checks.disallowedRequisites = res;
+                            return res;
+                        }
+                        return {};
+                    };
+
+                    checks.allowedReferences = get("allowedReferences");
+                    checks.allowedRequisites = get("allowedRequisites");
+                    checks.disallowedReferences = get("disallowedReferences");
+                    checks.disallowedRequisites = get("disallowedRequisites");
+
+                    applyChecks(checks);
+                }
+            }
+        } else {
+            // legacy non-structured-attributes case
+            Checks checks;
+            checks.allowedReferences = parsedDrv->getStringsAttr("allowedReferences");
+            checks.allowedRequisites = parsedDrv->getStringsAttr("allowedRequisites");
+            checks.disallowedReferences = parsedDrv->getStringsAttr("disallowedReferences");
+            checks.disallowedRequisites = parsedDrv->getStringsAttr("disallowedRequisites");
+            applyChecks(checks);
+        }
+    }
 }
 
 
