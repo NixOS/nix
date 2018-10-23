@@ -679,6 +679,18 @@ query is applied to the target of the symlink.</para>
 
   </varlistentry>
 
+  <varlistentry><term><option>--graphml</option></term>
+
+    <listitem><para>Prints the references graph of the store paths
+    <replaceable>paths</replaceable> in the <link
+    xlink:href="http://graphml.graphdrawing.org/">GraphML</link> file format.
+    This can be used to visualise dependency graphs. To obtain a
+    build-time dependency graph, apply this to a store derivation. To
+    obtain a runtime dependency graph, apply it to an output
+    path.</para></listitem>
+
+  </varlistentry>
+
   <varlistentry><term><option>--binding</option> <replaceable>name</replaceable></term>
     <term><option>-b</option> <replaceable>name</replaceable></term>
 
