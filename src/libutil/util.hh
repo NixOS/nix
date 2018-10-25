@@ -131,6 +131,9 @@ Path getCacheDir();
 /* Return $XDG_CONFIG_HOME or $HOME/.config. */
 Path getConfigDir();
 
+/* Return the directories to search for user configuration files */
+std::vector<Path> getConfigDirs();
+
 /* Return $XDG_DATA_HOME or $HOME/.local/share. */
 Path getDataDir();
 
