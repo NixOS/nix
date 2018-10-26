@@ -225,9 +225,9 @@ or          { return OR_KW; }
 {SPATH}     { yylval->path = strdup(yytext); return SPATH; }
 {URI}       { yylval->uri = strdup(yytext); return URI; }
 
-\/\*@\ +LANGUAGE\ +reindent\ +@\*\/ {
+^\/\*@.*@\*\/\ *$ {
               /* Pragma, hardcoded for now because there is only one use. */
-              yylval->pragma = "reindent";
+              yylval->pragma = strdup(yytext);
               return PRAGMA;
             }
 

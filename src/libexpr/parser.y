@@ -159,9 +159,15 @@ static void pushStringThenExpr(SymbolTable & symbols, vector<Expr *> * es, strin
     if (e) es->push_back(e);
 }
 
-static void evalPragma(const char* pragma, ParseData* data)
+static void evalPragma(const char * pragma, ParseData* data)
 {
-    data->reindent = true;
+    if ( strcmp(pragma, "/*@ LANGUAGE reindent @*/") == 0 ) {
+        data->reindent = true;
+    } else {
+        throw ParseError(format("unrecognised pragma '%1%'.\n"
+                "At the moment only '/*@ LANGUAGE reindent @*/' is supported (mind spacing).") % pragma);
+    }
+    delete pragma;
 }
 
 static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<vector<Expr *> *> * es, bool reindent)
@@ -265,12 +271,12 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   nix::NixInt n;
   nix::NixFloat nf;
   const char * id; // !!! -> Symbol
+  char * pragma;
   char * path;
   char * uri;
   std::vector<nix::AttrName> * attrNames;
   std::vector<nix::Expr *> * string_parts;
   std::vector<std::vector<nix::Expr *> *> * string_lines;
-  const char * pragma;
 }
 
 %type <e> start expr expr_function expr_if expr_op
