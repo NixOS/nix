@@ -1,0 +1,143 @@
+From 64dba3b0ddfcb839c4e24d2a9e9f5e51c59763e4 Mon Sep 17 00:00:00 2001
+From: Eelco Dolstra <edolstra@gmail.com>
+Date: Mon, 6 Aug 2018 17:15:04 +0200
+Subject: [PATCH] TransferManager: Allow setting a content-encoding for S3
+ uploads
+
+---
+ .../include/aws/transfer/TransferHandle.h     |  9 ++++++++
+ .../include/aws/transfer/TransferManager.h    |  9 +++++---
+ .../source/transfer/TransferManager.cpp       | 21 ++++++++++++++-----
+ 3 files changed, 31 insertions(+), 8 deletions(-)
+
+diff --git a/aws-cpp-sdk-transfer/include/aws/transfer/TransferHandle.h b/aws-cpp-sdk-transfer/include/aws/transfer/TransferHandle.h
+index 555be17121..2643ac5a9d 100644
+--- a/aws-cpp-sdk-transfer/include/aws/transfer/TransferHandle.h
++++ b/aws-cpp-sdk-transfer/include/aws/transfer/TransferHandle.h
+@@ -295,6 +295,14 @@ namespace Aws
+              * Content type of the object being transferred
+              */
+             inline void SetContentType(const Aws::String& value) { std::lock_guard<std::mutex> locker(m_getterSetterLock); m_contentType = value; } 
++            /**
++             * Content encoding of the object being transferred
++             */
++            inline const Aws::String GetContentEncoding() const { return m_contentEncoding; }
++            /**
++             * Content type of the object being transferred
++             */
++            inline void SetContentEncoding(const Aws::String& value) { m_contentEncoding = value; } 
+             /**
+              * In case of an upload, this is the metadata that was placed on the object when it was uploaded.
+              * In the case of a download, this is the object metadata from the GetObject operation.
+@@ -380,6 +388,7 @@ namespace Aws
+             Aws::String m_key;
+             Aws::String m_fileName;
+             Aws::String m_contentType;
++            Aws::String m_contentEncoding;
+             Aws::String m_versionId;
+             Aws::Map<Aws::String, Aws::String> m_metadata;
+             TransferStatus m_status;
+diff --git a/aws-cpp-sdk-transfer/include/aws/transfer/TransferManager.h b/aws-cpp-sdk-transfer/include/aws/transfer/TransferManager.h
+index 907016850d..23d64841be 100644
+--- a/aws-cpp-sdk-transfer/include/aws/transfer/TransferManager.h
++++ b/aws-cpp-sdk-transfer/include/aws/transfer/TransferManager.h
+@@ -152,7 +152,8 @@ namespace Aws
+                                                        const Aws::String& keyName,
+                                                        const Aws::String& contentType, 
+                                                        const Aws::Map<Aws::String, Aws::String>& metadata,
+-                                                       const std::shared_ptr<const Aws::Client::AsyncCallerContext>& context = nullptr);
++                                                       const std::shared_ptr<const Aws::Client::AsyncCallerContext>& context = nullptr,
++                                                       const Aws::String& contentEncoding = "");
+ 
+             /**
+              * Downloads the contents of bucketName/keyName in S3 to the file specified by writeToFile. This will perform a GetObject operation.
+@@ -232,7 +233,8 @@ namespace Aws
+                                                                    const Aws::Map<Aws::String,
+                                                                    Aws::String>& metadata,
+                                                                    const std::shared_ptr<const Aws::Client::AsyncCallerContext>& context,
+-                                                                   const Aws::String& fileName = "");
++                                                                   const Aws::String& fileName = "",
++                                                                   const Aws::String& contentEncoding = "");
+ 
+             /**
+              * Submits the actual task to task schecduler
+@@ -248,7 +250,8 @@ namespace Aws
+                                                          const Aws::String& keyName,
+                                                          const Aws::String& contentType,
+                                                          const Aws::Map<Aws::String, Aws::String>& metadata,
+-                                                         const std::shared_ptr<const Aws::Client::AsyncCallerContext>& context);
++                                                         const std::shared_ptr<const Aws::Client::AsyncCallerContext>& context,
++                                                         const Aws::String& contentEncoding);
+ 
+             /**
+              * Uploads the contents of file, to bucketName/keyName in S3. contentType and metadata will be added to the object. If the object is larger than the configured bufferSize,
+diff --git a/aws-cpp-sdk-transfer/source/transfer/TransferManager.cpp b/aws-cpp-sdk-transfer/source/transfer/TransferManager.cpp
+index 7fd44ad6d0..345cad6c60 100644
+--- a/aws-cpp-sdk-transfer/source/transfer/TransferManager.cpp
++++ b/aws-cpp-sdk-transfer/source/transfer/TransferManager.cpp
+@@ -97,9 +97,10 @@ namespace Aws
+                                                                     const Aws::String& bucketName,
+                                                                     const Aws::String& keyName, const Aws::String& contentType,
+                                                                     const Aws::Map<Aws::String, Aws::String>& metadata,
+-                                                                    const std::shared_ptr<const Aws::Client::AsyncCallerContext>& context)
++                                                                    const std::shared_ptr<const Aws::Client::AsyncCallerContext>& context,
++                                                                    const Aws::String& contentEncoding)
+         {
+-            return this->DoUploadFile(fileStream, bucketName, keyName, contentType, metadata, context);
++            return this->DoUploadFile(fileStream, bucketName, keyName, contentType, metadata, context, contentEncoding);
+         }
+ 
+         std::shared_ptr<TransferHandle> TransferManager::DownloadFile(const Aws::String& bucketName, 
+@@ -278,6 +279,9 @@ namespace Aws
+                 createMultipartRequest.WithKey(handle->GetKey());
+                 createMultipartRequest.WithMetadata(handle->GetMetadata());
+ 
++                if (handle->GetContentEncoding() != "")
++                    createMultipartRequest.WithContentEncoding(handle->GetContentEncoding());
++
+                 auto createMultipartResponse = m_transferConfig.s3Client->CreateMultipartUpload(createMultipartRequest);
+                 if (createMultipartResponse.IsSuccess())
+                 {
+@@ -430,6 +434,9 @@ namespace Aws
+ 
+             putObjectRequest.SetContentType(handle->GetContentType());
+ 
++            if (handle->GetContentEncoding() != "")
++                putObjectRequest.SetContentEncoding(handle->GetContentEncoding());
++
+             auto buffer = m_bufferManager.Acquire();
+ 
+             auto lengthToWrite = (std::min)(static_cast<uint64_t>(buffer->GetLength()), handle->GetBytesTotalSize());
+@@ -1110,12 +1117,15 @@ namespace Aws
+                                                                                 const Aws::String& contentType, 
+                                                                                 const Aws::Map<Aws::String, Aws::String>& metadata,
+                                                                                 const std::shared_ptr<const Aws::Client::AsyncCallerContext>& context,
+-                                                                                const Aws::String& fileName)
++                                                                                const Aws::String& fileName,
++                                                                                const Aws::String& contentEncoding)
+         {
+             auto handle = Aws::MakeShared<TransferHandle>(CLASS_TAG, bucketName, keyName, 0, fileName);
+             handle->SetContentType(contentType);
+             handle->SetMetadata(metadata);
+             handle->SetContext(context);
++            if (contentEncoding != "")
++                handle->SetContentEncoding(contentEncoding);
+ 
+             if (!fileStream->good())
+             {
+@@ -1182,9 +1192,10 @@ namespace Aws
+                                                                       const Aws::String& keyName,
+                                                                       const Aws::String& contentType,
+                                                                       const Aws::Map<Aws::String, Aws::String>& metadata,
+-                                                                      const std::shared_ptr<const Aws::Client::AsyncCallerContext>& context)
++                                                                      const std::shared_ptr<const Aws::Client::AsyncCallerContext>& context,
++                                                                      const Aws::String& contentEncoding)
+         {
+-            auto handle = CreateUploadFileHandle(fileStream.get(), bucketName, keyName, contentType, metadata, context);
++            auto handle = CreateUploadFileHandle(fileStream.get(), bucketName, keyName, contentType, metadata, context, "", contentEncoding);
+             return SubmitUpload(handle, fileStream);
+         }
+ 
+-- 
+2.18.0
+
