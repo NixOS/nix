@@ -5,17 +5,7 @@ makefiles = \
   src/libmain/local.mk \
   src/libexpr/local.mk \
   src/nix/local.mk \
-  src/nix-store/local.mk \
-  src/nix-instantiate/local.mk \
-  src/nix-env/local.mk \
-  src/nix-daemon/local.mk \
-  src/nix-collect-garbage/local.mk \
-  src/nix-copy-closure/local.mk \
-  src/nix-prefetch-url/local.mk \
   src/resolve-system-dependencies/local.mk \
-  src/nix-channel/local.mk \
-  src/nix-build/local.mk \
-  src/build-remote/local.mk \
   scripts/local.mk \
   corepkgs/local.mk \
   misc/systemd/local.mk \

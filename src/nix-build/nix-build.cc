@@ -16,6 +16,7 @@
 #include "get-drvs.hh"
 #include "common-eval-args.hh"
 #include "attr-path.hh"
+#include "legacy.hh"
 
 using namespace nix;
 using namespace std::string_literals;
@@ -66,11 +67,8 @@ std::vector<string> shellwords(const string & s)
     return res;
 }
 
-void mainWrapped(int argc, char * * argv)
+static void _main(int argc, char * * argv)
 {
-    initNix();
-    initGC();
-
     auto dryRun = false;
     auto runEnv = std::regex_search(argv[0], std::regex("nix-shell$"));
     auto pure = false;
@@ -504,9 +502,5 @@ void mainWrapped(int argc, char * * argv)
     }
 }
 
-int main(int argc, char * * argv)
-{
-    return handleExceptions(argv[0], [&]() {
-        return mainWrapped(argc, argv);
-    });
-}
+static RegisterLegacyCommand s1("nix-build", _main);
+static RegisterLegacyCommand s2("nix-shell", _main);

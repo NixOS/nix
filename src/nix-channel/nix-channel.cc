@@ -1,9 +1,11 @@
 #include "shared.hh"
 #include "globals.hh"
 #include "download.hh"
+#include "store-api.hh"
+#include "legacy.hh"
+
 #include <fcntl.h>
 #include <regex>
-#include "store-api.hh"
 #include <pwd.h>
 
 using namespace nix;
@@ -157,11 +159,9 @@ static void update(const StringSet & channelNames)
     replaceSymlink(profile, channelLink);
 }
 
-int main(int argc, char ** argv)
+static int _main(int argc, char ** argv)
 {
-    return handleExceptions(argv[0], [&]() {
-        initNix();
-
+    {
         // Figure out the name of the `.nix-channels' file to use
         auto home = getHome();
         channelsList = home + "/.nix-channels";
@@ -255,5 +255,9 @@ int main(int argc, char ** argv)
                 runProgram(settings.nixBinDir + "/nix-env", false, envArgs);
                 break;
         }
-    });
+
+        return 0;
+    }
 }
+
+static RegisterLegacyCommand s1("nix-channel", _main);

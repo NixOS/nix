@@ -9,6 +9,7 @@
 #include "util.hh"
 #include "worker-protocol.hh"
 #include "graphml.hh"
+#include "legacy.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -993,11 +994,9 @@ static void opVersion(Strings opFlags, Strings opArgs)
 /* Scan the arguments; find the operation, set global flags, put all
    other flags in a list, and put all other arguments in another
    list. */
-int main(int argc, char * * argv)
+static int _main(int argc, char * * argv)
 {
-    return handleExceptions(argv[0], [&]() {
-        initNix();
-
+    {
         Strings opFlags, opArgs;
         Operation op = 0;
 
@@ -1084,5 +1083,9 @@ int main(int argc, char * * argv)
             store = openStore();
 
         op(opFlags, opArgs);
-    });
+
+        return 0;
+    }
 }
+
+static RegisterLegacyCommand s1("nix-store", _main);

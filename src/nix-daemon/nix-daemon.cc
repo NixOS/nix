@@ -9,6 +9,7 @@
 #include "monitor-fd.hh"
 #include "derivations.hh"
 #include "finally.hh"
+#include "legacy.hh"
 
 #include <algorithm>
 
@@ -1058,11 +1059,9 @@ static void daemonLoop(char * * argv)
 }
 
 
-int main(int argc, char * * argv)
+static int _main(int argc, char * * argv)
 {
-    return handleExceptions(argv[0], [&]() {
-        initNix();
-
+    {
         auto stdio = false;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
@@ -1122,7 +1121,7 @@ int main(int argc, char * * argv)
                         if (res == -1)
                             throw SysError("splicing data from stdin to daemon socket");
                         else if (res == 0)
-                            return;
+                            return 0;
                     }
                 }
             } else {
@@ -1131,5 +1130,9 @@ int main(int argc, char * * argv)
         } else {
             daemonLoop(argv);
         }
-    });
+
+        return 0;
+    }
 }
+
+static RegisterLegacyCommand s1("nix-daemon", _main);

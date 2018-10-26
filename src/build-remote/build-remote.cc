@@ -17,6 +17,7 @@
 #include "store-api.hh"
 #include "derivations.hh"
 #include "local-store.hh"
+#include "legacy.hh"
 
 using namespace nix;
 using std::cin;
@@ -37,11 +38,9 @@ static AutoCloseFD openSlotLock(const Machine & m, unsigned long long slot)
     return openLockFile(fmt("%s/%s-%d", currentLoad, escapeUri(m.storeUri), slot), true);
 }
 
-int main (int argc, char * * argv)
+static int _main(int argc, char * * argv)
 {
-    return handleExceptions(argv[0], [&]() {
-        initNix();
-
+    {
         logger = makeJSONLogger(*logger);
 
         /* Ensure we don't get any SSH passphrase or host key popups. */
@@ -80,7 +79,7 @@ int main (int argc, char * * argv)
 
         if (machines.empty()) {
             std::cerr << "# decline-permanently\n";
-            return;
+            return 0;
         }
 
         string drvPath;
@@ -90,8 +89,8 @@ int main (int argc, char * * argv)
 
             try {
                 auto s = readString(source);
-                if (s != "try") return;
-            } catch (EndOfFile &) { return; }
+                if (s != "try") return 0;
+            } catch (EndOfFile &) { return 0; }
 
             auto amWilling = readInt(source);
             auto neededSystem = readString(source);
@@ -253,6 +252,8 @@ connected:
             copyPaths(ref<Store>(sshStore), store, missing, NoRepair, NoCheckSigs, NoSubstitute);
         }
 
-        return;
-    });
+        return 0;
+    }
 }
+
+static RegisterLegacyCommand s1("build-remote", _main);
