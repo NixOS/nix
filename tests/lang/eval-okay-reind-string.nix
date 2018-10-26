@@ -1,3 +1,5 @@
+/*@ LANGUAGE reindent @*/
+
 let
 
   s1 = ''
@@ -129,12 +131,60 @@ let
   # Accept dollars at end of strings
   s17 = ''ending dollar $'' + ''$'' + "\n";
 
+  # Test single antiquotation on its own line
   s18 = ''
-    This tests that /*@ LANGUAGE reindent @*/ is not enabled by default.
+    Some antiquotations evaluate to multi-line content.
+    In that case, all the lines are indented to respect at least the
+    indentation of the antiquotation itself.
+
+      ${''
+          This is why this line will be indented,
+          and this one too !
+        ''}
+
+  '';
+
+  s19 = ''
+    Antiquotations on their own lines are very special, as they collapse when
+    their content evaluates to an empty string.
     ${""}
-    This should look like two separate paragraphs.
+    Therefore, these two paragraphs look like one.
+
+  '';
+
+  s20 = ''
+    Also, antiquotation on their own line do not introduce empty lines when
+    it is not strictly necessary.
+
+    We have already shown that embedding an empty string does not introduce
+    ${""}
+    any empty line, but embedding an indented string also skips the extraneous
+    ${''
+        newline
+      ''}
+    in such a way that these lines look contiguous.
+
+  '';
+
+  s21 = ''
+    ${ "Such antiquotations" }
+      ${ "are\nintuitive\n" }
+    ${''
+        and very nice !
+
+      ''}
+  '';
+
+  s22 = let test = ''test''; in ''
+    This mechanism only works when the antiquotations are left alone on their own line.
+    As soon as the antiquotation is surrounded by text or other antiquotations,
+    it gets back to the behaviour described above.
+      ${test} ${test}
+      test ${test}
+      ${test} test
 
   '';
 
 in s1  + s2  + s3  + s4  + s5  + s6  + s7  + s8  + s9  + s10
- + s11 + s12 + s13 + s14 + s15 + s16 + s17 + s18
+ + s11 + s12 + s13 + s14 + s15 + s16 + s17 + s18 + s19 + s20
+ + s21 + s22

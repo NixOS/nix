@@ -20,6 +20,7 @@
 
 #include "nixexpr.hh"
 #include "eval.hh"
+#include <iostream>
 
 namespace nix {
 
@@ -32,10 +33,12 @@ namespace nix {
         Symbol path;
         string error;
         Symbol sLetBody;
+        bool reindent;
         ParseData(EvalState & state)
             : state(state)
             , symbols(state.symbols)
             , sLetBody(symbols.create("<let-body>"))
+            , reindent(false)
             { };
     };
 
@@ -156,7 +159,12 @@ static void pushStringThenExpr(SymbolTable & symbols, vector<Expr *> * es, strin
     if (e) es->push_back(e);
 }
 
-static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<vector<Expr *> *> * es)
+static void evalPragma(const char* pragma, ParseData* data)
+{
+    data->reindent = true;
+}
+
+static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<vector<Expr *> *> * es, bool reindent)
 {
     /* Figure out the minimum indentation.  Note that by design
        whitespace-only final lines are not taken into account.  (So
@@ -190,7 +198,7 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<ve
 
         /* Single antiquotations on their own lines are ExprIndAntiquot
            and manage their own indentation. */
-        if (isIndAntiquotLine(line)) {
+        if (reindent && isIndAntiquotLine(line)) {
             pushStringThenExpr(symbols, es2, s2, new ExprIndAntiquot(pos, line->at(1), indent));
             delete line;
             continue;
@@ -262,6 +270,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   std::vector<nix::AttrName> * attrNames;
   std::vector<nix::Expr *> * string_parts;
   std::vector<std::vector<nix::Expr *> *> * string_lines;
+  const char * pragma;
 }
 
 %type <e> start expr expr_function expr_if expr_op
@@ -281,6 +290,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %token <nf> FLOAT
 %token <path> PATH HPATH SPATH
 %token <uri> URI
+%token <pragma> PRAGMA
 %token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL OR_KW
 %token DOLLAR_CURLY /* == ${ */
 %token IND_STRING_OPEN IND_STRING_CLOSE
@@ -301,7 +311,11 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 
 %%
 
-start: expr { data->result = $1; };
+start: pragmas expr { data->result = $2; };
+
+pragmas
+  : pragmas PRAGMA { evalPragma($2, data); }
+  | {};
 
 expr: expr_function;
 
@@ -384,7 +398,7 @@ expr_simple
   | FLOAT { $$ = new ExprFloat($1); }
   | '"' string_parts '"' { $$ = $2; }
   | IND_STRING_OPEN ind_string_lines IND_STRING_CLOSE {
-      $$ = stripIndentation(CUR_POS, data->symbols, $2);
+      $$ = stripIndentation(CUR_POS, data->symbols, $2, data->reindent);
   }
   | PATH { $$ = new ExprPath(absPath($1, data->basePath)); }
   | HPATH { $$ = new ExprPath(getHome() + string{$1 + 1}); }

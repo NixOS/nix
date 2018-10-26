@@ -225,6 +225,12 @@ or          { return OR_KW; }
 {SPATH}     { yylval->path = strdup(yytext); return SPATH; }
 {URI}       { yylval->uri = strdup(yytext); return URI; }
 
+\/\*@\ +LANGUAGE\ +reindent\ +@\*\/ {
+              /* Pragma, hardcoded for now because there is only one use. */
+              yylval->pragma = "reindent";
+              return PRAGMA;
+            }
+
 [ \t\r\n]+    /* eat up whitespace */
 \#[^\r\n]*    /* single-line comments */
 \/\*([^*]|\*+[^*/])*\*+\/  /* long comments */
