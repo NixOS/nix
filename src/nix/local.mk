@@ -21,6 +21,6 @@ nix_LIBS = libexpr libmain libstore libutil libformat
 nix_LDFLAGS = -pthread $(SODIUM_LIBS)
 
 $(foreach name, \
-  nix-build nix-channel nix-collect-garbage nix-copy-closure nix-daemon nix-env nix-hash nix-instantiate nix-prefetch-rul nix-shell nix-shore, \
+  nix-build nix-channel nix-collect-garbage nix-copy-closure nix-daemon nix-env nix-hash nix-instantiate nix-prefetch-url nix-shell nix-store, \
   $(eval $(call install-symlink, nix, $(bindir)/$(name))))
 $(eval $(call install-symlink, $(bindir)/nix, $(libexecdir)/nix/build-remote))
