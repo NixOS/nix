@@ -1338,6 +1338,12 @@ void LocalStore::verifyPath(const Path & path, const PathSet & store,
 }
 
 
+unsigned int LocalStore::getProtocol()
+{
+    return PROTOCOL_VERSION;
+}
+
+
 #if defined(FS_IOC_SETFLAGS) && defined(FS_IOC_GETFLAGS) && defined(FS_IMMUTABLE_FL)
 
 static void makeMutable(const Path & path)

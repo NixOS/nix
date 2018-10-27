@@ -599,6 +599,12 @@ public:
        a notion of connection. Otherwise this is a no-op. */
     virtual void connect() { };
 
+    /* Get the protocol version of this store or it's connection. */
+    virtual unsigned int getProtocol()
+    {
+        return 0;
+    };
+
     /* Get the priority of the store, used to order substituters. In
        particular, binary caches can specify a priority field in their
        "nix-cache-info" file. Lower value means higher priority. */

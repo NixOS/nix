@@ -303,6 +303,12 @@ struct LegacySSHStore : public Store
     {
         auto conn(connections->get());
     }
+
+    unsigned int getProtocol() override
+    {
+        auto conn(connections->get());
+        return conn->remoteVersion;
+    }
 };
 
 static RegisterStoreImplementation regStore([](
