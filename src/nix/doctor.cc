@@ -91,7 +91,7 @@ struct CmdDoctor : StoreCommand
 
     void checkStoreProtocol(unsigned int storeProto)
     {
-        auto clientProto = GET_PROTOCOL_MAJOR(SERVE_PROTOCOL_VERSION) == GET_PROTOCOL_MAJOR(storeProto)
+        unsigned int clientProto = GET_PROTOCOL_MAJOR(SERVE_PROTOCOL_VERSION) == GET_PROTOCOL_MAJOR(storeProto)
             ? SERVE_PROTOCOL_VERSION
             : PROTOCOL_VERSION;
 
