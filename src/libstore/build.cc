@@ -3310,6 +3310,7 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
 
         struct Checks
         {
+            bool ignoreSelfRefs = false;
             std::experimental::optional<uint64_t> maxSize, maxClosureSize;
             std::experimental::optional<Strings> allowedReferences, allowedRequisites, disallowedReferences, disallowedRequisites;
         };
@@ -3345,35 +3346,6 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
             return std::make_pair(pathsDone, closureSize);
         };
 
-        auto checkRefs = [&](const std::experimental::optional<Strings> & value, bool allowed, bool recursive)
-        {
-            if (!value) return;
-
-            PathSet spec = parseReferenceSpecifiers(worker.store, *drv, *value);
-
-            PathSet used = recursive ? getClosure(info.path).first : info.references;
-
-            PathSet badPaths;
-
-            for (auto & i : used)
-                if (allowed) {
-                    if (spec.find(i) == spec.end())
-                        badPaths.insert(i);
-                } else {
-                    if (spec.find(i) != spec.end())
-                        badPaths.insert(i);
-                }
-
-            if (!badPaths.empty()) {
-                string badPathsStr;
-                for (auto & i : badPaths) {
-                    badPathsStr += "\n  ";
-                    badPathsStr += i;
-                }
-                throw BuildError("output '%s' is not allowed to refer to the following paths:%s", info.path, badPathsStr);
-            }
-        };
-
         auto applyChecks = [&](const Checks & checks)
         {
             if (checks.maxSize && info.narSize > *checks.maxSize)
@@ -3386,6 +3358,38 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
                     throw BuildError("closure of path '%s' is too large at %d bytes; limit is %d bytes",
                         info.path, closureSize, *checks.maxClosureSize);
             }
+
+            auto checkRefs = [&](const std::experimental::optional<Strings> & value, bool allowed, bool recursive)
+            {
+                if (!value) return;
+
+                PathSet spec = parseReferenceSpecifiers(worker.store, *drv, *value);
+
+                PathSet used = recursive ? getClosure(info.path).first : info.references;
+
+                if (recursive && checks.ignoreSelfRefs)
+                    used.erase(info.path);
+
+                PathSet badPaths;
+
+                for (auto & i : used)
+                    if (allowed) {
+                        if (!spec.count(i))
+                            badPaths.insert(i);
+                    } else {
+                        if (spec.count(i))
+                            badPaths.insert(i);
+                    }
+
+                if (!badPaths.empty()) {
+                    string badPathsStr;
+                    for (auto & i : badPaths) {
+                        badPathsStr += "\n  ";
+                        badPathsStr += i;
+                    }
+                    throw BuildError("output '%s' is not allowed to refer to the following paths:%s", info.path, badPathsStr);
+                }
+            };
 
             checkRefs(checks.allowedReferences, true, false);
             checkRefs(checks.allowedRequisites, true, true);
@@ -3435,6 +3439,7 @@ void DerivationGoal::checkOutputs(const std::map<Path, ValidPathInfo> & outputs)
         } else {
             // legacy non-structured-attributes case
             Checks checks;
+            checks.ignoreSelfRefs = true;
             checks.allowedReferences = parsedDrv->getStringsAttr("allowedReferences");
             checks.allowedRequisites = parsedDrv->getStringsAttr("allowedRequisites");
             checks.disallowedReferences = parsedDrv->getStringsAttr("disallowedReferences");

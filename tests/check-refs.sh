@@ -1,5 +1,7 @@
 source common.sh
 
+clearStore
+
 RESULT=$TEST_ROOT/result
 
 dep=$(nix-build -o $RESULT check-refs.nix -A dep)
