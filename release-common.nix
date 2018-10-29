@@ -29,6 +29,8 @@ rec {
     '';
   });
 
+  editline = pkgs.editline or (pkgs.callPackage ./editline.nix {});
+
   configureFlags =
     [
       "--enable-gc"
@@ -49,7 +51,7 @@ rec {
 
   buildDeps =
     [ curl
-      bzip2 xz brotli
+      bzip2 xz brotli editline
       openssl pkgconfig sqlite boehmgc
       boost
 

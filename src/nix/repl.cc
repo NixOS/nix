@@ -1,7 +1,11 @@
 #include <iostream>
 #include <cstdlib>
+#include <cstring>
+#include <climits>
 
 #include <setjmp.h>
+
+#include <editline.h>
 
 #include "shared.hh"
 #include "eval.hh"
@@ -14,8 +18,6 @@
 #include "globals.hh"
 #include "command.hh"
 #include "finally.hh"
-
-#include "src/linenoise/linenoise.h"
 
 namespace nix {
 
@@ -118,17 +120,53 @@ NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store)
 
 NixRepl::~NixRepl()
 {
-    linenoiseHistorySave(historyFile.c_str());
+    write_history(historyFile.c_str());
 }
-
 
 static NixRepl * curRepl; // ugly
 
-static void completionCallback(const char * s, linenoiseCompletions *lc)
-{
-    /* Otherwise, return all symbols that start with the prefix. */
-    for (auto & c : curRepl->completePrefix(s))
-        linenoiseAddCompletion(lc, c.c_str());
+static char * completionCallback(char * s, int *match) {
+  auto possible = curRepl->completePrefix(s);
+  if (possible.size() == 1) {
+    *match = 1;
+    auto *res = strdup(possible.begin()->c_str() + strlen(s));
+    if (!res) throw Error("allocation failure");
+    return res;
+  }
+
+  *match = 0;
+  return nullptr;
+}
+
+static int listPossibleCallback(char *s, char ***avp) {
+  auto possible = curRepl->completePrefix(s);
+
+  if (possible.size() > (INT_MAX / sizeof(char*)))
+    throw Error("too many completions");
+
+  int ac = 0;
+  char **vp = nullptr;
+
+  auto check = [&](auto *p) {
+    if (!p) {
+      if (vp) {
+        while (--ac >= 0)
+          free(vp[ac]);
+        free(vp);
+      }
+      throw Error("allocation failure");
+    }
+    return p;
+  };
+
+  vp = check((char **)malloc(possible.size() * sizeof(char*)));
+
+  for (auto & p : possible)
+    vp[ac++] = check(strdup(p.c_str()));
+
+  *avp = vp;
+
+  return ac;
 }
 
 
@@ -143,12 +181,16 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
     reloadFiles();
     if (!loadedFiles.empty()) std::cout << std::endl;
 
+    // Allow nix-repl specific settings in .inputrc
+    rl_readline_name = "nix-repl";
     createDirs(dirOf(historyFile));
-    linenoiseHistorySetMaxLen(1000);
-    linenoiseHistoryLoad(historyFile.c_str());
-
+    el_hist_size = 1000;
+    read_history(historyFile.c_str());
+    // rl_initialize();
+    // linenoiseSetCompletionCallback(completionCallback);
     curRepl = this;
-    linenoiseSetCompletionCallback(completionCallback);
+    rl_set_complete_func(completionCallback);
+    rl_set_list_possib_func(listPossibleCallback);
 
     std::string input;
 
@@ -174,12 +216,6 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
             printMsg(lvlError, format(error + "%1%%2%") % (settings.showTrace ? e.prefix() : "") % e.msg());
         }
 
-        if (input.size() > 0) {
-            // Remove trailing newline before adding to history
-            input.erase(input.size() - 1);
-            linenoiseHistoryAdd(input.c_str());
-        }
-
         // We handled the current input fully, so we should clear it
         // and read brand new input.
         input.clear();
@@ -190,19 +226,10 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
 
 bool NixRepl::getLine(string & input, const std::string &prompt)
 {
-    char * s = linenoise(prompt.c_str());
+    char * s = readline(prompt.c_str());
     Finally doFree([&]() { free(s); });
-    if (!s) {
-      switch (auto type = linenoiseKeyType()) {
-        case 1: // ctrl-C
-          input = "";
-          return true;
-        case 2: // ctrl-D
-          return false;
-        default:
-          throw Error(format("Unexpected linenoise keytype: %1%") % type);
-      }
-    }
+    if (!s)
+      return false;
     input += s;
     input += '\n';
     return true;
