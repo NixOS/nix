@@ -18,6 +18,8 @@ std::string formatProtocol(unsigned int proto)
 
 struct CmdDoctor : StoreCommand
 {
+    bool success = true;
+
     std::string name() override
     {
         return "doctor";
@@ -36,13 +38,16 @@ struct CmdDoctor : StoreCommand
         auto type = getStoreType();
 
         if (type < tOther) {
-            checkNixInPath();
-            checkProfileRoots(store);
+            success &= checkNixInPath();
+            success &= checkProfileRoots(store);
         }
-        checkStoreProtocol(store->getProtocol());
+        success &= checkStoreProtocol(store->getProtocol());
+
+        if (!success)
+            throw Exit(2);
     }
 
-    void checkNixInPath()
+    bool checkNixInPath()
     {
         PathSet dirs;
 
@@ -56,10 +61,13 @@ struct CmdDoctor : StoreCommand
             for (auto & dir : dirs)
                 std::cout << "  " << dir << std::endl;
             std::cout << std::endl;
+            return false;
         }
+
+        return true;
     }
 
-    void checkProfileRoots(ref<Store> store)
+    bool checkProfileRoots(ref<Store> store)
     {
         PathSet dirs;
 
@@ -86,10 +94,13 @@ struct CmdDoctor : StoreCommand
             for (auto & dir : dirs)
                 std::cout << "  " << dir << std::endl;
             std::cout << std::endl;
+            return false;
         }
+
+        return true;
     }
 
-    void checkStoreProtocol(unsigned int storeProto)
+    bool checkStoreProtocol(unsigned int storeProto)
     {
         unsigned int clientProto = GET_PROTOCOL_MAJOR(SERVE_PROTOCOL_VERSION) == GET_PROTOCOL_MAJOR(storeProto)
             ? SERVE_PROTOCOL_VERSION
@@ -103,7 +114,10 @@ struct CmdDoctor : StoreCommand
             std::cout << "Client protocol: " << formatProtocol(clientProto) << std::endl;
             std::cout << "Store protocol: " << formatProtocol(storeProto) << std::endl;
             std::cout << std::endl;
+            return false;
         }
+
+        return true;
     }
 };
 
