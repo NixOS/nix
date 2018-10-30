@@ -328,8 +328,6 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
                 s3Helper.client->PutObject(request));
         }
 
-        printTalkative("upload of '%s' completed", path);
-
         auto now2 = std::chrono::steady_clock::now();
 
         auto duration =
