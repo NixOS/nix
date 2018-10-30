@@ -1041,9 +1041,10 @@ void runProgram2(const RunOptions & options)
 
         restoreSignals();
 
-        if (options.searchPath)
+        if (options.searchPath) {
             execvp(options.program.c_str(), stringsToCharPtrs(args_).data());
-        else
+            _exit(127);
+        } else
             execv(options.program.c_str(), stringsToCharPtrs(args_).data());
 
         throw SysError("executing '%1%'", options.program);
