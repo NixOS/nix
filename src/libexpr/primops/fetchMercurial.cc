@@ -200,18 +200,30 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
     // whitelist. Ah well.
     state.checkURI(url);
 
-    auto hgInfo = exportMercurial(state.store, url, rev, name);
+    try {
+        auto hgInfo = exportMercurial(state.store, url, rev, name);
 
-    state.mkAttrs(v, 8);
-    mkString(*state.allocAttr(v, state.sOutPath), hgInfo.storePath, PathSet({hgInfo.storePath}));
-    mkString(*state.allocAttr(v, state.symbols.create("branch")), hgInfo.branch);
-    mkString(*state.allocAttr(v, state.symbols.create("rev")), hgInfo.rev);
-    mkString(*state.allocAttr(v, state.symbols.create("shortRev")), std::string(hgInfo.rev, 0, 12));
-    mkInt(*state.allocAttr(v, state.symbols.create("revCount")), hgInfo.revCount);
-    v.attrs->sort();
+        state.mkAttrs(v, 8);
+        mkString(*state.allocAttr(v, state.sOutPath), hgInfo.storePath, PathSet({hgInfo.storePath}));
+        mkString(*state.allocAttr(v, state.symbols.create("branch")), hgInfo.branch);
+        mkString(*state.allocAttr(v, state.symbols.create("rev")), hgInfo.rev);
+        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), std::string(hgInfo.rev, 0, 12));
+        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), hgInfo.revCount);
+        v.attrs->sort();
 
-    if (state.allowedPaths)
-        state.allowedPaths->insert(state.store->toRealPath(hgInfo.storePath));
+        if (state.allowedPaths)
+            state.allowedPaths->insert(state.store->toRealPath(hgInfo.storePath));
+    } catch (ExecError & e) {
+        if (e.status / 256 == 127) {
+            std::ostringstream out;
+            out << e.what() << std::endl;
+            out << "The program 'hg' is currently not installed. It is required for builtins.fetchMercurial" << std::endl;
+            out << "You can install it by running the following:" << std::endl;
+            out << "nix-env -f '<nixpkgs>' -iA mercurial";
+            throw ExecError(e.status, out.str());
+        }
+        throw;
+    }
 }
 
 static RegisterPrimOp r("fetchMercurial", 1, prim_fetchMercurial);
