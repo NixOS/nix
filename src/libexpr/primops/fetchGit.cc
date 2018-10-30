@@ -225,17 +225,29 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     // whitelist. Ah well.
     state.checkURI(url);
 
-    auto gitInfo = exportGit(state.store, url, ref, rev, name);
+    try {
+        auto gitInfo = exportGit(state.store, url, ref, rev, name);
 
-    state.mkAttrs(v, 8);
-    mkString(*state.allocAttr(v, state.sOutPath), gitInfo.storePath, PathSet({gitInfo.storePath}));
-    mkString(*state.allocAttr(v, state.symbols.create("rev")), gitInfo.rev);
-    mkString(*state.allocAttr(v, state.symbols.create("shortRev")), gitInfo.shortRev);
-    mkInt(*state.allocAttr(v, state.symbols.create("revCount")), gitInfo.revCount);
-    v.attrs->sort();
+        state.mkAttrs(v, 8);
+        mkString(*state.allocAttr(v, state.sOutPath), gitInfo.storePath, PathSet({gitInfo.storePath}));
+        mkString(*state.allocAttr(v, state.symbols.create("rev")), gitInfo.rev);
+        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), gitInfo.shortRev);
+        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), gitInfo.revCount);
+        v.attrs->sort();
 
-    if (state.allowedPaths)
-        state.allowedPaths->insert(state.store->toRealPath(gitInfo.storePath));
+        if (state.allowedPaths)
+            state.allowedPaths->insert(state.store->toRealPath(gitInfo.storePath));
+    } catch (ExecError & e) {
+        if (e.status / 256 == 127) {
+            std::ostringstream out;
+            out << e.what() << std::endl;
+            out << "The program 'git' is currently not installed. It is required for builtins.fetchGit" << std::endl;
+            out << "You can install it by running the following:" << std::endl;
+            out << "nix-env -f '<nixpkgs>' -iA git";
+            throw ExecError(e.status, out.str());
+        }
+        throw;
+    }
 }
 
 static RegisterPrimOp r("fetchGit", 1, prim_fetchGit);
