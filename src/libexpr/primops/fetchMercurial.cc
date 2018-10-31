@@ -24,6 +24,22 @@ struct HgInfo
 
 std::regex commitHashRegex("^[0-9a-fA-F]{40}$");
 
+string runMercurial(const Strings & args)
+{
+    try {
+        return runProgram("hg", true, args);
+    } catch (ExecError & e) {
+        if (WEXITSTATUS(e.status) == 127)
+            throw ExecError(e.status,
+                    "%s\n"
+                    "The program 'hg' is currently not installed. It is required for builtins.fetchMercurial\n"
+                    "You can install it by running the following:\n"
+                    "nix-env -f '<nixpkgs>' -iA mercurial",
+                    e.what());
+        throw;
+    }
+}
+
 HgInfo exportMercurial(ref<Store> store, const std::string & uri,
     std::string rev, const std::string & name)
 {
@@ -32,7 +48,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
 
     if (rev == "" && hasPrefix(uri, "/") && pathExists(uri + "/.hg")) {
 
-        bool clean = runProgram("hg", true, { "status", "-R", uri, "--modified", "--added", "--removed" }) == "";
+        bool clean = runMercurial({ "status", "-R", uri, "--modified", "--added", "--removed" }) == "";
 
         if (!clean) {
 
@@ -43,10 +59,10 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
 
             HgInfo hgInfo;
             hgInfo.rev = "0000000000000000000000000000000000000000";
-            hgInfo.branch = chomp(runProgram("hg", true, { "branch", "-R", uri }));
+            hgInfo.branch = chomp(runMercurial({ "branch", "-R", uri }));
 
             auto files = tokenizeString<std::set<std::string>>(
-                runProgram("hg", true, { "status", "-R", uri, "--clean", "--modified", "--added", "--no-status", "--print0" }), "\0"s);
+                runMercurial({ "status", "-R", uri, "--clean", "--modified", "--added", "--no-status", "--print0" }), "\0"s);
 
             PathFilter filter = [&](const Path & p) -> bool {
                 assert(hasPrefix(p, uri));
@@ -94,21 +110,21 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
 
             if (pathExists(cacheDir)) {
                 try {
-                    runProgram("hg", true, { "pull", "-R", cacheDir, "--", uri });
+                    runMercurial({ "pull", "-R", cacheDir, "--", uri });
                 }
                 catch (ExecError & e) {
                     string transJournal = cacheDir + "/.hg/store/journal";
                     /* hg throws "abandoned transaction" error only if this file exists */
                     if (pathExists(transJournal)) {
-                        runProgram("hg", true, { "recover", "-R", cacheDir });
-                        runProgram("hg", true, { "pull", "-R", cacheDir, "--", uri });
+                        runMercurial({ "recover", "-R", cacheDir });
+                        runMercurial({ "pull", "-R", cacheDir, "--", uri });
                     } else {
                         throw ExecError(e.status, fmt("'hg pull' %s", statusToString(e.status)));
                     }
                 }
             } else {
                 createDirs(dirOf(cacheDir));
-                runProgram("hg", true, { "clone", "--noupdate", "--", uri, cacheDir });
+                runMercurial({ "clone", "--noupdate", "--", uri, cacheDir });
             }
         }
 
@@ -116,7 +132,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
     }
 
     auto tokens = tokenizeString<std::vector<std::string>>(
-        runProgram("hg", true, { "log", "-R", cacheDir, "-r", rev, "--template", "{node} {rev} {branch}" }));
+        runMercurial({ "log", "-R", cacheDir, "-r", rev, "--template", "{node} {rev} {branch}" }));
     assert(tokens.size() == 3);
 
     HgInfo hgInfo;
@@ -146,7 +162,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
     Path tmpDir = createTempDir();
     AutoDelete delTmpDir(tmpDir, true);
 
-    runProgram("hg", true, { "archive", "-R", cacheDir, "-r", rev, tmpDir });
+    runMercurial({ "archive", "-R", cacheDir, "-r", rev, tmpDir });
 
     deletePath(tmpDir + "/.hg_archival.txt");
 
@@ -200,30 +216,18 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
     // whitelist. Ah well.
     state.checkURI(url);
 
-    try {
-        auto hgInfo = exportMercurial(state.store, url, rev, name);
+    auto hgInfo = exportMercurial(state.store, url, rev, name);
 
-        state.mkAttrs(v, 8);
-        mkString(*state.allocAttr(v, state.sOutPath), hgInfo.storePath, PathSet({hgInfo.storePath}));
-        mkString(*state.allocAttr(v, state.symbols.create("branch")), hgInfo.branch);
-        mkString(*state.allocAttr(v, state.symbols.create("rev")), hgInfo.rev);
-        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), std::string(hgInfo.rev, 0, 12));
-        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), hgInfo.revCount);
-        v.attrs->sort();
+    state.mkAttrs(v, 8);
+    mkString(*state.allocAttr(v, state.sOutPath), hgInfo.storePath, PathSet({hgInfo.storePath}));
+    mkString(*state.allocAttr(v, state.symbols.create("branch")), hgInfo.branch);
+    mkString(*state.allocAttr(v, state.symbols.create("rev")), hgInfo.rev);
+    mkString(*state.allocAttr(v, state.symbols.create("shortRev")), std::string(hgInfo.rev, 0, 12));
+    mkInt(*state.allocAttr(v, state.symbols.create("revCount")), hgInfo.revCount);
+    v.attrs->sort();
 
-        if (state.allowedPaths)
-            state.allowedPaths->insert(state.store->toRealPath(hgInfo.storePath));
-    } catch (ExecError & e) {
-        if (e.status / 256 == 127) {
-            std::ostringstream out;
-            out << e.what() << std::endl;
-            out << "The program 'hg' is currently not installed. It is required for builtins.fetchMercurial" << std::endl;
-            out << "You can install it by running the following:" << std::endl;
-            out << "nix-env -f '<nixpkgs>' -iA mercurial";
-            throw ExecError(e.status, out.str());
-        }
-        throw;
-    }
+    if (state.allowedPaths)
+        state.allowedPaths->insert(state.store->toRealPath(hgInfo.storePath));
 }
 
 static RegisterPrimOp r("fetchMercurial", 1, prim_fetchMercurial);

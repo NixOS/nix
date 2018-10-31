@@ -25,6 +25,22 @@ struct GitInfo
 
 std::regex revRegex("^[0-9a-fA-F]{40}$");
 
+string runGit(const Strings & args)
+{
+    try {
+        return runProgram("git", true, args);
+    } catch (ExecError & e) {
+        if (WEXITSTATUS(e.status) == 127)
+            throw ExecError(e.status,
+                    "%s\n"
+                    "The program 'git' is currently not installed. It is required for builtins.fetchGit\n"
+                    "You can install it by running the following:\n"
+                    "nix-env -f '<nixpkgs>' -iA git",
+                    e.what());
+        throw;
+    }
+}
+
 GitInfo exportGit(ref<Store> store, const std::string & uri,
     std::optional<std::string> ref, std::string rev,
     const std::string & name)
@@ -37,7 +53,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         bool clean = true;
 
         try {
-            runProgram("git", true, { "-C", uri, "diff-index", "--quiet", "HEAD", "--" });
+            runGit({ "-C", uri, "diff-index", "--quiet", "HEAD", "--" });
         } catch (ExecError e) {
             if (!WIFEXITED(e.status) || WEXITSTATUS(e.status) != 1) throw;
             clean = false;
@@ -53,7 +69,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
             gitInfo.shortRev = std::string(gitInfo.rev, 0, 7);
 
             auto files = tokenizeString<std::set<std::string>>(
-                runProgram("git", true, { "-C", uri, "ls-files", "-z" }), "\0"s);
+                runGit({ "-C", uri, "ls-files", "-z" }), "\0"s);
 
             PathFilter filter = [&](const Path & p) -> bool {
                 assert(hasPrefix(p, uri));
@@ -76,7 +92,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         }
 
         // clean working tree, but no ref or rev specified.  Use 'HEAD'.
-        rev = chomp(runProgram("git", true, { "-C", uri, "rev-parse", "HEAD" }));
+        rev = chomp(runGit({ "-C", uri, "rev-parse", "HEAD" }));
         ref = "HEAD"s;
     }
 
@@ -91,7 +107,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
     if (!pathExists(cacheDir)) {
         createDirs(dirOf(cacheDir));
-        runProgram("git", true, { "init", "--bare", cacheDir });
+        runGit({ "init", "--bare", cacheDir });
     }
 
     Path localRefFile = cacheDir + "/refs/heads/" + *ref;
@@ -102,7 +118,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
        repo. */
     if (rev != "") {
         try {
-            runProgram("git", true, { "-C", cacheDir, "cat-file", "-e", rev });
+            runGit({ "-C", cacheDir, "cat-file", "-e", rev });
             doFetch = false;
         } catch (ExecError & e) {
             if (WIFEXITED(e.status)) {
@@ -124,7 +140,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
         // FIXME: git stderr messes up our progress indicator, so
         // we're using --quiet for now. Should process its stderr.
-        runProgram("git", true, { "-C", cacheDir, "fetch", "--quiet", "--force", "--", uri, fmt("%s:%s", *ref, *ref) });
+        runGit({ "-C", cacheDir, "fetch", "--quiet", "--force", "--", uri, fmt("%s:%s", *ref, *ref) });
 
         struct timeval times[2];
         times[0].tv_sec = now;
@@ -164,7 +180,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
     // FIXME: should pipe this, or find some better way to extract a
     // revision.
-    auto tar = runProgram("git", true, { "-C", cacheDir, "archive", gitInfo.rev });
+    auto tar = runGit({ "-C", cacheDir, "archive", gitInfo.rev });
 
     Path tmpDir = createTempDir();
     AutoDelete delTmpDir(tmpDir, true);
@@ -173,7 +189,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 
     gitInfo.storePath = store->addToStore(name, tmpDir);
 
-    gitInfo.revCount = std::stoull(runProgram("git", true, { "-C", cacheDir, "rev-list", "--count", gitInfo.rev }));
+    gitInfo.revCount = std::stoull(runGit({ "-C", cacheDir, "rev-list", "--count", gitInfo.rev }));
 
     nlohmann::json json;
     json["storePath"] = gitInfo.storePath;
@@ -225,29 +241,17 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     // whitelist. Ah well.
     state.checkURI(url);
 
-    try {
-        auto gitInfo = exportGit(state.store, url, ref, rev, name);
+    auto gitInfo = exportGit(state.store, url, ref, rev, name);
 
-        state.mkAttrs(v, 8);
-        mkString(*state.allocAttr(v, state.sOutPath), gitInfo.storePath, PathSet({gitInfo.storePath}));
-        mkString(*state.allocAttr(v, state.symbols.create("rev")), gitInfo.rev);
-        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), gitInfo.shortRev);
-        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), gitInfo.revCount);
-        v.attrs->sort();
+    state.mkAttrs(v, 8);
+    mkString(*state.allocAttr(v, state.sOutPath), gitInfo.storePath, PathSet({gitInfo.storePath}));
+    mkString(*state.allocAttr(v, state.symbols.create("rev")), gitInfo.rev);
+    mkString(*state.allocAttr(v, state.symbols.create("shortRev")), gitInfo.shortRev);
+    mkInt(*state.allocAttr(v, state.symbols.create("revCount")), gitInfo.revCount);
+    v.attrs->sort();
 
-        if (state.allowedPaths)
-            state.allowedPaths->insert(state.store->toRealPath(gitInfo.storePath));
-    } catch (ExecError & e) {
-        if (e.status / 256 == 127) {
-            std::ostringstream out;
-            out << e.what() << std::endl;
-            out << "The program 'git' is currently not installed. It is required for builtins.fetchGit" << std::endl;
-            out << "You can install it by running the following:" << std::endl;
-            out << "nix-env -f '<nixpkgs>' -iA git";
-            throw ExecError(e.status, out.str());
-        }
-        throw;
-    }
+    if (state.allowedPaths)
+        state.allowedPaths->insert(state.store->toRealPath(gitInfo.storePath));
 }
 
 static RegisterPrimOp r("fetchGit", 1, prim_fetchGit);
