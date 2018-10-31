@@ -496,6 +496,15 @@ Path getConfigDir()
     return configDir;
 }
 
+std::vector<Path> getConfigDirs()
+{
+    Path configHome = getConfigDir();
+    string configDirs = getEnv("XDG_CONFIG_DIRS");
+    std::vector<Path> result = tokenizeString<std::vector<string>>(configDirs, ":");
+    result.insert(result.begin(), configHome);
+    return result;
+}
+
 
 Path getDataDir()
 {

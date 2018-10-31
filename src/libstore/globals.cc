@@ -78,7 +78,11 @@ void loadConfFile()
        ~/.nix/nix.conf or the command line. */
     globalConfig.resetOverriden();
 
-    globalConfig.applyConfigFile(getConfigDir() + "/nix/nix.conf");
+    auto dirs = getConfigDirs();
+    // Iterate over them in reverse so that the ones appearing first in the path take priority
+    for (auto dir = dirs.rbegin(); dir != dirs.rend(); dir++) {
+        globalConfig.applyConfigFile(*dir + "/nix/nix.conf");
+    }
 }
 
 unsigned int Settings::getDefaultCores()
