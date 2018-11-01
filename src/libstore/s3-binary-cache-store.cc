@@ -292,11 +292,14 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
         if (transferManager) {
 
+            if (contentEncoding != "")
+                throw Error("setting a content encoding is not supported with S3 multi-part uploads");
+
             std::shared_ptr<TransferHandle> transferHandle =
                 transferManager->UploadFile(
                     stream, bucketName, path, mimeType,
                     Aws::Map<Aws::String, Aws::String>(),
-                    nullptr, contentEncoding);
+                    nullptr /*, contentEncoding */);
 
             transferHandle->WaitUntilFinished();
 
