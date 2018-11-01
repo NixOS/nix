@@ -65,8 +65,8 @@ rec {
         customMemoryManagement = false;
       }).overrideDerivation (args: {
         patches = args.patches or [] ++ [ (fetchpatch {
-          url = https://github.com/edolstra/aws-sdk-cpp/commit/3e07e1f1aae41b4c8b340735ff9e8c735f0c063f.patch;
-          sha256 = "1pij0v449p166f9l29x7ppzk8j7g9k9mp15ilh5qxp29c7fnvxy2";
+          url = https://github.com/edolstra/aws-sdk-cpp/commit/7d58e303159b2fb343af9a1ec4512238efa147c7.patch;
+          sha256 = "103phn6kyvs1yc7fibyin3lgxz699qakhw671kl207484im55id1";
         }) ];
       }));
 
