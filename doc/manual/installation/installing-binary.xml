@@ -114,7 +114,7 @@ $ rm -rf /nix
   <para>You can uninstall Nix with the following commands:
 
 <screen>
-sudo rm -rf /etc/profile/nix.sh /etc/nix /nix ~root/.nix-profile ~root/.nix-defexpr ~root/.nix-channels ~/.nix-profile ~/.nix-defexpr ~/.nix-channels
+sudo rm -rf /etc/profile.d/nix.sh /etc/nix /nix ~root/.nix-profile ~root/.nix-defexpr ~root/.nix-channels ~/.nix-profile ~/.nix-defexpr ~/.nix-channels
 
 # If you are on Linux with systemd, you will need to run:
 sudo systemctl stop nix-daemon.socket
@@ -122,6 +122,9 @@ sudo systemctl stop nix-daemon.service
 sudo systemctl disable nix-daemon.socket
 sudo systemctl disable nix-daemon.service
 sudo systemctl daemon-reload
+
+seq 1 32 | while read num; do sudo userdel "nixbld${num}"; done
+sudo groupdel nixbld
 
 # If you are on macOS, you will need to run:
 sudo launchctl unload /Library/LaunchDaemons/org.nixos.nix-daemon.plist
