@@ -54,6 +54,10 @@ struct CmdBuild : MixDryRun, InstallablesCommand
 
         if (dryRun) return;
 
+        if (outLink == "") {
+            writeToStderr("\r\e[K");
+        }
+
         for (size_t i = 0; i < buildables.size(); ++i) {
             auto & b(buildables[i]);
 
