@@ -16,6 +16,7 @@ mkdir "$NIX_CONF_DIR"
 cat > "$NIX_CONF_DIR"/nix.conf <<EOF
 build-users-group =
 keep-derivations = false
+sandbox = false
 include nix.conf.extra
 EOF
 

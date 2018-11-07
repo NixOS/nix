@@ -195,7 +195,13 @@ public:
     Setting<bool> showTrace{this, false, "show-trace",
         "Whether to show a stack trace on evaluation errors."};
 
-    Setting<SandboxMode> sandboxMode{this, smDisabled, "sandbox",
+    Setting<SandboxMode> sandboxMode{this,
+        #if __linux__
+          smEnabled
+        #else
+          smDisabled
+        #endif
+        , "sandbox",
         "Whether to enable sandboxed builds. Can be \"true\", \"false\" or \"relaxed\".",
         {"build-use-chroot", "build-use-sandbox"}};
 
