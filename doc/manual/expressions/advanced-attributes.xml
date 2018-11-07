@@ -312,9 +312,7 @@ big = "a very long string";
   <varlistentry><term><varname>preferLocalBuild</varname></term>
 
     <listitem><para>If this attribute is set to
-    <literal>true</literal>, it has two effects.  First, the
-    derivation will always be built, not substituted, even if a
-    substitute is available.  Second, if <link
+    <literal>true</literal> and <link
     linkend="chap-distributed-builds">distributed building is
     enabled</link>, then, if possible, the derivaton will be built
     locally instead of forwarded to a remote machine.  This is
