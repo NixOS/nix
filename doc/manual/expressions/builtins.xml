@@ -1078,7 +1078,7 @@ Evaluates to <literal>[ "foo" ]</literal>.
 
     <listitem><para>Return <literal>true</literal> if the path
     <replaceable>path</replaceable> exists at evaluation time, and
-    <literal>false</literal> otherwise.
+    <literal>false</literal> otherwise.</para></listitem>
 
   </varlistentry>
 
