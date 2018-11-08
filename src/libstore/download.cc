@@ -805,7 +805,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
     if (pathExists(fileLink) && pathExists(dataFile)) {
         storePath = readLink(fileLink);
         store->addTempRoot(storePath);
-        if (store->isValidPath(storePath)) {
+        if (store->isInStore(storePath) && store->isValidPath(storePath)) {
             auto ss = tokenizeString<vector<string>>(readFile(dataFile), "\n");
             if (ss.size() >= 3 && ss[0] == url) {
                 time_t lastChecked;
