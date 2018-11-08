@@ -1027,22 +1027,8 @@ Evaluates to <literal>[ "foo" ]</literal>.
   <replaceable>path</replaceable></term>
 
     <listitem><para>Return <literal>true</literal> if the path
-    <replaceable>path</replaceable> exists, and
-    <literal>false</literal> otherwise.  One application of this
-    function is to conditionally include a Nix expression containing
-    user configuration:
-
-<programlisting>
-let
-  fileName = builtins.getEnv "CONFIG_FILE";
-  config =
-    if fileName != "" &amp;&amp; builtins.pathExists (builtins.toPath fileName)
-    then import (builtins.toPath fileName)
-    else { someSetting = false; }; <lineannotation># default configuration</lineannotation>
-in config.someSetting</programlisting>
-
-    (Note that <envar>CONFIG_FILE</envar> must be an absolute path for
-    this to work.)</para></listitem>
+    <replaceable>path</replaceable> exists at evaluation time, and
+    <literal>false</literal> otherwise.
 
   </varlistentry>
 
@@ -1344,13 +1330,10 @@ in foo</programlisting>
 
   <varlistentry><term><function>builtins.toPath</function> <replaceable>s</replaceable></term>
 
-    <listitem><para>Convert the string value
-    <replaceable>s</replaceable> into a path value.  The string
-    <replaceable>s</replaceable> must represent an absolute path
-    (i.e., must start with <literal>/</literal>).  The path need not
-    exist.  The resulting path is canonicalised, e.g.,
-    <literal>builtins.toPath "//foo/xyzzy/../bar/"</literal> returns
-    <literal>/foo/bar</literal>.</para></listitem>
+    <listitem><para> DEPRECATED. Use <literal>/. + "/path"</literal>
+    to convert a string into an absolute path. For relative paths,
+    use <literal>./. + "/path"</literal>.
+    </para></listitem>
 
   </varlistentry>
 
