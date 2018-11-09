@@ -19,6 +19,10 @@
     </para>
   </listitem>
 
+  <listitem>
+    <para>Sandbox builds are now enabled by default on Linux.</para>
+  </listitem>
+
 </itemizedlist>
 
 </section>
