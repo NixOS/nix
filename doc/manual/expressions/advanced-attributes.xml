@@ -330,8 +330,7 @@ big = "a very long string";
     derivation; it will not try to substitute its outputs. This is
     useful for very trivial derivations (such as
     <function>writeText</function> in Nixpkgs) that are cheaper to
-    build locally than to substitute from a binary
-    cache.</para></listitem>
+    build than to substitute from a binary cache.</para></listitem>
 
   </varlistentry>
 
