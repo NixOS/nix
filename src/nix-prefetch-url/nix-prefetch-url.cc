@@ -220,6 +220,8 @@ static int _main(int argc, char * * argv)
             assert(storePath == store->makeFixedOutputPath(unpack, hash, name));
         }
 
+        stopProgressBar();
+
         if (!printPath)
             printInfo(format("path is '%1%'") % storePath);
 
