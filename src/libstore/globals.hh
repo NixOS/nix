@@ -137,14 +137,14 @@ public:
     Setting<bool> useSubstitutes{this, true, "substitute",
         "Whether to use substitutes.",
         {"build-use-substitutes"}};
-
+#ifndef __MINGW32__
     Setting<std::string> buildUsersGroup{this, "", "build-users-group",
         "The Unix group that contains the build users."};
 
     Setting<bool> impersonateLinux26{this, false, "impersonate-linux-26",
         "Whether to impersonate a Linux 2.6 machine on newer kernels.",
         {"build-impersonate-linux-26"}};
-
+#endif
     Setting<bool> keepLog{this, true, "keep-build-log",
         "Whether to store build logs.",
         {"build-keep-log"}};

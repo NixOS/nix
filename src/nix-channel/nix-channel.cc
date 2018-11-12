@@ -1,11 +1,13 @@
+#ifndef __MINGW32__
 #include "shared.hh"
 #include "globals.hh"
 #include "download.hh"
 #include <fcntl.h>
 #include <regex>
 #include "store-api.hh"
+#ifndef __MINGW32__
 #include <pwd.h>
-
+#endif
 using namespace nix;
 
 typedef std::map<string,string> Channels;
@@ -33,7 +35,11 @@ static void readChannels()
 // Writes the list of channels.
 static void writeChannels()
 {
-    auto channelsFD = AutoCloseFD{open(channelsList.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0644)};
+    auto channelsFD = AutoCloseFD{open(channelsList.c_str(), O_WRONLY
+#ifndef __MINGW32__
+														    | O_CLOEXEC
+#endif
+														    | O_CREAT | O_TRUNC, 0644)};
     if (!channelsFD)
         throw SysError(format("opening '%1%' for writing") % channelsList);
     for (const auto & channel : channels)
@@ -186,9 +192,12 @@ int main(int argc, char ** argv)
         } cmd = cNone;
         std::vector<string> args;
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
+#ifndef __MINGW32__
             if (*arg == "--help") {
                 showManPage("nix-channel");
-            } else if (*arg == "--version") {
+            } else
+#endif
+                   if (*arg == "--version") {
                 printVersion("nix-channel");
             } else if (*arg == "--add") {
                 cmd = cAdd;
@@ -257,3 +266,11 @@ int main(int argc, char ** argv)
         }
     });
 }
+#else
+#include <iostream>
+int main(int argc, char * * argv)
+{
+	std::cerr << "TODO: nix-daemon" << std::endl;
+	return 1;
+}
+#endif

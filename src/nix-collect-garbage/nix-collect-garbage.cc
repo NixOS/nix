@@ -58,9 +58,12 @@ int main(int argc, char * * argv)
         GCOptions options;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
+#ifndef __MINGW32__
             if (*arg == "--help")
                 showManPage("nix-collect-garbage");
-            else if (*arg == "--version")
+            else
+#endif
+                 if (*arg == "--version")
                 printVersion("nix-collect-garbage");
             else if (*arg == "--delete-old" || *arg == "-d") removeOld = true;
             else if (*arg == "--delete-older-than") {

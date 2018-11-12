@@ -20,8 +20,9 @@
 #include <algorithm>
 #include <cstring>
 #include <regex>
+#ifndef __MINGW32__
 #include <dlfcn.h>
-
+#endif
 
 namespace nix {
 
@@ -154,6 +155,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
 /* !!! Should we pass the Pos or the file name too? */
 extern "C" typedef void (*ValueInitializer)(EvalState & state, Value & v);
 
+#ifndef __MINGW32__
 /* Load a ValueInitializer from a DSO and return whatever it initializes */
 void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -229,6 +231,7 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
         throw;
     }
 }
+#endif
 
 
 /* Return a string representing the type of the expression. */
@@ -1049,7 +1052,9 @@ static void addPath(EvalState & state, const Pos & pos, const string & name, con
         mkString(arg2,
             S_ISREG(st.st_mode) ? "regular" :
             S_ISDIR(st.st_mode) ? "directory" :
+#ifndef __MINGW32__
             S_ISLNK(st.st_mode) ? "symlink" :
+#endif
             "unknown" /* not supported, will fail! */);
 
         Value res;
@@ -2209,10 +2214,12 @@ void EvalState::createBaseEnv()
     mkApp(v, *vScopedImport, *v2);
     forceValue(v);
     addConstant("import", v);
+#ifndef __MINGW32__
     if (evalSettings.enableNativeCode) {
         addPrimOp("__importNative", 2, prim_importNative);
         addPrimOp("__exec", 1, prim_exec);
     }
+#endif
     addPrimOp("__typeOf", 1, prim_typeOf);
     addPrimOp("isNull", 1, prim_isNull);
     addPrimOp("__isFunction", 1, prim_isFunction);

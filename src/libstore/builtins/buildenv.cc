@@ -64,22 +64,32 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
 
         else if (S_ISDIR(srcSt.st_mode)) {
             struct stat dstSt;
+#ifndef __MINGW32__
             auto res = lstat(dstFile.c_str(), &dstSt);
+#else
+            auto res = stat(dstFile.c_str(), &dstSt);
+#endif
             if (res == 0) {
                 if (S_ISDIR(dstSt.st_mode)) {
                     createLinks(srcFile, dstFile, priority);
                     continue;
+#ifndef __MINGW32__
                 } else if (S_ISLNK(dstSt.st_mode)) {
                     auto target = canonPath(dstFile, true);
                     if (!S_ISDIR(lstat(target).st_mode))
                         throw Error("collision between '%1%' and non-directory '%2%'", srcFile, target);
                     if (unlink(dstFile.c_str()) == -1)
                         throw SysError(format("unlinking '%1%'") % dstFile);
-                    if (mkdir(dstFile.c_str(), 0755) == -1)
+                    if (mkdir(dstFile.c_str()
+#ifndef __MINGW32__
+                                , 0755
+#endif
+                                ) == -1)
                         throw SysError(format("creating directory '%1%'"));
                     createLinks(target, dstFile, priorities[dstFile]);
                     createLinks(srcFile, dstFile, priority);
                     continue;
+#endif
                 }
             } else if (errno != ENOENT)
                 throw SysError(format("getting status of '%1%'") % dstFile);
@@ -87,8 +97,13 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
 
         else {
             struct stat dstSt;
+#ifndef __MINGW32__
             auto res = lstat(dstFile.c_str(), &dstSt);
+#else
+            auto res = stat(dstFile.c_str(), &dstSt);
+#endif
             if (res == 0) {
+#ifndef __MINGW32__
                 if (S_ISLNK(dstSt.st_mode)) {
                     auto prevPriority = priorities[dstFile];
                     if (prevPriority == priority)
@@ -102,7 +117,9 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
                         continue;
                     if (unlink(dstFile.c_str()) == -1)
                         throw SysError(format("unlinking '%1%'") % dstFile);
-                } else if (S_ISDIR(dstSt.st_mode))
+                } else
+#endif
+                if (S_ISDIR(dstSt.st_mode))
                     throw Error("collision between non-directory '%1%' and directory '%2%'", srcFile, dstFile);
             } else if (errno != ENOENT)
                 throw SysError(format("getting status of '%1%'") % dstFile);

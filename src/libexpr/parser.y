@@ -555,9 +555,14 @@ Path resolveExprPath(Path path)
        path references work. */
     struct stat st;
     while (true) {
-        if (lstat(path.c_str(), &st))
+#ifndef __MINGW32__
+        if (::lstat(path.c_str(), &st))
             throw SysError(format("getting status of '%1%'") % path);
         if (!S_ISLNK(st.st_mode)) break;
+#else
+        if (::stat(path.c_str(), &st))
+            throw SysError(format("getting status of '%1%'") % path);
+#endif
         path = absPath(readLink(path), dirOf(path));
     }
 

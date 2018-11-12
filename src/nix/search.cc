@@ -123,7 +123,7 @@ struct CmdSearch : SourceExprCommand, MixJSON
             debug("at attribute '%s'", attrPath);
 
             try {
-                uint found = 0;
+                unsigned int found = 0;
 
                 state->forceValue(*v);
 
@@ -271,8 +271,9 @@ struct CmdSearch : SourceExprCommand, MixJSON
 
         if (results.size() == 0)
             throw Error("no results for the given search term(s)!");
-
+#ifndef __MINGW32__
         RunPager pager;
+#endif
         for (auto el : results) std::cout << el.second << "\n";
 
     }

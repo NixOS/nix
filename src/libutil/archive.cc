@@ -45,7 +45,11 @@ static void dumpContents(const Path & path, size_t size,
 {
     sink << "contents" << size;
 
-    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
+    AutoCloseFD fd = open(path.c_str(), O_RDONLY
+#ifndef __MINGW32__
+						    | O_CLOEXEC
+#endif
+						    );
     if (!fd) throw SysError(format("opening file '%1%'") % path);
 
     std::vector<unsigned char> buf(65536);
@@ -67,9 +71,12 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
     checkInterrupt();
 
     struct stat st;
+#ifndef __MINGW32__
     if (lstat(path.c_str(), &st))
+#else
+    if (stat(path.c_str(), &st))
+#endif
         throw SysError(format("getting attributes of path '%1%'") % path);
-
     sink << "(";
 
     if (S_ISREG(st.st_mode)) {
@@ -107,10 +114,10 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
                 sink << ")";
             }
     }
-
+#ifndef __MINGW32__
     else if (S_ISLNK(st.st_mode))
         sink << "type" << "symlink" << "target" << readLink(path);
-
+#endif
     else throw Error(format("file '%1%' has an unsupported type") % path);
 
     sink << ")";
@@ -302,14 +309,22 @@ struct RestoreSink : ParseSink
     void createDirectory(const Path & path)
     {
         Path p = dstPath + path;
-        if (mkdir(p.c_str(), 0777) == -1)
+        if (mkdir(p.c_str()
+#ifndef __MINGW32__
+	            , 0777
+#endif
+    	        ) == -1)
             throw SysError(format("creating directory '%1%'") % p);
     };
 
     void createRegularFile(const Path & path)
     {
         Path p = dstPath + path;
-        fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666);
+        fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY
+#ifndef __MINGW32__
+					        | O_CLOEXEC
+#endif
+					        , 0666);
         if (!fd) throw SysError(format("creating file '%1%'") % p);
     }
 
@@ -318,8 +333,10 @@ struct RestoreSink : ParseSink
         struct stat st;
         if (fstat(fd.get(), &st) == -1)
             throw SysError("fstat");
+#ifndef __MINGW32__
         if (fchmod(fd.get(), st.st_mode | (S_IXUSR | S_IXGRP | S_IXOTH)) == -1)
             throw SysError("fchmod");
+#endif
     }
 
     void preallocateContents(unsigned long long len)

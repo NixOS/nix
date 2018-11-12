@@ -171,7 +171,7 @@ struct NarAccessor : public FSAccessor
         return *result;
     }
 
-    Stat stat(const Path & path) override
+    Stat stat1(const Path & path) override
     {
         auto i = find(path);
         if (i == nullptr)
@@ -228,7 +228,7 @@ ref<FSAccessor> makeLazyNarAccessor(const std::string & listing,
 void listNar(JSONPlaceholder & res, ref<FSAccessor> accessor,
     const Path & path, bool recurse)
 {
-    auto st = accessor->stat(path);
+    auto st = accessor->stat1(path);
 
     auto obj = res.object();
 

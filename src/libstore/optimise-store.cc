@@ -11,6 +11,10 @@
 #include <stdio.h>
 #include <regex>
 
+#ifdef __MINGW32__
+#define random() rand()
+#include <iostream>
+#endif
 
 namespace nix {
 
@@ -18,7 +22,11 @@ namespace nix {
 static void makeWritable(const Path & path)
 {
     struct stat st;
+#ifndef __MINGW32__
     if (lstat(path.c_str(), &st))
+#else
+    if (stat(path.c_str(), &st))
+#endif
         throw SysError(format("getting attributes of path '%1%'") % path);
     if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
         throw SysError(format("changing writability of '%1%'") % path);
@@ -95,7 +103,11 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     checkInterrupt();
 
     struct stat st;
+#ifndef __MINGW32__
     if (lstat(path.c_str(), &st))
+#else
+    if (stat(path.c_str(), &st))
+#endif
         throw SysError(format("getting attributes of path '%1%'") % path);
 
 #if __APPLE__
@@ -157,12 +169,16 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 
  retry:
     if (!pathExists(linkPath)) {
+#ifndef __MINGW32__
         /* Nope, create a hard link in the links directory. */
         if (link(path.c_str(), linkPath.c_str()) == 0) {
             inodeHash.insert(st.st_ino);
             return;
         }
-
+#else
+        std::cerr << "TODO: link(" << path << ", " << linkPath << ")" << std::endl;
+        _exit(1);
+#endif
         switch (errno) {
         case EEXIST:
             /* Fall through if another process created ‘linkPath’ before
@@ -185,7 +201,11 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     /* Yes!  We've seen a file with the same contents.  Replace the
        current file with a hard link to that file. */
     struct stat stLink;
+#ifndef __MINGW32__
     if (lstat(linkPath.c_str(), &stLink))
+#else
+    if (stat(linkPath.c_str(), &stLink))
+#endif
         throw SysError(format("getting attributes of path '%1%'") % linkPath);
 
     if (st.st_ino == stLink.st_ino) {
@@ -213,7 +233,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 
     Path tempLink = (format("%1%/.tmp-link-%2%-%3%")
         % realStoreDir % getpid() % random()).str();
-
+#ifndef __MINGW32__
     if (link(linkPath.c_str(), tempLink.c_str()) == -1) {
         if (errno == EMLINK) {
             /* Too many links to the same file (>= 32000 on most file
@@ -225,6 +245,10 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
         }
         throw SysError("cannot link '%1%' to '%2%'", tempLink, linkPath);
     }
+#else
+        std::cerr << "TODO: link(" << linkPath << ", " << tempLink << ")" << std::endl;
+        _exit(1);
+#endif
 
     /* Atomically replace the old file with the new hard link. */
     if (rename(tempLink.c_str(), path.c_str()) == -1) {
@@ -243,10 +267,15 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 
     stats.filesLinked++;
     stats.bytesFreed += st.st_size;
+#ifndef __MINGW32__
     stats.blocksFreed += st.st_blocks;
-
+#endif
     if (act)
-        act->result(resFileLinked, st.st_size, st.st_blocks);
+        act->result(resFileLinked, st.st_size
+#ifndef __MINGW32__
+		            , st.st_blocks
+#endif
+		            );
 }
 
 

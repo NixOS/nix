@@ -44,10 +44,11 @@ int main (int argc, char * * argv)
 
         logger = makeJSONLogger(*logger);
 
+#ifndef __MINGW32__
         /* Ensure we don't get any SSH passphrase or host key popups. */
         unsetenv("DISPLAY");
         unsetenv("SSH_ASKPASS");
-
+#endif
         if (argc != 2)
             throw UsageError("called without required arguments");
 
@@ -103,7 +104,11 @@ int main (int argc, char * * argv)
                     || settings.extraPlatforms.get().count(neededSystem) > 0);
 
             /* Error ignored here, will be caught later */
-            mkdir(currentLoad.c_str(), 0777);
+            mkdir(currentLoad.c_str()
+#ifndef __MINGW32__
+            , 0777
+#endif
+            );
 
             while (true) {
                 bestSlotLock = -1;
@@ -168,7 +173,8 @@ int main (int argc, char * * argv)
                     break;
                 }
 
-#if __APPLE__
+#ifdef __MINGW32__
+#elif __APPLE__
                 futimes(bestSlotLock.get(), NULL);
 #else
                 futimens(bestSlotLock.get(), NULL);
@@ -217,13 +223,16 @@ connected:
 
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("waiting for the upload lock to '%s'", storeUri));
-
+#ifndef __MINGW32__
             auto old = signal(SIGALRM, handleAlarm);
             alarm(15 * 60);
+#endif
             if (!lockFile(uploadLock.get(), ltWrite, true))
                 printError("somebody is hogging the upload lock for '%s', continuing...");
+#ifndef __MINGW32__
             alarm(0);
             signal(SIGALRM, old);
+#endif
         }
 
         auto substitute = settings.buildersUseSubstitutes ? Substitute : NoSubstitute;

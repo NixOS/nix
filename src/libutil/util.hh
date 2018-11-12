@@ -120,7 +120,11 @@ void deletePath(const Path & path, unsigned long long & bytesFreed);
 
 /* Create a temporary directory. */
 Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
-    bool includePid = true, bool useGlobalCounter = true, mode_t mode = 0755);
+    bool includePid = true, bool useGlobalCounter = true
+#ifndef __MINGW32__
+    , mode_t mode = 0755
+#endif
+    );
 
 /* Return $HOME or the user's home directory from /etc/passwd. */
 Path getHome();
@@ -218,7 +222,9 @@ class Pid
 {
     pid_t pid = -1;
     bool separatePG = false;
+#ifndef __MINGW32__
     int killSignal = SIGKILL;
+#endif
 public:
     Pid();
     Pid(pid_t pid);
@@ -234,10 +240,11 @@ public:
 };
 
 
+#ifndef __MINGW32__
 /* Kill all processes running under the specified uid by sending them
    a SIGKILL. */
 void killUser(uid_t uid);
-
+#endif
 
 /* Fork a process that runs the given function, and return the child
    pid to the caller. */
@@ -453,7 +460,7 @@ struct Callback
     }
 };
 
-
+#ifndef __MINGW32__
 /* Start a thread that handles various signals. Also block those signals
    on the current thread (and thus any threads created by it). */
 void startSignalHandlerThread();
@@ -486,7 +493,7 @@ struct ReceiveInterrupts
         , callback(createInterruptCallback([&]() { pthread_kill(target, SIGUSR1); }))
     { }
 };
-
+#endif
 
 
 /* A RAII helper that increments a counter on construction and

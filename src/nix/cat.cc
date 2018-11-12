@@ -11,7 +11,7 @@ struct MixCat : virtual Args
 
     void cat(ref<FSAccessor> accessor)
     {
-        auto st = accessor->stat(path);
+        auto st = accessor->stat1(path);
         if (st.type == FSAccessor::Type::tMissing)
             throw Error(format("path '%1%' does not exist") % path);
         if (st.type != FSAccessor::Type::tRegular)

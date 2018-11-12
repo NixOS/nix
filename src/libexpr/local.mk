@@ -10,7 +10,9 @@ libexpr_LIBS = libutil libstore libformat
 
 libexpr_LDFLAGS =
 ifneq ($(OS), FreeBSD)
- libexpr_LDFLAGS += -ldl
+ ifneq (MINGW,$(findstring MINGW,$(OS)))
+  libexpr_LDFLAGS += -ldl
+ endif
 endif
 
 # The dependency on libgc must be propagated (i.e. meaning that

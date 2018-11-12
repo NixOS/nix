@@ -6,7 +6,11 @@ else
   ifeq (CYGWIN,$(findstring CYGWIN,$(OS)))
     SO_EXT = dll
   else
-    SO_EXT = so
+    ifeq (MINGW,$(findstring MINGW,$(OS)))
+      SO_EXT = dll
+    else
+      SO_EXT = so
+    endif
   endif
 endif
 
@@ -62,7 +66,11 @@ define build-library
   ifeq (CYGWIN,$(findstring CYGWIN,$(OS)))
     $(1)_INSTALL_DIR ?= $$(bindir)
   else
-    $(1)_INSTALL_DIR ?= $$(libdir)
+    ifeq (MINGW,$(findstring MINGW,$(OS)))
+      $(1)_INSTALL_DIR ?= $$(bindir)
+    else
+      $(1)_INSTALL_DIR ?= $$(libdir)
+    endif
   endif
 
   $(1)_LDFLAGS_USE :=
@@ -79,7 +87,9 @@ define build-library
     else
       ifneq ($(OS), Darwin)
         ifneq (CYGWIN,$(findstring CYGWIN,$(OS)))
-          $(1)_LDFLAGS += -Wl,-z,defs
+          ifneq (MINGW,$(findstring MINGW,$(OS)))
+            $(1)_LDFLAGS += -Wl,-z,defs
+          endif
         endif
       endif
     endif

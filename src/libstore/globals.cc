@@ -6,7 +6,9 @@
 #include <algorithm>
 #include <map>
 #include <thread>
+#ifndef __MINGW32__
 #include <dlfcn.h>
+#endif
 
 
 namespace nix {
@@ -42,7 +44,9 @@ Settings::Settings()
     , nixManDir(canonPath(NIX_MAN_DIR))
     , nixDaemonSocketFile(canonPath(nixStateDir + DEFAULT_SOCKET_PATH))
 {
+#ifndef __MINGW32__
     buildUsersGroup = getuid() == 0 ? "nixbld" : "";
+#endif
     lockCPU = getEnv("NIX_AFFINITY_HACK", "1") == "1";
 
     caFile = getEnv("NIX_SSL_CERT_FILE", getEnv("SSL_CERT_FILE", ""));
@@ -138,6 +142,7 @@ void MaxBuildJobsSetting::set(const std::string & str)
 
 void initPlugins()
 {
+#ifndef __MINGW32__
     for (const auto & pluginFile : settings.pluginFiles.get()) {
         Paths pluginFiles;
         try {
@@ -163,6 +168,7 @@ void initPlugins()
        unknown settings. */
     globalConfig.reapplyUnknownSettings();
     globalConfig.warnUnknownSettings();
+#endif
 }
 
 }

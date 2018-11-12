@@ -34,8 +34,9 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
 
     auto conn = std::make_unique<Connection>();
     conn->sshPid = startProcess([&]() {
+#ifndef __MINGW32__
         restoreSignals();
-
+#endif
         close(in.writeSide.get());
         close(out.readSide.get());
 
@@ -83,7 +84,11 @@ Path SSHMaster::startMaster()
 
     if (state->sshMaster != -1) return state->socketPath;
 
-    state->tmpDir = std::make_unique<AutoDelete>(createTempDir("", "nix", true, true, 0700));
+    state->tmpDir = std::make_unique<AutoDelete>(createTempDir("", "nix", true, true
+#ifndef __MINGW32__
+    	, 0700
+#endif
+    	));
 
     state->socketPath = (Path) *state->tmpDir + "/ssh.sock";
 
@@ -91,8 +96,9 @@ Path SSHMaster::startMaster()
     out.create();
 
     state->sshMaster = startProcess([&]() {
+#ifndef __MINGW32__
         restoreSignals();
-
+#endif
         close(out.readSide.get());
 
         if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)

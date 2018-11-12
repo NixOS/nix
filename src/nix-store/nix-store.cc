@@ -311,9 +311,9 @@ static void opQuery(Strings opFlags, Strings opArgs)
     }
 
     if (query == qDefault) query = qOutputs;
-
+#ifndef __MINGW32__
     RunPager pager;
-
+#endif
     switch (query) {
 
         case qOutputs: {
@@ -468,9 +468,9 @@ static void opPrintEnv(Strings opFlags, Strings opArgs)
 static void opReadLog(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
-
+#ifndef __MINGW32__
     RunPager pager;
-
+#endif
     for (auto & i : opArgs) {
         auto path = store->followLinksToStorePath(i);
         auto log = store->getBuildLog(path);
@@ -502,7 +502,11 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
         if (!store->isValidPath(info.path) || reregister) {
             /* !!! races */
             if (canonicalise)
-                canonicalisePathMetaData(info.path, -1);
+                canonicalisePathMetaData(info.path
+#ifndef __MINGW32__
+                    , -1
+#endif
+                    );
             if (!hashGiven) {
                 HashResult hash = hashPath(htSHA256, info.path);
                 info.narHash = hash.first;
@@ -884,7 +888,9 @@ static void opServe(Strings opFlags, Strings opArgs)
                 getBuildSettings();
 
                 try {
+#ifndef __MINGW32__
                     MonitorFdHup monitor(in.fd);
+#endif
                     store->buildPaths(paths);
                     out << 0;
                 } catch (Error & e) {
@@ -903,8 +909,9 @@ static void opServe(Strings opFlags, Strings opArgs)
                 readDerivation(in, *store, drv);
 
                 getBuildSettings();
-
+#ifndef __MINGW32__
                 MonitorFdHup monitor(in.fd);
+#endif
                 auto status = store->buildDerivation(drvPath, drv);
 
                 out << status.status << status.errorMsg;
@@ -1003,10 +1010,12 @@ int main(int argc, char * * argv)
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             Operation oldOp = op;
-
+#ifndef __MINGW32__
             if (*arg == "--help")
                 showManPage("nix-store");
-            else if (*arg == "--version")
+            else
+#endif
+                 if (*arg == "--version")
                 op = opVersion;
             else if (*arg == "--realise" || *arg == "--realize" || *arg == "-r")
                 op = opRealise;

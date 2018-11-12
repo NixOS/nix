@@ -49,7 +49,11 @@ Generations findGenerations(Path profile, int & curGen)
             gen.path = profileDir + "/" + i.name;
             gen.number = n;
             struct stat st;
+#ifndef __MINGW32__
             if (lstat(gen.path.c_str(), &st) != 0)
+#else
+            if (stat(gen.path.c_str(), &st) != 0)
+#endif
                 throw SysError(format("statting '%1%'") % gen.path);
             gen.creationTime = st.st_mtime;
             gens.push_back(gen);

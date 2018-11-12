@@ -111,17 +111,18 @@ struct CmdRun : InstallablesCommand
             }
 
             clearEnv();
-
+#ifndef __MINGW32__
             for (auto & var : kept)
                 setenv(var.first.c_str(), var.second.c_str(), 1);
-
+#endif
         } else {
 
             if (!keep.empty())
                 throw UsageError("--keep does not make sense without --ignore-environment");
-
+#ifndef __MINGW32__
             for (auto & var : unset)
                 unsetenv(var.c_str());
+#endif
         }
 
         std::unordered_set<Path> done;
@@ -139,22 +140,23 @@ struct CmdRun : InstallablesCommand
                 unixPath.push_front(path + "/bin");
 
             auto propPath = path + "/nix-support/propagated-user-env-packages";
-            if (accessor->stat(propPath).type == FSAccessor::tRegular) {
+            if (accessor->stat1(propPath).type == FSAccessor::tRegular) {
                 for (auto & p : tokenizeString<Paths>(readFile(propPath)))
                     todo.push(p);
             }
         }
 
+#ifndef __MINGW32__
         setenv("PATH", concatStringsSep(":", unixPath).c_str(), 1);
-
+#endif
         std::string cmd = *command.begin();
         Strings args;
         for (auto & arg : command) args.push_back(arg);
 
         stopProgressBar();
-
+#ifndef __MINGW32__
         restoreSignals();
-
+#endif
         restoreAffinity();
 
         /* If this is a diverted store (i.e. its "logical" location

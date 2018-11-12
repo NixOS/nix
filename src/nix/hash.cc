@@ -102,9 +102,12 @@ static int compatNixHash(int argc, char * * argv)
     std::vector<std::string> ss;
 
     parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
+#ifndef __MINGW32__
         if (*arg == "--help")
             showManPage("nix-hash");
-        else if (*arg == "--version")
+        else
+#endif
+             if (*arg == "--version")
             printVersion("nix-hash");
         else if (*arg == "--flat") flat = true;
         else if (*arg == "--base32") base32 = true;

@@ -56,8 +56,13 @@ ifeq ($(BUILD_SHARED_LIBS), 1)
     GLOBAL_CFLAGS += -U__STRICT_ANSI__ -D_GNU_SOURCE
     GLOBAL_CXXFLAGS += -U__STRICT_ANSI__ -D_GNU_SOURCE
   else
-    GLOBAL_CFLAGS += -fPIC
-    GLOBAL_CXXFLAGS += -fPIC
+    ifeq (MINGW,$(findstring MINGW,$(OS)))
+      GLOBAL_CFLAGS += -U__STRICT_ANSI__ -D_GNU_SOURCE
+      GLOBAL_CXXFLAGS += -U__STRICT_ANSI__ -D_GNU_SOURCE
+    else
+      GLOBAL_CFLAGS += -fPIC
+      GLOBAL_CXXFLAGS += -fPIC
+    endif
   endif
   ifneq ($(OS), Darwin)
    ifneq ($(OS), SunOS)

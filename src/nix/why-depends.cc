@@ -190,7 +190,7 @@ struct CmdWhyDepends : SourceExprCommand
             std::function<void(const Path &)> visitPath;
 
             visitPath = [&](const Path & p) {
-                auto st = accessor->stat(p);
+                auto st = accessor->stat1(p);
 
                 auto p2 = p == node.path ? "/" : std::string(p, node.path.size() + 1);
 
@@ -238,7 +238,9 @@ struct CmdWhyDepends : SourceExprCommand
 
             visitPath(node.path);
 
+#ifndef __MINGW32__
             RunPager pager;
+#endif
             for (auto & ref : refs) {
                 auto hash = storePathToHash(ref.second->path);
 

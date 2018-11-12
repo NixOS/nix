@@ -137,7 +137,9 @@ void mainWrapped(int argc, char * * argv)
     MyArgs myArgs(myName, [&](Strings::iterator & arg, const Strings::iterator & end) {
         if (*arg == "--help") {
             deletePath(tmpDir);
+#ifndef __MINGW32__
             showManPage(myName);
+#endif
         }
 
         else if (*arg == "--version")
@@ -264,9 +266,10 @@ void mainWrapped(int argc, char * * argv)
             left = {"default.nix"};
     }
 
+#ifndef __MINGW32__
     if (runEnv)
         setenv("IN_NIX_SHELL", pure ? "pure" : "impure", 1);
-
+#endif
     DrvInfos drvs;
 
     /* Parse the expressions. */
@@ -443,9 +446,9 @@ void mainWrapped(int argc, char * * argv)
         environ = envPtrs.data();
 
         auto argPtrs = stringsToCharPtrs(args);
-
+#ifndef __MINGW32__
         restoreSignals();
-
+#endif
         execvp(shell.c_str(), argPtrs.data());
 
         throw SysError("executing shell '%s'", shell);

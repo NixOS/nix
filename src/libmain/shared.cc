@@ -17,6 +17,10 @@
 
 #include <openssl/crypto.h>
 
+#ifdef __MINGW32__
+#define srandom(x) srand(x)
+#endif
+
 
 namespace nix {
 
@@ -93,9 +97,9 @@ static void opensslLockCallback(int mode, int type, const char * file, int line)
         opensslLocks[type].unlock();
 }
 
-
+#ifndef __MINGW32__
 static void sigHandler(int signo) { }
-
+#endif
 
 void initNix()
 {
@@ -110,7 +114,7 @@ void initNix()
     CRYPTO_set_locking_callback(opensslLockCallback);
 
     loadConfFile();
-
+#ifndef __MINGW32__
     startSignalHandlerThread();
 
     /* Reset SIGCHLD to its default. */
@@ -124,7 +128,7 @@ void initNix()
     /* Install a dummy SIGUSR1 handler for use with pthread_kill(). */
     act.sa_handler = sigHandler;
     if (sigaction(SIGUSR1, &act, 0)) throw SysError("handling SIGUSR1");
-
+#endif
     /* Register a SIGSEGV handler to detect stack overflows. */
     detectStackOverflow();
 
@@ -259,6 +263,7 @@ void printVersion(const string & programName)
 }
 
 
+#ifndef __MINGW32__
 void showManPage(const string & name)
 {
     restoreSignals();
@@ -266,12 +271,13 @@ void showManPage(const string & name)
     execlp("man", "man", name.c_str(), nullptr);
     throw SysError(format("command 'man %1%' failed") % name.c_str());
 }
-
+#endif
 
 int handleExceptions(const string & programName, std::function<void()> fun)
 {
+#ifndef __MINGW32__
     ReceiveInterrupts receiveInterrupts; // FIXME: need better place for this
-
+#endif
     string error = ANSI_RED "error:" ANSI_NORMAL " ";
     try {
         try {
@@ -308,6 +314,7 @@ int handleExceptions(const string & programName, std::function<void()> fun)
 }
 
 
+#ifndef __MINGW32__
 RunPager::RunPager()
 {
     if (!isatty(STDOUT_FILENO)) return;
@@ -351,7 +358,7 @@ RunPager::~RunPager()
         ignoreException();
     }
 }
-
+#endif
 
 string showBytes(unsigned long long bytes)
 {

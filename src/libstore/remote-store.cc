@@ -11,8 +11,12 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifndef __MINGW32__
 #include <sys/socket.h>
 #include <sys/un.h>
+#else
+#include <iostream>
+#endif
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -101,7 +105,7 @@ std::string UDSRemoteStore::getUri()
 ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
 {
     auto conn = make_ref<Connection>();
-
+#ifndef __MINGW32__
     /* Connect to a daemon that does the privileged work for us. */
     conn->fd = socket(PF_UNIX, SOCK_STREAM
         #ifdef SOCK_CLOEXEC
@@ -129,7 +133,10 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
     conn->startTime = std::chrono::steady_clock::now();
 
     initConnection(*conn);
-
+#else
+    std::cerr << "TODO: UDSRemoteStore::openConnection()" << std::endl;
+    _exit(1);
+#endif
     return conn;
 }
 

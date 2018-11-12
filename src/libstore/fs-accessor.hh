@@ -19,7 +19,7 @@ public:
         uint64_t narOffset = 0; // regular files only
     };
 
-    virtual Stat stat(const Path & path) = 0;
+    virtual Stat stat1(const Path & path) = 0;
 
     virtual StringSet readDirectory(const Path & path) = 0;
 

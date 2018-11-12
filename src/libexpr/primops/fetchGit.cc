@@ -38,7 +38,9 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         try {
             runProgram("git", true, { "-C", uri, "diff-index", "--quiet", "HEAD", "--" });
         } catch (ExecError e) {
+#ifndef __MINGW32__
             if (!WIFEXITED(e.status) || WEXITSTATUS(e.status) != 1) throw;
+#endif
             clean = false;
         }
 
@@ -103,9 +105,12 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
             runProgram("git", true, { "-C", cacheDir, "cat-file", "-e", rev });
             doFetch = false;
         } catch (ExecError & e) {
+#ifndef __MINGW32__
             if (WIFEXITED(e.status)) {
                 doFetch = true;
-            } else {
+            } else
+#endif
+            {
                 throw;
             }
         }
@@ -124,6 +129,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         // we're using --quiet for now. Should process its stderr.
         runProgram("git", true, { "-C", cacheDir, "fetch", "--quiet", "--force", "--", uri, *ref + ":" + localRef });
 
+#ifndef __MINGW32__
         struct timeval times[2];
         times[0].tv_sec = now;
         times[0].tv_usec = 0;
@@ -131,6 +137,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         times[1].tv_usec = 0;
 
         utimes(localRefFile.c_str(), times);
+#endif
     }
 
     // FIXME: check whether rev is an ancestor of ref.

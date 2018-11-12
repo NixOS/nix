@@ -11,10 +11,9 @@
 #include <cstring>
 #include <unistd.h>
 #include <sys/time.h>
+#ifndef __MINGW32__
 #include <sys/resource.h>
-
-#include <sys/time.h>
-#include <sys/resource.h>
+#endif
 
 #if HAVE_BOEHMGC
 
@@ -1729,17 +1728,19 @@ void EvalState::printStats()
     bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
     Verbosity v = showStats ? lvlInfo : lvlDebug;
     printMsg(v, "evaluation statistics:");
-
+#ifndef __MINGW32__
     struct rusage buf;
     getrusage(RUSAGE_SELF, &buf);
     float cpuTime = buf.ru_utime.tv_sec + ((float) buf.ru_utime.tv_usec / 1000000);
-
+#endif
     uint64_t bEnvs = nrEnvs * sizeof(Env) + nrValuesInEnvs * sizeof(Value *);
     uint64_t bLists = nrListElems * sizeof(Value *);
     uint64_t bValues = nrValues * sizeof(Value);
     uint64_t bAttrsets = nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Attr);
 
+#ifndef __MINGW32__
     printMsg(v, format("  time elapsed: %1%") % cpuTime);
+#endif
     printMsg(v, format("  size of a value: %1%") % sizeof(Value));
     printMsg(v, format("  size of an attr: %1%") % sizeof(Attr));
     printMsg(v, format("  environments allocated count: %1%") % nrEnvs);

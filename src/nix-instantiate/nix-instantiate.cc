@@ -108,9 +108,12 @@ int main(int argc, char * * argv)
         };
 
         MyArgs myArgs(baseNameOf(argv[0]), [&](Strings::iterator & arg, const Strings::iterator & end) {
+#ifndef __MINGW32__
             if (*arg == "--help")
                 showManPage("nix-instantiate");
-            else if (*arg == "--version")
+            else
+#endif
+                 if (*arg == "--version")
                 printVersion("nix-instantiate");
             else if (*arg == "-")
                 readStdin = true;

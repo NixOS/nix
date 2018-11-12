@@ -9,7 +9,7 @@
 
 namespace nix {
 
-
+#ifndef __MINGW32__
 static void sigsegvHandler(int signo, siginfo_t * info, void * ctx)
 {
     /* Detect stack overflows by comparing the faulting address with
@@ -42,7 +42,7 @@ static void sigsegvHandler(int signo, siginfo_t * info, void * ctx)
     act.sa_flags = 0;
     if (sigaction(SIGSEGV, &act, 0)) abort();
 }
-
+#endif
 
 void detectStackOverflow()
 {

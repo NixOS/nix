@@ -84,7 +84,7 @@ struct LegacyArgs : public MixCommonArgs
     bool processArgs(const Strings & args, bool finish) override;
 };
 
-
+#ifndef __MINGW32__
 /* Show the manual page for the specified program. */
 void showManPage(const string & name);
 
@@ -99,7 +99,7 @@ public:
 private:
     Pid pid;
 };
-
+#endif
 extern volatile ::sig_atomic_t blockInt;
 
 

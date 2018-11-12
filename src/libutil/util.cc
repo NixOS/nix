@@ -17,10 +17,12 @@
 
 #include <fcntl.h>
 #include <limits.h>
+#ifndef __MINGW32__
 #include <pwd.h>
 #include <sys/ioctl.h>
-#include <sys/types.h>
 #include <sys/wait.h>
+#endif
+#include <sys/types.h>
 #include <unistd.h>
 
 #ifdef __APPLE__
@@ -76,8 +78,10 @@ std::map<std::string, std::string> getEnv()
 
 void clearEnv()
 {
+#ifndef __MINGW32__
     for (auto & name : getEnv())
         unsetenv(name.first.c_str());
+#endif
 }
 
 
@@ -209,7 +213,11 @@ bool isDirOrInDir(const Path & path, const Path & dir)
 struct stat lstat(const Path & path)
 {
     struct stat st;
+#ifndef __MINGW32__
     if (lstat(path.c_str(), &st))
+#else
+    if (stat(path.c_str(), &st))
+#endif
         throw SysError(format("getting status of '%1%'") % path);
     return st;
 }
@@ -219,7 +227,11 @@ bool pathExists(const Path & path)
 {
     int res;
     struct stat st;
+#ifndef __MINGW32__
     res = lstat(path.c_str(), &st);
+#else
+    res = stat(path.c_str(), &st);
+#endif
     if (!res) return true;
     if (errno != ENOENT && errno != ENOTDIR)
         throw SysError(format("getting status of %1%") % path);
@@ -229,6 +241,7 @@ bool pathExists(const Path & path)
 
 Path readLink(const Path & path)
 {
+#ifndef __MINGW32__
     checkInterrupt();
     std::vector<char> buf;
     for (ssize_t bufSize = PATH_MAX/4; true; bufSize += bufSize/2) {
@@ -242,13 +255,20 @@ Path readLink(const Path & path)
         else if (rlSize < bufSize)
             return string(buf.data(), rlSize);
     }
+#else
+    return path; // todo
+#endif
 }
 
 
 bool isLink(const Path & path)
 {
+#ifndef __MINGW32__
     struct stat st = lstat(path);
     return S_ISLNK(st.st_mode);
+#else
+    return false; // todo
+#endif
 }
 
 
@@ -283,7 +303,9 @@ unsigned char getFileType(const Path & path)
 {
     struct stat st = lstat(path);
     if (S_ISDIR(st.st_mode)) return DT_DIR;
+#ifndef __MINGW32__
     if (S_ISLNK(st.st_mode)) return DT_LNK;
+#endif
     if (S_ISREG(st.st_mode)) return DT_REG;
     return DT_UNKNOWN;
 }
@@ -304,7 +326,11 @@ string readFile(int fd)
 
 string readFile(const Path & path, bool drain)
 {
-    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
+    AutoCloseFD fd = open(path.c_str(), O_RDONLY
+#ifndef __MINGW32__
+								    	| O_CLOEXEC
+#endif
+									    );
     if (!fd)
         throw SysError(format("opening file '%1%'") % path);
     return drain ? drainFD(fd.get()) : readFile(fd.get());
@@ -313,7 +339,11 @@ string readFile(const Path & path, bool drain)
 
 void readFile(const Path & path, Sink & sink)
 {
-    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
+    AutoCloseFD fd = open(path.c_str(), O_RDONLY
+#ifndef __MINGW32__
+ 									   | O_CLOEXEC
+#endif
+									    );
     if (!fd) throw SysError("opening file '%s'", path);
     drainFD(fd.get(), sink);
 }
@@ -321,7 +351,11 @@ void readFile(const Path & path, Sink & sink)
 
 void writeFile(const Path & path, const string & s, mode_t mode)
 {
-    AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
+    AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT
+#ifndef __MINGW32__
+									    | O_CLOEXEC
+#endif
+									    , mode);
     if (!fd)
         throw SysError(format("opening file '%1%'") % path);
     writeFull(fd.get(), s);
@@ -330,7 +364,11 @@ void writeFile(const Path & path, const string & s, mode_t mode)
 
 void writeFile(const Path & path, Source & source, mode_t mode)
 {
-    AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
+    AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT
+#ifndef __MINGW32__
+ 									   | O_CLOEXEC
+#endif
+									    , mode);
     if (!fd)
         throw SysError(format("opening file '%1%'") % path);
 
@@ -378,14 +416,19 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
     checkInterrupt();
 
     struct stat st;
+#ifndef __MINGW32__
     if (lstat(path.c_str(), &st) == -1) {
+#else
+    if (stat(path.c_str(), &st) == -1) {
+#endif
         if (errno == ENOENT) return;
         throw SysError(format("getting status of '%1%'") % path);
     }
 
+#ifndef __MINGW32__
     if (!S_ISDIR(st.st_mode) && st.st_nlink == 1)
         bytesFreed += st.st_blocks * 512;
-
+#endif
     if (S_ISDIR(st.st_mode)) {
         /* Make the directory accessible. */
         const auto PERM_MASK = S_IRUSR | S_IWUSR | S_IXUSR;
@@ -432,7 +475,11 @@ static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
 
 
 Path createTempDir(const Path & tmpRoot, const Path & prefix,
-    bool includePid, bool useGlobalCounter, mode_t mode)
+    bool includePid, bool useGlobalCounter
+#ifndef __MINGW32__
+				    , mode_t mode
+#endif
+					)
 {
     static int globalCounter = 0;
     int localCounter = 0;
@@ -441,7 +488,11 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
     while (1) {
         checkInterrupt();
         Path tmpDir = tempName(tmpRoot, prefix, includePid, counter);
-        if (mkdir(tmpDir.c_str(), mode) == 0) {
+        if (mkdir(tmpDir.c_str()
+#ifndef __MINGW32__
+	            , mode
+#endif
+	            ) == 0) {
 #if __FreeBSD__
             /* Explicitly set the group of the directory.  This is to
                work around around problems caused by BSD's group
@@ -464,6 +515,7 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
 
 static Lazy<Path> getHome2([]() {
     Path homeDir = getEnv("HOME");
+#ifndef __MINGW32__
     if (homeDir.empty()) {
         std::vector<char> buf(16384);
         struct passwd pwbuf;
@@ -473,8 +525,10 @@ static Lazy<Path> getHome2([]() {
             throw Error("cannot determine user's home directory");
         homeDir = pw->pw_dir;
     }
+#endif
     return homeDir;
 });
+
 
 Path getHome() { return getHome2(); }
 
@@ -512,32 +566,45 @@ Paths createDirs(const Path & path)
     if (path == "/") return created;
 
     struct stat st;
+#ifndef __MINGW32__
     if (lstat(path.c_str(), &st) == -1) {
+#else
+    if (stat(path.c_str(), &st) == -1) {
+#endif
         created = createDirs(dirOf(path));
-        if (mkdir(path.c_str(), 0777) == -1 && errno != EEXIST)
+        if (mkdir(path.c_str()
+#ifndef __MINGW32__
+                    , 0777
+#endif
+                    ) == -1 && errno != EEXIST)
             throw SysError(format("creating directory '%1%'") % path);
         st = lstat(path);
         created.push_back(path);
     }
-
+#ifndef __MINGW32__
     if (S_ISLNK(st.st_mode) && stat(path.c_str(), &st) == -1)
         throw SysError(format("statting symlink '%1%'") % path);
-
+#endif
     if (!S_ISDIR(st.st_mode)) throw Error(format("'%1%' is not a directory") % path);
 
     return created;
 }
 
 
+
 void createSymlink(const Path & target, const Path & link)
 {
+#ifndef __MINGW32__
     if (symlink(target.c_str(), link.c_str()))
         throw SysError(format("creating symlink from '%1%' to '%2%'") % link % target);
+#else
+    throw SysError(format("TODO: create symlink from '%1%' to '%2%'") % link % target);
+#endif
 }
-
 
 void replaceSymlink(const Path & target, const Path & link)
 {
+#ifndef __MINGW32__
     for (unsigned int n = 0; true; n++) {
         Path tmp = canonPath(fmt("%s/.%d_%s", dirOf(link), n, baseNameOf(link)));
 
@@ -553,8 +620,11 @@ void replaceSymlink(const Path & target, const Path & link)
 
         break;
     }
+#else
+	std::cerr << "TODO: replaceSymlink(" << target << ", " << link << ")" << std::endl;
+	_exit(1);
+#endif
 }
-
 
 void readFull(int fd, unsigned char * buf, size_t count)
 {
@@ -603,6 +673,7 @@ string drainFD(int fd, bool block)
 
 void drainFD(int fd, Sink & sink, bool block)
 {
+#ifndef __MINGW32__
     int saved;
 
     Finally finally([&]() {
@@ -631,6 +702,7 @@ void drainFD(int fd, Sink & sink, bool block)
         else if (rd == 0) break;
         else sink(buf.data(), rd);
     }
+#endif
 }
 
 
@@ -741,6 +813,7 @@ int AutoCloseFD::release()
 
 void Pipe::create()
 {
+#ifndef __MINGW32__
     int fds[2];
 #if HAVE_PIPE2
     if (pipe2(fds, O_CLOEXEC) != 0) throw SysError("creating pipe");
@@ -751,8 +824,11 @@ void Pipe::create()
 #endif
     readSide = fds[0];
     writeSide = fds[1];
+#else
+    std::cerr << "TODO: Pipe::create()" << std::endl;
+    _exit(1);
+#endif
 }
-
 
 
 //////////////////////////////////////////////////////////////////////
@@ -779,7 +855,9 @@ void Pid::operator =(pid_t pid)
 {
     if (this->pid != -1 && this->pid != pid) kill();
     this->pid = pid;
+#ifndef __MINGW32__
     killSignal = SIGKILL; // reset signal to default
+#endif
 }
 
 
@@ -794,7 +872,7 @@ int Pid::kill()
     assert(pid != -1);
 
     debug(format("killing process %1%") % pid);
-
+#ifndef __MINGW32__
     /* Send the requested signal to the child.  If it has its own
        process group, send the signal to every process in the child
        process group (which hopefully includes *all* its children). */
@@ -807,13 +885,14 @@ int Pid::kill()
 #endif
             printError((SysError("killing process %d", pid).msg()));
     }
-
+#endif
     return wait();
 }
 
 
 int Pid::wait()
 {
+#ifndef __MINGW32__
     assert(pid != -1);
     while (1) {
         int status;
@@ -826,6 +905,9 @@ int Pid::wait()
             throw SysError("cannot get child exit status");
         checkInterrupt();
     }
+#else
+    return 1;
+#endif
 }
 
 
@@ -837,7 +919,9 @@ void Pid::setSeparatePG(bool separatePG)
 
 void Pid::setKillSignal(int signal)
 {
+#ifndef __MINGW32__
     this->killSignal = signal;
+#endif
 }
 
 
@@ -849,6 +933,7 @@ pid_t Pid::release()
 }
 
 
+#ifndef __MINGW32__
 void killUser(uid_t uid)
 {
     debug(format("killing all processes running under uid '%1%'") % uid);
@@ -895,7 +980,7 @@ void killUser(uid_t uid)
        way to do so (I think).  The most reliable way may be `ps -eo
        uid | grep -q $uid'. */
 }
-
+#endif
 
 //////////////////////////////////////////////////////////////////////
 
@@ -905,6 +990,10 @@ void killUser(uid_t uid)
 static pid_t doFork(bool allowVfork, std::function<void()> fun) __attribute__((noinline));
 static pid_t doFork(bool allowVfork, std::function<void()> fun)
 {
+#ifdef __MINGW32__
+    std::cerr << "doFork" << std::endl;
+    _exit(1);
+#else
 #ifdef __linux__
     pid_t pid = allowVfork ? vfork() : fork();
 #else
@@ -913,6 +1002,7 @@ static pid_t doFork(bool allowVfork, std::function<void()> fun)
     if (pid != 0) return pid;
     fun();
     abort();
+#endif
 }
 
 
@@ -1015,9 +1105,9 @@ void runProgram2(const RunOptions & options)
 
         Strings args_(options.args);
         args_.push_front(options.program);
-
+#ifndef __MINGW32__
         restoreSignals();
-
+#endif
         if (options.searchPath)
             execvp(options.program.c_str(), stringsToCharPtrs(args_).data());
         else
@@ -1076,6 +1166,7 @@ void runProgram2(const RunOptions & options)
 
 void closeMostFDs(const set<int> & exceptions)
 {
+#ifndef __MINGW32__
 #if __linux__
     try {
         for (auto & s : readDirectory("/proc/self/fd")) {
@@ -1095,9 +1186,11 @@ void closeMostFDs(const set<int> & exceptions)
     for (int fd = 0; fd < maxFD; ++fd)
         if (!exceptions.count(fd))
             close(fd); /* ignore result */
+#endif
 }
 
 
+#ifndef __MINGW32__
 void closeOnExec(int fd)
 {
     int prev;
@@ -1105,7 +1198,7 @@ void closeOnExec(int fd)
         fcntl(fd, F_SETFD, prev | FD_CLOEXEC) == -1)
         throw SysError("setting close-on-exec flag");
 }
-
+#endif
 
 //////////////////////////////////////////////////////////////////////
 
@@ -1208,6 +1301,7 @@ string replaceStrings(const std::string & s,
 
 string statusToString(int status)
 {
+#ifndef __MINGW32__
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
         if (WIFEXITED(status))
             return (format("failed with exit code %1%") % WEXITSTATUS(status)).str();
@@ -1223,12 +1317,19 @@ string statusToString(int status)
         else
             return "died abnormally";
     } else return "succeeded";
+#else
+    return (format("with exit code %1%") % status).str();
+#endif
 }
 
 
 bool statusOk(int status)
 {
+#ifndef __MINGW32__
     return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+#else
+    return status == 0;
+#endif
 }
 
 
@@ -1394,7 +1495,7 @@ void callFailure(const std::function<void(std::exception_ptr exc)> & failure, st
 
 static Sync<std::pair<unsigned short, unsigned short>> windowSize{{0, 0}};
 
-
+#ifndef __MINGW32__
 static void updateWindowSize()
 {
     struct winsize ws;
@@ -1410,7 +1511,6 @@ std::pair<unsigned short, unsigned short> getWindowSize()
 {
     return *windowSize.lock();
 }
-
 
 static Sync<std::list<std::function<void()>>> _interruptCallbacks;
 
@@ -1444,6 +1544,7 @@ void triggerInterrupt()
         }
     }
 }
+
 
 static sigset_t savedSignalMask;
 
@@ -1494,5 +1595,5 @@ std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()>
 
     return std::unique_ptr<InterruptCallback>(res.release());
 }
-
+#endif
 }

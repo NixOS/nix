@@ -5,6 +5,10 @@
 
 #include <atomic>
 
+#ifdef __MINGW32__
+#define random() rand()
+#endif
+
 namespace nix {
 
 [[noreturn]] void throwSQLiteError(sqlite3 * db, const FormatOrString & fs)

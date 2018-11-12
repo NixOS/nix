@@ -64,9 +64,12 @@ int main(int argc, char * * argv)
         };
 
         MyArgs myArgs(baseNameOf(argv[0]), [&](Strings::iterator & arg, const Strings::iterator & end) {
+#ifndef __MINGW32__
             if (*arg == "--help")
                 showManPage("nix-prefetch-url");
-            else if (*arg == "--version")
+            else
+#endif
+                 if (*arg == "--version")
                 printVersion("nix-prefetch-url");
             else if (*arg == "--type") {
                 string s = getArg(*arg, arg, end);

@@ -10,7 +10,9 @@ libstore_LIBS = libutil libformat
 
 libstore_LDFLAGS = $(SQLITE3_LIBS) -lbz2 $(LIBCURL_LIBS) $(SODIUM_LIBS) -pthread
 ifneq ($(OS), FreeBSD)
- libstore_LDFLAGS += -ldl
+ ifneq (MINGW,$(findstring MINGW,$(OS)))
+  libstore_LDFLAGS += -ldl
+ endif
 endif
 
 libstore_FILES = sandbox-defaults.sb sandbox-minimal.sb sandbox-network.sb

@@ -462,8 +462,12 @@ struct CurlDownloader : public Downloader
         #endif
 
         wakeupPipe.create();
+#ifndef __MINGW32__
         fcntl(wakeupPipe.readSide.get(), F_SETFL, O_NONBLOCK);
-
+#else
+        std::cerr << "fcntl(wakeupPipe.readSide.get(), F_SETFL, O_NONBLOCK);" << std::endl;
+        _exit(1);
+#endif
         workerThread = std::thread([&]() { workerThreadEntry(); });
     }
 
@@ -488,11 +492,12 @@ struct CurlDownloader : public Downloader
 
     void workerThreadMain()
     {
+#ifndef __MINGW32__
         /* Cause this thread to be notified on SIGINT. */
         auto callback = createInterruptCallback([&]() {
             stopWorkerThread();
         });
-
+#endif
         std::map<CURL *, std::shared_ptr<DownloadItem>> items;
 
         bool quit = false;

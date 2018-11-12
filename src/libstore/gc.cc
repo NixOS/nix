@@ -11,11 +11,17 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifdef HAVE_STATVFS
 #include <sys/statvfs.h>
+#endif
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <climits>
+
+#ifdef __MINGW32__
+#define random() rand()
+#endif
 
 namespace nix {
 
@@ -36,7 +42,11 @@ int LocalStore::openGCLock(LockType lockType)
 
     debug(format("acquiring global GC lock '%1%'") % fnGCLock);
 
-    AutoCloseFD fdGCLock = open(fnGCLock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
+    AutoCloseFD fdGCLock = open(fnGCLock.c_str(), O_RDWR | O_CREAT
+#ifndef __MINGW32__
+											    | O_CLOEXEC
+#endif
+    , 0600);
     if (!fdGCLock)
         throw SysError(format("opening global GC lock '%1%'") % fnGCLock);
 
@@ -209,7 +219,11 @@ std::set<std::pair<pid_t, Path>> LocalStore::readTempRoots(FDs & fds)
         pid_t pid = std::stoi(i.name);
 
         debug(format("reading temporary root file '%1%'") % path);
-        FDPtr fd(new AutoCloseFD(open(path.c_str(), O_CLOEXEC | O_RDWR, 0666)));
+        FDPtr fd(new AutoCloseFD(open(path.c_str(),
+#ifndef __MINGW32__
+								        O_CLOEXEC |
+#endif
+								        O_RDWR, 0666)));
         if (!*fd) {
             /* It's okay if the file has disappeared. */
             if (errno == ENOENT) continue;
@@ -295,8 +309,10 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
                         unlink(path.c_str());
                     }
                 } else {
+#ifndef __MINGW32__
                     struct stat st2 = lstat(target);
                     if (!S_ISLNK(st2.st_mode)) return;
+#endif
                     Path target2 = readLink(target);
                     if (isInStore(target2)) foundRoot(target, target2);
                 }
@@ -357,7 +373,7 @@ Roots LocalStore::findRoots()
     return roots;
 }
 
-
+#ifndef __MINGW32__
 static void readProcLink(const string & file, StringSet & paths)
 {
     /* 64 is the starting buffer size gnu readlink uses... */
@@ -380,6 +396,7 @@ try_again:
         paths.emplace(static_cast<char *>(buf), res);
     return;
 }
+#endif
 
 static string quoteRegexChars(const string & raw)
 {
@@ -400,6 +417,7 @@ static void readFileRoots(const char * path, StringSet & paths)
 PathSet LocalStore::findRuntimeRoots()
 {
     PathSet roots;
+#ifndef __MINGW32__
     StringSet paths;
     auto procDir = AutoCloseDir{opendir("/proc")};
     if (procDir) {
@@ -486,7 +504,7 @@ PathSet LocalStore::findRuntimeRoots()
                 roots.insert(path);
             }
         }
-
+#endif
     return roots;
 }
 
@@ -545,7 +563,11 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
     Path realPath = realStoreDir + "/" + baseNameOf(path);
 
     struct stat st;
+#ifndef __MINGW32__
     if (lstat(realPath.c_str(), &st)) {
+#else
+    if (stat(realPath.c_str(), &st)) {
+#endif
         if (errno == ENOENT) return;
         throw SysError(format("getting status of %1%") % realPath);
     }
@@ -684,6 +706,7 @@ void LocalStore::tryToDelete(GCState & state, const Path & path)
    the link count. */
 void LocalStore::removeUnusedLinks(const GCState & state)
 {
+#ifndef __MINGW32__
     AutoCloseDir dir(opendir(linksDir.c_str()));
     if (!dir) throw SysError(format("opening directory '%1%'") % linksDir);
 
@@ -711,7 +734,6 @@ void LocalStore::removeUnusedLinks(const GCState & state)
 
         if (unlink(path.c_str()) == -1)
             throw SysError(format("deleting '%1%'") % path);
-
         state.results.bytesFreed += st.st_blocks * 512ULL;
     }
 
@@ -722,6 +744,7 @@ void LocalStore::removeUnusedLinks(const GCState & state)
 
     printInfo(format("note: currently hard linking saves %.2f MiB")
         % ((unsharedSize - actualSize - overhead) / (1024.0 * 1024.0)));
+#endif
 }
 
 
@@ -874,6 +897,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
 void LocalStore::autoGC(bool sync)
 {
+#ifdef HAVE_STATVFS
     auto getAvail = [this]() {
         struct statvfs st;
         if (statvfs(realStoreDir.c_str(), &st))
@@ -945,6 +969,7 @@ void LocalStore::autoGC(bool sync)
  sync:
     // Wait for the future outside of the state lock.
     if (sync) future.get();
+#endif
 }
 
 

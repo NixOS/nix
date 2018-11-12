@@ -12,7 +12,6 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/select.h>
 #include <sys/time.h>
 #include <unistd.h>
 #include <utime.h>
@@ -20,7 +19,10 @@
 #include <errno.h>
 #include <stdio.h>
 #include <time.h>
+#ifndef __MINGW32__
+#include <sys/select.h>
 #include <grp.h>
+#endif
 
 #if __linux__
 #include <sched.h>
@@ -69,7 +71,7 @@ LocalStore::LocalStore(const Params & params)
         createDirs(gcRootsDir);
         createSymlink(profilesDir, gcRootsDir + "/profiles");
     }
-
+#ifndef __MINGW32__
     /* Optionally, create directories and set permissions for a
        multi-user install. */
     if (getuid() == 0 && settings.buildUsersGroup != "") {
@@ -98,12 +100,13 @@ LocalStore::LocalStore(const Params & params)
             }
         }
     }
-
+#endif
     /* Ensure that the store and its parents are not symlinks. */
     if (getEnv("NIX_IGNORE_SYMLINK_STORE") != "1") {
         Path path = realStoreDir;
         struct stat st;
         while (path != "/") {
+#ifndef __MINGW32__
             if (lstat(path.c_str(), &st))
                 throw SysError(format("getting status of '%1%'") % path);
             if (S_ISLNK(st.st_mode))
@@ -111,6 +114,7 @@ LocalStore::LocalStore(const Params & params)
                         "the path '%1%' is a symlink; "
                         "this is not allowed for the Nix store and its parent directories")
                     % path);
+#endif
             path = dirOf(path);
         }
     }
@@ -124,7 +128,11 @@ LocalStore::LocalStore(const Params & params)
         if (stat(reservedPath.c_str(), &st) == -1 ||
             st.st_size != settings.reservedSize)
         {
-            AutoCloseFD fd = open(reservedPath.c_str(), O_WRONLY | O_CREAT | O_CLOEXEC, 0600);
+            AutoCloseFD fd = open(reservedPath.c_str(), O_WRONLY | O_CREAT
+#ifndef __MINGW32__
+					    						        | O_CLOEXEC
+#endif
+											            , 0600);
             int res = -1;
 #if HAVE_POSIX_FALLOCATE
             res = posix_fallocate(fd.get(), 0, settings.reservedSize);
@@ -381,7 +389,10 @@ const time_t mtimeStore = 1; /* 1 second into the epoch */
 
 static void canonicaliseTimestampAndPermissions(const Path & path, const struct stat & st)
 {
-    if (!S_ISLNK(st.st_mode)) {
+#ifndef __MINGW32__
+    if (!S_ISLNK(st.st_mode))
+#endif
+    {
 
         /* Mask out all type related bits. */
         mode_t mode = st.st_mode & ~S_IFMT;
@@ -396,6 +407,7 @@ static void canonicaliseTimestampAndPermissions(const Path & path, const struct 
 
     }
 
+#ifndef __MINGW32__
     if (st.st_mtime != mtimeStore) {
         struct timeval times[2];
         times[0].tv_sec = st.st_atime;
@@ -411,19 +423,28 @@ static void canonicaliseTimestampAndPermissions(const Path & path, const struct 
 #endif
             throw SysError(format("changing modification time of '%1%'") % path);
     }
+#endif
 }
 
 
 void canonicaliseTimestampAndPermissions(const Path & path)
 {
     struct stat st;
+#ifndef __MINGW32__
     if (lstat(path.c_str(), &st))
+#else
+    if (::stat(path.c_str(), &st))
+#endif
         throw SysError(format("getting attributes of path '%1%'") % path);
     canonicaliseTimestampAndPermissions(path, st);
 }
 
 
-static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSeen & inodesSeen)
+static void canonicalisePathMetaData_(const Path & path,
+#ifndef __MINGW32__
+    uid_t fromUid,
+#endif
+    InodesSeen & inodesSeen)
 {
     checkInterrupt();
 
@@ -438,11 +459,19 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
 #endif
 
     struct stat st;
+#ifndef __MINGW32__
     if (lstat(path.c_str(), &st))
+#else
+    if (::stat(path.c_str(), &st))
+#endif
         throw SysError(format("getting attributes of path '%1%'") % path);
 
     /* Really make sure that the path is of a supported type. */
-    if (!(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode)))
+    if (!(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode)
+#ifndef __MINGW32__
+        || S_ISLNK(st.st_mode)
+#endif
+        ))
         throw Error(format("file '%1%' has an unsupported type") % path);
 
 #if __linux__
@@ -468,6 +497,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
      }
 #endif
 
+#ifndef __MINGW32__
     /* Fail if the file is not owned by the build user.  This prevents
        us from messing up the ownership/permissions of files
        hard-linked into the output (e.g. "ln /etc/shadow $out/foo").
@@ -482,11 +512,11 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
         assert(S_ISLNK(st.st_mode) || (st.st_uid == geteuid() && (mode == 0444 || mode == 0555) && st.st_mtime == mtimeStore));
         return;
     }
-
+#endif
     inodesSeen.insert(Inode(st.st_dev, st.st_ino));
 
     canonicaliseTimestampAndPermissions(path, st);
-
+#ifndef __MINGW32__
     /* Change ownership to the current uid.  If it's a symlink, use
        lchown if available, otherwise don't bother.  Wrong ownership
        of a symlink doesn't matter, since the owning user can't change
@@ -504,36 +534,61 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
             throw SysError(format("changing owner of '%1%' to %2%")
                 % path % geteuid());
     }
-
+#endif
     if (S_ISDIR(st.st_mode)) {
         DirEntries entries = readDirectory(path);
         for (auto & i : entries)
-            canonicalisePathMetaData_(path + "/" + i.name, fromUid, inodesSeen);
+            canonicalisePathMetaData_(path + "/" + i.name,
+#ifndef __MINGW32__
+                fromUid,
+#endif
+                inodesSeen);
     }
 }
 
 
-void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen)
+void canonicalisePathMetaData(const Path & path
+#ifndef __MINGW32__
+    , uid_t fromUid
+#endif
+    , InodesSeen & inodesSeen)
 {
-    canonicalisePathMetaData_(path, fromUid, inodesSeen);
+    canonicalisePathMetaData_(path
+#ifndef __MINGW32__
+        , fromUid
+#endif
+        , inodesSeen);
 
     /* On platforms that don't have lchown(), the top-level path can't
        be a symlink, since we can't change its ownership. */
     struct stat st;
+#ifndef __MINGW32__
     if (lstat(path.c_str(), &st))
+#else
+    if (::stat(path.c_str(), &st))
+#endif
         throw SysError(format("getting attributes of path '%1%'") % path);
-
+#ifndef __MINGW32__
     if (st.st_uid != geteuid()) {
         assert(S_ISLNK(st.st_mode));
         throw Error(format("wrong ownership of top-level store path '%1%'") % path);
     }
+#endif
 }
 
 
-void canonicalisePathMetaData(const Path & path, uid_t fromUid)
+void canonicalisePathMetaData(const Path & path
+#ifndef __MINGW32__
+    , uid_t fromUid
+#endif
+    )
 {
     InodesSeen inodesSeen;
-    canonicalisePathMetaData(path, fromUid, inodesSeen);
+    canonicalisePathMetaData(path
+#ifndef __MINGW32__
+        , fromUid
+#endif
+        , inodesSeen);
 }
 
 
@@ -902,12 +957,13 @@ void LocalStore::registerValidPath(const ValidPathInfo & info)
 
 void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 {
+#ifndef __MINGW32__
     /* SQLite will fsync by default, but the new valid paths may not
        be fsync-ed.  So some may want to fsync them before registering
        the validity, at the expense of some speed of the path
        registering operation. */
     if (settings.syncBeforeRegistering) sync();
-
+#endif
     return retrySQLite<void>([&]() {
         auto state(_state.lock());
 
@@ -1029,7 +1085,11 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             autoGC();
 
-            canonicalisePathMetaData(realPath, -1);
+            canonicalisePathMetaData(realPath
+#ifndef __MINGW32__
+                , -1
+#endif
+                );
 
             optimisePath(realPath); // FIXME: combine with hashPath()
 
@@ -1071,7 +1131,11 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
             } else
                 writeFile(realPath, dump);
 
-            canonicalisePathMetaData(realPath, -1);
+            canonicalisePathMetaData(realPath
+#ifndef __MINGW32__
+                , -1
+#endif
+                );
 
             /* Register the SHA-256 hash of the NAR serialisation of
                the path in the database.  We may just have computed it
@@ -1141,7 +1205,11 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
 
             writeFile(realPath, s);
 
-            canonicalisePathMetaData(realPath, -1);
+            canonicalisePathMetaData(realPath
+#ifndef __MINGW32__
+                , -1
+#endif
+                );
 
             StringSink sink;
             dumpString(s, sink);
@@ -1356,7 +1424,11 @@ static void makeMutable(const Path & path)
     /* The O_NOFOLLOW is important to prevent us from changing the
        mutable bit on the target of a symlink (which would be a
        security hole). */
-    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_NOFOLLOW
+#ifndef __MINGW32__
+									    | O_CLOEXEC
+#endif
+									    );
     if (fd == -1) {
         if (errno == ELOOP) return; // it's a symlink
         throw SysError(format("opening file '%1%'") % path);

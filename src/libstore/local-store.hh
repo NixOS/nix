@@ -30,7 +30,9 @@ struct OptimiseStats
 {
     unsigned long filesLinked = 0;
     unsigned long long bytesFreed = 0;
+#ifndef __MINGW32__
     unsigned long long blocksFreed = 0;
+#endif
 };
 
 
@@ -308,8 +310,16 @@ typedef set<Inode> InodesSeen;
      without execute permission; setuid bits etc. are cleared)
    - the owner and group are set to the Nix user and group, if we're
      running as root. */
-void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen);
-void canonicalisePathMetaData(const Path & path, uid_t fromUid);
+void canonicalisePathMetaData(const Path & path
+#ifndef __MINGW32__
+    , uid_t fromUid
+#endif
+    , InodesSeen & inodesSeen);
+void canonicalisePathMetaData(const Path & path
+#ifndef __MINGW32__
+    , uid_t fromUid
+#endif
+    );
 
 void canonicaliseTimestampAndPermissions(const Path & path);
 

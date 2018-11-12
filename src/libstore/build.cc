@@ -23,22 +23,25 @@
 
 #include <limits.h>
 #include <sys/time.h>
-#include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifndef __MINGW32__
+#include <sys/wait.h>
 #include <sys/utsname.h>
 #include <sys/select.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
-#include <fcntl.h>
 #include <netdb.h>
+#endif
+#include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
 #include <cstring>
 
+#ifndef __MINGW32__
 #include <pwd.h>
 #include <grp.h>
-
+#endif
 /* Includes required for chroot support. */
 #if __linux__
 #include <sys/socket.h>
@@ -63,6 +66,9 @@
 
 #include <nlohmann/json.hpp>
 
+#ifdef __MINGW32__
+#define random() rand()
+#endif
 
 namespace nix {
 
@@ -432,6 +438,7 @@ void Goal::trace(const FormatOrString & fs)
 /* Common initialisation performed in child processes. */
 static void commonChildInit(Pipe & logPipe)
 {
+#ifndef __MINGW32__
     restoreSignals();
 
     /* Put the child in a separate session (and thus a separate
@@ -440,7 +447,7 @@ static void commonChildInit(Pipe & logPipe)
        terminal signals. */
     if (setsid() == -1)
         throw SysError(format("creating a new session"));
-
+#endif
     /* Dup the write side of the logger pipe into stderr. */
     if (dup2(logPipe.writeSide.get(), STDERR_FILENO) == -1)
         throw SysError("cannot pipe standard error into log file");
@@ -461,7 +468,7 @@ static void commonChildInit(Pipe & logPipe)
 
 //////////////////////////////////////////////////////////////////////
 
-
+#ifndef __MINGW32__
 class UserLock
 {
 private:
@@ -597,7 +604,7 @@ void UserLock::kill()
 {
     killUser(uid);
 }
-
+#endif
 
 //////////////////////////////////////////////////////////////////////
 
@@ -758,10 +765,10 @@ private:
 
     /* Outputs that are corrupt or not valid. */
     PathSet missingPaths;
-
+#ifndef __MINGW32__
     /* User selected for running the builder. */
     std::unique_ptr<UserLock> buildUser;
-
+#endif
     /* The process ID of the builder. */
     Pid pid;
 
@@ -855,10 +862,10 @@ private:
        allows us to compare whether two rounds produced the same
        result. */
     ValidPathInfos prevInfos;
-
+#ifndef __MINGW32__
     const uid_t sandboxUid = 1000;
     const gid_t sandboxGid = 100;
-
+#endif
     const static Path homeDir;
 
     std::unique_ptr<MaintainCount<uint64_t>> mcExpectedBuilds, mcRunningBuilds;
@@ -1028,7 +1035,7 @@ void DerivationGoal::killChild()
 {
     if (pid != -1) {
         worker.childTerminated(this);
-
+#ifndef __MINGW32__
         if (buildUser) {
             /* If we're using a build user, then there is a tricky
                race condition: if we kill the build user before the
@@ -1040,6 +1047,7 @@ void DerivationGoal::killChild()
             buildUser->kill();
             pid.wait();
         } else
+#endif
             pid.kill();
 
         assert(pid == -1);
@@ -1451,7 +1459,9 @@ void DerivationGoal::tryToBuild()
     } catch (BuildError & e) {
         printError(e.msg());
         outputLocks.unlock();
+#ifndef __MINGW32__
         buildUser.reset();
+#endif
         worker.permanentFailure = true;
         done(BuildResult::InputRejected, e.msg());
         return;
@@ -1486,12 +1496,12 @@ MakeError(NotDeterministic, BuildError)
 void DerivationGoal::buildDone()
 {
     trace("build done");
-
+#ifndef __MINGW32__
     /* Release the build user at the end of this function. We don't do
        it right away because we don't want another build grabbing this
        uid and then messing around with our output. */
     Finally releaseBuildUser([&]() { buildUser.reset(); });
-
+#endif
     /* Since we got an EOF on the logger pipe, the builder is presumed
        to have terminated.  In fact, the builder could also have
        simply have closed its end of the pipe, so just to be sure,
@@ -1515,14 +1525,14 @@ void DerivationGoal::buildDone()
 
     /* Close the log file. */
     closeLogFile();
-
+#ifndef __MINGW32__
     /* When running under a build user, make sure that all processes
        running under that uid are gone.  This is to prevent a
        malicious user from leaving behind a process that keeps files
        open and modifies them after they have been chown'ed to
        root. */
     if (buildUser) buildUser->kill();
-
+#endif
     bool diskFull = false;
 
     try {
@@ -1609,14 +1619,17 @@ void DerivationGoal::buildDone()
         outputLocks.unlock();
 
         BuildResult::Status st = BuildResult::MiscFailure;
-
+#ifndef __MINGW32__
         if (hook && WIFEXITED(status) && WEXITSTATUS(status) == 101)
             st = BuildResult::TimedOut;
 
         else if (hook && (!WIFEXITED(status) || WEXITSTATUS(status) != 100)) {
         }
 
-        else {
+        else
+#endif
+        {
+
             st =
                 dynamic_cast<NotDeterministic*>(&e) ? BuildResult::NotDeterministic :
                 statusOk(status) ? BuildResult::OutputRejected :
@@ -1774,6 +1787,7 @@ PathSet DerivationGoal::exportReferences(PathSet storePaths)
     return paths;
 }
 
+#ifndef __MINGW32__
 static std::once_flag dns_resolve_flag;
 
 static void preloadNSS() {
@@ -1789,6 +1803,7 @@ static void preloadNSS() {
         }
     });
 }
+#endif
 
 void DerivationGoal::startBuilder()
 {
@@ -1798,10 +1813,10 @@ void DerivationGoal::startBuilder()
             format("a '%1%' is required to build '%3%', but I am a '%2%'")
             % drv->platform % settings.thisSystem % drvPath);
     }
-
+#ifndef __MINGW32__
     if (drv->isBuiltin())
         preloadNSS();
-
+#endif
 #if __APPLE__
     additionalSandboxProfile = get(drv->env, "__sandboxProfile");
 #endif
@@ -1832,7 +1847,7 @@ void DerivationGoal::startBuilder()
             throw Error("building using a diverted store is not supported on this platform");
         #endif
     }
-
+#ifndef __MINGW32__
     /* If `build-users-group' is not empty, then we have to build as
        one of the members of that group. */
     if (settings.buildUsersGroup != "" && getuid() == 0) {
@@ -1848,11 +1863,15 @@ void DerivationGoal::startBuilder()
         throw Error("build users are not supported on this platform for security reasons");
 #endif
     }
-
+#endif
     /* Create a temporary directory where the build will take
        place. */
     auto drvName = storePathToName(drvPath);
-    tmpDir = createTempDir("", "nix-build-" + drvName, false, false, 0700);
+    tmpDir = createTempDir("", "nix-build-" + drvName, false, false
+#ifndef __MINGW32__
+    	, 0700
+#endif
+    	);
 
     /* In a sandbox, for determinism, always use the same temporary
        directory. */
@@ -1973,12 +1992,16 @@ void DerivationGoal::startBuilder()
 
         printMsg(lvlChatty, format("setting up chroot environment in '%1%'") % chrootRootDir);
 
-        if (mkdir(chrootRootDir.c_str(), 0750) == -1)
+        if (mkdir(chrootRootDir.c_str()
+#ifndef __MINGW32__
+    		        , 0750
+#endif
+		            ) == -1)
             throw SysError(format("cannot create '%1%'") % chrootRootDir);
-
+#ifndef __MINGW32__
         if (buildUser && chown(chrootRootDir.c_str(), 0, buildUser->getGID()) == -1)
             throw SysError(format("cannot change ownership of '%1%'") % chrootRootDir);
-
+#endif
         /* Create a writable /tmp in the chroot.  Many builders need
            this.  (Of course they should really respect $TMPDIR
            instead.) */
@@ -2019,10 +2042,10 @@ void DerivationGoal::startBuilder()
         Path chrootStoreDir = chrootRootDir + worker.store.storeDir;
         createDirs(chrootStoreDir);
         chmod_(chrootStoreDir, 01775);
-
+#ifndef __MINGW32__
         if (buildUser && chown(chrootStoreDir.c_str(), 0, buildUser->getGID()) == -1)
             throw SysError(format("cannot change ownership of '%1%'") % chrootStoreDir);
-
+#endif
         for (auto & i : inputPaths) {
             Path r = worker.store.toRealPath(i);
             struct stat st;
@@ -2250,7 +2273,9 @@ void DerivationGoal::startBuilder()
     } else
 #endif
     {
+#ifndef __MINGW32__
         options.allowVfork = !buildUser && !drv->isBuiltin();
+#endif
         pid = startProcess([&]() {
             runChild();
         }, options);
@@ -2479,9 +2504,11 @@ void DerivationGoal::writeStructuredAttrs()
 
 void DerivationGoal::chownToBuilder(const Path & path)
 {
+#ifndef __MINGW32__
     if (!buildUser) return;
     if (chown(path.c_str(), buildUser->getUID(), buildUser->getGID()) == -1)
         throw SysError(format("cannot change ownership of '%1%'") % path);
+#endif
 }
 
 
@@ -2556,14 +2583,14 @@ void DerivationGoal::runChild()
     try { /* child */
 
         commonChildInit(builderOut);
-
+#ifndef __MINGW32__
         try {
             setupSeccomp();
         } catch (...) {
             if (buildUser) throw;
         }
-
         bool setUser = true;
+#endif
 
         /* Make the contents of netrc available to builtin:fetchurl
            (which may run under a different uid and/or in a sandbox). */
@@ -2778,17 +2805,18 @@ void DerivationGoal::runChild()
         if (cur != -1) personality(cur | ADDR_NO_RANDOMIZE);
 #endif
 
+#ifndef __MINGW32__
         /* Disable core dumps by default. */
         struct rlimit limit = { 0, RLIM_INFINITY };
         setrlimit(RLIMIT_CORE, &limit);
-
+#endif
         // FIXME: set other limits to deterministic values?
 
         /* Fill in the environment. */
         Strings envStrs;
         for (auto & i : env)
             envStrs.push_back(rewriteStrings(i.first + "=" + i.second, inputRewrites));
-
+#ifndef __MINGW32__
         /* If we are running in `build-users' mode, then switch to the
            user we allocated above.  Make sure that we drop all root
            privileges.  Note that above we have closed all file
@@ -2813,7 +2841,7 @@ void DerivationGoal::runChild()
                 geteuid() != buildUser->getUID())
                 throw SysError("setuid failed");
         }
-
+#endif
         /* Fill in the arguments. */
         Strings args;
 
@@ -3062,7 +3090,11 @@ void DerivationGoal::registerOutputs()
         }
 
         struct stat st;
+#ifndef __MINGW32__
         if (lstat(actualPath.c_str(), &st) == -1) {
+#else
+        if (stat(actualPath.c_str(), &st) == -1) {
+#endif
             if (errno == ENOENT)
                 throw BuildError(
                     format("builder for '%1%' failed to produce output path '%2%'")
@@ -3070,6 +3102,7 @@ void DerivationGoal::registerOutputs()
             throw SysError(format("getting attributes of path '%1%'") % actualPath);
         }
 
+#ifndef __MINGW32__
 #ifndef __CYGWIN__
         /* Check that the output is not group or world writable, as
            that means that someone else can have interfered with the
@@ -3079,7 +3112,7 @@ void DerivationGoal::registerOutputs()
             (buildUser && st.st_uid != buildUser->getUID()))
             throw BuildError(format("suspicious ownership or permission on '%1%'; rejecting this build output") % path);
 #endif
-
+#endif
         /* Apply hash rewriting if necessary. */
         bool rewritten = false;
         if (!outputRewrites.empty()) {
@@ -3088,7 +3121,11 @@ void DerivationGoal::registerOutputs()
             /* Canonicalise first.  This ensures that the path we're
                rewriting doesn't contain a hard link to /etc/shadow or
                something like that. */
-            canonicalisePathMetaData(actualPath, buildUser ? buildUser->getUID() : -1, inodesSeen);
+            canonicalisePathMetaData(actualPath
+#ifndef __MINGW32__
+                , buildUser ? buildUser->getUID() : -1
+#endif
+                , inodesSeen);
 
             /* FIXME: this is in-memory. */
             StringSink sink;
@@ -3155,7 +3192,10 @@ void DerivationGoal::registerOutputs()
         /* Get rid of all weird permissions.  This also checks that
            all files are owned by the build user, if applicable. */
         canonicalisePathMetaData(actualPath,
-            buildUser && !rewritten ? buildUser->getUID() : -1, inodesSeen);
+#ifndef __MINGW32__
+            buildUser && !rewritten ? buildUser->getUID() : -1,
+#endif
+            inodesSeen);
 
         /* For this output path, find the references to other paths
            contained in it.  Compute the SHA-256 NAR hash at the same
@@ -3349,7 +3389,11 @@ Path DerivationGoal::openLogFile()
     Path logFileName = fmt("%s/%s%s", dir, string(baseName, 2),
         settings.compressLog ? ".bz2" : "");
 
-    fdLogFile = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0666);
+    fdLogFile = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC
+#ifndef __MINGW32__
+									    | O_CLOEXEC
+#endif
+    , 0666);
     if (!fdLogFile) throw SysError(format("creating log file '%1%'") % logFileName);
 
     logFileSink = std::make_shared<FdSink>(fdLogFile.get());
@@ -4119,7 +4163,10 @@ void Worker::run(const Goals & _topGoals)
 void Worker::waitForInput()
 {
     printMsg(lvlVomit, "waiting for children");
-
+#ifdef __MINGW32__
+    std::cerr << "TODO: Worker::waitForInput()" << std::endl;
+    _exit(1);
+#endif
     /* Process output from the file descriptors attached to the
        children, namely log output and output path creation commands.
        We also use this to detect child termination: if we get EOF on
@@ -4164,7 +4211,7 @@ void Worker::waitForInput()
 
     if (useTimeout)
         vomit("sleeping %d seconds", timeout.tv_sec);
-
+#ifndef __MINGW32__
     /* Use select() to wait for the input side of any logger pipe to
        become `available'.  Note that `available' (i.e., non-blocking)
        includes EOF. */
@@ -4184,7 +4231,7 @@ void Worker::waitForInput()
         if (errno == EINTR) return;
         throw SysError("waiting for input");
     }
-
+#endif
     auto after = steady_time_point::clock::now();
 
     /* Process all available file descriptors. FIXME: this is
@@ -4201,6 +4248,7 @@ void Worker::waitForInput()
         set<int> fds2(j->fds);
         std::vector<unsigned char> buffer(4096);
         for (auto & k : fds2) {
+#ifndef __MINGW32__
             if (FD_ISSET(k, &fds)) {
                 ssize_t rd = read(k, buffer.data(), buffer.size());
                 if (rd == -1) {
@@ -4219,6 +4267,7 @@ void Worker::waitForInput()
                     goal->handleChildOutput(k, data);
                 }
             }
+#endif
         }
 
         if (goal->getExitCode() == Goal::ecBusy &&

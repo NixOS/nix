@@ -1,3 +1,4 @@
+#ifndef __MINGW32__
 #include "shared.hh"
 #include "local-store.hh"
 #include "util.hh"
@@ -1132,3 +1133,11 @@ int main(int argc, char * * argv)
         }
     });
 }
+#else
+#include <iostream>
+int main(int argc, char * * argv)
+{
+	std::cerr << "TODO: nix-daemon" << std::endl;
+	return 1;
+}
+#endif

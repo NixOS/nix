@@ -980,8 +980,9 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
     }
 
     bool tty = isatty(STDOUT_FILENO);
+#ifndef __MINGW32__
     RunPager pager;
-
+#endif
     Table table;
     std::ostringstream dummy;
     XMLWriter xml(true, *(xmlOutput ? &cout : &dummy));
@@ -1260,9 +1261,9 @@ static void opListGenerations(Globals & globals, Strings opFlags, Strings opArgs
 
     int curGen;
     Generations gens = findGenerations(globals.profile, curGen);
-
+#ifndef __MINGW32__
     RunPager pager;
-
+#endif
     for (auto & i : gens) {
         tm t;
         if (!localtime_r(&i.creationTime, &t)) throw Error("cannot convert time");
@@ -1340,10 +1341,12 @@ int main(int argc, char * * argv)
 
         MyArgs myArgs(baseNameOf(argv[0]), [&](Strings::iterator & arg, const Strings::iterator & end) {
             Operation oldOp = op;
-
+#ifndef __MINGW32__
             if (*arg == "--help")
                 showManPage("nix-env");
-            else if (*arg == "--version")
+            else
+#endif
+                 if (*arg == "--version")
                 op = opVersion;
             else if (*arg == "--install" || *arg == "-i")
                 op = opInstall;

@@ -49,8 +49,9 @@ struct CmdLog : InstallableCommand
         subs.push_front(store);
 
         auto b = installable->toBuildable();
-
+#ifndef __MINGW32__
         RunPager pager;
+#endif
         for (auto & sub : subs) {
             auto log = b.drvPath != "" ? sub->getBuildLog(b.drvPath) : nullptr;
             for (auto & output : b.outputs) {

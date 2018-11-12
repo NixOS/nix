@@ -1,3 +1,4 @@
+#ifndef __MINGW32__
 #pragma once
 
 #include <thread>
@@ -56,3 +57,4 @@ public:
 
 
 }
+#endif

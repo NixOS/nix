@@ -304,8 +304,11 @@ public:
                 }
             }
         }
-
+#ifndef __MINGW32__
         auto width = getWindowSize().second;
+#else
+        auto width = 80;
+#endif
         if (width <= 0) std::numeric_limits<decltype(width)>::max();
 
         writeToStderr("\r" + filterANSIEscapes(line, false, width) + "\e[K");

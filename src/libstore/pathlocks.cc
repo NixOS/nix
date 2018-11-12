@@ -8,7 +8,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-
+#ifdef __MINGW32__
+#include <iostream>
+#endif
 
 namespace nix {
 
@@ -17,7 +19,11 @@ AutoCloseFD openLockFile(const Path & path, bool create)
 {
     AutoCloseFD fd;
 
-    fd = open(path.c_str(), O_CLOEXEC | O_RDWR | (create ? O_CREAT : 0), 0600);
+    fd = open(path.c_str(),
+#ifndef __MINGW32__
+    O_CLOEXEC |
+#endif
+    O_RDWR | (create ? O_CREAT : 0), 0600);
     if (!fd && (create || errno != ENOENT))
         throw SysError(format("opening lock file '%1%'") % path);
 
@@ -40,6 +46,7 @@ void deleteLockFile(const Path & path, int fd)
 
 bool lockFile(int fd, LockType lockType, bool wait)
 {
+#ifndef __MINGW32__
     struct flock lock;
     if (lockType == ltRead) lock.l_type = F_RDLCK;
     else if (lockType == ltWrite) lock.l_type = F_WRLCK;
@@ -65,7 +72,9 @@ bool lockFile(int fd, LockType lockType, bool wait)
                 throw SysError(format("acquiring/releasing lock"));
         }
     }
-
+#else
+    std::cerr << "TODO: lockFile" << std::endl;
+#endif
     return true;
 }
 
