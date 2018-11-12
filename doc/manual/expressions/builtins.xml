@@ -436,7 +436,7 @@ stdenv.mkDerivation { … }
         <title>Fetching a repository's specific commit on an arbitrary branch</title>
         <para>
           If the revision you're looking for is in the default branch
-          of the gift repository you don't strictly need to specify
+          of the git repository you don't strictly need to specify
           the branch name in the <varname>ref</varname> attribute.
         </para>
         <para>
@@ -465,7 +465,7 @@ stdenv.mkDerivation { … }
         <title>Fetching a repository's specific commit on the default branch</title>
         <para>
           If the revision you're looking for is in the default branch
-          of the gift repository you may omit the
+          of the git repository you may omit the
           <varname>ref</varname> attribute.
         </para>
         <programlisting>builtins.fetchGit {
