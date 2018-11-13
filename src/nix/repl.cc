@@ -285,6 +285,8 @@ static int runProgram(const string & program, const Strings & args)
     if (pid == -1) throw SysError("forking");
     if (pid == 0) {
         restoreAffinity();
+        restoreSignals();
+        restoreMountNamespace();
         execvp(program.c_str(), stringsToCharPtrs(args2).data());
         _exit(1);
     }

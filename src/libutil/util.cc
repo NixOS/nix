@@ -936,6 +936,7 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
                 throw SysError("setting death signal");
 #endif
             restoreAffinity();
+            restoreMountNamespace();
             fun();
         } catch (std::exception & e) {
             try {
@@ -1502,6 +1503,28 @@ std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()>
     res->it--;
 
     return std::unique_ptr<InterruptCallback>(res.release());
+}
+
+static AutoCloseFD fdSavedMountNamespace;
+
+void saveMountNamespace()
+{
+#if __linux__
+    std::once_flag done;
+    std::call_once(done, []() {
+        fdSavedMountNamespace = open("/proc/self/ns/mnt", O_RDONLY);
+        if (!fdSavedMountNamespace)
+            throw SysError("saving parent mount namespace");
+    });
+#endif
+}
+
+void restoreMountNamespace()
+{
+#if __linux__
+    if (fdSavedMountNamespace && setns(fdSavedMountNamespace.get(), CLONE_NEWNS) == -1)
+        throw SysError("restoring parent mount namespace");
+#endif
 }
 
 }

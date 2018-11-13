@@ -153,9 +153,9 @@ struct CmdRun : InstallablesCommand
 
         stopProgressBar();
 
-        restoreSignals();
-
         restoreAffinity();
+        restoreSignals();
+        restoreMountNamespace();
 
         /* If this is a diverted store (i.e. its "logical" location
            (typically /nix/store) differs from its "physical" location

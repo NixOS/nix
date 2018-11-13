@@ -1,4 +1,5 @@
 #include "ssh.hh"
+#include "affinity.hh"
 
 namespace nix {
 
@@ -34,7 +35,9 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
 
     auto conn = std::make_unique<Connection>();
     conn->sshPid = startProcess([&]() {
+        restoreAffinity();
         restoreSignals();
+        restoreMountNamespace();
 
         close(in.writeSide.get());
         close(out.readSide.get());

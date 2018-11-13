@@ -3,6 +3,7 @@
 #include "eval.hh"
 #include "attr-path.hh"
 #include "progress-bar.hh"
+#include "affinity.hh"
 
 #include <unistd.h>
 
@@ -71,6 +72,10 @@ struct CmdEdit : InstallableCommand
         args.push_back(filename);
 
         stopProgressBar();
+
+        restoreAffinity();
+        restoreSignals();
+        restoreMountNamespace();
 
         execvp(args.front().c_str(), stringsToCharPtrs(args).data());
 
