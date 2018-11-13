@@ -4,7 +4,6 @@ nix_DIR := $(d)
 
 nix_SOURCES := \
   $(wildcard $(d)/*.cc) \
-  $(wildcard src/linenoise/*.cpp) \
   $(wildcard src/build-remote/*.cc) \
   $(wildcard src/nix-build/*.cc) \
   $(wildcard src/nix-channel/*.cc) \
@@ -18,7 +17,7 @@ nix_SOURCES := \
 
 nix_LIBS = libexpr libmain libstore libutil libformat
 
-nix_LDFLAGS = -pthread $(SODIUM_LIBS)
+nix_LDFLAGS = -pthread $(SODIUM_LIBS) $(EDITLINE_LIBS)
 
 $(foreach name, \
   nix-build nix-channel nix-collect-garbage nix-copy-closure nix-daemon nix-env nix-hash nix-instantiate nix-prefetch-url nix-shell nix-store, \
