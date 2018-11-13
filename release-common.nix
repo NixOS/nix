@@ -29,8 +29,6 @@ rec {
     '';
   });
 
-  editline = pkgs.editline or (pkgs.callPackage ./editline.nix {});
-
   configureFlags =
     [
       "--enable-gc"
