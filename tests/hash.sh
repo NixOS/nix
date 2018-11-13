@@ -47,19 +47,31 @@ echo "Hello World" > $TEST_ROOT/hash-path/hello
 
 try2 md5 "ea9b55537dd4c7e104515b2ccfaf4100"
 
-# Execute bit matters.
-chmod +x $TEST_ROOT/hash-path/hello
-try2 md5 "20f3ffe011d4cfa7d72bfabef7882836"
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    echo "skip, MSYS 'chmod +x' does nothing"
+else
+    # Execute bit matters.
+    chmod +x $TEST_ROOT/hash-path/hello
+    try2 md5 "20f3ffe011d4cfa7d72bfabef7882836"
+fi
 
 # Mtime and other bits don't.
 touch -r . $TEST_ROOT/hash-path/hello
 chmod 744 $TEST_ROOT/hash-path/hello
-try2 md5 "20f3ffe011d4cfa7d72bfabef7882836"
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    try2 md5 "ea9b55537dd4c7e104515b2ccfaf4100"
+else
+    try2 md5 "20f3ffe011d4cfa7d72bfabef7882836"
+fi
 
-# File type (e.g., symlink) does.
-rm $TEST_ROOT/hash-path/hello
-ln -s x $TEST_ROOT/hash-path/hello
-try2 md5 "f78b733a68f5edbdf9413899339eaa4a"
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    echo "skip, MSYS 'ls -s' does copy"
+else
+    # File type (e.g., symlink) does.
+    rm $TEST_ROOT/hash-path/hello
+    ln -s x $TEST_ROOT/hash-path/hello
+    try2 md5 "f78b733a68f5edbdf9413899339eaa4a"
+fi
 
 # Conversion.
 try3() {

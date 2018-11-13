@@ -1,5 +1,13 @@
 source common.sh
 
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    exit 99
+fi
+
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    cacheDir=$(cygpath -m $cacheDir)
+fi
+
 clearStore
 clearCache
 
@@ -151,6 +159,10 @@ nix-store -r $outPath --substituters "file://$cacheDir" --trusted-public-keys "$
 clearStore
 
 cacheDir2=$TEST_ROOT/binary-cache-2
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    cacheDir2=$(cygpath -m $cacheDir2)
+fi
+
 rm -rf $cacheDir2
 cp -r $cacheDir $cacheDir2
 

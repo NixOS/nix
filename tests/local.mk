@@ -1,5 +1,26 @@
 check:
-	@echo "Warning: Nix has no 'make check'. Please install Nix and run 'make installcheck' instead."
+    @echo "Warning: Nix has no 'make check'. Please install Nix and run 'make installcheck' instead."
+
+ifeq (MINGW,$(findstring MINGW,$(OS)))
+
+# these do not pass (yet) on MINGW:
+
+#  gc-concurrent.sh         <-- fails trying to delete open .lock-file, need runtimeRoots
+#  gc-runtime.sh            <-- runtimeRoots not implemented yet
+#  user-envs.sh             <-- nix-env is not implemented yet
+#  remote-store.sh          <-- not implemented yet
+#  secure-drv-outputs.sh    <-- needs nix-daemin which is not ported yet
+#  nix-channel.sh           <-- nix-channel is not implemented yet
+#  nix-profile.sh           <-- not implemented yet
+#  case-hack.sh             <-- not implemented yet (it might have Windows-specific)
+#  nix-shell.sh             <-- not implemented yet
+#  linux-sandbox.sh         <-- not implemented (Docker can be use on Windows for sandboxing)
+#  plugins.sh               <-- not implemented yet
+#  nix-copy-ssh.sh          <-- not implemented yet
+#  build-remote.sh          <-- not implemented yet
+#  binary-cache.sh          <-- \* does not work in MSYS Bash (https://superuser.com/questions/897599/escaping-asterisk-in-bash-on-windows)
+#  nar-access.sh            <-- not possible to have args '/foo/data' (paths inside nar) without magic msys path translation (maybe `bash -c '...'` will work?)
+endif
 
 nix_tests = \
   init.sh hash.sh lang.sh add.sh simple.sh dependencies.sh \
@@ -35,4 +56,8 @@ tests-environment = NIX_REMOTE= $(bash) -e
 
 clean-files += $(d)/common.sh
 
+ifeq (MINGW,$(findstring MINGW,$(OS)))
+installcheck: $(d)/common.sh
+else
 installcheck: $(d)/common.sh $(d)/plugins/libplugintest.$(SO_EXT)
+endif

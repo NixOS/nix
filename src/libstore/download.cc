@@ -305,10 +305,12 @@ struct CurlDownloader : public Downloader
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_LIMIT, 1L);
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_TIME, lowSpeedTimeout);
 
+#ifndef __MINGW32__
             /* If no file exist in the specified path, curl continues to work
                anyway as if netrc support was disabled. */
             curl_easy_setopt(req, CURLOPT_NETRC_FILE, settings.netrcFile.get().c_str());
             curl_easy_setopt(req, CURLOPT_NETRC, CURL_NETRC_OPTIONAL);
+#endif
 
             result.data = std::make_shared<std::string>();
             result.bodySize = 0;
@@ -437,12 +439,14 @@ struct CurlDownloader : public Downloader
     };
 
     Sync<State> state_;
-
+#ifndef __MINGW32__
     /* We can't use a std::condition_variable to wake up the curl
        thread, because it only monitors file descriptors. So use a
-       pipe instead. */
+       pipe instead.
+       TODO: On Windows here should be a socket.
+    */
     Pipe wakeupPipe;
-
+#endif
     std::thread workerThread;
 
     CurlDownloader()
@@ -460,13 +464,8 @@ struct CurlDownloader : public Downloader
         curl_multi_setopt(curlm, CURLMOPT_MAX_TOTAL_CONNECTIONS,
             downloadSettings.httpConnections.get());
         #endif
-
-        wakeupPipe.create();
 #ifndef __MINGW32__
-        fcntl(wakeupPipe.readSide.get(), F_SETFL, O_NONBLOCK);
-#else
-        std::cerr << "fcntl(wakeupPipe.readSide.get(), F_SETFL, O_NONBLOCK);" << std::endl;
-        _exit(1);
+        wakeupPipe.createPipe();
 #endif
         workerThread = std::thread([&]() { workerThreadEntry(); });
     }
@@ -487,7 +486,9 @@ struct CurlDownloader : public Downloader
             auto state(state_.lock());
             state->quit = true;
         }
+#ifndef __MINGW32__
         writeFull(wakeupPipe.writeSide.get(), " ", false);
+#endif
     }
 
     void workerThreadMain()
@@ -529,20 +530,33 @@ struct CurlDownloader : public Downloader
 
             /* Wait for activity, including wakeup events. */
             int numfds = 0;
-            struct curl_waitfd extraFDs[1];
-            extraFDs[0].fd = wakeupPipe.readSide.get();
-            extraFDs[0].events = CURL_WAIT_POLLIN;
-            extraFDs[0].revents = 0;
+
             auto sleepTimeMs =
                 nextWakeup != std::chrono::steady_clock::time_point()
                 ? std::max(0, (int) std::chrono::duration_cast<std::chrono::milliseconds>(nextWakeup - std::chrono::steady_clock::now()).count())
                 : 10000;
+
             vomit("download thread waiting for %d ms", sleepTimeMs);
+#ifdef __MINGW32__
+            // as there is no way to wake up yet, limit the timeout to a reasonable small value
+            sleepTimeMs = std::min(500, sleepTimeMs);
+
+            if (items.empty()) {
+                Sleep(sleepTimeMs);
+            } else {
+                mc = curl_multi_wait(curlm, NULL, 0, sleepTimeMs, &numfds);
+                if (mc != CURLM_OK)
+                    throw nix::Error(format("unexpected error from curl_multi_wait(): %s") % curl_multi_strerror(mc));
+            }
+#else
+            struct curl_waitfd extraFDs[1];
+            extraFDs[0].fd = wakeupPipe.readSide.get();
+            extraFDs[0].events = CURL_WAIT_POLLIN;
+            extraFDs[0].revents = 0;
+
             mc = curl_multi_wait(curlm, extraFDs, 1, sleepTimeMs, &numfds);
             if (mc != CURLM_OK)
                 throw nix::Error(format("unexpected error from curl_multi_wait(): %s") % curl_multi_strerror(mc));
-
-            nextWakeup = std::chrono::steady_clock::time_point();
 
             /* Add new curl requests from the incoming requests queue,
                except for requests that are embargoed (waiting for a
@@ -551,8 +565,10 @@ struct CurlDownloader : public Downloader
                 char buf[1024];
                 auto res = read(extraFDs[0].fd, buf, sizeof(buf));
                 if (res == -1 && errno != EINTR)
-                    throw SysError("reading curl wakeup socket");
+                    throw PosixError("reading curl wakeup socket");
             }
+#endif
+            nextWakeup = std::chrono::steady_clock::time_point();
 
             std::vector<std::shared_ptr<DownloadItem>> incoming;
             auto now = std::chrono::steady_clock::now();
@@ -615,7 +631,9 @@ struct CurlDownloader : public Downloader
                 throw nix::Error("cannot enqueue download request because the download thread is shutting down");
             state->incoming.push(item);
         }
+#ifndef __MINGW32__
         writeFull(wakeupPipe.writeSide.get(), " ");
+#endif
     }
 
     void enqueueDownload(const DownloadRequest & request,
@@ -873,8 +891,17 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
             printInfo(format("unpacking '%1%'...") % url);
             Path tmpDir = createTempDir();
             AutoDelete autoDelete(tmpDir, true);
+#ifdef __MINGW32__
+            // BUGBUG: MSYS's tar does not support Windows paths! (remove this when nixpkgs will have own Windows coreutils)
+            const string realStorePath = store->toRealPath(storePath);
+            const string realStorePath2 = realStorePath.substr(1, 9) == ":/msys64/" ? trim(runProgramGetStdout("cygpath", true, {"-u", realStorePath})) : realStorePath;
+            const string tmpDir2        = tmpDir       .substr(1, 9) == ":/msys64/" ? trim(runProgramGetStdout("cygpath", true, {"-u", tmpDir       })) : tmpDir;
+            const string tarOutput      = runProgramGetStdout("tar", true, {"xvf", realStorePath2, "-C", tmpDir2, "--strip-components", "1"});
+std::cerr << "tarOutput='" << tarOutput << "'" << std::endl;
+#else
             // FIXME: this requires GNU tar for decompression.
-            runProgram("tar", true, {"xf", store->toRealPath(storePath), "-C", tmpDir, "--strip-components", "1"});
+            runProgramGetStdout("tar", true, {"xf", store->toRealPath(storePath), "-C", tmpDir, "--strip-components", "1"});
+#endif
             unpackedStorePath = store->addToStore(name, tmpDir, true, htSHA256, defaultPathFilter, NoRepair);
         }
         replaceSymlink(unpackedStorePath, unpackedLink);

@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __MINGW32__
+#include <winsock2.h>
+#include <windows.h>
+#endif
 
 #include "ref.hh"
 
@@ -120,20 +124,45 @@ public:
 
 MakeError(Error, BaseError)
 
-class SysError : public Error
+// to use in catch-blocks
+class SysError : public Error {
+protected:
+    SysError(const std::string & msg) : Error(msg) { }
+};
+
+// to throw
+class PosixError : public SysError
 {
 public:
     int errNo;
 
     template<typename... Args>
-    SysError(Args... args)
-        : Error(addErrno(fmt(args...)))
+    PosixError(Args... args)
+        : SysError(addErrno(fmt(args...)))
     { }
 
 private:
 
     std::string addErrno(const std::string & s);
 };
+
+#ifdef __MINGW32__
+// to throw
+class WinError : public SysError
+{
+public:
+    DWORD lastError;
+
+    template<typename... Args>
+    WinError(Args... args)
+        : SysError(addLastError(fmt(args...)))
+    { }
+
+private:
+
+    std::string addLastError(const std::string & s);
+};
+#endif
 
 
 typedef list<string> Strings;
@@ -145,6 +174,13 @@ typedef std::map<std::string, std::string> StringMap;
 typedef string Path;
 typedef list<Path> Paths;
 typedef set<Path> PathSet;
+
+
+#ifdef __MINGW32__
+std::ostream & operator << (std::ostream & os, const std::wstring & path) = delete;
+std::string to_bytes(const std::wstring & path);
+std::wstring from_bytes(const std::string & s);
+#endif
 
 
 }

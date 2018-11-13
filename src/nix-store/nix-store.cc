@@ -502,11 +502,11 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
         if (!store->isValidPath(info.path) || reregister) {
             /* !!! races */
             if (canonicalise)
-                canonicalisePathMetaData(info.path
 #ifndef __MINGW32__
-                    , -1
+                canonicalisePathMetaData(info.path, -1);
+#else
+                canonicalisePathMetaData(info.path);
 #endif
-                    );
             if (!hashGiven) {
                 HashResult hash = hashPath(htSHA256, info.path);
                 info.narHash = hash.first;
@@ -631,8 +631,11 @@ static void opDump(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (opArgs.size() != 1) throw UsageError("only one argument allowed");
-
+#ifndef __MINGW32__
     FdSink sink(STDOUT_FILENO);
+#else
+    FdSink sink(GetStdHandle(STD_OUTPUT_HANDLE));
+#endif
     string path = *opArgs.begin();
     dumpPath(path, sink);
     sink.flush();
@@ -645,8 +648,11 @@ static void opRestore(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (opArgs.size() != 1) throw UsageError("only one argument allowed");
-
+#ifndef __MINGW32__
     FdSource source(STDIN_FILENO);
+#else
+    FdSource source(GetStdHandle(STD_INPUT_HANDLE));
+#endif
     restorePath(*opArgs.begin(), source);
 }
 
@@ -658,8 +664,11 @@ static void opExport(Strings opFlags, Strings opArgs)
 
     for (auto & i : opArgs)
         i = store->followLinksToStorePath(i);
-
+#ifndef __MINGW32__
     FdSink sink(STDOUT_FILENO);
+#else
+    FdSink sink(GetStdHandle(STD_OUTPUT_HANDLE));
+#endif
     store->exportPaths(opArgs, sink);
     sink.flush();
 }
@@ -672,7 +681,11 @@ static void opImport(Strings opFlags, Strings opArgs)
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
+#ifndef __MINGW32__
     FdSource source(STDIN_FILENO);
+#else
+    FdSource source(GetStdHandle(STD_INPUT_HANDLE));
+#endif
     Paths paths = store->importPaths(source, nullptr, NoCheckSigs);
 
     for (auto & i : paths)
@@ -772,8 +785,13 @@ static void opServe(Strings opFlags, Strings opArgs)
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
+#ifndef __MINGW32__
     FdSource in(STDIN_FILENO);
     FdSink out(STDOUT_FILENO);
+#else
+    FdSource in(GetStdHandle(STD_INPUT_HANDLE));
+    FdSink out(GetStdHandle(STD_OUTPUT_HANDLE));
+#endif
 
     /* Exchange the greeting. */
     unsigned int magic = readInt(in);
@@ -1010,12 +1028,10 @@ int main(int argc, char * * argv)
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             Operation oldOp = op;
-#ifndef __MINGW32__
+
             if (*arg == "--help")
                 showManPage("nix-store");
-            else
-#endif
-                 if (*arg == "--version")
+            else if (*arg == "--version")
                 op = opVersion;
             else if (*arg == "--realise" || *arg == "--realize" || *arg == "-r")
                 op = opRealise;

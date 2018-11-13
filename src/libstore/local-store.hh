@@ -41,7 +41,11 @@ class LocalStore : public LocalFSStore
 private:
 
     /* Lock file used for upgrading. */
+#ifndef __MINGW32__
     AutoCloseFD globalLock;
+#else
+    AutoCloseWindowsHandle globalLock;
+#endif
 
     struct State
     {
@@ -63,7 +67,11 @@ private:
         SQLiteStmt stmtQueryValidPaths;
 
         /* The file to which we write our temporary roots. */
+#ifndef __MINGW32__
         AutoCloseFD fdTempRoots;
+#else
+        AutoCloseWindowsHandle fdTempRoots;
+#endif
 
         /* The last time we checked whether to do an auto-GC, or an
            auto-GC finished. */
@@ -178,11 +186,12 @@ public:
     void syncWithGC() override;
 
 private:
-
+#ifndef __MINGW32__
     typedef std::shared_ptr<AutoCloseFD> FDPtr;
     typedef list<FDPtr> FDs;
 
     std::set<std::pair<pid_t, Path>> readTempRoots(FDs & fds);
+#endif
 
 public:
 
@@ -262,9 +271,11 @@ private:
 
     bool isActiveTempFile(const GCState & state,
         const Path & path, const string & suffix);
-
+#ifndef __MINGW32__
     int openGCLock(LockType lockType);
-
+#else
+    HANDLE openGCLock(LockType lockType);
+#endif
     void findRoots(const Path & path, unsigned char type, Roots & roots);
 
     Roots findRootsNoTemp();
@@ -276,8 +287,11 @@ private:
     Path createTempDirInStore();
 
     void checkDerivationOutputs(const Path & drvPath, const Derivation & drv);
-
+#ifndef __MINGW32__
     typedef std::unordered_set<ino_t> InodeHash;
+#else
+    typedef std::unordered_set<uint64_t> InodeHash;
+#endif
 
     InodeHash loadInodeHash();
     Strings readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash);
@@ -297,8 +311,11 @@ private:
     friend class SubstitutionGoal;
 };
 
-
+#ifndef __MINGW32__
 typedef std::pair<dev_t, ino_t> Inode;
+#else
+typedef std::pair<DWORD, uint64_t> Inode;
+#endif
 typedef set<Inode> InodesSeen;
 
 
@@ -310,16 +327,13 @@ typedef set<Inode> InodesSeen;
      without execute permission; setuid bits etc. are cleared)
    - the owner and group are set to the Nix user and group, if we're
      running as root. */
-void canonicalisePathMetaData(const Path & path
 #ifndef __MINGW32__
-    , uid_t fromUid
+void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen);
+void canonicalisePathMetaData(const Path & path, uid_t fromUid);
+#else
+void canonicalisePathMetaData(const Path & path, InodesSeen & inodesSeen);
+void canonicalisePathMetaData(const Path & path);
 #endif
-    , InodesSeen & inodesSeen);
-void canonicalisePathMetaData(const Path & path
-#ifndef __MINGW32__
-    , uid_t fromUid
-#endif
-    );
 
 void canonicaliseTimestampAndPermissions(const Path & path);
 

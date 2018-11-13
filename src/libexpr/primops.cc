@@ -36,11 +36,22 @@ namespace nix {
    name>. */
 std::pair<string, string> decodeContext(const string & s)
 {
+std::cerr << "decodeContext('" << s << "')" << std::endl;
+    std::pair<string, string> rc;
     if (s.at(0) == '!') {
         size_t index = s.find("!", 1);
-        return std::pair<string, string>(string(s, index + 1), string(s, 1, index - 1));
-    } else
-        return std::pair<string, string>(s.at(0) == '/' ? s : string(s, 1), "");
+        rc = std::make_pair(string(s, index + 1), string(s, 1, index - 1));
+    } else {
+#ifndef __MINGW32__
+        assert(s.at(0) == '/'); // ???
+        rc = std::make_pair(s.at(0) == '/' ? s : string(s, 1), "");
+#else
+        assert(('A' <= s.at(0) && s.at(0) <= 'Z') && s.at(1) == ':' && s.at(2) == '/'); // ???
+        rc = std::make_pair(s, "");
+#endif
+    }
+std::cerr << "decoded.first='" << rc.first << "' -> '" << rc.second << "'" << std::endl;
+    return rc;
 }
 
 
@@ -216,7 +227,7 @@ void prim_exec(EvalState & state, const Pos & pos, Value * * args, Value & v)
             % program % e.path % pos);
     }
 
-    auto output = runProgram(program, true, commandArgs);
+    auto output = runProgramGetStdout(program, true, commandArgs);
     Expr * parsed;
     try {
         parsed = state.parseExprFromString(output, pos.file);
@@ -1038,7 +1049,7 @@ static void addPath(EvalState & state, const Pos & pos, const string & name, con
         path_ :
         state.checkSourcePath(path_);
     PathFilter filter = filterFun ? ([&](const Path & path) {
-        auto st = lstat(path);
+        unsigned char dt = getFileType(path);
 
         /* Call the filter function.  The first argument is the path,
            the second is a string indicating the type of the file. */
@@ -1050,11 +1061,9 @@ static void addPath(EvalState & state, const Pos & pos, const string & name, con
 
         Value arg2;
         mkString(arg2,
-            S_ISREG(st.st_mode) ? "regular" :
-            S_ISDIR(st.st_mode) ? "directory" :
-#ifndef __MINGW32__
-            S_ISLNK(st.st_mode) ? "symlink" :
-#endif
+            dt == DT_REG ? "regular" :
+            dt == DT_DIR ? "directory" :
+            dt == DT_LNK ? "symlink" :
             "unknown" /* not supported, will fail! */);
 
         Value res;

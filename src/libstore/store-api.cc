@@ -610,7 +610,7 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
         });
         srcStore->narFromPath({storePath}, wrapperSink);
     }, [&]() {
-	throw EndOfFile("NAR for '%s' fetched from '%s' is incomplete", storePath, srcStore->getUri());
+        throw EndOfFile("NAR for '%s' fetched from '%s' is incomplete", storePath, srcStore->getUri());
     });
 
     dstStore->addToStore(*info, *source, repair, checkSigs);
@@ -884,15 +884,24 @@ StoreType getStoreType(const std::string & uri, const std::string & stateDir)
 {
     if (uri == "daemon") {
         return tDaemon;
-    } else if (uri == "local" || hasPrefix(uri, "/")) {
+    } else if (uri == "local" || 
+#ifndef __MINGW32__
+        hasPrefix(uri, "/")
+#else
+        (uri.size() > 3 && (('A' <= uri[0] && uri[0] <= 'Z') || ('a' <= uri[0] && uri[0] <= 'z')) && uri[1] == ':' && isslash(uri[2]))
+#endif
+        ) {
         return tLocal;
     } else if (uri == "" || uri == "auto") {
+#ifndef __MINGW32__
         if (access(stateDir.c_str(), R_OK | W_OK) == 0)
             return tLocal;
         else if (pathExists(settings.nixDaemonSocketFile))
             return tDaemon;
         else
+#else
             return tLocal;
+#endif
     } else {
         return tOther;
     }
@@ -908,7 +917,11 @@ static RegisterStoreImplementation regStore([](
             return std::shared_ptr<Store>(std::make_shared<UDSRemoteStore>(params));
         case tLocal: {
             Store::Params params2 = params;
+#ifndef __MINGW32__
             if (hasPrefix(uri, "/"))
+#else
+            if (uri.size() > 3 && (('A' <= uri[0] && uri[0] <= 'Z') || ('a' <= uri[0] && uri[0] <= 'z')) && uri[1] == ':' && isslash(uri[2]))
+#endif
                 params2["root"] = uri;
             return std::shared_ptr<Store>(std::make_shared<LocalStore>(params2));
         }

@@ -32,11 +32,11 @@ std::set<std::string> runResolver(const Path & filename)
 {
     AutoCloseFD fd = open(filename.c_str(), O_RDONLY);
     if (!fd)
-        throw SysError("opening '%s'", filename);
+        throw PosixError("opening '%s'", filename);
 
     struct stat st;
     if (fstat(fd.get(), &st))
-        throw SysError("statting '%s'", filename);
+        throw PosixError("statting '%s'", filename);
 
     if (!S_ISREG(st.st_mode)) {
         printError("file '%s' is not a regular file", filename);
@@ -50,7 +50,7 @@ std::set<std::string> runResolver(const Path & filename)
 
     char* obj = (char*) mmap(NULL, st.st_size, PROT_READ, MAP_SHARED, fd.get(), 0);
     if (!obj)
-        throw SysError("mmapping '%s'", filename);
+        throw PosixError("mmapping '%s'", filename);
 
     ptrdiff_t mach64_offset = 0;
 
@@ -99,11 +99,7 @@ std::set<std::string> runResolver(const Path & filename)
 
 bool isSymlink(const Path & path)
 {
-    struct stat st;
-    if (lstat(path.c_str(), &st) == -1)
-        throw SysError("getting attributes of path '%1%'", path);
-
-    return S_ISLNK(st.st_mode);
+    return isLink(path);
 }
 
 Path resolveSymlink(const Path & path)

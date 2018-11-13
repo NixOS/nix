@@ -5,9 +5,18 @@ outPath=$(nix-store -rvv "$drvPath")
 
 # Set a GC root.
 rm -f "$NIX_STATE_DIR"/gcroots/foo
-ln -sf $outPath "$NIX_STATE_DIR"/gcroots/foo
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+  nix ln $outPath "$NIX_STATE_DIR"/gcroots/foo
+else
+  ln -sf $outPath "$NIX_STATE_DIR"/gcroots/foo
+fi
 
-[ "$(nix-store -q --roots $outPath)" = "$NIX_STATE_DIR"/gcroots/foo ]
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+  [ "$(nix-store -q --roots $outPath)" = "$(cygpath -m "$NIX_STATE_DIR"/gcroots/foo)" ]
+else
+  [ "$(nix-store -q --roots $outPath)" = "$NIX_STATE_DIR"/gcroots/foo ]
+fi
+
 
 nix-store --gc --print-roots | grep $outPath
 nix-store --gc --print-live | grep $outPath

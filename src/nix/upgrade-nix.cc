@@ -85,7 +85,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         {
             Activity act(*logger, lvlInfo, actUnknown, fmt("verifying that '%s' works...", storePath));
             auto program = storePath + "/bin/nix-env";
-            auto s = runProgram(program, false, {"--version"});
+            auto s = runProgramGetStdout(program, false, {"--version"});
             if (s.find("Nix") == std::string::npos)
                 throw Error("could not verify that '%s' works", program);
         }
@@ -94,7 +94,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
         {
             Activity act(*logger, lvlInfo, actUnknown, fmt("installing '%s' into profile '%s'...", storePath, profileDir));
-            runProgram(settings.nixBinDir + "/nix-env", false,
+            runProgramGetStdout(settings.nixBinDir + "/nix-env", false,
                 {"--profile", profileDir, "-i", storePath, "--no-sandbox"});
         }
 

@@ -33,11 +33,13 @@ struct Source;
 /* Return an environment variable. */
 string getEnv(const string & key, const string & def = "");
 
+#ifndef __MINGE32__
 /* Get the entire environment. */
 std::map<std::string, std::string> getEnv();
 
 /* Clear the environment. */
 void clearEnv();
+#endif
 
 /* Return an absolutized path, resolving paths relative to the
    specified directory, or the current directory otherwise.  The path
@@ -49,6 +51,9 @@ Path absPath(Path path, Path dir = "");
    components such that each component of the resulting path is *not*
    a symbolic link. */
 Path canonPath(const Path & path, bool resolveSymlinks = false);
+
+/* for paths inside .nar, platform-independent */
+Path canonNarPath(const Path & path);
 
 /* Return the directory part of the given canonical path, i.e.,
    everything before the final `/'.  If the path is the root or an
@@ -67,7 +72,8 @@ bool isInDir(const Path & path, const Path & dir);
 bool isDirOrInDir(const Path & path, const Path & dir);
 
 /* Get status of `path'. */
-struct stat lstat(const Path & path);
+// TODO: deprecate on Windows
+struct stat lstatPath(const Path & path);
 
 /* Return true iff the given path exists. */
 bool pathExists(const Path & path);
@@ -80,13 +86,20 @@ bool isLink(const Path & path);
 
 /* Read the contents of a directory.  The entries `.' and `..' are
    removed. */
+// TODO: deprecate on Windows
 struct DirEntry
 {
     string name;
+#ifndef __MINGW32__
     ino_t ino;
+#endif
     unsigned char type; // one of DT_*
     DirEntry(const string & name, ino_t ino, unsigned char type)
-        : name(name), ino(ino), type(type) { }
+        : name(name),
+#ifndef __MINGW32__
+          ino(ino), 
+#endif
+          type(type) { }
 };
 
 typedef vector<DirEntry> DirEntries;
@@ -96,7 +109,11 @@ DirEntries readDirectory(const Path & path);
 unsigned char getFileType(const Path & path);
 
 /* Read the contents of a file into a string. */
+#ifndef __MINGW32__
 string readFile(int fd);
+#else
+string readFile(HANDLE handle);
+#endif
 string readFile(const Path & path, bool drain = false);
 void readFile(const Path & path, Sink & sink);
 
@@ -106,10 +123,18 @@ void writeFile(const Path & path, const string & s, mode_t mode = 0666);
 void writeFile(const Path & path, Source & source, mode_t mode = 0666);
 
 /* Read a line from a file descriptor. */
+#ifndef __MINGW32__
 string readLine(int fd);
+#else
+string readLine(HANDLE handle);
+#endif
 
 /* Write a line to a file descriptor. */
+#ifndef __MINGW32__
 void writeLine(int fd, string s);
+#else
+void writeLine(HANDLE handle, string s);
+#endif
 
 /* Delete a path; i.e., in the case of a directory, it is deleted
    recursively. It's not an error if the path does not exist. The
@@ -143,7 +168,12 @@ Path getDataDir();
 Paths createDirs(const Path & path);
 
 /* Create a symlink. */
+#ifndef __MINGW32__
 void createSymlink(const Path & target, const Path & link);
+#else
+enum SymlinkType { SymlinkTypeDangling, SymlinkTypeDirectory, SymlinkTypeFile };
+SymlinkType createSymlink(const Path & target, const Path & link);
+#endif
 
 /* Atomically create or replace a symlink. */
 void replaceSymlink(const Path & target, const Path & link);
@@ -151,18 +181,29 @@ void replaceSymlink(const Path & target, const Path & link);
 
 /* Wrappers arount read()/write() that read/write exactly the
    requested number of bytes. */
+#ifndef __MINGW32__
 void readFull(int fd, unsigned char * buf, size_t count);
 void writeFull(int fd, const unsigned char * buf, size_t count, bool allowInterrupts = true);
 void writeFull(int fd, const string & s, bool allowInterrupts = true);
+#else
+void readFull(HANDLE handle, unsigned char * buf, size_t count);
+void writeFull(HANDLE handle, const unsigned char * buf, size_t count, bool allowInterrupts = true);
+void writeFull(HANDLE handle, const string & s, bool allowInterrupts = true);
+#endif
 
 MakeError(EndOfFile, Error)
 
 
 /* Read a file descriptor until EOF occurs. */
+#ifndef __MINGW32__
 string drainFD(int fd, bool block = true);
 
 void drainFD(int fd, Sink & sink, bool block = true);
+#else
+string drainFD(HANDLE handle/*, bool block = true*/);
 
+void drainFD(HANDLE handle, Sink & sink/*, bool block = true*/);
+#endif
 
 /* Automatic cleanup of resources. */
 
@@ -182,6 +223,8 @@ public:
 };
 
 
+
+#ifndef __MINGW32__
 class AutoCloseFD
 {
     int fd;
@@ -198,14 +241,53 @@ public:
     explicit operator bool() const;
     int release();
 };
+#else
+class AutoCloseWindowsHandle
+{
+    HANDLE handle;
+    void close();
+public:
+    AutoCloseWindowsHandle();
+    AutoCloseWindowsHandle(HANDLE handle);
+    AutoCloseWindowsHandle(const AutoCloseWindowsHandle & fd) = delete;
+    AutoCloseWindowsHandle(AutoCloseWindowsHandle&& fd);
+    ~AutoCloseWindowsHandle();
+    AutoCloseWindowsHandle& operator =(const AutoCloseWindowsHandle & fd) = delete;
+    AutoCloseWindowsHandle& operator =(AutoCloseWindowsHandle&& fd);
+    HANDLE get() const;
+    explicit operator bool() const;
+    HANDLE release();
+};
+#endif
 
 
+#ifndef __MINGW32__
 class Pipe
 {
 public:
     AutoCloseFD readSide, writeSide;
-    void create();
+    void createPipe();
 };
+#else
+class Pipe
+{
+public:
+    AutoCloseWindowsHandle hRead, hWrite;
+    void createPipe();
+};
+#endif
+
+#ifdef __MINGW32__
+class AsyncPipe
+{
+public:
+    AutoCloseWindowsHandle      hRead, hWrite;
+    OVERLAPPED                  overlapped;
+    DWORD                       got;
+    std::vector<unsigned char>  buffer;
+    void createAsyncPipe(HANDLE iocp);
+};
+#endif
 
 
 struct DIRDeleter
@@ -218,13 +300,12 @@ struct DIRDeleter
 typedef std::unique_ptr<DIR, DIRDeleter> AutoCloseDir;
 
 
+#ifndef __MINGW32__
 class Pid
 {
     pid_t pid = -1;
     bool separatePG = false;
-#ifndef __MINGW32__
     int killSignal = SIGKILL;
-#endif
 public:
     Pid();
     Pid(pid_t pid);
@@ -233,18 +314,30 @@ public:
     operator pid_t();
     int kill();
     int wait();
-
     void setSeparatePG(bool separatePG);
     void setKillSignal(int signal);
     pid_t release();
 };
 
-
-#ifndef __MINGW32__
 /* Kill all processes running under the specified uid by sending them
    a SIGKILL. */
 void killUser(uid_t uid);
+#else
+class Pid
+{
+public:
+    HANDLE hProcess;
+    DWORD dwProcessId;
+
+    Pid();
+    ~Pid();
+    void set(HANDLE, DWORD);
+    int kill();
+    int wait();
+};
 #endif
+
+
 
 /* Fork a process that runs the given function, and return the child
    pid to the caller. */
@@ -253,15 +346,17 @@ struct ProcessOptions
     string errorPrefix = "error: ";
     bool dieWithParent = true;
     bool runExitHandlers = false;
+#ifndef __MINGW32__
     bool allowVfork = true;
+#endif
 };
-
+#ifndef __MINGW32__
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = ProcessOptions());
-
+#endif
 
 /* Run a program and return its stdout in a string (i.e., like the
    shell backtick operator). */
-string runProgram(Path program, bool searchPath = false,
+string runProgramGetStdout(Path program, bool searchPath = false,
     const Strings & args = Strings(),
     const std::experimental::optional<std::string> & input = {});
 
@@ -281,9 +376,8 @@ struct RunOptions
     RunOptions & killStderr(bool v) { _killStderr = true; return *this; }
 };
 
-std::pair<int, std::string> runProgram(const RunOptions & options);
+std::pair<int, std::string> runProgramWithOptions(const RunOptions & options);
 
-void runProgram2(const RunOptions & options);
 
 
 class ExecError : public Error
@@ -396,6 +490,11 @@ std::string toLower(const std::string & s);
 /* Escape a string as a shell word. */
 std::string shellEscape(const std::string & s);
 
+#ifdef __MINGW32__
+std::string windowsEscape(const std::string & s);
+std::wstring windowsEscapeW(const std::wstring & s);
+#endif
+
 
 /* Exception handling in destructors: print an error message, then
    ignore the exception. */
@@ -403,11 +502,19 @@ void ignoreException();
 
 
 /* Some ANSI escape sequences. */
+#ifndef __MINGW32__
 #define ANSI_NORMAL "\e[0m"
 #define ANSI_BOLD "\e[1m"
 #define ANSI_RED "\e[31;1m"
 #define ANSI_GREEN "\e[32;1m"
 #define ANSI_BLUE "\e[34;1m"
+#else
+#define ANSI_NORMAL ""
+#define ANSI_BOLD ""
+#define ANSI_RED ""
+#define ANSI_GREEN ""
+#define ANSI_BLUE ""
+#endif
 
 
 /* Truncate a string to 'width' printable characters. If 'filterAll'
@@ -516,6 +623,26 @@ std::pair<unsigned short, unsigned short> getWindowSize();
 typedef std::function<bool(const Path & path)> PathFilter;
 
 extern PathFilter defaultPathFilter;
+
+#ifdef __MINGW32__
+std::wstring getCwdW();
+std::wstring getArgv0W();
+std::wstring getEnvW(const std::wstring & key, const std::wstring & def);
+
+struct no_case_compare {
+    bool operator() (const std::wstring & s1, const std::wstring & s2) const {
+        return wcsicmp(s1.c_str(), s2.c_str()) < 0;
+    }
+};
+std::map<std::wstring, std::wstring, no_case_compare> getEntireEnvW();
+
+Path handleToPath(HANDLE handle);
+std::wstring handleToFileName(HANDLE handle);
+std::wstring pathW(const Path & path);
+inline bool isslash(int c) { return c == '/' || c == '\\'; }
+#else
+inline bool isslash(int c) { return c == '/'; }
+#endif
 
 
 }

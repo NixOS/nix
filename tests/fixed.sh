@@ -44,7 +44,12 @@ rm -rf $TEST_ROOT/fixed
 mkdir $TEST_ROOT/fixed
 mkdir $TEST_ROOT/fixed/bla
 echo "Hello World!" > $TEST_ROOT/fixed/foo
-ln -s foo $TEST_ROOT/fixed/bar
+
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    nix ln foo $TEST_ROOT/fixed/bar
+else
+    ln -s foo $TEST_ROOT/fixed/bar
+fi
 
 out2=$(nix-store --add $TEST_ROOT/fixed)
 [ "$out" = "$out2" ]

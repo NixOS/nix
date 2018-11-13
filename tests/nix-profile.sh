@@ -1,5 +1,9 @@
 source common.sh
 
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    exit 99
+fi
+
 sed -e "s|@localstatedir@|$TEST_ROOT/profile-var|g" -e "s|@coreutils@|$coreutils|g" < ../scripts/nix-profile.sh.in > $TEST_ROOT/nix-profile.sh
 
 user=$(whoami)

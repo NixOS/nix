@@ -89,19 +89,31 @@ protected:
 /* A sink that writes data to a file descriptor. */
 struct FdSink : BufferedSink
 {
-    int fd;
     bool warn = false;
     size_t written = 0;
+#ifndef __MINGW32__
+    int fd;
 
     FdSink() : fd(-1) { }
     FdSink(int fd) : fd(fd) { }
+#else
+    HANDLE handle;
+
+    FdSink() : handle(INVALID_HANDLE_VALUE) { }
+    FdSink(HANDLE handle) : handle(handle) { }
+#endif
     FdSink(FdSink&&) = default;
 
     FdSink& operator=(FdSink && s)
     {
         flush();
+#ifndef __MINGW32__
         fd = s.fd;
         s.fd = -1;
+#else
+        handle = s.handle;
+        s.handle = INVALID_HANDLE_VALUE;
+#endif
         warn = s.warn;
         written = s.written;
         return *this;
@@ -121,17 +133,30 @@ private:
 /* A source that reads data from a file descriptor. */
 struct FdSource : BufferedSource
 {
-    int fd;
     size_t read = 0;
+
+#ifndef __MINGW32__
+    int fd;
 
     FdSource() : fd(-1) { }
     FdSource(int fd) : fd(fd) { }
+#else
+    HANDLE handle;
+
+    FdSource() : handle(INVALID_HANDLE_VALUE) { }
+    FdSource(HANDLE handle) : handle(handle) { }
+#endif
     FdSource(FdSource&&) = default;
 
     FdSource& operator=(FdSource && s)
     {
+#ifndef __MINGW32__
         fd = s.fd;
         s.fd = -1;
+#else
+        handle = s.handle;
+        s.handle = INVALID_HANDLE_VALUE;
+#endif
         read = s.read;
         return *this;
     }

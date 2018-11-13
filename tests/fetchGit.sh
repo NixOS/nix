@@ -8,6 +8,10 @@ fi
 clearStore
 
 repo=$TEST_ROOT/git
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    repo=$(cygpath -m $repo)
+fi
+
 
 rm -rf $repo ${repo}-tmp $TEST_HOME/.cache/nix/git
 
@@ -99,7 +103,11 @@ echo delft > $repo/hello
 git -C $repo add hello
 git -C $repo commit -m 'Bla4'
 rev3=$(git -C $repo rev-parse HEAD)
-nix eval --tarball-ttl 3600 "(builtins.fetchGit { url = $repo; rev = \"$rev3\"; })" >/dev/null
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    nix eval --tarball-ttl 3600 "(builtins.fetchGit { url = \"$(cygpath -m $repo)\"; rev = \"$rev3\"; })" >/dev/null
+else
+    nix eval --tarball-ttl 3600 "(builtins.fetchGit { url = $repo; rev = \"$rev3\"; })" >/dev/null
+fi
 
 # Update 'path' to reflect latest master
 path=$(nix eval --raw "(builtins.fetchGit file://$repo).outPath")

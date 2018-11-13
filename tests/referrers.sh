@@ -4,7 +4,12 @@ clearStore
 
 max=500
 
-reference=$NIX_STORE_DIR/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    reference=$(cygpath -m "$NIX_STORE_DIR/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+else
+    reference=$NIX_STORE_DIR/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+fi
+
 touch $reference
 (echo $reference && echo && echo 0) | nix-store --register-validity 
 
@@ -12,9 +17,17 @@ echo "making registration..."
 
 set +x
 for ((n = 0; n < $max; n++)); do
-    storePath=$NIX_STORE_DIR/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-$n
+    if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+        storePath=$(cygpath -m "$NIX_STORE_DIR/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-$n")
+    else
+        storePath=$NIX_STORE_DIR/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-$n
+    fi
     echo -n > $storePath
-    ref2=$NIX_STORE_DIR/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-$((n+1))
+    if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+        ref2=$(cygpath -m "$NIX_STORE_DIR/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-$((n+1))")
+    else
+        ref2=$NIX_STORE_DIR/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-$((n+1))
+    fi
     if test $((n+1)) = $max; then
         ref2=$reference
     fi

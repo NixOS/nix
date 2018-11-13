@@ -331,9 +331,10 @@ struct InvalidPathError : EvalError
 
 struct EvalSettings : Config
 {
+#ifndef __MINGW32__
     Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation",
         "Whether builtin functions that allow executing native code should be enabled."};
-
+#endif
     Setting<bool> restrictEval{this, false, "restrict-eval",
         "Whether to restrict file system access to paths in $NIX_PATH, "
         "and network access to the URI prefixes listed in 'allowed-uris'."};

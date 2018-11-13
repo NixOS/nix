@@ -11,6 +11,10 @@ cp dependencies.nix $tarroot/default.nix
 cp config.nix dependencies.builder*.sh $tarroot/
 
 tarball=$TEST_ROOT/tarball.tar.xz
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    tarball=$(cygpath -m $tarball)
+fi
+
 (cd $TEST_ROOT && tar c tarball) | xz > $tarball
 
 nix-env -f file://$tarball -qa --out-path | grep -q dependencies

@@ -3,7 +3,11 @@ source common.sh
 clearStore
 clearCache
 
-cacheURI="file://$cacheDir?compression=br"
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    cacheURI="file://$(cygpath -m $cacheDir)?compression=br"
+else
+    cacheURI="file://$cacheDir?compression=br"
+fi
 
 outPath=$(nix-build dependencies.nix --no-out-link)
 

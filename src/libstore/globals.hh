@@ -60,10 +60,10 @@ public:
 
     /* The directory where the man pages are stored. */
     Path nixManDir;
-
+#ifndef __MINGW32__
     /* File name of the socket the daemon listens to.  */
     Path nixDaemonSocketFile;
-
+#endif
     Setting<std::string> storeUri{this, getEnv("NIX_REMOTE", "auto"), "store",
         "The default Nix store to use."};
 
@@ -110,10 +110,10 @@ public:
     Setting<time_t> buildTimeout{this, 0, "timeout",
         "The maximum duration in seconds that a builder can run. "
         "0 means infinity.", {"build-timeout"}};
-
+#ifndef __MINGW32__
     PathSetting buildHook{this, true, nixLibexecDir + "/nix/build-remote", "build-hook",
         "The path of the helper program that executes builds to remote machines."};
-
+#endif
     Setting<std::string> builders{this, "@" + nixConfDir + "/machines", "builders",
         "A semicolon-separated list of build machines, in the format of nix.machines."};
 
@@ -302,10 +302,10 @@ public:
 #endif
         "pre-build-hook",
         "A program to run just before a build to set derivation-specific build settings."};
-
+#ifndef __MINGW32__
     Setting<std::string> netrcFile{this, fmt("%s/%s", nixConfDir, "netrc"), "netrc-file",
         "Path to the netrc file used to obtain usernames/passwords for downloads."};
-
+#endif
     /* Path to the SSL CA file used */
     Path caFile;
 

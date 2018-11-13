@@ -5,7 +5,12 @@ clearStore
 # Test fetching a flat file.
 hash=$(nix-hash --flat --type sha256 ./fetchurl.sh)
 
-outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr sha256 $hash --no-out-link --hashed-mirrors '')
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(cygpath -m $(pwd))/fetchurl.sh --argstr sha256 $hash --no-out-link --hashed-mirrors '')
+else
+    outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr sha256 $hash --no-out-link --hashed-mirrors '')
+fi
+
 
 cmp $outPath fetchurl.sh
 
@@ -14,7 +19,11 @@ clearStore
 
 hash=$(nix hash-file --type sha512 --base64 ./fetchurl.sh)
 
-outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr sha512 $hash --no-out-link --hashed-mirrors '')
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(cygpath -m $(pwd))/fetchurl.sh --argstr sha512 $hash --no-out-link --hashed-mirrors '')
+else
+    outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr sha512 $hash --no-out-link --hashed-mirrors '')
+fi
 
 cmp $outPath fetchurl.sh
 
@@ -27,27 +36,46 @@ hash32=$(nix hash-file --type sha512 --base16 ./fetchurl.sh)
 mirror=$TMPDIR/hashed-mirror
 rm -rf $mirror
 mkdir -p $mirror/sha512
-ln -s $(pwd)/fetchurl.sh $mirror/sha512/$hash32
 
-outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr sha512 $hash --no-out-link --hashed-mirrors "file://$mirror")
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    nix ln $(pwd)/fetchurl.sh $mirror/sha512/$hash32
+    outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr sha512 $hash --no-out-link --hashed-mirrors "file://$(cygpath -m $mirror)")
+else
+    ln -s $(pwd)/fetchurl.sh $mirror/sha512/$hash32
+    outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file:///no-such-dir/fetchurl.sh --argstr sha512 $hash --no-out-link --hashed-mirrors "file://$mirror")
+fi
 
 # Test unpacking a NAR.
 rm -rf $TEST_ROOT/archive
 mkdir -p $TEST_ROOT/archive
 cp ./fetchurl.sh $TEST_ROOT/archive
-chmod +x $TEST_ROOT/archive/fetchurl.sh
-ln -s foo $TEST_ROOT/archive/symlink
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    echo "no executable bit on Windows"
+    nix ln foo $TEST_ROOT/archive/symlink
+else
+    chmod +x $TEST_ROOT/archive/fetchurl.sh
+    ln -s foo $TEST_ROOT/archive/symlink
+fi
 nar=$TEST_ROOT/archive.nar
 nix-store --dump $TEST_ROOT/archive > $nar
 
 hash=$(nix-hash --flat --type sha256 $nar)
 
-outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$nar --argstr sha256 $hash \
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(cygpath -m $nar) --argstr sha256 $hash \
           --arg unpack true --argstr name xyzzy --no-out-link)
+else
+    outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$nar --argstr sha256 $hash \
+          --arg unpack true --argstr name xyzzy --no-out-link)
+fi
 
 echo $outPath | grep -q 'xyzzy'
 
-test -x $outPath/fetchurl.sh
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    echo "no executable bit on Windows"
+else
+    test -x $outPath/fetchurl.sh
+fi
 test -L $outPath/symlink
 
 nix-store --delete $outPath
@@ -56,8 +84,16 @@ nix-store --delete $outPath
 narxz=$TEST_ROOT/archive.nar.xz
 rm -f $narxz
 xz --keep $nar
-outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$narxz --argstr sha256 $hash \
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(cygpath -m $narxz) --argstr sha256 $hash \
           --arg unpack true --argstr name xyzzy --no-out-link)
 
-test -x $outPath/fetchurl.sh
+    echo "no executable bit on Windows"
+else
+    outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$narxz --argstr sha256 $hash \
+          --arg unpack true --argstr name xyzzy --no-out-link)
+
+    test -x $outPath/fetchurl.sh
+fi
+
 test -L $outPath/symlink

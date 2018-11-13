@@ -227,6 +227,11 @@ void initGC()
    can contain URLs (e.g. "nixpkgs=https://bla...:foo=https://"). */
 static Strings parseNixPath(const string & s)
 {
+#ifndef __MINGW32__
+    const char delim = ':';
+#else
+    const char delim = ';';
+#endif
     Strings res;
 
     auto p = s.begin();
@@ -235,7 +240,7 @@ static Strings parseNixPath(const string & s)
         auto start = p;
         auto start2 = p;
 
-        while (p != s.end() && *p != ':') {
+        while (p != s.end() && *p != delim) {
             if (*p == '=') start2 = p + 1;
             ++p;
         }
@@ -245,10 +250,10 @@ static Strings parseNixPath(const string & s)
             break;
         }
 
-        if (*p == ':') {
+        if (*p == delim) {
             if (isUri(std::string(start2, s.end()))) {
                 ++p;
-                while (p != s.end() && *p != ':') ++p;
+                while (p != s.end() && *p != delim) ++p;
             }
             res.push_back(std::string(start, p));
             if (p == s.end()) break;
@@ -397,7 +402,13 @@ void EvalState::checkURI(const std::string & uri)
 
     /* If the URI is a path, then check it against allowedPaths as
        well. */
-    if (hasPrefix(uri, "/")) {
+    if (
+#ifndef __MINGW32__
+        hasPrefix(uri, "/")
+#else
+        uri.size() > 3 && (('A' <= uri[0] && uri[0] <= 'Z') || ('a' <= uri[0] && uri[0] <= 'z')) && uri[1] == ':' && isslash(uri[2])
+#endif
+       ) {
         checkSourcePath(uri);
         return;
     }
@@ -1634,6 +1645,16 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
 Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
 {
     string path = coerceToString(pos, v, context, false, false);
+#ifdef __MINGW32__
+    if (path.length() >= 7 && path[0] == '\\' && path[1] == '\\' && (path[2] == '.' || path[2] == '?') && path[3] == '\\' &&
+               ('A' <= path[4] && path[4] <= 'Z') && path[5] == ':' && isslash(path[6])) {
+        return path;
+    }
+    if (path.length() >= 3 && (('A' <= path[0] && path[0] <= 'Z') || ('a' <= path[0] && path[0] <= 'z')) && path[1] == ':' && isslash(path[2])) {
+        return path;
+    }
+    throwEvalError("string '%1%' doesn't represent an absolute path, at %2%", path, pos);
+#endif
     if (path == "" || path[0] != '/')
         throwEvalError("string '%1%' doesn't represent an absolute path, at %2%", path, pos);
     return path;

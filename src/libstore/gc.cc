@@ -20,6 +20,7 @@
 #include <climits>
 
 #ifdef __MINGW32__
+#include <iostream>
 #define random() rand()
 #endif
 
@@ -35,20 +36,26 @@ static string gcRootsDir = "gcroots";
    read.  To be precise: when they try to create a new temporary root
    file, they will block until the garbage collector has finished /
    yielded the GC lock. */
+#ifndef __MINGW32__
 int LocalStore::openGCLock(LockType lockType)
+#else
+HANDLE LocalStore::openGCLock(LockType lockType)
+#endif
 {
     Path fnGCLock = (format("%1%/%2%")
         % stateDir % gcLockName).str();
 
-    debug(format("acquiring global GC lock '%1%'") % fnGCLock);
+    debug(format("acquiring global GC lock '%1%' '%2%'") % fnGCLock % lockType);
 
-    AutoCloseFD fdGCLock = open(fnGCLock.c_str(), O_RDWR | O_CREAT
 #ifndef __MINGW32__
-											    | O_CLOEXEC
-#endif
-    , 0600);
+    AutoCloseFD fdGCLock = open(fnGCLock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
     if (!fdGCLock)
-        throw SysError(format("opening global GC lock '%1%'") % fnGCLock);
+        throw PosixError("opening global GC lock '%1%'", fnGCLock);
+#else
+    AutoCloseWindowsHandle fdGCLock = CreateFileW(pathW(fnGCLock).c_str(), GENERIC_READ|GENERIC_WRITE, FILE_SHARE_READ|FILE_SHARE_WRITE, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_POSIX_SEMANTICS, NULL);
+    if (!fdGCLock)
+        throw WinError("opening global GC lock '%1%'", fnGCLock);
+#endif
 
     if (!lockFile(fdGCLock.get(), lockType, false)) {
         printError(format("waiting for the big garbage collector lock..."));
@@ -68,6 +75,7 @@ static void makeSymlink(const Path & link, const Path & target)
     /* Create directories up to `gcRoot'. */
     createDirs(dirOf(link));
 
+#ifndef __MINGW32__
     /* Create the new symlink. */
     Path tempLink = (format("%1%.tmp-%2%-%3%")
         % link % getpid() % random()).str();
@@ -75,14 +83,48 @@ static void makeSymlink(const Path & link, const Path & target)
 
     /* Atomically replace the old one. */
     if (rename(tempLink.c_str(), link.c_str()) == -1)
-        throw SysError(format("cannot rename '%1%' to '%2%'")
+        throw PosixError(format("cannot rename '%1%' to '%2%'")
             % tempLink % link);
+#else
+//std::cerr << "MoveFileExW '"<<tempLink<<"' -> '"<<link<<"'"<<std::endl;
+    Path tempLink = (format("%1%.tmp~%2%~%3%")
+        % link % getpid() % random()).str();
+
+    SymlinkType st = createSymlink(target, tempLink);
+
+    std::wstring wtempLink = pathW(absPath(tempLink));
+    std::wstring wlink     = pathW(absPath(link)); // already absolute?
+    if (!MoveFileExW(wtempLink.c_str(), wlink.c_str(), MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)) {
+        // so try once more harder (atomicity suffers here)
+        std::wstring old = pathW(absPath((format("%1%.old~%2%~%3%") % link % getpid() % random()).str()));
+        if (!MoveFileExW(wlink.c_str(), old.c_str(), MOVEFILE_WRITE_THROUGH))
+            throw WinError("MoveFileExW '%1%' -> '%2%'", to_bytes(wlink), to_bytes(old));
+        // repeat
+        if (!MoveFileExW(wtempLink.c_str(), wlink.c_str(), MOVEFILE_WRITE_THROUGH))
+            throw WinError("MoveFileExW '%1%' -> '%2%'", tempLink, to_bytes(wlink));
+
+        DWORD dw = GetFileAttributesW(old.c_str());
+        if (dw == 0xFFFFFFFF)
+            throw WinError("GetFileAttributesW '%1%'", to_bytes(old));
+        if ((dw & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+            if (!RemoveDirectoryW(old.c_str()))
+                std::cerr << WinError("RemoveDirectoryW '%1%'", to_bytes(old)).msg() << std::endl;
+        } else {
+            if (!DeleteFileW(old.c_str()))
+                std::cerr << WinError("DeleteFileW '%1%'", to_bytes(old)).msg() << std::endl;
+        }
+    }
+#endif
 }
 
 
 void LocalStore::syncWithGC()
 {
+#ifndef __MINGW32__
     AutoCloseFD fdGCLock = openGCLock(ltRead);
+#else
+    AutoCloseWindowsHandle fdGCLock = openGCLock(ltRead);
+#endif
 }
 
 
@@ -165,32 +207,44 @@ void LocalStore::addTempRoot(const Path & path)
     if (!state->fdTempRoots) {
 
         while (1) {
+#ifndef __MINGW32__
             AutoCloseFD fdGCLock = openGCLock(ltRead);
-
+#else
+            AutoCloseWindowsHandle fdGCLock = openGCLock(ltRead);
+#endif
             if (pathExists(fnTempRoots))
                 /* It *must* be stale, since there can be no two
                    processes with the same pid. */
                 unlink(fnTempRoots.c_str());
 
             state->fdTempRoots = openLockFile(fnTempRoots, true);
-
+#ifndef __MINGW32__
             fdGCLock = -1;
 
             debug(format("acquiring read lock on '%1%'") % fnTempRoots);
             lockFile(state->fdTempRoots.get(), ltRead, true);
-
             /* Check whether the garbage collector didn't get in our
                way. */
             struct stat st;
             if (fstat(state->fdTempRoots.get(), &st) == -1)
-                throw SysError(format("statting '%1%'") % fnTempRoots);
+                throw PosixError(format("statting '%1%'") % fnTempRoots);
             if (st.st_size == 0) break;
 
             /* The garbage collector deleted this file before we could
                get a lock.  (It won't delete the file after we get a
-               lock.)  Try again. */
-        }
+               lock.)  Try again.
 
+               It should not be the case on Windows because other process would fail deleting the file.
+               Perhaps GCLock is not needed here too
+             */
+#else
+            fdGCLock = INVALID_HANDLE_VALUE;
+
+            debug(format("acquiring read lock on '%1%'") % fnTempRoots);
+            assert(lockFile(state->fdTempRoots.get(), ltRead, true));
+            break;
+#endif
+        }
     }
 
     /* Upgrade the lock to a write lock.  This will cause us to block
@@ -206,7 +260,7 @@ void LocalStore::addTempRoot(const Path & path)
     lockFile(state->fdTempRoots.get(), ltRead, true);
 }
 
-
+#ifndef __MINGW32__
 std::set<std::pair<pid_t, Path>> LocalStore::readTempRoots(FDs & fds)
 {
     std::set<std::pair<pid_t, Path>> tempRoots;
@@ -219,15 +273,11 @@ std::set<std::pair<pid_t, Path>> LocalStore::readTempRoots(FDs & fds)
         pid_t pid = std::stoi(i.name);
 
         debug(format("reading temporary root file '%1%'") % path);
-        FDPtr fd(new AutoCloseFD(open(path.c_str(),
-#ifndef __MINGW32__
-								        O_CLOEXEC |
-#endif
-								        O_RDWR, 0666)));
+        FDPtr fd(new AutoCloseFD(open(path.c_str(), O_CLOEXEC | O_RDWR, 0666)));
         if (!*fd) {
             /* It's okay if the file has disappeared. */
             if (errno == ENOENT) continue;
-            throw SysError(format("opening temporary roots file '%1%'") % path);
+            throw PosixError(format("opening temporary roots file '%1%'") % path);
         }
 
         /* This should work, but doesn't, for some reason. */
@@ -273,6 +323,7 @@ std::set<std::pair<pid_t, Path>> LocalStore::readTempRoots(FDs & fds)
 
     return tempRoots;
 }
+#endif
 
 
 void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
@@ -309,10 +360,7 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
                         unlink(path.c_str());
                     }
                 } else {
-#ifndef __MINGW32__
-                    struct stat st2 = lstat(target);
-                    if (!S_ISLNK(st2.st_mode)) return;
-#endif
+                    if (!isLink(target)) return;
                     Path target2 = readLink(target);
                     if (isInStore(target2)) foundRoot(target, target2);
                 }
@@ -327,12 +375,14 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
 
     }
 
-    catch (SysError & e) {
+    catch (PosixError & e) {
         /* We only ignore permanent failures. */
         if (e.errNo == EACCES || e.errNo == ENOENT || e.errNo == ENOTDIR)
             printInfo(format("cannot read potential root '%1%'") % path);
         else
             throw;
+    } catch (WinError & e) {
+        throw e; // TODO
     }
 }
 
@@ -360,7 +410,7 @@ Roots LocalStore::findRootsNoTemp()
 Roots LocalStore::findRoots()
 {
     Roots roots = findRootsNoTemp();
-
+#ifndef __MINGW32__
     FDs fds;
     pid_t prev = -1;
     size_t n = 0;
@@ -369,7 +419,7 @@ Roots LocalStore::findRoots()
         prev = root.first;
         roots[fmt("{temp:%d:%d}", root.first, n++)] = root.second;
     }
-
+#endif
     return roots;
 }
 
@@ -384,7 +434,7 @@ try_again:
     if (res == -1) {
         if (errno == ENOENT || errno == EACCES || errno == ESRCH)
             return;
-        throw SysError("reading symlink");
+        throw PosixError("reading symlink");
     }
     if (res == bufsiz) {
         if (SSIZE_MAX / 2 < bufsiz)
@@ -404,15 +454,17 @@ static string quoteRegexChars(const string & raw)
     return std::regex_replace(raw, specialRegex, R"(\$&)");
 }
 
+#ifndef __MINGW32__
 static void readFileRoots(const char * path, StringSet & paths)
 {
     try {
         paths.emplace(readFile(path));
-    } catch (SysError & e) {
+    } catch (PosixError & e) {
         if (e.errNo != ENOENT && e.errNo != EACCES)
             throw;
     }
 }
+#endif
 
 PathSet LocalStore::findRuntimeRoots()
 {
@@ -436,7 +488,7 @@ PathSet LocalStore::findRuntimeRoots()
                 if (!fdDir) {
                     if (errno == ENOENT || errno == EACCES)
                         continue;
-                    throw SysError(format("opening %1%") % fdStr);
+                    throw PosixError(format("opening %1%") % fdStr);
                 }
                 struct dirent * fd_ent;
                 while (errno = 0, fd_ent = readdir(fdDir.get())) {
@@ -447,7 +499,7 @@ PathSet LocalStore::findRuntimeRoots()
                 if (errno) {
                     if (errno == ESRCH)
                         continue;
-                    throw SysError(format("iterating /proc/%1%/fd") % ent->d_name);
+                    throw PosixError(format("iterating /proc/%1%/fd") % ent->d_name);
                 }
                 fdDir.reset();
 
@@ -472,14 +524,14 @@ PathSet LocalStore::findRuntimeRoots()
             }
         }
         if (errno)
-            throw SysError("iterating /proc");
+            throw PosixError("iterating /proc");
     }
 
 #if !defined(__linux__)
     try {
         std::regex lsofRegex(R"(^n(/.*)$)");
         auto lsofLines =
-            tokenizeString<std::vector<string>>(runProgram(LSOF, true, { "-n", "-w", "-F", "n" }), "\n");
+            tokenizeString<std::vector<string>>(runProgramGetStdout(LSOF, true, { "-n", "-w", "-F", "n" }), "\n");
         for (const auto & line : lsofLines) {
             std::smatch match;
             if (std::regex_match(line, match, lsofRegex))
@@ -544,7 +596,7 @@ void LocalStore::deleteGarbage(GCState & state, const Path & path)
     state.results.bytesFreed += bytesFreed;
 }
 
-
+// TODO: make a native Windows version
 void LocalStore::deletePathRecursive(GCState & state, const Path & path)
 {
     checkInterrupt();
@@ -569,7 +621,7 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
     if (stat(realPath.c_str(), &st)) {
 #endif
         if (errno == ENOENT) return;
-        throw SysError(format("getting status of %1%") % realPath);
+        throw PosixError(format("getting status-9 of %1%") % realPath);
     }
 
     printInfo(format("deleting '%1%'") % path);
@@ -587,16 +639,18 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
         // size.
         try {
             if (chmod(realPath.c_str(), st.st_mode | S_IWUSR) == -1)
-                throw SysError(format("making '%1%' writable") % realPath);
+                throw PosixError(format("making '%1%' writable") % realPath);
             Path tmp = trashDir + "/" + baseNameOf(path);
             if (rename(realPath.c_str(), tmp.c_str()))
-                throw SysError(format("unable to rename '%1%' to '%2%'") % realPath % tmp);
+                throw PosixError(format("unable to rename '%1%' to '%2%'") % realPath % tmp);
             state.bytesInvalidated += size;
-        } catch (SysError & e) {
+        } catch (PosixError & e) {
             if (e.errNo == ENOSPC) {
                 printInfo(format("note: can't create move '%1%': %2%") % realPath % e.msg());
                 deleteGarbage(state, realPath);
             }
+        } catch (WinError & e) {
+            throw e; // TODO
         }
     } else
         deleteGarbage(state, realPath);
@@ -708,7 +762,7 @@ void LocalStore::removeUnusedLinks(const GCState & state)
 {
 #ifndef __MINGW32__
     AutoCloseDir dir(opendir(linksDir.c_str()));
-    if (!dir) throw SysError(format("opening directory '%1%'") % linksDir);
+    if (!dir) throw PosixError(format("opening directory '%1%'") % linksDir);
 
     long long actualSize = 0, unsharedSize = 0;
 
@@ -721,7 +775,7 @@ void LocalStore::removeUnusedLinks(const GCState & state)
 
         struct stat st;
         if (lstat(path.c_str(), &st) == -1)
-            throw SysError(format("statting '%1%'") % path);
+            throw PosixError(format("statting '%1%'") % path);
 
         if (st.st_nlink != 1) {
             unsigned long long size = st.st_blocks * 512ULL;
@@ -733,23 +787,76 @@ void LocalStore::removeUnusedLinks(const GCState & state)
         printMsg(lvlTalkative, format("deleting unused link '%1%'") % path);
 
         if (unlink(path.c_str()) == -1)
-            throw SysError(format("deleting '%1%'") % path);
+            throw PosixError(format("deleting '%1%'") % path);
         state.results.bytesFreed += st.st_blocks * 512ULL;
     }
 
     struct stat st;
     if (stat(linksDir.c_str(), &st) == -1)
-        throw SysError(format("statting '%1%'") % linksDir);
+        throw PosixError(format("statting '%1%'") % linksDir);
     long long overhead = st.st_blocks * 512ULL;
 
     printInfo(format("note: currently hard linking saves %.2f MiB")
         % ((unsharedSize - actualSize - overhead) / (1024.0 * 1024.0)));
+#else
+    long long actualSize = 0, unsharedSize = 0;
+
+    WIN32_FIND_DATAW wfd;
+    std::wstring wlinksDir = pathW(linksDir);
+    HANDLE hFind = FindFirstFileExW((wlinksDir + L"\\*").c_str(), FindExInfoBasic, &wfd, FindExSearchNameMatch, NULL, 0);
+    if (hFind == INVALID_HANDLE_VALUE) {
+        throw WinError("FindFirstFileExW when LocalStore::removeUnusedLinks()");
+    } else {
+        do {
+            bool isDot    = (wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 && wfd.cFileName[0]==L'.' && wfd.cFileName[1]==L'\0';
+            bool isDotDot = (wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 && wfd.cFileName[0]==L'.' && wfd.cFileName[1]==L'.' && wfd.cFileName[2]==L'\0';
+            if (isDot || isDotDot)
+                continue;
+
+            checkInterrupt();
+
+            BY_HANDLE_FILE_INFORMATION bhfi;
+            std::wstring wpath = wlinksDir + L'\\' + wfd.cFileName;
+            HANDLE hFile = CreateFileW(wpath.c_str(), 0, FILE_SHARE_READ, 0, OPEN_EXISTING,
+                                       FILE_FLAG_POSIX_SEMANTICS |
+                                       ((wfd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0 ? FILE_FLAG_OPEN_REPARSE_POINT : 0) |
+                                       ((wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY    ) != 0 ? FILE_FLAG_BACKUP_SEMANTICS   : 0),
+                                       0);
+            if (hFile == INVALID_HANDLE_VALUE)
+                throw WinError("CreateFileW when LocalStore::removeUnusedLinks() '%1%'", to_bytes(wpath));
+            if (!GetFileInformationByHandle(hFile, &bhfi))
+                throw WinError("GetFileInformationByHandle when LocalStore::removeUnusedLinks() '%1%'", to_bytes(wpath));
+            CloseHandle(hFile);
+
+            uint64_t size = (uint64_t(bhfi.nFileSizeHigh) << 32) + bhfi.nFileSizeLow;
+            if (bhfi.nNumberOfLinks != 1) {
+                actualSize += size;
+                unsharedSize += (bhfi.nNumberOfLinks - 1) * size;
+                continue;
+            }
+
+            printMsg(lvlTalkative, format("deleting unused link '%1%'") % to_bytes(wpath));
+    
+            if (!DeleteFileW(wpath.c_str()))
+                throw WinError("DeleteFileW when LocalStore::removeUnusedLinks() '%1%'", to_bytes(wpath));
+            state.results.bytesFreed += size;
+
+        } while(FindNextFileW(hFind, &wfd));
+        WinError winError("FindNextFileW when LocalStore::removeUnusedLinks()");
+        if (winError.lastError != ERROR_NO_MORE_FILES)
+            throw winError;
+        FindClose(hFind);
+    }
+
+    printInfo(format("note: currently hard linking saves %.2f MiB")
+        % ((unsharedSize - actualSize) / (1024.0 * 1024.0)));
 #endif
 }
 
 
 void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
+std::cerr << "LocalStore::collectGarbage" <<std::endl;
     GCState state(results);
     state.options = options;
     state.gcKeepOutputs = settings.gcKeepOutputs;
@@ -772,7 +879,11 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     /* Acquire the global GC root.  This prevents
        a) New roots from being added.
        b) Processes from creating new temporary root files. */
+#ifndef __MINGW32__
     AutoCloseFD fdGCLock = openGCLock(ltWrite);
+#else
+    AutoCloseWindowsHandle fdGCLock = openGCLock(ltWrite);
+#endif
 
     /* Find the roots.  Since we've grabbed the GC lock, the set of
        permanent roots cannot increase now. */
@@ -780,13 +891,14 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     Roots rootMap = options.ignoreLiveness ? Roots() : findRootsNoTemp();
 
     for (auto & i : rootMap) state.roots.insert(i.second);
-
+#ifndef __MINGW32__
     /* Read the temporary roots.  This acquires read locks on all
        per-process temporary root files.  So after this point no paths
        can be added to the set of temporary roots. */
     FDs fds;
     for (auto & root : readTempRoots(fds))
         state.tempRoots.insert(root.second);
+#endif
     state.roots.insert(state.tempRoots.begin(), state.tempRoots.end());
 
     /* After this point the set of roots or temporary roots cannot
@@ -797,11 +909,13 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         if (pathExists(trashDir)) deleteGarbage(state, trashDir);
         try {
             createDirs(trashDir);
-        } catch (SysError & e) {
+        } catch (PosixError & e) {
             if (e.errNo == ENOSPC) {
                 printInfo(format("note: can't create trash directory: %1%") % e.msg());
                 state.moveToTrash = false;
             }
+        } catch (WinError & e) {
+            throw e; // TODO
         }
     }
 
@@ -827,7 +941,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         try {
 
             AutoCloseDir dir(opendir(realStoreDir.c_str()));
-            if (!dir) throw SysError(format("opening directory '%1%'") % realStoreDir);
+            if (!dir) throw PosixError(format("opening directory '%1%'") % realStoreDir);
 
             /* Read the store and immediately delete all paths that
                aren't valid.  When using --max-freed etc., deleting
@@ -866,6 +980,15 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         }
     }
 
+#ifndef _NDEBUG
+    /* paths shouldn't be  dead and alive at the same time */
+    PathSet deadAndAlive;
+    std::set_intersection(state.dead.begin(), state.dead.end(),
+                          state.alive.begin(), state.alive.end(),
+                          std::inserter(deadAndAlive, deadAndAlive.begin()));
+    assert(deadAndAlive.size() == 0);
+#endif
+
     if (state.options.action == GCOptions::gcReturnLive) {
         state.results.paths = state.alive;
         return;
@@ -876,9 +999,13 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         return;
     }
 
+#ifndef __MINGW32__
     /* Allow other processes to add to the store from here on. */
     fdGCLock = -1;
     fds.clear();
+#else
+    fdGCLock = INVALID_HANDLE_VALUE;
+#endif
 
     /* Delete the trash directory. */
     printInfo(format("deleting '%1%'") % trashDir);
@@ -901,7 +1028,7 @@ void LocalStore::autoGC(bool sync)
     auto getAvail = [this]() {
         struct statvfs st;
         if (statvfs(realStoreDir.c_str(), &st))
-            throw SysError("getting filesystem info about '%s'", realStoreDir);
+            throw PosixError("getting filesystem info about '%s'", realStoreDir);
 
         return (uint64_t) st.f_bavail * st.f_bsize;
     };

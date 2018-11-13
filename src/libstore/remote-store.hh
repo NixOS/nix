@@ -142,7 +142,11 @@ private:
 
     struct Connection : RemoteStore::Connection
     {
+#ifndef __MINGW32__
         AutoCloseFD fd;
+#else
+        AutoCloseWindowsHandle handle;
+#endif
     };
 
     ref<RemoteStore::Connection> openConnection() override;

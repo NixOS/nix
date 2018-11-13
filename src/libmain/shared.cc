@@ -18,6 +18,7 @@
 #include <openssl/crypto.h>
 
 #ifdef __MINGW32__
+#include <fcntl.h>
 #define srandom(x) srand(x)
 #endif
 
@@ -109,6 +110,13 @@ void initNix()
     std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
 #endif
 
+#ifdef __MINGW32__
+    /* Do not replace \n with \r\n when using stdio */
+    _setmode( _fileno(stdin ), _O_BINARY );
+    _setmode( _fileno(stdout), _O_BINARY );
+    _setmode( _fileno(stderr), _O_BINARY );
+#endif
+
     /* Initialise OpenSSL locking. */
     opensslLocks = std::vector<std::mutex>(CRYPTO_num_locks());
     CRYPTO_set_locking_callback(opensslLockCallback);
@@ -123,11 +131,11 @@ void initNix()
     act.sa_handler = SIG_DFL;
     act.sa_flags = 0;
     if (sigaction(SIGCHLD, &act, 0))
-        throw SysError("resetting SIGCHLD");
+        throw PosixError("resetting SIGCHLD");
 
     /* Install a dummy SIGUSR1 handler for use with pthread_kill(). */
     act.sa_handler = sigHandler;
-    if (sigaction(SIGUSR1, &act, 0)) throw SysError("handling SIGUSR1");
+    if (sigaction(SIGUSR1, &act, 0)) throw PosixError("handling SIGUSR1");
 #endif
     /* Register a SIGSEGV handler to detect stack overflows. */
     detectStackOverflow();
@@ -263,15 +271,18 @@ void printVersion(const string & programName)
 }
 
 
-#ifndef __MINGW32__
 void showManPage(const string & name)
 {
+#ifndef __MINGW32__
     restoreSignals();
     setenv("MANPATH", settings.nixManDir.c_str(), 1);
     execlp("man", "man", name.c_str(), nullptr);
-    throw SysError(format("command 'man %1%' failed") % name.c_str());
-}
+    throw PosixError(format("command 'man %1%' failed") % name.c_str());
+#else
+    std::cerr << "TODO: man " << name << std::endl;
 #endif
+}
+
 
 int handleExceptions(const string & programName, std::function<void()> fun)
 {
@@ -327,7 +338,7 @@ RunPager::RunPager()
 
     pid = startProcess([&]() {
         if (dup2(toPager.readSide.get(), STDIN_FILENO) == -1)
-            throw SysError("dupping stdin");
+            throw PosixError("dupping stdin");
         if (!getenv("LESS"))
             setenv("LESS", "FRSXMK", 1);
         restoreSignals();
@@ -336,13 +347,13 @@ RunPager::RunPager()
         execlp("pager", "pager", nullptr);
         execlp("less", "less", nullptr);
         execlp("more", "more", nullptr);
-        throw SysError(format("executing '%1%'") % pager);
+        throw PosixError(format("executing '%1%'") % pager);
     });
 
     pid.setKillSignal(SIGINT);
 
     if (dup2(toPager.writeSide.get(), STDOUT_FILENO) == -1)
-        throw SysError("dupping stdout");
+        throw PosixError("dupping stdout");
 }
 
 

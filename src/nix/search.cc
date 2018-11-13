@@ -246,27 +246,35 @@ struct CmdSearch : SourceExprCommand, MixJSON
 
             Path tmpFile = fmt("%s.tmp.%d", jsonCacheFileName, getpid());
 
-            std::ofstream jsonCacheFile;
+            {
+                std::ofstream jsonCacheFile;
 
-            try {
-                // iostream considered harmful
-                jsonCacheFile.exceptions(std::ofstream::failbit);
-                jsonCacheFile.open(tmpFile);
+                try {
+                    // iostream considered harmful
+                    jsonCacheFile.exceptions(std::ofstream::failbit);
+                    jsonCacheFile.open(tmpFile);
 
-                auto cache = writeCache ? std::make_unique<JSONObject>(jsonCacheFile, false) : nullptr;
+                    auto cache = writeCache ? std::make_unique<JSONObject>(jsonCacheFile, false) : nullptr;
 
-                doExpr(getSourceExpr(*state), "", true, cache.get());
+                    doExpr(getSourceExpr(*state), "", true, cache.get());
 
-            } catch (std::exception &) {
-                /* Fun fact: catching std::ios::failure does not work
-                   due to C++11 ABI shenanigans.
-                   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=66145 */
-                if (!jsonCacheFile)
-                    throw Error("error writing to %s", tmpFile);
+                } catch (std::exception &) {
+                    /* Fun fact: catching std::ios::failure does not work
+                       due to C++11 ABI shenanigans.
+                       https://gcc.gnu.org/bugzilla/show_bug.cgi?id=66145 */
+                    if (!jsonCacheFile)
+                        throw Error("error writing to %s", tmpFile);
+                }
             }
-
-            if (writeCache && rename(tmpFile.c_str(), jsonCacheFileName.c_str()) == -1)
-                throw SysError("cannot rename '%s' to '%s'", tmpFile, jsonCacheFileName);
+            if (writeCache) {
+#ifndef __MINGW32__
+                if (rename(tmpFile.c_str(), jsonCacheFileName.c_str()) == -1)
+                    throw PosixError("cannot rename '%s' to '%s'", tmpFile, jsonCacheFileName);
+#else
+                if (!MoveFileExW(pathW(tmpFile).c_str(), pathW(jsonCacheFileName).c_str(), MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))
+                    throw WinError("MoveFileExW '%1%' '%2%'", tmpFile, jsonCacheFileName);
+#endif
+            }
         }
 
         if (results.size() == 0)

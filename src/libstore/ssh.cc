@@ -27,25 +27,23 @@ void SSHMaster::addCommonSSHOpts(Strings & args)
 std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string & command)
 {
     Path socketPath = startMaster();
-
+#ifndef __MINGW32__
     Pipe in, out;
-    in.create();
-    out.create();
+    in.createPipe();
+    out.createPipe();
 
     auto conn = std::make_unique<Connection>();
     conn->sshPid = startProcess([&]() {
-#ifndef __MINGW32__
         restoreSignals();
-#endif
         close(in.writeSide.get());
         close(out.readSide.get());
 
         if (dup2(in.readSide.get(), STDIN_FILENO) == -1)
-            throw SysError("duping over stdin");
+            throw PosixError("duping over stdin");
         if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
-            throw SysError("duping over stdout");
+            throw PosixError("duping over stdout");
         if (logFD != -1 && dup2(logFD, STDERR_FILENO) == -1)
-            throw SysError("duping over stderr");
+            throw PosixError("duping over stderr");
 
         Strings args;
 
@@ -63,17 +61,19 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
         args.push_back(command);
         execvp(args.begin()->c_str(), stringsToCharPtrs(args).data());
 
-        throw SysError("executing '%s' on '%s'", command, host);
+        throw PosixError("executing '%s' on '%s'", command, host);
     });
-
 
     in.readSide = -1;
     out.writeSide = -1;
 
     conn->out = std::move(out.readSide);
     conn->in = std::move(in.writeSide);
-
     return conn;
+#else
+fprintf(stderr, "%s:%lu abort\n", __FILE__, __LINE__);fflush(stderr);
+_exit(2);
+#endif
 }
 
 Path SSHMaster::startMaster()
@@ -81,28 +81,29 @@ Path SSHMaster::startMaster()
     if (!useMaster) return "";
 
     auto state(state_.lock());
-
+#ifndef __MINGW32__
     if (state->sshMaster != -1) return state->socketPath;
-
+#else
+    if (state->sshMaster.hProcess != INVALID_HANDLE_VALUE) return state->socketPath;
+#endif
     state->tmpDir = std::make_unique<AutoDelete>(createTempDir("", "nix", true, true
 #ifndef __MINGW32__
-    	, 0700
+        , 0700
 #endif
-    	));
+        ));
 
     state->socketPath = (Path) *state->tmpDir + "/ssh.sock";
-
+#ifndef __MINGW32__
     Pipe out;
-    out.create();
+    out.createPipe();
 
     state->sshMaster = startProcess([&]() {
-#ifndef __MINGW32__
+
         restoreSignals();
-#endif
         close(out.readSide.get());
 
         if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
-            throw SysError("duping over stdout");
+            throw PosixError("duping over stdout");
 
         Strings args =
             { "ssh", host.c_str(), "-M", "-N", "-S", state->socketPath
@@ -114,7 +115,7 @@ Path SSHMaster::startMaster()
         addCommonSSHOpts(args);
         execvp(args.begin()->c_str(), stringsToCharPtrs(args).data());
 
-        throw SysError("starting SSH master");
+        throw PosixError("starting SSH master");
     });
 
     out.writeSide = -1;
@@ -126,7 +127,10 @@ Path SSHMaster::startMaster()
 
     if (reply != "started")
         throw Error("failed to start SSH master connection to '%s'", host);
-
+#else
+fprintf(stderr, "%s:%lu abort\n", __FILE__, __LINE__);fflush(stderr);
+_exit(2);
+#endif
     return state->socketPath;
 }
 

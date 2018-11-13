@@ -27,7 +27,11 @@ struct CmdDumpPath : StorePathCommand
 
     void run(ref<Store> store, const Path & storePath) override
     {
+#ifndef __MINGW32__
         FdSink sink(STDOUT_FILENO);
+#else
+        FdSink sink(GetStdHandle(STD_OUTPUT_HANDLE));
+#endif
         store->narFromPath(storePath, sink);
         sink.flush();
     }

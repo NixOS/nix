@@ -7,6 +7,7 @@
 #include <sys/time.h>
 
 #include <regex>
+#include <iostream>
 
 #include <nlohmann/json.hpp>
 
@@ -30,9 +31,25 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
     if (evalSettings.pureEval && rev == "")
         throw Error("in pure evaluation mode, 'fetchMercurial' requires a Mercurial revision");
 
-    if (rev == "" && hasPrefix(uri, "/") && pathExists(uri + "/.hg")) {
+    // BUGBUG: MSYS's hg does not support Windows paths ! (remove this when nixpkgs will have own Windows hg)
+    string uriMSYS;
+#ifdef __MINGW32__
+    if (uri.substr(1, 9) == ":/msys64/") {
+        uriMSYS = trim(runProgramGetStdout("cygpath", true, {"-u", uri}));
+    } else
+#endif
+        uriMSYS = uri;
 
-        bool clean = runProgram("hg", true, { "status", "-R", uri, "--modified", "--added", "--removed" }) == "";
+
+    if (rev == "" && 
+#ifndef __MINGW32__
+        hasPrefix(uri, "/")
+#else
+        uri.size() > 3 && (('A' <= uri[0] && uri[0] <= 'Z') || ('a' <= uri[0] && uri[0] <= 'z')) && uri[1] == ':' && isslash(uri[2])
+#endif
+        && pathExists(uri + "/.hg")) {
+
+        bool clean = runProgramGetStdout("hg", true, { "status", "-R", uriMSYS, "--modified", "--added", "--removed" }) == "";
 
         if (!clean) {
 
@@ -43,16 +60,16 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
 
             HgInfo hgInfo;
             hgInfo.rev = "0000000000000000000000000000000000000000";
-            hgInfo.branch = chomp(runProgram("hg", true, { "branch", "-R", uri }));
+            hgInfo.branch = chomp(runProgramGetStdout("hg", true, { "branch", "-R", uriMSYS}));
 
             auto files = tokenizeString<std::set<std::string>>(
-                runProgram("hg", true, { "status", "-R", uri, "--clean", "--modified", "--added", "--no-status", "--print0" }), "\0"s);
+                runProgramGetStdout("hg", true, { "status", "-R", uriMSYS, "--clean", "--modified", "--added", "--no-status", "--print0" }), "\0"s);
 
             PathFilter filter = [&](const Path & p) -> bool {
                 assert(hasPrefix(p, uri));
                 std::string file(p, uri.size() + 1);
 
-                auto st = lstat(p);
+                auto st = lstatPath(p);
 
                 if (S_ISDIR(st.st_mode)) {
                     auto prefix = file + "/";
@@ -75,28 +92,48 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
 
     Path stampFile = fmt("%s/.hg/%s.stamp", cacheDir, hashString(htSHA512, rev).to_string(Base32, false));
 
+    // BUGBUG: MSYS's hg does not support Windows paths ! (remove this when nixpkgs will have own Windows hg)
+    string cacheDirMSYS;
+#ifdef __MINGW32__
+    if (cacheDir.substr(1, 9) == ":/msys64/") {
+        cacheDirMSYS = trim(runProgramGetStdout("cygpath", true, {"-u", cacheDir}));
+    } else
+#endif
+        cacheDirMSYS = cacheDir;
+
     /* If we haven't pulled this repo less than ‘tarball-ttl’ seconds,
        do so now. */
+#ifndef __MINGW32__
     time_t now = time(0);
     struct stat st;
     if (stat(stampFile.c_str(), &st) != 0 ||
         st.st_mtime + settings.tarballTtl <= now)
+#else
+    FILETIME ftnow;
+    GetSystemTimeAsFileTime(&ftnow);
+    WIN32_FILE_ATTRIBUTE_DATA wfad;
+    if (!GetFileAttributesExW(pathW(stampFile).c_str(), GetFileExInfoStandard, &wfad) ||
+            ((uint64_t(wfad.ftLastWriteTime.dwHighDateTime) << 32) + wfad.ftLastWriteTime.dwLowDateTime) + settings.tarballTtl*10000000ULL <= ((uint64_t(ftnow.dwHighDateTime) << 32) + ftnow.dwLowDateTime))
+#endif
     {
         /* Except that if this is a commit hash that we already have,
            we don't have to pull again. */
         if (!(std::regex_match(rev, commitHashRegex)
                 && pathExists(cacheDir)
-                && runProgram(
-                    RunOptions("hg", { "log", "-R", cacheDir, "-r", rev, "--template", "1" })
+                && runProgramWithOptions(
+                    RunOptions("hg", { "log", "-R", cacheDirMSYS, "-r", rev, "--template", "1" })
                     .killStderr(true)).second == "1"))
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Mercurial repository '%s'", uri));
 
             if (pathExists(cacheDir)) {
-                runProgram("hg", true, { "pull", "-R", cacheDir, "--", uri });
+                string res = runProgramGetStdout("hg", true, { "pull", "-R", cacheDirMSYS, "--", uriMSYS });
+                std::cerr << "res1='" << res << "'" << std::endl;
             } else {
                 createDirs(dirOf(cacheDir));
-                runProgram("hg", true, { "clone", "--noupdate", "--", uri, cacheDir });
+
+                string res = runProgramGetStdout("hg", true, { "clone", "--noupdate", "--", uriMSYS, cacheDirMSYS });
+                std::cerr << "res2='" << res << "'" << std::endl;
             }
         }
 
@@ -104,7 +141,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
     }
 
     auto tokens = tokenizeString<std::vector<std::string>>(
-        runProgram("hg", true, { "log", "-R", cacheDir, "-r", rev, "--template", "{node} {rev} {branch}" }));
+        runProgramGetStdout("hg", true, { "log", "-R", cacheDirMSYS, "-r", rev, "--template", "{node} {rev} {branch}" }));
     assert(tokens.size() == 3);
 
     HgInfo hgInfo;
@@ -127,14 +164,25 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
             return hgInfo;
         }
 
-    } catch (SysError & e) {
+    } catch (PosixError & e) {
         if (e.errNo != ENOENT) throw;
+    } catch (WinError & e) {
+        if (e.lastError != ERROR_FILE_NOT_FOUND) throw;
     }
 
     Path tmpDir = createTempDir();
     AutoDelete delTmpDir(tmpDir, true);
 
-    runProgram("hg", true, { "archive", "-R", cacheDir, "-r", rev, tmpDir });
+    // BUGBUG: MSYS's hg does not support Windows paths ! (remove this when nixpkgs will have own Windows hg)
+    string tmpDirMSYS;
+#ifdef __MINGW32__
+    if (uri.substr(1, 9) == ":/msys64/") {
+        tmpDirMSYS = trim(runProgramGetStdout("cygpath", true, {"-u", tmpDir}));
+    } else
+#endif
+        tmpDirMSYS = tmpDir;
+
+    runProgramGetStdout("hg", true, { "archive", "-R", cacheDirMSYS, "-r", rev, tmpDirMSYS });
 
     deletePath(tmpDir + "/.hg_archival.txt");
 

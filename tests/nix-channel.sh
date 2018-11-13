@@ -1,5 +1,9 @@
 source common.sh
 
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    exit 99
+fi
+
 clearProfiles
 
 rm -f $TEST_HOME/.nix-channels $TEST_HOME/.nix-profile

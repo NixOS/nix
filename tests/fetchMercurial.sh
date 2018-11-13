@@ -62,7 +62,11 @@ path2=$(nix eval --tarball-ttl 0 --raw "(builtins.fetchMercurial { url = file://
 mv ${repo}-tmp $repo
 
 # Using a clean working tree should produce the same result.
-path2=$(nix eval --raw "(builtins.fetchMercurial $repo).outPath")
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    path2=$(nix eval --raw "(builtins.fetchMercurial \"$(cygpath -m $repo)\").outPath")
+else
+    path2=$(nix eval --raw "(builtins.fetchMercurial $repo).outPath")
+fi
 [[ $path = $path2 ]]
 
 # Using an unclean tree should yield the tracked but uncommitted changes.
@@ -73,17 +77,30 @@ echo bar > $repo/dir2/bar
 hg add --cwd $repo dir1/foo
 hg rm --cwd $repo hello
 
-path2=$(nix eval --raw "(builtins.fetchMercurial $repo).outPath")
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    path2=$(nix eval --raw "(builtins.fetchMercurial \"$(cygpath -m $repo)\").outPath")
+else
+    path2=$(nix eval --raw "(builtins.fetchMercurial $repo).outPath")
+fi
+
 [ ! -e $path2/hello ]
 [ ! -e $path2/bar ]
 [ ! -e $path2/dir2/bar ]
 [ ! -e $path2/.hg ]
 [[ $(cat $path2/dir1/foo) = foo ]]
 
-[[ $(nix eval --raw "(builtins.fetchMercurial $repo).rev") = 0000000000000000000000000000000000000000 ]]
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    [[ $(nix eval --raw "(builtins.fetchMercurial \"$(cygpath -m $repo)\").rev") = 0000000000000000000000000000000000000000 ]]
+else
+    [[ $(nix eval --raw "(builtins.fetchMercurial $repo).rev") = 0000000000000000000000000000000000000000 ]]
+fi
 
 # ... unless we're using an explicit rev.
-path3=$(nix eval --raw "(builtins.fetchMercurial { url = $repo; rev = \"default\"; }).outPath")
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    path3=$(nix eval --raw "(builtins.fetchMercurial { url = \"$(cygpath -m $repo)\"; rev = \"default\"; }).outPath")
+else
+    path3=$(nix eval --raw "(builtins.fetchMercurial { url = $repo; rev = \"default\"; }).outPath")
+fi
 [[ $path = $path3 ]]
 
 # Committing should not affect the store path.

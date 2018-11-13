@@ -8,6 +8,7 @@ namespace nix {
 
 void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
 {
+#ifndef __MINGW32__
     /* Make the host's netrc data available. Too bad curl requires
        this to be stored in a file. It would be nice if we could just
        pass a pointer to the data. */
@@ -15,7 +16,7 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
         settings.netrcFile = "netrc";
         writeFile(settings.netrcFile, netrcData, 0600);
     }
-
+#endif
     auto getAttr = [&](const string & name) {
         auto i = drv.env.find(name);
         if (i == drv.env.end()) throw Error(format("attribute '%s' missing") % name);
@@ -54,7 +55,7 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
         auto executable = drv.env.find("executable");
         if (executable != drv.env.end() && executable->second == "1") {
             if (chmod(storePath.c_str(), 0755) == -1)
-                throw SysError(format("making '%1%' executable") % storePath);
+                throw PosixError(format("making '%1%' executable") % storePath);
         }
     };
 

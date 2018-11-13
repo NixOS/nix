@@ -140,7 +140,7 @@ struct NarAccessor : public FSAccessor
 
     NarMember * find(const Path & path)
     {
-        Path canon = path == "" ? "" : canonPath(path);
+        Path canon = path == "" ? "" : canonNarPath(path);
         NarMember * current = &root;
         auto end = path.end();
         for (auto it = path.begin(); it != end; ) {
@@ -148,7 +148,7 @@ struct NarAccessor : public FSAccessor
             // a directory
             if (current->type != FSAccessor::Type::tDirectory) return nullptr;
 
-            // skip slash (canonPath above ensures that this is always a slash)
+            // skip slash (canonNarPath above ensures that this is always a slash)
             assert(*it == '/');
             it += 1;
 

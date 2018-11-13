@@ -34,7 +34,11 @@ public:
     struct Connection
     {
         Pid sshPid;
+#ifndef __MINGW32__
         AutoCloseFD out, in;
+#else
+        AutoCloseWindowsHandle out, in;
+#endif
     };
 
     std::unique_ptr<Connection> startCommand(const std::string & command);

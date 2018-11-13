@@ -31,15 +31,23 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     if (evalSettings.pureEval && rev == "")
         throw Error("in pure evaluation mode, 'fetchGit' requires a Git revision");
 
-    if (!ref && rev == "" && hasPrefix(uri, "/") && pathExists(uri + "/.git")) {
+    if (!ref && rev == "" &&
+#ifndef __MINGW32__
+        hasPrefix(uri, "/")
+#else
+        uri.size() > 3 && (('A' <= uri[0] && uri[0] <= 'Z') || ('a' <= uri[0] && uri[0] <= 'z')) && uri[1] == ':' && isslash(uri[2])
+#endif
+        && pathExists(uri + "/.git")) {
 
         bool clean = true;
 
         try {
-            runProgram("git", true, { "-C", uri, "diff-index", "--quiet", "HEAD", "--" });
+            runProgramGetStdout("git", true, { "-C", uri, "diff-index", "--quiet", "HEAD", "--" });
         } catch (ExecError e) {
 #ifndef __MINGW32__
             if (!WIFEXITED(e.status) || WEXITSTATUS(e.status) != 1) throw;
+#else
+            if (e.status != 1) throw; // ???
 #endif
             clean = false;
         }
@@ -54,13 +62,13 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
             gitInfo.shortRev = std::string(gitInfo.rev, 0, 7);
 
             auto files = tokenizeString<std::set<std::string>>(
-                runProgram("git", true, { "-C", uri, "ls-files", "-z" }), "\0"s);
+                runProgramGetStdout("git", true, { "-C", uri, "ls-files", "-z" }), "\0"s);
 
             PathFilter filter = [&](const Path & p) -> bool {
                 assert(hasPrefix(p, uri));
                 std::string file(p, uri.size() + 1);
 
-                auto st = lstat(p);
+                auto st = lstatPath(p);
 
                 if (S_ISDIR(st.st_mode)) {
                     auto prefix = file + "/";
@@ -77,7 +85,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         }
 
         // clean working tree, but no ref or rev specified.  Use 'HEAD'.
-        rev = chomp(runProgram("git", true, { "-C", uri, "rev-parse", "HEAD" }));
+        rev = chomp(runProgramGetStdout("git", true, { "-C", uri, "rev-parse", "HEAD" }));
         ref = "HEAD"s;
     }
 
@@ -89,7 +97,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     Path cacheDir = getCacheDir() + "/nix/git";
 
     if (!pathExists(cacheDir)) {
-        runProgram("git", true, { "init", "--bare", cacheDir });
+        runProgramGetStdout("git", true, { "init", "--bare", cacheDir });
     }
 
     std::string localRef = hashString(htSHA256, fmt("%s-%s", uri, *ref)).to_string(Base32, false);
@@ -97,37 +105,60 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     Path localRefFile = cacheDir + "/refs/heads/" + localRef;
 
     bool doFetch;
+#ifndef __MINGW32__
     time_t now = time(0);
+#else
+    FILETIME ftnow;
+    GetSystemTimeAsFileTime(&ftnow);
+#endif
     /* If a rev was specified, we need to fetch if it's not in the
        repo. */
     if (rev != "") {
         try {
-            runProgram("git", true, { "-C", cacheDir, "cat-file", "-e", rev });
+            runProgramGetStdout("git", true, { "-C", cacheDir, "cat-file", "-e", rev });
             doFetch = false;
         } catch (ExecError & e) {
 #ifndef __MINGW32__
             if (WIFEXITED(e.status)) {
                 doFetch = true;
             } else
-#endif
             {
                 throw;
             }
+#else
+            doFetch = true;
+#endif
         }
     } else {
         /* If the local ref is older than ‘tarball-ttl’ seconds, do a
            git fetch to update the local ref to the remote ref. */
+#ifndef __MINGW32__
         struct stat st;
         doFetch = stat(localRefFile.c_str(), &st) != 0 ||
             st.st_mtime + settings.tarballTtl <= now;
+#else
+        WIN32_FILE_ATTRIBUTE_DATA wfad;
+        doFetch = !GetFileAttributesExW(pathW(localRefFile).c_str(), GetFileExInfoStandard, &wfad) ||
+            ((uint64_t(wfad.ftLastWriteTime.dwHighDateTime) << 32) + wfad.ftLastWriteTime.dwLowDateTime) + settings.tarballTtl*10000000ULL <= ((uint64_t(ftnow.dwHighDateTime) << 32) + ftnow.dwLowDateTime);
+#endif
     }
     if (doFetch)
     {
         Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Git repository '%s'", uri));
 
+        // BUGBUG: MSYS's git does not support Windows paths after "--" ! (remove this when nixpkgs will have own Windows git)
+        string uri2;
+        if (uri.substr(1, 9) == ":/msys64/") {
+            uri2 = trim(runProgramGetStdout("cygpath", true, {"-u", uri}));
+        } else if (uri.substr(0, 7) == "file://" && uri.substr(8, 9) == ":/msys64/") {
+            uri2 = "file://" + trim(runProgramGetStdout("cygpath", true, {"-u", uri.substr(7)}));
+        } else {
+            uri2 = uri;
+        }
+
         // FIXME: git stderr messes up our progress indicator, so
         // we're using --quiet for now. Should process its stderr.
-        runProgram("git", true, { "-C", cacheDir, "fetch", "--quiet", "--force", "--", uri, *ref + ":" + localRef });
+        runProgramGetStdout("git", true, { "-C", cacheDir, "fetch", "--quiet", "--force", "--", uri2, *ref + ":" + localRef });
 
 #ifndef __MINGW32__
         struct timeval times[2];
@@ -137,6 +168,12 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         times[1].tv_usec = 0;
 
         utimes(localRefFile.c_str(), times);
+#else
+        AutoCloseWindowsHandle hFile = CreateFileW(pathW(localRefFile).c_str(), FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ, 0, OPEN_EXISTING, FILE_FLAG_POSIX_SEMANTICS, 0);
+        if (hFile.get() == INVALID_HANDLE_VALUE)
+            throw WinError("CreateFileW('%1%') when exportGit", localRefFile);
+        if (!SetFileTime(hFile.get(), NULL, NULL, &ftnow))
+            throw WinError("SetFileTime('%1%') when exportGit", localRefFile);
 #endif
     }
 
@@ -163,22 +200,24 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
             return gitInfo;
         }
 
-    } catch (SysError & e) {
+    } catch (PosixError & e) {
         if (e.errNo != ENOENT) throw;
+    } catch (WinError & e) {
+        if (e.lastError != ERROR_FILE_NOT_FOUND) throw;
     }
 
     // FIXME: should pipe this, or find some better way to extract a
     // revision.
-    auto tar = runProgram("git", true, { "-C", cacheDir, "archive", gitInfo.rev });
+    auto tar = runProgramGetStdout("git", true, { "-C", cacheDir, "archive", gitInfo.rev });
 
     Path tmpDir = createTempDir();
     AutoDelete delTmpDir(tmpDir, true);
 
-    runProgram("tar", true, { "x", "-C", tmpDir }, tar);
+    runProgramGetStdout("tar", true, { "x", "-C", tmpDir }, tar);
 
     gitInfo.storePath = store->addToStore(name, tmpDir);
 
-    gitInfo.revCount = std::stoull(runProgram("git", true, { "-C", cacheDir, "rev-list", "--count", gitInfo.rev }));
+    gitInfo.revCount = std::stoull(runProgramGetStdout("git", true, { "-C", cacheDir, "rev-list", "--count", gitInfo.rev }));
 
     nlohmann::json json;
     json["storePath"] = gitInfo.storePath;

@@ -67,7 +67,11 @@ void FdSink::write(const unsigned char * data, size_t len)
         }
     }
     try {
+#ifndef  __MINGW32__
         writeFull(fd, data, len);
+#else
+        writeFull(handle, data, len);
+#endif
     } catch (SysError & e) {
         _good = false;
         throw;
@@ -130,13 +134,22 @@ bool BufferedSource::hasData()
 
 size_t FdSource::readUnbuffered(unsigned char * data, size_t len)
 {
+#ifndef __MINGW32__
     ssize_t n;
     do {
         checkInterrupt();
         n = ::read(fd, (char *) data, len);
     } while (n == -1 && errno == EINTR);
-    if (n == -1) { _good = false; throw SysError("reading from file"); }
+    if (n == -1) { _good = false; throw PosixError("reading from file"); }
     if (n == 0) { _good = false; throw EndOfFile("unexpected end-of-file"); }
+#else
+    DWORD n;
+    checkInterrupt();
+    if (!::ReadFile(handle, (char *) data, len, &n, NULL)) {
+        _good = false;
+        throw WinError("ReadFile when FdSource::readUnbuffered");
+    }
+#endif
     read += n;
     return n;
 }

@@ -32,7 +32,11 @@ std::string escapeUri(std::string uri)
 
 static string currentLoad;
 
+#ifndef __MINGW32__
 static AutoCloseFD openSlotLock(const Machine & m, unsigned long long slot)
+#else
+static AutoCloseWindowsHandle openSlotLock(const Machine & m, unsigned long long slot)
+#endif
 {
     return openLockFile(fmt("%s/%s-%d", currentLoad, escapeUri(m.storeUri), slot), true);
 }
@@ -53,9 +57,11 @@ int main (int argc, char * * argv)
             throw UsageError("called without required arguments");
 
         verbosity = (Verbosity) std::stoll(argv[1]);
-
+#ifndef __MINGW32__
         FdSource source(STDIN_FILENO);
-
+#else
+        FdSource source(GetStdHandle(STD_INPUT_HANDLE));
+#endif
         /* Read the parent's settings. */
         while (readInt(source)) {
             auto name = readString(source);
@@ -74,7 +80,11 @@ int main (int argc, char * * argv)
         currentLoad = store->stateDir + "/current-load";
 
         std::shared_ptr<Store> sshStore;
+#ifndef __MINGW32__
         AutoCloseFD bestSlotLock;
+#else
+        AutoCloseWindowsHandle bestSlotLock;
+#endif
 
         auto machines = getMachines();
         debug("got %d remote builders", machines.size());
@@ -111,8 +121,13 @@ int main (int argc, char * * argv)
             );
 
             while (true) {
+#ifndef __MINGW32__
                 bestSlotLock = -1;
                 AutoCloseFD lock = openLockFile(currentLoad + "/main-lock", true);
+#else
+                bestSlotLock = INVALID_HANDLE_VALUE;
+                AutoCloseWindowsHandle lock = openLockFile(currentLoad + "/main-lock", true);
+#endif
                 lockFile(lock.get(), ltWrite, true);
 
                 bool rightType = false;
@@ -128,7 +143,11 @@ int main (int argc, char * * argv)
                         m.allSupported(requiredFeatures) &&
                         m.mandatoryMet(requiredFeatures)) {
                         rightType = true;
+#ifndef __MINGW32__
                         AutoCloseFD free;
+#else
+                        AutoCloseWindowsHandle free;
+#endif
                         unsigned long long load = 0;
                         for (unsigned long long slot = 0; slot < m.maxJobs; ++slot) {
                             auto slotLock = openSlotLock(m, slot);
@@ -174,13 +193,18 @@ int main (int argc, char * * argv)
                 }
 
 #ifdef __MINGW32__
+                FILETIME ft;
+                GetSystemTimeAsFileTime(&ft);
+                if (!SetFileTime(bestSlotLock.get(), &ft, &ft, &ft))
+                    throw WinError("SetFileTime");
+                lock = INVALID_HANDLE_VALUE;
 #elif __APPLE__
                 futimes(bestSlotLock.get(), NULL);
+                lock = -1;
 #else
                 futimens(bestSlotLock.get(), NULL);
-#endif
-
                 lock = -1;
+#endif
 
                 try {
 
@@ -199,10 +223,15 @@ int main (int argc, char * * argv)
                     storeUri = bestMachine->storeUri;
 
                 } catch (std::exception & e) {
+#ifndef __MINGW32__
                     auto msg = chomp(drainFD(5, false));
                     printError("cannot build on '%s': %s%s",
                         bestMachine->storeUri, e.what(),
                         (msg.empty() ? "" : ": " + msg));
+#else
+fprintf(stderr, "todo abort %s:%d\n", __FILE__, __LINE__);fflush(stderr);
+_exit(101);
+#endif
                     bestMachine->enabled = false;
                     continue;
                 }
@@ -218,9 +247,11 @@ connected:
 
         auto inputs = readStrings<PathSet>(source);
         auto outputs = readStrings<PathSet>(source);
-
+#ifndef __MINGW32__
         AutoCloseFD uploadLock = openLockFile(currentLoad + "/" + escapeUri(storeUri) + ".upload-lock", true);
-
+#else
+        AutoCloseWindowsHandle uploadLock = openLockFile(currentLoad + "/" + escapeUri(storeUri) + ".upload-lock", true);
+#endif
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("waiting for the upload lock to '%s'", storeUri));
 #ifndef __MINGW32__
@@ -242,7 +273,11 @@ connected:
             copyPaths(store, ref<Store>(sshStore), inputs, NoRepair, NoCheckSigs, substitute);
         }
 
+#ifndef __MINGW32__
         uploadLock = -1;
+#else
+        uploadLock = INVALID_HANDLE_VALUE;
+#endif
 
         BasicDerivation drv(readDerivation(store->realStoreDir + "/" + baseNameOf(drvPath)));
         drv.inputSrcs = inputs;

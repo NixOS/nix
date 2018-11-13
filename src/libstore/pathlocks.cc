@@ -15,21 +15,17 @@
 namespace nix {
 
 
+#ifndef __MINGW32__
 AutoCloseFD openLockFile(const Path & path, bool create)
 {
     AutoCloseFD fd;
 
-    fd = open(path.c_str(),
-#ifndef __MINGW32__
-    O_CLOEXEC |
-#endif
-    O_RDWR | (create ? O_CREAT : 0), 0600);
+    fd = open(path.c_str(), O_CLOEXEC | O_RDWR | (create ? O_CREAT : 0), 0600);
     if (!fd && (create || errno != ENOENT))
-        throw SysError(format("opening lock file '%1%'") % path);
+        throw PosixError(format("opening lock file '%1%'") % path);
 
     return fd;
 }
-
 
 void deleteLockFile(const Path & path, int fd)
 {
@@ -42,11 +38,43 @@ void deleteLockFile(const Path & path, int fd)
     /* Note that the result of unlink() is ignored; removing the lock
        file is an optimisation, not a necessity. */
 }
+#else
+AutoCloseWindowsHandle openLockFile(const Path & path, bool create)
+{
+    std::cerr << "openLockFile(" << path << "," << create << ") GetFileAttributesW=" << GetFileAttributesW(pathW(path).c_str()) << std::endl;
+
+    AutoCloseWindowsHandle fd = CreateFileW(pathW(path).c_str(),
+                                            GENERIC_READ | GENERIC_WRITE,
+                                            FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                            NULL,
+                                            create ? /*CREATE_NEW*/ OPEN_ALWAYS : OPEN_EXISTING,
+                                            FILE_ATTRIBUTE_NORMAL | FILE_FLAG_POSIX_SEMANTICS,
+                                            NULL);
+    std::cerr << "openLockFile fd=" << fd.get() << std::endl;
+    if (fd.get() == INVALID_HANDLE_VALUE)
+        throw WinError("%4%:%5% openLockFile(%1%, %2%) CreateFileW '%3%'", path, create, path, __FILE__, __LINE__);
+
+    return fd;
+}
+
+void deleteLockFile(const Path & path)
+{
+    if (!DeleteFileW(pathW(path).c_str())) {
+        std::cerr << WinError("DeleteFileW(%1%) in deleteLockFile", path).msg() << std::endl;
+    }
+    /* Note that the result of unlink() is ignored; removing the lock
+       file is an optimisation, not a necessity.
+       But leaving lock files would result in failing some tests in nix testsuite,
+       those who rely on ".. | grep $outPath" will match "$outPath.lock" too
+    */
+}
+#endif
 
 
+
+#ifndef __MINGW32__
 bool lockFile(int fd, LockType lockType, bool wait)
 {
-#ifndef __MINGW32__
     struct flock lock;
     if (lockType == ltRead) lock.l_type = F_RDLCK;
     else if (lockType == ltWrite) lock.l_type = F_WRLCK;
@@ -60,7 +88,7 @@ bool lockFile(int fd, LockType lockType, bool wait)
         while (fcntl(fd, F_SETLKW, &lock) != 0) {
             checkInterrupt();
             if (errno != EINTR)
-                throw SysError(format("acquiring/releasing lock"));
+                throw PosixError(format("acquiring/releasing lock"));
             else
                 return false;
         }
@@ -69,14 +97,77 @@ bool lockFile(int fd, LockType lockType, bool wait)
             checkInterrupt();
             if (errno == EACCES || errno == EAGAIN) return false;
             if (errno != EINTR)
-                throw SysError(format("acquiring/releasing lock"));
+                throw PosixError(format("acquiring/releasing lock"));
         }
     }
-#else
-    std::cerr << "TODO: lockFile" << std::endl;
-#endif
+
     return true;
 }
+#else
+bool lockFile(HANDLE handle, LockType lockType, bool wait)
+{
+    /* simulating Linux: read lock region 0:1, write locks 1:2, unlock 0:2 both at once */
+
+//  std::cerr << "lockFile handle="<<handle<<"("
+//            << handleToPath(handle)<<") lockType="<<lockType<<" wait="<<wait
+//            << std::endl;
+    switch(lockType) {
+        case ltNone: {
+            OVERLAPPED ov = { .Offset = 0 };
+            if (!UnlockFileEx(handle, 0, 2, 0, &ov)) {
+                WinError winError("UnlockFileEx(handle=%1%)", handle/*, handleToPath(handle)*/);
+//              std::cerr << "TODO: UnlockFileEx gle="<<winError.lastError << std::endl;
+                throw winError;
+            }
+//          std::cerr << "/lockFile handle="<<handle << std::endl;
+            return true;
+        }
+        case ltRead: {
+            OVERLAPPED ov = { .Offset = 0 };
+            if (!LockFileEx(handle, wait ? 0 : LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &ov)) {
+                WinError winError("LockFileEx(handle=%1%)", handle/*, handleToPath(handle)*/);
+//              std::cerr << "TODO: LockFileEx gle="<<winError.lastError << std::endl;
+                if (winError.lastError == ERROR_LOCK_VIOLATION)
+                    return false;
+                throw winError;
+            }
+//          std::cerr << "LockFileEx ok? gle="<<GetLastError() << std::endl;
+
+            // remove write lock if any
+            ov.Offset = 1;
+            if (!UnlockFileEx(handle, 0, 1, /*hidword*/0, &ov)) {
+                WinError winError("UnlockFileEx(handle=%1%)", handle/*, handleToPath(handle)*/);
+                if (winError.lastError != ERROR_NOT_LOCKED)
+                    throw winError;
+            }
+//          std::cerr << "/lockFile handle="<<handle << std::endl;
+            return true;
+        }
+        case ltWrite: {
+            OVERLAPPED ov = { .Offset = 1 };
+            if (!LockFileEx(handle, LOCKFILE_EXCLUSIVE_LOCK | (wait ? 0 : LOCKFILE_FAIL_IMMEDIATELY), 0, 1, 0, &ov)) {
+                WinError winError("LockFileEx(handle=%1%)", handle/*, handleToPath(handle)*/);
+//              std::cerr << "TODO: LockFileEx gle="<<winError.lastError << std::endl;
+                if (winError.lastError == ERROR_LOCK_VIOLATION)
+                    return false;
+                throw winError;
+            }
+//          std::cerr << "LockFileEx ok? gle="<<GetLastError() << std::endl;
+
+            // remove read lock if any
+            ov.Offset = 0;
+            if (!UnlockFileEx(handle, 0, 1, /*hidword*/0, &ov)) {
+                WinError winError("UnlockFileEx(handle=%1%)", handle/*, handleToPath(handle)*/);
+                if (winError.lastError != ERROR_NOT_LOCKED)
+                    throw winError;
+            }
+//          std::cerr << "/lockFile handle="<<handle << std::endl;
+            return true;
+        }
+        default: assert(false);
+    }
+}
+#endif
 
 
 /* This enables us to check whether are not already holding a lock on
@@ -103,6 +194,14 @@ PathLocks::PathLocks(const PathSet & paths, const string & waitMsg)
 bool PathLocks::lockPaths(const PathSet & _paths,
     const string & waitMsg, bool wait)
 {
+    std::string strpaths = "[";
+    for(auto & v : _paths) {
+        if (strpaths.size() > 1)
+            strpaths += ", ";
+        strpaths += v;
+    }
+    strpaths += "]";
+    std::cerr << "lockPaths _paths="<<strpaths<<" waitMsg="<<waitMsg<<" wait="<<wait << std::endl;
     assert(fds.empty());
 
     /* Note that `fds' is built incrementally so that the destructor
@@ -130,9 +229,11 @@ bool PathLocks::lockPaths(const PathSet & _paths,
         }
 
         try {
-
+#ifndef __MINGW32__
             AutoCloseFD fd;
-
+#else
+            AutoCloseWindowsHandle fd;
+#endif
             while (1) {
 
                 /* Open/create the lock file. */
@@ -153,12 +254,12 @@ bool PathLocks::lockPaths(const PathSet & _paths,
                 }
 
                 debug(format("lock acquired on '%1%'") % lockPath);
-
+#ifndef __MINGW32__
                 /* Check that the lock file hasn't become stale (i.e.,
                    hasn't been unlinked). */
                 struct stat st;
                 if (fstat(fd.get(), &st) == -1)
-                    throw SysError(format("statting lock file '%1%'") % lockPath);
+                    throw PosixError(format("statting lock file '%1%'") % lockPath);
                 if (st.st_size != 0)
                     /* This lock file has been unlinked, so we're holding
                        a lock on a deleted file.  This means that other
@@ -166,6 +267,7 @@ bool PathLocks::lockPaths(const PathSet & _paths,
                        `lockPath', and proceed.  So we must retry. */
                     debug(format("open lock file '%1%' has become stale") % lockPath);
                 else
+#endif
                     break;
             }
 
@@ -196,6 +298,8 @@ PathLocks::~PathLocks()
 void PathLocks::unlock()
 {
     for (auto & i : fds) {
+
+#ifndef __MINGW32__
         if (deletePaths) deleteLockFile(i.second, i.first);
 
         lockedPaths_.lock()->erase(i.second);
@@ -203,6 +307,14 @@ void PathLocks::unlock()
         if (close(i.first) == -1)
             printError(
                 format("error (ignored): cannot close lock file on '%1%'") % i.second);
+#else
+        lockedPaths_.lock()->erase(i.second);
+        if (!CloseHandle(i.first))
+            printError(
+                format("%3%:%4% error (ignored): cannot close lock file on '%1%' lastError=%d") % i.second % GetLastError() % __FILE__ % __LINE__);
+
+        if (deletePaths) deleteLockFile(i.second); // close the file for delete to success
+#endif
 
         debug(format("lock released on '%1%'") % i.second);
     }

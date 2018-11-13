@@ -182,6 +182,8 @@ AC_CHECK_LIB([lzma], [lzma_stream_encoder_mt],
 # Look for libbrotli{enc,dec}.
 PKG_CHECK_MODULES([LIBBROTLI], [libbrotlienc libbrotlidec], [CXXFLAGS="$LIBBROTLI_CFLAGS $CXXFLAGS"])
 
+# Look for libbacktrace
+PKG_CHECK_MODULES([LIBBACKTRACE], [libbacktrace], [CXXFLAGS="$LIBBACKTRACE_CFLAGS $CXXFLAGS"])
 
 # Look for libseccomp, required for Linux sandboxing.
 if test "$sys_name" = linux; then

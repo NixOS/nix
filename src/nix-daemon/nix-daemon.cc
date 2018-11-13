@@ -846,7 +846,7 @@ static void setSigChldAction(bool autoReap)
     sigfillset(&act.sa_mask);
     act.sa_flags = 0;
     if (sigaction(SIGCHLD, &act, &oact))
-        throw SysError("setting SIGCHLD handler");
+        throw PosixError("setting SIGCHLD handler");
 }
 
 
@@ -892,7 +892,7 @@ static PeerInfo getPeerInfo(int remote)
     ucred cred;
     socklen_t credLen = sizeof(cred);
     if (getsockopt(remote, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) == -1)
-        throw SysError("getting peer credentials");
+        throw PosixError("getting peer credentials");
     peer = { true, cred.pid, true, cred.uid, true, cred.gid };
 
 #elif defined(LOCAL_PEERCRED)
@@ -904,7 +904,7 @@ static PeerInfo getPeerInfo(int remote)
     xucred cred;
     socklen_t credLen = sizeof(cred);
     if (getsockopt(remote, SOL_LOCAL, LOCAL_PEERCRED, &cred, &credLen) == -1)
-        throw SysError("getting peer credentials");
+        throw PosixError("getting peer credentials");
     peer = { false, 0, true, cred.cr_uid, false, 0 };
 
 #endif
@@ -919,7 +919,7 @@ static PeerInfo getPeerInfo(int remote)
 static void daemonLoop(char * * argv)
 {
     if (chdir("/") == -1)
-        throw SysError("cannot change current directory");
+        throw PosixError("cannot change current directory");
 
     /* Get rid of children automatically; don't let them become
        zombies. */
@@ -940,7 +940,7 @@ static void daemonLoop(char * * argv)
         /* Create and bind to a Unix domain socket. */
         fdSocket = socket(PF_UNIX, SOCK_STREAM, 0);
         if (!fdSocket)
-            throw SysError("cannot create Unix domain socket");
+            throw PosixError("cannot create Unix domain socket");
 
         string socketPath = settings.nixDaemonSocketFile;
 
@@ -950,7 +950,7 @@ static void daemonLoop(char * * argv)
            So chdir to the socket directory so that we can pass a
            relative path name. */
         if (chdir(dirOf(socketPath).c_str()) == -1)
-            throw SysError("cannot change current directory");
+            throw PosixError("cannot change current directory");
         Path socketPathRel = "./" + baseNameOf(socketPath);
 
         struct sockaddr_un addr;
@@ -968,13 +968,13 @@ static void daemonLoop(char * * argv)
         int res = bind(fdSocket.get(), (struct sockaddr *) &addr, sizeof(addr));
         umask(oldMode);
         if (res == -1)
-            throw SysError(format("cannot bind to socket '%1%'") % socketPath);
+            throw PosixError(format("cannot bind to socket '%1%'") % socketPath);
 
         if (chdir("/") == -1) /* back to the root */
-            throw SysError("cannot change current directory");
+            throw PosixError("cannot change current directory");
 
         if (listen(fdSocket.get(), 5) == -1)
-            throw SysError(format("cannot listen on socket '%1%'") % socketPath);
+            throw PosixError(format("cannot listen on socket '%1%'") % socketPath);
     }
 
     closeOnExec(fdSocket.get());
@@ -992,7 +992,7 @@ static void daemonLoop(char * * argv)
             checkInterrupt();
             if (!remote) {
                 if (errno == EINTR) continue;
-                throw SysError("accepting connection");
+                throw PosixError("accepting connection");
             }
 
             closeOnExec(remote.get());
@@ -1030,7 +1030,7 @@ static void daemonLoop(char * * argv)
 
                 /* Background the daemon. */
                 if (setsid() == -1)
-                    throw SysError(format("creating a new session"));
+                    throw PosixError(format("creating a new session"));
 
                 /* Restore normal handling of SIGCHLD. */
                 setSigChldAction(false);
@@ -1086,11 +1086,11 @@ int main(int argc, char * * argv)
                 auto socketPath = settings.nixDaemonSocketFile;
                 auto s = socket(PF_UNIX, SOCK_STREAM, 0);
                 if (s == -1)
-                    throw SysError("creating Unix domain socket");
+                    throw PosixError("creating Unix domain socket");
 
                 auto socketDir = dirOf(socketPath);
                 if (chdir(socketDir.c_str()) == -1)
-                    throw SysError(format("changing to socket directory '%1%'") % socketDir);
+                    throw PosixError(format("changing to socket directory '%1%'") % socketDir);
 
                 auto socketName = baseNameOf(socketPath);
                 auto addr = sockaddr_un{};
@@ -1100,7 +1100,7 @@ int main(int argc, char * * argv)
                 strcpy(addr.sun_path, socketName.c_str());
 
                 if (connect(s, (struct sockaddr *) &addr, sizeof(addr)) == -1)
-                    throw SysError(format("cannot connect to daemon at %1%") % socketPath);
+                    throw PosixError(format("cannot connect to daemon at %1%") % socketPath);
 
                 auto nfds = (s > STDIN_FILENO ? s : STDIN_FILENO) + 1;
                 while (true) {
@@ -1109,18 +1109,18 @@ int main(int argc, char * * argv)
                     FD_SET(s, &fds);
                     FD_SET(STDIN_FILENO, &fds);
                     if (select(nfds, &fds, nullptr, nullptr, nullptr) == -1)
-                        throw SysError("waiting for data from client or server");
+                        throw PosixError("waiting for data from client or server");
                     if (FD_ISSET(s, &fds)) {
                         auto res = splice(s, nullptr, STDOUT_FILENO, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
                         if (res == -1)
-                            throw SysError("splicing data from daemon socket to stdout");
+                            throw PosixError("splicing data from daemon socket to stdout");
                         else if (res == 0)
                             throw EndOfFile("unexpected EOF from daemon socket");
                     }
                     if (FD_ISSET(STDIN_FILENO, &fds)) {
                         auto res = splice(STDIN_FILENO, nullptr, s, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
                         if (res == -1)
-                            throw SysError("splicing data from stdin to daemon socket");
+                            throw PosixError("splicing data from stdin to daemon socket");
                         else if (res == 0)
                             return;
                     }
@@ -1137,7 +1137,7 @@ int main(int argc, char * * argv)
 #include <iostream>
 int main(int argc, char * * argv)
 {
-	std::cerr << "TODO: nix-daemon" << std::endl;
-	return 1;
+    std::cerr << "TODO: nix-daemon" << std::endl;
+    return 1;
 }
 #endif

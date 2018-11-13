@@ -5,9 +5,8 @@
 #include <fcntl.h>
 #include <regex>
 #include "store-api.hh"
-#ifndef __MINGW32__
 #include <pwd.h>
-#endif
+
 using namespace nix;
 
 typedef std::map<string,string> Channels;
@@ -35,13 +34,9 @@ static void readChannels()
 // Writes the list of channels.
 static void writeChannels()
 {
-    auto channelsFD = AutoCloseFD{open(channelsList.c_str(), O_WRONLY
-#ifndef __MINGW32__
-														    | O_CLOEXEC
-#endif
-														    | O_CREAT | O_TRUNC, 0644)};
+    auto channelsFD = AutoCloseFD{open(channelsList.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0644)};
     if (!channelsFD)
-        throw SysError(format("opening '%1%' for writing") % channelsList);
+        throw PosixError(format("opening '%1%' for writing") % channelsList);
     for (const auto & channel : channels)
         writeFull(channelsFD.get(), channel.second + " " + channel.first + "\n");
 }
@@ -154,9 +149,9 @@ static void update(const StringSet & channelNames)
         if (S_ISLNK(st.st_mode))
             // old-skool ~/.nix-defexpr
             if (unlink(nixDefExpr.c_str()) == -1)
-                throw SysError(format("unlinking %1%") % nixDefExpr);
+                throw PosixError(format("unlinking %1%") % nixDefExpr);
     } else if (errno != ENOENT) {
-        throw SysError(format("getting status of %1%") % nixDefExpr);
+        throw PosixError(format("getting status of %1%") % nixDefExpr);
     }
     createDirs(nixDefExpr);
     auto channelLink = nixDefExpr + "/channels";
@@ -192,12 +187,9 @@ int main(int argc, char ** argv)
         } cmd = cNone;
         std::vector<string> args;
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
-#ifndef __MINGW32__
             if (*arg == "--help") {
                 showManPage("nix-channel");
-            } else
-#endif
-                   if (*arg == "--version") {
+            } else if (*arg == "--version") {
                 printVersion("nix-channel");
             } else if (*arg == "--add") {
                 cmd = cAdd;
@@ -270,7 +262,7 @@ int main(int argc, char ** argv)
 #include <iostream>
 int main(int argc, char * * argv)
 {
-	std::cerr << "TODO: nix-daemon" << std::endl;
-	return 1;
+    std::cerr << "TODO: nix-channel" << std::endl;
+    return 1;
 }
 #endif

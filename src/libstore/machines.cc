@@ -59,7 +59,7 @@ void parseMachines(const std::string & s, Machines & machines)
             auto file = trim(std::string(line, 1));
             try {
                 parseMachines(readFile(file), machines);
-            } catch (const SysError & e) {
+            } catch (const PosixError & e) {
                 if (e.errNo != ENOENT)
                     throw;
                 debug("cannot find machines file '%s'", file);

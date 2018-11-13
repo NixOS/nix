@@ -1,5 +1,9 @@
 source common.sh
 
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    exit 99
+fi
+
 clearStore
 
 # Test nix-shell -A

@@ -3,6 +3,12 @@
 #include "fs-accessor.hh"
 #include "nar-accessor.hh"
 
+#ifdef __MINGW32__
+#include "builtins.hh"
+#include "derivations.hh"
+#include <nlohmann/json.hpp>
+#endif
+
 using namespace nix;
 
 struct MixCat : virtual Args
@@ -72,3 +78,73 @@ struct CmdCatNar : StoreCommand, MixCat
 
 static RegisterCommand r1(make_ref<CmdCatStore>());
 static RegisterCommand r2(make_ref<CmdCatNar>());
+
+
+struct CmdLn : Command
+{
+    Path target, link;
+
+    CmdLn()
+    {
+        expectArg("target", &target);
+        expectArg("link", &link);
+    }
+
+    std::string name() override
+    {
+        return "ln";
+    }
+
+    std::string description() override
+    {
+        return "make a symbolic link (because MSYS's ln does not do it)";
+    }
+
+    void run() override
+    {
+        createSymlink(target, absPath(link));
+    }
+};
+
+static RegisterCommand r3(make_ref<CmdLn>());
+
+
+#ifdef __MINGW32__
+// builtin:fetchurl builder as there is no fork()
+struct CmdBuiltinFetchurl : Command
+{
+    std::string drvenv;
+
+    CmdBuiltinFetchurl()
+    {
+        expectArg("drvenv", &drvenv);
+    }
+
+    std::string name() override
+    {
+        return "builtin-fetchurl";
+    }
+
+    std::string description() override
+    {
+        return "an internal command supporting `builtin:fetchurl` builder";
+    }
+
+    void run() override
+    {
+        logger = makeJSONLogger(*logger);
+
+        std::cerr << "drvenv=" << drvenv << std::endl;
+        auto j = nlohmann::json::parse(drvenv);
+        std::cerr << "j=" << j << std::endl;
+
+        BasicDerivation drv2;
+        for (nlohmann::json::iterator it = j.begin(); it != j.end(); ++it) {
+          drv2.env[it.key()] = it.value();
+        }
+        builtinFetchurl(drv2, /*netrcData*/"");
+    }
+};
+
+static RegisterCommand r4(make_ref<CmdBuiltinFetchurl>());
+#endif

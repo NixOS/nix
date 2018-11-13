@@ -1,4 +1,7 @@
 #include <algorithm>
+#ifdef __MINGW32__
+#include <boost/algorithm/string/predicate.hpp>
+#endif
 
 #include "command.hh"
 #include "common-args.hh"
@@ -82,7 +85,11 @@ void mainWrapped(int argc, char * * argv)
 
     programPath = argv[0];
     string programName = baseNameOf(programPath);
-
+#ifdef __MINGW32__
+    if (boost::algorithm::iends_with(programName, ".exe")) {
+        programName = programName.substr(0, programName.size()-4);
+    }
+#endif
     {
         auto legacy = (*RegisterLegacyCommand::commands)[programName];
         if (legacy) return legacy(argc, argv);

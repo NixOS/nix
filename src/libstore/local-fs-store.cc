@@ -29,32 +29,43 @@ struct LocalStoreAccessor : public FSAccessor
     FSAccessor::Stat stat1(const Path & path) override
     {
         auto realPath = toRealPath(path);
-
-        struct stat st;
 #ifndef __MINGW32__
+        struct stat st;
         if (lstat(realPath.c_str(), &st)) {
-#else
-        if (::stat(realPath.c_str(), &st)) {
-#endif
             if (errno == ENOENT || errno == ENOTDIR) return {Type::tMissing, 0, false};
-            throw SysError(format("getting status of '%1%'") % path);
+            throw PosixError(format("getting status-7 of '%1%'") % path);
         }
 
-        if (!S_ISREG(st.st_mode) && !S_ISDIR(st.st_mode)
-#ifndef __MINGW32__
-            && !S_ISLNK(st.st_mode)
-#endif
-            )
+        if (!S_ISREG(st.st_mode) && !S_ISDIR(st.st_mode) && !S_ISLNK(st.st_mode))
             throw Error(format("file '%1%' has unsupported type") % path);
 
         return {
             S_ISREG(st.st_mode) ? Type::tRegular :
-#ifndef __MINGW32__
             S_ISLNK(st.st_mode) ? Type::tSymlink :
-#endif
             Type::tDirectory,
             S_ISREG(st.st_mode) ? (uint64_t) st.st_size : 0,
             S_ISREG(st.st_mode) && st.st_mode & S_IXUSR};
+#else
+// TODO: make Windows native
+        struct stat st;
+
+        if (::stat(realPath.c_str(), &st)) {
+            if (errno == ENOENT || errno == ENOTDIR) return {Type::tMissing, 0, false};
+            throw PosixError(format("getting status-8 of '%1%'") % path);
+        }
+
+        unsigned char dt = getFileType(realPath);
+
+        if (dt == DT_UNKNOWN)
+            throw Error(format("file '%1%' has unsupported type") % path);
+
+        return {
+            dt == DT_REG ? Type::tRegular :
+            dt == DT_LNK ? Type::tSymlink :
+            Type::tDirectory,
+            dt == DT_REG ? (uint64_t) st.st_size : 0,
+            0};
+#endif
     }
 
     StringSet readDirectory(const Path & path) override

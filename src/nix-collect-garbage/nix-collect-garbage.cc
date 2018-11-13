@@ -15,7 +15,7 @@ bool dryRun = false;
 /* If `-d' was specified, remove all old generations of all profiles.
  * Of course, this makes rollbacks to before this point in time
  * impossible. */
-
+// TODO make a native Windows version
 void removeOldGenerations(std::string dir)
 {
     if (access(dir.c_str(), R_OK) != 0) return;
@@ -32,8 +32,10 @@ void removeOldGenerations(std::string dir)
             std::string link;
             try {
                 link = readLink(path);
-            } catch (SysError & e) {
+            } catch (PosixError & e) {
                 if (e.errNo == ENOENT) continue;
+            } catch (WinError & e) {
+                throw e; // TODO
             }
             if (link.find("link") != string::npos) {
                 printInfo(format("removing old generations of profile %1%") % path);
@@ -58,12 +60,9 @@ int main(int argc, char * * argv)
         GCOptions options;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
-#ifndef __MINGW32__
             if (*arg == "--help")
                 showManPage("nix-collect-garbage");
-            else
-#endif
-                 if (*arg == "--version")
+            else if (*arg == "--version")
                 printVersion("nix-collect-garbage");
             else if (*arg == "--delete-old" || *arg == "-d") removeOld = true;
             else if (*arg == "--delete-older-than") {

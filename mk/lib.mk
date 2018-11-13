@@ -78,9 +78,9 @@ endif
 BUILD_DEBUG ?= 1
 
 ifeq ($(BUILD_DEBUG), 1)
-  GLOBAL_CFLAGS += -g
-  GLOBAL_CXXFLAGS += -g
-  GLOBAL_JAVACFLAGS += -g
+    GLOBAL_CFLAGS += -g
+    GLOBAL_CXXFLAGS += -g
+    GLOBAL_JAVACFLAGS += -g
 endif
 
 

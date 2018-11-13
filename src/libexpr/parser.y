@@ -264,11 +264,11 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %type <id> attr
 %token <id> ID ATTRPATH
 %token <e> STR IND_STR
-%token <n> INT
-%token <nf> FLOAT
+%token <n> INTX
+%token <nf> FLOATX
 %token <path> PATH HPATH SPATH
 %token <uri> URI
-%token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL OR_KW
+%token IF THEN ELSE ASSERT WITH LET INX REC INHERIT EQ NEQ AND OR IMPL OR_KW
 %token DOLLAR_CURLY /* == ${ */
 %token IND_STRING_OPEN IND_STRING_CLOSE
 %token ELLIPSIS
@@ -305,7 +305,7 @@ expr_function
     { $$ = new ExprAssert(CUR_POS, $2, $4); }
   | WITH expr ';' expr_function
     { $$ = new ExprWith(CUR_POS, $2, $4); }
-  | LET binds IN expr_function
+  | LET binds INX expr_function
     { if (!$2->dynamicAttrs.empty())
         throw ParseError(format("dynamic attributes not allowed in let at %1%")
             % CUR_POS);
@@ -367,8 +367,8 @@ expr_simple
       else
           $$ = new ExprVar(CUR_POS, data->symbols.create($1));
   }
-  | INT { $$ = new ExprInt($1); }
-  | FLOAT { $$ = new ExprFloat($1); }
+  | INTX { $$ = new ExprInt($1); }
+  | FLOATX { $$ = new ExprFloat($1); }
   | '"' string_parts '"' { $$ = $2; }
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
       $$ = stripIndentation(CUR_POS, data->symbols, *$2);
@@ -549,25 +549,32 @@ Expr * EvalState::parse(const char * text,
 
 Path resolveExprPath(Path path)
 {
-    assert(path[0] == '/');
-
+    assert(
+#ifdef __MINGW32__
+           ( path.length() >= 7 &&
+             path[0] == '\\' &&
+             path[1] == '\\' &&
+             (path[2] == '.' || path[2] == '?') &&
+             path[3] == '\\' &&
+             ('A' <= path[4] && path[4] <= 'Z') &&
+             path[5] == ':' &&
+             isslash(path[6])) ||
+           ( path.length() >= 3 &&
+             (('A' <= path[0] && path[0] <= 'Z') || ('a' <= path[0] && path[0] <= 'z')) &&
+             path[1] == ':' &&
+             isslash(path[2])) ||
+#endif
+           path[0] == '/'
+          );
     /* If `path' is a symlink, follow it.  This is so that relative
        path references work. */
-    struct stat st;
-    while (true) {
-#ifndef __MINGW32__
-        if (::lstat(path.c_str(), &st))
-            throw SysError(format("getting status of '%1%'") % path);
-        if (!S_ISLNK(st.st_mode)) break;
-#else
-        if (::stat(path.c_str(), &st))
-            throw SysError(format("getting status of '%1%'") % path);
-#endif
+
+    while (isLink(path)) {
         path = absPath(readLink(path), dirOf(path));
     }
 
     /* If `path' refers to a directory, append `/default.nix'. */
-    if (S_ISDIR(st.st_mode))
+    if (getFileType(path) == DT_DIR)
         path = canonPath(path + "/default.nix");
 
     return path;
@@ -600,8 +607,12 @@ Expr * EvalState::parseExprFromString(const string & s, const Path & basePath)
 
 Expr * EvalState::parseStdin()
 {
-    //Activity act(*logger, lvlTalkative, format("parsing standard input"));
-    return parseExprFromString(drainFD(0), absPath("."));
+#ifndef __MINGW32__
+    Activity act(*logger, lvlTalkative, format("parsing standard input"));
+    return parseExprFromString(drainFD(STDIN_FILENO), absPath("."));
+#else
+    return parseExprFromString(drainFD(GetStdHandle(STD_INPUT_HANDLE)), absPath("."));
+#endif
 }
 
 

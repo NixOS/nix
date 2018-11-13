@@ -9,7 +9,11 @@ nix-store --generate-binary-cache-key cache2.example.org $TEST_ROOT/sk2 $TEST_RO
 pk2=$(cat $TEST_ROOT/pk2)
 
 # Build a path.
-outPath=$(nix-build dependencies.nix --no-out-link --secret-key-files "$TEST_ROOT/sk1 $TEST_ROOT/sk2")
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    outPath=$(nix-build dependencies.nix --no-out-link --secret-key-files "$(cygpath -m $TEST_ROOT/sk1) $(cygpath -m $TEST_ROOT/sk2)")
+else
+    outPath=$(nix-build dependencies.nix --no-out-link --secret-key-files "$TEST_ROOT/sk1 $TEST_ROOT/sk2")
+fi
 
 # Verify that the path got signed.
 info=$(nix path-info --json $outPath)
@@ -63,17 +67,30 @@ nix verify $outPathCA
 nix verify $outPathCA --sigs-needed 1000
 
 # Copy to a binary cache.
-nix copy --to file://$cacheDir $outPath2
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    nix copy --to file://$(cygpath -m $cacheDir) $outPath2
+else
+    nix copy --to file://$cacheDir $outPath2
+fi
 
 # Verify that signatures got copied.
-info=$(nix path-info --store file://$cacheDir --json $outPath2)
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    info=$(nix path-info --store file://$(cygpath -m $cacheDir) --json $outPath2)
+else
+    info=$(nix path-info --store file://$cacheDir --json $outPath2)
+fi
 (! [[ $info =~ '"ultimate":true' ]])
 [[ $info =~ 'cache1.example.org' ]]
 (! [[ $info =~ 'cache2.example.org' ]])
 
 # Verify that adding a signature to a path in a binary cache works.
-nix sign-paths --store file://$cacheDir --key-file $TEST_ROOT/sk2 $outPath2
-info=$(nix path-info --store file://$cacheDir --json $outPath2)
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    nix sign-paths --store file://$(cygpath -m $cacheDir) --key-file $TEST_ROOT/sk2 $outPath2
+    info=$(nix path-info --store file://$(cygpath -m $cacheDir) --json $outPath2)
+else
+    nix sign-paths --store file://$cacheDir --key-file $TEST_ROOT/sk2 $outPath2
+    info=$(nix path-info --store file://$cacheDir --json $outPath2)
+fi
 [[ $info =~ 'cache1.example.org' ]]
 [[ $info =~ 'cache2.example.org' ]]
 

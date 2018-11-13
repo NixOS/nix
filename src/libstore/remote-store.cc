@@ -113,7 +113,7 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
         #endif
         , 0);
     if (!conn->fd)
-        throw SysError("cannot create Unix domain socket");
+        throw PosixError("cannot create Unix domain socket");
     closeOnExec(conn->fd.get());
 
     string socketPath = path ? *path : settings.nixDaemonSocketFile;
@@ -125,7 +125,7 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
     strcpy(addr.sun_path, socketPath.c_str());
 
     if (::connect(conn->fd.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
-        throw SysError(format("cannot connect to daemon at '%1%'") % socketPath);
+        throw PosixError(format("cannot connect to daemon at '%1%'") % socketPath);
 
     conn->from.fd = conn->fd.get();
     conn->to.fd = conn->fd.get();
@@ -135,7 +135,7 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
     initConnection(*conn);
 #else
     std::cerr << "TODO: UDSRemoteStore::openConnection()" << std::endl;
-    _exit(1);
+    _exit(110);
 #endif
     return conn;
 }
@@ -453,7 +453,7 @@ Path RemoteStore::addToStore(const string & name, const Path & _srcPath,
         }
         conn->to.warn = false;
         conn->processStderr();
-    } catch (SysError & e) {
+    } catch (PosixError & e) {
         /* Daemon closed while we were sending the path. Probably OOM
            or I/O error. */
         if (e.errNo == EPIPE)

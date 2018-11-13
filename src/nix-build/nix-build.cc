@@ -4,6 +4,9 @@
 #include <regex>
 #include <sstream>
 #include <vector>
+#ifdef __MINGW32__
+#include <boost/algorithm/string/predicate.hpp>
+#endif
 
 #include "store-api.hh"
 #include "globals.hh"
@@ -72,7 +75,11 @@ void mainWrapped(int argc, char * * argv)
     initGC();
 
     auto dryRun = false;
-    auto runEnv = std::regex_search(argv[0], std::regex("nix-shell$"));
+#ifndef __MINGW32__
+    bool runEnv = hasSuffix(argv[0], "nix-shell");
+#else
+    bool runEnv = boost::algorithm::iends_with(argv[0], "nix-shell.exe");
+#endif
     auto pure = false;
     auto fromArgs = false;
     auto packages = false;
@@ -137,9 +144,7 @@ void mainWrapped(int argc, char * * argv)
     MyArgs myArgs(myName, [&](Strings::iterator & arg, const Strings::iterator & end) {
         if (*arg == "--help") {
             deletePath(tmpDir);
-#ifndef __MINGW32__
             showManPage(myName);
-#endif
         }
 
         else if (*arg == "--version")
@@ -326,6 +331,7 @@ void mainWrapped(int argc, char * * argv)
     };
 
     if (runEnv) {
+#ifndef __MINGW32__
         if (drvs.size() != 1)
             throw UsageError("nix-shell requires a single derivation");
 
@@ -446,12 +452,16 @@ void mainWrapped(int argc, char * * argv)
         environ = envPtrs.data();
 
         auto argPtrs = stringsToCharPtrs(args);
-#ifndef __MINGW32__
+
         restoreSignals();
-#endif
+
         execvp(shell.c_str(), argPtrs.data());
 
-        throw SysError("executing shell '%s'", shell);
+        throw PosixError("executing shell '%s'", shell);
+#else
+        std::cerr << "TODO: nix-shell" << std::endl;
+        _exit(1);
+#endif
     }
 
     else {
@@ -499,7 +509,7 @@ void mainWrapped(int argc, char * * argv)
                 store2->addPermRoot(symlink.second, absPath(symlink.first), true);
 
         for (auto & path : outPaths)
-            std::cout << path << '\n';
+            std::cout << path << std::endl;
     }
 }
 

@@ -68,16 +68,22 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_)
             auto narAccessor = makeLazyNarAccessor(listing,
                 [cacheFile](uint64_t offset, uint64_t length) {
 
-                    AutoCloseFD fd = open(cacheFile.c_str(), O_RDONLY
 #ifndef __MINGW32__
-					                    | O_CLOEXEC
-#endif
-					                    );
+                    AutoCloseFD fd = open(cacheFile.c_str(), O_RDONLY | O_CLOEXEC);
                     if (!fd)
-                        throw SysError("opening NAR cache file '%s'", cacheFile);
+                        throw PosixError("opening NAR cache file '%s'", cacheFile);
 
                     if (lseek(fd.get(), offset, SEEK_SET) != (off_t) offset)
-                        throw SysError("seeking in '%s'", cacheFile);
+                        throw PosixError("seeking in '%s'", cacheFile);
+#else
+                    AutoCloseWindowsHandle fd = CreateFileW(pathW(cacheFile).c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+                    if (fd.get() == INVALID_HANDLE_VALUE)
+                        throw WinError("CreateFileW when RemoteFSAccessor::fetch '%1%'", cacheFile);
+
+                    LARGE_INTEGER newOffset;
+                    if (!SetFilePointerEx(fd.get(), {offset}, &newOffset, FILE_BEGIN) || offset != newOffset.QuadPart)
+                        throw WinError("CreateFileW when RemoteFSAccessor::fetch '%1%'", cacheFile);
+#endif
 
                     std::string buf(length, 0);
                     readFull(fd.get(), (unsigned char *) buf.data(), length);

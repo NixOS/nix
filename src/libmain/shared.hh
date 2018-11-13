@@ -84,10 +84,11 @@ struct LegacyArgs : public MixCommonArgs
     bool processArgs(const Strings & args, bool finish) override;
 };
 
-#ifndef __MINGW32__
+
 /* Show the manual page for the specified program. */
 void showManPage(const string & name);
 
+#ifndef __MINGW32__
 /* The constructor of this class starts a pager if stdout is a
    terminal and $PAGER is set. Stdout is redirected to the pager. */
 class RunPager

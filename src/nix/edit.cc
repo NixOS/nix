@@ -74,7 +74,7 @@ struct CmdEdit : InstallableCommand
 
         execvp(args.front().c_str(), stringsToCharPtrs(args).data());
 
-        throw SysError("cannot run editor '%s'", editor);
+        throw PosixError("cannot run editor '%s'", editor);
     }
 };
 

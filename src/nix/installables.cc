@@ -206,7 +206,7 @@ static std::vector<std::shared_ptr<Installable>> parseInstallables(
         if (s.compare(0, 1, "(") == 0)
             result.push_back(std::make_shared<InstallableExpr>(cmd, s));
 
-        else if (s.find("/") != std::string::npos) {
+        else if (s.find('/') != std::string::npos) {
 
             auto path = store->toStorePath(store->followLinksToStore(s));
 

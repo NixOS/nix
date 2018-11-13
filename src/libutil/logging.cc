@@ -78,7 +78,11 @@ void warnOnce(bool & haveWarned, const FormatOrString & fs)
 void writeToStderr(const string & s)
 {
     try {
+#ifndef __MINGW32__
         writeFull(STDERR_FILENO, s, false);
+#else
+        writeFull(GetStdHandle(STD_ERROR_HANDLE), s, false);
+#endif
     } catch (SysError & e) {
         /* Ignore failing writes to stderr.  We need to ignore write
            errors to ensure that cleanup code that logs to stderr runs

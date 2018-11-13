@@ -1,5 +1,10 @@
 # Test the `--timeout' option.
 
+# sometimes fails when run via "make installcheck"
+#if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+#    exit 99
+#fi
+
 source common.sh
 
 failed=0

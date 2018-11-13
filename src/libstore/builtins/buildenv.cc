@@ -16,18 +16,21 @@ static Priorities priorities;
 static unsigned long symlinks;
 
 /* For each activated package, create symlinks */
+// TODO: make Windows native version
 static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
 {
     DirEntries srcFiles;
 
     try {
         srcFiles = readDirectory(srcDir);
-    } catch (SysError & e) {
+    } catch (PosixError & e) {
         if (e.errNo == ENOTDIR) {
             printError("warning: not including '%s' in the user environment because it's not a directory", srcDir);
             return;
         }
         throw;
+    } catch (WinError & e) {
+        throw e; // TODO
     }
 
     for (const auto & ent : srcFiles) {
@@ -40,13 +43,15 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
         struct stat srcSt;
         try {
             if (stat(srcFile.c_str(), &srcSt) == -1)
-                throw SysError("getting status of '%1%'", srcFile);
-        } catch (SysError & e) {
+                throw PosixError("getting status-4 of '%1%'", srcFile);
+        } catch (PosixError & e) {
             if (e.errNo == ENOENT || e.errNo == ENOTDIR) {
                 printError("warning: skipping dangling symlink '%s'", dstFile);
                 continue;
             }
             throw;
+        } catch (WinError & e) {
+            throw e; // TODO
         }
 
         /* The files below are special-cased to that they don't show up
@@ -63,48 +68,36 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
             continue;
 
         else if (S_ISDIR(srcSt.st_mode)) {
-            struct stat dstSt;
-#ifndef __MINGW32__
-            auto res = lstat(dstFile.c_str(), &dstSt);
-#else
-            auto res = stat(dstFile.c_str(), &dstSt);
-#endif
-            if (res == 0) {
-                if (S_ISDIR(dstSt.st_mode)) {
+            unsigned char dt = getFileType(dstFile);
+
+            if (dt != DT_UNKNOWN) {
+                if (dt == DT_DIR) {
                     createLinks(srcFile, dstFile, priority);
                     continue;
-#ifndef __MINGW32__
-                } else if (S_ISLNK(dstSt.st_mode)) {
+                } else if (dt == DT_LNK) {
                     auto target = canonPath(dstFile, true);
-                    if (!S_ISDIR(lstat(target).st_mode))
+                    if (getFileType(target) != DT_DIR)
                         throw Error("collision between '%1%' and non-directory '%2%'", srcFile, target);
                     if (unlink(dstFile.c_str()) == -1)
-                        throw SysError(format("unlinking '%1%'") % dstFile);
+                        throw PosixError(format("unlinking '%1%'") % dstFile);
                     if (mkdir(dstFile.c_str()
 #ifndef __MINGW32__
                                 , 0755
 #endif
                                 ) == -1)
-                        throw SysError(format("creating directory '%1%'"));
+                        throw PosixError(format("creating directory '%1%'"));
                     createLinks(target, dstFile, priorities[dstFile]);
                     createLinks(srcFile, dstFile, priority);
                     continue;
-#endif
                 }
-            } else if (errno != ENOENT)
-                throw SysError(format("getting status of '%1%'") % dstFile);
+            } //else if (errno != ENOENT)
+                //throw PosixError(format("getting status-5 of '%1%'") % dstFile);
         }
 
         else {
-            struct stat dstSt;
-#ifndef __MINGW32__
-            auto res = lstat(dstFile.c_str(), &dstSt);
-#else
-            auto res = stat(dstFile.c_str(), &dstSt);
-#endif
-            if (res == 0) {
-#ifndef __MINGW32__
-                if (S_ISLNK(dstSt.st_mode)) {
+            unsigned char dt = getFileType(dstFile);
+            if (dt != DT_UNKNOWN) {
+                if (dt == DT_LNK) {
                     auto prevPriority = priorities[dstFile];
                     if (prevPriority == priority)
                         throw Error(
@@ -116,13 +109,12 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
                     if (prevPriority < priority)
                         continue;
                     if (unlink(dstFile.c_str()) == -1)
-                        throw SysError(format("unlinking '%1%'") % dstFile);
+                        throw PosixError(format("unlinking '%1%'") % dstFile);
                 } else
-#endif
-                if (S_ISDIR(dstSt.st_mode))
+                if (dt == DT_DIR)
                     throw Error("collision between non-directory '%1%' and directory '%2%'", srcFile, dstFile);
-            } else if (errno != ENOENT)
-                throw SysError(format("getting status of '%1%'") % dstFile);
+            } //else if (errno != ENOENT)
+                //throw PosixError(format("getting status-6 of '%1%'") % dstFile);
         }
 
         createSymlink(srcFile, dstFile);
@@ -149,8 +141,10 @@ static void addPkg(const Path & pkgDir, int priority)
                 readFile(pkgDir + "/nix-support/propagated-user-env-packages"), " \n"))
             if (!done.count(p))
                 postponed.insert(p);
-    } catch (SysError & e) {
+    } catch (PosixError & e) {
         if (e.errNo != ENOENT && e.errNo != ENOTDIR) throw;
+    } catch (WinError & e) {
+        throw e; // TODO
     }
 }
 

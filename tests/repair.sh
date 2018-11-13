@@ -1,5 +1,9 @@
 source common.sh
 
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    cacheDir=$(cygpath -m $cacheDir)
+fi
+
 clearStore
 
 path=$(nix-build dependencies.nix -o $TEST_ROOT/result)

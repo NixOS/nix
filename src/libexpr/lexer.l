@@ -87,8 +87,8 @@ static Expr * unescapeStr(SymbolTable & symbols, const char * s, size_t length)
 
 ANY         .|\n
 ID          [a-zA-Z\_][a-zA-Z0-9\_\'\-]*
-INT         [0-9]+
-FLOAT       (([1-9][0-9]*\.[0-9]*)|(0?\.[0-9]+))([Ee][+-]?[0-9]+)?
+INTX        [0-9]+
+FLOATX      (([1-9][0-9]*\.[0-9]*)|(0?\.[0-9]+))([Ee][+-]?[0-9]+)?
 PATH        [a-zA-Z0-9\.\_\-\+]*(\/[a-zA-Z0-9\.\_\-\+]+)+\/?
 HPATH       \~(\/[a-zA-Z0-9\.\_\-\+]+)+\/?
 SPATH       \<[a-zA-Z0-9\.\_\-\+]+(\/[a-zA-Z0-9\.\_\-\+]+)*\>
@@ -106,7 +106,7 @@ else        { return ELSE; }
 assert      { return ASSERT; }
 with        { return WITH; }
 let         { return LET; }
-in          { return IN; }
+in          { return INX; }
 rec         { return REC; }
 inherit     { return INHERIT; }
 or          { return OR_KW; }
@@ -123,17 +123,17 @@ or          { return OR_KW; }
 \+\+        { return CONCAT; }
 
 {ID}        { yylval->id = strdup(yytext); return ID; }
-{INT}       { errno = 0;
+{INTX}      { errno = 0;
               yylval->n = strtol(yytext, 0, 10);
               if (errno != 0)
                   throw ParseError(format("invalid integer '%1%'") % yytext);
-              return INT;
+              return INTX;
             }
-{FLOAT}     { errno = 0;
+{FLOATX}    { errno = 0;
               yylval->nf = strtod(yytext, 0);
               if (errno != 0)
                   throw ParseError(format("invalid float '%1%'") % yytext);
-              return FLOAT;
+              return FLOATX;
             }
 
 \$\{        { PUSH_STATE(INSIDE_DOLLAR_CURLY); return DOLLAR_CURLY; }

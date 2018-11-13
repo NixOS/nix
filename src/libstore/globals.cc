@@ -13,13 +13,14 @@
 
 namespace nix {
 
-
+#ifndef __MINGW32__
 /* The default location of the daemon socket, relative to nixStateDir.
    The socket is in a directory to allow you to control access to the
    Nix daemon by setting the mode/ownership of the directory
    appropriately.  (This wouldn't work on the socket itself since it
    must be deleted and recreated on startup.) */
 #define DEFAULT_SOCKET_PATH "/daemon-socket/socket"
+#endif
 
 /* chroot-like behavior from Apple's sandbox */
 #if __APPLE__
@@ -42,8 +43,19 @@ Settings::Settings()
     , nixLibexecDir(canonPath(getEnv("NIX_LIBEXEC_DIR", NIX_LIBEXEC_DIR)))
     , nixBinDir(canonPath(getEnv("NIX_BIN_DIR", NIX_BIN_DIR)))
     , nixManDir(canonPath(NIX_MAN_DIR))
+#ifndef __MINGW32__
     , nixDaemonSocketFile(canonPath(nixStateDir + DEFAULT_SOCKET_PATH))
+#endif
 {
+//  fprintf(stderr, "NixStore=%s\n", nixStore.c_str());
+//  fprintf(stderr, "NixDataDir=%s\n", nixDataDir.c_str());
+//  fprintf(stderr, "NixLogDir=%s\n", nixLogDir.c_str());
+//  fprintf(stderr, "NixStateDir=%s\n", nixStateDir.c_str());
+//  fprintf(stderr, "NixConfDir=%s\n", nixConfDir.c_str());
+//  fprintf(stderr, "NixLibexecDir=%s\n", nixLibexecDir.c_str());
+//  fprintf(stderr, "NixBinDir=%s\n", nixBinDir.c_str());
+//  fprintf(stderr, "NixManDir=%s\n", nixManDir.c_str());
+
 #ifndef __MINGW32__
     buildUsersGroup = getuid() == 0 ? "nixbld" : "";
 #endif
@@ -51,7 +63,13 @@ Settings::Settings()
 
     caFile = getEnv("NIX_SSL_CERT_FILE", getEnv("SSL_CERT_FILE", ""));
     if (caFile == "") {
-        for (auto & fn : {"/etc/ssl/certs/ca-certificates.crt", "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})
+        for (auto & fn : {
+#ifndef __MINGW32__
+                          "/etc/ssl/certs/ca-certificates.crt",
+#else
+                          "C:/msys64/usr/ssl/certs/ca-bundle.crt", // BUGBUG!!!
+#endif
+                          "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})
             if (pathExists(fn)) {
                 caFile = fn;
                 break;

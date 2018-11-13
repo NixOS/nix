@@ -56,14 +56,14 @@ void detectStackOverflow()
     stack.ss_sp = stackBuf->data();
     if (!stack.ss_sp) throw Error("cannot allocate alternative stack");
     stack.ss_flags = 0;
-    if (sigaltstack(&stack, 0) == -1) throw SysError("cannot set alternative stack");
+    if (sigaltstack(&stack, 0) == -1) throw PosixError("cannot set alternative stack");
 
     struct sigaction act;
     sigfillset(&act.sa_mask);
     act.sa_sigaction = sigsegvHandler;
     act.sa_flags = SA_SIGINFO | SA_ONSTACK;
     if (sigaction(SIGSEGV, &act, 0))
-        throw SysError("resetting SIGCHLD");
+        throw PosixError("resetting SIGCHLD");
 #endif
 }
 

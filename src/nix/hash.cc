@@ -40,7 +40,7 @@ struct CmdHash : Command
     void run() override
     {
         for (auto path : paths) {
-            Hash h = mode == mFile ? hashFile(ht, path) : hashPath(ht, path).first;
+            Hash h = mode == mFile ? hashFile(ht, absPath(path)) : hashPath(ht, absPath(path)).first;
             if (truncate && h.hashSize > 20) h = compressHash(h, 20);
             std::cout << format("%1%\n") %
                 h.to_string(base, false);
@@ -102,12 +102,9 @@ static int compatNixHash(int argc, char * * argv)
     std::vector<std::string> ss;
 
     parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
-#ifndef __MINGW32__
         if (*arg == "--help")
             showManPage("nix-hash");
-        else
-#endif
-             if (*arg == "--version")
+        else if (*arg == "--version")
             printVersion("nix-hash");
         else if (*arg == "--flat") flat = true;
         else if (*arg == "--base32") base32 = true;

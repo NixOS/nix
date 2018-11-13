@@ -17,12 +17,9 @@ int main(int argc, char ** argv)
         PathSet storePaths;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
-#ifndef __MINGW32__
             if (*arg == "--help")
                 showManPage("nix-copy-closure");
-            else
-#endif
-                 if (*arg == "--version")
+            else if (*arg == "--version")
                 printVersion("nix-copy-closure");
             else if (*arg == "--gzip" || *arg == "--bzip2" || *arg == "--xz") {
                 if (*arg != "--gzip")

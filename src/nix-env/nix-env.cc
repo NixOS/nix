@@ -148,7 +148,7 @@ static void loadSourceExpr(EvalState & state, const Path & path, Value & v)
 {
     struct stat st;
     if (stat(path.c_str(), &st) == -1)
-        throw SysError(format("getting information about '%1%'") % path);
+        throw PosixError(format("getting information about '%1%'") % path);
 
     if (isNixExpr(path, st))
         state.evalFile(path, v);
@@ -979,8 +979,8 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         return;
     }
 
-    bool tty = isatty(STDOUT_FILENO);
 #ifndef __MINGW32__
+    bool tty = isatty(STDOUT_FILENO);
     RunPager pager;
 #endif
     Table table;
@@ -1055,8 +1055,10 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                     }
                 } else {
                     string column = (string) "" + ch + " " + version;
+#ifndef __MINGW32__
                     if (diff == cvGreater && tty)
                         column = ANSI_RED + column + ANSI_NORMAL;
+#endif
                     columns.push_back(column);
                 }
             }
@@ -1341,12 +1343,10 @@ int main(int argc, char * * argv)
 
         MyArgs myArgs(baseNameOf(argv[0]), [&](Strings::iterator & arg, const Strings::iterator & end) {
             Operation oldOp = op;
-#ifndef __MINGW32__
+
             if (*arg == "--help")
                 showManPage("nix-env");
-            else
-#endif
-                 if (*arg == "--version")
+            else if (*arg == "--version")
                 op = opVersion;
             else if (*arg == "--install" || *arg == "-i")
                 op = opInstall;

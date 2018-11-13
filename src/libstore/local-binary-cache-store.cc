@@ -38,8 +38,11 @@ protected:
     {
         try {
             readFile(binaryCacheDir + "/" + path, sink);
-        } catch (SysError & e) {
+        } catch (PosixError & e) {
             if (e.errNo == ENOENT)
+                throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache", path);
+        } catch (WinError & e) {
+            if (e.lastError == ERROR_FILE_NOT_FOUND)
                 throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache", path);
         }
     }
@@ -71,8 +74,13 @@ static void atomicWrite(const Path & path, const std::string & s)
     Path tmp = path + ".tmp." + std::to_string(getpid());
     AutoDelete del(tmp, false);
     writeFile(tmp, s);
+#ifndef __MINGW32__
     if (rename(tmp.c_str(), path.c_str()))
-        throw SysError(format("renaming '%1%' to '%2%'") % tmp % path);
+        throw PosixError(format("renaming '%1%' to '%2%'") % tmp % path);
+#else
+    if (!MoveFileExW(pathW(tmp).c_str(), pathW(path).c_str(), MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))
+        throw WinError("MoveFileExW in atomicWrite '%1%' to '%2%'", tmp, path);
+#endif
     del.cancel();
 }
 

@@ -17,8 +17,8 @@ rec {
     dep2 = dep2;
     builder = builtins.toFile "builder.sh" ''
       mkdir $out
-      ln -s $dep1/file1 $out/file1
-      ln -s $dep2/file2 $out/file2
+      nix ln $dep1/file1 $out/file1
+      nix ln $dep2/file2 $out/file2
     '';
   };
 
@@ -27,7 +27,7 @@ rec {
     inherit deps;
     builder = builtins.toFile "builder.sh" ''
       mkdir $out
-      ln -s $deps $out/depdir1
+      nix ln $deps $out/depdir1
     '';
     allowedRequisites = allowreqs;
   };
@@ -44,14 +44,14 @@ rec {
   test6 = mkDerivation {
     name = "check-reqs";
     inherit deps;
-    builder = builtins.toFile "builder.sh" "mkdir $out; ln -s $deps $out/depdir1";
+    builder = builtins.toFile "builder.sh" "mkdir $out; nix ln $deps $out/depdir1";
     disallowedRequisites = [dep1];
   };
 
   test7 = mkDerivation {
     name = "check-reqs";
     inherit deps;
-    builder = builtins.toFile "builder.sh" "mkdir $out; ln -s $deps $out/depdir1";
+    builder = builtins.toFile "builder.sh" "mkdir $out; nix ln $deps $out/depdir1";
     disallowedRequisites = [test1];
   };
 }

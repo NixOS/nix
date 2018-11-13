@@ -1,5 +1,9 @@
 source common.sh
 
+if [[ "$(uname)" =~ ^MINGW|^MSYS ]]; then
+    exit 99
+fi
+
 echo "building test path"
 storePath="$(nix-build nar-access.nix -A a --no-out-link)"
 

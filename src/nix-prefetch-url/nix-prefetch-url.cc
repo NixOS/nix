@@ -64,12 +64,9 @@ int main(int argc, char * * argv)
         };
 
         MyArgs myArgs(baseNameOf(argv[0]), [&](Strings::iterator & arg, const Strings::iterator & end) {
-#ifndef __MINGW32__
             if (*arg == "--help")
                 showManPage("nix-prefetch-url");
-            else
-#endif
-                 if (*arg == "--version")
+            else if (*arg == "--version")
                 printVersion("nix-prefetch-url");
             else if (*arg == "--type") {
                 string s = getArg(*arg, arg, end);
@@ -172,8 +169,15 @@ int main(int argc, char * * argv)
 
             /* Download the file. */
             {
+#ifndef __MINGW32__
                 AutoCloseFD fd = open(tmpFile.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
-                if (!fd) throw SysError("creating temporary file '%s'", tmpFile);
+                if (!fd) throw PosixError("creating temporary file '%s'", tmpFile);
+#else
+                AutoCloseWindowsHandle fd = CreateFileW(pathW(tmpFile).c_str(), GENERIC_WRITE, 0, NULL, CREATE_NEW,
+                                                        FILE_ATTRIBUTE_NORMAL | FILE_FLAG_POSIX_SEMANTICS, NULL);
+                if (fd.get() == INVALID_HANDLE_VALUE)
+                    throw WinError("CreateFileW '%1%'", tmpFile);
+#endif
 
                 FdSink sink(fd.get());
 
@@ -188,10 +192,10 @@ int main(int argc, char * * argv)
                 Path unpacked = (Path) tmpDir + "/unpacked";
                 createDirs(unpacked);
                 if (hasSuffix(baseNameOf(uri), ".zip"))
-                    runProgram("unzip", true, {"-qq", tmpFile, "-d", unpacked});
+                    runProgramGetStdout("unzip", true, {"-qq", tmpFile, "-d", unpacked});
                 else
                     // FIXME: this requires GNU tar for decompression.
-                    runProgram("tar", true, {"xf", tmpFile, "-C", unpacked});
+                    runProgramGetStdout("tar", true, {"xf", tmpFile, "-C", unpacked});
 
                 /* If the archive unpacks to a single file/directory, then use
                    that as the top-level. */

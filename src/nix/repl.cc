@@ -278,14 +278,14 @@ static int runProgram(const string & program, const Strings & args)
 {
 #ifdef __MINGW32__
     std::cerr << "runProgram " << program << /*" " << args <<*/ std::endl;
-    _exit(1);
+    _exit(118);
 #else
     Strings args2(args);
     args2.push_front(program);
 
     Pid pid;
     pid = fork();
-    if (pid == -1) throw SysError("forking");
+    if (pid == -1) throw PosixError("forking");
     if (pid == 0) {
         restoreAffinity();
         execvp(program.c_str(), stringsToCharPtrs(args2).data());
@@ -295,6 +295,7 @@ static int runProgram(const string & program, const Strings & args)
     return pid.wait();
 #endif
 }
+
 
 
 bool isVarName(const string & s)

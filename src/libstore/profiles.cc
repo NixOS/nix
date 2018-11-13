@@ -34,7 +34,7 @@ static int parseName(const string & profileName, const string & name)
 }
 
 
-
+// TODO: make a Windows native
 Generations findGenerations(Path profile, int & curGen)
 {
     Generations gens;
@@ -54,7 +54,7 @@ Generations findGenerations(Path profile, int & curGen)
 #else
             if (stat(gen.path.c_str(), &st) != 0)
 #endif
-                throw SysError(format("statting '%1%'") % gen.path);
+                throw PosixError(format("statting '%1%'") % gen.path);
             gen.creationTime = st.st_mtime;
             gens.push_back(gen);
         }
@@ -121,7 +121,7 @@ Path createGeneration(ref<LocalFSStore> store, Path profile, Path outPath)
 static void removeFile(const Path & path)
 {
     if (remove(path.c_str()) == -1)
-        throw SysError(format("cannot unlink '%1%'") % path);
+        throw PosixError(format("cannot unlink '%1%'") % path);
 }
 
 
