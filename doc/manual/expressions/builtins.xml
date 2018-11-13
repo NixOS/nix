@@ -1480,7 +1480,7 @@ stdenv.mkDerivation (rec {
   builder = builtins.toFile "builder.sh" "
     source $stdenv/setup
     mkdir $out
-    echo $servlets | xsltproc ${stylesheet} - > $out/server-conf.xml]]> <co xml:id='ex-toxml-co-apply' /> <![CDATA[
+    echo "$servlets" | xsltproc ${stylesheet} - > $out/server-conf.xml]]> <co xml:id='ex-toxml-co-apply' /> <![CDATA[
   ";
 
   stylesheet = builtins.toFile "stylesheet.xsl"]]> <co xml:id='ex-toxml-co-stylesheet' /> <![CDATA[
