@@ -936,7 +936,8 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
                 throw SysError("setting death signal");
 #endif
             restoreAffinity();
-            restoreMountNamespace();
+            if (options.restoreMountNamespace)
+                restoreMountNamespace();
             fun();
         } catch (std::exception & e) {
             try {
