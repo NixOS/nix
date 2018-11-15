@@ -61,10 +61,13 @@ elif [ -e /etc/ssl/certs/ca-bundle.crt ]; then # Old NixOS
     export NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
 elif [ -e /etc/pki/tls/certs/ca-bundle.crt ]; then # Fedora, CentOS
     export NIX_SSL_CERT_FILE=/etc/pki/tls/certs/ca-bundle.crt
-elif [ -e "$NIX_USER_PROFILE_DIR/etc/ssl/certs/ca-bundle.crt" ]; then # fall back to cacert in the user's Nix profile
-    export NIX_SSL_CERT_FILE=$NIX_USER_PROFILE_DIR/etc/ssl/certs/ca-bundle.crt
-elif [ -e "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt" ]; then # fall back to cacert in the default Nix profile
-    export NIX_SSL_CERT_FILE=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt
+else
+  # Fall back to what is in the nix profiles, favouring whatever is defined last.
+  for i in $NIX_PROFILES; do
+    if [ -e $i/etc/ssl/certs/ca-bundle.crt ]; then
+      export NIX_SSL_CERT_FILE=$i/etc/ssl/certs/ca-bundle.crt
+    fi
+  done
 fi
 
 export NIX_PATH="nixpkgs=@localstatedir@/nix/profiles/per-user/root/channels/nixpkgs:@localstatedir@/nix/profiles/per-user/root/channels"
