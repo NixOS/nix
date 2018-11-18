@@ -204,8 +204,6 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
     createDirs(dirOf(historyFile));
     el_hist_size = 1000;
     read_history(historyFile.c_str());
-    // rl_initialize();
-    // linenoiseSetCompletionCallback(completionCallback);
     curRepl = this;
     rl_set_complete_func(completionCallback);
     rl_set_list_possib_func(listPossibleCallback);
