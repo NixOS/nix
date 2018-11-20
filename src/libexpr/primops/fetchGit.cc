@@ -3,6 +3,7 @@
 #include "download.hh"
 #include "store-api.hh"
 #include "pathlocks.hh"
+#include "hash.hh"
 
 #include <sys/time.h>
 
@@ -84,9 +85,10 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     if (rev != "" && !std::regex_match(rev, revRegex))
         throw Error("invalid Git revision '%s'", rev);
 
-    Path cacheDir = getCacheDir() + "/nix/git";
+    Path cacheDir = getCacheDir() + "/nix/gitv2/" + hashString(htSHA256, uri).to_string(Base32, false);
 
     if (!pathExists(cacheDir)) {
+        createDirs(dirOf(cacheDir));
         runProgram("git", true, { "init", "--bare", cacheDir });
     }
 
