@@ -57,13 +57,13 @@ $ NIX_SECRET_KEY_FILE=/path/to/secret/key nix-serve -p 8080
 </para>
 
 <para>On the client side, you can tell Nix to use your binary cache
-using <option>--option extra-binary-caches</option>, e.g.:
+using <option>--option extra-substituters</option>, e.g.:
 
 <screen>
-$ nix-env -i firefox --option extra-binary-caches http://avalon:8080/
+$ nix-env -i firefox --option extra-substituters http://avalon:8080/
 </screen>
 
-The option <option>extra-binary-caches</option> tells Nix to use this
+The option <option>extra-substituters</option> tells Nix to use this
 binary cache in addition to your default caches, such as
 <uri>https://cache.nixos.org</uri>. Thus, for any path in the closure
 of Firefox, Nix will first check if the path is available on the
@@ -75,15 +75,19 @@ a line to the <filename linkend="sec-conf-file">nix.conf</filename>
 configuration file like this:
 
 <programlisting>
-binary-caches = http://avalon:8080/ https://cache.nixos.org/
-</programlisting>
+substituters = http://avalon:8080/ https://cache.nixos.org/
+</programlisting></para>
 
-If <option linkend="conf-require-sigs">require-sigs</option> is set to true (the default) you
+<para>Remember only trusted users can use the options <option linkend="conf-extra-substituters">extra-substituters</option>
+or <option linkend="conf-substituters">substituters</option> on the command line, if you don't
+add the binary cache to <option linkend="conf-substituters">substituters</option> or
+<option linkend="conf-extra-substituters">extra-substituters</option> in <filename linkend="sec-conf-file">nix.conf</filename>.</para>
+
+<para>If <option linkend="conf-require-sigs">require-sigs</option> is set to true (the default) you
 need to add the corresponding public key to
 <option linkend="conf-trusted-public-keys">trusted-public-keys</option> or the secret key
 used above to <option linkend="conf-secret-key-files">secret-key-files</option> in your
-<filename linkend="sec-conf-file">nix.conf</filename>.
+<filename linkend="sec-conf-file">nix.conf</filename>.</para>
 
-</para>
 
 </section>
