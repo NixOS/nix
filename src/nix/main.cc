@@ -104,10 +104,15 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             "--help-config' for a list of configuration settings.\n";
     }
 
+    void printHelp(const string & programName, std::ostream & out)
+    {
+        MultiCommand::printHelp(programName, out);
+        std::cout << "\nNote: this program is EXPERIMENTAL and subject to change.\n";
+    }
+
     void showHelpAndExit()
     {
         printHelp(programName, std::cout);
-        std::cout << "\nNote: this program is EXPERIMENTAL and subject to change.\n";
         throw Exit();
     }
 };
