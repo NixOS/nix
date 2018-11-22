@@ -173,7 +173,7 @@ public:
 
     std::shared_ptr<Command> command;
 
-    MultiCommand(const Commands & commands);
+    MultiCommand(const std::vector<ref<Command>> & commands);
 
     void printHelp(const string & programName, std::ostream & out) override;
 
@@ -185,12 +185,12 @@ public:
 /* A helper class for registering commands globally. */
 struct RegisterCommand
 {
-    static Commands * commands;
+    static std::vector<ref<Command>> * commands;
 
     RegisterCommand(ref<Command> command)
     {
-        if (!commands) commands = new Commands;
-        commands->emplace(command->name(), command);
+        if (!commands) commands = new std::vector<ref<Command>>;
+        commands->push_back(command);
     }
 };
 

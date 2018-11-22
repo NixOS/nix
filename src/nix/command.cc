@@ -4,7 +4,7 @@
 
 namespace nix {
 
-Commands * RegisterCommand::commands = 0;
+std::vector<ref<Command>> * RegisterCommand::commands = 0;
 
 void Command::printHelp(const string & programName, std::ostream & out)
 {
@@ -21,9 +21,11 @@ void Command::printHelp(const string & programName, std::ostream & out)
     }
 }
 
-MultiCommand::MultiCommand(const Commands & _commands)
-    : commands(_commands)
+MultiCommand::MultiCommand(const std::vector<ref<Command>> & _commands)
 {
+    for (auto & command : _commands)
+        commands.emplace(command->name(), command);
+
     expectedArgs.push_back(ExpectedArg{"command", 1, true, [=](std::vector<std::string> ss) {
         assert(!command);
         auto i = commands.find(ss[0]);
