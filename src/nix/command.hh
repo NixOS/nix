@@ -11,29 +11,6 @@ struct Value;
 class Bindings;
 class EvalState;
 struct Pos;
-
-/* A command is an argument parser that can be executed by calling its
-   run() method. */
-struct Command : virtual Args
-{
-    virtual ~Command() { }
-    virtual std::string name() = 0;
-    virtual void prepare() { };
-    virtual void run() = 0;
-
-    struct Example
-    {
-        std::string description;
-        std::string command;
-    };
-
-    typedef std::list<Example> Examples;
-
-    virtual Examples examples() { return Examples(); }
-
-    void printHelp(const string & programName, std::ostream & out) override;
-};
-
 class Store;
 
 /* A command that requires a Nix store. */
@@ -169,26 +146,6 @@ struct StorePathCommand : public InstallablesCommand
     virtual void run(ref<Store> store, const Path & storePath) = 0;
 
     void run(ref<Store> store) override;
-};
-
-typedef std::map<std::string, ref<Command>> Commands;
-
-/* An argument parser that supports multiple subcommands,
-   i.e. ‘<command> <subcommand>’. */
-class MultiCommand : virtual Args
-{
-public:
-    Commands commands;
-
-    std::shared_ptr<Command> command;
-
-    MultiCommand(const std::vector<ref<Command>> & commands);
-
-    void printHelp(const string & programName, std::ostream & out) override;
-
-    bool processFlag(Strings::iterator & pos, Strings::iterator end) override;
-
-    bool processArgs(const Strings & args, bool finish) override;
 };
 
 /* A helper class for registering commands globally. */

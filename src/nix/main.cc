@@ -107,6 +107,11 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
     void printHelp(const string & programName, std::ostream & out)
     {
         MultiCommand::printHelp(programName, out);
+
+#if 0
+        out << "\nFor full documentation, run 'man " << programName << "' or 'man " << programName << "-<COMMAND>'.\n";
+#endif
+
         std::cout << "\nNote: this program is EXPERIMENTAL and subject to change.\n";
     }
 
