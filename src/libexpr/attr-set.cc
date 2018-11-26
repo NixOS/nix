@@ -43,6 +43,12 @@ Value * EvalState::allocAttr(Value & vAttrs, const Symbol & name)
 }
 
 
+Value * EvalState::allocAttr(Value & vAttrs, const std::string & name)
+{
+    return allocAttr(vAttrs, symbols.create(name));
+}
+
+
 void Bindings::sort()
 {
     std::sort(begin(), end());

@@ -264,6 +264,7 @@ public:
     Env & allocEnv(size_t size);
 
     Value * allocAttr(Value & vAttrs, const Symbol & name);
+    Value * allocAttr(Value & vAttrs, const std::string & name);
 
     Bindings * allocBindings(size_t capacity);
 
