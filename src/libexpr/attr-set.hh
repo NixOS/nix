@@ -4,6 +4,7 @@
 #include "symbol-table.hh"
 
 #include <algorithm>
+#include <optional>
 
 namespace nix {
 
@@ -61,6 +62,14 @@ public:
         iterator i = std::lower_bound(begin(), end(), key);
         if (i != end() && i->name == name) return i;
         return end();
+    }
+
+    std::optional<Attr *> get(const Symbol & name)
+    {
+        Attr key(name, 0);
+        iterator i = std::lower_bound(begin(), end(), key);
+        if (i != end() && i->name == name) return &*i;
+        return {};
     }
 
     iterator begin() { return &attrs[0]; }
