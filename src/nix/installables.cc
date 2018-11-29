@@ -26,47 +26,12 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
 {
     if (vSourceExpr) return vSourceExpr;
 
-    auto sToplevel = state.symbols.create("_toplevel");
-
     vSourceExpr = state.allocValue();
 
     if (file != "")
         state.evalFile(lookupFileArg(state, file), *vSourceExpr);
-
-    else {
-
-        /* Construct the installation source from $NIX_PATH. */
-
-        auto searchPath = state.getSearchPath();
-
-        state.mkAttrs(*vSourceExpr, searchPath.size() + 1);
-
-        mkBool(*state.allocAttr(*vSourceExpr, sToplevel), true);
-
-        std::unordered_set<std::string> seen;
-
-        for (auto & i : searchPath) {
-            if (i.first == "") continue;
-            if (seen.count(i.first)) continue;
-            seen.insert(i.first);
-#if 0
-            auto res = state.resolveSearchPathElem(i);
-            if (!res.first) continue;
-            if (!pathExists(res.second)) continue;
-            mkApp(*state.allocAttr(*vSourceExpr, state.symbols.create(i.first)),
-                state.getBuiltin("import"),
-                mkString(*state.allocValue(), res.second));
-#endif
-            Value * v1 = state.allocValue();
-            mkPrimOpApp(*v1, state.getBuiltin("findFile"), state.getBuiltin("nixPath"));
-            Value * v2 = state.allocValue();
-            mkApp(*v2, *v1, mkString(*state.allocValue(), i.first));
-            mkApp(*state.allocAttr(*vSourceExpr, state.symbols.create(i.first)),
-                state.getBuiltin("import"), *v2);
-        }
-
-        vSourceExpr->attrs->sort();
-    }
+    else
+        state.evalFile(lookupFileArg(state, "<nix/default-installation-source.nix>"), *vSourceExpr);
 
     return vSourceExpr;
 }

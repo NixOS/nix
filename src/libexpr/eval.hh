@@ -72,7 +72,8 @@ public:
         sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
         sFile, sLine, sColumn, sFunctor, sToString,
         sRight, sWrong, sStructuredAttrs, sBuilder, sArgs,
-        sOutputHash, sOutputHashAlgo, sOutputHashMode;
+        sOutputHash, sOutputHashAlgo, sOutputHashMode,
+        sDescription;
     Symbol sDerivationNix;
 
     /* If set, force copying files to the Nix store even if they
@@ -311,6 +312,23 @@ private:
     friend struct ExprOpConcatLists;
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
+
+public:
+
+    struct FlakeRegistry
+    {
+        struct Entry
+        {
+            std::string uri;
+        };
+        std::map<std::string, Entry> entries;
+    };
+
+    const FlakeRegistry & getFlakeRegistry();
+
+private:
+    std::unique_ptr<FlakeRegistry> _flakeRegistry;
+    std::once_flag _flakeRegistryInit;
 };
 
 

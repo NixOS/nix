@@ -1,3 +1,4 @@
+#include "fetchGit.hh"
 #include "primops.hh"
 #include "eval-inline.hh"
 #include "download.hh"
@@ -14,14 +15,6 @@
 using namespace std::string_literals;
 
 namespace nix {
-
-struct GitInfo
-{
-    Path storePath;
-    std::string rev;
-    std::string shortRev;
-    uint64_t revCount = 0;
-};
 
 std::regex revRegex("^[0-9a-fA-F]{40}$");
 
