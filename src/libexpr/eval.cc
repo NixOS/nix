@@ -439,14 +439,21 @@ Value * EvalState::addConstant(const string & name, Value & v)
 Value * EvalState::addPrimOp(const string & name,
     size_t arity, PrimOpFun primOp)
 {
+    auto name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
+    Symbol sym = symbols.create(name2);
+
+    /* Hack to make constants lazy: turn them into a application of
+       the primop to a dummy value. */
     if (arity == 0) {
+        auto vPrimOp = allocValue();
+        vPrimOp->type = tPrimOp;
+        vPrimOp->primOp = new PrimOp(primOp, 1, sym);
         Value v;
-        primOp(*this, noPos, nullptr, v);
+        mkApp(v, *vPrimOp, *vPrimOp);
         return addConstant(name, v);
     }
+
     Value * v = allocValue();
-    string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    Symbol sym = symbols.create(name2);
     v->type = tPrimOp;
     v->primOp = new PrimOp(primOp, arity, sym);
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
