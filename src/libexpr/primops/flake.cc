@@ -4,6 +4,7 @@
 #include "download.hh"
 
 #include <queue>
+#include <regex>
 #include <nlohmann/json.hpp>
 
 namespace nix {
@@ -67,16 +68,39 @@ struct Flake
     Value * vProvides; // FIXME: gc
 };
 
-static Flake fetchFlake(EvalState & state, const std::string & flakeUri)
+std::regex flakeRegex("^flake:([a-zA-Z][a-zA-Z0-9_-]+)$");
+
+static Path fetchFlake(EvalState & state, const std::string & flakeUri)
 {
+    std::smatch match;
+
+    if (std::regex_match(flakeUri, match, flakeRegex)) {
+        auto flakeName = match[1];
+        auto registry = state.getFlakeRegistry();
+        auto i = registry.entries.find(flakeName);
+        if (i == registry.entries.end())
+            throw Error("unknown flake '%s'", flakeName);
+        return fetchFlake(state, i->second.uri);
+    }
+
+    else if (hasPrefix(flakeUri, "/") || hasPrefix(flakeUri, "git://")) {
+        auto gitInfo = exportGit(state.store, flakeUri, {}, "", "source");
+        return gitInfo.storePath;
+    }
+
+    else
+        throw Error("unsupported flake URI '%s'", flakeUri);
+}
+
+static Flake getFlake(EvalState & state, const std::string & flakeUri)
+{
+    auto flakePath = fetchFlake(state, flakeUri);
+    state.store->assertStorePath(flakePath);
+
     Flake flake;
 
-    auto gitInfo = exportGit(state.store, flakeUri, {}, "", "source");
-
-    state.store->assertStorePath(gitInfo.storePath);
-
     Value vInfo;
-    state.evalFile(gitInfo.storePath + "/flake.nix", vInfo);
+    state.evalFile(flakePath + "/flake.nix", vInfo);
 
     state.forceAttrs(vInfo);
 
@@ -106,8 +130,6 @@ static Flake fetchFlake(EvalState & state, const std::string & flakeUri)
 
 static std::map<std::string, Flake> resolveFlakes(EvalState & state, const StringSet & flakeUris)
 {
-    auto registry = state.getFlakeRegistry();
-
     std::map<std::string, Flake> done;
     std::queue<std::string> todo;
     for (auto & i : flakeUris) todo.push(i);
@@ -117,14 +139,10 @@ static std::map<std::string, Flake> resolveFlakes(EvalState & state, const Strin
         todo.pop();
         if (done.count(flakeUri)) continue;
 
-        auto flake = fetchFlake(state, flakeUri);
+        auto flake = getFlake(state, flakeUri);
 
-        for (auto & require : flake.requires) {
-            auto i = registry.entries.find(require);
-            if (i == registry.entries.end())
-                throw Error("unknown flake '%s'", require);
-            todo.push(i->second.uri);
-        }
+        for (auto & require : flake.requires)
+            todo.push(require);
 
         done.emplace(flake.name, flake);
     }
