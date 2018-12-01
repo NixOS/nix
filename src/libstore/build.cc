@@ -2406,7 +2406,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
 //        || boost::iequals(i.first, L"CommonProgramFiles")
 //        || boost::iequals(i.first, L"CommonProgramFiles(x86)")
 //        || boost::iequals(i.first, L"CommonProgramW6432")
-//        || boost::iequals(i.first, L"OS")
+          || boost::iequals(i.first, L"OS")                     // many build scripts checks %OS%
           || boost::iequals(i.first, L"PROCESSOR_ARCHITECTURE") // nmake needs it
            ) {
             uenv[i.first] = i.second;
