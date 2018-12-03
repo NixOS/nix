@@ -949,8 +949,11 @@ static void _deletePath(const std::wstring & wpath, const DWORD * pdwFileAttribu
         if (!RemoveDirectoryW(wpath.c_str()))
             throw WinError("RemoveDirectoryW  when _deletePath '%1%' dwFileAttributes=%2%", to_bytes(wpath), dwFileAttributes);
     } else {
-        if (!DeleteFileW(wpath.c_str()))
-            throw WinError("DeleteFileW  when _deletePath '%1%' dwFileAttributes=%2%", to_bytes(wpath), dwFileAttributes);
+        if (!DeleteFileW(wpath.c_str())) {
+            WinError winError("DeleteFileW  when _deletePath '%1%' dwFileAttributes=%2%", to_bytes(wpath), dwFileAttributes);
+            if (winError.lastError != ERROR_FILE_NOT_FOUND) // it happens with .tmp files
+                throw winError;
+        }
         bytesFreed += filesize;
     }
 }

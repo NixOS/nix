@@ -53,7 +53,7 @@ static void dumpContents(const Path & path, size_t size,
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
     if (!fd) throw PosixError(format("opening file '%1%'") % path);
 #else
-std::cerr << "dumpContents(" << path << "," << size << ")" << std::endl;
+//std::cerr << "dumpContents(" << path << "," << size << ")" << std::endl;
     AutoCloseWindowsHandle fd = CreateFileW(pathW(path).c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (fd.get() == INVALID_HANDLE_VALUE)
         throw WinError("CreateFileW when dumpContents '%1%'", path);

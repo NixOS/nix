@@ -2397,7 +2397,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
         if ( boost::iequals(i.first, L"ComSpec")
 //        || boost::iequals(i.first, L"windir")
           || boost::iequals(i.first, L"SystemRoot")   // curl unable to resolve domains without it
-//        || boost::iequals(i.first, L"SystemDrive")
+          || boost::iequals(i.first, L"SystemDrive")  // msbuild fails without it ("The path is not of a legal form")
           || boost::iequals(i.first, L"PATHEXT")
 //        || boost::iequals(i.first, L"ProgramData")
 //        || boost::iequals(i.first, L"ProgramFiles")
@@ -2406,8 +2406,10 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
 //        || boost::iequals(i.first, L"CommonProgramFiles")
 //        || boost::iequals(i.first, L"CommonProgramFiles(x86)")
 //        || boost::iequals(i.first, L"CommonProgramW6432")
+          || boost::iequals(i.first, L"NUMBER_OF_PROCESSORS")
           || boost::iequals(i.first, L"OS")                     // many build scripts checks %OS%
           || boost::iequals(i.first, L"PROCESSOR_ARCHITECTURE") // nmake needs it
+          || boost::iequals(i.first, L"PROCESSOR_ARCHITEW6432")
            ) {
             uenv[i.first] = i.second;
         }
