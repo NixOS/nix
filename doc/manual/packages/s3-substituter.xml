@@ -51,6 +51,18 @@ the S3 URL:</para>
     addressing.</para></note>
   </listitem>
   </varlistentry>
+
+  <varlistentry><term><literal>scheme</literal></term>
+  <listitem>
+    <para>
+      The scheme used for S3 requests, <literal>https</literal>
+      (default) or <literal>http</literal>.  This option allows you to
+      disable HTTPS for binary caches which don't support it.
+    </para>
+    <note><para>HTTPS should be used if the cache might contain
+    sensitive information.</para></note>
+  </listitem>
+  </varlistentry>
 </variablelist>
 
 <para>In this example we will use the bucket named
@@ -165,7 +177,7 @@ the S3 URL:</para>
   </example>
 
   <example><title>Uploading to an S3-Compatible Binary Cache</title>
-    <para><command>nix copy --to 's3://example-nix-cache?profile=cache-upload&amp;endpoint=minio.example.com' nixpkgs.hello</command></para>
+    <para><command>nix copy --to 's3://example-nix-cache?profile=cache-upload&amp;scheme=https&amp;endpoint=minio.example.com' nixpkgs.hello</command></para>
   </example>
 </section>
 </section>
