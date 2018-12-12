@@ -31,6 +31,7 @@ create table if not exists NARs (
     refs             text,
     deriver          text,
     sigs             text,
+    ca               text,
     timestamp        integer not null,
     present          integer not null,
     primary key (cache, hashPart),
@@ -72,7 +73,7 @@ public:
     {
         auto state(_state.lock());
 
-        Path dbPath = getCacheDir() + "/nix/binary-cache-v5.sqlite";
+        Path dbPath = getCacheDir() + "/nix/binary-cache-v6.sqlite";
         createDirs(dirOf(dbPath));
 
         state->db = SQLite(dbPath);
@@ -94,7 +95,7 @@ public:
 
         state->insertNAR.create(state->db,
             "insert or replace into NARs(cache, hashPart, namePart, url, compression, fileHash, fileSize, narHash, "
-            "narSize, refs, deriver, sigs, timestamp, present) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)");
+            "narSize, refs, deriver, sigs, ca, timestamp, present) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)");
 
         state->insertMissingNAR.create(state->db,
             "insert or replace into NARs(cache, hashPart, timestamp, present) values (?, ?, ?, 0)");
@@ -210,6 +211,7 @@ public:
                 narInfo->deriver = cache.storeDir + "/" + queryNAR.getStr(10);
             for (auto & sig : tokenizeString<Strings>(queryNAR.getStr(11), " "))
                 narInfo->sigs.insert(sig);
+            narInfo->ca = queryNAR.getStr(12);
 
             return {oValid, narInfo};
         });
@@ -243,6 +245,7 @@ public:
                     (concatStringsSep(" ", info->shortRefs()))
                     (info->deriver != "" ? baseNameOf(info->deriver) : "", info->deriver != "")
                     (concatStringsSep(" ", info->sigs))
+                    (info->ca)
                     (time(0)).exec();
 
             } else {
