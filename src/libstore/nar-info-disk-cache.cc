@@ -101,7 +101,7 @@ public:
             "insert or replace into NARs(cache, hashPart, timestamp, present) values (?, ?, ?, 0)");
 
         state->queryNAR.create(state->db,
-            "select * from NARs where cache = ? and hashPart = ? and ((present = 0 and timestamp > ?) or (present = 1 and timestamp > ?))");
+            "select present, namePart, url, compression, fileHash, fileSize, narHash, narSize, refs, deriver, sigs, ca from NARs where cache = ? and hashPart = ? and ((present = 0 and timestamp > ?) or (present = 1 and timestamp > ?))");
 
         /* Periodically purge expired entries from the database. */
         retrySQLite<void>([&]() {
@@ -190,28 +190,28 @@ public:
             if (!queryNAR.next())
                 return {oUnknown, 0};
 
-            if (!queryNAR.getInt(13))
+            if (!queryNAR.getInt(0))
                 return {oInvalid, 0};
 
             auto narInfo = make_ref<NarInfo>();
 
-            auto namePart = queryNAR.getStr(2);
+            auto namePart = queryNAR.getStr(1);
             narInfo->path = cache.storeDir + "/" +
                 hashPart + (namePart.empty() ? "" : "-" + namePart);
-            narInfo->url = queryNAR.getStr(3);
-            narInfo->compression = queryNAR.getStr(4);
-            if (!queryNAR.isNull(5))
-                narInfo->fileHash = Hash(queryNAR.getStr(5));
-            narInfo->fileSize = queryNAR.getInt(6);
-            narInfo->narHash = Hash(queryNAR.getStr(7));
-            narInfo->narSize = queryNAR.getInt(8);
-            for (auto & r : tokenizeString<Strings>(queryNAR.getStr(9), " "))
+            narInfo->url = queryNAR.getStr(2);
+            narInfo->compression = queryNAR.getStr(3);
+            if (!queryNAR.isNull(4))
+                narInfo->fileHash = Hash(queryNAR.getStr(4));
+            narInfo->fileSize = queryNAR.getInt(5);
+            narInfo->narHash = Hash(queryNAR.getStr(6));
+            narInfo->narSize = queryNAR.getInt(7);
+            for (auto & r : tokenizeString<Strings>(queryNAR.getStr(8), " "))
                 narInfo->references.insert(cache.storeDir + "/" + r);
-            if (!queryNAR.isNull(10))
-                narInfo->deriver = cache.storeDir + "/" + queryNAR.getStr(10);
-            for (auto & sig : tokenizeString<Strings>(queryNAR.getStr(11), " "))
+            if (!queryNAR.isNull(9))
+                narInfo->deriver = cache.storeDir + "/" + queryNAR.getStr(9);
+            for (auto & sig : tokenizeString<Strings>(queryNAR.getStr(10), " "))
                 narInfo->sigs.insert(sig);
-            narInfo->ca = queryNAR.getStr(12);
+            narInfo->ca = queryNAR.getStr(11);
 
             return {oValid, narInfo};
         });
