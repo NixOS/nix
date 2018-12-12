@@ -324,7 +324,7 @@ EOF
         fi
     done
 
-    if [ -d /nix ]; then
+    if [ -e /nix/store -o -e /nix/var ]; then
         failure <<EOF
 There are some relics of a previous installation of Nix at /nix, and
 this scripts assumes Nix is _not_ yet installed. Please delete the old
