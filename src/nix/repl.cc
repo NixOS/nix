@@ -445,7 +445,7 @@ bool NixRepl::processLine(string line)
             /* We could do the build in this process using buildPaths(),
                but doing it in a child makes it easier to recover from
                problems / SIGINT. */
-            if (runProgram(settings.nixBinDir + "/nix", Strings{"build", drvPath}) == 0) {
+            if (runProgram(settings.nixBinDir + "/nix", Strings{"build", "--no-link", drvPath}) == 0) {
                 Derivation drv = readDerivation(drvPath);
                 std::cout << std::endl << "this derivation produced the following outputs:" << std::endl;
                 for (auto & i : drv.outputs)
