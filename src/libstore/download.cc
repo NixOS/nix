@@ -881,8 +881,8 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
         Hash gotHash = unpack
             ? hashPath(expectedHash.type, store->toRealPath(storePath)).first
             : hashFile(expectedHash.type, store->toRealPath(storePath));
-        throw nix::Error("hash mismatch in file downloaded from '%s': got hash '%s' instead of the expected hash '%s'",
-            url, gotHash.to_string(), expectedHash.to_string());
+        throw nix::Error("hash mismatch in file downloaded from '%s':\n  wanted: %s\n  got:    %s",
+            url, expectedHash.to_string(), gotHash.to_string());
     }
 
     return store->toRealPath(storePath);
