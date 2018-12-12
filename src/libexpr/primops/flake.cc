@@ -68,7 +68,8 @@ struct Flake
     Value * vProvides; // FIXME: gc
 };
 
-std::regex flakeRegex("^flake:([a-zA-Z][a-zA-Z0-9_-]+)$");
+std::regex flakeRegex("^flake:([a-zA-Z][a-zA-Z0-9_-]*)(/[a-zA-Z][a-zA-Z0-9_.-]*)?$");
+std::regex githubRegex("^github:([a-zA-Z][a-zA-Z0-9_-]*)/([a-zA-Z][a-zA-Z0-9_-]*)(/([a-zA-Z][a-zA-Z0-9_-]*))?$");
 
 static Path fetchFlake(EvalState & state, const std::string & flakeUri)
 {
@@ -76,11 +77,31 @@ static Path fetchFlake(EvalState & state, const std::string & flakeUri)
 
     if (std::regex_match(flakeUri, match, flakeRegex)) {
         auto flakeName = match[1];
+        auto revOrRef = match[2];
         auto registry = state.getFlakeRegistry();
         auto i = registry.entries.find(flakeName);
         if (i == registry.entries.end())
             throw Error("unknown flake '%s'", flakeName);
         return fetchFlake(state, i->second.uri);
+    }
+
+    else if (std::regex_match(flakeUri, match, githubRegex)) {
+        auto owner = match[1];
+        auto repo = match[2];
+        auto revOrRef = match[4].str();
+        if (revOrRef.empty()) revOrRef = "master";
+
+        // FIXME: require hash in pure mode.
+
+        // FIXME: use regular /archive URLs instead? api.github.com
+        // might have stricter rate limits.
+        auto storePath = getDownloader()->downloadCached(state.store,
+            fmt("https://api.github.com/repos/%s/%s/tarball/%s", owner, repo, revOrRef),
+            true, "source");
+
+        // FIXME: extract revision hash from ETag.
+
+        return storePath;
     }
 
     else if (hasPrefix(flakeUri, "/") || hasPrefix(flakeUri, "git://")) {
