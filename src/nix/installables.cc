@@ -96,7 +96,15 @@ struct InstallableStorePath : Installable
 
     Buildables toBuildables() override
     {
-        return {{isDerivation(storePath) ? storePath : "", {{"out", storePath}}}};
+        if (isDerivation(storePath)) {
+            std::map<std::string, Path> outputs;
+            auto drv = readDerivation(storePath);
+            for (auto & output : drv.outputs)
+                outputs.emplace(output.first, output.second.path);
+            return {{storePath, outputs}};
+        }
+        else
+            return {{"", {{"out", storePath}}}};
     }
 };
 
