@@ -23,6 +23,8 @@ private:
 
 public:
 
+    const Setting<bool> cache{this, true, "cache", "Whether to cache narinfo metadata for this binary cache."};
+
     HttpBinaryCacheStore(
         const Params & params, const Path & _cacheUri)
         : BinaryCacheStore(params)
@@ -31,7 +33,10 @@ public:
         if (cacheUri.back() == '/')
             cacheUri.pop_back();
 
-        diskCache = getNarInfoDiskCache();
+        if (cache)
+            diskCache = getNarInfoDiskCache();
+        else
+            printTalkative(format("skipping local narinfo cache for '%1%'") % cacheUri);
     }
 
     std::string getUri() override
@@ -42,7 +47,7 @@ public:
     void init() override
     {
         // FIXME: do this lazily?
-        if (!diskCache->cacheExists(cacheUri, wantMassQuery_, priority)) {
+        if (diskCache && !diskCache->cacheExists(cacheUri, wantMassQuery_, priority)) {
             try {
                 BinaryCacheStore::init();
             } catch (UploadToHTTP &) {

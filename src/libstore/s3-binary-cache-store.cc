@@ -170,6 +170,7 @@ S3Helper::DownloadResult S3Helper::getObject(
 
 struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 {
+    const Setting<bool> cache{this, true, "cache", "Whether to cache narinfo metadata for this binary cache."};
     const Setting<std::string> profile{this, "", "profile", "The name of the AWS configuration profile to use."};
     const Setting<std::string> region{this, Aws::Region::US_EAST_1, "region", {"aws-region"}};
     const Setting<std::string> scheme{this, "", "scheme", "The scheme to use for S3 requests, https by default."};
@@ -194,7 +195,10 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
         , bucketName(bucketName)
         , s3Helper(profile, region, scheme, endpoint)
     {
-        diskCache = getNarInfoDiskCache();
+        if (cache)
+            diskCache = getNarInfoDiskCache();
+        else
+            printTalkative(format("skipping local narinfo cache for 's3://%1%'") % bucketName);
     }
 
     std::string getUri() override
@@ -204,10 +208,8 @@ struct S3BinaryCacheStoreImpl : public S3BinaryCacheStore
 
     void init() override
     {
-        if (!diskCache->cacheExists(getUri(), wantMassQuery_, priority)) {
-
+        if (diskCache && !diskCache->cacheExists(getUri(), wantMassQuery_, priority)) {
             BinaryCacheStore::init();
-
             diskCache->createCache(getUri(), storeDir, wantMassQuery_, priority);
         }
     }
