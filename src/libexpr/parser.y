@@ -550,7 +550,7 @@ Expr * EvalState::parse(const char * text,
 Path resolveExprPath(Path path)
 {
     assert(
-#ifdef __MINGW32__
+#ifdef _WIN32
            ( path.length() >= 7 &&
              path[0] == '\\' &&
              path[1] == '\\' &&
@@ -607,7 +607,7 @@ Expr * EvalState::parseExprFromString(const string & s, const Path & basePath)
 
 Expr * EvalState::parseStdin()
 {
-#ifndef __MINGW32__
+#ifndef _WIN32
     Activity act(*logger, lvlTalkative, format("parsing standard input"));
     return parseExprFromString(drainFD(STDIN_FILENO), absPath("."));
 #else

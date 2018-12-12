@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <vector>
 #include <map>
-#ifdef __MINGW32__
+#ifdef _WIN32
 #include <iostream>
 #endif
 
@@ -22,7 +22,7 @@ namespace nix {
 
 struct ArchiveSettings : Config
 {
-#ifndef __MINGW32__ // assume our Windows is fresh enough to suport posix semantics
+#ifndef _WIN32 // assume our Windows is fresh enough to suport posix semantics
     Setting<bool> useCaseHack{this,
         #if __APPLE__
             true,
@@ -49,7 +49,7 @@ static void dumpContents(const Path & path, size_t size,
     Sink & sink)
 {
     sink << "contents" << size;
-#ifndef __MINGW32__
+#ifndef _WIN32
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
     if (!fd) throw PosixError(format("opening file '%1%'") % path);
 #else
@@ -72,7 +72,7 @@ static void dumpContents(const Path & path, size_t size,
     writePadding(size, sink);
 }
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 static void dump(const Path & path, Sink & sink, PathFilter & filter)
 {
     checkInterrupt();
@@ -330,7 +330,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
                     if (name <= prevName)
                         throw Error("NAR directory is not sorted");
                     prevName = name;
-#ifndef __MINGW32__
+#ifndef _WIN32
                     if (archiveSettings.useCaseHack) {
                         auto i = names.find(name);
                         if (i != names.end()) {
@@ -378,7 +378,7 @@ void parseDump(ParseSink & sink, Source & source)
 struct RestoreSink : ParseSink
 {
     Path dstPath;
-#ifndef __MINGW32__
+#ifndef _WIN32
     AutoCloseFD fd;
 #else
     AutoCloseWindowsHandle fd;
@@ -387,7 +387,7 @@ struct RestoreSink : ParseSink
     void createDirectory(const Path & path)
     {
         Path p = dstPath + path;
-#ifndef __MINGW32__
+#ifndef _WIN32
         if (mkdir(p.c_str(), 0777) == -1)
             throw PosixError(format("creating directory '%1%'") % p);
 #else
@@ -399,7 +399,7 @@ struct RestoreSink : ParseSink
     void createRegularFile(const Path & path)
     {
         Path p = dstPath + path;
-#ifndef __MINGW32__
+#ifndef _WIN32
         fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666);
         if (!fd) throw PosixError(format("creating file '%1%'") % p);
 #else
@@ -410,7 +410,7 @@ struct RestoreSink : ParseSink
 #endif
     }
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     void isExecutable()
     {
         struct stat st;

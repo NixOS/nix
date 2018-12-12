@@ -30,7 +30,7 @@
 #include <errno.h>
 #include <cstring>
 
-#ifdef __MINGW32__
+#ifdef _WIN32
 #define random() rand()
 #include <boost/algorithm/string/predicate.hpp>
 #else
@@ -73,7 +73,7 @@ namespace nix {
 
 using std::map;
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 static string pathNullDevice = "/dev/null";
 #endif
 
@@ -154,7 +154,7 @@ public:
 
     virtual void waiteeDone(GoalPtr waitee, ExitCode result);
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     virtual void handleChildOutput(int fd, const string & data)
     {
         abort();
@@ -216,7 +216,7 @@ struct Child
 {
     WeakGoalPtr goal;
     Goal * goal2; // ugly hackery
-#ifndef __MINGW32__
+#ifndef _WIN32
     set<int> fds;
 #else
     vector<AsyncPipe*> pipes;
@@ -282,11 +282,11 @@ public:
     /* Set if at least one derivation had a timeout. */
     bool timedOut;
 
-#ifdef __MINGW32__
+#ifdef _WIN32
     AutoCloseWindowsHandle ioport;
 #endif
     LocalStore & store;
-#ifndef __MINGW32__
+#ifndef _WIN32
     std::unique_ptr<HookInstance> hook;
 #endif
     uint64_t expectedBuilds = 0;
@@ -302,7 +302,7 @@ public:
     uint64_t doneDownloadSize = 0;
     uint64_t expectedNarSize = 0;
     uint64_t doneNarSize = 0;
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* Whether to ask the build hook if it can build a derivation. If
        it answers with "decline-permanently", we don't try again. */
     bool tryBuildHook = true;
@@ -329,7 +329,7 @@ public:
 
     /* Registers a running child process.  `inBuildSlot' means that
        the process counts towards the jobs limit. */
-#ifndef __MINGW32__
+#ifndef _WIN32
     void childStarted(GoalPtr goal, const set<int> & fds,
         bool inBuildSlot, bool respectTimeouts);
 #else
@@ -456,7 +456,7 @@ void Goal::trace(const FormatOrString & fs)
 
 //////////////////////////////////////////////////////////////////////
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 /* Common initialisation performed in child processes. */
 static void commonChildInit(Pipe & logPipe)
 {
@@ -629,7 +629,7 @@ void UserLock::kill()
 
 //////////////////////////////////////////////////////////////////////
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 struct HookInstance
 {
     /* Pipes for talking to the build hook. */
@@ -787,7 +787,7 @@ private:
 
     /* Outputs that are corrupt or not valid. */
     PathSet missingPaths;
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* User selected for running the builder. */
     std::unique_ptr<UserLock> buildUser;
 #endif
@@ -801,7 +801,7 @@ private:
     Path tmpDirInSandbox;
 
     /* File descriptor for the log file. */
-#ifndef __MINGW32__
+#ifndef _WIN32
     AutoCloseFD fdLogFile;
 #else
     AutoCloseWindowsHandle hLogFile;
@@ -818,7 +818,7 @@ private:
     size_t currentLogLinePos = 0; // to handle carriage return
 
     std::string currentHookLine;
-#ifdef __MINGW32__
+#ifdef _WIN32
     /* Pipe for the builder's standard output/error. */
     AsyncPipe asyncBuilderOut;
     AutoCloseWindowsHandle nul;
@@ -892,7 +892,7 @@ private:
        allows us to compare whether two rounds produced the same
        result. */
     ValidPathInfos prevInfos;
-#ifndef __MINGW32__
+#ifndef _WIN32
     const uid_t sandboxUid = 1000;
     const gid_t sandboxGid = 100;
 #endif
@@ -947,7 +947,7 @@ private:
     void inputsRealised();
     void tryToBuild();
     void buildDone();
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* Is the build hook willing to perform the build? */
     HookReply tryBuildHook();
 #endif
@@ -960,7 +960,7 @@ private:
     /* Write a JSON file containing the derivation attributes. */
     void writeStructuredAttrs();
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* Make a file owned by the builder. */
     void chownToBuilder(const Path & path);
 
@@ -984,7 +984,7 @@ private:
     void deleteTmpDir(bool force);
 
     /* Callback used by the worker to write to the log. */
-#ifndef __MINGW32__
+#ifndef _WIN32
     void handleChildOutput(int fd, const string & data) override;
     void handleEOF(int fd) override;
 #else
@@ -1017,7 +1017,7 @@ private:
 };
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 const Path DerivationGoal::homeDir = "/homeless-shelter";
 #else
 const Path DerivationGoal::homeDir = "C:/homeless-shelter";
@@ -1074,7 +1074,7 @@ DerivationGoal::~DerivationGoal()
 
 void DerivationGoal::killChild()
 {
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (pid != -1) {
         worker.childTerminated(this);
 
@@ -1462,7 +1462,7 @@ void DerivationGoal::tryToBuild()
             nrRounds > 1 ? "building '%s' (round %d/%d)" :
             "building '%s'", drvPath, curRound, nrRounds);
         fmt("building '%s'", drvPath);
-#ifndef __MINGW32__
+#ifndef _WIN32
         if (hook) msg += fmt(" on '%s'", machineName);
         act = std::make_unique<Activity>(*logger, lvlInfo, actBuild, msg,
             Logger::Fields{drvPath, hook ? machineName : "", curRound, nrRounds});
@@ -1474,7 +1474,7 @@ void DerivationGoal::tryToBuild()
         worker.updateProgress();
     };
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* Is the build hook willing to accept this job? */
     if (!buildLocally) {
         switch (tryBuildHook()) {
@@ -1515,7 +1515,7 @@ void DerivationGoal::tryToBuild()
     } catch (BuildError & e) {
         printError(e.msg());
         outputLocks.unlock();
-#ifndef __MINGW32__
+#ifndef _WIN32
         buildUser.reset();
 #endif
         worker.permanentFailure = true;
@@ -1553,7 +1553,7 @@ void DerivationGoal::buildDone()
 {
     trace("build done");
 std::cerr << "DerivationGoal::buildDone()" << std::endl;
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* Release the build user at the end of this function. We don't do
        it right away because we don't want another build grabbing this
        uid and then messing around with our output. */
@@ -1564,7 +1564,7 @@ std::cerr << "DerivationGoal::buildDone()" << std::endl;
        simply have closed its end of the pipe, so just to be sure,
        kill it. */
     int status =
-#ifndef __MINGW32__
+#ifndef _WIN32
             hook ? hook->pid.kill() :
 #endif
             pid.kill();
@@ -1578,7 +1578,7 @@ std::cerr << (format("builder process for '%1%' finished status=%2%") % drvPath 
     /* So the child is gone now. */
     worker.childTerminated(this);
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* Close the read side of the logger pipe. */
     if (hook) {
         hook->builderOut.readSide = -1;
@@ -1592,7 +1592,7 @@ std::cerr << (format("builder process for '%1%' finished status=%2%") % drvPath 
 
     /* Close the log file. */
     closeLogFile();
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* When running under a build user, make sure that all processes
        running under that uid are gone.  This is to prevent a
        malicious user from leaving behind a process that keeps files
@@ -1624,7 +1624,7 @@ std::cerr << (format("builder process for '%1%' finished status=%2%") % drvPath 
 #endif
 
             deleteTmpDir(false);
-#ifndef __MINGW32__
+#ifndef _WIN32
             /* Move paths out of the chroot for easier debugging of
                build failures. */
             if (useChroot && buildMode == bmNormal)
@@ -1662,7 +1662,7 @@ std::cerr << (format("builder process for '%1%' finished status=%2%") % drvPath 
                 deletePath(i.second);
             }
         }
-#ifndef __MINGW32__
+#ifndef _WIN32
         /* Delete the chroot (if we were using one). */
         autoDelChroot.reset(); /* this runs the destructor */
 #endif
@@ -1689,7 +1689,7 @@ std::cerr << (format("builder process for '%1%' finished status=%2%") % drvPath 
         outputLocks.unlock();
 
         BuildResult::Status st = BuildResult::MiscFailure;
-#ifndef __MINGW32__
+#ifndef _WIN32
         if (hook && WIFEXITED(status) && WEXITSTATUS(status) == 101)
             st = BuildResult::TimedOut;
 
@@ -1714,7 +1714,7 @@ std::cerr << (format("builder process for '%1%' finished status=%2%") % drvPath 
     done(BuildResult::Built);
 }
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 HookReply DerivationGoal::tryBuildHook()
 {
     if (!worker.tryBuildHook || !useDerivation) return rpDecline;
@@ -1858,7 +1858,7 @@ std::cerr << "----------------------------------------------------DerivationGoal
     return paths;
 }
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 static std::once_flag dns_resolve_flag;
 
 static void preloadNSS() {
@@ -1885,7 +1885,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
             format("a '%1%' is required to build '%3%', but I am a '%2%'")
             % drv->platform % settings.thisSystem % drvPath);
     }
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (drv->isBuiltin())
         preloadNSS();
 #endif
@@ -1893,7 +1893,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
     additionalSandboxProfile = get(drv->env, "__sandboxProfile");
 #endif
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* Are we doing a chroot build? */
     {
         if (settings.sandboxMode == smEnabled) {
@@ -1912,7 +1912,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
         else if (settings.sandboxMode == smRelaxed)
             useChroot = !fixedOutput && get(drv->env, "__noChroot") != "1";
     }
-#endif // __MINGW32__
+#endif // _WIN32
 
 
     if (worker.store.storeDir != worker.store.realStoreDir) {
@@ -1924,7 +1924,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
     }
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* If `build-users-group' is not empty, then we have to build as
        one of the members of that group. */
     if (settings.buildUsersGroup != "" && getuid() == 0) {
@@ -1940,12 +1940,12 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
         throw Error("build users are not supported on this platform for security reasons");
 #endif
     }
-#endif // __MINGW32__
+#endif // _WIN32
     /* Create a temporary directory where the build will take
        place. */
     auto drvName = storePathToName(drvPath);
     tmpDir = createTempDir("", "nix-build-" + drvName, false, false
-#ifndef __MINGW32__
+#ifndef _WIN32
         , 0700
 #endif
         );
@@ -1957,7 +1957,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
 #else
     tmpDirInSandbox = tmpDir;
 #endif
-#ifndef __MINGW32__
+#ifndef _WIN32
     chownToBuilder(tmpDir);
 #endif
     /* Substitute output placeholders with the actual output paths. */
@@ -1995,7 +1995,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
     }
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (useChroot) {
 
         /* Allow a user-configurable set of directories from the
@@ -2163,7 +2163,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
 #endif
     }
     else
-#endif // __MINGW32__
+#endif // _WIN32
     {
 
         if (pathExists(homeDir))
@@ -2192,7 +2192,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
                 }
     }
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (useChroot && settings.preBuildHook != "" && dynamic_cast<Derivation *>(drv.get())) {
         printMsg(lvlChatty, format("executing pre-build hook '%1%'")
             % settings.preBuildHook);
@@ -2237,7 +2237,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
     Path logFile = openLogFile();
 
     /* Create a pipe to get the output of the builder. */
-#ifndef __MINGW32__
+#ifndef _WIN32
     builderOut.createPipe();
 #else
 //std::cerr << (format("c----createAsyncPipe(%p, %p)") % &worker % worker.ioport.get()) << std::endl;
@@ -2255,7 +2255,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
     /* Fork a child to build the package. */
     ProcessOptions options;
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 #if __linux__
     if (useChroot) {
         /* Set up private namespaces for the build:
@@ -2383,7 +2383,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
         }
         debug(msg);
     }
-#else // __MINGW32__
+#else // _WIN32
     for (auto v : inputRewrites)
         std::cerr << "## inputRewrite: '" << v.first << "' -> '" << v.second << "'\n";
 
@@ -2559,7 +2559,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
 //  std::cerr << std::endl;
 
     worker.childStarted(shared_from_this(), {&asyncBuilderOut}, true, true);
-#endif // __MINGW32__
+#endif // _WIN32
 }
 
 
@@ -2607,7 +2607,7 @@ void DerivationGoal::initEnv()
                 string fn = ".attr-" + std::to_string(fileNr++);
                 Path p = tmpDir + "/" + fn;
                 writeFile(p, i.second);
-#ifndef __MINGW32__
+#ifndef _WIN32
                 chownToBuilder(p);
 #endif
                 env[i.first + "Path"] = tmpDirInSandbox + "/" + fn;
@@ -2769,7 +2769,7 @@ void DerivationGoal::writeStructuredAttrs()
 }
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 void DerivationGoal::chownToBuilder(const Path & path)
 {
     if (!buildUser) return;
@@ -3300,7 +3300,7 @@ PathSet parseReferenceSpecifiers(Store & store, const BasicDerivation & drv, str
 
 void DerivationGoal::registerOutputs()
 {
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* When using a build hook, the build hook can register the output
        as valid (by doing `nix-store --import').  If so we don't have
        to do anything here. */
@@ -3334,7 +3334,7 @@ void DerivationGoal::registerOutputs()
         ValidPathInfo info;
 
         Path actualPath = path;
-#ifndef __MINGW32__
+#ifndef _WIN32
         if (useChroot) {
             actualPath = chrootRootDir + path;
             if (pathExists(actualPath)) {
@@ -3359,7 +3359,7 @@ void DerivationGoal::registerOutputs()
         }
 
         struct stat st;
-#ifndef __MINGW32__
+#ifndef _WIN32
         if (lstat(actualPath.c_str(), &st) == -1) {
 #else
         if (stat(actualPath.c_str(), &st) == -1) {
@@ -3371,7 +3371,7 @@ void DerivationGoal::registerOutputs()
             throw PosixError(format("getting attributes of path '%1%'") % actualPath);
         }
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 #ifndef __CYGWIN__
         /* Check that the output is not group or world writable, as
            that means that someone else can have interfered with the
@@ -3391,7 +3391,7 @@ void DerivationGoal::registerOutputs()
                rewriting doesn't contain a hard link to /etc/shadow or
                something like that. */
             canonicalisePathMetaData(actualPath
-#ifndef __MINGW32__
+#ifndef _WIN32
                 , buildUser ? buildUser->getUID() : -1
 #endif
                 , inodesSeen);
@@ -3419,7 +3419,7 @@ void DerivationGoal::registerOutputs()
                 /* The output path should be a regular file without
                    execute permission. */
                 if (!S_ISREG(st.st_mode)
-#ifndef __MINGW32__
+#ifndef _WIN32
                     || (st.st_mode & S_IXUSR) != 0
 #endif
                     )
@@ -3465,7 +3465,7 @@ void DerivationGoal::registerOutputs()
         /* Get rid of all weird permissions.  This also checks that
            all files are owned by the build user, if applicable. */
         canonicalisePathMetaData(actualPath,
-#ifndef __MINGW32__
+#ifndef _WIN32
             buildUser && !rewritten ? buildUser->getUID() : -1,
 #endif
             inodesSeen);
@@ -3662,7 +3662,7 @@ Path DerivationGoal::openLogFile()
     Path logFileName = fmt("%s/%s%s", dir, string(baseName, 2),
         settings.compressLog ? ".bz2" : "");
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     fdLogFile = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0666);
     if (!fdLogFile) throw PosixError(format("creating log file '%1%'") % logFileName);
 
@@ -3690,7 +3690,7 @@ void DerivationGoal::closeLogFile()
     if (logSink2) logSink2->finish();
     if (logFileSink) logFileSink->flush();
     logSink = logFileSink = 0;
-#ifndef __MINGW32__
+#ifndef _WIN32
     fdLogFile = -1;
 #else
     hLogFile = INVALID_HANDLE_VALUE;
@@ -3716,7 +3716,7 @@ void DerivationGoal::deleteTmpDir(bool force)
 }
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 void DerivationGoal::handleChildOutput(int fd, const string & data)
 {
     if ((hook && fd == hook->builderOut.readSide.get()) ||
@@ -3790,7 +3790,7 @@ void DerivationGoal::handleChildOutput(HANDLE handle, const string & data)
 #endif
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 void DerivationGoal::handleEOF(int fd)
 #else
 void DerivationGoal::handleEOF(HANDLE handle)
@@ -3900,7 +3900,7 @@ private:
     std::shared_ptr<const ValidPathInfo> info;
 
     /* Pipe for the substituter's standard output. */
-#ifndef __MINGW32__
+#ifndef _WIN32
     Pipe outPipe;
 #else
     AsyncPipe outPipe;
@@ -3947,7 +3947,7 @@ public:
     void finished();
 
     /* Callback used by the worker to write to the log. */
-#ifndef __MINGW32__
+#ifndef _WIN32
     void handleChildOutput(int fd, const string & data) override;
     virtual void handleEOF(int fd) override;
 #else
@@ -4160,7 +4160,7 @@ void SubstitutionGoal::tryToRun()
         try {
             /* Wake up the worker loop when we're done. */
             Finally updateStats([this]() {
-#ifndef __MINGW32__
+#ifndef _WIN32
                 outPipe.writeSide = -1;
 #else
                 outPipe.hWrite = INVALID_HANDLE_VALUE;
@@ -4178,7 +4178,7 @@ void SubstitutionGoal::tryToRun()
         }
     });
     worker.childStarted(shared_from_this(), {
-#ifndef __MINGW32__
+#ifndef _WIN32
         outPipe.readSide.get()
 #else
         &outPipe
@@ -4248,7 +4248,7 @@ void SubstitutionGoal::finished()
 }
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 void SubstitutionGoal::handleChildOutput(int fd, const string & data)
 {
 }
@@ -4289,7 +4289,7 @@ Worker::Worker(LocalStore & store)
     lastWokenUp = steady_time_point::min();
     permanentFailure = false;
     timedOut = false;
-#ifdef __MINGW32__
+#ifdef _WIN32
     ioport = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
     if (ioport.get() == NULL)
         throw WinError("CreateIoCompletionPort");
@@ -4397,7 +4397,7 @@ unsigned Worker::getNrLocalBuilds()
 }
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 void Worker::childStarted(GoalPtr goal, const set<int> & fds,
     bool inBuildSlot, bool respectTimeouts)
 #else
@@ -4408,7 +4408,7 @@ void Worker::childStarted(GoalPtr goal, const vector<AsyncPipe*> & pipes,
     Child child;
     child.goal = goal;
     child.goal2 = goal.get();
-#ifndef __MINGW32__
+#ifndef _WIN32
     child.fds = fds;
 #else
     child.pipes = pipes;
@@ -4573,7 +4573,7 @@ void Worker::waitForInput()
 
     if (useTimeout)
         vomit("sleeping %d seconds", timeout.tv_sec);
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* Use select() to wait for the input side of any logger pipe to
        become `available'.  Note that `available' (i.e., non-blocking)
        includes EOF. */
@@ -4644,7 +4644,7 @@ std::cerr << "bytesRead     " << bytesRead                 << std::endl;
         GoalPtr goal = j->goal.lock();
         assert(goal);
 
-#ifndef __MINGW32__
+#ifndef _WIN32
         std::vector<unsigned char> buffer(4096);
         set<int> fds2(j->fds);
         for (auto & k : fds2) {

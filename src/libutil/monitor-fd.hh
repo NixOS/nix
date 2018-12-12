@@ -1,4 +1,4 @@
-#ifndef __MINGW32__
+#ifndef _WIN32
 #pragma once
 
 #include <thread>

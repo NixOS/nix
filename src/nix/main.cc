@@ -1,5 +1,5 @@
 #include <algorithm>
-#ifdef __MINGW32__
+#ifdef _WIN32
 #include <boost/algorithm/string/predicate.hpp>
 #endif
 
@@ -85,7 +85,7 @@ void mainWrapped(int argc, char * * argv)
 
     programPath = argv[0];
     string programName = baseNameOf(programPath);
-#ifdef __MINGW32__
+#ifdef _WIN32
     if (boost::algorithm::iends_with(programName, ".exe")) {
         programName = programName.substr(0, programName.size()-4);
     }

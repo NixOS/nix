@@ -20,7 +20,7 @@
 #include <algorithm>
 #include <cstring>
 #include <regex>
-#ifndef __MINGW32__
+#ifndef _WIN32
 #include <dlfcn.h>
 #endif
 
@@ -42,7 +42,7 @@ std::cerr << "decodeContext('" << s << "')" << std::endl;
         size_t index = s.find("!", 1);
         rc = std::make_pair(string(s, index + 1), string(s, 1, index - 1));
     } else {
-#ifndef __MINGW32__
+#ifndef _WIN32
         assert(s.at(0) == '/'); // ???
         rc = std::make_pair(s.at(0) == '/' ? s : string(s, 1), "");
 #else
@@ -166,7 +166,7 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
 /* !!! Should we pass the Pos or the file name too? */
 extern "C" typedef void (*ValueInitializer)(EvalState & state, Value & v);
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 /* Load a ValueInitializer from a DSO and return whatever it initializes */
 void prim_importNative(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -2223,7 +2223,7 @@ void EvalState::createBaseEnv()
     mkApp(v, *vScopedImport, *v2);
     forceValue(v);
     addConstant("import", v);
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (evalSettings.enableNativeCode) {
         addPrimOp("__importNative", 2, prim_importNative);
         addPrimOp("__exec", 1, prim_exec);

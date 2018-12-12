@@ -305,7 +305,7 @@ struct CurlDownloader : public Downloader
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_LIMIT, 1L);
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_TIME, lowSpeedTimeout);
 
-#ifndef __MINGW32__
+#ifndef _WIN32
             /* If no file exist in the specified path, curl continues to work
                anyway as if netrc support was disabled. */
             curl_easy_setopt(req, CURLOPT_NETRC_FILE, settings.netrcFile.get().c_str());
@@ -439,7 +439,7 @@ struct CurlDownloader : public Downloader
     };
 
     Sync<State> state_;
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* We can't use a std::condition_variable to wake up the curl
        thread, because it only monitors file descriptors. So use a
        pipe instead.
@@ -464,7 +464,7 @@ struct CurlDownloader : public Downloader
         curl_multi_setopt(curlm, CURLMOPT_MAX_TOTAL_CONNECTIONS,
             downloadSettings.httpConnections.get());
         #endif
-#ifndef __MINGW32__
+#ifndef _WIN32
         wakeupPipe.createPipe();
 #endif
         workerThread = std::thread([&]() { workerThreadEntry(); });
@@ -486,14 +486,14 @@ struct CurlDownloader : public Downloader
             auto state(state_.lock());
             state->quit = true;
         }
-#ifndef __MINGW32__
+#ifndef _WIN32
         writeFull(wakeupPipe.writeSide.get(), " ", false);
 #endif
     }
 
     void workerThreadMain()
     {
-#ifndef __MINGW32__
+#ifndef _WIN32
         /* Cause this thread to be notified on SIGINT. */
         auto callback = createInterruptCallback([&]() {
             stopWorkerThread();
@@ -537,7 +537,7 @@ struct CurlDownloader : public Downloader
                 : 10000;
 
             vomit("download thread waiting for %d ms", sleepTimeMs);
-#ifdef __MINGW32__
+#ifdef _WIN32
             // as there is no way to wake up yet, limit the timeout to a reasonable small value
             sleepTimeMs = std::min(500, sleepTimeMs);
 
@@ -631,7 +631,7 @@ struct CurlDownloader : public Downloader
                 throw nix::Error("cannot enqueue download request because the download thread is shutting down");
             state->incoming.push(item);
         }
-#ifndef __MINGW32__
+#ifndef _WIN32
         writeFull(wakeupPipe.writeSide.get(), " ");
 #endif
     }
@@ -891,7 +891,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
             printInfo(format("unpacking '%1%'...") % url);
             Path tmpDir = createTempDir();
             AutoDelete autoDelete(tmpDir, true);
-#ifdef __MINGW32__
+#ifdef _WIN32
             // BUGBUG: MSYS's tar does not support Windows paths! (remove this when nixpkgs will have own Windows coreutils)
             const string realStorePath = store->toRealPath(storePath);
             const string realStorePath2 = realStorePath.substr(1, 9) == ":/msys64/" ? trim(runProgramGetStdout("cygpath", true, {"-u", realStorePath})) : realStorePath;

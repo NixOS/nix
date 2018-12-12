@@ -60,7 +60,7 @@ public:
 
     /* The directory where the man pages are stored. */
     Path nixManDir;
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* File name of the socket the daemon listens to.  */
     Path nixDaemonSocketFile;
 #endif
@@ -110,7 +110,7 @@ public:
     Setting<time_t> buildTimeout{this, 0, "timeout",
         "The maximum duration in seconds that a builder can run. "
         "0 means infinity.", {"build-timeout"}};
-#ifndef __MINGW32__
+#ifndef _WIN32
     PathSetting buildHook{this, true, nixLibexecDir + "/nix/build-remote", "build-hook",
         "The path of the helper program that executes builds to remote machines."};
 #endif
@@ -137,7 +137,7 @@ public:
     Setting<bool> useSubstitutes{this, true, "substitute",
         "Whether to use substitutes.",
         {"build-use-substitutes"}};
-#ifndef __MINGW32__
+#ifndef _WIN32
     Setting<std::string> buildUsersGroup{this, "", "build-users-group",
         "The Unix group that contains the build users."};
 
@@ -302,7 +302,7 @@ public:
 #endif
         "pre-build-hook",
         "A program to run just before a build to set derivation-specific build settings."};
-#ifndef __MINGW32__
+#ifndef _WIN32
     Setting<std::string> netrcFile{this, fmt("%s/%s", nixConfDir, "netrc"), "netrc-file",
         "Path to the netrc file used to obtain usernames/passwords for downloads."};
 #endif

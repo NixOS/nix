@@ -7,14 +7,14 @@ namespace nix {
 /* Open (possibly create) a lock file and return the file descriptor.
    -1 is returned if create is false and the lock could not be opened
    because it doesn't exist.  Any other error throws an exception. */
-#ifndef __MINGW32__
+#ifndef _WIN32
 AutoCloseFD openLockFile(const Path & path, bool create);
 #else
 AutoCloseWindowsHandle openLockFile(const Path & path, bool create);
 #endif
 
 /* Delete an open lock file. */
-#ifndef __MINGW32__
+#ifndef _WIN32
 void deleteLockFile(const Path & path, int fd);
 #else
 void deleteLockFile(const Path & path);
@@ -22,7 +22,7 @@ void deleteLockFile(const Path & path);
 
 enum LockType { ltRead, ltWrite, ltNone };
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 bool lockFile(int fd, LockType lockType, bool wait);
 #else
 bool lockFile(HANDLE handle, LockType lockType, bool wait);
@@ -33,7 +33,7 @@ MakeError(AlreadyLocked, Error);
 class PathLocks
 {
 private:
-#ifndef __MINGW32__
+#ifndef _WIN32
     typedef std::pair<int, Path> FDPair;
 #else
     typedef std::pair<HANDLE, Path> FDPair;

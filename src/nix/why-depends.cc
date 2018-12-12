@@ -238,7 +238,7 @@ struct CmdWhyDepends : SourceExprCommand
 
             visitPath(node.path);
 
-#ifndef __MINGW32__
+#ifndef _WIN32
             RunPager pager;
 #endif
             for (auto & ref : refs) {

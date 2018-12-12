@@ -112,7 +112,7 @@ static string parseString(std::istream & str)
 static Path parsePath(std::istream & str)
 {
     string s = parseString(str);
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (s.size() == 0 || s[0] != '/')
 #else
     if (s.size() < 3 || !('A' <= s[0] && s[0] <= 'Z') || s[1] != ':' || s[2] != '/') // expect result of canonPath

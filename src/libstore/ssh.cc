@@ -27,7 +27,7 @@ void SSHMaster::addCommonSSHOpts(Strings & args)
 std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string & command)
 {
     Path socketPath = startMaster();
-#ifndef __MINGW32__
+#ifndef _WIN32
     Pipe in, out;
     in.createPipe();
     out.createPipe();
@@ -81,19 +81,19 @@ Path SSHMaster::startMaster()
     if (!useMaster) return "";
 
     auto state(state_.lock());
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (state->sshMaster != -1) return state->socketPath;
 #else
     if (state->sshMaster.hProcess != INVALID_HANDLE_VALUE) return state->socketPath;
 #endif
     state->tmpDir = std::make_unique<AutoDelete>(createTempDir("", "nix", true, true
-#ifndef __MINGW32__
+#ifndef _WIN32
         , 0700
 #endif
         ));
 
     state->socketPath = (Path) *state->tmpDir + "/ssh.sock";
-#ifndef __MINGW32__
+#ifndef _WIN32
     Pipe out;
     out.createPipe();
 

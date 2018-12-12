@@ -29,7 +29,7 @@ struct LocalStoreAccessor : public FSAccessor
     FSAccessor::Stat stat1(const Path & path) override
     {
         auto realPath = toRealPath(path);
-#ifndef __MINGW32__
+#ifndef _WIN32
         struct stat st;
         if (lstat(realPath.c_str(), &st)) {
             if (errno == ENOENT || errno == ENOTDIR) return {Type::tMissing, 0, false};

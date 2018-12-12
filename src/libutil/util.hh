@@ -5,7 +5,9 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifndef _MSC_VER
 #include <dirent.h>
+#endif
 #include <unistd.h>
 #include <signal.h>
 
@@ -33,7 +35,7 @@ struct Source;
 /* Return an environment variable. */
 string getEnv(const string & key, const string & def = "");
 
-#ifndef __MINGE32__
+#ifndef _WIN32
 /* Get the entire environment. */
 std::map<std::string, std::string> getEnv();
 
@@ -90,13 +92,13 @@ bool isLink(const Path & path);
 struct DirEntry
 {
     string name;
-#ifndef __MINGW32__
+#ifndef _WIN32
     ino_t ino;
 #endif
     unsigned char type; // one of DT_*
     DirEntry(const string & name, ino_t ino, unsigned char type)
         : name(name),
-#ifndef __MINGW32__
+#ifndef _WIN32
           ino(ino), 
 #endif
           type(type) { }
@@ -109,7 +111,7 @@ DirEntries readDirectory(const Path & path);
 unsigned char getFileType(const Path & path);
 
 /* Read the contents of a file into a string. */
-#ifndef __MINGW32__
+#ifndef _WIN32
 string readFile(int fd);
 #else
 string readFile(HANDLE handle);
@@ -123,14 +125,14 @@ void writeFile(const Path & path, const string & s, mode_t mode = 0666);
 void writeFile(const Path & path, Source & source, mode_t mode = 0666);
 
 /* Read a line from a file descriptor. */
-#ifndef __MINGW32__
+#ifndef _WIN32
 string readLine(int fd);
 #else
 string readLine(HANDLE handle);
 #endif
 
 /* Write a line to a file descriptor. */
-#ifndef __MINGW32__
+#ifndef _WIN32
 void writeLine(int fd, string s);
 #else
 void writeLine(HANDLE handle, string s);
@@ -146,7 +148,7 @@ void deletePath(const Path & path, unsigned long long & bytesFreed);
 /* Create a temporary directory. */
 Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
     bool includePid = true, bool useGlobalCounter = true
-#ifndef __MINGW32__
+#ifndef _WIN32
     , mode_t mode = 0755
 #endif
     );
@@ -168,7 +170,7 @@ Path getDataDir();
 Paths createDirs(const Path & path);
 
 /* Create a symlink. */
-#ifndef __MINGW32__
+#ifndef _WIN32
 void createSymlink(const Path & target, const Path & link);
 #else
 enum SymlinkType { SymlinkTypeDangling, SymlinkTypeDirectory, SymlinkTypeFile };
@@ -181,7 +183,7 @@ void replaceSymlink(const Path & target, const Path & link);
 
 /* Wrappers arount read()/write() that read/write exactly the
    requested number of bytes. */
-#ifndef __MINGW32__
+#ifndef _WIN32
 void readFull(int fd, unsigned char * buf, size_t count);
 void writeFull(int fd, const unsigned char * buf, size_t count, bool allowInterrupts = true);
 void writeFull(int fd, const string & s, bool allowInterrupts = true);
@@ -195,7 +197,7 @@ MakeError(EndOfFile, Error)
 
 
 /* Read a file descriptor until EOF occurs. */
-#ifndef __MINGW32__
+#ifndef _WIN32
 string drainFD(int fd, bool block = true);
 
 void drainFD(int fd, Sink & sink, bool block = true);
@@ -224,7 +226,7 @@ public:
 
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 class AutoCloseFD
 {
     int fd;
@@ -261,7 +263,7 @@ public:
 #endif
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 class Pipe
 {
 public:
@@ -277,7 +279,7 @@ public:
 };
 #endif
 
-#ifdef __MINGW32__
+#ifdef _WIN32
 class AsyncPipe
 {
 public:
@@ -300,7 +302,7 @@ struct DIRDeleter
 typedef std::unique_ptr<DIR, DIRDeleter> AutoCloseDir;
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 class Pid
 {
     pid_t pid = -1;
@@ -346,11 +348,11 @@ struct ProcessOptions
     string errorPrefix = "error: ";
     bool dieWithParent = true;
     bool runExitHandlers = false;
-#ifndef __MINGW32__
+#ifndef _WIN32
     bool allowVfork = true;
 #endif
 };
-#ifndef __MINGW32__
+#ifndef _WIN32
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = ProcessOptions());
 #endif
 
@@ -490,7 +492,7 @@ std::string toLower(const std::string & s);
 /* Escape a string as a shell word. */
 std::string shellEscape(const std::string & s);
 
-#ifdef __MINGW32__
+#ifdef _WIN32
 std::string windowsEscape(const std::string & s);
 std::wstring windowsEscapeW(const std::wstring & s);
 #endif
@@ -502,7 +504,7 @@ void ignoreException();
 
 
 /* Some ANSI escape sequences. */
-#ifndef __MINGW32__
+#ifndef _WIN32
 #define ANSI_NORMAL "\e[0m"
 #define ANSI_BOLD "\e[1m"
 #define ANSI_RED "\e[31;1m"
@@ -567,7 +569,7 @@ struct Callback
     }
 };
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 /* Start a thread that handles various signals. Also block those signals
    on the current thread (and thus any threads created by it). */
 void startSignalHandlerThread();
@@ -624,7 +626,7 @@ typedef std::function<bool(const Path & path)> PathFilter;
 
 extern PathFilter defaultPathFilter;
 
-#ifdef __MINGW32__
+#ifdef _WIN32
 std::wstring getCwdW();
 std::wstring getArgv0W();
 std::wstring getEnvW(const std::wstring & key, const std::wstring & def);

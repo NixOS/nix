@@ -49,7 +49,7 @@ struct CmdLog : InstallableCommand
         subs.push_front(store);
 
         auto b = installable->toBuildable();
-#ifndef __MINGW32__
+#ifndef _WIN32
         RunPager pager;
 #endif
         for (auto & sub : subs) {

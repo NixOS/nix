@@ -6,14 +6,14 @@
 #include <algorithm>
 #include <map>
 #include <thread>
-#ifndef __MINGW32__
+#ifndef _WIN32
 #include <dlfcn.h>
 #endif
 
 
 namespace nix {
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 /* The default location of the daemon socket, relative to nixStateDir.
    The socket is in a directory to allow you to control access to the
    Nix daemon by setting the mode/ownership of the directory
@@ -43,7 +43,7 @@ Settings::Settings()
     , nixLibexecDir(canonPath(getEnv("NIX_LIBEXEC_DIR", NIX_LIBEXEC_DIR)))
     , nixBinDir(canonPath(getEnv("NIX_BIN_DIR", NIX_BIN_DIR)))
     , nixManDir(canonPath(NIX_MAN_DIR))
-#ifndef __MINGW32__
+#ifndef _WIN32
     , nixDaemonSocketFile(canonPath(nixStateDir + DEFAULT_SOCKET_PATH))
 #endif
 {
@@ -56,7 +56,7 @@ Settings::Settings()
 //  fprintf(stderr, "NixBinDir=%s\n", nixBinDir.c_str());
 //  fprintf(stderr, "NixManDir=%s\n", nixManDir.c_str());
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     buildUsersGroup = getuid() == 0 ? "nixbld" : "";
 #endif
     lockCPU = getEnv("NIX_AFFINITY_HACK", "1") == "1";
@@ -64,7 +64,7 @@ Settings::Settings()
     caFile = getEnv("NIX_SSL_CERT_FILE", getEnv("SSL_CERT_FILE", ""));
     if (caFile == "") {
         for (auto & fn : {
-#ifndef __MINGW32__
+#ifndef _WIN32
                           "/etc/ssl/certs/ca-certificates.crt",
 #else
                           "C:/msys64/usr/ssl/certs/ca-bundle.crt", // BUGBUG!!!
@@ -160,7 +160,7 @@ void MaxBuildJobsSetting::set(const std::string & str)
 
 void initPlugins()
 {
-#ifndef __MINGW32__
+#ifndef _WIN32
     for (const auto & pluginFile : settings.pluginFiles.get()) {
         Paths pluginFiles;
         try {

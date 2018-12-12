@@ -885,7 +885,7 @@ StoreType getStoreType(const std::string & uri, const std::string & stateDir)
     if (uri == "daemon") {
         return tDaemon;
     } else if (uri == "local" || 
-#ifndef __MINGW32__
+#ifndef _WIN32
         hasPrefix(uri, "/")
 #else
         (uri.size() > 3 && (('A' <= uri[0] && uri[0] <= 'Z') || ('a' <= uri[0] && uri[0] <= 'z')) && uri[1] == ':' && isslash(uri[2]))
@@ -893,7 +893,7 @@ StoreType getStoreType(const std::string & uri, const std::string & stateDir)
         ) {
         return tLocal;
     } else if (uri == "" || uri == "auto") {
-#ifndef __MINGW32__
+#ifndef _WIN32
         if (access(stateDir.c_str(), R_OK | W_OK) == 0)
             return tLocal;
         else if (pathExists(settings.nixDaemonSocketFile))
@@ -917,7 +917,7 @@ static RegisterStoreImplementation regStore([](
             return std::shared_ptr<Store>(std::make_shared<UDSRemoteStore>(params));
         case tLocal: {
             Store::Params params2 = params;
-#ifndef __MINGW32__
+#ifndef _WIN32
             if (hasPrefix(uri, "/"))
 #else
             if (uri.size() > 3 && (('A' <= uri[0] && uri[0] <= 'Z') || ('a' <= uri[0] && uri[0] <= 'z')) && uri[1] == ':' && isslash(uri[2]))

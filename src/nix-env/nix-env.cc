@@ -979,7 +979,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         return;
     }
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     bool tty = isatty(STDOUT_FILENO);
     RunPager pager;
 #endif
@@ -1055,7 +1055,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                     }
                 } else {
                     string column = (string) "" + ch + " " + version;
-#ifndef __MINGW32__
+#ifndef _WIN32
                     if (diff == cvGreater && tty)
                         column = ANSI_RED + column + ANSI_NORMAL;
 #endif
@@ -1263,7 +1263,7 @@ static void opListGenerations(Globals & globals, Strings opFlags, Strings opArgs
 
     int curGen;
     Generations gens = findGenerations(globals.profile, curGen);
-#ifndef __MINGW32__
+#ifndef _WIN32
     RunPager pager;
 #endif
     for (auto & i : gens) {

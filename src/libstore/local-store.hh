@@ -30,7 +30,7 @@ struct OptimiseStats
 {
     unsigned long filesLinked = 0;
     unsigned long long bytesFreed = 0;
-#ifndef __MINGW32__
+#ifndef _WIN32
     unsigned long long blocksFreed = 0;
 #endif
 };
@@ -41,7 +41,7 @@ class LocalStore : public LocalFSStore
 private:
 
     /* Lock file used for upgrading. */
-#ifndef __MINGW32__
+#ifndef _WIN32
     AutoCloseFD globalLock;
 #else
     AutoCloseWindowsHandle globalLock;
@@ -67,7 +67,7 @@ private:
         SQLiteStmt stmtQueryValidPaths;
 
         /* The file to which we write our temporary roots. */
-#ifndef __MINGW32__
+#ifndef _WIN32
         AutoCloseFD fdTempRoots;
 #else
         AutoCloseWindowsHandle fdTempRoots;
@@ -186,7 +186,7 @@ public:
     void syncWithGC() override;
 
 private:
-#ifndef __MINGW32__
+#ifndef _WIN32
     typedef std::shared_ptr<AutoCloseFD> FDPtr;
     typedef list<FDPtr> FDs;
 
@@ -271,7 +271,7 @@ private:
 
     bool isActiveTempFile(const GCState & state,
         const Path & path, const string & suffix);
-#ifndef __MINGW32__
+#ifndef _WIN32
     int openGCLock(LockType lockType);
 #else
     HANDLE openGCLock(LockType lockType);
@@ -287,7 +287,7 @@ private:
     Path createTempDirInStore();
 
     void checkDerivationOutputs(const Path & drvPath, const Derivation & drv);
-#ifndef __MINGW32__
+#ifndef _WIN32
     typedef std::unordered_set<ino_t> InodeHash;
 #else
     typedef std::unordered_set<uint64_t> InodeHash;
@@ -311,7 +311,7 @@ private:
     friend class SubstitutionGoal;
 };
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 typedef std::pair<dev_t, ino_t> Inode;
 #else
 typedef std::pair<DWORD, uint64_t> Inode;
@@ -327,7 +327,7 @@ typedef set<Inode> InodesSeen;
      without execute permission; setuid bits etc. are cleared)
    - the owner and group are set to the Nix user and group, if we're
      running as root. */
-#ifndef __MINGW32__
+#ifndef _WIN32
 void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen);
 void canonicalisePathMetaData(const Path & path, uid_t fromUid);
 #else

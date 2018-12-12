@@ -11,14 +11,14 @@
 #include <stdio.h>
 #include <regex>
 
-#ifdef __MINGW32__
+#ifdef _WIN32
 #define random() rand()
 #include <iostream>
 #endif
 
 namespace nix {
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 static void makeWritable(const Path & path)
 {
     struct stat st;
@@ -49,7 +49,7 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
 {
     debug("loading hash inodes in memory");
     InodeHash inodeHash;
-#ifndef __MINGW32__
+#ifndef _WIN32
     AutoCloseDir dir(opendir(linksDir.c_str()));
     if (!dir) throw PosixError(format("opening directory '%1%'") % linksDir);
 
@@ -105,7 +105,7 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
 Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash)
 {
     Strings names;
-#ifndef __MINGW32__
+#ifndef _WIN32
     AutoCloseDir dir(opendir(path.c_str()));
     if (!dir) throw PosixError(format("opening directory '%1%'") % path);
 
@@ -177,7 +177,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     checkInterrupt();
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     struct stat st;
     if (lstat(path.c_str(), &st))
         throw PosixError(format("getting attributes of path '%1%'") % path);
@@ -203,7 +203,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 #endif
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (S_ISDIR(st.st_mode)) {
 #else
     if ((wfad.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 && (wfad.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) == 0) {
@@ -215,7 +215,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     }
 
     /* We can hard link regular files and maybe symlinks. */
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (!S_ISREG(st.st_mode)
 #if CAN_LINK_SYMLINK
         && !S_ISLNK(st.st_mode)
@@ -233,7 +233,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        modified, in particular when running programs as root under
        NixOS (example: $fontconfig/var/cache being modified).  Skip
        those files.  FIXME: check the modification time. */
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (S_ISREG(st.st_mode) && (st.st_mode & S_IWUSR)) {
 #else
     if ((wfad.dwFileAttributes & FILE_ATTRIBUTE_READONLY) == 0) {
@@ -243,7 +243,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     }
 
     /* This can still happen on top-level files. */
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (st.st_nlink > 1 && inodeHash.count(st.st_ino)) {
         debug(format("'%1%' is already linked, with %2% other file(s)") % path % (st.st_nlink - 2));
 #else
@@ -284,7 +284,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 
  retry:
     if (!pathExists(linkPath)) {
-#ifndef __MINGW32__
+#ifndef _WIN32
         /* Nope, create a hard link in the links directory. */
         if (link(path.c_str(), linkPath.c_str()) == 0) {
             inodeHash.insert(st.st_ino);
@@ -319,7 +319,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 #endif
     }
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* Yes!  We've seen a file with the same contents.  Replace the
        current file with a hard link to that file. */
     struct stat stLink;
@@ -337,7 +337,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     const uint64_t ino2 = (uint64_t(bhfi2.nFileIndexHigh)<<32) +  bhfi2.nFileIndexLow;
 #endif
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (st.st_ino == stLink.st_ino) {
 #else
     if (ino == ino2) {
@@ -347,13 +347,13 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     }
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (st.st_size != stLink.st_size) {
 #else
     if (((uint64_t(bhfi.nFileSizeHigh) << 32) + bhfi.nFileSizeLow) != ((uint64_t(bhfi2.nFileSizeHigh) << 32) + bhfi2.nFileSizeLow)) {
 #endif
         printError(format("removing corrupted link '%1%'") % linkPath);
-#ifndef __MINGW32__
+#ifndef _WIN32
         unlink(linkPath.c_str());
 #else
         DeleteFileW(pathW(linkPath).c_str());
@@ -363,7 +363,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 
     printMsg(lvlTalkative, format("linking '%1%' to '%2%'") % path % linkPath);
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* Make the containing directory writable, but only if it's not
        the store itself (we don't want or need to mess with its
        permissions). */
@@ -377,7 +377,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 
     Path tempLink = (format("%1%/.tmp-link-%2%-%3%")
         % realStoreDir % getpid() % random()).str();
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (link(linkPath.c_str(), tempLink.c_str()) == -1) {
         if (errno == EMLINK) {
             /* Too many links to the same file (>= 32000 on most file
@@ -396,7 +396,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 #endif
 
     /* Atomically replace the old file with the new hard link. */
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (rename(tempLink.c_str(), path.c_str()) == -1) {
         if (unlink(tempLink.c_str()) == -1)
             printError(format("unable to unlink '%1%'") % tempLink);
@@ -428,7 +428,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 #endif
 
     stats.filesLinked++;
-#ifndef __MINGW32__
+#ifndef _WIN32
     stats.bytesFreed += st.st_size;
     stats.blocksFreed += st.st_blocks;
 

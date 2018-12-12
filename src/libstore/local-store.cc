@@ -20,7 +20,7 @@
 #include <stdio.h>
 #include <time.h>
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 #include <sys/select.h>
 #include <grp.h>
 #endif
@@ -79,7 +79,7 @@ LocalStore::LocalStore(const Params & params)
         createDirs(gcRootsDir);
         createSymlink(profilesDir, gcRootsDir + "/profiles");
     }
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* Optionally, create directories and set permissions for a
        multi-user install. */
     if (getuid() == 0 && settings.buildUsersGroup != "") {
@@ -133,7 +133,7 @@ LocalStore::LocalStore(const Params & params)
         if (stat(reservedPath.c_str(), &st) == -1 ||
             st.st_size != settings.reservedSize)
         {
-#ifndef __MINGW32__
+#ifndef _WIN32
             AutoCloseFD fd = open(reservedPath.c_str(), O_WRONLY | O_CREAT | O_CLOEXEC, 0600);
             if (!fd)
                 throw PosixError(format("opening file '%1%'") % reservedPath);
@@ -277,7 +277,7 @@ LocalStore::~LocalStore()
     try {
         auto state(_state.lock());
         if (state->fdTempRoots) {
-#ifndef __MINGW32__
+#ifndef _WIN32
             state->fdTempRoots = -1;
 #else
             state->fdTempRoots = INVALID_HANDLE_VALUE;
@@ -398,7 +398,7 @@ void LocalStore::makeStoreWritable()
 }
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 
 const time_t mtimeStore = 1; /* 1 second into the epoch */
 
@@ -1040,7 +1040,7 @@ void LocalStore::registerValidPath(const ValidPathInfo & info)
 
 void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 {
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* SQLite will fsync by default, but the new valid paths may not
        be fsync-ed.  So some may want to fsync them before registering
        the validity, at the expense of some speed of the path
@@ -1168,7 +1168,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             autoGC();
 
-#ifndef __MINGW32__
+#ifndef _WIN32
             canonicalisePathMetaData(realPath, -1);
 #else
             canonicalisePathMetaData(realPath);
@@ -1214,7 +1214,7 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
             } else
                 writeFile(realPath, dump);
 
-#ifndef __MINGW32__
+#ifndef _WIN32
             canonicalisePathMetaData(realPath, -1);
 #else
             canonicalisePathMetaData(realPath);
@@ -1288,7 +1288,7 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
 
             writeFile(realPath, s);
 
-#ifndef __MINGW32__
+#ifndef _WIN32
             canonicalisePathMetaData(realPath, -1);
 #else
             canonicalisePathMetaData(realPath);
@@ -1362,7 +1362,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
     bool errors = false;
 
     /* Acquire the global GC lock to prevent a garbage collection. */
-#ifndef __MINGW32__
+#ifndef _WIN32
     AutoCloseFD fdGCLock = openGCLock(ltWrite);
 #else
     AutoCloseWindowsHandle fdGCLock = openGCLock(ltWrite);
@@ -1381,7 +1381,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
     /* Release the GC lock so that checking content hashes (which can
        take ages) doesn't block the GC or builds. */
-#ifndef __MINGW32__
+#ifndef _WIN32
     fdGCLock = -1;
 #else
     fdGCLock = INVALID_HANDLE_VALUE;
@@ -1497,7 +1497,7 @@ void LocalStore::verifyPath(const Path & path, const PathSet & store,
 }
 
 
-#if !defined(__MINGW32__) && defined(FS_IOC_SETFLAGS) && defined(FS_IOC_GETFLAGS) && defined(FS_IMMUTABLE_FL)
+#if !defined(_WIN32) && defined(FS_IOC_SETFLAGS) && defined(FS_IOC_GETFLAGS) && defined(FS_IMMUTABLE_FL)
 
 static void makeMutable(const Path & path)
 {

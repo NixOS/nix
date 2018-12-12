@@ -32,7 +32,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         throw Error("in pure evaluation mode, 'fetchGit' requires a Git revision");
 
     if (!ref && rev == "" &&
-#ifndef __MINGW32__
+#ifndef _WIN32
         hasPrefix(uri, "/")
 #else
         uri.size() > 3 && (('A' <= uri[0] && uri[0] <= 'Z') || ('a' <= uri[0] && uri[0] <= 'z')) && uri[1] == ':' && isslash(uri[2])
@@ -44,7 +44,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         try {
             runProgramGetStdout("git", true, { "-C", uri, "diff-index", "--quiet", "HEAD", "--" });
         } catch (ExecError e) {
-#ifndef __MINGW32__
+#ifndef _WIN32
             if (!WIFEXITED(e.status) || WEXITSTATUS(e.status) != 1) throw;
 #else
             if (e.status != 1) throw; // ???
@@ -105,7 +105,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     Path localRefFile = cacheDir + "/refs/heads/" + localRef;
 
     bool doFetch;
-#ifndef __MINGW32__
+#ifndef _WIN32
     time_t now = time(0);
 #else
     FILETIME ftnow;
@@ -118,7 +118,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
             runProgramGetStdout("git", true, { "-C", cacheDir, "cat-file", "-e", rev });
             doFetch = false;
         } catch (ExecError & e) {
-#ifndef __MINGW32__
+#ifndef _WIN32
             if (WIFEXITED(e.status)) {
                 doFetch = true;
             } else
@@ -132,7 +132,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     } else {
         /* If the local ref is older than ‘tarball-ttl’ seconds, do a
            git fetch to update the local ref to the remote ref. */
-#ifndef __MINGW32__
+#ifndef _WIN32
         struct stat st;
         doFetch = stat(localRefFile.c_str(), &st) != 0 ||
             st.st_mtime + settings.tarballTtl <= now;
@@ -160,7 +160,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         // we're using --quiet for now. Should process its stderr.
         runProgramGetStdout("git", true, { "-C", cacheDir, "fetch", "--quiet", "--force", "--", uri2, *ref + ":" + localRef });
 
-#ifndef __MINGW32__
+#ifndef _WIN32
         struct timeval times[2];
         times[0].tv_sec = now;
         times[0].tv_usec = 0;

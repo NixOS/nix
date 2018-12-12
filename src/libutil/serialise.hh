@@ -91,7 +91,7 @@ struct FdSink : BufferedSink
 {
     bool warn = false;
     size_t written = 0;
-#ifndef __MINGW32__
+#ifndef _WIN32
     int fd;
 
     FdSink() : fd(-1) { }
@@ -107,7 +107,7 @@ struct FdSink : BufferedSink
     FdSink& operator=(FdSink && s)
     {
         flush();
-#ifndef __MINGW32__
+#ifndef _WIN32
         fd = s.fd;
         s.fd = -1;
 #else
@@ -135,7 +135,7 @@ struct FdSource : BufferedSource
 {
     size_t read = 0;
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     int fd;
 
     FdSource() : fd(-1) { }
@@ -150,7 +150,7 @@ struct FdSource : BufferedSource
 
     FdSource& operator=(FdSource && s)
     {
-#ifndef __MINGW32__
+#ifndef _WIN32
         fd = s.fd;
         s.fd = -1;
 #else

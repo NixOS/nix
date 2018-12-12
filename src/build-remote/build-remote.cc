@@ -32,7 +32,7 @@ std::string escapeUri(std::string uri)
 
 static string currentLoad;
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 static AutoCloseFD openSlotLock(const Machine & m, unsigned long long slot)
 #else
 static AutoCloseWindowsHandle openSlotLock(const Machine & m, unsigned long long slot)
@@ -48,7 +48,7 @@ int main (int argc, char * * argv)
 
         logger = makeJSONLogger(*logger);
 
-#ifndef __MINGW32__
+#ifndef _WIN32
         /* Ensure we don't get any SSH passphrase or host key popups. */
         unsetenv("DISPLAY");
         unsetenv("SSH_ASKPASS");
@@ -57,7 +57,7 @@ int main (int argc, char * * argv)
             throw UsageError("called without required arguments");
 
         verbosity = (Verbosity) std::stoll(argv[1]);
-#ifndef __MINGW32__
+#ifndef _WIN32
         FdSource source(STDIN_FILENO);
 #else
         FdSource source(GetStdHandle(STD_INPUT_HANDLE));
@@ -80,7 +80,7 @@ int main (int argc, char * * argv)
         currentLoad = store->stateDir + "/current-load";
 
         std::shared_ptr<Store> sshStore;
-#ifndef __MINGW32__
+#ifndef _WIN32
         AutoCloseFD bestSlotLock;
 #else
         AutoCloseWindowsHandle bestSlotLock;
@@ -115,13 +115,13 @@ int main (int argc, char * * argv)
 
             /* Error ignored here, will be caught later */
             mkdir(currentLoad.c_str()
-#ifndef __MINGW32__
+#ifndef _WIN32
             , 0777
 #endif
             );
 
             while (true) {
-#ifndef __MINGW32__
+#ifndef _WIN32
                 bestSlotLock = -1;
                 AutoCloseFD lock = openLockFile(currentLoad + "/main-lock", true);
 #else
@@ -143,7 +143,7 @@ int main (int argc, char * * argv)
                         m.allSupported(requiredFeatures) &&
                         m.mandatoryMet(requiredFeatures)) {
                         rightType = true;
-#ifndef __MINGW32__
+#ifndef _WIN32
                         AutoCloseFD free;
 #else
                         AutoCloseWindowsHandle free;
@@ -192,7 +192,7 @@ int main (int argc, char * * argv)
                     break;
                 }
 
-#ifdef __MINGW32__
+#ifdef _WIN32
                 FILETIME ft;
                 GetSystemTimeAsFileTime(&ft);
                 if (!SetFileTime(bestSlotLock.get(), &ft, &ft, &ft))
@@ -223,7 +223,7 @@ int main (int argc, char * * argv)
                     storeUri = bestMachine->storeUri;
 
                 } catch (std::exception & e) {
-#ifndef __MINGW32__
+#ifndef _WIN32
                     auto msg = chomp(drainFD(5, false));
                     printError("cannot build on '%s': %s%s",
                         bestMachine->storeUri, e.what(),
@@ -247,20 +247,20 @@ connected:
 
         auto inputs = readStrings<PathSet>(source);
         auto outputs = readStrings<PathSet>(source);
-#ifndef __MINGW32__
+#ifndef _WIN32
         AutoCloseFD uploadLock = openLockFile(currentLoad + "/" + escapeUri(storeUri) + ".upload-lock", true);
 #else
         AutoCloseWindowsHandle uploadLock = openLockFile(currentLoad + "/" + escapeUri(storeUri) + ".upload-lock", true);
 #endif
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("waiting for the upload lock to '%s'", storeUri));
-#ifndef __MINGW32__
+#ifndef _WIN32
             auto old = signal(SIGALRM, handleAlarm);
             alarm(15 * 60);
 #endif
             if (!lockFile(uploadLock.get(), ltWrite, true))
                 printError("somebody is hogging the upload lock for '%s', continuing...");
-#ifndef __MINGW32__
+#ifndef _WIN32
             alarm(0);
             signal(SIGALRM, old);
 #endif
@@ -273,7 +273,7 @@ connected:
             copyPaths(store, ref<Store>(sshStore), inputs, NoRepair, NoCheckSigs, substitute);
         }
 
-#ifndef __MINGW32__
+#ifndef _WIN32
         uploadLock = -1;
 #else
         uploadLock = INVALID_HANDLE_VALUE;

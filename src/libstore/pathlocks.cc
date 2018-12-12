@@ -8,14 +8,14 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#ifdef __MINGW32__
+#ifdef _WIN32
 #include <iostream>
 #endif
 
 namespace nix {
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 AutoCloseFD openLockFile(const Path & path, bool create)
 {
     AutoCloseFD fd;
@@ -72,7 +72,7 @@ void deleteLockFile(const Path & path)
 
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 bool lockFile(int fd, LockType lockType, bool wait)
 {
     struct flock lock;
@@ -229,7 +229,7 @@ bool PathLocks::lockPaths(const PathSet & _paths,
         }
 
         try {
-#ifndef __MINGW32__
+#ifndef _WIN32
             AutoCloseFD fd;
 #else
             AutoCloseWindowsHandle fd;
@@ -254,7 +254,7 @@ bool PathLocks::lockPaths(const PathSet & _paths,
                 }
 
                 debug(format("lock acquired on '%1%'") % lockPath);
-#ifndef __MINGW32__
+#ifndef _WIN32
                 /* Check that the lock file hasn't become stale (i.e.,
                    hasn't been unlinked). */
                 struct stat st;
@@ -299,7 +299,7 @@ void PathLocks::unlock()
 {
     for (auto & i : fds) {
 
-#ifndef __MINGW32__
+#ifndef _WIN32
         if (deletePaths) deleteLockFile(i.second, i.first);
 
         lockedPaths_.lock()->erase(i.second);

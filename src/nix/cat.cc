@@ -3,7 +3,7 @@
 #include "fs-accessor.hh"
 #include "nar-accessor.hh"
 
-#ifdef __MINGW32__
+#ifdef _WIN32
 #include "builtins.hh"
 #include "derivations.hh"
 #include <nlohmann/json.hpp>
@@ -109,7 +109,7 @@ struct CmdLn : Command
 static RegisterCommand r3(make_ref<CmdLn>());
 
 
-#ifdef __MINGW32__
+#ifdef _WIN32
 // builtin:fetchurl builder as there is no fork()
 struct CmdBuiltinFetchurl : Command
 {

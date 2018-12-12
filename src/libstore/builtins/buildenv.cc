@@ -81,7 +81,7 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
                     if (unlink(dstFile.c_str()) == -1)
                         throw PosixError(format("unlinking '%1%'") % dstFile);
                     if (mkdir(dstFile.c_str()
-#ifndef __MINGW32__
+#ifndef _WIN32
                                 , 0755
 #endif
                                 ) == -1)

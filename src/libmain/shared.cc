@@ -17,7 +17,7 @@
 
 #include <openssl/crypto.h>
 
-#ifdef __MINGW32__
+#ifdef _WIN32
 #include <fcntl.h>
 #define srandom(x) srand(x)
 #endif
@@ -98,7 +98,7 @@ static void opensslLockCallback(int mode, int type, const char * file, int line)
         opensslLocks[type].unlock();
 }
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 static void sigHandler(int signo) { }
 #endif
 
@@ -110,7 +110,7 @@ void initNix()
     std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
 #endif
 
-#ifdef __MINGW32__
+#ifdef _WIN32
     /* Do not replace \n with \r\n when using stdio */
     _setmode( _fileno(stdin ), _O_BINARY );
     _setmode( _fileno(stdout), _O_BINARY );
@@ -122,7 +122,7 @@ void initNix()
     CRYPTO_set_locking_callback(opensslLockCallback);
 
     loadConfFile();
-#ifndef __MINGW32__
+#ifndef _WIN32
     startSignalHandlerThread();
 
     /* Reset SIGCHLD to its default. */
@@ -273,7 +273,7 @@ void printVersion(const string & programName)
 
 void showManPage(const string & name)
 {
-#ifndef __MINGW32__
+#ifndef _WIN32
     restoreSignals();
     setenv("MANPATH", settings.nixManDir.c_str(), 1);
     execlp("man", "man", name.c_str(), nullptr);
@@ -286,7 +286,7 @@ void showManPage(const string & name)
 
 int handleExceptions(const string & programName, std::function<void()> fun)
 {
-#ifndef __MINGW32__
+#ifndef _WIN32
     ReceiveInterrupts receiveInterrupts; // FIXME: need better place for this
 #endif
     string error = ANSI_RED "error:" ANSI_NORMAL " ";
@@ -325,7 +325,7 @@ int handleExceptions(const string & programName, std::function<void()> fun)
 }
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 RunPager::RunPager()
 {
     if (!isatty(STDOUT_FILENO)) return;

@@ -4,7 +4,7 @@
 #include <regex>
 #include <sstream>
 #include <vector>
-#ifdef __MINGW32__
+#ifdef _WIN32
 #include <boost/algorithm/string/predicate.hpp>
 #endif
 
@@ -75,7 +75,7 @@ void mainWrapped(int argc, char * * argv)
     initGC();
 
     auto dryRun = false;
-#ifndef __MINGW32__
+#ifndef _WIN32
     bool runEnv = hasSuffix(argv[0], "nix-shell");
 #else
     bool runEnv = boost::algorithm::iends_with(argv[0], "nix-shell.exe");
@@ -271,7 +271,7 @@ void mainWrapped(int argc, char * * argv)
             left = {"default.nix"};
     }
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (runEnv)
         setenv("IN_NIX_SHELL", pure ? "pure" : "impure", 1);
 #endif
@@ -331,7 +331,7 @@ void mainWrapped(int argc, char * * argv)
     };
 
     if (runEnv) {
-#ifndef __MINGW32__
+#ifndef _WIN32
         if (drvs.size() != 1)
             throw UsageError("nix-shell requires a single derivation");
 

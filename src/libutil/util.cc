@@ -28,7 +28,7 @@
 #include <sys/prctl.h>
 #endif
 
-#ifdef __MINGW32__
+#ifdef _WIN32
 #define BOOST_STACKTRACE_USE_BACKTRACE
 #include <boost/stacktrace.hpp>
 #include <boost/algorithm/string/predicate.hpp>
@@ -45,7 +45,7 @@ extern char * * environ;
 
 namespace nix {
 
-#ifdef __MINGW32__
+#ifdef _WIN32
 static std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 std::string to_bytes(const std::wstring & path) { return converter.to_bytes(path); }
 std::wstring from_bytes(const std::string & s) { return converter.from_bytes(s); }
@@ -99,7 +99,7 @@ Path handleToPath(HANDLE handle) {
 #endif
 
 static inline Path::size_type rfindSlash(const Path & path, Path::size_type from = Path::npos) {
-#ifdef __MINGW32__
+#ifdef _WIN32
     Path::size_type p1 = path.rfind('/', from);
     Path::size_type p2 = path.rfind('\\', from);
     return p1 == Path::npos ? p2 :
@@ -123,7 +123,7 @@ std::string PosixError::addErrno(const std::string & s)
     return s + ": " + strerror(errNo);
 }
 
-#ifdef __MINGW32__
+#ifdef _WIN32
 std::string WinError::addLastError(const std::string & s)
 {
     lastError = GetLastError();
@@ -148,7 +148,7 @@ std::string WinError::addLastError(const std::string & s)
 }
 #endif
 
-#ifdef __MINGW32__
+#ifdef _WIN32
 std::wstring getCwdW()
 {
     std::vector<wchar_t> buf(0x1000);
@@ -249,7 +249,7 @@ void clearEnv()
 
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 Path absPath(Path path, Path dir)
 {
 //  std::cerr << "absPath("<<path<<", "<<dir<<")"<<std::endl;
@@ -306,7 +306,7 @@ std::experimental::optional<Path> maybeCanonPath(const Path & path, bool resolve
 
     Path::const_iterator i = path.begin(), end = path.end();
     Path s;
-#ifdef __MINGW32__
+#ifdef _WIN32
     if (path.length() >= 3 && (('A' <= path[0] && path[0] <= 'Z') || ('a' <= path[0] && path[0] <= 'z')) && path[1] == ':' && isslash(path[2])) {
         i += 2;
         s = /*Path("\\\\.\\") +*/ Path() + char(path[0] & ~0x20) + ":";
@@ -358,7 +358,7 @@ std::experimental::optional<Path> maybeCanonPath(const Path & path, bool resolve
                 temp = absPath(readLink(s), dirOf(s))
                     + string(i, end);
                 end = temp.end();
-#ifdef __MINGW32__
+#ifdef _WIN32
                 i = temp.begin() + 2;
                 s = temp.substr(0, 2);
 #else
@@ -368,7 +368,7 @@ std::experimental::optional<Path> maybeCanonPath(const Path & path, bool resolve
             }
         }
     }
-#ifndef __MINGW32__
+#ifndef _WIN32
     s = s.empty() ? "/" : s;
 #else
 //    std::cerr << "canonPath("<<path<<", resolveSymlinks="<<resolveSymlinks<<") -> ["<<s<<"]"<<std::endl;
@@ -425,7 +425,7 @@ Path dirOf(const Path & path)
     if (pos == string::npos)
         throw Error(format("invalid file name4 '%1%'") % path);
 // fprintf(stderr, "dirOf(%s)\n", path.c_str());
-#ifdef __MINGW32__
+#ifdef _WIN32
     if (path.length() >= 7 && path[0] == '\\' && path[1] == '\\' && (path[2] == '.' || path[2] == '?') && path[3] == '\\' &&
                ('A' <= path[4] && path[4] <= 'Z') && path[5] == ':' && isslash(path[6])) {
 //        Path::size_type pos = rfindSlash(path);
@@ -479,7 +479,7 @@ string baseNameOf(const Path & path)
 bool isInDir(const Path & path, const Path & dir)
 {
 //std::cerr << "isInDir("<<path<<", "<<dir<<")" << std::endl;
-#ifndef __MINGW32__
+#ifndef _WIN32
     return path[0] == '/'
         && path.compare(0, dir.size(), dir) == 0
         && path.size() >= dir.size() + 2
@@ -507,7 +507,7 @@ bool isDirOrInDir(const Path & path, const Path & dir)
 struct stat lstatPath(const Path & path)
 {
     struct stat st;
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (lstat(path.c_str(), &st))
 #else
     if (stat(path.c_str(), &st))
@@ -517,7 +517,7 @@ struct stat lstatPath(const Path & path)
 }
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 bool pathExists(const Path & path)
 {
     int res;
@@ -548,7 +548,7 @@ bool pathExists(const Path & path) {
 #endif
 
 
-#ifdef __MINGW32__
+#ifdef _WIN32
 // from Windows SDK, mingw headers miss it
 typedef struct _REPARSE_DATA_BUFFER
 {
@@ -588,7 +588,7 @@ typedef struct _REPARSE_DATA_BUFFER
 Path readLink(const Path & path)
 {
     checkInterrupt();
-#ifndef __MINGW32__
+#ifndef _WIN32
     std::vector<char> buf;
     for (ssize_t bufSize = PATH_MAX/4; true; bufSize += bufSize/2) {
         buf.resize(bufSize);
@@ -678,7 +678,7 @@ std::cerr << "readDirectory("<<path<<")"<<std::endl;
 
 unsigned char getFileType(const Path & path)
 {
-#ifdef __MINGW32__
+#ifdef _WIN32
 //std::cerr /*<< file<<":"<<line*/<<" __getFileType(" << path << ")" << std::endl;
     DWORD dw = GetFileAttributesW(pathW(path).c_str());
     if (dw == 0xFFFFFFFF)
@@ -698,7 +698,7 @@ unsigned char getFileType(const Path & path)
 #endif
 }
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 string readFile(int fd)
 {
     struct stat st;
@@ -728,7 +728,7 @@ string readFile(HANDLE handle)
 string readFile(const Path & path, bool drain)
 {
 // std::cerr << "readFile("<<path<<", drain="<<drain<<")" << std::endl;
-#ifndef __MINGW32__
+#ifndef _WIN32
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC );
     if (!fd)
         throw PosixError(format("opening file '%1%'") % path);
@@ -745,7 +745,7 @@ string readFile(const Path & path, bool drain)
 void readFile(const Path & path, Sink & sink)
 {
 // std::cerr << "readFile("<<path<<")" << std::endl;
-#ifndef __MINGW32__
+#ifndef _WIN32
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
     if (!fd) throw PosixError("opening file '%s'", path);
 #else
@@ -760,7 +760,7 @@ void readFile(const Path & path, Sink & sink)
 
 void writeFile(const Path & path, const string & s, mode_t mode)
 {
-#ifndef __MINGW32__
+#ifndef _WIN32
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
         throw PosixError(format("opening file '%1%'") % path);
@@ -778,7 +778,7 @@ void writeFile(const Path & path, const string & s, mode_t mode)
 
 void writeFile(const Path & path, Source & source, mode_t mode)
 {
-#ifndef __MINGW32__
+#ifndef _WIN32
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
         throw PosixError(format("opening file '%1%'") % path);
@@ -801,7 +801,7 @@ void writeFile(const Path & path, Source & source, mode_t mode)
     }
 }
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 string readLine(int fd)
 {
     string s;
@@ -842,7 +842,7 @@ string readLine(HANDLE handle)
 }
 #endif
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 void writeLine(int fd, string s)
 {
     s += '\n';
@@ -856,7 +856,7 @@ void writeLine(HANDLE handle, string s)
 }
 #endif
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 static void _deletePath(const Path & path, unsigned long long & bytesFreed)
 {
     checkInterrupt();
@@ -980,7 +980,7 @@ static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
     int & counter)
 {
 //std::cerr << "tempName("<<tmpRoot<<", "<<prefix<<", includePid="<<includePid<<", counter="<<counter<<")"<<std::endl;
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (tmpRoot.empty()) tmpRoot = getEnv("TMPDIR", "/tmp");
 #else
     if (tmpRoot.empty()) tmpRoot = getEnv("TMPDIR");
@@ -996,7 +996,7 @@ static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
 }
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 Path createTempDir(const Path & tmpRoot, const Path & prefix, bool includePid, bool useGlobalCounter, mode_t mode)
 {
 //std::cerr << "createTempDir("<<tmpRoot<<", "<<prefix<<", includePid="<<includePid<<", useGlobalCounter="<<useGlobalCounter<<")"<<std::endl;
@@ -1049,7 +1049,7 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix, bool includePid, b
 
 
 static Lazy<Path> getHome2([]() {
-#ifndef __MINGW32__
+#ifndef _WIN32
     Path homeDir = getEnv("HOME");
     if (homeDir.empty()) {
         std::vector<char> buf(16384);
@@ -1104,7 +1104,7 @@ Paths createDirs(const Path & path)
 {
     Paths created;
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (path == "/") return created;
     assert(!path.empty() && path[path.size()-1] != '/');
 
@@ -1162,7 +1162,7 @@ Paths createDirs(const Path & path)
 }
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 void createSymlink(const Path & target, const Path & link)
 {
     assert(!target.empty() && !link.empty());
@@ -1219,13 +1219,13 @@ SymlinkType createSymlink(const Path & target, const Path & link)
 void replaceSymlink(const Path & target, const Path & link)
 {
     assert(!target.empty() && !link.empty());
-#ifdef __MINGW32__
+#ifdef _WIN32
     assert(target[0] != '/' && link[0] != '/');
 #endif
     for (unsigned int n = 0; true; n++) {
         Path tmp = canonPath(fmt("%s/.%d_%s", dirOf(link), n, baseNameOf(link)));
 
-#ifndef __MINGW32__
+#ifndef _WIN32
         try {
             createSymlink(target, tmp);
         } catch (PosixError & e) {
@@ -1269,7 +1269,7 @@ void replaceSymlink(const Path & target, const Path & link)
     }
 }
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 void readFull(int fd, unsigned char * buf, size_t count)
 {
     while (count) {
@@ -1300,7 +1300,7 @@ void readFull(HANDLE handle, unsigned char * buf, size_t count)
 #endif
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 void writeFull(int fd, const unsigned char * buf, size_t count, bool allowInterrupts)
 {
     while (count) {
@@ -1333,7 +1333,7 @@ void writeFull(HANDLE handle, const unsigned char * buf, size_t count, bool allo
 #endif
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 void writeFull(int fd, const string & s, bool allowInterrupts)
 {
     writeFull(fd, (const unsigned char *) s.data(), s.size(), allowInterrupts);
@@ -1346,7 +1346,7 @@ void writeFull(HANDLE handle, const string & s, bool allowInterrupts)
 #endif
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 string drainFD(int fd, bool block)
 {
     StringSink sink;
@@ -1363,7 +1363,7 @@ string drainFD(HANDLE fd/*, bool block*/)
 #endif
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 void drainFD(int fd, Sink & sink, bool block)
 {
     int saved;
@@ -1433,7 +1433,7 @@ AutoDelete::~AutoDelete()
             if (recursive)
                 deletePath(path);
             else {
-#ifndef __MINGW32__
+#ifndef _WIN32
                 if (remove(path.c_str()) == -1)
                     throw PosixError(format("cannot unlink '%1%'") % path);
 #else
@@ -1462,7 +1462,7 @@ void AutoDelete::reset(const Path & p, bool recursive) {
 
 //////////////////////////////////////////////////////////////////////
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 AutoCloseFD::AutoCloseFD() : fd{-1} {}
 
 
@@ -1586,7 +1586,7 @@ HANDLE AutoCloseWindowsHandle::release()
 }
 #endif
 
-#ifdef __MINGW32__
+#ifdef _WIN32
 void AsyncPipe::createAsyncPipe(HANDLE iocp) {
 //std::cerr << (format("-----AsyncPipe::createAsyncPipe(%x)") % iocp) << std::endl;
 
@@ -1618,7 +1618,7 @@ void AsyncPipe::createAsyncPipe(HANDLE iocp) {
 }
 #endif
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 void Pipe::create()
 {
     int fds[2];
@@ -1655,7 +1655,7 @@ void Pipe::createPipe()
 //////////////////////////////////////////////////////////////////////
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 Pid::Pid()
 {
 }
@@ -1819,7 +1819,7 @@ int Pid::wait()
 #endif
 
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 void killUser(uid_t uid)
 {
     debug(format("killing all processes running under uid '%1%'") % uid);
@@ -1870,7 +1870,7 @@ void killUser(uid_t uid)
 
 //////////////////////////////////////////////////////////////////////
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 /* Wrapper around vfork to prevent the child process from clobbering
    the caller's stack frame in the parent. */
 static pid_t doFork(bool allowVfork, std::function<void()> fun) __attribute__((noinline));
@@ -1974,7 +1974,7 @@ void runProgram2(const RunOptions & options)
         source = source_.get();
     }
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* Create a pipe. */
     Pipe out, in;
     if (options.standardOut) out.createPipe();
@@ -2188,7 +2188,7 @@ if (options.input)
 
 
     if (source) {
-#ifndef __MINGW32__
+#ifndef _WIN32
         in.readSide = -1;
 #else
         in.hRead = INVALID_HANDLE_VALUE;
@@ -2203,7 +2203,7 @@ if (options.input)
                     } catch (EndOfFile &) {
                         break;
                     }
-#ifndef __MINGW32__
+#ifndef _WIN32
                     writeFull(in.writeSide.get(), buf.data(), n);
 #else
                     writeFull(in.hWrite.get(), buf.data(), n);
@@ -2213,14 +2213,14 @@ if (options.input)
             } catch (...) {
                 promise.set_exception(std::current_exception());
             }
-#ifndef __MINGW32__
+#ifndef _WIN32
             in.writeSide = -1;
 #else
             in.hWrite = INVALID_HANDLE_VALUE;
 #endif
         });
     }
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (options.standardOut)
         drainFD(out.readSide.get(), *options.standardOut);
 #else
@@ -2242,7 +2242,7 @@ if (options.input)
         throw ExecError(status, fmt("program '%1%' %2%", options.program, statusToString(status)));
 }
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 void closeMostFDs(const set<int> & exceptions)
 {
 #if __linux__
@@ -2377,7 +2377,7 @@ string replaceStrings(const std::string & s,
 
 string statusToString(int status)
 {
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
         if (WIFEXITED(status))
             return (format("failed with exit code %1%") % WEXITSTATUS(status)).str();
@@ -2404,7 +2404,7 @@ string statusToString(int status)
 
 bool statusOk(int status)
 {
-#ifndef __MINGW32__
+#ifndef _WIN32
     return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 #else
     return status == 0;
@@ -2442,7 +2442,7 @@ std::string shellEscape(const std::string & s)
     return r;
 }
 
-#ifdef __MINGW32__
+#ifdef _WIN32
 std::string windowsEscape(const std::string & s)
 {
     if (s.empty() || s.find_first_of("&()[]{}^=;!'+,`!\" ") != std::wstring::npos) {
@@ -2601,7 +2601,7 @@ void callFailure(const std::function<void(std::exception_ptr exc)> & failure, st
 
 static Sync<std::pair<unsigned short, unsigned short>> windowSize{{0, 0}};
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 static void updateWindowSize()
 {
     struct winsize ws;

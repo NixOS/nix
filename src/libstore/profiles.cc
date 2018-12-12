@@ -49,7 +49,7 @@ Generations findGenerations(Path profile, int & curGen)
             gen.path = profileDir + "/" + i.name;
             gen.number = n;
             struct stat st;
-#ifndef __MINGW32__
+#ifndef _WIN32
             if (lstat(gen.path.c_str(), &st) != 0)
 #else
             if (stat(gen.path.c_str(), &st) != 0)

@@ -67,7 +67,7 @@ void FdSink::write(const unsigned char * data, size_t len)
         }
     }
     try {
-#ifndef  __MINGW32__
+#ifndef  _WIN32
         writeFull(fd, data, len);
 #else
         writeFull(handle, data, len);
@@ -134,7 +134,7 @@ bool BufferedSource::hasData()
 
 size_t FdSource::readUnbuffered(unsigned char * data, size_t len)
 {
-#ifndef __MINGW32__
+#ifndef _WIN32
     ssize_t n;
     do {
         checkInterrupt();

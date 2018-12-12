@@ -1,4 +1,4 @@
-#ifndef __MINGW32__
+#ifndef _WIN32
 #include "shared.hh"
 #include "local-store.hh"
 #include "util.hh"

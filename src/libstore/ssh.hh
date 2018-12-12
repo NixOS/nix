@@ -34,7 +34,7 @@ public:
     struct Connection
     {
         Pid sshPid;
-#ifndef __MINGW32__
+#ifndef _WIN32
         AutoCloseFD out, in;
 #else
         AutoCloseWindowsHandle out, in;

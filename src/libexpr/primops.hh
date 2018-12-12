@@ -15,7 +15,7 @@ struct RegisterPrimOp
     RegisterPrimOp(std::string name, size_t arity, PrimOpFun fun);
 };
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 /* These primops are disabled without enableNativeCode, but plugins
    may wish to use them in limited contexts without globally enabling
    them. */

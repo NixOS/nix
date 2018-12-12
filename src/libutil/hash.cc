@@ -255,7 +255,7 @@ Hash hashFile(HashType ht, const Path & path)
     start(ht, ctx);
     std::vector<unsigned char> buf(8192);
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
     if (!fd) throw PosixError(format("opening file '%1%'") % path);
 

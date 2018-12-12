@@ -169,7 +169,7 @@ int main(int argc, char * * argv)
 
             /* Download the file. */
             {
-#ifndef __MINGW32__
+#ifndef _WIN32
                 AutoCloseFD fd = open(tmpFile.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
                 if (!fd) throw PosixError("creating temporary file '%s'", tmpFile);
 #else

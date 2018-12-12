@@ -11,7 +11,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
-#ifndef __MINGW32__
+#ifndef _WIN32
 #include <sys/socket.h>
 #include <sys/un.h>
 #else
@@ -105,7 +105,7 @@ std::string UDSRemoteStore::getUri()
 ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
 {
     auto conn = make_ref<Connection>();
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* Connect to a daemon that does the privileged work for us. */
     conn->fd = socket(PF_UNIX, SOCK_STREAM
         #ifdef SOCK_CLOEXEC

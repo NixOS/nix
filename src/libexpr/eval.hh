@@ -331,7 +331,7 @@ struct InvalidPathError : EvalError
 
 struct EvalSettings : Config
 {
-#ifndef __MINGW32__
+#ifndef _WIN32
     Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation",
         "Whether builtin functions that allow executing native code should be enabled."};
 #endif

@@ -74,7 +74,7 @@ static void atomicWrite(const Path & path, const std::string & s)
     Path tmp = path + ".tmp." + std::to_string(getpid());
     AutoDelete del(tmp, false);
     writeFile(tmp, s);
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (rename(tmp.c_str(), path.c_str()))
         throw PosixError(format("renaming '%1%' to '%2%'") % tmp % path);
 #else

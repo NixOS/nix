@@ -1,6 +1,6 @@
 #pragma once
 
-#ifdef __MINGW32__
+#ifdef _WIN32
 #include <winsock2.h>
 #include <windows.h>
 #endif
@@ -146,7 +146,7 @@ private:
     std::string addErrno(const std::string & s);
 };
 
-#ifdef __MINGW32__
+#ifdef _WIN32
 // to throw
 class WinError : public SysError
 {
@@ -176,7 +176,7 @@ typedef list<Path> Paths;
 typedef set<Path> PathSet;
 
 
-#ifdef __MINGW32__
+#ifdef _WIN32
 std::ostream & operator << (std::ostream & os, const std::wstring & path) = delete;
 std::string to_bytes(const std::wstring & path);
 std::wstring from_bytes(const std::string & s);

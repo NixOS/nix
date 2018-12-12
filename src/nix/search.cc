@@ -267,7 +267,7 @@ struct CmdSearch : SourceExprCommand, MixJSON
                 }
             }
             if (writeCache) {
-#ifndef __MINGW32__
+#ifndef _WIN32
                 if (rename(tmpFile.c_str(), jsonCacheFileName.c_str()) == -1)
                     throw PosixError("cannot rename '%s' to '%s'", tmpFile, jsonCacheFileName);
 #else
@@ -279,7 +279,7 @@ struct CmdSearch : SourceExprCommand, MixJSON
 
         if (results.size() == 0)
             throw Error("no results for the given search term(s)!");
-#ifndef __MINGW32__
+#ifndef _WIN32
         RunPager pager;
 #endif
         for (auto el : results) std::cout << el.second << "\n";

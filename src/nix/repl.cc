@@ -276,7 +276,7 @@ StringSet NixRepl::completePrefix(string prefix)
 
 static int runProgram(const string & program, const Strings & args)
 {
-#ifdef __MINGW32__
+#ifdef _WIN32
     std::cerr << "runProgram " << program << /*" " << args <<*/ std::endl;
     _exit(118);
 #else

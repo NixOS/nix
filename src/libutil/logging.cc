@@ -78,7 +78,7 @@ void warnOnce(bool & haveWarned, const FormatOrString & fs)
 void writeToStderr(const string & s)
 {
     try {
-#ifndef __MINGW32__
+#ifndef _WIN32
         writeFull(STDERR_FILENO, s, false);
 #else
         writeFull(GetStdHandle(STD_ERROR_HANDLE), s, false);

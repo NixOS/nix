@@ -27,7 +27,7 @@ struct CmdDumpPath : StorePathCommand
 
     void run(ref<Store> store, const Path & storePath) override
     {
-#ifndef __MINGW32__
+#ifndef _WIN32
         FdSink sink(STDOUT_FILENO);
 #else
         FdSink sink(GetStdHandle(STD_OUTPUT_HANDLE));

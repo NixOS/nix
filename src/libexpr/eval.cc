@@ -11,7 +11,7 @@
 #include <cstring>
 #include <unistd.h>
 #include <sys/time.h>
-#ifndef __MINGW32__
+#ifndef _WIN32
 #include <sys/resource.h>
 #endif
 
@@ -227,7 +227,7 @@ void initGC()
    can contain URLs (e.g. "nixpkgs=https://bla...:foo=https://"). */
 static Strings parseNixPath(const string & s)
 {
-#ifndef __MINGW32__
+#ifndef _WIN32
     const char delim = ':';
 #else
     const char delim = ';';
@@ -403,7 +403,7 @@ void EvalState::checkURI(const std::string & uri)
     /* If the URI is a path, then check it against allowedPaths as
        well. */
     if (
-#ifndef __MINGW32__
+#ifndef _WIN32
         hasPrefix(uri, "/")
 #else
         uri.size() > 3 && (('A' <= uri[0] && uri[0] <= 'Z') || ('a' <= uri[0] && uri[0] <= 'z')) && uri[1] == ':' && isslash(uri[2])
@@ -1645,7 +1645,7 @@ string EvalState::copyPathToStore(PathSet & context, const Path & path)
 Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
 {
     string path = coerceToString(pos, v, context, false, false);
-#ifdef __MINGW32__
+#ifdef _WIN32
     if (path.length() >= 7 && path[0] == '\\' && path[1] == '\\' && (path[2] == '.' || path[2] == '?') && path[3] == '\\' &&
                ('A' <= path[4] && path[4] <= 'Z') && path[5] == ':' && isslash(path[6])) {
         return path;
@@ -1749,7 +1749,7 @@ void EvalState::printStats()
     bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
     Verbosity v = showStats ? lvlInfo : lvlDebug;
     printMsg(v, "evaluation statistics:");
-#ifndef __MINGW32__
+#ifndef _WIN32
     struct rusage buf;
     getrusage(RUSAGE_SELF, &buf);
     float cpuTime = buf.ru_utime.tv_sec + ((float) buf.ru_utime.tv_usec / 1000000);
@@ -1759,7 +1759,7 @@ void EvalState::printStats()
     uint64_t bValues = nrValues * sizeof(Value);
     uint64_t bAttrsets = nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Attr);
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     printMsg(v, format("  time elapsed: %1%") % cpuTime);
 #endif
     printMsg(v, format("  size of a value: %1%") % sizeof(Value));

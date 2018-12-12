@@ -99,7 +99,7 @@ struct CmdRun : InstallablesCommand
 
         auto accessor = store->getFSAccessor();
 
-#ifndef __MINGW32__
+#ifndef _WIN32
         if (ignoreEnvironment) {
 
             if (!unset.empty())

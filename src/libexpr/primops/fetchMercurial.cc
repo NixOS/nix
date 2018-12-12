@@ -33,7 +33,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
 
     // BUGBUG: MSYS's hg does not support Windows paths ! (remove this when nixpkgs will have own Windows hg)
     string uriMSYS;
-#ifdef __MINGW32__
+#ifdef _WIN32
     if (uri.substr(1, 9) == ":/msys64/") {
         uriMSYS = trim(runProgramGetStdout("cygpath", true, {"-u", uri}));
     } else
@@ -42,7 +42,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
 
 
     if (rev == "" && 
-#ifndef __MINGW32__
+#ifndef _WIN32
         hasPrefix(uri, "/")
 #else
         uri.size() > 3 && (('A' <= uri[0] && uri[0] <= 'Z') || ('a' <= uri[0] && uri[0] <= 'z')) && uri[1] == ':' && isslash(uri[2])
@@ -94,7 +94,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
 
     // BUGBUG: MSYS's hg does not support Windows paths ! (remove this when nixpkgs will have own Windows hg)
     string cacheDirMSYS;
-#ifdef __MINGW32__
+#ifdef _WIN32
     if (cacheDir.substr(1, 9) == ":/msys64/") {
         cacheDirMSYS = trim(runProgramGetStdout("cygpath", true, {"-u", cacheDir}));
     } else
@@ -103,7 +103,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
 
     /* If we haven't pulled this repo less than ‘tarball-ttl’ seconds,
        do so now. */
-#ifndef __MINGW32__
+#ifndef _WIN32
     time_t now = time(0);
     struct stat st;
     if (stat(stampFile.c_str(), &st) != 0 ||
@@ -175,7 +175,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
 
     // BUGBUG: MSYS's hg does not support Windows paths ! (remove this when nixpkgs will have own Windows hg)
     string tmpDirMSYS;
-#ifdef __MINGW32__
+#ifdef _WIN32
     if (uri.substr(1, 9) == ":/msys64/") {
         tmpDirMSYS = trim(runProgramGetStdout("cygpath", true, {"-u", tmpDir}));
     } else

@@ -8,7 +8,7 @@ namespace nix {
 
 void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
 {
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* Make the host's netrc data available. Too bad curl requires
        this to be stored in a file. It would be nice if we could just
        pass a pointer to the data. */

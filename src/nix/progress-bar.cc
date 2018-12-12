@@ -304,7 +304,7 @@ public:
                 }
             }
         }
-#ifndef __MINGW32__
+#ifndef _WIN32
         auto width = getWindowSize().second;
 #else
         auto width = 80;

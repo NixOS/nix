@@ -311,7 +311,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
     }
 
     if (query == qDefault) query = qOutputs;
-#ifndef __MINGW32__
+#ifndef _WIN32
     RunPager pager;
 #endif
     switch (query) {
@@ -468,7 +468,7 @@ static void opPrintEnv(Strings opFlags, Strings opArgs)
 static void opReadLog(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
-#ifndef __MINGW32__
+#ifndef _WIN32
     RunPager pager;
 #endif
     for (auto & i : opArgs) {
@@ -502,7 +502,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
         if (!store->isValidPath(info.path) || reregister) {
             /* !!! races */
             if (canonicalise)
-#ifndef __MINGW32__
+#ifndef _WIN32
                 canonicalisePathMetaData(info.path, -1);
 #else
                 canonicalisePathMetaData(info.path);
@@ -631,7 +631,7 @@ static void opDump(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (opArgs.size() != 1) throw UsageError("only one argument allowed");
-#ifndef __MINGW32__
+#ifndef _WIN32
     FdSink sink(STDOUT_FILENO);
 #else
     FdSink sink(GetStdHandle(STD_OUTPUT_HANDLE));
@@ -648,7 +648,7 @@ static void opRestore(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (opArgs.size() != 1) throw UsageError("only one argument allowed");
-#ifndef __MINGW32__
+#ifndef _WIN32
     FdSource source(STDIN_FILENO);
 #else
     FdSource source(GetStdHandle(STD_INPUT_HANDLE));
@@ -664,7 +664,7 @@ static void opExport(Strings opFlags, Strings opArgs)
 
     for (auto & i : opArgs)
         i = store->followLinksToStorePath(i);
-#ifndef __MINGW32__
+#ifndef _WIN32
     FdSink sink(STDOUT_FILENO);
 #else
     FdSink sink(GetStdHandle(STD_OUTPUT_HANDLE));
@@ -681,7 +681,7 @@ static void opImport(Strings opFlags, Strings opArgs)
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     FdSource source(STDIN_FILENO);
 #else
     FdSource source(GetStdHandle(STD_INPUT_HANDLE));
@@ -785,7 +785,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     FdSource in(STDIN_FILENO);
     FdSink out(STDOUT_FILENO);
 #else
@@ -906,7 +906,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 getBuildSettings();
 
                 try {
-#ifndef __MINGW32__
+#ifndef _WIN32
                     MonitorFdHup monitor(in.fd);
 #endif
                     store->buildPaths(paths);
@@ -927,7 +927,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 readDerivation(in, *store, drv);
 
                 getBuildSettings();
-#ifndef __MINGW32__
+#ifndef _WIN32
                 MonitorFdHup monitor(in.fd);
 #endif
                 auto status = store->buildDerivation(drvPath, drv);

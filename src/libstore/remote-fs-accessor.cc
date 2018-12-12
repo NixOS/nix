@@ -68,7 +68,7 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_)
             auto narAccessor = makeLazyNarAccessor(listing,
                 [cacheFile](uint64_t offset, uint64_t length) {
 
-#ifndef __MINGW32__
+#ifndef _WIN32
                     AutoCloseFD fd = open(cacheFile.c_str(), O_RDONLY | O_CLOEXEC);
                     if (!fd)
                         throw PosixError("opening NAR cache file '%s'", cacheFile);

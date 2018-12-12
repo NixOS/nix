@@ -19,7 +19,7 @@
 #include <unistd.h>
 #include <climits>
 
-#ifdef __MINGW32__
+#ifdef _WIN32
 #include <iostream>
 #define random() rand()
 #endif
@@ -36,7 +36,7 @@ static string gcRootsDir = "gcroots";
    read.  To be precise: when they try to create a new temporary root
    file, they will block until the garbage collector has finished /
    yielded the GC lock. */
-#ifndef __MINGW32__
+#ifndef _WIN32
 int LocalStore::openGCLock(LockType lockType)
 #else
 HANDLE LocalStore::openGCLock(LockType lockType)
@@ -47,7 +47,7 @@ HANDLE LocalStore::openGCLock(LockType lockType)
 
     debug(format("acquiring global GC lock '%1%' '%2%'") % fnGCLock % lockType);
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     AutoCloseFD fdGCLock = open(fnGCLock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
     if (!fdGCLock)
         throw PosixError("opening global GC lock '%1%'", fnGCLock);
@@ -75,7 +75,7 @@ static void makeSymlink(const Path & link, const Path & target)
     /* Create directories up to `gcRoot'. */
     createDirs(dirOf(link));
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* Create the new symlink. */
     Path tempLink = (format("%1%.tmp-%2%-%3%")
         % link % getpid() % random()).str();
@@ -120,7 +120,7 @@ static void makeSymlink(const Path & link, const Path & target)
 
 void LocalStore::syncWithGC()
 {
-#ifndef __MINGW32__
+#ifndef _WIN32
     AutoCloseFD fdGCLock = openGCLock(ltRead);
 #else
     AutoCloseWindowsHandle fdGCLock = openGCLock(ltRead);
@@ -207,7 +207,7 @@ void LocalStore::addTempRoot(const Path & path)
     if (!state->fdTempRoots) {
 
         while (1) {
-#ifndef __MINGW32__
+#ifndef _WIN32
             AutoCloseFD fdGCLock = openGCLock(ltRead);
 #else
             AutoCloseWindowsHandle fdGCLock = openGCLock(ltRead);
@@ -218,7 +218,7 @@ void LocalStore::addTempRoot(const Path & path)
                 unlink(fnTempRoots.c_str());
 
             state->fdTempRoots = openLockFile(fnTempRoots, true);
-#ifndef __MINGW32__
+#ifndef _WIN32
             fdGCLock = -1;
 
             debug(format("acquiring read lock on '%1%'") % fnTempRoots);
@@ -260,7 +260,7 @@ void LocalStore::addTempRoot(const Path & path)
     lockFile(state->fdTempRoots.get(), ltRead, true);
 }
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 std::set<std::pair<pid_t, Path>> LocalStore::readTempRoots(FDs & fds)
 {
     std::set<std::pair<pid_t, Path>> tempRoots;
@@ -410,7 +410,7 @@ Roots LocalStore::findRootsNoTemp()
 Roots LocalStore::findRoots()
 {
     Roots roots = findRootsNoTemp();
-#ifndef __MINGW32__
+#ifndef _WIN32
     FDs fds;
     pid_t prev = -1;
     size_t n = 0;
@@ -423,7 +423,7 @@ Roots LocalStore::findRoots()
     return roots;
 }
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 static void readProcLink(const string & file, StringSet & paths)
 {
     /* 64 is the starting buffer size gnu readlink uses... */
@@ -454,7 +454,7 @@ static string quoteRegexChars(const string & raw)
     return std::regex_replace(raw, specialRegex, R"(\$&)");
 }
 
-#ifndef __MINGW32__
+#ifndef _WIN32
 static void readFileRoots(const char * path, StringSet & paths)
 {
     try {
@@ -469,7 +469,7 @@ static void readFileRoots(const char * path, StringSet & paths)
 PathSet LocalStore::findRuntimeRoots()
 {
     PathSet roots;
-#ifndef __MINGW32__
+#ifndef _WIN32
     StringSet paths;
     auto procDir = AutoCloseDir{opendir("/proc")};
     if (procDir) {
@@ -615,7 +615,7 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
     Path realPath = realStoreDir + "/" + baseNameOf(path);
 
     struct stat st;
-#ifndef __MINGW32__
+#ifndef _WIN32
     if (lstat(realPath.c_str(), &st)) {
 #else
     if (stat(realPath.c_str(), &st)) {
@@ -760,7 +760,7 @@ void LocalStore::tryToDelete(GCState & state, const Path & path)
    the link count. */
 void LocalStore::removeUnusedLinks(const GCState & state)
 {
-#ifndef __MINGW32__
+#ifndef _WIN32
     AutoCloseDir dir(opendir(linksDir.c_str()));
     if (!dir) throw PosixError(format("opening directory '%1%'") % linksDir);
 
@@ -879,7 +879,7 @@ std::cerr << "LocalStore::collectGarbage" <<std::endl;
     /* Acquire the global GC root.  This prevents
        a) New roots from being added.
        b) Processes from creating new temporary root files. */
-#ifndef __MINGW32__
+#ifndef _WIN32
     AutoCloseFD fdGCLock = openGCLock(ltWrite);
 #else
     AutoCloseWindowsHandle fdGCLock = openGCLock(ltWrite);
@@ -891,7 +891,7 @@ std::cerr << "LocalStore::collectGarbage" <<std::endl;
     Roots rootMap = options.ignoreLiveness ? Roots() : findRootsNoTemp();
 
     for (auto & i : rootMap) state.roots.insert(i.second);
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* Read the temporary roots.  This acquires read locks on all
        per-process temporary root files.  So after this point no paths
        can be added to the set of temporary roots. */
@@ -999,7 +999,7 @@ std::cerr << "LocalStore::collectGarbage" <<std::endl;
         return;
     }
 
-#ifndef __MINGW32__
+#ifndef _WIN32
     /* Allow other processes to add to the store from here on. */
     fdGCLock = -1;
     fds.clear();
