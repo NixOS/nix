@@ -202,7 +202,7 @@ bool isInDir(const Path & path, const Path & dir)
 
 bool isDirOrInDir(const Path & path, const Path & dir)
 {
-    return path == dir or isInDir(path, dir);
+    return path == dir || isInDir(path, dir);
 }
 
 
