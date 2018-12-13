@@ -76,7 +76,7 @@ struct LocalStoreAccessor : public FSAccessor
 
         StringSet res;
         for (auto & entry : entries)
-            res.insert(entry.name);
+            res.insert(entry.name());
 
         return res;
     }

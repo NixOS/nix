@@ -34,12 +34,13 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
     }
 
     for (const auto & ent : srcFiles) {
-        if (ent.name[0] == '.')
+        auto name = ent.name();
+        if (name[0] == '.')
             /* not matched by glob */
             continue;
-        auto srcFile = srcDir + "/" + ent.name;
-        auto dstFile = dstDir + "/" + ent.name;
-
+        auto srcFile = srcDir + "/" + name;
+        auto dstFile = dstDir + "/" + name;
+#ifndef _WIN32
         struct stat srcSt;
         try {
             if (stat(srcFile.c_str(), &srcSt) == -1)
@@ -50,9 +51,18 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
                 continue;
             }
             throw;
-        } catch (WinError & e) {
-            throw e; // TODO
         }
+#else
+        WIN32_FILE_ATTRIBUTE_DATA wfad;
+        if (!GetFileAttributesExW(pathW(srcFile).c_str(), GetFileExInfoStandard, &wfad)) {
+            WinError winError("GetFileAttributesExW when createLinks '%1%'", srcFile);
+            if (winError.lastError == ERROR_FILE_NOT_FOUND || winError.lastError == ERROR_PATH_NOT_FOUND) {
+                printError("warning: skipping dangling symlink '%s'", dstFile);
+                continue;
+            }
+            throw winError;
+        }
+#endif
 
         /* The files below are special-cased to that they don't show up
          * in user profiles, either because they are useless, or
@@ -67,7 +77,11 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
             hasSuffix(srcFile, "/log"))
             continue;
 
+#ifndef _WIN32
         else if (S_ISDIR(srcSt.st_mode)) {
+#else
+        else if ((wfad.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+#endif
             unsigned char dt = getFileType(dstFile);
 
             if (dt != DT_UNKNOWN) {
@@ -78,14 +92,17 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
                     auto target = canonPath(dstFile, true);
                     if (getFileType(target) != DT_DIR)
                         throw Error("collision between '%1%' and non-directory '%2%'", srcFile, target);
+#ifndef _WIN32
                     if (unlink(dstFile.c_str()) == -1)
                         throw PosixError(format("unlinking '%1%'") % dstFile);
-                    if (mkdir(dstFile.c_str()
-#ifndef _WIN32
-                                , 0755
-#endif
-                                ) == -1)
+                    if (mkdir(dstFile.c_str(), 0755) == -1)
                         throw PosixError(format("creating directory '%1%'"));
+#else
+                    if (!DeleteFileW(pathW(dstFile).c_str()))
+                        throw WinError("DeleteFileW when createLinks '%1%'", dstFile);
+                    if (!CreateDirectoryW(pathW(dstFile).c_str(), NULL))
+                        throw WinError("CreateDirectoryW when createLinks '%1%'", dstFile);
+#endif
                     createLinks(target, dstFile, priorities[dstFile]);
                     createLinks(srcFile, dstFile, priority);
                     continue;
@@ -108,8 +125,13 @@ static void createLinks(const Path & srcDir, const Path & dstDir, int priority)
                                 srcFile, readLink(dstFile), priority);
                     if (prevPriority < priority)
                         continue;
+#ifndef _WIN32
                     if (unlink(dstFile.c_str()) == -1)
                         throw PosixError(format("unlinking '%1%'") % dstFile);
+#else
+                    if (!DeleteFileW(pathW(dstFile).c_str()))
+                        throw WinError("DeleteFileW when createLinks '%1%'", dstFile);
+#endif
                 } else
                 if (dt == DT_DIR)
                     throw Error("collision between non-directory '%1%' and directory '%2%'", srcFile, dstFile);

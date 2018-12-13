@@ -175,8 +175,8 @@ struct CmdSearch : SourceExprCommand, MixJSON
                         } else {
                             results[attrPath] = fmt(
                                 "* %s (%s)\n  %s\n",
-                                wrap("\e[0;1m", hilite(attrPath, attrPathMatch, "\e[0;1m")),
-                                wrap("\e[0;2m", hilite(parsed.fullName, nameMatch, "\e[0;2m")),
+                                wrap("\x1B[0;1m", hilite(attrPath, attrPathMatch, "\x1B[0;1m")),
+                                wrap("\x1B[0;2m", hilite(parsed.fullName, nameMatch, "\x1B[0;2m")),
                                 hilite(description, descriptionMatch, ANSI_NORMAL));
                         }
                     }
@@ -243,9 +243,11 @@ struct CmdSearch : SourceExprCommand, MixJSON
 
         else {
             createDirs(dirOf(jsonCacheFileName));
-
+#ifndef _WIN32
             Path tmpFile = fmt("%s.tmp.%d", jsonCacheFileName, getpid());
-
+#else
+            Path tmpFile = fmt("%s.tmp.%d", jsonCacheFileName, GetCurrentProcessId());
+#endif
             {
                 std::ofstream jsonCacheFile;
 

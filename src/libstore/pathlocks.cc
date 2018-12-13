@@ -113,7 +113,7 @@ bool lockFile(HANDLE handle, LockType lockType, bool wait)
 //            << std::endl;
     switch(lockType) {
         case ltNone: {
-            OVERLAPPED ov = { .Offset = 0 };
+            OVERLAPPED ov = { /*.Offset =*/ 0 };
             if (!UnlockFileEx(handle, 0, 2, 0, &ov)) {
                 WinError winError("UnlockFileEx(handle=%1%)", handle/*, handleToPath(handle)*/);
 //              std::cerr << "TODO: UnlockFileEx gle="<<winError.lastError << std::endl;
@@ -123,7 +123,7 @@ bool lockFile(HANDLE handle, LockType lockType, bool wait)
             return true;
         }
         case ltRead: {
-            OVERLAPPED ov = { .Offset = 0 };
+            OVERLAPPED ov = { /*.Offset =*/ 0 };
             if (!LockFileEx(handle, wait ? 0 : LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &ov)) {
                 WinError winError("LockFileEx(handle=%1%)", handle/*, handleToPath(handle)*/);
 //              std::cerr << "TODO: LockFileEx gle="<<winError.lastError << std::endl;
@@ -144,7 +144,8 @@ bool lockFile(HANDLE handle, LockType lockType, bool wait)
             return true;
         }
         case ltWrite: {
-            OVERLAPPED ov = { .Offset = 1 };
+            OVERLAPPED ov = { 0 };
+            ov.Offset = 1;
             if (!LockFileEx(handle, LOCKFILE_EXCLUSIVE_LOCK | (wait ? 0 : LOCKFILE_FAIL_IMMEDIATELY), 0, 1, 0, &ov)) {
                 WinError winError("LockFileEx(handle=%1%)", handle/*, handleToPath(handle)*/);
 //              std::cerr << "TODO: LockFileEx gle="<<winError.lastError << std::endl;

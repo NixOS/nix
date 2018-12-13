@@ -141,6 +141,20 @@ extern Verbosity verbosity; /* suppress msgs > this */
 /* Print a message if the current log level is at least the specified
    level. Note that this has to be implemented as a macro to ensure
    that the arguments are evaluated lazily. */
+#ifdef _MSC_VER
+#define printMsg(level, ...) \
+    do { \
+        if (level <= nix::verbosity) { \
+            logger->log(level, fmt(__VA_ARGS__)); \
+        } \
+    } while (0)
+
+#define printError(...) printMsg(lvlError, __VA_ARGS__)
+#define printInfo(...) printMsg(lvlInfo, __VA_ARGS__)
+#define printTalkative(...) printMsg(lvlTalkative, __VA_ARGS__)
+#define debug(...) printMsg(lvlDebug, __VA_ARGS__)
+#define vomit(...) printMsg(lvlVomit, __VA_ARGS__)
+#else
 #define printMsg(level, args...) \
     do { \
         if (level <= nix::verbosity) { \
@@ -153,6 +167,7 @@ extern Verbosity verbosity; /* suppress msgs > this */
 #define printTalkative(args...) printMsg(lvlTalkative, args)
 #define debug(args...) printMsg(lvlDebug, args)
 #define vomit(args...) printMsg(lvlVomit, args)
+#endif
 
 template<typename... Args>
 inline void warn(const std::string & fs, Args... args)

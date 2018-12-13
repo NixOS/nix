@@ -3,9 +3,9 @@
 #include "download.hh"
 #include "store-api.hh"
 #include "pathlocks.hh"
-
+#ifndef _MSC_VER
 #include <sys/time.h>
-
+#endif
 #include <regex>
 
 #include <nlohmann/json.hpp>
@@ -25,7 +25,7 @@ struct GitInfo
 std::regex revRegex("^[0-9a-fA-F]{40}$");
 
 GitInfo exportGit(ref<Store> store, const std::string & uri,
-    std::experimental::optional<std::string> ref, std::string rev,
+    optional<std::string> ref, std::string rev,
     const std::string & name)
 {
     if (evalSettings.pureEval && rev == "")
@@ -68,9 +68,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
                 assert(hasPrefix(p, uri));
                 std::string file(p, uri.size() + 1);
 
-                auto st = lstatPath(p);
-
-                if (S_ISDIR(st.st_mode)) {
+                if (isDirectory(p)) {
                     auto prefix = file + "/";
                     auto i = files.lower_bound(prefix);
                     return i != files.end() && hasPrefix(*i, prefix);
@@ -234,7 +232,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
 static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     std::string url;
-    std::experimental::optional<std::string> ref;
+    optional<std::string> ref;
     std::string rev;
     std::string name = "source";
     PathSet context;

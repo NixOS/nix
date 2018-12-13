@@ -12,9 +12,11 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifndef _MSC_VER
 #include <sys/time.h>
 #include <unistd.h>
 #include <utime.h>
+#endif
 #include <fcntl.h>
 #include <errno.h>
 #include <stdio.h>
@@ -55,7 +57,11 @@ LocalStore::LocalStore(const Params & params)
     , schemaPath(dbDir + "/schema")
     , trashDir(realStoreDir + "/trash")
     , tempRootsDir(stateDir + "/temproots")
+#ifndef _WIN32
     , fnTempRoots(fmt("%s/%d", tempRootsDir, getpid()))
+#else
+    , fnTempRoots(fmt("%s/%d", tempRootsDir, GetCurrentProcessId()))
+#endif
 {
     auto state(_state.lock());
 
@@ -310,8 +316,10 @@ int LocalStore::getSchema()
 
 void LocalStore::openDB(State & state, bool create)
 {
+#ifndef _WIN32
     if (access(dbDir.c_str(), R_OK | W_OK))
         throw PosixError(format("Nix database directory '%1%' is not writable") % dbDir);
+#endif
 
     /* Open the Nix database. */
     string dbPath = dbDir + "/db.sqlite";
@@ -561,7 +569,7 @@ void canonicalisePathMetaData(const Path & path, uid_t fromUid)
 
 #else
 
-const FILETIME mtimeStore = { .dwLowDateTime = 0xD5D71680, .dwHighDateTime = 0x019DB1DE };  /* 1970/01/01 + 1 second */
+const FILETIME mtimeStore = { /*.dwLowDateTime =*/ 0xD5D71680, /*.dwHighDateTime =*/ 0x019DB1DE };  /* 1970/01/01 + 1 second */
 
 static void canonicaliseTimestampAndPermissions4(const std::wstring & wpath, HANDLE hFile, DWORD dwFileAttributes, FILETIME ftLastWriteTime)
 {
@@ -1369,7 +1377,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 #endif
 
     PathSet store;
-    for (auto & i : readDirectory(realStoreDir)) store.insert(i.name);
+    for (auto & i : readDirectory(realStoreDir)) store.insert(i.name());
 
     /* Check whether all valid paths actually exist. */
     printInfo("checking path existence...");

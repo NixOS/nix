@@ -94,7 +94,7 @@ public:
         if (!state->active) return;
         state->active = false;
         std::string status = getStatus(*state);
-        writeToStderr("\r\e[K");
+        writeToStderr("\r\x1B[K");
         if (status != "")
             writeToStderr("[" + status + "]\n");
         updateCV.notify_one();
@@ -109,7 +109,7 @@ public:
 
     void log(State & state, Verbosity lvl, const std::string & s)
     {
-        writeToStderr("\r\e[K" + s + ANSI_NORMAL "\n");
+        writeToStderr("\r\x1B[K" + s + ANSI_NORMAL "\n");
         draw(state);
     }
 
@@ -311,7 +311,7 @@ public:
 #endif
         if (width <= 0) std::numeric_limits<decltype(width)>::max();
 
-        writeToStderr("\r" + filterANSIEscapes(line, false, width) + "\e[K");
+        writeToStderr("\r" + filterANSIEscapes(line, false, width) + "\x1B[K");
     }
 
     std::string getStatus(State & state)

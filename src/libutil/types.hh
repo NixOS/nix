@@ -3,6 +3,10 @@
 #ifdef _WIN32
 #include <winsock2.h>
 #include <windows.h>
+#ifdef _MSC_VER
+#undef min
+#undef max
+#endif
 #endif
 
 #include "ref.hh"

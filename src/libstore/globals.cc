@@ -47,14 +47,22 @@ Settings::Settings()
     , nixDaemonSocketFile(canonPath(nixStateDir + DEFAULT_SOCKET_PATH))
 #endif
 {
-//  fprintf(stderr, "NixStore=%s\n", nixStore.c_str());
-//  fprintf(stderr, "NixDataDir=%s\n", nixDataDir.c_str());
-//  fprintf(stderr, "NixLogDir=%s\n", nixLogDir.c_str());
-//  fprintf(stderr, "NixStateDir=%s\n", nixStateDir.c_str());
-//  fprintf(stderr, "NixConfDir=%s\n", nixConfDir.c_str());
-//  fprintf(stderr, "NixLibexecDir=%s\n", nixLibexecDir.c_str());
-//  fprintf(stderr, "NixBinDir=%s\n", nixBinDir.c_str());
-//  fprintf(stderr, "NixManDir=%s\n", nixManDir.c_str());
+    fprintf(stderr, "NixStore=%s\n",        nixStore.c_str());
+    fprintf(stderr, "NixDataDir=%s\n",      nixDataDir.c_str());
+    fprintf(stderr, "NixLogDir=%s\n",       nixLogDir.c_str());
+    fprintf(stderr, "NixStateDir=%s\n",     nixStateDir.c_str());
+    fprintf(stderr, "NixConfDir=%s\n",      nixConfDir.c_str());
+    fprintf(stderr, "NixLibexecDir=%s\n",   nixLibexecDir.c_str());
+    fprintf(stderr, "NixBinDir=%s\n",       nixBinDir.c_str());
+    fprintf(stderr, "NixManDir=%s\n",       nixManDir.c_str());
+    assert(!nixStore.empty());
+    assert(!nixDataDir.empty());
+    assert(!nixLogDir.empty());
+    assert(!nixStateDir.empty());
+    assert(!nixConfDir.empty());
+    assert(!nixLibexecDir.empty());
+    assert(!nixBinDir.empty());
+    assert(!nixManDir.empty());
 
 #ifndef _WIN32
     buildUsersGroup = getuid() == 0 ? "nixbld" : "";

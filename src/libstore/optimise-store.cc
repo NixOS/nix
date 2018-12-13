@@ -6,7 +6,9 @@
 #include <cstring>
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifndef _MSC_VER
 #include <unistd.h>
+#endif
 #include <errno.h>
 #include <stdio.h>
 #include <regex>
@@ -375,9 +377,9 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     MakeReadOnly makeReadOnly(mustToggle ? dirOf(path) : "");
 #endif
 
+#ifndef _WIN32
     Path tempLink = (format("%1%/.tmp-link-%2%-%3%")
         % realStoreDir % getpid() % random()).str();
-#ifndef _WIN32
     if (link(linkPath.c_str(), tempLink.c_str()) == -1) {
         if (errno == EMLINK) {
             /* Too many links to the same file (>= 32000 on most file
@@ -390,6 +392,8 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
         throw PosixError("cannot link '%1%' to '%2%'", tempLink, linkPath);
     }
 #else
+    Path tempLink = (format("%1%/.tmp-link-%2%-%3%")
+        % realStoreDir % GetCurrentProcessId() % random()).str();
     if (!CreateHardLinkW(pathW(tempLink).c_str(), pathW(linkPath).c_str(), NULL)) {
         throw WinError("CreateHardLinkW-2 '%1%' '%2%'", linkPath, tempLink);
     }

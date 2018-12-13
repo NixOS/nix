@@ -7,8 +7,8 @@
 #include <sys/stat.h>
 #ifndef _MSC_VER
 #include <dirent.h>
-#endif
 #include <unistd.h>
+#endif
 #include <signal.h>
 
 #include <functional>
@@ -16,8 +16,18 @@
 #include <cstdio>
 #include <map>
 #include <sstream>
+#ifdef _MSC_VER
+#include <optional>
+using std::optional;
+#else
 #include <experimental/optional>
+using std::experimental::optional;
+#endif
 #include <future>
+
+#ifdef _WIN32
+#include <iostream>
+#endif
 
 #ifndef HAVE_STRUCT_DIRENT_D_TYPE
 #define DT_UNKNOWN 0
@@ -86,23 +96,38 @@ Path readLink(const Path & path);
 
 bool isLink(const Path & path);
 
+bool isDirectory(const Path & path);
+
 /* Read the contents of a directory.  The entries `.' and `..' are
    removed. */
-// TODO: deprecate on Windows
+#ifndef _WIN32
 struct DirEntry
 {
-    string name;
-#ifndef _WIN32
-    ino_t ino;
-#endif
-    unsigned char type; // one of DT_*
+    const string name_;
+    const ino_t ino;
+    const unsigned char type_; // one of DT_*
+
+    const string & name() const { return name_; }
+    unsigned char  type() const { return type_; }
     DirEntry(const string & name, ino_t ino, unsigned char type)
-        : name(name),
-#ifndef _WIN32
-          ino(ino), 
-#endif
-          type(type) { }
+        : name(name), ino(ino), type(type) { }
 };
+#else
+struct DirEntry
+{
+          string   name() const { return to_bytes(wfd.cFileName); }
+    unsigned char  type() const {
+        if (wfd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) { return DT_LNK; }
+        if (wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY    ) { return DT_DIR; }
+        if (wfd.dwFileAttributes & FILE_ATTRIBUTE_NORMAL       ) { return DT_REG; }
+        if (wfd.dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE      ) { return DT_REG; }
+        std::cerr <<" .type() = DT_UNKNOWN (wfd.dwFileAttributes = "  << wfd.dwFileAttributes << ")" << std::endl;
+        return DT_UNKNOWN;
+    }
+
+    WIN32_FIND_DATAW wfd;
+};
+#endif
 
 typedef vector<DirEntry> DirEntries;
 
@@ -120,9 +145,13 @@ string readFile(const Path & path, bool drain = false);
 void readFile(const Path & path, Sink & sink);
 
 /* Write a string to a file. */
+#ifndef _WIN32
 void writeFile(const Path & path, const string & s, mode_t mode = 0666);
-
 void writeFile(const Path & path, Source & source, mode_t mode = 0666);
+#else
+void writeFile(const Path & path, const string & s, bool setReadOnlyAttribute = false);
+void writeFile(const Path & path, Source & source, bool setReadOnlyAttribute = false);
+#endif
 
 /* Read a line from a file descriptor. */
 #ifndef _WIN32
@@ -277,9 +306,7 @@ public:
     AutoCloseWindowsHandle hRead, hWrite;
     void createPipe();
 };
-#endif
 
-#ifdef _WIN32
 class AsyncPipe
 {
 public:
@@ -291,7 +318,7 @@ public:
 };
 #endif
 
-
+#ifndef _WIN32
 struct DIRDeleter
 {
     void operator()(DIR * dir) const {
@@ -300,6 +327,16 @@ struct DIRDeleter
 };
 
 typedef std::unique_ptr<DIR, DIRDeleter> AutoCloseDir;
+#else
+struct DIRDeleter
+{
+    void operator()(HANDLE dir) const {
+        FindClose(dir);
+    }
+};
+
+typedef std::unique_ptr<HANDLE, DIRDeleter> AutoCloseDir;
+#endif
 
 
 #ifndef _WIN32
@@ -360,14 +397,14 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = P
    shell backtick operator). */
 string runProgramGetStdout(Path program, bool searchPath = false,
     const Strings & args = Strings(),
-    const std::experimental::optional<std::string> & input = {});
+    const optional<std::string> & input = {});
 
 struct RunOptions
 {
     Path program;
     bool searchPath = true;
     Strings args;
-    std::experimental::optional<std::string> input;
+    optional<std::string> input;
     Source * standardIn = nullptr;
     Sink * standardOut = nullptr;
     bool _killStderr = false;
@@ -505,11 +542,11 @@ void ignoreException();
 
 /* Some ANSI escape sequences. */
 #ifndef _WIN32
-#define ANSI_NORMAL "\e[0m"
-#define ANSI_BOLD "\e[1m"
-#define ANSI_RED "\e[31;1m"
-#define ANSI_GREEN "\e[32;1m"
-#define ANSI_BLUE "\e[34;1m"
+#define ANSI_NORMAL "\x1B[0m"
+#define ANSI_BOLD "\x1B[1m"
+#define ANSI_RED "\x1B[31;1m"
+#define ANSI_GREEN "\x1B[32;1m"
+#define ANSI_BLUE "\x1B[34;1m"
 #else
 #define ANSI_NORMAL ""
 #define ANSI_BOLD ""
@@ -517,7 +554,6 @@ void ignoreException();
 #define ANSI_GREEN ""
 #define ANSI_BLUE ""
 #endif
-
 
 /* Truncate a string to 'width' printable characters. If 'filterAll'
    is true, all ANSI escape sequences are filtered out. Otherwise,

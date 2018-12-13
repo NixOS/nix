@@ -104,10 +104,10 @@ void mainWrapped(int argc, char * * argv)
     if (!args.command) args.showHelpAndExit();
 
     Finally f([]() { stopProgressBar(); });
-
+#ifndef _WIN32
     if (isatty(STDERR_FILENO))
         startProgressBar();
-
+#endif
     args.command->prepare();
     args.command->run();
 }

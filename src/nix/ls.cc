@@ -30,8 +30,11 @@ struct MixLs : virtual Args, MixJSON
             if (verbose) {
                 auto st = accessor->stat1(curPath);
                 std::string tp =
-                    st.type == FSAccessor::Type::tRegular ?
-                        (st.isExecutable ? "-r-xr-xr-x" : "-r--r--r--") :
+                    st.type == FSAccessor::Type::tRegular ? (
+#ifndef _WIN32
+                        st.isExecutable ? "-r-xr-xr-x" :
+#endif
+                        "-r--r--r--") :
                     st.type == FSAccessor::Type::tSymlink ? "lrwxrwxrwx" :
                     "dr-xr-xr-x";
                 std::cout <<

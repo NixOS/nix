@@ -516,8 +516,9 @@ formal
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#ifndef _MSC_VER
 #include <unistd.h>
-
+#endif
 #include "eval.hh"
 #include "download.hh"
 #include "store-api.hh"
@@ -549,8 +550,8 @@ Expr * EvalState::parse(const char * text,
 
 Path resolveExprPath(Path path)
 {
-    assert(
 #ifdef _WIN32
+    assert(
            ( path.length() >= 7 &&
              path[0] == '\\' &&
              path[1] == '\\' &&
@@ -563,9 +564,11 @@ Path resolveExprPath(Path path)
              (('A' <= path[0] && path[0] <= 'Z') || ('a' <= path[0] && path[0] <= 'z')) &&
              path[1] == ':' &&
              isslash(path[2])) ||
-#endif
            path[0] == '/'
           );
+#else
+    assert(path[0] == '/');
+#endif
     /* If `path' is a symlink, follow it.  This is so that relative
        path references work. */
 

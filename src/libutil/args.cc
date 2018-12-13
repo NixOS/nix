@@ -182,7 +182,7 @@ std::string renderLabels(const Strings & labels)
 {
     std::string res;
     for (auto label : labels) {
-        for (auto & c : label) c = std::toupper(c);
+        for (auto & c : label) c = std::toupper(c, std::locale());
         res += " <" + label + ">";
     }
     return res;

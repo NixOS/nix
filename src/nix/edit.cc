@@ -4,7 +4,9 @@
 #include "attr-path.hh"
 #include "progress-bar.hh"
 
+#ifndef _MSC_VER
 #include <unistd.h>
+#endif
 
 using namespace nix;
 
@@ -71,9 +73,11 @@ struct CmdEdit : InstallableCommand
         args.push_back(filename);
 
         stopProgressBar();
-
+#ifndef _WIN32
         execvp(args.front().c_str(), stringsToCharPtrs(args).data());
-
+#else
+// TODO:
+#endif
         throw PosixError("cannot run editor '%s'", editor);
     }
 };

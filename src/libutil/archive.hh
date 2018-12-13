@@ -56,7 +56,9 @@ struct ParseSink
     virtual void createDirectory(const Path & path) { };
 
     virtual void createRegularFile(const Path & path) { };
+#ifndef _WIN32
     virtual void isExecutable() { };
+#endif
     virtual void preallocateContents(unsigned long long size) { };
     virtual void receiveContents(unsigned char * data, unsigned int len) { };
 

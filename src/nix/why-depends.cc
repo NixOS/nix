@@ -92,7 +92,10 @@ struct CmdWhyDepends : SourceExprCommand
 
         auto accessor = store->getFSAccessor();
 
-        auto const inf = std::numeric_limits<size_t>::max();
+#ifdef _MSC_VER
+        static
+#endif
+        const size_t inf = std::numeric_limits<size_t>::max();
 
         struct Node
         {
@@ -159,7 +162,7 @@ struct CmdWhyDepends : SourceExprCommand
             assert(node.dist != inf);
             std::cout << fmt("%s%s%s%s" ANSI_NORMAL "\n",
                 firstPad,
-                node.visited ? "\e[38;5;244m" : "",
+                node.visited ? "\x1B[38;5;244m" : "",
                 firstPad != "" ? "=> " : "",
                 node.path);
 

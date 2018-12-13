@@ -3,9 +3,9 @@
 #include "download.hh"
 #include "store-api.hh"
 #include "pathlocks.hh"
-
+#ifndef _MSC_VER
 #include <sys/time.h>
-
+#endif
 #include <regex>
 #include <iostream>
 
@@ -69,9 +69,7 @@ HgInfo exportMercurial(ref<Store> store, const std::string & uri,
                 assert(hasPrefix(p, uri));
                 std::string file(p, uri.size() + 1);
 
-                auto st = lstatPath(p);
-
-                if (S_ISDIR(st.st_mode)) {
+                if (isDirectory(p)) {
                     auto prefix = file + "/";
                     auto i = files.lower_bound(prefix);
                     return i != files.end() && hasPrefix(*i, prefix);

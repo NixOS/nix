@@ -322,7 +322,8 @@ struct CmdRun : InstallablesCommand
 //      std::cerr << "_________________shebang='"    <<         (shebang)           << "'" << std::endl;
 //      std::cerr << "_________________ucmdline='"   << to_bytes(ucmdline)          << "'" << std::endl;
 
-        STARTUPINFOW si = { .cb = sizeof(STARTUPINFOW) };
+        STARTUPINFOW si = {0};
+        si.cb = sizeof(STARTUPINFOW);
         PROCESS_INFORMATION pi = {0};
         if (!CreateProcessW(
             pathW(shebang.empty() ? executable : shebang).c_str(),         // LPCWSTR               lpApplicationName,

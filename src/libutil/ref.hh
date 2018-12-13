@@ -16,6 +16,11 @@ private:
     std::shared_ptr<T> p;
 
 public:
+#ifdef _MSC_VER
+    // avoid "'nix::ref<nix::ValidPathInfo>': no appropriate default constructor available"
+    ref<T>()
+    { }
+#endif
 
     ref<T>(const ref<T> & r)
         : p(r.p)

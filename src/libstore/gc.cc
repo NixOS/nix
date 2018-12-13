@@ -16,12 +16,13 @@
 #endif
 #include <errno.h>
 #include <fcntl.h>
+#ifndef _MSC_VER
 #include <unistd.h>
+#endif
 #include <climits>
 
 #ifdef _WIN32
 #include <iostream>
-#define random() rand()
 #endif
 
 namespace nix {
@@ -88,7 +89,7 @@ static void makeSymlink(const Path & link, const Path & target)
 #else
 //std::cerr << "MoveFileExW '"<<tempLink<<"' -> '"<<link<<"'"<<std::endl;
     Path tempLink = (format("%1%.tmp~%2%~%3%")
-        % link % getpid() % random()).str();
+        % link % GetCurrentProcessId() % rand()).str();
 
     SymlinkType st = createSymlink(target, tempLink);
 
@@ -96,7 +97,7 @@ static void makeSymlink(const Path & link, const Path & target)
     std::wstring wlink     = pathW(absPath(link)); // already absolute?
     if (!MoveFileExW(wtempLink.c_str(), wlink.c_str(), MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)) {
         // so try once more harder (atomicity suffers here)
-        std::wstring old = pathW(absPath((format("%1%.old~%2%~%3%") % link % getpid() % random()).str()));
+        std::wstring old = pathW(absPath((format("%1%.old~%2%~%3%") % link % GetCurrentProcessId() % rand()).str()));
         if (!MoveFileExW(wlink.c_str(), old.c_str(), MOVEFILE_WRITE_THROUGH))
             throw WinError("MoveFileExW '%1%' -> '%2%'", to_bytes(wlink), to_bytes(old));
         // repeat
@@ -343,7 +344,7 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
 
         if (type == DT_DIR) {
             for (auto & i : readDirectory(path))
-                findRoots(path + "/" + i.name, i.type, roots);
+                findRoots(path + "/" + i.name(), i.type(), roots);
         }
 
         else if (type == DT_LNK) {
@@ -596,7 +597,6 @@ void LocalStore::deleteGarbage(GCState & state, const Path & path)
     state.results.bytesFreed += bytesFreed;
 }
 
-// TODO: make a native Windows version
 void LocalStore::deletePathRecursive(GCState & state, const Path & path)
 {
     checkInterrupt();
@@ -613,16 +613,21 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
     }
 
     Path realPath = realStoreDir + "/" + baseNameOf(path);
-
-    struct stat st;
 #ifndef _WIN32
+    struct stat st;
     if (lstat(realPath.c_str(), &st)) {
-#else
-    if (stat(realPath.c_str(), &st)) {
-#endif
         if (errno == ENOENT) return;
         throw PosixError(format("getting status-9 of %1%") % realPath);
     }
+#else
+    WIN32_FILE_ATTRIBUTE_DATA wfad;
+    if (!GetFileAttributesExW(pathW(realPath).c_str(), GetFileExInfoStandard, &wfad)) {
+        WinError winError("GetFileAttributesExW when deletePathRecursive '%1%'", realPath);
+        if (winError.lastError == ERROR_FILE_NOT_FOUND)
+            return;
+        throw winError;
+    }
+#endif
 
     printInfo(format("deleting '%1%'") % path);
 
@@ -633,6 +638,7 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
        not holding the global GC lock) we can delete the path without
        being afraid that the path has become alive again.  Otherwise
        delete it right away. */
+#ifndef _WIN32
     if (state.moveToTrash && S_ISDIR(st.st_mode)) {
         // Estimate the amount freed using the narSize field.  FIXME:
         // if the path was not valid, need to determine the actual
@@ -649,9 +655,18 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
                 printInfo(format("note: can't create move '%1%': %2%") % realPath % e.msg());
                 deleteGarbage(state, realPath);
             }
+        }
+#else
+    if (state.moveToTrash && (wfad.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+        try {
+            Path tmp = trashDir + "/" + baseNameOf(path);
+            if (!MoveFileExW(pathW(realPath).c_str(), pathW(tmp).c_str(), MOVEFILE_WRITE_THROUGH))
+                throw WinError(format("unable to rename '%1%' to '%2%'") % realPath % tmp);
+            state.bytesInvalidated += size;
         } catch (WinError & e) {
             throw e; // TODO
         }
+#endif
     } else
         deleteGarbage(state, realPath);
 
@@ -939,7 +954,8 @@ std::cerr << "LocalStore::collectGarbage" <<std::endl;
             printError(format("determining live/dead paths..."));
 
         try {
-
+            Paths entries;
+#ifndef _WIN32
             AutoCloseDir dir(opendir(realStoreDir.c_str()));
             if (!dir) throw PosixError(format("opening directory '%1%'") % realStoreDir);
 
@@ -949,7 +965,6 @@ std::cerr << "LocalStore::collectGarbage" <<std::endl;
                paths, since unreachable paths could become reachable
                again.  We don't use readDirectory() here so that GCing
                can start faster. */
-            Paths entries;
             struct dirent * dirent;
             while (errno = 0, dirent = readdir(dir.get())) {
                 checkInterrupt();
@@ -963,6 +978,30 @@ std::cerr << "LocalStore::collectGarbage" <<std::endl;
             }
 
             dir.reset();
+#else
+            WIN32_FIND_DATAW wfd;
+            HANDLE hFind = FindFirstFileExW((pathW(realStoreDir) + L"\\*").c_str(), FindExInfoBasic, &wfd, FindExSearchNameMatch, NULL, 0);
+            if (hFind == INVALID_HANDLE_VALUE) {
+                throw WinError("FindFirstFileExW when collectGarbage '%1%'", realStoreDir);
+            } else {
+                do {
+                    checkInterrupt();
+                    if ((wfd.cFileName[0] == '.' && wfd.cFileName[1] == '\0')
+                     || (wfd.cFileName[0] == '.' && wfd.cFileName[1] == '.' && wfd.cFileName[2] == '\0')) {
+                    } else {
+                        Path path = storeDir + "/" + to_bytes(wfd.cFileName);
+                        if (isStorePath(path) && isValidPath(path))
+                            entries.push_back(path);
+                        else
+                            tryToDelete(state, path);
+                    }
+                } while(FindNextFileW(hFind, &wfd));
+                WinError winError("FindNextFileW when collectGarbage '%1%'", realStoreDir);
+                if (winError.lastError != ERROR_NO_MORE_FILES)
+                    throw winError;
+                FindClose(hFind);
+            }
+#endif
 
             /* Now delete the unreachable valid paths.  Randomise the
                order in which we delete entries to make the collector

@@ -80,8 +80,10 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_)
                     if (fd.get() == INVALID_HANDLE_VALUE)
                         throw WinError("CreateFileW when RemoteFSAccessor::fetch '%1%'", cacheFile);
 
+                    LARGE_INTEGER setOffset;
+                    setOffset.QuadPart = offset;
                     LARGE_INTEGER newOffset;
-                    if (!SetFilePointerEx(fd.get(), {offset}, &newOffset, FILE_BEGIN) || offset != newOffset.QuadPart)
+                    if (!SetFilePointerEx(fd.get(), setOffset, &newOffset, FILE_BEGIN) || offset != newOffset.QuadPart)
                         throw WinError("CreateFileW when RemoteFSAccessor::fetch '%1%'", cacheFile);
 #endif
 

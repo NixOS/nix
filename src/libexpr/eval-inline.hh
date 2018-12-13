@@ -2,8 +2,13 @@
 
 #include "eval.hh"
 
+#ifdef _MSC_VER
+#define LocalNoInline(f) static __declspec(noinline) f
+#define LocalNoInlineNoReturn(f) static __declspec(noinline, noreturn) f
+#else
 #define LocalNoInline(f) static f __attribute__((noinline)); f
 #define LocalNoInlineNoReturn(f) static f __attribute__((noinline, noreturn)); f
+#endif
 
 namespace nix {
 

@@ -22,11 +22,15 @@
 #include <regex>
 
 #include <limits.h>
+#ifndef _MSC_VER
 #include <sys/time.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#ifndef _MSC_VER
 #include <unistd.h>
+#endif
 #include <errno.h>
 #include <cstring>
 
@@ -1537,7 +1541,11 @@ void replaceValidPath(const Path & storePath, const Path tmpPath)
        tmpPath (the replacement), so we have to move it out of the
        way first.  We'd better not be interrupted here, because if
        we're repairing (say) Glibc, we end up with a broken system. */
+#ifndef _WIN32
     Path oldPath = (format("%1%.old-%2%-%3%") % storePath % getpid() % random()).str();
+#else
+    Path oldPath = (format("%1%.old-%2%-%3%") % storePath % GetCurrentProcessId() % random()).str();
+#endif
     if (pathExists(storePath))
         rename(storePath.c_str(), oldPath.c_str());
     if (rename(tmpPath.c_str(), storePath.c_str()) == -1)
@@ -2244,7 +2252,9 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
     asyncBuilderOut.createAsyncPipe(worker.ioport.get());
 
     // Must be inheritable so subprocesses can dup to children.
-    SECURITY_ATTRIBUTES sa = { .nLength = sizeof(SECURITY_ATTRIBUTES), .bInheritHandle = TRUE };
+    SECURITY_ATTRIBUTES sa = {0};
+    sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+    sa.bInheritHandle = TRUE;
     nul = CreateFileA("NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, &sa, OPEN_EXISTING, 0, NULL);
     if (!nul.get())
         throw WinError("CreateFileA(NUL)");
@@ -2526,13 +2536,12 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
         uenvline += i.first + L'=' + i.second + L'\0';
     uenvline += L'\0';
 
-    STARTUPINFOW si = {
-        .cb = sizeof(STARTUPINFOW),
-        .dwFlags = STARTF_USESTDHANDLES,
-        .hStdInput = nul.get(),
-        .hStdOutput = asyncBuilderOut.hWrite.get(),
-        .hStdError = asyncBuilderOut.hWrite.get()
-    };
+    STARTUPINFOW si = {0};
+    si.cb = sizeof(STARTUPINFOW);
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdInput = nul.get();
+    si.hStdOutput = asyncBuilderOut.hWrite.get();
+    si.hStdError = asyncBuilderOut.hWrite.get();
     PROCESS_INFORMATION pi = {0};
 
     if (!CreateProcessW(
@@ -2701,7 +2710,7 @@ void DerivationGoal::writeStructuredAttrs()
            objects consisting entirely of those values. (So nested
            arrays or objects are not supported.) */
 
-        auto handleSimpleType = [](const nlohmann::json & value) -> std::experimental::optional<std::string> {
+        auto handleSimpleType = [](const nlohmann::json & value) -> optional<std::string> {
             if (value.is_string())
                 return shellEscape(value);
 
@@ -3358,18 +3367,16 @@ void DerivationGoal::registerOutputs()
                 actualPath = redirected;
         }
 
-        struct stat st;
 #ifndef _WIN32
+        struct stat st;
         if (lstat(actualPath.c_str(), &st) == -1) {
-#else
-        if (stat(actualPath.c_str(), &st) == -1) {
-#endif
             if (errno == ENOENT)
                 throw BuildError(
                     format("builder for '%1%' failed to produce output path '%2%'")
                     % drvPath % path);
             throw PosixError(format("getting attributes of path '%1%'") % actualPath);
         }
+#endif
 
 #ifndef _WIN32
 #ifndef __CYGWIN__
@@ -3418,11 +3425,11 @@ void DerivationGoal::registerOutputs()
             if (!recursive) {
                 /* The output path should be a regular file without
                    execute permission. */
-                if (!S_ISREG(st.st_mode)
 #ifndef _WIN32
-                    || (st.st_mode & S_IXUSR) != 0
+                if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
+#else
+                if (getFileType(actualPath) != DT_REG)
 #endif
-                    )
                     throw BuildError(
                         format("output path '%1%' should be a non-executable regular file") % path);
             }
@@ -3707,7 +3714,9 @@ void DerivationGoal::deleteTmpDir(bool force)
             printError(
                 format("note: keeping build directory '%2%'")
                 % drvPath % tmpDir);
+#ifndef _WIN32
             chmod(tmpDir.c_str(), 0755);
+#endif
         }
         else
             deletePath(tmpDir);
@@ -4672,7 +4681,7 @@ std::cerr << "bytesRead     " << bytesRead                 << std::endl;
         while (p != j->pipes.end()) {
             decltype(p) nextp = p+1;
             for (ULONG i = 0; i<removed; i++) {
-                if (oentries[i].lpCompletionKey == (ULONG_PTR)(*p)->hRead.get() ^ 0x5555) {
+                if (oentries[i].lpCompletionKey == ((ULONG_PTR)((*p)->hRead.get()) ^ 0x5555)) {
                     if (oentries[i].dwNumberOfBytesTransferred > 0) {
                         printMsg(lvlVomit, format("%1%: read %2% bytes") % goal->getName() % oentries[i].dwNumberOfBytesTransferred);
                         string data((char *) (*p)->buffer.data(), oentries[i].dwNumberOfBytesTransferred);

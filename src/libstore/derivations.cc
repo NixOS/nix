@@ -83,7 +83,11 @@ Path writeDerivation(ref<Store> store,
 /* Read string `s' from stream `str'. */
 static void expect(std::istream & str, const string & s)
 {
+#ifdef _MSC_VER
+    char * s2 = static_cast<char *>(alloca(s.size()));
+#else
     char s2[s.size()];
+#endif
     str.read(s2, s.size());
     if (string(s2, s.size()) != s)
         throw FormatError(format("expected string '%1%'") % s);

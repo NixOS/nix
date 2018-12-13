@@ -295,7 +295,7 @@ static bool getDerivation(EvalState & state, Value & v,
 }
 
 
-std::experimental::optional<DrvInfo> getDerivation(EvalState & state, Value & v,
+optional<DrvInfo> getDerivation(EvalState & state, Value & v,
     bool ignoreAssertionFailures)
 {
     Done done;

@@ -6,12 +6,16 @@
 #include <iostream>
 #endif
 
+#ifndef _MSC_VER
 #include <strings.h> // for strcasecmp
+#endif
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifndef _MSC_VER
 #include <unistd.h>
 #include <dirent.h>
+#endif
 #include <fcntl.h>
 
 #include "archive.hh"
@@ -252,7 +256,11 @@ struct CaseInsensitiveCompare
 {
     bool operator() (const string & a, const string & b) const
     {
+#ifdef _MSC_VER
+        return _stricmp(a.c_str(), b.c_str()) < 0;
+#else
         return strcasecmp(a.c_str(), b.c_str()) < 0;
+#endif
     }
 };
 
@@ -303,13 +311,13 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
         else if (s == "contents" && type == tpRegular) {
             parseContents(sink, source, path);
         }
-
+#ifndef _WIN32
         else if (s == "executable" && type == tpRegular) {
             auto s = readString(source);
             if (s != "") throw badArchive("executable marker has non-empty value");
             sink.isExecutable();
         }
-
+#endif
         else if (s == "entry" && type == tpDirectory) {
             string name, prevName;
 

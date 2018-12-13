@@ -1,5 +1,8 @@
 #include "json.hh"
 
+#ifdef _MSC_VER
+#include <string> // for operator <<(std::string)
+#endif
 #include <iomanip>
 #include <cstring>
 

@@ -52,10 +52,11 @@ protected:
         PathSet paths;
 
         for (auto & entry : readDirectory(binaryCacheDir)) {
-            if (entry.name.size() != 40 ||
-                !hasSuffix(entry.name, ".narinfo"))
+            auto name = entry.name();
+            if (name.size() != 40 ||
+                !hasSuffix(name, ".narinfo"))
                 continue;
-            paths.insert(storeDir + "/" + entry.name.substr(0, entry.name.size() - 8));
+            paths.insert(storeDir + "/" + name.substr(0, name.size() - 8));
         }
 
         return paths;
@@ -71,13 +72,16 @@ void LocalBinaryCacheStore::init()
 
 static void atomicWrite(const Path & path, const std::string & s)
 {
+#ifndef _WIN32
     Path tmp = path + ".tmp." + std::to_string(getpid());
     AutoDelete del(tmp, false);
     writeFile(tmp, s);
-#ifndef _WIN32
     if (rename(tmp.c_str(), path.c_str()))
         throw PosixError(format("renaming '%1%' to '%2%'") % tmp % path);
 #else
+    Path tmp = path + ".tmp." + std::to_string(GetCurrentProcessId());
+    AutoDelete del(tmp, false);
+    writeFile(tmp, s);
     if (!MoveFileExW(pathW(tmp).c_str(), pathW(path).c_str(), MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))
         throw WinError("MoveFileExW in atomicWrite '%1%' to '%2%'", tmp, path);
 #endif

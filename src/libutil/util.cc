@@ -18,7 +18,9 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <sys/types.h>
+#ifndef _MSC_VER
 #include <unistd.h>
+#endif
 
 #ifdef __APPLE__
 #include <sys/syscall.h>
@@ -50,7 +52,7 @@ static std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 std::string to_bytes(const std::wstring & path) { return converter.to_bytes(path); }
 std::wstring from_bytes(const std::string & s) { return converter.from_bytes(s); }
 
-std::experimental::optional<std::wstring> maybePathW(const Path & path) {
+optional<std::wstring> maybePathW(const Path & path) {
     if (path.length() >= 3 && (('A' <= path[0] && path[0] <= 'Z') || ('a' <= path[0] && path[0] <= 'z')) && path[1] == ':' && isslash(path[2])) {
         std::wstring sw = from_bytes("\\\\?\\" + path);
         std::replace(sw.begin(), sw.end(), '/', '\\');
@@ -62,11 +64,11 @@ std::experimental::optional<std::wstring> maybePathW(const Path & path) {
         std::replace(sw.begin(), sw.end(), '/', '\\');
         return sw;
     }
-    return std::experimental::optional<std::wstring>();
+    return optional<std::wstring>();
 }
 
 std::wstring pathW(const Path & path) {
-    std::experimental::optional<std::wstring> sw = maybePathW(path);
+    optional<std::wstring> sw = maybePathW(path);
     if (!sw) {
         std::cerr << "invalid path for WinAPI call ["<<path<<"]"<<std::endl;
         _exit(111);
@@ -296,7 +298,7 @@ Path absPath(Path path, Path dir)
 #endif
 
 
-std::experimental::optional<Path> maybeCanonPath(const Path & path, bool resolveSymlinks)
+optional<Path> maybeCanonPath(const Path & path, bool resolveSymlinks)
 {
 // std::cerr << "canonPath("<<file<<":"<<line<<" "<<path<<", resolveSymlinks="<<resolveSymlinks<<")"<<std::endl;
 // if (path.find(';') != Path::npos){
@@ -315,10 +317,10 @@ std::experimental::optional<Path> maybeCanonPath(const Path & path, bool resolve
         i += 6;
         s = path.substr(4, 2);
     } else
-        return std::experimental::optional<Path>();
+        return optional<Path>();
 #else
     if (path[0] != '/')
-        return std::experimental::optional<Path>();
+        return optional<Path>();
 #endif
 
     string temp;
@@ -377,7 +379,7 @@ std::experimental::optional<Path> maybeCanonPath(const Path & path, bool resolve
 }
 
 Path canonPath(const Path & path, bool resolveSymlinks) {
-    std::experimental::optional<Path> mb = maybeCanonPath(path, resolveSymlinks);
+    optional<Path> mb = maybeCanonPath(path, resolveSymlinks);
     if (!mb)
         throw Error(format("not an absolute path: '%1%'") % path);
     return *mb;
@@ -485,10 +487,10 @@ bool isInDir(const Path & path, const Path & dir)
         && path.size() >= dir.size() + 2
         && path[dir.size()] == '/';
 #else
-    std::experimental::optional<Path> cpath = maybeCanonPath(path, false);
+    optional<Path> cpath = maybeCanonPath(path, false);
     if (!cpath)
         return false;
-    std::experimental::optional<Path> cdir  = maybeCanonPath(dir, false);
+    optional<Path> cdir  = maybeCanonPath(dir, false);
     if (!cdir)
         return false;
     return (*cpath).compare(0, (*cdir).size(), *cdir) == 0
@@ -500,7 +502,7 @@ bool isInDir(const Path & path, const Path & dir)
 
 bool isDirOrInDir(const Path & path, const Path & dir)
 {
-    return path == dir or isInDir(path, dir);
+    return path == dir || isInDir(path, dir);
 }
 
 // todo: get rid of stat(), is has a lot of unexpected MSYS magic
@@ -647,10 +649,14 @@ bool isLink(const Path & path)
     return getFileType(path) == DT_LNK;
 }
 
+bool isDirectory(const Path & path)
+{
+    return getFileType(path) == DT_DIR;
+}
 
+#ifndef _WIN32
 DirEntries readDirectory(const Path & path)
 {
-std::cerr << "readDirectory("<<path<<")"<<std::endl;
     DirEntries entries;
     entries.reserve(64);
 
@@ -674,6 +680,36 @@ std::cerr << "readDirectory("<<path<<")"<<std::endl;
 
     return entries;
 }
+#else
+DirEntries readDirectory(const Path & path)
+{
+std::cerr << "readDirectory("<<path<<")"<<std::endl;
+    DirEntries entries;
+    entries.reserve(64);
+
+    const std::wstring wpath = pathW(path);
+
+    WIN32_FIND_DATAW wfd;
+    HANDLE hFind = FindFirstFileExW((wpath + L"\\*").c_str(), FindExInfoBasic, &wfd, FindExSearchNameMatch, NULL, 0);
+    if (hFind == INVALID_HANDLE_VALUE) {
+        throw WinError("FindFirstFileExW when readDirectory '%1%'", path);
+    } else {
+        do {
+            if ((wfd.cFileName[0] == '.' && wfd.cFileName[1] == '\0')
+             || (wfd.cFileName[0] == '.' && wfd.cFileName[1] == '.' && wfd.cFileName[2] == '\0')) {
+            } else {
+                entries.emplace_back(DirEntry{wfd});
+            }
+        } while(FindNextFileW(hFind, &wfd));
+        WinError winError("FindNextFileW when readDirectory '%1%'", path);
+        if (winError.lastError != ERROR_NO_MORE_FILES)
+            throw winError;
+        FindClose(hFind);
+    }
+
+    return entries;
+}
+#endif
 
 
 unsigned char getFileType(const Path & path)
@@ -758,37 +794,39 @@ void readFile(const Path & path, Sink & sink)
 }
 
 
+#ifndef _WIN32
 void writeFile(const Path & path, const string & s, mode_t mode)
 {
-#ifndef _WIN32
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
         throw PosixError(format("opening file '%1%'") % path);
 #else
-//std::cerr << "writeFile-1(" << path << ")" << std::endl;
+void writeFile(const Path & path, const string & s, bool setReadOnlyAttribute)
+{
     AutoCloseWindowsHandle fd = CreateFileW(pathW(path).c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
-                                            ((mode & 0200) == 0 ? FILE_ATTRIBUTE_READONLY : FILE_ATTRIBUTE_NORMAL) | FILE_FLAG_POSIX_SEMANTICS,
+                                            (setReadOnlyAttribute ? FILE_ATTRIBUTE_READONLY : FILE_ATTRIBUTE_NORMAL) | FILE_FLAG_POSIX_SEMANTICS,
                                             NULL);
     if (fd.get() == INVALID_HANDLE_VALUE)
-        throw WinError("CreateFileW when writeFile '%1%' s.length=%2% mode=%3%", path, s.length(), mode);
+        throw WinError("CreateFileW when writeFile '%1%' s.length=%2%", path, s.length());
 #endif
     writeFull(fd.get(), s);
 }
 
 
+#ifndef _WIN32
 void writeFile(const Path & path, Source & source, mode_t mode)
 {
-#ifndef _WIN32
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
         throw PosixError(format("opening file '%1%'") % path);
 #else
-//std::cerr << "writeFile-2(" << path << ")" << std::endl;
+void writeFile(const Path & path, Source & source, bool setReadOnlyAttribute)
+{
     AutoCloseWindowsHandle fd = CreateFileW(pathW(path).c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
-                                            ((mode & 0200) == 0 ? FILE_ATTRIBUTE_READONLY : FILE_ATTRIBUTE_NORMAL) | FILE_FLAG_POSIX_SEMANTICS,
+                                            (setReadOnlyAttribute ? FILE_ATTRIBUTE_READONLY : FILE_ATTRIBUTE_NORMAL) | FILE_FLAG_POSIX_SEMANTICS,
                                             NULL);
     if (fd.get() == INVALID_HANDLE_VALUE)
-        throw WinError("CreateFileW when writeFile '%1%' mode=%2%", path, mode);
+        throw WinError("CreateFileW when writeFile '%1%'", path);
 #endif
 
     std::vector<unsigned char> buf(64 * 1024);
@@ -982,17 +1020,22 @@ static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
 //std::cerr << "tempName("<<tmpRoot<<", "<<prefix<<", includePid="<<includePid<<", counter="<<counter<<")"<<std::endl;
 #ifndef _WIN32
     if (tmpRoot.empty()) tmpRoot = getEnv("TMPDIR", "/tmp");
-#else
-    if (tmpRoot.empty()) tmpRoot = getEnv("TMPDIR");
-    if (tmpRoot.empty()) tmpRoot = getEnv("TMP");
-    if (tmpRoot.empty()) tmpRoot = getEnv("TEMP");
-    if (tmpRoot.empty()) throw Error("both '%TEMP%' and '%TMP%' are empty");
-#endif
     tmpRoot = canonPath(tmpRoot, true);
     if (includePid)
         return (format("%1%/%2%-%3%-%4%") % tmpRoot % prefix % getpid() % counter++).str();
     else
         return (format("%1%/%2%-%3%") % tmpRoot % prefix % counter++).str();
+#else
+    if (tmpRoot.empty()) tmpRoot = getEnv("TMPDIR");
+    if (tmpRoot.empty()) tmpRoot = getEnv("TMP");
+    if (tmpRoot.empty()) tmpRoot = getEnv("TEMP");
+    if (tmpRoot.empty()) throw Error("both '%TEMP%' and '%TMP%' are empty");
+    tmpRoot = canonPath(tmpRoot, true);
+    if (includePid)
+        return (format("%1%/%2%-%3%-%4%") % tmpRoot % prefix % GetCurrentProcessId() % counter++).str();
+    else
+        return (format("%1%/%2%-%3%") % tmpRoot % prefix % counter++).str();
+#endif
 }
 
 
@@ -1176,7 +1219,7 @@ SymlinkType createSymlink(const Path & target, const Path & link)
     assert(target[0] != '/' && link[0] != '/');
     BOOLEAN rc;
     std::wstring wlink = pathW(link);
-    std::experimental::optional<std::wstring> wtarget = maybePathW(target);
+    optional<std::wstring> wtarget = maybePathW(target);
     SymlinkType st;
     if (!wtarget) {
         std::cerr << "path not absolute (" << target  << "), so make a dangling symlink" << std::endl;
@@ -1246,7 +1289,7 @@ void replaceSymlink(const Path & target, const Path & link)
 
         if (!MoveFileExW(pathW(tmp).c_str(), pathW(link).c_str(), MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)) {
             // MOVEFILE_REPLACE_EXISTING might fail with access denied, so try once more harder (atomicity suffers here)
-            std::wstring old = pathW(absPath((format("%1%.old~%2%-%3%") % link % getpid() % random()).str()));
+            std::wstring old = pathW(absPath((format("%1%.old~%2%-%3%") % link % GetCurrentProcessId() % random()).str()));
             if (!MoveFileExW(pathW(link).c_str(), old.c_str(), MOVEFILE_WRITE_THROUGH))
                 throw WinError("MoveFileExW '%1%' -> '%2%'", link, to_bytes(old));
             // repeat
@@ -1601,17 +1644,17 @@ void AsyncPipe::createAsyncPipe(HANDLE iocp) {
     if (!hRead)
         throw WinError("CreateNamedPipeA(%s)", pipeName);
 
-    HANDLE hIocp = CreateIoCompletionPort(hRead.get(), iocp, (ULONG_PTR)hRead.get() ^ 0x5555, 0);
+    HANDLE hIocp = CreateIoCompletionPort(hRead.get(), iocp, (ULONG_PTR)(hRead.get()) ^ 0x5555, 0);
     if (hIocp != iocp)
         throw WinError("CreateIoCompletionPort(%x[%s], %x, ...) returned %x", hRead.get(), pipeName, iocp, hIocp);
 
     if (!ConnectNamedPipe(hRead.get(), &overlapped) && GetLastError() != ERROR_IO_PENDING)
         throw WinError("ConnectNamedPipe(%s)", pipeName);
 
-    SECURITY_ATTRIBUTES psa2 = {
-        .nLength = sizeof(SECURITY_ATTRIBUTES),
-        .bInheritHandle = TRUE
-    };
+    SECURITY_ATTRIBUTES psa2 = {0};
+    psa2.nLength = sizeof(SECURITY_ATTRIBUTES);
+    psa2.bInheritHandle = TRUE;
+
     hWrite = CreateFileA(pipeName.c_str(), GENERIC_WRITE, 0, &psa2, OPEN_EXISTING, 0, NULL);
     if (!hRead)
         throw WinError("CreateFileA(%s)", pipeName);
@@ -1636,18 +1679,17 @@ void Pipe::create()
 
 void Pipe::createPipe()
 {
-    SECURITY_ATTRIBUTES saAttr = {
-         .nLength = sizeof(SECURITY_ATTRIBUTES),
-         .lpSecurityDescriptor = NULL,
-         .bInheritHandle = TRUE
-     };
+    SECURITY_ATTRIBUTES saAttr = {0};
+    saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
+    saAttr.lpSecurityDescriptor = NULL;
+    saAttr.bInheritHandle = TRUE;
 
-     HANDLE hReadPipe, hWritePipe;
-     if (!CreatePipe(&hReadPipe, &hWritePipe, &saAttr, 0))
-         throw WinError("CreatePipe");
+    HANDLE hReadPipe, hWritePipe;
+    if (!CreatePipe(&hReadPipe, &hWritePipe, &saAttr, 0))
+        throw WinError("CreatePipe");
 
-     hRead = hReadPipe;
-     hWrite = hWritePipe;
+    hRead = hReadPipe;
+    hWrite = hWritePipe;
 }
 #endif
 
@@ -1927,7 +1969,7 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
 
 
 string runProgramGetStdout(Path program, bool searchPath, const Strings & args,
-    const std::experimental::optional<std::string> & input)
+    const optional<std::string> & input)
 {
     RunOptions opts(program, args);
     opts.searchPath = searchPath;
@@ -2035,11 +2077,15 @@ if (options.input)
         uenvline += i.first + L'=' + i.second + L'\0';
     uenvline += L'\0';
 
-    STARTUPINFOW si = { .cb = sizeof(STARTUPINFOW), .dwFlags = STARTF_USESTDHANDLES };
+    STARTUPINFOW si = {0};
+    si.cb = sizeof(STARTUPINFOW);
+    si.dwFlags = STARTF_USESTDHANDLES;
 
     AutoCloseWindowsHandle nul;
     if (!source || !options.standardOut) {
-        SECURITY_ATTRIBUTES sa = { .nLength = sizeof(SECURITY_ATTRIBUTES), .bInheritHandle = TRUE };
+        SECURITY_ATTRIBUTES sa = {0};
+        sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+        sa.bInheritHandle = TRUE;
         nul = CreateFileA("NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, &sa, OPEN_EXISTING, 0, NULL);
         if (!nul.get())
             throw WinError("CreateFileA(NUL)");
@@ -2488,7 +2534,7 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
 
     while (w < (size_t) width && i != s.end()) {
 
-        if (*i == '\e') {
+        if (*i == '\x1B') {
             std::string e;
             e += *i++;
             char last = 0;

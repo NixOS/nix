@@ -10,16 +10,19 @@
 #include <mutex>
 
 #include <cstdlib>
-#include <sys/time.h>
 #include <sys/stat.h>
+#ifndef _MSC_VER
+#include <sys/time.h>
 #include <unistd.h>
+#else
+#include <io.h>
+#endif
 #include <signal.h>
 
 #include <openssl/crypto.h>
 
 #ifdef _WIN32
 #include <fcntl.h>
-#define srandom(x) srand(x)
 #endif
 
 
@@ -139,16 +142,19 @@ void initNix()
 #endif
     /* Register a SIGSEGV handler to detect stack overflows. */
     detectStackOverflow();
-
+#ifndef _WIN32
     /* There is no privacy in the Nix system ;-)  At least not for
        now.  In particular, store objects should be readable by
        everybody. */
     umask(0022);
+#endif
 
     /* Initialise the PRNG. */
+#ifndef _WIN32
     struct timeval tv;
     gettimeofday(&tv, 0);
     srandom(tv.tv_usec);
+#endif
 
     /* On macOS, don't use the per-session TMPDIR (as set e.g. by
        sshd). This breaks build users because they don't have access

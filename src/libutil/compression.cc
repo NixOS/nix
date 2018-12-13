@@ -8,8 +8,10 @@
 #include <cstdio>
 #include <cstring>
 
+#ifndef _MSC_VER // brotli and cmake not ported to nix/msvc yet
 #include <brotli/decode.h>
 #include <brotli/encode.h>
+#endif
 
 #include <iostream>
 
@@ -147,6 +149,7 @@ struct BzipDecompressionSink : ChunkedCompressionSink
     }
 };
 
+#ifndef _MSC_VER
 struct BrotliDecompressionSink : ChunkedCompressionSink
 {
     Sink & nextSink;
@@ -197,6 +200,7 @@ struct BrotliDecompressionSink : ChunkedCompressionSink
         }
     }
 };
+#endif
 
 ref<std::string> decompress(const std::string & method, const std::string & in)
 {
@@ -215,8 +219,10 @@ ref<CompressionSink> makeDecompressionSink(const std::string & method, Sink & ne
         return make_ref<XzDecompressionSink>(nextSink);
     else if (method == "bzip2")
         return make_ref<BzipDecompressionSink>(nextSink);
+#ifndef _MSC_VER
     else if (method == "br")
         return make_ref<BrotliDecompressionSink>(nextSink);
+#endif
     else
         throw UnknownCompressionMethod("unknown compression method '%s'", method);
 }
@@ -353,6 +359,7 @@ struct BzipCompressionSink : ChunkedCompressionSink
     }
 };
 
+#ifndef _MSC_VER
 struct BrotliCompressionSink : ChunkedCompressionSink
 {
     Sink & nextSink;
@@ -405,6 +412,7 @@ struct BrotliCompressionSink : ChunkedCompressionSink
         }
     }
 };
+#endif
 
 ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel)
 {
@@ -414,8 +422,10 @@ ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & next
         return make_ref<XzCompressionSink>(nextSink, parallel);
     else if (method == "bzip2")
         return make_ref<BzipCompressionSink>(nextSink);
+#ifndef _MSC_VER
     else if (method == "br")
         return make_ref<BrotliCompressionSink>(nextSink);
+#endif
     else
         throw UnknownCompressionMethod(format("unknown compression method '%s'") % method);
 }

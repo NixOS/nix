@@ -4,7 +4,9 @@
 #include <cstddef>
 #include <cstdlib>
 
+#ifndef _MSC_VER
 #include <unistd.h>
+#endif
 #include <signal.h>
 
 namespace nix {

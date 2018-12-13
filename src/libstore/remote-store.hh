@@ -150,7 +150,7 @@ private:
     };
 
     ref<RemoteStore::Connection> openConnection() override;
-    std::experimental::optional<std::string> path;
+    optional<std::string> path;
 };
 
 

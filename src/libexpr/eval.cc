@@ -9,8 +9,10 @@
 
 #include <algorithm>
 #include <cstring>
+#ifndef _MSC_VER
 #include <unistd.h>
 #include <sys/time.h>
+#endif
 #ifndef _WIN32
 #include <sys/resource.h>
 #endif
@@ -1070,7 +1072,11 @@ void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
         /* We have all the arguments, so call the primop. */
 
         /* Put all the arguments in an array. */
+#ifdef _MSC_VER
+        Value ** vArgs = static_cast<Value **>(alloca(arity * sizeof(Value*)));
+#else
         Value * vArgs[arity];
+#endif
         auto n = arity - 1;
         vArgs[n--] = &arg;
         for (Value * arg = &fun; arg->type == tPrimOpApp; arg = arg->primOpApp.left)

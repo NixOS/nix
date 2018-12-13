@@ -15,7 +15,9 @@ public:
     {
         Type type = tMissing;
         uint64_t fileSize = 0; // regular files only
+#ifndef _WIN32
         bool isExecutable = false; // regular files only
+#endif
         uint64_t narOffset = 0; // regular files only
     };
 

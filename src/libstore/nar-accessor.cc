@@ -13,9 +13,9 @@ namespace nix {
 struct NarMember
 {
     FSAccessor::Type type = FSAccessor::Type::tMissing;
-
+#ifndef _WIN32
     bool isExecutable = false;
-
+#endif
     /* If this is a regular file, position of the contents of this
        file in the NAR. */
     size_t start = 0, size = 0;
@@ -71,12 +71,12 @@ struct NarAccessor : public FSAccessor
         {
             createMember(path, {FSAccessor::Type::tRegular, false, 0, 0});
         }
-
+#ifndef _WIN32
         void isExecutable() override
         {
             parents.top()->isExecutable = true;
         }
-
+#endif
         void preallocateContents(unsigned long long size) override
         {
             currentStart = string(s, pos, 16);
@@ -97,7 +97,11 @@ struct NarAccessor : public FSAccessor
         void createSymlink(const Path & path, const string & target) override
         {
             createMember(path,
-                NarMember{FSAccessor::Type::tSymlink, false, 0, 0, target});
+                NarMember{FSAccessor::Type::tSymlink,
+#ifndef _WIN32
+                            false,
+#endif
+                            0, 0, target});
         }
     };
 
@@ -126,7 +130,9 @@ struct NarAccessor : public FSAccessor
             } else if (type == "regular") {
                 member.type = FSAccessor::Type::tRegular;
                 member.size = v["size"];
+#ifndef _WIN32
                 member.isExecutable = v.value("executable", false);
+#endif
                 member.start = v["narOffset"];
             } else if (type == "symlink") {
                 member.type = FSAccessor::Type::tSymlink;
@@ -176,7 +182,11 @@ struct NarAccessor : public FSAccessor
         auto i = find(path);
         if (i == nullptr)
             return {FSAccessor::Type::tMissing, 0, false};
-        return {i->type, i->size, i->isExecutable, i->start};
+        return {i->type, i->size,
+#ifndef _WIN32
+            i->isExecutable,
+#endif
+            i->start};
     }
 
     StringSet readDirectory(const Path & path) override
@@ -236,8 +246,10 @@ void listNar(JSONPlaceholder & res, ref<FSAccessor> accessor,
     case FSAccessor::Type::tRegular:
         obj.attr("type", "regular");
         obj.attr("size", st.fileSize);
+#ifndef _WIN32
         if (st.isExecutable)
             obj.attr("executable", true);
+#endif
         if (st.narOffset)
             obj.attr("narOffset", st.narOffset);
         break;

@@ -51,12 +51,13 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
             restorePath(storePath, *source);
         else
             writeFile(storePath, *source);
-
+#ifndef _WIN32
         auto executable = drv.env.find("executable");
         if (executable != drv.env.end() && executable->second == "1") {
             if (chmod(storePath.c_str(), 0755) == -1)
                 throw PosixError(format("making '%1%' executable") % storePath);
         }
+#endif
     };
 
     /* Try the hashed mirrors first. */

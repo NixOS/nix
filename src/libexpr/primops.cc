@@ -15,7 +15,9 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifndef _MSC_VER
 #include <unistd.h>
+#endif
 
 #include <algorithm>
 #include <cstring>
@@ -569,7 +571,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     PathSet context;
 
-    std::experimental::optional<std::string> outputHash;
+    optional<std::string> outputHash;
     std::string outputHashAlgo;
     bool outputHashRecursive = false;
 
@@ -958,13 +960,15 @@ static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Val
     state.mkAttrs(v, entries.size());
 
     for (auto & ent : entries) {
-        Value * ent_val = state.allocAttr(v, state.symbols.create(ent.name));
-        if (ent.type == DT_UNKNOWN)
-            ent.type = getFileType(path + "/" + ent.name);
+        auto name = ent.name();
+        auto type = ent.type();
+        Value * ent_val = state.allocAttr(v, state.symbols.create(name));
+        if (type == DT_UNKNOWN)
+            type = getFileType(path + "/" + name);
         mkStringNoCopy(*ent_val,
-            ent.type == DT_REG ? "regular" :
-            ent.type == DT_DIR ? "directory" :
-            ent.type == DT_LNK ? "symlink" :
+            type == DT_REG ? "regular" :
+            type == DT_DIR ? "directory" :
+            type == DT_LNK ? "symlink" :
             "unknown");
     }
 
@@ -1320,8 +1324,11 @@ static void prim_catAttrs(EvalState & state, const Pos & pos, Value * * args, Va
 {
     Symbol attrName = state.symbols.create(state.forceStringNoCtx(*args[0], pos));
     state.forceList(*args[1], pos);
-
+#ifdef _MSC_VER
+    Value ** res = static_cast<Value **>(alloca(args[1]->listSize() * sizeof(Value *)));
+#else
     Value * res[args[1]->listSize()];
+#endif
     unsigned int found = 0;
 
     for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
@@ -1461,7 +1468,11 @@ static void prim_filter(EvalState & state, const Pos & pos, Value * * args, Valu
     state.forceList(*args[1], pos);
 
     // FIXME: putting this on the stack is risky.
+#ifdef _MSC_VER
+    Value ** vs = static_cast<Value **>(alloca(args[1]->listSize() * sizeof(Value *)));
+#else
     Value * vs[args[1]->listSize()];
+#endif
     unsigned int k = 0;
 
     bool same = true;
@@ -1666,7 +1677,11 @@ static void prim_concatMap(EvalState & state, const Pos & pos, Value * * args, V
     state.forceList(*args[1], pos);
     auto nrLists = args[1]->listSize();
 
+#ifdef _MSC_VER
+    Value * lists = static_cast<Value *>(alloca(nrLists * sizeof(Value)));
+#else
     Value lists[nrLists];
+#endif
     size_t len = 0;
 
     for (unsigned int n = 0; n < nrLists; ++n) {

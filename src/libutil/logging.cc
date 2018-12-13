@@ -27,7 +27,7 @@ void Logger::warn(const std::string & msg)
 class SimpleLogger : public Logger
 {
 public:
-
+#ifndef _WIN32
     bool systemd, tty;
 
     SimpleLogger()
@@ -55,7 +55,16 @@ public:
 
         writeToStderr(prefix + filterANSIEscapes(fs.s, !tty) + "\n");
     }
+#else
+    void log(Verbosity lvl, const FormatOrString & fs) override
+    {
+        if (lvl > verbosity) return;
 
+        std::string prefix;
+
+        writeToStderr(prefix + fs.s + "\n");
+    }
+#endif
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
         const std::string & s, const Fields & fields, ActivityId parent)
         override
@@ -96,7 +105,13 @@ Logger * makeDefaultLogger()
     return new SimpleLogger();
 }
 
-std::atomic<uint64_t> nextId{(uint64_t) getpid() << 32};
+std::atomic<uint64_t> nextId{
+#ifndef _WIN32
+        (uint64_t) getpid() << 32
+#else
+        (uint64_t) GetCurrentProcessId() << 32
+#endif
+    };
 
 Activity::Activity(Logger & logger, Verbosity lvl, ActivityType type,
     const std::string & s, const Logger::Fields & fields, ActivityId parent)

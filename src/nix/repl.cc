@@ -229,8 +229,9 @@ StringSet NixRepl::completePrefix(string prefix)
             auto dir = std::string(cur, 0, slash);
             auto prefix2 = std::string(cur, slash + 1);
             for (auto & entry : readDirectory(dir == "" ? "/" : dir)) {
-                if (entry.name[0] != '.' && hasPrefix(entry.name, prefix2))
-                    completions.insert(prev + dir + "/" + entry.name);
+                auto name = entry.name();
+                if (name[0] != '.' && hasPrefix(name, prefix2))
+                    completions.insert(prev + dir + "/" + name);
             }
         } catch (Error &) {
         }

@@ -4,7 +4,9 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifndef _MSC_VER
 #include <unistd.h>
+#endif
 #include <errno.h>
 #include <stdio.h>
 
@@ -44,9 +46,10 @@ Generations findGenerations(Path profile, int & curGen)
 
     for (auto & i : readDirectory(profileDir)) {
         int n;
-        if ((n = parseName(profileName, i.name)) != -1) {
+        auto name = i.name();
+        if ((n = parseName(profileName, name)) != -1) {
             Generation gen;
-            gen.path = profileDir + "/" + i.name;
+            gen.path = profileDir + "/" + name;
             gen.number = n;
             struct stat st;
 #ifndef _WIN32

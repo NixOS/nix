@@ -13,7 +13,9 @@
 #include <aws/core/client/ClientConfiguration.h>
 #endif
 
+#ifndef _MSC_VER
 #include <unistd.h>
+#endif
 #include <fcntl.h>
 
 #include <curl/curl.h>
