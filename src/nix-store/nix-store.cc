@@ -1000,6 +1000,9 @@ static int _main(int argc, char * * argv)
         Strings opFlags, opArgs;
         Operation op = 0;
 
+        Hash h("sha512-Q2bFTOhEALkN8hOms2FKTDLy7eugP2zFZ1T8LCvX42Fp3WoNr3bjZSAHeOsHrbV1Fu9/A0EzCinRE7Af1ofPrw==");
+        printError("GOT HASH %s", h.to_string(Base64));
+
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             Operation oldOp = op;
 

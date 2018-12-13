@@ -724,16 +724,14 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         if (outputs.size() != 1 || *(outputs.begin()) != "out")
             throw Error(format("multiple outputs are not supported in fixed-output derivations, at %1%") % posDrvName);
 
-        HashType ht = parseHashType(outputHashAlgo);
-        if (ht == htUnknown)
-            throw EvalError(format("unknown hash algorithm '%1%', at %2%") % outputHashAlgo % posDrvName);
+        HashType ht = outputHashAlgo.empty() ? htUnknown : parseHashType(outputHashAlgo);
         Hash h(*outputHash, ht);
-        outputHash = h.to_string(Base16, false);
-        if (outputHashRecursive) outputHashAlgo = "r:" + outputHashAlgo;
 
         Path outPath = state.store->makeFixedOutputPath(outputHashRecursive, h, drvName);
         if (!jsonObject) drv.env["out"] = outPath;
-        drv.outputs["out"] = DerivationOutput(outPath, outputHashAlgo, *outputHash);
+        drv.outputs["out"] = DerivationOutput(outPath,
+            (outputHashRecursive ? "r:" : "") + printHashType(h.type),
+            h.to_string(Base16, false));
     }
 
     else {

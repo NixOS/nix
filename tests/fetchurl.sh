@@ -18,6 +18,17 @@ outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh 
 
 cmp $outPath fetchurl.sh
 
+# Now using an SRI hash.
+clearStore
+
+hash=$(nix hash-file ./fetchurl.sh)
+
+[[ $hash =~ ^sha512- ]]
+
+outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr hash $hash --no-out-link --hashed-mirrors '')
+
+cmp $outPath fetchurl.sh
+
 # Test the hashed mirror feature.
 clearStore
 

@@ -9,13 +9,14 @@ struct CmdHash : Command
 {
     enum Mode { mFile, mPath };
     Mode mode;
-    Base base = Base16;
+    Base base = SRI;
     bool truncate = false;
-    HashType ht = htSHA512;
+    HashType ht = htSHA256;
     std::vector<std::string> paths;
 
     CmdHash(Mode mode) : mode(mode)
     {
+        mkFlag(0, "sri", "print hash in SRI format", &base, SRI);
         mkFlag(0, "base64", "print hash in base-64", &base, Base64);
         mkFlag(0, "base32", "print hash in base-32 (Nix-specific)", &base, Base32);
         mkFlag(0, "base16", "print hash in base-16", &base, Base16);
@@ -43,7 +44,7 @@ struct CmdHash : Command
             Hash h = mode == mFile ? hashFile(ht, path) : hashPath(ht, path).first;
             if (truncate && h.hashSize > 20) h = compressHash(h, 20);
             std::cout << format("%1%\n") %
-                h.to_string(base, false);
+                h.to_string(base, base == SRI);
         }
     }
 };
@@ -54,7 +55,7 @@ static RegisterCommand r2(make_ref<CmdHash>(CmdHash::mPath));
 struct CmdToBase : Command
 {
     Base base;
-    HashType ht = htSHA512;
+    HashType ht = htUnknown;
     std::vector<std::string> args;
 
     CmdToBase(Base base) : base(base)
@@ -70,26 +71,30 @@ struct CmdToBase : Command
         return
             base == Base16 ? "to-base16" :
             base == Base32 ? "to-base32" :
-            "to-base64";
+            base == Base64 ? "to-base64" :
+            "to-sri";
     }
 
     std::string description() override
     {
-        return fmt("convert a hash to base-%d representation",
-            base == Base16 ? 16 :
-            base == Base32 ? 32 : 64);
+        return fmt("convert a hash to %s representation",
+            base == Base16 ? "base-16" :
+            base == Base32 ? "base-32" :
+            base == Base64 ? "base-64" :
+            "SRI");
     }
 
     void run() override
     {
         for (auto s : args)
-            std::cout << fmt("%s\n", Hash(s, ht).to_string(base, false));
+            std::cout << fmt("%s\n", Hash(s, ht).to_string(base, base == SRI));
     }
 };
 
 static RegisterCommand r3(make_ref<CmdToBase>(Base16));
 static RegisterCommand r4(make_ref<CmdToBase>(Base32));
 static RegisterCommand r5(make_ref<CmdToBase>(Base64));
+static RegisterCommand r6(make_ref<CmdToBase>(SRI));
 
 /* Legacy nix-hash command. */
 static int compatNixHash(int argc, char * * argv)
