@@ -25,6 +25,12 @@
   If your distribution does not provide it, you can get it from <link
   xlink:href="https://www.openssl.org"/>.</para></listitem>
 
+  <listitem><para>The <literal>libbrotlienc</literal> and
+  <literal>libbrotlidec</literal> libraries to provide implementation
+  of the Brotli compression algorithm. They are available for download
+  from the official repository <link
+  xlink:href="https://github.com/google/brotli" />.</para></listitem>
+
   <listitem><para>The bzip2 compressor program and the
   <literal>libbz2</literal> library.  Thus you must have bzip2
   installed, including development headers and libraries.  If your
@@ -52,6 +58,10 @@
   pass the flag <option>--enable-gc</option> to
   <command>configure</command>.</para></listitem>
 
+  <listitem><para>The <literal>boost</literal> library of version
+  1.66.0 or higher. It can be obtained from the official web site
+  <link xlink:href="https://www.boost.org/" />.</para></listitem>
+
   <listitem><para>The <command>xmllint</command> and
   <command>xsltproc</command> programs to build this manual and the
   man-pages.  These are part of the <literal>libxml2</literal> and
@@ -76,6 +86,15 @@
   ubiquitous 2.5.4a won't.  Note that these are only required if you
   modify the parser or when you are building from the Git
   repository.</para></listitem>
+
+  <listitem><para>The <literal>libseccomp</literal> is used to provide
+  syscall filtering on Linux. This is an optional dependency and can
+  be disabled passing a <option>--disable-seccomp-sandboxing</option>
+  option to the <command>configure</command> script (Not recommended
+  unless your system doesn't support
+  <literal>libseccomp</literal>). To get the library, visit <link
+  xlink:href="https://github.com/seccomp/libseccomp"
+  />.</para></listitem>
 
 </itemizedlist>
 
