@@ -59,7 +59,7 @@
   <command>configure</command>.</para></listitem>
 
   <listitem><para>The <literal>boost</literal> library of version
-  1.61.0 or higher. It can be obtained from the official web site
+  1.66.0 or higher. It can be obtained from the official web site
   <link xlink:href="https://www.boost.org/" />.</para></listitem>
 
   <listitem><para>The <command>xmllint</command> and
