@@ -728,41 +728,51 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 
 void EvalState::evalFile(const Path & path_, Value & v)
 {
-    auto path = checkSourcePath(path_);
+    if (path_ == "-") {
+        Expr * e = parseStdin();
+        try {
+            eval(e, v);
+        } catch (Error & e) {
+            addErrorPrefix(e, "while evaluating %1%:\n", "<stdin>");
+            throw;
+        }
+    } else {
+        auto path = checkSourcePath(path_);
 
-    FileEvalCache::iterator i;
-    if ((i = fileEvalCache.find(path)) != fileEvalCache.end()) {
-        v = i->second;
-        return;
+        FileEvalCache::iterator i;
+        if ((i = fileEvalCache.find(path)) != fileEvalCache.end()) {
+            v = i->second;
+            return;
+        }
+
+        Path path2 = resolveExprPath(path);
+        if ((i = fileEvalCache.find(path2)) != fileEvalCache.end()) {
+            v = i->second;
+            return;
+        }
+
+        printTalkative("evaluating file '%1%'", path2);
+        Expr * e = nullptr;
+
+        auto j = fileParseCache.find(path2);
+        if (j != fileParseCache.end())
+            e = j->second;
+
+        if (!e)
+            e = parseExprFromFile(checkSourcePath(path2));
+
+        fileParseCache[path2] = e;
+
+        try {
+            eval(e, v);
+        } catch (Error & e) {
+            addErrorPrefix(e, "while evaluating the file '%1%':\n", path2);
+            throw;
+        }
+
+        fileEvalCache[path2] = v;
+        if (path != path2) fileEvalCache[path] = v;
     }
-
-    Path path2 = resolveExprPath(path);
-    if ((i = fileEvalCache.find(path2)) != fileEvalCache.end()) {
-        v = i->second;
-        return;
-    }
-
-    printTalkative("evaluating file '%1%'", path2);
-    Expr * e = nullptr;
-
-    auto j = fileParseCache.find(path2);
-    if (j != fileParseCache.end())
-        e = j->second;
-
-    if (!e)
-        e = parseExprFromFile(checkSourcePath(path2));
-
-    fileParseCache[path2] = e;
-
-    try {
-        eval(e, v);
-    } catch (Error & e) {
-        addErrorPrefix(e, "while evaluating the file '%1%':\n", path2);
-        throw;
-    }
-
-    fileEvalCache[path2] = v;
-    if (path != path2) fileEvalCache[path] = v;
 }
 
 
