@@ -154,7 +154,9 @@ input.</para>
     <listitem><para>When used with <option>--eval</option>, perform
     evaluation in read/write mode so nix language features that
     require it will still work (at the cost of needing to do
-    instantiation of every evaluated derivation).</para>
+    instantiation of every evaluated derivation). If this option is
+    not enabled, there may be uninstantiated store paths in the final
+    output.</para>
 
     </listitem>
 
