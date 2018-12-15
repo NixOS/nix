@@ -23,7 +23,7 @@ clearStore
 
 hash=$(nix hash-file ./fetchurl.sh)
 
-[[ $hash =~ ^sha512- ]]
+[[ $hash =~ ^sha256- ]]
 
 outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$(pwd)/fetchurl.sh --argstr hash $hash --no-out-link --hashed-mirrors '')
 
