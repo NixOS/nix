@@ -34,16 +34,16 @@ Settings settings;
 static GlobalConfig::Register r1(&settings);
 
 Settings::Settings()
-    : nixPrefix(NIX_PREFIX)
-    , nixStore(canonPath(getEnv("NIX_STORE_DIR", getEnv("NIX_STORE", NIX_STORE_DIR))))
+    : nixStore(canonPath(getEnv("NIX_STORE_DIR", getEnv("NIX_STORE", NIX_STORE_DIR))))
     , nixDataDir(canonPath(getEnv("NIX_DATA_DIR", NIX_DATA_DIR)))
     , nixLogDir(canonPath(getEnv("NIX_LOG_DIR", NIX_LOG_DIR)))
     , nixStateDir(canonPath(getEnv("NIX_STATE_DIR", NIX_STATE_DIR)))
     , nixConfDir(canonPath(getEnv("NIX_CONF_DIR", NIX_CONF_DIR)))
-    , nixLibexecDir(canonPath(getEnv("NIX_LIBEXEC_DIR", NIX_LIBEXEC_DIR)))
     , nixBinDir(canonPath(getEnv("NIX_BIN_DIR", NIX_BIN_DIR)))
-    , nixManDir(canonPath(NIX_MAN_DIR))
 #ifndef _WIN32
+    , nixPrefix(NIX_PREFIX)
+    , nixLibexecDir(canonPath(getEnv("NIX_LIBEXEC_DIR", NIX_LIBEXEC_DIR)))
+    , nixManDir(canonPath(NIX_MAN_DIR))
     , nixDaemonSocketFile(canonPath(nixStateDir + DEFAULT_SOCKET_PATH))
 #endif
 {
@@ -52,17 +52,13 @@ Settings::Settings()
     fprintf(stderr, "NixLogDir=%s\n",       nixLogDir.c_str());
     fprintf(stderr, "NixStateDir=%s\n",     nixStateDir.c_str());
     fprintf(stderr, "NixConfDir=%s\n",      nixConfDir.c_str());
-    fprintf(stderr, "NixLibexecDir=%s\n",   nixLibexecDir.c_str());
     fprintf(stderr, "NixBinDir=%s\n",       nixBinDir.c_str());
-    fprintf(stderr, "NixManDir=%s\n",       nixManDir.c_str());
     assert(!nixStore.empty());
     assert(!nixDataDir.empty());
     assert(!nixLogDir.empty());
     assert(!nixStateDir.empty());
     assert(!nixConfDir.empty());
-    assert(!nixLibexecDir.empty());
     assert(!nixBinDir.empty());
-    assert(!nixManDir.empty());
 
 #ifndef _WIN32
     buildUsersGroup = getuid() == 0 ? "nixbld" : "";

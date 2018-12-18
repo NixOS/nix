@@ -61,6 +61,7 @@ LocalStore::LocalStore(const Params & params)
     , fnTempRoots(fmt("%s/%d", tempRootsDir, getpid()))
 #else
     , fnTempRoots(fmt("%s/%d", tempRootsDir, GetCurrentProcessId()))
+//  , fnTempRoots((format("%1%/%2%") % tempRootsDir % GetCurrentProcessId()).str())
 #endif
 {
     auto state(_state.lock());

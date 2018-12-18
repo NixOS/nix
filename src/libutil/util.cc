@@ -1110,9 +1110,7 @@ static Lazy<Path> getHome2([]() {
         homeDir = pw->pw_dir;
     }
 #else
-    Path homeDir = getEnv("HOME");
-    if (homeDir.empty())
-        homeDir = getEnv("USERPROFILE");
+    Path homeDir = getEnv("USERPROFILE");
     assert(!homeDir.empty());
     homeDir = canonPath(homeDir);
 #endif
@@ -2071,12 +2069,14 @@ if (options.input)
     Pipe in, out;
 
     std::map<std::wstring, std::wstring> uenv;
-    uenv[L"HOME"] = getEnvW(L"HOME", L"");
-    uenv[L"TEMP"] = getEnvW(L"TEMP", L"");
-    uenv[L"PATH"] = getEnvW(L"PATH", L"");
-    std::cerr << "HOME=" << to_bytes(uenv[L"HOME"]) << std::endl;
-    std::cerr << "TEMP=" << to_bytes(uenv[L"TEMP"]) << std::endl;
-    std::cerr << "PATH=" << to_bytes(uenv[L"PATH"]) << std::endl;
+//  uenv[L"HOME"]        = getEnvW(L"HOME",        L"");
+    uenv[L"USERPROFILE"] = getEnvW(L"USERPROFILE", L"");
+    uenv[L"TEMP"]        = getEnvW(L"TEMP",        L"");
+    uenv[L"PATH"]        = getEnvW(L"PATH",        L"");
+//  std::cerr << "HOME="        << to_bytes(uenv[L"HOME"])        << std::endl;
+    std::cerr << "USERPROFILE=" << to_bytes(uenv[L"USERPROFILE"]) << std::endl;
+    std::cerr << "TEMP="        << to_bytes(uenv[L"TEMP"])        << std::endl;
+    std::cerr << "PATH="        << to_bytes(uenv[L"PATH"])        << std::endl;
 
     std::wstring uenvline;
     for (auto & i : uenv)

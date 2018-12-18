@@ -36,8 +36,6 @@ public:
 
     Settings();
 
-    Path nixPrefix;
-
     /* The directory where we store sources and derived files. */
     Path nixStore;
 
@@ -52,15 +50,17 @@ public:
     /* The directory where configuration files are stored. */
     Path nixConfDir;
 
+    /* The directory where the main programs are stored. */
+    Path nixBinDir;
+#ifndef _WIN32
+    Path nixPrefix;
+
     /* The directory where internal helper programs are stored. */
     Path nixLibexecDir;
 
-    /* The directory where the main programs are stored. */
-    Path nixBinDir;
-
     /* The directory where the man pages are stored. */
     Path nixManDir;
-#ifndef _WIN32
+
     /* File name of the socket the daemon listens to.  */
     Path nixDaemonSocketFile;
 #endif

@@ -112,7 +112,13 @@ void mainWrapped(int argc, char * * argv)
     std::string outLink = "./result";
 
     // List of environment variables kept for --pure
-    std::set<string> keepVars{"HOME", "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL", "TZ", "PAGER", "NIX_BUILD_SHELL", "SHLVL"};
+    std::set<string> keepVars{
+#ifndef _WIN32
+                              "HOME",
+#else
+                              "USERPROFILE",
+#endif
+                              "USER", "LOGNAME", "DISPLAY", "PATH", "TERM", "IN_NIX_SHELL", "TZ", "PAGER", "NIX_BUILD_SHELL", "SHLVL"};
 
     Strings args;
     for (int i = 1; i < argc; ++i)

@@ -2429,9 +2429,10 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
     if (drv->isBuiltin()) {
 
         if (drv->builder == "builtin:fetchurl") {
-            uenv[L"HOME"] = getEnvW(L"HOME", L"");
-            uenv[L"TEMP"] = getEnvW(L"TEMP", L"");
-            uenv[L"PATH"] = getEnvW(L"PATH", L"");
+//          uenv[L"HOME"]        = getEnvW(L"HOME", L"");
+            uenv[L"USERPROFILE"] = getEnvW(L"USERPROFILE", L"");
+            uenv[L"TEMP"]        = getEnvW(L"TEMP", L"");
+            uenv[L"PATH"]        = getEnvW(L"PATH", L"");
 
             uargs.push_back(from_bytes(dirOf(to_bytes(getArgv0W())) + "\\nix.exe")); // getArgv0W() might return path to nix-build.exe
             uargs.push_back(L"--hashed-mirrors");
@@ -2587,7 +2588,11 @@ void DerivationGoal::initEnv()
        if HOME is not set, but they will just assume that the settings file
        they are looking for does not exist if HOME is set but points to some
        non-existing path. */
+#ifdef _WIN32
+    env["USERPROFILE"] = homeDir;
+#else
     env["HOME"] = homeDir;
+#endif
 
     /* Tell the builder where the Nix store is.  Usually they
        shouldn't care, but this is useful for purity checking (e.g.,

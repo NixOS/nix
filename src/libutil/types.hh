@@ -44,7 +44,6 @@ using boost::format;
    for all variadic arguments but ignoring the result. */
 struct nop { template<typename... T> nop(T...) {} };
 
-
 struct FormatOrString
 {
     string s;
@@ -58,6 +57,16 @@ struct FormatOrString
    equivalent to ‘boost::format(format) % a_0 % ... %
    ... a_n’. However, ‘fmt(s)’ is equivalent to ‘s’ (so no %-expansion
    takes place). */
+
+inline void formatHelper(boost::format & f)
+{
+}
+
+template<typename T, typename... Args>
+inline void formatHelper(boost::format & f, T x, Args... args)
+{
+    formatHelper(f % x, args...);
+}
 
 inline std::string fmt(const std::string & s)
 {
@@ -79,7 +88,7 @@ inline std::string fmt(const std::string & fs, Args... args)
 {
     boost::format f(fs);
     f.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
-    nop{boost::io::detail::feed(f, args)...};
+    formatHelper(f, args...);
     return f.str();
 }
 
