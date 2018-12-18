@@ -201,7 +201,7 @@ int main(int argc, char * * argv)
                    that as the top-level. */
                 auto entries = readDirectory(unpacked);
                 if (entries.size() == 1)
-                    tmpFile = unpacked + "/" + entries[0].name;
+                    tmpFile = unpacked + "/" + entries[0].name();
                 else
                     tmpFile = unpacked;
             }

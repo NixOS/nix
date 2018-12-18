@@ -55,8 +55,8 @@ template<class N> N getIntArg(const string & opt,
     string s = *i;
     N multiplier = 1;
     if (allowUnit && !s.empty()) {
-        char u = std::toupper(*s.rbegin());
-        if (std::isalpha(u)) {
+        char u = std::toupper(*s.rbegin(), std::locale());
+        if (std::isalpha(u, std::locale())) {
             if (u == 'K') multiplier = 1ULL << 10;
             else if (u == 'M') multiplier = 1ULL << 20;
             else if (u == 'G') multiplier = 1ULL << 30;

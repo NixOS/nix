@@ -23,7 +23,9 @@
 using namespace nix;
 using namespace std::string_literals;
 
+#ifndef _WIN32
 extern char * * environ;
+#endif
 
 /* Recreate the effect of the perl shellwords function, breaking up a
  * string into arguments like a shell word, including escapes
@@ -84,7 +86,11 @@ void mainWrapped(int argc, char * * argv)
     auto fromArgs = false;
     auto packages = false;
     // Same condition as bash uses for interactive shells
+#ifdef _MSC_VER
+    auto interactive = false;
+#else
     auto interactive = isatty(STDIN_FILENO) && isatty(STDERR_FILENO);
+#endif
     Strings attrPaths;
     Strings left;
     RepairFlag repair = NoRepair;

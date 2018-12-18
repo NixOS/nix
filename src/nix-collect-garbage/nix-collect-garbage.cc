@@ -15,9 +15,9 @@ bool dryRun = false;
 /* If `-d' was specified, remove all old generations of all profiles.
  * Of course, this makes rollbacks to before this point in time
  * impossible. */
-// TODO make a native Windows version
 void removeOldGenerations(std::string dir)
 {
+#ifndef _WIN32
     if (access(dir.c_str(), R_OK) != 0) return;
 
     bool canWrite = access(dir.c_str(), W_OK) == 0;
@@ -48,6 +48,10 @@ void removeOldGenerations(std::string dir)
             removeOldGenerations(path);
         }
     }
+#else
+    std::cerr << "TODO: make a native Windows version" << std::endl;
+    _exit(1);
+#endif
 }
 
 int main(int argc, char * * argv)

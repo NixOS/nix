@@ -40,17 +40,22 @@
 #include <pwd.h>
 #include <sys/ioctl.h>
 #include <sys/wait.h>
-#endif
 
 extern char * * environ;
+#endif
 
 
 namespace nix {
 
 #ifdef _WIN32
-static std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-std::string to_bytes(const std::wstring & path) { return converter.to_bytes(path); }
-std::wstring from_bytes(const std::string & s) { return converter.from_bytes(s); }
+std::string to_bytes(const std::wstring & path) {
+    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+    return converter.to_bytes(path);
+}
+std::wstring from_bytes(const std::string & s) {
+    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+    return converter.from_bytes(s);
+}
 
 optional<std::wstring> maybePathW(const Path & path) {
     if (path.length() >= 3 && (('A' <= path[0] && path[0] <= 'Z') || ('a' <= path[0] && path[0] <= 'z')) && path[1] == ':' && isslash(path[2])) {
@@ -300,7 +305,8 @@ Path absPath(Path path, Path dir)
 
 optional<Path> maybeCanonPath(const Path & path, bool resolveSymlinks)
 {
-// std::cerr << "canonPath("<<file<<":"<<line<<" "<<path<<", resolveSymlinks="<<resolveSymlinks<<")"<<std::endl;
+//std::cerr << "maybeCanonPath("<<path<<", resolveSymlinks="<<resolveSymlinks<<")"<<std::endl;
+
 // if (path.find(';') != Path::npos){
 //     std::cerr << boost::stacktrace::stacktrace() << std::endl;
 // }
