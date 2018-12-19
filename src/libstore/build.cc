@@ -2454,6 +2454,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
             //builtinBuildenv(drv2);
         } else
             throw Error(format("unsupported builtin function '%1%'") % string(drv->builder, 8));
+#ifdef __MINGW32__
     } else if ( drv->builder == "/usr/bin/bash"                 // BUGBUG
              || drv->builder == "/bin/bash"                     // BUGBUG
              || drv->builder == "c:/msys64/usr/bin/bash.exe"    // BUGBUG
@@ -2489,7 +2490,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
         uargs.push_back(L"C:\\msys64\\usr\\bin\\bash.exe"); // ok
         for (auto & i : drv->args)
             uargs.push_back(from_bytes(rewriteStrings(i, inputRewrites)));
-
+#endif
     } else if (drv->builder == "C:/Windows/System32/cmd.exe"
             || drv->builder == "C:/Perl64/bin/perl.exe"
             || drv->builder == "C:/lua/lua53.exe") {
@@ -2527,11 +2528,12 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
     assert(!uargs.empty());
     std::wstring ucmdline;
     for (const auto & v : uargs) {
-        std::cerr << "## args: " << to_bytes(v) << "\n";
+        std::cerr << "## args: " << to_bytes(v) << std::endl;
         if (!ucmdline.empty())
             ucmdline += L' ';
         ucmdline += windowsEscapeW(v);
     }
+//  std::cerr << "ucmdline='" << to_bytes(ucmdline) << "'" << std::endl;
     std::wstring uenvline;
     for (auto & i : uenv)
         uenvline += i.first + L'=' + i.second + L'\0';
