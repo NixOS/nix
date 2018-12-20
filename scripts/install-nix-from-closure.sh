@@ -22,10 +22,12 @@ if [ -z "$HOME" ]; then
     exit 1
 fi
 
-# macOS support for 10.10 or higher
+# macOS support for 10.12.6 or higher
 if [ "$(uname -s)" = "Darwin" ]; then
-    if [ $(($(sw_vers -productVersion | cut -d '.' -f 2))) -lt 10 ]; then
-        echo "$0: macOS $(sw_vers -productVersion) is not supported, upgrade to 10.10 or higher"
+    macos_major=$(sw_vers -productVersion | cut -d '.' -f 2)
+    macos_minor=$(sw_vers -productVersion | cut -d '.' -f 3)
+    if [ "$macos_major" -lt 12 ] || ([ "$macos_major" -eq 12 ] && [ "$macos_minor" -lt 6 ]); then
+        echo "$0: macOS $(sw_vers -productVersion) is not supported, upgrade to 10.12.6 or higher"
         exit 1
     fi
 fi
