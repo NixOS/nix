@@ -990,8 +990,13 @@ static void _deletePath(const std::wstring & wpath, const DWORD * pdwFileAttribu
                 FindClose(hFind);
             }
         }
-        if (!RemoveDirectoryW(wpath.c_str()))
-            throw WinError("RemoveDirectoryW  when _deletePath '%1%' dwFileAttributes=%2%", to_bytes(wpath), dwFileAttributes);
+        if (!RemoveDirectoryW(wpath.c_str())) {
+            // RemoveDirectory fails on Windows more often than on POSIX.
+            // For example when the directory is the currrent in another process.
+            // Thus it shouldn't be fatal error.
+            WinError winError("RemoveDirectoryW  when _deletePath '%1%' dwFileAttributes=%2%", to_bytes(wpath), dwFileAttributes);
+            std::cerr << winError.msg() << std::endl;
+        }
     } else {
         if (!DeleteFileW(wpath.c_str())) {
             WinError winError("DeleteFileW  when _deletePath '%1%' dwFileAttributes=%2%", to_bytes(wpath), dwFileAttributes);
@@ -2502,7 +2507,7 @@ std::string windowsEscape(const std::string & s)
         char lastChar = 0;
         for (char i : s) {
             if (i == '"') // N double quotes replaced with (2N+1) double quotes
-                r += lastChar == '"' ? "\"\"" : "\"\"\"";
+                r += lastChar == i ? "\"\"" : "\"\"\"";
             else
                 r += i;
             lastChar = i;
@@ -2519,8 +2524,8 @@ std::wstring windowsEscapeW(const std::wstring & s)
         std::wstring r = L"\"";
         wchar_t lastChar = 0;
         for (wchar_t i : s) {
-            if (i == '"') // N double quotes replaced with (2N+1) double quotes
-                r += lastChar == '"' ? L"\"\"" : L"\"\"\"";
+            if (i == L'"') // N double quotes replaced with (2N+1) double quotes
+                r += lastChar == i ? L"\"\"" : L"\"\"\"";
             else
                 r += i;
             lastChar = i;

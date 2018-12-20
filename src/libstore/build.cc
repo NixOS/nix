@@ -899,9 +899,8 @@ private:
 #ifndef _WIN32
     const uid_t sandboxUid = 1000;
     const gid_t sandboxGid = 100;
-#endif
     const static Path homeDir;
-
+#endif
     std::unique_ptr<MaintainCount<uint64_t>> mcExpectedBuilds, mcRunningBuilds;
 
     std::unique_ptr<Activity> act;
@@ -1023,8 +1022,8 @@ private:
 
 #ifndef _WIN32
 const Path DerivationGoal::homeDir = "/homeless-shelter";
-#else
-const Path DerivationGoal::homeDir = "C:/homeless-shelter";
+//#else
+//const Path DerivationGoal::homeDir = "C:/homeless-shelter";
 #endif
 
 
@@ -2174,8 +2173,10 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
 #endif // _WIN32
     {
 
+#ifndef _WIN32
         if (pathExists(homeDir))
             throw Error(format("directory '%1%' exists; please remove it") % homeDir);
+#endif
 
         /* We're not doing a chroot build, but we have some valid
            output paths.  Since we can't just overwrite or delete
@@ -2491,9 +2492,9 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
         for (auto & i : drv->args)
             uargs.push_back(from_bytes(rewriteStrings(i, inputRewrites)));
 #endif
-    } else if (drv->builder == "C:/Windows/System32/cmd.exe"
-            || drv->builder == "C:/Perl64/bin/perl.exe"
-            || drv->builder == "C:/lua/lua53.exe") {
+    } else if (boost::algorithm::iends_with(drv->builder, "cmd.exe") // "C:/Windows/System32/cmd.exe"
+            || boost::algorithm::iends_with(drv->builder, "perl.exe")
+            || boost::algorithm::iends_with(drv->builder, "lus53.exe")) {
         for (auto & i : env) {
             std::string value = rewriteStrings(i.second, inputRewrites);
             if (hasPrefix(value, "C:/")) { // BUGBUG: canonPath to 'C:\\'
@@ -2591,7 +2592,7 @@ void DerivationGoal::initEnv()
        they are looking for does not exist if HOME is set but points to some
        non-existing path. */
 #ifdef _WIN32
-    env["USERPROFILE"] = homeDir;
+    env["USERPROFILE"] = tmpDirInSandbox;
 #else
     env["HOME"] = homeDir;
 #endif
