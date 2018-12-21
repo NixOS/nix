@@ -2554,7 +2554,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
         NULL,                                                          // LPSECURITY_ATTRIBUTES lpProcessAttributes
         NULL,                                                          // LPSECURITY_ATTRIBUTES lpThreadAttributes
         TRUE,                                                          // BOOL                  bInheritHandles
-        CREATE_UNICODE_ENVIRONMENT,                                    // DWORD                 dwCreationFlags
+        CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW,                 // DWORD                 dwCreationFlags
         const_cast<wchar_t*>(uenvline.c_str()),                        // LPVOID                lpEnvironment
         from_bytes(rewriteStrings(env["PWD"], inputRewrites)).c_str(), // LPCWSTR               lpCurrentDirectory
         &si,                                                           // LPSTARTUPINFOW        lpStartupInfo

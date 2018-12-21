@@ -10,13 +10,13 @@ NIX_LOG_DIR   = C:\nix\var\log\nix
 NIX_STATE_DIR = C:\nix\var\nix
 
 # `nix-build -I nixpkgs=C:\msys64\home\User\nixpkgs -E "with (import <nixpkgs> { }).pkgs; [ stdenv.cc boost openssl xz bzip2 curl_7_59 sqlite ]`
-STDENV_CC = C:\nix\store\n2p75ifmcgwmx26ym4niw9ws1wcza9k0-msvc-14.16.27023+sdk-10.0.17134.0+msbuild-15.0
-BOOST     = C:\nix\store\aj3ivgn1ssf4dd1v0ql1kp73b205dmg9-boost-1.67_0
-OPENSSL   = C:\nix\store\rrqyni9gl6b1109irkkczq806916qx4q-openssl-1.0.2p
-XZ        = C:\nix\store\7g885r45k50w6p63j8c8wikwzayhdcf1-xz-5.2.4
-BZIP2     = C:\nix\store\vnbhhhr7c6ckpdzwb2wh1rhcs6ma93rp-bzip2-1.0.6.0.1
-CURL      = C:\nix\store\pj26pxgvq4gv72768vv4abnvd21hy243-curl-7.59.0
-SQLITE    = C:\nix\store\dsx5fjbp8l6bxyvj8dlvjwm89zsibjxm-sqlite-3.24.0
+STDENV_CC = # C:\nix\store\n2p75ifmcgwmx26ym4niw9ws1wcza9k0-msvc-14.16.27023+sdk-10.0.17134.0+msbuild-15.0
+BOOST     = # C:\nix\store\aj3ivgn1ssf4dd1v0ql1kp73b205dmg9-boost-1.67_0
+OPENSSL   = # C:\nix\store\rrqyni9gl6b1109irkkczq806916qx4q-openssl-1.0.2p
+XZ        = # C:\nix\store\7g885r45k50w6p63j8c8wikwzayhdcf1-xz-5.2.4
+BZIP2     = # C:\nix\store\vnbhhhr7c6ckpdzwb2wh1rhcs6ma93rp-bzip2-1.0.6.0.1
+CURL      = # C:\nix\store\pj26pxgvq4gv72768vv4abnvd21hy243-curl-7.59.0
+SQLITE    = # C:\nix\store\dsx5fjbp8l6bxyvj8dlvjwm89zsibjxm-sqlite-3.24.0
 
 # ensure no / in paths
 _NIX_BIN_DIR   = $(NIX_BIN_DIR:/=\)
@@ -73,8 +73,8 @@ LINK_FLAGS=/nologo /LTCG \
            $(_SQLITE)\lib\winsqlite3.lib
 
 
-LIB=$(_STDENV_CC)\bin\lib.exe
-LIB_FLAGS=/nologo /LTCG
+AR=$(_STDENV_CC)\bin\lib.exe
+AR_FLAGS=/nologo /LTCG
 
 .cc.obj:
   $(CC) -c -Fo:$@ $(CC_FLAGS) $<
@@ -100,7 +100,7 @@ LIBEXPR_SRC=src\libexpr\attr-path.cc \
             src\libexpr\primops\fromTOML.cc
 LIBEXPR_OBJ=$(LIBEXPR_SRC:.cc=.obj)
 libexpr.lib: $(LIBEXPR_OBJ)
-  $(LIB) $(LIB_FLAGS) -out:$@ $(LIBEXPR_OBJ)
+  $(AR) $(AR_FLAGS) -out:$@ $(LIBEXPR_OBJ)
 
 
 LIBMAIN_SRC=src\libmain\common-args.cc \
@@ -108,7 +108,7 @@ LIBMAIN_SRC=src\libmain\common-args.cc \
             src\libmain\stack.cc
 LIBMAIN_OBJ=$(LIBMAIN_SRC:.cc=.obj)
 libmain.lib: $(LIBMAIN_OBJ)
-  $(LIB) $(LIB_FLAGS) -out:$@ $(LIBMAIN_OBJ)
+  $(AR) $(AR_FLAGS) -out:$@ $(LIBMAIN_OBJ)
 
 LIBUTIL_SRC=src\libutil\affinity.cc \
             src\libutil\archive.cc \
@@ -124,7 +124,7 @@ LIBUTIL_SRC=src\libutil\affinity.cc \
             src\libutil\xml-writer.cc
 LIBUTIL_OBJ=$(LIBUTIL_SRC:.cc=.obj)
 libutil.lib: $(LIBUTIL_OBJ)
-  $(LIB) $(LIB_FLAGS) -out:$@ $(LIBUTIL_OBJ)
+  $(AR) $(AR_FLAGS) -out:$@ $(LIBUTIL_OBJ)
 
 LIBSTORE_SRC=src\libstore\binary-cache-store.cc \
              src\libstore\build.cc \
@@ -159,14 +159,14 @@ LIBSTORE_SRC=src\libstore\binary-cache-store.cc \
              src\libstore\builtins\fetchurl.cc
 LIBSTORE_OBJ=$(LIBSTORE_SRC:.cc=.obj)
 libstore.lib: $(LIBSTORE_OBJ)
-  $(LIB) $(LIB_FLAGS) -out:$@ $(LIBSTORE_OBJ)
+  $(AR) $(AR_FLAGS) -out:$@ $(LIBSTORE_OBJ)
 
 LINENOISE_SRC=src\linenoise\ConvertUTF.cpp \
               src\linenoise\linenoise.cpp \
               src\linenoise\wcwidth.cpp
 LINENOISE_OBJ=$(LINENOISE_SRC:.cpp=.obj)
 linenoise.lib: $(LINENOISE_OBJ)
-  $(LIB) $(LIB_FLAGS) -out:$@ $(LINENOISE_OBJ)
+  $(AR) $(AR_FLAGS) -out:$@ $(LINENOISE_OBJ)
 
 NIX_SRC=src\nix\add-to-store.cc \
         src\nix\build.cc \
@@ -199,7 +199,7 @@ NIX_OBJ=$(NIX_SRC:.cc=.obj)
 nix.exe: $(NIX_OBJ) libexpr.lib libmain.lib libutil.lib libstore.lib linenoise.lib
   $(LINK) $(LINK_FLAGS) -out:$@ $(NIX_OBJ) libexpr.lib libmain.lib libutil.lib libstore.lib linenoise.lib
 
-NIX_INSTANTIATE_SRC=src\nix-build\nix-build.cc
+NIX_INSTANTIATE_SRC=src\nix-instantiate\nix-instantiate.cc
 NIX_INSTANTIATE_OBJ=$(NIX_INSTANTIATE_SRC:.cc=.obj)
 nix-instantiate.exe: $(NIX_INSTANTIATE_OBJ) libexpr.lib libmain.lib libutil.lib libstore.lib linenoise.lib
   $(LINK) $(LINK_FLAGS) -out:$@ $(NIX_INSTANTIATE_OBJ) libexpr.lib libmain.lib libutil.lib libstore.lib linenoise.lib
