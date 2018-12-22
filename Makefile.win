@@ -48,18 +48,18 @@ CC_FLAGS=$(CC_FLAGS) -DHAVE_BZLIB_H=1 \
                      -DHAVE_STDINT_H=1 \
                      -DHAVE_STDLIB_H=1 \
                      -DHAVE_STRING_H=1 \
-                     -DPACKAGE_NAME="""nix""" \
-                     -DPACKAGE_STRING="""nix $(VERSION)""" \
-                     -DPACKAGE_TARNAME="""nix""" \
-                     -DPACKAGE_VERSION="""$(VERSION)""" \
-                     -DSYSTEM="""x86_64-windows""" \
+                     "-DPACKAGE_NAME=\"nix\"" \
+                     "-DPACKAGE_STRING=\"nix $(VERSION)\"" \
+                     "-DPACKAGE_TARNAME=\"nix\"" \
+                     "-DPACKAGE_VERSION=\"$(VERSION)"\" \
+                     "-DSYSTEM=\"x86_64-windows\"" \
                      -DYY_NO_UNISTD_H=1
-CC_FLAGS=$(CC_FLAGS) -DNIX_BIN_DIR="""$(_NIX_BIN_DIR:\=\\)""" \
-                     -DNIX_CONF_DIR="""$(_NIX_CONF_DIR:\=\\)""" \
-                     -DNIX_DATA_DIR="""$(_NIX_DATA_DIR:\=\\)""" \
-                     -DNIX_STORE_DIR="""$(_NIX_STORE_DIR:\=\\)""" \
-                     -DNIX_LOG_DIR="""$(_NIX_LOG_DIR:\=\\)""" \
-                     -DNIX_STATE_DIR="""$(_NIX_STATE_DIR:\=\\)"""
+CC_FLAGS=$(CC_FLAGS) "-DNIX_BIN_DIR=\"$(_NIX_BIN_DIR:\=\\)\"" \
+                     "-DNIX_CONF_DIR=\"$(_NIX_CONF_DIR:\=\\)\"" \
+                     "-DNIX_DATA_DIR=\"$(_NIX_DATA_DIR:\=\\)\"" \
+                     "-DNIX_STORE_DIR=\"$(_NIX_STORE_DIR:\=\\)\"" \
+                     "-DNIX_LOG_DIR=\"$(_NIX_LOG_DIR:\=\\)\"" \
+                     "-DNIX_STATE_DIR=\"$(_NIX_STATE_DIR:\=\\)\""
 
 LINK=$(_STDENV_CC)\bin\link.exe
 LINK_FLAGS=/nologo /LTCG \
@@ -81,6 +81,9 @@ AR_FLAGS=/nologo /LTCG
 
 .cpp.obj:
   $(CC) -c -Fo:$@ $(CC_FLAGS) $<
+
+
+all: nix.exe nix-instantiate.exe nix-build.exe nix-store.exe
 
 LIBEXPR_SRC=src\libexpr\attr-path.cc \
             src\libexpr\attr-set.cc \
@@ -216,8 +219,7 @@ NIX_STORE_OBJ=$(NIX_STORE_SRC:.cc=.obj)
 nix-store.exe: $(NIX_STORE_OBJ) libexpr.lib libmain.lib libutil.lib libstore.lib linenoise.lib
   $(LINK) $(LINK_FLAGS) -out:$@ $(NIX_STORE_OBJ) libexpr.lib libmain.lib libutil.lib libstore.lib linenoise.lib
 
-
-install: nix.exe nix-instantiate.exe nix-build.exe nix-store.exe
+install: all
   -md $(_NIX_BIN_DIR)
   copy $(_OPENSSL)\bin\libeay32.dll            $(_NIX_BIN_DIR)\LIBEAY32.dll
   copy $(_OPENSSL)\bin\ssleay32.dll            $(_NIX_BIN_DIR)\SSLEAY32.dll

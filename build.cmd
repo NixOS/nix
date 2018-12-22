@@ -1,8 +1,8 @@
 @echo off
 
 rem path to old nix (mingw's is ok)
-rem set OLDNIX=C:\nix2
-set OLDNIX=C:\nix-windows
+set OLDNIX=C:\nix2
+rem set OLDNIX=C:\nix-windows
 set NIX_STORE_DIR=C:\nix\store
 set NIX_PATH=nixpkgs=C:\msys64\home\User\nixpkgs
 

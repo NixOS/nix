@@ -2504,9 +2504,9 @@ std::string windowsEscape(const std::string & s)
 {
     if (s.empty() || s.find_first_of("&<>()[]{}^=;!'+,`!\" ") != std::wstring::npos) {
         std::string r = "\"";
-        for (char i : s) {
-            r += i;
-            if (i == '"') r += i;
+        for (auto i=0; i < s.length(); i++) {
+            if (s[i] == '"' || (s[i] == '\\' && (i==s.length()-1 || s[i+1] == '"'))) r += '\\';
+            r += s[i];
         }
         r += '"';
         return r;
@@ -2518,9 +2518,9 @@ std::wstring windowsEscapeW(const std::wstring & s)
 {
     if (s.empty() || s.find_first_of(L"&<>()[]{}^=;!'+,`!\" ") != std::wstring::npos) {
         std::wstring r = L"\"";
-        for (wchar_t i : s) {
-            r += i;
-            if (i == L'"') r += i;
+        for (auto i=0; i < s.length(); i++) {
+            if (s[i] == L'"' || (s[i] == L'\\' && (i==s.length()-1 || s[i+1] == L'"'))) r += L'\\';
+            r += s[i];
         }
         r += L'"';
         return r;
