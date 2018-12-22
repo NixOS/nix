@@ -1,3 +1,4 @@
+#include "command.hh"
 #include "config.hh"
 #include "primops.hh"
 
@@ -22,3 +23,23 @@ static void prim_anotherNull (EvalState & state, const Pos & pos, Value ** args,
 }
 
 static RegisterPrimOp rp("anotherNull", 0, prim_anotherNull);
+
+struct CmdSayHi : Command
+{
+    virtual std::string name() override
+    {
+        return "sayhi";
+    }
+
+    virtual std::string description() override
+    {
+        return "say hi";
+    }
+
+    void run() override
+    {
+        printf("Hi!");
+    }
+};
+
+static RegisterCommand rc(make_ref<CmdSayHi>());
