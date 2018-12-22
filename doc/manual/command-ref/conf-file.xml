@@ -539,6 +539,12 @@ password <replaceable>my-password</replaceable>
         more details.
       </para>
       <para>
+        This option may be specified in the configuration file
+        or on the command line <emphasis>before</emphasis> the subcommand
+        name as the plugins will be loaded right before the subcommand is
+        resolved.
+      </para>
+      <para>
         Since these files are loaded into the same address space as
         Nix itself, they must be DSOs compatible with the instance of
         Nix running at the time (i.e. compiled against the same
