@@ -223,6 +223,7 @@ install: nix.exe nix-instantiate.exe nix-build.exe nix-store.exe
   copy $(_OPENSSL)\bin\ssleay32.dll            $(_NIX_BIN_DIR)\SSLEAY32.dll
   copy $(_XZ)\bin\liblzma.dll                  $(_NIX_BIN_DIR)\liblzma.dll
   copy $(_CURL)\bin\libcurl.dll                $(_NIX_BIN_DIR)\libcurl.dll
+  copy $(_CURL)\bin\zlib1.dll                  $(_NIX_BIN_DIR)\zlib1.dll
   copy $(_SQLITE)\bin\winsqlite3.dll           $(_NIX_BIN_DIR)\winsqlite3.dll
   copy nix.exe                                 $(_NIX_BIN_DIR)\nix.exe
   copy nix.pdb                                 $(_NIX_BIN_DIR)\nix.pdb
