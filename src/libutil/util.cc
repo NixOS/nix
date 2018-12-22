@@ -2502,15 +2502,11 @@ std::string shellEscape(const std::string & s)
 #ifdef _WIN32
 std::string windowsEscape(const std::string & s)
 {
-    if (s.empty() || s.find_first_of("&()[]{}^=;!'+,`!\" ") != std::wstring::npos) {
+    if (s.empty() || s.find_first_of("&<>()[]{}^=;!'+,`!\" ") != std::wstring::npos) {
         std::string r = "\"";
-        char lastChar = 0;
         for (char i : s) {
-            if (i == '"') // N double quotes replaced with (2N+1) double quotes
-                r += lastChar == i ? "\"\"" : "\"\"\"";
-            else
-                r += i;
-            lastChar = i;
+            r += i;
+            if (i == '"') r += i;
         }
         r += '"';
         return r;
@@ -2520,15 +2516,11 @@ std::string windowsEscape(const std::string & s)
 
 std::wstring windowsEscapeW(const std::wstring & s)
 {
-    if (s.empty() || s.find_first_of(L"&()[]{}^=;!'+,`!\" ") != std::wstring::npos) {
+    if (s.empty() || s.find_first_of(L"&<>()[]{}^=;!'+,`!\" ") != std::wstring::npos) {
         std::wstring r = L"\"";
-        wchar_t lastChar = 0;
         for (wchar_t i : s) {
-            if (i == L'"') // N double quotes replaced with (2N+1) double quotes
-                r += lastChar == i ? L"\"\"" : L"\"\"\"";
-            else
-                r += i;
-            lastChar = i;
+            r += i;
+            if (i == L'"') r += i;
         }
         r += L'"';
         return r;
