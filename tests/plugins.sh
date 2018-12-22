@@ -7,3 +7,5 @@ res=$(nix --option plugin-files $PWD/plugins/libplugintest* eval '(builtins.anot
 
 res=$(nix --option plugin-files $PWD/plugins/libplugintest* sayhi)
 [ "$res"x = "Hi!x" ]
+
+nix --option plugin-files $PWD/plugins/libplugintest* 2>&1 | grep sayhi >/dev/null
