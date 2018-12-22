@@ -6,6 +6,13 @@ namespace nix {
 
 Commands * RegisterCommand::commands = 0;
 
+RegisterCommand::RegisterCommand(ref<Command> command)
+{
+    if (!commands) commands = new Commands;
+    commands->emplace(command->name(), command);
+}
+
+
 void Command::printHelp(const string & programName, std::ostream & out)
 {
     Args::printHelp(programName, out);

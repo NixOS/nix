@@ -186,12 +186,7 @@ public:
 struct RegisterCommand
 {
     static Commands * commands;
-
-    RegisterCommand(ref<Command> command)
-    {
-        if (!commands) commands = new Commands;
-        commands->emplace(command->name(), command);
-    }
+    RegisterCommand(ref<Command> command);
 };
 
 std::shared_ptr<Installable> parseInstallable(
