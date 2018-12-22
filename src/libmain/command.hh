@@ -169,7 +169,7 @@ typedef std::map<std::string, ref<Command>> Commands;
 class MultiCommand : virtual Args
 {
 public:
-    Commands commands;
+    const Commands & commands;
 
     std::shared_ptr<Command> command;
 

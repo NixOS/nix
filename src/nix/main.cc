@@ -20,7 +20,7 @@ std::string programPath;
 
 struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
-    NixArgs() : MultiCommand(*RegisterCommand::commands), MixCommonArgs("nix")
+    NixArgs(Commands * commands) : MultiCommand(*commands), MixCommonArgs("nix")
     {
         mkFlag()
             .longName("help")
@@ -88,7 +88,7 @@ void mainWrapped(int argc, char * * argv)
     verbosity = lvlError;
     settings.verboseBuild = false;
 
-    NixArgs args;
+    NixArgs args(RegisterCommand::commands);
 
     args.parseCmdline(argvToStrings(argc, argv));
 
