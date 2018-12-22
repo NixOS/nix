@@ -534,7 +534,7 @@ password <replaceable>my-password</replaceable>
         add new primops or constants to the expression language,
         RegisterStoreImplementation to add new store implementations,
         RegisterCommand to add new subcommands to the
-        <literal>nix</literal> command, and RegisterSetting to add new
+        <literal>nix</literal> command, and GlobalConfig::Register to add new
         nix config settings. See the constructors for those types for
         more details.
       </para>
