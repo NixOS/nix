@@ -1,7 +1,8 @@
 @echo off
 
 rem path to old nix (mingw's is ok)
-set OLDNIX=C:\nix2
+rem set OLDNIX=C:\nix2
+set OLDNIX=C:\nix-windows
 set NIX_STORE_DIR=C:\nix\store
 set NIX_PATH=nixpkgs=C:\msys64\home\User\nixpkgs
 
@@ -23,4 +24,4 @@ echo SQLITE=%SQLITE%
 rem PATH=%STDENV_CC%\bin;%PATH%
 
 rem %STDENV_CC%\bin\nmake /E -f Makefile.win clean
-%STDENV_CC%\bin\nmake /E -f Makefile.win install
+%STDENV_CC%\bin\nmake /E -f Makefile.win %*
