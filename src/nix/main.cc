@@ -20,14 +20,17 @@ std::string programPath;
 
 struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
+    bool pluginsInited = false;
+
     NixArgs(Commands * commands) : MultiCommand(*commands), MixCommonArgs("nix")
     {
         // `MultiCommand` creates a single expected arg, which is the command name.
         // We tweak its handler to initialise plugins right before this handler
         // is executed to make adding new subcommands possible.
         auto origHandler = expectedArgs.back().handler;
-        expectedArgs.back().handler = [origHandler](std::vector<std::string> ss) {
+        expectedArgs.back().handler = [this,origHandler](std::vector<std::string> ss) {
             initPlugins();
+            pluginsInited = true;
             origHandler(std::move(ss));
         };
 
@@ -100,6 +103,8 @@ void mainWrapped(int argc, char * * argv)
     NixArgs args(RegisterCommand::commands);
 
     args.parseCmdline(argvToStrings(argc, argv));
+
+    if (!args.pluginsInited) initPlugins();
 
     if (!args.command) args.showHelpAndExit();
 
