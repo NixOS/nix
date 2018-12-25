@@ -2323,17 +2323,21 @@ void DerivationGoal::startBuilder()
 
         /* Set the UID/GID mapping of the builder's user namespace
            such that the sandbox user maps to the build user, or to
-           the calling user (if build users are disabled). */
+           the calling user (if build users are disabled). Also map
+           root uid and gid to itself, so that the ownership of
+           /nix/store does not fall back on the overflow uid/gid of
+           nobody:nogroup, which upsets some software like sudo.
+        */
         uid_t hostUid = buildUser ? buildUser->getUID() : getuid();
         uid_t hostGid = buildUser ? buildUser->getGID() : getgid();
 
         writeFile("/proc/" + std::to_string(pid) + "/uid_map",
-            (format("%d %d 1") % sandboxUid % hostUid).str());
+            (format("0 0 1\n%d %d 1") % sandboxUid % hostUid).str());
 
         writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
 
         writeFile("/proc/" + std::to_string(pid) + "/gid_map",
-            (format("%d %d 1") % sandboxGid % hostGid).str());
+            (format("0 0 1\n%d %d 1") % sandboxGid % hostGid).str());
 
         /* Signal the builder that we've updated its user
            namespace. */
@@ -2767,7 +2771,7 @@ void DerivationGoal::runChild()
                     createDirs(dirOf(target));
                     writeFile(target, "");
                 }
-                if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
+                if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC | MS_NOSUID, 0) == -1)
                     throw SysError("bind mount from '%1%' to '%2%' failed", source, target);
             };
 
