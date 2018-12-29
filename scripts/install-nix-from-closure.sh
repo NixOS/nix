@@ -483,45 +483,49 @@ checkingRequirements() {
 }
 
 }
+
+
+###############################
+###  Check installer mode
+###############################
+{
+
+checkInstallerMode() {
+    # Determine what mode of installer should be used
+    if [ "$(uname -s)" = "Darwin" ]; then
+        echo "Note: a multi-user installation is possible. See https://nixos.org/nix/manual/#sect-multi-user-installation" >&2
+    elif [ "$(uname -s)" = "Linux" ] && [ -e /run/systemd/system ]; then
+        echo "Note: a multi-user installation is possible. See https://nixos.org/nix/manual/#sect-multi-user-installation" >&2
+    fi
+
+    INSTALL_MODE=no-daemon
+    # Trivially handle the --daemon / --no-daemon options
+    if [ "x${1:-}" = "x--no-daemon" ]; then
+        readonly INSTALL_MODE=no-daemon
+    elif [ "x${1:-}" = "x--daemon" ]; then
+        readonly INSTALL_MODE=daemon
+    elif [ "x${1:-}" != "x" ]; then
+        error '
+
+    Nix Installer [--daemon|--no-daemon]
+      --daemon:    Force the installer to use the Daemon
+                   based installer, even though it may not
+                   work.
+
+      --no-daemon: Simple, single-user installation that does not require root
+                   and that is trivial to uninstall
+                   (default)
+    '
+    fi
+}
+
+}
 # macOS support for 10.10 or higher
 if [ "$(uname -s)" = "Darwin" ]; then
     if [ $(($(sw_vers -productVersion | cut -d '.' -f 2))) -lt 10 ]; then
         echo "$0: macOS $(sw_vers -productVersion) is not supported, upgrade to 10.10 or higher"
         exit 1
     fi
-fi
-
-# Determine if we could use the multi-user installer or not
-if [ "$(uname -s)" = "Darwin" ]; then
-    echo "Note: a multi-user installation is possible. See https://nixos.org/nix/manual/#sect-multi-user-installation" >&2
-elif [ "$(uname -s)" = "Linux" ] && [ -e /run/systemd/system ]; then
-    echo "Note: a multi-user installation is possible. See https://nixos.org/nix/manual/#sect-multi-user-installation" >&2
-fi
-
-INSTALL_MODE=no-daemon
-# Trivially handle the --daemon / --no-daemon options
-if [ "x${1:-}" = "x--no-daemon" ]; then
-    INSTALL_MODE=no-daemon
-elif [ "x${1:-}" = "x--daemon" ]; then
-    INSTALL_MODE=daemon
-elif [ "x${1:-}" != "x" ]; then
-    (
-        echo "Nix Installer [--daemon|--no-daemon]"
-
-        echo "Choose installation method."
-        echo ""
-        echo " --daemon:    Installs and configures a background daemon that manages the store,"
-        echo "              providing multi-user support and better isolation for local builds."
-        echo "              Both for security and reproducibility, this method is recommended if"
-        echo "              supported on your platform."
-        echo "              See https://nixos.org/nix/manual/#sect-multi-user-installation"
-        echo ""
-        echo " --no-daemon: Simple, single-user installation that does not require root and is"
-        echo "              trivial to uninstall."
-        echo "              (default)"
-        echo ""
-    ) >&2
-    exit
 fi
 
 if [ "$INSTALL_MODE" = "daemon" ]; then
