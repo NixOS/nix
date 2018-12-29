@@ -520,21 +520,24 @@ checkInstallerMode() {
 }
 
 }
-# macOS support for 10.10 or higher
-if [ "$(uname -s)" = "Darwin" ]; then
-    if [ $(($(sw_vers -productVersion | cut -d '.' -f 2))) -lt 10 ]; then
-        echo "$0: macOS $(sw_vers -productVersion) is not supported, upgrade to 10.10 or higher"
-        exit 1
+
+
+###############################
+###  Exec installer mode
+###############################
+{
+
+execInstallerMode() {
+    if [ "$INSTALL_MODE" = "daemon" ]; then
+        notice '
+
+    Entering daemon-based installer
+    '
+        exec "$self/install-multi-user"
     fi
-fi
+}
 
-if [ "$INSTALL_MODE" = "daemon" ]; then
-    printf '\e[1;31mSwitching to the Daemon-based Installer\e[0m\n'
-    exec "$self/install-multi-user"
-    exit 0
-fi
-
-
+}
 echo "performing a single-user installation of Nix..." >&2
 
 
