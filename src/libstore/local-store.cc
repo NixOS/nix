@@ -673,7 +673,7 @@ void canonicalisePathMetaData(const Path & path, InodesSeen & inodesSeen)
     canonicalisePathMetaData_(pathW(path), NULL, inodesSeen);
 
     // allow only read access (todo: make is the other way around: read-only inherited c:\nix\store and allow access to the building derivation)
-    runProgramWithOptions(RunOptions("icacls", { to_bytes(pathW(path)) /* add \\?\ for paths longer than 255 chars */, "/inheritance:r", "/grant:r", "Authenticated Users:R", "/T", "/L" }));
+    runProgramWithOptions(RunOptions("icacls", { to_bytes(pathW(path)) /* add \\?\ for paths longer than 255 chars */, "/inheritance:r", "/grant:r", "Authenticated Users:RX", "/T", "/L" }));
 }
 
 void canonicalisePathMetaData(const Path & path)
