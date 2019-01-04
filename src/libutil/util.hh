@@ -403,7 +403,7 @@ struct RunOptions
 {
     Path program;
     bool searchPath = true;
-    Strings args;
+    Strings args; // TODO: unicode on Windows?
     optional<std::string> input;
     Source * standardIn = nullptr;
     Sink * standardOut = nullptr;

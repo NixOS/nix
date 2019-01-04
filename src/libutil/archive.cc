@@ -143,7 +143,7 @@ static void dump(const Path & path, const std::wstring & wpath, /* the same path
     if (pdwFileAttributes == NULL || pFileSize == NULL) {
         WIN32_FILE_ATTRIBUTE_DATA wfad;
         if (!GetFileAttributesExW(wpath.c_str(), GetFileExInfoStandard, &wfad))
-            throw WinError("GetFileAttributesExW when canonicalisePathMetaData '%1%'", path);
+            throw WinError("GetFileAttributesExW when dump '%1%'", path);
         dwFileAttributes = wfad.dwFileAttributes;
         filesize = (uint64_t(wfad.nFileSizeHigh) << 32) + wfad.nFileSizeLow;
     } else {

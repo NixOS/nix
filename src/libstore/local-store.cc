@@ -671,6 +671,9 @@ static void canonicalisePathMetaData_(const std::wstring & wpath, const WIN32_FI
 void canonicalisePathMetaData(const Path & path, InodesSeen & inodesSeen)
 {
     canonicalisePathMetaData_(pathW(path), NULL, inodesSeen);
+
+    // allow only read access (todo: make is the other way around: read-only inherited c:\nix\store and allow access to the building derivation)
+    runProgramWithOptions(RunOptions("icacls", { path, "/inheritance:r", "/grant:r", "Authenticated Users:R", "/T", "/L" }));
 }
 
 void canonicalisePathMetaData(const Path & path)
