@@ -1,0 +1,68 @@
+#
+# Original
+#
+
+option(
+  'with-system',
+  type : 'string',
+  description : '''
+    The identifier for the type of machine this build of Nix will try to perform builds for.
+    Typically a two-component config like that produced by `uname`.
+  ''',
+)
+option(
+  'normal-var',
+  type : 'boolean',
+  value : 'true',
+  description : 'Whether to use `/nix/var` or the user-overridable `localstatedir`.'
+)
+
+option(
+  'with-coreutils-bin',
+  type : 'string',
+  description : 'path of cat, mkdir, etc.'
+)
+
+option(
+  'with-store-dir',
+  type : 'string',
+  value : '/nix/store',
+  description : 'path of the Nix store (defaults to /nix/store)'
+)
+
+option(
+  'enable-seccomp-sandboxing',
+  type : 'feature',
+  description : '''
+    Don't build support for seccomp sandboxing (only recommended if your arch doesn't support libseccomp yet!
+  ''',
+)
+
+option(
+  'enable-gc',
+  type : 'feature',
+  description : '''
+    enable garbage collection in the Nix expression evaluator (requires Boehm GC) [default=no]
+  ''',
+)
+
+option(
+  'disable-doc-gen',
+  type : 'boolean',
+  value : false,
+  description : 'disable documentation generation',
+)
+
+option(
+  'with-sandbox-shell',
+  type : 'string',
+  description : 'path of a statically-linked shell to use as /bin/sh in sandboxes',
+)
+
+#
+# New for declarative config
+#
+
+option('have-pubsetbuf', type : 'feature')
+option('can-link-symlink', type : 'feature')
+option('have-aws', type : 'feature')
