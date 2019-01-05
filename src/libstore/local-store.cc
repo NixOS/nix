@@ -25,6 +25,8 @@
 #ifndef _WIN32
 #include <sys/select.h>
 #include <grp.h>
+#else
+#include <boost/algorithm/string/predicate.hpp>
 #endif
 
 #if __linux__
@@ -673,7 +675,9 @@ void canonicalisePathMetaData(const Path & path, InodesSeen & inodesSeen)
     canonicalisePathMetaData_(pathW(path), NULL, inodesSeen);
 
     // allow only read access (todo: make is the other way around: read-only inherited c:\nix\store and allow access to the building derivation)
-    runProgramWithOptions(RunOptions("icacls", { to_bytes(pathW(path)) /* add \\?\ for paths longer than 255 chars */, "/inheritance:r", "/grant:r", "Authenticated Users:RX", "/T", "/L" }));
+    if (!boost::algorithm::iends_with(path, ".drv")) { // for a while, do not protect .drv, nix might want to replace it
+      runProgramWithOptions(RunOptions("icacls", { to_bytes(pathW(path)) /* add \\?\ for paths longer than 255 chars */, "/inheritance:r", "/grant:r", "Authenticated Users:RX", "/T", "/L" }));
+    }
 }
 
 void canonicalisePathMetaData(const Path & path)
