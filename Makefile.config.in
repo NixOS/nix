@@ -18,7 +18,6 @@ LIBBROTLI_LIBS = @LIBBROTLI_LIBS@
 EDITLINE_LIBS = @EDITLINE_LIBS@
 bash = @bash@
 bindir = @bindir@
-brotli = @brotli@
 lsof = @lsof@
 datadir = @datadir@
 datarootdir = @datarootdir@
