@@ -253,11 +253,6 @@ if test "$(uname)" = "Darwin"; then
 fi
 
 
-# Figure out the extension of dynamic libraries.
-eval dynlib_suffix=$shrext_cmds
-AC_SUBST(dynlib_suffix)
-
-
 # Do we have GNU tar?
 AC_MSG_CHECKING([if you have a recent GNU tar])
 if $tar --version 2> /dev/null | grep -q GNU && tar cvf /dev/null --warning=no-timestamp ./config.log > /dev/null; then
