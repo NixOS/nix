@@ -129,8 +129,6 @@ if progItem.found()
 endif
 progItem = find_program('pv', required: false)
 conf_data.set('pv', progItem.found() ? progItem.path() : 'pv')
-progItem = find_program(['brotli', 'bro'], required: false)
-conf_data.set('brotli', progItem.found() ? progItem.path() : 'bro')
 progItem = find_program(['lsof'], required: false)
 conf_data.set('lsof', progItem.found() ? progItem.path() : 'lsof')
 
