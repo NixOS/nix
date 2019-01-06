@@ -286,6 +286,8 @@ global_subdirs = include_directories([
   'src/nix',
 ])
 
+add_project_arguments('-g', '-Wall', '-include', 'config.h', language : 'cpp')
+
 libraries = []
 
 subdir('src/libutil')
