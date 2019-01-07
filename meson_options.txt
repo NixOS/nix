@@ -65,4 +65,4 @@ option(
 
 option('have-pubsetbuf', type : 'feature')
 option('can-link-symlink', type : 'feature')
-option('have-aws', type : 'feature')
+option('enable-s3', type : 'feature')
