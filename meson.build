@@ -179,7 +179,7 @@ conf_data.set(
 # Look for libseccomp, required for Linux sandboxing.
 want_seccomp = get_option('enable-seccomp-sandboxing')
 if want_seccomp.disabled() or (want_seccomp.auto() and host_machine.system() != 'linux')
-  seccomp = dependency('')
+  seccomp = dependency('', required : false)
 else # enabled or auto on linux
   seccomp = dependency('libseccomp')
   if want_seccomp.enabled() and not seccomp.found()
@@ -271,6 +271,16 @@ configure_file(
 #
 
 boost_context = dependency('boost', modules : ['context'])
+
+if enable_s3
+  aws_cpp_sdk_transfer = meson.get_compiler('cpp').find_library('aws-cpp-sdk-transfer')
+  aws_cpp_sdk_s3 = meson.get_compiler('cpp').find_library('aws-cpp-sdk-s3')
+  aws_cpp_sdk_core = meson.get_compiler('cpp').find_library('aws-cpp-sdk-core')
+else
+  aws_cpp_sdk_transfer = dependency('', required : false)
+  aws_cpp_sdk_s3 = dependency('', required : false)
+  aws_cpp_sdk_core = dependency('', required : false)
+endif
 
 #
 # Old Makefile

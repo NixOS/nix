@@ -1,3 +1,16 @@
+sql_header_script = '''
+  echo 'R"foo(' >> @OUTPUT@
+  cat @INPUT@ >> @OUTPUT@
+  echo ')foo"' >> @OUTPUT@
+'''
+
+sql_header = custom_target(
+  'schema.sql.gen.hh',
+  output : ['schema.sql.gen.hh'],
+  input : 'schema.sql',
+  command : ['sh', '-c', sql_header_script]
+)
+
 libstore = library(
   'libnixstore',
   [
@@ -34,6 +47,8 @@ libstore = library(
 
     'builtins/buildenv.cc',
     'builtins/fetchurl.cc',
+
+    sql_header,
   ],
   install : true,
   include_directories : global_subdirs,
@@ -45,10 +60,16 @@ libstore = library(
     libcurl,
     libsodium,
     pthread,
+
+    aws_cpp_sdk_transfer,
+    aws_cpp_sdk_s3,
+    aws_cpp_sdk_core,
+    seccomp,
   ],
   link_with : [
     libutil,
   ],
+  link_args : host_machine.system() == 'freebsd' ? ['-ldl'] : []
 )
 
 libraries += [ libstore ]
