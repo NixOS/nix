@@ -19,8 +19,7 @@ system = get_option('with-system')
 if system == ''
   system = host_machine.cpu() + '-' + host_machine.system()
 endif
-# platform identifier (`cpu-os')
-conf_data.set_quoted('SYSTEM', system)
+conf_data.set_quoted('SYSTEM', system, description : 'platform identifier (`cpu-os\')')
 
 # State should be stored in /nix/var, unless the user overrides it explicitly.
 if get_option('normal-var')
@@ -63,8 +62,7 @@ else
   endif
 endif
 if have_pubsetbuf
-  # Whether pubsetbuf is available.
-  conf_data.set('HAVE_PUBSETBUF', 1)
+  conf_data.set('HAVE_PUBSETBUF', 1, description : 'Whether pubsetbuf is available.')
 endif
 
 foreach f : [
@@ -94,8 +92,7 @@ else
   endif
 endif
 if can_link_symlink
-  # Whether link() works on symlinks.
-  conf_data.set('CAN_LINK_SYMLINK', 1)
+  conf_data.set('CAN_LINK_SYMLINK', 1, description : 'Whether link() works on symlinks.')
 endif
 
 # Check for <locale>.
@@ -160,8 +157,7 @@ editline = dependency('libeditline')
 # Look for libsodium, an optional dependency.
 libsodium = dependency('sodium', required : false)
 if libsodium.found()
-  # Whether to use libsodium for cryptography.
-  conf_data.set('HAVE_SODIUM', 1)
+  conf_data.set('HAVE_SODIUM', 1, description : 'Whether to use libsodium for cryptography.')
 endif
 
 # Look for libbrotli{enc,dec}.
@@ -172,9 +168,8 @@ libbrotli = [
 
 # Look for liblzma, a required dependency.
 liblzma = dependency('liblzma')
-# xz multithreaded compression support
 if meson.get_compiler('cpp').has_function('lzma_stream_encoder_mt', dependencies : liblzma)
-  conf_data.set('HAVE_LSMA_MT', 1)
+  conf_data.set('HAVE_LSMA_MT', 1, description : 'xz multithreaded compression support')
 endif
 
 # Look for libseccomp, required for Linux sandboxing.
@@ -187,9 +182,8 @@ else # enabled or auto on linux
     error('you required `libseccomp`, but we do not have it.')
   endif
 endif
-# Whether seccomp is available and should be used for sandboxing.
 if seccomp.found()
-  conf_data.set('HAVE_SECCOMP', 1)
+  conf_data.set('HAVE_SECCOMP', 1, description : 'Whether seccomp is available and should be used for sandboxing.')
 endif
 
 # Look for aws-cpp-sdk-s3.
@@ -199,18 +193,15 @@ if want_s3.disabled()
 else
   enable_s3 = meson.get_compiler('cpp').check_header('aws/s3/S3Client.h')
 endif
-# Whether to enable S3 support via aws-sdk-cpp.
-conf_data.set('ENABLE_S3', enable_s3)
+conf_data.set('ENABLE_S3', enable_s3, description : 'Whether to enable S3 support via aws-sdk-cpp.')
 
 if enable_s3
   aws_version = meson.get_compiler('cpp').get_define(
     'AWS_SDK_VERSION_STRING',
     prefix : '#include <aws/core/VersionConfig.h>'
   ).strip('"').split('.')
-  # Major version of aws-sdk-cpp.
-  conf_data.set('AWS_VERSION_MAJOR', aws_version[0])
-  # Minor version of aws-sdk-cpp.
-  conf_data.set('AWS_VERSION_MINOR', aws_version[1])
+  conf_data.set('AWS_VERSION_MAJOR', aws_version[0], description : 'Major version of aws-sdk-cpp.')
+  conf_data.set('AWS_VERSION_MINOR', aws_version[1], description : 'Minor version of aws-sdk-cpp.')
 endif
 
 # Whether to use the Boehm garbage collector.
@@ -223,9 +214,8 @@ else
     error('you required garbage collection, but we do not have the library to support it.')
   endif
 endif
-# Whether to use the Boehm garbage collector.
 if libsodium.found()
-  conf_data.set('HAVE_BOEHMGC', 1)
+  conf_data.set('HAVE_BOEHMGC', 1, description : 'Whether to use the Boehm garbage collector.')
 endif
 
 # documentation generation switch
