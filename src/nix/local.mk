@@ -15,7 +15,7 @@ nix_SOURCES := \
   $(wildcard src/nix-prefetch-url/*.cc) \
   $(wildcard src/nix-store/*.cc) \
 
-nix_LIBS = libexpr libmain libstore libutil libformat
+nix_LIBS = libexpr libmain libstore libutil
 
 nix_LDFLAGS = -pthread $(SODIUM_LIBS) $(EDITLINE_LIBS)
 

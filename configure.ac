@@ -127,8 +127,6 @@ NEED_PROG(bzip2, bzip2)
 NEED_PROG(gzip, gzip)
 NEED_PROG(xz, xz)
 AC_PATH_PROG(dot, dot)
-AC_PATH_PROG(pv, pv, pv)
-AC_PATH_PROGS(brotli, brotli bro, bro)
 AC_PATH_PROG(lsof, lsof, lsof)
 
 
@@ -251,11 +249,6 @@ AC_CHECK_FUNCS([strsignal posix_fallocate sysconf])
 if test "$(uname)" = "Darwin"; then
     LDFLAGS="-all_load $LDFLAGS"
 fi
-
-
-# Figure out the extension of dynamic libraries.
-eval dynlib_suffix=$shrext_cmds
-AC_SUBST(dynlib_suffix)
 
 
 # Do we have GNU tar?
