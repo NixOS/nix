@@ -35,8 +35,8 @@ libexpr = library(
     'value-to-json.cc',
     'value-to-xml.cc',
 
-    lexer_tab_cchh[0],
-    parser_tab_cchh[0],
+    lexer_tab_cchh,
+    parser_tab_cchh,
   ],
   install : true,
   include_directories : global_subdirs,
