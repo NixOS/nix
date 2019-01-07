@@ -20,7 +20,7 @@ if system == ''
   system = host_machine.cpu() + '-' + host_machine.system()
 endif
 # platform identifier (`cpu-os')
-conf_data.set('SYSTEM', system)
+conf_data.set_quoted('SYSTEM', system)
 
 # State should be stored in /nix/var, unless the user overrides it explicitly.
 if get_option('normal-var')
@@ -109,7 +109,7 @@ foreach prog : [
   'cat',
   'tr',
 ]
-  conf_data.set(prog, find_program(prog).path())
+  conf_data.set_quoted(prog, find_program(prog).path())
 endforeach
 
 false_ = find_program('false')
@@ -120,20 +120,20 @@ foreach prog : [
   'bison',
 ]
   progItem = find_program(prog, required: false)
-  conf_data.set(prog, progItem.found() ? progItem.path() : false_.path())
+  conf_data.set_quoted(prog, progItem.found() ? progItem.path() : false_.path())
 endforeach
 
 progItem = find_program('dot', required: false)
 if progItem.found()
-  conf_data.set('dot', progItem.path())
+  conf_data.set_quoted('dot', progItem.path())
 endif
 progItem = find_program('pv', required: false)
-conf_data.set('pv', progItem.found() ? progItem.path() : 'pv')
+conf_data.set_quoted('pv', progItem.found() ? progItem.path() : 'pv')
 progItem = find_program(['lsof'], required: false)
-conf_data.set('lsof', progItem.found() ? progItem.path() : 'lsof')
+conf_data.set_quoted('lsof', progItem.found() ? progItem.path() : 'lsof')
 
-conf_data.set('coreutils', get_option('with-coreutils-bin'))
-conf_data.set('storedir', get_option('with-store-dir'))
+conf_data.set_quoted('coreutils', get_option('with-coreutils-bin'))
+conf_data.set_quoted('storedir', get_option('with-store-dir'))
 
 # Special case
 pthread = dependency('threads')
@@ -203,7 +203,7 @@ if enable_s3
   aws_version = meson.get_compiler('cpp').get_define(
     'AWS_SDK_VERSION_STRING',
     prefix : '#include <aws/core/VersionConfig.h>'
-  ).split('.')
+  ).strip('"').split('.')
   # Major version of aws-sdk-cpp.
   conf_data.set('AWS_VERSION_MAJOR', aws_version[0])
   # Minor version of aws-sdk-cpp.
@@ -259,7 +259,7 @@ if run_command('sh', '-c', link_text_script).returncode() == 0
 endif
 conf_data.set('tarFlags', tar_flags)
 
-conf_data.set('sandbox_shell', get_option('with-sandbox-shell'))
+conf_data.set_quoted('sandbox_shell', get_option('with-sandbox-shell'))
 
 configure_file(
   output : 'config.h',
