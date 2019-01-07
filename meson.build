@@ -127,8 +127,6 @@ progItem = find_program('dot', required: false)
 if progItem.found()
   conf_data.set_quoted('dot', progItem.path())
 endif
-progItem = find_program('pv', required: false)
-conf_data.set_quoted('pv', progItem.found() ? progItem.path() : 'pv')
 progItem = find_program(['lsof'], required: false)
 conf_data.set_quoted('lsof', progItem.found() ? progItem.path() : 'lsof')
 
@@ -257,7 +255,7 @@ tar_flags = ''
 if run_command('sh', '-c', link_text_script).returncode() == 0
   tar_flags += '--warning=no-timestamp'
 endif
-conf_data.set('tarFlags', tar_flags)
+conf_data.set_quoted('tarFlags', tar_flags)
 
 conf_data.set_quoted('sandbox_shell', get_option('with-sandbox-shell'))
 
