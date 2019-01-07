@@ -3,19 +3,19 @@ bison = find_program('bison')
 
 parser_tab_cchh = custom_target(
   'parser_tab.[cchh]',
-  output : ['parser_tab.cc', 'parser_tab.hh'],
+  output : ['parser-tab.cc', 'parser-tab.hh'],
   input : 'parser.y',
   command : [bison, '-v', '-o', '@OUTPUT0@', '@INPUT@', '-d']
 )
 
 lexer_tab_cchh = custom_target(
   'lexer_tab.[cchh]',
-  output : ['lexer_tab.cc', 'lexer_tab.hh'],
+  output : ['lexer-tab.cc', 'lexer-tab.hh'],
   input : 'lexer.l',
   command : [
     flex,
     '--outfile', '@OUTPUT0@',
-    '--headerfile', '@OUTPUT1@',
+    '--header-file', '@OUTPUT1@',
     '@INPUT@'
   ]
 )
