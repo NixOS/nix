@@ -15,7 +15,7 @@ lexer_tab_cchh = custom_target(
   command : [
     flex,
     '--outfile', '@OUTPUT0@',
-    '--header-file', '@OUTPUT1@',
+    '--header-file=@OUTPUT1@',
     '@INPUT@'
   ]
 )
