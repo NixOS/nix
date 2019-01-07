@@ -190,16 +190,16 @@ endif
 conf_data.set('HAVE_SECCOMP', seccomp.found())
 
 # Look for aws-cpp-sdk-s3.
-want_aws = get_option('have-aws')
-if want_aws.disabled()
-  have_aws = false
+want_s3 = get_option('enable-s3')
+if want_s3.disabled()
+  enable_s3 = false
 else
-  have_aws = meson.get_compiler('cpp').check_header('aws/s3/S3Client.h')
+  enable_s3 = meson.get_compiler('cpp').check_header('aws/s3/S3Client.h')
 endif
 # Whether to enable S3 support via aws-sdk-cpp.
-conf_data.set('HAVE_S3', have_aws)
+conf_data.set('ENABLE_S3', enable_s3)
 
-if have_aws
+if enable_s3
   aws_version = meson.get_compiler('cpp').get_define(
     'AWS_SDK_VERSION_STRING',
     prefix : '#include <aws/core/VersionConfig.h>'
