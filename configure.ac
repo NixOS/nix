@@ -127,7 +127,6 @@ NEED_PROG(bzip2, bzip2)
 NEED_PROG(gzip, gzip)
 NEED_PROG(xz, xz)
 AC_PATH_PROG(dot, dot)
-AC_PATH_PROG(pv, pv, pv)
 AC_PATH_PROG(lsof, lsof, lsof)
 
 

@@ -95,15 +95,6 @@ those paths.  If this bothers you, use
 
   </varlistentry>
 
-  <!--
-  <varlistentry><term><option>- -show-progress</option></term>
-
-    <listitem><para>Show the progress of each path's transfer as it's made.
-    This requires the <command>pv</command> utility to be in <envar>PATH</envar>.</para></listitem>
-
-  </varlistentry>
-  -->
-
   <varlistentry><term><option>--include-outputs</option></term>
 
     <listitem><para>Also copy the outputs of store derivations
