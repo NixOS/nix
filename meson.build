@@ -109,7 +109,7 @@ foreach prog : [
   'cat',
   'tr',
 ]
-  conf_data.set_quoted(prog, find_program(prog).path())
+  find_program(prog)
 endforeach
 
 false_ = find_program('false')
@@ -119,19 +119,14 @@ foreach prog : [
   'flex',
   'bison',
 ]
-  progItem = find_program(prog, required: false)
-  conf_data.set_quoted(prog, progItem.found() ? progItem.path() : false_.path())
+  find_program(prog, required: false)
 endforeach
 
-progItem = find_program('dot', required: false)
-if progItem.found()
-  conf_data.set_quoted('dot', progItem.path())
-endif
-progItem = find_program(['lsof'], required: false)
-conf_data.set_quoted('lsof', progItem.found() ? progItem.path() : 'lsof')
+find_program('dot', required: false)
+lsof = find_program('lsof', required: false)
 
 conf_data.set_quoted('coreutils', get_option('with-coreutils-bin'))
-conf_data.set_quoted('storedir', get_option('with-store-dir'))
+storedir = get_option('with-store-dir')
 
 # Special case
 pthread = dependency('threads')
@@ -253,7 +248,7 @@ if run_command('sh', '-c', link_text_script).returncode() == 0
 endif
 conf_data.set_quoted('tarFlags', tar_flags)
 
-conf_data.set_quoted('sandbox_shell', get_option('with-sandbox-shell'))
+sandbox_shell = get_option('with-sandbox-shell')
 
 configure_file(
   output : 'config.h',

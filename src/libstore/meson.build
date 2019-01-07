@@ -69,6 +69,19 @@ libstore = library(
   link_with : [
     libutil,
   ],
+  c_args : [
+    '-DNIX_PREFIX=@0@'.format(get_option('prefix')),
+    '-DNIX_STORE_DIR=@0@'.format(storedir),
+    '-DNIX_DATA_DIR=@0@'.format(get_option('datadir')),
+    '-DNIX_STATE_DIR=@0@/nix'.format(get_option('localstatedir')),
+    '-DNIX_LOG_DIR=@0@/log/nix'.format(get_option('localstatedir')),
+    '-DNIX_CONF_DIR=@0@/nix'.format(get_option('sysconfdir')),
+    '-DNIX_LIBEXEC_DIR=@0@'.format(get_option('libexecdir')),
+    '-DNIX_BIN_DIR=@0@'.format(get_option('bindir')),
+    '-DNIX_MAN_DIR=@0@'.format(get_option('mandir')),
+    '-DSANDBOX_SHELL=@0@'.format(sandbox_shell),
+    '-DLSOF=@0@'.format(lsof),
+  ],
   link_args : host_machine.system() == 'freebsd' ? ['-ldl'] : []
 )
 
