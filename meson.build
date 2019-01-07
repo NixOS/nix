@@ -292,3 +292,4 @@ libraries = []
 
 subdir('src/libutil')
 subdir('src/libstore')
+subdir('src/libmain')
