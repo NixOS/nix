@@ -62,8 +62,10 @@ else
     error('you required the `pubsetbuf` function, but we do not have it.')
   endif
 endif
-# Whether pubsetbuf is available.
-conf_data.set('HAVE_PUBSETBUF', have_pubsetbuf)
+if have_pubsetbuf
+  # Whether pubsetbuf is available.
+  conf_data.set('HAVE_PUBSETBUF', 1)
+endif
 
 foreach f : [
   'statvfs',
@@ -71,10 +73,9 @@ foreach f : [
   # Check for lutimes, optionally used for changing the mtime of symlinks.
   'lutimes',
 ]
-  conf_data.set(
-    'HAVE_' + f.to_upper(),
-    meson.get_compiler('cpp').has_function(f),
-  )
+  if meson.get_compiler('cpp').has_function(f)
+    conf_data.set('HAVE_' + f.to_upper(), 1)
+  endif
 endforeach
 
 # Check whether the store optimiser can optimise symlinks.
@@ -92,8 +93,10 @@ else
     error('you required that we hard link symlinks, but we cannot.')
   endif
 endif
-# Whether link() works on symlinks.
-conf_data.set('CAN_LINK_SYMLINK', can_link_symlink)
+if can_link_symlink
+  # Whether link() works on symlinks.
+  conf_data.set('CAN_LINK_SYMLINK', 1)
+endif
 
 # Check for <locale>.
 meson.get_compiler('cpp').check_header('locale')
@@ -156,8 +159,10 @@ editline = dependency('libeditline')
 
 # Look for libsodium, an optional dependency.
 libsodium = dependency('sodium', required : false)
-# Whether to use libsodium for cryptography.
-conf_data.set('HAVE_SODIUM', libsodium.found())
+if libsodium.found()
+  # Whether to use libsodium for cryptography.
+  conf_data.set('HAVE_SODIUM', 1)
+endif
 
 # Look for libbrotli{enc,dec}.
 libbrotli = [
@@ -168,11 +173,9 @@ libbrotli = [
 # Look for liblzma, a required dependency.
 liblzma = dependency('liblzma')
 # xz multithreaded compression support
-conf_data.set(
-  'HAVE_LSMA_MT',
-  meson.get_compiler('cpp')
-       .has_function('lzma_stream_encoder_mt', dependencies : liblzma),
-)
+if meson.get_compiler('cpp').has_function('lzma_stream_encoder_mt', dependencies : liblzma)
+  conf_data.set('HAVE_LSMA_MT', 1)
+endif
 
 # Look for libseccomp, required for Linux sandboxing.
 want_seccomp = get_option('enable-seccomp-sandboxing')
@@ -185,7 +188,9 @@ else # enabled or auto on linux
   endif
 endif
 # Whether seccomp is available and should be used for sandboxing.
-conf_data.set('HAVE_SECCOMP', seccomp.found())
+if seccomp.found()
+  conf_data.set('HAVE_SECCOMP', 1)
+endif
 
 # Look for aws-cpp-sdk-s3.
 want_s3 = get_option('enable-s3')
@@ -219,7 +224,9 @@ else
   endif
 endif
 # Whether to use the Boehm garbage collector.
-conf_data.set('HAVE_BOEHMGC', libsodium.found())
+if libsodium.found()
+  conf_data.set('HAVE_BOEHMGC', 1)
+endif
 
 # documentation generation switch
 conf_data.set('doc_generate', not get_option('disable-doc-gen'))
@@ -235,10 +242,9 @@ foreach f : [
   'posix_fallocate',
   'sysconf',
 ]
-  conf_data.set(
-    'HAVE_' + f.to_upper(),
-    meson.get_compiler('cpp').has_function(f),
-  )
+  if meson.get_compiler('cpp').has_function(f)
+    conf_data.set('HAVE_' + f.to_upper(), 1)
+  endif
 endforeach
 
 # This is needed if bzip2 is a static library, and the Nix libraries
