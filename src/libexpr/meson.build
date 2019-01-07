@@ -1,5 +1,5 @@
-flex = find_program('flex', required: false)
-bison = find_program('bison', required: false)
+flex = find_program('flex')
+bison = find_program('bison')
 
 parser_tab_cchh = custom_target(
   'parser_tab.[cchh]',
