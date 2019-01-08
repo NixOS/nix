@@ -188,7 +188,9 @@ if want_s3.disabled()
 else
   enable_s3 = meson.get_compiler('cpp').check_header('aws/s3/S3Client.h')
 endif
-conf_data.set('ENABLE_S3', enable_s3, description : 'Whether to enable S3 support via aws-sdk-cpp.')
+if enable_s3
+  conf_data.set('ENABLE_S3', 1, description : 'Whether to enable S3 support via aws-sdk-cpp.')
+endif
 
 if enable_s3
   aws_version = meson.get_compiler('cpp').get_define(
