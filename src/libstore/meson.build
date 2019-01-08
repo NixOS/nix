@@ -6,7 +6,7 @@ sql_header_script = '''
 
 sql_header = custom_target(
   'schema.sql.gen.hh',
-  output : ['schema.sql.gen.hh'],
+  output : 'schema.sql.gen.hh',
   input : 'schema.sql',
   command : ['sh', '-c', sql_header_script]
 )
