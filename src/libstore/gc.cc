@@ -832,7 +832,7 @@ void LocalStore::removeUnusedLinks(const GCState & state)
 
             BY_HANDLE_FILE_INFORMATION bhfi;
             std::wstring wpath = wlinksDir + L'\\' + wfd.cFileName;
-            HANDLE hFile = CreateFileW(wpath.c_str(), 0, FILE_SHARE_READ, 0, OPEN_EXISTING,
+            HANDLE hFile = CreateFileW(wpath.c_str(), 0, FILE_SHARE_READ|FILE_SHARE_WRITE, 0, OPEN_EXISTING,
                                        FILE_FLAG_POSIX_SEMANTICS |
                                        ((wfd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0 ? FILE_FLAG_OPEN_REPARSE_POINT : 0) |
                                        ((wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY    ) != 0 ? FILE_FLAG_BACKUP_SEMANTICS   : 0),

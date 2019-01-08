@@ -79,7 +79,7 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
 
             BY_HANDLE_FILE_INFORMATION bhfi;
             std::wstring wpath = wlinksDir + L'\\' + wfd.cFileName;
-            HANDLE hFile = CreateFileW(wpath.c_str(), 0, FILE_SHARE_READ, 0, OPEN_EXISTING,
+            HANDLE hFile = CreateFileW(wpath.c_str(), 0, FILE_SHARE_READ|FILE_SHARE_WRITE, 0, OPEN_EXISTING,
                                        FILE_FLAG_POSIX_SEMANTICS |
                                        ((wfd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0 ? FILE_FLAG_OPEN_REPARSE_POINT : 0) |
                                        ((wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY    ) != 0 ? FILE_FLAG_BACKUP_SEMANTICS   : 0),
@@ -142,7 +142,7 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
 
             BY_HANDLE_FILE_INFORMATION bhfi;
             std::wstring wsubpath = wpath + L'\\' + wfd.cFileName;
-            HANDLE hFile = CreateFileW(wsubpath.c_str(), 0, FILE_SHARE_READ, 0, OPEN_EXISTING,
+            HANDLE hFile = CreateFileW(wsubpath.c_str(), 0, FILE_SHARE_READ|FILE_SHARE_WRITE, 0, OPEN_EXISTING,
                                        FILE_FLAG_POSIX_SEMANTICS |
                                        ((wfd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0 ? FILE_FLAG_OPEN_REPARSE_POINT : 0) |
                                        ((wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY    ) != 0 ? FILE_FLAG_BACKUP_SEMANTICS   : 0),
@@ -250,7 +250,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
         debug(format("'%1%' is already linked, with %2% other file(s)") % path % (st.st_nlink - 2));
 #else
     BY_HANDLE_FILE_INFORMATION bhfi;
-    HANDLE hFile = CreateFileW(wpath.c_str(), 0, FILE_SHARE_READ, 0, OPEN_EXISTING,
+    HANDLE hFile = CreateFileW(wpath.c_str(), 0, FILE_SHARE_READ|FILE_SHARE_WRITE, 0, OPEN_EXISTING,
                                FILE_FLAG_POSIX_SEMANTICS /*|
                                ((dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0 ? FILE_FLAG_OPEN_REPARSE_POINT : 0) |
                                ((dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY    ) != 0 ? FILE_FLAG_BACKUP_SEMANTICS   : 0)*/,

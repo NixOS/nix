@@ -618,7 +618,7 @@ std::cerr << "readLink(" << path << ")" << std::endl;
     if ((dw & FILE_ATTRIBUTE_REPARSE_POINT) == 0)
         throw Error("'%1%' is not a symlink", path);
 
-    AutoCloseWindowsHandle hFile = CreateFileW(wpath.c_str(), 0, FILE_SHARE_READ, 0, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT|FILE_FLAG_POSIX_SEMANTICS|((dw & FILE_ATTRIBUTE_DIRECTORY) != 0 ? FILE_FLAG_BACKUP_SEMANTICS : 0), 0);
+    AutoCloseWindowsHandle hFile = CreateFileW(wpath.c_str(), 0, FILE_SHARE_READ|FILE_SHARE_WRITE, 0, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT|FILE_FLAG_POSIX_SEMANTICS|((dw & FILE_ATTRIBUTE_DIRECTORY) != 0 ? FILE_FLAG_BACKUP_SEMANTICS : 0), 0);
     if (hFile.get() == INVALID_HANDLE_VALUE)
         throw WinError("readLink('%1%'): CreateFileW when reading symbolic link", path);
 

@@ -674,9 +674,12 @@ void canonicalisePathMetaData(const Path & path, InodesSeen & inodesSeen)
 {
     canonicalisePathMetaData_(pathW(path), NULL, inodesSeen);
 
-    // allow only read access (todo: make is the other way around: read-only inherited c:\nix\store and allow access to the building derivation)
     if (!boost::algorithm::iends_with(path, ".drv")) { // for a while, do not protect .drv, nix might want to replace it
-      runProgramWithOptions(RunOptions("icacls", { to_bytes(pathW(path)) /* add \\?\ for paths longer than 255 chars */, "/inheritance:r", "/grant:r", "Authenticated Users:RX", "/T", "/L" }));
+      // allow only read access (todo: make is the other way around: read-only inherited c:\nix\store and allow access to the building derivation)
+      if (isDirectory(path))
+        runProgramWithOptions(RunOptions("icacls", { to_bytes(pathW(path)) /* it add \\?\ for paths longer than 255 chars */, "/inheritance:r", "/grant:r", "Authenticated Users:(OI)(CI)RX" /*, "/T", "/L"*/ }));
+      else
+        runProgramWithOptions(RunOptions("icacls", { to_bytes(pathW(path)) /* it add \\?\ for paths longer than 255 chars */, "/inheritance:r", "/grant:r", "Authenticated Users:RX" /*, "/T", "/L"*/ }));
     }
 }
 
