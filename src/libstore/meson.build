@@ -85,5 +85,3 @@ libstore = library(
   ],
   link_args : host_machine.system() == 'freebsd' ? ['-ldl'] : []
 )
-
-libraries += [ libstore ]

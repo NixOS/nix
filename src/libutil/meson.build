@@ -27,5 +27,3 @@ libutil = library(
     boost_context,
   ],
 )
-
-libraries += [ libutil ]

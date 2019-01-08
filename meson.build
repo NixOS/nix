@@ -296,8 +296,6 @@ global_subdirs = include_directories([
 
 add_project_arguments('-g', '-Wall', '-include', 'config.h', language : 'cpp')
 
-libraries = []
-
 subdir('src/libutil')
 subdir('src/libstore')
 subdir('src/libmain')

@@ -17,5 +17,3 @@ libmain = library(
     libutil,
   ],
 )
-
-libraries += [ libmain ]
