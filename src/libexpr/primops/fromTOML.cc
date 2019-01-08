@@ -22,22 +22,24 @@ static void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Va
             size_t size = 0;
             for (auto & i : *t2) { (void) i; size++; }
 
-            state.mkAttrs(v, size);
+            BindingsBuilder bb(size);
 
             for (auto & i : *t2) {
-                auto & v2 = *state.allocAttr(v, state.symbols.create(i.first));
+                Value * v2 = state.allocValue();
 
                 if (auto i2 = i.second->as_table_array()) {
                     size_t size2 = i2->get().size();
-                    state.mkList(v2, size2);
+                    state.mkList(*v2, size2);
                     for (size_t j = 0; j < size2; ++j)
-                        visit(*(v2.listElems()[j] = state.allocValue()), i2->get()[j]);
+                        visit(*(v2->listElems()[j] = state.allocValue()), i2->get()[j]);
                 }
                 else
-                    visit(v2, i.second);
+                    visit(*v2, i.second);
+
+                bb.push_back(state.symbols.create(i.first), v2, &noPos);
             }
 
-            v.attrs->sort();
+            state.mkAttrs(v, bb);
         }
 
         else if (auto t2 = t->as_array()) {

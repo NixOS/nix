@@ -77,9 +77,9 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
         break;
     case tAttrs: {
         str << "{ ";
-        for (auto & i : v.attrs->lexicographicOrder()) {
-            str << i->name << " = ";
-            printValue(str, active, *i->value);
+        for (Bindings::lex_iterator i = v.attrs->lex_begin(); !i.at_end(); ++i) {
+            str << i.name() << " = ";
+            printValue(str, active, *i.value());
             str << "; ";
         }
         str << "}";
@@ -330,7 +330,7 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
 
     clearValue(vEmptySet);
     vEmptySet.type = tAttrs;
-    vEmptySet.attrs = allocBindings(0);
+    vEmptySet.attrs = BindingsBuilder(0).result();
 
     createBaseEnv();
 }
@@ -424,25 +424,25 @@ Path EvalState::toRealPath(const Path & path, const PathSet & context)
 };
 
 
-Value * EvalState::addConstant(const string & name, Value & v)
+Value * EvalState::addConstant(BindingsBuilder & bb, const string & name, Value & v)
 {
     Value * v2 = allocValue();
     *v2 = v;
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v2;
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v2));
+    bb.push_back(symbols.create(name2), v2, &noPos);
     return v2;
 }
 
 
-Value * EvalState::addPrimOp(const string & name,
+Value * EvalState::addPrimOp(BindingsBuilder & bb, const string & name,
     size_t arity, PrimOpFun primOp)
 {
     if (arity == 0) {
         Value v;
         primOp(*this, noPos, nullptr, v);
-        return addConstant(name, v);
+        return addConstant(bb, name, v);
     }
     Value * v = allocValue();
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
@@ -451,14 +451,14 @@ Value * EvalState::addPrimOp(const string & name,
     v->primOp = new PrimOp(primOp, arity, sym);
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
-    baseEnv.values[0]->attrs->push_back(Attr(sym, v));
+    bb.push_back(sym, v, &noPos);
     return v;
 }
 
 
 Value & EvalState::getBuiltin(const string & name)
 {
-    return *baseEnv.values[0]->attrs->find(symbols.create(name))->value;
+    return *baseEnv.values[0]->attrs->find(symbols.create(name)).value();
 }
 
 
@@ -574,10 +574,10 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             env->values[0] = v;
             env->type = Env::HasWithAttrs;
         }
-        Bindings::iterator j = env->values[0]->attrs->find(var.name);
-        if (j != env->values[0]->attrs->end()) {
-            if (countCalls && j->pos) attrSelects[*j->pos]++;
-            return j->value;
+        Bindings::find_iterator j = env->values[0]->attrs->find(var.name);
+        if (j.found()) {
+            if (countCalls && j.pos()) attrSelects[*j.pos()]++;
+            return j.value();
         }
         if (!env->prevWith)
             throwUndefinedVarError("undefined variable '%1%' at %2%", var.name, var.pos);
@@ -652,14 +652,14 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 }
 
 
-void EvalState::mkPos(Value & v, Pos * pos)
+void EvalState::mkPos(Value & v, const Pos * pos)
 {
     if (pos && pos->file.set()) {
-        mkAttrs(v, 3);
-        mkString(*allocAttr(v, sFile), pos->file);
-        mkInt(*allocAttr(v, sLine), pos->line);
-        mkInt(*allocAttr(v, sColumn), pos->column);
-        v.attrs->sort();
+        BindingsBuilder bb(3);
+        Value * v1 = allocValue();  mkString(*v1, pos->file);  bb.push_back(sFile,   v1, &noPos);
+        Value * v2 = allocValue();  mkInt(*v2, pos->line);     bb.push_back(sLine,   v2, &noPos);
+        Value * v3 = allocValue();  mkInt(*v3, pos->column);   bb.push_back(sColumn, v3, &noPos);
+        mkAttrs(v, bb);
     } else
         mkNull(v);
 }
@@ -823,17 +823,35 @@ void ExprPath::eval(EvalState & state, Env & env, Value & v)
 }
 
 
+static void apply_dyn_vars(EvalState & state, const ExprAttrs::DynamicAttrDefs & dynamicAttrs, Env & dynamicEnv, BindingsBuilder & bb) {
+    for (auto & i : dynamicAttrs) {
+        Value nameVal;
+        i.nameExpr->eval(state, dynamicEnv, nameVal);
+        state.forceValue(nameVal, i.pos);
+        if (nameVal.type == tNull)
+            continue;
+        state.forceStringNoCtx(nameVal);
+        Symbol nameSym = state.symbols.create(nameVal.string.s);
+
+        BindingsBuilder::iterator j = bb.find(nameSym);
+        if (j != bb.end())
+            throwEvalError("dynamic attribute '%1%' at %2% already defined at %3%", nameSym, i.pos, *bb.positions[j]);
+
+        i.valueExpr->setName(nameSym);
+        /* Keep sorted order so find can catch duplicates */
+        bb.push_back(nameSym, i.valueExpr->maybeThunk(state, dynamicEnv), &i.pos);
+    }
+}
+
 void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 {
-    state.mkAttrs(v, attrs.size() + dynamicAttrs.size());
-    Env *dynamicEnv = &env;
+    BindingsBuilder bb1(attrs.size() + dynamicAttrs.size());
 
     if (recursive) {
         /* Create a new environment that contains the attributes in
            this `rec'. */
         Env & env2(state.allocEnv(attrs.size()));
         env2.up = &env;
-        dynamicEnv = &env2;
 
         AttrDefs::iterator overrides = attrs.find(state.sOverrides);
         bool hasOverrides = overrides != attrs.end();
@@ -850,7 +868,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             } else
                 vAttr = i.second.e->maybeThunk(state, i.second.inherited ? env : env2);
             env2.values[displ++] = vAttr;
-            v.attrs->push_back(Attr(i.first, vAttr, &i.second.pos));
+            bb1.push_back(i.first, vAttr, &i.second.pos);
         }
 
         /* If the rec contains an attribute called `__overrides', then
@@ -862,46 +880,35 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
            been substituted into the bodies of the other attributes.
            Hence we need __overrides.) */
         if (hasOverrides) {
-            Value * vOverrides = (*v.attrs)[overrides->second.displ].value;
+            Value * vOverrides = bb1.values[overrides->second.displ];
             state.forceAttrs(*vOverrides);
-            Bindings * newBnds = state.allocBindings(v.attrs->size() + vOverrides->attrs->size());
-            for (auto & i : *v.attrs)
-                newBnds->push_back(i);
-            for (auto & i : *vOverrides->attrs) {
-                AttrDefs::iterator j = attrs.find(i.name);
+            BindingsBuilder newbb(bb1.size() + vOverrides->attrs->size());
+            for (size_t i=0; i<bb1.size(); i++)
+                newbb.push_back(bb1.names.symOrder[i], bb1.values[i], bb1.positions[i]);
+            for (Bindings::iterator i = vOverrides->attrs->begin(); !i.at_end(); ++i) {
+                AttrDefs::iterator j = attrs.find(i.name());
                 if (j != attrs.end()) {
-                    (*newBnds)[j->second.displ] = i;
-                    env2.values[j->second.displ] = i.value;
+                    bb1.values   [j->second.displ] = i.value();
+                    bb1.positions[j->second.displ] = i.pos();
+                    env2.values  [j->second.displ] = i.value();
                 } else
-                    newBnds->push_back(i);
+                  newbb.push_back(i.name(), i.value(), i.pos());
             }
-            newBnds->sort();
-            v.attrs = newBnds;
+            /* Dynamic attrs apply *after* rec and __overrides. */
+            apply_dyn_vars(state, dynamicAttrs, env2, newbb);
+            state.mkAttrs(v, newbb);
+        } else {
+            apply_dyn_vars(state, dynamicAttrs, env2, bb1);
+            state.mkAttrs(v, bb1);
         }
+        return;
     }
 
-    else
-        for (auto & i : attrs)
-            v.attrs->push_back(Attr(i.first, i.second.e->maybeThunk(state, env), &i.second.pos));
+    for (auto & i : attrs)
+        bb1.push_back(i.first, i.second.e->maybeThunk(state, env), &i.second.pos);
 
-    /* Dynamic attrs apply *after* rec and __overrides. */
-    for (auto & i : dynamicAttrs) {
-        Value nameVal;
-        i.nameExpr->eval(state, *dynamicEnv, nameVal);
-        state.forceValue(nameVal, i.pos);
-        if (nameVal.type == tNull)
-            continue;
-        state.forceStringNoCtx(nameVal);
-        Symbol nameSym = state.symbols.create(nameVal.string.s);
-        Bindings::iterator j = v.attrs->find(nameSym);
-        if (j != v.attrs->end())
-            throwEvalError("dynamic attribute '%1%' at %2% already defined at %3%", nameSym, i.pos, *j->pos);
-
-        i.valueExpr->setName(nameSym);
-        /* Keep sorted order so find can catch duplicates */
-        v.attrs->push_back(Attr(nameSym, i.valueExpr->maybeThunk(state, *dynamicEnv), &i.pos));
-        v.attrs->sort(); // FIXME: inefficient
-    }
+    apply_dyn_vars(state, dynamicAttrs, env, bb1);
+    state.mkAttrs(v, bb1);
 }
 
 
@@ -961,7 +968,7 @@ unsigned long nrLookups = 0;
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 {
     Value vTmp;
-    Pos * pos2 = 0;
+    const Pos * pos2 = 0;
     Value * vAttrs = &vTmp;
 
     e->eval(state, env, vTmp);
@@ -970,23 +977,29 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 
         for (auto & i : attrPath) {
             nrLookups++;
-            Bindings::iterator j;
             Symbol name = getName(i, state, env);
             if (def) {
                 state.forceValue(*vAttrs, pos);
-                if (vAttrs->type != tAttrs ||
-                    (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
+                if (vAttrs->type != tAttrs) {
+                    def->eval(state, env, v);
+                    return;
+                }
+                Bindings::find_iterator j = vAttrs->attrs->find(name);
+                if (!j.found())
                 {
                     def->eval(state, env, v);
                     return;
                 }
+                vAttrs = j.value();
+                pos2 = j.pos();
             } else {
                 state.forceAttrs(*vAttrs, pos);
-                if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
+                Bindings::find_iterator j = vAttrs->attrs->find(name);
+                if (!j.found())
                     throwEvalError("attribute '%1%' missing, at %2%", name, pos);
+                vAttrs = j.value();
+                pos2 = j.pos();
             }
-            vAttrs = j->value;
-            pos2 = j->pos;
             if (state.countCalls && pos2) state.attrSelects[*pos2]++;
         }
 
@@ -1012,16 +1025,17 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
 
     for (auto & i : attrPath) {
         state.forceValue(*vAttrs);
-        Bindings::iterator j;
         Symbol name = getName(i, state, env);
-        if (vAttrs->type != tAttrs ||
-            (j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
-        {
+        if (vAttrs->type != tAttrs) {
             mkBool(v, false);
             return;
-        } else {
-            vAttrs = j->value;
         }
+        Bindings::find_iterator j = vAttrs->attrs->find(name);
+        if (!j.found()) {
+            mkBool(v, false);
+            return;
+        }
+        vAttrs = j.value();
     }
 
     mkBool(v, true);
@@ -1093,7 +1107,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
 
     if (fun.type == tAttrs) {
       auto found = fun.attrs->find(sFunctor);
-      if (found != fun.attrs->end()) {
+      if (found.found()) {
         /* fun may be allocated on the stack of the calling function,
          * but for functors we may keep a reference, so heap-allocate
          * a copy and use that instead.
@@ -1102,7 +1116,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         fun2 = fun;
         /* !!! Should we use the attr pos here? */
         Value v2;
-        callFunction(*found->value, fun2, v2, pos);
+        callFunction(*found.value(), fun2, v2, pos);
         return callFunction(v2, arg, v, pos);
       }
     }
@@ -1134,14 +1148,14 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
            argument has a default, use the default. */
         size_t attrsUsed = 0;
         for (auto & i : lambda.formals->formals) {
-            Bindings::iterator j = arg.attrs->find(i.name);
-            if (j == arg.attrs->end()) {
+            Bindings::find_iterator j = arg.attrs->find(i.name);
+            if (!j.found()) {
                 if (!i.def) throwTypeError("%1% called without required argument '%2%', at %3%",
                     lambda, i.name, pos);
                 env2.values[displ++] = i.def->maybeThunk(*this, env2);
             } else {
                 attrsUsed++;
-                env2.values[displ++] = j->value;
+                env2.values[displ++] = j.value();
             }
         }
 
@@ -1150,9 +1164,9 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         if (!lambda.formals->ellipsis && attrsUsed != arg.attrs->size()) {
             /* Nope, so show the first unexpected argument to the
                user. */
-            for (auto & i : *arg.attrs)
-                if (lambda.formals->argNames.find(i.name) == lambda.formals->argNames.end())
-                    throwTypeError("%1% called with unexpected argument '%2%', at %3%", lambda, i.name, pos);
+            for (Bindings::iterator i = arg.attrs->begin(); !i.at_end(); ++i)
+                if (lambda.formals->argNames.find(i.name()) == lambda.formals->argNames.end())
+                    throwTypeError("%1% called with unexpected argument '%2%', at %3%", lambda, i.name(), pos);
             abort(); // can't happen
         }
     }
@@ -1188,9 +1202,9 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
 
     if (fun.type == tAttrs) {
         auto found = fun.attrs->find(sFunctor);
-        if (found != fun.attrs->end()) {
+        if (found.found()) {
             Value * v = allocValue();
-            callFunction(*found->value, fun, *v, noPos);
+            callFunction(*found.value(), fun, *v, noPos);
             forceValue(*v);
             return autoCallFunction(args, *v, res);
         }
@@ -1202,17 +1216,17 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
     }
 
     Value * actualArgs = allocValue();
-    mkAttrs(*actualArgs, fun.lambda.fun->formals->formals.size());
+    BindingsBuilder bb(fun.lambda.fun->formals->formals.size());
 
     for (auto & i : fun.lambda.fun->formals->formals) {
-        Bindings::iterator j = args.find(i.name);
-        if (j != args.end())
-            actualArgs->attrs->push_back(*j);
+        Bindings::find_iterator j = args.find(i.name);
+        if (j.found())
+            bb.push_back( j.name(), j.value(), j.pos() );
         else if (!i.def)
             throwTypeError("cannot auto-call a function that has an argument without a default value ('%1%')", i.name);
     }
 
-    actualArgs->attrs->sort();
+    mkAttrs(*actualArgs, bb);
 
     callFunction(fun, *actualArgs, res, noPos);
 }
@@ -1295,28 +1309,32 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
     if (v1.attrs->size() == 0) { v = v2; return; }
     if (v2.attrs->size() == 0) { v = v1; return; }
 
-    state.mkAttrs(v, v1.attrs->size() + v2.attrs->size());
+    BindingsBuilder bb(v1.attrs->size() + v2.attrs->size());
 
     /* Merge the sets, preferring values from the second set.  Make
        sure to keep the resulting vector in sorted order. */
     Bindings::iterator i = v1.attrs->begin();
     Bindings::iterator j = v2.attrs->begin();
 
-    while (i != v1.attrs->end() && j != v2.attrs->end()) {
-        if (i->name == j->name) {
-            v.attrs->push_back(*j);
+    while (!i.at_end() && !j.at_end()) {
+        if (i.name() == j.name()) {
+            bb.push_back(j.name(), j.value(), j.pos());
             ++i; ++j;
         }
-        else if (i->name < j->name)
-            v.attrs->push_back(*i++);
-        else
-            v.attrs->push_back(*j++);
+        else if (i.name() < j.name()) {
+            bb.push_back(i.name(), i.value(), i.pos());
+            ++i;
+        } else {
+            bb.push_back(j.name(), j.value(), j.pos());
+            ++j;
+        }
     }
 
-    while (i != v1.attrs->end()) v.attrs->push_back(*i++);
-    while (j != v2.attrs->end()) v.attrs->push_back(*j++);
+    while (!i.at_end()) { bb.push_back(i.name(), i.value(), i.pos()); ++i; }
+    while (!j.at_end()) { bb.push_back(j.name(), j.value(), j.pos()); ++j; }
 
-    state.nrOpUpdateValuesCopied += v.attrs->size();
+    state.nrOpUpdateValuesCopied += bb.size();
+    state.mkAttrs(v, bb, /* alreadySorted = */ true);
 }
 
 
@@ -1435,11 +1453,11 @@ void EvalState::forceValueDeep(Value & v)
         forceValue(v);
 
         if (v.type == tAttrs) {
-            for (auto & i : *v.attrs)
+            for (Bindings::iterator i = v.attrs->begin(); !i.at_end(); ++i)
                 try {
-                    recurse(*i.value);
+                    recurse(*i.value());
                 } catch (Error & e) {
-                    addErrorPrefix(e, "while evaluating the attribute '%1%' at %2%:\n", i.name, *i.pos);
+                    addErrorPrefix(e, "while evaluating the attribute '%1%' at %2%:\n", i.name(), *i.pos());
                     throw;
                 }
         }
@@ -1485,7 +1503,7 @@ bool EvalState::forceBool(Value & v, const Pos & pos)
 
 bool EvalState::isFunctor(Value & fun)
 {
-    return fun.type == tAttrs && fun.attrs->find(sFunctor) != fun.attrs->end();
+    return fun.type == tAttrs && fun.attrs->find(sFunctor).found();
 }
 
 
@@ -1544,11 +1562,11 @@ string EvalState::forceStringNoCtx(Value & v, const Pos & pos)
 bool EvalState::isDerivation(Value & v)
 {
     if (v.type != tAttrs) return false;
-    Bindings::iterator i = v.attrs->find(sType);
-    if (i == v.attrs->end()) return false;
-    forceValue(*i->value);
-    if (i->value->type != tString) return false;
-    return strcmp(i->value->string.s, "derivation") == 0;
+    Bindings::find_iterator i = v.attrs->find(sType);
+    if (!i.found()) return false;
+    forceValue(*i.value());
+    if (i.value()->type != tString) return false;
+    return strcmp(i.value()->string.s, "derivation") == 0;
 }
 
 
@@ -1570,15 +1588,15 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
     }
 
     if (v.type == tAttrs) {
-        auto i = v.attrs->find(sToString);
-        if (i != v.attrs->end()) {
+        Bindings::find_iterator i1 = v.attrs->find(sToString);
+        if (i1.found()) {
             Value v1;
-            callFunction(*i->value, v, v1, pos);
+            callFunction(*i1.value(), v, v1, pos);
             return coerceToString(pos, v1, context, coerceMore, copyToStore);
         }
-        i = v.attrs->find(sOutPath);
-        if (i == v.attrs->end()) throwTypeError("cannot coerce a set to a string, at %1%", pos);
-        return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
+        Bindings::find_iterator i2 = v.attrs->find(sOutPath);
+        if (!i2.found()) throwTypeError("cannot coerce a set to a string, at %1%", pos);
+        return coerceToString(pos, *i2.value(), context, coerceMore, copyToStore);
     }
 
     if (v.type == tExternal)
@@ -1691,18 +1709,18 @@ bool EvalState::eqValues(Value & v1, Value & v2)
             /* If both sets denote a derivation (type = "derivation"),
                then compare their outPaths. */
             if (isDerivation(v1) && isDerivation(v2)) {
-                Bindings::iterator i = v1.attrs->find(sOutPath);
-                Bindings::iterator j = v2.attrs->find(sOutPath);
-                if (i != v1.attrs->end() && j != v2.attrs->end())
-                    return eqValues(*i->value, *j->value);
+                Bindings::find_iterator i = v1.attrs->find(sOutPath);
+                Bindings::find_iterator j = v2.attrs->find(sOutPath);
+                if (i.found() && j.found())
+                    return eqValues(*i.value(), *j.value());
             }
 
-            if (v1.attrs->size() != v2.attrs->size()) return false;
+            /* compare pointers to interned vectors of attrset keys; this also compares attrset's size) */
+            if (!v1.attrs->sameKeys(v2.attrs)) return false;
 
             /* Otherwise, compare the attributes one by one. */
-            Bindings::iterator i, j;
-            for (i = v1.attrs->begin(), j = v2.attrs->begin(); i != v1.attrs->end(); ++i, ++j)
-                if (i->name != j->name || !eqValues(*i->value, *j->value))
+            for (Bindings::iterator i = v1.attrs->begin(), j = v2.attrs->begin(); !i.at_end(); ++i, ++j)
+                if (!eqValues(*i.value(), *j.value()))
                     return false;
 
             return true;
@@ -1736,7 +1754,7 @@ void EvalState::printStats()
     uint64_t bEnvs = nrEnvs * sizeof(Env) + nrValuesInEnvs * sizeof(Value *);
     uint64_t bLists = nrListElems * sizeof(Value *);
     uint64_t bValues = nrValues * sizeof(Value);
-    uint64_t bAttrsets = nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Attr);
+    uint64_t bAttrsets = nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Value*) + Bindings::bNameLists + Bindings::bPosLists;
 
 #if HAVE_BOEHMGC
     GC_word heapSize, totalBytes;
@@ -1869,9 +1887,13 @@ size_t valueSize(Value & v)
         case tAttrs:
             if (seen.find(v.attrs) == seen.end()) {
                 seen.insert(v.attrs);
-                sz += sizeof(Bindings) + sizeof(Attr) * v.attrs->capacity();
-                for (auto & i : *v.attrs)
-                    sz += doValue(*i.value);
+                sz += sizeof(Bindings) + sizeof(Value*) * v.attrs->size();
+                if (seen.insert(v.attrs->pnames).second)
+                    sz += sizeof(Symbol) * v.attrs->size();
+                if (seen.insert(v.attrs->ppositions).second)
+                    sz += sizeof(Pos *) * v.attrs->size();
+                for (Bindings::iterator i = v.attrs->begin(); !i.at_end(); ++i)
+                    sz += doValue(*i.value());
             }
             break;
         case tList1:

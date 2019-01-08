@@ -99,7 +99,7 @@ static bool isNixExpr(const Path & path, struct stat & st)
 
 
 static void getAllExprs(EvalState & state,
-    const Path & path, StringSet & attrs, Value & v)
+    const Path & path, StringSet & attrs, BindingsBuilder & bb)
 {
     StringSet namesSorted;
     for (auto & i : readDirectory(path)) namesSorted.insert(i.name);
@@ -131,16 +131,16 @@ static void getAllExprs(EvalState & state,
             attrs.insert(attrName);
             /* Load the expression on demand. */
             Value & vFun = state.getBuiltin("import");
-            Value & vArg(*state.allocValue());
-            mkString(vArg, path2);
-            if (v.attrs->size() == v.attrs->capacity())
-                throw Error(format("too many Nix expressions in directory '%1%'") % path);
-            mkApp(*state.allocAttr(v, state.symbols.create(attrName)), vFun, vArg);
+            Value * vArg = state.allocValue();
+            Value * vApp = state.allocValue();
+            mkString(*vArg, path2);
+            mkApp(*vApp, vFun, *vArg);
+            bb.push_back(state.symbols.create(attrName), vApp, &noPos);
         }
         else if (S_ISDIR(st.st_mode))
             /* `path2' is a directory (with no default.nix in it);
                recurse into it. */
-            getAllExprs(state, path2, attrs, v);
+            getAllExprs(state, path2, attrs, bb);
     }
 }
 
@@ -160,12 +160,14 @@ static void loadSourceExpr(EvalState & state, const Path & path, Value & v)
        set flat, not nested, to make it easier for a user to have a
        ~/.nix-defexpr directory that includes some system-wide
        directory). */
-    else if (S_ISDIR(st.st_mode)) {
-        state.mkAttrs(v, 1024);
-        state.mkList(*state.allocAttr(v, state.symbols.create("_combineChannels")), 0);
+    if (S_ISDIR(st.st_mode)) {
+        BindingsBuilder bb(1024);
+        Value * vv = state.allocValue();
+        state.mkList(*vv, 0);
+        bb.push_back(state.symbols.create("_combineChannels"), vv, &noPos);
         StringSet attrs;
-        getAllExprs(state, path, attrs, v);
-        v.attrs->sort();
+        getAllExprs(state, path, attrs, bb);
+        state.mkAttrs(v, bb);
     }
 
     else throw Error("path '%s' is not a directory or a Nix expression", path);
@@ -1140,19 +1142,19 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                                         attrs3["value"] = v->listElems()[j]->string.s;
                                         xml.writeEmptyElement("string", attrs3);
                                     }
-                              } else if (v->type == tAttrs) {
-                                  attrs2["type"] = "strings";
-                                  XMLOpenElement m(xml, "meta", attrs2);
-                                  Bindings & attrs = *v->attrs;
-                                  for (auto &i : attrs) {
-                                      Attr & a(*attrs.find(i.name));
-                                      if(a.value->type != tString) continue;
-                                      XMLAttrs attrs3;
-                                      attrs3["type"] = i.name;
-                                      attrs3["value"] = a.value->string.s;
-                                      xml.writeEmptyElement("string", attrs3);
+                                } else if (v->type == tAttrs) {
+                                    attrs2["type"] = "strings";
+                                    XMLOpenElement m(xml, "meta", attrs2);
+                                    Bindings & attrs = *v->attrs;
+                                    for (Bindings::iterator i = attrs.begin(); !i.at_end(); ++i) {
+                                        Bindings::find_iterator a = attrs.find(i.name());
+                                        if (a.value()->type != tString) continue;
+                                        XMLAttrs attrs3;
+                                        attrs3["type"] = i.name();
+                                        attrs3["value"] = a.value()->string.s;
+                                        xml.writeEmptyElement("string", attrs3);
+                                    }
                                 }
-                              }
                             }
                         }
                     }

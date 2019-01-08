@@ -103,23 +103,31 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
     if (state.store->isStorePath(path) && state.store->isValidPath(path) && isDerivation(path)) {
         Derivation drv = readDerivation(realPath);
         Value & w = *state.allocValue();
-        state.mkAttrs(w, 3 + drv.outputs.size());
-        Value * v2 = state.allocAttr(w, state.sDrvPath);
+        BindingsBuilder bb(3 + drv.outputs.size());
+
+        Value * v2 = state.allocValue();
         mkString(*v2, path, {"=" + path});
-        v2 = state.allocAttr(w, state.sName);
+        bb.push_back(state.sDrvPath, v2, &noPos);
+
+        v2 = state.allocValue();
         mkString(*v2, drv.env["name"]);
-        Value * outputsVal =
-            state.allocAttr(w, state.symbols.create("outputs"));
+        bb.push_back(state.sName, v2, &noPos);
+
+        Value * outputsVal = state.allocValue();
         state.mkList(*outputsVal, drv.outputs.size());
+        bb.push_back(state.symbols.create("outputs"), outputsVal, &noPos);
+
         unsigned int outputs_index = 0;
 
         for (const auto & o : drv.outputs) {
-            v2 = state.allocAttr(w, state.symbols.create(o.first));
+            v2 = state.allocValue();
             mkString(*v2, o.second.path, {"!" + o.first + "!" + path});
+            bb.push_back(state.symbols.create(o.first), v2, &noPos);
+
             outputsVal->listElems()[outputs_index] = state.allocValue();
             mkString(*(outputsVal->listElems()[outputs_index++]), o.first);
         }
-        w.attrs->sort();
+        state.mkAttrs(w, bb);
         Value fun;
         state.evalFile(settings.nixDataDir + "/nix/corepkgs/imported-drv-to-derivation.nix", fun);
         state.forceFunction(fun, pos);
@@ -136,9 +144,9 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
             StaticEnv staticEnv(false, &state.staticBaseEnv);
 
             unsigned int displ = 0;
-            for (auto & attr : *args[0]->attrs) {
-                staticEnv.vars[attr.name] = displ;
-                env->values[displ++] = attr.value;
+            for (Bindings::iterator attr = args[0]->attrs->begin(); !attr.at_end(); ++attr) {
+                staticEnv.vars[attr.name()] = displ;
+                env->values[displ++] = attr.value();
             }
 
             printTalkative("evaluating file '%1%'", realPath);
@@ -354,22 +362,22 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
     state.forceAttrs(*args[0], pos);
 
     /* Get the start set. */
-    Bindings::iterator startSet =
+    Bindings::find_iterator startSet =
         args[0]->attrs->find(state.symbols.create("startSet"));
-    if (startSet == args[0]->attrs->end())
+    if (!startSet.found())
         throw EvalError(format("attribute 'startSet' required, at %1%") % pos);
-    state.forceList(*startSet->value, pos);
+    state.forceList(*startSet.value(), pos);
 
     ValueList workSet;
-    for (unsigned int n = 0; n < startSet->value->listSize(); ++n)
-        workSet.push_back(startSet->value->listElems()[n]);
+    for (unsigned int n = 0; n < startSet.value()->listSize(); ++n)
+        workSet.push_back(startSet.value()->listElems()[n]);
 
     /* Get the operator. */
-    Bindings::iterator op =
+    Bindings::find_iterator op =
         args[0]->attrs->find(state.symbols.create("operator"));
-    if (op == args[0]->attrs->end())
+    if (!op.found())
         throw EvalError(format("attribute 'operator' required, at %1%") % pos);
-    state.forceValue(*op->value);
+    state.forceValue(*op.value());
 
     /* Construct the closure by applying the operator to element of
        `workSet', adding the result to `workSet', continuing until
@@ -384,19 +392,19 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
 
         state.forceAttrs(*e, pos);
 
-        Bindings::iterator key =
+        Bindings::find_iterator key =
             e->attrs->find(state.symbols.create("key"));
-        if (key == e->attrs->end())
+        if (!key.found())
             throw EvalError(format("attribute 'key' required, at %1%") % pos);
-        state.forceValue(*key->value);
+        state.forceValue(*key.value());
 
-        if (doneKeys.find(key->value) != doneKeys.end()) continue;
-        doneKeys.insert(key->value);
+        if (doneKeys.find(key.value()) != doneKeys.end()) continue;
+        doneKeys.insert(key.value());
         res.push_back(e);
 
         /* Call the `operator' function with `e' as argument. */
         Value call;
-        mkApp(call, *op->value, *e);
+        mkApp(call, *op.value(), *e);
         state.forceList(call, pos);
 
         /* Add the values returned by the operator to the work set. */
@@ -447,16 +455,18 @@ static void prim_addErrorContext(EvalState & state, const Pos & pos, Value * * a
  * else => {success=false; value=false;} */
 static void prim_tryEval(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    state.mkAttrs(v, 2);
+    BindingsBuilder bb(2);
+    Value * vSuccess = state.allocValue();
     try {
         state.forceValue(*args[0]);
-        v.attrs->push_back(Attr(state.sValue, args[0]));
-        mkBool(*state.allocAttr(v, state.symbols.create("success")), true);
+        bb.push_back(state.sValue, args[0], &noPos);
+        mkBool(*vSuccess, true);
     } catch (AssertionError & e) {
-        mkBool(*state.allocAttr(v, state.sValue), false);
-        mkBool(*state.allocAttr(v, state.symbols.create("success")), false);
+        mkBool(*vSuccess, false);
+        bb.push_back(state.sValue, vSuccess, &noPos);
     }
-    v.attrs->sort();
+    bb.push_back(state.symbols.create("success"), vSuccess, &noPos);
+    state.mkAttrs(v, bb);
 }
 
 
@@ -525,13 +535,13 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     state.forceAttrs(*args[0], pos);
 
     /* Figure out the name first (for stack backtraces). */
-    Bindings::iterator attr = args[0]->attrs->find(state.sName);
-    if (attr == args[0]->attrs->end())
+    Bindings::find_iterator attr1 = args[0]->attrs->find(state.sName);
+    if (!attr1.found())
         throw EvalError(format("required attribute 'name' missing, at %1%") % pos);
     string drvName;
-    Pos & posDrvName(*attr->pos);
+    const Pos & posDrvName(*attr1.pos());
     try {
-        drvName = state.forceStringNoCtx(*attr->value, pos);
+        drvName = state.forceStringNoCtx(*attr1.value(), pos);
     } catch (Error & e) {
         e.addPrefix(format("while evaluating the derivation attribute 'name' at %1%:\n") % posDrvName);
         throw;
@@ -540,15 +550,15 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     /* Check whether attributes should be passed as a JSON file. */
     std::ostringstream jsonBuf;
     std::unique_ptr<JSONObject> jsonObject;
-    attr = args[0]->attrs->find(state.sStructuredAttrs);
-    if (attr != args[0]->attrs->end() && state.forceBool(*attr->value, pos))
+    Bindings::find_iterator attr2 = args[0]->attrs->find(state.sStructuredAttrs);
+    if (attr2.found() && state.forceBool(*attr2.value(), pos))
         jsonObject = std::make_unique<JSONObject>(jsonBuf);
 
     /* Check whether null attributes should be ignored. */
     bool ignoreNulls = false;
-    attr = args[0]->attrs->find(state.sIgnoreNulls);
-    if (attr != args[0]->attrs->end())
-        ignoreNulls = state.forceBool(*attr->value, pos);
+    Bindings::find_iterator attr3 = args[0]->attrs->find(state.sIgnoreNulls);
+    if (attr3.found())
+        ignoreNulls = state.forceBool(*attr3.value(), pos);
 
     /* Build the derivation expression by processing the attributes. */
     Derivation drv;
@@ -562,9 +572,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     StringSet outputs;
     outputs.insert("out");
 
-    for (auto & i : args[0]->attrs->lexicographicOrder()) {
-        if (i->name == state.sIgnoreNulls) continue;
-        const string & key = i->name;
+    for (Bindings::lex_iterator i = args[0]->attrs->lex_begin(); !i.at_end(); ++i) {
+        if (i.name() == state.sIgnoreNulls) continue;
+        const string & key = i.name();
         vomit("processing attribute '%1%'", key);
 
         auto handleHashMode = [&](const std::string & s) {
@@ -594,16 +604,16 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         try {
 
             if (ignoreNulls) {
-                state.forceValue(*i->value);
-                if (i->value->type == tNull) continue;
+                state.forceValue(*i.value());
+                if (i.value()->type == tNull) continue;
             }
 
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
-            if (i->name == state.sArgs) {
-                state.forceList(*i->value, pos);
-                for (unsigned int n = 0; n < i->value->listSize(); ++n) {
-                    string s = state.coerceToString(posDrvName, *i->value->listElems()[n], context, true);
+            if (i.name() == state.sArgs) {
+                state.forceList(*i.value(), pos);
+                for (unsigned int n = 0; n < i.value()->listSize(); ++n) {
+                    string s = state.coerceToString(posDrvName, *i.value()->listElems()[n], context, true);
                     drv.args.push_back(s);
                 }
             }
@@ -614,39 +624,39 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
                 if (jsonObject) {
 
-                    if (i->name == state.sStructuredAttrs) continue;
+                    if (i.name() == state.sStructuredAttrs) continue;
 
                     auto placeholder(jsonObject->placeholder(key));
-                    printValueAsJSON(state, true, *i->value, placeholder, context);
+                    printValueAsJSON(state, true, *i.value(), placeholder, context);
 
-                    if (i->name == state.sBuilder)
-                        drv.builder = state.forceString(*i->value, context, posDrvName);
-                    else if (i->name == state.sSystem)
-                        drv.platform = state.forceStringNoCtx(*i->value, posDrvName);
-                    else if (i->name == state.sOutputHash)
-                        outputHash = state.forceStringNoCtx(*i->value, posDrvName);
-                    else if (i->name == state.sOutputHashAlgo)
-                        outputHashAlgo = state.forceStringNoCtx(*i->value, posDrvName);
-                    else if (i->name == state.sOutputHashMode)
-                        handleHashMode(state.forceStringNoCtx(*i->value, posDrvName));
-                    else if (i->name == state.sOutputs) {
+                    if (i.name() == state.sBuilder)
+                        drv.builder = state.forceString(*i.value(), context, posDrvName);
+                    else if (i.name() == state.sSystem)
+                        drv.platform = state.forceStringNoCtx(*i.value(), posDrvName);
+                    else if (i.name() == state.sOutputHash)
+                        outputHash = state.forceStringNoCtx(*i.value(), posDrvName);
+                    else if (i.name() == state.sOutputHashAlgo)
+                        outputHashAlgo = state.forceStringNoCtx(*i.value(), posDrvName);
+                    else if (i.name() == state.sOutputHashMode)
+                        handleHashMode(state.forceStringNoCtx(*i.value(), posDrvName));
+                    else if (i.name() == state.sOutputs) {
                         /* Require ‘outputs’ to be a list of strings. */
-                        state.forceList(*i->value, posDrvName);
+                        state.forceList(*i.value(), posDrvName);
                         Strings ss;
-                        for (unsigned int n = 0; n < i->value->listSize(); ++n)
-                            ss.emplace_back(state.forceStringNoCtx(*i->value->listElems()[n], posDrvName));
+                        for (unsigned int n = 0; n < i.value()->listSize(); ++n)
+                            ss.emplace_back(state.forceStringNoCtx(*i.value()->listElems()[n], posDrvName));
                         handleOutputs(ss);
                     }
 
                 } else {
-                    auto s = state.coerceToString(posDrvName, *i->value, context, true);
+                    auto s = state.coerceToString(posDrvName, *i.value(), context, true);
                     drv.env.emplace(key, s);
-                    if (i->name == state.sBuilder) drv.builder = s;
-                    else if (i->name == state.sSystem) drv.platform = s;
-                    else if (i->name == state.sOutputHash) outputHash = s;
-                    else if (i->name == state.sOutputHashAlgo) outputHashAlgo = s;
-                    else if (i->name == state.sOutputHashMode) handleHashMode(s);
-                    else if (i->name == state.sOutputs)
+                    if (i.name() == state.sBuilder) drv.builder = s;
+                    else if (i.name() == state.sSystem) drv.platform = s;
+                    else if (i.name() == state.sOutputHash) outputHash = s;
+                    else if (i.name() == state.sOutputHashAlgo) outputHashAlgo = s;
+                    else if (i.name() == state.sOutputHashMode) handleHashMode(s);
+                    else if (i.name() == state.sOutputs)
                         handleOutputs(tokenizeString<Strings>(s));
                 }
 
@@ -768,13 +778,16 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
        read them later. */
     drvHashes[drvPath] = hashDerivationModulo(*state.store, drv);
 
-    state.mkAttrs(v, 1 + drv.outputs.size());
-    mkString(*state.allocAttr(v, state.sDrvPath), drvPath, {"=" + drvPath});
+    BindingsBuilder bb(1 + drv.outputs.size());
+    Value * vv = state.allocValue();
+    mkString(*vv, drvPath, {"=" + drvPath});
+    bb.push_back(state.sDrvPath, vv, &noPos);
     for (auto & i : drv.outputs) {
-        mkString(*state.allocAttr(v, state.symbols.create(i.first)),
-            i.second.path, {"!" + i.first + "!" + drvPath});
+        Value * vv = state.allocValue();
+        mkString(*vv, i.second.path, {"!" + i.first + "!" + drvPath});
+        bb.push_back(state.symbols.create(i.first), vv, &noPos);
     }
-    v.attrs->sort();
+    state.mkAttrs(v, bb);
 }
 
 
@@ -900,16 +913,16 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
         state.forceAttrs(v2, pos);
 
         string prefix;
-        Bindings::iterator i = v2.attrs->find(state.symbols.create("prefix"));
-        if (i != v2.attrs->end())
-            prefix = state.forceStringNoCtx(*i->value, pos);
+        Bindings::find_iterator i1 = v2.attrs->find(state.symbols.create("prefix"));
+        if (i1.found())
+            prefix = state.forceStringNoCtx(*i1.value(), pos);
 
-        i = v2.attrs->find(state.symbols.create("path"));
-        if (i == v2.attrs->end())
+        Bindings::find_iterator i2 = v2.attrs->find(state.symbols.create("path"));
+        if (!i2.found())
             throw EvalError(format("attribute 'path' missing, at %1%") % pos);
 
         PathSet context;
-        string path = state.coerceToString(pos, *i->value, context, false, false);
+        string path = state.coerceToString(pos, *i2.value(), context, false, false);
 
         try {
             state.realiseContext(context);
@@ -939,10 +952,10 @@ static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Val
     }
 
     DirEntries entries = readDirectory(state.checkSourcePath(path));
-    state.mkAttrs(v, entries.size());
+    BindingsBuilder bb(entries.size());
 
     for (auto & ent : entries) {
-        Value * ent_val = state.allocAttr(v, state.symbols.create(ent.name));
+        Value * ent_val = state.allocValue();
         if (ent.type == DT_UNKNOWN)
             ent.type = getFileType(path + "/" + ent.name);
         mkStringNoCopy(*ent_val,
@@ -950,9 +963,10 @@ static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Val
             ent.type == DT_DIR ? "directory" :
             ent.type == DT_LNK ? "symlink" :
             "unknown");
+        bb.push_back(state.symbols.create(ent.name), ent_val, &noPos);
     }
 
-    v.attrs->sort();
+    state.mkAttrs(v, bb);
 }
 
 
@@ -1099,24 +1113,24 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
     auto recursive = true;
     Hash expectedHash;
 
-    for (auto & attr : *args[0]->attrs) {
-        const string & n(attr.name);
+    for (Bindings::iterator attr = args[0]->attrs->begin(); !attr.at_end(); ++attr) {
+        const string & n(attr.name());
         if (n == "path") {
             PathSet context;
-            path = state.coerceToPath(*attr.pos, *attr.value, context);
+            path = state.coerceToPath(*attr.pos(), *attr.value(), context);
             if (!context.empty())
-                throw EvalError(format("string '%1%' cannot refer to other paths, at %2%") % path % *attr.pos);
-        } else if (attr.name == state.sName)
-            name = state.forceStringNoCtx(*attr.value, *attr.pos);
+                throw EvalError(format("string '%1%' cannot refer to other paths, at %2%") % path % *attr.pos());
+        } else if (attr.name() == state.sName)
+            name = state.forceStringNoCtx(*attr.value(), *attr.pos());
         else if (n == "filter") {
-            state.forceValue(*attr.value);
-            filterFun = attr.value;
+            state.forceValue(*attr.value());
+            filterFun = attr.value();
         } else if (n == "recursive")
-            recursive = state.forceBool(*attr.value, *attr.pos);
+            recursive = state.forceBool(*attr.value(), *attr.pos());
         else if (n == "sha256")
-            expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
+            expectedHash = Hash(state.forceStringNoCtx(*attr.value(), *attr.pos()), htSHA256);
         else
-            throw EvalError(format("unsupported argument '%1%' to 'addPath', at %2%") % attr.name % *attr.pos);
+            throw EvalError(format("unsupported argument '%1%' to 'addPath', at %2%") % attr.name() % *attr.pos());
     }
     if (path.empty())
         throw EvalError(format("'path' required, at %1%") % pos);
@@ -1141,11 +1155,9 @@ static void prim_attrNames(EvalState & state, const Pos & pos, Value * * args, V
     state.mkList(v, args[0]->attrs->size());
 
     size_t n = 0;
-    for (auto & i : *args[0]->attrs)
-        mkString(*(v.listElems()[n++] = state.allocValue()), i.name);
-
-    std::sort(v.listElems(), v.listElems() + n,
-              [](Value * v1, Value * v2) { return strcmp(v1->string.s, v2->string.s) < 0; });
+    for (Bindings::lex_iterator i = args[0]->attrs->lex_begin(); !i.at_end(); ++i) {
+        mkString(*(v.listElems()[n++] = state.allocValue()), i.name());
+    }
 }
 
 
@@ -1158,14 +1170,8 @@ static void prim_attrValues(EvalState & state, const Pos & pos, Value * * args, 
     state.mkList(v, args[0]->attrs->size());
 
     unsigned int n = 0;
-    for (auto & i : *args[0]->attrs)
-        v.listElems()[n++] = (Value *) &i;
-
-    std::sort(v.listElems(), v.listElems() + n,
-        [](Value * v1, Value * v2) { return (string) ((Attr *) v1)->name < (string) ((Attr *) v2)->name; });
-
-    for (unsigned int i = 0; i < n; ++i)
-        v.listElems()[i] = ((Attr *) v.listElems()[i])->value;
+    for (Bindings::lex_iterator i = args[0]->attrs->lex_begin(); !i.at_end(); ++i)
+        v.listElems()[n++] = i.value();
 }
 
 
@@ -1175,13 +1181,13 @@ void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
     string attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
     // !!! Should we create a symbol here or just do a lookup?
-    Bindings::iterator i = args[1]->attrs->find(state.symbols.create(attr));
-    if (i == args[1]->attrs->end())
+    Bindings::find_iterator i = args[1]->attrs->find(state.symbols.create(attr));
+    if (!i.found())
         throw EvalError(format("attribute '%1%' missing, at %2%") % attr % pos);
     // !!! add to stack trace?
-    if (state.countCalls && i->pos) state.attrSelects[*i->pos]++;
-    state.forceValue(*i->value);
-    v = *i->value;
+    if (state.countCalls && i.pos()) state.attrSelects[*i.pos()]++;
+    state.forceValue(*i.value());
+    v = *i.value();
 }
 
 
@@ -1190,11 +1196,11 @@ void prim_unsafeGetAttrPos(EvalState & state, const Pos & pos, Value * * args, V
 {
     string attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
-    Bindings::iterator i = args[1]->attrs->find(state.symbols.create(attr));
-    if (i == args[1]->attrs->end())
+    Bindings::find_iterator i = args[1]->attrs->find(state.symbols.create(attr));
+    if (!i.found())
         mkNull(v);
     else
-        state.mkPos(v, i->pos);
+        state.mkPos(v, i.pos());
 }
 
 
@@ -1203,7 +1209,7 @@ static void prim_hasAttr(EvalState & state, const Pos & pos, Value * * args, Val
 {
     string attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
-    mkBool(v, args[1]->attrs->find(state.symbols.create(attr)) != args[1]->attrs->end());
+    mkBool(v, args[1]->attrs->find(state.symbols.create(attr)).found());
 }
 
 
@@ -1230,11 +1236,12 @@ static void prim_removeAttrs(EvalState & state, const Pos & pos, Value * * args,
     /* Copy all attributes not in that set.  Note that we don't need
        to sort v.attrs because it's a subset of an already sorted
        vector. */
-    state.mkAttrs(v, args[0]->attrs->size());
-    for (auto & i : *args[0]->attrs) {
-        if (names.find(i.name) == names.end())
-            v.attrs->push_back(i);
+    BindingsBuilder bb(args[0]->attrs->size());
+    for (Bindings::iterator i = args[0]->attrs->begin(); !i.at_end(); ++i) {
+        if (names.find(i.name()) == names.end())
+            bb.push_back(i.name(), i.value(), i.pos());
     }
+    state.mkAttrs(v, bb, /* alreadySorted = */ true);
 }
 
 
@@ -1247,7 +1254,7 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
 {
     state.forceList(*args[0], pos);
 
-    state.mkAttrs(v, args[0]->listSize());
+    BindingsBuilder bb(args[0]->listSize());
 
     std::set<Symbol> seen;
 
@@ -1255,23 +1262,23 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
         Value & v2(*args[0]->listElems()[i]);
         state.forceAttrs(v2, pos);
 
-        Bindings::iterator j = v2.attrs->find(state.sName);
-        if (j == v2.attrs->end())
+        Bindings::find_iterator j = v2.attrs->find(state.sName);
+        if (!j.found())
             throw TypeError(format("'name' attribute missing in a call to 'listToAttrs', at %1%") % pos);
-        string name = state.forceStringNoCtx(*j->value, pos);
+        string name = state.forceStringNoCtx(*j.value(), pos);
 
         Symbol sym = state.symbols.create(name);
         if (seen.find(sym) == seen.end()) {
-            Bindings::iterator j2 = v2.attrs->find(state.symbols.create(state.sValue));
-            if (j2 == v2.attrs->end())
+            Bindings::find_iterator j2 = v2.attrs->find(state.symbols.create(state.sValue));
+            if (!j2.found())
                 throw TypeError(format("'value' attribute missing in a call to 'listToAttrs', at %1%") % pos);
 
-            v.attrs->push_back(Attr(sym, j2->value, j2->pos));
+            bb.push_back(sym, j2.value(), j2.pos());
             seen.insert(sym);
         }
     }
 
-    v.attrs->sort();
+    state.mkAttrs(v, bb);
 }
 
 
@@ -1283,13 +1290,14 @@ static void prim_intersectAttrs(EvalState & state, const Pos & pos, Value * * ar
     state.forceAttrs(*args[0], pos);
     state.forceAttrs(*args[1], pos);
 
-    state.mkAttrs(v, std::min(args[0]->attrs->size(), args[1]->attrs->size()));
+    BindingsBuilder bb(std::min(args[0]->attrs->size(), args[1]->attrs->size()));
 
-    for (auto & i : *args[0]->attrs) {
-        Bindings::iterator j = args[1]->attrs->find(i.name);
-        if (j != args[1]->attrs->end())
-            v.attrs->push_back(*j);
+    for (Bindings::iterator i = args[0]->attrs->begin(); !i.at_end(); ++i) {
+        Bindings::find_iterator j = args[1]->attrs->find(i.name());
+        if (j.found())
+            bb.push_back(j.name(), j.value(), j.pos());
     }
+    state.mkAttrs(v, bb, /* alreadySorted = */ true);
 }
 
 
@@ -1311,9 +1319,9 @@ static void prim_catAttrs(EvalState & state, const Pos & pos, Value * * args, Va
     for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
         Value & v2(*args[1]->listElems()[n]);
         state.forceAttrs(v2, pos);
-        Bindings::iterator i = v2.attrs->find(attrName);
-        if (i != v2.attrs->end())
-            res[found++] = i->value;
+        Bindings::find_iterator i = v2.attrs->find(attrName);
+        if (i.found())
+            res[found++] = i.value();
     }
 
     state.mkList(v, found);
@@ -1342,15 +1350,18 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
         throw TypeError(format("'functionArgs' requires a function, at %1%") % pos);
 
     if (!args[0]->lambda.fun->matchAttrs) {
-        state.mkAttrs(v, 0);
+        v = state.vEmptySet;
         return;
     }
 
-    state.mkAttrs(v, args[0]->lambda.fun->formals->formals.size());
-    for (auto & i : args[0]->lambda.fun->formals->formals)
+    BindingsBuilder bb(args[0]->lambda.fun->formals->formals.size());
+    for (auto & i : args[0]->lambda.fun->formals->formals) {
         // !!! should optimise booleans (allocate only once)
-        mkBool(*state.allocAttr(v, i.name), i.def);
-    v.attrs->sort();
+        Value * vv = state.allocValue();
+        mkBool(*vv, i.def);
+        bb.push_back(i.name, vv, &pos);
+    }
+    state.mkAttrs(v, bb);
 }
 
 
@@ -1359,15 +1370,18 @@ static void prim_mapAttrs(EvalState & state, const Pos & pos, Value * * args, Va
 {
     state.forceAttrs(*args[1], pos);
 
-    state.mkAttrs(v, args[1]->attrs->size());
+    BindingsBuilder bb(args[1]->attrs->size());
 
-    for (auto & i : *args[1]->attrs) {
+    for (Bindings::iterator i = args[1]->attrs->begin(); !i.at_end(); ++i) {
         Value * vName = state.allocValue();
         Value * vFun2 = state.allocValue();
-        mkString(*vName, i.name);
+        Value * vApp  = state.allocValue();
+        mkString(*vName, i.name());
         mkApp(*vFun2, *args[0], *vName);
-        mkApp(*state.allocAttr(v, i.name), *vFun2, *i.value);
+        mkApp(*vApp, *vFun2, *i.value());
+        bb.push_back(i.name(), vApp, &pos);
     }
+    state.mkAttrs(v, bb, /* alreadySorted = */ true);
 }
 
 
@@ -1624,21 +1638,23 @@ static void prim_partition(EvalState & state, const Pos & pos, Value * * args, V
             wrong.push_back(vElem);
     }
 
-    state.mkAttrs(v, 2);
 
-    Value * vRight = state.allocAttr(v, state.sRight);
+    Value * vRight = state.allocValue();
     auto rsize = right.size();
     state.mkList(*vRight, rsize);
     if (rsize)
         memcpy(vRight->listElems(), right.data(), sizeof(Value *) * rsize);
 
-    Value * vWrong = state.allocAttr(v, state.sWrong);
+    Value * vWrong = state.allocValue();
     auto wsize = wrong.size();
     state.mkList(*vWrong, wsize);
     if (wsize)
         memcpy(vWrong->listElems(), wrong.data(), sizeof(Value *) * wsize);
 
-    v.attrs->sort();
+    BindingsBuilder bb(2);
+    bb.push_back(state.sRight, vRight, &pos);
+    bb.push_back(state.sWrong, vWrong, &pos);
+    state.mkAttrs(v, bb);
 }
 
 
@@ -2036,10 +2052,10 @@ static void prim_parseDrvName(EvalState & state, const Pos & pos, Value * * args
 {
     string name = state.forceStringNoCtx(*args[0], pos);
     DrvName parsed(name);
-    state.mkAttrs(v, 2);
-    mkString(*state.allocAttr(v, state.sName), parsed.name);
-    mkString(*state.allocAttr(v, state.symbols.create("version")), parsed.version);
-    v.attrs->sort();
+    BindingsBuilder bb(2);
+    Value * v1 = state.allocValue();  mkString(*v1, parsed.name   );  bb.push_back(state.sName                    , v1, &pos);
+    Value * v2 = state.allocValue();  mkString(*v2, parsed.version);  bb.push_back(state.symbols.create("version"), v2, &pos);
+    state.mkAttrs(v, bb);
 }
 
 
@@ -2089,16 +2105,16 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
 
         state.forceAttrs(*args[0], pos);
 
-        for (auto & attr : *args[0]->attrs) {
-            string n(attr.name);
+        for (Bindings::iterator attr = args[0]->attrs->begin(); !attr.at_end(); ++attr) {
+            const string & n(attr.name());
             if (n == "url")
-                url = state.forceStringNoCtx(*attr.value, *attr.pos);
+                url = state.forceStringNoCtx(*attr.value(), *attr.pos());
             else if (n == "sha256")
-                expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
+                expectedHash = Hash(state.forceStringNoCtx(*attr.value(), *attr.pos()), htSHA256);
             else if (n == "name")
-                name = state.forceStringNoCtx(*attr.value, *attr.pos);
+                name = state.forceStringNoCtx(*attr.value(), *attr.pos());
             else
-                throw EvalError(format("unsupported argument '%1%' to '%2%', at %3%") % attr.name % who % attr.pos);
+                throw EvalError(format("unsupported argument '%1%' to '%2%', at %3%") % attr.name() % who % attr.pos());
         }
 
         if (url.empty())
@@ -2141,7 +2157,7 @@ static void prim_fetchTarball(EvalState & state, const Pos & pos, Value * * args
 RegisterPrimOp::PrimOps * RegisterPrimOp::primOps;
 
 
-RegisterPrimOp::RegisterPrimOp(std::string name, size_t arity, PrimOpFun fun)
+RegisterPrimOp::RegisterPrimOp(const std::string & name, size_t arity, PrimOpFun fun)
 {
     if (!primOps) primOps = new PrimOps;
     primOps->emplace_back(name, arity, fun);
@@ -2153,200 +2169,200 @@ void EvalState::createBaseEnv()
     baseEnv.up = 0;
 
     /* Add global constants such as `true' to the base environment. */
+    BindingsBuilder bb(128);
     Value v;
 
     /* `builtins' must be first! */
-    mkAttrs(v, 128);
-    addConstant("builtins", v);
+    addConstant(bb, "builtins", vEmptySet);
 
     mkBool(v, true);
-    addConstant("true", v);
+    addConstant(bb, "true", v);
 
     mkBool(v, false);
-    addConstant("false", v);
+    addConstant(bb, "false", v);
 
     mkNull(v);
-    addConstant("null", v);
+    addConstant(bb, "null", v);
 
-    auto vThrow = addPrimOp("throw", 1, prim_throw);
+    auto vThrow = addPrimOp(bb, "throw", 1, prim_throw);
 
     auto addPurityError = [&](const std::string & name) {
         Value * v2 = allocValue();
         mkString(*v2, fmt("'%s' is not allowed in pure evaluation mode", name));
         mkApp(v, *vThrow, *v2);
-        addConstant(name, v);
+        addConstant(bb, name, v);
     };
 
     if (!evalSettings.pureEval) {
         mkInt(v, time(0));
-        addConstant("__currentTime", v);
+        addConstant(bb, "__currentTime", v);
     }
 
     if (!evalSettings.pureEval) {
         mkString(v, settings.thisSystem);
-        addConstant("__currentSystem", v);
+        addConstant(bb, "__currentSystem", v);
     }
 
     mkString(v, nixVersion);
-    addConstant("__nixVersion", v);
+    addConstant(bb, "__nixVersion", v);
 
     mkString(v, store->storeDir);
-    addConstant("__storeDir", v);
+    addConstant(bb, "__storeDir", v);
 
     /* Language version.  This should be increased every time a new
        language feature gets added.  It's not necessary to increase it
        when primops get added, because you can just use `builtins ?
        primOp' to check. */
     mkInt(v, 5);
-    addConstant("__langVersion", v);
+    addConstant(bb, "__langVersion", v);
 
     // Miscellaneous
-    auto vScopedImport = addPrimOp("scopedImport", 2, prim_scopedImport);
+    auto vScopedImport = addPrimOp(bb, "scopedImport", 2, prim_scopedImport);
     Value * v2 = allocValue();
-    mkAttrs(*v2, 0);
+    *v2 = vEmptySet;
     mkApp(v, *vScopedImport, *v2);
     forceValue(v);
-    addConstant("import", v);
+    addConstant(bb, "import", v);
     if (evalSettings.enableNativeCode) {
-        addPrimOp("__importNative", 2, prim_importNative);
-        addPrimOp("__exec", 1, prim_exec);
+        addPrimOp(bb, "__importNative", 2, prim_importNative);
+        addPrimOp(bb, "__exec", 1, prim_exec);
     }
-    addPrimOp("__typeOf", 1, prim_typeOf);
-    addPrimOp("isNull", 1, prim_isNull);
-    addPrimOp("__isFunction", 1, prim_isFunction);
-    addPrimOp("__isString", 1, prim_isString);
-    addPrimOp("__isInt", 1, prim_isInt);
-    addPrimOp("__isFloat", 1, prim_isFloat);
-    addPrimOp("__isBool", 1, prim_isBool);
-    addPrimOp("__genericClosure", 1, prim_genericClosure);
-    addPrimOp("abort", 1, prim_abort);
-    addPrimOp("__addErrorContext", 2, prim_addErrorContext);
-    addPrimOp("__tryEval", 1, prim_tryEval);
-    addPrimOp("__getEnv", 1, prim_getEnv);
+    addPrimOp(bb, "__typeOf", 1, prim_typeOf);
+    addPrimOp(bb, "isNull", 1, prim_isNull);
+    addPrimOp(bb, "__isFunction", 1, prim_isFunction);
+    addPrimOp(bb, "__isString", 1, prim_isString);
+    addPrimOp(bb, "__isInt", 1, prim_isInt);
+    addPrimOp(bb, "__isFloat", 1, prim_isFloat);
+    addPrimOp(bb, "__isBool", 1, prim_isBool);
+    addPrimOp(bb, "__genericClosure", 1, prim_genericClosure);
+    addPrimOp(bb, "abort", 1, prim_abort);
+    addPrimOp(bb, "__addErrorContext", 2, prim_addErrorContext);
+    addPrimOp(bb, "__tryEval", 1, prim_tryEval);
+    addPrimOp(bb, "__getEnv", 1, prim_getEnv);
 
     // Strictness
-    addPrimOp("__seq", 2, prim_seq);
-    addPrimOp("__deepSeq", 2, prim_deepSeq);
+    addPrimOp(bb, "__seq", 2, prim_seq);
+    addPrimOp(bb, "__deepSeq", 2, prim_deepSeq);
 
     // Debugging
-    addPrimOp("__trace", 2, prim_trace);
-    addPrimOp("__valueSize", 1, prim_valueSize);
+    addPrimOp(bb, "__trace", 2, prim_trace);
+    addPrimOp(bb, "__valueSize", 1, prim_valueSize);
 
     // Paths
-    addPrimOp("__toPath", 1, prim_toPath);
+    addPrimOp(bb, "__toPath", 1, prim_toPath);
     if (evalSettings.pureEval)
         addPurityError("__storePath");
     else
-        addPrimOp("__storePath", 1, prim_storePath);
-    addPrimOp("__pathExists", 1, prim_pathExists);
-    addPrimOp("baseNameOf", 1, prim_baseNameOf);
-    addPrimOp("dirOf", 1, prim_dirOf);
-    addPrimOp("__readFile", 1, prim_readFile);
-    addPrimOp("__readDir", 1, prim_readDir);
-    addPrimOp("__findFile", 2, prim_findFile);
+        addPrimOp(bb, "__storePath", 1, prim_storePath);
+    addPrimOp(bb, "__pathExists", 1, prim_pathExists);
+    addPrimOp(bb, "baseNameOf", 1, prim_baseNameOf);
+    addPrimOp(bb, "dirOf", 1, prim_dirOf);
+    addPrimOp(bb, "__readFile", 1, prim_readFile);
+    addPrimOp(bb, "__readDir", 1, prim_readDir);
+    addPrimOp(bb, "__findFile", 2, prim_findFile);
 
     // Creating files
-    addPrimOp("__toXML", 1, prim_toXML);
-    addPrimOp("__toJSON", 1, prim_toJSON);
-    addPrimOp("__fromJSON", 1, prim_fromJSON);
-    addPrimOp("__toFile", 2, prim_toFile);
-    addPrimOp("__filterSource", 2, prim_filterSource);
-    addPrimOp("__path", 1, prim_path);
+    addPrimOp(bb, "__toXML", 1, prim_toXML);
+    addPrimOp(bb, "__toJSON", 1, prim_toJSON);
+    addPrimOp(bb, "__fromJSON", 1, prim_fromJSON);
+    addPrimOp(bb, "__toFile", 2, prim_toFile);
+    addPrimOp(bb, "__filterSource", 2, prim_filterSource);
+    addPrimOp(bb, "__path", 1, prim_path);
 
     // Sets
-    addPrimOp("__attrNames", 1, prim_attrNames);
-    addPrimOp("__attrValues", 1, prim_attrValues);
-    addPrimOp("__getAttr", 2, prim_getAttr);
-    addPrimOp("__unsafeGetAttrPos", 2, prim_unsafeGetAttrPos);
-    addPrimOp("__hasAttr", 2, prim_hasAttr);
-    addPrimOp("__isAttrs", 1, prim_isAttrs);
-    addPrimOp("removeAttrs", 2, prim_removeAttrs);
-    addPrimOp("__listToAttrs", 1, prim_listToAttrs);
-    addPrimOp("__intersectAttrs", 2, prim_intersectAttrs);
-    addPrimOp("__catAttrs", 2, prim_catAttrs);
-    addPrimOp("__functionArgs", 1, prim_functionArgs);
-    addPrimOp("__mapAttrs", 2, prim_mapAttrs);
+    addPrimOp(bb, "__attrNames", 1, prim_attrNames);
+    addPrimOp(bb, "__attrValues", 1, prim_attrValues);
+    addPrimOp(bb, "__getAttr", 2, prim_getAttr);
+    addPrimOp(bb, "__unsafeGetAttrPos", 2, prim_unsafeGetAttrPos);
+    addPrimOp(bb, "__hasAttr", 2, prim_hasAttr);
+    addPrimOp(bb, "__isAttrs", 1, prim_isAttrs);
+    addPrimOp(bb, "removeAttrs", 2, prim_removeAttrs);
+    addPrimOp(bb, "__listToAttrs", 1, prim_listToAttrs);
+    addPrimOp(bb, "__intersectAttrs", 2, prim_intersectAttrs);
+    addPrimOp(bb, "__catAttrs", 2, prim_catAttrs);
+    addPrimOp(bb, "__functionArgs", 1, prim_functionArgs);
+    addPrimOp(bb, "__mapAttrs", 2, prim_mapAttrs);
 
     // Lists
-    addPrimOp("__isList", 1, prim_isList);
-    addPrimOp("__elemAt", 2, prim_elemAt);
-    addPrimOp("__head", 1, prim_head);
-    addPrimOp("__tail", 1, prim_tail);
-    addPrimOp("map", 2, prim_map);
-    addPrimOp("__filter", 2, prim_filter);
-    addPrimOp("__elem", 2, prim_elem);
-    addPrimOp("__concatLists", 1, prim_concatLists);
-    addPrimOp("__length", 1, prim_length);
-    addPrimOp("__foldl'", 3, prim_foldlStrict);
-    addPrimOp("__any", 2, prim_any);
-    addPrimOp("__all", 2, prim_all);
-    addPrimOp("__genList", 2, prim_genList);
-    addPrimOp("__sort", 2, prim_sort);
-    addPrimOp("__partition", 2, prim_partition);
-    addPrimOp("__concatMap", 2, prim_concatMap);
+    addPrimOp(bb, "__isList", 1, prim_isList);
+    addPrimOp(bb, "__elemAt", 2, prim_elemAt);
+    addPrimOp(bb, "__head", 1, prim_head);
+    addPrimOp(bb, "__tail", 1, prim_tail);
+    addPrimOp(bb, "map", 2, prim_map);
+    addPrimOp(bb, "__filter", 2, prim_filter);
+    addPrimOp(bb, "__elem", 2, prim_elem);
+    addPrimOp(bb, "__concatLists", 1, prim_concatLists);
+    addPrimOp(bb, "__length", 1, prim_length);
+    addPrimOp(bb, "__foldl'", 3, prim_foldlStrict);
+    addPrimOp(bb, "__any", 2, prim_any);
+    addPrimOp(bb, "__all", 2, prim_all);
+    addPrimOp(bb, "__genList", 2, prim_genList);
+    addPrimOp(bb, "__sort", 2, prim_sort);
+    addPrimOp(bb, "__partition", 2, prim_partition);
+    addPrimOp(bb, "__concatMap", 2, prim_concatMap);
 
     // Integer arithmetic
-    addPrimOp("__add", 2, prim_add);
-    addPrimOp("__sub", 2, prim_sub);
-    addPrimOp("__mul", 2, prim_mul);
-    addPrimOp("__div", 2, prim_div);
-    addPrimOp("__bitAnd", 2, prim_bitAnd);
-    addPrimOp("__bitOr", 2, prim_bitOr);
-    addPrimOp("__bitXor", 2, prim_bitXor);
-    addPrimOp("__lessThan", 2, prim_lessThan);
+    addPrimOp(bb, "__add", 2, prim_add);
+    addPrimOp(bb, "__sub", 2, prim_sub);
+    addPrimOp(bb, "__mul", 2, prim_mul);
+    addPrimOp(bb, "__div", 2, prim_div);
+    addPrimOp(bb, "__bitAnd", 2, prim_bitAnd);
+    addPrimOp(bb, "__bitOr", 2, prim_bitOr);
+    addPrimOp(bb, "__bitXor", 2, prim_bitXor);
+    addPrimOp(bb, "__lessThan", 2, prim_lessThan);
 
     // String manipulation
-    addPrimOp("toString", 1, prim_toString);
-    addPrimOp("__substring", 3, prim_substring);
-    addPrimOp("__stringLength", 1, prim_stringLength);
-    addPrimOp("__hasContext", 1, prim_hasContext);
-    addPrimOp("__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
-    addPrimOp("__unsafeDiscardOutputDependency", 1, prim_unsafeDiscardOutputDependency);
-    addPrimOp("__hashString", 2, prim_hashString);
-    addPrimOp("__match", 2, prim_match);
-    addPrimOp("__split", 2, prim_split);
-    addPrimOp("__concatStringsSep", 2, prim_concatStringSep);
-    addPrimOp("__replaceStrings", 3, prim_replaceStrings);
+    addPrimOp(bb, "toString", 1, prim_toString);
+    addPrimOp(bb, "__substring", 3, prim_substring);
+    addPrimOp(bb, "__stringLength", 1, prim_stringLength);
+    addPrimOp(bb, "__hasContext", 1, prim_hasContext);
+    addPrimOp(bb, "__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
+    addPrimOp(bb, "__unsafeDiscardOutputDependency", 1, prim_unsafeDiscardOutputDependency);
+    addPrimOp(bb, "__hashString", 2, prim_hashString);
+    addPrimOp(bb, "__match", 2, prim_match);
+    addPrimOp(bb, "__split", 2, prim_split);
+    addPrimOp(bb, "__concatStringsSep", 2, prim_concatStringSep);
+    addPrimOp(bb, "__replaceStrings", 3, prim_replaceStrings);
 
     // Versions
-    addPrimOp("__parseDrvName", 1, prim_parseDrvName);
-    addPrimOp("__compareVersions", 2, prim_compareVersions);
-    addPrimOp("__splitVersion", 1, prim_splitVersion);
+    addPrimOp(bb, "__parseDrvName", 1, prim_parseDrvName);
+    addPrimOp(bb, "__compareVersions", 2, prim_compareVersions);
+    addPrimOp(bb, "__splitVersion", 1, prim_splitVersion);
 
     // Derivations
-    addPrimOp("derivationStrict", 1, prim_derivationStrict);
-    addPrimOp("placeholder", 1, prim_placeholder);
+    addPrimOp(bb, "derivationStrict", 1, prim_derivationStrict);
+    addPrimOp(bb, "placeholder", 1, prim_placeholder);
 
     // Networking
-    addPrimOp("__fetchurl", 1, prim_fetchurl);
-    addPrimOp("fetchTarball", 1, prim_fetchTarball);
+    addPrimOp(bb, "__fetchurl", 1, prim_fetchurl);
+    addPrimOp(bb, "fetchTarball", 1, prim_fetchTarball);
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
     string path = canonPath(settings.nixDataDir + "/nix/corepkgs/derivation.nix", true);
     sDerivationNix = symbols.create(path);
     evalFile(path, v);
-    addConstant("derivation", v);
+    addConstant(bb, "derivation", v);
 
     /* Add a value containing the current Nix expression search path. */
     mkList(v, searchPath.size());
     int n = 0;
     for (auto & i : searchPath) {
         v2 = v.listElems()[n++] = allocValue();
-        mkAttrs(*v2, 2);
-        mkString(*allocAttr(*v2, symbols.create("path")), i.second);
-        mkString(*allocAttr(*v2, symbols.create("prefix")), i.first);
-        v2->attrs->sort();
+        BindingsBuilder bb(2);
+        Value * vv1 = allocValue();  mkString(*vv1, i.second);  bb.push_back(symbols.create("path"  ), vv1, &noPos);
+        Value * vv2 = allocValue();  mkString(*vv2, i.first );  bb.push_back(symbols.create("prefix"), vv2, &noPos);
+        mkAttrs(*v2, bb);
     }
-    addConstant("__nixPath", v);
+    addConstant(bb, "__nixPath", v);
 
     if (RegisterPrimOp::primOps)
         for (auto & primOp : *RegisterPrimOp::primOps)
-            addPrimOp(std::get<0>(primOp), std::get<1>(primOp), std::get<2>(primOp));
+            addPrimOp(bb, std::get<0>(primOp), std::get<1>(primOp), std::get<2>(primOp));
 
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */
-    baseEnv.values[0]->attrs->sort();
+    mkAttrs(*baseEnv.values[0], bb);
 }
 
 

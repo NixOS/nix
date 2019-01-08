@@ -34,15 +34,15 @@ string resolveMirrorUri(EvalState & state, string uri)
     state.eval(state.parseExprFromString("import <nixpkgs/pkgs/build-support/fetchurl/mirrors.nix>", "."), vMirrors);
     state.forceAttrs(vMirrors);
 
-    auto mirrorList = vMirrors.attrs->find(state.symbols.create(mirrorName));
-    if (mirrorList == vMirrors.attrs->end())
+    Bindings::find_iterator mirrorList = vMirrors.attrs->find(state.symbols.create(mirrorName));
+    if (!mirrorList.found())
         throw Error(format("unknown mirror name '%1%'") % mirrorName);
-    state.forceList(*mirrorList->value);
+    state.forceList(*mirrorList.value());
 
-    if (mirrorList->value->listSize() < 1)
+    if (mirrorList.value()->listSize() < 1)
         throw Error(format("mirror URI '%1%' did not expand to anything") % uri);
 
-    string mirror = state.forceString(*mirrorList->value->listElems()[0]);
+    string mirror = state.forceString(*mirrorList.value()->listElems()[0]);
     return mirror + (hasSuffix(mirror, "/") ? "" : "/") + string(s, p + 1);
 }
 
@@ -123,26 +123,26 @@ static int _main(int argc, char * * argv)
             state->forceAttrs(v);
 
             /* Extract the URI. */
-            auto attr = v.attrs->find(state->symbols.create("urls"));
-            if (attr == v.attrs->end())
+            Bindings::find_iterator attr1 = v.attrs->find(state->symbols.create("urls"));
+            if (!attr1.found())
                 throw Error("attribute set does not contain a 'urls' attribute");
-            state->forceList(*attr->value);
-            if (attr->value->listSize() < 1)
+            state->forceList(*attr1.value());
+            if (attr1.value()->listSize() < 1)
                 throw Error("'urls' list is empty");
-            uri = state->forceString(*attr->value->listElems()[0]);
+            uri = state->forceString(*attr1.value()->listElems()[0]);
 
             /* Extract the hash mode. */
-            attr = v.attrs->find(state->symbols.create("outputHashMode"));
-            if (attr == v.attrs->end())
+            Bindings::find_iterator attr2 = v.attrs->find(state->symbols.create("outputHashMode"));
+            if (!attr2.found())
                 printInfo("warning: this does not look like a fetchurl call");
             else
-                unpack = state->forceString(*attr->value) == "recursive";
+                unpack = state->forceString(*attr2.value()) == "recursive";
 
             /* Extract the name. */
             if (name.empty()) {
-                attr = v.attrs->find(state->symbols.create("name"));
-                if (attr != v.attrs->end())
-                    name = state->forceString(*attr->value);
+                Bindings::find_iterator attr3 = v.attrs->find(state->symbols.create("name"));
+                if (attr3.found())
+                    name = state->forceString(*attr3.value());
             }
         }
 

@@ -224,9 +224,9 @@ private:
 
     void createBaseEnv();
 
-    Value * addConstant(const string & name, Value & v);
+    Value * addConstant(BindingsBuilder & bb, const string & name, Value & v);
 
-    Value * addPrimOp(const string & name,
+    Value * addPrimOp(BindingsBuilder & bb, const string & name,
         size_t arity, PrimOpFun primOp);
 
 public:
@@ -263,14 +263,10 @@ public:
     Value * allocValue();
     Env & allocEnv(size_t size);
 
-    Value * allocAttr(Value & vAttrs, const Symbol & name);
-
-    Bindings * allocBindings(size_t capacity);
-
     void mkList(Value & v, size_t length);
-    void mkAttrs(Value & v, size_t capacity);
+    void mkAttrs(Value & v, BindingsBuilder & bb, bool alreadySorted = false);
     void mkThunk_(Value & v, Expr * expr);
-    void mkPos(Value & v, Pos * pos);
+    void mkPos(Value & v, const Pos * pos);
 
     void concatLists(Value & v, size_t nrLists, Value * * lists, const Pos & pos);
 

@@ -68,10 +68,10 @@ Value * findAlongAttrPath(EvalState & state, const string & attrPath,
             if (attr.empty())
                 throw Error(format("empty attribute name in selection path '%1%'") % attrPath);
 
-            Bindings::iterator a = v->attrs->find(state.symbols.create(attr));
-            if (a == v->attrs->end())
+            Bindings::find_iterator a = v->attrs->find(state.symbols.create(attr));
+            if (!a.found())
                 throw Error(format("attribute '%1%' in selection path '%2%' not found") % attr % attrPath);
-            v = &*a->value;
+            v = a.value();
         }
 
         else if (apType == apIndex) {

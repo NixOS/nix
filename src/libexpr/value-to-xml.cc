@@ -34,19 +34,19 @@ static void showAttrs(EvalState & state, bool strict, bool location,
 {
     StringSet names;
 
-    for (auto & i : attrs)
-        names.insert(i.name);
+    for (Bindings::iterator i = attrs.begin(); !i.at_end(); ++i)
+        names.insert(i.name());
 
     for (auto & i : names) {
-        Attr & a(*attrs.find(state.symbols.create(i)));
+        Bindings::find_iterator a = attrs.find(state.symbols.create(i));
 
         XMLAttrs xmlAttrs;
         xmlAttrs["name"] = i;
-        if (location && a.pos != &noPos) posToXML(xmlAttrs, *a.pos);
+        if (location && a.pos() != &noPos) posToXML(xmlAttrs, *a.pos());
 
         XMLOpenElement _(doc, "attr", xmlAttrs);
         printValueAsXML(state, strict, location,
-            *a.value, doc, context, drvsSeen);
+            *a.value(), doc, context, drvsSeen);
     }
 }
 
@@ -86,21 +86,19 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
             if (state.isDerivation(v)) {
                 XMLAttrs xmlAttrs;
 
-                Bindings::iterator a = v.attrs->find(state.symbols.create("derivation"));
-
                 Path drvPath;
-                a = v.attrs->find(state.sDrvPath);
-                if (a != v.attrs->end()) {
-                    if (strict) state.forceValue(*a->value);
-                    if (a->value->type == tString)
-                        xmlAttrs["drvPath"] = drvPath = a->value->string.s;
+                Bindings::find_iterator a1 = v.attrs->find(state.sDrvPath);
+                if (a1.found()) {
+                    if (strict) state.forceValue(*a1.value());
+                    if (a1.value()->type == tString)
+                        xmlAttrs["drvPath"] = drvPath = a1.value()->string.s;
                 }
 
-                a = v.attrs->find(state.sOutPath);
-                if (a != v.attrs->end()) {
-                    if (strict) state.forceValue(*a->value);
-                    if (a->value->type == tString)
-                        xmlAttrs["outPath"] = a->value->string.s;
+                Bindings::find_iterator a2 = v.attrs->find(state.sOutPath);
+                if (a2.found()) {
+                    if (strict) state.forceValue(*a2.value());
+                    if (a2.value()->type == tString)
+                        xmlAttrs["outPath"] = a2.value()->string.s;
                 }
 
                 XMLOpenElement _(doc, "derivation", xmlAttrs);

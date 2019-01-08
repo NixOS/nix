@@ -181,16 +181,16 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
 
         state.forceAttrs(*args[0], pos);
 
-        for (auto & attr : *args[0]->attrs) {
-            string n(attr.name);
+        for (Bindings::iterator attr = args[0]->attrs->begin(); !attr.at_end(); ++attr) {
+            const string & n(attr.name());
             if (n == "url")
-                url = state.coerceToString(*attr.pos, *attr.value, context, false, false);
+                url = state.coerceToString(*attr.pos(), *attr.value(), context, false, false);
             else if (n == "rev")
-                rev = state.forceStringNoCtx(*attr.value, *attr.pos);
+                rev = state.forceStringNoCtx(*attr.value(), *attr.pos());
             else if (n == "name")
-                name = state.forceStringNoCtx(*attr.value, *attr.pos);
+                name = state.forceStringNoCtx(*attr.value(), *attr.pos());
             else
-                throw EvalError("unsupported argument '%s' to 'fetchMercurial', at %s", attr.name, *attr.pos);
+                throw EvalError("unsupported argument '%s' to 'fetchMercurial', at %s", attr.name(), *attr.pos());
         }
 
         if (url.empty())
@@ -205,13 +205,13 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
 
     auto hgInfo = exportMercurial(state.store, url, rev, name);
 
-    state.mkAttrs(v, 8);
-    mkString(*state.allocAttr(v, state.sOutPath), hgInfo.storePath, PathSet({hgInfo.storePath}));
-    mkString(*state.allocAttr(v, state.symbols.create("branch")), hgInfo.branch);
-    mkString(*state.allocAttr(v, state.symbols.create("rev")), hgInfo.rev);
-    mkString(*state.allocAttr(v, state.symbols.create("shortRev")), std::string(hgInfo.rev, 0, 12));
-    mkInt(*state.allocAttr(v, state.symbols.create("revCount")), hgInfo.revCount);
-    v.attrs->sort();
+    BindingsBuilder bb(8);
+    Value * v1 = state.allocValue();  mkString(*v1, hgInfo.storePath, PathSet({hgInfo.storePath}));  bb.push_back(state.sOutPath                  , v1, &noPos);
+    Value * v2 = state.allocValue();  mkString(*v2, hgInfo.branch);                                  bb.push_back(state.symbols.create("branch")  , v2, &noPos);
+    Value * v3 = state.allocValue();  mkString(*v3, hgInfo.rev);                                     bb.push_back(state.symbols.create("rev")     , v3, &noPos);
+    Value * v4 = state.allocValue();  mkString(*v4, std::string(hgInfo.rev, 0, 12));                 bb.push_back(state.symbols.create("shortRev"), v4, &noPos);
+    Value * v5 = state.allocValue();  mkInt   (*v5, hgInfo.revCount);                                bb.push_back(state.symbols.create("revCount"), v5, &noPos);
+    state.mkAttrs(v, bb);
 
     if (state.allowedPaths)
         state.allowedPaths->insert(hgInfo.storePath);
