@@ -69,7 +69,7 @@ libstore = library(
   link_with : [
     libutil,
   ],
-  c_args : [
+  cpp_args : [
     '-DNIX_PREFIX=@0@'.format(get_option('prefix')),
     '-DNIX_STORE_DIR=@0@'.format(storedir),
     '-DNIX_DATA_DIR=@0@'.format(get_option('datadir')),
