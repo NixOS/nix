@@ -252,16 +252,14 @@ conf_data.set_quoted('tarFlags', tar_flags)
 
 sandbox_shell = get_option('with-sandbox-shell')
 
-configure_file(
-  output : 'config.h',
-  configuration : conf_data
-)
-
 #
 # Extra Configure
 #
 
 boost_context = dependency('boost', modules : ['context'])
+
+# Done by default by autoconf
+conf_data.set_quoted('PACKAGE_VERSION', meson.project_version())
 
 if enable_s3
   aws_cpp_sdk_transfer = meson.get_compiler('cpp').find_library('aws-cpp-sdk-transfer')
@@ -272,6 +270,15 @@ else
   aws_cpp_sdk_s3 = dependency('', required : false)
   aws_cpp_sdk_core = dependency('', required : false)
 endif
+
+#
+# original Configure.ac, but much go last
+#
+
+configure_file(
+  output : 'config.h',
+  configuration : conf_data
+)
 
 #
 # Old Makefile
