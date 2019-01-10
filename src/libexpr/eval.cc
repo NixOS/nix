@@ -757,6 +757,7 @@ void EvalState::evalFile(const Path & path_, Value & v)
 void EvalState::resetFileCache()
 {
     fileEvalCache.clear();
+    fileParseCache.clear();
 }
 
 
