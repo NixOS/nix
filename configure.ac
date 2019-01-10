@@ -212,11 +212,9 @@ AC_SUBST(ENABLE_S3, [$enable_s3])
 AC_LANG_POP(C++)
 
 if test -n "$enable_s3"; then
-  aws_version_tokens="$(printf '#include <aws/core/VersionConfig.h>\nAWS_SDK_VERSION_STRING' | $CPP $CPPFLAGS - | grep -v '^#.*' | sed 's/"//g' | tr '.' ' ')"
-  aws_major_version="$(awk -v ver="${aws_version_tokens}" '{print $1}')"
-  aws_minor_version="$(awk -v ver="${aws_version_tokens}" '{print $2}')"
-  AC_DEFINE_UNQUOTED([AWS_VERSION_MAJOR], ${aws_major_version}, [Major version of aws-sdk-cpp.])
-  AC_DEFINE_UNQUOTED([AWS_VERSION_MINOR], ${aws_minor_version}, [Minor version of aws-sdk-cpp.])
+  declare -a aws_version_tokens=($(printf '#include <aws/core/VersionConfig.h>\nAWS_SDK_VERSION_STRING' | $CPP $CPPFLAGS - | grep -v '^#.*' | sed 's/"//g' | tr '.' ' '))
+  AC_DEFINE_UNQUOTED([AWS_VERSION_MAJOR], ${aws_version_tokens@<:@0@:>@}, [Major version of aws-sdk-cpp.])
+  AC_DEFINE_UNQUOTED([AWS_VERSION_MINOR], ${aws_version_tokens@<:@1@:>@}, [Minor version of aws-sdk-cpp.])
 fi
 
 
@@ -274,12 +272,9 @@ AC_SUBST(sandbox_shell)
 test "$prefix" = NONE && prefix=$ac_default_prefix
 test "$exec_prefix" = NONE && exec_prefix='${prefix}'
 for name in $ac_subst_vars; do
-    for _ in 1 2 3; do
-    if printf '%s' "${name}" | egrep '^[_[:alpha:]][_[:alnum:]]*$'
-    then
-        eval "${name}"="$(eval echo "\${${name}}")"
-    fi
-    done
+    declare $name="$(eval echo "${!name}")"
+    declare $name="$(eval echo "${!name}")"
+    declare $name="$(eval echo "${!name}")"
 done
 
 rm -f Makefile.config
