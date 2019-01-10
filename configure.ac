@@ -275,7 +275,7 @@ test "$prefix" = NONE && prefix=$ac_default_prefix
 test "$exec_prefix" = NONE && exec_prefix='${prefix}'
 for name in $ac_subst_vars; do
     for _ in 1 2 3; do
-    if printf '%s' "${name}" | egrep '^[[_[[:alpha:]]]][[_[[:alnum:]]]]*$'
+    if printf '%s' "${name}" | egrep '^[_[:alpha:]][_[:alnum:]]*$'
     then
         eval "${name}"="$(eval echo "\${${name}}")"
     fi
