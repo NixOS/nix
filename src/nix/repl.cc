@@ -643,30 +643,13 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
             for (auto & i : *v.attrs)
                 sorted[i.name] = i.value;
 
-            /* If this is a derivation, then don't show the
-               self-references ("all", "out", etc.). */
-            StringSet hidden;
-            if (isDrv) {
-                hidden.insert("all");
-                Bindings::iterator i = v.attrs->find(state.sOutputs);
-                if (i == v.attrs->end())
-                    hidden.insert("out");
-                else {
-                    state.forceList(*i->value);
-                    for (unsigned int j = 0; j < i->value->listSize(); ++j)
-                        hidden.insert(state.forceStringNoCtx(*i->value->listElems()[j]));
-                }
-            }
-
             for (auto & i : sorted) {
                 if (isVarName(i.first))
                     str << i.first;
                 else
                     printStringValue(str, i.first.c_str());
                 str << " = ";
-                if (hidden.find(i.first) != hidden.end())
-                    str << "«...»";
-                else if (seen.find(i.second) != seen.end())
+                if (seen.find(i.second) != seen.end())
                     str << "«repeated»";
                 else
                     try {
