@@ -83,7 +83,7 @@ std::wstring pathW(const Path & path) {
 
 
 std::wstring handleToFileName(HANDLE handle) {
-    std::vector<wchar_t> buf(0x1000);
+    std::vector<wchar_t> buf(0x100);
     DWORD dw = GetFinalPathNameByHandleW(handle, buf.data(), buf.size(), FILE_NAME_OPENED);
     if (dw == 0) {
         if (handle == GetStdHandle(STD_INPUT_HANDLE )) return L"<stdin>";
@@ -92,8 +92,8 @@ std::wstring handleToFileName(HANDLE handle) {
         return (boost::wformat(L"<unnnamed handle %X>") % handle).str();
     }
     if (dw > buf.size()) {
-        buf.resize(dw+1);
-        if (GetFinalPathNameByHandleW(handle, buf.data(), buf.size(), FILE_NAME_OPENED) != dw)
+        buf.resize(dw);
+        if (GetFinalPathNameByHandleW(handle, buf.data(), buf.size(), FILE_NAME_OPENED) != dw-1)
             throw WinError("GetFinalPathNameByHandleW");
     }
     return std::wstring(buf.data(), dw);
@@ -158,14 +158,14 @@ std::string WinError::addLastError(const std::string & s)
 #ifdef _WIN32
 std::wstring getCwdW()
 {
-    std::vector<wchar_t> buf(0x1000);
+    std::vector<wchar_t> buf(0x100);
     DWORD dw = GetCurrentDirectoryW(buf.size(), buf.data());
     if (dw == 0) {
         throw WinError("GetCurrentDirectoryW");
     }
     if (dw > buf.size()) {
-        buf.resize(dw+1);
-        if (GetCurrentDirectoryW(buf.size(), buf.data()) != dw)
+        buf.resize(dw);
+        if (GetCurrentDirectoryW(buf.size(), buf.data()) != dw-1)
             throw WinError("GetCurrentDirectoryW");
     }
     return std::wstring(buf.data(), dw);
@@ -173,14 +173,14 @@ std::wstring getCwdW()
 
 std::wstring getArgv0W()
 {
-    std::vector<wchar_t> buf(0x1000);
+    std::vector<wchar_t> buf(0x100);
     DWORD dw = GetModuleFileNameW(NULL, buf.data(), buf.size());
     if (dw == 0) {
         throw WinError("GetModuleFileNameW");
     }
     if (dw > buf.size()) {
-        buf.resize(dw+1);
-        if (GetModuleFileNameW(NULL, buf.data(), buf.size()) != dw)
+        buf.resize(dw);
+        if (GetModuleFileNameW(NULL, buf.data(), buf.size()) != dw-1)
             throw WinError("GetModuleFileNameW");
     }
     return std::wstring(buf.data(), dw);
@@ -188,7 +188,7 @@ std::wstring getArgv0W()
 
 std::wstring getEnvW(const std::wstring & key, const std::wstring & def)
 {
-    std::vector<wchar_t> buf(0x1000);
+    std::vector<wchar_t> buf(0x100);
     DWORD dw = GetEnvironmentVariableW(key.c_str(), buf.data(), buf.size());
     if (0 == dw) {
         WinError winError("GetEnvironmentVariableW '%1%'", to_bytes(key));
@@ -197,8 +197,8 @@ std::wstring getEnvW(const std::wstring & key, const std::wstring & def)
         return def;
     }
     if (dw > buf.size()) {
-        buf.resize(dw+1);
-        if (GetEnvironmentVariableW(key.c_str(), buf.data(), buf.size()) != dw)
+        buf.resize(dw);
+        if (GetEnvironmentVariableW(key.c_str(), buf.data(), buf.size()) != dw-1)
             throw WinError("GetEnvironmentVariableW");
     }
     return std::wstring(buf.data(), dw);
