@@ -799,6 +799,9 @@ private:
     Pid pid;
 
     /* The temporary directory. */
+#ifdef _WIN32
+    Path tmpDirOrig;
+#endif
     Path tmpDir;
 
     /* The path of the temporary directory in the sandbox. */
@@ -1951,11 +1954,29 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
     /* Create a temporary directory where the build will take
        place. */
     auto drvName = storePathToName(drvPath);
-    tmpDir = createTempDir("", "nix-build-" + drvName, false, false
 #ifndef _WIN32
-        , 0700
+    tmpDir = createTempDir("", "nix-build-" + drvName, false, false, 0700);
+#else
+    tmpDir = tmpDirOrig = createTempDir("", "nix-build-" + drvName, false, false);
+
+    // try to shorten the paths and also prevent going ..
+    if (true) {
+        DWORD bitmaskDrives = GetLogicalDrives();
+        for (char letter = 'Z'; letter >= 'D'; letter--) {
+            bool isBusy = (bitmaskDrives & (1 << (letter - 'A'))) != 0;
+            if (isBusy) continue;
+            tmpDir = (format("%c:/") % letter).str();
+            //    runProgramWithOptions(RunOptions("subst", { tmpDir.substr(0, 2), tmpDirOrig }));
+            if (DefineDosDeviceW(DDD_NO_BROADCAST_SYSTEM, from_bytes(tmpDir.substr(0, 2)).c_str(), pathW(tmpDirOrig).c_str())) {
+                break;
+            }
+            // TODO: some of the error might be caused by race condition, when another process
+            //       allocated the disk letter after we checked it is free and before we tryed to allocate it
+            //       So we have to retry on some error codes (which?)
+            throw WinError("DefineDosDeviceW(%1%, %2%)", tmpDir.substr(0, 2), tmpDirOrig);
+        }
+    }
 #endif
-        );
 
     /* In a sandbox, for determinism, always use the same temporary
        directory. */
@@ -3716,18 +3737,36 @@ void DerivationGoal::closeLogFile()
 void DerivationGoal::deleteTmpDir(bool force)
 {
     if (tmpDir != "") {
+#ifdef _WIN32
+        if (tmpDir != tmpDirOrig) {
+//          runProgramWithOptions(RunOptions("subst", { tmpDir.substr(0, 2), "/D" }));
+            if (!DefineDosDeviceW(DDD_NO_BROADCAST_SYSTEM|DDD_REMOVE_DEFINITION|DDD_EXACT_MATCH_ON_REMOVE, from_bytes(tmpDir.substr(0, 2)).c_str(), pathW(tmpDirOrig).c_str())) {
+                throw WinError("DefineDosDeviceW(%1%, %2%)", tmpDir.substr(0, 2), tmpDirOrig);
+            }
+        }
+
+        /* Don't keep temporary directories for builtins because they
+           might have privileged stuff (like a copy of netrc). */
+        if (settings.keepFailed && !force && !drv->isBuiltin()) {
+            printError(
+                format("note: keeping build directory '%2%'")
+                % drvPath % tmpDirOrig);
+        }
+        else
+            deletePath(tmpDirOrig);
+#else
         /* Don't keep temporary directories for builtins because they
            might have privileged stuff (like a copy of netrc). */
         if (settings.keepFailed && !force && !drv->isBuiltin()) {
             printError(
                 format("note: keeping build directory '%2%'")
                 % drvPath % tmpDir);
-#ifndef _WIN32
             chmod(tmpDir.c_str(), 0755);
-#endif
         }
         else
             deletePath(tmpDir);
+
+#endif
         tmpDir = "";
     }
 }
