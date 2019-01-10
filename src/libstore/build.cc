@@ -1975,6 +1975,9 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
             //       So we have to retry on some error codes (which?)
             throw WinError("DefineDosDeviceW(%1%, %2%)", tmpDir.substr(0, 2), tmpDirOrig);
         }
+        if (tmpDir == tmpDirOrig) {
+            printError(format("warning: no free drive letter available, build root will be '%1%'") % tmpDir);
+        }
     }
 #endif
 
