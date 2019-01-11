@@ -95,6 +95,7 @@ std::wstring handleToFileName(HANDLE handle) {
         buf.resize(dw);
         if (GetFinalPathNameByHandleW(handle, buf.data(), buf.size(), FILE_NAME_OPENED) != dw-1)
             throw WinError("GetFinalPathNameByHandleW");
+        dw -= 1;
     }
     return std::wstring(buf.data(), dw);
 }
@@ -167,6 +168,7 @@ std::wstring getCwdW()
         buf.resize(dw);
         if (GetCurrentDirectoryW(buf.size(), buf.data()) != dw-1)
             throw WinError("GetCurrentDirectoryW");
+        dw -= 1;
     }
     return std::wstring(buf.data(), dw);
 }
@@ -178,10 +180,12 @@ std::wstring getArgv0W()
     if (dw == 0) {
         throw WinError("GetModuleFileNameW");
     }
-    if (dw > buf.size()) {
-        buf.resize(dw);
-        if (GetModuleFileNameW(NULL, buf.data(), buf.size()) != dw-1)
-            throw WinError("GetModuleFileNameW");
+    while (dw >= buf.size()) {
+        buf.resize(dw*2);
+        DWORD dw2 = GetModuleFileNameW(NULL, buf.data(), buf.size());
+        if (dw2 == dw) break;
+        assert(dw2 > dw);
+        dw = dw2;
     }
     return std::wstring(buf.data(), dw);
 }
@@ -200,6 +204,7 @@ std::wstring getEnvW(const std::wstring & key, const std::wstring & def)
         buf.resize(dw);
         if (GetEnvironmentVariableW(key.c_str(), buf.data(), buf.size()) != dw-1)
             throw WinError("GetEnvironmentVariableW");
+        dw -= 1;
     }
     return std::wstring(buf.data(), dw);
 }

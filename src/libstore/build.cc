@@ -1965,7 +1965,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
         for (char letter = 'Z'; letter >= 'D'; letter--) {
             bool isBusy = (bitmaskDrives & (1 << (letter - 'A'))) != 0;
             if (isBusy) continue;
-            tmpDir = (format("%c:/") % letter).str();
+            tmpDir = (format("%c:") % letter).str();
             //    runProgramWithOptions(RunOptions("subst", { tmpDir.substr(0, 2), tmpDirOrig }));
             if (DefineDosDeviceW(DDD_NO_BROADCAST_SYSTEM, from_bytes(tmpDir.substr(0, 2)).c_str(), pathW(tmpDirOrig).c_str())) {
                 break;
