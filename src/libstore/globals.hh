@@ -255,7 +255,12 @@ public:
         "listed in 'trusted-public-keys'."};
 
     Setting<StringSet> extraPlatforms{this,
-        std::string{SYSTEM} == "x86_64-linux" ? StringSet{"i686-linux"} : StringSet{},
+#ifdef _WIN32
+        std::string{SYSTEM} == "x86_64-windows" ? StringSet{"i686-windows"} :
+#else
+        std::string{SYSTEM} == "x86_64-linux" ? StringSet{"i686-linux"} :
+#endif
+        StringSet{},
         "extra-platforms",
         "Additional platforms that can be built on the local system. "
         "These may be supported natively (e.g. armv7 on some aarch64 CPUs "
