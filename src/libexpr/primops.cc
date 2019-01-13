@@ -687,20 +687,11 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             }
         }
 
-        /* See prim_unsafeDiscardOutputDependency. */
-        else if (path.at(0) == '~')
-            drv.inputSrcs.insert(string(path, 1));
-
         /* Handle derivation outputs of the form ‘!<name>!<path>’. */
         else if (path.at(0) == '!') {
             std::pair<string, string> ctx = decodeContext(path);
             drv.inputDrvs[ctx.first].insert(ctx.second);
         }
-
-        /* Handle derivation contexts returned by
-           ‘builtins.storePath’. */
-        else if (isDerivation(path))
-            drv.inputDrvs[path] = state.store->queryDerivationOutputNames(path);
 
         /* Otherwise it's a source file. */
         else
@@ -1004,13 +995,8 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
     PathSet refs;
 
     for (auto path : context) {
-        if (path.at(0) == '=') path = string(path, 1);
-        if (isDerivation(path)) {
-            /* See prim_unsafeDiscardOutputDependency. */
-            if (path.at(0) != '~')
-                throw EvalError(format("in 'toFile': the file '%1%' cannot refer to derivation outputs, at %2%") % name % pos);
-            path = string(path, 1);
-        }
+        if (path.at(0) != '/')
+            throw EvalError(format("in 'toFile': the file '%1%' cannot refer to derivation outputs, at %2%") % name % pos);
         refs.insert(path);
     }
 
@@ -1823,7 +1809,7 @@ static void prim_unsafeDiscardOutputDependency(EvalState & state, const Pos & po
 
     PathSet context2;
     for (auto & p : context)
-        context2.insert(p.at(0) == '=' ? "~" + string(p, 1) : p);
+        context2.insert(p.at(0) == '=' ? string(p, 1) : p);
 
     mkString(v, s, context2);
 }
