@@ -2505,13 +2505,36 @@ std::string shellEscape(const std::string & s)
 }
 
 #ifdef _WIN32
+//   https://docs.microsoft.com/en-us/windows/desktop/api/shellapi/nf-shellapi-commandlinetoargvw
+//   https://docs.microsoft.com/en-us/previous-versions//17w5ykft(v=vs.85)
 std::string windowsEscape(const std::string & s)
 {
-    if (s.empty() || s.find_first_of("&<>()[]{}^=;!'+,`!\" ") != std::wstring::npos) {
+    if (s.empty() || s.find_first_of("&()<>[]{}^=;!'+,`!\"\t ") != std::string::npos) {
         std::string r = "\"";
-        for (auto i=0; i < s.length(); i++) {
-            if (s[i] == '"' || (s[i] == '\\' && (i==s.length()-1 || s[i+1] == '"'))) r += '\\';
-            r += s[i];
+        for (auto i=0; i < s.length(); ) {
+            if (s[i] == '"') {
+                r += '\\';
+                r += s[i++];
+            } else if (s[i] == '\\') {
+                for (int j = 1; ; j++) {
+                    if (i+j == s.length()) {
+                        while (j--) { r += '\\'; i++; };
+                        r += '\\';
+                        break;
+                    } else if (s[i+j] == '"') {
+                        while (j--) { r += '\\'; r += '\\'; i++; }
+                        r += L'\\';
+                        r += s[i++];
+                        break;
+                    } else if (s[i+j] != '\\') {
+                        while (j--) { r += '\\'; i++; };
+                        r += s[i++];
+                        break;
+                    }
+                }
+            } else {
+                r += s[i++];
+            }
         }
         r += '"';
         return r;
@@ -2521,11 +2544,32 @@ std::string windowsEscape(const std::string & s)
 
 std::wstring windowsEscapeW(const std::wstring & s)
 {
-    if (s.empty() || s.find_first_of(L"&<>()[]{}^=;!'+,`!\" ") != std::wstring::npos) {
+    if (s.empty() || s.find_first_of(L"&()<>[]{}^=;!'+,`!\"\t ") != std::wstring::npos) {
         std::wstring r = L"\"";
-        for (auto i=0; i < s.length(); i++) {
-            if (s[i] == L'"' || (s[i] == L'\\' && (i==s.length()-1 || s[i+1] == L'"'))) r += L'\\';
-            r += s[i];
+        for (auto i=0; i < s.length(); ) {
+            if (s[i] == L'"') {
+                r += L'\\';
+                r += s[i++];
+            } else if (s[i] == L'\\') {
+                for (int j = 1; ; j++) {
+                    if (i+j == s.length()) {
+                        while (j--) { r += L'\\'; i++; };
+                        r += L'\\';
+                        break;
+                    } else if (s[i+j] == L'"') {
+                        while (j--) { r += L'\\'; r += L'\\'; i++; }
+                        r += L'\\';
+                        r += s[i++];
+                        break;
+                    } else if (s[i+j] != L'\\') {
+                        while (j--) { r += L'\\'; i++; };
+                        r += s[i++];
+                        break;
+                    }
+                }
+            } else {
+                r += s[i++];
+            }
         }
         r += L'"';
         return r;
