@@ -18,5 +18,7 @@ let
     };
   };
 
-  legit-context = "${path}${drv.outPath}${drv.foo.outPath}${drv.drvPath}";
-in builtins.getContext legit-context == desired-context
+  legit-context = builtins.getContext "${path}${drv.outPath}${drv.foo.outPath}${drv.drvPath}";
+
+  constructed-context = builtins.getContext (builtins.appendContext "" desired-context);
+in legit-context == constructed-context
