@@ -178,7 +178,6 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
 void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     const Path & path, InodeHash & inodeHash)
 {
-//std::cerr << "optimisePath_(" << path << ")" << std::endl;
     checkInterrupt();
 
 

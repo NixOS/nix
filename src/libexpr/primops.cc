@@ -38,7 +38,7 @@ namespace nix {
    name>. */
 std::pair<string, string> decodeContext(const string & s)
 {
-std::cerr << "decodeContext('" << s << "')" << std::endl;
+//std::cerr << "decodeContext('" << s << "')" << std::endl;
     std::pair<string, string> rc;
     if (s.at(0) == '!') {
         size_t index = s.find("!", 1);
@@ -52,7 +52,7 @@ std::cerr << "decodeContext('" << s << "')" << std::endl;
         rc = std::make_pair(s, "");
 #endif
     }
-std::cerr << "decoded.first='" << rc.first << "' -> '" << rc.second << "'" << std::endl;
+//std::cerr << "decoded.first='" << rc.first << "' -> '" << rc.second << "'" << std::endl;
     return rc;
 }
 

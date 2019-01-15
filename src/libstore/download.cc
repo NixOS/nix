@@ -899,7 +899,7 @@ Path Downloader::downloadCached(ref<Store> store, const string & url_, bool unpa
             const string realStorePath2 = realStorePath.substr(1, 9) == ":/msys64/" ? trim(runProgramGetStdout("cygpath", true, {"-u", realStorePath})) : realStorePath;
             const string tmpDir2        = tmpDir       .substr(1, 9) == ":/msys64/" ? trim(runProgramGetStdout("cygpath", true, {"-u", tmpDir       })) : tmpDir;
             const string tarOutput      = runProgramGetStdout("tar", true, {"xvf", realStorePath2, "-C", tmpDir2, "--strip-components", "1"});
-std::cerr << "tarOutput='" << tarOutput << "'" << std::endl;
+std::cerr << "(TODO: get rid of tar here) tarOutput='" << tarOutput << "'" << std::endl;
 #else
             // FIXME: this requires GNU tar for decompression.
             runProgramGetStdout("tar", true, {"xf", store->toRealPath(storePath), "-C", tmpDir, "--strip-components", "1"});

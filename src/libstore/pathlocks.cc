@@ -60,7 +60,7 @@ AutoCloseWindowsHandle openLockFile(const Path & path, bool create)
 void deleteLockFile(const Path & path)
 {
     if (!DeleteFileW(pathW(path).c_str())) {
-        std::cerr << WinError("DeleteFileW(%1%) in deleteLockFile", path).msg() << std::endl;
+        printError(WinError("DeleteFileW(%1%) in deleteLockFile", path).msg());
     }
     /* Note that the result of unlink() is ignored; removing the lock
        file is an optimisation, not a necessity.

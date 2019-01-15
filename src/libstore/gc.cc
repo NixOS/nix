@@ -109,10 +109,10 @@ static void makeSymlink(const Path & link, const Path & target)
             throw WinError("GetFileAttributesW '%1%'", to_bytes(old));
         if ((dw & FILE_ATTRIBUTE_DIRECTORY) != 0) {
             if (!RemoveDirectoryW(old.c_str()))
-                std::cerr << WinError("RemoveDirectoryW '%1%'", to_bytes(old)).msg() << std::endl;
+                printError(WinError("RemoveDirectoryW '%1%'", to_bytes(old)).msg());
         } else {
             if (!DeleteFileW(old.c_str()))
-                std::cerr << WinError("DeleteFileW '%1%'", to_bytes(old)).msg() << std::endl;
+                printError(WinError("DeleteFileW '%1%'", to_bytes(old)).msg());
         }
     }
 #endif
@@ -358,7 +358,20 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
                 if (!pathExists(target)) {
                     if (isInDir(path, stateDir + "/" + gcRootsDir + "/auto")) {
                         printInfo(format("removing stale link from '%1%' to '%2%'") % path % target);
+#ifndef _WIN32
                         unlink(path.c_str());
+#else // unlink() cannot delete symlink to directory
+                        DWORD dw = GetFileAttributesW(pathW(path).c_str());
+                        if (dw == 0xFFFFFFFF)
+                            throw WinError("GetFileAttributesW '%1%'", path);
+                        if ((dw & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+                            if (!RemoveDirectoryW(pathW(path).c_str()))
+                                printError(WinError("RemoveDirectoryW '%1%'", path).msg());
+                        } else {
+                            if (!DeleteFileW(pathW(path).c_str()))
+                                printError(WinError("DeleteFileW '%1%'", path).msg());
+                        }
+#endif
                     }
                 } else {
                     if (!isLink(target)) return;

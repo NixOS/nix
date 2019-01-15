@@ -1579,7 +1579,7 @@ std::cerr << "DerivationGoal::buildDone()" << std::endl;
 #endif
             pid.kill();
 
-std::cerr << (format("builder process for '%1%' finished status=%2%") % drvPath % status) << std::endl;
+//printError(format("builder process for '%1%' finished status=%2%") % drvPath % status);
     debug(format("builder process for '%1%' finished") % drvPath);
 
     result.timesBuilt++;
