@@ -1965,7 +1965,8 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
         for (char letter = 'Z'; letter >= 'D'; letter--) {
             bool isBusy = (bitmaskDrives & (1 << (letter - 'A'))) != 0;
             if (isBusy) continue;
-            tmpDir = (format("%c:") % letter).str();
+            // make the tmpDit as short as possible but not the root directory of the drive (boost rejects to be built in root dir)
+            tmpDir = (format("%c:/x") % letter).str();
             //    runProgramWithOptions(RunOptions("subst", { tmpDir.substr(0, 2), tmpDirOrig }));
             if (DefineDosDeviceW(DDD_NO_BROADCAST_SYSTEM, from_bytes(tmpDir.substr(0, 2)).c_str(), pathW(tmpDirOrig).c_str())) {
                 break;
@@ -1977,6 +1978,10 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
         }
         if (tmpDir == tmpDirOrig) {
             printError(format("warning: no free drive letter available, build root will be '%1%'") % tmpDir);
+        } else {
+            if (!CreateDirectoryW(pathW(tmpDir).c_str(), NULL))
+                throw("CreateDirectoryW when createTempDir '%1%'", tmpDir);
+
         }
     }
 #endif

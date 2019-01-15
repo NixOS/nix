@@ -1,8 +1,8 @@
 @echo off
 
 rem path to old nix (mingw's is ok)
-set OLDNIX=C:\nix2
-rem set OLDNIX=C:\nix-windows
+rem set OLDNIX=C:\nix2
+set OLDNIX=C:\nix-windows
 
 set NIX_BIN_DIR=%OLDNIX%\bin
 set NIX_CONF_DIR=%OLDNIX%\etc
@@ -13,6 +13,8 @@ set NIX_LOG_DIR=C:\nix2-data\var\log\nix
 set NIX_STATE_DIR=C:\nix2-data\var\nix
 
 set NIX_PATH=nixpkgs=C:\msys64\home\User\nixpkgs
+rem %OLDNIX%\bin\nix-store.exe --gc
+rem exit
 
 for /f %%i in ('%OLDNIX%\bin\nix-build.exe --no-out-link -E "(import <nixpkgs> { }).stdenv.cc"') do set STDENV_CC=%%i
 for /f %%i in ('%OLDNIX%\bin\nix-build.exe --no-out-link -E "(import <nixpkgs> { }).boost"'    ) do set BOOST=%%i
