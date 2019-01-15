@@ -152,7 +152,10 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
             if (!GetFileInformationByHandle(hFile, &bhfi))
                 throw WinError("GetFileInformationByHandle when LocalStore::readDirectoryIgnoringInodes() '%1%'", to_bytes(wsubpath));
             CloseHandle(hFile);
-            assert(((uint64_t(bhfi.nFileSizeHigh) << 32) + bhfi.nFileSizeLow) == ((uint64_t(wfd.nFileSizeHigh) << 32) + wfd.nFileSizeLow));
+            if ((wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) {
+              // for directories these values are 4096 and 0
+              assert(((uint64_t(bhfi.nFileSizeHigh) << 32) + bhfi.nFileSizeLow) == ((uint64_t(wfd.nFileSizeHigh) << 32) + wfd.nFileSizeLow));
+            }
 
             if (inodeHash.count((uint64_t(bhfi.nFileIndexHigh)<<32) +  bhfi.nFileIndexLow)) {
                 debug(format("'%1%' is already linked") % to_bytes(wsubpath));
@@ -395,7 +398,13 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     Path tempLink = (format("%1%/.tmp-link-%2%-%3%")
         % realStoreDir % GetCurrentProcessId() % random()).str();
     if (!CreateHardLinkW(pathW(tempLink).c_str(), pathW(linkPath).c_str(), NULL)) {
-        throw WinError("CreateHardLinkW-2 '%1%' '%2%'", linkPath, tempLink);
+        WinError winError("CreateHardLinkW-2 '%1%' '%2%'", linkPath, tempLink);
+        if (winError.lastError == ERROR_TOO_MANY_LINKS) {
+            if ((uint64_t(wfad.nFileSizeHigh) << 32) + wfad.nFileSizeLow > 0)
+                printInfo(format("'%1%' has maximum number of links") % linkPath);
+            return;
+        }
+        throw winError;
     }
 #endif
 
@@ -419,8 +428,25 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
         if (!SetFileAttributesW(wpath.c_str(), wfad.dwFileAttributes & ~FILE_ATTRIBUTE_READONLY))
             throw WinError("SetFileAttributes '%1%'", path);
 
+    bool optimized = false;
     if (!MoveFileExW(pathW(tempLink).c_str(), wpath.c_str(), MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)) {
-        throw WinError("MoveFileExW '%1%' '%2%'", tempLink, path);
+        WinError winError("MoveFileExW '%1%' '%2%'", tempLink, path);
+        if (winError.lastError == ERROR_ACCESS_DENIED) { // it happens, target file may be a running executable
+            printError(format("Access denied '%1%'") %  path);
+            // delete `tempLink`
+            if (!SetFileAttributesW(pathW(tempLink).c_str(), wfad.dwFileAttributes & ~FILE_ATTRIBUTE_READONLY))
+                throw WinError("SetFileAttributes '%1%'", tempLink);
+            if (!DeleteFileW(pathW(tempLink).c_str()))
+                throw WinError("DeleteFileW '%1%'", tempLink);
+            // restore readOnly on `path`
+            if ((wfad.dwFileAttributes & FILE_ATTRIBUTE_READONLY) != 0)
+                if (!SetFileAttributesW(wpath.c_str(), wfad.dwFileAttributes))
+                    throw WinError("SetFileAttributesW '%1%'", path);
+        } else {
+            throw winError;
+        }
+    } else {
+        optimized = true;
     }
 
 #ifdef _NDEBUG
@@ -431,18 +457,20 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 #endif
 #endif
 
-    stats.filesLinked++;
+    if (optimized) {
+        stats.filesLinked++;
 #ifndef _WIN32
-    stats.bytesFreed += st.st_size;
-    stats.blocksFreed += st.st_blocks;
+        stats.bytesFreed += st.st_size;
+        stats.blocksFreed += st.st_blocks;
 
-    if (act)
-        act->result(resFileLinked, st.st_size, st.st_blocks);
+        if (act)
+            act->result(resFileLinked, st.st_size, st.st_blocks);
 #else
-    stats.bytesFreed += (uint64_t(bhfi.nFileSizeHigh) << 32) + bhfi.nFileSizeLow;
-    if (act)
-        act->result(resFileLinked, (uint64_t(bhfi.nFileSizeHigh) << 32) + bhfi.nFileSizeLow);
+        stats.bytesFreed += (uint64_t(bhfi.nFileSizeHigh) << 32) + bhfi.nFileSizeLow;
+        if (act)
+            act->result(resFileLinked, (uint64_t(bhfi.nFileSizeHigh) << 32) + bhfi.nFileSizeLow);
 #endif
+    }
 }
 
 

@@ -679,9 +679,10 @@ void canonicalisePathMetaData(const Path & path, InodesSeen & inodesSeen)
       Path path2 = to_bytes(pathW(path)); /* it add \\?\ for paths longer than 255 chars */
       if (isDirectory(path)) {
         runProgramWithOptions(RunOptions("icacls", { path2, "/reset", "/C", "/T", "/L" })); // reset ACL on all children
-        runProgramWithOptions(RunOptions("icacls", { path2, "/inheritance:r", "/grant:r", "Authenticated Users:(OI)(CI)RX" /*, "/T", "/L"*/ }));
+        // WA=Write Attributes is needed for hard link creation in "nix-store --optimise" https://helgeklein.com/blog/2009/05/hard-links-and-permissions-acls/
+        runProgramWithOptions(RunOptions("icacls", { path2, "/inheritance:r", "/grant:r", "Authenticated Users:(OI)(CI)(RX,WA)" /*, "/T", "/L"*/ }));
       } else {
-        runProgramWithOptions(RunOptions("icacls", { path2, "/inheritance:r", "/grant:r", "Authenticated Users:RX" /*, "/T", "/L"*/ }));
+        runProgramWithOptions(RunOptions("icacls", { path2, "/inheritance:r", "/grant:r", "Authenticated Users:(RX,WA)" /*, "/T", "/L"*/ }));
       }
     }
 }

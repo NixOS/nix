@@ -615,7 +615,6 @@ Path readLink(const Path & path)
             return string(buf.data(), rlSize);
     }
 #else
-std::cerr << "readLink(" << path << ")" << std::endl;
     std::wstring wpath = pathW(path);
     DWORD dw = GetFileAttributesW(wpath.c_str());
     if (dw == 0xFFFFFFFF)
