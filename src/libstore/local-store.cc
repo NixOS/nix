@@ -574,16 +574,18 @@ void canonicalisePathMetaData(const Path & path, uid_t fromUid)
 
 const FILETIME mtimeStore = { /*.dwLowDateTime =*/ 0xD5D71680, /*.dwHighDateTime =*/ 0x019DB1DE };  /* 1970/01/01 + 1 second */
 
-static void canonicaliseTimestampAndPermissions4(const std::wstring & wpath, HANDLE hFile, DWORD dwFileAttributes, FILETIME ftLastWriteTime)
+static void canonicaliseTimestampAndPermissions6(const std::wstring & wpath, HANDLE hFile, DWORD dwFileAttributes, FILETIME ftCreationTime, FILETIME ftLastAccessTime, FILETIME ftLastWriteTime)
 {
-    if (0 != memcmp(&ftLastWriteTime, &mtimeStore, sizeof(FILETIME))) {
-        if (!SetFileTime(hFile, NULL, NULL, &mtimeStore))
-            throw WinError("SetFileTime when canonicaliseTimestampAndPermissions4 '%1%'", to_bytes(wpath));
+    if (0 != CompareFileTime(&ftCreationTime,   &mtimeStore) ||
+        0 != CompareFileTime(&ftLastAccessTime, &mtimeStore) ||
+        0 != CompareFileTime(&ftLastWriteTime,  &mtimeStore)) {
+        if (!SetFileTime(hFile, &mtimeStore, &mtimeStore, &mtimeStore))
+            throw WinError("SetFileTime when canonicaliseTimestampAndPermissions6 '%1%'", to_bytes(wpath));
     }
 
     if ((dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) == 0 && (dwFileAttributes & FILE_ATTRIBUTE_READONLY) == 0) {
         if (!SetFileAttributesW(wpath.c_str(), dwFileAttributes | FILE_ATTRIBUTE_READONLY))
-            throw WinError("SetFileAttributes when canonicaliseTimestampAndPermissions4 '%1%'", to_bytes(wpath));
+            throw WinError("SetFileAttributes when canonicaliseTimestampAndPermissions6 '%1%'", to_bytes(wpath));
     }
 }
 
@@ -595,11 +597,13 @@ void canonicaliseTimestampAndPermissions(const Path & path)
     if (!GetFileAttributesExW(wpath.c_str(), GetFileExInfoStandard, &wfad))
         throw WinError("GetFileAttributesExW when canonicaliseTimestampAndPermissions '%1%'", path);
 
-    if (0 != memcmp(&wfad.ftLastWriteTime, &mtimeStore, sizeof(FILETIME))) {
+    if (0 != CompareFileTime(&wfad.ftCreationTime,   &mtimeStore) ||
+        0 != CompareFileTime(&wfad.ftLastAccessTime, &mtimeStore) ||
+        0 != CompareFileTime(&wfad.ftLastWriteTime,  &mtimeStore)) {
         AutoCloseWindowsHandle hFile = CreateFileW(wpath.c_str(), FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ, 0, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT|FILE_FLAG_POSIX_SEMANTICS|FILE_FLAG_BACKUP_SEMANTICS, 0);
         if (hFile.get() == INVALID_HANDLE_VALUE)
             throw WinError("CreateFileW when canonicaliseTimestampAndPermissions '%1%'", path);
-        if (!SetFileTime(hFile.get(), NULL, NULL, &mtimeStore))
+        if (!SetFileTime(hFile.get(), &mtimeStore, &mtimeStore, &mtimeStore))
             throw WinError("SetFileTime when canonicaliseTimestampAndPermissions '%1%'", path);
     }
 
@@ -615,15 +619,21 @@ static void canonicalisePathMetaData_(const std::wstring & wpath, const WIN32_FI
     checkInterrupt();
 
     DWORD dwFileAttributes;
+    FILETIME ftCreationTime;
+    FILETIME ftLastAccessTime;
     FILETIME ftLastWriteTime;
     if (wpathFD == NULL) {
         WIN32_FILE_ATTRIBUTE_DATA wfad;
         if (!GetFileAttributesExW(wpath.c_str(), GetFileExInfoStandard, &wfad))
             throw WinError("GetFileAttributesExW when canonicalisePathMetaData '%1%'", to_bytes(wpath));
         dwFileAttributes = wfad.dwFileAttributes;
+        ftCreationTime   = wfad.ftCreationTime;
+        ftLastAccessTime = wfad.ftLastAccessTime;
         ftLastWriteTime  = wfad.ftLastWriteTime;
     } else {
         dwFileAttributes = wpathFD->dwFileAttributes;
+        ftCreationTime   = wpathFD->ftCreationTime;
+        ftLastAccessTime = wpathFD->ftLastAccessTime;
         ftLastWriteTime  = wpathFD->ftLastWriteTime;
     }
 
@@ -644,7 +654,7 @@ static void canonicalisePathMetaData_(const std::wstring & wpath, const WIN32_FI
                 throw WinError("GetFileInformationByHandle when canonicalisePathMetaData '%1%'", to_bytes(wpath));
 
             inodesSeen.insert(Inode(bhfi.dwVolumeSerialNumber, (uint64_t(bhfi.nFileIndexHigh)<<32) +  bhfi.nFileIndexLow));
-            canonicaliseTimestampAndPermissions4(wpath, hFile.get(), dwFileAttributes, ftLastWriteTime);
+            canonicaliseTimestampAndPermissions6(wpath, hFile.get(), dwFileAttributes, ftCreationTime, ftLastAccessTime, ftLastWriteTime);
         }
 
         if ((dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {

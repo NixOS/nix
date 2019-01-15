@@ -170,7 +170,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
         AutoCloseWindowsHandle hFile = CreateFileW(pathW(localRefFile).c_str(), FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ, 0, OPEN_EXISTING, FILE_FLAG_POSIX_SEMANTICS, 0);
         if (hFile.get() == INVALID_HANDLE_VALUE)
             throw WinError("CreateFileW('%1%') when exportGit", localRefFile);
-        if (!SetFileTime(hFile.get(), NULL, NULL, &ftnow))
+        if (!SetFileTime(hFile.get(), &ftnow, &ftnow, &ftnow))
             throw WinError("SetFileTime('%1%') when exportGit", localRefFile);
 #endif
     }
