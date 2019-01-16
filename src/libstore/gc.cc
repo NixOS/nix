@@ -669,7 +669,11 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
                 deleteGarbage(state, realPath);
             }
         }
+    } else
+        deleteGarbage(state, realPath);
 #else
+    runProgramWithOptions(RunOptions("icacls", { realPath, "/reset" /*, "/C", "/T", "/L"*/ }));
+
     if (state.moveToTrash && (wfad.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
         try {
             Path tmp = trashDir + "/" + baseNameOf(path);
@@ -679,9 +683,9 @@ void LocalStore::deletePathRecursive(GCState & state, const Path & path)
         } catch (WinError & e) {
             throw e; // TODO
         }
-#endif
     } else
         deleteGarbage(state, realPath);
+#endif
 
     if (state.results.bytesFreed + state.bytesInvalidated > state.options.maxFreed) {
         printInfo(format("deleted or invalidated more than %1% bytes; stopping") % state.options.maxFreed);
