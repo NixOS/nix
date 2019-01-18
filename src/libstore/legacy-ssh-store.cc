@@ -187,28 +187,17 @@ struct LegacySSHStore : public Store
         copyNAR(conn->from, sink);
     }
 
-    PathSet queryAllValidPaths() override { unsupported(); }
-
-    void queryReferrers(const Path & path, PathSet & referrers) override
-    { unsupported(); }
-
-    PathSet queryDerivationOutputs(const Path & path) override
-    { unsupported(); }
-
-    StringSet queryDerivationOutputNames(const Path & path) override
-    { unsupported(); }
-
     Path queryPathFromHashPart(const string & hashPart) override
-    { unsupported(); }
+    { unsupported("queryPathFromHashPart"); }
 
     Path addToStore(const string & name, const Path & srcPath,
         bool recursive, HashType hashAlgo,
         PathFilter & filter, RepairFlag repair) override
-    { unsupported(); }
+    { unsupported("addToStore"); }
 
     Path addTextToStore(const string & name, const string & s,
         const PathSet & references, RepairFlag repair) override
-    { unsupported(); }
+    { unsupported("addTextToStore"); }
 
     BuildResult buildDerivation(const Path & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override
@@ -242,25 +231,7 @@ struct LegacySSHStore : public Store
     }
 
     void ensurePath(const Path & path) override
-    { unsupported(); }
-
-    void addTempRoot(const Path & path) override
-    { unsupported(); }
-
-    void addIndirectRoot(const Path & path) override
-    { unsupported(); }
-
-    Roots findRoots() override
-    { unsupported(); }
-
-    void collectGarbage(const GCOptions & options, GCResults & results) override
-    { unsupported(); }
-
-    ref<FSAccessor> getFSAccessor() override
-    { unsupported(); }
-
-    void addSignatures(const Path & storePath, const StringSet & sigs) override
-    { unsupported(); }
+    { unsupported("ensurePath"); }
 
     void computeFSClosure(const PathSet & paths,
         PathSet & out, bool flipDirection = false,

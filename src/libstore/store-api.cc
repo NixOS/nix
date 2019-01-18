@@ -562,10 +562,10 @@ void Store::buildPaths(const PathSet & paths, BuildMode buildMode)
 {
     for (auto & path : paths)
         if (isDerivation(path))
-            unsupported();
+            unsupported("buildPaths");
 
     if (queryValidPaths(paths).size() != paths.size())
-        unsupported();
+        unsupported("buildPaths");
 }
 
 
