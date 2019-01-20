@@ -2434,7 +2434,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
     std::map<std::wstring, std::wstring> uenv;
     for (auto & i : getEntireEnvW()) {
         if ( boost::iequals(i.first, L"ComSpec")
-//        || boost::iequals(i.first, L"windir")
+          || boost::iequals(i.first, L"windir")       // EWDK build of python2 fails with "The system could not find the environment option that was entered"
           || boost::iequals(i.first, L"SystemRoot")   // curl unable to resolve domains without it
           || boost::iequals(i.first, L"SystemDrive")  // msbuild fails without it ("The path is not of a legal form")
           || boost::iequals(i.first, L"PATHEXT")
