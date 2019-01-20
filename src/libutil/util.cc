@@ -2517,8 +2517,7 @@ std::string windowsEscape(const std::string & s)
             } else if (s[i] == '\\') {
                 for (int j = 1; ; j++) {
                     if (i+j == s.length()) {
-                        while (j--) { r += '\\'; i++; };
-                        r += '\\';
+                        while (j--) { r += '\\'; r += '\\'; i++; };
                         break;
                     } else if (s[i+j] == '"') {
                         while (j--) { r += '\\'; r += '\\'; i++; }
@@ -2552,8 +2551,7 @@ std::wstring windowsEscapeW(const std::wstring & s)
             } else if (s[i] == L'\\') {
                 for (int j = 1; ; j++) {
                     if (i+j == s.length()) {
-                        while (j--) { r += L'\\'; i++; };
-                        r += L'\\';
+                        while (j--) { r += L'\\'; r += L'\\'; i++; };
                         break;
                     } else if (s[i+j] == L'"') {
                         while (j--) { r += L'\\'; r += L'\\'; i++; }

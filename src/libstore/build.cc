@@ -1102,7 +1102,6 @@ void DerivationGoal::killChild()
 
     hook.reset();
 #else
-std::cerr << "---------DerivationGoal::killChild("<<pid.hProcess<<")" << std::endl;
     if (pid.hProcess != INVALID_HANDLE_VALUE) {
         worker.childTerminated(this);
 
@@ -2523,7 +2522,7 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
 #endif
     } else if (boost::algorithm::iends_with(drv->builder, "cmd.exe") // "C:/Windows/System32/cmd.exe"
             || boost::algorithm::iends_with(drv->builder, "perl.exe")
-            || boost::algorithm::iends_with(drv->builder, "lus53.exe")) {
+            || boost::algorithm::iends_with(drv->builder, "lua53.exe")) {
         for (auto & i : env) {
             std::string value = rewriteStrings(i.second, inputRewrites);
             if (hasPrefix(value, "C:/")) { // BUGBUG: canonPath to 'C:\\'

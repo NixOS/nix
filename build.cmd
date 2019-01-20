@@ -16,6 +16,10 @@ set NIX_PATH=nixpkgs=C:\msys64\home\User\nixpkgs
 rem %OLDNIX%\bin\nix-store.exe --gc
 rem exit
 
+rem for /f %%i in ('%OLDNIX%\bin\nix-build.exe --no-out-link -E "(import <nixpkgs> { }).msysPackages.coreutils"') do set COREUTILS=%%i
+rem echo COREUTILS=%COREUTILS%
+rem exit
+
 for /f %%i in ('%OLDNIX%\bin\nix-build.exe --no-out-link -E "(import <nixpkgs> { }).stdenv.cc"') do set STDENV_CC=%%i
 for /f %%i in ('%OLDNIX%\bin\nix-build.exe --no-out-link -E "(import <nixpkgs> { }).boost"'    ) do set BOOST=%%i
 for /f %%i in ('%OLDNIX%\bin\nix-build.exe --no-out-link -E "(import <nixpkgs> { }).openssl"'  ) do set OPENSSL=%%i
