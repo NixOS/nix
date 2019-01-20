@@ -657,7 +657,8 @@ password <replaceable>my-password</replaceable>
     <varname>__noChroot</varname> attribute set to
     <literal>true</literal> do not run in sandboxes.</para>
 
-    <para>The default is <literal>false</literal>.</para>
+    <para>The default is <literal>true</literal> on Linux and
+    <literal>false</literal> on all other platforms.</para>
 
     </listitem>
 
