@@ -2577,19 +2577,41 @@ fprintf(stderr, "DerivationGoal::startBuilder()\n");
     PROCESS_INFORMATION pi = {0};
 
     if (!CreateProcessW(
-        NULL,                                                          // LPCWSTR               lpApplicationName
-        const_cast<wchar_t*>(ucmdline.c_str()),                        // LPWSTR                lpCommandLine
-        NULL,                                                          // LPSECURITY_ATTRIBUTES lpProcessAttributes
-        NULL,                                                          // LPSECURITY_ATTRIBUTES lpThreadAttributes
-        TRUE,                                                          // BOOL                  bInheritHandles
-        CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW,                 // DWORD                 dwCreationFlags
-        const_cast<wchar_t*>(uenvline.c_str()),                        // LPVOID                lpEnvironment
-        from_bytes(rewriteStrings(env["PWD"], inputRewrites)).c_str(), // LPCWSTR               lpCurrentDirectory
-        &si,                                                           // LPSTARTUPINFOW        lpStartupInfo
-        &pi                                                            // LPPROCESS_INFORMATION lpProcessInformation
+        NULL,                                                             // LPCWSTR               lpApplicationName
+        const_cast<wchar_t*>(ucmdline.c_str()),                           // LPWSTR                lpCommandLine
+        NULL,                                                             // LPSECURITY_ATTRIBUTES lpProcessAttributes
+        NULL,                                                             // LPSECURITY_ATTRIBUTES lpThreadAttributes
+        TRUE,                                                             // BOOL                  bInheritHandles
+        CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW | CREATE_SUSPENDED, // DWORD                 dwCreationFlags
+        const_cast<wchar_t*>(uenvline.c_str()),                           // LPVOID                lpEnvironment
+        from_bytes(rewriteStrings(env["PWD"], inputRewrites)).c_str(),    // LPCWSTR               lpCurrentDirectory
+        &si,                                                              // LPSTARTUPINFOW        lpStartupInfo
+        &pi                                                               // LPPROCESS_INFORMATION lpProcessInformation
     )) {
         throw WinError("CreateProcessW(%1%)", to_bytes(ucmdline));
     }
+
+    // to kill the child process on parent death (hJob can be reused?)
+    HANDLE hJob = CreateJobObjectA(NULL, NULL);
+    if (hJob == NULL) {
+        TerminateProcess(pi.hProcess, 0);
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+        throw WinError("CreateJobObjectA()");
+    }
+    if (!AssignProcessToJobObject(hJob, pi.hProcess)) {
+        TerminateProcess(pi.hProcess, 0);
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+        throw WinError("AssignProcessToJobObject()");
+    }
+    if (!ResumeThread(pi.hThread)) {
+        TerminateProcess(pi.hProcess, 0);
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+        throw WinError("ResumeThread()");
+    }
+
 //  std::cerr << to_bytes(ucmdline) << " pi.hProcess=" << pi.hProcess << "\n";
 //  std::cerr << "pi.hThread=" << pi.hThread << "\n";
 //  std::cerr << "pi.dwProcessId=" << pi.dwProcessId << "\n";

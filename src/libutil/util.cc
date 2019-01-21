@@ -2223,7 +2223,7 @@ if (options.input)
         NULL,                                                          // LPSECURITY_ATTRIBUTES lpProcessAttributes,
         NULL,                                                          // LPSECURITY_ATTRIBUTES lpThreadAttributes,
         TRUE,                                                          // BOOL                  bInheritHandles,
-        CREATE_UNICODE_ENVIRONMENT,                                    // DWORD                 dwCreationFlags,
+        CREATE_UNICODE_ENVIRONMENT | CREATE_SUSPENDED,                 // DWORD                 dwCreationFlags,
         const_cast<wchar_t*>(uenvline.c_str()),
         /*from_bytes(rewriteStrings(env["PWD"], inputRewrites)).c_str()*/NULL, // LPCWSTR               lpCurrentDirectory,
         &si,                                                           // LPSTARTUPINFOW        lpStartupInfo,
@@ -2232,6 +2232,27 @@ if (options.input)
         throw WinError("CreateProcessW(%1%)", to_bytes(ucmdline));
     }
 //  std::cerr << to_bytes(ucmdline) << "   pi.hProcess=" << pi.hProcess << "\n";
+
+    // to kill the child process on parent death (hJob can be reused?)
+    HANDLE hJob = CreateJobObjectA(NULL, NULL);
+    if (hJob == NULL) {
+        TerminateProcess(pi.hProcess, 0);
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+        throw WinError("CreateJobObjectA()");
+    }
+    if (!AssignProcessToJobObject(hJob, pi.hProcess)) {
+        TerminateProcess(pi.hProcess, 0);
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+        throw WinError("AssignProcessToJobObject()");
+    }
+    if (!ResumeThread(pi.hThread)) {
+        TerminateProcess(pi.hProcess, 0);
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+        throw WinError("ResumeThread()");
+    }
 
     out.hWrite = INVALID_HANDLE_VALUE;
     CloseHandle(pi.hThread);
