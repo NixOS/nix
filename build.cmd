@@ -13,20 +13,20 @@ set NIX_LOG_DIR=C:\nix2-data\var\log\nix
 set NIX_STATE_DIR=C:\nix2-data\var\nix
 
 set NIX_PATH=nixpkgs=C:\msys64\home\User\nixpkgs
+
 rem %OLDNIX%\bin\nix-store.exe --gc
-rem exit
+
 
 rem for /f %%i in ('%OLDNIX%\bin\nix-build.exe --no-out-link -E "(import <nixpkgs> { }).msysPackages.coreutils"') do set COREUTILS=%%i
 rem echo COREUTILS=%COREUTILS%
 rem exit
-
-for /f %%i in ('%OLDNIX%\bin\nix-build.exe --no-out-link -E "(import <nixpkgs> { }).stdenv.cc"') do set STDENV_CC=%%i
-for /f %%i in ('%OLDNIX%\bin\nix-build.exe --no-out-link -E "(import <nixpkgs> { }).boost"'    ) do set BOOST=%%i
-for /f %%i in ('%OLDNIX%\bin\nix-build.exe --no-out-link -E "(import <nixpkgs> { }).openssl"'  ) do set OPENSSL=%%i
-for /f %%i in ('%OLDNIX%\bin\nix-build.exe --no-out-link -E "(import <nixpkgs> { }).xz"'       ) do set XZ=%%i
-for /f %%i in ('%OLDNIX%\bin\nix-build.exe --no-out-link -E "(import <nixpkgs> { }).bzip2"'    ) do set BZIP2=%%i
-for /f %%i in ('%OLDNIX%\bin\nix-build.exe --no-out-link -E "(import <nixpkgs> { }).curl"'     ) do set CURL=%%i
-for /f %%i in ('%OLDNIX%\bin\nix-build.exe --no-out-link -E "(import <nixpkgs> { }).sqlite"'   ) do set SQLITE=%%i
+for /f %%i in ('%OLDNIX%\bin\nix-build.exe -o stdenv-cc -E "(import <nixpkgs> { }).stdenv.cc"') do set STDENV_CC=%%i
+for /f %%i in ('%OLDNIX%\bin\nix-build.exe -o boost     -E "(import <nixpkgs> { }).boost"'    ) do set BOOST=%%i
+for /f %%i in ('%OLDNIX%\bin\nix-build.exe -o openssl   -E "(import <nixpkgs> { }).openssl"'  ) do set OPENSSL=%%i
+for /f %%i in ('%OLDNIX%\bin\nix-build.exe -o xz        -E "(import <nixpkgs> { }).xz"'       ) do set XZ=%%i
+for /f %%i in ('%OLDNIX%\bin\nix-build.exe -o bzip2     -E "(import <nixpkgs> { }).bzip2"'    ) do set BZIP2=%%i
+for /f %%i in ('%OLDNIX%\bin\nix-build.exe -o curl      -E "(import <nixpkgs> { }).curl"'     ) do set CURL=%%i
+for /f %%i in ('%OLDNIX%\bin\nix-build.exe -o sqlite    -E "(import <nixpkgs> { }).sqlite"'   ) do set SQLITE=%%i
 echo STDENV_CC=%STDENV_CC%
 echo BOOST=%BOOST%
 echo OPENSSL=%OPENSSL%
@@ -34,7 +34,6 @@ echo XZ=%XZ%
 echo BZIP2=%BZIP2%
 echo CURL=%CURL%
 echo SQLITE=%SQLITE%
-
 rem PATH=%STDENV_CC%\bin;%PATH%
 
 rem %STDENV_CC%\bin\nmake /E -f Makefile.win clean
