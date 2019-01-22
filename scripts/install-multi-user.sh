@@ -271,6 +271,14 @@ when we need to.
 EOF
     fi
 
+    perms=$(umask -S | sed -e 's/[wx]//g')
+    if [ "u=r,g=r,o=r" != "$perms" ]; then
+        failure <<EOF
+The installation will fail with your current umask $(umask).
+Please set your umask to the system default i.e. umask 002
+EOF
+    fi
+
     if type nix-env 2> /dev/null >&2; then
         failure <<EOF
 Nix already appears to be installed, and this tool assumes it is
@@ -753,21 +761,6 @@ EOF
           install -m 0664 "$SCRATCH/nix.conf" /etc/nix/nix.conf
 }
 
-check_umask() {
-    perms=$(umask -S | sed -e 's/[wx]//g')
-    if [ "u=r,g=r,o=r" != "$perms" ]; then
-        failure <<EOF
-The installation will fail with your current umask $(umask).
-Please set your umask to the system default i.e. umask 002
-EOF
-    fi
-}
-
-preflight_checks() {
-    echo "Running Preflight Checks"
-    check_umask
-}
-
 main() {
     if [ "$(uname -s)" = "Darwin" ]; then
         # shellcheck source=./install-darwin-multi-user.sh
@@ -778,8 +771,6 @@ main() {
     else
         failure "Sorry, I don't know what to do on $(uname)"
     fi
-
-    preflight_checks
 
     welcome_to_nix
     chat_about_sudo
