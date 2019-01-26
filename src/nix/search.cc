@@ -82,8 +82,8 @@ struct CmdSearch : SourceExprCommand, MixJSON
                 "nix search git 'frontend|gui'"
             },
             Example{
-                "To display the description of the found packages:",
-                "nix search git --verbose"
+                "To display the version of the found packages:",
+                "nix search --verbose git"
             }
         };
     }
@@ -172,13 +172,19 @@ struct CmdSearch : SourceExprCommand, MixJSON
                             jsonElem.attr("version", parsed.version);
                             jsonElem.attr("description", description);
 
-                        } else {
-                            auto name = hilite(parsed.name, nameMatch, "\e[0;2m")
-                                + std::string(parsed.fullName, parsed.name.length());
-                            results[attrPath] = fmt(
-                                "* %s (%s)\n  %s\n",
-                                wrap("\e[0;1m", hilite(attrPath, attrPathMatch, "\e[0;1m")),
-                                wrap("\e[0;2m", hilite(name, nameMatch, "\e[0;2m")),
+			// or something more human readable
+			} else {
+				results[attrPath] = fmt ("* %s",
+				wrap("\e[0;1m", hilite(attrPath, attrPathMatch, "\e[0;1m")));
+
+				// add a line with the version
+				if (verbosity > 0){
+					results[attrPath] += fmt (" %s",
+					wrap("\e[0;2m", parsed.version));
+				}
+				// add the description
+				results[attrPath] += fmt (" (%s)\n %s\n",
+				wrap("\e[0;2m", hilite(name, nameMatch, "\e[0;2m")),
                                 hilite(description, descriptionMatch, ANSI_NORMAL));
                         }
                     }
