@@ -231,6 +231,14 @@ private:
 
     void makeStoreWritable();
 
+    struct HardLinkStats {
+        unsigned long long actualSize = 0;
+        unsigned long long unsharedSize = 0;
+        unsigned long long overhead = 0;
+    };
+
+    void getHardLinkSavings(HardLinkStats & linkStats);
+
     uint64_t queryValidPathId(State & state, const Path & path);
 
     uint64_t addValidPath(State & state, const ValidPathInfo & info, bool checkOutputs = true);
