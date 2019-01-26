@@ -7,7 +7,6 @@
 #include "common-args.hh"
 #include "json.hh"
 #include "json-to-value.hh"
-#include "shared.hh"
 
 #include <regex>
 #include <fstream>
@@ -274,7 +273,6 @@ struct CmdSearch : SourceExprCommand, MixJSON
         if (results.size() == 0)
             throw Error("no results for the given search term(s)!");
 
-        RunPager pager;
         for (auto el : results) std::cout << el.second << "\n";
 
     }
