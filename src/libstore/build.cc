@@ -2193,7 +2193,6 @@ void DerivationGoal::startBuilder()
         userNamespaceSync.create();
 
         options.allowVfork = false;
-        options.restoreMountNamespace = false;
 
         Pid helper = startProcess([&]() {
 
@@ -2260,7 +2259,6 @@ void DerivationGoal::startBuilder()
 #endif
     {
         options.allowVfork = !buildUser && !drv->isBuiltin();
-        options.restoreMountNamespace = false;
         pid = startProcess([&]() {
             runChild();
         }, options);

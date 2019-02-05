@@ -250,7 +250,6 @@ struct ProcessOptions
     bool dieWithParent = true;
     bool runExitHandlers = false;
     bool allowVfork = true;
-    bool restoreMountNamespace = true;
 };
 
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = ProcessOptions());
@@ -513,15 +512,6 @@ std::pair<unsigned short, unsigned short> getWindowSize();
 typedef std::function<bool(const Path & path)> PathFilter;
 
 extern PathFilter defaultPathFilter;
-
-
-/* Save the current mount namespace. Ignored if called more than
-   once. */
-void saveMountNamespace();
-
-/* Restore the mount namespace saved by saveMountNamespace(). Ignored
-   if saveMountNamespace() was never called. */
-void restoreMountNamespace();
 
 
 }
