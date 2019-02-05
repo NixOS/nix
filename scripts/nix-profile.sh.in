@@ -75,8 +75,18 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
         export NIX_SSL_CERT_FILE="$NIX_LINK/etc/ca-bundle.crt"
     fi
 
+    # Prefer MANPATH if configured
+    # Otherwise build a MANPATH which would work on the LHS
     if [ -n "${MANPATH}" ]; then
-        export MANPATH="$NIX_LINK/share/man:$MANPATH"
+        export MANPATH="$NIX_LINK/share/man:${MANPATH}"
+    else
+        if [ -d /usr/share/man ]; then
+            MANPATH=":/usr/share/man"
+        fi
+        if [ -d /usr/local/share/man ]; then
+            MANPATH="${MANPATH}:/usr/local/share/man"
+        fi
+        export MANPATH="$NIX_LINK/share/man${MANPATH}"
     fi
 
     export PATH="$NIX_LINK/bin:$__savedpath"
