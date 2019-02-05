@@ -2,6 +2,7 @@
 , nixpkgs ? builtins.fetchGit { url = https://github.com/NixOS/nixpkgs-channels.git; ref = "nixos-18.09"; }
 , officialRelease ? false
 , systems ? [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
+, crossSystems ? [ "armv6l-linux" "armv7l-linux" ]
 }:
 
 let
@@ -53,11 +54,12 @@ let
       };
 
 
-    build = pkgs.lib.genAttrs systems (system:
+    build = pkgs.lib.genAttrs (systems ++ crossSystems) (system:
 
-      let pkgs = import nixpkgs { inherit system; }; in
-
-      with pkgs;
+      let pkgs = if builtins.elem system systems
+                 then import nixpkgs { inherit system; }
+                 else import nixpkgs { crossSystem = { inherit system; }; };
+      in with pkgs;
 
       with import ./release-common.nix { inherit pkgs; };
 
@@ -89,9 +91,12 @@ let
       });
 
 
-    perlBindings = pkgs.lib.genAttrs systems (system:
+    perlBindings = pkgs.lib.genAttrs (systems ++ crossSystems) (system:
 
-      let pkgs = import nixpkgs { inherit system; }; in with pkgs;
+      let pkgs = if builtins.elem system systems
+                 then import nixpkgs { inherit system; }
+                 else import nixpkgs { crossSystem = { inherit system; }; };
+      in with pkgs;
 
       releaseTools.nixBuild {
         name = "nix-perl";
@@ -112,9 +117,12 @@ let
       });
 
 
-    binaryTarball = pkgs.lib.genAttrs systems (system:
+    binaryTarball = pkgs.lib.genAttrs (systems ++ crossSystems) (system:
 
-      with import nixpkgs { inherit system; };
+      let pkgs = if builtins.elem system systems
+                 then import nixpkgs { inherit system; }
+                 else import nixpkgs { crossSystem = { inherit system; }; };
+      in with pkgs;
 
       let
         toplevel = builtins.getAttr system jobs.build;
