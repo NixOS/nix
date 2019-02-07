@@ -551,6 +551,10 @@ Path resolveExprPath(Path path)
 {
     assert(path[0] == '/');
 
+    // Do not follow symlink chain in /dev, it will be "/dev/stdin" -> "/proc/self/fd/0" -> "/tmp/sh-thd.PUK62Q (deleted)"
+    if (path.compare(0, 5, "/dev/") == 0)
+      return path;
+
     /* If `path' is a symlink, follow it.  This is so that relative
        path references work. */
     struct stat st;
@@ -577,7 +581,10 @@ Expr * EvalState::parseExprFromFile(const Path & path)
 
 Expr * EvalState::parseExprFromFile(const Path & path, StaticEnv & staticEnv)
 {
-    return parse(readFile(path).c_str(), path, dirOf(path), staticEnv);
+    if (path == "/dev/stdin")
+      return parse(readFile(path).c_str(), path, absPath("."), staticEnv);
+    else
+      return parse(readFile(path).c_str(), path, dirOf(path), staticEnv);
 }
 
 
