@@ -133,7 +133,7 @@ let
       in
 
       runCommand "nix-binary-tarball-${version}"
-        { nativeBuildInputs = lib.optional (system != "aarch64-linux") shellcheck;
+        { nativeBuildInputs = lib.optional (system != "aarch64-linux") buildPackages.shellcheck;
           meta.description = "Distribution-independent Nix bootstrap binaries for ${system}";
         }
         ''
