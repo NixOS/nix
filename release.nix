@@ -24,6 +24,7 @@ let
         src = nix;
         inherit officialRelease;
 
+        nativeBuildInputs = nativeBuildDeps;
         buildInputs = tarballDeps ++ buildDeps;
 
         configureFlags = "--enable-gc";
@@ -67,6 +68,7 @@ let
         name = "nix";
         src = tarball;
 
+        nativeBuildInputs = nativeBuildDeps;
         buildInputs = buildDeps;
 
         preConfigure =
@@ -199,6 +201,7 @@ let
         name = "nix-build";
         src = tarball;
 
+        nativeBuildInputs = nativeBuildDeps;
         buildInputs = buildDeps;
 
         dontInstall = false;

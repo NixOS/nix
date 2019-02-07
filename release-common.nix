@@ -47,19 +47,21 @@ rec {
       autoreconfHook
     ];
 
+  nativeBuildDeps =
+    [ buildPackages.pkgconfig
+
+      # Tests
+      buildPackages.git
+      buildPackages.mercurial
+    ] ++ lib.optional stdenv.isLinux buildPackages.utillinuxMinimal;
+
   buildDeps =
     [ curl
       bzip2 xz brotli editline
       openssl sqlite boehmgc
       boost
-
-      buildPackages.pkgconfig
-
-      # Tests
-      buildPackages.git
-      buildPackages.mercurial
     ]
-    ++ lib.optionals stdenv.isLinux [libseccomp buildPackages.utillinuxMinimal]
+    ++ lib.optional stdenv.isLinux libseccomp
     ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
     ++ lib.optional (stdenv.isLinux || stdenv.isDarwin)
       ((aws-sdk-cpp.override {
