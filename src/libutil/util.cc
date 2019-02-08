@@ -4,6 +4,7 @@
 #include "sync.hh"
 #include "finally.hh"
 #include "serialise.hh"
+#include "selinux.hh"
 
 #include <cctype>
 #include <cerrno>
@@ -321,7 +322,11 @@ void readFile(const Path & path, Sink & sink)
 
 void writeFile(const Path & path, const string & s, mode_t mode)
 {
-    AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
+    AutoCloseFD fd = SELinux().withFileContext<int>(path,
+        [mode](const std::string & path)->int {
+            return open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
+        });
+
     if (!fd)
         throw SysError(format("opening file '%1%'") % path);
     writeFull(fd.get(), s);
@@ -330,7 +335,11 @@ void writeFile(const Path & path, const string & s, mode_t mode)
 
 void writeFile(const Path & path, Source & source, mode_t mode)
 {
-    AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
+    AutoCloseFD fd = SELinux().withFileContext<int>(path,
+        [mode](const std::string & path)->int {
+            return open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
+        });
+
     if (!fd)
         throw SysError(format("opening file '%1%'") % path);
 
@@ -540,7 +549,7 @@ Paths createDirs(const Path & path)
 
 void createSymlink(const Path & target, const Path & link)
 {
-    if (symlink(target.c_str(), link.c_str()))
+    if (SELinux().withLinkContext<int>(link, [target](const std::string & link)->int { return symlink(target.c_str(), link.c_str()); }))
         throw SysError(format("creating symlink from '%1%' to '%2%'") % link % target);
 }
 

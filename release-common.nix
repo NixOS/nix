@@ -57,7 +57,7 @@ rec {
       git
       mercurial
     ]
-    ++ lib.optionals stdenv.isLinux [libseccomp utillinuxMinimal]
+    ++ lib.optionals stdenv.isLinux [libseccomp utillinuxMinimal libselinux]
     ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
     ++ lib.optional (stdenv.isLinux || stdenv.isDarwin)
       ((aws-sdk-cpp.override {
