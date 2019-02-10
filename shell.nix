@@ -1,6 +1,9 @@
-{ useClang ? false }:
+{ useClang ? false
+, nixpkgs ? builtins.fetchGit { url = https://github.com/NixOS/nixpkgs-channels.git; ref = "nixos-18.09"; }
+}:
 
-with import (builtins.fetchGit { url = https://github.com/NixOS/nixpkgs-channels.git; ref = "nixos-18.09"; }) {};
+# with import (builtins.fetchGit { url = https://github.com/NixOS/nixpkgs-channels.git; ref = "nixos-18.09"; }) {};
+with import nixpkgs {};
 
 with import ./release-common.nix { inherit pkgs; };
 
@@ -12,8 +15,6 @@ with import ./release-common.nix { inherit pkgs; };
   inherit configureFlags;
 
   enableParallelBuilding = true;
-
-  installFlags = "sysconfdir=$(out)/etc";
 
   shellHook =
     ''

@@ -119,16 +119,7 @@ let
       let
         toplevel = builtins.getAttr system jobs.build;
         version = toplevel.src.version;
-        installerClosureInfo = closureInfo
-          { rootPaths = [ toplevel cacert ] ++ lib.optional stdenv.isLinux nix-selinux-policy; };
-        multiUserScript = substituteAll ({
-          name = "install-multi-user.sh";
-          src = ./scripts/install-multi-user.sh;
-          nix = toplevel;
-          inherit cacert;
-        } // lib.optionalAttrs stdenv.isLinux {
-          policy = "${nix-selinux-policy}/nix.pp";
-        });
+        installerClosureInfo = closureInfo { rootPaths = [ toplevel cacert ]; };
       in
 
       runCommand "nix-binary-tarball-${version}"
@@ -147,7 +138,9 @@ let
           substitute ${./scripts/install-systemd-multi-user.sh} $TMPDIR/install-systemd-multi-user.sh \
             --subst-var-by nix ${toplevel} \
             --subst-var-by cacert ${cacert}
-          cp ${multiUserScript} $TMPDIR/install-multi-user
+          substitute ${./scripts/install-multi-user.sh} $TMPDIR/install-multi-user \
+            --subst-var-by nix ${toplevel} \
+            --subst-var-by cacert ${cacert}
 
           if type -p shellcheck; then
             # SC1090: Don't worry about not being able to find

@@ -37,7 +37,6 @@ readonly PROFILE_NIX_FILE="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-
 
 readonly NIX_INSTALLED_NIX="@nix@"
 readonly NIX_INSTALLED_CACERT="@cacert@"
-readonly NIX_INSTALLED_SELINUX_POLICY="@policy@"
 readonly EXTRACTED_NIX_PATH="$(dirname "$0")"
 
 readonly ROOT_HOME=$(echo ~root)
@@ -774,7 +773,7 @@ setup_selinux() {
     fi
 
     _sudo "to install the Nix SELinux policy" \
-          semodule -i $NIX_INSTALLED_SELINUX_POLICY
+          semodule -i "$NIX_INSTALLED_NIX/share/selinux/packages/nix.pp"
 
     _sudo "to relabel the SELinux security context" \
           restorecon -FR /nix
