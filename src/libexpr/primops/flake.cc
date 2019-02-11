@@ -17,15 +17,19 @@ const EvalState::FlakeRegistry & EvalState::getFlakeRegistry()
 
         if (!evalSettings.pureEval) {
 
+#if 0
             auto registryUri = "file:///home/eelco/Dev/gists/nix-flakes/registry.json";
 
             auto registryFile = getDownloader()->download(DownloadRequest(registryUri));
+#endif
 
-            auto json = nlohmann::json::parse(*registryFile.data);
+            auto registryFile = readFile(settings.nixDataDir + "/nix/flake-registry.json");
+
+            auto json = nlohmann::json::parse(registryFile);
 
             auto version = json.value("version", 0);
             if (version != 1)
-                throw Error("flake registry '%s' has unsupported version %d", registryUri, version);
+                throw Error("flake registry '%s' has unsupported version %d", registryFile, version);
 
             auto flakes = json["flakes"];
             for (auto i = flakes.begin(); i != flakes.end(); ++i) {

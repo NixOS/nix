@@ -1,0 +1,11 @@
+{
+    "version": 1,
+    "flakes": {
+        "dwarffs": {
+            "uri": "github:edolstra/dwarffs/flake"
+        },
+        "nixpkgs": {
+            "uri": "github:edolstra/nixpkgs/flake"
+        }
+    }
+}

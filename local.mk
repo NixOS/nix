@@ -10,3 +10,5 @@ GLOBAL_CXXFLAGS += -I . -I src -I src/libutil -I src/libstore -I src/libmain -I 
 
 $(foreach i, config.h $(call rwildcard, src/lib*, *.hh), \
   $(eval $(call install-file-in, $(i), $(includedir)/nix, 0644)))
+
+$(eval $(call install-data-in,$(d)/flake-registry.json,$(datadir)/nix))
