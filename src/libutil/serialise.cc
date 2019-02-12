@@ -171,7 +171,7 @@ std::unique_ptr<Source> sinkToSource(
 
         std::function<void(Sink &)> fun;
         std::function<void()> eof;
-        std::experimental::optional<coro_t::pull_type> coro;
+        std::optional<coro_t::pull_type> coro;
         bool started = false;
 
         SinkToSource(std::function<void(Sink &)> fun, std::function<void()> eof)

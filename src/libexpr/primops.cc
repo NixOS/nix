@@ -555,7 +555,7 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     PathSet context;
 
-    std::experimental::optional<std::string> outputHash;
+    std::optional<std::string> outputHash;
     std::string outputHashAlgo;
     bool outputHashRecursive = false;
 
