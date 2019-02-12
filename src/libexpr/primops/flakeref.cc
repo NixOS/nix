@@ -136,4 +136,18 @@ std::string FlakeRef::to_string() const
     else abort();
 }
 
+bool FlakeRef::isImmutable() const
+{
+    if (auto refData = std::get_if<FlakeRef::IsFlakeId>(&data))
+        return (bool) refData->rev;
+
+    else if (auto refData = std::get_if<FlakeRef::IsGitHub>(&data))
+        return (bool) refData->rev;
+
+    else if (auto refData = std::get_if<FlakeRef::IsGit>(&data))
+        return (bool) refData->rev;
+
+    else abort();
+}
+
 }

@@ -149,10 +149,7 @@ struct FlakeRef
 
     /* Check whether this is an "immutable" flake reference, that is,
        one that contains a commit hash or content hash. */
-    bool isImmutable() const
-    {
-        abort(); // TODO
-    }
+    bool isImmutable() const;
 };
 
 }

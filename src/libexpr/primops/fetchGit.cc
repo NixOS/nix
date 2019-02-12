@@ -22,9 +22,6 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     std::optional<std::string> ref, std::string rev,
     const std::string & name)
 {
-    if (evalSettings.pureEval && rev == "")
-        throw Error("in pure evaluation mode, 'fetchGit' requires a Git revision");
-
     if (!ref && rev == "" && hasPrefix(uri, "/") && pathExists(uri + "/.git")) {
 
         bool clean = true;
@@ -217,6 +214,9 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     // FIXME: git externals probably can be used to bypass the URI
     // whitelist. Ah well.
     state.checkURI(url);
+
+    if (evalSettings.pureEval && rev == "")
+        throw Error("in pure evaluation mode, 'fetchGit' requires a Git revision");
 
     auto gitInfo = exportGit(state.store, url, ref, rev, name);
 

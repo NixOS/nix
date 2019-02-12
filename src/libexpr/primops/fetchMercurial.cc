@@ -27,9 +27,6 @@ std::regex commitHashRegex("^[0-9a-fA-F]{40}$");
 HgInfo exportMercurial(ref<Store> store, const std::string & uri,
     std::string rev, const std::string & name)
 {
-    if (evalSettings.pureEval && rev == "")
-        throw Error("in pure evaluation mode, 'fetchMercurial' requires a Mercurial revision");
-
     if (rev == "" && hasPrefix(uri, "/") && pathExists(uri + "/.hg")) {
 
         bool clean = runProgram("hg", true, { "status", "-R", uri, "--modified", "--added", "--removed" }) == "";
@@ -202,6 +199,9 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
     // FIXME: git externals probably can be used to bypass the URI
     // whitelist. Ah well.
     state.checkURI(url);
+
+    if (evalSettings.pureEval && rev == "")
+        throw Error("in pure evaluation mode, 'fetchMercurial' requires a Mercurial revision");
 
     auto hgInfo = exportMercurial(state.store, url, rev, name);
 

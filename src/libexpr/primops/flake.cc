@@ -162,16 +162,17 @@ static Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
     return flake;
 }
 
-/* Given a set of flake references, recursively fetch them and their
+/* Given a flake reference, recursively fetch it and its
    dependencies. */
-static std::map<FlakeId, Flake> resolveFlakes(EvalState & state, const std::vector<FlakeRef> & flakeRefs)
+static std::map<FlakeId, Flake> resolveFlake(EvalState & state,
+    const FlakeRef & topRef, bool impureTopRef)
 {
     std::map<FlakeId, Flake> done;
-    std::queue<FlakeRef> todo;
-    for (auto & i : flakeRefs) todo.push(i);
+    std::queue<std::tuple<FlakeRef, bool>> todo;
+    todo.push({topRef, impureTopRef});
 
     while (!todo.empty()) {
-        auto flakeRef = todo.front();
+        auto [flakeRef, impureRef] = todo.front();
         todo.pop();
 
         if (auto refData = std::get_if<FlakeRef::IsFlakeId>(&flakeRef.data)) {
@@ -179,12 +180,15 @@ static std::map<FlakeId, Flake> resolveFlakes(EvalState & state, const std::vect
             flakeRef = lookupFlake(state, flakeRef);
         }
 
+        if (evalSettings.pureEval && !flakeRef.isImmutable() && !impureRef)
+            throw Error("mutable flake '%s' is not allowed in pure mode; use --no-pure-eval to disable", flakeRef.to_string());
+
         auto flake = getFlake(state, flakeRef);
 
         if (done.count(flake.id)) continue;
 
         for (auto & require : flake.requires)
-            todo.push(require);
+            todo.push({require, false});
 
         done.emplace(flake.id, flake);
     }
@@ -194,9 +198,19 @@ static std::map<FlakeId, Flake> resolveFlakes(EvalState & state, const std::vect
 
 static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
-    auto flakeUri = FlakeRef(state.forceStringNoCtx(*args[0], pos));
+    auto flakeUri = state.forceStringNoCtx(*args[0], pos);
 
-    auto flakes = resolveFlakes(state, {flakeUri});
+    // FIXME: temporary hack to make the default installation source
+    // work.
+    bool impure = false;
+    if (hasPrefix(flakeUri, "impure:")) {
+        flakeUri = std::string(flakeUri, 7);
+        impure = true;
+    }
+
+    auto flakeRef = FlakeRef(flakeUri);
+
+    auto flakes = resolveFlake(state, flakeUri, impure);
 
     auto vResult = state.allocValue();
 

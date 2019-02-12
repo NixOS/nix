@@ -31,9 +31,11 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
     if (file != "")
         state.evalFile(lookupFileArg(state, file), *vSourceExpr);
     else {
+        // FIXME: remove "impure" hack, call some non-user-accessible
+        // variant of getFlake instead.
         auto fun = state.parseExprFromString(
              "builtins.mapAttrs (flakeName: flakeInfo:"
-             "  (getFlake flakeInfo.uri).${flakeName}.provides.packages or {})", "/");
+             "  (getFlake (\"impure:\" + flakeInfo.uri)).${flakeName}.provides.packages or {})", "/");
         auto vFun = state.allocValue();
         state.eval(fun, *vFun);
         auto vRegistry = state.makeFlakeRegistryValue();
