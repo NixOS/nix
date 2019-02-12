@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 
 #if HAVE_SELINUX
+#include <selinux/selinux.h>
 #include <selinux/label.h>
 #endif
 
@@ -29,6 +30,8 @@ protected:
 public:
     SELinux();
     ~SELinux();
+
+    void restoreContext(const std::string & path, mode_t mode);
 
     template<typename T>
     T withContext(const std::string & path, mode_t mode, std::function<T(const std::string &)> f)
@@ -80,5 +83,7 @@ public:
         return withContext<T>(path, S_IFLNK, f);
     }
 };
+
+static SELinux selinux;
 
 }

@@ -5,6 +5,7 @@
 #include "worker-protocol.hh"
 #include "derivations.hh"
 #include "nar-info.hh"
+#include "selinux.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -467,6 +468,8 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
         }
      }
 #endif
+
+    selinux.restoreContext(path, st.st_mode);
 
     /* Fail if the file is not owned by the build user.  This prevents
        us from messing up the ownership/permissions of files

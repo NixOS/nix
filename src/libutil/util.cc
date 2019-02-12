@@ -38,7 +38,6 @@ extern char * * environ;
 
 namespace nix {
 
-
 BaseError & BaseError::addPrefix(const FormatOrString & fs)
 {
     prefix_ = fs.s + prefix_;
@@ -322,7 +321,7 @@ void readFile(const Path & path, Sink & sink)
 
 void writeFile(const Path & path, const string & s, mode_t mode)
 {
-    AutoCloseFD fd = SELinux().withFileContext<int>(path,
+    AutoCloseFD fd = selinux.withFileContext<int>(path,
         [mode](const std::string & path)->int {
             return open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
         });
@@ -335,7 +334,7 @@ void writeFile(const Path & path, const string & s, mode_t mode)
 
 void writeFile(const Path & path, Source & source, mode_t mode)
 {
-    AutoCloseFD fd = SELinux().withFileContext<int>(path,
+    AutoCloseFD fd = selinux.withFileContext<int>(path,
         [mode](const std::string & path)->int {
             return open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
         });

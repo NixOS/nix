@@ -299,7 +299,6 @@ struct RestoreSink : ParseSink
 {
     Path dstPath;
     AutoCloseFD fd;
-    SELinux selinux;
 
     void createDirectory(const Path & path)
     {
