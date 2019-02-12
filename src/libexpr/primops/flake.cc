@@ -16,50 +16,49 @@ const FlakeRegistry & EvalState::getFlakeRegistry()
     {
         _flakeRegistry = std::make_unique<FlakeRegistry>();
 
-        if (!evalSettings.pureEval) {
-
 #if 0
-            auto registryUri = "file:///home/eelco/Dev/gists/nix-flakes/registry.json";
+        auto registryUri = "file:///home/eelco/Dev/gists/nix-flakes/registry.json";
 
-            auto registryFile = getDownloader()->download(DownloadRequest(registryUri));
+        auto registryFile = getDownloader()->download(DownloadRequest(registryUri));
 #endif
 
-            auto registryFile = readFile(settings.nixDataDir + "/nix/flake-registry.json");
+        auto registryFile = readFile(settings.nixDataDir + "/nix/flake-registry.json");
 
-            auto json = nlohmann::json::parse(registryFile);
+        auto json = nlohmann::json::parse(registryFile);
 
-            auto version = json.value("version", 0);
-            if (version != 1)
-                throw Error("flake registry '%s' has unsupported version %d", registryFile, version);
+        auto version = json.value("version", 0);
+        if (version != 1)
+            throw Error("flake registry '%s' has unsupported version %d", registryFile, version);
 
-            auto flakes = json["flakes"];
-            for (auto i = flakes.begin(); i != flakes.end(); ++i) {
-                FlakeRegistry::Entry entry{FlakeRef(i->value("uri", ""))};
-                _flakeRegistry->entries.emplace(i.key(), entry);
-            }
+        auto flakes = json["flakes"];
+        for (auto i = flakes.begin(); i != flakes.end(); ++i) {
+            FlakeRegistry::Entry entry{FlakeRef(i->value("uri", ""))};
+            _flakeRegistry->entries.emplace(i.key(), entry);
         }
     });
 
     return *_flakeRegistry;
 }
 
-static void prim_flakeRegistry(EvalState & state, const Pos & pos, Value * * args, Value & v)
+Value * EvalState::makeFlakeRegistryValue()
 {
-    auto registry = state.getFlakeRegistry();
+    auto v = allocValue();
 
-    state.mkAttrs(v, registry.entries.size());
+    auto registry = getFlakeRegistry();
+
+    mkAttrs(*v, registry.entries.size());
 
     for (auto & entry : registry.entries) {
-        auto vEntry = state.allocAttr(v, entry.first);
-        state.mkAttrs(*vEntry, 2);
-        mkString(*state.allocAttr(*vEntry, state.symbols.create("uri")), entry.second.ref.to_string());
+        auto vEntry = allocAttr(*v, entry.first);
+        mkAttrs(*vEntry, 2);
+        mkString(*allocAttr(*vEntry, symbols.create("uri")), entry.second.ref.to_string());
         vEntry->attrs->sort();
     }
 
-    v.attrs->sort();
-}
+    v->attrs->sort();
 
-static RegisterPrimOp r1("__flakeRegistry", 0, prim_flakeRegistry);
+    return v;
+}
 
 static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef)
 {
@@ -128,6 +127,9 @@ static Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
 {
     auto flakePath = fetchFlake(state, flakeRef);
     state.store->assertStorePath(flakePath);
+
+    if (state.allowedPaths)
+        state.allowedPaths->insert(flakePath);
 
     Flake flake;
 

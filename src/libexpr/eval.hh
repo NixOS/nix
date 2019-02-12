@@ -318,6 +318,8 @@ public:
 
     const FlakeRegistry & getFlakeRegistry();
 
+    Value * makeFlakeRegistryValue();
+
 private:
     std::unique_ptr<FlakeRegistry> _flakeRegistry;
     std::once_flag _flakeRegistryInit;

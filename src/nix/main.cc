@@ -97,6 +97,7 @@ void mainWrapped(int argc, char * * argv)
 
     verbosity = lvlError;
     settings.verboseBuild = false;
+    evalSettings.pureEval = true;
 
     NixArgs args;
 

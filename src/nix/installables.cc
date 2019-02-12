@@ -30,8 +30,15 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
 
     if (file != "")
         state.evalFile(lookupFileArg(state, file), *vSourceExpr);
-    else
-        state.evalFile(lookupFileArg(state, "<nix/default-installation-source.nix>"), *vSourceExpr);
+    else {
+        auto fun = state.parseExprFromString(
+             "builtins.mapAttrs (flakeName: flakeInfo:"
+             "  (getFlake flakeInfo.uri).${flakeName}.provides.packages or {})", "/");
+        auto vFun = state.allocValue();
+        state.eval(fun, *vFun);
+        auto vRegistry = state.makeFlakeRegistryValue();
+        mkApp(*vSourceExpr, *vFun, *vRegistry);
+    }
 
     return vSourceExpr;
 }
