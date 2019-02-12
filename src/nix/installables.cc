@@ -7,6 +7,7 @@
 #include "get-drvs.hh"
 #include "store-api.hh"
 #include "shared.hh"
+#include "primops/flake.hh"
 
 #include <regex>
 
@@ -18,8 +19,15 @@ SourceExprCommand::SourceExprCommand()
         .shortName('f')
         .longName("file")
         .label("file")
-        .description("evaluate FILE rather than the default")
+        .description("evaluate FILE rather than use the default installation source")
         .dest(&file);
+
+    mkFlag()
+        .shortName('F')
+        .longName("flake")
+        .label("flake")
+        .description("evaluate FLAKE rather than use the default installation source")
+        .dest(&flakeUri);
 }
 
 Value * SourceExprCommand::getSourceExpr(EvalState & state)
@@ -28,9 +36,17 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
 
     vSourceExpr = state.allocValue();
 
-    if (file != "")
-        state.evalFile(lookupFileArg(state, file), *vSourceExpr);
-    else {
+    if (file && flakeUri)
+        throw Error("cannot use both --file and --flake");
+
+    if (file)
+        state.evalFile(lookupFileArg(state, *file), *vSourceExpr);
+    else if (flakeUri) {
+        // FIXME: handle flakeUri being a relative path
+        auto vTemp = state.allocValue();
+        auto vFlake = *makeFlakeValue(state, "impure:" + *flakeUri, *vTemp);
+        *vSourceExpr = *((*vFlake.attrs->get(state.symbols.create("provides")))->value);
+    } else {
         // FIXME: remove "impure" hack, call some non-user-accessible
         // variant of getFlake instead.
         auto fun = state.parseExprFromString(
@@ -38,7 +54,7 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
              "  (getFlake (\"impure:\" + flakeInfo.uri)).${flakeName}.provides.packages or {})", "/");
         auto vFun = state.allocValue();
         state.eval(fun, *vFun);
-        auto vRegistry = state.makeFlakeRegistryValue();
+        auto vRegistry = makeFlakeRegistryValue(state);
         mkApp(*vSourceExpr, *vFun, *vRegistry);
     }
 

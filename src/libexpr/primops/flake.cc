@@ -40,18 +40,18 @@ const FlakeRegistry & EvalState::getFlakeRegistry()
     return *_flakeRegistry;
 }
 
-Value * EvalState::makeFlakeRegistryValue()
+Value * makeFlakeRegistryValue(EvalState & state)
 {
-    auto v = allocValue();
+    auto v = state.allocValue();
 
-    auto registry = getFlakeRegistry();
+    auto registry = state.getFlakeRegistry();
 
-    mkAttrs(*v, registry.entries.size());
+    state.mkAttrs(*v, registry.entries.size());
 
     for (auto & entry : registry.entries) {
-        auto vEntry = allocAttr(*v, entry.first);
-        mkAttrs(*vEntry, 2);
-        mkString(*allocAttr(*vEntry, symbols.create("uri")), entry.second.ref.to_string());
+        auto vEntry = state.allocAttr(*v, entry.first);
+        state.mkAttrs(*vEntry, 2);
+        mkString(*state.allocAttr(*vEntry, state.symbols.create("uri")), entry.second.ref.to_string());
         vEntry->attrs->sort();
     }
 
@@ -163,16 +163,19 @@ static Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
 }
 
 /* Given a flake reference, recursively fetch it and its
-   dependencies. */
-static std::map<FlakeId, Flake> resolveFlake(EvalState & state,
+   dependencies.
+   FIXME: this should return a graph of flakes.
+*/
+static std::tuple<FlakeId, std::map<FlakeId, Flake>> resolveFlake(EvalState & state,
     const FlakeRef & topRef, bool impureTopRef)
 {
     std::map<FlakeId, Flake> done;
     std::queue<std::tuple<FlakeRef, bool>> todo;
-    todo.push({topRef, impureTopRef});
+    std::optional<FlakeId> topFlakeId; /// FIXME: ambiguous
+    todo.push({topRef, true});
 
     while (!todo.empty()) {
-        auto [flakeRef, impureRef] = todo.front();
+        auto [flakeRef, toplevel] = todo.front();
         todo.pop();
 
         if (auto refData = std::get_if<FlakeRef::IsFlakeId>(&flakeRef.data)) {
@@ -180,12 +183,14 @@ static std::map<FlakeId, Flake> resolveFlake(EvalState & state,
             flakeRef = lookupFlake(state, flakeRef);
         }
 
-        if (evalSettings.pureEval && !flakeRef.isImmutable() && !impureRef)
+        if (evalSettings.pureEval && !flakeRef.isImmutable() && (!toplevel || !impureTopRef))
             throw Error("mutable flake '%s' is not allowed in pure mode; use --no-pure-eval to disable", flakeRef.to_string());
 
         auto flake = getFlake(state, flakeRef);
 
         if (done.count(flake.id)) continue;
+
+        if (toplevel) topFlakeId = flake.id;
 
         for (auto & require : flake.requires)
             todo.push({require, false});
@@ -193,13 +198,12 @@ static std::map<FlakeId, Flake> resolveFlake(EvalState & state,
         done.emplace(flake.id, flake);
     }
 
-    return done;
+    assert(topFlakeId);
+    return {*topFlakeId, done};
 }
 
-static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
+Value * makeFlakeValue(EvalState & state, std::string flakeUri, Value & v)
 {
-    auto flakeUri = state.forceStringNoCtx(*args[0], pos);
-
     // FIXME: temporary hack to make the default installation source
     // work.
     bool impure = false;
@@ -210,14 +214,20 @@ static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Va
 
     auto flakeRef = FlakeRef(flakeUri);
 
-    auto flakes = resolveFlake(state, flakeUri, impure);
+    auto [topFlakeId, flakes] = resolveFlake(state, flakeUri, impure);
+
+    // FIXME: we should call each flake with only its dependencies
+    // (rather than the closure of the top-level flake).
 
     auto vResult = state.allocValue();
 
     state.mkAttrs(*vResult, flakes.size());
 
+    Value * vTop = 0;
+
     for (auto & flake : flakes) {
         auto vFlake = state.allocAttr(*vResult, flake.second.id);
+        if (topFlakeId == flake.second.id) vTop = vFlake;
         state.mkAttrs(*vFlake, 2);
         mkString(*state.allocAttr(*vFlake, state.sDescription), flake.second.description);
         auto vProvides = state.allocAttr(*vFlake, state.symbols.create("provides"));
@@ -228,6 +238,14 @@ static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Va
     vResult->attrs->sort();
 
     v = *vResult;
+
+    assert(vTop);
+    return vTop;
+}
+
+static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    makeFlakeValue(state, state.forceStringNoCtx(*args[0], pos), v);
 }
 
 static RegisterPrimOp r2("getFlake", 1, prim_getFlake);

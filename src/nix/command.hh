@@ -53,7 +53,8 @@ struct Installable
 
 struct SourceExprCommand : virtual Args, StoreCommand, MixEvalArgs
 {
-    Path file;
+    std::optional<Path> file;
+    std::optional<std::string> flakeUri;
 
     SourceExprCommand();
 
