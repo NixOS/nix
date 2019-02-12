@@ -1,3 +1,4 @@
+#include "primops/flake.hh"
 #include "command.hh"
 #include "common-args.hh"
 #include "shared.hh"
@@ -27,7 +28,7 @@ struct CmdFlakeList : StoreCommand, MixEvalArgs
         stopProgressBar();
 
         for (auto & entry : registry.entries) {
-            std::cout << entry.first << " " << entry.second.uri << "\n";
+            std::cout << entry.first << " " << entry.second.ref.to_string() << "\n";
         }
     }
 };

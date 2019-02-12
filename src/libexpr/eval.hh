@@ -17,6 +17,7 @@ namespace nix {
 class Store;
 class EvalState;
 enum RepairFlag : bool;
+struct FlakeRegistry;
 
 
 typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, Value & v);
@@ -314,15 +315,6 @@ private:
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
 
 public:
-
-    struct FlakeRegistry
-    {
-        struct Entry
-        {
-            std::string uri;
-        };
-        std::map<std::string, Entry> entries;
-    };
 
     const FlakeRegistry & getFlakeRegistry();
 

@@ -16,7 +16,7 @@ using namespace std::string_literals;
 
 namespace nix {
 
-std::regex revRegex("^[0-9a-fA-F]{40}$");
+extern std::regex revRegex;
 
 GitInfo exportGit(ref<Store> store, const std::string & uri,
     std::optional<std::string> ref, std::string rev,

@@ -18,6 +18,4 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     std::optional<std::string> ref, std::string rev,
     const std::string & name);
 
-extern std::regex revRegex;
-
 }
