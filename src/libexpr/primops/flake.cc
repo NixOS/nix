@@ -10,31 +10,40 @@
 
 namespace nix {
 
+/* Read the registry or a lock file. (Currently they have an identical
+   format. */
+static std::unique_ptr<FlakeRegistry> readRegistry(const Path & path)
+{
+    auto registry = std::make_unique<FlakeRegistry>();
+
+    auto json = nlohmann::json::parse(readFile(path));
+
+    auto version = json.value("version", 0);
+    if (version != 1)
+        throw Error("flake registry '%s' has unsupported version %d", path, version);
+
+    auto flakes = json["flakes"];
+    for (auto i = flakes.begin(); i != flakes.end(); ++i) {
+        FlakeRegistry::Entry entry{FlakeRef(i->value("uri", ""))};
+        registry->entries.emplace(i.key(), entry);
+    }
+
+    return registry;
+}
+
 const FlakeRegistry & EvalState::getFlakeRegistry()
 {
     std::call_once(_flakeRegistryInit, [&]()
     {
-        _flakeRegistry = std::make_unique<FlakeRegistry>();
-
 #if 0
         auto registryUri = "file:///home/eelco/Dev/gists/nix-flakes/registry.json";
 
         auto registryFile = getDownloader()->download(DownloadRequest(registryUri));
 #endif
 
-        auto registryFile = readFile(settings.nixDataDir + "/nix/flake-registry.json");
+        auto registryFile = settings.nixDataDir + "/nix/flake-registry.json";
 
-        auto json = nlohmann::json::parse(registryFile);
-
-        auto version = json.value("version", 0);
-        if (version != 1)
-            throw Error("flake registry '%s' has unsupported version %d", registryFile, version);
-
-        auto flakes = json["flakes"];
-        for (auto i = flakes.begin(); i != flakes.end(); ++i) {
-            FlakeRegistry::Entry entry{FlakeRef(i->value("uri", ""))};
-            _flakeRegistry->entries.emplace(i.key(), entry);
-        }
+        _flakeRegistry = readRegistry(registryFile);
     });
 
     return *_flakeRegistry;
@@ -60,32 +69,23 @@ Value * makeFlakeRegistryValue(EvalState & state)
     return v;
 }
 
-static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef)
+static FlakeRef lookupFlake(EvalState & state, const FlakeRef & flakeRef,
+    std::vector<const FlakeRegistry *> registries)
 {
     if (auto refData = std::get_if<FlakeRef::IsFlakeId>(&flakeRef.data)) {
-        auto registry = state.getFlakeRegistry();
-        auto i = registry.entries.find(refData->id);
-        if (i == registry.entries.end())
-            throw Error("cannot find flake '%s' in the flake registry", refData->id);
-        auto newRef = FlakeRef(i->second.ref);
-        if (!newRef.isDirect())
-            throw Error("found indirect flake URI '%s' in the flake registry", i->second.ref.to_string());
-        return newRef;
+        for (auto registry : registries) {
+            auto i = registry->entries.find(refData->id);
+            if (i != registry->entries.end()) {
+                auto newRef = FlakeRef(i->second.ref);
+                if (!newRef.isDirect())
+                    throw Error("found indirect flake URI '%s' in the flake registry", i->second.ref.to_string());
+                return newRef;
+            }
+        }
+        throw Error("cannot find flake '%s' in the flake registry or in the flake lock file", refData->id);
     } else
         return flakeRef;
 }
-
-struct Flake
-{
-    FlakeId id;
-    std::string description;
-    Path path;
-    std::set<std::string> requires;
-    Value * vProvides; // FIXME: gc
-    // commit hash
-    // date
-    // content hash
-};
 
 static Path fetchFlake(EvalState & state, const FlakeRef & flakeRef)
 {
@@ -123,6 +123,19 @@ static Path fetchFlake(EvalState & state, const FlakeRef & flakeRef)
     else abort();
 }
 
+struct Flake
+{
+    FlakeId id;
+    std::string description;
+    Path path;
+    std::vector<FlakeRef> requires;
+    std::unique_ptr<FlakeRegistry> lockFile;
+    Value * vProvides; // FIXME: gc
+    // commit hash
+    // date
+    // content hash
+};
+
 static Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
 {
     auto flakePath = fetchFlake(state, flakeRef);
@@ -134,7 +147,7 @@ static Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
     Flake flake;
 
     Value vInfo;
-    state.evalFile(flakePath + "/flake.nix", vInfo);
+    state.evalFile(flakePath + "/flake.nix", vInfo); // FIXME: symlink attack
 
     state.forceAttrs(vInfo);
 
@@ -149,8 +162,8 @@ static Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
     if (auto requires = vInfo.attrs->get(state.symbols.create("requires"))) {
         state.forceList(*(**requires).value, *(**requires).pos);
         for (unsigned int n = 0; n < (**requires).value->listSize(); ++n)
-            flake.requires.insert(state.forceStringNoCtx(
-                    *(**requires).value->listElems()[n], *(**requires).pos));
+            flake.requires.push_back(FlakeRef(state.forceStringNoCtx(
+                *(**requires).value->listElems()[n], *(**requires).pos)));
     }
 
     if (auto provides = vInfo.attrs->get(state.symbols.create("provides"))) {
@@ -158,6 +171,16 @@ static Flake getFlake(EvalState & state, const FlakeRef & flakeRef)
         flake.vProvides = (**provides).value;
     } else
         throw Error("flake lacks attribute 'provides'");
+
+    auto lockFile = flakePath + "/flake.lock"; // FIXME: symlink attack
+
+    if (pathExists(lockFile)) {
+        flake.lockFile = readRegistry(lockFile);
+        for (auto & entry : flake.lockFile->entries)
+            if (!entry.second.ref.isImmutable())
+                throw Error("flake lock file '%s' contains mutable entry '%s'",
+                    lockFile, entry.second.ref.to_string());
+    }
 
     return flake;
 }
@@ -174,13 +197,19 @@ static std::tuple<FlakeId, std::map<FlakeId, Flake>> resolveFlake(EvalState & st
     std::optional<FlakeId> topFlakeId; /// FIXME: ambiguous
     todo.push({topRef, true});
 
+    std::vector<const FlakeRegistry *> registries;
+    FlakeRegistry localRegistry;
+    registries.push_back(&localRegistry);
+    if (!evalSettings.pureEval)
+        registries.push_back(&state.getFlakeRegistry());
+
     while (!todo.empty()) {
         auto [flakeRef, toplevel] = todo.front();
         todo.pop();
 
         if (auto refData = std::get_if<FlakeRef::IsFlakeId>(&flakeRef.data)) {
             if (done.count(refData->id)) continue; // optimization
-            flakeRef = lookupFlake(state, flakeRef);
+            flakeRef = lookupFlake(state, flakeRef, registries);
         }
 
         if (evalSettings.pureEval && !flakeRef.isImmutable() && (!toplevel || !impureTopRef))
@@ -195,11 +224,17 @@ static std::tuple<FlakeId, std::map<FlakeId, Flake>> resolveFlake(EvalState & st
         for (auto & require : flake.requires)
             todo.push({require, false});
 
-        done.emplace(flake.id, flake);
+        if (flake.lockFile)
+            for (auto & entry : flake.lockFile->entries) {
+                if (localRegistry.entries.count(entry.first)) continue;
+                localRegistry.entries.emplace(entry.first, entry.second);
+            }
+
+        done.emplace(flake.id, std::move(flake));
     }
 
     assert(topFlakeId);
-    return {*topFlakeId, done};
+    return {*topFlakeId, std::move(done)};
 }
 
 Value * makeFlakeValue(EvalState & state, std::string flakeUri, Value & v)
