@@ -16,7 +16,7 @@ ParsedDerivation::ParsedDerivation(const Path & drvPath, BasicDerivation & drv)
     }
 }
 
-std::experimental::optional<std::string> ParsedDerivation::getStringAttr(const std::string & name) const
+std::optional<std::string> ParsedDerivation::getStringAttr(const std::string & name) const
 {
     if (structuredAttrs) {
         auto i = structuredAttrs->find(name);
@@ -56,7 +56,7 @@ bool ParsedDerivation::getBoolAttr(const std::string & name, bool def) const
     }
 }
 
-std::experimental::optional<Strings> ParsedDerivation::getStringsAttr(const std::string & name) const
+std::optional<Strings> ParsedDerivation::getStringsAttr(const std::string & name) const
 {
     if (structuredAttrs) {
         auto i = structuredAttrs->find(name);

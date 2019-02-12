@@ -965,7 +965,7 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
 
 
 string runProgram(Path program, bool searchPath, const Strings & args,
-    const std::experimental::optional<std::string> & input)
+    const std::optional<std::string> & input)
 {
     RunOptions opts(program, args);
     opts.searchPath = searchPath;

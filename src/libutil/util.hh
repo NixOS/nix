@@ -14,7 +14,7 @@
 #include <cstdio>
 #include <map>
 #include <sstream>
-#include <experimental/optional>
+#include <optional>
 #include <future>
 
 #ifndef HAVE_STRUCT_DIRENT_D_TYPE
@@ -259,14 +259,14 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = P
    shell backtick operator). */
 string runProgram(Path program, bool searchPath = false,
     const Strings & args = Strings(),
-    const std::experimental::optional<std::string> & input = {});
+    const std::optional<std::string> & input = {});
 
 struct RunOptions
 {
     Path program;
     bool searchPath = true;
     Strings args;
-    std::experimental::optional<std::string> input;
+    std::optional<std::string> input;
     Source * standardIn = nullptr;
     Sink * standardOut = nullptr;
     bool _killStderr = false;
