@@ -79,7 +79,9 @@ FlakeRef::FlakeRef(const std::string & uri)
         data = d;
     }
 
-    else if (std::regex_match(uri.c_str(), match, uriRegex) && hasSuffix(match[4], ".git")) {
+    else if (std::regex_match(uri.c_str(), match, uriRegex)
+        && (match[2] == "file" || hasSuffix(match[4], ".git")))
+    {
         IsGit d;
         d.uri = match[1];
         for (auto & param : tokenizeString<Strings>(match[5], "&")) {
