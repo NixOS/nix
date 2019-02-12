@@ -81,6 +81,9 @@ perl/Makefile.config
 /tests/common.sh
 /tests/dummy
 /tests/result*
+/tests/restricted-innocent
+/tests/shell
+/tests/shell.drv
 
 # /tests/lang/
 /tests/lang/*.out

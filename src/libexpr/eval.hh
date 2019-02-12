@@ -316,6 +316,9 @@ private:
 /* Return a string representing the type of the value `v'. */
 string showType(const Value & v);
 
+/* Decode a context string ‘!<name>!<path>’ into a pair <path,
+   name>. */
+std::pair<string, string> decodeContext(const string & s);
 
 /* If `path' refers to a directory, then append "/default.nix". */
 Path resolveExprPath(Path path);

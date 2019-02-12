@@ -687,20 +687,11 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             }
         }
 
-        /* See prim_unsafeDiscardOutputDependency. */
-        else if (path.at(0) == '~')
-            drv.inputSrcs.insert(string(path, 1));
-
         /* Handle derivation outputs of the form ‘!<name>!<path>’. */
         else if (path.at(0) == '!') {
             std::pair<string, string> ctx = decodeContext(path);
             drv.inputDrvs[ctx.first].insert(ctx.second);
         }
-
-        /* Handle derivation contexts returned by
-           ‘builtins.storePath’. */
-        else if (isDerivation(path))
-            drv.inputDrvs[path] = state.store->queryDerivationOutputNames(path);
 
         /* Otherwise it's a source file. */
         else
@@ -1004,13 +995,8 @@ static void prim_toFile(EvalState & state, const Pos & pos, Value * * args, Valu
     PathSet refs;
 
     for (auto path : context) {
-        if (path.at(0) == '=') path = string(path, 1);
-        if (isDerivation(path)) {
-            /* See prim_unsafeDiscardOutputDependency. */
-            if (path.at(0) != '~')
-                throw EvalError(format("in 'toFile': the file '%1%' cannot refer to derivation outputs, at %2%") % name % pos);
-            path = string(path, 1);
-        }
+        if (path.at(0) != '/')
+            throw EvalError(format("in 'toFile': the file '%1%' cannot refer to derivation outputs, at %2%") % name % pos);
         refs.insert(path);
     }
 
@@ -1794,41 +1780,6 @@ static void prim_stringLength(EvalState & state, const Pos & pos, Value * * args
 }
 
 
-static void prim_unsafeDiscardStringContext(EvalState & state, const Pos & pos, Value * * args, Value & v)
-{
-    PathSet context;
-    string s = state.coerceToString(pos, *args[0], context);
-    mkString(v, s, PathSet());
-}
-
-
-static void prim_hasContext(EvalState & state, const Pos & pos, Value * * args, Value & v)
-{
-    PathSet context;
-    state.forceString(*args[0], context, pos);
-    mkBool(v, !context.empty());
-}
-
-
-/* Sometimes we want to pass a derivation path (i.e. pkg.drvPath) to a
-   builder without causing the derivation to be built (for instance,
-   in the derivation that builds NARs in nix-push, when doing
-   source-only deployment).  This primop marks the string context so
-   that builtins.derivation adds the path to drv.inputSrcs rather than
-   drv.inputDrvs. */
-static void prim_unsafeDiscardOutputDependency(EvalState & state, const Pos & pos, Value * * args, Value & v)
-{
-    PathSet context;
-    string s = state.coerceToString(pos, *args[0], context);
-
-    PathSet context2;
-    for (auto & p : context)
-        context2.insert(p.at(0) == '=' ? "~" + string(p, 1) : p);
-
-    mkString(v, s, context2);
-}
-
-
 /* Return the cryptographic hash of a string in base-16. */
 static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
@@ -2299,9 +2250,6 @@ void EvalState::createBaseEnv()
     addPrimOp("toString", 1, prim_toString);
     addPrimOp("__substring", 3, prim_substring);
     addPrimOp("__stringLength", 1, prim_stringLength);
-    addPrimOp("__hasContext", 1, prim_hasContext);
-    addPrimOp("__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
-    addPrimOp("__unsafeDiscardOutputDependency", 1, prim_unsafeDiscardOutputDependency);
     addPrimOp("__hashString", 2, prim_hashString);
     addPrimOp("__match", 2, prim_match);
     addPrimOp("__split", 2, prim_split);
