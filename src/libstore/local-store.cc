@@ -469,7 +469,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
      }
 #endif
 
-    selinux.restoreContext(path, st.st_mode);
+    SELinux().restoreContext(path, st.st_mode);
 
     /* Fail if the file is not owned by the build user.  This prevents
        us from messing up the ownership/permissions of files

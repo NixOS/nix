@@ -84,6 +84,4 @@ public:
     }
 };
 
-static SELinux selinux;
-
 }

@@ -303,14 +303,14 @@ struct RestoreSink : ParseSink
     void createDirectory(const Path & path)
     {
         Path p = dstPath + path;
-        if (selinux.withDirectoryContext<int>(p, [](const std::string & path)->int { return mkdir(path.c_str(), 0777); }) == -1)
+        if (SELinux().withDirectoryContext<int>(p, [](const std::string & path)->int { return mkdir(path.c_str(), 0777); }) == -1)
             throw SysError(format("creating directory '%1%'") % p);
     };
 
     void createRegularFile(const Path & path)
     {
         Path p = dstPath + path;
-        fd = selinux.withFileContext<int>(p, [](const std::string & path)->int { return open(path.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666); });
+        fd = SELinux().withFileContext<int>(p, [](const std::string & path)->int { return open(path.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666); });
         if (!fd) throw SysError(format("creating file '%1%'") % p);
     }
 
