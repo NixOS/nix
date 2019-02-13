@@ -39,6 +39,8 @@ void SELinux::restoreContext(const std::string & path, mode_t mode)
         if (!labelHandle)
             return;
 
+        auto setter = S_ISLNK(mode) ? lsetfilecon_raw : setfilecon_raw;
+
         int r = selabel_lookup_raw(labelHandle, &context, path.c_str(), mode);
         if (r < 0) {
             if (errno != ENOENT)
@@ -46,7 +48,7 @@ void SELinux::restoreContext(const std::string & path, mode_t mode)
         }
         else {
             logger->log(lvlDebug, fmt("setting SELinux context of %s to %s", path, context));
-            if (setfilecon_raw(path.c_str(), context) < 0)
+            if (setter(path.c_str(), context) < 0)
                 logger->log(lvlError, fmt("error setting SELinux context of %s to %s", path, context));
         }
 
